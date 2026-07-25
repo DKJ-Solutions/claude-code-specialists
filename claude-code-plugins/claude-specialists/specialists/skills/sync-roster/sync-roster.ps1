@@ -13,9 +13,11 @@
         lines. That avoids duplicating the enabled-plugins / highest-version-cache / agent-id
         resolution logic -- if the detection rule changes, it changes in one place.
       - For each agent MISSING A LENS it creates an empty lens scaffold at
-        .claude/plugins/claude-specialists/<plugin>/<group>-<id>-extension.md, using the SAME
+        .claude/plugins/<Get-LensFamily>/<plugin>/<group>-<id>-extension.md, using the SAME
         additive, BOM-less-LF, never-overwrite format that specialists-init/bootstrap.ps1 writes
-        (the lens-only blockquote intro + a "## Specific to this repo (VUL-IN)" slot).
+        (the lens-only blockquote intro + a "## Specific to this repo (VUL-IN)" slot). The family
+        segment comes from check-report-lib.ps1, the single source both writers and the check use
+        (issue #179) -- so a scaffold can never land where the check does not look.
       - For each agent MISSING A ROSTER ROW it reads the agent's frontmatter (name + description) and
         PRINTS a proposed roster row to stdout for the human to paste. It NEVER edits the roster /
         CLAUDE.md.
@@ -260,9 +262,22 @@ foreach ($e in $missingLens) {
     $pi = Split-PluginId -PluginId $e.PluginId
     if ($null -eq $pi) { Write-Failure "skipping lens for '$id' -- invalid plugin id '$($e.PluginId)'."; continue }
 
-    $dest = Join-Path $repoRoot ".claude/plugins/claude-specialists/$($pi.Name)/$id-extension.md"
+    $lensRel = ".claude/plugins/$(Get-LensFamily)/$($pi.Name)/$id-extension.md"
+    $dest = Join-Path $repoRoot $lensRel
     if (Test-Path -LiteralPath $dest -PathType Leaf) {
         Write-Info "lens $id-extension.md already exists -- left untouched (additive only)."
+        $script:kept++
+        continue
+    }
+    # Guard against a SECOND copy on a second path (issue #179): the check reports a lens as missing
+    # only when no candidate location holds it, but a stale check output (or a hand-run) could still
+    # reach here for a lens that sits on a non-canonical family segment. Writing the scaffold then
+    # would leave the repo with two lenses for one specialist -- exactly the outcome #179 warns about.
+    $existingElsewhere = @(Get-LensDirCandidates -RepoRoot $repoRoot -PluginName $pi.Name |
+        ForEach-Object { Join-Path $_ "$id-extension.md" } |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
+    if ($existingElsewhere.Count -gt 0) {
+        Write-Info "lens $id-extension.md already exists at '$($existingElsewhere[0])' (non-canonical path) -- no second copy written; move it to $lensRel yourself."
         $script:kept++
         continue
     }
@@ -271,7 +286,7 @@ foreach ($e in $missingLens) {
     $destDir = Split-Path $dest -Parent
     if (-not (Test-Path -LiteralPath $destDir)) { New-Item -ItemType Directory -Path $destDir -Force | Out-Null }
     [System.IO.File]::WriteAllText($dest, (New-LensScaffold -Group $group -Id $idNum -PluginName $pi.Name), $Utf8NoBom)
-    Write-Ok "created lens scaffold .claude/plugins/claude-specialists/$($pi.Name)/$id-extension.md ($id)"
+    Write-Ok "created lens scaffold $lensRel ($id)"
     $script:created++
 }
 
@@ -320,7 +335,7 @@ foreach ($e in $missingRoster) {
     if ($short.Length -gt 160) { $short = $short.Substring(0, 157).TrimEnd() + '...' }
 
     $lensName = "$id-extension.md"
-    $lensPath = ".claude/plugins/claude-specialists/$($pi.Name)/$lensName"
+    $lensPath = ".claude/plugins/$(Get-LensFamily)/$($pi.Name)/$lensName"
     if ($rosterStyle -eq 'list') {
         $row = "- **$displayName** #$idNum -- $short ([``$lensName``]($lensPath))"
     } else {
@@ -344,8 +359,11 @@ Write-Host "`n-- proposed lens-header reconciles -- replace the stale header in 
 if ($staleHeaders.Count -eq 0) { Write-Info "no lens carries a stale scaffold header." }
 foreach ($h in $staleHeaders) {
     $pi = Split-PluginId -PluginId $h.PluginId
-    $pname = if ($pi) { $pi.Name } else { 'claude-specialists' }
-    $lensPath = ".claude/plugins/claude-specialists/$pname/$($h.Id)-extension.md"
+    # Without a parseable plugin id the plugin segment is genuinely unknown; print a placeholder
+    # rather than the family name, which is a different thing entirely (the family/plugin mix-up
+    # behind issue #179).
+    $pname = if ($pi) { $pi.Name } else { '<plugin>' }
+    $lensPath = ".claude/plugins/$(Get-LensFamily)/$pname/$($h.Id)-extension.md"
     Write-Host "  $lensPath -- header names '$($h.Stale)', but agent '$($h.Id)' is now '$($h.Current)':" -ForegroundColor Yellow
     Write-Host "    # $($h.Id) $midDot repo-lens" -ForegroundColor Green
     Write-Host "    (also update any remaining '$($h.Stale)' mention in the intro line just below the header.)" -ForegroundColor Gray
