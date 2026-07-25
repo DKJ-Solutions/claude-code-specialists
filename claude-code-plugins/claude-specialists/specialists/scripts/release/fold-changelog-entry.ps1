@@ -1,6 +1,12 @@
 <#
-Folds one or more changelog entry files (<branch-name>.md in the repo root) into the
-## Pull Requests section of CHANGELOG.md, and then removes the entry files.
+Folds one or more changelog entry files (<branch-name>.md in the repo root) into a section of
+CHANGELOG.md, and then removes the entry files.
+
+WHICH section is repo-owned: repo-config.ps1's Get-ChangelogHeading names the literal heading line
+('## Pull Requests' in this workshop, '## [Unreleased]' on a Keep-a-Changelog consumer). It used to
+be hardcoded, which made this script stop outright on any repo naming its section differently
+(issue #178). The function is OPTIONAL -- a consumer without it falls back to '## Pull Requests', so
+every existing consumer keeps working unchanged.
 
 In fold-all mode (no -Branch) only files that are actually changelog entries are folded: an entry
 opens with the '### <title> <midDot> <type> <midDot> <date>' H3 heading, so repo-root meta docs
@@ -128,7 +134,23 @@ if ($entryFiles.Count -eq 0) {
 }
 
 $changelogPath = Join-Path $repoRoot "CHANGELOG.md"
-$headingPattern = '(?m)^## Pull Requests\s*?$'
+
+# The section heading to fold into: repo-owned and OPTIONAL (issue #178). Get-Command-guarded exactly
+# like open-pr.ps1 does for its optional repo-config functions, so a consumer whose repo-config
+# predates this contract simply gets the workshop default instead of a crash.
+#
+# The local name is $foldHeading, NOT $changelogHeading: repo-config.ps1 backs Get-ChangelogHeading
+# with $script:ChangelogHeading, and PowerShell variable names are case-insensitive -- at script
+# top-level the local and script scopes are the same, so assigning $changelogHeading here would
+# overwrite the dot-sourced value before the function is ever called, and the configured heading
+# would silently read back as the default. Sibling of the $RepoRoot/$repoRoot collision documented
+# at the top of this file.
+$foldHeading = '## Pull Requests'
+if (Get-Command Get-ChangelogHeading -ErrorAction SilentlyContinue) {
+    $configured = Get-ChangelogHeading
+    if ($configured) { $foldHeading = $configured.Trim() }
+}
+$headingPattern = '(?m)^' + [regex]::Escape($foldHeading) + '\s*?$'
 
 foreach ($file in $entryFiles) {
     $filePath = Join-Path $repoRoot $file
@@ -192,18 +214,20 @@ foreach ($file in $entryFiles) {
 
     $headingMatch = [regex]::Match($changelogContent, $headingPattern)
     if (-not $headingMatch.Success) {
-        Write-Host "Could not find the '## Pull Requests' heading in CHANGELOG.md - stopping." -ForegroundColor Red
+        Write-Host "Could not find the '$foldHeading' heading in CHANGELOG.md - stopping. (The heading comes from Get-ChangelogHeading in scripts\repo-config.ps1; set it to the section this repo folds into.)" -ForegroundColor Red
         exit 1
     }
     $afterHeader = $headingMatch.Index + $headingMatch.Length
 
-    # Insert after any intro paragraph: before the first ###-entry in the Pull Requests section,
-    # or - if the section is still empty - before the ## Releases heading. This keeps the intro
-    # line at the top.
-    $relMatch = [regex]::Match($changelogContent, '(?m)^## Releases\s*?$')
-    $relPos = if ($relMatch.Success) { $relMatch.Index } else { $changelogContent.Length }
+    # Insert after any intro paragraph: at the top of the section, but below its intro text. The
+    # section ends at whichever comes first after the heading -- the first ###-entry already in it, or
+    # the next ##-section. Deriving the boundary structurally (issue #178) rather than looking for a
+    # literal '## Releases' keeps this correct on a Keep-a-Changelog consumer too, where the sections
+    # below '## [Unreleased]' are the released versions ('## [vX.Y.Z] - ...'), not a Releases block.
+    $nextSection = ([regex]'(?m)^## ').Match($changelogContent, $afterHeader)
+    $sectionEnd = if ($nextSection.Success) { $nextSection.Index } else { $changelogContent.Length }
     $firstEntry = ([regex]'(?m)^### ').Match($changelogContent, $afterHeader)
-    $insertPos = if ($firstEntry.Success -and $firstEntry.Index -lt $relPos) { $firstEntry.Index } else { $relPos }
+    $insertPos = if ($firstEntry.Success -and $firstEntry.Index -lt $sectionEnd) { $firstEntry.Index } else { $sectionEnd }
 
     $entryBlock = "$entryContent$nl$nl---$nl$nl"
     $changelogContent = $changelogContent.Substring(0, $insertPos) + $entryBlock + $changelogContent.Substring($insertPos)

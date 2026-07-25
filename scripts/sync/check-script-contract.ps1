@@ -19,11 +19,19 @@
       - open-pr             -> branch-info.ps1: Get-BranchInfo
                                repo-config.ps1: Get-RepoName, Get-LintScript
       - fold-changelog-entry -> repo-config.ps1: Get-RepoName
+                                repo-config.ps1: Get-ChangelogHeading (OPTIONAL -- see below)
       - check-roster-sync   -> repo-config.ps1: Get-RosterPath, Get-RosterIgnoredIds
 
-    Deliberately OUT of the contract: the OPTIONAL repo-config functions that open-pr.ps1 itself
+    OPTIONAL contract entries are declared with Optional = $true and report [INFO] instead of
+    [ERROR] when absent, naming the default that will be used. Get-ChangelogHeading (issue #178) is
+    the case this exists for: fold-changelog-entry.ps1 falls back to '## Pull Requests', so a
+    consumer without the function is not broken -- but a consumer whose CHANGELOG names its section
+    differently DOES need it, and silence would leave them to discover that at fold time.
+
+    Deliberately OUT of the contract entirely: the optional repo-config functions that open-pr.ps1
     guards via Get-Command (Get-PrDescriptionPlaceholder, Get-PrApprovalPattern, Get-PrAssignee,
-    Get-PrMilestone) -- a consumer without them is not drifted, so they are never declared here.
+    Get-PrMilestone) -- those are per-repo taste with no wrong-by-default failure mode, so they are
+    never declared here.
     Also out of scope: workshop-only scripts (ship-pr.ps1, cut-release.ps1) -- they are not mirrored
     into the plugin and are not part of the consumer contract.
 
@@ -92,15 +100,45 @@ $script:infos  = 0
 
 # The declared contract: one record per (lib, required function), grouped by lib for the report.
 # Each record names the shared script(s) that call the function at runtime, so an [ERROR] here reads
-# like the actionable runtime crash it prevents.
+# like the actionable runtime crash it prevents. Optional = $true downgrades a missing function to
+# [INFO] and names the Default the caller falls back to (issue #178).
 $script:Contract = @(
     @{ Lib = 'scripts\lib\branch-info.ps1'; Function = 'Get-BranchInfo';  Scripts = @('new-changelog-entry', 'open-pr') },
     @{ Lib = 'scripts\lib\branch-info.ps1'; Function = 'Test-BranchName'; Scripts = @('new-branch') },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RepoName';    Scripts = @('open-pr', 'fold-changelog-entry') },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-LintScript';  Scripts = @('open-pr') },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RosterPath';  Scripts = @('check-roster-sync') },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RosterIgnoredIds'; Scripts = @('check-roster-sync') }
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RosterIgnoredIds'; Scripts = @('check-roster-sync') },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ChangelogHeading'; Scripts = @('fold-changelog-entry');
+       Optional = $true; Default = '## Pull Requests' }
 )
+
+# An optional record reports [INFO] (with the fallback the caller uses) where a required one reports
+# [ERROR]. ContainsKey rather than dot-access on a possibly-absent key: this script runs under
+# Set-StrictMode -Version Latest.
+function Test-OptionalRecord {
+    param([hashtable]$Record)
+    return ($Record.ContainsKey('Optional') -and $Record.Optional)
+}
+
+function Get-RecordDefault {
+    param([hashtable]$Record)
+    if ($Record.ContainsKey('Default')) { return $Record.Default }
+    return ''
+}
+
+# One finding line for a contract record that could not be satisfied: [ERROR] when required, [INFO]
+# when optional (the caller has a documented fallback, so it is a signal, not a breach).
+function Write-ContractGap {
+    param([hashtable]$Record, [string]$Message)
+    if (Test-OptionalRecord -Record $Record) {
+        $def = Get-RecordDefault -Record $Record
+        $suffix = if ($def) { " -- optional; the shared script falls back to '$def'." } else { ' -- optional; the shared script has a built-in fallback.' }
+        Write-Info ($Message + $suffix)
+    } else {
+        Write-Failure $Message
+    }
+}
 
 Write-Host "== check-script-contract -- $repoRoot ==" -ForegroundColor Cyan
 
@@ -113,7 +151,7 @@ foreach ($libRel in @($script:Contract.Lib | Sort-Object -Unique)) {
     if (-not (Test-Path -LiteralPath $libPath -PathType Leaf)) {
         foreach ($r in $records) {
             $scriptList = $r.Scripts -join ', '
-            Write-Failure "'$libRel' not found -- '$($r.Function)' (required by: $scriptList) cannot be checked; the shared script(s) will crash on first use."
+            Write-ContractGap -Record $r -Message "'$libRel' not found -- '$($r.Function)' (required by: $scriptList) cannot be checked; the shared script(s) will crash on first use."
         }
         continue
     }
@@ -143,17 +181,18 @@ foreach ($libRel in @($script:Contract.Lib | Sort-Object -Unique)) {
     if (-not $probe.Loaded) {
         foreach ($r in $records) {
             $scriptList = $r.Scripts -join ', '
-            Write-Failure "'$libRel' failed to load ($($probe.Error)) -- '$($r.Function)' (required by: $scriptList) cannot be checked."
+            Write-ContractGap -Record $r -Message "'$libRel' failed to load ($($probe.Error)) -- '$($r.Function)' (required by: $scriptList) cannot be checked."
         }
         continue
     }
 
     foreach ($r in $records) {
         $scriptList = $r.Scripts -join ', '
+        $needed = if (Test-OptionalRecord -Record $r) { 'used by' } else { 'required by' }
         if ($probe.Present[$r.Function]) {
             Write-Ok "'$($r.Function)' present in $libRel"
         } else {
-            Write-Failure "'$($r.Function)' missing from $libRel (required by: $scriptList) -- this lib predates the contract the shared script(s) call; update it from the workshop's own $libRel."
+            Write-ContractGap -Record $r -Message "'$($r.Function)' missing from $libRel ($needed`: $scriptList) -- this lib predates the contract the shared script(s) call; update it from the workshop's own $libRel."
         }
     }
 }

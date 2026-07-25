@@ -4,8 +4,9 @@ description: >-
   Fold a branch's changelog entry files into CHANGELOG.md via the shared, centralized fold script
   from the plugin (single source of truth, issue #81) -- so a consumer does not have to duplicate
   this script locally. Use this on main, immediately after merging a branch, to fold the entry
-  files (<branch-name>.md in the repo root) into the ## Pull Requests section and then remove
-  them.
+  files (<branch-name>.md in the repo root) into the repo's changelog section (## Pull Requests by
+  default, or whatever Get-ChangelogHeading names -- e.g. ## [Unreleased] on Keep-a-Changelog) and
+  then remove them.
 disable-model-invocation: true
 ---
 
@@ -25,9 +26,16 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/fold-changelo
 
 Without `-Branch` it folds all entry files present in the root. The script:
 
-1. Folds each entry file (`<branch-name-with-hyphens>.md`) into the `## Pull Requests` section of
-   `CHANGELOG.md`, with the PR number + link included (retrieved via `gh pr list`).
+1. Folds each entry file (`<branch-name-with-hyphens>.md`) into this repo's changelog section of
+   `CHANGELOG.md`, with the PR number + link included (retrieved via `gh pr list`). The entry lands
+   at the top of that section, below any intro text and above whatever already sits there.
 2. Removes the entry file afterwards.
+
+**Which section** comes from `Get-ChangelogHeading` in the consumer's `scripts/repo-config.ps1` --
+the literal heading line, e.g. `## Pull Requests` (this workshop) or `## [Unreleased]` (a
+Keep-a-Changelog repo). The function is optional: without it the script falls back to
+`## Pull Requests`. If the configured heading is not found in `CHANGELOG.md`, the fold stops before
+touching anything and names both the heading it looked for and the function to set (issue #178).
 
 Then commit the result (`CHANGELOG.md` + the removed entry files) directly on main.
 
@@ -54,10 +62,11 @@ closing step -- not something to remember per repo or per time:
 The script is repo-agnostic, but reads a small block of repo data from the **root** of the consumer
 (dual-context: it resolves the repo root via `${CLAUDE_PROJECT_DIR}`):
 
-- `scripts/repo-config.ps1` with `Get-RepoName` (for the `gh --repo` calls). This is the only
-  repo-specific file fold needs -- it derives the PR number via `gh pr list` and the
+- `scripts/repo-config.ps1` with `Get-RepoName` (for the `gh --repo` calls), and optionally
+  `Get-ChangelogHeading` (the section to fold into; defaults to `## Pull Requests`). This is the
+  only repo-specific file fold needs -- it derives the PR number via `gh pr list` and the
   entry file name, and thus does not dot-source `branch-info.ps1` (unlike `open-pr`).
-- A `CHANGELOG.md` with a `## Pull Requests` section in the expected format.
+- A `CHANGELOG.md` carrying that heading.
 - `git` and a logged-in `gh` CLI.
 
 If `repo-config.ps1` is missing -- typical on a clean consumer -- the script stops before the

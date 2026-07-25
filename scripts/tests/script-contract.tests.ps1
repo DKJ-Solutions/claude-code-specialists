@@ -168,11 +168,11 @@ try {
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
     Assert-Equal 0 $r.Code 'happy path: exit-code 0'
     Assert-NotMatch '\[ERROR\]' $r.Out 'happy path: no errors'
-    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds')) {
+    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds', 'Get-ChangelogHeading')) {
         Assert-Match "\[OK\]\s+'$fn' present in" $r.Out "happy path: '$fn' reported OK"
     }
     $okCount = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 6 $okCount 'happy path: exactly six [OK] lines (the six mandatory functions, nothing else)'
+    Assert-Equal 7 $okCount 'happy path: exactly seven [OK] lines (the six mandatory functions + the optional Get-ChangelogHeading, nothing else)'
 
     # --- 2. Missing function in branch-info.ps1 (the exact #147 incident): Test-BranchName ---------
     #     new-branch crashed at runtime with "The term 'Test-BranchName' is not recognized" because
@@ -205,7 +205,8 @@ try {
         Assert-Match "\[ERROR\].*'$fn'.*cannot be checked" $r.Out "missing repo-config.ps1: '$fn' reported as unreachable"
     }
     $errCount3 = @([regex]::Matches($r.Out, '\[ERROR\]')).Count
-    Assert-Equal 4 $errCount3 'missing repo-config.ps1: exactly four errors (one per repo-config function)'
+    Assert-Equal 4 $errCount3 'missing repo-config.ps1: exactly four errors (one per MANDATORY repo-config function)'
+    Assert-Match "\[INFO\].*'Get-ChangelogHeading'.*falls back to '## Pull Requests'" $r.Out 'missing repo-config.ps1: the optional Get-ChangelogHeading is INFO, not ERROR (#178)'
     Assert-Match "\[OK\]\s+'Get-BranchInfo' present in" $r.Out 'missing repo-config.ps1: branch-info.ps1 unaffected, still OK'
 
     # --- 5. Lib throws on load: branch-info.ps1 content that raises on dot-source ------------------
@@ -230,7 +231,18 @@ try {
         Assert-NotMatch $optFn $r.Out "optional Get-Pr*: '$optFn' never mentioned (not in the contract)"
     }
     $okCount6 = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 6 $okCount6 'optional Get-Pr*: still exactly six [OK] (only the mandatory six, optional ones excluded)'
+    Assert-Equal 7 $okCount6 'optional Get-Pr*: still exactly seven [OK] (the mandatory six + Get-ChangelogHeading; the Get-Pr* four excluded)'
+
+    # --- 6c. An optional contract function that is ABSENT -> [INFO] naming the fallback, exit 0 -----
+    #     Get-ChangelogHeading (issue #178) is declared Optional: fold-changelog-entry.ps1 falls back
+    #     to '## Pull Requests', so a consumer whose repo-config predates it is NOT drifted. It must
+    #     still be mentioned -- silence would leave a Keep-a-Changelog consumer to discover at fold
+    #     time that its section is never found.
+    $c = New-FixtureConsumer -StripFromRepoConfig @('Get-ChangelogHeading')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c)
+    Assert-Equal 0 $r.Code 'optional absent: exit-code 0 (a fallback exists, so not a breach)'
+    Assert-NotMatch '\[ERROR\]' $r.Out 'optional absent: no error'
+    Assert-Match "\[INFO\].*'Get-ChangelogHeading' missing from scripts\\repo-config\.ps1.*used by: fold-changelog-entry.*optional.*falls back to '## Pull Requests'" $r.Out 'optional absent: INFO names the function, the caller and the fallback'
 
     # --- 6b. Regression guard: legacy pre-strict-mode top-level code must not false-positive --------
     #     Victor's finding (fixed by Sylvester): the check used to dot-source consumer libs under this
@@ -287,12 +299,13 @@ function Get-RosterIgnoredIds { return @() }
         @{ Function = 'Get-RepoName';         Lib = 'scripts\repo-config.ps1';     Scripts = @('open-pr', 'fold-changelog-entry') },
         @{ Function = 'Get-LintScript';       Lib = 'scripts\repo-config.ps1';     Scripts = @('open-pr') },
         @{ Function = 'Get-RosterPath';       Lib = 'scripts\repo-config.ps1';     Scripts = @('check-roster-sync') },
-        @{ Function = 'Get-RosterIgnoredIds'; Lib = 'scripts\repo-config.ps1';     Scripts = @('check-roster-sync') }
+        @{ Function = 'Get-RosterIgnoredIds'; Lib = 'scripts\repo-config.ps1';     Scripts = @('check-roster-sync') },
+        @{ Function = 'Get-ChangelogHeading'; Lib = 'scripts\repo-config.ps1';     Scripts = @('fold-changelog-entry') }
     )
 
     $contractSrc = [System.IO.File]::ReadAllText($Script)
     $totalRecordCount = @([regex]::Matches($contractSrc, "Lib\s*=\s*'[^']+';\s*Function\s*=\s*'[^']+';\s*Scripts\s*=\s*@\(")).Count
-    Assert-Equal 6 $totalRecordCount 'contract: exactly six (lib, function) records declared in check-script-contract.ps1'
+    Assert-Equal 7 $totalRecordCount 'contract: exactly seven (lib, function) records declared in check-script-contract.ps1'
 
     foreach ($e in $expectedContract) {
         $pattern = "Lib\s*=\s*'([^']+)';\s*Function\s*=\s*'" + [regex]::Escape($e.Function) + "';\s*Scripts\s*=\s*@\(([^)]*)\)"

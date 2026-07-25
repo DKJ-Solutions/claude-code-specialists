@@ -69,3 +69,16 @@ function Get-RosterIgnoredIds {
     <# Ids of enabled agents intentionally kept out of the roster/lenses (skipped by the check). #>
     return $script:RosterIgnoredIds
 }
+
+# The CHANGELOG.md section heading that fold-changelog-entry.ps1 folds a merged entry into. This
+# workshop keeps merged PRs under '## Pull Requests' (with '## Releases' below it); a consumer on
+# Keep-a-Changelog uses '## [Unreleased]'. The heading used to be hardcoded in the fold script, which
+# made it stop outright on any repo that names its section differently (issue #178). Optional in the
+# contract: a consumer without this function simply gets the default below.
+$script:ChangelogHeading = '## Pull Requests'
+
+function Get-ChangelogHeading {
+    <# The CHANGELOG.md section heading a folded entry is inserted under. Must be the literal heading
+       line as it appears in the file (including the leading '##'). #>
+    return $script:ChangelogHeading
+}
