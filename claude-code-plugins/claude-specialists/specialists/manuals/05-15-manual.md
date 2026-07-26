@@ -50,12 +50,16 @@ and safe hook construction.
 - **Plugin/subagent changes don't load by themselves mid-session — reload deliberately, both ways.**
   A newly registered or enabled plugin doesn't appear on its own in the running session, and the
   reverse holds too: if you remove a local agent-def mid-session (as in a migration to a plugin),
-  that specialist drops out, even though the plugin version is already staged. The fast path is
-  **`/reload-plugins`**: it reloads the enabled plugins (subagents/skills) directly into the running
-  session, without a restart. If that command is missing in the Claude Code version in use, or if
-  nothing loads afterward anyway, the trusted path applies: a restart of Claude Code, deliberately
-  scheduled as the closing step of every plugin migration. Note: this applies to plugin content
-  (subagents/skills); changes to `CLAUDE.md` imports and settings still load only on a restart.
+  that specialist drops out, even though the plugin version is already staged. For that
+  registration/removal case, the fast path is **`/reload-plugins`**: it reloads the enabled plugins
+  (subagents/skills) directly into the running session, without a restart. If that command is
+  missing in the Claude Code version in use, or if nothing loads afterward anyway, the trusted path
+  applies: a restart of Claude Code, deliberately scheduled as the closing step of every plugin
+  migration. **This "without a restart" path does not extend to a new skill that ships inside an
+  already-enabled plugin's updated version** — that only becomes available after a restart, and the
+  skill counters `/reload-plugins`/`/reload-skills` print are not evidence either way (see
+  QUICKSTART.md's "Staying up to date" section for the detail). Note: this applies to plugin
+  content; changes to `CLAUDE.md` imports and settings still load only on a restart.
 
 ## Sylvester is lazy
 
