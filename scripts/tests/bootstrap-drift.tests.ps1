@@ -96,6 +96,15 @@ try {
     $rcText = [System.IO.File]::ReadAllText($rcScaffold, [System.Text.Encoding]::UTF8)
     Assert-True ($rcText -match 'VUL-IN') 'repo-config scaffold carries the VUL-IN marker'
     Assert-True ($rcText -match 'function Get-RepoName') 'repo-config scaffold supplies Get-RepoName'
+    # Get-ChangelogHeading (#178) and Get-LiveStage (#177) both ship a concrete, non-VUL-IN default
+    # (unlike Get-RepoName/Get-LintScript above, which are placeholders every consumer must fill in) --
+    # both are Optional in the script contract, so a consumer that never touches these two lines still
+    # gets a working fallback. Asserted here on the literal default value, not just function presence,
+    # so a future edit that accidentally reintroduces a VUL-IN marker on either line is caught.
+    Assert-True ($rcText -match 'function Get-ChangelogHeading') 'repo-config scaffold supplies Get-ChangelogHeading (#178)'
+    Assert-True ($rcText -match "\`$script:ChangelogHeading = '## Pull Requests'") 'repo-config scaffold defaults ChangelogHeading to a concrete value, not VUL-IN'
+    Assert-True ($rcText -match 'function Get-LiveStage') 'repo-config scaffold supplies Get-LiveStage (#177)'
+    Assert-True ($rcText -match "\`$script:LiveStage = ''") 'repo-config scaffold defaults LiveStage to empty (no live stage), not VUL-IN'
     $biText = [System.IO.File]::ReadAllText($biScaffold, [System.Text.Encoding]::UTF8)
     Assert-True ($biText -match '\$script:BranchPrefixTable = @\{\s*\}') 'branch-info scaffold has an EMPTY prefix table (no repo taxonomy baked in)'
 

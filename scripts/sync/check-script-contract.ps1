@@ -21,7 +21,7 @@
       - fold-changelog-entry -> repo-config.ps1: Get-RepoName
                                 repo-config.ps1: Get-ChangelogHeading (OPTIONAL -- see below)
       - check-roster-sync   -> repo-config.ps1: Get-RosterPath, Get-RosterIgnoredIds
-      - cut-release (skill checklist) -> repo-config.ps1: Get-LiveStage (OPTIONAL -- see below)
+      - cut-release skill   -> repo-config.ps1: Get-LiveStage (OPTIONAL -- see below)
 
     OPTIONAL contract entries are declared with Optional = $true and report [INFO] instead of
     [ERROR] when absent, naming the default that will be used. Get-ChangelogHeading (issue #178) is
@@ -119,7 +119,7 @@ $script:Contract = @(
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RosterIgnoredIds'; Scripts = @('check-roster-sync') },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ChangelogHeading'; Scripts = @('fold-changelog-entry');
        Optional = $true; Default = '## Pull Requests' },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-LiveStage'; Scripts = @('cut-release (skill checklist)');
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-LiveStage'; Scripts = @('cut-release skill');
        Optional = $true; Default = '' }
 )
 

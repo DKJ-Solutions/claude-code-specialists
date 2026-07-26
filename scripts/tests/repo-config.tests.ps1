@@ -54,6 +54,19 @@ Assert-Match $roster '\.md$' 'Get-RosterPath points to a .md'
 $ignored = @(Get-RosterIgnoredIds)
 foreach ($id in $ignored) { Assert-Match $id '^\d{2}-\d{2}$' "Get-RosterIgnoredIds: '$id' is a valid <group>-<id>" }
 
+# The CHANGELOG.md section heading fold-changelog-entry.ps1 folds a merged entry into (issue #178,
+# Optional in the script contract -- see check-script-contract.ps1). Must be the literal '##' heading
+# line as it appears in the file; this workshop's own value is '## Pull Requests'.
+$heading = Get-ChangelogHeading
+Assert-Match $heading '^##\s' 'Get-ChangelogHeading returns a literal ## heading line'
+Assert-Equal '## Pull Requests' $heading "Get-ChangelogHeading is '## Pull Requests' in this workshop"
+
+# The optional "go live" stage description for the cut-release skill's Block 2 (issue #177, Optional
+# in the script contract). Empty by default in this workshop and life-hub -- no separate live stage,
+# so Block 2 of the checklist never applies here; only a repo that has one fills this in.
+$liveStage = Get-LiveStage
+Assert-Equal '' $liveStage "Get-LiveStage defaults to '' in this workshop (no separate live stage)"
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
