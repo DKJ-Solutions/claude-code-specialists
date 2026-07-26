@@ -104,12 +104,15 @@ function New-FixtureCache {
 }
 
 # Builds a fixture consumer repo-root. RosterIds -> written into the roster file; LensIds -> lens files
-# on the plugin-path; LegacyLensIds -> lens files on the legacy path.
+# on the plugin-path; LegacyLensIds -> lens files on the legacy path; OffPathLensIds -> lens files on a
+# NON-canonical family segment, the way a pre-#179 bootstrap wrote them.
 function New-FixtureConsumer {
     param(
         [string[]]$RosterIds = @(),
         [string[]]$LensIds = @(),
         [string[]]$LegacyLensIds = @(),
+        [string[]]$OffPathLensIds = @(),
+        [string]$OffPathFamily = 'davekjohns-workshop',
         [bool]$Enabled = $true,
         [bool]$WriteSettings = $true,
         [string]$RosterFile = 'CLAUDE.md',
@@ -153,6 +156,11 @@ function New-FixtureConsumer {
         $ldir = Join-Path $root '.claude\extensions'
         New-Item -ItemType Directory -Path $ldir -Force | Out-Null
         foreach ($id in $LegacyLensIds) { [System.IO.File]::WriteAllText((Join-Path $ldir "$id-extension.md"), "lens") }
+    }
+    if ($OffPathLensIds.Count -gt 0) {
+        $odir = Join-Path $root ".claude\plugins\$OffPathFamily\$PluginName"
+        New-Item -ItemType Directory -Path $odir -Force | Out-Null
+        foreach ($id in $OffPathLensIds) { [System.IO.File]::WriteAllText((Join-Path $odir "$id-extension.md"), "lens") }
     }
     foreach ($pn in $ExtraLensesByPlugin.Keys) {
         $edir = Join-Path $root ".claude\plugins\claude-specialists\$pn"
@@ -260,6 +268,20 @@ try {
     $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
     Assert-Equal 0 $r.Code 'legacy lens: exit-code 0 (lens found on legacy path)'
     Assert-NotMatch '\[ERROR\]' $r.Out 'legacy lens: no errors'
+
+    # --- 9b. Non-canonical family segment is honored, and flagged softly (issue #179) --------------
+    #     A pre-#179 bootstrap derived the family from the install path and wrote the lenses under the
+    #     MARKETPLACE name. Those lenses exist and work, so they must NOT be reported as missing (the
+    #     misleading double-ERROR from the issue: 12 present lenses counted as 24 errors). The check
+    #     finds them and adds ONE soft line per directory pointing at the misalignment.
+    $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16', '06-17') }
+    $c = New-FixtureConsumer -RosterIds @('06-16', '06-17') -LensIds @() -OffPathLensIds @('06-16', '06-17')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 0 $r.Code 'off-path lens: exit-code 0 (lens found under the marketplace family)'
+    Assert-NotMatch '\[ERROR\]' $r.Out 'off-path lens: no false missing-lens errors'
+    Assert-Match "\[OK\]\s+agent '06-16' present in roster \+ lens" $r.Out 'off-path lens: counted as present'
+    Assert-Match '\[INFO\].*2 lens file\(s\).*davekjohns-workshop.*canonical' $r.Out 'off-path lens: one INFO per directory naming the misalignment'
+    Assert-Equal 1 ([regex]::Matches($r.Out, 'instead of the canonical').Count) 'off-path lens: reported once per directory, not once per lens'
 
     # --- 10. Ignore-list: an enabled agent deliberately kept out of the roster/lenses is skipped ---
     #     04-11 is an agent with no roster row and no lens, but repo-config's Get-RosterIgnoredIds

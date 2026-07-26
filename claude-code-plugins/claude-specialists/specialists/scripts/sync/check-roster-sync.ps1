@@ -18,8 +18,10 @@
           (default 'CLAUDE.md', repo-root-relative). "Present in the roster" is decided by scanning the
           roster text for each '<group>-<id>' token (format-agnostic -- works for a table OR a list;
           deliberately NOT a brittle table parser).
-      (c) The lens files: .claude/plugins/claude-specialists/<plugin>/<g>-<id>-extension.md and the
-          legacy .claude/extensions/<g>-<id>-extension.md.
+      (c) The lens files, looked up via Get-LensDirCandidates (check-report-lib.ps1 -- the same source
+          the writers use, issue #179): the canonical .claude/plugins/claude-specialists/<plugin>/
+          <g>-<id>-extension.md, a non-canonical family segment left behind by a pre-#179 bootstrap,
+          and the legacy .claude/extensions/<g>-<id>-extension.md.
 
     Findings + severity (same [OK]/[INFO]/[ERROR] convention as check-connectors.ps1):
       - agent WITHOUT a roster row  -> [ERROR]  (the core case this feature exists for: a new
@@ -29,6 +31,11 @@
       - orphan (a roster token OR a lens file whose '<group>-<id>' has NO matching agent AND no
         matching persona in any enabled plugin) -> [INFO] (could be a just-removed specialist; also
         soft because personas are counted as backing, see below).
+      - lens on a NON-CANONICAL family segment -> [INFO] (issue #179): a pre-fix bootstrap derived the
+                                                 family from the install path and so wrote the lenses
+                                                 under the marketplace name. The lens works and counts
+                                                 as present; the line only points at the misalignment
+                                                 (reported once per directory, not once per lens).
       - lens header still naming a STALE persona name -> [INFO] (issue #145): an older scaffold baked
         the first name into the lens header ("# Sean <midDot> repo-lens"); after a rename that name is
         stale, but the lens is present, so it is a cosmetic mismatch, not missing-lens drift. Soft on
@@ -116,22 +123,29 @@ function Test-InRoster {
     return ($RosterText -match ('(?<!\d)' + [regex]::Escape($Id) + '(?!\d)'))
 }
 
-# The lens path for '<group>-<id>': the plugin-path (the standard) or the legacy extensions-path,
-# whichever exists; $null when neither does.
+# The lens path for '<group>-<id>': the first of Get-LensDirCandidates that actually holds the file --
+# the canonical plugin-path, a non-canonical family segment left by a pre-#179 bootstrap, or the legacy
+# extensions-path; $null when none does. The candidate list is the shared source the writers
+# (bootstrap.ps1, sync-roster.ps1) derive their target path from, so reader and writer cannot drift.
 function Get-LensPath {
     param([string]$RepoRoot, [string]$PluginName, [string]$Id)
-    $candidates = @(
-        (Join-Path $RepoRoot (".claude\plugins\claude-specialists\$PluginName\$Id-extension.md")),
-        (Join-Path $RepoRoot (".claude\extensions\$Id-extension.md"))
-    )
-    foreach ($c in $candidates) { if (Test-Path -LiteralPath $c -PathType Leaf) { return $c } }
+    foreach ($d in (Get-LensDirCandidates -RepoRoot $RepoRoot -PluginName $PluginName)) {
+        $c = Join-Path $d "$Id-extension.md"
+        if (Test-Path -LiteralPath $c -PathType Leaf) { return $c }
+    }
     return $null
 }
 
-# A lens for '<group>-<id>' exists at the plugin-path (the standard) or the legacy extensions-path.
+# A lens for '<group>-<id>' exists at any of the candidate locations.
 function Test-LensExists {
     param([string]$RepoRoot, [string]$PluginName, [string]$Id)
     return [bool](Get-LensPath -RepoRoot $RepoRoot -PluginName $PluginName -Id $Id)
+}
+
+# The canonical directory a lens for $PluginName belongs in -- what the writers produce.
+function Get-CanonicalLensDir {
+    param([string]$RepoRoot, [string]$PluginName)
+    return (Join-Path (Join-Path (Join-Path $RepoRoot '.claude\plugins') (Get-LensFamily)) $PluginName)
 }
 
 # The agent's display name from its cache-file frontmatter (best-effort; '' when absent). Only the
@@ -163,13 +177,15 @@ function Get-ScaffoldHeaderName {
     return ''
 }
 
-# All lens ids present in the consumer (plugin-path for each enabled plugin + the legacy path), mapped
-# to a display path -- used to surface lens files that back no agent (orphans).
+# All lens ids present in the consumer (every candidate dir for each enabled plugin + the legacy path),
+# mapped to a display path -- used to surface lens files that back no agent (orphans).
 function Get-LensIds {
     param([string]$RepoRoot, [string[]]$PluginNames)
     $dirs = @()
-    foreach ($pn in $PluginNames) { $dirs += (Join-Path $RepoRoot ".claude\plugins\claude-specialists\$pn") }
-    $dirs += (Join-Path $RepoRoot '.claude\extensions')
+    foreach ($pn in $PluginNames) { $dirs += @(Get-LensDirCandidates -RepoRoot $RepoRoot -PluginName $pn) }
+    # -Unique: the legacy .claude/extensions dir is a candidate for every plugin, so with two enabled
+    # plugins it would otherwise be walked twice.
+    $dirs = @($dirs | Sort-Object -Unique)
     $result = @{}
     foreach ($d in $dirs) {
         if (-not (Test-Path -LiteralPath $d -PathType Container)) { continue }
@@ -285,6 +301,12 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
     Write-Host "`n-- plugin: $plugId (cache $(Split-Path $pluginDir -Leaf))" -ForegroundColor Cyan
     if ($agentIds.Count -eq 0) { Write-Info "no agents found for '$plugId'."; continue }
 
+    $canonicalLensDir = Get-CanonicalLensDir -RepoRoot $repoRoot -PluginName $name
+    $legacyLensDir    = Join-Path $repoRoot '.claude\extensions'
+    # Non-canonical family dirs found while walking this plugin's agents -- reported once per dir after
+    # the loop instead of once per lens, so a whole pre-#179 tree yields one line, not sixteen.
+    $offPathDirs = @{}
+
     foreach ($id in $agentIds) {
         if ($ignoredIds -contains $id) {
             Write-Info "agent '$id' ($plugId) deliberately kept out of the roster/lenses (repo-config ignore-list) -- skipped."
@@ -297,9 +319,23 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
             Write-Failure "agent '$id' ($plugId) has no roster row in $rosterRel -- add it to the roster."
         }
         if (-not $hasLens) {
-            Write-Failure "agent '$id' ($plugId) has no repo-lens (.claude/plugins/claude-specialists/$name/$id-extension.md or the legacy .claude/extensions/ path)."
+            Write-Failure "agent '$id' ($plugId) has no repo-lens (.claude/plugins/$(Get-LensFamily)/$name/$id-extension.md or the legacy .claude/extensions/ path)."
         }
         if ($inRoster -and $hasLens) { Write-Ok "agent '$id' present in roster + lens" }
+
+        # Lens on a non-canonical family segment (INFO -- issue #179): a bootstrap from before that fix
+        # derived the family from the install path, which in the plugin-cache layout is the MARKETPLACE
+        # name. The lens is present and fully functional, so this is NOT missing-lens drift -- flagging
+        # it as such is exactly the misleading report #179 was filed about. Soft on purpose: silent at
+        # session start, visible on a deliberate run, and the @-import in CLAUDE.md is the thing to
+        # check when the tree is moved.
+        if ($hasLens) {
+            $lensDir = Split-Path $lensPath -Parent
+            if ($lensDir -ne $canonicalLensDir -and $lensDir -ne $legacyLensDir) {
+                if (-not $offPathDirs.ContainsKey($lensDir)) { $offPathDirs[$lensDir] = 0 }
+                $offPathDirs[$lensDir]++
+            }
+        }
 
         # Header drift (INFO -- issue #145): a lens generated by an older scaffold bakes the persona's
         # first name into its header ("# Sean <midDot> repo-lens"). After a rename that name is stale in
@@ -316,6 +352,14 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
                 }
             }
         }
+    }
+
+    foreach ($d in ($offPathDirs.Keys | Sort-Object)) {
+        $rel = $d
+        if ($rel.StartsWith($repoRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $rel = $rel.Substring($repoRoot.Length).TrimStart('\', '/')
+        }
+        Write-Info "$($offPathDirs[$d]) lens file(s) for '$plugId' live in '$rel' instead of the canonical '.claude\plugins\$(Get-LensFamily)\$name' -- they are found and counted as present; move them (and the CLAUDE.md @-import along with them) to align with the standard."
     }
 }
 

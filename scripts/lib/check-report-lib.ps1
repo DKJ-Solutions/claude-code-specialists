@@ -41,6 +41,11 @@
       - Get-DisplayName                               -- sanitize + capitalize a raw agent name into a
                                                           display name (single source for sync-roster
                                                           and check-roster-sync -- issue #145).
+      - Get-LensFamily / Get-LensDirCandidates        -- the family segment of the consumer repo-lens
+                                                          path, and the ordered dirs to look for a
+                                                          lens in (single source for the writers
+                                                          bootstrap.ps1/sync-roster.ps1 and the reader
+                                                          check-roster-sync.ps1 -- issue #179).
 
     Not every caller needs every function -- e.g. sync-roster.ps1 uses its own non-counting
     Write-Info/Write-Failure (it tracks created/kept/proposed, not error/info signals, and always
@@ -124,4 +129,50 @@ function Get-DisplayName {
     $n = $RawName -replace '[^A-Za-z0-9_-]', ''
     if (-not $n) { return $Fallback }
     return ($n.Substring(0, 1).ToUpper() + $n.Substring(1))
+}
+
+function Get-LensFamily {
+    <# The family segment of a consumer's repo-lens path:
+       .claude/plugins/<family>/<plugin>/<group>-<id>-extension.md.
+
+       A CONSTANT, deliberately not derived from the install path (issue #179). specialists-init used
+       to derive it, and in the plugin-cache layout (~/.claude/plugins/cache/<marketplace>/<plugin>/
+       <version>/) that derivation yields the MARKETPLACE name instead of the plugin family. A repo
+       installed through 'specialists@davekjohns-workshop' therefore got its lenses written to
+       .claude/plugins/davekjohns-workshop/<plugin>/, while every reader looked only under
+       'claude-specialists' -- so existing lenses were reported as missing, and following that advice
+       would have produced a second copy of every lens on a second path. The family is a property of
+       the plugin family, not of the marketplace it happens to be fetched from, so it is fixed here:
+       one value, used by the writers (bootstrap.ps1, sync-roster.ps1) and the reader
+       (check-roster-sync.ps1) alike. #>
+    return 'claude-specialists'
+}
+
+function Get-LensDirCandidates {
+    <# The ordered directories a repo lens for $PluginName may live in, most canonical first:
+         1. .claude/plugins/<Get-LensFamily>/<plugin>/   -- the standard; where writers write.
+         2. .claude/plugins/<other-family>/<plugin>/     -- what a pre-#179 bootstrap left behind
+                                                            (the marketplace name as family). Read
+                                                            but never written, so a consumer that was
+                                                            bootstrapped before the fix keeps working
+                                                            without a migration.
+         3. .claude/extensions/                          -- the legacy pre-plugin-path location.
+       Readers should walk this list; writers should use Get-LensFamily directly. $PluginName is
+       assumed slug-validated by the caller (Test-PluginNameSlug) before it becomes a path segment. #>
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$PluginName
+    )
+    $family = Get-LensFamily
+    $pluginsRoot = Join-Path $RepoRoot '.claude\plugins'
+    $dirs = @((Join-Path (Join-Path $pluginsRoot $family) $PluginName))
+    if (Test-Path -LiteralPath $pluginsRoot -PathType Container) {
+        foreach ($fam in (Get-ChildItem -LiteralPath $pluginsRoot -Directory | Sort-Object Name)) {
+            if ($fam.Name -eq $family) { continue }
+            $d = Join-Path $fam.FullName $PluginName
+            if (Test-Path -LiteralPath $d -PathType Container) { $dirs += $d }
+        }
+    }
+    $dirs += (Join-Path $RepoRoot '.claude\extensions')
+    return $dirs
 }
