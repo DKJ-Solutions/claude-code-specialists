@@ -163,3 +163,9 @@ start. This hook is — alongside the `specialists-init` skill and the `roster-s
 (the roster-sync feature) — one of the named, repo-neutral exceptions to the rule that plugins
 carry no hooks/skills (see the root README). Mind the **version gate**: consumers only receive the
 hook after a release bump plus a `claude plugin update` + session restart on their side.
+
+The same gate applies to a newly added **skill** file — see
+[Staying up to date](../QUICKSTART.md#staying-up-to-date) in the Quickstart for the full mechanics.
+Watch out here in particular: the `/reload-plugins`/`/reload-skills` skill counters are no proof
+that this hook has landed for a consumer — treating a reload notice as that confirmation is exactly
+the trap from #186.
