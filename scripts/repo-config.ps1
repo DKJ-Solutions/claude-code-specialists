@@ -82,3 +82,18 @@ function Get-ChangelogHeading {
        line as it appears in the file (including the leading '##'). #>
     return $script:ChangelogHeading
 }
+
+# Whether this repo has a separate "go live" stage after cutting a release -- e.g. a push to a live
+# deploy target, distinct from the tag/GitHub Release. Empty by default: this workshop (like
+# life-hub) cuts a release without one, so the cut-release skill's Block 2 (the live push + moving
+# the '<- LIVE' marker) never applies here. A repo that DOES have a live stage (e.g. a theme repo
+# pushing to a live Shopify theme) describes its target in this string; the cut-release skill then
+# prints Block 2 using it. Optional in the contract (see check-script-contract.ps1): a consumer
+# without this function simply gets Block 1 only, same pattern as Get-ChangelogHeading (#178).
+$script:LiveStage = ''
+
+function Get-LiveStage {
+    <# Short description of this repo's "go live" push target for the cut-release skill's Block 2.
+       Empty string means: no separate live stage -- the skill only prints Block 1 (cutting). #>
+    return $script:LiveStage
+}

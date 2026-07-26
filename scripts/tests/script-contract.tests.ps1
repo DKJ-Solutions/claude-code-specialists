@@ -168,11 +168,11 @@ try {
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
     Assert-Equal 0 $r.Code 'happy path: exit-code 0'
     Assert-NotMatch '\[ERROR\]' $r.Out 'happy path: no errors'
-    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds', 'Get-ChangelogHeading')) {
+    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds', 'Get-ChangelogHeading', 'Get-LiveStage')) {
         Assert-Match "\[OK\]\s+'$fn' present in" $r.Out "happy path: '$fn' reported OK"
     }
     $okCount = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 7 $okCount 'happy path: exactly seven [OK] lines (the six mandatory functions + the optional Get-ChangelogHeading, nothing else)'
+    Assert-Equal 8 $okCount 'happy path: exactly eight [OK] lines (the six mandatory functions + the optional Get-ChangelogHeading + the optional Get-LiveStage, nothing else)'
 
     # --- 2. Missing function in branch-info.ps1 (the exact #147 incident): Test-BranchName ---------
     #     new-branch crashed at runtime with "The term 'Test-BranchName' is not recognized" because
@@ -231,7 +231,7 @@ try {
         Assert-NotMatch $optFn $r.Out "optional Get-Pr*: '$optFn' never mentioned (not in the contract)"
     }
     $okCount6 = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 7 $okCount6 'optional Get-Pr*: still exactly seven [OK] (the mandatory six + Get-ChangelogHeading; the Get-Pr* four excluded)'
+    Assert-Equal 8 $okCount6 'optional Get-Pr*: still exactly eight [OK] (the mandatory six + Get-ChangelogHeading + Get-LiveStage; the Get-Pr* four excluded)'
 
     # --- 6c. An optional contract function that is ABSENT -> [INFO] naming the fallback, exit 0 -----
     #     Get-ChangelogHeading (issue #178) is declared Optional: fold-changelog-entry.ps1 falls back
@@ -243,6 +243,27 @@ try {
     Assert-Equal 0 $r.Code 'optional absent: exit-code 0 (a fallback exists, so not a breach)'
     Assert-NotMatch '\[ERROR\]' $r.Out 'optional absent: no error'
     Assert-Match "\[INFO\].*'Get-ChangelogHeading' missing from scripts\\repo-config\.ps1.*used by: fold-changelog-entry.*optional.*falls back to '## Pull Requests'" $r.Out 'optional absent: INFO names the function, the caller and the fallback'
+
+    # --- 6d. Get-LiveStage: absent -> [INFO] naming the empty-string fallback, exit 0 (issue #177) ----
+    #     Mirrors test 6c above (Get-ChangelogHeading, issue #178): Get-LiveStage is Optional in the
+    #     contract, so a consumer's repo-config.ps1 without it is not drifted -- the cut-release skill's
+    #     Block 2 simply never applies (empty default = no separate live stage). Still surfaced, not
+    #     silent: a repo that DOES have a live stage needs to learn the getter is missing, or the skill
+    #     would silently never print Block 2. Its Default ('') is falsy, so Write-ContractGap's INFO
+    #     message uses the "built-in fallback" phrasing rather than naming a quoted default value --
+    #     asserted explicitly below (distinct from Get-ChangelogHeading's "falls back to '...'" phrasing
+    #     in 6c, which has a non-empty Default).
+    $c = New-FixtureConsumer -StripFromRepoConfig @('Get-LiveStage')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c)
+    Assert-Equal 0 $r.Code 'Get-LiveStage absent: exit-code 0 (empty-string fallback, not a breach)'
+    Assert-NotMatch '\[ERROR\]' $r.Out 'Get-LiveStage absent: no error'
+    Assert-Match "\[INFO\].*'Get-LiveStage' missing from scripts\\repo-config\.ps1.*used by: cut-release skill.*optional; the shared script has a built-in fallback\." $r.Out 'Get-LiveStage absent: INFO names the function, the caller, and the built-in (empty) fallback'
+    # Still present -> [OK], not INFO or ERROR (already covered generically by the happy path in test 1;
+    # made explicit here too, for direct traceability with the absent-case scenario just above).
+    $c2 = New-FixtureConsumer
+    $r2 = Invoke-Ps @('-ConsumerPathOverride', $c2)
+    Assert-Equal 0 $r2.Code 'Get-LiveStage present: exit-code 0'
+    Assert-Match "\[OK\]\s+'Get-LiveStage' present in" $r2.Out 'Get-LiveStage present: reported OK, not INFO or ERROR'
 
     # --- 6b. Regression guard: legacy pre-strict-mode top-level code must not false-positive --------
     #     Victor's finding (fixed by Sylvester): the check used to dot-source consumer libs under this
@@ -277,17 +298,31 @@ function Get-RosterIgnoredIds { return @() }
 
     Write-Host "`n== script-contract.tests: contract-completeness drift guard ==" -ForegroundColor Cyan
     # Two-layered defense against the declared $script:Contract array in check-script-contract.ps1
-    # silently going stale, chosen over the weaker "just re-type the six pairs here" option because
+    # silently going stale, chosen over the weaker "just re-type the pairs here" option because
     # that would only catch an accidental REMOVAL and would drift itself the moment a maintainer edits
     # the contract without updating this test:
-    #   (a) parse the six (Lib, Function, Scripts) records straight out of the check script's OWN
+    #   (a) parse the (Lib, Function, Scripts) records straight out of the check script's OWN
     #       source text (not re-typed here) and assert the exact set/attribution still matches what
-    #       issue #147 declared -- catches a silent removal or a changed Scripts attribution.
-    #   (b) for every (Function, Scripts) pair found, read the REAL source of each named shared script
-    #       (via Get-SharedScriptPairs, the same SSOT shared-scripts.tests.ps1 uses) and assert the
-    #       function name actually appears there -- catches a contract entry going STALE (e.g. a
-    #       shared script refactored to stop calling the function while the contract still lists it),
-    #       which a simple re-typed-list assertion could never catch.
+    #       issue #147 (and #178, #177) declared -- catches a silent removal or a changed Scripts
+    #       attribution.
+    #   (b) for every (Function, Scripts) pair found, verify the function is really referenced where
+    #       the contract claims it is used -- catches a contract entry going STALE (e.g. a refactor
+    #       that stops calling the function while the contract still lists it), which a simple
+    #       re-typed-list assertion could never catch.
+    #
+    # Design decision for Tycho (issue #177): the eighth record, Get-LiveStage, is checked by a
+    # SEPARATE, dedicated block right after this loop rather than being folded into $expectedContract.
+    # Reason: its Scripts attribution names the cut-release SKILL ('cut-release skill'), not a
+    # mirrored shared script -- Get-SharedScriptPairs (the shared-script registry) genuinely does not
+    # know it and should not, so the loop's per-script "is this a registered shared script" assertion
+    # does not apply to it. Get-LiveStage instead gets its own literal/regex assertion for the record's
+    # declaration AND its own staleness check against the real source of the cut-release SKILL.md it is
+    # attributed to (the skill-file analogue of the loop's shared-script check) -- see the dedicated
+    # block right after the loop. Both records are covered end to end, just by two different, fitting
+    # mechanisms. The guard against a FUTURE ninth record silently falling outside coverage is
+    # $totalRecordCount below (parsed from the check script's own source): a new record bumps that
+    # count and this test goes red until a maintainer adds either a new $expectedContract entry (a real
+    # shared script) or a new dedicated block (a skill or other non-mirrored attribution).
     . (Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1')
     $pairs = @(Get-SharedScriptPairs -RepoRoot $RepoRoot)
     $pairsByName = @{}
@@ -305,9 +340,15 @@ function Get-RosterIgnoredIds { return @() }
 
     $contractSrc = [System.IO.File]::ReadAllText($Script)
     $totalRecordCount = @([regex]::Matches($contractSrc, "Lib\s*=\s*'[^']+';\s*Function\s*=\s*'[^']+';\s*Scripts\s*=\s*@\(")).Count
-    Assert-Equal 7 $totalRecordCount 'contract: exactly seven (lib, function) records declared in check-script-contract.ps1'
+    Assert-Equal 8 $totalRecordCount 'contract: exactly eight (lib, function) records declared in check-script-contract.ps1 (the seven below plus the dedicated Get-LiveStage block after this loop)'
 
     foreach ($e in $expectedContract) {
+        # Pitfall for whoever adds a record 9 here: this capture -- @\(([^)]*)\) -- stops at the FIRST
+        # ')' it meets, so a Scripts value carrying its own parenthesis (e.g. 'foo (bar)') gets truncated
+        # before the record's real closing paren. Keep every Scripts entry parenthesis-free; a record
+        # attributed to something that needs a parenthetical name is a sign it does not belong in this
+        # loop at all (see the design-decision comment above for Get-LiveStage, whose own dedicated
+        # block below sidesteps this capture entirely).
         $pattern = "Lib\s*=\s*'([^']+)';\s*Function\s*=\s*'" + [regex]::Escape($e.Function) + "';\s*Scripts\s*=\s*@\(([^)]*)\)"
         $m = [regex]::Match($contractSrc, $pattern)
         Assert-True $m.Success "contract: record for '$($e.Function)' still declared"
@@ -326,6 +367,20 @@ function Get-RosterIgnoredIds { return @() }
                 }
             }
         }
+    }
+
+    # --- Get-LiveStage (record 8, issue #177): its own dedicated check -- see the design-decision -----
+    #     comment above this loop for why it is not folded into $expectedContract. Verified by hand
+    #     (scratch script, not checked in) before writing this pattern: it correctly matches the real
+    #     record and correctly fails to match if the Lib/Scripts/Optional/Default attribution changes.
+    $liveStagePattern = 'Lib\s*=\s*''scripts\\repo-config\.ps1'';\s*Function\s*=\s*''Get-LiveStage'';\s*Scripts\s*=\s*@\(''cut-release skill''\);\s*Optional\s*=\s*\$true;\s*Default\s*=\s*'''''
+    Assert-True ([regex]::IsMatch($contractSrc, $liveStagePattern)) "contract: record for 'Get-LiveStage' still declared, attributed to scripts\repo-config.ps1 / 'cut-release skill', Optional with an empty-string Default"
+
+    $cutReleaseSkillPath = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists\specialists\skills\cut-release\SKILL.md'
+    Assert-True (Test-Path -LiteralPath $cutReleaseSkillPath) 'contract: cut-release SKILL.md exists at the path the Get-LiveStage record is attributed to'
+    if (Test-Path -LiteralPath $cutReleaseSkillPath) {
+        $skillText = [System.IO.File]::ReadAllText($cutReleaseSkillPath)
+        Assert-True ($skillText -match 'Get-LiveStage') "contract: cut-release SKILL.md really references 'Get-LiveStage' in its own real source (not a stale entry)"
     }
 
     Write-Host "`n== script-contract.tests: script-contract-sessioncheck.ps1 (hook) ==" -ForegroundColor Cyan

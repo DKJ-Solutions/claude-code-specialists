@@ -348,6 +348,16 @@ function Get-ChangelogHeading {
     return $script:ChangelogHeading
 }
 
+# Optional (#177): if this repo has a separate "go live" stage after cutting a release -- e.g. a
+# push to a live deploy target -- describe it here so the cut-release skill's Block 2 (the live push
+# + moving the '<- LIVE' marker) applies. Left empty: most repos (this workshop, life-hub) cut a
+# release without one, so the skill only prints Block 1 (cutting).
+$script:LiveStage = ''
+
+function Get-LiveStage {
+    return $script:LiveStage
+}
+
 # Optional (#101): if this repo's PR template uses different marker text than the workshop's own,
 # or a PR should carry a default assignee/milestone, define any of these four functions --
 # Get-PrDescriptionPlaceholder, Get-PrApprovalPattern, Get-PrAssignee, Get-PrMilestone -- and
