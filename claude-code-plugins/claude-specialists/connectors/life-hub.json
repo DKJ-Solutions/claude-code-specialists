@@ -7,7 +7,8 @@
       "id": "specialists@davekjohns-workshop",
       "extensions": [
         "01-01", "02-09", "03-02", "03-07", "04-11", "04-12", "04-13", "04-18",
-        "05-05", "05-06", "05-15", "06-16", "06-17", "06-19", "06-23"
+        "05-05", "05-06", "05-15", "06-16", "06-17", "06-19", "06-23",
+        "06-24", "06-25", "06-29", "06-30"
       ]
     },
     {
@@ -17,5 +18,5 @@
       ]
     }
   ],
-  "notes": "life-hub uses the lens-only model for the four personas (01-01, 03-02, 05-05, 05-06): no body copy in the consumer. Open for the life-hub session (other machine): still bring the plugins there up to v1.10.0 via `claude plugin update`, and register the 06-24 (Ravi) lens -- present in the checkout -- in this registry from the authoritative life-hub session."
+  "notes": "life-hub uses the lens-only model for the four personas (01-01, 03-02, 05-05, 05-06): no body copy in the consumer."
 }

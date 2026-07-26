@@ -84,6 +84,12 @@ if (-not (Test-Path -LiteralPath $ConsumerPath)) {
 }
 $ConsumerRoot = (Resolve-Path -LiteralPath $ConsumerPath).Path
 
+# Get-LensDirCandidates: the shared source (issue #179) for where a consumer's repo lenses may live,
+# so this reader cannot drift away from what specialists-init/sync-roster write. Only that helper is
+# used here; the report helpers this lib also carries stay unused (no name collision -- this script
+# writes its own Write-Host lines).
+. (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
+
 function Read-NormalizedText {
     param([string]$Path)
     $raw = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
@@ -212,14 +218,14 @@ if ($personaDirs.Count -gt 0) {
         if ($_.BaseName -notmatch '^(\d{2})-(\d{2})-persona$') { return }
         $g = $Matches[1]; $id = $Matches[2]
         $srcBody = Get-PortableBody $_.FullName
-        # The consumer copy can live on the plugin path (.claude/plugins/claude-specialists/
-        # <plugin>/, since life-hub parity) or on the legacy path (.claude/extensions/).
+        # The consumer copy can live on the canonical plugin path (.claude/plugins/<family>/<plugin>/,
+        # since life-hub parity), on a non-canonical family segment left by a pre-#179 bootstrap, or on
+        # the legacy path (.claude/extensions/) -- Get-LensDirCandidates enumerates all three in that
+        # order, shared with check-roster-sync and the writers.
         $pluginName = Split-Path (Split-Path $_.DirectoryName -Parent) -Leaf
         $consumerExt = $null
-        foreach ($candidate in @(
-            (Join-Path $ConsumerRoot ".claude\plugins\claude-specialists\$pluginName\$g-$id-extension.md")
-            (Join-Path $ConsumerRoot ".claude\extensions\$g-$id-extension.md")
-        )) {
+        foreach ($dir in (Get-LensDirCandidates -RepoRoot $ConsumerRoot -PluginName $pluginName)) {
+            $candidate = Join-Path $dir "$g-$id-extension.md"
             if (Test-Path -LiteralPath $candidate -PathType Leaf) { $consumerExt = $candidate; break }
         }
         if ($null -eq $consumerExt) {
