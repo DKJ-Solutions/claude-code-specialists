@@ -96,16 +96,21 @@ description while building; ownership of the entry mechanism stays Rendall's.
 ### Versioning & releases
 
 A release here is a **recorded moment**: all plugins get the same version number
-(**lockstep, repo-wide**) and the state is tagged as `vX.Y.Z`. **Nothing is published to GitHub
-Releases** — only a git tag, the full notes in `releases/development/`, and a reference to them in
-`CHANGELOG.md` (Dave's choice). The `version` in each
+(**lockstep, repo-wide**) and the state is tagged as `vX.Y.Z`. `cut-release.ps1` itself publishes
+nothing to GitHub Releases — only a git tag, the full notes in `releases/development/`, and a
+reference to them in `CHANGELOG.md`. For a **Minor or Major** bump, publishing a GitHub Release
+(highlights as the body, the full development notes as an attachment) is a manual closing step
+Rendall walks through afterward, per the `cut-release` skill's checklist — not automated by the
+script; a **Patch** release skips that step (tag only). See
+[releases/README.md](../../../../releases/README.md#cutting-a-release) for the full mechanics. The
+`version` in each
 `.claude-plugin/plugin.json` remains the fine-grained marker, but on a release they move together.
 Note: that number is also the **update gate** — `claude plugin update` compares version numbers
 only, so consumers (and this repo itself, which consumes itself) only receive merged changes after
 a bump. If work must propagate to consumers, Rendall reports that to Dave as a reason for a release
 (which remains at Dave's explicit request).
 
-The `releases/` directory (modeled on life-hub, but without GitHub Releases):
+The `releases/` directory (modeled on life-hub):
 - **`releases/development/<X>.x/<X.Y.Z>.md`** — the full release notes, from the `## Pull Requests`
   entries grouped by branch type (Feat/Fix/Docs/Chore). Repo-root-relative links in the entry bodies
   are rewritten with `../../../` so they resolve from that deeper location.
@@ -167,6 +172,9 @@ committed, and only then is picked up by the consuming repos.
 
 A new recurring release chore? Rendall builds a script for it with the same guardrails.
 
-In short: the **how** (changelog, SemVer, tags, GitHub Releases) is portable; the **what** (these
-scripts, the per-branch entry + fold convention, and the lockstep repo-wide release via `cut-release.ps1`
-with git tag + `## Releases` block but without a GitHub Release) belongs to this repo.
+In short: the **how** (changelog, SemVer, tags, and — where a release publishes one — a GitHub
+Release) is portable; the **what** (these scripts, the per-branch entry + fold convention, and the
+lockstep repo-wide release via `cut-release.ps1` with git tag + `## Releases` block) belongs to this
+repo. Publishing a GitHub Release here is a manual Minor/Major-only closing step, per the
+`cut-release` skill, that `cut-release.ps1` itself does not automate and that a Patch skips
+entirely.

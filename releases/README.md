@@ -2,13 +2,16 @@
 
 The release history of the davekjohns-workshop marketplace. A release here is not a deploy but a
 **recorded moment**: a git tag that marks the state of the marketplace, with all plugin versions in
-lockstep. **No GitHub Releases** are published on purpose — the full notes live below in
-`development/<X>.x/<X.Y.Z>.md`, and the `## Releases` block in
-[`CHANGELOG.md`](../CHANGELOG.md) references them. Releases are cut only at Dave's explicit request
-via [`scripts/release/cut-release.ps1`](../scripts/release/cut-release.ps1) — see
-[Cutting a release](#cutting-a-release) below for the full mechanics. Each release also
-refreshes, per plugin, the `RELEASE.md` card that consumers see (version + short notes, travelling
-along with the plugin cache via `claude plugin update`).
+lockstep. The full notes live below in `development/<X>.x/<X.Y.Z>.md`, and the `## Releases` block in
+[`CHANGELOG.md`](../CHANGELOG.md) references them. [`scripts/release/cut-release.ps1`](../scripts/release/cut-release.ps1)
+itself publishes nothing to GitHub Releases — that is a separate, manual closing step: for a
+**Minor or Major** bump, the [`cut-release` skill](../claude-code-plugins/claude-specialists/specialists/skills/cut-release/SKILL.md)'s
+checklist walks through `gh release create` + `gh release upload` (the highlights as the release
+body, the full development notes as an attachment); a **Patch** release skips that step (tag only).
+Releases are cut only at Dave's explicit request — see [Cutting a release](#cutting-a-release)
+below for the full mechanics. Each release also refreshes, per plugin, the `RELEASE.md` card that
+consumers see (version + short notes, travelling along with the plugin cache via
+`claude plugin update`).
 
 ## Overview
 
@@ -69,9 +72,9 @@ top one).
 ## Cutting a release
 
 A release is a **captured moment**: all plugins get the same version number
-(**lockstep, repo-wide**) and the state is tagged as `vX.Y.Z`. Nothing is published to GitHub Releases
-— only a git tag, the full notes here in `development/`, and a reference to them in
-[`CHANGELOG.md`](../CHANGELOG.md). A release is cut **only on Dave's explicit
+(**lockstep, repo-wide**) and the state is tagged as `vX.Y.Z`. `cut-release.ps1` itself publishes
+nothing to GitHub Releases — it produces only a git tag, the full notes here in `development/`, and
+a reference to them in [`CHANGELOG.md`](../CHANGELOG.md). A release is cut **only on Dave's explicit
 request** and deliberately does **not** go through a branch + PR: like the fold commit, the
 release commit is a permitted direct-on-`main` action (the second exception to "everything via
 branch + PR" — see [`CONTRIBUTING.md`](../CONTRIBUTING.md)).
@@ -93,6 +96,15 @@ In one motion, on a clean `main`:
    Maintenance, Other — with features and fixes at the top;
 4. commits that directly on `main` (`release: vX.Y.Z`) and sets an annotated tag `vX.Y.Z`;
 5. pushes `main` + the tag (unless `-NoPush` for inspection first).
+
+**Closing step, after the script, for a Minor/Major bump: publish a GitHub Release.** Not run by
+`cut-release.ps1` and not automated — the release manager walks through the
+[`cut-release` skill](../claude-code-plugins/claude-specialists/specialists/skills/cut-release/SKILL.md)'s
+checklist: `gh release create` with the highlights as the release body (`--notes-file`), then
+`gh release upload` with the full development notes file as an attachment. That split is not a
+style choice: `gh`'s release-notes body has a hard 125,000-character limit, which a full notes file
+can exceed. A **Patch** release skips this step entirely (tag only, no GitHub Release) — which is
+why, for example, `v2.6.1` and `v2.7.1` have no GitHub Release while `v2.6.0` and `v2.7.0` do.
 
 Guardrails: a clean `main`, no unfolded entry files, lint gate green, tag doesn't exist yet. The
 lint gate ([`scripts/lint/check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1),

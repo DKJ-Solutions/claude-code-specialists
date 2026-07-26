@@ -210,8 +210,10 @@ marketplace has (see the "out of scope" note in
 **procedure** — the closing steps every release shares once the version bump is committed (tag +
 push, branch cleanup) — was genuinely portable, so it shipped as the `cut-release` **skill**
 instead: a checklist with no script of its own (issue #177). That checklist also covers a
-Minor/Major GitHub Release, with its highlights-as-body/notes-as-attachment split — a step for a
-consumer that publishes GitHub Releases, which this workshop deliberately does not.
+Minor/Major GitHub Release, with its highlights-as-body/notes-as-attachment split — a manual
+closing step this workshop's own Minor/Major releases go through too (see
+[releases/README.md](../../releases/README.md#cutting-a-release)), just not one `cut-release.ps1`
+itself automates.
 
 Cowork is positioned for non-code knowledge work; davekjohns-workshop is a code/plugin-maintenance
 repo, so Claude Code is the right tool here and the repo stays deliberately Claude-Code-centric.
