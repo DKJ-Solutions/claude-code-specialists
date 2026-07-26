@@ -115,12 +115,14 @@ function Get-BackingIds {
     return @($ids | Sort-Object -Unique)
 }
 
-# "Present in the roster": scan the roster text for the literal '<group>-<id>' token, bounded by
-# non-digits so '06-24' still matches inside '06-24-extension.md' but NOT inside '106-240'.
-# Format-agnostic on purpose (table or list) -- see the Get-RosterPath note in repo-config.ps1.
+# "Present in the roster": scan the roster text for the literal '<group>-<id>' token, bounded so
+# '06-24' still matches inside '06-24-extension.md' but NOT inside '106-240' or an ISO date like
+# '2026-07-25'. The boundary itself is Get-RosterIdTokenPattern's (check-report-lib.ps1) single
+# source, shared with the orphan-scan below -- issue #182. Format-agnostic on purpose (table or
+# list) -- see the Get-RosterPath note in repo-config.ps1.
 function Test-InRoster {
     param([string]$RosterText, [string]$Id)
-    return ($RosterText -match ('(?<!\d)' + [regex]::Escape($Id) + '(?!\d)'))
+    return ($RosterText -match (Get-RosterIdTokenPattern -Id $Id))
 }
 
 # The lens path for '<group>-<id>': the first of Get-LensDirCandidates that actually holds the file --
@@ -369,7 +371,7 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
 if ($pluginNames.Count -gt 0) {
     Write-Host "`n-- orphans" -ForegroundColor Cyan
     $lensIds = Get-LensIds -RepoRoot $repoRoot -PluginNames ($pluginNames | Sort-Object -Unique)
-    $rosterTokenIds = @([regex]::Matches($rosterText, '(?<!\d)\d{2}-\d{2}(?!\d)') |
+    $rosterTokenIds = @([regex]::Matches($rosterText, (Get-RosterIdTokenPattern)) |
         ForEach-Object { $_.Value } | Sort-Object -Unique)
 
     $orphanFound = $false

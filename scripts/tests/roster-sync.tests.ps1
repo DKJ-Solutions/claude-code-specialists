@@ -126,7 +126,11 @@ function New-FixtureConsumer {
         [hashtable]$ExtraLensesByPlugin = @{},
         # Per-id override for a plugin-path lens file's content (default 'lens'). Lets a case give a
         # lens a specific header to exercise the stale-header detection (issue #145).
-        [hashtable]$LensContent = @{}
+        [hashtable]$LensContent = @{},
+        # Extra free-text lines appended to the roster file AFTER the id rows -- lets a case add
+        # ordinary prose (e.g. an ISO-dated note) alongside the real roster rows, without that prose
+        # itself becoming a roster row (issue #182: the token-boundary fix).
+        [string[]]$ExtraRosterLines = @()
     )
     $root = Join-Path $Fixture 'consumer'
     if (Test-Path -LiteralPath $root) { Remove-Item -Recurse -Force -LiteralPath $root }
@@ -142,6 +146,7 @@ function New-FixtureConsumer {
 
     $lines = @('# Roster', '')
     foreach ($id in $RosterIds) { $lines += "| $id | [$id-extension.md](x) |" }
+    foreach ($line in $ExtraRosterLines) { $lines += $line }
     [System.IO.File]::WriteAllText((Join-Path $root $RosterFile), ($lines -join "`n"))
 
     if ($LensIds.Count -gt 0) {
@@ -176,6 +181,24 @@ function New-FixtureConsumer {
 
 try {
     Write-Host "== roster-sync.tests ==" -ForegroundColor Cyan
+
+    # --- Unit: Get-RosterIdTokenPattern (check-report-lib.ps1) -- inbound #182 ---------------------
+    #     Pure-regex checks against literal strings -- no child process, no fixture. Pins the exact
+    #     boundary edge cases of the single shared pattern in milliseconds. This complements, but does
+    #     NOT replace, the fixture-driven scenarios below (15-17): a unit test of the regex alone
+    #     cannot prove the pattern is actually WIRED into both call sites end to end (Test-InRoster +
+    #     the orphan-scan) -- one call site could keep a stale duplicate of the old boundary while this
+    #     unit test stays green. Verified against the real function (not hand-traced) before writing
+    #     these assertions.
+    . (Join-Path $RepoRoot 'scripts\lib\check-report-lib.ps1')
+    $genericPattern = Get-RosterIdTokenPattern
+    Assert-NotMatch $genericPattern '2026-07-25' 'pattern unit: generic pattern does not match inside an ISO date (07-25 excluded)'
+    Assert-Match $genericPattern 'See 05-15-extension.md for the lens.' 'pattern unit: generic pattern still matches a real lens reference (05-15)'
+    Assert-Match $genericPattern 'see pages 12-34 for details' 'pattern unit: KNOWN LIMITATION (documented in Get-RosterIdTokenPattern, NOT desired behavior) -- a plain two-digit prose range still matches; update this assertion (not just delete it) if the boundary is ever tightened further'
+
+    $idPattern515 = Get-RosterIdTokenPattern -Id '05-15'
+    Assert-NotMatch $idPattern515 'the note is dated 2026-05-15' 'pattern unit: id-specific pattern for 05-15 does not match inside the ISO date (the masking case, isolated from Test-InRoster/the full script)'
+    Assert-Match $idPattern515 'See 05-15-extension.md for the lens.' 'pattern unit: id-specific pattern for 05-15 matches the real reference'
 
     # --- 1. Happy path: agents present in roster + lens -> exit 0 --------------------------------
     $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16', '06-17') }
@@ -410,6 +433,53 @@ try {
     Assert-Match "\[OK\]\s+agent '06-16' present in roster" $r.Out 'strict-mode crash guard: Get-RosterPath honored (ROSTER.md read)'
     Assert-NotMatch '\[ERROR\]' $r.Out 'strict-mode crash guard: no false ERROR'
     Assert-NotMatch 'cannot be retrieved|has not been set|Exception' $r.Out 'strict-mode crash guard: no raw strict-mode exception surfaced'
+
+    # --- 15. ISO date in roster prose does NOT yield an orphan token (inbound #182, the reported bug) -
+    #     06-16 fully satisfied (roster row + lens). The roster ALSO carries an ordinary prose sentence
+    #     dating a note -- exactly the shape the issue reported: under the OLD boundary ('(?<!\d)',
+    #     excluding only a preceding DIGIT) the '07' in '2026-07-25' is preceded by a HYPHEN, so it
+    #     passed, and '07-25' was read as a specialist token -> a false '[INFO] orphan 07-25' line, even
+    #     though no specialist #25 exists in group 07.
+    $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') }
+    $c = New-FixtureConsumer -RosterIds @('06-16') -LensIds @('06-16') `
+        -ExtraRosterLines @('', 'Last updated 2026-07-25.')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 0 $r.Code 'ISO date in prose: exit-code 0'
+    Assert-NotMatch "orphan '07-25'" $r.Out 'ISO date in prose: no false orphan for the date itself'
+    Assert-Match '\[OK\]\s+no orphan roster tokens' $r.Out 'ISO date in prose: orphan scan reports clean'
+
+    # --- 16. Masking case (the more serious, NOT-reported half of #182): a specialist missing a roster
+    #     row must still surface as such even when an ISO date resembling their id appears in prose --
+    #     this exercises Test-InRoster's boundary, not just the orphan-scan's --------------------------
+    #     05-15 is a REAL agent (with a lens present), but has NO roster row -- as if Sylvester had just
+    #     been removed from the roster table. The roster text DOES contain the ordinary prose sentence
+    #     "Sylvester's fix landed on 2026-05-15." -- under the OLD boundary, the '05' in '2026-05-15' is
+    #     preceded by a hyphen (not a digit), so it passed, and Test-InRoster('05-15') returned True from
+    #     the date alone, masking the missing roster row as present. Without the fix, this whole
+    #     scenario would wrongly assert exit-code 0 / no ERROR / 'present in roster'. DO NOT DELETE --
+    #     this is the regression guard for the more serious half of #182 (a missed [ERROR], not just
+    #     orphan noise).
+    $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16', '05-15') }
+    $c = New-FixtureConsumer -RosterIds @('06-16') -LensIds @('06-16', '05-15') `
+        -ExtraRosterLines @('', "Sylvester's fix landed on 2026-05-15.")
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 1 $r.Code 'masking case: exit-code 1 (missing roster row surfaces despite the date)'
+    Assert-Match "\[ERROR\].*'05-15'.*no roster row" $r.Out 'masking case: 05-15 flagged as missing from roster, not masked by the date'
+    Assert-NotMatch "\[OK\]\s+agent '05-15' present in roster" $r.Out 'masking case: 05-15 not falsely counted as present'
+
+    # --- 17. Documented residual limitation (inbound #182) -- NOT desired behavior, see the KNOWN
+    #     LIMITATION note in Get-RosterIdTokenPattern: a plain two-digit-hyphen-two-digit range in
+    #     ordinary prose (not a date) still reads as a token and surfaces as an orphan, as long as no
+    #     real specialist happens to share that id. This pins the CURRENTLY ACCEPTED trade-off so it
+    #     does not silently regress into a false ERROR either. If the boundary is ever tightened further
+    #     to also exclude this case, THIS test is expected to change (not just be deleted) -- update it
+    #     alongside Get-RosterIdTokenPattern's doc comment.
+    $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') }
+    $c = New-FixtureConsumer -RosterIds @('06-16') -LensIds @('06-16') `
+        -ExtraRosterLines @('', 'See pages 12-34 for the full history.')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 0 $r.Code 'residual limitation: exit-code 0 (INFO only, never blocking)'
+    Assert-Match "\[INFO\].*orphan '12-34'" $r.Out 'residual limitation: two-digit prose range still reads as an orphan token (accepted, documented -- NOT desired behavior)'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
 }
