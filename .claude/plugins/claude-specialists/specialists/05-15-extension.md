@@ -29,11 +29,12 @@ infrastructure.
 - **`.github/workflows/ci.yml`** — the CI gate on GitHub: runs the same lint gate + all test suites
   (`scripts/tests/*.tests.ps1`) on every PR and every push to `main`, so the guard also applies to
   work that comes about outside `open-pr.ps1`. Since July 15, 2026, the repo ruleset
-  **`main-ci-poort`** (GitHub → Settings → Rules) enforces that gate as a **required status check**:
-  a PR to `main` only merges on a green `lint-en-tests` job. The bypass list (Repository admin + the
-  Write role, "Always allow") keeps the direct fold/release commits on `main` possible — the work
-  account `davekokbwj` has write rights, not admin. That Write bypass is safe as long as there are
-  no external collaborators and must be revisited as soon as there are.
+  **`main-ci-gate`** (renamed from `main-ci-poort` by Dave on July 26, 2026; found at GitHub →
+  Settings → Rules) enforces that gate as a **required status check**: a PR to `main` only merges
+  on a green `lint-en-tests` job. The bypass list (Repository admin + the Write role, "Always
+  allow") keeps the direct fold/release commits on `main` possible — the work account `davekokbwj`
+  has write rights, not admin. That Write bypass is safe as long as there are no external
+  collaborators and must be revisited as soon as there are.
 - **`scripts/lint/check-consumer-drift.ps1`** — the read-only drift check against a consuming repo
   (`MISSING`/`IDENTICAL`/`DRIFTED`).
 - **`scripts/lib/branch-info.ps1`** — the prefix→label→changelog-type table (shared with the

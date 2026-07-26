@@ -174,15 +174,7 @@ undercounts a layer, that is a gap to close on discovery (as this pass did for
   This is not a forgotten translation — renaming it would silently break that binding, and every
   future PR would sit unmergeable (`BLOCKED`, waiting on a check that no longer exists) until
   someone traced it back to this rename, a failure that would only surface at the next PR, not at
-  the moment of the change. It stays Dutch-shaped on purpose. The repo ruleset **`main-ci-poort`**
-  (named in [Sylvester #15's lens](.claude/plugins/claude-specialists/specialists/05-15-extension.md))
-  is a third, and for a different reason than the other two: it is not a flag or a job id this repo
-  defines, but the **actual name of an external GitHub object**, verified via the GitHub API — the
-  doc cites reality rather than binding to it. Translating the doc's mention would make it false
-  (a ruleset by that English name would not exist); making the name itself English first requires
-  renaming the ruleset in GitHub's branch-protection settings, which touches `main`'s merge
-  security and is therefore Dave's decision to make, not something to change from a documentation
-  pass.
+  the moment of the change. It stays Dutch-shaped on purpose.
 - **Legacy back-compat markers** deliberately keep recognizing existing, not-yet-migrated consumer
   content and are not translation debt: the slot heading `## Specific to this repo` alongside its
   legacy predecessor in the drift-check (`scripts/lint/check-consumer-drift.ps1`) and the bootstrap
@@ -198,6 +190,19 @@ system-wide norm above — sharpened July 21, 2026 to make explicit that it cove
 and script-generated content, not only docs/manuals/agent-defs, and sharpened again July 26, 2026
 to make explicit that `.github/**` (workflows, issue templates, PR template) is covered too, after
 a documentation audit found `ci.yml` had been missed.
+
+**A verification lesson from that same audit, worth keeping even though its concrete exception has
+since closed:** a name that looks non-English is not automatically translation debt. Check first
+whether it is the live name of an *external* object — one this repo doesn't define and can't
+rename unilaterally from a documentation pass. If it is, the doc may cite that name as-is (citing
+reality is not a language violation), and the fix runs in one direction only: the object gets
+renamed first, by whoever owns that object's security/binding, and the doc follows — never the
+reverse. This section once cited the repo ruleset enforcing the CI gate under that reasoning, as
+`main-ci-poort` (verified via the GitHub API rather than assumed). Dave has since renamed it to
+`main-ci-gate` (July 26, 2026); a field-by-field API re-check confirmed only the name changed —
+required check, enforcement, target branch, rules, and bypass actors are all unchanged. See
+[Sylvester #15's lens](.claude/plugins/claude-specialists/specialists/05-15-extension.md) for where
+the ruleset lives operationally. With the name now English, no exception remains to list above.
 
 ### The team: roster & routing
 
