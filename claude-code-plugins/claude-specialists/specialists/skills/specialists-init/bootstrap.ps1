@@ -66,29 +66,39 @@ if (-not (Test-Path -LiteralPath $ConsumerRoot -PathType Container)) {
 }
 $ConsumerRoot = (Resolve-Path -LiteralPath $ConsumerRoot).Path
 
-# --- Derive family/plugin + the ~ path to the plugin install -------------------------------------
-# personaDir = <...>/claude-code-plugins/<family>/<plugin>/personas. From that we derive the plugin carrying
-# the personas and the family directory -- these determine the plugin path in the consumer
-# (.claude/plugins/<family>/<plugin>/). The portable body comes from the plugin install; if personaDir
-# falls under user home (~), the standard marketplace cache, we express that path as a ~ path for the @-import in CLAUDE.md.
-# github-source-cache: <...>/claude-code-plugins/<family>/<plugin>/personas -> family = segment after
-# 'claude-code-plugins', plugin = segment after that. Fallback (version cache <...>/<plugin>/<version>/
-# personas): plugin = directory above personas (or above version directory), family = directory above that.
+# --- Derive plugin + the ~ path to the plugin install ---------------------------------------------
+# personaDir = <...>/claude-code-plugins/<family>/<plugin>/personas (source/marketplace-clone layout) or
+# <...>/<marketplace>/<plugin>/<version>/personas (plugin-cache layout). From that we derive the plugin
+# carrying the personas. The portable body comes from the plugin install; if personaDir falls under user
+# home (~), the standard marketplace cache, we express that path as a ~ path for the @-import in CLAUDE.md.
+#
+# The FAMILY segment is deliberately NOT derived here (issue #179). It used to be, and in the
+# plugin-cache layout that derivation yields the MARKETPLACE name: a repo installed through
+# 'specialists@davekjohns-workshop' got its lenses written to .claude/plugins/davekjohns-workshop/,
+# while check-roster-sync.ps1 only ever looked under 'claude-specialists' -- so it reported 16 existing
+# lenses as missing, and the fix it suggested would have created a second copy of each on a second
+# path. The family is a property of the plugin family, not of the marketplace it came from, so it now
+# comes from Get-LensFamily in check-report-lib.ps1: one value, shared by this writer, sync-roster.ps1
+# and the check.
 $segs = ($personaDir -replace '/', '\') -split '\\' | Where-Object { $_ }
 $ccpIdx = [array]::IndexOf([string[]]$segs, 'claude-code-plugins')
 if ($ccpIdx -ge 0 -and ($ccpIdx + 2) -lt $segs.Count) {
-    $family        = $segs[$ccpIdx + 1]
     $personaPlugin = $segs[$ccpIdx + 2]
 } else {
     $pdParent = Split-Path $personaDir -Parent
     if ((Split-Path $pdParent -Leaf) -match '^\d+\.\d+\.\d+') {
         $personaPlugin = Split-Path (Split-Path $pdParent -Parent) -Leaf
-        $family        = Split-Path (Split-Path (Split-Path $pdParent -Parent) -Parent) -Leaf
     } else {
         $personaPlugin = Split-Path $pdParent -Leaf
-        $family        = Split-Path (Split-Path $pdParent -Parent) -Leaf
     }
 }
+# check-report-lib.ps1 travels in the same plugin payload as this skill, so a $PSScriptRoot-relative
+# dot-source resolves from the source repo, the marketplace clone and the plugin cache alike (the same
+# reasoning sync-roster.ps1 relies on). A missing lib must never stop a bootstrap -- this is the script
+# that sets a repo up in the first place -- so it falls back to the same literal the lib returns.
+$lensLib = Join-Path $PSScriptRoot '../../scripts/lib/check-report-lib.ps1'
+if (Test-Path -LiteralPath $lensLib -PathType Leaf) { . $lensLib }
+$family = if (Get-Command Get-LensFamily -ErrorAction SilentlyContinue) { Get-LensFamily } else { 'claude-specialists' }
 # Durable body path: the written @-import must NEVER point to the version-pinned cache. The cache
 # (~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/) is ephemeral -- after a plugin update,
 # the old version directory is purged (~7 days) and an import pointing to it breaks; the orchestrator body

@@ -192,13 +192,12 @@ foreach ($mf in $manifestFiles) {
         }
 
         # 3. Registered extensions present? + unregistered extensions of this plugin.
-        # Lenses can live in two places: the plugin path (.claude/plugins/claude-specialists/
-        # <plugin>/, since life-hub parity) or the legacy path (.claude/extensions/). Both
-        # count; the plugin path is derived from the already-validated plugin id (see Get-PluginDir).
-        $extDirs = @(@(
-            (Join-Path $checkout (Join-Path '.claude\plugins\claude-specialists' $p.id.Split('@')[0]))
-            (Join-Path $checkout '.claude\extensions')
-        ) | Where-Object { Test-Path -LiteralPath $_ })
+        # Lenses can live on the canonical plugin path (.claude/plugins/<family>/<plugin>/, since
+        # life-hub parity), on a non-canonical family segment a pre-#179 bootstrap left behind, or on
+        # the legacy path (.claude/extensions/). All count; Get-LensDirCandidates is the shared source
+        # for that list (issue #179), fed the already-validated plugin id (see Get-PluginDir).
+        $extDirs = @(@(Get-LensDirCandidates -RepoRoot $checkout -PluginName $p.id.Split('@')[0]) |
+            Where-Object { Test-Path -LiteralPath $_ })
 
         $missing = @()
         foreach ($id in $p.extensions) {

@@ -156,8 +156,10 @@ try {
 
     # --- 2b. Version-cache layout: the semantically highest version wins (Victor's finding) ------------
     # Mimicked version cache: the specialists plugin as 1.4.0, plus a sibling domain plugin with
-    # 1.9.0 AND 1.10.0 side by side -- a string sort would pick 1.9.0, a [version] sort 1.10.0. In this
-    # layout (no claude-code-plugins segment) the family derivation falls back to 'davekjohns-workshop'.
+    # 1.9.0 AND 1.10.0 side by side -- a string sort would pick 1.9.0, a [version] sort 1.10.0. This
+    # layout (no claude-code-plugins segment) is also the one that used to derive the family from the
+    # install path and land the lenses under the MARKETPLACE name -- where no reader looks (issue
+    # #179). The family is a constant now, so the scaffolds must appear on the canonical path here too.
     Write-Host "bootstrap.ps1 -- version cache picks the semantically highest version" -ForegroundColor Cyan
     $cacheRoot = Join-Path $Fixture 'cache\davekjohns-workshop'
     $ownCache  = Join-Path $cacheRoot 'specialists\1.4.0'
@@ -174,9 +176,14 @@ try {
     $cachedBootstrap = Join-Path $ownCache 'skills\specialists-init\bootstrap.ps1'
     $rc = Invoke-Script -Path $cachedBootstrap -ScriptArgs @('-ConsumerRoot', $cacheConsumer)
     Assert-Equal 0 $rc.Code 'version cache: bootstrap exit 0'
-    $ppCache = '.claude\plugins\davekjohns-workshop\specialists-lifehub'
+    $ppCache = '.claude\plugins\claude-specialists\specialists-lifehub'
     Assert-True (Test-Path -LiteralPath (Join-Path $cacheConsumer "$ppCache\04-99-extension.md")) 'version cache: scaffold from the highest version (1.10.0)'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $cacheConsumer "$ppCache\04-88-extension.md"))) 'version cache: older version (1.9.0) not used'
+    # Regression #179: the family segment must be the plugin family, never the marketplace the plugin
+    # was installed from -- a lens under 'davekjohns-workshop' is invisible to every reader.
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $cacheConsumer '.claude\plugins\davekjohns-workshop'))) 'version cache: no lenses under the marketplace name (#179)'
+    $cacheMd = [System.IO.File]::ReadAllText((Join-Path $cacheConsumer 'CLAUDE.md'), [System.Text.Encoding]::UTF8)
+    Assert-True ($cacheMd -match [regex]::Escape('@.claude/plugins/claude-specialists/specialists/01-01-extension.md')) 'version cache: the CLAUDE.md lens @-import follows the canonical path (#179)'
 
     # --- 2c. Durable body path: cache install -> @-import points to the marketplaces clone (Gap C) -----
     # Mimics the real user-scope layout: .../plugins/cache/<mp>/<plugin>/<version>/ next to a
