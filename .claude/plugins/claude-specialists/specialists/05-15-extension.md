@@ -86,6 +86,17 @@ infrastructure.
   broke `cut-release.ps1` while cutting v1.12.0)**, `gh` (auth/update notices), … Query commands
   (`git rev-parse`, `git status`) write results to stdout and only real errors to stderr, so `Stop`
   is correct there — don't wrap those. Swept across all release scripts after the v1.12.0 break.
+- **Never name a local variable after a `$script:` variable a dot-sourced repo lib owns.** PowerShell
+  variable names are case-insensitive, and at script top-level the local scope *is* the script scope
+  — so `$changelogHeading = '<default>'` in a script that has dot-sourced `repo-config.ps1`
+  overwrites that file's `$script:ChangelogHeading` **before** the `Get-…` accessor is ever called.
+  The accessor then dutifully returns the default, and the configured value silently disappears: no
+  error, no warning, just the fallback everywhere. This bit the `Get-ChangelogHeading` work for
+  inbound #178; the fix is a distinct local name (`$foldHeading`). Sibling of the `$RepoRoot`/
+  `$repoRoot` collision already documented at the top of `fold-changelog-entry.ps1`. Rule: when you
+  read an optional repo-config value into a local, give the local a name that is not the backing
+  variable's — and prove it with a test that sets a *non-default* value, since a test using the
+  default passes either way.
 - **Never dot-source a consumer's repo-owned lib under `Set-StrictMode`.** A check or hook that
   dot-sources `scripts/lib/branch-info.ps1` or `scripts/repo-config.ps1` to probe it (e.g.
   `check-script-contract.ps1`, `check-roster-sync.ps1`) must load it in a child scope with

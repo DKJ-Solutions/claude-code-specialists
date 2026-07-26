@@ -52,27 +52,58 @@ function New-FoldFixture {
         with the ## Pull Requests / ## Releases skeleton. release-lib.ps1 is deliberately NOT copied,
         so the optional 'Plugins:' detection is simply skipped.
     #>
-    param([Parameter(Mandatory = $true)][string]$Label)
+    param(
+        [Parameter(Mandatory = $true)][string]$Label,
+        # Keep-a-Changelog shape (issue #178): '## [Unreleased]' with released versions as ## sections
+        # below it, and no '## Releases' anywhere. -Heading sets what repo-config reports; omit it to
+        # strip Get-ChangelogHeading entirely and exercise the built-in fallback.
+        [switch]$KeepAChangelog,
+        [string]$Heading,
+        [switch]$OmitHeadingFunction
+    )
     $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("fold-test-$PID-$Label")
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\release') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\lib')     -Force | Out-Null
     Copy-Item -LiteralPath $FoldSrc          -Destination (Join-Path $dir 'scripts\release\fold-changelog-entry.ps1') -Force
-    Copy-Item -LiteralPath $RepoConfigSrc    -Destination (Join-Path $dir 'scripts\repo-config.ps1')                  -Force
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')       -Force
 
-    $changelog = @(
-        '# Changelog',
-        '',
-        '## Pull Requests',
-        '',
-        'Everything merged since the last release.',
-        '',
-        '## Releases',
-        '',
-        'Released versions.',
-        ''
-    ) -join "`n"
+    $repoConfig = [System.IO.File]::ReadAllText($RepoConfigSrc)
+    if ($OmitHeadingFunction) {
+        # A consumer whose repo-config predates the contract: the whole function is gone.
+        $repoConfig = $repoConfig -replace '(?s)function Get-ChangelogHeading \{.*?\r?\n\}', ''
+    } elseif ($PSBoundParameters.ContainsKey('Heading')) {
+        $repoConfig = $repoConfig -replace "(?m)^\`$script:ChangelogHeading = .*$", "`$script:ChangelogHeading = '$Heading'"
+    }
+    [System.IO.File]::WriteAllText((Join-Path $dir 'scripts\repo-config.ps1'), $repoConfig, $Utf8NoBom)
+
+    $changelog = if ($KeepAChangelog) {
+        @(
+            '# Changelog',
+            '',
+            'All notable changes to this project.',
+            '',
+            '## [Unreleased]',
+            '',
+            '## [v2.21.0] - 2026-07-24 - Minor',
+            '',
+            '- An older, already released change.',
+            ''
+        ) -join "`n"
+    } else {
+        @(
+            '# Changelog',
+            '',
+            '## Pull Requests',
+            '',
+            'Everything merged since the last release.',
+            '',
+            '## Releases',
+            '',
+            'Released versions.',
+            ''
+        ) -join "`n"
+    }
     [System.IO.File]::WriteAllText((Join-Path $dir 'CHANGELOG.md'), $changelog, $Utf8NoBom)
     $script:fixtures += $dir
     return $dir
@@ -157,6 +188,45 @@ Assert-True ($r4.ExitCode -eq 0)                                            '-Br
 Assert-True (-not (Test-Path (Join-Path $dir4 'fix-explicit-target.md')))   '-Branch folds the named entry'
 Assert-True ($changelog4 -match 'Explicit target')                         '-Branch entry lands in CHANGELOG'
 Assert-True (Test-Path (Join-Path $dir4 'CONTRIBUTING.md'))                'CONTRIBUTING.md untouched in -Branch mode'
+
+# ---------------------------------------------------------------------------------------------------
+Write-Host "Keep-a-Changelog -- folds under the configured '## [Unreleased]' heading" -ForegroundColor Cyan
+$dir5 = New-FoldFixture -Label 'keepachangelog' -KeepAChangelog -Heading '## [Unreleased]'
+New-EntryFile -Dir $dir5 -Name 'fix-mix-titels.md' -Title 'Mix titles'
+$r5 = Invoke-Fold -Dir $dir5
+$changelog5 = Get-Content -LiteralPath (Join-Path $dir5 'CHANGELOG.md') -Raw
+Assert-True ($r5.ExitCode -eq 0)                                            'keep-a-changelog: exits 0 (no hard stop on the heading)'
+Assert-True (-not (Test-Path (Join-Path $dir5 'fix-mix-titels.md')))        'keep-a-changelog: the entry file is folded away'
+Assert-True ($changelog5 -match 'Mix titles')                              'keep-a-changelog: the entry lands in CHANGELOG'
+# Placement: inside [Unreleased], above the released version below it -- not appended at the end.
+$posUnreleased = $changelog5.IndexOf('## [Unreleased]')
+$posEntry      = $changelog5.IndexOf('Mix titles')
+$posReleased   = $changelog5.IndexOf('## [v2.21.0]')
+Assert-True ($posUnreleased -lt $posEntry)                                 'keep-a-changelog: the entry sits BELOW the [Unreleased] heading'
+Assert-True ($posEntry -lt $posReleased)                                   'keep-a-changelog: the entry sits ABOVE the released version section'
+
+# ---------------------------------------------------------------------------------------------------
+Write-Host "Keep-a-Changelog -- a wrong/absent heading stops cleanly, naming the config" -ForegroundColor Cyan
+$dir6 = New-FoldFixture -Label 'headingmiss' -KeepAChangelog -Heading '## Pull Requests'
+New-EntryFile -Dir $dir6 -Name 'fix-no-heading.md' -Title 'No heading here'
+$r6 = Invoke-Fold -Dir $dir6
+Assert-True ($r6.ExitCode -eq 1)                                            'heading miss: exits 1'
+Assert-True (Test-Path (Join-Path $dir6 'fix-no-heading.md'))               'heading miss: the entry file is left untouched'
+Assert-True ($r6.Output -match [regex]::Escape('## Pull Requests'))         'heading miss: the message names the heading it looked for'
+Assert-True ($r6.Output -match 'Get-ChangelogHeading')                      'heading miss: the message points at the repo-config function to set'
+
+# ---------------------------------------------------------------------------------------------------
+Write-Host "Backwards compatible -- a repo-config without Get-ChangelogHeading still folds" -ForegroundColor Cyan
+$dir7 = New-FoldFixture -Label 'nofunction' -OmitHeadingFunction
+New-EntryFile -Dir $dir7 -Name 'fix-legacy-config.md' -Title 'Legacy config'
+$r7 = Invoke-Fold -Dir $dir7
+$changelog7 = Get-Content -LiteralPath (Join-Path $dir7 'CHANGELOG.md') -Raw
+Assert-True ($r7.ExitCode -eq 0)                                            'legacy config: exits 0 (falls back to the default heading)'
+Assert-True ($changelog7 -match 'Legacy config')                           'legacy config: the entry lands under ## Pull Requests'
+$posPr    = $changelog7.IndexOf('## Pull Requests')
+$posEnt7  = $changelog7.IndexOf('Legacy config')
+$posRel7  = $changelog7.IndexOf('## Releases')
+Assert-True ($posPr -lt $posEnt7 -and $posEnt7 -lt $posRel7)               'legacy config: placement unchanged (between the two headings)'
 
 # ---------------------------------------------------------------------------------------------------
 foreach ($f in $script:fixtures) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }
