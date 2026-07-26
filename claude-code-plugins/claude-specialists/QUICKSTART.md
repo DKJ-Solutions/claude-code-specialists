@@ -71,6 +71,16 @@ proposes a roster row for you to review. It never edits your `CLAUDE.md` or comm
 change on a branch under your own governance. You can also run
 `scripts/sync/check-roster-sync.ps1` yourself for the full report.
 
+When an update adds a **new skill**, restart your Claude Code session before you go looking for it.
+`/reload-plugins` and `/reload-skills` only reload the skill set that is already loaded, not a new
+skill file from an updated plugin version. So a slash command that did not exist in the previous
+release stays absent until you restart — `claude plugin update`'s own `Restart to apply changes.` is
+literally true here. Don't trust the skill counter those two commands print as evidence either way:
+it excludes any skill with `disable-model-invocation: true`. Several of `specialists`' own skills
+(`cut-release`, `fold-changelog`, `open-pr`, `park`) are slash-only for exactly that reason, so an
+unchanged count, or even `0 skills`, proves nothing about whether a new skill has actually landed.
+The only reliable check is the slash list itself.
+
 ## Reporting back or improving something
 
 - **An improvement to the shared core** (an agent def, playbook, persona, or skill): don't
