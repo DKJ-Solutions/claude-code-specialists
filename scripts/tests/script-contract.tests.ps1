@@ -168,11 +168,11 @@ try {
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
     Assert-Equal 0 $r.Code 'happy path: exit-code 0'
     Assert-NotMatch '\[ERROR\]' $r.Out 'happy path: no errors'
-    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds', 'Get-ChangelogHeading')) {
+    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds', 'Get-ChangelogHeading', 'Get-LiveStage')) {
         Assert-Match "\[OK\]\s+'$fn' present in" $r.Out "happy path: '$fn' reported OK"
     }
     $okCount = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 7 $okCount 'happy path: exactly seven [OK] lines (the six mandatory functions + the optional Get-ChangelogHeading, nothing else)'
+    Assert-Equal 8 $okCount 'happy path: exactly eight [OK] lines (the six mandatory functions + the optional Get-ChangelogHeading + the optional Get-LiveStage, nothing else)'
 
     # --- 2. Missing function in branch-info.ps1 (the exact #147 incident): Test-BranchName ---------
     #     new-branch crashed at runtime with "The term 'Test-BranchName' is not recognized" because
@@ -231,7 +231,7 @@ try {
         Assert-NotMatch $optFn $r.Out "optional Get-Pr*: '$optFn' never mentioned (not in the contract)"
     }
     $okCount6 = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 7 $okCount6 'optional Get-Pr*: still exactly seven [OK] (the mandatory six + Get-ChangelogHeading; the Get-Pr* four excluded)'
+    Assert-Equal 8 $okCount6 'optional Get-Pr*: still exactly eight [OK] (the mandatory six + Get-ChangelogHeading + Get-LiveStage; the Get-Pr* four excluded)'
 
     # --- 6c. An optional contract function that is ABSENT -> [INFO] naming the fallback, exit 0 -----
     #     Get-ChangelogHeading (issue #178) is declared Optional: fold-changelog-entry.ps1 falls back
@@ -305,7 +305,12 @@ function Get-RosterIgnoredIds { return @() }
 
     $contractSrc = [System.IO.File]::ReadAllText($Script)
     $totalRecordCount = @([regex]::Matches($contractSrc, "Lib\s*=\s*'[^']+';\s*Function\s*=\s*'[^']+';\s*Scripts\s*=\s*@\(")).Count
-    Assert-Equal 7 $totalRecordCount 'contract: exactly seven (lib, function) records declared in check-script-contract.ps1'
+    Assert-Equal 8 $totalRecordCount 'contract: exactly eight (lib, function) records declared in check-script-contract.ps1'
+    # Note (for Tycho #18): the eighth record (Get-LiveStage, issue #177) is deliberately NOT added to
+    # $expectedContract below -- its 'Scripts' attribution names the cut-release SKILL, not a real
+    # mirrored script, so the existing per-record loop's Get-SharedScriptPairs lookup does not apply
+    # to it as-is. Real dedicated coverage for Get-LiveStage (missing-optional -> [INFO], present ->
+    # [OK], mirroring test 6c for Get-ChangelogHeading) is still open.
 
     foreach ($e in $expectedContract) {
         $pattern = "Lib\s*=\s*'([^']+)';\s*Function\s*=\s*'" + [regex]::Escape($e.Function) + "';\s*Scripts\s*=\s*@\(([^)]*)\)"

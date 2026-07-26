@@ -21,19 +21,27 @@
       - fold-changelog-entry -> repo-config.ps1: Get-RepoName
                                 repo-config.ps1: Get-ChangelogHeading (OPTIONAL -- see below)
       - check-roster-sync   -> repo-config.ps1: Get-RosterPath, Get-RosterIgnoredIds
+      - cut-release (skill checklist) -> repo-config.ps1: Get-LiveStage (OPTIONAL -- see below)
 
     OPTIONAL contract entries are declared with Optional = $true and report [INFO] instead of
     [ERROR] when absent, naming the default that will be used. Get-ChangelogHeading (issue #178) is
     the case this exists for: fold-changelog-entry.ps1 falls back to '## Pull Requests', so a
     consumer without the function is not broken -- but a consumer whose CHANGELOG names its section
     differently DOES need it, and silence would leave them to discover that at fold time.
+    Get-LiveStage (issue #177) is the same pattern for the cut-release skill: it falls back to an
+    empty string (no separate live stage, Block 2 of the checklist never applies), so a consumer
+    without the function is not broken either -- but a repo that DOES have a live stage needs it
+    filled in, or the skill would silently never print that block.
 
     Deliberately OUT of the contract entirely: the optional repo-config functions that open-pr.ps1
     guards via Get-Command (Get-PrDescriptionPlaceholder, Get-PrApprovalPattern, Get-PrAssignee,
     Get-PrMilestone) -- those are per-repo taste with no wrong-by-default failure mode, so they are
     never declared here.
-    Also out of scope: workshop-only scripts (ship-pr.ps1, cut-release.ps1) -- they are not mirrored
-    into the plugin and are not part of the consumer contract.
+    Also out of scope: workshop-only scripts (ship-pr.ps1, scripts/release/cut-release.ps1 -- the
+    284-line, marketplace-specific script that bumps every plugin.json in lockstep) -- they are not
+    mirrored into the plugin and are not part of the consumer contract. The 'cut-release' entry above
+    is a different thing entirely: the shared cut-release SKILL (issue #177), a checklist with no
+    script of its own, that reads Get-LiveStage to decide whether its Block 2 applies.
 
     For each repo-owned lib in the contract:
       - lib file MISSING            -> [ERROR] naming the file and every function/shared-script that
@@ -110,7 +118,9 @@ $script:Contract = @(
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RosterPath';  Scripts = @('check-roster-sync') },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RosterIgnoredIds'; Scripts = @('check-roster-sync') },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ChangelogHeading'; Scripts = @('fold-changelog-entry');
-       Optional = $true; Default = '## Pull Requests' }
+       Optional = $true; Default = '## Pull Requests' },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-LiveStage'; Scripts = @('cut-release (skill checklist)');
+       Optional = $true; Default = '' }
 )
 
 # An optional record reports [INFO] (with the fallback the caller uses) where a required one reports
