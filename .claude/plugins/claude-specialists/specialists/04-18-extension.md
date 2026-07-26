@@ -20,14 +20,25 @@ logic in `release-lib.ps1` (version bump, CHANGELOG transformation, release-note
 
 ### Honest status & Tycho's role
 
-- **The suite has only just begun.** First member: [`scripts/tests/release-lib.tests.ps1`](../../../../scripts/tests/release-lib.tests.ps1)
-  — dependency-free (no Pester), dot-sources `release-lib.ps1` and asserts the version bump +
-  CHANGELOG transformation, exit 1 on the first failure (usable in a CI gate). The remaining scripts
-  are still verified manually; given their size that is defensible, but it is exactly the kind of
-  routine check a test should replace as soon as a script grows more complex or changes more often.
-- Tycho's role here is to **build that suite out when it pays off**: fixture repos (a valid and a
-  deliberately broken plugin directory) against which the lint gate must produce its errors, so that
-  a future change to `check-plugin-integrity.ps1` does not silently disable a check.
+- **The suite has grown well past its first member.** It started with
+  [`scripts/tests/release-lib.tests.ps1`](../../../../scripts/tests/release-lib.tests.ps1) —
+  dependency-free (no Pester), dot-sources `release-lib.ps1` and asserts the version bump + CHANGELOG
+  transformation, exit 1 on the first failure (usable in a CI gate) — and that dependency-free,
+  exit-1-on-first-failure style now runs across the suite under `scripts/tests/`, which covers most
+  of what Sylvester's lens lists: the lint gate (`check-plugin-integrity.tests.ps1`), the shared
+  agent-def blocks (`agent-shared.tests.ps1`), the branch/changelog/release chain
+  (`branch-info.tests.ps1`, `new-branch.tests.ps1`, `fold-changelog.tests.ps1`,
+  `cut-release-guardrail.tests.ps1`, `park-branch.tests.ps1`), the connectors + roster machinery
+  (`connectors.tests.ps1`, `roster-sync.tests.ps1`, `sync-roster.tests.ps1`), the shared-scripts
+  mirror + contract (`shared-scripts.tests.ps1`, `script-contract.tests.ps1`), the bootstrap drift
+  check (`bootstrap-drift.tests.ps1`), and the repo-config helper (`repo-config.tests.ps1`). Tycho
+  does not need to re-derive that list from memory: `Get-ChildItem scripts/tests/*.tests.ps1` gives
+  the current count and membership directly, which is deliberately how this file avoids hardcoding a
+  number that would drift with every new suite.
+- Tycho's role here is now mostly **keeping the suite honest as the scripts evolve**: add a test the
+  moment a script grows a new decision path or a fixture (a valid and a deliberately broken plugin
+  directory) the lint gate must still catch, and close any genuine gap Victor flags during review —
+  not starting the suite from scratch.
 - He works together with [Sylvester #15](05-15-extension.md) (who owns the scripts) and
   [Victor #19](06-19-extension.md) (who flags a missing test during review).
 

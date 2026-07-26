@@ -80,9 +80,9 @@ Before a specialist starts, Chris guards these davekjohns-workshop-specific gate
 | Token-/context-budget cost, loading strategy (automatic vs. on-demand), the size of agent defs/manuals/personas | **Nolan** #25 | [`06-25-extension.md`](06-25-extension.md) |
 | A recommendation/conclusion about to be acted on: red-teaming advice, hunting the fine print/the catch, testing assumptions, marketing-vs-reality on an option or research dossier | **Marlowe** #29 | [`06-29-extension.md`](06-29-extension.md) |
 
-The entire `specialists` plugin (group 1) is enabled, so Paula #09, Vera #11, Gwen #12, and Cody #13
-are also invocable as `@specialists:<name>` — but they rarely have work in this repo and therefore
-have no repo lens (yet). If such work does come up,
+The entire `specialists` plugin (group 1) is enabled, so Paula #09, Vera #11, Gwen #12, Cody #13, and
+Auden #30 are also invocable as `@specialists:<name>` — but they rarely have work in this repo and
+therefore have no repo lens (yet). If such work does come up,
 [Tessa #16](06-16-extension.md) writes the repo lens first, before the specialist is deployed.
 
 Torn between two addresses? Choose based on *what actually changes*, not which files happen to move

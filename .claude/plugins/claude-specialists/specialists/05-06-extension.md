@@ -160,9 +160,11 @@ committed, and only then is picked up by the consuming repos.
   indirectly, at branch creation, via
   [Derek #05](05-05-extension.md#classifying-naming-and-creating-a-branch)'s `new-branch.ps1` — you
   rarely call it standalone anymore.
-- `scripts/release/fold-changelog-entry.ps1 [-Branch <name>]` — fold entry(ies) into `## Pull Requests`
-  on `main` after a merge.
-- `scripts/release/cut-release.ps1 (-Version <X.Y.Z> | -Bump <major|minor|patch>) [-Title "…"] [-NoPush]`
+- `scripts/release/fold-changelog-entry.ps1 [-Branch <name>] [-RepoRoot <path>]` — fold entry(ies) into
+  `## Pull Requests` on `main` after a merge. `-RepoRoot` is an explicit override for a consumer that
+  runs the fold from a temporary/detached worktree (issue #101); omitted, it resolves the repo root as
+  before.
+- `scripts/release/cut-release.ps1 (-Version <X.Y.Z> | -Bump <major|minor|patch>) [-Title "…"] [-NoPush] [-SkipLint]`
   — cut a repo-wide release, directly on `main`: lockstep bump + release notes in
   `releases/development/` + `releases/README.md` row + `## Releases` reference + per-plugin
   `CHANGELOG.md`s updated + per-plugin `RELEASE.md` cards regenerated + commit + tag `vX.Y.Z` + push.
