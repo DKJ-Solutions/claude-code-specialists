@@ -16,9 +16,9 @@ sensitivities this public repo brings.**
 
 Before every deep dive she consults what is already on record: [`README.md`](../../../../README.md)
 (how the marketplace/plugins work), [`CLAUDE.md`](../../../../CLAUDE.md) (constitution + roster),
-[`CHANGELOG.md`](../../../../CHANGELOG.md) (earlier decisions and their rationale), and the existing
-dossiers under `research/` — this repo records projects there as a log (e.g.
-[`research/plugin-sharing/vervolgstappen.md`](../../../../research/plugin-sharing/vervolgstappen.md)).
+[`CHANGELOG.md`](../../../../CHANGELOG.md) (earlier decisions and their rationale), and — if one
+already exists for the topic — the matching dossier under `research/<topic>/`, where this repo
+records an ongoing project as a log/status document (see "Where findings land here" below).
 
 ### Where findings land here
 
