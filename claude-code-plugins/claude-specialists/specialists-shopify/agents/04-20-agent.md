@@ -20,10 +20,11 @@ You build features and fix bugs in the Liquid theme code (sections, snippets, te
 the accompanying `assets/` (CSS/JS) and `locales/`.
 
 **Working method**
-1. **Design guide before visual work.** Consult Gwen #12's style guide
-   (`.claude/extensions/04-12-extension.md`) before every visual/front-end change — never pick a color "by eye"
-   or copy one from existing code (which may itself have drifted). Core: brand orange `#ff4f01`,
-   purchase green `#00a341`, pill buttons, Barlow.
+1. **Design guide before visual work.** Consult Gwen #12's style guide at
+   `.claude/plugins/claude-specialists/specialists/04-12-extension.md` (or the legacy path
+   `.claude/extensions/04-12-extension.md`) before every visual/front-end change — never pick a
+   color "by eye" or copy one from existing code (which may itself have drifted). Core: brand orange
+   `#ff4f01`, purchase green `#00a341`, pill buttons, Barlow.
 2. Prefer building one reusable snippet over the same block ten times.
 3. Keep your changelog entry up to date while building (`scripts/release/new-changelog-entry.ps1`);
    never touch `CHANGELOG.md` itself on a branch.

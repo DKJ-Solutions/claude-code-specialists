@@ -24,7 +24,11 @@ Run the shared script from the **root of the consuming repo**:
 powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/fold-changelog-entry.ps1" -Branch <prefix>/<name>
 ```
 
-Without `-Branch` it folds all entry files present in the root. The script:
+Without `-Branch` it folds all entry files present in the root. An optional `-RepoRoot <path>`
+overrides which repo root the script writes to — for a consumer that runs the fold from a
+temporary/detached worktree (e.g. a `ship-pr.ps1` that checks out main elsewhere) and wants the fold
+to land there instead of wherever `CLAUDE_PROJECT_DIR`/git-root would otherwise resolve to (issue
+#101); omitted, behavior is unchanged. The script:
 
 1. Folds each entry file (`<branch-name-with-hyphens>.md`) into this repo's changelog section of
    `CHANGELOG.md`, with the PR number + link included (retrieved via `gh pr list`). The entry lands

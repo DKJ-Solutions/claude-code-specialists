@@ -101,7 +101,8 @@ deliberately leaves personas alone (they have no agent def).
 ## Shared agent-def blocks — one source for the verbatim boundaries
 
 A number of bullets in the **Boundaries** section are word-for-word identical across
-many agent defs — the **inbound rule** even across all 19. Such governance belongs *in* the
+many agent defs — the **inbound rule** and the **automation-first rule** even across all 26 (every
+agent def in every plugin). Such governance belongs *in* the
 agent-def body (always loaded, also for a directly invoked worker subagent), but Claude Code has no
 native transclusion in an agent def — what's written there is there, literally. To still maintain
 those blocks in **one place** instead of in every agent def, a **build-and-lint** model applies:
@@ -117,9 +118,12 @@ those blocks in **one place** instead of in every agent def, a **build-and-lint*
   soon as a marked region deviates from its source (a hand edit or a forgotten rebuild), just like
   the drift lint for consumers.
 
-Current blocks: `inbound-behaviour`, `laziness-automation`, `language-behavior`, `webcontent-boundary`,
-`artifact-publishing-boundary`, and `browser-compatibility`. This way changing a shared boundary costs
-one edit + one build, not a manual change in every agent def that carries it.
+Current blocks — one canonical source file each under `agent-shared/`, so the directory listing is
+always the up-to-date enumeration: `inbound-behaviour`, `laziness-automation`, `language-behavior`,
+`no-conversation-history`, `no-commit-push-pr`, `browser-compatibility`, `webcontent-boundary`,
+`changelog-entry-boundary`, `design-owner-boundary`, `storefront-preview-boundary`, and
+`artifact-publishing-boundary`. This way changing a shared boundary costs one edit + one build, not a
+manual change in every agent def that carries it.
 
 ## Marking a complete skill enumeration
 

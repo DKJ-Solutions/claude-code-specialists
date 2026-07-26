@@ -16,6 +16,15 @@ consumers (life-hub, smartwatchbanden, …) no longer duplicate them per repo. T
 
 ## Status
 
+This table mirrors the full registry in
+[`scripts/lib/shared-scripts-lib.ps1`](../../../../scripts/lib/shared-scripts-lib.ps1)'s
+`Get-SharedScriptPairs` -- one row per registered pair, so this is the **complete** shared set, not
+a skill-only subset. Not every pair is reached through a skill, though: `check-roster-sync` /
+`check-script-contract` are read-only checks invoked by a SessionStart hook instead, and
+`check-report-lib` / `native-capture-lib` are dot-sourced libs with no standalone entry point of
+their own -- their **Skill** cell says so rather than linking one, so their absence from a skill
+link is not an oversight.
+
 | Script | Status | Skill |
 |---|---|---|
 | `release/fold-changelog-entry.ps1` | **Shared** (mirror active) | [`fold-changelog`](../skills/fold-changelog/SKILL.md) |
@@ -23,6 +32,10 @@ consumers (life-hub, smartwatchbanden, …) no longer duplicate them per repo. T
 | `release/new-changelog-entry.ps1` | **Shared** (mirror active; normally reached indirectly via `new-branch`, not called standalone) | [`new-branch`](../skills/new-branch/SKILL.md) |
 | `task/new-branch.ps1` | **Shared** (mirror active; creates the branch and calls `new-changelog-entry.ps1` as a child step in the same move -- a branch is never entry-less) | [`new-branch`](../skills/new-branch/SKILL.md) |
 | `task/park-branch.ps1` | **Shared** (mirror active; commits all outstanding work + `git push -u` -- no PR, no live action; self-contained, no repo-owned config) | [`park`](../skills/park/SKILL.md) |
+| `sync/check-roster-sync.ps1` | **Shared** (mirror active; read-only roster/lens drift check) | none -- invoked by the `roster-sessioncheck` SessionStart hook |
+| `sync/check-script-contract.ps1` | **Shared** (mirror active; read-only script-contract drift check) | none -- invoked by the `script-contract-sessioncheck` SessionStart hook |
+| `lib/check-report-lib.ps1` | **Shared** (mirror active; dot-sourced `[OK]`/`[INFO]`/`[ERROR]` report helper lib, no standalone entry point) | none -- consumed by the sync/check scripts |
+| `lib/native-capture-lib.ps1` | **Shared** (mirror active; dot-sourced `Invoke-NativeCapture` helper lib -- the stderr-safe native-command wrapper -- no standalone entry point) | none -- consumed by every native-command call site (release/task scripts) |
 
 ## How the mirror works
 

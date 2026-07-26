@@ -34,10 +34,24 @@ The verbatim-shared blocks run on **build-and-lint** (built July 2026):
 - **Gate:** `check-plugin-integrity.ps1` (check 7) fails as soon as a marked region deviates from its
   source. Details in the [Sylvester #15 lens](05-15-extension.md).
 
-Current shared blocks: `inbound-behaviour` (19 agent defs), `webcontent-boundary` (3), `artifact-publishing-boundary`
-(2), `language-behavior` (19 — the closing "respond in the user's language" line; 03-07/Rebecca keeps a
-local variant with a source-quoting nuance, deliberately not shared). That makes the circle of
-application per block explicit — not every block applies to everyone.
+Current shared blocks, sourced one file each under `agent-shared/`, fall into four tiers by how far
+each one reaches: **universal** — `inbound-behaviour` and `laziness-automation` (every agent def
+carries both); **near-universal** — `language-behavior` (every agent def except 03-07/Rebecca, who
+keeps a local variant with a source-quoting nuance, deliberately not shared); a **middle tier** —
+`no-conversation-history` and `no-commit-push-pr`, each reaching a meaningful share of agent defs,
+comfortably wider than the narrow tier below but well short of near-universal; and a **narrowly
+applied** tier — `browser-compatibility`, `webcontent-boundary`, `changelog-entry-boundary`,
+`design-owner-boundary`, `storefront-preview-boundary`, and `artifact-publishing-boundary` — each
+reaching only the circle of agent defs whose craft the rule actually touches (e.g.
+`changelog-entry-boundary` only where the specialist owns an entry file,
+`design-owner-boundary`/`storefront-preview-boundary` only for the relevant Shopify roles).
+Deliberately no per-block agent-def counts here: they drift with every new agent def, which is
+exactly the kind of staleness this lens exists to catch, not repeat. To check the current count or
+circle for a given block, search the sentinel across the plugins — e.g.
+`Get-ChildItem -Recurse -Filter '*-agent.md' claude-code-plugins/claude-specialists | Select-String
+-Pattern 'BEGIN shared:<name>'` lists every agent def currently carrying it;
+`scripts/agents/build-agent-defs.ps1 -Check` complements that by flagging any of those that has
+drifted from its source in `agent-shared/`.
 
 ### Working method in this repo
 
