@@ -1,9 +1,9 @@
-# Release v2.7.2
+# Release v2.7.3
 
 **Date:** 2026-07-26  
 **Type:** Patch
 
-Documentation audit: correct the GitHub Release doctrine, stale enumerations, and the last language gap
+Follow the ruleset rename in the docs and retire the dated research dossiers
 
 You are on this release.
 
@@ -11,5 +11,5 @@ No changes to this plugin in this release — see the full notes.
 
 ---
 
-Full workshop notes: [releases/development/2.x/2.7.2.md](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/releases/development/2.x/2.7.2.md)
+Full workshop notes: [releases/development/2.x/2.7.3.md](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/releases/development/2.x/2.7.3.md)
 Cumulative plugin history: [CHANGELOG.md](CHANGELOG.md)
