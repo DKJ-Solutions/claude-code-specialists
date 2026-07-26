@@ -23,7 +23,7 @@ is an **inbound signal**: the change is first brought back here and then synced 
 discovers core improvements (something for the shared agent defs, manuals, persona bodies, or
 skills — not lens work), that session does not build it itself, but opens an **issue on this repo**
 with the label **`inbound`** — template:
-[`inbound-verbeterpunt`](../../../.github/ISSUE_TEMPLATE/inbound-verbeterpunt.md). This way nothing
+[`inbound-improvement`](../../../.github/ISSUE_TEMPLATE/inbound-improvement.md). This way nothing
 gets lost and every workshop session has a visible backlog; the workshop processes it through the
 normal chain (branch → reviews → PR on Dave's word → release bump), after which the consumer gets
 it back via the plugin update. The only legitimate bridge on the consumer side is a deliberately

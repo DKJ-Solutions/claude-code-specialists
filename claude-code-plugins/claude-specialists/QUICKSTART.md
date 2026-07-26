@@ -85,7 +85,7 @@ The only reliable check is the slash list itself.
 
 - **An improvement to the shared core** (an agent def, playbook, persona, or skill): don't
   rework it locally, but report it as an issue on this repo with the label `inbound` — an
-  [issue template](../../.github/ISSUE_TEMPLATE/inbound-verbeterpunt.md) is ready for that. The
+  [issue template](../../.github/ISSUE_TEMPLATE/inbound-improvement.md) is ready for that. The
   workshop processes it through its own chain, and the improvement comes back to all consumers via
   a release.
 - **Repo-specific additions** belong in your own repo lenses on the plugin path

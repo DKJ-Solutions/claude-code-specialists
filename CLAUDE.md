@@ -146,14 +146,19 @@ docstrings, console output, and script-generated document content), the session-
 stays separate and follows the user, with three explicit exceptions — lives in
 [Tessa #16's portable manual](claude-code-plugins/claude-specialists/specialists/manuals/06-16-manual.md#what-tessa-covers),
 under **"Guarding the language convention,"** so it travels to every consuming repo, not just this
-one. This slot records this repo's own concrete instances of that norm — **unambiguously
-everything**, not just docs/manuals/agent-defs:
+one. This slot records this repo's own concrete instances of that norm across **every layer of the
+repo**, not just docs/manuals/agent-defs. The list below is meant to be exhaustive; if it ever
+undercounts a layer, that is a gap to close on discovery (as this pass did for
+`.github/workflows/ci.yml`), not a quiet exception to the norm:
 
 - **The script layer is fully in scope.** Every `.ps1` file under `scripts/**` (and the shared
-  mirrors under `claude-code-plugins/claude-specialists/*/scripts/`), the hooks, and the tests are
-  English throughout — comments, docstrings, and console output (`Write-Host`/`Write-Error`/
-  `Write-Warning`/`throw` text). New scripts and edits are written in English; no new non-English
-  text is added anywhere in scope.
+  mirrors under `claude-code-plugins/claude-specialists/*/scripts/`), the hooks, the tests, and
+  `.github/**` (the workflows, the issue templates, and the PR template) are English throughout —
+  comments, docstrings, console output (`Write-Host`/`Write-Error`/`Write-Warning`/`throw` text), and
+  workflow/template body text. `ci.yml` was translated in this pass (July 26, 2026), closing the gap
+  a documentation audit found between this claim and the actual repo state — a CI workflow,
+  matching none of the exceptions below, had simply been missed. New scripts and edits are written
+  in English; no new non-English text is added anywhere in scope.
 - **Script-*generated* document content is in scope too.** The CHANGELOG.md sections,
   release-notes, and per-plugin CHANGELOGs that `scripts/lib/release-lib.ps1` builds are English
   going forward: its document-generating template strings (the category labels, the reference line,
@@ -162,8 +167,22 @@ everything**, not just docs/manuals/agent-defs:
   reference line were translated on July 22, 2026 — Dave's decision). The archived
   `releases/development/*.md` notes stay in their original language, so older ones remain Dutch.
 - **Technical identifiers/flags** keep their original form — the scaffold marker `VUL-IN` (used
-  across the plugin's scaffold scripts, e.g. `bootstrap.ps1`, `new-branch.ps1`) is the concrete
-  example here; Dave's explicit decision.
+  across the plugin's scaffold scripts, e.g. `bootstrap.ps1`, `new-branch.ps1`) is one example;
+  Dave's explicit decision. The job id **`lint-en-tests`** in
+  [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is a second, higher-stakes one: it is the
+  exact name GitHub's `main` ruleset requires as a passing status check before any PR can merge.
+  This is not a forgotten translation — renaming it would silently break that binding, and every
+  future PR would sit unmergeable (`BLOCKED`, waiting on a check that no longer exists) until
+  someone traced it back to this rename, a failure that would only surface at the next PR, not at
+  the moment of the change. It stays Dutch-shaped on purpose. The repo ruleset **`main-ci-poort`**
+  (named in [Sylvester #15's lens](.claude/plugins/claude-specialists/specialists/05-15-extension.md))
+  is a third, and for a different reason than the other two: it is not a flag or a job id this repo
+  defines, but the **actual name of an external GitHub object**, verified via the GitHub API — the
+  doc cites reality rather than binding to it. Translating the doc's mention would make it false
+  (a ruleset by that English name would not exist); making the name itself English first requires
+  renaming the ruleset in GitHub's branch-protection settings, which touches `main`'s merge
+  security and is therefore Dave's decision to make, not something to change from a documentation
+  pass.
 - **Legacy back-compat markers** deliberately keep recognizing existing, not-yet-migrated consumer
   content and are not translation debt: the slot heading `## Specific to this repo` alongside its
   legacy predecessor in the drift-check (`scripts/lint/check-consumer-drift.ps1`) and the bootstrap
@@ -176,7 +195,9 @@ everything**, not just docs/manuals/agent-defs:
 
 Decision by Dave, July 20, 2026 (repo-wide English) — the decision that in turn prompted the
 system-wide norm above — sharpened July 21, 2026 to make explicit that it covers the script layer
-and script-generated content, not only docs/manuals/agent-defs.
+and script-generated content, not only docs/manuals/agent-defs, and sharpened again July 26, 2026
+to make explicit that `.github/**` (workflows, issue templates, PR template) is covered too, after
+a documentation audit found `ci.yml` had been missed.
 
 ### The team: roster & routing
 
