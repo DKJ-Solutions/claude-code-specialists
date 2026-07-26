@@ -2,7 +2,7 @@
   "name": "specialists-shopify",
   "displayName": "Claude Specialists — Shopify domain",
   "description": "Domain plugin for Shopify store repos (e.g. smartwatchbanden): the subagents Liam, Sandra, and Steven, plus the domain skill start-task (new branch + preview theme). Deliberately NOT repo-neutral — only a Shopify repo enables this plugin. The governance layer (CLAUDE.md + .claude/manuals/*) and the shared core (plugin 'specialists') stay separate.",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "author": { "name": "DaveKJohn" },
   "keywords": ["specialists", "workflow", "claude-code", "shopify", "liquid"]
 }
