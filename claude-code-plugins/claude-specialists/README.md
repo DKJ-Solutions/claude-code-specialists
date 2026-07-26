@@ -121,6 +121,41 @@ Current blocks: `inbound-behaviour`, `laziness-automation`, `language-behavior`,
 `artifact-publishing-boundary`, and `browser-compatibility`. This way changing a shared boundary costs
 one edit + one build, not a manual change in every agent def that carries it.
 
+## Marking a complete skill enumeration
+
+The skill set is spread across several plugin folders, which makes "list/count all skills" a
+recurring way for prose to drift out of sync. The same sentinel idea as the shared agent-def blocks
+above applies here, one level lighter: an author who writes a prose enumeration that is meant to be
+**the complete skill set** wraps it in a BEGIN/END HTML-comment marker:
+
+```
+<!-- skills:all -->
+- `skill-name`
+...
+<!-- /skills:all -->
+```
+
+and the lint gate ([`check-plugin-integrity.ps1`](../../scripts/lint/check-plugin-integrity.ps1),
+check 10) then verifies the span's backtick-quoted names against the real skill set on every run.
+Three rules govern when and how to reach for it:
+
+- **Wrap tightly.** The extraction is character-based (so the sentinels may sit inline, mid-sentence,
+  not just around a standalone bullet list as shown above), but *every* backtick-quoted term inside
+  the span counts as a claimed skill name — so the span must close around just the skill names,
+  nothing else in backticks.
+- **Only for a genuinely complete enumeration.** A deliberately partial or illustrative list (e.g.
+  QUICKSTART.md's slash-only subset) gets no marker — marking it would turn an intentional subset
+  into a permanent false positive.
+- **Showing the syntax literally needs a fence, not inline code.** The check masks fenced code
+  blocks before it looks for markers, precisely so a paragraph like this one can show the literal
+  syntax without being misread as a real span (as happened once during development). A single pair of
+  backticks does *not* get that treatment — a claimed skill name inside a real span is itself
+  backtick-delimited, so there is no way to tell "this is an example" apart from "this is a claimed
+  name" in inline code. A fence is the only safe way to display the marker literally.
+
+This is opt-in, not a generic prose scan: a doc with zero spans passes silently. See the check's
+docstring in `check-plugin-integrity.ps1` for the full mechanics.
+
 ## Where this runs: Chat, Cowork, and Claude Code
 
 Anthropic's Claude product has three relevant surfaces: **Chat** (a conversation), **Cowork** (a
@@ -136,8 +171,8 @@ Cowork and in Claude Code — in a plain Claude.ai Chat session they show up gra
 Concretely for davekjohns-workshop: the specialists roster (the subagents under Chris) and the three
 SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`)
 function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
-(`fold-changelog`, `open-pr`, `new-branch`, `park`, `specialists-init`, `sync-roster`, `start-task`,
-`cut-release`) remain available there.
+<!-- skills:all -->(`fold-changelog`, `open-pr`, `new-branch`, `park`, `specialists-init`, `sync-roster`, `start-task`,
+`cut-release`)<!-- /skills:all --> remain available there.
 
 Skills themselves are Anthropic's general **Agent Skills** mechanism — organized folders of
 instructions/scripts/resources that an agent discovers and loads progressively (name + description
@@ -150,9 +185,9 @@ interchangeable with — a Claude Code subagent.
 
 ## How we use skills — and what we deliberately don't
 
-Most skills in davekjohns-workshop today (`fold-changelog`, `open-pr`, `new-branch`, `park`,
+<!-- skills:all -->Most skills in davekjohns-workshop today (`fold-changelog`, `open-pr`, `new-branch`, `park`,
 `specialists-init`, `sync-roster`, `start-task`) are a thin wrapper around a script — procedural
-**mechanism** (branch, PR, fold, bootstrap, roster-sync). `cut-release` is the deliberate exception:
+**mechanism** (branch, PR, fold, bootstrap, roster-sync). `cut-release`<!-- /skills:all --> is the deliberate exception:
 a checklist with no script of its own (see below). Either way, the specialists' craft and judgment
 live in the persona/manual context (agent defs), not in skills. That's a deliberate split, but it
 also means we currently use only one half of what Agent Skills can carry.

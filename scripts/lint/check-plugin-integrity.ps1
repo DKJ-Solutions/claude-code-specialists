@@ -42,6 +42,18 @@
          the 'vX.Y.Z' it contains equals the 'version' in that plugin's plugin.json. Only
          cut-release.ps1 changes both files together, so an ordinary feature PR can never trip this
          -- a mismatch/missing file means the card was not (re)generated.
+     10. marked "all skills" enumerations: an opt-in <!-- skills:all --> ... <!-- /skills:all -->
+         span (character-based, so it also wraps inline running prose, not just a bullet list on
+         its own lines; scanned in every file from check 4's $linkFiles, with fenced ```-code blocks
+         masked out first so a literal example of the marker syntax in a fence is not itself read as
+         a live marker) must contain the exact set of backtick-quoted names -- no more, no fewer --
+         against the canonical skillset read from every <plugin>/skills/<name>/SKILL.md 'name:'
+         frontmatter across ALL plugin folders (not just 'specialists'). A BEGIN without a matching
+         END, an END without a matching BEGIN, AND a stray extra END inside an already-open span
+         (e.g. a pasted-in duplicate '/skills:all') are all hard errors -- symmetric in both
+         directions, EXCEPT when a marker sits inside a fenced example (masked out before matching,
+         so it is never seen at all, paired or not). Deliberately opt-in (no generic prose scan): a
+         doc with zero spans passes without warning.
 
     Exit code: 0 = no errors. 1 = at least one error (usable as a gate in open-pr.ps1).
 .EXAMPLE
@@ -185,6 +197,16 @@ Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-persona.md' -File |
 # (b) if the link has a #anchor: that anchor exists as a heading in the target file (GitHub slug
 # rules). External http(s)/mailto links are skipped.
 
+function Test-FenceDelimiterLine {
+    # A single source for what counts as a fenced-code-block delimiter line, so the fence syntax
+    # (currently ``` -- three-plus backticks, optionally indented) only ever needs to change in ONE
+    # place. Shared by Get-HeadingSlugs (below) and Get-FenceMaskedText (check 10): both need to
+    # toggle "am I inside a fence" per line, and a later fence-syntax change (tildes, four
+    # backticks, ...) must not risk drifting between two independent hardcoded patterns.
+    param([string]$Line)
+    return [bool]($Line -match '^\s*```')
+}
+
 function ConvertTo-GhSlug {
     # Converts a heading text to a GitHub anchor slug.
     param([string]$Text)
@@ -205,7 +227,7 @@ function Get-HeadingSlugs {
     $counts = @{}
     $inFence = $false
     foreach ($line in $lines) {
-        if ($line -match '^\s*```') { $inFence = -not $inFence; continue }
+        if (Test-FenceDelimiterLine -Line $line) { $inFence = -not $inFence; continue }
         if ($inFence) { continue }
         if ($line -match '^#{1,6}\s+(.*)$') {
             $base = ConvertTo-GhSlug -Text $Matches[1]
@@ -455,6 +477,165 @@ Get-ChildItem -Path $RepoRoot -Recurse -Filter 'plugin.json' -File |
             Add-Error "[release-card] $pluginName/RELEASE.md carries v$($vm.Groups[1].Value), but plugin.json says v$pjVersion -- run cut-release.ps1 again."
         }
     }
+
+# --- 10. marked "all skills" enumerations vs. the canonical skillset -----------------------------------
+# A prose bullet list that claims to enumerate "all skills" is a maintenance trap: it silently
+# drifts as skills are added/removed, and a generic prose scan over-detects (tested and rejected --
+# 147 hits repo-wide, including QUICKSTART.md's deliberately incomplete illustrative list, which
+# would permanently false-positive). Instead this is opt-in: an author wraps the enumeration in
+#     <!-- skills:all -->
+#     - `skill-name`
+#     ...
+#     <!-- /skills:all -->
+# and only spans between those sentinels are checked -- a doc with zero spans passes silently
+# (that absence of warning is deliberate, not an oversight). Reuses check 4's $linkFiles set
+# rather than its own file list (single source for "which docs matter").
+#
+# Extraction is CHARACTER-based (offset of the end of the BEGIN match to the start of the END
+# match), not line-based. The real-world enumerations this exists for (e.g. the family README's
+# "only the skills (...) remain available there" sentence) are inline running prose, not a bullet
+# list on its own lines -- a line-based span could only mark that by putting a sentinel on its own
+# line mid-paragraph, which breaks the paragraph in rendered markdown (an HTML comment is an HTML
+# block that interrupts a paragraph). Character-based extraction lets the author wrap the sentinels
+# tightly around just the enumeration itself, inline, e.g. `(...skills <!-- skills:all -->(`a`,
+# `b`)<!-- /skills:all --> remain...`, with the same code path serving both the inline form and a
+# block bullet-list form. AUTHOR CONDITION, because of this: every backtick-quoted token anywhere
+# inside the span counts as a claimed name -- so the span must be wrapped tightly enough to contain
+# ONLY skill names, nothing else in backticks (e.g. NOT the three SessionStart hook names in that
+# same README sentence, which sit outside the parenthesized skill list and so outside the span).
+#
+# A literal example of the marker syntax in a doc (e.g. Tessa's convention writeup) must NOT be
+# read as a live marker itself -- otherwise the syntax could only ever be described, never shown.
+# Get-FenceMaskedText below masks fenced ```-code blocks with same-length whitespace before the
+# BEGIN/END scan runs, so an example fence is invisible to it (an unpaired BEGIN inside a fence is
+# therefore also invisible -- not reported, because the scan never sees it at all, not because it
+# is special-cased). Deliberately fences only, not inline single-backtick code: a real span's own
+# claimed names are themselves single-backtick-delimited (the `` `skill-name` `` bullets), so
+# masking every inline-code run would erase the very names a real span exists to list -- there is
+# no way to tell "backtick pair is an inline-code escape" from "backtick pair is a claimed skill
+# name" at the character level. A fence is therefore the ONLY supported way to show the bare marker
+# text without it being read as live; showing it in inline code is not an escape and stays in scope
+# (Tessa documents the fence form as the convention, not inline code).
+function Get-FenceMaskedText {
+    # Masks fenced ```-code blocks with SAME-LENGTH whitespace (newlines untouched), so the caller
+    # can keep using character offsets into the RETURNED text to derive correct line numbers -- the
+    # length and every newline position stay identical to the input, only non-newline characters
+    # inside a fence become spaces. Uses the SAME fence-toggle detection (Test-FenceDelimiterLine,
+    # flip a boolean per line) that Get-HeadingSlugs already uses above -- one shared pattern, not
+    # two independently hardcoded ones. It cannot reuse Get-HeadingSlugs's RESULT directly, though:
+    # that function drops fenced lines outright (fine there -- it never reports a line number),
+    # whereas this needs a same-shape mask, not a shorter string.
+    param([string]$Text)
+    $parts = [regex]::Split($Text, '(\r\n|\r|\n)')
+    $inFence = $false
+    for ($k = 0; $k -lt $parts.Length; $k += 2) {
+        $isFenceLine = Test-FenceDelimiterLine -Line $parts[$k]
+        if ($isFenceLine) { $inFence = -not $inFence }
+        if ($isFenceLine -or $inFence) {
+            $parts[$k] = ($parts[$k] -replace '.', ' ')
+        }
+    }
+    return -join $parts
+}
+
+# Canonical skillset: every claude-code-plugins/claude-specialists/<plugin>/skills/<name>/SKILL.md
+# (exact depth -- plugin, then 'skills', then exactly one skill-name folder, then the file -- so a
+# deeper file such as a level-3 progressive-disclosure skills/<name>/references/SKILL.md, should
+# that pattern ever appear, is not mistaken for a top-level skill), across ALL plugin folders (not
+# just 'specialists' -- specialists-shopify/skills/start-task counts too). The name is read from the
+# frontmatter 'name:' (the authoritative Claude Code call name, /plugin:name) rather than the folder
+# name; as of this writing every skill's folder name happens to equal its frontmatter name, so this
+# made no observable difference here, but frontmatter is the real source of truth if the two ever
+# diverge. Falls back to the folder name only if 'name:' is missing from the frontmatter, so a
+# future skill without that line does not silently drop out of the canonical set (not a new failure
+# mode: the frontmatter's own presence/shape is check 3's domain, not this one's).
+$skillCanonicalList = New-Object System.Collections.Generic.List[string]
+$skillsRoot = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists'
+if (Test-Path -LiteralPath $skillsRoot) {
+    Get-ChildItem -Path $skillsRoot -Recurse -Filter 'SKILL.md' -File |
+        Where-Object { $_.FullName -match '\\skills\\[^\\]+\\SKILL\.md$' } | ForEach-Object {
+            $text = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)
+            $nm = [regex]::Match($text, '(?m)^name:\s*(\S+)\s*$')
+            if ($nm.Success) {
+                $skillCanonicalList.Add($nm.Groups[1].Value.Trim())
+            } else {
+                $skillCanonicalList.Add((Split-Path (Split-Path $_.FullName -Parent) -Leaf))
+            }
+        }
+}
+$skillCanonicalSet = New-Object System.Collections.Generic.HashSet[string]
+foreach ($n in $skillCanonicalList) { [void]$skillCanonicalSet.Add($n) }
+
+$skillBeginRegex = [regex]'<!--\s*skills:all\s*-->'
+$skillEndRegex = [regex]'<!--\s*/skills:all\s*-->'
+$skillSpanCount = 0
+foreach ($lf in $linkFiles) {
+    $content = [System.IO.File]::ReadAllText($lf, [System.Text.Encoding]::UTF8)
+    # Masked, not raw: a fenced example of the marker syntax must not be read as a live marker (see
+    # Get-FenceMaskedText above). Same length + same newline positions as $content, so offsets
+    # derived from it (line numbers, substrings) still point at the right place; a genuine span is
+    # never inside a fence -- if it were, masking would make it invisible, not "found but wrong".
+    $maskedContent = Get-FenceMaskedText -Text $content
+    $rel = $lf.Replace($RepoRoot, '.')
+    # Every END match that actually closes a valid span is recorded here by its offset, so the
+    # sweep after the loop (below) can tell an END that legitimately paired with a BEGIN apart from
+    # one that did not -- a stray END before any BEGIN, or a SECOND END pasted inside an
+    # already-open span (the main loop below only ever consumes the FIRST END after a BEGIN, so a
+    # duplicate further down would otherwise just sit there as silent, unchecked prose instead of
+    # being reported).
+    $consumedEndIndices = New-Object System.Collections.Generic.HashSet[int]
+    $searchStart = 0
+    while ($searchStart -le $maskedContent.Length) {
+        $beginMatch = $skillBeginRegex.Match($maskedContent, $searchStart)
+        if (-not $beginMatch.Success) { break }
+        $beginLineNo = 1 + [regex]::Matches($maskedContent.Substring(0, $beginMatch.Index), "`n").Count
+        $spanStart = $beginMatch.Index + $beginMatch.Length
+        $endMatch = $skillEndRegex.Match($maskedContent, $spanStart)
+        if (-not $endMatch.Success) {
+            # Unpaired marker is a hard error, never a silent pass -- same principle as the
+            # BEGIN-without-END guard in agent-shared-lib.ps1's Expand-AgentDefShared (check 7): a
+            # typo'd sentinel must not read as "no span here". Keep scanning past it (rather than
+            # abandoning the whole file) so a later, well-formed pair further down still gets
+            # checked instead of being silently skipped because an earlier marker was malformed.
+            # (A BEGIN inside a fence never reaches this branch at all -- it was masked to
+            # whitespace before the match, so $skillBeginRegex simply never sees it there.)
+            Add-Error "[skill-list] ${rel}: '<!-- skills:all -->' at line $beginLineNo has no matching '<!-- /skills:all -->'."
+            $searchStart = $spanStart
+            continue
+        }
+        [void]$consumedEndIndices.Add($endMatch.Index)
+        $skillSpanText = $maskedContent.Substring($spanStart, $endMatch.Index - $spanStart)
+        $skillFoundNames = [regex]::Matches($skillSpanText, '`([^`\r\n]+)`') | ForEach-Object { $_.Groups[1].Value }
+        $skillFoundSet = New-Object System.Collections.Generic.HashSet[string]
+        foreach ($n in $skillFoundNames) { [void]$skillFoundSet.Add($n) }
+        $skillMissing = @($skillCanonicalSet | Where-Object { -not $skillFoundSet.Contains($_) } | Sort-Object)
+        $skillExtra = @($skillFoundSet | Where-Object { -not $skillCanonicalSet.Contains($_) } | Sort-Object)
+        if ($skillMissing.Count -gt 0) {
+            Add-Error "[skill-list] ${rel}: <!-- skills:all --> span at line $beginLineNo is missing: $($skillMissing -join ', ')."
+        }
+        if ($skillExtra.Count -gt 0) {
+            Add-Error "[skill-list] ${rel}: <!-- skills:all --> span at line $beginLineNo lists name(s) that are not a known skill: $($skillExtra -join ', ')."
+        }
+        $skillSpanCount++
+        $searchStart = $endMatch.Index + $endMatch.Length
+    }
+    # Symmetric sweep: the loop above only ever walks forward from a BEGIN, so an END that sits
+    # BEFORE any BEGIN (a lone orphan) or a SECOND END inside an already-open span (only the first
+    # one after a BEGIN gets consumed above) is never visited by it at all -- it would otherwise
+    # vanish into ordinary, unchecked prose instead of being reported. Every END match in the
+    # (already fence-masked) text that was NOT recorded as a real span's closer above is therefore
+    # a hard error here, mirroring the BEGIN-without-END error the same way.
+    foreach ($m in $skillEndRegex.Matches($maskedContent)) {
+        if ($consumedEndIndices.Contains($m.Index)) { continue }
+        $endLineNo = 1 + [regex]::Matches($maskedContent.Substring(0, $m.Index), "`n").Count
+        Add-Error "[skill-list] ${rel}: '<!-- /skills:all -->' at line $endLineNo has no matching '<!-- skills:all -->'."
+    }
+}
+if ($skillSpanCount -eq 0) {
+    Write-Host "  [skill-list] 0 <!-- skills:all --> span(s) found -- opt-in, so this is a pass." -ForegroundColor DarkGray
+} else {
+    Write-Host "  [skill-list] checked $skillSpanCount <!-- skills:all --> span(s) against $($skillCanonicalSet.Count) canonical skill(s)." -ForegroundColor DarkGray
+}
 
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {
