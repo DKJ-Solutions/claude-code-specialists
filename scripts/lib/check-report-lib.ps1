@@ -46,6 +46,12 @@
                                                           lens in (single source for the writers
                                                           bootstrap.ps1/sync-roster.ps1 and the reader
                                                           check-roster-sync.ps1 -- issue #179).
+      - Get-RosterIdTokenPattern                      -- the regex that recognizes a '<group>-<id>'
+                                                          specialist token in free roster prose,
+                                                          bounded so it does not also match inside an
+                                                          ISO date (single source for
+                                                          check-roster-sync.ps1's Test-InRoster and
+                                                          its orphan-scan -- issue #182).
 
     Not every caller needs every function -- e.g. sync-roster.ps1 uses its own non-counting
     Write-Info/Write-Failure (it tracks created/kept/proposed, not error/info signals, and always
@@ -146,6 +152,44 @@ function Get-LensFamily {
        one value, used by the writers (bootstrap.ps1, sync-roster.ps1) and the reader
        (check-roster-sync.ps1) alike. #>
     return 'claude-specialists'
+}
+
+function Get-RosterIdTokenPattern {
+    <# The regex pattern that recognizes a '<group>-<id>' specialist token (e.g. '06-24') bounded so
+       it does not spuriously match inside surrounding digits/dates. Single source (inbound #182) for
+       BOTH call sites in check-roster-sync.ps1 -- Test-InRoster (a specific id's presence) and the
+       orphan-scan's Matches() over the whole roster text (every token) -- so the two can no longer
+       drift out of sync, which is exactly how this bug arose: the same lookaround duplicated in two
+       places and tightened in neither.
+
+       Leading boundary '(?<![\d-])': excludes a preceding digit OR hyphen. The old pattern
+       ('(?<!\d)') only excluded a digit, so an ISO date matched -- in '2026-07-25' the '07' is
+       preceded by '-', which passed, so '07-25' was read as a specialist token. Excluding a
+       preceding hyphen too kills that case; verified '2026-07-25' and '2026-05-15' now yield no
+       match, while '06-24' and '05-15' inside a real reference like 'See 05-15-extension.md' still
+       match (nothing precedes them there but the start-of-string/whitespace).
+
+       Trailing boundary '(?!\d)' (unchanged, deliberately NOT tightened to '(?![\d-])'): a real
+       lens reference is immediately followed by '-extension.md', i.e. a hyphen -- tightening the
+       trailing side to also exclude a hyphen would stop '05-15-extension.md' from matching at all,
+       breaking the exact legitimate case this token exists to recognize. Verified.
+
+       KNOWN LIMITATION (documented in inbound #182, not silently swallowed): this narrows the
+       ISO-date case in practice but does not cover every prose false positive -- e.g. a plain
+       two-digit number range in prose ('see pages 12-34', 'a range of 10-20 items') still matches
+       (verified). That only becomes a visible orphan line if no real specialist happens to share
+       that id, and stays [INFO], never [ERROR]. Accepted as-is; option 2 from the issue (binding the token to
+       a roster row/table shape) was deliberately not taken, since Test-InRoster is asked about a
+       specific id in free prose and binding it to a table shape would change behavior for consumers
+       who format their roster differently -- a bigger risk than the residual noise this leaves. #>
+    param(
+        # Omit to get the generic 'any <group>-<id> token' pattern (the orphan-scan's use, matching
+        # every token in the roster text). Pass a specific id (e.g. '05-15') to get a pattern that
+        # matches only that literal token (Test-InRoster's use) -- same boundary, single source.
+        [string]$Id = ''
+    )
+    $body = if ($Id) { [regex]::Escape($Id) } else { '\d{2}-\d{2}' }
+    return "(?<![\d-])$body(?!\d)"
 }
 
 function Get-LensDirCandidates {
