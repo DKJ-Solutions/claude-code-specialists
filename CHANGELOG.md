@@ -9,6 +9,25 @@ folding) is described in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 Everything merged to `main` since the last release — newest at the top, one block per pull
 request.
 
+### #190 · Connectors README: cross-link the new-skill restart rule at the version gate · Docs · 2026-07-26
+
+Edith's copy edit on #187 recommended cross-linking to QUICKSTART.md's restart-on-new-skill rule
+from wherever the session-check hook's version gate is documented. #188 covered the family-README
+half; this is the second half, for the connectors README.
+
+Added a short pointer right after the hook's version-gate sentence in `## The session check
+(automatic)`: the same restart gate applies to a newly added **skill** file (link to
+[Staying up to date](claude-code-plugins/claude-specialists/QUICKSTART.md#staying-up-to-date)), and
+the `/reload-plugins`/`/reload-skills` skill counters are no proof that this hook has actually
+landed for a consumer — treating a reload notice as that confirmation is exactly the trap from
+#186. (Edith's review caught an earlier draft bundling the drift check into that same claim: unlike
+the hook, `check-consumer-drift.ps1` is not version-gated plugin content, so that parenthetical
+would have conflated two different mechanisms — dropped it.)
+
+[PR #190](https://github.com/DaveKJohn/davekjohns-workshop/pull/190)
+
+---
+
 ## Releases
 
 The recorded versions of the marketplace — newest at the top. Each release bumps all plugin
