@@ -7,8 +7,11 @@
 
 .DESCRIPTION
     A release here is a *recorded moment*: all plugins get the same version number
-    (lockstep, repo-wide) and the state is tagged as vX.Y.Z. Nothing is published to GitHub
-    Releases -- only a git tag, release notes in releases/, and a reference in CHANGELOG.md.
+    (lockstep, repo-wide) and the state is tagged as vX.Y.Z. This script itself publishes nothing
+    to GitHub Releases -- only a git tag, release notes in releases/, and a reference in
+    CHANGELOG.md. For a Minor/Major bump, publishing a GitHub Release is a manual follow-up step
+    the release manager takes afterward, per the cut-release skill's closing checklist; a Patch
+    bump skips that step entirely (tag only).
 
     A release deliberately does NOT run via a branch + PR. Like the fold commit, the release
     commit is an allowed direct-on-main action (the second exception to "everything via branch +
