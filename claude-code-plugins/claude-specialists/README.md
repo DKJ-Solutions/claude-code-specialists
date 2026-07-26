@@ -136,8 +136,8 @@ Cowork and in Claude Code — in a plain Claude.ai Chat session they show up gra
 Concretely for davekjohns-workshop: the specialists roster (the subagents under Chris) and the three
 SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`)
 function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
-(`fold-changelog`, `open-pr`, `new-branch`, `park`, `specialists-init`, `sync-roster`, `start-task`)
-remain available there.
+(`fold-changelog`, `open-pr`, `new-branch`, `park`, `specialists-init`, `sync-roster`, `start-task`,
+`cut-release`) remain available there.
 
 Skills themselves are Anthropic's general **Agent Skills** mechanism — organized folders of
 instructions/scripts/resources that an agent discovers and loads progressively (name + description
@@ -150,11 +150,12 @@ interchangeable with — a Claude Code subagent.
 
 ## How we use skills — and what we deliberately don't
 
-Every skill in davekjohns-workshop today (`fold-changelog`, `open-pr`, `new-branch`, `park`,
-`specialists-init`, `sync-roster`, `start-task`) is a thin wrapper around a script — procedural **mechanism** (branch,
-PR, fold, bootstrap, roster-sync). The specialists' craft and judgment live in the persona/manual
-context (agent defs), not in skills. That's a deliberate split, but it also means we currently use
-only one half of what Agent Skills can carry.
+Most skills in davekjohns-workshop today (`fold-changelog`, `open-pr`, `new-branch`, `park`,
+`specialists-init`, `sync-roster`, `start-task`) are a thin wrapper around a script — procedural
+**mechanism** (branch, PR, fold, bootstrap, roster-sync). `cut-release` is the deliberate exception:
+a checklist with no script of its own (see below). Either way, the specialists' craft and judgment
+live in the persona/manual context (agent defs), not in skills. That's a deliberate split, but it
+also means we currently use only one half of what Agent Skills can carry.
 
 The unused half is a noted opportunity, not an open task: of the three progressive-disclosure levels
 described in [Where this runs](#where-this-runs-chat-cowork-and-claude-code) above, none of our
@@ -165,10 +166,17 @@ plain Chat session where subagents and hooks are unavailable.
 
 That doesn't mean maximizing skill usage everywhere. The discipline is: add a skill only where it
 makes a repeatable procedure or piece of knowledge genuinely portable, and where that value covers
-the maintenance cost. Living example: `cut-release` is deliberately **not** a skill — workshop-only,
-rare, and already documented — a choice already recorded in
-[`scripts/sync/check-script-contract.ps1`](../../scripts/sync/check-script-contract.ps1) ("workshop-only
-scripts ... are not mirrored into the plugin and are not part of the consumer contract").
+the maintenance cost. Living example: `cut-release` shows both sides of that discipline at once. Its
+**script**, `scripts/release/cut-release.ps1`, stays workshop-only and is deliberately not mirrored —
+marketplace-specific machinery that reads `.claude-plugin/marketplace.json` as the source of truth
+for what a plugin is and bumps every `plugin.json` it lists in lockstep, a structure only this
+marketplace has (see the "out of scope" note in
+[`scripts/sync/check-script-contract.ps1`](../../scripts/sync/check-script-contract.ps1)). Its
+**procedure** — the closing steps every release shares once the version bump is committed (tag +
+push, branch cleanup) — was genuinely portable, so it shipped as the `cut-release` **skill**
+instead: a checklist with no script of its own (issue #177). That checklist also covers a
+Minor/Major GitHub Release, with its highlights-as-body/notes-as-attachment split — a step for a
+consumer that publishes GitHub Releases, which this workshop deliberately does not.
 
 Cowork is positioned for non-code knowledge work; davekjohns-workshop is a code/plugin-maintenance
 repo, so Claude Code is the right tool here and the repo stays deliberately Claude-Code-centric.
@@ -186,6 +194,10 @@ that version) right next to its `CHANGELOG.md`. It travels with the plugin cache
 `claude plugin update` has pinned your install to a version, the cached copy of `RELEASE.md` is
 exactly that release — open it under the plugin path in your own cache to see which one you're on.
 See [Consumption](../../README.md#consumption) in the root README for the mechanics.
+
+A newly added **skill** additionally needs a session restart before it becomes visible, and the
+skill counters `/reload-plugins`/`/reload-skills` print are not reliable evidence either way — see
+[Staying up to date](QUICKSTART.md#staying-up-to-date) in the Quickstart for the full detail.
 
 ## Adoption: the bootstrap path
 
