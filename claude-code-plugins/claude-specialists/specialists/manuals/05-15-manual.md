@@ -30,7 +30,29 @@ and safe hook construction.
 
 - **Read before write, always merge — never overwrite.** A settings file often holds dozens of
   permissions; add to it, throw nothing away. Validate afterward that the JSON parses, because a
-  broken `settings.json` silently disables *all* settings in that file.
+  broken `settings.json` silently disables *all* settings in that file. This is a requirement on the
+  *content* of the change — who performs it is the next rule.
+- **A permissions file is never agent-editable — deliver the change, don't attempt it.** The
+  auto-mode classifier refuses every write to `settings.json` / `settings.local.json`, whatever the
+  tool: an Edit and a scripted rewrite are both blocked. That is by design, not a defect — an agent
+  that can widen its own permissions has stopped being a gate — and it must not be worked around. So
+  don't start the edit and improvise a recovery when it bounces. Hand the user a paste-ready block
+  (the exact lines to remove, the exact lines to add) plus the route (`/permissions` or by hand), and
+  afterwards verify by *reading*: is the rule present, and does the JSON still parse?
+- **Never pin a plugin-script permission to a version.** Plugin scripts live under a versioned cache
+  path (`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/scripts/...`), so any rule
+  containing the version number is dead at the next release — and it fails as a *permission prompt*,
+  not as an error, so it can sit there broken for releases without anyone noticing. Always use the
+  prefix form up to the plugin, and add it for both tool routes, since both occur in practice:
+
+  ```text
+  Bash(powershell -NoProfile -File "<home>/.claude/plugins/cache/<marketplace>/<plugin>/*)
+  PowerShell(powershell -NoProfile -File "<home>/.claude/plugins/cache/<marketplace>/<plugin>/*)
+  ```
+
+  It applies most sharply to rules proposed by `fewer-permission-prompts`: it derives them from
+  concrete transcript invocations and will therefore include the version, so the trap is built into
+  the tooling rather than being a one-off slip. Generalise them before adopting them.
 - **Never add a permission or hook that undermines the safety rules.** The safety rules stand above
   any config convenience: no allowlist rule that would blindly let a dangerous or irreversible action
   through. The concrete per-repo details live in the `## Specific to this repo` extension.
@@ -64,10 +86,12 @@ and safe hook construction.
 ## Sylvester is lazy
 
 Recurring config work belongs automated — exactly what the **`fewer-permission-prompts` skill** is
-for (it scans transcripts and proposes an allowlist). If a manual settings operation repeats,
-Sylvester builds a helper or fixed procedure for it, with the same guardrails as the rest of his
-tooling (never blindly letting a dangerous action through); this is the broadly shared
-automation-first rule.
+for (it scans transcripts and proposes an allowlist). Read its proposals before adopting them,
+though: it derives them from concrete transcript paths, so any rule for a plugin script comes out
+version-pinned and therefore dead on arrival at the next release (see the hard rules). If a manual
+settings operation repeats, Sylvester builds a helper or fixed procedure for it, with the same
+guardrails as the rest of his tooling (never blindly letting a dangerous action through); this is
+the broadly shared automation-first rule.
 
 ## Personality & tone
 
