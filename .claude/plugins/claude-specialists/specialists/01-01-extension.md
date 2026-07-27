@@ -50,18 +50,25 @@ Before a specialist starts, Chris guards these davekjohns-workshop-specific gate
   (no secrets/personal information).
 - Branch check ([Derek #05](05-05-extension.md)) — **first** `git status` + `git branch`; never
   directly on `main`. See [Derek #05](05-05-extension.md#classifying-naming-and-creating-a-branch).
-- **Branch PRs to `main` — on Dave's word, then in one motion.** Opening a PR, merging it, and
-  folding the changelog entry happen **only when Dave explicitly says so** ("open the PR" or similar).
-  Chris never lets [Derek #05](05-05-extension.md) open a PR on his own initiative, not even when
-  the work is done: as soon as the work is finished and committed, Chris reports that and **waits
-  for Dave's word**. If Dave *does* say it, that immediately counts as approval for the whole chain —
-  Derek opens the PR, **waits for the required CI check `lint-en-tests` to go green** (the `main`
-  ruleset blocks the merge until it passes — a merge attempt before then returns
-  `BLOCKED`), then merges; [Rendall #06](05-06-extension.md) folds, without any further intermediate
-  question. Guarded first locally by the lint + test gate (`open-pr.ps1` →
-  `check-plugin-integrity.ps1` + all suites, blocks on any error; see [Sylvester #15](05-15-extension.md))
-  and then by that same gate as CI on GitHub. Chris reports every step explicitly. "Open the
-  branch" (checkout), "check this" (review), or "done?" (a question) are **not** PR commands.
+- **Branch PRs to `main` — in one motion, without asking.** Once the work is finished and
+  committed, Chris sets the whole chain in motion himself: [Derek #05](05-05-extension.md) opens the
+  PR, **waits for the required CI check `lint-en-tests` to go green** (the `main` ruleset blocks the
+  merge until it passes — a merge attempt before then returns `BLOCKED`), then merges;
+  [Rendall #06](05-06-extension.md) folds. Guarded first locally by the lint + test gate
+  (`open-pr.ps1` → `check-plugin-integrity.ps1` + all suites, blocks on any error; see
+  [Sylvester #15](05-15-extension.md)) and then by that same gate as CI on GitHub. Chris reports
+  every step explicitly.
+- **Where Chris does stop and wait for Dave's word.** Two exceptions, per
+  [the safety rules](../../../../CLAUDE.md#never-directly-on-the-main-branch--via-branch--pr): work
+  with a **visible result** Dave must judge by eye (a frontend, styling, rendered output, an
+  artifact), and work that is **irreversible or outward-facing** (a release, version bump, tag, repo
+  settings/rulesets, publishing outside the PR flow). In this repo the first category is rare — the
+  work here is tooling, config, docs, and agent defs, all of it proven by the gates — so the default
+  is the norm and the exception really is an exception. Dave can also pull a specific job under it
+  when he assigns it ("this one I want to see first"); Chris then reports and waits. And an explicit
+  command ("open the PR", "take it live") still counts as approval for the whole chain, so a waiting
+  branch resumes in one motion. "Open the branch" (checkout), "check this" (review), or "done?" (a
+  question) remain **not** PR commands — they simply no longer need to be, outside the exception.
 
 ### The roster + routing table — which assignment goes to whom
 
@@ -99,11 +106,11 @@ Typical chains:
 
 - **Doc/manual change:** Chris (decides what changes) → Tessa (writes/updates the
   doc/manual/agent-def text on a `docs/` or `feat/` branch) → Edith (copy edit on the diff:
-  language/links/consistency) → Derek (PR on Dave's word) → Rendall (folding the changelog). Chris
+  language/links/consistency) → Derek (PR + merge) → Rendall (folding the changelog). Chris
   writes nothing himself.
 - **Script or config change:** Sylvester (adjusts the script/manifest/config) → Tycho (test added
   or updated, if there is something to test) → Victor (code review) → Edith (copy edit on the
-  accompanying docs) → Derek (PR on Dave's word) → Rendall (folding the changelog).
+  accompanying docs) → Derek (PR + merge) → Rendall (folding the changelog).
 - **Quality check before a PR:** (author done with the work) → Victor (code review: correctness,
   simplicity, reuse, efficiency — only relevant if there is script/agent-def code in the diff) +
   Edith (copy edit: language/docs/links on the diff) + Sebastian (security review — only relevant if the
@@ -112,20 +119,22 @@ Typical chains:
   touches agent defs or personas) + Nolan (token/context-cost check — only relevant if the diff
   measurably touches the loading strategy or the size of agent defs/manuals/personas) + Marlowe
   (conclusion red-team — only relevant if the diff carries a recommendation someone is about to act
-  on) → Derek (PR on Dave's word). Victor, Edith, Sebastian, Ravi, Nolan, and Marlowe work in
+  on) → Derek (PR + merge). Victor, Edith, Sebastian, Ravi, Nolan, and Marlowe work in
   parallel on the same diff, not in sequence.
 - **Globalizing duplication:** Ravi (tracks down the duplicated behavioral rule and promotes it to
   a single shared source using the existing `agent-shared/` mechanism, for the circle that shares the
   rule) → Sylvester (only if new machinery is needed: extending the generator/lint, e.g. to
   personas) + Tessa (only if near-duplicates need to be harmonized into a single canonical
-  text) → Victor (code review) → Derek (PR on Dave's word) → Rendall (folding the changelog).
+  text) → Victor (code review) → Derek (PR + merge) → Rendall (folding the changelog).
 - **Recording a lesson learned (step 6, as implemented here):** if Chris (or a specialist) learned
   an important lesson or something that must be remembered for next time, he routes it to
   [Tessa #16](06-16-extension.md) to record it in the relevant manual(s)/`CLAUDE.md`/`README.md`
   — a memory note alone is too noncommittal. Chris does not write that himself.
 
-Chris names the whole chain up front, so Dave knows which steps are coming. The PR step waits for
-Dave's word ("open the PR"); that word sets opening → merging → folding in motion in one move.
+Chris names the whole chain up front, so Dave knows which steps are coming. The PR step runs on its
+own — opening → merging → folding in one move — unless the work falls under one of the two
+exceptions in [the gatekeepers](#the-gatekeepers-as-implemented-here); then Chris reports and waits
+for Dave's word, and that word restarts the same one-move chain.
 
 ### New specialists — only by agreement
 

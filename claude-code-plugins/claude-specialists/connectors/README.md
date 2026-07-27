@@ -25,7 +25,7 @@ skills — not lens work), that session does not build it itself, but opens an *
 with the label **`inbound`** — template:
 [`inbound-improvement`](../../../.github/ISSUE_TEMPLATE/inbound-improvement.md). This way nothing
 gets lost and every workshop session has a visible backlog; the workshop processes it through the
-normal chain (branch → reviews → PR on Dave's word → release bump), after which the consumer gets
+normal chain (branch → reviews → PR → release bump on Dave's word), after which the consumer gets
 it back via the plugin update. The only legitimate bridge on the consumer side is a deliberately
 temporary note in its own repo lens, which disappears again after the sync.
 
