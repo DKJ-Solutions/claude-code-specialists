@@ -161,6 +161,15 @@ via a temporary file.
   only drops tracking refs for branches *already* gone from the remote, so a clean local list is no
   evidence at all that the remote is clean. Verifying means `git ls-remote --heads origin`. See the
   portable rule (and what each command is for) in the `fold-changelog` skill (#163).
+- **Deleting a *remote* branch stays a manual action for Dave — deliberately, don't propose
+  otherwise.** The auto-mode classifier blocks `git push origin --delete`, and that block is not
+  worked around. Dave weighed adding a permission for it on July 27, 2026 and declined, for a reason
+  worth keeping: with `deleteBranchOnMerge` on, merged branches disappear by themselves, so the
+  permission would only ever apply to branches that are *not* merged — a parked branch
+  (`park-branch.ps1`), unfinished work, or a branch pushed from the other machine. Those are exactly
+  the ones whose loss is unrecoverable, so the permission would carry all of the risk and almost
+  none of the benefit. Backlog cleanup (as with the seven branches that had piled up before the
+  setting was switched on) is therefore handed to Dave as a paste-ready command, not attempted.
 - **Working in parallel from multiple machines** (lesson of July 16, 2026, when PR #46 and #47
   crossed each other): merging different branches in parallel is safe — the lint gate and CI protect
   `main` independently of which machine merges. Two rules keep it that way: **never the same branch
