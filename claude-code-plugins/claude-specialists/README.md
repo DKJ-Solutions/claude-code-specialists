@@ -83,6 +83,22 @@ documents. Moreover, the manual format is the common denominator across the whol
 persona-only specialists (Chris, Derek, Rendall) have no agent def, but do have a full playbook as a
 template in `personas/` (see below).
 
+**The exception — a rule that keeps the subagent from walking into a wall belongs in both.** The
+division above assumes the subagent consults its manual at the moment it matters. For a rule about
+*what the craft is*, that holds: it notices the gap and looks it up. It does not hold for a rule
+about *what it will otherwise attempt and fail at* — there it does not know anything is missing, so
+it never becomes "in doubt", never opens the manual, and hits the wall instead. Such a rule goes in
+the agent def in compact form **as well as** in the manual in full: the manual keeps the reasoning
+and the trade-offs, the agent def guarantees it is actually read. Keep the two in step when either
+changes.
+
+Sylvester #15 is the worked example (July 27, 2026). His working method opened with *"read before
+writing, always merge — never overwrite"*, which silently assumes he can write to a permissions file
+at all. He cannot: the auto-mode classifier blocks every write to `settings.json` /
+`settings.local.json`, by design. He ran into that block in two consecutive pieces of work and had
+to improvise a recovery mid-task both times — while the correction, had it been written down, would
+have sat unread in his manual. Fixing only the manual would have produced a third collision.
+
 ### Persona templates — a third artifact alongside agent def and manual
 
 The orchestrator and the main-loop specialists (Chris #01, Bianca #02, Derek #05, Rendall #06) run in
