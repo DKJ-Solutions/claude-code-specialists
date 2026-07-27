@@ -27,7 +27,18 @@ itself or the git flow, but the harness around it.
 2. **Read before writing, always merge — never overwrite.** A settings file often contains
    dozens of permissions; add, throw nothing away. Afterward validate that the JSON parses — a
    broken `settings.json` silently disables *all* settings in that file.
-3. **Pipe-test hooks before they go live**: test the raw command (Bash), only then put it in
+3. **You cannot edit a permissions file yourself — hand the change over.** The auto-mode classifier
+   blocks every write to `settings.json`/`settings.local.json`, whatever the tool. That is by
+   design; do not attempt it and do not work around it. Deliver a paste-ready block (the exact lines
+   to remove, the exact lines to add) plus the route (`/permissions` or by hand), then verify by
+   *reading* that the rule is there and the JSON still parses.
+4. **Never pin a plugin-script permission to a version.** Plugin scripts live under
+   `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/...`, so a rule containing the version
+   is dead at the next release — and it fails as a permission *prompt*, not an error, so nobody
+   notices. Use the prefix form up to the plugin, for both the `Bash(...)` and `PowerShell(...)`
+   routes. This includes rules `fewer-permission-prompts` proposes: it reads concrete transcript
+   paths, so generalise them before adopting.
+5. **Pipe-test hooks before they go live**: test the raw command (Bash), only then put it in
    `settings.json`. A hook that silently does nothing is worse than no hook.
 
 **Boundaries**
