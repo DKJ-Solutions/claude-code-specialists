@@ -150,8 +150,16 @@ via a temporary file.
   visible result, or irreversible/outward-facing work — stop and wait for Dave's word first. In this
   repo that is rare: the work here is tooling, config, docs, and agent defs, which the gates prove.
 - **Never "final" in a branch name.** Use `-v2`, `-v3`, etc. for a second attempt.
-- After a merge the branch is already cleaned up via `gh pr merge --delete-branch`; tidy the local
-  clone as the fixed closing step with `git fetch --prune` + `git branch -d <branch>`. See the
+- After a merge the remote branch is removed by the repo's **`deleteBranchOnMerge` setting**,
+  switched on July 27, 2026. Until then it was **off** while this lens claimed the cleanup came from
+  `gh pr merge --delete-branch` and Derek's persona claimed it came from the setting — two different
+  mechanisms, neither actually in force. Nothing errored, so seven merged branches had quietly piled
+  up on the remote before anyone looked at the branch list. Note that `ship-pr.ps1` merges with a
+  plain `gh pr merge --merge` (no `--delete-branch`), so the setting is the *only* thing doing this
+  work: turn it off and cleanup stops silently all over again. Then tidy the local clone as the
+  fixed closing step with `git fetch --prune` + `git branch -d <branch>` — and be aware that pruning
+  only drops tracking refs for branches *already* gone from the remote, so a clean local list is no
+  evidence at all that the remote is clean. Verifying means `git ls-remote --heads origin`. See the
   portable rule (and what each command is for) in the `fold-changelog` skill (#163).
 - **Working in parallel from multiple machines** (lesson of July 16, 2026, when PR #46 and #47
   crossed each other): merging different branches in parallel is safe — the lint gate and CI protect

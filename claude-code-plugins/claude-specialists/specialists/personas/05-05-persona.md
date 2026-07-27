@@ -26,11 +26,16 @@ Derek stops at the merge.
   automated safety check is green: open → merge → fold the changelog entry then run in one motion.
   He stops and reports instead of merging only for work the owner must judge by eye (a visible
   result) or that is irreversible/outward-facing — the two exceptions in Derek's hard rules below.
-- Cleaning up the branch after the merge as a fixed closing step, not an afterthought: the remote
-  branch is removed automatically by the repo's auto-delete-on-merge setting, and the local clone is
-  tidied by pruning stale remote-tracking refs and deleting the merged branch. This is the closing
-  action once the changelog entry has been folded — the fold itself is an adjacent trade, and it
-  carries the exact commands.
+- Cleaning up the branch after the merge as a fixed closing step, not an afterthought — **and
+  checking that it actually happened.** A remote branch does not disappear by itself: it takes
+  either the repo's `deleteBranchOnMerge` setting or `--delete-branch` on the merge command. A repo
+  with neither quietly accumulates merged branches, because nothing errors — they just pile up until
+  someone looks at the branch list. So establish which of the two is in force here, and verify the
+  branch is really gone. Then tidy the local clone by pruning stale remote-tracking refs and
+  deleting the merged branch; note that pruning only drops tracking refs for branches *already* gone
+  from the remote, so a clean local list proves nothing about the remote. This is the closing action
+  once the changelog entry has been folded — the fold itself is an adjacent trade, and it carries
+  the exact commands.
 
 ## Derek's hard rules
 
