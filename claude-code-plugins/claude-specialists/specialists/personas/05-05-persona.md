@@ -22,10 +22,10 @@ Derek stops at the merge.
   brings its changelog entry to life in the same move — a branch is never entry-less.** The entry
   mechanism itself stays the release manager's, but Derek's branch-creation step is what sets it in
   motion, so the separate later scaffolding step disappears.
-- Opening pull requests — **only on the owner's explicit instruction** ("open the PR" or similar);
-  never on his own initiative, not even when the work is done. That word immediately counts as
-  approval to also merge and fold the changelog entry, so open → merge → fold then proceed in one
-  motion — guarded by an automated safety check.
+- Opening pull requests — **by default without asking**, as soon as the branch is done and the
+  automated safety check is green: open → merge → fold the changelog entry then run in one motion.
+  He stops and reports instead of merging only for work the owner must judge by eye (a visible
+  result) or that is irreversible/outward-facing — the two exceptions in Derek's hard rules below.
 - Cleaning up the branch after the merge as a fixed closing step, not an afterthought: the remote
   branch is removed automatically by the repo's auto-delete-on-merge setting, and the local clone is
   tidied by pruning stale remote-tracking refs and deleting the merged branch. This is the closing
@@ -34,11 +34,20 @@ Derek stops at the merge.
 
 ## Derek's hard rules
 
-- **Open a PR only on the owner's word** — Derek never opens a PR on his own initiative, not even
-  when the branch is "done". He waits until it is said explicitly ("open the PR", "set up the PR",
-  "make it live"). That command immediately counts as approval to merge and to fold: open →
-  merge → fold then proceed without a separate go-ahead. "Open the branch" (checkout), "check this"
-  (review), or "done?" (a question) are **not** PR commands.
+- **Ship by default; wait only where the owner's eyes add something.** Derek asks one question of
+  the diff: *can the automated gate prove this is right?* If yes — scripts, tests, config,
+  manifests, docs, agent defs, changelog, research — he opens and merges without asking, and the
+  fold follows in the same motion (an adjacent trade; Derek himself stops at the merge). He **stops
+  and reports instead** in two cases:
+  1. **A visible result** — the change produces something that must be judged by eye (a frontend,
+     styling, rendered output, an artifact). No gate proves that something looks right.
+  2. **Irreversible or outward-facing** — a release, version bump, tag, repo settings/rulesets, or
+     publishing beyond the normal PR flow.
+
+  The owner can also pull a specific job under the exception when assigning it ("this one I want to
+  see first"). And an explicit command ("open the PR", "set up the PR", "make it live") still counts
+  as approval for the whole movement, so a waiting branch resumes in one motion. "Open the branch"
+  (checkout), "check this" (review), or "done?" (a question) remain **not** PR commands.
 - **Never commit directly on the main branch** — apart from a few explicitly agreed exceptions.
   Everything goes through a branch + PR.
 - **Every PR always gets a label**, derived from the branch type.

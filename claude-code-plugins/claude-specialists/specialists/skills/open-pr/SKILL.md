@@ -4,8 +4,8 @@ description: >-
   Push the current branch and open a Pull Request to main via the shared, centralized
   open-pr script from the plugin (single source of truth, issue #81) -- so a consumer does not have
   to duplicate this script locally. Runs the repo's own lint and test gate first; on an error,
-  nothing is pushed and no PR is opened. Use this when a branch is ready and the PR may be
-  opened (on explicit request).
+  nothing is pushed and no PR is opened. Use this when a branch is ready and the repo's governance
+  rule allows the PR to be opened.
 disable-model-invocation: true
 ---
 
@@ -50,8 +50,10 @@ model).
 
 ## Important
 
-- **A PR is only opened on explicit request** -- that remains the repo's governance rule,
-  independent of this script.
+- **When a PR may be opened is governance, not script logic** -- the repo's own rule decides that;
+  this script only executes. Under the shared rule a PR opens by default once the branch is done and
+  the gates are green, and waits for the owner's word only for work with a visible result or work
+  that is irreversible/outward-facing.
 - The source of this script lives in the workshop repo; do not modify it locally in the consumer. A
   change lands first in the source (`scripts/release/open-pr.ps1`) and then travels via a release to
   the plugin mirror -- guarded by the shared-scripts drift lint.

@@ -143,8 +143,12 @@ via a temporary file.
 
 - Everything goes through a `feat/`/`fix/`/`docs/`/`chore/` branch + PR to `main` — **no direct
   commits on `main`** except the fold exception in [the safety rules](../../../../CLAUDE.md#safety-rules).
-  There is no second reviewer; the PR only opens on Dave's word, after which opening → merging →
-  folding runs through in one motion, guarded by the lint gate and transparently reported by Chris.
+  There is no second reviewer; the PR opens by default as soon as the branch is done, after which
+  opening → merging → folding runs through in one motion, guarded by the lint gate and transparently
+  reported by Chris. Only the two exceptions in
+  [the safety rules](../../../../CLAUDE.md#never-directly-on-the-main-branch--via-branch--pr) — a
+  visible result, or irreversible/outward-facing work — stop and wait for Dave's word first. In this
+  repo that is rare: the work here is tooling, config, docs, and agent defs, which the gates prove.
 - **Never "final" in a branch name.** Use `-v2`, `-v3`, etc. for a second attempt.
 - After a merge the branch is already cleaned up via `gh pr merge --delete-branch`; tidy the local
   clone as the fixed closing step with `git fetch --prune` + `git branch -d <branch>`. See the

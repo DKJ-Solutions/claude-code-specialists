@@ -22,9 +22,12 @@ changelog entry — the same workflow as the consuming repos. The steps:
    The same gate also runs as **CI** on GitHub ([`.github/workflows/ci.yml`](.github/workflows/ci.yml):
    lint + all test suites, on every PR and every push to `main`) — so a PR created outside the
    scripts still passes through it all the same.
-4. **Merge** (on Dave's word) — after the required CI check `lint-en-tests` has gone green. Branch
-   protection on `main` blocks the merge until then (a merge attempt before it passes returns
-   `BLOCKED`); wait for CI, then merge.
+4. **Merge** — after the required CI check `lint-en-tests` has gone green. Branch protection on
+   `main` blocks the merge until then (a merge attempt before it passes returns `BLOCKED`); wait for
+   CI, then merge. This step does not wait for Dave: under
+   [the safety rules](CLAUDE.md#never-directly-on-the-main-branch--via-branch--pr) a finished branch
+   opens, merges, and folds in one motion, and only work with a **visible result** — or work that is
+   **irreversible/outward-facing** — stops for his word first.
 5. **Fold:** on `main`, right after the merge,
    [`scripts/release/fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)`-Branch <name>`
    folds the entry file into the `## Pull Requests` section of [`CHANGELOG.md`](CHANGELOG.md) (with

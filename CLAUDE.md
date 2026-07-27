@@ -67,7 +67,10 @@ for this repo (the main branch, the lint gate, the fold exception, being public)
 
 ### Never without Dave's explicit permission
 
-- **Opening a PR** — even when the work is "done", nobody opens a PR on their own initiative (see below).
+- **Merging work with a visible result** — if the change produces something Dave has to judge with
+  his own eyes (a frontend, styling, rendered output, an artifact), the branch stops and reports
+  instead of merging. No automated gate can prove that something *looks* right. Work whose
+  correctness the gates do prove runs through on its own (see below).
 - **A release/version bump** of a plugin (raising `version` in a `plugin.json`, creating a tag or
   GitHub Release) — only on explicit request.
 - **`git push --force`** (on any branch whatsoever), **`git reset --hard`**, **`git rebase`** on a
@@ -77,14 +80,29 @@ for this repo (the main branch, the lint gate, the fold exception, being public)
 
 ### Never directly on the main branch — via branch + PR
 
-All changes go through a branch + Pull Request. **A PR is only opened when Dave explicitly says
-so** — Dave decides that, never a specialist acting on their own. Even when the work is "done",
-nobody opens a PR on their own initiative: as soon as the work on a branch is finished and
-committed, Chris reports that and waits for Dave's word. **If Dave says "open the PR"** (or "set up
-the PR", "take it live" — an explicit PR command), **then that immediately counts as approval for
-the whole movement**: opening → merging → folding the changelog entry then run through without any
-further intermediate question. Note: "open the branch" (checkout), "check this" (review), or
-"done?" (a question) are **not** PR commands.
+All changes go through a branch + Pull Request. **Whether that PR waits for Dave depends on what is
+in it**, and the test is one question: *does Dave's own look add something the gates cannot?*
+
+- **The default — no waiting.** Once the work on a branch is finished, committed, and the gates are
+  green, the whole movement runs in one go: opening → merging → folding the changelog entry, with no
+  intermediate question. This covers the bulk of the work — scripts, tests, config, manifests, docs,
+  agent defs and manuals, the changelog, research. The lint gate, the test gate, and CI prove this
+  kind of change is sound; a stamp from Dave adds nothing to that, and anything that does turn out
+  wrong is one revert PR away.
+- **The exception — stop and wait for Dave's word.** Two kinds of change do not merge on their own:
+  1. **A visible result** — the change produces something that has to be judged by eye: a frontend,
+     styling, rendered output, an artifact. No gate can prove that something looks right.
+  2. **Irreversible or outward-facing** — a release, a version bump, a tag, repo settings or
+     rulesets, or publishing anything beyond the normal PR flow.
+- **Dave keeps the wheel in both directions.** He can pull any single piece of work under the
+  exception when he assigns it ("this one I want to see first"), and then the chain waits. And when
+  he *does* give an explicit PR command ("open the PR", "set up the PR", "take it live"), that counts
+  as approval for the whole movement exactly as it always did.
+
+The reasoning behind the default: Dave's substantive approval is given in the conversation *before*
+the work is built, not at the merge button afterwards. Where the button used to be a second
+checkpoint, in practice it was a rubber stamp — so it is only a checkpoint now where it genuinely
+buys something. Decision by Dave, July 27, 2026.
 
 On the main branch a few narrowly defined, deliberate exceptions to "never commit directly" exist —
 the **fold commit** after a merge and the **release commit** (on explicit request) — and a

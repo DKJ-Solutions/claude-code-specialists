@@ -3,13 +3,14 @@
     Ship the current branch in one command: open the PR -> wait for the CI check -> merge -> fold.
 
 .DESCRIPTION
-    Orchestrates the whole "on Dave's word" PR chain that is otherwise run by hand
+    Orchestrates the whole PR chain that is otherwise run by hand
     (open-pr.ps1 -> watch CI -> gh pr merge -> checkout main -> fold-changelog-entry.ps1), so the
     five-step sequence becomes one call. Deliberately workshop-local tooling (like cut-release.ps1):
     NOT mirrored into the plugin, because merge policy and the CI check name are repo-specific --
     a consumer that wants the same convenience writes its own (smartwatchbanden already has a
-    ship-pr.ps1). Run it ONLY on Dave's explicit request ("open the PR" / "ship it"), exactly like
-    open-pr.ps1 -- opening a PR is never a specialist's own initiative.
+    ship-pr.ps1). WHEN it may run is governance, not script logic (see CLAUDE.md): by default a
+    finished branch ships without asking, but work with a visible result -- or work that is
+    irreversible/outward-facing -- waits for Dave's explicit word first.
 
     Steps, stopping on the first failure (nothing is forced):
       1. open-pr.ps1 -Title <Title> [-SkipLint] [-SkipTests] -- runs the local lint + test gate,
