@@ -87,6 +87,27 @@ try {
     Assert-True ($mdText -match '(?m)^@[^\r\n]*personas/01-01-persona\.md') 'CLAUDE.md carries the body @-import (from the plugin install)'
     Assert-True (Test-Path -LiteralPath (Join-Path $Fixture '.claude\settings.suggested.jsonc')) 'settings.suggested.jsonc placed'
 
+    # --- 1b. Register proposal: the bootstrap points at the workshop register (gap found 2026-07-28) --
+    #     Bootstrapping a consumer used to leave no trace towards the connector register, and nothing
+    #     else filled that gap -- a third consumer ran unregistered for days while the workshop stayed
+    #     blind to its plugin version, lens inventory and agent-def drift. The script cannot create the
+    #     manifest (it lives in the workshop; the register never writes cross-repo), so it must hand one
+    #     over. These assertions pin the handover, not the wording of the prose around it.
+    Assert-True ($r1.Out -match 'connector register proposal') 'register proposal: the bootstrap prints a register block'
+    Assert-True ($r1.Out -match '"repo"\s*:') 'register proposal: the block is a manifest with a repo field'
+    # The inventory must cover BOTH lens kinds -- a persona-only specialist (01-01) and an agent
+    # (06-16). Missing the personas would hand over a manifest that under-reports the repo, which is
+    # exactly the class of bug inbound #204 was about.
+    Assert-True ($r1.Out -match '"01-01"') 'register proposal: inventory includes a persona-only id'
+    Assert-True ($r1.Out -match '"06-16"') 'register proposal: inventory includes an agent id'
+    # The two fields this script genuinely cannot know stay VUL-IN rather than being guessed: it has no
+    # idea where the workshop checkout sits relative to this repo, and a guessed path is what the
+    # register's marker check exists to prevent.
+    Assert-True ($r1.Out -match 'visibility.*VUL-IN') 'register proposal: visibility is left as VUL-IN, not guessed'
+    Assert-True ($r1.Out -match 'localCheckout.*VUL-IN') 'register proposal: localCheckout is left as VUL-IN, not guessed'
+    # Propose-only, like every other bootstrap output: nothing may be written into the consumer.
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'connectors'))) 'register proposal: writes no connectors/ dir into the consumer'
+
     # --- 1c. scripts/ scaffolds for the shared workflow skills (#86): repo-config + branch-info ----
     Write-Host "bootstrap.ps1 -- script-config scaffolds (#86)" -ForegroundColor Cyan
     $rcScaffold = Join-Path $Fixture 'scripts\repo-config.ps1'

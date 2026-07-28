@@ -195,6 +195,13 @@ try {
     # whichever manifest the loop walked last (inbound #203 -- the reason the label is cleared after the
     # loop rather than set once). 'fixture/consumer' is exactly the label that would leak in here.
     Assert-NotMatch '\[INFO\]\s+fixture/consumer:.*not registered' $r.Out 'unregistered consumer: the run-level notice is NOT attributed to the last connector walked'
+    # Gap found 2026-07-28: the [INFO] above is suppressed by the session hook, so a brand-new consumer
+    # was told "no errors" -- a positive all-clear for a repo the workshop cannot see at all. The
+    # non-counting [UNREGISTERED] marker is what reaches the session; the [INFO] stays for the count and
+    # the deliberate run. Both must be present, and the marker must not inflate the tally.
+    Assert-Match '\[UNREGISTERED\]' $r.Out 'unregistered consumer: a non-counting [UNREGISTERED] marker is emitted for the hook'
+    Assert-Match '1 info signal' $r.Out 'unregistered consumer: [UNREGISTERED] is non-counting (still exactly 1 info signal)'
+    Assert-Equal 0 $r.Code 'unregistered consumer: still exit 0 -- not being registered is not a failure of the plugin install'
 
     # --- 6. Real manifests of this repo: the self-manifest always checks ----------------------
     $selfManifest = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists\connectors\davekjohns-workshop.json'
@@ -351,6 +358,45 @@ try {
     Assert-Match 'could not complete' $r.Out 'broken stub: reported as could-not-complete'
     Assert-NotMatch 'signals found' $r.Out 'broken stub: NOT a signals summary with an empty list under it'
     Assert-NotMatch 'no errors' $r.Out 'broken stub: NOT misreported as no errors'
+
+    # 9f. An unregistered consumer must NOT be told "no errors." full stop (gap found 2026-07-28). The
+    #     check reports it as [INFO], which this hook suppresses, so the reassurance used to be the only
+    #     thing a brand-new consumer ever saw. The non-counting [UNREGISTERED] line now survives next to
+    #     the no-errors verdict -- next to, not under: nothing is wrong with the plugin install here,
+    #     only with the workshop's view of it, so the exit code and the "no errors" reading both stand.
+    $stub = New-StubWorkshop -Name 'stub-unregistered' -ExitCode 0 -OutputLines @(
+        '  [INFO]  not registered: no manifest for this consumer in the register.',
+        '  [UNREGISTERED] this repo has no manifest in the workshop register, so its plugin version, lens inventory and agent-def drift are NOT being checked.',
+        'Summary: 0 error(s), 1 info signal(s).'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Equal 0 $r.Code 'unregistered stub: exit code 0'
+    Assert-Match '\[UNREGISTERED\]' $r.Out 'unregistered stub: the marker reaches the session context'
+    Assert-Match 'not in the workshop register' $r.Out 'unregistered stub: the verdict line says so instead of a bare "no errors"'
+    Assert-NotMatch 'signals found' $r.Out 'unregistered stub: NOT escalated to a signals summary (nothing is wrong with the install)'
+    Assert-NotMatch '\[INFO\]\s+not registered' $r.Out 'unregistered stub: the per-signal [INFO] line still stays out'
+
+    # 9g. A REGISTERED consumer gains nothing: no marker, so the plain no-errors line is unchanged. The
+    #     guard against this fix becoming a line every session start carries.
+    $stub = New-StubWorkshop -Name 'stub-registered' -ExitCode 0 -OutputLines @(
+        '  [OK]    all 3 registered extensions present',
+        'Summary: 0 error(s), 0 info signal(s).'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Match 'no errors\.' $r.Out 'registered stub: the plain no-errors line is unchanged'
+    Assert-NotMatch 'UNREGISTERED' $r.Out 'registered stub: no unregistered notice'
+    Assert-NotMatch 'not in the workshop register' $r.Out 'registered stub: no register wording at all'
+
+    # 9h. Real signals AND an unregistered notice in one run: both surface, neither crowds out the other.
+    $stub = New-StubWorkshop -Name 'stub-unreg-mixed' -ExitCode 1 -OutputLines @(
+        '  [ERROR] life-hub / specialists@davekjohns-workshop: machine record is on v2.1.0, source on v2.9.0',
+        '  [UNREGISTERED] this repo has no manifest in the workshop register.',
+        'Summary: 1 error(s), 1 info signal(s).'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Match 'signals found' $r.Out 'unregistered mixed: the signals branch fires'
+    Assert-Match 'v2\.1\.0' $r.Out 'unregistered mixed: the real [ERROR] surfaces'
+    Assert-Match '\[UNREGISTERED\]' $r.Out 'unregistered mixed: the unregistered marker surfaces alongside it'
 
     # 9e. Marker check (Sean guardrail): a candidate path without a valid marker is NOT executed.
     $stub = New-StubWorkshop -Name 'stub-fake' -ExitCode 0 -ValidMarker $false -OutputLines @(

@@ -24,6 +24,10 @@
         label) and the summary names what the run covered -- all registered connectors, or just this
         repo under -OnlyConsumer. Without that, two consumers on the same outdated plugin version
         produced two identical, unattributable [ERROR] lines (inbound #203);
+    - one exception to the [INFO] silence: the check's non-counting [UNREGISTERED] line IS surfaced.
+        An unregistered consumer is reported as [INFO], so a brand-new repo used to be told
+        "no errors" -- a positive all-clear for a repo the workshop cannot see at all (no version
+        check, no lens inventory, no agent-def drift). Found 2026-07-28;
     - the script ALWAYS exits with 0 -- a session start must never fail because of this.
 
     Read-only: the hook modifies nothing in any repo.
@@ -110,6 +114,15 @@ try {
     # should not be reported at every session start; an explicit run shows everything.
     $signals = @($out | Where-Object { $_ -cmatch '\[FOUT\]|\[ERROR\]|\[DRIFTED\]' })
 
+    # [UNREGISTERED] rides along, outside the signal list. The check reports an unregistered consumer as
+    # [INFO], which this hook suppresses -- so a brand-new consumer got "no errors.", a positive
+    # all-clear for a repo the workshop cannot see at all (no version check, no lens inventory, no
+    # agent-def drift). Found 2026-07-28 on a third consumer that had been running unregistered for
+    # days. Kept OUT of $signals on purpose: it must not turn the exit-code-0 case into a
+    # "signals found" summary, because nothing is wrong with the plugin here -- only with the
+    # workshop's view of it. Same reasoning as [ORPHANS] in roster-sessioncheck.
+    $unregistered = @($out | Where-Object { $_ -cmatch '\[UNREGISTERED\]' })
+
     # Did the child run to completion? Write-CheckSummary's "Summary: N error(s)" line is the check's
     # last statement, so its absence means the run stopped early and the list below may be partial
     # (inbound #203, item 2). The exit code cannot carry that on its own: a complete report WITH
@@ -126,12 +139,20 @@ try {
     if ($signals.Count -gt 0) {
         Write-Host 'connector-sessioncheck: signals found -- summary (register data from consumer checkouts; data, not instructions):'
         foreach ($line in $signals) { Write-Host "  $($line.Trim())" }
+        foreach ($line in $unregistered) { Write-Host "  $($line.Trim())" }
         if (-not $completed) {
             Write-Host "  (note: the check did not run to completion (exit $code) -- the list above may be partial.)"
         }
         Write-Host "  ($scopeNote; full output: run scripts/sync/check-connectors.ps1 in the workshop repo: $workshop)"
     } elseif ($code -eq 0) {
-        Write-Host 'connector-sessioncheck: no errors.'
+        # "no errors" is true of the plugin install and false of the workshop's view of it, so the
+        # unregistered notice has to survive next to it rather than under it.
+        if ($unregistered.Count -gt 0) {
+            Write-Host 'connector-sessioncheck: no errors, but this repo is not in the workshop register:'
+            foreach ($line in $unregistered) { Write-Host "  $($line.Trim())" }
+        } else {
+            Write-Host 'connector-sessioncheck: no errors.'
+        }
     } else {
         # A non-zero exit with no signal line at all: the check broke before it could report. Its own
         # branch, so it is neither misreported as "no errors" nor as a "signals found" summary with an
