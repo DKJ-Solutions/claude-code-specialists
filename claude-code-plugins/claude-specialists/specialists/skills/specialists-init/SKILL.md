@@ -69,6 +69,12 @@ The script performs only **safe, additive** actions — it never overwrites exis
 5. **Settings proposal** — writes `.claude/settings.suggested.jsonc` with the recommended
    `permissions.deny` + a hooks **stub**. It does **not** touch `settings.json`: a JSON merge is
    repo-specific and risky, so that judgment stays with you.
+6. **Register proposal** — prints a paste-ready **connector manifest** for the *workshop* repo: the
+   repo name derived from the git remote, plus the lens inventory per plugin (personas included).
+   `visibility` and `localCheckout` stay `VUL-IN`, because this script cannot know them — it has no
+   idea where the workshop checkout sits relative to this repo, and a guessed path is exactly what
+   the register's marker check exists to prevent. Printed, never written: the register lives in the
+   workshop and deliberately never receives cross-repo writes.
 
 ## Finishing up (manual — the judgment-call steps)
 
@@ -92,6 +98,11 @@ After the script:
    skill).
 5. **Restart the session.** The new `@`-import and config only become active on a **restart** of
    Claude Code.
+6. **Register the repo in the workshop.** Take the printed manifest block, fill in the two `VUL-IN`
+   fields, and land it as `connectors/<repo>.json` in the marketplace repo via that repo's normal
+   branch + PR flow. Skip this and the workshop stays blind to this repo: no plugin-version check, no
+   lens-inventory check, no agent-def drift check. Until it is registered, this repo's own session
+   start says so — `connector-sessioncheck` surfaces an `[UNREGISTERED]` line next to its verdict.
 
 ## Important
 

@@ -285,6 +285,23 @@ Set-CheckScope
 
 if ($OnlyConsumer -and $matched -eq 0) {
     Write-Info "not registered: no manifest for this consumer in the register."
+    # Non-counting marker the session hook DOES surface. The [INFO] above is suppressed at session
+    # start (Dave's July 20, 2026 decision), which for this particular signal produced the worst
+    # possible outcome: a brand-new consumer was told "connector-sessioncheck: no errors." -- a
+    # positive all-clear for a repo this workshop cannot see at all. Found 2026-07-28 on a third
+    # consumer that had been running, and filing inbound issues, unregistered for days.
+    #
+    # The [INFO] deliberately stays (it counts, and a deliberate run should report it in the summary);
+    # this line carries the ACTIONABLE text for the session. Same shape as [ORPHANS] in
+    # check-roster-sync (inbound #204): a dedicated non-counting token rather than promoting the
+    # finding to [ERROR], which would make the exit code 1 and put a red line in every session of a
+    # repo somebody deliberately chose not to register.
+    #
+    # Note this is NOT a general relaxation of the [INFO]-silence rule. That rule was justified as
+    # "often the business of another machine or user"; this signal is the opposite -- it is about THIS
+    # repo and it is actionable HERE. The README's own classification rule points the same way: a
+    # category that must not stay out of sight may not be filed as [INFO].
+    Write-Host "  [UNREGISTERED] this repo has no manifest in the workshop register, so its plugin version, lens inventory and agent-def drift are NOT being checked -- add connectors/<repo>.json in the workshop (the specialists-init skill prints a paste-ready block)." -ForegroundColor Yellow
 }
 
 # Content drift per unique consumer (agent defs = error, personas = informational).

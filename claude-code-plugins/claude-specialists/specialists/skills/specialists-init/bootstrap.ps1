@@ -143,6 +143,22 @@ $padDirRoot = Join-Path $ConsumerRoot (".claude/plugins/$family")
 
 Write-Host "== specialists-init bootstrap -- $ConsumerRoot ==" -ForegroundColor Cyan
 
+# Lens inventory per plugin, collected while the lenses below are written or found. It feeds the
+# register proposal this script prints at the end: 'which <group>-<id>s does this repo have a lens
+# for' is exactly what the workshop's connector manifest records in its 'extensions' array. Collected
+# for BOTH the created and the already-present case -- the manifest describes the repo's state, not
+# what this particular run happened to do.
+$registerInventory = @{}
+
+function Add-RegisterId {
+    <# Record an id under a plugin in the inventory. Hashtable + ArrayList are reference types, so this
+       works from inside the ForEach-Object blocks below; keeping it one function stops the two lens
+       loops from growing two slightly different versions of the same bookkeeping. #>
+    param([hashtable]$Inventory, [string]$Plugin, [string]$Id)
+    if (-not $Inventory.ContainsKey($Plugin)) { $Inventory[$Plugin] = New-Object System.Collections.ArrayList }
+    if (-not $Inventory[$Plugin].Contains($Id)) { [void]$Inventory[$Plugin].Add($Id) }
+}
+
 # --- 1. Persona lenses (LENS-ONLY) to plugin path (never overwrite) ------------------------
 $personaDest = Join-Path $padDirRoot $personaPlugin
 if (-not (Test-Path -LiteralPath $personaDest)) { New-Item -ItemType Directory -Path $personaDest -Force | Out-Null }
@@ -152,6 +168,7 @@ Get-ChildItem -Path $personaDir -Filter '*-persona.md' -File | Sort-Object Name 
     if ($_.BaseName -notmatch '^(\d{2})-(\d{2})-persona$') { return }
     $g = $Matches[1]; $id = $Matches[2]
     $dest = Join-Path $personaDest "$g-$id-extension.md"
+    Add-RegisterId -Inventory $registerInventory -Plugin $personaPlugin -Id "$g-$id"
     if (Test-Path -LiteralPath $dest -PathType Leaf) {
         Write-Host "  [keep]  $(Split-Path $dest -Leaf) already exists -- not overwritten." -ForegroundColor DarkGray
         $script:kept++
@@ -236,14 +253,18 @@ $ownPluginName = Get-OwnPluginName $ownPluginRoot
 # Enabled plugins from consumer settings; without (readable) settings, only own plugin.
 # Plugin names validated as slugs before converting to paths.
 $pluginNames = @($ownPluginName)
+# The FULL plugin ids ('<name>@<marketplace>'), kept alongside the bare names: the workshop's
+# connector manifest identifies a plugin by its full id, so the register proposal at the end of this
+# script needs the '@marketplace' part that the name-only list above deliberately drops.
+$pluginIdByName = @{}
 $consumerSettings = Join-Path $ConsumerRoot '.claude/settings.json'
 if (Test-Path -LiteralPath $consumerSettings -PathType Leaf) {
     try {
         $cs = Get-Content -LiteralPath $consumerSettings -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($cs.PSObject.Properties.Name -contains 'enabledPlugins') {
-            $enabledNames = @($cs.enabledPlugins.PSObject.Properties |
-                Where-Object { $_.Value -eq $true } |
-                ForEach-Object { $_.Name.Split('@')[0] })
+            $enabledEntries = @($cs.enabledPlugins.PSObject.Properties | Where-Object { $_.Value -eq $true })
+            $enabledNames = @($enabledEntries | ForEach-Object { $_.Name.Split('@')[0] })
+            foreach ($e in $enabledEntries) { $pluginIdByName[$e.Name.Split('@')[0]] = $e.Name }
             if ($enabledNames.Count -gt 0) { $pluginNames = $enabledNames }
         }
     } catch {
@@ -268,6 +289,7 @@ foreach ($pluginName in ($pluginNames | Sort-Object -Unique)) {
         if ($_.BaseName -notmatch '^(\d{2})-(\d{2})-agent$') { return }
         $group = $Matches[1]; $id = $Matches[2]
         $dest = Join-Path $pluginPad "$group-$id-extension.md"
+        Add-RegisterId -Inventory $registerInventory -Plugin $pluginName -Id "$group-$id"
         if (Test-Path -LiteralPath $dest -PathType Leaf) { $script:lensKept++; return }
         $midDot = [char]0x00B7
         # Rename-proof (issue #145): the header carries the STABLE '<group>-<id>' slug, never the
@@ -563,4 +585,55 @@ if ($repoConfigDerived) {
 }
 Write-Host "  3. Copy desired parts from .claude/settings.suggested.jsonc to settings.json and delete proposal." -ForegroundColor Gray
 Write-Host "  4. Restart Claude Code session to activate new @-imports + config." -ForegroundColor Gray
+Write-Host "  5. Register this repo in the workshop's connector register -- paste-ready block below." -ForegroundColor Gray
+
+# --- Register proposal (workshop-side) -------------------------------------------------------------
+# Why this block exists: bootstrapping a consumer used to leave NO trace towards the register, and
+# nothing else fills that gap either. The register lives in the workshop
+# (claude-code-plugins/claude-specialists/connectors/<repo>.json) while this script runs in the
+# consumer, and the register's own doctrine is explicit that it never writes cross-repo -- so this
+# script cannot create the manifest, only hand you one. Without it the workshop is blind to this repo:
+# no plugin-version check, no lens-inventory check, no agent-def drift check. Found 2026-07-28, after a
+# third consumer had been running (and filing inbound issues) unregistered for days without anyone
+# noticing -- see also the [UNREGISTERED] signal that check-connectors now surfaces at session start.
+#
+# Proposal only, deliberately: 'visibility' and 'localCheckout' cannot be derived here (this script
+# does not know where the workshop checkout sits relative to this repo, and guessing a path is exactly
+# what the register's marker check exists to prevent), so they stay VUL-IN -- the repo's standard
+# fill-in marker.
+Write-Host ""
+Write-Host "-- connector register proposal (for the WORKSHOP repo, not this one)" -ForegroundColor Cyan
+if ($registerInventory.Keys.Count -eq 0) {
+    Write-Host "  [notice] no lenses found or created -- nothing to register yet." -ForegroundColor Yellow
+} else {
+    $repoField = if ($derivedRepo) { $derivedRepo } else { 'VUL-IN/repo' }
+    $leaf = Split-Path $ConsumerRoot -Leaf
+    $pluginBlocks = @()
+    foreach ($pn in ($registerInventory.Keys | Sort-Object)) {
+        $fullId = if ($pluginIdByName.ContainsKey($pn)) { $pluginIdByName[$pn] } else { "$pn@VUL-IN" }
+        $ids = @($registerInventory[$pn] | Sort-Object) | ForEach-Object { '"' + $_ + '"' }
+        $pluginBlocks += @"
+    {
+      "id": "$fullId",
+      "extensions": [$($ids -join ', ')]
+    }
+"@
+    }
+    $manifest = @"
+{
+  "repo": "$repoField",
+  "visibility": "VUL-IN (private|public)",
+  "localCheckout": "VUL-IN (relative to the workshop root, e.g. ../$leaf)",
+  "plugins": [
+$($pluginBlocks -join ",`n")
+  ],
+  "notes": ""
+}
+"@
+    foreach ($line in ($manifest -split "`r?`n")) { Write-Host "  $line" -ForegroundColor Gray }
+    Write-Host ""
+    Write-Host "  Save as claude-code-plugins/claude-specialists/connectors/$leaf.json in the WORKSHOP repo," -ForegroundColor Gray
+    Write-Host "  via that repo's normal branch + PR flow. Fill in the two VUL-IN fields first." -ForegroundColor Gray
+    Write-Host "  Privacy boundary: the workshop is public -- metadata only, never lens content or absolute paths." -ForegroundColor Gray
+}
 exit 0

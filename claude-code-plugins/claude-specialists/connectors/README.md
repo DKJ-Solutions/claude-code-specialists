@@ -159,7 +159,31 @@ silent at session start (decision by Dave, July 20, 2026); they are visible on a
 a classification rule for extensions of the check (security review advice, July 20, 2026): a new
 signal category that may be security-relevant (e.g. an indication of tampering) must never be
 classified as `[INFO]`, but as `[ERROR]` — otherwise it silently stays out of sight at session
-start. This hook is — alongside the `specialists-init` skill and the `roster-sessioncheck` hook
+start.
+
+**One named exception to that silence: `[UNREGISTERED]`** (July 28, 2026). "This repo has no manifest
+in the register" was filed as `[INFO]`, and the consequence was the worst possible reading: a
+brand-new consumer got `connector-sessioncheck: no errors.` — a positive all-clear for a repo this
+workshop cannot see at all (no plugin-version check, no lens inventory, no agent-def drift). Found
+after a third consumer had been running, and filing inbound issues, unregistered for days without
+anyone noticing. `check-connectors.ps1` therefore also emits a **non-counting `[UNREGISTERED]`** line
+that the hook does surface, next to the no-errors verdict rather than under it — nothing is wrong with
+the plugin install there, only with this workshop's view of it, so the exit code stays 0 and the
+per-signal `[INFO]` line stays suppressed.
+
+This is deliberately *not* a relaxation of the `[INFO]` rule above. That rule was justified as "often
+the business of another machine or user"; this signal is the exact opposite — it is about the repo the
+session is in, and it is actionable there. The mechanism is the same one `check-roster-sync` uses for
+`[ORPHANS]` (inbound #204): a dedicated non-counting token, rather than promoting the finding to
+`[ERROR]` and putting a red line plus a non-zero exit code in every session of a repo somebody
+deliberately chose not to register.
+
+**Registering a new consumer is a workshop-side, manual step, and nothing can do it for you.** The
+manifest lives here while the install happens in the consumer, and this registry never writes
+cross-repo — so the `specialists-init` skill closes the loop from the other side: after bootstrapping a
+consumer it prints a **paste-ready manifest block** (repo name derived from the git remote, the lens
+inventory per plugin, `visibility` and `localCheckout` left as `VUL-IN` because it cannot know them),
+which then lands here through the normal branch + PR flow. This hook is — alongside the `specialists-init` skill and the `roster-sessioncheck` hook
 (the roster-sync feature) — one of the named, repo-neutral exceptions to the rule that plugins
 carry no hooks/skills (see the root README). Mind the **version gate**: consumers only receive the
 hook after a release bump plus a `claude plugin update` + session restart on their side.
