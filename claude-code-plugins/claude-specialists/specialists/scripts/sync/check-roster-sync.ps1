@@ -60,6 +60,13 @@
     now real drift. That is what the Get-RosterIgnoredIds ignore-list is for -- record the choice there
     (this workshop does so for Bianca 03-02), rather than relying on the check being blind to it.
 
+    What to DO with an [ERROR] from this check (Dave, July 28, 2026): adopt. A specialist that arrives
+    with a plugin update is adopted by default -- no approval question, and no per-specialist "which of
+    these do you want?". The sync-roster skill stages it; its SKILL.md carries the full reasoning. The
+    scaffold is empty on purpose and may stay empty until that specialist has work here, so adopting
+    costs nothing that has to be filled in today. The ignore-list above is the deliberate exception you
+    write on your own initiative, not the answer to a question this check asks.
+
     Exit-code: 0 = no errors (INFO does not count), 1 = at least one error.
 
 .PARAMETER ConsumerPathOverride

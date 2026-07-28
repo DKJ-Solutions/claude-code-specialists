@@ -16,8 +16,35 @@ When a plugin release adds a new specialist, a consumer that updates the plugin 
 surfaces it at the top of a session. This skill is **layer 3**: it stages the catch-up so you only
 have to review and place it.
 
-It does the safe, mechanical part and leaves every judgment call -- and every write to the
+It does the safe, mechanical part and leaves the remaining judgment calls -- and every write to the
 governance doc -- to you.
+
+## Adopting is the default, not a question (Dave, July 28, 2026)
+
+**A specialist that arrives with a plugin update gets adopted. Do not ask permission for it, and do
+not ask per specialist which ones are wanted.** Stage the lens scaffold and the roster row for every
+one the check reports, and report what you did.
+
+The reasoning: the scaffold is **empty on purpose**. A `VUL-IN` lens may sit there untouched until that
+specialist actually has work in this repo — that is what the scaffold is *for*, not an unfinished task.
+So adopting costs a file nobody has to fill in yet, while asking costs an interruption for a decision
+with no downside either way. That makes it exactly the kind of approval question the governance rule
+("approval questions are rare — irreversible, outward-facing, or genuinely risky only") says not to
+ask.
+
+What remains a judgment call is *the content*: what the lens says once the specialist does have work
+here, and where the roster row belongs in the table. Those are writes to the governance doc, which this
+skill deliberately never makes.
+
+**The ignore-list is the exception, and it is a statement, not an answer to a question.** If a
+specialist genuinely has no place in this repo, record that in `Get-RosterIgnoredIds`
+(`scripts/repo-config.ps1`) with a comment naming who it is and why — a deliberate, documented
+omission, put there on your own initiative. It is not a per-update checklist item.
+
+Recorded after a smartwatchbanden catch-up session asked Dave, one by one, which of five new
+specialists to adopt. The asking came from a hand-written handover prompt rather than from this skill,
+which is precisely why the rule now lives here instead: a prompt is written once and forgotten, a skill
+is read every time.
 
 ## When to run it
 
