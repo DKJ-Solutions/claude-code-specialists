@@ -116,17 +116,31 @@ $repoRoot = $scope.Path
 # Each record names the shared script(s) that call the function at runtime, so an [ERROR] here reads
 # like the actionable runtime crash it prevents. Optional = $true downgrades a missing function to
 # [INFO] and names the Default the caller falls back to (issue #178).
+# 'Returns' states, in one line, what the function must give back. It exists so a finding is
+# SELF-CONTAINED (Dave, July 28, 2026: a consumer must be served by the plugin, not put to work for
+# it). The message used to end with "update it from the workshop's own scripts\repo-config.ps1" --
+# useless advice for the reader most likely to hit it: someone who installed the plugin, has no copy of
+# that source repo, and no reason to know it exists. With 'Returns' in the finding, the reader can write
+# the function from the report alone.
 $script:Contract = @(
-    @{ Lib = 'scripts\lib\branch-info.ps1'; Function = 'Get-BranchInfo';  Scripts = @('new-changelog-entry', 'open-pr') },
-    @{ Lib = 'scripts\lib\branch-info.ps1'; Function = 'Test-BranchName'; Scripts = @('new-branch') },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RepoName';    Scripts = @('open-pr', 'fold-changelog-entry') },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-LintScript';  Scripts = @('open-pr') },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RosterPath';  Scripts = @('check-roster-sync') },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RosterIgnoredIds'; Scripts = @('check-roster-sync') },
+    @{ Lib = 'scripts\lib\branch-info.ps1'; Function = 'Get-BranchInfo';  Scripts = @('new-changelog-entry', 'open-pr');
+       Returns = "an object for a branch name with at least Prefix, Label and ChangelogType, derived from this repo's own branch-prefix table" },
+    @{ Lib = 'scripts\lib\branch-info.ps1'; Function = 'Test-BranchName'; Scripts = @('new-branch');
+       Returns = 'an object with IsValid plus a Reason when invalid; reject an empty name and the main branch' },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RepoName';    Scripts = @('open-pr', 'fold-changelog-entry');
+       Returns = "this repo as 'owner/name', the form ``gh --repo`` takes" },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-LintScript';  Scripts = @('open-pr');
+       Returns = 'the repo-root-relative path to the lint script to run before a PR' },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RosterPath';  Scripts = @('check-roster-sync');
+       Returns = "the repo-root-relative path to the file holding the specialist roster -- 'CLAUDE.md' unless this repo keeps it elsewhere" },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RosterIgnoredIds'; Scripts = @('check-roster-sync');
+       Returns = "an array of '<group>-<id>' ids deliberately kept out of the roster -- normally empty, @(), since every enabled specialist belongs in the roster" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ChangelogHeading'; Scripts = @('fold-changelog-entry');
-       Optional = $true; Default = '## Pull Requests' },
+       Optional = $true; Default = '## Pull Requests';
+       Returns = "the literal '## ' heading line a merged entry is folded under" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-LiveStage'; Scripts = @('cut-release skill');
-       Optional = $true; Default = '' }
+       Optional = $true; Default = '';
+       Returns = "a short description of this repo's separate go-live target, or '' when it has none" }
 )
 
 # An optional record reports [INFO] (with the fallback the caller uses) where a required one reports
@@ -140,6 +154,16 @@ function Test-OptionalRecord {
 function Get-RecordDefault {
     param([hashtable]$Record)
     if ($Record.ContainsKey('Default')) { return $Record.Default }
+    return ''
+}
+
+function Get-RecordReturns {
+    <# The one-line "what it must give back" for a record, as ' It must return <...>.' ready to append
+       to a finding -- empty when a record has no Returns yet, so an un-annotated record degrades to the
+       old, shorter message instead of printing a dangling sentence. ContainsKey rather than dot-access:
+       this script runs under Set-StrictMode -Version Latest. #>
+    param([hashtable]$Record)
+    if ($Record.ContainsKey('Returns') -and $Record.Returns) { return " It must return $($Record.Returns)." }
     return ''
 }
 
@@ -209,7 +233,7 @@ foreach ($libRel in @($script:Contract.Lib | Sort-Object -Unique)) {
         if ($probe.Present[$r.Function]) {
             Write-Ok "'$($r.Function)' present in $libRel"
         } else {
-            Write-ContractGap -Record $r -Message "'$($r.Function)' missing from $libRel ($needed`: $scriptList) -- this lib predates the contract the shared script(s) call; update it from the workshop's own $libRel."
+            Write-ContractGap -Record $r -Message "'$($r.Function)' missing from $libRel ($needed`: $scriptList) -- this lib predates the contract the shared script(s) call; add the function.$(Get-RecordReturns -Record $r)"
         }
     }
 }

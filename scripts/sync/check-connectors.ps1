@@ -301,7 +301,14 @@ if ($OnlyConsumer -and $matched -eq 0) {
     # "often the business of another machine or user"; this signal is the opposite -- it is about THIS
     # repo and it is actionable HERE. The README's own classification rule points the same way: a
     # category that must not stay out of sight may not be filed as [INFO].
-    Write-Host "  [UNREGISTERED] this repo has no manifest in the workshop register, so its plugin version, lens inventory and agent-def drift are NOT being checked -- add connectors/<repo>.json in the workshop (the specialists-init skill prints a paste-ready block)." -ForegroundColor Yellow
+    # Phrased for a reader who has never heard of this workshop (Dave, July 28, 2026: assume a consumer
+    # knows nothing about the source repo -- a colleague who merely installed the plugin must be served
+    # by it, not put to work for it). The earlier wording said "add connectors/<repo>.json in the
+    # workshop", which is homework in a repo that reader may not have, may not have access to, and has
+    # no reason to know exists. Who benefits from registration is the plugin's maintainer; who was being
+    # instructed was the consumer. So: state that nothing here is broken, and address the action to the
+    # maintainer conditionally.
+    Write-Host "  [UNREGISTERED] this repo is not in the plugin maintainer's connector register. Nothing here is affected -- the plugin works normally. It only means the maintainer has no view of this repo's plugin version and lens inventory. If you maintain the plugin source, add a connectors/<repo>.json manifest there; if you just use the plugin, no action is needed on your side." -ForegroundColor Yellow
 }
 
 # Content drift per unique consumer (agent defs = error, personas = informational).

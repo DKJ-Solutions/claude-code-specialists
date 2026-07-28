@@ -32,6 +32,13 @@
 
     Read-only: the hook modifies nothing in any repo.
 
+    Matcher note: hooks.json matches "startup|resume|clear|compact", not just "startup" -- a
+    SessionStart hook's injected stdout does not survive a compaction by itself, so a startup-only
+    matcher made every report go silent after the first /compact and never return. This hook is the
+    slowest of the three (~2.6s, it runs the drift check per consumer), which is why the cost was
+    measured before widening the matcher rather than assumed. See roster-sessioncheck.ps1's docstring
+    for the full reasoning (JSON cannot carry a comment).
+
 .PARAMETER WorkshopPathOverride
     (Optional, for tests) Skip the candidate search and use this path as the candidate
     (the marker check still applies).
@@ -148,7 +155,9 @@ try {
         # "no errors" is true of the plugin install and false of the workshop's view of it, so the
         # unregistered notice has to survive next to it rather than under it.
         if ($unregistered.Count -gt 0) {
-            Write-Host 'connector-sessioncheck: no errors, but this repo is not in the workshop register:'
+            # "the workshop" is jargon to a consumer who only installed the plugin, so the verdict names
+            # the role instead of this repo's internal nickname.
+            Write-Host "connector-sessioncheck: no errors, but this repo is not in the plugin maintainer's register:"
             foreach ($line in $unregistered) { Write-Host "  $($line.Trim())" }
         } else {
             Write-Host 'connector-sessioncheck: no errors.'

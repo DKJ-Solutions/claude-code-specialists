@@ -28,6 +28,16 @@
 
     Read-only: the hook changes nothing, in any repo.
 
+    Why hooks.json matches "startup|resume|clear|compact" and not just "startup" (July 28, 2026):
+    a SessionStart hook's stdout is added to Claude's context, and that injected text does NOT survive
+    a compaction on its own -- the documented way to keep it is to let the hook run again, which it
+    only does for the sources its matcher names. Startup-only therefore meant every report here went
+    silent after the first /compact or /resume and never came back. 'fork' is deliberately left out: a
+    forked session inherits the parent's context, so re-running would only duplicate the report. The
+    cost was measured before widening it -- all three hooks together take ~4.6s, less than the
+    compaction they now run alongside. hooks.json is JSON and cannot carry a comment, which is why
+    this reasoning lives here.
+
 .PARAMETER CheckScriptOverride
     (Optional, for tests) Use this check-script path instead of the ${CLAUDE_PLUGIN_ROOT} one.
 
