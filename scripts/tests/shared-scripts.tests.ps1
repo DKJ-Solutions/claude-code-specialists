@@ -65,10 +65,25 @@ Write-Host "Dual-context resolution guarded in every source" -ForegroundColor Cy
 # entry point -- it never resolves a repo root; it is reached via a $PSScriptRoot-relative
 # dot-source from a caller that already resolved one, so this invariant does not apply to it.
 $libOnlyPairs = @('check-report-lib', 'native-capture-lib')
+# Two ways to satisfy the invariant since inbound #203: resolve CLAUDE_PROJECT_DIR inline, or delegate
+# to check-report-lib's shared Resolve-CheckRoot (which the two sync checks now do, so they can also
+# report HOW the root was resolved). A bare '-match CLAUDE_PROJECT_DIR' would still pass on the two
+# checks purely because their COMMENTS name the env var -- the assertion has to look for an actual
+# call, otherwise it silently stops guarding anything the day the code moves out.
 foreach ($pair in ($pairs | Where-Object { $libOnlyPairs -notcontains $_.Name })) {
     $src = Get-NormalizedScriptContent -Path $pair.SourcePath
-    Assert-True ($src -match 'CLAUDE_PROJECT_DIR') "$($pair.Name): source resolves the repo root via CLAUDE_PROJECT_DIR"
+    $inline   = $src -match '\$env:CLAUDE_PROJECT_DIR'
+    $delegate = $src -match 'Resolve-CheckRoot\s+-Override'
+    Assert-True ($inline -or $delegate) "$($pair.Name): source resolves the repo root dual-context (inline `$env:CLAUDE_PROJECT_DIR or Resolve-CheckRoot)"
 }
+
+# The invariant moves with the behavior: check-report-lib now OWNS the dual-context resolution for the
+# scripts that delegate, so the env var has to be read there for real. Without this, dropping it from
+# Resolve-CheckRoot would leave every delegating check silently non-dual-context while the loop above
+# stayed green on the delegation alone.
+$reportLibSrc = Get-NormalizedScriptContent -Path (($pairs | Where-Object { $_.Name -eq 'check-report-lib' }).SourcePath)
+Assert-True ($reportLibSrc -match 'function Resolve-CheckRoot') 'check-report-lib defines Resolve-CheckRoot (the shared dual-context resolver)'
+Assert-True ($reportLibSrc -match '\$env:CLAUDE_PROJECT_DIR') 'check-report-lib really reads $env:CLAUDE_PROJECT_DIR (not only the delegating callers)'
 
 Write-Host "Get-NormalizedScriptContent" -ForegroundColor Cyan
 $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("shared-scripts-test-$PID.ps1")

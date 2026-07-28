@@ -126,6 +126,17 @@ $matched = 0
 foreach ($mf in $manifestFiles) {
     $m = Get-Content -LiteralPath $mf.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
 
+    # Every finding from here to the end of this iteration belongs to THIS connector, so it carries
+    # that name (inbound #203). The session hook filters this script's output down to the signal
+    # lines and drops the '== connector: <repo>' headers, which is how two consumers on the same
+    # outdated plugin version produced two IDENTICAL, unattributable [ERROR] lines. Set per iteration
+    # rather than once: a stale label from the previous connector would misattribute the guardrail
+    # failures below, which fire before this connector's header is ever printed.
+    # 'repo' is manifest content, so its presence is probed rather than assumed (StrictMode); the
+    # manifest filename is a truthful fallback.
+    $connectorLabel = $(if ($m.PSObject.Properties.Name -contains 'repo') { [string]$m.repo } else { $mf.Name })
+    Set-CheckScope $connectorLabel
+
     # Determine the checkout, with guardrails on the manifest field. With -OnlyConsumer, manifests
     # of other consumers are SILENTLY skipped -- their guardrail messages should not land in
     # someone else's session either (Sean's advice, round 3).
@@ -173,6 +184,14 @@ foreach ($mf in $manifestFiles) {
 
     foreach ($p in @($m.plugins)) {
         Write-Host "  -- plugin: $($p.id)" -ForegroundColor Cyan
+
+        # Narrow the label to this plugin block. A consumer can register SEVERAL plugins, and a shared
+        # cause (one outdated install) then produces one finding per plugin -- word-for-word identical
+        # once the '-- plugin:' header above is filtered out of the session summary. Verified against
+        # this repo's own register: smartwatchbanden has two plugin blocks, both behind, and the hook
+        # surfaced two indistinguishable [ERROR] lines. Connector name alone was not enough (inbound
+        # #203); the plugin id is what makes each line actionable.
+        Set-CheckScope "$connectorLabel / $($p.id)"
 
         $pluginDir = Get-PluginDir $p.id
         if ($null -eq $pluginDir) {
@@ -253,8 +272,16 @@ foreach ($mf in $manifestFiles) {
         }
     }
 
+    # Back to connector level: anything reported from here on belongs to the connector as a whole, not
+    # to whichever plugin block the loop above happened to end on.
+    Set-CheckScope $connectorLabel
+
     if (-not $checkedConsumers.ContainsKey($checkout)) { $checkedConsumers[$checkout] = $m.repo }
 }
+
+# Back to run-level findings: clear the per-connector label so the notice below is not attributed to
+# whichever connector the loop happened to walk last.
+Set-CheckScope
 
 if ($OnlyConsumer -and $matched -eq 0) {
     Write-Info "not registered: no manifest for this consumer in the register."
@@ -265,11 +292,13 @@ if (-not $SkipDrift) {
     foreach ($checkout in $checkedConsumers.Keys) {
         if ($checkout -eq $RepoRoot) { continue }
         Write-Host "`n-- drift-check: $($checkedConsumers[$checkout])" -ForegroundColor Cyan
+        Set-CheckScope $checkedConsumers[$checkout]
         & powershell -NoProfile -ExecutionPolicy Bypass -File $DriftLint -ConsumerPath $checkout -Quiet |
             Where-Object { $_ -match 'DRIFTED|IDENTICAL|summary|drift' } |
             ForEach-Object { Write-Host "  $_" }
-        if ($LASTEXITCODE -ne 0) { Write-Failure "agent-def drift found in $($checkedConsumers[$checkout]) -- see check-consumer-drift." }
+        if ($LASTEXITCODE -ne 0) { Write-Failure "agent-def drift found -- see check-consumer-drift." }
     }
+    Set-CheckScope
 }
 
 Write-CheckSummary

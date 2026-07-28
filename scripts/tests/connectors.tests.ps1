@@ -140,6 +140,16 @@ try {
     $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
     Assert-Equal 1 $r.Code 'missing extension: exit code 1'
     Assert-Match '\[ERROR\].*06-19' $r.Out 'missing extension: ERROR names the id'
+    # inbound #203: the finding carries the connector it is about. The session hook filters this output
+    # down to the signal lines and drops the '== connector: <repo>' headers, so two consumers on the
+    # same outdated plugin version used to produce two identical, unattributable [ERROR] lines. This is
+    # the end-to-end proof that Set-CheckScope reaches a real Write-Failure line.
+    # The label narrows to '<repo> / <plugin-id>' inside a plugin block: a consumer can register several
+    # plugins, and one shared cause (a single outdated install) then yields one finding per plugin --
+    # identical to the character once the '-- plugin:' header is filtered out. Found live in this repo's
+    # own register while verifying the connector-name fix, so the plugin id is part of the fix, not a
+    # nice-to-have.
+    Assert-Match '\[ERROR\]\s+fixture/consumer / specialists@davekjohns-workshop:' $r.Out 'missing extension: the ERROR line names the connector AND the plugin block it belongs to'
 
     # --- 3. Plugin not enabled -> exit 1 --------------------------------------------------------
     New-FixtureConsumer -ExtensionIds @('06-16') -PluginEnabled $false
@@ -181,6 +191,10 @@ try {
     Assert-Equal 0 $r.Code 'unregistered consumer: exit code 0 (INFO, no block)'
     Assert-Match '\[INFO\].*not registered' $r.Out 'unregistered consumer: not-registered signal'
     Assert-Match '1 info signal' $r.Out 'unregistered consumer: counts as an info signal'
+    # This notice is about the RUN, not about any single connector, so it must not inherit the label of
+    # whichever manifest the loop walked last (inbound #203 -- the reason the label is cleared after the
+    # loop rather than set once). 'fixture/consumer' is exactly the label that would leak in here.
+    Assert-NotMatch '\[INFO\]\s+fixture/consumer:.*not registered' $r.Out 'unregistered consumer: the run-level notice is NOT attributed to the last connector walked'
 
     # --- 6. Real manifests of this repo: the self-manifest always checks ----------------------
     $selfManifest = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists\connectors\davekjohns-workshop.json'
@@ -299,6 +313,44 @@ try {
     $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
     Assert-Match 'fixture-mix-error' $r.Out 'mix stub: [ERROR] line passed through'
     Assert-NotMatch 'fixture-mix-info' $r.Out 'mix stub: INFO line NOT passed through'
+
+    # 9d3. Complete report (Summary line present) -> findings surface WITHOUT a partial-report warning,
+    #      and the summary states what the run covered. The hook is invoked from the repo root against a
+    #      stub workshop elsewhere, so this is the -OnlyConsumer scoping path (inbound #203): saying so
+    #      distinguishes "this repo is behind" from "some registered consumer is behind" -- the exact
+    #      confusion the 2026-07-27 investigation ran into.
+    $stub = New-StubWorkshop -Name 'stub-complete' -ExitCode 1 -OutputLines @(
+        '  [ERROR] life-hub: machine record is on v2.1.0, source on v2.8.0',
+        'Summary: 1 error(s), 0 info signal(s).'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Equal 0 $r.Code 'complete stub: exit code 0'
+    Assert-Match 'signals found' $r.Out 'complete stub: signals branch'
+    Assert-Match 'life-hub' $r.Out 'complete stub: the connector name travels with the finding'
+    Assert-NotMatch 'may be partial' $r.Out 'complete stub: a complete report is not flagged as partial'
+    Assert-Match 'scoped to this repo' $r.Out 'complete stub: the summary states the run was scoped to this repo (-OnlyConsumer)'
+
+    # 9d4. Same findings, but the check stopped before its Summary line -> flagged as possibly partial.
+    #      The exit code cannot carry this on its own: a complete report WITH findings and a crash
+    #      halfway both leave the child on a non-zero exit (inbound #203 item 2).
+    $stub = New-StubWorkshop -Name 'stub-partial' -ExitCode 1 -OutputLines @(
+        '  [ERROR] life-hub: machine record is on v2.1.0, source on v2.8.0'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Match 'signals found' $r.Out 'partial stub: findings still surface'
+    Assert-Match 'may be partial' $r.Out 'partial stub: missing Summary marker flags the list as possibly incomplete'
+
+    # 9d5. Non-zero exit with NO signal line at all: the check broke before it could report anything.
+    #      This used to fall into the else-branch and print the "signals found -- summary" header with an
+    #      EMPTY list under it, which reads as a finding that is not there. It now has its own branch.
+    $stub = New-StubWorkshop -Name 'stub-broke' -ExitCode 1 -OutputLines @(
+        'some unexpected failure before any check ran'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Equal 0 $r.Code 'broken stub: exit code 0 (the hook never blocks)'
+    Assert-Match 'could not complete' $r.Out 'broken stub: reported as could-not-complete'
+    Assert-NotMatch 'signals found' $r.Out 'broken stub: NOT a signals summary with an empty list under it'
+    Assert-NotMatch 'no errors' $r.Out 'broken stub: NOT misreported as no errors'
 
     # 9e. Marker check (Sean guardrail): a candidate path without a valid marker is NOT executed.
     $stub = New-StubWorkshop -Name 'stub-fake' -ExitCode 0 -ValidMarker $false -OutputLines @(

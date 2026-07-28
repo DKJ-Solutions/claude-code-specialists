@@ -88,23 +88,29 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# Repo-root -- dual-context: a consumer running the shared plugin mirror gets its repo-root from
-# CLAUDE_PROJECT_DIR; in the workshop-root (or outside a session) it falls back to the git-root. This
-# keeps the root-copy and the plugin-mirror byte-identical (guarded by the shared-scripts drift-lint).
-# -ConsumerPathOverride wins so a fixture can point the check at a throwaway consumer.
-$repoRoot = if ($ConsumerPathOverride) { $ConsumerPathOverride }
-            elseif ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR }
-            else { (git rev-parse --show-toplevel).Trim() }
-$repoRoot = (Resolve-Path -LiteralPath $repoRoot).Path
-
 $script:errors = 0
 $script:infos  = 0
 
-# Write-Ok/Write-Info/Write-Failure/Write-CheckSummary: shared with check-roster-sync.ps1 (single
-# source, issue #114). $PSScriptRoot-relative (NOT $repoRoot -- this lib is not repo-owned, unlike
-# branch-info.ps1/repo-config.ps1), so it resolves correctly from the workshop root or the plugin
-# mirror.
+# Write-Ok/Write-Info/Write-Failure/Write-CheckSummary/Resolve-CheckRoot/Write-CheckScope: shared
+# with check-roster-sync.ps1 (single source, issue #114). $PSScriptRoot-relative (NOT $repoRoot --
+# this lib is not repo-owned, unlike branch-info.ps1/repo-config.ps1), so it resolves correctly from
+# the workshop root or the plugin mirror. Dot-sourced BEFORE the repo-root resolution below, which
+# now comes from that same shared lib.
 . (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
+
+# Repo-root -- dual-context via the shared Resolve-CheckRoot: a consumer running the plugin mirror
+# gets its repo-root from CLAUDE_PROJECT_DIR; in the workshop-root (or outside a session) it falls
+# back to the git-root. This keeps the root-copy and the plugin-mirror byte-identical (guarded by the
+# shared-scripts drift-lint). -ConsumerPathOverride wins so a fixture can point the check at a
+# throwaway consumer. The returned Source/Note travel into the [SCOPE] line below, so a finding
+# surfaced by the session hook always names the repo it is about (inbound #203).
+$scope = Resolve-CheckRoot -Override $ConsumerPathOverride
+if (-not $scope.Path) {
+    Write-Host '== check-script-contract ==' -ForegroundColor Cyan
+    Write-Failure "no repo root could be resolved ($($scope.Note)) -- nothing was checked."
+    Write-CheckSummary
+}
+$repoRoot = $scope.Path
 
 # The declared contract: one record per (lib, required function), grouped by lib for the report.
 # Each record names the shared script(s) that call the function at runtime, so an [ERROR] here reads
@@ -150,7 +156,8 @@ function Write-ContractGap {
     }
 }
 
-Write-Host "== check-script-contract -- $repoRoot ==" -ForegroundColor Cyan
+Write-Host '== check-script-contract ==' -ForegroundColor Cyan
+Write-CheckScope -Scope $scope -CheckName 'check-script-contract'
 
 foreach ($libRel in @($script:Contract.Lib | Sort-Object -Unique)) {
     $records = @($script:Contract | Where-Object { $_.Lib -eq $libRel })
