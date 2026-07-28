@@ -1,136 +1,75 @@
-# Release v2.9.0
+# Release v2.10.0
 
 **Date:** 2026-07-28  
 **Type:** Minor
 
-Two inbound fixes: session checks name the repo a finding is about, and the roster check covers persona-only specialists
+An unregistered consumer no longer reads as 'no errors', plus the register handover in specialists-init
 
 You are on this release.
 
 ## Fixes
 
-### #206 · Roster check covers persona-only specialists · Fix · 2026-07-28
+### #208 · An unregistered consumer is visible at session start · Fix · 2026-07-28
 
-Inbound #204 from life-hub. `check-roster-sync.ps1` never checked whether a **persona-only**
-specialist had a roster row and a lens, so the roster could lose Chris's or Derek's row and the check
-would stay green. Measured in life-hub: the shared check validated **20** specialists where that
-repo's own `lint-plugin-sync.ps1` compared **24** — the gap being exactly the four persona-only
-main-loop specialists.
+Found by Dave: the `specialists` plugin had been installed on a third repo (`djcylow-react`) and it
+never appeared in the connectors register. Reproduced against a throwaway clean consumer, and the
+result was worse than a missing entry — it was a false all-clear:
 
-**The old exclusion bundled two decisions into one, and only the first followed from the reasoning.**
-*"A persona is not an orphan"* is right — counting personas as backing is what stops them being
-flagged as orphans in every real repo, and `Get-BackingIds` keeps doing exactly that, untouched.
-*"A persona can therefore never be missing"* does not follow: a persona is a real specialist with a
-roster row and a lens, just like an agent, and when the row or the lens is gone that is actionable
-drift of precisely the kind this check exists for. The missing-row/missing-lens loop now walks agents
-**and** personas, each finding naming which kind it is about.
+```
+check-connectors:        [INFO]  not registered: no manifest for this consumer in the register.
+connector-sessioncheck:  no errors.
+```
 
-**One persona exception remains, deliberately: the lens-header drift check.** That comparison needs
-the specialist's current name, which comes from an agent file's `name:` frontmatter. A persona file
-carries only `id`/`group`. Run it anyway and every persona lens whose header holds a name — i.e. all
-the older ones — would be reported as drifting from its own id: a false signal in exactly the
-register the session hook is being taught to trust. Documented as a gap in the script, with a test
-pinning the absence of the false signal rather than the presence of a feature.
+The check *knew*. The hook suppresses `[INFO]` (Dave's July 20, 2026 decision), so what a brand-new
+consumer actually saw was a positive verdict for a repo this workshop cannot see at all: no
+plugin-version check, no lens-inventory check, no agent-def drift check. `djcylow-react` had been
+filing inbound issues since July 26 in that state.
 
-**Two consequences of extending the coverage, both handled rather than discovered later:**
+**Two gaps, and they compounded.**
 
-- **A deliberately unrostered persona is now real drift.** This workshop has one: Bianca (03-02), a
-  main-loop *intake* persona `CLAUDE.md` explicitly does not roster, because there is no
-  intake-interview work here. That choice was prose only; it is now also recorded in
-  `Get-RosterIgnoredIds`, where the check can read it. The ignore-list doing its job — the
-  alternative was a permanent `[ERROR]` at every session start for a decision made on purpose.
-- **The `sync-roster` skill would have staged nothing for the new findings.** Its `[ERROR]`-parsing
-  regex matched the literal word `agent`, while both the check's own report and the session hook point
-  the reader at that skill to stage the catch-up. Left alone, the pointer would have looked helpful
-  and quietly done nothing for exactly the findings this change introduced. The pattern now accepts
-  `persona` too. Both downstream steps already cope: the lens scaffold has been nameless since #145,
-  so it needs no persona variant, and a proposed roster row falls back to the id plus an explicit
-  *"(add a short description)"* placeholder — degraded on purpose rather than inventing a name a
-  persona file does not contain.
+**Gap A — nothing pointed towards registration.** `specialists-init` contained no mention of the
+register at all (`connector|register|manifest`: zero hits), and it structurally cannot create the
+manifest: the register lives in the workshop, the bootstrap runs in the consumer, and the register's
+doctrine is explicit that it never writes cross-repo. So it now closes the loop from the other side —
+after bootstrapping it prints a **paste-ready manifest block**: repo name derived from the git remote,
+lens inventory per plugin, and `visibility`/`localCheckout` left as `VUL-IN` because it genuinely
+cannot know them (it has no idea where the workshop checkout sits relative to the consumer, and a
+guessed path is exactly what the register's marker check exists to prevent). Printed, never written.
 
-**Change 2 — the orphan trail is no longer silent.** An orphan (a roster token or lens file with no
-backing agent *or* persona — the "specialist removed from the plugin, consumer lens left behind"
-case) is `[INFO]`, and the hook suppresses `[INFO]`, so the finding existed only for whoever
-deliberately ran the script: in practice nobody. The per-orphan lines stay `[INFO]` and stay
-suppressed — an orphan can be a legitimately just-removed specialist, and a red line through every
-transition is how a gate gets ignored. What the check now adds is one non-counting `[ORPHANS]`
-roll-up naming the count, which the hook *does* surface, in both the drift and the in-sync branch.
+The inventory deliberately covers **both** lens kinds. Collecting only the agents would hand over a
+manifest that under-reports the repo by exactly its persona-only specialists — the same class of bug
+inbound #204 was about, one layer along.
 
-Deliberately **not** the alternative the issue also offered (promote the orphan to `[ERROR]`), and
-deliberately not a generic *"N info signals"* line either: a repo permanently carries ignore-list
-`[INFO]`s — this one has six — so a generic counter would fire at every single session start, which
-is the noise PR #99 removed. No orphans means no line at all, and there is a test for that too.
+**Gap B — the "unregistered" signal could not reach a session.** `check-connectors.ps1` now also emits
+a non-counting **`[UNREGISTERED]`** line that the hook surfaces, *next to* the no-errors verdict rather
+than under it: nothing is wrong with the plugin install in that repo, only with this workshop's view of
+it, so the exit code stays 0 and the per-signal `[INFO]` stays suppressed. The `[INFO]` itself remains
+for the count and the deliberate run.
 
-**What this unblocks.** With persona coverage in place the shared check subsumes the repo-local
-duplicate, so a consumer can retire its own `lint-plugin-sync.ps1` — the reason #204 was
-investigated. Until this reaches a consumer via a release, that duplicate is load-bearing, not
-redundant.
+Deliberately **not** promoted to `[ERROR]`, which would make the exit code 1 and put a red line in
+every session of a repo somebody chose not to register. The mechanism is the one `check-roster-sync`
+already uses for `[ORPHANS]` (inbound #204) — a dedicated non-counting token — applied a second time,
+which is what makes it a pattern rather than a one-off.
 
-The issue's two closing observations (`Resolve-PluginDir`'s cache-based resolution as the reference
-behavior, and the `startup`-only hook matcher) were offered as data rather than asks and are left as
-they are.
+**This is not a relaxation of the `[INFO]`-silence rule.** That rule was justified as *"often the
+business of another machine or user"*; this signal is its opposite — about the repo the session is in,
+actionable there. The connectors README's own classification rule already pointed the same way: a
+category that must not stay out of sight may not be filed as `[INFO]`. Recorded there as a named
+exception, so the next extension of the check has a precedent to reason from instead of a
+contradiction.
 
-[PR #206](https://github.com/DaveKJohn/davekjohns-workshop/pull/206)
+**Someone got halfway here before.** `connectors.tests.ps1` case 5c carries the comment *"regression:
+this used to be a bare Write-Host that did not count as an info signal, causing the hook to show 'all
+connectors in sync'"* — the false reassurance was spotted once and half-fixed: made countable, so a
+deliberate run reports it, while the hook kept hiding it. The remaining half is this change.
+
+Not resolved here: registering `djcylow-react` itself. Its checkout is not on this machine, so its
+plugin set and lens inventory cannot be read — that manifest needs a session on the machine where the
+repo lives, or the data by hand.
+
+[PR #208](https://github.com/DaveKJohn/davekjohns-workshop/pull/208)
 
 ---
 
-### #205 · SessionStart hooks name the repo a finding is about · Fix · 2026-07-28
-
-Inbound #203 from life-hub. The three SessionStart hooks reported **that** there was drift but not
-**where**: they filter their child check's output down to the `[ERROR]` lines, and that filter threw
-away the one line naming the inspected repo. On 2026-07-27 that sent an investigation into the wrong
-repo — a script-contract alarm about `Get-RosterPath`/`Get-RosterIgnoredIds` that did not reproduce,
-against functions that had landed two days *earlier*. The check was right; it was right about a
-**different repo** than the session it reported into, and the report had no way to say so.
-
-**The fix is diagnosability, not detection — the checks themselves were sound.** Two mechanisms in
-the shared `check-report-lib.ps1`, one per shape of check:
-
-- **`Resolve-CheckRoot` + a `[SCOPE]` line** for a check whose whole run inspects one repo root
-  (`check-script-contract`, `check-roster-sync`). Both now delegate their dual-context root
-  resolution to that single source and print the resolved root *and how it was resolved*. The
-  hooks keep `[SCOPE]` through the `[ERROR]` filter, so a surfaced finding always arrives with its
-  repo. Deliberately the root the **check** resolved, not the one the hook assumes it is in: the two
-  diverging *is* the failure mode, so printing the hook's own assumption would read just as
-  reassuringly and be just as wrong.
-- **`Set-CheckScope`** for a check that walks several scopes in one run (`check-connectors`, one
-  block per connector). A per-run line cannot disambiguate there, so each finding carries its own
-  subject. The label is set per iteration and cleared afterwards, so a run-level notice is never
-  attributed to whichever connector the loop happened to end on.
-
-Naming the connector turned out not to be enough, and this repo's own register proved it: the live
-session summary showed two **word-for-word identical** `[ERROR]` lines for smartwatchbanden, because
-that consumer registers two plugins and both were behind on one outdated install — the
-distinguishing `-- plugin:` header being exactly what the filter drops. The label therefore narrows
-to `<repo> / <plugin-id>` inside a plugin block. Same defect, one layer deeper.
-
-Two further blind spots in the hooks, from the same issue:
-
-- **A partial drift report used to be indistinguishable from a complete one.** The exit code cannot
-  carry that distinction — a complete report *with* findings and a crash halfway both leave a `-File`
-  child on a non-zero exit. `Write-CheckSummary`'s `Summary: N error(s)` line is the check's last
-  statement, so its absence is the reliable marker; a drift report missing it (or on an unexpected
-  exit code) is now flagged as possibly partial. Used only to *qualify* a drift report, never to
-  withhold the in-sync line: a check may legitimately exit 0 early without a summary, and turning
-  that into "could not complete" would trade one misreport for another.
-- **`connector-sessioncheck` printed "signals found -- summary" with an empty list** whenever the
-  check exited non-zero without emitting a signal line — a finding that is not there. That case now
-  has its own could-not-complete branch, matching the other two hooks.
-
-`Resolve-CheckRoot` also reports a missing `CLAUDE_PROJECT_DIR` explicitly instead of falling back to
-the working directory's git root in silence, and returns `$null` rather than letting a caller under
-`$ErrorActionPreference = 'Stop'` die on a `.Trim()` of nothing.
-
-**The dual-context invariant moved with the behavior.** `shared-scripts.tests.ps1` asserted that
-every shared source matches `CLAUDE_PROJECT_DIR` — which the two sync checks would still have passed
-purely on their *comments* after the resolution moved into the lib. It now requires a real call
-(inline `$env:CLAUDE_PROJECT_DIR` **or** `Resolve-CheckRoot`), plus an assertion that
-`check-report-lib` itself really reads the env var. Otherwise the guard would have quietly stopped
-guarding anything.
-
-[PR #205](https://github.com/DaveKJohn/davekjohns-workshop/pull/205)
-
----
-
-Full workshop notes: [releases/development/2.x/2.9.0.md](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/releases/development/2.x/2.9.0.md)
+Full workshop notes: [releases/development/2.x/2.10.0.md](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/releases/development/2.x/2.10.0.md)
 Cumulative plugin history: [CHANGELOG.md](CHANGELOG.md)
