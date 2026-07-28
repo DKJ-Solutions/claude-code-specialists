@@ -173,6 +173,14 @@ try {
     }
     $okCount = @([regex]::Matches($r.Out, '\[OK\]')).Count
     Assert-Equal 8 $okCount 'happy path: exactly eight [OK] lines (the six mandatory functions + the optional Get-ChangelogHeading + the optional Get-LiveStage, nothing else)'
+    # inbound #203: the run names the root it inspected and how it resolved it. Asserted on the clean
+    # run too, not only on a drifted one -- the [SCOPE] line is context that must always be emitted, so
+    # that the hook has something to surface the moment a finding does appear.
+    Assert-Match '\[SCOPE\].*check-script-contract inspected' $r.Out 'happy path: a [SCOPE] line names the inspected root'
+    Assert-Match ([regex]::Escape($c)) $r.Out 'happy path: the [SCOPE] line names the ACTUAL fixture root, not the session/git root'
+    Assert-Match '\[SCOPE\].*-ConsumerPathOverride' $r.Out 'happy path: the [SCOPE] line names HOW the root was resolved (override)'
+    # Non-counting, like [OK]/[SKIP]: context must never move the error/info tallies or the exit code.
+    Assert-Match 'Summary: 0 error\(s\), 0 info signal\(s\)' $r.Out 'happy path: [SCOPE] is non-counting (0 errors, 0 infos)'
 
     # --- 2. Missing function in branch-info.ps1 (the exact #147 incident): Test-BranchName ---------
     #     new-branch crashed at runtime with "The term 'Test-BranchName' is not recognized" because
@@ -399,6 +407,14 @@ function Get-RosterIgnoredIds { return @() }
     Assert-Equal 0 $r.Code 'hook drifted: exit 0 (never blocks the session)'
     Assert-Match 'script-contract drift found' $r.Out 'hook drifted: drift summary shown'
     Assert-Match "\[ERROR\].*Test-BranchName" $r.Out 'hook drifted: the [ERROR] line is surfaced verbatim'
+    # The end-to-end version of inbound #203, against the REAL check rather than a stub: a finding that
+    # reaches the session must arrive with the repo it is about. The 2026-07-27 incident was exactly
+    # this line going missing -- a true Test-BranchName finding, read as being about the wrong repo.
+    Assert-Match '\[SCOPE\].*check-script-contract inspected' $r.Out 'hook drifted: the [SCOPE] line survives the [ERROR] filter'
+    Assert-Match ([regex]::Escape($c)) $r.Out 'hook drifted: the surfaced scope is the fixture root the check really inspected'
+    Assert-NotMatch 'may be partial' $r.Out 'hook drifted: a complete real check run is not flagged as partial'
+    # [OK] lines must still stay out: widening the filter for [SCOPE] must not have widened it further.
+    Assert-NotMatch '\[OK\]' $r.Out 'hook drifted: [OK] lines still stay out of the session context'
 
     # --- 9. Check script not found (-CheckScriptOverride to a nonexistent path) --------------------
     $missing = Join-Path $Fixture 'does-not-exist.ps1'

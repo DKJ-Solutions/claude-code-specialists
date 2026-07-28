@@ -66,31 +66,38 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# Repo-root -- dual-context: a consumer running the shared plugin mirror gets its repo-root from
-# CLAUDE_PROJECT_DIR; in the workshop-root (or outside a session) it falls back to the git-root. This
-# keeps the root-copy and the plugin-mirror byte-identical (guarded by the shared-scripts drift-lint).
-# -ConsumerPathOverride wins so a fixture can point the check at a throwaway consumer.
-$repoRoot = if ($ConsumerPathOverride) { $ConsumerPathOverride }
-            elseif ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR }
-            else { (git rev-parse --show-toplevel).Trim() }
-$repoRoot = (Resolve-Path -LiteralPath $repoRoot).Path
-
-# Plugin cache root (overridable for tests).
-$cacheRoot = if ($CacheRootOverride) { $CacheRootOverride } else { Join-Path $env:USERPROFILE '.claude\plugins\cache' }
-
 $script:errors = 0
 $script:infos  = 0
 
 # Middle dot used in the scaffold-lineage lens header; kept as a code point so this file stays ASCII.
 $midDot = [char]0x00B7
 
-# Write-Ok/Write-Info/Write-Failure + Test-PluginNameSlug/Test-PluginMarketplaceSlug + Resolve-PluginDir:
-# shared with check-connectors.ps1 and skills/sync-roster/sync-roster.ps1 (single source, issue
-# #114). This script is a whole-file mirror (scripts/lib/shared-scripts-lib.ps1); check-report-lib.ps1
-# is registered in that same pair set and therefore travels along, so a $PSScriptRoot-relative
-# dot-source (not $repoRoot -- this lib is not repo-owned, unlike repo-config.ps1/branch-info.ps1)
-# resolves correctly whether this file runs from the workshop root or the plugin mirror.
+# Write-Ok/Write-Info/Write-Failure + Test-PluginNameSlug/Test-PluginMarketplaceSlug + Resolve-PluginDir
+# + Resolve-CheckRoot/Write-CheckScope: shared with check-connectors.ps1 and
+# skills/sync-roster/sync-roster.ps1 (single source, issue #114). This script is a whole-file mirror
+# (scripts/lib/shared-scripts-lib.ps1); check-report-lib.ps1 is registered in that same pair set and
+# therefore travels along, so a $PSScriptRoot-relative dot-source (not $repoRoot -- this lib is not
+# repo-owned, unlike repo-config.ps1/branch-info.ps1) resolves correctly whether this file runs from
+# the workshop root or the plugin mirror. Dot-sourced BEFORE the repo-root resolution below, which
+# now comes from that same shared lib.
 . (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
+
+# Repo-root -- dual-context via the shared Resolve-CheckRoot: a consumer running the plugin mirror
+# gets its repo-root from CLAUDE_PROJECT_DIR; in the workshop-root (or outside a session) it falls
+# back to the git-root. This keeps the root-copy and the plugin-mirror byte-identical (guarded by the
+# shared-scripts drift-lint). -ConsumerPathOverride wins so a fixture can point the check at a
+# throwaway consumer. The returned Source/Note travel into the [SCOPE] line further down, so a
+# finding surfaced by the session hook always names the repo it is about (inbound #203).
+$scope = Resolve-CheckRoot -Override $ConsumerPathOverride
+if (-not $scope.Path) {
+    Write-Host '== check-roster-sync ==' -ForegroundColor Cyan
+    Write-Failure "no repo root could be resolved ($($scope.Note)) -- nothing was checked."
+    Write-CheckSummary
+}
+$repoRoot = $scope.Path
+
+# Plugin cache root (overridable for tests).
+$cacheRoot = if ($CacheRootOverride) { $CacheRootOverride } else { Join-Path $env:USERPROFILE '.claude\plugins\cache' }
 
 # Agent ids ('<group>-<id>') a plugin ships (source a).
 function Get-AgentIds {
@@ -201,7 +208,8 @@ function Get-LensIds {
     return $result
 }
 
-Write-Host "== check-roster-sync -- $repoRoot ==" -ForegroundColor Cyan
+Write-Host '== check-roster-sync ==' -ForegroundColor Cyan
+Write-CheckScope -Scope $scope -CheckName 'check-roster-sync'
 
 # Roster path from repo-config's Get-RosterPath (default 'CLAUDE.md'). repo-config is repo-specific and
 # lives in the consumer repo-root; if it is absent we fall back to the default (this check has a sane

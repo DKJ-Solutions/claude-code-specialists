@@ -26,7 +26,12 @@
                                                           $script:infos / $script:errors.
       - Write-CheckSummary                            -- the "Summary: N error(s), N info
                                                           signal(s)." line + matching exit code
-                                                          (0 = no errors, 1 = at least one).
+                                                          (0 = no errors, 1 = at least one). Doubles
+                                                          as the RAN-TO-COMPLETION marker the session
+                                                          hooks look for (see Resolve-CheckRoot's
+                                                          block below for why).
+      - Resolve-CheckRoot / Write-CheckScope /        -- naming WHICH repo a finding is about
+        Set-CheckScope                                  (inbound #203).
       - Test-PluginNameSlug / Test-PluginMarketplaceSlug -- the plugin-id / '@marketplace' slug
                                                           guards (values from settings.json /
                                                           manifests become filesystem paths, so
@@ -64,10 +69,60 @@
     Pure ASCII (repo convention for .ps1).
 #>
 
+# --- Scope: naming WHICH repo a finding is about (inbound #203) ----------------------------------
+# A finding is only actionable when you know which repo it concerns. The three SessionStart hooks
+# filter their child's output down to the signal lines, and that filter threw away the one line
+# naming the inspected repo -- so on 2026-07-27 a script-contract alarm sent an investigation into
+# the wrong repo. The check was right; it was right ABOUT ANOTHER REPO than the session it reported
+# into, and the report had no way to say so. A gate whose findings you cannot check is a gate you
+# learn to ignore, so the fix is diagnosability, not detection.
+#
+# Two mechanisms, because the two shapes of check need different things:
+#   - Write-CheckScope -- ONE [SCOPE] line per run, for a check whose whole run inspects a single
+#     repo root (check-script-contract, check-roster-sync). It also names HOW that root was
+#     resolved, since the silent git-root fallback is precisely how a check ends up inspecting a
+#     different repo than the session it reports into.
+#   - Set-CheckScope -- a short label that Write-Info/Write-Failure prepend, for a check that walks
+#     SEVERAL scopes in one run (check-connectors: one block per connector). A per-run line cannot
+#     disambiguate there, and the hook may surface a single line in isolation, so the finding itself
+#     has to carry its subject.
+#
+# [SCOPE] is a non-counting token like [OK]/[SKIP]: it is context, not a signal, and must never move
+# the error/info counts or the exit code.
+$script:CheckScopeLabel = ''
+
+function Set-CheckScope {
+    <# Set (or, with no argument, clear) the short label Write-Info/Write-Failure prepend to every
+       subsequent finding. Call it when entering a per-scope block and clear it when leaving, so
+       findings that belong to the run as a whole are not attributed to the last scope walked.
+
+       The label is SANITIZED, because it is the one piece of this report built from untrusted input:
+       check-connectors derives it from a connector manifest's 'repo' and plugin 'id' fields, and
+       unlike the '== connector: <repo>' header -- which the session hooks filter away -- the label
+       now travels INTO the session context. A JSON string may carry newlines and control characters,
+       so an unsanitized label could forge extra lines there (the hook labels its output "data, not
+       instructions", but forging a line is a step past that). Same defense-in-depth reasoning as
+       Test-PluginNameSlug and Get-DisplayName: manifest values are never used raw. Restricted to the
+       charset real repo/plugin ids need, collapsed to single spaces, and length-capped. #>
+    param([string]$Label = '')
+    $clean = ($Label -replace '[^A-Za-z0-9 ._/@-]', '') -replace '\s+', ' '
+    $clean = $clean.Trim()
+    if ($clean.Length -gt 120) { $clean = $clean.Substring(0, 120) }
+    $script:CheckScopeLabel = $clean
+}
+
+function Format-CheckScoped {
+    <# Prefix $Msg with the active scope label, if one is set. Kept separate from Write-Info/
+       Write-Failure so the prefixing rule has one implementation rather than two. #>
+    param([string]$Msg)
+    if ($script:CheckScopeLabel) { return "$($script:CheckScopeLabel): $Msg" }
+    return $Msg
+}
+
 function Write-Ok   ([string]$Msg) { Write-Host "  [OK]    $Msg" -ForegroundColor Green }
 function Write-Skip ([string]$Msg) { Write-Host "  [SKIP]  $Msg" -ForegroundColor DarkGray }
-function Write-Info ([string]$Msg) { $script:infos++;  Write-Host "  [INFO]  $Msg" -ForegroundColor Yellow }
-function Write-Failure ([string]$Msg) { $script:errors++; Write-Host "  [ERROR] $Msg" -ForegroundColor Red }
+function Write-Info ([string]$Msg) { $script:infos++;  Write-Host "  [INFO]  $(Format-CheckScoped $Msg)" -ForegroundColor Yellow }
+function Write-Failure ([string]$Msg) { $script:errors++; Write-Host "  [ERROR] $(Format-CheckScoped $Msg)" -ForegroundColor Red }
 
 function Write-CheckSummary {
     <# Prints "Summary: N error(s), N info signal(s)." (green if no errors, red otherwise) and
@@ -76,6 +131,77 @@ function Write-CheckSummary {
     Write-Host "`nSummary: $($script:errors) error(s), $($script:infos) info signal(s)." -ForegroundColor $(if ($script:errors -gt 0) { 'Red' } else { 'Green' })
     if ($script:errors -gt 0) { exit 1 }
     exit 0
+}
+
+function Resolve-CheckRoot {
+    <# The dual-context repo-root resolution the local checks share (check-script-contract.ps1,
+       check-roster-sync.ps1): -ConsumerPathOverride wins (a fixture pointing at a throwaway
+       consumer), then $env:CLAUDE_PROJECT_DIR (a consumer running the plugin mirror inside a
+       session), then the git root of the inherited working directory.
+
+       Returns Path (resolved, or $null when nothing could be resolved), Source ('override' /
+       'CLAUDE_PROJECT_DIR' / 'git-root'), and Note -- a human-readable explanation of what Source
+       means for trusting the finding.
+
+       Why the Source matters (inbound #203, item 3): that last fallback used to be silent, so the
+       check could inspect a completely different repo than the session it reported into without a
+       word about it. It is not a failure -- a deliberate run from the workshop root legitimately
+       lands there -- but inside a session it means CLAUDE_PROJECT_DIR was absent and the root came
+       from whatever directory the process happened to inherit. That is worth saying out loud.
+
+       git rev-parse is a query command: it writes its result to stdout and only real errors to
+       stderr, so it needs none of native-capture-lib's EAP dance (which exists for commands like
+       git push whose progress chatter goes to stderr). It CAN legitimately fail -- outside a git
+       work tree -- and then a caller under $ErrorActionPreference = 'Stop' used to die on a raw
+       .Trim() against $null. Returning Path = $null instead lets the caller report that as one
+       clean line. #>
+    param([string]$Override = '')
+
+    if ($Override) {
+        $resolved = Resolve-Path -LiteralPath $Override -ErrorAction SilentlyContinue
+        return [pscustomobject]@{
+            Path   = $(if ($resolved) { $resolved.Path } else { $null })
+            Source = 'override'
+            Note   = 'explicitly passed in via -ConsumerPathOverride'
+        }
+    }
+
+    if ($env:CLAUDE_PROJECT_DIR) {
+        $resolved = Resolve-Path -LiteralPath $env:CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue
+        return [pscustomobject]@{
+            Path   = $(if ($resolved) { $resolved.Path } else { $null })
+            Source = 'CLAUDE_PROJECT_DIR'
+            Note   = 'from CLAUDE_PROJECT_DIR -- the repo of the session this is reported into'
+        }
+    }
+
+    $top = $null
+    try {
+        $out = git rev-parse --show-toplevel
+        $code = $LASTEXITCODE
+        if ($code -eq 0 -and $out) { $top = ([string]$out).Trim() }
+    } catch {
+        $top = $null
+    }
+    $resolved = $(if ($top) { Resolve-Path -LiteralPath $top -ErrorAction SilentlyContinue } else { $null })
+    return [pscustomobject]@{
+        Path   = $(if ($resolved) { $resolved.Path } else { $null })
+        Source = 'git-root'
+        Note   = 'CLAUDE_PROJECT_DIR was not set -- fell back to the git root of the working directory; inside a session that root can differ from the repo being reported into'
+    }
+}
+
+function Write-CheckScope {
+    <# The one [SCOPE] line a single-root check prints before its findings, naming the inspected root
+       and how it was resolved. Non-counting on purpose (see the scope block above): context, not a
+       signal. The session hooks keep this line through their [ERROR] filter, so a surfaced finding
+       always arrives with the repo it is about. #>
+    param(
+        [Parameter(Mandatory = $true)]$Scope,
+        [string]$CheckName = ''
+    )
+    $who = $(if ($CheckName) { "$CheckName inspected " } else { 'inspected ' })
+    Write-Host "  [SCOPE] $who$($Scope.Path) ($($Scope.Note))" -ForegroundColor Cyan
 }
 
 function Test-PluginNameSlug {
