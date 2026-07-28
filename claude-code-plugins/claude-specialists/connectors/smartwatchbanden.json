@@ -17,5 +17,5 @@
       ]
     }
   ],
-  "notes": "03-02 (Bianca) has no repo lens in swb yet; not required, but worth mentioning. 06-23 (Sean) registered since swb commit 7dca9bd (2026-07-17)."
+  "notes": "03-02 (Bianca) has no repo lens in swb. This used to be noted as 'not required'; since v2.9.0 that is no longer true -- check-roster-sync now checks persona-only specialists for a missing roster row/lens, so once swb updates past v2.1.0 this becomes an [ERROR] there. Two valid outcomes, and it is a decision rather than a defect: adopt her in swb, or record the deliberate omission in that repo's Get-RosterIgnoredIds. 06-23 (Sean) registered since swb commit 7dca9bd (2026-07-17)."
 }

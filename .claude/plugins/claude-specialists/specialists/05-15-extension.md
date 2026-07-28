@@ -112,6 +112,28 @@ infrastructure.
   load failure (a real syntax error) should degrade to a sane default or a reported `[ERROR]`, not
   abort the check. Recognized while building the script-contract check for inbound #147 (#148) and
   immediately found in its sibling `check-roster-sync.ps1` (#149).
+- **A check's `[ERROR]` text is a consumed interface, not just prose.** `skills/sync-roster/sync-roster.ps1`
+  does not re-implement detection — it *parses* `check-roster-sync.ps1`'s finding lines with a regex
+  (`\[ERROR\]\s+(?:agent|persona) '(?<id>\d{2}-\d{2})' \(...\) has no (roster row|repo-lens)`). So
+  rewording or widening a finding silently changes what the recovery skill can act on. Inbound #204
+  hit exactly that: extending the check to persona-only specialists made it emit
+  `persona '01-01' ... has no roster row`, which the then-`agent`-only pattern did not match — while
+  both the check's own report *and* the session hook point the reader at that skill to stage the
+  catch-up. Left alone it would have shipped advice that looks helpful and does nothing, for precisely
+  the findings the change introduced. The rule: when you touch a finding's wording or scope, grep for
+  who parses it before you touch the message. The integration tests in
+  `scripts/tests/sync-roster.tests.ps1` drive the REAL check (not a stub) for exactly this reason, so
+  they do fail on a wording change — treat that failure as the coupling reporting itself, not as a
+  test to patch.
+- **Verify a diagnosability fix against real data, not against the diff.** A report that "names the
+  thing" reads correct in review and can still be useless in practice. The #203 fix made
+  `check-connectors` label each finding with its connector — provably right, fully tested, and still
+  producing two word-for-word identical lines when run against this repo's own register, because that
+  consumer registers *two* plugins and both were behind on one outdated install. The distinguishing
+  `-- plugin:` header was the very thing the hook filters away. Only running it surfaced that; the
+  label now carries `<repo> / <plugin-id>`. For any change whose whole purpose is "make the output
+  actionable", run it against the real register/repo before calling it done — a fixture proves the
+  mechanism, not the usefulness.
 - This repo is **public**: config never contains secrets.
 
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
