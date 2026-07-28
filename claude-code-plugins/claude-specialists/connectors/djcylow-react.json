@@ -1,0 +1,16 @@
+{
+  "repo": "DaveKJohn/djcylow-react",
+  "visibility": "public",
+  "localCheckout": "../djcylow-react",
+  "plugins": [
+    {
+      "id": "specialists@davekjohns-workshop",
+      "extensions": [
+        "01-01", "02-09", "03-02", "03-07", "04-11", "04-12", "04-13", "04-18",
+        "05-05", "05-06", "05-15", "06-16", "06-17", "06-19", "06-23",
+        "06-24", "06-25", "06-29", "06-30"
+      ]
+    }
+  ],
+  "notes": "Registered 2026-07-28, after the [UNREGISTERED] gap was found: this repo had been a consumer since at least 2026-07-26 (inbound #177 came from here) without a manifest, so the workshop was blind to it. Inventory read from the GitHub API, not a local checkout -- the repo is not on the workshop machine, so the check will SKIP it here and run wherever it is cloned. Fully adopted: all 19 specialists the plugin ships (15 agents + 4 personas) have both a roster row and a lens, including 03-02 (Bianca), so the v2.9.0 persona check needs no ignore-list entry here. Only the specialists plugin is enabled. Note: its .claude/settings.json has no extraKnownMarketplaces block, so the marketplace must be registered at user level on that machine."
+}
