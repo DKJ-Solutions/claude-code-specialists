@@ -195,14 +195,23 @@ $checkArgs = @('-ConsumerPathOverride', $repoRoot)
 if ($CacheRootOverride) { $checkArgs += @('-CacheRootOverride', $cacheRoot) }
 $checkOut = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $checkScript @checkArgs)
 
-# Parse the [ERROR] lines. check-roster-sync emits, per missing agent:
-#   [ERROR] agent '<g>-<id>' (<plugin>@<marketplace>) has no roster row in <file> ...
-#   [ERROR] agent '<g>-<id>' (<plugin>@<marketplace>) has no repo-lens ...
-# (An "invalid plugin id" ERROR does not match this agent pattern and is deliberately ignored here --
+# Parse the [ERROR] lines. check-roster-sync emits, per missing specialist:
+#   [ERROR] <agent|persona> '<g>-<id>' (<plugin>@<marketplace>) has no roster row in <file> ...
+#   [ERROR] <agent|persona> '<g>-<id>' (<plugin>@<marketplace>) has no repo-lens ...
+# (An "invalid plugin id" ERROR does not match this pattern and is deliberately ignored here --
 # it is a settings problem, not a recoverable roster gap.)
+#
+# 'persona' joined the alternation with inbound #204, which extended the check to persona-only
+# specialists. It has to: check-roster-sync's own report and the session hook both point the reader at
+# this skill to stage the catch-up, and a pattern that only matched 'agent' would have silently staged
+# NOTHING for exactly the findings that change introduced -- advice that looks helpful and does nothing.
+# Both downstream steps already cope: the lens scaffold has been nameless since #145 (no agent-file
+# lookup), and for a roster row Get-AgentInfo simply returns $null for a persona, so the proposal falls
+# back to the id plus a "(add a short description)" placeholder -- degraded but honest, and still a
+# paste-ready row. A persona file carries no name/description to do better with.
 $missingLens   = @()   # ordered list of @{ Id; PluginId }
 $missingRoster = @()
-$rx = [regex]"\[ERROR\]\s+agent '(?<id>\d{2}-\d{2})' \((?<pid>[^)]+)\) has no (?<kind>roster row|repo-lens)"
+$rx = [regex]"\[ERROR\]\s+(?:agent|persona) '(?<id>\d{2}-\d{2})' \((?<pid>[^)]+)\) has no (?<kind>roster row|repo-lens)"
 foreach ($line in $checkOut) {
     $m = $rx.Match($line)
     if (-not $m.Success) { continue }
@@ -223,7 +232,7 @@ foreach ($line in $checkOut) {
 }
 
 if ($missingLens.Count -eq 0 -and $missingRoster.Count -eq 0 -and $staleHeaders.Count -eq 0) {
-    Write-Ok "no missing-agent drift or stale lens headers reported by check-roster-sync -- nothing to stage."
+    Write-Ok "no missing-specialist drift or stale lens headers reported by check-roster-sync -- nothing to stage."
     Write-Host "`nSummary: 0 scaffold(s) created, 0 roster row(s) proposed, 0 header reconcile(s)." -ForegroundColor Green
     exit 0
 }
@@ -253,9 +262,9 @@ function Get-CachedPluginDir {
     return $pluginDirCache[$key]
 }
 
-# --- 2. Missing-lens agents: create the additive scaffold (never overwrite) -------------------------
+# --- 2. Missing-lens specialists: create the additive scaffold (never overwrite) --------------------
 Write-Host "`n-- lens scaffolds" -ForegroundColor Cyan
-if ($missingLens.Count -eq 0) { Write-Info "no agent is missing a lens." }
+if ($missingLens.Count -eq 0) { Write-Info "no specialist is missing a lens." }
 foreach ($e in $missingLens) {
     $id = $e.Id
     $parts = $id.Split('-'); $group = $parts[0]; $idNum = $parts[1]
@@ -290,7 +299,7 @@ foreach ($e in $missingLens) {
     $script:created++
 }
 
-# --- 3. Missing-roster agents: PRINT a proposed row (never edit the roster) -------------------------
+# --- 3. Missing-roster specialists: PRINT a proposed row (never edit the roster) --------------------
 # Best-effort match of the consumer's roster style: if the roster text contains a markdown table row,
 # propose a table row; if it contains list bullets, propose a list line; otherwise default to a table
 # row. Read the roster path via repo-config's Get-RosterPath (default CLAUDE.md), same as the check.
@@ -310,7 +319,7 @@ if ($rosterText -match '(?m)^\s*\|.*\|\s*$') { $rosterStyle = 'table' }
 elseif ($rosterText -match '(?m)^\s*[-*]\s+\S') { $rosterStyle = 'list' }
 
 Write-Host "`n-- proposed roster rows (style: $rosterStyle) -- paste into $rosterRel" -ForegroundColor Cyan
-if ($missingRoster.Count -eq 0) { Write-Info "no agent is missing a roster row." }
+if ($missingRoster.Count -eq 0) { Write-Info "no specialist is missing a roster row." }
 foreach ($e in $missingRoster) {
     $id = $e.Id
     $parts = $id.Split('-'); $group = $parts[0]; $idNum = $parts[1]

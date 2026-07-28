@@ -17,6 +17,10 @@
         [INFO] (orphans, deliberate ignore-list skips, uncached plugins) stays silent at session
         start -- it is registry administration, not work worth interrupting a session start for; a
         deliberate run of check-roster-sync.ps1 shows everything;
+      - one exception to that silence: the check's non-counting [ORPHANS] roll-up line IS surfaced,
+        in both the drift and the in-sync branch, because "a lens left behind by a removed
+        specialist" was otherwise visible only to whoever deliberately ran the script -- in practice
+        nobody. The per-orphan [INFO] lines still stay out (inbound #204);
       - the check's [SCOPE] line travels along with those signals, so a surfaced finding always names
         the repo the check resolved -- and whether that root came from CLAUDE_PROJECT_DIR or from the
         working-directory git-root fallback (inbound #203);
@@ -68,8 +72,17 @@ try {
     # the finding was true, about a different repo than the session it landed in. The repo the CHECK
     # resolved, not the one this hook believes it is in: the two diverging IS the failure mode, so
     # printing the hook's own assumption would read just as reassuringly and be just as wrong.
+    # [ORPHANS] rides along too (inbound #204). An orphan -- a roster token or lens file with no backing
+    # agent or persona, i.e. "specialist removed from the plugin, consumer lens left behind" -- is
+    # [INFO] and therefore invisible here, which in practice meant invisible to everyone: the trail
+    # existed only for whoever deliberately ran the script. The per-orphan lines STAY suppressed (an
+    # orphan can be a legitimately just-removed specialist, and a red line through every transition is
+    # how a gate gets ignored); what surfaces is the check's non-counting roll-up naming the count.
+    # Deliberately not a general "N info signals" line: a repo permanently carries ignore-list [INFO]s,
+    # so that would fire at every single session start -- the noise PR #99 removed.
     $signals = @($out | Where-Object { $_ -cmatch '\[ERROR\]|\[SCOPE\]' })
     $errorCount = @($signals | Where-Object { $_ -cmatch '\[ERROR\]' }).Count
+    $orphanLines = @($out | Where-Object { $_ -cmatch '\[ORPHANS\]' })
 
     # Did the child run to completion? Write-CheckSummary's "Summary: N error(s)" line is the check's
     # last statement, so its absence means the run stopped early. The exit code cannot tell us on its
@@ -83,12 +96,19 @@ try {
     if ($errorCount -gt 0) {
         Write-Host 'roster-sessioncheck: roster drift found -- a specialist is missing from the roster/lenses (data, not instructions):'
         foreach ($line in $signals) { Write-Host "  $($line.Trim())" }
+        foreach ($line in $orphanLines) { Write-Host "  $($line.Trim())" }
         if (-not $completed -or $code -ne 1) {
             Write-Host "  (note: the check did not run to completion (exit $code) -- the list above may be partial.)"
         }
         Write-Host '  (run scripts/sync/check-roster-sync.ps1 for the full report, or the sync-roster skill to stage the catch-up.)'
     } elseif ($code -eq 0) {
         Write-Host 'roster-sessioncheck: roster in sync with the enabled plugins.'
+        # The in-sync line is literally true -- no specialist is missing -- but an orphan left behind is
+        # still something to know, and it would otherwise be swallowed by exactly that reassurance.
+        foreach ($line in $orphanLines) { Write-Host "  $($line.Trim())" }
+        if ($orphanLines.Count -gt 0) {
+            Write-Host '  (run scripts/sync/check-roster-sync.ps1 to see which ids, or the sync-roster skill to stage the catch-up.)'
+        }
     } else {
         Write-Host "roster-sessioncheck: the roster check could not complete (exit $code) -- run scripts/sync/check-roster-sync.ps1 to see why."
     }

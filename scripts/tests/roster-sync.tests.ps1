@@ -307,6 +307,13 @@ try {
     Assert-Equal 0 $r.Code 'orphan: exit-code 0 (INFO, not blocking)'
     Assert-Match "\[INFO\].*orphan '09-99'" $r.Out 'orphan: INFO names the id'
     Assert-Match '1 info signal' $r.Out 'orphan: counted as info signal'
+    # inbound #204 change 2: a roll-up line the hook can surface, so the orphan trail is not visible
+    # only to whoever deliberately runs this script (in practice nobody). The per-orphan lines stay
+    # [INFO] and stay suppressed -- an orphan can be a legitimately just-removed specialist.
+    Assert-Match '\[ORPHANS\] 1 roster token\(s\)/lens file\(s\)' $r.Out 'orphan: an [ORPHANS] roll-up line states the count'
+    # Non-counting, like [OK]: the roll-up is context and must not inflate the info tally (which the
+    # '1 info signal' assertion above would catch as '2' if it did) or change the exit code.
+    Assert-NotMatch '2 info signal' $r.Out 'orphan: the [ORPHANS] roll-up is non-counting'
 
     # --- 5. Plugin not enabled -> handled, exit 0 ------------------------------------------------
     $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') }
@@ -336,15 +343,69 @@ try {
     Assert-Match "\[ERROR\].*'06-24'" $r.Out 'highest version: 06-24 (only in 1.10.0) flagged'
     Assert-Match 'cache 1\.10\.0' $r.Out 'highest version: header shows 1.10.0'
 
-    # --- 7. Persona backing: a persona-only id is NOT drift and NOT an orphan --------------------
-    #     01-01 ships as a persona (no agent). It has a roster row + lens. It must produce no ERROR
-    #     (personas are not agents) and no orphan INFO (personas count as backing).
+    # --- 7. Persona backing: a satisfied persona-only id is NOT drift and NOT an orphan -----------
+    #     01-01 ships as a persona (no agent). It has a roster row + lens, so it must stay clean. This
+    #     is the half of the old behavior that was RIGHT and must survive inbound #204: extending the
+    #     missing-checks to personas may not turn a properly adopted persona into noise.
     $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') } -VersionPersonas @{ '1.11.0' = @('01-01') }
     $c = New-FixtureConsumer -RosterIds @('06-16', '01-01') -LensIds @('06-16', '01-01')
     $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
     Assert-Equal 0 $r.Code 'persona backing: exit-code 0'
     Assert-NotMatch "orphan '01-01'" $r.Out 'persona backing: 01-01 not an orphan'
     Assert-NotMatch "'01-01'.*no roster row" $r.Out 'persona backing: 01-01 not flagged as missing agent'
+    # Since inbound #204 the persona is not merely unflagged, it is actually CHECKED -- and the line
+    # says which kind it is, so a reader can tell an agent finding from a persona finding.
+    Assert-Match "\[OK\]\s+persona '01-01' present in roster \+ lens" $r.Out 'persona backing: 01-01 is reported as a CHECKED persona, not silently skipped'
+
+    # --- 7b. inbound #204, the core case: a persona-only specialist with NO roster row -> [ERROR] ---
+    #     This is the scenario the whole feature exists for and the one the old exclusion was blind to:
+    #     a new persona-only specialist a consumer has not adopted. Measured in life-hub, the check
+    #     validated 20 specialists where the repo's own duplicate compared 24; the roster could lose
+    #     Chris's row and the check would stay green.
+    $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') } -VersionPersonas @{ '1.11.0' = @('01-01') }
+    $c = New-FixtureConsumer -RosterIds @('06-16') -LensIds @('06-16')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 1 $r.Code 'persona missing: exit-code 1 (the case that used to be silently green)'
+    Assert-Match "\[ERROR\].*persona '01-01'.*no roster row" $r.Out 'persona missing: no roster row is an ERROR and names the kind'
+    Assert-Match "\[ERROR\].*persona '01-01'.*no repo-lens" $r.Out 'persona missing: no lens is an ERROR too'
+    # The orphan side must be untouched: 01-01 is backed by a persona file, so it is missing, NOT an
+    # orphan. Reporting both would be contradictory -- "we do not know this id" plus "adopt this id".
+    Assert-NotMatch "orphan '01-01'" $r.Out 'persona missing: still not an orphan (Get-BackingIds unchanged)'
+
+    # --- 7c. A persona with a roster row but no lens -> [ERROR] on the lens only -------------------
+    $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') } -VersionPersonas @{ '1.11.0' = @('05-05') }
+    $c = New-FixtureConsumer -RosterIds @('06-16', '05-05') -LensIds @('06-16')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 1 $r.Code 'persona lens-less: exit-code 1'
+    Assert-Match "\[ERROR\].*persona '05-05'.*no repo-lens" $r.Out 'persona lens-less: missing lens flagged'
+    Assert-NotMatch "persona '05-05'.*no roster row" $r.Out 'persona lens-less: the roster row it DOES have is not also flagged'
+
+    # --- 7d. A deliberately unrostered persona belongs on the ignore-list, not in the report -------
+    #     The consequence of 7b for a real consumer: a persona it chooses not to adopt (this workshop
+    #     does exactly that for Bianca 03-02, a main-loop intake persona with no work here) would
+    #     otherwise be a permanent [ERROR] at every session start. Get-RosterIgnoredIds is the
+    #     mechanism for recording that choice, and it must cover personas as well as agents.
+    $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') } -VersionPersonas @{ '1.11.0' = @('03-02') }
+    $repoConfigIgnore = "function Get-RosterIgnoredIds { return @('03-02') }"
+    $c = New-FixtureConsumer -RosterIds @('06-16') -LensIds @('06-16') -RepoConfig $repoConfigIgnore
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 0 $r.Code 'persona ignore-list: exit-code 0 (a documented choice is not drift)'
+    Assert-Match "\[INFO\].*persona '03-02'.*deliberately kept out" $r.Out 'persona ignore-list: reported as a deliberate skip'
+    Assert-NotMatch "\[ERROR\].*'03-02'" $r.Out 'persona ignore-list: NOT an error'
+
+    # --- 7e. Header drift stays an AGENT-only check -- a documented gap, guarded against regression --
+    #     A persona file carries no `name:` field, so there is no authoritative current name to compare
+    #     a lens header against. Running the check anyway would make Get-AgentName return '', fall back
+    #     to the id, and report every persona lens whose header carries a name as drifting from its own
+    #     id -- a false signal in exactly the register the hook is being taught to trust. The gap is
+    #     stated in check-roster-sync.ps1; this pins the absence of the false signal. If personas ever
+    #     gain a name in their frontmatter, UPDATE this assertion rather than delete it.
+    $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') } -VersionPersonas @{ '1.11.0' = @('01-01') }
+    $c = New-FixtureConsumer -RosterIds @('06-16', '01-01') -LensIds @('06-16', '01-01') `
+        -LensContent @{ '01-01' = "# Chris $([char]0x00B7) repo-lens`n`nbody" }
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 0 $r.Code 'persona header: exit-code 0'
+    Assert-NotMatch "lens '01-01'.*header still names" $r.Out 'persona header: a named persona lens header is NOT reported as stale (no name source to compare against)'
 
     # --- 8. Get-RosterPath override: roster lives in ROSTER.md -----------------------------------
     #     repo-config returns 'ROSTER.md'; the roster is written there, CLAUDE.md is empty. If the
@@ -464,6 +525,43 @@ try {
     Assert-Match 'could not complete' $r.Out 'hook: crash reported as could-not-complete'
     Assert-NotMatch 'in sync' $r.Out 'hook: crash NOT misreported as in sync'
 
+    # H7. inbound #204 change 2: the [ORPHANS] roll-up reaches the session in the CLEAN branch. This is
+    #     the whole point -- an orphan lives under an otherwise-reassuring "roster in sync" line, and
+    #     before this it was reachable only by deliberately running the script. The per-orphan [INFO]
+    #     line must still stay out, so the exception is the roll-up and nothing more.
+    $stub = New-StubCheck -Name 'stub-orphan-clean' -ExitCode 0 -OutputLines @(
+        '  [OK]    all present',
+        "  [INFO]  orphan '09-99' (lens + roster) -- no matching agent/persona in any enabled plugin.",
+        '  [ORPHANS] 1 roster token(s)/lens file(s) have no backing agent or persona in any enabled plugin.',
+        'Summary: 0 error(s), 1 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Equal 0 $r.Code 'hook orphans-clean: exit 0'
+    Assert-Match 'in sync' $r.Out 'hook orphans-clean: still reports in sync (no specialist IS missing)'
+    Assert-Match '\[ORPHANS\] 1 roster token' $r.Out 'hook orphans-clean: the roll-up reaches the session context'
+    Assert-NotMatch "orphan '09-99'" $r.Out 'hook orphans-clean: the per-orphan [INFO] line still stays out'
+    Assert-Match 'to see which ids' $r.Out 'hook orphans-clean: points at the deliberate run for the ids'
+
+    # H8. And in the DRIFT branch it travels alongside the errors, rather than being crowded out by them.
+    $stub = New-StubCheck -Name 'stub-orphan-drift' -ExitCode 1 -OutputLines @(
+        "  [ERROR]  persona '01-01' has no roster row",
+        '  [ORPHANS] 2 roster token(s)/lens file(s) have no backing agent or persona in any enabled plugin.',
+        'Summary: 1 error(s), 2 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Match 'roster drift found' $r.Out 'hook orphans-drift: drift branch fires'
+    Assert-Match "persona '01-01'" $r.Out 'hook orphans-drift: the persona ERROR surfaces'
+    Assert-Match '\[ORPHANS\] 2 roster token' $r.Out 'hook orphans-drift: the roll-up surfaces alongside the drift'
+
+    # H9. No orphans -> no roll-up line, so a clean repo gains no extra session-start line at all. The
+    #     guard against this fix becoming the noise it was meant to avoid.
+    $stub = New-StubCheck -Name 'stub-no-orphans' -ExitCode 0 -OutputLines @(
+        '  [OK]    all present',
+        '  [OK]    no orphan roster tokens / lens files',
+        'Summary: 0 error(s), 0 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Match 'in sync' $r.Out 'hook no-orphans: in-sync message'
+    Assert-NotMatch '\[ORPHANS\]' $r.Out 'hook no-orphans: no roll-up line when there is nothing to roll up'
+    Assert-NotMatch 'to see which ids' $r.Out 'hook no-orphans: no pointer line either'
+
     # --- 11. Guardrail: a malformed plugin id in settings.json is rejected before filesystem access ---
     #     An uppercase/underscore plugin name fails the slug regex; the script must ERROR ("invalid
     #     plugin id") and skip it rather than build a path from it. Security-relevant branch (Sean/Victor).
@@ -552,6 +650,10 @@ try {
     Assert-Equal 0 $r.Code 'ISO date in prose: exit-code 0'
     Assert-NotMatch "orphan '07-25'" $r.Out 'ISO date in prose: no false orphan for the date itself'
     Assert-Match '\[OK\]\s+no orphan roster tokens' $r.Out 'ISO date in prose: orphan scan reports clean'
+    # The other half of the roll-up contract: with zero orphans there is no [ORPHANS] line at all, so a
+    # clean repo gets no extra line at session start (inbound #204 -- the roll-up must not become the
+    # very per-session noise it was designed to avoid).
+    Assert-NotMatch '\[ORPHANS\]' $r.Out 'ISO date in prose: no [ORPHANS] roll-up when there are no orphans'
 
     # --- 16. Masking case (the more serious, NOT-reported half of #182): a specialist missing a roster
     #     row must still surface as such even when an ISO date resembling their id appears in prose --

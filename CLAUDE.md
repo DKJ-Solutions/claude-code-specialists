@@ -250,7 +250,11 @@ Vera #11, Gwen #12, Cody #13, Auden #30) is also enabled and callable as `@speci
 but rarely has work here and therefore has no repo lens (yet). **Bianca #02** (the Biographer, a
 main-loop *intake* persona) also exists in the plugin as a persona template, but — unlike those five
 callable subagents — she is a main-loop persona and is deliberately **not** rostered or `@`-imported
-here: this maintenance repo has no intake-interview work for her. New specialists are **never**
+here: this maintenance repo has no intake-interview work for her. Since inbound #204 that choice is
+also recorded where the tooling can read it — `03-02` sits in `Get-RosterIgnoredIds`
+([`scripts/repo-config.ps1`](scripts/repo-config.ps1)), alongside the five callable-but-unused
+subagents — because the roster check now covers persona-only specialists too, so a deliberate
+omission has to be stated rather than merely gone unnoticed. New specialists are **never**
 invented on anyone's own initiative — only in consultation with Dave (see
 [Chris #01](.claude/plugins/claude-specialists/specialists/01-01-extension.md#new-specialists--only-by-agreement)).
 
