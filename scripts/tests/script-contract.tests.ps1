@@ -189,6 +189,13 @@ try {
     $c = New-FixtureConsumer -StripFromBranchInfo @('Test-BranchName')
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
     Assert-Equal 1 $r.Code 'missing Test-BranchName: exit-code 1'
+    # The finding must be actionable on its own (Dave, July 28, 2026: a consumer is served by the
+    # plugin, not put to work for it). It used to end with "update it from the workshop's own
+    # scripts\lib\branch-info.ps1" -- useless to the reader most likely to hit it: someone who installed
+    # the plugin, has no copy of that source repo, and no reason to know it exists.
+    Assert-Match 'It must return' $r.Out 'missing function: the finding states what the function must return'
+    Assert-NotMatch "workshop's own" $r.Out 'missing function: the finding no longer points at a repo the reader may not have'
+    Assert-NotMatch 'workshop' $r.Out 'missing function: no internal "workshop" jargon in a consumer-facing finding'
     Assert-Match "\[ERROR\].*'Test-BranchName' missing from scripts\\lib\\branch-info\.ps1.*required by: new-branch" $r.Out 'missing Test-BranchName: ERROR names the function, the lib, and new-branch'
     $errCount1 = @([regex]::Matches($r.Out, '\[ERROR\]')).Count
     Assert-Equal 1 $errCount1 'missing Test-BranchName: exactly one error (Get-BranchInfo unaffected)'
@@ -349,6 +356,13 @@ function Get-RosterIgnoredIds { return @() }
     $contractSrc = [System.IO.File]::ReadAllText($Script)
     $totalRecordCount = @([regex]::Matches($contractSrc, "Lib\s*=\s*'[^']+';\s*Function\s*=\s*'[^']+';\s*Scripts\s*=\s*@\(")).Count
     Assert-Equal 8 $totalRecordCount 'contract: exactly eight (lib, function) records declared in check-script-contract.ps1 (the seven below plus the dedicated Get-LiveStage block after this loop)'
+
+    # Every record must carry a 'Returns' line, so a finding is actionable without any reference to this
+    # source repo (Dave, July 28, 2026). Counted against $totalRecordCount rather than listed per record:
+    # a ninth record added without a Returns then turns this red, which is exactly the drift to catch --
+    # Get-RecordReturns degrades silently to the shorter message, so nothing else would notice.
+    $returnsCount = @([regex]::Matches($contractSrc, "(?m)^\s*Returns\s*=\s*")).Count
+    Assert-Equal $totalRecordCount $returnsCount 'contract: every declared record carries a Returns line (a finding must be actionable without the source repo)'
 
     foreach ($e in $expectedContract) {
         # Pitfall for whoever adds a record 9 here: this capture -- @\(([^)]*)\) -- stops at the FIRST

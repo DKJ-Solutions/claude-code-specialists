@@ -24,6 +24,11 @@
 
     Read-only: the hook changes nothing, in any repo.
 
+    Matcher note: hooks.json matches "startup|resume|clear|compact", not just "startup" -- a
+    SessionStart hook's injected stdout does not survive a compaction by itself, so a startup-only
+    matcher made every report go silent after the first /compact and never return. See
+    roster-sessioncheck.ps1's docstring for the full reasoning (JSON cannot carry a comment).
+
 .PARAMETER CheckScriptOverride
     (Optional, for tests) Use this check-script path instead of the ${CLAUDE_PLUGIN_ROOT} one.
 

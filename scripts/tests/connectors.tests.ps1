@@ -200,6 +200,12 @@ try {
     # non-counting [UNREGISTERED] marker is what reaches the session; the [INFO] stays for the count and
     # the deliberate run. Both must be present, and the marker must not inflate the tally.
     Assert-Match '\[UNREGISTERED\]' $r.Out 'unregistered consumer: a non-counting [UNREGISTERED] marker is emitted for the hook'
+    # The message has to serve a reader who knows nothing about the plugin's source repo (Dave, July 28,
+    # 2026). Two halves: say nothing here is broken, and address the fix to the maintainer rather than
+    # handing homework to whoever merely installed the plugin.
+    Assert-Match 'Nothing here is affected' $r.Out 'unregistered consumer: the message states the consumer is not broken'
+    Assert-Match 'no action is needed on your side' $r.Out 'unregistered consumer: a plain user is told explicitly to do nothing'
+    Assert-NotMatch 'in the workshop' $r.Out 'unregistered consumer: no instruction to go work in a repo the reader may not have'
     Assert-Match '1 info signal' $r.Out 'unregistered consumer: [UNREGISTERED] is non-counting (still exactly 1 info signal)'
     Assert-Equal 0 $r.Code 'unregistered consumer: still exit 0 -- not being registered is not a failure of the plugin install'
 
@@ -364,15 +370,21 @@ try {
     #     thing a brand-new consumer ever saw. The non-counting [UNREGISTERED] line now survives next to
     #     the no-errors verdict -- next to, not under: nothing is wrong with the plugin install here,
     #     only with the workshop's view of it, so the exit code and the "no errors" reading both stand.
+    # The stub carries the REAL message text (kept in step with check-connectors.ps1), because the
+    # jargon assertion below only means something if the fixture is faithful -- an old-wording stub would
+    # make the hook look guilty of text it never produced.
     $stub = New-StubWorkshop -Name 'stub-unregistered' -ExitCode 0 -OutputLines @(
         '  [INFO]  not registered: no manifest for this consumer in the register.',
-        '  [UNREGISTERED] this repo has no manifest in the workshop register, so its plugin version, lens inventory and agent-def drift are NOT being checked.',
+        "  [UNREGISTERED] this repo is not in the plugin maintainer's connector register. Nothing here is affected -- the plugin works normally. If you maintain the plugin source, add a connectors/<repo>.json manifest there; if you just use the plugin, no action is needed on your side.",
         'Summary: 0 error(s), 1 info signal(s).'
     )
     $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
     Assert-Equal 0 $r.Code 'unregistered stub: exit code 0'
     Assert-Match '\[UNREGISTERED\]' $r.Out 'unregistered stub: the marker reaches the session context'
-    Assert-Match 'not in the workshop register' $r.Out 'unregistered stub: the verdict line says so instead of a bare "no errors"'
+    Assert-Match "not in the plugin maintainer's register" $r.Out 'unregistered stub: the verdict line says so instead of a bare "no errors"'
+    # Consumer-first wording (Dave, July 28, 2026): a reader who only installed the plugin has never
+    # heard of "the workshop", so that nickname must not appear in anything surfaced to a session.
+    Assert-NotMatch 'workshop' $r.Out 'unregistered stub: no internal "workshop" jargon reaches the consumer'
     Assert-NotMatch 'signals found' $r.Out 'unregistered stub: NOT escalated to a signals summary (nothing is wrong with the install)'
     Assert-NotMatch '\[INFO\]\s+not registered' $r.Out 'unregistered stub: the per-signal [INFO] line still stays out'
 
