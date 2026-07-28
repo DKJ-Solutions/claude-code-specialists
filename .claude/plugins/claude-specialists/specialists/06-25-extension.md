@@ -76,10 +76,44 @@ Two things that make this generalizable rather than a one-off:
   entirely would have produced 15 false "no roster row" errors. Hence: keep a compact id line, drop the
   descriptions — a trim that needed no change to any shared script.
 
-**Where to look next, unmeasured so far:** Chris's own lens carries a routing table (signal ->
-specialist) and is on the automatic loading path, so it is always-on too. Its content is *not*
-duplication — a routing signal is not a description — but its size has never been measured against what
-the routing actually needs.
+### Chris's always-on path — measured, verdict: leave it alone (July 28, 2026)
+
+The open question from the roster trim, now answered. `CLAUDE.md` `@`-imports two files, so three
+documents load in full on every session:
+
+| always-on | characters | ~tokens |
+|---|---|---|
+| `CLAUDE.md` | 24.388 | ~6.600 |
+| Chris's portable body (`personas/01-01-persona.md`) | 6.628 | ~1.800 |
+| Chris's repo lens (`01-01-extension.md`) | 12.274 | ~3.300 |
+| **documents total** | **43.290** | **~11.700** |
+| plus the plugin listing (`claude plugin details`) | | ~3.505 |
+
+So roughly **~15.200 tokens are spent before a single assignment is given.** Chris's lens, at ~3.300,
+is the largest single specialist file in the repo and the only one on the automatic path.
+
+Broken down by section: routing table 3.023 chars · chains 2.784 · gatekeepers 2.250 · Dave rules
+1.589 · new-specialists 945 · intro 897.
+
+**The verdict is that there is no free win here, and that is worth recording** — the roster case made
+this look like the same kind of target, and it is not. Two traps, both hit while measuring:
+
+- **The routing table's "Repo lens" column looks like duplication and is not.** Thirteen links of an
+  apparently uniform `<g>-<id>-extension.md` shape, so the obvious trim is to state the pattern once and
+  drop the column. That breaks it: the group prefix is **not** derivable from the display number.
+  Derek #05 is `05-05`, but Rebecca #07 is `03-07`, Rendall #06 is `05-06` and Tycho #18 is `04-18`. That
+  column is the only always-on place the group lives. Do not remove it.
+- **The gatekeepers section restates safety rules `CLAUDE.md` already carries in full**, both always-on
+  — the one genuinely reducible ~600 tokens. But it is deliberate reinforcement at the point of use, and
+  Claude Code's own guidance is explicit that instructions are context rather than enforced
+  configuration, so *how* they are written affects how reliably they are followed. Cutting it therefore
+  trades tokens for adherence. That is a different kind of decision than removing a description that was
+  already in context twice, and it is Dave's to make, not a mechanical trim.
+
+**The lever this leaves.** Reduce cost by moving content *off* the automatic path rather than deleting
+it: `CLAUDE.md` at ~6.600 tokens is the biggest item and is 277 lines against the documented target of
+under 200, and path-scoped `.claude/rules/` files load only when Claude touches matching files. That is
+the direction with room in it — not Chris's lens.
 
 ### Boundaries with the other roles
 
