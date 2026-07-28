@@ -230,30 +230,35 @@ specialist's repo lens lives in [`.claude/plugins/claude-specialists/specialists
 | Specialist | Title | Specialty | Repo lens |
 |---|---|---|---|
 | **Chris** 🧭 #01 | Chief of Staff | Orchestrator: intake, routing, explanation, workflow monitoring. Every assignment starts and ends with him. | [`01-01-extension.md`](.claude/plugins/claude-specialists/specialists/01-01-extension.md) |
-| **Bianca** 🎙️ #02 | Biographer | Intake interviews: a back-and-forth conversation with the requester to get a subject on paper. A main-loop persona, not a subagent | [`03-02-extension.md`](.claude/plugins/claude-specialists/specialists/03-02-extension.md) |
+| **Bianca** 🎙️ #02 | Biographer | Intake interviews: a back-and-forth conversation with the requester to get a subject on paper | [`03-02-extension.md`](.claude/plugins/claude-specialists/specialists/03-02-extension.md) |
 | **Derek** 🐙 #05 | DevOps Engineer | Branches, pull requests, merges, labels, `gh` CLI — up to and including the merge | [`05-05-extension.md`](.claude/plugins/claude-specialists/specialists/05-05-extension.md) |
-| **Rebecca** 🔬 #07 | Research Specialist | In-depth, source-cited research: deep dives, option comparisons, groundwork before a change or dossier | [`03-07-extension.md`](.claude/plugins/claude-specialists/specialists/03-07-extension.md) |
 | **Rendall** 🎬 #06 | Release Manager | Changelog, folding entry files, and the repo-wide release (`cut-release.ps1`): lockstep version bump + git tag `vX.Y.Z` + `## Releases` block | [`05-06-extension.md`](.claude/plugins/claude-specialists/specialists/05-06-extension.md) |
-| **Paula** 📅 #09 | Project Planner | Deadlines, milestones, timelines and priority across ongoing work: what has to be done by when, laid out on a timeline | [`02-09-extension.md`](.claude/plugins/claude-specialists/specialists/02-09-extension.md) |
-| **Vera** 📊 #11 | Data Analyst | Turns the repo's own source data into readable insights and BI-style overviews; verifies the data is demonstrably correct before using it | [`04-11-extension.md`](.claude/plugins/claude-specialists/specialists/04-11-extension.md) |
-| **Gwen** 🎨 #12 | Graphic & Front-End Designer | Translates raw information or a style guideline into clear visual form: infographics, visual overviews, standalone frontend pages | [`04-12-extension.md`](.claude/plugins/claude-specialists/specialists/04-12-extension.md) |
-| **Cody** 💻 #13 | App Developer | Builds working, functional software: interactive tools/utilities and application code, per the platform that applies here | [`04-13-extension.md`](.claude/plugins/claude-specialists/specialists/04-13-extension.md) |
-| **Sylvester** ⚙️ #15 | System Administrator | Scripts (`scripts/**`), harness config, `marketplace.json`/`plugin.json`, the lint gate | [`05-15-extension.md`](.claude/plugins/claude-specialists/specialists/05-15-extension.md) |
-| **Tessa** 📜 #16 | Technical Writer | `CLAUDE.md`, `README.md`, the manuals + agent-def texts, the workflow rules | [`06-16-extension.md`](.claude/plugins/claude-specialists/specialists/06-16-extension.md) |
-| **Edith** 🔍 #17 | Copy Editor | The independent final look before a PR: language/spelling, consistency, dead links | [`06-17-extension.md`](.claude/plugins/claude-specialists/specialists/06-17-extension.md) |
-| **Tycho** 🧪 #18 | Test Engineer | Automated tests for the scripts (lint/release), regression monitoring | [`04-18-extension.md`](.claude/plugins/claude-specialists/specialists/04-18-extension.md) |
-| **Victor** 🧐 #19 | Code Reviewer | Independent code review before a merge: correctness, simplicity, reuse, efficiency | [`06-19-extension.md`](.claude/plugins/claude-specialists/specialists/06-19-extension.md) |
-| **Sebastian** 🛡️ #23 | Security Engineer | Independent security review before a merge: secrets/PII, injection surface, guardrail audits | [`06-23-extension.md`](.claude/plugins/claude-specialists/specialists/06-23-extension.md) |
-| **Ravi** ♻️ #24 | Refactoring Specialist | Duplication watchdog: tracks down verbatim-shared behavioral rules (boundaries/working practices) across agent defs and personas and promotes them to a single shared source for the circle that shares the rule | [`06-24-extension.md`](.claude/plugins/claude-specialists/specialists/06-24-extension.md) |
-| **Nolan** ⚡ #25 | Performance Engineer | Measures and trims token/context budget: loading strategy, the size of agent defs/manuals/personas, and redundant or double-loaded context | [`06-25-extension.md`](.claude/plugins/claude-specialists/specialists/06-25-extension.md) |
-| **Marlowe** 🕵️ #29 | Investigative Journalist | Independent devil's advocate on the conclusion itself: red-teams a recommendation before it is acted on — the fine print/the catch, the load-bearing assumption, and real-world evidence (customer experiences, complaints, regulator warnings) versus the sales pitch. Delivers a critical counter-report with a verdict (HOLDS/WOBBLES/FALLS) | [`06-29-extension.md`](.claude/plugins/claude-specialists/specialists/06-29-extension.md) |
-| **Auden** 🖋️ #30 | Academic & Long-form Writer | Authors long, structured, argued content from researched material: subject-matter documentation and academic/thesis-style pieces | [`06-30-extension.md`](.claude/plugins/claude-specialists/specialists/06-30-extension.md) |
 
-**The roster lists every specialist the enabled plugins ship — all of them, without exception.** Some
-of the rows above have little or no work in this maintenance repo (Bianca's intake interviews, Paula's
-timelines, Vera's dashboards, Gwen's visuals, Cody's application code, Auden's long-form writing), and
-their repo lens is therefore an empty `VUL-IN` scaffold. **That is the intended state, not a backlog
-item.** A lens waits, filled in on the day that specialist first has work here.
+**Only the four main-loop personas are described here, and that is deliberate.** They ship as
+personas, not subagents, so they appear in **no** always-on listing — this table is the only place they
+exist for a session. Subagent descriptions are the opposite: Claude Code already loads every enabled
+plugin's into every session, so repeating them here only cost tokens (~750/session).
+**Do not restore them** — the method and the numbers are in
+[Nolan #25's lens](.claude/plugins/claude-specialists/specialists/06-25-extension.md).
+
+The subagents of the enabled `specialists` plugin, by id — their descriptions are already in context,
+so this line is for **you** and for the roster-sync check:
+
+`02-09` Paula (Project Planner) · `03-07` Rebecca (Research) · `04-11` Vera (Data Analyst) ·
+`04-12` Gwen (Designer) · `04-13` Cody (App Developer) · `04-18` Tycho (Test Engineer) ·
+`05-15` Sylvester (System Administrator) · `06-16` Tessa (Technical Writer) · `06-17` Edith (Copy
+Editor) · `06-19` Victor (Code Reviewer) · `06-23` Sebastian (Security Engineer) · `06-24` Ravi
+(Refactoring) · `06-25` Nolan (Performance) · `06-29` Marlowe (Investigative Journalist) ·
+`06-30` Auden (Long-form Writer)
+
+Each has a repo lens at `.claude/plugins/claude-specialists/specialists/<g>-<id>-extension.md`. For a
+full description, run `claude plugin details specialists@davekjohns-workshop` or read their manual.
+
+**Every specialist the enabled plugins ship is listed above, without exception.** Some have little or
+no work in this maintenance repo (Bianca's intake interviews, Paula's timelines, Vera's dashboards,
+Gwen's visuals, Cody's application code, Auden's long-form writing), and their repo lens is therefore
+an empty `VUL-IN` scaffold. **That is the intended state, not a backlog item.** A lens waits, filled in
+on the day that specialist first has work here.
 
 Five of those six used to be left off the roster and registered in `Get-RosterIgnoredIds` instead
 (Bianca joined them briefly on July 28, 2026). That list turned out never to have been a decision:
