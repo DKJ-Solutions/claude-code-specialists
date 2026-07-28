@@ -58,15 +58,23 @@ function Get-RosterPath {
     return $script:RosterPath
 }
 
-# Agent ids ('<group>-<id>') that are ENABLED but deliberately have no roster row and no lens, so
+# Specialist ids ('<group>-<id>') that are ENABLED but deliberately have no roster row and no lens, so
 # check-roster-sync.ps1 must not flag them as drift. In this workshop, Paula (02-09), Vera (04-11),
 # Gwen (04-12), Cody (04-13) and Auden (06-30) are enabled from the `specialists` plugin but have
 # (as yet) no repo work here, hence no lens and no roster row -- a documented choice in CLAUDE.md,
-# not drift. A fresh consumer leaves this empty (every enabled agent belongs in its roster).
-$script:RosterIgnoredIds = @('02-09', '04-11', '04-12', '04-13', '06-30')
+# not drift. A fresh consumer leaves this empty (every enabled specialist belongs in its roster).
+#
+# Bianca (03-02) joined this list with inbound #204, which extended the check to persona-only
+# specialists. She is a main-loop INTAKE persona and CLAUDE.md deliberately does not roster or
+# @-import her -- this maintenance repo has no intake-interview work. That decision was previously
+# only prose; now that personas are checked, it has to be recorded where the check can read it. This
+# is the ignore-list doing its job, not a workaround for the new coverage: the alternative would be a
+# permanent [ERROR] at every session start for a choice that was made on purpose.
+$script:RosterIgnoredIds = @('02-09', '03-02', '04-11', '04-12', '04-13', '06-30')
 
 function Get-RosterIgnoredIds {
-    <# Ids of enabled agents intentionally kept out of the roster/lenses (skipped by the check). #>
+    <# Ids of enabled agents/personas intentionally kept out of the roster/lenses (skipped by the
+       check). #>
     return $script:RosterIgnoredIds
 }
 

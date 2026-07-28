@@ -8,12 +8,13 @@
     gets no signal that its roster (a table/list in CLAUDE.md) and its repo lenses now lag behind.
     This script surfaces that drift by comparing three sources:
 
-      (a) Agents of the ENABLED plugins. Enabled plugins are read from .claude/settings.json
-          (enabledPlugins: a plugin id like 'specialists@davekjohns-workshop' counts as enabled when
-          its value is $true -- mirrors bootstrap.ps1). For each enabled plugin the versioned dir is
-          resolved in the local plugin cache (semantically highest version, [version]-sort -- the same
-          approach bootstrap.ps1 uses so 1.10.0 beats 1.9.0), and the agent ids ('<group>-<id>', e.g.
-          06-24) are taken from <plugin-dir>/agents/<g>-<id>-agent.md.
+      (a) Specialists of the ENABLED plugins -- agents AND personas. Enabled plugins are read from
+          .claude/settings.json (enabledPlugins: a plugin id like 'specialists@davekjohns-workshop'
+          counts as enabled when its value is $true -- mirrors bootstrap.ps1). For each enabled plugin
+          the versioned dir is resolved in the local plugin cache (semantically highest version,
+          [version]-sort -- the same approach bootstrap.ps1 uses so 1.10.0 beats 1.9.0). Agent ids
+          ('<group>-<id>', e.g. 06-24) come from <plugin-dir>/agents/<g>-<id>-agent.md, persona ids
+          from <plugin-dir>/personas/<g>-<id>-persona.md (inbound #204 -- see the persona note below).
       (b) The consumer's roster. Its path comes from Get-RosterPath in scripts/repo-config.ps1
           (default 'CLAUDE.md', repo-root-relative). "Present in the roster" is decided by scanning the
           roster text for each '<group>-<id>' token (format-agnostic -- works for a table OR a list;
@@ -24,13 +25,16 @@
           and the legacy .claude/extensions/<g>-<id>-extension.md.
 
     Findings + severity (same [OK]/[INFO]/[ERROR] convention as check-connectors.ps1):
-      - agent WITHOUT a roster row  -> [ERROR]  (the core case this feature exists for: a new
+      - agent/persona WITHOUT a roster row -> [ERROR] (the core case this feature exists for: a new
                                                  specialist that is invisible in the governance doc).
-      - agent WITHOUT a lens file   -> [ERROR]  (actionable drift for a real agent: no landing spot
-                                                 for its repo-specific context).
+      - agent/persona WITHOUT a lens file  -> [ERROR] (actionable drift for a real specialist: no
+                                                 landing spot for its repo-specific context).
       - orphan (a roster token OR a lens file whose '<group>-<id>' has NO matching agent AND no
         matching persona in any enabled plugin) -> [INFO] (could be a just-removed specialist; also
-        soft because personas are counted as backing, see below).
+        soft because personas are counted as backing, see below), PLUS one [ORPHANS] roll-up line
+        stating the count. That roll-up is non-counting (like [OK]) and exists so the orphan trail is
+        not silent at session start: the hook suppresses [INFO] but does surface [ORPHANS], so the
+        finding reaches a session without turning a legitimate transition red (inbound #204).
       - lens on a NON-CANONICAL family segment -> [INFO] (issue #179): a pre-fix bootstrap derived the
                                                  family from the install path and so wrote the lenses
                                                  under the marketplace name. The lens works and counts
@@ -41,10 +45,20 @@
         stale, but the lens is present, so it is a cosmetic mismatch, not missing-lens drift. Soft on
         purpose (silent at session start); the sync-roster skill stages a paste-ready reconcile.
 
-    Personas as orphan-backing: main-loop specialists (Chris 01-01, Derek 05-05, Rendall 05-06, ...)
-    ship as <plugin>/personas/<g>-<id>-persona.md, NOT as agents, yet legitimately have a roster row
-    and a lens. Counting personas as "backing" keeps them from being flagged as orphans on every real
-    repo. Personas are NEVER treated as missing-roster/missing-lens drift -- only agents are (source a).
+    Personas: main-loop specialists (Chris 01-01, Derek 05-05, Rendall 05-06, ...) ship as
+    <plugin>/personas/<g>-<id>-persona.md, NOT as agents, yet legitimately have a roster row and a
+    lens. They count as "backing" so they are never flagged as orphans -- and, since inbound #204,
+    they are ALSO checked for a missing roster row / missing lens, exactly like agents. Those used to
+    be one decision; they are two, and only the first followed from the reasoning. "A persona is not an
+    orphan" is right. "A persona can therefore never be missing" does not follow: measured in life-hub,
+    the check validated 20 specialists where that repo's own duplicate compared 24 -- the gap being
+    precisely the persona-only specialists, so the roster could lose Chris's row and stay green.
+    The ONE persona exception left is the lens-header drift check (see Get-CheckedSpecialists and the
+    header-drift block), which needs a `name:` field personas do not have.
+
+    Consequence worth knowing when adopting this: a persona a consumer deliberately does NOT roster is
+    now real drift. That is what the Get-RosterIgnoredIds ignore-list is for -- record the choice there
+    (this workshop does so for Bianca 03-02), rather than relying on the check being blind to it.
 
     Exit-code: 0 = no errors (INFO does not count), 1 = at least one error.
 
@@ -109,17 +123,47 @@ function Get-AgentIds {
         Sort-Object -Unique)
 }
 
+# Persona ids ('<group>-<id>') a plugin ships (source a', alongside the agents).
+function Get-PersonaIds {
+    param([string]$PluginDir)
+    $dir = Join-Path $PluginDir 'personas'
+    if (-not (Test-Path -LiteralPath $dir -PathType Container)) { return @() }
+    return @(Get-ChildItem -LiteralPath $dir -Filter '*-persona.md' -File |
+        ForEach-Object { if ($_.BaseName -match '^(\d{2})-(\d{2})-persona$') { "$($Matches[1])-$($Matches[2])" } } |
+        Sort-Object -Unique)
+}
+
 # Ids that BACK a roster token / lens: agents + personas. Personas run in the main loop (not as
 # subagents) but are real specialists with roster rows + lenses, so counting them prevents false orphans.
 function Get-BackingIds {
     param([string]$PluginDir)
-    $ids = @(Get-AgentIds -PluginDir $PluginDir)
-    $pdir = Join-Path $PluginDir 'personas'
-    if (Test-Path -LiteralPath $pdir -PathType Container) {
-        $ids += @(Get-ChildItem -LiteralPath $pdir -Filter '*-persona.md' -File |
-            ForEach-Object { if ($_.BaseName -match '^(\d{2})-(\d{2})-persona$') { "$($Matches[1])-$($Matches[2])" } })
+    return @(@(Get-AgentIds -PluginDir $PluginDir) + @(Get-PersonaIds -PluginDir $PluginDir) | Sort-Object -Unique)
+}
+
+# The specialists whose roster row + lens this check REQUIRES: agents and personas alike, each tagged
+# with its kind so a finding can name what it is about.
+#
+# Why personas belong here (inbound #204): the old exclusion bundled two decisions into one, and only
+# the first followed from the reasoning. "A persona is not an orphan" is right -- Get-BackingIds above
+# keeps that intact. "A persona can therefore never be MISSING" does not follow: a persona is a real
+# specialist with a roster row and a lens, exactly like an agent, and when the row or the lens is gone
+# that is actionable drift of precisely the kind this check exists for. Measured in life-hub: the check
+# validated 20 specialists where the repo's own duplicate compared 24 -- the gap being exactly the
+# persona-only main-loop specialists. The roster could lose Chris's or Derek's row and stay green.
+#
+# An id that is BOTH an agent and a persona counts as an agent: the agent file is the one with a
+# `name:` to compare a lens header against, so that kind carries strictly more checking.
+function Get-CheckedSpecialists {
+    param([string]$PluginDir)
+    $agentIds = @(Get-AgentIds -PluginDir $PluginDir)
+    $records = @($agentIds | ForEach-Object { [pscustomobject]@{ Id = $_; Kind = 'agent' } })
+    # NOT $pid -- that is a PowerShell automatic variable (the process id); shadowing it in a loop is
+    # the kind of quiet breakage that surfaces somewhere else entirely.
+    foreach ($personaId in (Get-PersonaIds -PluginDir $PluginDir)) {
+        if ($agentIds -contains $personaId) { continue }
+        $records += [pscustomobject]@{ Id = $personaId; Kind = 'persona' }
     }
-    return @($ids | Sort-Object -Unique)
+    return @($records | Sort-Object Id)
 }
 
 # "Present in the roster": scan the roster text for the literal '<group>-<id>' token, bounded so
@@ -306,32 +350,36 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
 
     $pluginNames += $name
     foreach ($bid in (Get-BackingIds -PluginDir $pluginDir)) { $allBackingIds[$bid] = $true }
-    $agentIds = @(Get-AgentIds -PluginDir $pluginDir)
+    # Agents AND personas (inbound #204) -- see Get-CheckedSpecialists for why the persona exclusion
+    # only ever held for the orphan side.
+    $specialists = @(Get-CheckedSpecialists -PluginDir $pluginDir)
 
     Write-Host "`n-- plugin: $plugId (cache $(Split-Path $pluginDir -Leaf))" -ForegroundColor Cyan
-    if ($agentIds.Count -eq 0) { Write-Info "no agents found for '$plugId'."; continue }
+    if ($specialists.Count -eq 0) { Write-Info "no agents or personas found for '$plugId'."; continue }
 
     $canonicalLensDir = Get-CanonicalLensDir -RepoRoot $repoRoot -PluginName $name
     $legacyLensDir    = Join-Path $repoRoot '.claude\extensions'
-    # Non-canonical family dirs found while walking this plugin's agents -- reported once per dir after
-    # the loop instead of once per lens, so a whole pre-#179 tree yields one line, not sixteen.
+    # Non-canonical family dirs found while walking this plugin's specialists -- reported once per dir
+    # after the loop instead of once per lens, so a whole pre-#179 tree yields one line, not sixteen.
     $offPathDirs = @{}
 
-    foreach ($id in $agentIds) {
+    foreach ($spec in $specialists) {
+        $id   = $spec.Id
+        $kind = $spec.Kind
         if ($ignoredIds -contains $id) {
-            Write-Info "agent '$id' ($plugId) deliberately kept out of the roster/lenses (repo-config ignore-list) -- skipped."
+            Write-Info "$kind '$id' ($plugId) deliberately kept out of the roster/lenses (repo-config ignore-list) -- skipped."
             continue
         }
         $inRoster = Test-InRoster -RosterText $rosterText -Id $id
         $lensPath = Get-LensPath -RepoRoot $repoRoot -PluginName $name -Id $id
         $hasLens  = [bool]$lensPath
         if (-not $inRoster) {
-            Write-Failure "agent '$id' ($plugId) has no roster row in $rosterRel -- add it to the roster."
+            Write-Failure "$kind '$id' ($plugId) has no roster row in $rosterRel -- add it to the roster."
         }
         if (-not $hasLens) {
-            Write-Failure "agent '$id' ($plugId) has no repo-lens (.claude/plugins/$(Get-LensFamily)/$name/$id-extension.md or the legacy .claude/extensions/ path)."
+            Write-Failure "$kind '$id' ($plugId) has no repo-lens (.claude/plugins/$(Get-LensFamily)/$name/$id-extension.md or the legacy .claude/extensions/ path)."
         }
-        if ($inRoster -and $hasLens) { Write-Ok "agent '$id' present in roster + lens" }
+        if ($inRoster -and $hasLens) { Write-Ok "$kind '$id' present in roster + lens" }
 
         # Lens on a non-canonical family segment (INFO -- issue #179): a bootstrap from before that fix
         # derived the family from the install path, which in the plugin-cache layout is the MARKETPLACE
@@ -353,7 +401,17 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
         # cosmetic mismatch. Kept INFO on purpose: silent at session start (the hook only surfaces
         # [ERROR]), shown on a deliberate run, and staged as a paste-ready reconcile by the sync-roster
         # skill. The nameless header the scaffold now writes never triggers this (its token is the g-id).
-        if ($hasLens) {
+        #
+        # AGENTS ONLY, and that is a known gap rather than an oversight (inbound #204). The comparison
+        # needs the specialist's CURRENT name, which Get-AgentName reads from the agent file's `name:`
+        # frontmatter. A persona file has no such field (only id/group), so for a persona there is no
+        # authoritative name to compare against: Get-AgentName would return '', Get-DisplayName would
+        # fall back to the id, and every persona lens whose header carries a name -- i.e. all of the
+        # older ones -- would be reported as drifting from its own id. That is a false signal, and a
+        # false signal in the exact register the hook is being taught to trust is worse than a missing
+        # one. Header drift for personas stays undetectable until a persona carries a name in its
+        # frontmatter; the missing-row/missing-lens checks above do cover personas.
+        if ($hasLens -and $kind -eq 'agent') {
             $staleName = Get-ScaffoldHeaderName -LensPath $lensPath -MidDot $midDot
             if ($staleName -and $staleName -ne $id) {
                 $current = Get-DisplayName -RawName (Get-AgentName -PluginDir $pluginDir -Id $id) -Fallback $id
@@ -382,16 +440,29 @@ if ($pluginNames.Count -gt 0) {
     $rosterTokenIds = @([regex]::Matches($rosterText, (Get-RosterIdTokenPattern)) |
         ForEach-Object { $_.Value } | Sort-Object -Unique)
 
-    $orphanFound = $false
+    $orphanCount = 0
     foreach ($id in (@($lensIds.Keys) + $rosterTokenIds | Sort-Object -Unique)) {
         if ($allBackingIds.ContainsKey($id)) { continue }
         $where = @()
         if ($lensIds.ContainsKey($id)) { $where += 'lens' }
         if ($rosterTokenIds -contains $id) { $where += 'roster' }
         Write-Info "orphan '$id' ($($where -join ' + ')) -- no matching agent/persona in any enabled plugin."
-        $orphanFound = $true
+        $orphanCount++
     }
-    if (-not $orphanFound) { Write-Ok "no orphan roster tokens / lens files" }
+    if ($orphanCount -eq 0) {
+        Write-Ok "no orphan roster tokens / lens files"
+    } else {
+        # One machine-readable roll-up so the orphan trail is not silent at session start (inbound #204,
+        # change 2). The per-orphan lines above stay [INFO] and stay suppressed by the hook, which is
+        # deliberate: an orphan can be a legitimately just-removed specialist, and promoting it to
+        # [ERROR] would put a red line in every session during any transition. But "only visible to
+        # whoever deliberately runs the script" is in practice nobody, so the count gets its own
+        # non-counting token that the hook DOES surface -- one line, and only when there is something
+        # to say. Deliberately not a general "N info signals" line: this repo permanently carries
+        # ignore-list [INFO]s, so that would fire at every single session start -- exactly the noise
+        # the quieter session start (PR #99) removed.
+        Write-Host "  [ORPHANS] $orphanCount roster token(s)/lens file(s) have no backing agent or persona in any enabled plugin -- a removed specialist leaves this behind." -ForegroundColor Yellow
+    }
 }
 
 Write-CheckSummary

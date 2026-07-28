@@ -74,8 +74,11 @@ function Invoke-Ps {
 function Get-B64 { param([string]$Path) return [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Path)) }
 
 # Fixture cache. -Agents: @{ '06-24' = @{ Name = 'ravi'; Desc = 'Refactoring Specialist. More.' } }.
+# -Personas: @('01-01') -- persona-only specialists, which carry id/group but deliberately NO name or
+# description (that is the real file shape, and the reason a proposed row for a persona degrades to the
+# id plus a placeholder).
 function New-FixtureCache {
-    param([hashtable]$Agents, [string]$Version = '1.11.0')
+    param([hashtable]$Agents, [string[]]$Personas = @(), [string]$Version = '1.11.0')
     $cache = Join-Path $Fixture 'cache'
     if (Test-Path -LiteralPath $cache) { Remove-Item -Recurse -Force -LiteralPath $cache }
     $adir = Join-Path $cache "$Marketplace\$PluginName\$Version\agents"
@@ -85,6 +88,14 @@ function New-FixtureCache {
         $nm = $Agents[$id].Name; $ds = $Agents[$id].Desc
         $fm = "---`nname: $nm`nid: $i`ngroup: $g`ndescription: >`n  $ds`n---`nbody"
         [System.IO.File]::WriteAllText((Join-Path $adir "$id-agent.md"), $fm)
+    }
+    if ($Personas.Count -gt 0) {
+        $pdir = Join-Path $cache "$Marketplace\$PluginName\$Version\personas"
+        New-Item -ItemType Directory -Path $pdir -Force | Out-Null
+        foreach ($id in $Personas) {
+            $g = $id.Split('-')[0]; $i = $id.Split('-')[1]
+            [System.IO.File]::WriteAllText((Join-Path $pdir "$id-persona.md"), "---`nid: $i`ngroup: $g`n---`nbody")
+        }
     }
     return $cache
 }
@@ -174,6 +185,39 @@ try {
 
     # CLAUDE.md / the roster is NEVER modified.
     Assert-Equal $rosterBefore (Get-B64 $rosterPath) 'integration: CLAUDE.md bytes unchanged'
+
+    # --- 1b. Persona-only specialists are staged too (inbound #204) ---------------------------------
+    #     check-roster-sync now reports a missing PERSONA as [ERROR] too, and both its own report and
+    #     the session hook point the reader at this skill to stage the catch-up. This suite is what
+    #     stops that pointer from being hollow: the [ERROR]-parsing regex used to match only the literal
+    #     word 'agent', so it would have staged NOTHING for exactly the findings that change introduced
+    #     -- advice that looks helpful and quietly does nothing.
+    #       01-01: persona, NOT in roster, NO lens -> both a proposed row AND a scaffold.
+    #       05-05: persona, in roster + lens       -> nothing.
+    $cache = New-FixtureCache -Agents @{ '06-16' = @{ Name = 'victor'; Desc = 'Code Reviewer here.' } } `
+                              -Personas @('01-01', '05-05')
+    $c = New-FixtureConsumer -RosterIds @('06-16', '05-05') -LensIds @('06-16', '05-05')
+    $rosterBefore = Get-B64 (Join-Path $c 'CLAUDE.md')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 0 $r.Code 'persona staging: exit-code 0'
+
+    $scaffold0101 = Join-Path $c "$lensRel\01-01-extension.md"
+    Assert-True (Test-Path -LiteralPath $scaffold0101 -PathType Leaf) 'persona staging: a missing PERSONA lens gets a scaffold'
+    if (Test-Path -LiteralPath $scaffold0101) {
+        $s0101 = [System.IO.File]::ReadAllText($scaffold0101, [System.Text.Encoding]::UTF8)
+        # The scaffold has been nameless since #145, which is exactly why it needs no persona-specific
+        # branch: there is no name to look up in a file that does not have one.
+        Assert-Match '(?m)^# 01-01 .* repo-lens \(VUL-IN\)' $s0101 'persona staging: the nameless scaffold shape works unchanged for a persona'
+    }
+    Assert-Match '01-01' $r.Out 'persona staging: a proposed roster row names the persona id'
+    # Degraded but honest: a persona file carries no name/description, so Get-AgentInfo returns $null and
+    # the row falls back to the id plus a placeholder rather than inventing a name.
+    Assert-Match 'add a short description' $r.Out 'persona staging: the row carries the placeholder description a persona cannot supply'
+    # A satisfied persona must not be staged at all -- the skill stays as quiet as the check.
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c "$lensRel\05-05-extension.md")) -or `
+                 (([System.IO.File]::ReadAllText((Join-Path $c "$lensRel\05-05-extension.md"))) -eq 'existing-lens-05-05')) `
+                'persona staging: a satisfied persona lens is left untouched'
+    Assert-Equal $rosterBefore (Get-B64 (Join-Path $c 'CLAUDE.md')) 'persona staging: CLAUDE.md bytes unchanged (propose-only)'
 
     # --- 2. Additive guard: an existing lens is NEVER overwritten -----------------------------------
     #   The stub reports 06-16 as missing-lens WHILE the plugin-path lens already exists -- the only

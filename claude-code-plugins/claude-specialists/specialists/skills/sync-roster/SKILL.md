@@ -22,8 +22,10 @@ governance doc -- to you.
 ## When to run it
 
 Run it after the `roster-sessioncheck` hook (or a deliberate run of `check-roster-sync.ps1`) reports
-`[ERROR]` lines like *"agent '06-24' ... has no roster row"* or *"... has no repo-lens"*. It is safe
-to run repeatedly: it is additive and never overwrites.
+`[ERROR]` lines like *"agent '06-24' ... has no roster row"* or *"... has no repo-lens"*. Since
+inbound #204 the same applies to **persona-only** specialists (*"persona '01-01' ... has no roster
+row"*) — main-loop specialists such as Chris, Derek and Rendall, which ship as a persona rather than
+an agent. It is safe to run repeatedly: it is additive and never overwrites.
 
 ## What the skill does
 
@@ -37,14 +39,18 @@ The script:
 
 1. **Delegates detection** to `check-roster-sync.ps1` (the single source of truth for what counts as
    drift) -- it runs the check and parses its `[ERROR]` lines, rather than re-implementing the
-   enabled-plugins / cache-version / agent-id logic.
-2. **Creates a lens scaffold** for each agent **missing a lens**, at
+   enabled-plugins / cache-version / specialist-id logic.
+2. **Creates a lens scaffold** for each specialist **missing a lens** -- agent or persona -- at
    `.claude/plugins/claude-specialists/<plugin>/<group>-<id>-extension.md`, using the same additive,
    BOM-less-LF, never-overwrite format `specialists-init` writes (the lens-only blockquote intro + a
-   `## Specific to this repo (VUL-IN)` slot).
-3. **Proposes a roster row** for each agent **missing a roster row**: it reads the agent's frontmatter
-   (name + description) and prints a proposed markdown row (matching the roster's table/list style as
-   best-effort) to stdout. It does **not** edit the roster / `CLAUDE.md`.
+   `## Specific to this repo (VUL-IN)` slot). The scaffold is nameless (issue #145), which is why it
+   needs no persona-specific variant.
+3. **Proposes a roster row** for each specialist **missing a roster row**: it reads the agent's
+   frontmatter (name + description) and prints a proposed markdown row (matching the roster's
+   table/list style as best-effort) to stdout. It does **not** edit the roster / `CLAUDE.md`. For a
+   **persona** there is no `name`/`description` in the file to read, so the row falls back to the
+   `<group>-<id>` id plus an explicit *"(add a short description)"* placeholder -- degraded on purpose
+   rather than inventing a name.
 4. **Proposes a header reconcile** for each lens whose header still carries a **stale persona name**.
    An older scaffold baked the first name into the lens header (`# Sean · repo-lens`); after the
    agent-def is renamed that name is stale in every consumer. The skill prints the rename-proof,
