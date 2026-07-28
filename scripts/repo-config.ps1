@@ -59,18 +59,28 @@ function Get-RosterPath {
 }
 
 # Specialist ids ('<group>-<id>') that are ENABLED but deliberately have no roster row and no lens, so
-# check-roster-sync.ps1 must not flag them as drift. In this workshop, Paula (02-09), Vera (04-11),
-# Gwen (04-12), Cody (04-13) and Auden (06-30) are enabled from the `specialists` plugin but have
-# (as yet) no repo work here, hence no lens and no roster row -- a documented choice in CLAUDE.md,
-# not drift. A fresh consumer leaves this empty (every enabled specialist belongs in its roster).
+# check-roster-sync.ps1 must not flag them as drift.
 #
-# Bianca (03-02) joined this list with inbound #204, which extended the check to persona-only
-# specialists. She is a main-loop INTAKE persona and CLAUDE.md deliberately does not roster or
-# @-import her -- this maintenance repo has no intake-interview work. That decision was previously
-# only prose; now that personas are checked, it has to be recorded where the check can read it. This
-# is the ignore-list doing its job, not a workaround for the new coverage: the alternative would be a
-# permanent [ERROR] at every session start for a choice that was made on purpose.
-$script:RosterIgnoredIds = @('02-09', '03-02', '04-11', '04-12', '04-13', '06-30')
+# EMPTY, and that is the normal state -- for this workshop as much as for a fresh consumer. Every
+# enabled specialist belongs in the roster. Adopting one is the default and needs no approval (Dave,
+# July 28, 2026): the lens scaffold is empty on purpose and may stay empty until that specialist has
+# work here, so adopting costs a file nobody has to fill in today. See the sync-roster skill's
+# SKILL.md for the full reasoning.
+#
+# Why this is worth a comment rather than just an empty array -- the list used to hold six ids, and
+# none of them were ever a decision. It was introduced on 2026-07-20 by the very commit that built
+# check-roster-sync (d2c8393), pre-populated with Paula/Vera/Gwen/Cody, and justified in this file as
+# "a documented choice in CLAUDE.md". CLAUDE.md said no such thing: it said those specialists "rarely
+# has work here and therefore has no repo lens (yet)" -- a statement about the current state, with an
+# explicit "yet". The list converted "not yet" into "never report this", and then cited Dave for it.
+# Auden (06-30) was added on 2026-07-24 as a blocking code-review finding whose stated reason was
+# literally "so the roster hook does not flag Auden as drift after merge"; Bianca (03-02) was added on
+# 2026-07-28 with the same reflex. Dave, asked about it, did not recognise the list as his.
+#
+# So the rule, in one line: a check that reports something inconvenient is not silenced by a list.
+# If a specialist ever genuinely has no place in a repo, that goes here as a deliberate statement with
+# a comment naming who and why -- written on your own initiative, never as a way to quiet a finding.
+$script:RosterIgnoredIds = @()
 
 function Get-RosterIgnoredIds {
     <# Ids of enabled agents/personas intentionally kept out of the roster/lenses (skipped by the
