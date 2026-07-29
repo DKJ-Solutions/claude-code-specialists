@@ -35,6 +35,18 @@ logic in `release-lib.ps1` (version bump, CHANGELOG transformation, release-note
   does not need to re-derive that list from memory: `Get-ChildItem scripts/tests/*.tests.ps1` gives
   the current count and membership directly, which is deliberately how this file avoids hardcoding a
   number that would drift with every new suite.
+- **One committed member is deliberately not a test: `scripts/tests/fresh-consumer.measure.ps1`.** The
+  `.measure.ps1` suffix keeps it out of CI's `scripts/tests/*.tests.ps1` glob on purpose — it reports
+  numbers for a human to read and asserts nothing. It builds a synthetic consumer in the state a real
+  one is in right after enabling the plugin (its own `CLAUDE.md`, no lenses, no repo-config, no
+  orchestrator import) and runs the three `SessionStart` hooks against it the way the harness does,
+  optionally after `specialists-init`'s bootstrap. It is committed rather than run ad hoc for one
+  reason: **the point is that round two is comparable to round one**, and a measurement done by hand
+  cannot be repeated identically, so its before/after could not be trusted. First run, July 29, 2026:
+  **44 `[ERROR]` lines before the bootstrap and 21 after a successful one, with zero lines naming
+  `specialists-init` in either state.** Turning the install/uninstall round-trip into a genuinely
+  asserting suite is the follow-up this harness exists to make possible — a measurement first, so the
+  assertions encode observed behaviour instead of assumed behaviour.
 - Tycho's role here is now mostly **keeping the suite honest as the scripts evolve**: add a test the
   moment a script grows a new decision path or a fixture (a valid and a deliberately broken plugin
   directory) the lint gate must still catch, and close any genuine gap Victor flags during review —

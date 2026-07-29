@@ -167,6 +167,30 @@ infrastructure.
   One produced a false pass, this one a false failure — so the rule is not "distrust green" or
   "distrust red" but: before believing either verdict, confirm the check was observed from the same
   place its real consumer observes it. Both instances happened on July 29, 2026, within one session.
+- **`Select-Object -First N` kills a child process mid-run; `-Last N` cannot.** The `$LASTEXITCODE`
+  rule above says not to pipe a native command through a cmdlet — this is the sharpest instance and
+  the discriminator that makes it predictable. `-First N` tears the pipeline down the moment N items
+  are in, and the still-running upstream process dies with it; `-Last N` has to drain the entire
+  stream to know what the last N are, so it is harmless. Measured on July 29, 2026 while measuring the
+  fresh-consumer install: piping `bootstrap.ps1` into `-First 1` created **zero** lenses and reported
+  nothing wrong, and into `-First 20` it wrote 19 lenses and exited **255** — while `-Last 25` on the
+  identical command completed normally with exit 0. Both truncations look like display choices in the
+  diff. The consequence was worse than a crash: the harness went on to measure an *unbootstrapped*
+  repo and label the numbers "after bootstrap", and the first explanation reached for was a bug in
+  `Get-DerivedRepoName` — a real hypothesis, tested across three git states (no repo / repo without
+  remote / repo with remote), all exit 0. **So: capture a child process's output into a variable in
+  full, then slice the variable — and when setup runs before a measurement, check its exit code and
+  abort rather than measuring past it.**
+- **A check that scans a file for a token can be satisfied by a *path* containing that token.**
+  `check-roster-sync` looks for each `<group>-<id>` in the roster file, and the bootstrap writes
+  `@.claude/plugins/claude-specialists/specialists/01-01-extension.md` into `CLAUDE.md`. That import
+  line contains `01-01`, so Chris counts as rostered without a roster row ever existing — measured
+  July 29, 2026: 18 ids reported missing after a bootstrap, not 19, with `01-01` the one silently
+  passing. It is the worst possible id to lose, because a persona appears in no always-on listing at
+  all and the roster row is the *only* thing that makes him exist for a session. Same class as the
+  roster token-boundary fix in v2.6.0, so treat that fix as incomplete rather than done: **when a
+  check's evidence is "the token appears in the file", ask what else in that file legitimately
+  contains the token — a path, a link, a changelog line — before trusting a pass.**
 - **Restoring a file with `Set-Content -Encoding utf8` is not a restore.** PowerShell 5.1's `utf8`
   means *with BOM*, so writing a captured `$orig` back leaves a byte-level diff (`M-oM-;M-?{`) on a
   file that was BOM-less — a "clean" restore that shows up as a modified file. When a probe needs to
