@@ -263,10 +263,18 @@ skill counters `/reload-plugins`/`/reload-skills` print are not reliable evidenc
 > for those who didn't build the system. Below is the underlying explanation.
 
 Enabling the plugin delivers the **worker subagents**, but not the **conductor** (Chris) or the
-governance/hooks layer — those cannot come from a plugin (a plugin injects no
-main-loop context and edits no `CLAUDE.md`). The skill **`specialists-init`** (group 1) closes that
-gap in a consuming repo. Because a plugin skill cannot hook itself in, the path is
-two-stage:
+governance/hooks layer, so the skill **`specialists-init`** (group 1) closes that gap in a consuming
+repo. Because a plugin skill cannot hook itself in, the path is two-stage:
+
+> **One half of the old reason for this is false, and it matters for
+> [Removal: the teardown gap](#removal-the-teardown-gap) below.** This section used to justify the
+> bootstrap with "a plugin injects no main-loop context and edits no `CLAUDE.md`". The second half is
+> true and documented. The first is not: a plugin **can** activate one of its own agents as the main
+> thread via a root `settings.json`. That does not make the bootstrap redundant today — Chris's body
+> is written for a director *inside* a general-purpose loop and would be crippling as the main
+> thread's own system prompt, so it needs rewriting first — but the `@`-import is not the only
+> possible delivery mechanism, and it is the single worst thing left behind on uninstall. Finding and
+> blocker: [issue #215](https://github.com/DaveKJohn/davekjohns-workshop/issues/215).
 
 - **Step 0 (manual).** Put the marketplace source + `enabledPlugins` in `.claude/settings.json`
   (see [Consumption](../../README.md#consumption) in the root README) and **restart** the session —
@@ -280,6 +288,68 @@ two-stage:
   (or creates a scaffold), and writes a `settings.suggested.jsonc` with a `permissions.deny` +
   hooks **stub**. It does not touch `settings.json` — that merge and filling in the repo lens are
   manual work afterwards (repo-specific), after which one more **restart** activates the new context.
+
+## Removal: the teardown gap
+
+**The requirement, set by Dave on July 29, 2026.** A consumer must be able to **install and uninstall
+these plugins at any moment**, and after an uninstall it must be able to *stand fully free*: no
+lingering reference to a specialist, a manual, a persona, or a roster anywhere in the repo. Adoption
+is reversible by design, not a one-way door.
+
+**The bootstrap path above has no counterpart.** `specialists-init` builds up; nothing tears down. It
+was measured against the `life-hub` consumer on July 29, 2026 rather than estimated:
+
+| what an uninstall leaves | measured |
+|---|---|
+| Agent defs, manuals, persona bodies, skills, shared scripts | **gone cleanly** — plugin-owned |
+| The three `SessionStart` hooks | **gone cleanly** — plugin-owned, via `${CLAUDE_PLUGIN_ROOT}` |
+| Lens files under `.claude/plugins/` | **26 git-tracked files**, now referencing nothing |
+| The two `@`-imports in `CLAUDE.md` | one **actively breaks** — it points into the marketplace cache |
+| Specialist mentions in `CLAUDE.md` | **101**, across 492 lines |
+| Scripts that exist only for specialists | e.g. `rename-specialist.ps1` |
+| `scripts/repo-config.ps1`, `scripts/lib/branch-info.ps1` | the script contract, written for the shared scripts |
+
+The half that is already right is worth stating plainly: **everything the plugin owns disappears
+correctly.** Hooks included — they are registered by the plugin's own `hooks/hooks.json`, not in the
+consumer's `settings.json`, so they leave with it. The gap is entirely on the consumer side.
+
+### Why "delete everything" is the wrong goal
+
+Consumer-side content is not one thing but three, and only one of them is disposable:
+
+1. **Plugin-owned, portable** — agent defs, manuals, personas, skills, hooks, shared scripts. Already
+   correct: it lives in the plugin and vanishes on uninstall.
+2. **Consumer-owned but plugin-shaped** — the lens files, the roster, the routing table, the chains.
+   The *repo owner* wrote this about their *own* repo, but it is built entirely on plugin concepts.
+   Valuable, and meaningless without the plugin.
+3. **Consumer-owned and genuinely independent** — the branch taxonomy in `branch-info.ps1`, the
+   changelog convention, "never directly on `main`". This survives an uninstall as a useful repo
+   agreement — but it is currently *phrased* in specialist terms ("Derek opens the PR"), which turns a
+   still-valid rule into a reference to a character that no longer exists.
+
+So a teardown that deletes indiscriminately destroys governance and repo knowledge the owner authored,
+which is worse than leaving clutter. **The actual defect is not that too much lives in the consumer —
+it is that category 2 is *woven in* rather than *bolted on*.** 101 mentions spread through one file
+cannot be removed cleanly; one import pointing at one directory can.
+
+### What the ideal shape looks like
+
+- **Category 2 behind a single seam.** All specialist content reachable through one inclusion, so
+  teardown is "remove one directory and one line" instead of editing 492 lines by hand.
+- **Category 3 written plugin-neutrally**, so it stays true after an uninstall instead of pointing at
+  a departed persona.
+- **A `specialists-teardown` beside `specialists-init`.** Symmetric by construction: whatever the
+  bootstrap puts down, the teardown can take away, because it is the same inventory. This is the
+  missing piece, and it is not a large one.
+- **Lens files off the plugin path.** `.claude/plugins/claude-specialists/` looks like plugin
+  property and is in fact git-tracked consumer content — which is exactly why it reads as orphaned
+  debris after an uninstall.
+
+**Order matters here.** Every further addition woven into a consumer's `CLAUDE.md` raises the cost of
+the untangling, so the seam is worth settling before more content lands on that path — and
+[issue #215](https://github.com/DaveKJohn/davekjohns-workshop/issues/215) is the same problem seen
+from the other side, not merely a token saving: a plugin-delivered Chris removes the `@`-import, which
+is the worst artifact in the table above.
 
 ## Adding a new plugin group
 
