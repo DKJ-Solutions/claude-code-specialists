@@ -70,6 +70,36 @@ authored.
   `check-roster-sync` stop counting them as roster rows.
 - **It never touches the plugin install or cache.** `claude plugin uninstall` is a separate step.
 
+## Verifying a round-trip — and why `git status` is not enough
+
+The first real round-trip (`davekokbwj/smartwatchbanden`, July 29, 2026) was verified with
+`git status` / `git diff`, and that method turned out to be **partly blind**: that repo ignores
+`.claude/*`, so `settings.suggested.jsonc` never appeared in `git status` and `git checkout .` did not
+clean it up. Since `.claude/` is where most of what the bootstrap writes lives, git can miss the bulk of
+it. Worse, in such a repo git cannot **restore** a wrongly deleted lens either — so establish whether
+`.claude/` is tracked *before* running with `-Apply`.
+
+Take a **filesystem** inventory at each stage instead, and compare the numbers:
+
+```powershell
+# count of lenses, imports, scaffolds, and the settings proposal
+@(Get-ChildItem .claude -Recurse -Filter '*-extension.md' -File).Count
+@([System.IO.File]::ReadAllLines('CLAUDE.md') | Where-Object { $_ -match '^\s*@' }).Count
+Test-Path scripts\repo-config.ps1; Test-Path scripts\lib\branch-info.ps1
+Test-Path .claude\settings.suggested.jsonc
+```
+
+Two further checks the hooks will not do for you, both of which caught real defects:
+
+- **Count the bootstrap's note line.** A `teardown` → `init` cycle used to add one copy per cycle
+  (measured 1 → 2 → 3) while all three session hooks reported "in sync". Run the cycle **twice**: once
+  cannot distinguish "does not accumulate" from "accumulates once".
+- **Count lone LFs in `CLAUDE.md`.** `([regex]::Matches($text, "(?<!\`r)\`n")).Count` — the bootstrap
+  used to paste LF into a CRLF file, invisible to every gate.
+
+And declare your own empty-lens convention if you have one, or the report will keep files it cannot
+recognise: `-EmptyLensPattern '<your marker>'`.
+
 ## What is left over afterwards, honestly
 
 A repo that ran the bootstrap, filled in its lenses, and then tore down is **not** blank. The lenses it
