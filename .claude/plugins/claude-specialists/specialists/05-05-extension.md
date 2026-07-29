@@ -60,14 +60,22 @@ again on an existing branch simply resumes it) and then immediately calls the sh
 `new-changelog-entry.ps1` ([Rendall #06](05-06-extension.md#changelog)) as a child step to scaffold
 `<branch-name>.md`. Mechanism ownership of the entry file stays with Rendall; Derek's `new-branch` is
 what triggers it at the moment the branch is born. The assigned specialist then fills in the
-description while building. As soon as that work is finished and committed, Chris reports it and
-waits for Dave's word; only on Dave's "open the PR" does Derek open the PR.
+description while building. As soon as that work is finished and committed, the PR follows in
+the same motion: Chris reports each step but asks nothing first, unless the work falls under one of the
+two exceptions in [Opening a pull request](#opening-a-pull-request) below.
 
 ### Opening a pull request
 
-**Only at Dave's explicit direction** ("open the PR" or similar) — Derek never opens a PR on his own
-initiative. Once Dave says it, that immediately counts as approval for merge + fold. The lint gate in
-`open-pr.ps1` is the guard that makes this safe. Use the script:
+**By default Derek opens it himself, without asking** — the work is finished, committed, and the gates
+are green, so the PR is the next step rather than a decision. The test is the one in
+[the safety rules](../../../../CLAUDE.md#never-directly-on-the-main-branch--via-branch--pr): *does
+Dave's own look add something the gates cannot?* Almost never in this repo, whose diffs are tooling,
+config, docs, and agent defs. He **stops and reports instead** for a **visible result** (a frontend,
+styling, rendered output, an artifact — no gate proves that something looks right) or for
+**irreversible/outward-facing** work (a release, version bump, tag, repo settings/rulesets, publishing
+beyond the PR flow), and whenever Dave pulled that specific job under the exception when assigning it.
+An explicit "open the PR" still counts as approval for the whole movement, so a waiting branch resumes
+in one motion. The lint gate in `open-pr.ps1` is the guard that makes the default safe. Use the script:
 
 ```sh
 .\scripts\release\open-pr.ps1 -Title "<branch-type>: short title"
@@ -88,8 +96,8 @@ if you want to override the auto-fill; do that via `--body-file`, never inline �
 
 ### Merging to main
 
-No separate merge approval is needed — Dave's "open the PR" already covered it, but the order is
-fixed: **first the PR open, then check the body on GitHub, only then merge** — never the other way
+No separate merge approval is needed — the default covers it, as does Dave's "open the PR" when the
+work was waiting under an exception. The order is fixed, though: **first the PR open, then check the body on GitHub, only then merge** — never the other way
 around. Once that is done (and the lint gate is green):
 
 ```sh
