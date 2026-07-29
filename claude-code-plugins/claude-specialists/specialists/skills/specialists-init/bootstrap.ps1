@@ -24,10 +24,16 @@
          plugin(s) (enabledPlugins in the consumer's settings; without settings, only its own plugin),
          clearly marked as VUL-IN.
       1c. Places the repo-specific script config scaffolds required by the shared workflow skills
-         (open-pr / fold-changelog): scripts/repo-config.ps1 (Get-RepoName / Get-RepoBlobUrl /
-         Get-LintScript) and scripts/lib/branch-info.ps1 (the prefix table). Both as VUL-IN scaffolds
-         with an EMPTY branch table -- taxonomy differs per repo. Without these files, a clean consumer
-         hits a raw dot-sourcing error (#86). Never overwrites.
+         (open-pr / fold-changelog / new-branch / check-roster-sync): scripts/repo-config.ps1 and
+         scripts/lib/branch-info.ps1. Both as VUL-IN scaffolds with an EMPTY branch table -- taxonomy
+         differs per repo. Without these files, a clean consumer hits a raw dot-sourcing error (#86).
+         Never overwrites.
+         The scaffolds define EVERY function check-script-contract marks required, deliberately: the
+         contract used to grow (Test-BranchName, Get-RosterPath, Get-RosterIgnoredIds) without the
+         scaffolds following, so a freshly bootstrapped repo got 3 [ERROR] lines about files the
+         bootstrap had just written, phrased as "this lib predates the contract" (issue #226). The
+         invariant is guarded by a test that runs this bootstrap and then the real contract check --
+         do not add a required contract entry without extending the scaffold below.
       2. Ensures that <ConsumerRoot>/CLAUDE.md carries the TWO orchestrator @-imports at the bottom:
          the body from the plugin install (~/.claude/plugins/marketplaces/.../01-01-persona.md) and
          the repo lens (.claude/plugins/<family>/<plugin>/01-01-extension.md). If CLAUDE.md is missing,
@@ -360,6 +366,27 @@ function Get-LintScript {
     return $script:LintScript
 }
 
+# Repo-root-relative path to the file holding the specialist roster, read by check-roster-sync.
+# 'CLAUDE.md' unless this repo keeps its roster somewhere else. Required by the contract, so the
+# scaffold defines it rather than leaving the session check to report it against a missing function
+# (issue #226).
+$script:RosterPath = 'CLAUDE.md'
+
+function Get-RosterPath {
+    return $script:RosterPath
+}
+
+# '<group>-<id>' ids deliberately kept OUT of the roster and lenses. Normally empty: every specialist
+# an enabled plugin ships belongs in the roster, and adopting one that arrives with a plugin update is
+# the default, not a question. Fill this in only for a deliberate, self-authored exception -- and note
+# that without it 'skip this one' is not an implementable outcome at all, which is exactly why the
+# contract marks it required.
+$script:RosterIgnoredIds = @()
+
+function Get-RosterIgnoredIds {
+    return $script:RosterIgnoredIds
+}
+
 # The CHANGELOG.md section heading fold-changelog folds a merged entry into -- the literal heading
 # line as it appears in the file. Two common shapes: '## Pull Requests' (a merged-PR section with the
 # releases below it) or '## [Unreleased]' (Keep-a-Changelog). Set it to whatever this repo uses; the
@@ -393,8 +420,9 @@ $branchInfoScaffold = @'
 .SYNOPSIS
     Shared branch conventions for workflow scripts (repo-specific prefix table).
 .DESCRIPTION
-    Placed by specialists-init as a VUL-IN scaffold. Provides Get-BranchTypes, Get-BranchPrefix, and
-    Get-BranchInfo. Prefix table determines GitHub label for PR and changelog entry type, and is
+    Placed by specialists-init as a VUL-IN scaffold. Provides Get-BranchTypes, Get-BranchPrefix,
+    Get-BranchInfo and Test-BranchName -- every function check-script-contract marks required for this
+    lib. Prefix table determines GitHub label for PR and changelog entry type, and is
     DIFFERENT PER REPO -- fill in your branch taxonomy below (table intentionally empty).
 
     No Set-StrictMode here: dot-sourcing would modify calling script's strict mode.
@@ -434,6 +462,29 @@ function Get-BranchInfo {
         Type     = $(if ($known) { $script:BranchPrefixTable[$prefix].Type } else { $null })
         SafeName = $Branch -replace '/', '-'
     }
+}
+
+# Validates a branch name before it is used (new-branch.ps1), instead of repeating the reject rules
+# inline. Required by the contract, so the scaffold defines it rather than leaving the session check to
+# report it against a missing function (issue #226). Hard rejects: an empty name, 'main', and any name
+# containing 'final' (deliberately broad, so 'finalize' is rejected too). An UNKNOWN PREFIX is not a
+# hard reject -- the caller reads IsKnown and decides for itself, consistent with the other shared
+# scripts, which fall back on an unknown prefix rather than blocking.
+function Test-BranchName {
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Branch)
+
+    if ([string]::IsNullOrWhiteSpace($Branch)) {
+        return [pscustomobject]@{ IsValid = $false; Reason = "Branch name must not be empty."; IsKnown = $false }
+    }
+    if ($Branch -eq 'main') {
+        return [pscustomobject]@{ IsValid = $false; Reason = "Branch name must not be 'main'."; IsKnown = $false }
+    }
+    if ($Branch -match 'final') {
+        return [pscustomobject]@{ IsValid = $false; Reason = "Branch name must not contain the token 'final'."; IsKnown = $false }
+    }
+
+    $info = Get-BranchInfo -Branch $Branch
+    [pscustomobject]@{ IsValid = $true; Reason = $null; IsKnown = $info.IsKnown }
 }
 '@
 

@@ -129,6 +129,33 @@ try {
     $biText = [System.IO.File]::ReadAllText($biScaffold, [System.Text.Encoding]::UTF8)
     Assert-True ($biText -match '\$script:BranchPrefixTable = @\{\s*\}') 'branch-info scaffold has an EMPTY prefix table (no repo taxonomy baked in)'
 
+    # --- 1c2. THE INVARIANT: the bootstrap's own scaffolds satisfy the plugin's own contract --------
+    #     Issue #226. Every function assertion above is a spot-check against a hand-maintained list,
+    #     and that is exactly how this drifted: the contract grew (Test-BranchName for new-branch,
+    #     Get-RosterPath + Get-RosterIgnoredIds for check-roster-sync) while the scaffolds did not
+    #     follow, so a freshly bootstrapped repo got 3 [ERROR] lines about files the bootstrap had
+    #     just written -- phrased as "this lib predates the contract", which is the wrong story for a
+    #     lib written seconds earlier by the current version of the plugin.
+    #
+    #     This case does not spot-check anything. It runs the REAL contract check against the REAL
+    #     bootstrap output, so the invariant holds by construction: add a required contract entry
+    #     without extending the scaffold and this fails, whatever the entry happens to be named.
+    Write-Host "bootstrap.ps1 -- the scaffolds satisfy check-script-contract (#226)" -ForegroundColor Cyan
+    $contractCheck = Join-Path $RepoRoot 'scripts\sync\check-script-contract.ps1'
+    $rc = Invoke-Script -Path $contractCheck -ScriptArgs @('-ConsumerPathOverride', $Fixture)
+    Assert-Equal 0 $rc.Code 'scaffolds vs contract: exit-code 0 -- a freshly bootstrapped repo satisfies the contract'
+    Assert-True (-not ($rc.Out -match '\[ERROR\]')) 'scaffolds vs contract: no [ERROR] about a file the bootstrap just wrote'
+    # And it must be reaching the real per-function verdicts, not passing because the [BOOTSTRAP]
+    # short-circuit from #225 swallowed the run -- that would make this assertion worthless.
+    Assert-True (-not ($rc.Out -match '\[BOOTSTRAP\]')) 'scaffolds vs contract: the libs exist, so the check really did probe them'
+    Assert-True ($rc.Out -match "\[OK\]\s+'Test-BranchName'") 'scaffolds vs contract: Test-BranchName probed and present'
+    Assert-True ($rc.Out -match "\[OK\]\s+'Get-RosterPath'") 'scaffolds vs contract: Get-RosterPath probed and present'
+    Assert-True ($rc.Out -match "\[OK\]\s+'Get-RosterIgnoredIds'") 'scaffolds vs contract: Get-RosterIgnoredIds probed and present'
+    # The two required functions that were never missing -- guards against a "fix" that adds the three
+    # new ones while dropping an old one.
+    Assert-True ($rc.Out -match "\[OK\]\s+'Get-BranchInfo'") 'scaffolds vs contract: Get-BranchInfo still present'
+    Assert-True ($rc.Out -match "\[OK\]\s+'Get-RepoName'") 'scaffolds vs contract: Get-RepoName still present'
+
     # --- 1d. RepoName derived from the consumer's git remote (origin) (Gap B) -------------------
     # A consumer that is a git repo with a github.com origin gets RepoName pre-filled instead of
     # the VUL-IN placeholder; non-github or no remote -> falls back to VUL-IN. The git call must
