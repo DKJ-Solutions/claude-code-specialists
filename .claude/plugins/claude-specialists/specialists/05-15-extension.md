@@ -156,6 +156,17 @@ infrastructure.
   the hook consumes them, via `& powershell -File …`, and treat a negative assertion that cannot
   distinguish "absent" from "uncapturable" as no assertion at all. The suite in
   `scripts/tests/connectors.tests.ps1` already does this correctly through `Invoke-Ps`.
+- **Run a suite from the tree it is meant to judge — `$PSScriptRoot` follows the file, the working
+  directory does not.** `roster-sync.tests.ps1` asserts that the git-root fallback lands on the repo the
+  test runs inside. Invoked by absolute path out of a linked worktree while the shell's CWD was still
+  the main checkout, it failed on exactly that assertion: `git rev-parse --show-toplevel` answers for
+  the *process's* directory, not for the script's. 125 pass, 1 fail — a red suite caused entirely by
+  where it was launched from, and the temptation is to read it as a real regression in the branch under
+  test. `Push-Location <worktree>` around the run (or `git -C`) is the whole fix. **Sibling of the
+  `Write-Host` trap above, and the same underlying mistake: verifying from the wrong vantage point.**
+  One produced a false pass, this one a false failure — so the rule is not "distrust green" or
+  "distrust red" but: before believing either verdict, confirm the check was observed from the same
+  place its real consumer observes it. Both instances happened on July 29, 2026, within one session.
 - **Restoring a file with `Set-Content -Encoding utf8` is not a restore.** PowerShell 5.1's `utf8`
   means *with BOM*, so writing a captured `$orig` back leaves a byte-level diff (`M-oM-;M-?{`) on a
   file that was BOM-less — a "clean" restore that shows up as a modified file. When a probe needs to
