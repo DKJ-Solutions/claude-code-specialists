@@ -6,10 +6,11 @@
     {
       "id": "specialists@davekjohns-workshop",
       "extensions": [
-        "01-01", "03-07", "04-18", "05-05", "05-06", "05-15",
-        "06-16", "06-17", "06-19", "06-23", "06-24", "06-25", "06-29"
+        "01-01", "02-09", "03-02", "03-07", "04-11", "04-12", "04-13", "04-18",
+        "05-05", "05-06", "05-15", "06-16", "06-17", "06-19", "06-23", "06-24",
+        "06-25", "06-29", "06-30"
       ]
     }
   ],
-  "notes": "The workshop consumes itself (see CLAUDE.md); through the github source it sees the most recently pushed version, not ongoing branch work."
+  "notes": "The workshop consumes itself (see CLAUDE.md); through the github source it sees the most recently pushed version, not ongoing branch work. Inventory brought to 19 on 2026-07-29 -- the full roster, matching the enabled plugin exactly. Six were added: 02-09, 03-02, 04-11, 04-12, 04-13, 06-30, whose lenses landed with the adopt-the-six change (PR #212) while this register was not updated alongside. That gap is why an inventory drift can sit unnoticed in the register of the very repo that owns the check: 'exists in the consumer but is not in the register' is an [INFO], and the session hook reports only [ERROR] lines, so nothing surfaced it at session start. It took a deliberate run of check-connectors.ps1 to find. Whoever lands lenses here updates this array in the same change."
 }

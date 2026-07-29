@@ -137,6 +137,15 @@ structural path difference.
 - **After a refresh, also update the manifest** (`notes`, and the `extensions` inventory if lenses
   were added or removed): the investigation found an already-performed refresh that was still
   administratively booked as open — the registry data should follow reality.
+- **Update the `extensions` inventory in the same change that lands the lens — nothing will remind
+  you later.** "Exists in the consumer but is not in the register" is an `[INFO]`, and the session
+  hook surfaces only `[ERROR]` lines, so a drifted inventory is invisible at session start; it takes
+  a deliberate run of `check-connectors.ps1` to find. On July 29, 2026 such a run found eleven of
+  them at once, six in the register of *this* repo — the lenses had landed with the adopt-the-six
+  change (PR #212) and the inventory was simply never updated alongside. The rule above ("after a
+  refresh") was already there and was not enough, because it reads as a follow-up step and a
+  follow-up step is exactly what goes missing. Treat the inventory as part of the lens change, not
+  as bookkeeping that trails it.
 
 ## The session check (automatic)
 
