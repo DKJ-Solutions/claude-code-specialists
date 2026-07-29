@@ -179,6 +179,35 @@ try {
     Assert-Equal 0 $r.Code 'unregistered on plugin path: exit code 0'
     Assert-Match "\[INFO\].*'06-23'" $r.Out 'unregistered on plugin path: INFO names the id'
 
+    # --- 5d. Inventory drift in the session's OWN register -> non-counting [INVENTORY] --------------
+    #     Found 2026-07-29: a deliberate run turned up eleven of these at once, six in the workshop's
+    #     own entry (the lenses landed with PR #212, the inventory was never updated alongside). The
+    #     finding is an [INFO], the hook shows only [ERROR], so nothing had surfaced it. -OnlyConsumer
+    #     marks the fixture as the repo this run is "in", which is the case a reader can act on.
+    New-FixtureConsumer -ExtensionIds @('06-16', '06-23')
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture, '-OnlyConsumer', $Fixture))
+    Assert-Match '\[INVENTORY\]' $r.Out 'own inventory drift: a non-counting [INVENTORY] marker is emitted for the hook'
+    Assert-Match "\[INVENTORY\].*06-23" $r.Out 'own inventory drift: the marker names the missing id'
+    Assert-Match "\[INFO\].*'06-23'" $r.Out 'own inventory drift: the [INFO] stays for the count and the deliberate run'
+    Assert-Match '1 info signal' $r.Out 'own inventory drift: [INVENTORY] is non-counting (still exactly 1 info signal)'
+    Assert-Equal 0 $r.Code 'own inventory drift: exit 0 -- a behind-reality register is not a failure of the plugin install'
+    # Same audience rule as [UNREGISTERED]: say plainly that nothing is broken, so the line reads as
+    # bookkeeping rather than as a fault in the reader's repo.
+    Assert-Match 'Nothing is broken' $r.Out 'own inventory drift: the message states the repo is not broken'
+
+    # --- 5e. The same drift in ANOTHER repo's register stays silent --------------------------------
+    #     The scoping that keeps this from reintroducing the other-machine noise the [INFO]-silence
+    #     rule removed (Dave, July 20, 2026). Identical fixture to 5d, minus -OnlyConsumer: the
+    #     checkout is then no longer the repo the run is in, so the [INFO] must still appear while the
+    #     [INVENTORY] marker must not. Without this test the feature would look correct in 5d and
+    #     quietly surface every consumer's bookkeeping at every session start.
+    New-FixtureConsumer -ExtensionIds @('06-16', '06-23')
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Match "\[INFO\].*'06-23'" $r.Out "another repo's inventory drift: the [INFO] is still reported on a deliberate run"
+    Assert-NotMatch '\[INVENTORY\]' $r.Out "another repo's inventory drift: NO [INVENTORY] marker -- it would be another machine's bookkeeping"
+
     # --- 5c. -OnlyConsumer without a manifest in the register -> INFO, exit 0 -----------------------
     #     A fresh/unregistered consumer (as the SessionStart hook passes via -OnlyConsumer) should
     #     see an informational "not registered" signal -- NOT the reassuring "in sync" branch. The
@@ -398,6 +427,46 @@ try {
     Assert-Match 'no errors\.' $r.Out 'registered stub: the plain no-errors line is unchanged'
     Assert-NotMatch 'UNREGISTERED' $r.Out 'registered stub: no unregistered notice'
     Assert-NotMatch 'not in the workshop register' $r.Out 'registered stub: no register wording at all'
+
+    # 9i. An [INVENTORY] notice reaches the session on its own verdict line (found 2026-07-29). Same
+    #     shape as 9f one step further in: the repo IS registered, so "not in the register" would be the
+    #     wrong story -- its entry simply lists fewer lenses than the repo holds. The check emits the
+    #     line only about the repo the session is in, so the hook can surface it unconditionally.
+    $stub = New-StubWorkshop -Name 'stub-inventory' -ExitCode 0 -OutputLines @(
+        "  [INFO]  DaveKJohn/davekjohns-workshop / specialists@davekjohns-workshop: extension '04-11' exists in the consumer but is not in the register -- update the register or review the change.",
+        "  [INVENTORY] this repo has 1 lens(es) that its own entry in the connector register does not list (04-11) -- add them to the 'extensions' array in davekjohns-workshop.json, in the same change that landed the lens. Nothing is broken: the register's view of this repo is simply behind reality.",
+        'Summary: 0 error(s), 1 info signal(s).'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Equal 0 $r.Code 'inventory stub: exit code 0'
+    Assert-Match '\[INVENTORY\]' $r.Out 'inventory stub: the marker reaches the session context'
+    Assert-Match 'lens inventory for this repo is behind' $r.Out 'inventory stub: its own verdict line, not the not-registered one'
+    Assert-NotMatch "not in the plugin maintainer's register" $r.Out 'inventory stub: NOT reported as unregistered -- the entry exists, it is just behind'
+    Assert-NotMatch 'signals found' $r.Out 'inventory stub: NOT escalated to a signals summary (nothing is wrong with the install)'
+    Assert-NotMatch '\[INFO\]' $r.Out 'inventory stub: the per-signal [INFO] line still stays out'
+
+    # 9j. A clean run gains nothing: the guard against this becoming a line every session start carries.
+    $stub = New-StubWorkshop -Name 'stub-no-inventory' -ExitCode 0 -OutputLines @(
+        '  [OK]    all 19 registered extensions present',
+        'Summary: 0 error(s), 0 info signal(s).'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Match 'no errors\.' $r.Out 'no-inventory stub: the plain no-errors line is unchanged'
+    Assert-NotMatch 'INVENTORY' $r.Out 'no-inventory stub: no inventory notice'
+    Assert-NotMatch 'inventory' $r.Out 'no-inventory stub: no inventory wording at all'
+
+    # 9k. Real signals AND an inventory notice in one run: both surface (the $notices list, not just
+    #     $unregistered -- a regression here would silently drop the marker whenever anything else is
+    #     also wrong, which is exactly when a session is busiest).
+    $stub = New-StubWorkshop -Name 'stub-inv-mixed' -ExitCode 1 -OutputLines @(
+        '  [ERROR] life-hub / specialists@davekjohns-workshop: machine record is on v2.9.0, source on v2.11.0',
+        "  [INVENTORY] this repo has 1 lens(es) that its own entry in the connector register does not list (04-11) -- add them to the 'extensions' array in davekjohns-workshop.json, in the same change that landed the lens. Nothing is broken: the register's view of this repo is simply behind reality.",
+        'Summary: 1 error(s), 1 info signal(s).'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Match 'signals found' $r.Out 'inventory mixed: the signals branch fires'
+    Assert-Match 'v2\.9\.0' $r.Out 'inventory mixed: the real [ERROR] surfaces'
+    Assert-Match '\[INVENTORY\]' $r.Out 'inventory mixed: the inventory marker surfaces alongside it'
 
     # 9h. Real signals AND an unregistered notice in one run: both surface, neither crowds out the other.
     $stub = New-StubWorkshop -Name 'stub-unreg-mixed' -ExitCode 1 -OutputLines @(

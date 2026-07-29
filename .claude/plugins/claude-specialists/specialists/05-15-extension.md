@@ -134,6 +134,33 @@ infrastructure.
   label now carries `<repo> / <plugin-id>`. For any change whose whole purpose is "make the output
   actionable", run it against the real register/repo before calling it done — a fixture proves the
   mechanism, not the usefulness.
+- **A documented rule is not a mechanism, and a silent signal is not a signal.** The connectors README
+  had carried "after a refresh, also update the manifest" for days when a deliberate run of
+  `check-connectors.ps1` found eleven inventory-drift findings at once — six in this repo's own
+  register, where the lenses had landed with PR #212 and the inventory was never updated alongside. The
+  rule was on the books and had been followed exactly zero times, because the finding is an `[INFO]` and
+  the session hook surfaces only `[ERROR]`: nothing ever reported the omission, so nothing ever
+  prompted anyone. Writing the rule down more firmly would have changed nothing. What changed it was the
+  non-counting `[INVENTORY]` marker (July 29, 2026) — the third instance of the
+  `[UNREGISTERED]`/`[ORPHANS]` shape. **When a rule depends on someone remembering a follow-up step, ask
+  what would report the omission; if the answer is "a deliberate run nobody has a reason to make",
+  the rule needs a mechanism, not a sharper sentence.**
+- **`Write-Host` output is invisible to a same-process pipeline, so an in-process assertion about it
+  silently passes.** While verifying the `[INVENTORY]` marker by hand, `$out = .\check-connectors.ps1;
+  @($out | Where-Object { $_ -cmatch '\[INVENTORY\]' }).Count` returned 0 for the case that *should*
+  emit it — the line was plainly visible on the console, but `Write-Host` writes to the host and never
+  enters the pipeline. Both the positive and the negative case therefore "passed", which is the
+  dangerous half: a scoping test that can only ever read 0 proves nothing. The checks use `Write-Host`
+  throughout (deliberately — it carries `-ForegroundColor`), and the hook only captures it because it
+  runs the check as a **child process**, whose stdout *is* captured. So: verify these scripts the way
+  the hook consumes them, via `& powershell -File …`, and treat a negative assertion that cannot
+  distinguish "absent" from "uncapturable" as no assertion at all. The suite in
+  `scripts/tests/connectors.tests.ps1` already does this correctly through `Invoke-Ps`.
+- **Restoring a file with `Set-Content -Encoding utf8` is not a restore.** PowerShell 5.1's `utf8`
+  means *with BOM*, so writing a captured `$orig` back leaves a byte-level diff (`M-oM-;M-?{`) on a
+  file that was BOM-less — a "clean" restore that shows up as a modified file. When a probe needs to
+  mutate a tracked file temporarily, undo it with `git checkout -- <path>` rather than rewriting the
+  captured content.
 - This repo is **public**: config never contains secrets.
 
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
