@@ -45,7 +45,16 @@
 #>
 param(
     [string]$ConsumerRoot = (Get-Location).Path,
-    [switch]$Apply
+    [switch]$Apply,
+    # Regex identifying THIS repo's own "nothing recorded here yet" convention for an empty lens.
+    # Left empty on purpose: the plugin recognises the scaffold shapes IT writes and must not guess at
+    # a convention it did not create. Measured in a real consumer (davekokbwj/smartwatchbanden,
+    # 2026-07-29): 20 of its 22 lenses are empty under that repo's own "schone lei" convention -- a
+    # closing sentence in Dutch, no '(VUL-IN)' heading anywhere -- so the teardown kept all 22 and
+    # reported them as authored. The prediction "all 22 kept" came out for the WRONG reason, and
+    # adoption was therefore less reversible than this skill claimed.
+    # Pass e.g. -EmptyLensPattern 'Nog niets vastgelegd' to have those recognised as removable.
+    [string]$EmptyLensPattern = ''
 )
 $ErrorActionPreference = 'Stop'
 
@@ -95,7 +104,13 @@ function Test-LooksGenerated {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
     $text = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
     switch ($Kind) {
-        'lens'        { return ($text -match '(?m)^#{1,6}\s.*\(VUL-IN\)\s*$') }
+        'lens' {
+            # The scaffold shape this plugin writes.
+            if ($text -match '(?m)^#{1,6}\s.*\(VUL-IN\)\s*$') { return $true }
+            # The consumer's own empty-lens convention, only if they told us what it looks like.
+            if ($EmptyLensPattern -and ($text -match $EmptyLensPattern)) { return $true }
+            return $false
+        }
         'repo-config' { return ($text -match "=\s*'[^']*VUL-IN") }
         'branch-info' { return ($text -match '(?m)\$script:BranchPrefixTable\s*=\s*@\{\s*\}') }
     }
@@ -123,8 +138,12 @@ foreach ($dir in $lensDirs) {
         if (Test-LooksGenerated -Path $lens.FullName -Kind 'lens') {
             Remove-IfApplying -Path $lens.FullName -Label $rel
         } else {
+            # Deliberately does NOT say "filled in" or "somebody wrote this". The script cannot
+            # establish authorship -- it can only say the file does not match a scaffold shape it
+            # recognises. Claiming otherwise was measurably false in a real consumer, where 20 empty
+            # lenses were reported as repo knowledge because they used that repo's own convention.
             $kept += $rel
-            Write-Host ("  [KEEP]   $rel -- filled in, so it is repo knowledge somebody wrote") -ForegroundColor Yellow
+            Write-Host ("  [KEEP]   $rel -- not recognised as an unfilled scaffold; this script does not judge it") -ForegroundColor Yellow
         }
     }
 }
@@ -148,24 +167,43 @@ if ($Apply) {
 # property that let check-roster-sync stop counting them as roster rows (issue #227).
 $claudeMd = Join-Path $root 'CLAUDE.md'
 if (Test-Path -LiteralPath $claudeMd -PathType Leaf) {
+    $text0 = [System.IO.File]::ReadAllText($claudeMd, [System.Text.Encoding]::UTF8)
     $lines = [System.IO.File]::ReadAllLines($claudeMd)
     $isSpecialistImport = {
         param($line)
         ($line -match '^\s*@') -and ($line -match '(-persona\.md|-extension\.md)\s*$')
     }
+    # The explanatory line the bootstrap writes above the imports. Removed too, and matched on its
+    # LITERAL generated wording only -- a consumer who reworded or translated it has authored that
+    # text. Leaving it behind is what made the round-trip accumulate a copy per cycle: the bootstrap's
+    # guard saw the paragraph gone-but-not-gone and re-appended the whole block (measured 1 -> 2 -> 3
+    # in davekokbwj/smartwatchbanden, 2026-07-29, with every gate reporting "in sync").
+    $bootstrapNote = 'The orchestrator (Chris) is always loaded -- portable body from plugin install and repo lens'
+    $noteHits = @($lines | Where-Object { $_.Trim() -eq $bootstrapNote })
+    foreach ($n in $noteHits) {
+        Write-Host "  [remove] CLAUDE.md: the bootstrap's orchestrator note line" -ForegroundColor Green
+        $removed += "CLAUDE.md: bootstrap orchestrator note line"
+    }
+
     $hits = @($lines | Where-Object { & $isSpecialistImport $_ })
-    if ($hits.Count -gt 0) {
+    if ($hits.Count -gt 0 -or $noteHits.Count -gt 0) {
         foreach ($hit in $hits) {
             Write-Host ("  [remove] CLAUDE.md import: " + $hit.Trim()) -ForegroundColor Green
             $removed += ('CLAUDE.md import: ' + $hit.Trim())
         }
         if ($Apply) {
-            $keptLines = @($lines | Where-Object { -not (& $isSpecialistImport $_) })
+            $keptLines = @($lines | Where-Object {
+                (-not (& $isSpecialistImport $_)) -and ($_.Trim() -ne $bootstrapNote)
+            })
             # Trailing blank lines the imports left behind, so the file does not end in a growing gap.
             while ($keptLines.Count -gt 0 -and [string]::IsNullOrWhiteSpace($keptLines[-1])) {
                 $keptLines = $keptLines[0..($keptLines.Count - 2)]
             }
-            [System.IO.File]::WriteAllLines($claudeMd, $keptLines)
+            # Preserve the file's own line endings. WriteAllLines uses Environment.NewLine, which is
+            # right on Windows/CRLF and wrong for an LF-normalised repo; the sibling defect on the
+            # bootstrap side pasted LF into a CRLF file and no gate saw it.
+            $nl = if ($text0 -match "`r`n") { "`r`n" } else { "`n" }
+            [System.IO.File]::WriteAllText($claudeMd, (($keptLines -join $nl) + $nl))
         }
     }
     # Everything else in CLAUDE.md is authored text, and a roster row is not distinguishable from
@@ -215,9 +253,14 @@ $notes += "The plugin install itself is untouched: run 'claude plugin uninstall'
 
 # --- Summary --------------------------------------------------------------------------------------
 Write-Host ''
-Write-Host ("Summary: " + $removed.Count + " item(s) " + $(if ($Apply) { 'removed' } else { 'to remove' }) + ", " + $kept.Count + " kept (authored).") -ForegroundColor Cyan
+# "kept", not "kept (authored)". The script cannot establish authorship, and saying so was measurably
+# wrong: 20 empty lenses in a real consumer were reported as authored because they used that repo's own
+# convention rather than this plugin's scaffold shape.
+Write-Host ("Summary: " + $removed.Count + " item(s) " + $(if ($Apply) { 'removed' } else { 'to remove' }) + ", " + $kept.Count + " kept.") -ForegroundColor Cyan
 if ($kept.Count -gt 0) {
-    Write-Host "  Kept because somebody wrote them -- delete by hand if you really want them gone:" -ForegroundColor Yellow
+    Write-Host "  Kept -- not recognised as an unfilled scaffold. Review them: some may be empty under a" -ForegroundColor Yellow
+    Write-Host "  convention this plugin does not know, in which case they are yours to delete (or re-run" -ForegroundColor Yellow
+    Write-Host "  with -EmptyLensPattern '<your marker>' to have them recognised):" -ForegroundColor Yellow
     foreach ($k in $kept) { Write-Host "    $k" }
 }
 foreach ($n in $notes) { Write-Host "  [note] $n" }

@@ -559,9 +559,18 @@ foreach ($s in $scriptScaffolds) {
 $bodyImport = "@$personaTilde/01-01-persona.md"
 $lensImport = "@$padRel/$personaPlugin/01-01-extension.md"
 $claudeMd = Join-Path $ConsumerRoot 'CLAUDE.md'
+# The explanatory line is kept as its own variable so BOTH the idempotence guard below and
+# specialists-teardown can recognise it literally. Measured in a real consumer round-trip
+# (davekokbwj/smartwatchbanden, 2026-07-29): the guard used to test only for $lensImport, so after a
+# teardown -- which removes '@' lines and deliberately nothing else -- the paragraph was still there
+# while the import was gone. The guard then read "not present" and re-appended the WHOLE block,
+# paragraph included. One extra copy per teardown->init cycle, counted 1 -> 2 -> 3, and no gate
+# reported it. Idempotence has to cover everything the script WRITES, not just the line it happens
+# to look for.
+$importNote = 'The orchestrator (Chris) is always loaded -- portable body from plugin install and repo lens'
 $importBlock = @"
 
-The orchestrator (Chris) is always loaded -- portable body from plugin install and repo lens
+$importNote
 from plugin path; routes on-demand to specialists in ``$padRel/``.
 
 $bodyImport
@@ -584,7 +593,22 @@ $importBlock
     if ($md -match [regex]::Escape($lensImport)) {
         Write-Host "  [keep]   CLAUDE.md already has orchestrator imports." -ForegroundColor DarkGray
     } else {
-        $md = $md.TrimEnd() + "`n" + $importBlock + "`n"
+        # Drop a leftover explanatory line from an earlier cycle before appending, so a
+        # teardown -> init round-trip cannot accumulate copies of it. Matches the literal generated
+        # sentence only: a consumer who reworded or translated it has authored that text, and this
+        # must not touch it.
+        $mdLines = @($md -split "`r?`n")
+        $kept = @($mdLines | Where-Object { $_.Trim() -ne $importNote })
+        $dropped = $mdLines.Count - $kept.Count
+        if ($dropped -gt 0) {
+            $md = $kept -join "`n"
+            Write-Host "  [tidy]   removed $dropped leftover orchestrator note line(s) from a previous cycle." -ForegroundColor DarkGray
+        }
+        # Match the file's own line endings. WriteAllText with a "`n"-built block used to paste LF
+        # into a CRLF file -- measured as 8 lone LFs in a real consumer, invisible to every gate.
+        $nl = if ($md -match "`r`n") { "`r`n" } else { "`n" }
+        $block = (($importBlock -replace "`r`n", "`n") -replace "`n", $nl)
+        $md = $md.TrimEnd() + $nl + $block + $nl
         [System.IO.File]::WriteAllText($claudeMd, $md, $Utf8NoBom)
         Write-Host "  [add]    orchestrator imports added to bottom of CLAUDE.md." -ForegroundColor Green
     }

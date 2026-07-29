@@ -42,10 +42,20 @@ the script classifies before it removes:
 | **Authored by the owner** | a filled-in lens -- repo knowledge somebody wrote | **reported, never touched** |
 | **Owned by the repo anyway** | a `repo-config.ps1` with real values, a filled branch table: this repo's own conventions | **reported as yours to keep or drop** |
 
-The `VUL-IN` marker is the test, because that is the exact contract `bootstrap.ps1` writes those files
-under. Its absence means somebody edited the file, which makes the file theirs. Deliberately a content
-test rather than a timestamp or hash: a consumer may have reformatted line endings or been through a
-merge, and neither makes the content authored.
+The signals are the scaffold shapes **this plugin writes**: a `(VUL-IN)` slot heading for a lens, a
+`VUL-IN` in an assignment's *value* for `repo-config.ps1`, an empty prefix table for `branch-info.ps1`.
+Deliberately a content test rather than a timestamp or hash: a reformat or a merge does not make content
+authored.
+
+> **It only recognises its own conventions, and says so rather than guessing.** A round-trip in
+> `davekokbwj/smartwatchbanden` (July 29, 2026) found 20 of its 22 lenses empty under **that repo's own**
+> "clean slate" convention — a closing sentence, no `(VUL-IN)` heading anywhere. All 22 were kept, and the
+> report claimed they were "filled in". Right answer, wrong reason, and adoption was less reversible than
+> this skill implied. Two changes followed: the report no longer asserts authorship it cannot establish
+> (it says the file is *not recognised as a scaffold*, which is all it knows), and a consumer can declare
+> its own convention with **`-EmptyLensPattern <regex>`**, e.g.
+> `-EmptyLensPattern 'Nothing recorded yet'`. Without it those lenses are kept — the safe direction,
+> since a false keep leaves clutter while a false remove destroys someone's work.
 
 ## What it deliberately will not do
 
