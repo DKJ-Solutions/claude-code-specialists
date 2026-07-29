@@ -4,6 +4,143 @@ Consumer-facing history of this plugin: per release, the changes that touched th
 Automatically appended by `cut-release.ps1` of the marketplace repo (davekjohns-workshop); the full
 workshop history lives there in `CHANGELOG.md` and `releases/`.
 
+## v2.14.0 — 2026-07-29
+
+### Features
+
+#### #250 · Teardown can hand back working copies of the shared scripts · Feat · 2026-07-29
+
+The runtime dependency that no teardown could fix now has a built-in way out. `teardown.ps1 -Apply
+-VendorScripts` copies the plugin's shared script payload (`scripts/task`, `scripts/release`,
+`scripts/lib`, `scripts/sync`) into the consumer's own `scripts/`, structure preserved, so the daily git
+workflow keeps running once the plugin is uninstalled — instead of the resolver throwing and taking
+`start-task`, `open-pr` and `fold-changelog-entry` down with it.
+
+**Why it works, and why that was not obvious until it was checked.** The shared scripts were built to
+travel as a payload: they locate the repo through `CLAUDE_PROJECT_DIR` / `git rev-parse --show-toplevel`
+— never their own location — and dot-source their siblings `$PSScriptRoot`-relative. A copy therefore
+behaves identically anywhere inside the repo, provided the *structure* comes along; a flattened copy would
+break at the next branch rather than at copy time. This repo is the standing proof, and it settled the
+design choice: its five `scripts/` copies are **byte-identical** to the plugin's, so the workshop has been
+running the vendored model all along. That is why vendoring won over the alternative of making the
+resolver degrade gracefully — one option ends with a repo that works, the other with a repo that fails
+clearly.
+
+**It is the one additive act in a subtractive script**, hence opt-in, and it never overwrites. A
+destination that exists and differs is reported and left alone — typically the consumer's own wrapper
+around the shared script, so the rule that protects a filled-in lens protects it too; an identical
+destination is reported as already current, making re-runs safe. The report also states the one
+combination that hands back scripts with nothing to dot-source: if the same run removed
+`repo-config.ps1`/`branch-info.ps1` because they were still unfilled scaffolds, the vendored scripts
+cannot run — and a repo in that state had no working workflow to preserve in the first place.
+
+Twelve new asserts (89 total in `teardown.tests.ps1`) cover the properties rather than the happy path:
+the dry run writes nothing, the payload arrives byte-identical to the plugin's, the sibling lib comes
+along, a differing destination is provably **not** overwritten, the collision is reported rather than
+silent, a second run recognises its own work, and without the switch nothing is written at all.
+
+[PR #250](https://github.com/DaveKJohn/davekjohns-workshop/pull/250)
+
+---
+
+#### #249 · Teardown warns when a consumer script resolves the plugin cache · Feat · 2026-07-29
+
+The teardown documented a leftover it could not act on: the consumer's own resolver locates the
+marketplace cache and throws once the plugin is gone, and in the measured repo
+(`davekokbwj/smartwatchbanden`, July 29, 2026) three operational scripts dot-sourced it — so an
+uninstall took the daily git workflow down rather than leaving debris behind. Documenting that was
+right, but it left the dry run silent about the only leftover that breaks a run: the report answered
+*"what did the bootstrap put here"* while a reader's actual question before trusting the word
+*reversible* is *"what stops working after I uninstall"*.
+
+`teardown.ps1` now answers the second question too. Every `.ps1` under `scripts/` that references the
+marketplace cache or `CLAUDE_PLUGIN_ROOT` is reported as a `[WARN]` line together with the scripts that
+depend on it, plus a note naming the two ways out (keep local copies of the operational scripts, or make
+the resolver degrade to one clear failure instead of a throw) and stating plainly that no teardown can
+fix this, because the shared-script model (#81) is what creates the dependency.
+
+**It is report-only by construction, and that is the property under test.** These files are the
+consumer's own code; a check that deleted them to make its own summary look clean would do exactly the
+damage the classification exists to prevent. So the suite asserts both halves — the report *names* the
+resolver and its dependents, and `-Apply` still leaves both files on disk — plus exit code 0 (a warning
+is not a failure) and no false alarm on a consumer whose scripts never reach into the plugin. Eight new
+asserts, 77 total in `teardown.tests.ps1`.
+
+Two limits stated rather than hidden: the scan covers `scripts/` only, so a resolver living elsewhere is
+not counted, and dependents are matched by filename rather than by parsing dot-source syntax — a
+consumer may reach the resolver via `$PSScriptRoot`, a variable, or `Join-Path`, and this report only has
+to point a human at the right file.
+
+[PR #249](https://github.com/DaveKJohn/davekjohns-workshop/pull/249)
+
+### Documentation
+
+#### #247 · Separate live references from historical ones in the teardown goal · Docs · 2026-07-29
+
+The last two findings of the hand measurement in `davekokbwj/smartwatchbanden` (July 29, 2026), and the
+second one moves the goalpost rather than adding to the list.
+
+**A consumer gate that goes blind rather than red.** A consumer that lints its own lens files keeps that
+check after a teardown, and in the measured repo the lens category **silently skips** once the directory
+is gone: nothing errors, nothing is reported, and the gate stays green while checking nothing. Right for
+a deliberate teardown, wrong for an accidental loss — a silent skip cannot tell an operator's removal
+from a bad merge or a mistyped path, so the one case it must warn about is the one case it stays quiet
+in. The gate is the consumer's own, so this is documented rather than fixed here, together with the
+target-shape requirement that a skip should *say* it skipped.
+
+**The goal is no *live* reference, not zero references.** `CHANGELOG.md` (3) and
+`releases/development/*` (43) mention specialists in the measured repo — 46 references that are each an
+accurate record of something that happened. History is finished business: never rewritten, and a
+teardown must not touch it. So the requirement as literally stated ("no lingering reference anywhere in
+the repo") is both unreachable and undesirable for any repo that ever adopted the plugin, and it is now
+read as: nothing a **session loads**, a **script resolves**, or a **gate depends on** may still point at
+the plugin. That reading makes the goal testable and sorts the four known leftovers by what they cost —
+a resolver that throws breaks a run, an orphaned roster row only misleads a reader.
+
+Recorded in the [family README](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/claude-code-plugins/claude-specialists/README.md#removal-the-teardown-gap)
+(the requirement itself, plus a fifth target-shape bullet) and in
+[`specialists-teardown`](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/claude-code-plugins/claude-specialists/specialists/skills/specialists-teardown/SKILL.md),
+whose leftover section now runs to four kinds and closes with what is correctly left standing.
+
+[PR #247](https://github.com/DaveKJohn/davekjohns-workshop/pull/247)
+
+---
+
+#### #246 · Record what a teardown leaves behind, honestly · Docs · 2026-07-29
+
+A hand measurement in `davekokbwj/smartwatchbanden` (July 29, 2026) established how far a torn-down
+consumer really is from "no reference to the plugin anywhere", and one of the findings contradicted
+what the family README claimed. Both docs now state it.
+
+**The finding that matters: a runtime dependency, not clutter.** The plugin is the single source of
+truth for the operational scripts (`new-branch.ps1`, `park-branch.ps1`, `new-changelog-entry.ps1`,
+`open-pr.ps1`, `fold-changelog-entry.ps1`; #81), and a consumer reaches them through a resolver of its
+own that locates the marketplace cache and **throws** once that cache is gone — in the measured
+consumer `scripts/lib/plugin-paths.ps1`, dot-sourced by `start-task.ps1`, `open-pr.ps1`, and
+`fold-changelog-entry.ps1`. So after a teardown plus `claude plugin uninstall` the repo does not merely
+carry leftovers: its daily git workflow stops working. The teardown gap table in the family README
+listed the shared scripts as "gone cleanly — plugin-owned", which is true of the plugin's side of the
+boundary only; that row is now qualified, and the target shape gains the missing requirement (the
+resolver degrades to an actionable failure, or the consumer keeps local copies — decided at adoption,
+because no teardown can decide it afterwards).
+
+**Two further leftovers named in [`specialists-teardown`](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/claude-code-plugins/claude-specialists/specialists/skills/specialists-teardown/SKILL.md).**
+The authored text the script refuses to touch is now quantified rather than described — roughly 43
+lines across some 6 sections of `CLAUDE.md` (the 22-row roster table, the work-division block, the
+loading-strategy paragraph, the safety cross-references), plus loose mentions in `README.md` (5),
+`research/plugin-sharing/README.md` (14), `releases/README.md` (1) and
+`.github/pull_request_template.md` (1). And the orchestrator's lens survives as an **orphan**: it is
+authored, so it is kept, while the `@`-import that loaded it is knowably bootstrap-written and is
+removed — a `[KEEP]` line that reads as "still working" when it only means "still there".
+
+The skill also now says plainly that its dry run warns about none of this: it reports what it would
+remove and what it keeps, not what breaks afterwards. Making it warn is a script change, deliberately
+not folded into this documentation pass.
+
+[PR #246](https://github.com/DaveKJohn/davekjohns-workshop/pull/246)
+
+---
+
 ## v2.13.3 — 2026-07-29
 
 ### Fixes

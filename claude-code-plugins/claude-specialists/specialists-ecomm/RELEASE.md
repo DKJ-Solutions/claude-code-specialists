@@ -1,9 +1,9 @@
-# Release v2.13.3
+# Release v2.14.0
 
 **Date:** 2026-07-29  
-**Type:** Patch
+**Type:** Minor
 
-Entry heading levels corrected, the round-trip protocol moved into the skill, and the notes parser no longer reads quoted markdown as structure
+Teardown becomes a real exit: it warns about the runtime dependency and can hand the shared scripts back
 
 You are on this release.
 
@@ -11,5 +11,5 @@ No changes to this plugin in this release — see the full notes.
 
 ---
 
-Full workshop notes: [releases/development/2.x/2.13.3.md](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/releases/development/2.x/2.13.3.md)
+Full workshop notes: [releases/development/2.x/2.14.0.md](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/releases/development/2.x/2.14.0.md)
 Cumulative plugin history: [CHANGELOG.md](CHANGELOG.md)
