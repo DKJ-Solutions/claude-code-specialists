@@ -1,0 +1,43 @@
+### The teardown no longer deletes a file that merely mentions `VUL-IN` · Fix · 2026-07-29
+
+**A dry run against a real consumer found a bug that would have destroyed working configuration.** Dave
+asked whether a real consumer test was possible yet; it was, read-only, and it earned its keep
+immediately.
+
+`specialists-teardown` classified a file as an unfilled scaffold if the string `VUL-IN` appeared
+**anywhere** in it. Run against `davekokbwj/smartwatchbanden`, that marked `scripts/repo-config.ps1` for
+removal — a file carrying real values for all eight contract functions. The only `VUL-IN` left in it sits
+in the scaffold's own **docstring** (*"fill in remaining VUL-IN values"*), which a consumer has no reason
+to strip. That is not an edge case: it is the **normal state of a filled-in scaffold**, so the naive rule
+would have deleted the file `open-pr`, `fold-changelog`, `new-branch` and `check-roster-sync` all depend
+on. The same flaw applied to lenses — an authored lens that happens to explain the scaffold convention
+would have gone the same way.
+
+The test now keys on a placeholder in a **position that only real use produces**: a `VUL-IN` inside an
+assignment's *value* for `repo-config.ps1`, the *empty prefix table* for `branch-info.ps1`, an unfilled
+slot *heading* for a lens.
+
+| dry run, real consumers | before | after |
+|---|---|---|
+| `smartwatchbanden` | 3 to remove, 23 kept | **2 to remove, 24 kept** |
+| `life-hub` | 2 to remove, 26 kept | **2 to remove, 26 kept** |
+
+Both now propose removing only the two `@`-imports, and both checkouts were verified byte-untouched
+before and after every run.
+
+**Third instance of one defect in a single day**, now generalised in
+[Sylvester #15's lens](.claude/plugins/claude-specialists/specialists/05-15-extension.md) as **mention vs
+use**: the roster check counted an `@`-import path as a roster row (#227), the lint gate read a marker
+quoted in changelog prose as a real enumeration (#235), and this read a docstring explaining placeholders
+as a placeholder. When a check's evidence is "this string appears in the file", ask what else in that file
+legitimately contains it — and for a script that deletes, resolve every doubt toward keeping: a false keep
+leaves clutter, a false remove destroys someone's work.
+
+**Why no fixture caught it.** Every test scaffold was either untouched or fully rewritten; none
+reproduced the real-world middle state of a scaffold whose values are filled in while its docstring stays.
+The regression test now uses that exact shape, and was verified to **fail against the old heuristic**
+before being trusted.
+
+**Consequence worth stating plainly: v2.13.0 shipped with the naive test.** Anyone running the teardown
+with `-Apply` from that release risks losing a configured `repo-config.ps1`. This fix is on `main` and
+needs a release to reach consumers.

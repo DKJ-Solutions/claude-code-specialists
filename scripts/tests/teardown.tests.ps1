@@ -128,6 +128,50 @@ try {
     # And the branch-info scaffold was still untouched, so it must still have gone.
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\lib\branch-info.ps1'))) 'authored content: the still-untouched scaffold is removed as normal'
 
+    # --- 5b. MENTION vs USE: a filled-in file that merely NAMES VUL-IN must be kept ------------------
+    #     The bug a dry run against a real consumer found on 2026-07-29, which no fixture had caught.
+    #     davekokbwj/smartwatchbanden's repo-config.ps1 carries real values for all eight contract
+    #     functions -- and the scaffold's own DOCSTRING still says "Fill in remaining VUL-IN values",
+    #     because a consumer has no reason to strip a docstring. The naive test ('VUL-IN' anywhere in
+    #     the file) therefore classified a fully configured, actively used file as an untouched scaffold
+    #     and would have deleted it, breaking open-pr, fold-changelog, new-branch and check-roster-sync
+    #     in that repo. Not an edge case: it is the NORMAL state of a filled-in scaffold.
+    #     The fixture below reproduces that exact shape -- real values, docstring mention retained.
+    New-BootstrappedConsumer | Out-Null
+    $filledRc = Join-Path $Fixture 'scripts\repo-config.ps1'
+    [System.IO.File]::WriteAllText($filledRc, @"
+<#
+.DESCRIPTION
+    Placed by specialists-init as a VUL-IN scaffold. Fill in remaining VUL-IN values
+    below and remove VUL-IN markers.
+#>
+`$script:RepoName = 'someone/my-repo'
+function Get-RepoName { return `$script:RepoName }
+`$script:LintScript = 'scripts/lint.ps1'
+function Get-LintScript { return `$script:LintScript }
+"@)
+    # Same shape on the lens side: an authored lens that happens to explain the scaffold convention.
+    $filledLens = Join-Path $Fixture '.claude\plugins\claude-specialists\specialists\06-16-extension.md'
+    [System.IO.File]::WriteAllText($filledLens, "# 06-16 repo lens`n`n## Specific to this repo`n`nTessa guards the docs. A lens may stay a VUL-IN scaffold until that specialist has work here.")
+    $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
+    Assert-Equal 0 $r.Code 'mention vs use: exit-code 0'
+    Assert-True (Test-Path -LiteralPath $filledRc) 'mention vs use: a filled repo-config whose DOCSTRING says VUL-IN is KEPT'
+    Assert-True (Test-Path -LiteralPath $filledLens) 'mention vs use: a filled lens whose PROSE says VUL-IN is KEPT'
+    # Its content must be byte-identical -- kept means untouched, not rewritten.
+    Assert-True ([System.IO.File]::ReadAllText($filledRc) -match 'someone/my-repo') 'mention vs use: the kept repo-config still holds its real value'
+    # And the genuinely unfilled branch-info scaffold must still go, so this did not simply stop removing.
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\lib\branch-info.ps1'))) 'mention vs use: the genuinely unfilled branch-info scaffold is still removed'
+
+    # --- 5c. The positive side of each signal still fires -------------------------------------------
+    #     Guard against 5b being "fixed" by never removing anything. Each kind keeps its own signal:
+    #     a placeholder VALUE for repo-config, an EMPTY prefix table for branch-info, an unfilled slot
+    #     HEADING for a lens.
+    New-BootstrappedConsumer | Out-Null
+    $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\repo-config.ps1'))) 'signals: an unfilled repo-config (placeholder VALUE) is removed'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\lib\branch-info.ps1'))) 'signals: an unfilled branch-info (empty prefix table) is removed'
+    Assert-Equal 0 (Get-LensCount) 'signals: unfilled lenses (slot heading) are removed'
+
     # --- 6. An unrelated @-import is NOT eaten ------------------------------------------------------
     #     The sharpest risk in the design. The matcher must key on the specialist shape
     #     (-persona.md / -extension.md), not merely on a line starting with '@' -- a consumer's own

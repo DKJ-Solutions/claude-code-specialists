@@ -204,6 +204,22 @@ infrastructure.
   remote / repo with remote), all exit 0. **So: capture a child process's output into a variable in
   full, then slice the variable — and when setup runs before a measurement, check its exit code and
   abort rather than measuring past it.**
+- **MENTION vs USE — the day's recurring defect, and the rule that covers all three.** Three separate
+  checks were satisfied by text that merely *named* the thing they look for, rather than *using* it:
+  `check-roster-sync` counted an `@`-import path as a roster row because the path contains the id
+  (#227); the lint gate's check 10 read a marker quoted in changelog prose as a real enumeration, on
+  `main`, where no PR gate could see it (#235); and `specialists-teardown` classified a fully configured
+  `repo-config.ps1` as an unfilled scaffold because the scaffold's own **docstring** still says "fill in
+  the remaining VUL-IN values" — which is the *normal* state of a filled-in scaffold, not an edge case.
+  That third one would have **deleted** the file `open-pr`, `fold-changelog`, `new-branch` and
+  `check-roster-sync` all depend on, and only a dry run against a real consumer
+  (`davekokbwj/smartwatchbanden`, July 29, 2026) surfaced it — every fixture had scaffolds that were
+  either untouched or rewritten, never the real-world middle state.
+  **The rule: when a check's evidence is "this string appears in the file", ask what else in that file
+  legitimately contains it — docstrings, prose, links, paths — and key on the string in a POSITION that
+  only real use produces.** A placeholder in an assignment's *value*, an unfilled slot *heading*, an
+  empty table. And for a script that deletes, resolve every remaining doubt toward keeping: a false
+  keep leaves clutter, a false remove destroys someone's work.
 - **A check that scans a file for a token can be satisfied by a *path* containing that token.**
   `check-roster-sync` looks for each `<group>-<id>` in the roster file, and the bootstrap writes
   `@.claude/plugins/claude-specialists/specialists/01-01-extension.md` into `CLAUDE.md`. That import
