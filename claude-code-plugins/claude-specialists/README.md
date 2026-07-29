@@ -297,6 +297,18 @@ these plugins at any moment**, and after an uninstall it must be able to *stand 
 lingering reference to a specialist, a manual, a persona, or a roster anywhere in the repo. Adoption
 is reversible by design, not a one-way door.
 
+**Read as "no *live* reference" — the hand measurement forced that distinction, and it is the working
+reading until Dave says otherwise.** Taken literally, "no reference anywhere in the repo" is both
+unreachable and undesirable for any repo that ever adopted the plugin, because its own history records
+the adoption: measured in `davekokbwj/smartwatchbanden` (July 29, 2026), `CHANGELOG.md` (3) and
+`releases/development/*` (43) mention specialists, and every one of those is an accurate record of
+something that happened. **History is finished business, not debt, and is never rewritten** — the same
+reasoning that lets this family's archived release notes keep their original language. The requirement
+therefore bites on what is *live*: nothing that a **session loads**, a **script resolves**, or a **gate
+depends on** may still point at the plugin. That reading is what makes the goal testable, and it sorts
+the leftovers below by how much they actually cost — a resolver that throws is a different order of
+problem from a roster row nobody reads.
+
 **The bootstrap path above has no counterpart.** `specialists-init` builds up; nothing tears down. It
 was measured against the `life-hub` consumer on July 29, 2026 rather than estimated:
 
@@ -391,6 +403,11 @@ finish the job without guessing where a roster row ends and the owner's prose be
   uninstall breaks the repo's git workflow rather than merely leaving debris behind. Either the resolver
   degrades to a clear, actionable failure, or the consumer keeps local copies — and whichever it is
   should be a stated part of adoption, since no teardown can decide it afterwards.
+- **Consumer gates that announce when they stop applying.** A consumer that lints its own lens files
+  keeps that check after the teardown, and in the measured repo it *silently skips* the lens category
+  once the directory is gone: green, and checking nothing. Right for a deliberate teardown, wrong for an
+  accidental loss — a silent skip cannot tell an operator's removal from a bad merge or a wrong path. A
+  skip that says it skipped costs one line and keeps the gate honest.
 - **Lens files off the plugin path.** `.claude/plugins/claude-specialists/` looks like plugin
   property and is in fact git-tracked consumer content — which is exactly why it reads as orphaned
   debris after an uninstall.

@@ -13,7 +13,9 @@ description: >-
 
 The counterpart to [`specialists-init`](../specialists-init/SKILL.md). Adoption is reversible by
 design (Dave's requirement, July 29, 2026): a consumer must be able to install **and uninstall** at
-any moment, and afterwards carry no lingering reference to a specialist, manual, persona or roster.
+any moment, and afterwards carry no *live* reference to a specialist, manual, persona or roster --
+nothing a session loads, a script resolves, or a gate depends on. Its own changelog history is
+exempt, and stays as written.
 
 ## Run it
 
@@ -103,9 +105,11 @@ recognise: `-EmptyLensPattern '<your marker>'`.
 ## What is left over afterwards, honestly
 
 A repo that ran the bootstrap, filled in its lenses, and then tore down is **not** blank. The remaining
-distance to "no reference to the plugin anywhere" was measured by hand in
-`davekokbwj/smartwatchbanden` (July 29, 2026) rather than estimated, and it is three different kinds of
-leftover. Only the second is this skill's own limitation.
+distance was measured by hand in `davekokbwj/smartwatchbanden` (July 29, 2026) rather than estimated,
+and it is four different kinds of leftover. Only the second is this skill's own limitation. Note that
+the target is **no *live* reference, not zero references** -- see
+[what is correctly left standing](#and-what-is-correctly-left-standing) at the end of this section, and
+the requirement itself in the [family README](../../../README.md#removal-the-teardown-gap).
 
 **1. A runtime dependency no teardown can undo -- the one that actually hurts.** The plugin is the
 single source of truth for the operational scripts (`new-branch.ps1`, `park-branch.ps1`,
@@ -141,5 +145,26 @@ removed, being knowably bootstrap-written. The file therefore survives as an orp
 and read by nothing. Both halves are correct, and the combination is worth naming, because a `[KEEP]`
 line reads as "still working" when all it means is "still there".
 
+**4. A consumer gate that goes blind rather than red.** A consumer that lints its own lens files keeps
+that check afterwards, and in the measured repo the lens category **silently skips** once the directory
+is gone: nothing errors, nothing is reported, and the gate stays green while checking nothing. That is
+the right outcome for a deliberate teardown and the wrong one for an accidental loss -- a silent skip
+cannot tell an operator's removal from a bad merge or a mistyped path, so the one case it must warn about
+is the one case it stays quiet in. Not this script's to fix (the gate is the consumer's own), but worth
+knowing before you rely on a green gate to tell you the repo is intact: a skip that *says* it skipped
+costs one line.
+
 And `.claude/settings.json` is unchanged -- that is the refusal above rather than a leftover. The plugin
 stays enabled, subagents and session hooks included, until the owner removes the entry and restarts.
+
+### And what is correctly left standing
+
+Some references are supposed to survive, and counting them as debt would be a mistake. In the measured
+repo, `CHANGELOG.md` (3) and `releases/development/*` (43) mention specialists -- 46 references that are
+each an accurate record of something that happened. **History is finished business: it is never
+rewritten, and a teardown must not touch it.**
+
+Which is why the goal is *no live reference* rather than *no reference*: nothing a **session loads**, a
+**script resolves**, or a **gate depends on** may still point at the plugin. Read that way the four
+leftovers sort by what they actually cost -- (1) breaks a run, (2) and (3) mislead a reader, (4) misleads
+a gate, and the changelog is simply the record of having adopted the plugin in the first place.
