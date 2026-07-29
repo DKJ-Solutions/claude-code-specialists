@@ -102,10 +102,44 @@ recognise: `-EmptyLensPattern '<your marker>'`.
 
 ## What is left over afterwards, honestly
 
-A repo that ran the bootstrap, filled in its lenses, and then tore down is **not** blank. The lenses it
-authored and the roster sections in `CLAUDE.md` remain, reported rather than removed. That is the
-correct outcome for the content, and it is also the known limitation: as long as specialist content is
-woven through `CLAUDE.md` rather than sitting behind a single inclusion, a script cannot finish the job
-without guessing. Closing that gap is the seam described in
+A repo that ran the bootstrap, filled in its lenses, and then tore down is **not** blank. The remaining
+distance to "no reference to the plugin anywhere" was measured by hand in
+`davekokbwj/smartwatchbanden` (July 29, 2026) rather than estimated, and it is three different kinds of
+leftover. Only the second is this skill's own limitation.
+
+**1. A runtime dependency no teardown can undo -- the one that actually hurts.** The plugin is the
+single source of truth for the operational scripts (`new-branch.ps1`, `park-branch.ps1`,
+`new-changelog-entry.ps1`, `open-pr.ps1`, `fold-changelog-entry.ps1`;
+[issue #81](https://github.com/DaveKJohn/davekjohns-workshop/issues/81)), and a consumer reaches them
+through a resolver of its own that locates the marketplace cache and **throws** when that cache is gone.
+In the measured consumer that resolver is `scripts/lib/plugin-paths.ps1`, and three operational scripts
+dot-source it: `start-task.ps1`, `open-pr.ps1`, `fold-changelog-entry.ps1`. So after a teardown plus a
+`claude plugin uninstall`, the repo does not merely carry clutter -- **its daily git workflow stops
+working.** No option to this script can fix that: adopting the shared-script model is what creates the
+dependency, and undoing it means the consumer holding local copies of those scripts (or its resolver
+degrading instead of throwing). State the promise precisely, then: what the bootstrap *wrote* is
+reversible; what the consumer *built on top of the plugin* is not, and a consumer that relies on the
+shared scripts has to plan that step itself. Note also that the dry run says nothing about this today --
+it reports what it would remove and what it keeps, not what breaks afterwards. Warning about it would be
+a change to the script, not to this page.
+
+**2. Authored text this script refuses to touch.** By design, per
+[the section above](#what-it-deliberately-will-not-do) -- and measured, so the size of the hand work is
+known. `CLAUDE.md` carried the roster table (22 rows), the work-division block, the loading-strategy
+paragraph, and the safety cross-references into the orchestrator's lens: roughly 43 lines across some 6
+sections. Outside that file the mentions are loose and few -- `README.md` (5),
+`research/plugin-sharing/README.md` (14), `releases/README.md` (1),
+`.github/pull_request_template.md` (1). As long as specialist content is woven through `CLAUDE.md`
+rather than sitting behind a single inclusion, a script cannot finish this without guessing where a
+roster row ends and the owner's prose begins. Closing it is the seam in
 [issue #221](https://github.com/DaveKJohn/davekjohns-workshop/issues/221) -- this skill is the half that
 can be built and tested today.
+
+**3. A lens that outlives the import which loaded it.** The orchestrator's lens
+(`01-01-extension.md`) is authored content, so it is kept -- while the `@`-import that loaded it is
+removed, being knowably bootstrap-written. The file therefore survives as an orphan: present, tracked,
+and read by nothing. Both halves are correct, and the combination is worth naming, because a `[KEEP]`
+line reads as "still working" when all it means is "still there".
+
+And `.claude/settings.json` is unchanged -- that is the refusal above rather than a leftover. The plugin
+stays enabled, subagents and session hooks included, until the owner removes the entry and restarts.
