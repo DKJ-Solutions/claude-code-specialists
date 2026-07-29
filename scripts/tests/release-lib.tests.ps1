@@ -103,6 +103,48 @@ Assert-Match $entries[0] '^### #2 ' 'first entry starts with ### #2'
 Assert-Match $entries[0] '\[PR #2\]' 'first entry contains the PR link'
 Assert-Throws { Get-PullRequestEntries -Content "# Changelog`n`n## Pull Requests`n`nIntro.`n`n## Releases`n" } 'empty PR section throws'
 
+Write-Host "Get-FencedLineFlags" -ForegroundColor Cyan
+$fenceLines = @('### real', 'text', '```', '### QUOTED', '---', '```', '---', '### real2')
+$fenceFlags = Get-FencedLineFlags -Lines $fenceLines
+Assert-Equal $false $fenceFlags[0] 'flags: a heading outside a fence is not fenced'
+Assert-Equal $true  $fenceFlags[2] 'flags: the opening marker belongs to the block'
+Assert-Equal $true  $fenceFlags[3] 'flags: a heading inside a fence IS fenced'
+Assert-Equal $true  $fenceFlags[4] 'flags: a separator inside a fence IS fenced'
+Assert-Equal $true  $fenceFlags[5] 'flags: the closing marker belongs to the block'
+Assert-Equal $false $fenceFlags[6] 'flags: back outside after the fence closes'
+Assert-Equal $false $fenceFlags[7] 'flags: a heading after the fence is not fenced'
+# An unclosed fence leaves the tail flagged -- the safe direction, since it stops the parser
+# inventing structure out of code.
+$openFlags = Get-FencedLineFlags -Lines @('text', '```', '### QUOTED')
+Assert-Equal $true $openFlags[2] 'flags: an unclosed fence keeps the tail fenced (safe direction)'
+# A section can legitimately be a single empty line; a Mandatory [string[]] used to reject that.
+Assert-Equal 1 (@(Get-FencedLineFlags -Lines @('')).Count) 'flags: an empty line binds without throwing'
+
+Write-Host "Get-PullRequestEntries -- fenced code is not structure" -ForegroundColor Cyan
+# The v2.13.3 defect: an entry body that QUOTES a '### #NN' heading inside a fence produced a third
+# entry from two, split the fence open, and duplicated a category heading in the generated notes.
+# Also covers the '---' separator, which was skipped anywhere -- including inside a fence, which would
+# strip a YAML frontmatter example out of a quoted block.
+$fencedSample = @(
+    '# Changelog', '', '## Pull Requests', '', 'Intro.', '',
+    '### #11 ' + [char]0x00B7 + ' Real entry ' + [char]0x00B7 + ' Fix ' + [char]0x00B7 + ' 2026-07-29', '',
+    'Shows what a broken structure looks like:', '',
+    '```', '## Fixes', '### #99 ' + [char]0x00B7 + ' quoted heading', '---', 'id: 1', '```', '',
+    '[PR #11](https://example.test/11)', '',
+    '---', '',
+    '### #12 ' + [char]0x00B7 + ' Second entry ' + [char]0x00B7 + ' Docs ' + [char]0x00B7 + ' 2026-07-29', '',
+    'Body.', '', '[PR #12](https://example.test/12)', '',
+    '## Releases', '', 'Rel intro.', '', '### [v1.0.0] - 2026-01-01 - Minor', ''
+) -join "`n"
+$fencedEntries = @(Get-PullRequestEntries -Content $fencedSample)
+Assert-Equal 2 $fencedEntries.Count 'fenced: two entries, not three -- the quoted heading is not a new entry'
+Assert-Match $fencedEntries[0] '^### #11 ' 'fenced: the first entry is the real one'
+Assert-Match $fencedEntries[0] '### #99' 'fenced: the quoted heading is KEPT inside the entry body'
+Assert-Match $fencedEntries[0] '(?m)^id: 1$' 'fenced: a --- inside the fence does not strip the lines after it'
+$fenceCount = @([regex]::Matches($fencedEntries[0], '(?m)^```')).Count
+Assert-Equal 2 $fenceCount 'fenced: the fence survives intact (both markers present)'
+Assert-Match $fencedEntries[1] '^### #12 ' 'fenced: the second entry is the next real one'
+
 Write-Host "Convert-ChangelogForRelease (reference)" -ForegroundColor Cyan
 $notesPath = 'releases/development/0.x/0.2.0.md'
 $result = Convert-ChangelogForRelease -Content $sample -Version '0.2.0' -Date '2026-07-14' -Type 'Minor' -NotesRelPath $notesPath
