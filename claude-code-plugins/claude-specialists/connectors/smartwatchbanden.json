@@ -6,8 +6,9 @@
     {
       "id": "specialists@davekjohns-workshop",
       "extensions": [
-        "01-01", "02-09", "03-07", "04-11", "04-12", "04-13", "04-18",
-        "05-05", "05-06", "05-15", "06-16", "06-17", "06-19", "06-23"
+        "01-01", "02-09", "03-02", "03-07", "04-11", "04-12", "04-13", "04-18",
+        "05-05", "05-06", "05-15", "06-16", "06-17", "06-19", "06-23", "06-24",
+        "06-25", "06-29", "06-30"
       ]
     },
     {
@@ -17,5 +18,5 @@
       ]
     }
   ],
-  "notes": "Gap MEASURED on 2026-07-28 by running the v2.10.0 checks against this checkout from the workshop machine (not estimated). Two parts. (1) Script contract: scripts/repo-config.ps1 is missing Get-RosterPath and Get-RosterIgnoredIds (both required) plus the optional Get-ChangelogHeading and Get-LiveStage; it has Get-RepoName, Get-RepoBlobUrl, Get-LintScript. This is the very fingerprint that misled the inbound #203 investigation -- that alarm was true, about THIS repo, and reported into a life-hub session. scripts/lib/branch-info.ps1 is complete. (2) Roster/lenses: five specialists have neither a roster row nor a lens -- 03-02 (Bianca, persona), 06-24 (Ravi), 06-25 (Nolan), 06-29 (Marlowe), 06-30 (Auden). Everything else is clean: no orphans, no off-path lenses, no stale lens headers. The 'extensions' arrays above are deliberately NOT pre-filled with those five: this register records what the consumer HAS, so claiming them would make the check report them as missing-in-consumer. Update the inventory only after lenses actually land there. Order matters when catching up: the script contract has to be fixed BEFORE deciding per specialist, because Get-RosterIgnoredIds is the mechanism for recording a deliberate non-adoption -- without it, 'skip this one' is not an implementable outcome and only adopting remains. Whether each of the five is adopted or deliberately skipped is Dave's call per specialist; a handover prompt for that session was prepared on 2026-07-28. Plugin still on v2.1.0 (nine minors behind), so this repo does not yet see any of the diagnostics that surface the above. Historical: 06-23 (Sebastian, then named Sean) registered since swb commit 7dca9bd (2026-07-17)."
+  "notes": "Catch-up CLOSED, verified on 2026-07-29 by re-running the checks against this checkout from the workshop machine (not assumed from the consumer's own report). The gap measured on 2026-07-28 had two halves and both are in: the script contract now reports all eight functions [OK] (it was missing the required Get-RosterPath and Get-RosterIgnoredIds plus the optional Get-ChangelogHeading and Get-LiveStage), and the five specialists that had neither a roster row nor a lens -- 03-02 (Bianca, persona), 06-24 (Ravi), 06-25 (Nolan), 06-29 (Marlowe), 06-30 (Auden) -- all landed and are added to the inventory above, bringing it to the full 19. All five were adopted, none deliberately skipped, per the rule that adopting is the default (v2.11.0). Two things worth keeping from that measurement. The missing-Get-RosterIgnoredIds fingerprint is what misled the inbound #203 investigation: that alarm was true and about THIS repo, but surfaced inside a life-hub session -- which is why the checks now name the repo a finding is about. And the inventory was deliberately left un-pre-filled while the lenses were still absent, because this register records what a consumer HAS: claiming a lens early makes the check report 'registered extension(s) missing', turning the register itself into a false alarm. Historical: 06-23 (Sebastian, then named Sean) registered since swb commit 7dca9bd (2026-07-17)."
 }
