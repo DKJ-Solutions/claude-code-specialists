@@ -58,8 +58,11 @@ sections is not blank afterwards — those are reported, not removed. As long as
 through `CLAUDE.md` instead of sitting behind one inclusion, no script can finish without guessing where a
 roster row ends and the owner's prose begins. That is the seam, and #221 stays open for it.
 
-The lint gate's skill-enumeration check (#10) caught the new skill missing from two `<!-- skills:all -->`
-spans in the family README before CI did — the guard working exactly as designed.
+The lint gate's skill-enumeration check (#10) caught the new skill missing from two marked
+`skills:all` spans in the family README before CI did — the guard working exactly as designed.
+(Deliberately naming the marker without its comment delimiters: check 10 scans `CHANGELOG.md` for
+those delimiters and does not skip code spans, so writing them out here would make this entry trip
+the very check it describes — which is exactly what happened on the first attempt, see #234.)
 
 Plugins: specialists
 
