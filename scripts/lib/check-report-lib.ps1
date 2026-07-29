@@ -307,7 +307,18 @@ function Get-RosterIdTokenPattern {
        that id, and stays [INFO], never [ERROR]. Accepted as-is; option 2 from the issue (binding the token to
        a roster row/table shape) was deliberately not taken, since Test-InRoster is asked about a
        specific id in free prose and binding it to a table shape would change behavior for consumers
-       who format their roster differently -- a bigger risk than the residual noise this leaves. #>
+       who format their roster differently -- a bigger risk than the residual noise this leaves.
+
+       WHERE THAT LIMITATION STOPPED BEING COSMETIC (issue #227, July 29, 2026): the bootstrap writes
+       '@.claude/plugins/<family>/<plugin>/01-01-extension.md' into CLAUDE.md, and that path contains
+       the token, so the import LINE satisfied Test-InRoster and Chris counted as rostered with no
+       roster row in the file at all -- measured as 18 ids missing after a bootstrap instead of 19. The
+       decision above is unchanged: the fix is NOT in this pattern. check-roster-sync.ps1 strips
+       '^\s*@' lines from the roster text before reading it, which is safe precisely because an
+       '@'-import is never a roster row under ANY formatting convention -- the property the rejected
+       table-shape rule could not claim. If a future case needs more than that, weigh it against this
+       carve-out rather than reopening option 2 from scratch: the useful question is whether the
+       offending text has a writer that is knowably not the roster author. #>
     param(
         # Omit to get the generic 'any <group>-<id> token' pattern (the orphan-scan's use, matching
         # every token in the roster text). Pass a specific id (e.g. '05-15') to get a pattern that

@@ -332,6 +332,31 @@ try {
     Assert-Equal 0 $r.Code 'not in cache: exit-code 0'
     Assert-Match 'not found in the cache' $r.Out 'not in cache: INFO'
 
+    # --- 5f. An '@'-import must NOT count as a roster row (issue #227) -----------------------------
+    #     The bootstrap writes '@.claude/plugins/<family>/<plugin>/06-16-extension.md' into CLAUDE.md,
+    #     and that path CONTAINS the token '06-16' -- so Test-InRoster was satisfied by the import
+    #     itself. Measured on a real bootstrapped consumer: 18 ids reported missing instead of 19, with
+    #     01-01 the one silently passing. The worst id to lose, since a persona appears in no always-on
+    #     listing and the roster row is the only thing that makes them exist for a session.
+    #     Lenses ARE present here, so this is a bootstrapped repo (not the #225 case) and the missing
+    #     roster rows must be reported per specialist.
+    $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16', '06-24') }
+    $c = New-FixtureConsumer -RosterIds @() -LensIds @('06-16', '06-24') -ExtraRosterLines @(
+        '', '@.claude/plugins/claude-specialists/specialists/06-16-extension.md')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 1 $r.Code 'import line: exit-code 1 -- the missing roster rows are real'
+    Assert-Match "\[ERROR\].*'06-16'.*has no roster row" $r.Out 'import line: the id in the @-import is still reported missing'
+    Assert-Match "\[ERROR\].*'06-24'.*has no roster row" $r.Out 'import line: the unaffected id is reported too'
+    Assert-NotMatch '\[BOOTSTRAP\]' $r.Out 'import line: lenses exist, so this is drift and not an unbootstrapped repo'
+
+    # And the same line must not manufacture an ORPHAN either: before the strip, an import naming an id
+    # with no backing specialist would have been collected as a roster token.
+    $c = New-FixtureConsumer -RosterIds @('06-16') -LensIds @('06-16') -ExtraRosterLines @(
+        '', '@.claude/plugins/claude-specialists/specialists/09-99-extension.md')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', (New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') }))
+    Assert-Equal 0 $r.Code 'import line: exit-code 0 -- nothing is missing'
+    Assert-NotMatch "orphan '09-99'" $r.Out 'import line: an @-import does not manufacture an orphan token'
+
     # --- 5c. Never bootstrapped -> one non-counting [BOOTSTRAP] marker, no per-specialist errors ----
     #     Issue #225. A repo that has never run specialists-init has no lenses AND no roster rows, so
     #     every enabled specialist is "missing" twice over: measured on a real fresh consumer, 38
