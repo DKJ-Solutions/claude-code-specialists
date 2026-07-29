@@ -326,6 +326,35 @@ if ($enabledIds.Count -eq 0 -and (Test-Path -LiteralPath $settingsPath -PathType
     Write-Info "no enabled plugins in .claude/settings.json -- nothing to check."
 }
 
+# --- Is this repo bootstrapped at all? (issue #225) -----------------------------------------------
+# A repo that has never run specialists-init has no lenses and no roster rows, so EVERY enabled
+# specialist is "missing" twice over. Measured on a fresh consumer: 38 [ERROR] lines from this check
+# alone, and nothing anywhere naming the skill that resolves them -- which reads as "this plugin is
+# broken" rather than "you are not done yet". Drift reporting is right for a bootstrapped repo and
+# wrong for an unbootstrapped one, and until now the check could not tell those apart.
+#
+# The predicate is deliberately strict -- no lens ANYWHERE and no roster row for ANY id. A repo with
+# roster rows but no lenses is a maintained repo that has drifted, and must keep erroring; the same
+# holds the other way round. Only the state where neither exists is "never bootstrapped".
+$anyLensFile = $false
+foreach ($dir in @((Join-Path $repoRoot '.claude\plugins'), (Join-Path $repoRoot '.claude\extensions'))) {
+    if (-not (Test-Path -LiteralPath $dir)) { continue }
+    if (@(Get-ChildItem -LiteralPath $dir -Recurse -Filter '*-extension.md' -File -ErrorAction SilentlyContinue).Count -gt 0) {
+        $anyLensFile = $true; break
+    }
+}
+# Any '<gg>-<ii>' token at all in the roster, using the same boundary rule as Test-InRoster so a
+# stray ISO date or a page range cannot pass for a roster row (issue #182).
+$anyRosterRow = $rosterText -match '(?<![\d-])\d{2}-\d{2}(?![\d-])'
+
+$unbootstrapped = ($enabledIds.Count -gt 0) -and (-not $anyLensFile) -and (-not $anyRosterRow)
+# Counts specialists actually resolved from a cache dir, so the marker below only fires when there was
+# genuinely something to report. Deliberately NOT an early exit before the plugin loop: a first version
+# did that and broke the "plugin enabled but not in the cache" case, telling the reader to run
+# specialists-init when the real problem was that the plugin is not installed on this machine at all.
+# The loop therefore still runs and still reports everything else it knows -- not-in-cache, orphans,
+# off-path lenses -- and only the two "missing twice over" findings per specialist are replaced.
+$suppressedForBootstrap = 0
 $allBackingIds = @{}
 $pluginNames = @()
 
@@ -380,11 +409,18 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
         $inRoster = Test-InRoster -RosterText $rosterText -Id $id
         $lensPath = Get-LensPath -RepoRoot $repoRoot -PluginName $name -Id $id
         $hasLens  = [bool]$lensPath
-        if (-not $inRoster) {
-            Write-Failure "$kind '$id' ($plugId) has no roster row in $rosterRel -- add it to the roster."
-        }
-        if (-not $hasLens) {
-            Write-Failure "$kind '$id' ($plugId) has no repo-lens (.claude/plugins/$(Get-LensFamily)/$name/$id-extension.md or the legacy .claude/extensions/ path)."
+        if ($unbootstrapped) {
+            # Never bootstrapped, so both findings are guaranteed for every specialist and neither says
+            # anything the one [BOOTSTRAP] line after the loop does not say better. Counted rather than
+            # silently dropped, so the marker can state how much it stands in for.
+            $suppressedForBootstrap++
+        } else {
+            if (-not $inRoster) {
+                Write-Failure "$kind '$id' ($plugId) has no roster row in $rosterRel -- add it to the roster."
+            }
+            if (-not $hasLens) {
+                Write-Failure "$kind '$id' ($plugId) has no repo-lens (.claude/plugins/$(Get-LensFamily)/$name/$id-extension.md or the legacy .claude/extensions/ path)."
+            }
         }
         if ($inRoster -and $hasLens) { Write-Ok "$kind '$id' present in roster + lens" }
 
@@ -470,6 +506,15 @@ if ($pluginNames.Count -gt 0) {
         # the quieter session start (PR #99) removed.
         Write-Host "  [ORPHANS] $orphanCount roster token(s)/lens file(s) have no backing agent or persona in any enabled plugin -- a removed specialist leaves this behind." -ForegroundColor Yellow
     }
+}
+
+if ($suppressedForBootstrap -gt 0) {
+    # Non-counting marker the session hooks surface, same shape as [ORPHANS] above and
+    # [UNREGISTERED]/[INVENTORY] in connector-sessioncheck: the plugin install is fine, only this
+    # repo's own side of the setup has not happened. Counting it as an error would put a red line and
+    # exit 1 in every session of a repo whose owner has simply not got round to the bootstrap -- and
+    # not shouting at that person is the entire point of issue #225.
+    Write-Host "  [BOOTSTRAP] the specialists plugin is enabled here but this repo has not been set up yet: no repo lenses and no roster rows exist, so all $suppressedForBootstrap specialist(s) would each be reported missing twice over. Nothing is broken -- the subagents work; what is missing is the orchestrator and the repo-specific setup. Run the 'specialists-init' skill to put them in place: it is additive and never overwrites anything you have written." -ForegroundColor Yellow
 }
 
 Write-CheckSummary

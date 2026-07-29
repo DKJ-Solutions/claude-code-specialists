@@ -332,6 +332,48 @@ try {
     Assert-Equal 0 $r.Code 'not in cache: exit-code 0'
     Assert-Match 'not found in the cache' $r.Out 'not in cache: INFO'
 
+    # --- 5c. Never bootstrapped -> one non-counting [BOOTSTRAP] marker, no per-specialist errors ----
+    #     Issue #225. A repo that has never run specialists-init has no lenses AND no roster rows, so
+    #     every enabled specialist is "missing" twice over: measured on a real fresh consumer, 38
+    #     [ERROR] lines from this check alone, with nothing anywhere naming the skill that fixes it.
+    #     That reads as "this plugin is broken" rather than "you are not done yet".
+    $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16', '06-24') }
+    $c = New-FixtureConsumer -RosterIds @() -LensIds @()
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 0 $r.Code 'never bootstrapped: exit-code 0 -- an unbootstrapped repo is not a failure'
+    Assert-Match '\[BOOTSTRAP\]' $r.Out 'never bootstrapped: the non-counting marker is emitted'
+    Assert-Match 'specialists-init' $r.Out 'never bootstrapped: the marker names the skill that resolves it'
+    Assert-Match 'Nothing is broken' $r.Out 'never bootstrapped: states plainly that the install is fine'
+    Assert-NotMatch '\[ERROR\]' $r.Out 'never bootstrapped: NOT one error per specialist per axis'
+    # The marker must say how much it stands in for, or it reads as if less was wrong than there is.
+    Assert-Match 'all 2 specialist' $r.Out 'never bootstrapped: the marker states how many it covers'
+
+    # --- 5d. The predicate is strict: a repo with EITHER half is drifted, not unbootstrapped -------
+    #     The guard against 5c swallowing real drift. A maintained repo that lost its lenses, or one
+    #     whose roster was never filled after a bootstrap, must keep erroring per specialist -- only
+    #     the state where neither lenses nor roster rows exist is "never set up".
+    $c = New-FixtureConsumer -RosterIds @('06-16', '06-24') -LensIds @()
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 1 $r.Code 'roster but no lenses: exit-code 1 -- real drift, not an unbootstrapped repo'
+    Assert-Match 'has no repo-lens' $r.Out 'roster but no lenses: the per-specialist errors stand'
+    Assert-NotMatch '\[BOOTSTRAP\]' $r.Out 'roster but no lenses: NOT reported as never bootstrapped'
+
+    $c = New-FixtureConsumer -RosterIds @() -LensIds @('06-16', '06-24')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 1 $r.Code 'lenses but no roster: exit-code 1 -- real drift'
+    Assert-Match 'has no roster row' $r.Out 'lenses but no roster: the per-specialist errors stand'
+    Assert-NotMatch '\[BOOTSTRAP\]' $r.Out 'lenses but no roster: NOT reported as never bootstrapped'
+
+    # --- 5e. An uninstalled plugin must NOT be mistaken for an unbootstrapped repo -----------------
+    #     Regression guard: the first version of the #225 fix short-circuited BEFORE plugin resolution,
+    #     so a repo whose plugin is not in the cache was told to run specialists-init when the real
+    #     problem was that the plugin is not installed on this machine at all. The suite caught it.
+    $c = New-FixtureConsumer -RosterIds @() -LensIds @()
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $emptyCache)
+    Assert-Equal 0 $r.Code 'not in cache + no lenses: exit-code 0'
+    Assert-Match 'not found in the cache' $r.Out 'not in cache + no lenses: the real cause is still reported'
+    Assert-NotMatch '\[BOOTSTRAP\]' $r.Out 'not in cache + no lenses: NOT misreported as an unbootstrapped repo'
+
     # --- 6. Highest-version cache resolution -----------------------------------------------------
     #     1.9.0 ships only 06-16; 1.10.0 adds 06-24. A string-sort would wrongly pick 1.9.0 (misses
     #     06-24). With [version]-sort the script picks 1.10.0, so 06-24 (absent from roster/lens) is
@@ -525,6 +567,31 @@ try {
     Assert-Match 'could not complete' $r.Out 'hook: crash reported as could-not-complete'
     Assert-NotMatch 'in sync' $r.Out 'hook: crash NOT misreported as in sync'
 
+    # H6b. Issue #225: the hook gives [BOOTSTRAP] its OWN verdict. It arrives on an exit-0 run with no
+    #      [ERROR] lines, so without a dedicated branch it would fall through to "roster in sync with
+    #      the enabled plugins" -- a bald-faced lie for a repo that has no roster at all, and the exact
+    #      shape of misreport that made a fresh consumer's 38 errors so confusing.
+    $stub = New-StubCheck -Name 'stub-bootstrap' -ExitCode 0 -OutputLines @(
+        "  [BOOTSTRAP] the specialists plugin is enabled here but this repo has not been set up yet: no repo lenses and no roster rows exist, so all 19 specialist(s) would each be reported missing twice over. Nothing is broken -- run the 'specialists-init' skill.",
+        'Summary: 0 error(s), 0 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Equal 0 $r.Code 'hook bootstrap: exit 0 (the hook never blocks)'
+    Assert-Match '\[BOOTSTRAP\]' $r.Out 'hook bootstrap: the marker reaches the session context'
+    Assert-Match 'has not been set up yet' $r.Out 'hook bootstrap: its own verdict line'
+    Assert-Match 'specialists-init' $r.Out 'hook bootstrap: the session is told which skill to run'
+    Assert-NotMatch 'in sync' $r.Out 'hook bootstrap: NOT reported as in sync -- there is no roster to be in sync'
+    Assert-NotMatch 'drift found' $r.Out 'hook bootstrap: NOT reported as drift either'
+
+    # H6c. A clean bootstrapped repo gains nothing -- the guard against this becoming a line every
+    #      session start carries, which is the noise the quieter session start removed.
+    $stub = New-StubCheck -Name 'stub-no-bootstrap' -ExitCode 0 -OutputLines @(
+        '  [OK]    all present',
+        'Summary: 0 error(s), 0 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Match 'in sync' $r.Out 'hook no-bootstrap: the plain in-sync line is unchanged'
+    Assert-NotMatch 'BOOTSTRAP' $r.Out 'hook no-bootstrap: no bootstrap notice'
+    Assert-NotMatch 'set up yet' $r.Out 'hook no-bootstrap: no setup wording at all'
+
     # H7. inbound #204 change 2: the [ORPHANS] roll-up reaches the session in the CLEAN branch. This is
     #     the whole point -- an orphan lives under an otherwise-reassuring "roster in sync" line, and
     #     before this it was reachable only by deliberately running the script. The per-orphan [INFO]
@@ -539,7 +606,11 @@ try {
     Assert-Match 'in sync' $r.Out 'hook orphans-clean: still reports in sync (no specialist IS missing)'
     Assert-Match '\[ORPHANS\] 1 roster token' $r.Out 'hook orphans-clean: the roll-up reaches the session context'
     Assert-NotMatch "orphan '09-99'" $r.Out 'hook orphans-clean: the per-orphan [INFO] line still stays out'
-    Assert-Match 'to see which ids' $r.Out 'hook orphans-clean: points at the deliberate run for the ids'
+    # Points at the recovery SKILL, not at 'scripts/sync/check-roster-sync.ps1' as it used to (#225):
+    # that path is repo-relative and a consumer does not have it -- the script ships in the plugin. A
+    # remediation hint naming a file the reader cannot open is worse than none.
+    Assert-Match 'sync-roster skill' $r.Out 'hook orphans-clean: points at the recovery skill, not a repo path a consumer lacks'
+    Assert-NotMatch 'scripts/sync/check-roster-sync' $r.Out 'hook orphans-clean: no workshop-shaped path in a consumer-facing message'
 
     # H8. And in the DRIFT branch it travels alongside the errors, rather than being crowded out by them.
     $stub = New-StubCheck -Name 'stub-orphan-drift' -ExitCode 1 -OutputLines @(

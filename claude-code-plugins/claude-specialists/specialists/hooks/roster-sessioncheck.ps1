@@ -94,6 +94,14 @@ try {
     $errorCount = @($signals | Where-Object { $_ -cmatch '\[ERROR\]' }).Count
     $orphanLines = @($out | Where-Object { $_ -cmatch '\[ORPHANS\]' })
 
+    # [BOOTSTRAP] rides along outside the signal list (issue #225). The check emits it INSTEAD of the
+    # per-specialist drift when the repo has never been set up, so it arrives on an exit-0 run with no
+    # [ERROR] lines at all -- and it gets its own verdict below, because "roster in sync" would be a
+    # bald-faced lie for a repo that has no roster. Kept out of $signals on purpose: nothing is wrong
+    # with the plugin install, so this must not read as a failure. Same shape as [ORPHANS] here and
+    # [UNREGISTERED]/[INVENTORY] in connector-sessioncheck.
+    $bootstrapLines = @($out | Where-Object { $_ -cmatch '\[BOOTSTRAP\]' })
+
     # Did the child run to completion? Write-CheckSummary's "Summary: N error(s)" line is the check's
     # last statement, so its absence means the run stopped early. The exit code cannot tell us on its
     # own: a complete drift report and a crash halfway both leave a -File child on exit 1, which is
@@ -110,17 +118,26 @@ try {
         if (-not $completed -or $code -ne 1) {
             Write-Host "  (note: the check did not run to completion (exit $code) -- the list above may be partial.)"
         }
-        Write-Host '  (run scripts/sync/check-roster-sync.ps1 for the full report, or the sync-roster skill to stage the catch-up.)'
+        # The remediation used to name 'scripts/sync/check-roster-sync.ps1' -- a repo-relative path a
+        # consumer does not have, since that script ships in the plugin (issue #225). Naming the skill
+        # is both correct everywhere and the thing a reader can actually act on.
+        Write-Host '  (run the sync-roster skill to stage the catch-up.)'
+    } elseif ($bootstrapLines.Count -gt 0) {
+        # Its own verdict, not folded under the in-sync line and not under drift: "not set up yet" is a
+        # different situation from both, with a different action. This is the branch that replaces the
+        # 38 [ERROR] lines a fresh consumer used to get from this check alone.
+        Write-Host 'roster-sessioncheck: the plugin is enabled but this repo has not been set up yet:'
+        foreach ($line in $bootstrapLines) { Write-Host "  $($line.Trim())" }
     } elseif ($code -eq 0) {
         Write-Host 'roster-sessioncheck: roster in sync with the enabled plugins.'
         # The in-sync line is literally true -- no specialist is missing -- but an orphan left behind is
         # still something to know, and it would otherwise be swallowed by exactly that reassurance.
         foreach ($line in $orphanLines) { Write-Host "  $($line.Trim())" }
         if ($orphanLines.Count -gt 0) {
-            Write-Host '  (run scripts/sync/check-roster-sync.ps1 to see which ids, or the sync-roster skill to stage the catch-up.)'
+            Write-Host '  (run the sync-roster skill to stage the catch-up.)'
         }
     } else {
-        Write-Host "roster-sessioncheck: the roster check could not complete (exit $code) -- run scripts/sync/check-roster-sync.ps1 to see why."
+        Write-Host "roster-sessioncheck: the roster check could not complete (exit $code)."
     }
 } catch {
     Write-Host ('roster-sessioncheck skipped due to an error: ' + $_.Exception.Message)

@@ -167,6 +167,29 @@ infrastructure.
   One produced a false pass, this one a false failure — so the rule is not "distrust green" or
   "distrust red" but: before believing either verdict, confirm the check was observed from the same
   place its real consumer observes it. Both instances happened on July 29, 2026, within one session.
+- **The non-counting marker is a standing pattern now, not a series of exceptions.** Four instances:
+  `[ORPHANS]` (inbound #204), `[UNREGISTERED]` (#208), `[INVENTORY]` (#220) and `[BOOTSTRAP]` (#225).
+  Each solves the same problem — a finding that is **real, actionable, and about the repo the session is
+  in**, but that would be wrong as an `[ERROR]` because nothing is broken and a red line plus exit 1
+  would be a lie. Each is also the answer to a specific failure: an `[INFO]` the session hook suppresses
+  is, from the reader's seat, indistinguishable from no finding at all. **The recipe:** emit a dedicated
+  bracketed token with `Write-Host` (never through `Write-Failure`/`Write-Info`, so the summary count
+  and the exit code stay untouched), have the hook match it with its own `-cmatch` outside the
+  `$signals` list, and give it **its own verdict line** rather than folding it under an existing one —
+  `[BOOTSTRAP]` arrives on an exit-0 run, so without that branch it would have fallen through to
+  "roster in sync", which for a repo with no roster is a flat untruth. When a fifth case appears, reach
+  for this shape before inventing a new one, and ask the classification question first: if the finding
+  could indicate tampering or a genuine breach it must be an `[ERROR]`, per the connectors README rule.
+- **A repo-wide verdict must be computed where the evidence is complete, not where it is convenient.**
+  The first `[BOOTSTRAP]` implementation short-circuited *before* the plugin-resolution loop, since that
+  is where the predicate (no lenses, no roster rows) is cheapest to evaluate. It shipped a regression
+  immediately: a repo whose plugin is enabled but **not present in the cache** was told to run
+  `specialists-init`, when the real cause was that the plugin is not installed on that machine at all —
+  two states that look identical from outside the loop and need opposite advice. The fix was to let the
+  loop run, suppress only the two findings the marker replaces, count them, and emit the marker
+  afterwards; everything else the check knows (not-in-cache, orphans, off-path lenses) still reports.
+  `roster-sync.tests.ps1` caught this within one run, which is the argument for adding the guard case in
+  the same commit as the feature rather than after it.
 - **`Select-Object -First N` kills a child process mid-run; `-Last N` cannot.** The `$LASTEXITCODE`
   rule above says not to pipe a native command through a cmdlet — this is the sharpest instance and
   the discriminator that makes it predictable. `-First N` tears the pipeline down the moment N items

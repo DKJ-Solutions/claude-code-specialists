@@ -224,6 +224,32 @@ try {
     Assert-Match "\[INFO\].*'Get-ChangelogHeading'.*falls back to '## Pull Requests'" $r.Out 'missing repo-config.ps1: the optional Get-ChangelogHeading is INFO, not ERROR (#178)'
     Assert-Match "\[OK\]\s+'Get-BranchInfo' present in" $r.Out 'missing repo-config.ps1: branch-info.ps1 unaffected, still OK'
 
+    # --- 4b. ALL libs absent -> one non-counting [BOOTSTRAP] marker, no per-function errors ---------
+    #     Issue #225. When no contract lib exists at all, the repo has not been through
+    #     specialists-init -- these files are exactly what its bootstrap puts down. Reporting each
+    #     required function then produces errors about files that were never meant to exist yet (6 on a
+    #     real fresh consumer), phrased as "this lib predates the contract", which is the wrong story
+    #     for a repo that has no lib at all. A missing lib is only drift once the repo is set up.
+    $c = New-FixtureConsumer -OmitBranchInfo -OmitRepoConfig
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c)
+    Assert-Equal 0 $r.Code 'all libs absent: exit-code 0 -- an unbootstrapped repo is not a failure'
+    Assert-Match '\[BOOTSTRAP\]' $r.Out 'all libs absent: the non-counting marker is emitted'
+    Assert-Match 'specialists-init' $r.Out 'all libs absent: the marker names the skill that resolves it'
+    Assert-Match 'Nothing is broken' $r.Out 'all libs absent: states plainly that the install is fine'
+    Assert-NotMatch '\[ERROR\]' $r.Out 'all libs absent: NOT one error per required function'
+    # Both lib names belong in the message -- a reader should not have to guess which files are meant.
+    Assert-Match 'branch-info\.ps1' $r.Out 'all libs absent: the marker names branch-info.ps1'
+    Assert-Match 'repo-config\.ps1' $r.Out 'all libs absent: the marker names repo-config.ps1'
+
+    # --- 4c. The predicate is strict: ONE lib present means real drift, not an unbootstrapped repo ---
+    #     Guard against 4b swallowing case 4. Covered there for repo-config; asserted here from the
+    #     other side so neither direction can regress into the bootstrap branch.
+    $c = New-FixtureConsumer -OmitBranchInfo
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c)
+    Assert-Equal 1 $r.Code 'one lib present: exit-code 1 -- real drift'
+    Assert-Match "\[ERROR\].*'scripts\\lib\\branch-info\.ps1' not found" $r.Out 'one lib present: the missing lib is still an ERROR'
+    Assert-NotMatch '\[BOOTSTRAP\]' $r.Out 'one lib present: NOT reported as an unbootstrapped repo'
+
     # --- 5. Lib throws on load: branch-info.ps1 content that raises on dot-source ------------------
     #     Caught, not a crash -- one [ERROR] per function that lib was supposed to provide, naming the
     #     lib and surfacing the underlying exception message.
