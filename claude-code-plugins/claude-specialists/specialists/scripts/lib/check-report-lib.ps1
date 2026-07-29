@@ -329,24 +329,59 @@ function Get-RosterIdTokenPattern {
     return "(?<![\d-])$body(?!\d)"
 }
 
+function Get-SeamPaths {
+    <# THE SEAM (issue #221): the single place a consumer's whole specialist surface lives, so a
+       teardown is "remove one directory and one line" instead of hand-editing a roster woven through
+       CLAUDE.md. One source for the literal strings, because the bootstrap WRITES them and the
+       teardown MATCHES them -- the pair that must never drift apart.
+
+         .claude/specialists/SPECIALISTS.md   the inclusion: body import, lens import, roster slot
+         .claude/specialists/lenses/          every <group>-<id>-extension.md, flat (ids are unique
+                                              family-wide, so no per-plugin subdirectory is needed)
+
+       ImportLine is what goes into CLAUDE.md, forward-slashed: an '@'-import path is not a filesystem
+       path, and it must read identically on every platform. Verified against the memory reference:
+       imports nest to a maximum of four hops, and the seam spends two (CLAUDE.md -> SPECIALISTS.md ->
+       body/lens), so a lens may still import something of its own. #>
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+    $dir = Join-Path $RepoRoot '.claude\specialists'
+    return [pscustomobject]@{
+        Dir        = $dir
+        LensDir    = Join-Path $dir 'lenses'
+        Inclusion  = Join-Path $dir 'SPECIALISTS.md'
+        ImportLine = '@.claude/specialists/SPECIALISTS.md'
+        RelDir     = '.claude/specialists'
+    }
+}
+
 function Get-LensDirCandidates {
     <# The ordered directories a repo lens for $PluginName may live in, most canonical first:
-         1. .claude/plugins/<Get-LensFamily>/<plugin>/   -- the standard; where writers write.
+         0. .claude/specialists/lenses/                  -- THE SEAM (#221); where writers write for a
+                                                            FRESH consumer. Plugin-independent on
+                                                            purpose: one directory holds the lenses of
+                                                            every enabled plugin, since <group>-<id> is
+                                                            unique family-wide.
+         1. .claude/plugins/<Get-LensFamily>/<plugin>/   -- the pre-seam standard; still written for a
+                                                            consumer that already has a lens tree there,
+                                                            because the bootstrap never relocates a file
+                                                            the repo owner owns.
          2. .claude/plugins/<other-family>/<plugin>/     -- what a pre-#179 bootstrap left behind
                                                             (the marketplace name as family). Read
                                                             but never written, so a consumer that was
                                                             bootstrapped before the fix keeps working
                                                             without a migration.
          3. .claude/extensions/                          -- the legacy pre-plugin-path location.
-       Readers should walk this list; writers should use Get-LensFamily directly. $PluginName is
-       assumed slug-validated by the caller (Test-PluginNameSlug) before it becomes a path segment. #>
+       Readers should walk this list; writers should ask Get-LensWriteDir, which picks between the seam
+       and an existing tree. $PluginName is assumed slug-validated by the caller (Test-PluginNameSlug)
+       before it becomes a path segment. #>
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
         [Parameter(Mandatory = $true)][string]$PluginName
     )
     $family = Get-LensFamily
     $pluginsRoot = Join-Path $RepoRoot '.claude\plugins'
-    $dirs = @((Join-Path (Join-Path $pluginsRoot $family) $PluginName))
+    $dirs = @((Get-SeamPaths -RepoRoot $RepoRoot).LensDir)
+    $dirs += (Join-Path (Join-Path $pluginsRoot $family) $PluginName)
     if (Test-Path -LiteralPath $pluginsRoot -PathType Container) {
         foreach ($fam in (Get-ChildItem -LiteralPath $pluginsRoot -Directory | Sort-Object Name)) {
             if ($fam.Name -eq $family) { continue }
@@ -356,4 +391,29 @@ function Get-LensDirCandidates {
     }
     $dirs += (Join-Path $RepoRoot '.claude\extensions')
     return $dirs
+}
+
+function Get-LensWriteDir {
+    <# Where a writer (the bootstrap) should PUT a lens. The seam for a fresh consumer; the existing
+       tree for one that already has lenses somewhere.
+
+       WHY NOT ALWAYS THE SEAM: the bootstrap is strictly additive and never relocates a file the repo
+       owner owns. Writing seam lenses next to a legacy tree would split the surface in two, which is
+       worse than either layout alone -- the teardown would then have to reason about both at once, and
+       a reader would find half a roster in each. Migrating is the owner's act, documented in the family
+       README, and once they have moved the files this function follows them automatically because the
+       legacy tree is gone.
+
+       Returns the seam lens dir when no *-extension.md exists in ANY candidate directory, else the
+       first candidate directory that actually holds one. #>
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$PluginName
+    )
+    foreach ($dir in (Get-LensDirCandidates -RepoRoot $RepoRoot -PluginName $PluginName)) {
+        if (-not (Test-Path -LiteralPath $dir -PathType Container)) { continue }
+        $found = @(Get-ChildItem -LiteralPath $dir -Filter '*-extension.md' -File -ErrorAction SilentlyContinue)
+        if ($found.Count -gt 0) { return $dir }
+    }
+    return (Get-SeamPaths -RepoRoot $RepoRoot).LensDir
 }
