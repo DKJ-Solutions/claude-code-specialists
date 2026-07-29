@@ -314,6 +314,16 @@ The half that is already right is worth stating plainly: **everything the plugin
 correctly.** Hooks included — they are registered by the plugin's own `hooks/hooks.json`, not in the
 consumer's `settings.json`, so they leave with it. The gap is entirely on the consumer side.
 
+**One row of that table needs qualifying, though, and it is the row that reads as reassuring.** The
+shared scripts do vanish cleanly — but a consumer does not call them from nowhere. It calls them through
+a resolver of its own that locates the marketplace cache, and that resolver **throws** once the cache is
+gone. Measured in `davekokbwj/smartwatchbanden` (July 29, 2026): `scripts/lib/plugin-paths.ps1` is that
+resolver and three operational scripts dot-source it — `start-task.ps1`, `open-pr.ps1`,
+`fold-changelog-entry.ps1`. So "gone cleanly" describes the *plugin's* side of the boundary only; on the
+consumer's side the same removal takes the daily git workflow down with it. This is not clutter a
+teardown can classify away, it is a **hard runtime dependency**, created by adopting the shared-script
+model in the first place — which is why it belongs in the target shape below rather than in the skill.
+
 ### Why "delete everything" is the wrong goal
 
 Consumer-side content is not one thing but three, and only one of them is disposable:
@@ -374,8 +384,13 @@ finish the job without guessing where a roster row ends and the owner's prose be
 - **Category 3 written plugin-neutrally**, so it stays true after an uninstall instead of pointing at
   a departed persona.
 - **A `specialists-teardown` beside `specialists-init`.** Symmetric by construction: whatever the
-  bootstrap puts down, the teardown can take away, because it is the same inventory. This is the
-  missing piece, and it is not a large one.
+  bootstrap puts down, the teardown can take away, because it is the same inventory. **Built on
+  July 29, 2026** — see [the section above](#what-exists-now-the-specialists-teardown-skill).
+- **Shared scripts that survive their own absence.** The operational scripts are plugin-owned on
+  purpose (#81), but the consumer-side resolver that reaches them throws once the plugin is gone, so an
+  uninstall breaks the repo's git workflow rather than merely leaving debris behind. Either the resolver
+  degrades to a clear, actionable failure, or the consumer keeps local copies — and whichever it is
+  should be a stated part of adoption, since no teardown can decide it afterwards.
 - **Lens files off the plugin path.** `.claude/plugins/claude-specialists/` looks like plugin
   property and is in fact git-tracked consumer content — which is exactly why it reads as orphaned
   debris after an uninstall.
