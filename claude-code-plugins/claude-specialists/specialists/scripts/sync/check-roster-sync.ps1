@@ -20,9 +20,11 @@
           roster text for each '<group>-<id>' token (format-agnostic -- works for a table OR a list;
           deliberately NOT a brittle table parser).
       (c) The lens files, looked up via Get-LensDirCandidates (check-report-lib.ps1 -- the same source
-          the writers use, issue #179): the canonical .claude/plugins/claude-specialists/<plugin>/
-          <g>-<id>-extension.md, a non-canonical family segment left behind by a pre-#179 bootstrap,
-          and the legacy .claude/extensions/<g>-<id>-extension.md.
+          the writers use, issues #179 and #221): the canonical seam
+          .claude/specialists/lenses/<g>-<id>-extension.md, the pre-seam
+          .claude/plugins/claude-specialists/<plugin>/ path that is still written for a consumer with a
+          tree there, a non-canonical family segment left behind by a pre-#179 bootstrap, and the
+          legacy .claude/extensions/<g>-<id>-extension.md.
 
     Findings + severity (same [OK]/[INFO]/[ERROR] convention as check-connectors.ps1):
       - agent/persona WITHOUT a roster row -> [ERROR] (the core case this feature exists for: a new
@@ -39,7 +41,10 @@
                                                  family from the install path and so wrote the lenses
                                                  under the marketplace name. The lens works and counts
                                                  as present; the line only points at the misalignment
-                                                 (reported once per directory, not once per lens).
+                                                 (reported once per directory, not once per lens). The
+                                                 two locations current writers actually use -- the seam
+                                                 and the pre-seam plugin path -- are NOT reported; see
+                                                 Get-OnPathLensDirs.
       - lens header still naming a STALE persona name -> [INFO] (issue #145): an older scaffold baked
         the first name into the lens header ("# Sean <midDot> repo-lens"); after a rename that name is
         stale, but the lens is present, so it is a cosmetic mismatch, not missing-lens drift. Soft on
@@ -202,10 +207,35 @@ function Test-LensExists {
     return [bool](Get-LensPath -RepoRoot $RepoRoot -PluginName $PluginName -Id $Id)
 }
 
-# The canonical directory a lens for $PluginName belongs in -- what the writers produce.
-function Get-CanonicalLensDir {
+# The directories a lens may live in WITHOUT being off-path -- what the writers actually produce today,
+# canonical first. Candidates 0 and 1 of Get-LensDirCandidates: the seam .claude/specialists/lenses/
+# (issue #221, where a FRESH consumer's lenses land) and the pre-seam .claude/plugins/<family>/<plugin>/
+# path (where Get-LensWriteDir still writes for a consumer that already has a tree there). Neither is a
+# misalignment, so neither belongs in the off-path report.
+#
+# This function used to be Get-CanonicalLensDir and returned ONLY the pre-seam path, hardcoded -- while
+# the shared source (Get-LensDirCandidates/Get-SeamPaths in check-report-lib.ps1) had already named the
+# seam canonical. A repo that migrated onto the seam therefore had every one of its OWN lenses reported
+# as living somewhere non-canonical, with the remedy pointing back at the layout it had just left: a
+# reader following that advice would undo the migration. Derive both from the shared source, so the
+# reader cannot drift from the writers again the way it did here.
+function Get-OnPathLensDirs {
     param([string]$RepoRoot, [string]$PluginName)
-    return (Join-Path (Join-Path (Join-Path $RepoRoot '.claude\plugins') (Get-LensFamily)) $PluginName)
+    return @(
+        (Get-SeamPaths -RepoRoot $RepoRoot).LensDir,
+        (Join-Path (Join-Path (Join-Path $RepoRoot '.claude\plugins') (Get-LensFamily)) $PluginName)
+    )
+}
+
+# A path rendered relative to the repo root, for display in a finding. Used for BOTH sides of the
+# off-path report's "X instead of Y" sentence, so the canonical target it names is the same value the
+# comparison actually used rather than a literal repeated in the message.
+function Get-RelativeToRoot {
+    param([string]$RepoRoot, [string]$Path)
+    if ($Path.StartsWith($RepoRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $Path.Substring($RepoRoot.Length).TrimStart('\', '/')
+    }
+    return $Path
 }
 
 # The agent's display name from its cache-file frontmatter (best-effort; '' when absent). Only the
@@ -356,8 +386,14 @@ if ($enabledIds.Count -eq 0 -and (Test-Path -LiteralPath $settingsPath -PathType
 # The predicate is deliberately strict -- no lens ANYWHERE and no roster row for ANY id. A repo with
 # roster rows but no lenses is a maintained repo that has drifted, and must keep erroring; the same
 # holds the other way round. Only the state where neither exists is "never bootstrapped".
+#
+# The seam directory belongs in this scan, and its absence was the same pre-seam hardcode as
+# Get-OnPathLensDirs': a consumer whose lenses live in .claude/specialists/lenses/ (i.e. any consumer
+# bootstrapped since #221) looked lens-less here, so one empty roster slot was enough to declare it
+# never bootstrapped -- and the [BOOTSTRAP] line would then swallow every real finding behind advice to
+# run specialists-init on a repo that already has its whole lens tree in place.
 $anyLensFile = $false
-foreach ($dir in @((Join-Path $repoRoot '.claude\plugins'), (Join-Path $repoRoot '.claude\extensions'))) {
+foreach ($dir in @((Get-SeamPaths -RepoRoot $repoRoot).Dir, (Join-Path $repoRoot '.claude\plugins'), (Join-Path $repoRoot '.claude\extensions'))) {
     if (-not (Test-Path -LiteralPath $dir)) { continue }
     if (@(Get-ChildItem -LiteralPath $dir -Recurse -Filter '*-extension.md' -File -ErrorAction SilentlyContinue).Count -gt 0) {
         $anyLensFile = $true; break
@@ -413,7 +449,8 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
     Write-Host "`n-- plugin: $plugId (cache $(Split-Path $pluginDir -Leaf))" -ForegroundColor Cyan
     if ($specialists.Count -eq 0) { Write-Info "no agents or personas found for '$plugId'."; continue }
 
-    $canonicalLensDir = Get-CanonicalLensDir -RepoRoot $repoRoot -PluginName $name
+    $onPathLensDirs   = @(Get-OnPathLensDirs -RepoRoot $repoRoot -PluginName $name)
+    $canonicalLensDir = $onPathLensDirs[0]
     $legacyLensDir    = Join-Path $repoRoot '.claude\extensions'
     # Non-canonical family dirs found while walking this plugin's specialists -- reported once per dir
     # after the loop instead of once per lens, so a whole pre-#179 tree yields one line, not sixteen.
@@ -439,7 +476,7 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
                 Write-Failure "$kind '$id' ($plugId) has no roster row in $rosterRel -- add it to the roster."
             }
             if (-not $hasLens) {
-                Write-Failure "$kind '$id' ($plugId) has no repo-lens (.claude/plugins/$(Get-LensFamily)/$name/$id-extension.md or the legacy .claude/extensions/ path)."
+                Write-Failure "$kind '$id' ($plugId) has no repo-lens (.claude/specialists/lenses/$id-extension.md, the pre-seam .claude/plugins/$(Get-LensFamily)/$name/ path, or the legacy .claude/extensions/ path)."
             }
         }
         if ($inRoster -and $hasLens) { Write-Ok "$kind '$id' present in roster + lens" }
@@ -452,7 +489,7 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
         # check when the tree is moved.
         if ($hasLens) {
             $lensDir = Split-Path $lensPath -Parent
-            if ($lensDir -ne $canonicalLensDir -and $lensDir -ne $legacyLensDir) {
+            if ($onPathLensDirs -notcontains $lensDir -and $lensDir -ne $legacyLensDir) {
                 if (-not $offPathDirs.ContainsKey($lensDir)) { $offPathDirs[$lensDir] = 0 }
                 $offPathDirs[$lensDir]++
             }
@@ -485,12 +522,10 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
         }
     }
 
+    $canonicalRel = Get-RelativeToRoot -RepoRoot $repoRoot -Path $canonicalLensDir
     foreach ($d in ($offPathDirs.Keys | Sort-Object)) {
-        $rel = $d
-        if ($rel.StartsWith($repoRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-            $rel = $rel.Substring($repoRoot.Length).TrimStart('\', '/')
-        }
-        Write-Info "$($offPathDirs[$d]) lens file(s) for '$plugId' live in '$rel' instead of the canonical '.claude\plugins\$(Get-LensFamily)\$name' -- they are found and counted as present; move them (and the CLAUDE.md @-import along with them) to align with the standard."
+        $rel = Get-RelativeToRoot -RepoRoot $repoRoot -Path $d
+        Write-Info "$($offPathDirs[$d]) lens file(s) for '$plugId' live in '$rel' instead of the canonical '$canonicalRel' -- they are found and counted as present; move them (and the CLAUDE.md @-import along with them) to align with the standard."
     }
 }
 
