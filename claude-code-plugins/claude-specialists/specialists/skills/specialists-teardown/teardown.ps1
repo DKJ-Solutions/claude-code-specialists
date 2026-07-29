@@ -36,6 +36,28 @@
 .PARAMETER Apply
     Actually remove. Without it the script only reports what it would do.
 
+.PARAMETER VendorScripts
+    Hand back working copies of the plugin's shared script payload (scripts/task, scripts/release,
+    scripts/lib, scripts/sync) into the consumer's own scripts/, structure preserved.
+
+    THE ONE ADDITIVE THING THIS SCRIPT DOES, and opt-in for exactly that reason. Everything else here
+    is subtractive; this writes files. It earns the exception because it is the only answer to the
+    leftover that section 6 can otherwise only warn about: the consumer's resolver locates the
+    marketplace cache and throws once the plugin is gone, so an uninstall does not leave clutter, it
+    stops the repo's daily git workflow. Vendoring turns "reversible except for the part that breaks"
+    into an actual exit.
+
+    It works because the shared scripts were built to travel as a payload: they locate the repo via
+    CLAUDE_PROJECT_DIR / `git rev-parse --show-toplevel` (never their own location) and dot-source
+    their siblings $PSScriptRoot-relative, so a copy runs identically from anywhere inside the repo.
+    The source repo is the proof: its scripts/ copies are byte-identical to the plugin's.
+
+    NEVER OVERWRITES. A destination that exists and differs is reported and left alone -- it is
+    typically the consumer's own wrapper around the shared script, i.e. authored content, and the rule
+    that protects a filled-in lens protects this too. Identical destinations are reported as already
+    current. Combine with -Apply to write; on its own it previews, like every other part of this
+    script.
+
 .EXAMPLE
     ./teardown.ps1
     # Preview: what would be removed, what is authored, what is yours to decide.
@@ -54,7 +76,10 @@ param(
     # reported them as authored. The prediction "all 22 kept" came out for the WRONG reason, and
     # adoption was therefore less reversible than this skill claimed.
     # Pass e.g. -EmptyLensPattern 'Nog niets vastgelegd' to have those recognised as removable.
-    [string]$EmptyLensPattern = ''
+    [string]$EmptyLensPattern = '',
+    # Copy the plugin's shared script payload into the consumer's scripts/ (see .PARAMETER above).
+    # The only additive act in a subtractive script, hence opt-in, and it never overwrites.
+    [switch]$VendorScripts
 )
 $ErrorActionPreference = 'Stop'
 
@@ -301,7 +326,72 @@ if ($resolverFindings.Count -gt 0) {
             Write-Host ("           depended on by: " + ($finding.Dependents -join ', ')) -ForegroundColor Red
         }
     }
-    $notes += "$($resolverFindings.Count) script(s) under scripts/ resolve the plugin install at runtime and stop working after 'claude plugin uninstall' -- listed above as [WARN], and deliberately NOT removed: they are your code. No teardown can fix this, because the shared-script model (#81) is what creates the dependency. Two ways out, both yours to pick BEFORE you uninstall: keep local copies of the operational scripts, or make the resolver degrade to one clear, actionable failure instead of a throw. Note this scan covers scripts/ only, so a resolver living elsewhere is not counted."
+    $notes += "$($resolverFindings.Count) script(s) under scripts/ resolve the plugin install at runtime and stop working after 'claude plugin uninstall' -- listed above as [WARN], and deliberately NOT removed: they are your code. No teardown can fix this, because the shared-script model (#81) is what creates the dependency. Two ways out, both yours to pick BEFORE you uninstall: keep local copies of the operational scripts (re-run with -VendorScripts and this script writes them for you, overwriting nothing), or make the resolver degrade to one clear, actionable failure instead of a throw. Note this scan covers scripts/ only, so a resolver living elsewhere is not counted."
+}
+
+# --- 7. -VendorScripts: hand back working copies of the shared scripts ----------------------------
+# The way out of section 6, and the only place this script writes rather than deletes -- opt-in for
+# exactly that reason (see .PARAMETER VendorScripts). Without it, a teardown can describe the runtime
+# dependency and nothing more; with it, the consumer keeps a working git workflow after the plugin is
+# gone, which is what "reversible" was supposed to mean in the first place.
+#
+# Structure is preserved, because the payload depends on it: the scripts dot-source their siblings
+# $PSScriptRoot-relative (scripts/release/* reaching ..\lib\native-capture-lib.ps1, and so on) while
+# locating the REPO via CLAUDE_PROJECT_DIR / git rev-parse. Flattening the tree would break the first
+# without touching the second -- the failure would surface at the next branch, not here.
+if ($VendorScripts) {
+    $payloadDir = Join-Path $PSScriptRoot '..\..\scripts'
+    $payloadRoot = if (Test-Path -LiteralPath $payloadDir) { (Resolve-Path -LiteralPath $payloadDir).Path } else { $null }
+    if (-not $payloadRoot) {
+        # Reported rather than thrown: a teardown that already removed things must not die on its last
+        # step, and the reader needs to know the vendoring did NOT happen.
+        $notes += "-VendorScripts: the plugin's shared scripts are not reachable from this script's location ($payloadDir), so nothing was vendored. Run the teardown from the installed plugin, or copy the scripts by hand."
+    } else {
+        Write-Host ''
+        $vendored = @(); $vendorCurrent = @(); $vendorSkipped = @()
+        foreach ($src in @(Get-ChildItem -LiteralPath $payloadRoot -Recurse -Filter '*.ps1' -File)) {
+            $rel     = $src.FullName.Substring($payloadRoot.Length).TrimStart('\', '/')
+            $dest    = Join-Path (Join-Path $root 'scripts') $rel
+            $destRel = Join-Path 'scripts' $rel
+            if (Test-Path -LiteralPath $dest -PathType Leaf) {
+                if ((Get-FileHash -LiteralPath $dest).Hash -eq (Get-FileHash -LiteralPath $src.FullName).Hash) {
+                    $vendorCurrent += $destRel
+                    Write-Host ("  [vendor] " + $destRel + " -- already current") -ForegroundColor DarkGray
+                } else {
+                    # The collision that matters: typically the consumer's own thin wrapper around the
+                    # shared script. Authored content, so the same rule that protects a filled-in lens
+                    # protects it here -- named, never replaced.
+                    $vendorSkipped += $destRel
+                    Write-Host ("  [SKIP]   " + $destRel + " -- exists and differs; yours, not overwritten") -ForegroundColor Yellow
+                }
+                continue
+            }
+            if ($Apply) {
+                $destDir = Split-Path -Parent $dest
+                if (-not (Test-Path -LiteralPath $destDir)) { New-Item -ItemType Directory -Path $destDir -Force | Out-Null }
+                Copy-Item -LiteralPath $src.FullName -Destination $dest -Force
+            }
+            $vendored += $destRel
+            Write-Host ("  [vendor] " + $destRel + $(if ($Apply) { '' } else { ' (would be written)' })) -ForegroundColor Green
+        }
+        $verb = if ($Apply) { 'vendored' } else { 'to vendor' }
+        $note = "-VendorScripts: $($vendored.Count) script(s) $verb into scripts/, $($vendorCurrent.Count) already current"
+        if ($vendorSkipped.Count -gt 0) {
+            $note += ", $($vendorSkipped.Count) skipped because a different file already sits there ($($vendorSkipped -join ', ')) -- those are yours to reconcile: compare them against the vendored copy and decide which one you keep."
+        } else { $note += '.' }
+        $notes += $note
+        if ($vendored.Count -gt 0 -or $vendorCurrent.Count -gt 0) {
+            $notes += "The vendored scripts are yours now: a later teardown will not remove them (it only knows the bootstrap's own inventory), and they no longer need the plugin to run. What they DO still need is the repo-owned script contract they dot-source -- scripts/lib/branch-info.ps1 and scripts/repo-config.ps1 -- so keep those, whatever else you drop."
+            # The one combination that hands back scripts with nothing to dot-source. Said out loud
+            # rather than left to be discovered at the next branch: a repo whose contract was still an
+            # unfilled scaffold never had a working workflow to preserve, so this is a statement of
+            # where it stands, not a failure.
+            $contractGone = @($removed | Where-Object { $_ -match 'repo-config\.ps1|branch-info\.ps1' })
+            if ($contractGone.Count -gt 0) {
+                $notes += "Heads-up: this same run also $(if ($Apply) { 'removed' } else { 'would remove' }) $($contractGone -join ' and ') -- still an unfilled scaffold, so it counted as generated. The scripts just vendored dot-source exactly that contract, so they cannot run until you provide it. A repo in this state had no working workflow to keep in the first place."
+            }
+        }
+    }
 }
 
 # --- Summary --------------------------------------------------------------------------------------
