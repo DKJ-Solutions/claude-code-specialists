@@ -63,6 +63,17 @@ Two things are still missing and are added by `fold-changelog-entry.ps1` when fo
 the number is retrieved during the fold via `gh pr list`. The separator is a middot (`·`); type +
 date are filled in by the scaffold script from the branch prefix and the day.
 
+**An entry body must never use `##`.** The entry heading itself is an `###`, and `cut-release.ps1` puts
+`## Features` / `## Fixes` / `## Documentation` / `## Maintenance` above the entries it groups — so an
+`##` inside a body climbs out of its category and renders as a sibling of it. Seen in v2.13.2, where a
+body's `## On the tests` and `## Filed separately` came out looking like two extra release categories
+next to `## Fixes`. Use `####` for a sub-heading, or bold. Worth knowing *when* it bites: the entry file
+looks perfectly fine on its own and in the `## Pull Requests` section, and the damage only appears once
+`cut-release` lifts the body into the notes and the per-plugin CHANGELOG — the same
+[fold/release blind spot as #234](https://github.com/DaveKJohn/davekjohns-workshop/issues/234), where
+the artifact a reader finally sees is assembled past every gate that could have judged it. **Inspect the
+generated notes before pushing a release; that is what `-NoPush` is for.**
+
 **Never merge without an entry file**, not even for small changes. Since the branch-creation
 improvement, that entry file now comes into being **at the moment the branch is created** — no
 separate later scaffolding step: [Derek #05](05-05-extension.md#classifying-naming-and-creating-a-branch)'s
