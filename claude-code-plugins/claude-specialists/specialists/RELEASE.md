@@ -1,155 +1,53 @@
-# Release v2.15.0
+# Release v2.15.1
 
 **Date:** 2026-07-29  
-**Type:** Minor
+**Type:** Patch
 
-The seam: a consumer's whole specialist surface becomes one directory and one line, and the orchestrator can be delivered by the plugin
+Three silent failures made visible
 
 You are on this release.
 
-## Features
+## Fixes
 
-### #254 · The seam: the bootstrap writes it and the teardown removes it · Feat · 2026-07-29
+### #257 · check-roster-sync calls the seam canonical · Fix · 2026-07-29
 
-The writer half of [#221](https://github.com/DaveKJohn/davekjohns-workshop/issues/221), after the
-readable half landed in #253. A **fresh** consumer now gets one directory and one line, and a teardown
-takes both away.
+`check-roster-sync.ps1` still carried the **pre-seam path hardcoded in two places**, while the shared
+source it is supposed to agree with — `Get-LensDirCandidates` / `Get-SeamPaths` in
+[`check-report-lib.ps1`](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/scripts/lib/check-report-lib.ps1) — had named the seam
+`.claude/specialists/lenses/` canonical since [#221](https://github.com/DaveKJohn/davekjohns-workshop/issues/221).
+Reader and writers had drifted apart, and this repo tripped over it the moment it migrated onto the
+seam itself in [#255](https://github.com/DaveKJohn/davekjohns-workshop/pull/255).
 
-**What the bootstrap writes for a fresh consumer.** Lenses flat in `.claude/specialists/lenses/` (no
-per-plugin segment — `<group>-<id>` is unique family-wide, so several enabled plugins share one
-directory, which is what makes "remove one directory" true for a multi-plugin consumer too),
-`.claude/specialists/SPECIALISTS.md` carrying the body import, a lens import relative to itself, and a
-`## The roster (VUL-IN)` slot, plus exactly **one** `@`-import in `CLAUDE.md`. One detail is load-bearing:
-the inclusion's **title carries no marker, only the roster slot does.** Filling in the roster therefore
-removes the marker, so the teardown reads the file as authored — a `(VUL-IN)` title would have survived a
-filled-in roster and made the teardown delete somebody's work.
+**1. Its own lenses were reported as living off-path.** `Get-CanonicalLensDir` returned only
+`.claude/plugins/<family>/<plugin>/`, so all 19 seam lenses produced one `[INFO]` telling the reader to
+move them — back to the layout the repo had just left. A reader who followed that advice would undo the
+migration. Replaced by `Get-OnPathLensDirs`, which derives **both** currently-written locations from the
+shared source: the seam (candidate 0) and the pre-seam plugin path (candidate 1, still written by
+`Get-LensWriteDir` for a consumer that already has a tree there). Neither is a misalignment now, and the
+finding keeps meaning exactly what #179 built it for: the marketplace-named family that only the
+reader's back-compat list keeps working.
 
-**An already-adopted consumer is untouched** and keeps both its lens tree and its two imports.
-`Get-LensWriteDir` makes that call, so nothing is relocated and the surface never splits across two
-paths. Once the owner migrates by hand, the writer follows automatically.
+**2. A seam consumer could be declared "never bootstrapped".** The `$anyLensFile` probe behind the
+`[BOOTSTRAP]` marker scanned `.claude/plugins` and `.claude/extensions` — not the seam. So for any
+consumer bootstrapped since #221 the probe saw no lenses at all, and a single unfilled roster was enough
+to swallow every real finding behind advice to run `specialists-init` on a repo whose whole lens tree
+was already in place. The seam directory joined the scan.
 
-**What the teardown does.** It reads the seam's literals from `Get-SeamPaths` rather than retyping them —
-the bootstrap writes them and the teardown matches them, and a drift between the two would leave a
-dangling import that nothing errors on. `SPECIALISTS.md` is classified exactly like a lens: unfilled slot
-heading → removed; authored → kept, with the import **still** removed, because that line is what makes
-the content live. The report then says outright that nothing loads the file any more. So the orphan does
-not disappear, it *shrinks*: one named file holding the roster in one piece, instead of 43 lines scattered
-through six sections. That trade is the seam's actual payoff, and the report names it.
+Worth noting how invisible this was: the false finding was an **`[INFO]`**, which the session hook
+suppresses by design — so nothing reported it, and the check's exit code stayed 0. It surfaced only
+because someone ran the script deliberately and read the one line the hook filters away. The same shape
+as the `[INVENTORY]` case: a rule nobody was ever prompted about.
 
-**Measured end to end** before the suites were touched: a fresh fixture bootstraps to 19 lenses in the
-seam and a single import, and a teardown leaves 27 items removed, 0 kept, and nothing but the owner's own
-two files.
+Both are covered by regression tests in
+[`scripts/tests/roster-sync.tests.ps1`](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/scripts/tests/roster-sync.tests.ps1) (scenario 9c: the seam is
+canonical and a migrated repo reports *completely* clean — asserting "no `[ERROR]`" would have missed
+this entirely; 9d: the pre-seam path stays tolerated **silently**, so the fix cannot be "corrected" by
+swapping one hardcoded path for another; plus the seam case in 5d for `[BOOTSTRAP]`). Verified the
+honest way: all five new assertions fail against the unfixed script and pass against the fixed one.
 
-**The suites.** The estimate was ~30 assertions across five suites; the reality was two suites.
-`connectors`, `sync-roster`, `roster-sync` and `release-lib` pass **unchanged** because they build
-fixtures on the pre-seam path, which readers still accept — the back-compat promise, verified by accident.
-`bootstrap-drift` (87 asserts) and `teardown` (101) were updated, and the new coverage pins what B2 adds:
-CLAUDE.md carries exactly one import **as a count**, nothing lands on the pre-seam path for a fresh
-consumer, the body import now lives in `SPECIALISTS.md` (so the durable-body-path assertion reads the right
-file instead of passing vacuously), the whole `.claude/specialists` directory is gone after `-Apply`, and an
-authored inclusion is kept while its import is removed.
-
-Two boundaries stated rather than quietly crossed. The **57 agent defs and manuals** that name the
-pre-seam lens path are left alone: both layouts are read and every existing consumer's lenses really are
-still there, so those texts are accurate, not stale — sweeping them is a documentation pass for after the
-consumers migrate. And this repo has **not** migrated itself yet; that is the next step, by hand, and it
-only becomes visible in a later session because the plugin loads from the pushed `github` source.
-
-[PR #254](https://github.com/DaveKJohn/davekjohns-workshop/pull/254)
+[PR #257](https://github.com/DaveKJohn/davekjohns-workshop/pull/257)
 
 ---
 
-### #253 · The seam, specified and readable · Feat · 2026-07-29
-
-The first half of [#221](https://github.com/DaveKJohn/davekjohns-workshop/issues/221)'s remaining work:
-the seam is **specified** in the family README and **readable** by every reader, with no behaviour change
-for any existing consumer. What is deliberately not in this change is the writer flip — see the end.
-
-**The shape.** A fresh consumer's whole specialist surface becomes one directory and one line:
-`.claude/specialists/SPECIALISTS.md` (the inclusion: body import, lens import, roster slot) plus
-`.claude/specialists/lenses/<group>-<id>-extension.md`, flat because `<group>-<id>` is unique
-family-wide. `CLAUDE.md` carries `@.claude/specialists/SPECIALISTS.md` and nothing else, so a teardown
-becomes *remove one directory and one line* instead of hand-cutting a roster woven through 6 sections.
-
-**Four facts were verified from the reference before any of this was designed, and each could have sunk
-it.** Nested imports work (*"a maximum depth of four hops"* — the seam spends two). A path in backticks
-is not an import, so the docs can name the seam line safely. A project-root `CLAUDE.md` is re-read after
-`/compact`, so the roster comes back with it. And it is **not a token saving**: *"imported files still
-load and enter the context window at launch"* — the seam buys removability, nothing else, and claiming
-otherwise would be the kind of unearned win this repo keeps catching elsewhere.
-
-**One fragility the seam concentrates rather than removes,** now written down: the body import resolves
-into the marketplace cache, outside the working directory, and such an import is gated by a one-time
-approval dialog whose refusal is sticky — *"If you decline, the imports stay disabled and the dialog
-doesn't appear again."* With one line instead of two, a single decline delivers nothing at all, silently.
-Worth knowing before diagnosing that as a bug in this repo.
-
-**The mechanism, in one place.** `check-report-lib.ps1` gains `Get-SeamPaths` (the literals the bootstrap
-will write and the teardown must match — one source, because a drift between those two leaves a dangling
-import that nothing errors on) and `Get-LensWriteDir`. `Get-LensDirCandidates` gains the seam as its most
-canonical candidate ahead of the three it already walked, so **a consumer who migrates by hand works
-immediately** — the roster check, the drift lint and the teardown all find lenses there today. The
-mirrored plugin copy is back in step.
-
-`Get-LensWriteDir` encodes the promise that keeps this safe: a fresh consumer gets the seam, a consumer
-that already has lenses keeps writing where they are. The bootstrap never relocates a tree the repo owner
-owns, because seam lenses written beside a legacy tree would split the surface in two — worse than either
-layout alone, with the teardown then reasoning about both at once.
-
-A new suite covers all of it (`check-report-lib.tests.ps1`, 12 asserts) — these shared helpers previously
-had no direct test at all, only indirect coverage from suites that happen to call them. The pinned
-properties: the seam is candidate 0, the legacy locations still resolve and `extensions/` stays last, the
-import line never picks up a backslash from `Join-Path`, an *empty* legacy directory does not count as
-adopted, and after a hand migration the writer follows to the seam without being told.
-
-**Deliberately still to come, and why the split.** Flipping the bootstrap to write the seam by default
-(and teaching the teardown its one-line/one-directory form) changes 30 assertions across five suites that
-encode the current layout. Landing the readable half first means the seam can be proved on a real repo —
-this one, by hand — before the default moves under every consumer at once.
-
-[PR #253](https://github.com/DaveKJohn/davekjohns-workshop/pull/253)
-
----
-
-### #252 · Chris's body can serve as a main-thread system prompt · Feat · 2026-07-29
-
-The blocker on [#215](https://github.com/DaveKJohn/davekjohns-workshop/issues/215) is removed. Chris's
-portable body said he *"never executes anything himself — he writes no content, opens no PR, does not
-merge"*. As a role inside a general-purpose loop that works; as **the main thread's own system prompt**
-it is crippling, because the main thread would refuse to edit files. No configuration change could fix
-that, which is why the issue sat blocked.
-
-**The rule was reframed, not weakened: it now forbids unattributed work rather than typing.** Every
-executing action still belongs to the specialist who owns it, is announced before it happens, and is
-performed under that specialist's craft rules — by handing off to a subagent where subagents exist, and
-otherwise by Chris doing that specialist's work *under their name*. What is forbidden is work with no
-specialist behind it, work done by Chris's general judgment where a craft has rules, and a handover
-claimed but not made. Read it as *"nothing happens anonymously"*.
-
-Two things this surfaced. The old wording was **internally inconsistent** — ritual step 5 has always
-read *"execute according to their trade rules"*, so the body both forbade and prescribed the same act.
-And in a harness without subagents the old rule was already fiction: the work got done anyway, just
-without the wording admitting it. The reframing describes what actually happens and keeps the property
-that matters, which is attribution.
-
-**The mechanism was verified from the docs rather than assumed**, and recorded in the
-[family README](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/claude-code-plugins/claude-specialists/README.md#adoption-the-bootstrap-path): a plugin
-root `settings.json` supports `agent` (and `subagentStatusLine`) and *"activates one of the plugin's
-custom agents as the main thread, applying its system prompt, tool restrictions, and model"*. The
-issue's compaction worry dissolves in this route: only **skill** descriptions are flagged as not
-re-injected after `/compact`, and a main-thread agent's body *is* the system prompt, which travels with
-every request anyway.
-
-**The switch stays off, deliberately.** What happens when two enabled plugins both set `agent` is
-documented nowhere — not on the plugins page, not in the reference — and that is a poor thing to
-discover through your main thread. It would also change every consumer's main loop from a version bump
-they did not read, and since Chris ships as a persona there is no agent-def to point at: creating one
-means its `tools:` and `model` become the whole main thread's policy. Ready, not thrown; settling the
-multi-plugin question needs an experiment, not another read.
-
-[PR #252](https://github.com/DaveKJohn/davekjohns-workshop/pull/252)
-
----
-
-Full workshop notes: [releases/development/2.x/2.15.0.md](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/releases/development/2.x/2.15.0.md)
+Full workshop notes: [releases/development/2.x/2.15.1.md](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/releases/development/2.x/2.15.1.md)
 Cumulative plugin history: [CHANGELOG.md](CHANGELOG.md)
