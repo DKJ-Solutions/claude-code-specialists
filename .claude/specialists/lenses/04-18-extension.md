@@ -21,7 +21,7 @@ logic in `release-lib.ps1` (version bump, CHANGELOG transformation, release-note
 ### Honest status & Tycho's role
 
 - **The suite has grown well past its first member.** It started with
-  [`scripts/tests/release-lib.tests.ps1`](../../../../scripts/tests/release-lib.tests.ps1) —
+  [`scripts/tests/release-lib.tests.ps1`](../../../scripts/tests/release-lib.tests.ps1) —
   dependency-free (no Pester), dot-sources `release-lib.ps1` and asserts the version bump + CHANGELOG
   transformation, exit 1 on the first failure (usable in a CI gate) — and that dependency-free,
   exit-1-on-first-failure style now runs across the suite under `scripts/tests/`, which covers most

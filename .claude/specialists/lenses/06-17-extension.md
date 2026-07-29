@@ -14,7 +14,7 @@ and how her work relates to the automated lint gate.**
 
 ### The machine layer already catches a lot — Edith covers the human layer
 
-The lint gate [`check-plugin-integrity.ps1`](../../../../scripts/lint/check-plugin-integrity.ps1)
+The lint gate [`check-plugin-integrity.ps1`](../../../scripts/lint/check-plugin-integrity.ps1)
 ([Sylvester #15](05-15-extension.md)) already catches the mechanical: an invalid `marketplace.json`/
 `plugin.json`, agent-def/manual frontmatter that does not match the filename, and dead relative
 links in the README/manuals. Edith does not need to redo that — she does what a machine cannot:

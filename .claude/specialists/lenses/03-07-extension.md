@@ -14,9 +14,9 @@ sensitivities this public repo brings.**
 
 ### What Rebecca checks against first here
 
-Before every deep dive she consults what is already on record: [`README.md`](../../../../README.md)
-(how the marketplace/plugins work), [`CLAUDE.md`](../../../../CLAUDE.md) (constitution + roster),
-[`CHANGELOG.md`](../../../../CHANGELOG.md) (earlier decisions and their rationale), and — if one
+Before every deep dive she consults what is already on record: [`README.md`](../../../README.md)
+(how the marketplace/plugins work), [`CLAUDE.md`](../../../CLAUDE.md) (constitution + roster),
+[`CHANGELOG.md`](../../../CHANGELOG.md) (earlier decisions and their rationale), and — if one
 already exists for the topic — the matching dossier under `research/<topic>/`, where this repo
 records an ongoing project as a log/status document (see "Where findings land here" below).
 

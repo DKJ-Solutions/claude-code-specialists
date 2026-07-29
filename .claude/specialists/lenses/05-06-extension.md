@@ -45,7 +45,7 @@ after the merge.
   `claude-code-plugins/claude-specialists/<plugin>/`; the `connectors/` directory does not count) — that
   is how `cut-release.ps1` later knows which entries belong in which per-plugin CHANGELOG. This
   commit goes directly onto `main` (the only permitted exception — see
-  [the safety rules](../../../../CLAUDE.md#safety-rules)).
+  [the safety rules](../../../CLAUDE.md#safety-rules)).
 
 #### Entry format
 
@@ -113,7 +113,7 @@ reference to them in `CHANGELOG.md`. For a **Minor or Major** bump, publishing a
 (highlights as the body, the full development notes as an attachment) is a manual closing step
 Rendall walks through afterward, per the `cut-release` skill's checklist — not automated by the
 script; a **Patch** release skips that step (tag only). See
-[releases/README.md](../../../../releases/README.md#cutting-a-release) for the full mechanics. The
+[releases/README.md](../../../releases/README.md#cutting-a-release) for the full mechanics. The
 `version` in each
 `.claude-plugin/plugin.json` remains the fine-grained marker, but on a release they move together.
 Note: that number is also the **update gate** — `claude plugin update` compares version numbers
@@ -130,7 +130,7 @@ The `releases/` directory (modeled on life-hub):
   to the notes file, rather than the full contents inline.
 
 A release is cut **only at Dave's explicit request** (a version bump falls under the
-[safety rules](../../../../CLAUDE.md#safety-rules)) and deliberately does **not go via a branch + PR**. Like the
+[safety rules](../../../CLAUDE.md#safety-rules)) and deliberately does **not go via a branch + PR**. Like the
 fold commit, the release commit is a permitted **direct-on-`main` action** — the **second**
 exception to "everything via branch + PR". `cut-release.ps1` therefore runs on `main` itself and
 does everything in one motion:
@@ -180,8 +180,8 @@ committed, and only then is picked up by the consuming repos.
   `releases/development/` + `releases/README.md` row + `## Releases` reference + per-plugin
   `CHANGELOG.md`s updated + per-plugin `RELEASE.md` cards regenerated + commit + tag `vX.Y.Z` + push.
   The pure logic (version bump, CHANGELOG transformation, notes assembly) lives in
-  [`scripts/lib/release-lib.ps1`](../../../../scripts/lib/release-lib.ps1), covered by
-  [`scripts/tests/release-lib.tests.ps1`](../../../../scripts/tests/release-lib.tests.ps1).
+  [`scripts/lib/release-lib.ps1`](../../../scripts/lib/release-lib.ps1), covered by
+  [`scripts/tests/release-lib.tests.ps1`](../../../scripts/tests/release-lib.tests.ps1).
 
 A new recurring release chore? Rendall builds a script for it with the same guardrails.
 
