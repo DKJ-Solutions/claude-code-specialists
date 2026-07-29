@@ -309,6 +309,26 @@ if (Test-Path -LiteralPath $rosterPath -PathType Leaf) {
     Write-Info "roster file '$rosterRel' not found in the repo-root -- treated as empty."
 }
 
+# Drop '@'-import lines before anything reads this text (issue #227). The bootstrap writes
+# '@.claude/plugins/<family>/<plugin>/01-01-extension.md' into CLAUDE.md, and that path CONTAINS the
+# token '01-01' -- so the roster test was satisfied by the import itself and Chris counted as rostered
+# with no roster row anywhere in the file. Measured: 18 ids reported missing after a bootstrap instead
+# of 19, and 01-01 is the worst possible one to lose, because a persona appears in no always-on listing
+# and the roster row is the ONLY thing that makes them exist for a session.
+#
+# Narrow on purpose. Get-RosterIdTokenPattern's docstring records that binding the token to a
+# roster-row/table shape was DELIBERATELY rejected (inbound #182): Test-InRoster is asked about an id in
+# free prose, and a table shape would change behaviour for consumers who format their roster as a list.
+# That reasoning still holds and is not overturned here. An '@'-import is a different thing entirely --
+# a line the bootstrap writes, never a roster row under any formatting convention -- so excluding it
+# needs none of that risk.
+#
+# Residual, unchanged and deliberately not chased: a repo whose roster file happens to reference a lens
+# path in ORDINARY PROSE still satisfies the test for that id. This repo does exactly that (Chris's lens
+# is linked from the routing prose), so its 01-01 would pass even without a table row -- harmless here,
+# because the real roster row exists. Same accepted class as the prose false positives in #182.
+$rosterText = (($rosterText -split "`r?`n") | Where-Object { $_ -notmatch '^\s*@' }) -join "`n"
+
 # Enabled plugins from .claude/settings.json (mirrors bootstrap.ps1).
 $settingsPath = Join-Path $repoRoot '.claude\settings.json'
 $enabledIds = @()
