@@ -183,7 +183,27 @@ function Write-ContractGap {
 Write-Host '== check-script-contract ==' -ForegroundColor Cyan
 Write-CheckScope -Scope $scope -CheckName 'check-script-contract'
 
-foreach ($libRel in @($script:Contract.Lib | Sort-Object -Unique)) {
+# --- Is this repo set up at all? (issue #225) -----------------------------------------------------
+# When EVERY contract lib is absent, the repo has not been through specialists-init: the scaffolds are
+# exactly what the bootstrap puts down. Reporting each required function separately then produces a
+# list of errors about files that were never meant to exist yet -- 6 [ERROR] lines on a fresh
+# consumer, phrased as "this lib predates the contract", which is the wrong story for a repo that has
+# no lib at all. A missing lib is only drift once the repo has been set up.
+#
+# Strict on purpose: if even one lib is present, this is a set-up repo with a real gap and every
+# finding stands. Only the all-absent case is "never bootstrapped".
+$contractLibs = @($script:Contract.Lib | Sort-Object -Unique)
+$presentLibs = @($contractLibs | Where-Object { Test-Path -LiteralPath (Join-Path $repoRoot $_) -PathType Leaf })
+
+if ($contractLibs.Count -gt 0 -and $presentLibs.Count -eq 0) {
+    # Same non-counting shape as the roster check's marker, and for the same reason: nothing is
+    # broken, the repo-side setup simply has not happened.
+    Write-Host ("  [BOOTSTRAP] this repo has none of the libs the shared workflow scripts expect (" + ($contractLibs -join ', ') + ") -- it has not been set up yet. Nothing is broken: those files are what the 'specialists-init' skill puts down as scaffolds for you to fill in. Run that skill; until then this check reports nothing further, because every required function would otherwise be listed against a file that does not exist yet.") -ForegroundColor Yellow
+    Write-CheckSummary
+    exit 0
+}
+
+foreach ($libRel in $contractLibs) {
     $records = @($script:Contract | Where-Object { $_.Lib -eq $libRel })
     $libPath = Join-Path $repoRoot $libRel
 

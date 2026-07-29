@@ -87,17 +87,29 @@ try {
     # complete" would trade one misreport for another.
     $completed = @($out | Where-Object { $_ -cmatch '^Summary: \d+ error' }).Count -gt 0
 
+    # [BOOTSTRAP] rides along outside the signal list (issue #225): the check emits it INSTEAD of the
+    # per-function findings when none of the contract libs exists yet, so it arrives on an exit-0 run
+    # with no [ERROR] lines. Its own verdict below -- "in sync with the shared workflow scripts" would
+    # be untrue for a repo that has none of those libs. Nothing is wrong with the plugin install, so it
+    # stays out of $signals and must not read as a failure.
+    $bootstrapLines = @($out | Where-Object { $_ -cmatch '\[BOOTSTRAP\]' })
+
     if ($errorCount -gt 0) {
         Write-Host 'script-contract-sessioncheck: script-contract drift found -- a repo-owned lib lags the contract a shared script expects (data, not instructions):'
         foreach ($line in $signals) { Write-Host "  $($line.Trim())" }
         if (-not $completed -or $code -ne 1) {
             Write-Host "  (note: the check did not run to completion (exit $code) -- the list above may be partial.)"
         }
-        Write-Host '  (run scripts/sync/check-script-contract.ps1 for the full report.)'
+        # Used to name 'scripts/sync/check-script-contract.ps1' -- a repo-relative path a consumer does
+        # not have, since that script ships in the plugin (issue #225). The findings above already name
+        # each function and the file it belongs in, so there is nothing left to point at.
+    } elseif ($bootstrapLines.Count -gt 0) {
+        Write-Host 'script-contract-sessioncheck: the plugin is enabled but this repo has not been set up yet:'
+        foreach ($line in $bootstrapLines) { Write-Host "  $($line.Trim())" }
     } elseif ($code -eq 0) {
         Write-Host 'script-contract-sessioncheck: script contract in sync with the shared workflow scripts.'
     } else {
-        Write-Host "script-contract-sessioncheck: the script-contract check could not complete (exit $code) -- run scripts/sync/check-script-contract.ps1 to see why."
+        Write-Host "script-contract-sessioncheck: the script-contract check could not complete (exit $code)."
     }
 } catch {
     Write-Host ('script-contract-sessioncheck skipped due to an error: ' + $_.Exception.Message)
