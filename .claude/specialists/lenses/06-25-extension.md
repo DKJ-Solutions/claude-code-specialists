@@ -15,7 +15,7 @@ him levers to pull.**
 ### What Nolan measures here
 
 - **The deliberate loading strategy** described in
-  [`CLAUDE.md`](../../../../CLAUDE.md#the-claude-specialists--who-does-what): only Chris's operating
+  [`CLAUDE.md`](../SPECIALISTS.md#the-claude-specialists--who-does-what): only Chris's operating
   manual loads automatically (via the `@` import at the bottom of `CLAUDE.md`, because he is
   involved in every assignment); every other specialist's portable playbook + repo lens is read
   **on demand**, at the moment Chris assigns work to them — "deliberate, to save context/tokens".

@@ -27,11 +27,11 @@ Every change starts with the right branch — this is Derek's canonical explanat
 **Step 1 — check the branch before you touch a single file.** Run `git status` + `git branch`.
 Non-negotiable: not a single file (not even a script or manifest) is written before this check.
 - **On `main`** → create the right branch first, then make changes. Never commit directly on `main`
-  (except the fold exception in [the safety rules](../../../../CLAUDE.md#safety-rules)).
+  (except the fold exception in [the safety rules](../../../CLAUDE.md#safety-rules)).
 - **On a feature branch** → continue on that branch.
 
 **Step 2 — classify the work and name the branch.** Choose the prefix by type of work. The canonical
-table lives in [`scripts/lib/branch-info.ps1`](../../../../scripts/lib/branch-info.ps1):
+table lives in [`scripts/lib/branch-info.ps1`](../../../scripts/lib/branch-info.ps1):
 
 | Type of work | Branch name | GitHub label | Changelog type |
 |---|---|---|---|
@@ -68,7 +68,7 @@ two exceptions in [Opening a pull request](#opening-a-pull-request) below.
 
 **By default Derek opens it himself, without asking** — the work is finished, committed, and the gates
 are green, so the PR is the next step rather than a decision. The test is the one in
-[the safety rules](../../../../CLAUDE.md#never-directly-on-the-main-branch--via-branch--pr): *does
+[the safety rules](../../../CLAUDE.md#never-directly-on-the-main-branch--via-branch--pr): *does
 Dave's own look add something the gates cannot?* Almost never in this repo, whose diffs are tooling,
 config, docs, and agent defs. He **stops and reports instead** for a **visible result** (a frontend,
 styling, rendered output, an artifact — no gate proves that something looks right) or for
@@ -150,11 +150,11 @@ via a temporary file.
 ### Branch & repo hygiene
 
 - Everything goes through a `feat/`/`fix/`/`docs/`/`chore/` branch + PR to `main` — **no direct
-  commits on `main`** except the fold exception in [the safety rules](../../../../CLAUDE.md#safety-rules).
+  commits on `main`** except the fold exception in [the safety rules](../../../CLAUDE.md#safety-rules).
   There is no second reviewer; the PR opens by default as soon as the branch is done, after which
   opening → merging → folding runs through in one motion, guarded by the lint gate and transparently
   reported by Chris. Only the two exceptions in
-  [the safety rules](../../../../CLAUDE.md#never-directly-on-the-main-branch--via-branch--pr) — a
+  [the safety rules](../../../CLAUDE.md#never-directly-on-the-main-branch--via-branch--pr) — a
   visible result, or irreversible/outward-facing work — stop and wait for Dave's word first. In this
   repo that is rare: the work here is tooling, config, docs, and agent defs, which the gates prove.
 - **Never "final" in a branch name.** Use `-v2`, `-v3`, etc. for a second attempt.
@@ -191,7 +191,7 @@ via a temporary file.
   **public** — a deliberate choice, so the remote `github` marketplace source can be read without gh auth.
   If you get `Repository not found`, first run `gh auth setup-git`.
 - This repo is **public**: nothing confidential belongs in it (no personal information, credentials,
-  or secrets). See the general guidelines in [`CLAUDE.md`](../../../../CLAUDE.md#davekjohns-workshops-safety-implementation).
+  or secrets). See the general guidelines in [`CLAUDE.md`](../../../CLAUDE.md#davekjohns-workshops-safety-implementation).
 
 ### Derek is lazy — so he scripted everything
 

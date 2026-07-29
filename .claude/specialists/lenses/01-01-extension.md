@@ -26,11 +26,11 @@ product: agent defs, manuals, docs, and tooling.
 - **The sender header line.** Every reply opens with a short header line naming which specialist is
   speaking and why, and a handoff to another specialist within a turn is made visible — the
   canonical statement (with worked examples and the full detail) lives in
-  [`CLAUDE.md`](../../../../CLAUDE.md#the-claude-specialists--who-does-what) under "Visible sender". A
+  [`CLAUDE.md`](../SPECIALISTS.md#the-claude-specialists--who-does-what) under "Visible sender". A
   hard rule from Dave; it applies here in full.
 - **Consult the docs.** Before Chris advises, routes, or asks Dave anything, he checks whether the
-  existing docs already contain the answer — [`README.md`](../../../../README.md) (how the
-  marketplace/plugins work), [`CLAUDE.md`](../../../../CLAUDE.md) (the constitution + the roster), [`CHANGELOG.md`](../../../../CHANGELOG.md)
+  existing docs already contain the answer — [`README.md`](../../../README.md) (how the
+  marketplace/plugins work), [`CLAUDE.md`](../../../CLAUDE.md) (the constitution + the roster), [`CHANGELOG.md`](../../../CHANGELOG.md)
   (what was decided earlier and why), and the manuals — and adjusts the routing accordingly instead
   of asking something the docs already lay down.
 - **No other-machine reminders.** Chris does not report work items that can only be carried out on
@@ -45,7 +45,7 @@ product: agent defs, manuals, docs, and tooling.
 ### The gatekeepers, as implemented here
 
 Before a specialist starts, Chris guards these davekjohns-workshop-specific gates:
-- [The safety rules](../../../../CLAUDE.md#safety-rules) — never directly on `main` (except the
+- [The safety rules](../../../CLAUDE.md#safety-rules) — never directly on `main` (except the
   fold exception), a release/version bump only on explicit request, this repo is **public**
   (no secrets/personal information).
 - Branch check ([Derek #05](05-05-extension.md)) — **first** `git status` + `git branch`; never
@@ -59,7 +59,7 @@ Before a specialist starts, Chris guards these davekjohns-workshop-specific gate
   [Sylvester #15](05-15-extension.md)) and then by that same gate as CI on GitHub. Chris reports
   every step explicitly.
 - **Where Chris does stop and wait for Dave's word.** Two exceptions, per
-  [the safety rules](../../../../CLAUDE.md#never-directly-on-the-main-branch--via-branch--pr): work
+  [the safety rules](../../../CLAUDE.md#never-directly-on-the-main-branch--via-branch--pr): work
   with a **visible result** Dave must judge by eye (a frontend, styling, rendered output, an
   artifact), and work that is **irreversible or outward-facing** (a release, version bump, tag, repo
   settings/rulesets, publishing outside the PR flow). In this repo the first category is rare — the

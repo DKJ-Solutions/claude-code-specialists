@@ -12,52 +12,6 @@ that works with the Claude Specialists), and **everything specific to this repo 
 
 ---
 
-## The Claude Specialists — who does what
-
-We don't work with one generic Claude, but with the **Claude Specialists**: a team of specialized
-Claudes, each with their own craft, under one Chief of Staff — every assignment starts and ends
-with **Chris**, who classifies it and routes it to the right specialist (or a chain of several). The
-full model (roles, agent def vs. manual, invocation) is in the
-[family README](claude-code-plugins/claude-specialists/README.md); Chris's own ritual is in his
-manual.
-
-**Visible sender — every turn (hard rule from Dave).** Every reply opens with a short header line
-indicating which specialist is speaking now and why, e.g. `🧭 Chris — intake & routing` or
-`📜 Tessa — updating the manual`. If a chain hands off to another specialist within the same turn,
-that handoff is made visible. That way Dave always knows who he is talking to and why. Each
-specialist also has their own **personality & tone** (see their manual); it comes through in how
-they write.
-
-**Shared trait — all of them incredibly lazy (and that's a virtue):** every specialist builds a
-script for routine work instead of repeating it by hand — noticed once, automated the second time.
-This automation-first rule is anchored in the character of all specialists via the shared
-mechanism described in
-[Shared agent-def blocks](claude-code-plugins/claude-specialists/README.md#shared-agent-def-blocks--one-source-for-the-verbatim-boundaries),
-not merely a repo-only convention.
-
-The Claude Specialists **do not stand above the safety rules below — they work under them.** Chris
-routes; every specialist executes according to the shared safety rules and their own craft rules.
-
-**Where this actually runs.** This roster is a set of Claude Code subagents plus three informational
-SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`);
-both run in Claude Code and in Cowork, but not in a plain Claude.ai Chat session (there they show up
-grayed out). Only the skills stay available in Chat. See the family README's
-[Where this runs](claude-code-plugins/claude-specialists/README.md#where-this-runs-chat-cowork-and-claude-code)
-section for the sourced detail.
-
-**Loading strategy (deliberate, to save context/tokens):** only the operating manual of the
-orchestrator (Chris) is loaded automatically (`@` at the bottom of this file), because he is
-involved in every assignment. The other specialists are read **on demand**, at the moment Chris assigns work to them; how that
-mechanism works (portable playbook + repo lens) is described in the **Specialists handbook**
-[`.claude/plugins/claude-specialists/README.md`](.claude/plugins/claude-specialists/README.md#persona-or-subagent--one-specialist-two-representations).
-
-**Team structure & organization** — the roster, the routing, and the structural conventions (persona
-vs. subagent, the two-part manual split, the stable-id system) live in the **Specialists handbook**
-[`.claude/plugins/claude-specialists/README.md`](.claude/plugins/claude-specialists/README.md). The roster and the routing are also listed below in
-the repo slot.
-
----
-
 ## Safety rules
 
 **Constitution — read this first.** These rules are broadly shared and take precedence over any
@@ -118,7 +72,7 @@ destructive actions above happen only on Dave's explicit request.
   important lesson or discovers something that must be remembered for next time, it is recorded
   immediately in the relevant doc(s) — `README.md`, this `CLAUDE.md`, or a manual/agent def
   — a memory note alone is too noncommittal. (In this repo that is the technical-writer specialist,
-  [Tessa #16](.claude/plugins/claude-specialists/specialists/06-16-extension.md).)
+  [Tessa #16](.claude/specialists/lenses/06-16-extension.md).)
 - Within a branch, be proactive about creating new folders/files as soon as a new topic comes up.
   Don't ask permission first for the file structure itself; do ask for the content if something is
   sensitive or uncertain.
@@ -176,59 +130,6 @@ layers instead of in every session. Two things to know before moving anything el
 So only content that is inert until you open a matching file belongs there. Decision by Dave,
 July 20, 2026; sharpened July 21 and July 26, 2026.
 
-### The team: roster & routing
-
-Small and maintenance-focused. The portable playbooks come from the `specialists` plugin; each
-specialist's repo lens lives in [`.claude/plugins/claude-specialists/specialists/`](.claude/plugins/claude-specialists/specialists/).
-
-| Specialist | Title | Specialty | Repo lens |
-|---|---|---|---|
-| **Chris** 🧭 #01 | Chief of Staff | Orchestrator: intake, routing, explanation, workflow monitoring. Every assignment starts and ends with him. | [`01-01-extension.md`](.claude/plugins/claude-specialists/specialists/01-01-extension.md) |
-| **Bianca** 🎙️ #02 | Biographer | Intake interviews: a back-and-forth conversation with the requester to get a subject on paper | [`03-02-extension.md`](.claude/plugins/claude-specialists/specialists/03-02-extension.md) |
-| **Derek** 🐙 #05 | DevOps Engineer | Branches, pull requests, merges, labels, `gh` CLI — up to and including the merge | [`05-05-extension.md`](.claude/plugins/claude-specialists/specialists/05-05-extension.md) |
-| **Rendall** 🎬 #06 | Release Manager | Changelog, folding entry files, and the repo-wide release (`cut-release.ps1`): lockstep version bump + git tag `vX.Y.Z` + `## Releases` block | [`05-06-extension.md`](.claude/plugins/claude-specialists/specialists/05-06-extension.md) |
-
-**Only the four main-loop personas are described here, and that is deliberate.** They ship as
-personas, not subagents, so they appear in **no** always-on listing — this table is the only place they
-exist for a session. Subagent descriptions are the opposite: Claude Code already loads every enabled
-plugin's into every session, so repeating them here only cost tokens (~750/session).
-**Do not restore them** — the method and the numbers are in
-[Nolan #25's lens](.claude/plugins/claude-specialists/specialists/06-25-extension.md).
-
-The subagents of the enabled `specialists` plugin, by id — their descriptions are already in context,
-so this line is for **you** and for the roster-sync check:
-
-`02-09` Paula (Project Planner) · `03-07` Rebecca (Research) · `04-11` Vera (Data Analyst) ·
-`04-12` Gwen (Designer) · `04-13` Cody (App Developer) · `04-18` Tycho (Test Engineer) ·
-`05-15` Sylvester (System Administrator) · `06-16` Tessa (Technical Writer) · `06-17` Edith (Copy
-Editor) · `06-19` Victor (Code Reviewer) · `06-23` Sebastian (Security Engineer) · `06-24` Ravi
-(Refactoring) · `06-25` Nolan (Performance) · `06-29` Marlowe (Investigative Journalist) ·
-`06-30` Auden (Long-form Writer)
-
-Each has a repo lens at `.claude/plugins/claude-specialists/specialists/<g>-<id>-extension.md`. For a
-full description, run `claude plugin details specialists@davekjohns-workshop` or read their manual.
-
-**Every specialist the enabled plugins ship is listed above, without exception.** Some have little or
-no work in this maintenance repo (Bianca's intake interviews, Paula's timelines, Vera's dashboards,
-Gwen's visuals, Cody's application code, Auden's long-form writing), and their repo lens is therefore
-an empty `VUL-IN` scaffold. **That is the intended state, not a backlog item.** A lens waits, filled in
-on the day that specialist first has work here.
-
-Five of those six used to be left off the roster and registered in `Get-RosterIgnoredIds` instead
-(Bianca joined them briefly on July 28, 2026). That list turned out never to have been a decision:
-it was introduced by the same commit that built the roster check, pre-populated to keep that new check
-quiet, and justified in the code as "a documented choice in CLAUDE.md" while this file only ever said
-those specialists had no lens *yet*. Dave, asked about it on July 28, 2026, did not recognise the list
-as his — so the six were adopted and the list is empty. **Adopting a specialist that arrives with a
-plugin update is the default and needs no approval**; the ignore-list is now reserved for a deliberate,
-self-authored exception. See the `sync-roster` skill for the reasoning.
-
-The full routing (which assignment goes to whom) and the chains are in
-[Chris's manual #01](.claude/plugins/claude-specialists/specialists/01-01-extension.md) and the
-[Specialists handbook](.claude/plugins/claude-specialists/README.md). New specialists are **never**
-invented on anyone's own initiative — only in consultation with Dave (see
-[Chris #01](.claude/plugins/claude-specialists/specialists/01-01-extension.md#new-specialists--only-by-agreement)).
-
 ### Structure — where everything lives
 
 The full repo layout (`.claude-plugin/`, `claude-code-plugins/` incl. `connectors/` and
@@ -242,27 +143,27 @@ The constitution above, concretely implemented here:
 - **The main branch is `main`.** All changes via a `<prefix>/<short-name>` branch + PR to
   `main`. Valid prefixes ([`scripts/lib/branch-info.ps1`](scripts/lib/branch-info.ps1)):
   `feat/` → enhancement · `fix/` → bug · `docs/` → documentation · `chore/` → documentation. See
-  [Derek #05](.claude/plugins/claude-specialists/specialists/05-05-extension.md#classifying-naming-and-creating-a-branch).
+  [Derek #05](.claude/specialists/lenses/05-05-extension.md#classifying-naming-and-creating-a-branch).
 - **The lint and test gates are the safety guard before every PR.**
   [`scripts/lint/check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1) validates the
   manifests (`marketplace.json` + every `plugin.json`) and the agent-def and manual frontmatter, and
   scans for dead links; after that all test suites run (`scripts/tests/*.tests.ps1`), exactly as CI
   does. `open-pr.ps1` runs both gates first; on an error or a failing suite nothing is pushed and
-  no PR is opened (`-SkipLint`/`-SkipTests` are the escape valves). See [Sylvester #15](.claude/plugins/claude-specialists/specialists/05-15-extension.md).
+  no PR is opened (`-SkipLint`/`-SkipTests` are the escape valves). See [Sylvester #15](.claude/specialists/lenses/05-15-extension.md).
 - **Two deliberate exceptions to "never directly on `main`":**
   1. The **fold commit** after a merge: [`fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)
      folds the entry file into `CHANGELOG.md` and removes it — scope limited to `CHANGELOG.md` +
-     the entry file. See [Rendall #06](.claude/plugins/claude-specialists/specialists/05-06-extension.md#changelog).
+     the entry file. See [Rendall #06](.claude/specialists/lenses/05-06-extension.md#changelog).
   2. The **release commit** (only on explicit request): [`cut-release.ps1`](scripts/release/cut-release.ps1)
      bumps all plugin versions in lockstep, generates the release notes in `releases/development/`,
      references them from `## Releases`, (re)generates each plugin's consumer-facing `RELEASE.md`
      card, commits that on `main`, and tags `vX.Y.Z`. Deliberately no branch/PR — just like the
-     fold. See [Rendall #06](.claude/plugins/claude-specialists/specialists/05-06-extension.md#versioning--releases).
+     fold. See [Rendall #06](.claude/specialists/lenses/05-06-extension.md#versioning--releases).
 - **This repo is `public`.** A deliberate choice, so the remote `github` marketplace source can be
   read without gh auth. Consequence: **nothing confidential** belongs here — no personal
   information, credentials, or secrets. The group 1 agent defs are therefore deliberately
   repo-neutral; repo-specific context lives in the consuming (private) repo's
-  `.claude/plugins/claude-specialists/specialists/` lens.
+  `.claude/specialists/lenses/` lens.
 - **Changes to shared agent defs land here first**, are committed here, and only then picked up by
   the consuming repos — never the other way around.
 
@@ -275,8 +176,9 @@ language, the concrete `main` branch and fold exception, the scripts, and the pl
 belongs to this repo and sits in this slot.
 
 The orchestrator (Chris) is always loaded along; he refers on demand to the specialists in
-[`.claude/plugins/claude-specialists/specialists/`](.claude/plugins/claude-specialists/specialists/).
+[`.claude/specialists/lenses/`](.claude/specialists/lenses/).
 
-@~/.claude/plugins/marketplaces/davekjohns-workshop/claude-code-plugins/claude-specialists/specialists/personas/01-01-persona.md
+The orchestrator (Chris) is always loaded -- portable body from plugin install and repo lens
+from `.claude/specialists/`; that file carries the body import, the lens import and this repo's roster.
 
-@.claude/plugins/claude-specialists/specialists/01-01-extension.md
+@.claude/specialists/SPECIALISTS.md

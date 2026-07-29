@@ -51,7 +51,11 @@ function Get-LintScript {
 # decide which agent ids are "present in the roster". Repo-root-relative; 'CLAUDE.md' by default.
 # There is deliberately NO Get-RosterFormat: the check is format-agnostic (it scans the text for each
 # <group>-<id> token), so it works whether the roster is a table or a list.
-$script:RosterPath = 'CLAUDE.md'
+# The roster moved behind the seam (issue #221): CLAUDE.md now carries one import line and no roster,
+# so check-roster-sync must read the inclusion instead. Getting this wrong is silent in the worst way --
+# the check would find zero specialists in a file that legitimately has none, and report the whole roster
+# as missing.
+$script:RosterPath = '.claude/specialists/SPECIALISTS.md'
 
 function Get-RosterPath {
     <# Repo-root-relative path to the file that holds the roster (specialists table/list). #>
