@@ -246,6 +246,21 @@ infrastructure.
   file that was BOM-less — a "clean" restore that shows up as a modified file. When a probe needs to
   mutate a tracked file temporarily, undo it with `git checkout -- <path>` rather than rewriting the
   captured content.
+- **Never run `claude plugin marketplace remove` from a repo whose `.claude/settings.json` you want to
+  keep.** What was observed on July 29, 2026: the removal reaches the settings of the directory it is run
+  *from*, not only the scope the marketplace was registered in. Run it from a throwaway directory
+  instead. Recorded with its gap named rather than smoothed over: the operating rule and the effect were
+  captured, the exact scope resolution behind them was not — and the one experiment that would pin that
+  down is the one that destroys a real `settings.json`. So this stays an operating rule with an
+  unverified mechanism, and it is explicitly **not** to be "confirmed" by running the command anywhere
+  that matters. Sibling in spirit of the `-First N` lesson above: the cheap way to be sure is the
+  expensive way to be wrong.
+- **When a tool refuses with "auto mode cannot determine the safety", retry it — do not route around it
+  via the Bash tool.** A recurring platform fault on July 29, 2026 made PowerShell and Edit calls refuse
+  intermittently; it comes and goes, and a plain retry clears it. That the Bash tool can usually do the
+  same work is exactly the trap, because it makes the workaround feel like resourcefulness: reaching for
+  it converts a transient refusal into a deliberate bypass of the safety decision that produced the
+  refusal. The refusal is not the obstacle to route around — it is the mechanism working. Wait it out.
 - This repo is **public**: config never contains secrets.
 
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**

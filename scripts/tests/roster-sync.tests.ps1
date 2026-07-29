@@ -103,13 +103,17 @@ function New-FixtureCache {
     return $cache
 }
 
-# Builds a fixture consumer repo-root. RosterIds -> written into the roster file; LensIds -> lens files
-# on the plugin-path; LegacyLensIds -> lens files on the legacy path; OffPathLensIds -> lens files on a
-# NON-canonical family segment, the way a pre-#179 bootstrap wrote them.
+# Builds a fixture consumer repo-root. RosterIds -> written into the roster file; SeamLensIds -> lens
+# files in THE SEAM (.claude/specialists/lenses, issue #221 -- where a fresh consumer's lenses land);
+# LensIds -> lens files on the pre-seam plugin-path; LegacyLensIds -> lens files on the legacy path;
+# OffPathLensIds -> lens files on a NON-canonical family segment, the way a pre-#179 bootstrap wrote them.
 function New-FixtureConsumer {
     param(
         [string[]]$RosterIds = @(),
         [string[]]$LensIds = @(),
+        # The seam lens dir is flat and plugin-independent on purpose (ids are unique family-wide), so
+        # unlike $LensIds this takes no plugin segment -- a second plugin's lenses land in the same dir.
+        [string[]]$SeamLensIds = @(),
         [string[]]$LegacyLensIds = @(),
         [string[]]$OffPathLensIds = @(),
         [string]$OffPathFamily = 'davekjohns-workshop',
@@ -156,6 +160,11 @@ function New-FixtureConsumer {
             $body = if ($LensContent.ContainsKey($id)) { $LensContent[$id] } else { 'lens' }
             [System.IO.File]::WriteAllText((Join-Path $pdir "$id-extension.md"), $body)
         }
+    }
+    if ($SeamLensIds.Count -gt 0) {
+        $sdir = Join-Path $root '.claude\specialists\lenses'
+        New-Item -ItemType Directory -Path $sdir -Force | Out-Null
+        foreach ($id in $SeamLensIds) { [System.IO.File]::WriteAllText((Join-Path $sdir "$id-extension.md"), "lens") }
     }
     if ($LegacyLensIds.Count -gt 0) {
         $ldir = Join-Path $root '.claude\extensions'
@@ -389,6 +398,18 @@ try {
     Assert-Match 'has no roster row' $r.Out 'lenses but no roster: the per-specialist errors stand'
     Assert-NotMatch '\[BOOTSTRAP\]' $r.Out 'lenses but no roster: NOT reported as never bootstrapped'
 
+    #     And the same case with the lenses in THE SEAM, which is where every consumer bootstrapped
+    #     since #221 has them. The $anyLensFile probe scanned only .claude/plugins and
+    #     .claude/extensions, so a seam consumer looked lens-less and a single unfilled roster was
+    #     enough to declare a fully set-up repo "never bootstrapped" -- swallowing every real finding
+    #     behind advice to run specialists-init on a repo whose whole lens tree is already in place.
+    #     Same pre-seam hardcode as the off-path bug in 9c, in a second place in the same file.
+    $c = New-FixtureConsumer -RosterIds @() -LensIds @() -SeamLensIds @('06-16', '06-24')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 1 $r.Code 'seam lenses but no roster: exit-code 1 -- real drift'
+    Assert-Match 'has no roster row' $r.Out 'seam lenses but no roster: the per-specialist errors stand'
+    Assert-NotMatch '\[BOOTSTRAP\]' $r.Out 'seam lenses but no roster: a seam consumer is NOT reported as never bootstrapped'
+
     # --- 5e. An uninstalled plugin must NOT be mistaken for an unbootstrapped repo -----------------
     #     Regression guard: the first version of the #225 fix short-circuited BEFORE plugin resolution,
     #     so a repo whose plugin is not in the cache was told to run specialists-init when the real
@@ -507,6 +528,34 @@ try {
     Assert-Match "\[OK\]\s+agent '06-16' present in roster \+ lens" $r.Out 'off-path lens: counted as present'
     Assert-Match '\[INFO\].*2 lens file\(s\).*davekjohns-workshop.*canonical' $r.Out 'off-path lens: one INFO per directory naming the misalignment'
     Assert-Equal 1 ([regex]::Matches($r.Out, 'instead of the canonical').Count) 'off-path lens: reported once per directory, not once per lens'
+
+    # --- 9c. THE SEAM is the canonical lens location, not merely a tolerated one (issue #221) -------
+    #     Regression for the bug this scenario was added with. Get-CanonicalLensDir hardcoded the
+    #     PRE-SEAM .claude/plugins/<family>/<plugin>/ path while the shared source it was supposed to
+    #     agree with (Get-LensDirCandidates) had already made the seam candidate 0. So a repo that
+    #     migrated onto the seam had every one of its OWN lenses reported as living somewhere
+    #     non-canonical, with the remedy pointing back at the layout it had just left -- a reader
+    #     following that advice would undo the migration. Measured in this workshop right after PR #255:
+    #     one [INFO] covering all 19 lenses. The seam is canonical, so the run must be COMPLETELY clean
+    #     -- asserting "no ERROR" would not have caught this, since the false finding was an [INFO].
+    $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16', '06-17') }
+    $c = New-FixtureConsumer -RosterIds @('06-16', '06-17') -SeamLensIds @('06-16', '06-17')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 0 $r.Code 'seam lens: exit-code 0'
+    Assert-Match "\[OK\]\s+agent '06-16' present in roster \+ lens" $r.Out 'seam lens: found in the seam and counted as present'
+    Assert-NotMatch 'instead of the canonical' $r.Out 'seam lens: the canonical location is NOT reported as a misalignment'
+    Assert-Match 'Summary: 0 error\(s\), 0 info signal\(s\)' $r.Out 'seam lens: a migrated repo reports completely clean'
+
+    # --- 9d. The pre-seam plugin path stays tolerated, and silently -------------------------------
+    #     The guard that keeps 9c from being "fixed" by swapping one hardcoded path for another.
+    #     Get-LensWriteDir deliberately keeps writing to an existing pre-seam tree (the bootstrap never
+    #     relocates a file the repo owner owns), and the family README treats migrating as the owner's
+    #     act -- so the reader must not nag about a layout the writer itself still produces.
+    $c = New-FixtureConsumer -RosterIds @('06-16', '06-17') -LensIds @('06-16', '06-17')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 0 $r.Code 'pre-seam lens: exit-code 0'
+    Assert-NotMatch 'instead of the canonical' $r.Out 'pre-seam lens: a location the writer still uses is not off-path'
+    Assert-Match 'Summary: 0 error\(s\), 0 info signal\(s\)' $r.Out 'pre-seam lens: reports clean too'
 
     # --- 10. Ignore-list: an enabled agent deliberately kept out of the roster/lenses is skipped ---
     #     04-11 is an agent with no roster row and no lens, but repo-config's Get-RosterIgnoredIds
