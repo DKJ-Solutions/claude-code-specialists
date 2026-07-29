@@ -271,11 +271,47 @@ repo. Because a plugin skill cannot hook itself in, the path is two-stage:
 > [Removal: the teardown gap](#removal-the-teardown-gap) below.** This section used to justify the
 > bootstrap with "a plugin injects no main-loop context and edits no `CLAUDE.md`". The second half is
 > true and documented. The first is not: a plugin **can** activate one of its own agents as the main
-> thread via a root `settings.json`. That does not make the bootstrap redundant today — Chris's body
-> is written for a director *inside* a general-purpose loop and would be crippling as the main
-> thread's own system prompt, so it needs rewriting first — but the `@`-import is not the only
-> possible delivery mechanism, and it is the single worst thing left behind on uninstall. Finding and
-> blocker: [issue #215](https://github.com/DaveKJohn/davekjohns-workshop/issues/215).
+> thread via a root `settings.json` — and the `@`-import is both the only reason the bootstrap exists
+> and the single worst thing left behind on uninstall. Finding:
+> [issue #215](https://github.com/DaveKJohn/davekjohns-workshop/issues/215).
+
+### Delivering the orchestrator from the plugin — verified, deliberately not switched on
+
+The mechanism was read from the docs rather than assumed (July 29, 2026), because the whole bootstrap
+path turns on whether it exists:
+
+- **It does what the issue claimed.** *"Plugins can include a `settings.json` file at the plugin root
+  to apply default configuration when the plugin is enabled. Currently, only the `agent` and
+  `subagentStatusLine` keys are supported."* And: *"Setting `agent` activates one of the plugin's
+  custom agents as the main thread, applying its system prompt, tool restrictions, and model."*
+  Unknown keys are silently ignored, and `settings.json` takes priority over `settings` in
+  `plugin.json`.
+- **The compaction worry dissolves in this route rather than being small.** The context-window
+  reference flags exactly one startup block as not re-injected after `/compact` — the **skill**
+  descriptions (*"Only skills you actually invoked get preserved"*). Agent descriptions carry no such
+  flag. More decisively: a main-thread agent's body **is** the system prompt, which travels with every
+  request by construction. There is nothing left to compact away.
+- **The blocker is gone as of this release.** Chris's body used to say he *"never executes anything
+  himself"*, which is workable as a role inside a general-purpose loop and crippling as a system
+  prompt. It now forbids **unattributed** work rather than typing: every action is taken in the owning
+  specialist's name, announced first, under their craft rules — by handing off to a subagent where
+  subagents exist, and otherwise by Chris doing that specialist's work under their name. The old
+  wording was internally inconsistent anyway: ritual step 5 has always said *"execute according to
+  their trade rules"*.
+
+**So why is the switch still off?** Three reasons, and the first is the one that decides it:
+
+1. **What happens when two enabled plugins both set `agent` is not documented** — not on the plugins
+   page, not in the reference. A consumer who enables any other plugin that also sets it gets
+   behaviour nobody has written down. That is a poor thing to discover through your main thread.
+2. **It changes every consumer's main loop on their next plugin update**, from a version bump they did
+   not read. Outward-facing and effectively irreversible for anyone who pulls it before a revert.
+3. **Chris ships as a persona, not a subagent, so there is no `agents/01-01-agent.md` to point at.**
+   Creating one is not a formality: that file's `tools:` and `model` would become **the whole main
+   thread's** tool policy and model.
+
+The body is therefore ready and the switch is not thrown. Flipping it is Dave's call, and the honest
+prerequisite is settling point 1 by experiment rather than by reading.
 
 - **Step 0 (manual).** Put the marketplace source + `enabledPlugins` in `.claude/settings.json`
   (see [Consumption](../../README.md#consumption) in the root README) and **restart** the session —
