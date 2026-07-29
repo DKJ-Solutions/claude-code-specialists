@@ -107,8 +107,22 @@ gh pr merge <branch> --merge --delete-branch --subject "merge: <branch> (#<PR-nu
 
 `--merge` creates a **merge commit** (no squash/rebase — preserves the individual commits).
 `--subject` gives the merge commit the `merge:` prefix. `--delete-branch` cleans up the branch
-(remote + local). Then synchronize: `git checkout main` followed by `git pull --ff-only` (two
-statements — see the `&&` note just below).
+(remote + local). Then synchronize with `git checkout main` followed by
+`git merge --ff-only origin/main` (two statements — see the `&&` note just below), preceded by a
+`git fetch --prune` if you have not already fetched.
+
+**Use `git merge --ff-only origin/main`, not a bare `git pull --ff-only`, for that sync (lesson of
+July 29, 2026, PR #257).** The bare pull failed there with `fatal: Cannot fast-forward to multiple
+branches` on a clean `main` immediately after `gh pr merge --delete-branch` plus a
+`git fetch --prune` that removed two remote refs; the explicit merge ran straight through and
+fast-forwarded correctly. Git emits that error when it is handed **more than one** ref to merge, and
+why the pull got more than one was **not established** — the repo's config is ordinary (a single
+`remote.origin.fetch` refspec, `branch.main.merge` naming one ref, `pull.rebase=false`), and a
+later inspection showed a single `for-merge` line in `FETCH_HEAD`. So this is deliberately not
+recorded as a mechanism note. The rule stands on its own reasoning instead: the explicit form names
+exactly one ref, so it cannot reach that failure mode at all, while the bare pull's behaviour depends
+on whatever `FETCH_HEAD` happens to contain. Prefer the deterministic command for a step that sits in
+the middle of the merge → fold chain, where a stall leaves `main` in a half-finished state.
 
 **Never chain `gh pr checks --watch` onto a merge in one command (lesson of July 29, 2026).** The
 watch only waits when there is something to wait for: if no run has started yet it returns
