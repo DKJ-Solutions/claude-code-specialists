@@ -191,8 +191,8 @@ Cowork and in Claude Code — in a plain Claude.ai Chat session they show up gra
 Concretely for davekjohns-workshop: the specialists roster (the subagents under Chris) and the three
 SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`)
 function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
-<!-- skills:all -->(`fold-changelog`, `open-pr`, `new-branch`, `park`, `specialists-init`, `sync-roster`, `start-task`,
-`cut-release`)<!-- /skills:all --> remain available there.
+<!-- skills:all -->(`fold-changelog`, `open-pr`, `new-branch`, `park`, `specialists-init`, `specialists-teardown`,
+`sync-roster`, `start-task`, `cut-release`)<!-- /skills:all --> remain available there.
 
 Skills themselves are Anthropic's general **Agent Skills** mechanism — organized folders of
 instructions/scripts/resources that an agent discovers and loads progressively (name + description
@@ -206,8 +206,9 @@ interchangeable with — a Claude Code subagent.
 ## How we use skills — and what we deliberately don't
 
 <!-- skills:all -->Most skills in davekjohns-workshop today (`fold-changelog`, `open-pr`, `new-branch`, `park`,
-`specialists-init`, `sync-roster`, `start-task`) are a thin wrapper around a script — procedural
-**mechanism** (branch, PR, fold, bootstrap, roster-sync). `cut-release`<!-- /skills:all --> is the deliberate exception:
+`specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`) are a thin wrapper around a
+script — procedural **mechanism** (branch, PR, fold, bootstrap, teardown, roster-sync).
+`cut-release`<!-- /skills:all --> is the deliberate exception:
 a checklist with no script of its own (see below). Either way, the specialists' craft and judgment
 live in the persona/manual context (agent defs), not in skills. That's a deliberate split, but it
 also means we currently use only one half of what Agent Skills can carry.
@@ -331,6 +332,40 @@ So a teardown that deletes indiscriminately destroys governance and repo knowled
 which is worse than leaving clutter. **The actual defect is not that too much lives in the consumer —
 it is that category 2 is *woven in* rather than *bolted on*.** 101 mentions spread through one file
 cannot be removed cleanly; one import pointing at one directory can.
+
+### What exists now: the `specialists-teardown` skill
+
+**Built July 29, 2026** — the third item of the target shape below, and the half that could be built
+and tested without restructuring anything first. [`specialists-teardown`](specialists/skills/specialists-teardown/SKILL.md)
+is the bootstrap's mirror image: where `specialists-init` is strictly **additive** and never
+overwrites, the teardown is strictly **subtractive** and never deletes what the owner wrote.
+
+It classifies before it removes, along exactly the three categories below:
+
+| category | what happens |
+|---|---|
+| generated and untouched (a lens still carrying its `VUL-IN` marker, an unfilled script scaffold, the `@`-imports, `settings.suggested.jsonc`) | **removed** |
+| authored by the owner (a filled-in lens) | **reported, never touched** |
+| owned by the repo anyway (a real `repo-config.ps1`, a filled branch table) | **reported as yours to keep or drop** |
+
+The `VUL-IN` marker is the test, because that is the exact contract the bootstrap writes those files
+under — its absence means somebody edited the file, which makes the file theirs. It is a content test
+rather than a timestamp or hash on purpose: a reformat or a merge does not make content authored.
+
+**Dry run by default**; `-Apply` acts. Two things it deliberately refuses to do: it never edits
+`.claude/settings.json` (disabling the plugin is the owner's act, and the bootstrap never wrote that
+file either — the symmetry cuts both ways), and it never removes roster rows or repo prose from
+`CLAUDE.md`. The only lines it touches there are the two `@`-imports, safe because an import naming a
+persona body or an extension lens is knowably bootstrap-written — the same property that let
+`check-roster-sync` stop counting them as roster rows (#227).
+
+**Measured round-trip** (`scripts/tests/teardown.tests.ps1`): bootstrap a fixture → 24 items placed →
+teardown removes 22 and keeps the 2 the owner filled in, with the owner's own `CLAUDE.md` prose intact.
+
+**What it still cannot finish, and why that is the seam's problem rather than the skill's.** A repo that
+authored lenses and roster sections is not blank afterwards: those are reported, not removed. As long as
+specialist content is woven through `CLAUDE.md` instead of sitting behind one inclusion, no script can
+finish the job without guessing where a roster row ends and the owner's prose begins.
 
 ### What the ideal shape looks like
 
