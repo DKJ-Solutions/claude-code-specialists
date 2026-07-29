@@ -137,6 +137,43 @@ function Get-PluginManifestPaths {
     }
 }
 
+function Get-FencedLineFlags {
+    <#
+        Returns a bool per input line: is that line inside a fenced code block?
+
+        Exists because markdown structure tests -- '^### ' for an entry heading, '^---$' for a
+        separator -- must not fire on text an entry body QUOTES. An entry may legitimately show a
+        broken heading structure or a YAML frontmatter example, and treating that as structure is how
+        cutting v2.13.3 produced a third entry from two PRs, split a fence open, and duplicated a
+        category heading in the release notes.
+
+        The fence line ITSELF is reported as fenced ($true), so a caller that skips fenced lines keeps
+        the fence markers with the content rather than stripping them and leaving the body inside
+        rendered as prose.
+
+        Deliberately simple: a line whose first non-space characters are ``` or ~~~ toggles the state.
+        That is CommonMark's own rule for the common cases and needs no parser. Nested fences of the
+        same kind are not a thing in CommonMark, and an unclosed fence leaves the tail flagged as
+        fenced -- which is the safe direction, since it stops the parser inventing structure out of
+        code.
+    #>
+    # Not Mandatory, and both Allow* attributes: a changelog section can legitimately be a single
+    # empty line, and a Mandatory [string[]] rejects '' outright (ParameterArgumentValidationError).
+    param([AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines = @())
+    if ($null -eq $Lines) { return @() }
+    $flags = New-Object 'bool[]' $Lines.Count
+    $inFence = $false
+    for ($i = 0; $i -lt $Lines.Count; $i++) {
+        if ($Lines[$i] -match '^\s*(```|~~~)') {
+            $flags[$i] = $true          # the marker belongs to the block
+            $inFence = -not $inFence
+        } else {
+            $flags[$i] = $inFence
+        }
+    }
+    return $flags
+}
+
 function Split-Changelog {
     <#
         Private helper: parses CHANGELOG.md into its parts. Returns an object with Nl, Head
@@ -162,7 +199,10 @@ function Split-Changelog {
 
     $prBody = @($lines[($prIdx + 1)..($relIdx - 1)])
     $prFirst = -1
-    for ($i = 0; $i -lt $prBody.Count; $i++) { if ($prBody[$i] -match '^###\s') { $prFirst = $i; break } }
+    # Fence-aware here too: a '###' quoted inside a fence in the section intro would otherwise be read
+    # as the first entry, putting the intro/entries boundary in the middle of a code block.
+    $prFenced = Get-FencedLineFlags -Lines $prBody
+    for ($i = 0; $i -lt $prBody.Count; $i++) { if ((-not $prFenced[$i]) -and $prBody[$i] -match '^###\s') { $prFirst = $i; break } }
     if ($prFirst -lt 0) { throw "No changelog entries under '## Pull Requests' -- nothing to release." }
 
     $prIntro = if ($prFirst -gt 0) { @($prBody[0..($prFirst - 1)]) } else { @() }
@@ -170,14 +210,24 @@ function Split-Changelog {
 
     # Split entry lines into blocks: a new block starts at every '### ' heading. '---' separators
     # between entries are skipped.
+    #
+    # BOTH of those tests must ignore FENCED CODE BLOCKS. An entry body may legitimately quote markdown
+    # -- a broken heading structure, a YAML frontmatter example -- and without fence awareness the
+    # parser reads that quoted text as structure. Measured while cutting v2.13.3: an entry that quoted
+    # a '### #242 ...' line inside a ``` fence produced a THIRD entry from two PRs, split the fence
+    # open, and duplicated '## Fixes' in the generated notes. Caught by -NoPush before it shipped.
+    # Fourth instance of the same defect class in one day (#227, #235, and the teardown's VUL-IN test):
+    # a matcher satisfied by a MENTION rather than a use.
+    $fenced = Get-FencedLineFlags -Lines $entryLines
     $entries = @()
     $cur = $null
-    foreach ($ln in $entryLines) {
-        if ($ln -match '^###\s') {
+    for ($i = 0; $i -lt $entryLines.Count; $i++) {
+        $ln = $entryLines[$i]
+        if ((-not $fenced[$i]) -and $ln -match '^###\s') {
             if ($null -ne $cur) { $entries += (($cur -join $nl).Trim()) }
             $cur = @($ln)
         } elseif ($null -ne $cur) {
-            if ($ln -match '^---\s*$') { continue }
+            if ((-not $fenced[$i]) -and $ln -match '^---\s*$') { continue }
             $cur += $ln
         }
     }
