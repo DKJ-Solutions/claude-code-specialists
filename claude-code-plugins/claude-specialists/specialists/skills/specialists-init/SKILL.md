@@ -48,24 +48,31 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/skills/specialists-init/boots
 
 The script performs only **safe, additive** actions — it never overwrites existing content:
 
+**Where the lenses land — the seam (issue #221).** A **fresh** consumer gets one directory and one
+line: lenses flat in `.claude/specialists/lenses/`, everything else behind
+`.claude/specialists/SPECIALISTS.md`, and a single `@`-import in `CLAUDE.md`. A consumer that
+**already has a lens tree** on the pre-seam plugin path (`.claude/plugins/<family>/<plugin>/`) keeps
+writing there — this script never relocates a file the repo owner owns, and splitting the surface
+across both paths would be worse than either. Migrating is your act, four steps, described in the
+[family README](../../../README.md#the-seam-specified). Every reader accepts both layouts.
+
 1. **Persona lenses (lens-only)** — for each main-loop persona (Chris `01-01`, Derek `05-05`,
-   Rendall `05-06`), puts a `*-extension.md` in place on the consumer's **plugin path**
-   `.claude/plugins/<family>/<plugin>/`, only if it is not already there. The lens
-   carries **no body copy** — only the repo-lens slot; the portable body comes via an `@`-import
-   directly from the plugin install.
+   Rendall `05-06`), puts a `*-extension.md` in place in the lens directory chosen above, only if it
+   is not already there. The lens carries **no body copy** — only the repo-lens slot; the portable
+   body comes via an `@`-import directly from the plugin install.
 2. **Empty lens scaffolds** — for each subagent of the **enabled** plugin(s), puts an empty
-   `VUL-IN` scaffold in place on that same plugin path
-   (`.claude/plugins/<family>/<plugin>/<g>-<id>-extension.md`, never overwriting). This makes it
+   `VUL-IN` scaffold in place in that same directory (never overwriting). This makes it
    visible from the first install where the repo-specific tasks per specialist are to be filled in;
-   the agent-def automatically reads the lens along once it is filled.
+   the agent-def automatically reads the lens along once it is filled. In the seam the directory is
+   **flat**: `<group>-<id>` is unique family-wide, so several enabled plugins share one `lenses/`.
 3. **Script-config scaffolds (#86)** — puts `scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1`
    in place as `VUL-IN` scaffolds (never overwriting, with an **empty** branch table — the taxonomy
    differs per repo). Without these two files, the shared workflow skills `open-pr`/`fold` break on
    a clean consumer over a missing file.
-4. **The two `@`-imports** — ensures `CLAUDE.md` carries the orchestrator at the bottom via two
-   imports: the portable body from the plugin install and the repo lens
-   (`@.claude/plugins/<family>/<plugin>/01-01-extension.md`). Creates a minimal `CLAUDE.md` scaffold
-   if it is missing.
+4. **The import(s)** — ensures `CLAUDE.md` carries the orchestrator at the bottom. In the seam that is
+   **one** line, `` `@.claude/specialists/SPECIALISTS.md` ``, and that file carries the body import, the
+   lens import and this repo's roster slot; on the pre-seam path it stays the two imports it always was
+   (portable body + repo lens). Creates a minimal `CLAUDE.md` scaffold if it is missing.
 5. **Settings proposal** — writes `.claude/settings.suggested.jsonc` with the recommended
    `permissions.deny` + a hooks **stub**. It does **not** touch `settings.json`: a JSON merge is
    repo-specific and risky, so that judgment stays with you.

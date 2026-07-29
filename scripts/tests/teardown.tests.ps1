@@ -79,14 +79,14 @@ try {
     Assert-True ($r.Out -match 'DRY RUN') 'dry run: says so up front'
     Assert-True ($r.Out -match 'to remove') 'dry run: reports items as "to remove", not "removed"'
     Assert-Equal $lensesBefore (Get-LensCount) 'dry run: removed NOTHING -- lens count unchanged'
-    Assert-Equal 2 (Get-ImportCount) 'dry run: the @-imports are still there'
+    Assert-Equal 1 (Get-ImportCount) 'dry run: the seam import is still there'
     Assert-True ($r.Out -match 'Re-run with -Apply') 'dry run: tells the reader how to act'
 
     # --- 2. -Apply removes the generated set ---------------------------------------------------------
     $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
     Assert-Equal 0 $r.Code 'apply: exit-code 0'
     Assert-Equal 0 (Get-LensCount) 'apply: every generated lens is gone'
-    Assert-Equal 0 (Get-ImportCount) 'apply: both @-imports are gone from CLAUDE.md'
+    Assert-Equal 0 (Get-ImportCount) 'apply: the seam import is gone from CLAUDE.md'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\repo-config.ps1'))) 'apply: the untouched repo-config scaffold is gone'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\lib\branch-info.ps1'))) 'apply: the untouched branch-info scaffold is gone'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture '.claude\settings.suggested.jsonc'))) 'apply: the settings proposal is gone'
@@ -112,7 +112,7 @@ try {
     #     The assertion this whole script exists to earn. Deleting a filled-in lens to leave a tidy tree
     #     destroys repo knowledge somebody wrote -- a worse outcome than leaving clutter.
     New-BootstrappedConsumer | Out-Null
-    $authoredLens = Join-Path $Fixture '.claude\plugins\claude-specialists\specialists\06-16-extension.md'
+    $authoredLens = Join-Path $Fixture '.claude\specialists\lenses\06-16-extension.md'
     [System.IO.File]::WriteAllText($authoredLens, "# 06-16 repo lens`n`n## Specific to this repo`n`nTessa guards our API docs under docs/api/.")
     $authoredRc = Join-Path $Fixture 'scripts\repo-config.ps1'
     [System.IO.File]::WriteAllText($authoredRc, "function Get-RepoName { return 'someone/my-repo' }`nfunction Get-LintScript { return 'scripts/lint.ps1' }")
@@ -128,7 +128,7 @@ try {
     Assert-True ($r.Out -match 'EmptyLensPattern') 'authored content: the reader is pointed at the declared-convention escape hatch'
     Assert-True (-not ($r.Out -match 'kept \(authored\)')) 'authored content: no blanket authorship claim in the summary'
     # The directory must survive too -- pruning it would take the authored lens with it.
-    Assert-True (Test-Path -LiteralPath (Join-Path $Fixture '.claude\plugins')) 'authored content: the lens directory is not pruned while a kept file lives in it'
+    Assert-True (Test-Path -LiteralPath (Join-Path $Fixture '.claude\specialists\lenses')) 'authored content: the lens directory is not pruned while a kept file lives in it'
     # And the branch-info scaffold was still untouched, so it must still have gone.
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\lib\branch-info.ps1'))) 'authored content: the still-untouched scaffold is removed as normal'
 
@@ -155,7 +155,7 @@ function Get-RepoName { return `$script:RepoName }
 function Get-LintScript { return `$script:LintScript }
 "@)
     # Same shape on the lens side: an authored lens that happens to explain the scaffold convention.
-    $filledLens = Join-Path $Fixture '.claude\plugins\claude-specialists\specialists\06-16-extension.md'
+    $filledLens = Join-Path $Fixture '.claude\specialists\lenses\06-16-extension.md'
     [System.IO.File]::WriteAllText($filledLens, "# 06-16 repo lens`n`n## Specific to this repo`n`nTessa guards the docs. A lens may stay a VUL-IN scaffold until that specialist has work here.")
     $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
     Assert-Equal 0 $r.Code 'mention vs use: exit-code 0'
@@ -182,10 +182,10 @@ function Get-LintScript { return `$script:LintScript }
     #     '@docs/git-instructions.md' import is exactly the kind of line that a sloppy rule destroys,
     #     and the consumer would have no idea why their instructions stopped loading.
     New-BootstrappedConsumer -ExtraClaudeMdLines @('', '@docs/git-instructions.md', '@~/.claude/my-notes.md') | Out-Null
-    Assert-Equal 4 (Get-ImportCount) "unrelated imports: setup has 4 imports (2 specialist + 2 of the owner's)"
+    Assert-Equal 3 (Get-ImportCount) "unrelated imports: setup has 3 imports (1 seam + 2 of the owner's)"
     $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
     Assert-Equal 0 $r.Code 'unrelated imports: exit-code 0'
-    Assert-Equal 2 (Get-ImportCount) "unrelated imports: only the 2 specialist imports were removed"
+    Assert-Equal 2 (Get-ImportCount) "unrelated imports: only the seam import was removed -- the owner's 2 survive"
     $md = [System.IO.File]::ReadAllText((Join-Path $Fixture 'CLAUDE.md'), [System.Text.Encoding]::UTF8)
     Assert-True ($md -match [regex]::Escape('@docs/git-instructions.md')) "unrelated imports: the owner's own import survives"
     Assert-True ($md -match [regex]::Escape('@~/.claude/my-notes.md')) "unrelated imports: the owner's home-dir import survives"
@@ -216,7 +216,7 @@ function Get-LintScript { return `$script:LintScript }
         finally { $env:CLAUDE_PLUGIN_ROOT = $prevPlugin }
         Assert-Equal 0 $ri.Code "round-trip cycle ${cycle}: re-init exit 0"
         Assert-Equal 1 (Get-NoteCount) "round-trip cycle ${cycle}: STILL exactly one note line -- no accumulation"
-        Assert-Equal 2 (Get-ImportCount) "round-trip cycle ${cycle}: exactly two imports restored"
+        Assert-Equal 1 (Get-ImportCount) "round-trip cycle ${cycle}: exactly one import restored"
     }
 
     # --- 6b2. The bootstrap's own guard, ISOLATED ----------------------------------------------------
@@ -237,7 +237,7 @@ function Get-LintScript { return `$script:LintScript }
     finally { $env:CLAUDE_PLUGIN_ROOT = $prevPlugin }
     Assert-Equal 0 $rg.Code 'isolated guard: re-init exit 0'
     Assert-Equal 1 (Get-NoteCount) 'isolated guard: STILL one note -- the bootstrap tidied the leftover'
-    Assert-Equal 2 (Get-ImportCount) 'isolated guard: the imports are restored'
+    Assert-Equal 1 (Get-ImportCount) 'isolated guard: the import is restored'
 
     # --- 6c. NO LINE-ENDING DRIFT ---------------------------------------------------------------------
     #     Also measured there: the bootstrap pasted a "`n"-built block into a CRLF file, leaving 8 lone
@@ -266,7 +266,7 @@ function Get-LintScript { return `$script:LintScript }
     #     claimed. The plugin must not GUESS at a convention it did not create, so the consumer
     #     declares it. Default (no pattern) keeps them, which is the safe direction.
     New-BootstrappedConsumer | Out-Null
-    $emptyByConvention = Join-Path $Fixture '.claude\plugins\claude-specialists\specialists\06-16-extension.md'
+    $emptyByConvention = Join-Path $Fixture '.claude\specialists\lenses\06-16-extension.md'
     [System.IO.File]::WriteAllText($emptyByConvention, "---`nid: 16`ngroup: 06`n---`n`n# 06-16 repo-lens`n`n## Eigen aan deze repo`n`nSchone lei: hier staan alleen repo-eigen regels. Nog niets vastgelegd.")
     $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
     Assert-True ($r.Out -match [regex]::Escape('06-16-extension.md') ) 'own convention: the lens appears in the report'
@@ -366,6 +366,39 @@ function Get-LintScript { return `$script:LintScript }
     New-BootstrappedConsumer | Out-Null
     $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\task\new-branch.ps1'))) 'vendor: nothing is vendored without the switch'
+
+    # --- 10. THE SEAM: one directory and one line (issue #221) ---------------------------------------
+    #     The claim the whole seam exists to make good on, asserted as an absolute rather than a count:
+    #     after a teardown of an untouched consumer, the specialist surface is GONE -- not "smaller".
+    Write-Host "the seam -- an untouched consumer tears down to nothing" -ForegroundColor Cyan
+    New-BootstrappedConsumer | Out-Null
+    $seamDir = Join-Path $Fixture '.claude\specialists'
+    Assert-True (Test-Path -LiteralPath (Join-Path $seamDir 'SPECIALISTS.md')) 'seam: the bootstrap placed the inclusion'
+    Assert-Equal 1 (Get-ImportCount) 'seam: CLAUDE.md carries exactly one import'
+    $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
+    Assert-Equal 0 $r.Code 'seam: exit-code 0'
+    Assert-True (-not (Test-Path -LiteralPath $seamDir)) 'seam: the whole .claude/specialists directory is gone -- one directory'
+    Assert-Equal 0 (Get-ImportCount) 'seam: CLAUDE.md has no import left -- one line'
+    $ownMd = [System.IO.File]::ReadAllText((Join-Path $Fixture 'CLAUDE.md'), [System.Text.Encoding]::UTF8)
+    Assert-True ($ownMd -match 'Feature work goes on a branch') "seam: the owner's own prose is untouched"
+
+    # --- 10b. An AUTHORED inclusion is kept, and the report says it is now loaded by nothing ---------
+    #     The safety property from section 5, applied to the file that now holds the roster. And the
+    #     honest half: the import is still removed, so the file survives as an orphan -- but ONE named
+    #     orphan holding the roster in one piece, instead of 43 lines scattered through CLAUDE.md. That
+    #     trade is the seam's actual payoff, so the report has to say it out loud.
+    Write-Host "the seam -- an authored SPECIALISTS.md is kept and reported" -ForegroundColor Cyan
+    New-BootstrappedConsumer | Out-Null
+    $inclusion = Join-Path $Fixture '.claude\specialists\SPECIALISTS.md'
+    # A roster somebody wrote: the VUL-IN slot heading is gone, which is exactly the signal.
+    [System.IO.File]::WriteAllText($inclusion, "# The Claude Specialists`n`n## Our roster`n`n| signal | specialist |`n|---|---|`n| branches | Derek |`n")
+    $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
+    Assert-Equal 0 $r.Code 'authored inclusion: exit-code 0'
+    Assert-True (Test-Path -LiteralPath $inclusion) 'authored inclusion: kept, never deleted'
+    Assert-True ([System.IO.File]::ReadAllText($inclusion) -match 'branches \| Derek') 'authored inclusion: the roster somebody wrote is intact'
+    Assert-Equal 0 (Get-ImportCount) 'authored inclusion: the import is STILL removed -- that line is what made it live'
+    Assert-True ($r.Out -match 'nothing loads it') 'authored inclusion: the report says outright that nothing loads it any more'
+    Assert-True ($r.Out -match 'one named file to decide about') 'authored inclusion: the report names the trade the seam makes'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
