@@ -122,7 +122,11 @@ try {
     Assert-True (Test-Path -LiteralPath $authoredRc) 'authored content: the filled-in repo-config is KEPT'
     Assert-Equal 1 (Get-LensCount) 'authored content: exactly the authored lens remains'
     Assert-True ($r.Out -match '\[KEEP\]') 'authored content: reported as kept, not silently skipped'
-    Assert-True ($r.Out -match 'delete by hand') 'authored content: the reader is told how to finish if they want to'
+    # Asserts the SUBSTANCE -- the reader is pointed at both ways to finish the job -- rather than one
+    # brittle phrase. The wording changed once already, when the blanket "authored" claim was dropped.
+    Assert-True ($r.Out -match 'yours to delete') 'authored content: the reader is told the kept files are theirs to remove'
+    Assert-True ($r.Out -match 'EmptyLensPattern') 'authored content: the reader is pointed at the declared-convention escape hatch'
+    Assert-True (-not ($r.Out -match 'kept \(authored\)')) 'authored content: no blanket authorship claim in the summary'
     # The directory must survive too -- pruning it would take the authored lens with it.
     Assert-True (Test-Path -LiteralPath (Join-Path $Fixture '.claude\plugins')) 'authored content: the lens directory is not pruned while a kept file lives in it'
     # And the branch-info scaffold was still untouched, so it must still have gone.
@@ -187,6 +191,90 @@ function Get-LintScript { return `$script:LintScript }
     Assert-True ($md -match [regex]::Escape('@~/.claude/my-notes.md')) "unrelated imports: the owner's home-dir import survives"
     Assert-True (-not ($md -match '01-01-persona\.md')) 'unrelated imports: the persona import is gone'
     Assert-True (-not ($md -match '01-01-extension\.md')) 'unrelated imports: the lens import is gone'
+
+    # --- 6b. THE ROUND-TRIP DOES NOT ACCUMULATE ------------------------------------------------------
+    #     Measured in davekokbwj/smartwatchbanden on 2026-07-29: the bootstrap's note line survived a
+    #     teardown (which removes '@' lines and deliberately nothing else), so the bootstrap's guard --
+    #     which only tested for the lens import -- read "not present" and re-appended the WHOLE block.
+    #     One extra copy of the note per teardown->init cycle, counted 1 -> 2 -> 3, with all three
+    #     session hooks reporting "in sync" throughout. Two runs of the cycle here, since one cycle
+    #     cannot distinguish "does not accumulate" from "accumulates once".
+    $note = 'The orchestrator (Chris) is always loaded -- portable body from plugin install and repo lens'
+    function Get-NoteCount {
+        $p = Join-Path $Fixture 'CLAUDE.md'
+        if (-not (Test-Path -LiteralPath $p)) { return 0 }
+        return @([System.IO.File]::ReadAllLines($p) | Where-Object { $_.Trim() -eq $note }).Count
+    }
+    New-BootstrappedConsumer | Out-Null
+    Assert-Equal 1 (Get-NoteCount) 'round-trip: one note line after the first init'
+    foreach ($cycle in 1, 2) {
+        $null = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
+        Assert-Equal 0 (Get-NoteCount) "round-trip cycle ${cycle}: the teardown removes the note line too"
+        $prevPlugin = $env:CLAUDE_PLUGIN_ROOT
+        $env:CLAUDE_PLUGIN_ROOT = $Plugin
+        try { $ri = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $Fixture) }
+        finally { $env:CLAUDE_PLUGIN_ROOT = $prevPlugin }
+        Assert-Equal 0 $ri.Code "round-trip cycle ${cycle}: re-init exit 0"
+        Assert-Equal 1 (Get-NoteCount) "round-trip cycle ${cycle}: STILL exactly one note line -- no accumulation"
+        Assert-Equal 2 (Get-ImportCount) "round-trip cycle ${cycle}: exactly two imports restored"
+    }
+
+    # --- 6b2. The bootstrap's own guard, ISOLATED ----------------------------------------------------
+    #     6b passes even with the bootstrap fix reverted, because the teardown now removes the note and
+    #     the cycle needed BOTH defects. Verified by reverting it. So 6b does not cover the bootstrap
+    #     half at all, and the scenario it actually defends is a repo whose imports were removed by
+    #     hand -- or by an older teardown -- while the note stayed. Without the guard, re-init appends
+    #     a second copy.
+    New-BootstrappedConsumer | Out-Null
+    $mdP = Join-Path $Fixture 'CLAUDE.md'
+    $handEdited = @([System.IO.File]::ReadAllLines($mdP) | Where-Object { $_ -notmatch '^\s*@' })
+    [System.IO.File]::WriteAllLines($mdP, $handEdited)
+    Assert-Equal 1 (Get-NoteCount) 'isolated guard: setup leaves the note but no imports'
+    Assert-Equal 0 (Get-ImportCount) 'isolated guard: setup really removed the imports'
+    $prevPlugin = $env:CLAUDE_PLUGIN_ROOT
+    $env:CLAUDE_PLUGIN_ROOT = $Plugin
+    try { $rg = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $Fixture) }
+    finally { $env:CLAUDE_PLUGIN_ROOT = $prevPlugin }
+    Assert-Equal 0 $rg.Code 'isolated guard: re-init exit 0'
+    Assert-Equal 1 (Get-NoteCount) 'isolated guard: STILL one note -- the bootstrap tidied the leftover'
+    Assert-Equal 2 (Get-ImportCount) 'isolated guard: the imports are restored'
+
+    # --- 6c. NO LINE-ENDING DRIFT ---------------------------------------------------------------------
+    #     Also measured there: the bootstrap pasted a "`n"-built block into a CRLF file, leaving 8 lone
+    #     LFs. Invisible to every gate, and the kind of thing that turns a later diff into noise.
+    New-BootstrappedConsumer | Out-Null
+    $mdPath = Join-Path $Fixture 'CLAUDE.md'
+    # Force the consumer's file to CRLF, the realistic Windows case, then run a full cycle.
+    $crlf = ([System.IO.File]::ReadAllText($mdPath) -replace "`r`n", "`n") -replace "`n", "`r`n"
+    [System.IO.File]::WriteAllText($mdPath, $crlf)
+    $null = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
+    $afterTeardown = [System.IO.File]::ReadAllText($mdPath)
+    $loneAfterTeardown = ([regex]::Matches($afterTeardown, "(?<!`r)`n")).Count
+    Assert-Equal 0 $loneAfterTeardown 'line endings: the teardown leaves no lone LF in a CRLF file'
+    $prevPlugin = $env:CLAUDE_PLUGIN_ROOT
+    $env:CLAUDE_PLUGIN_ROOT = $Plugin
+    try { $null = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $Fixture) }
+    finally { $env:CLAUDE_PLUGIN_ROOT = $prevPlugin }
+    $afterInit = [System.IO.File]::ReadAllText($mdPath)
+    $loneAfterInit = ([regex]::Matches($afterInit, "(?<!`r)`n")).Count
+    Assert-Equal 0 $loneAfterInit 'line endings: re-init appends CRLF into a CRLF file, not lone LF'
+
+    # --- 6d. A CONSUMER'S OWN EMPTY-LENS CONVENTION, only when declared ----------------------------
+    #     The blindness this skill shipped with: 20 of smartwatchbanden's 22 lenses are empty under
+    #     that repo's own convention (a closing sentence, no '(VUL-IN)' heading), so all 22 were kept
+    #     and reported as authored -- right answer, wrong reason, and adoption was less reversible than
+    #     claimed. The plugin must not GUESS at a convention it did not create, so the consumer
+    #     declares it. Default (no pattern) keeps them, which is the safe direction.
+    New-BootstrappedConsumer | Out-Null
+    $emptyByConvention = Join-Path $Fixture '.claude\plugins\claude-specialists\specialists\06-16-extension.md'
+    [System.IO.File]::WriteAllText($emptyByConvention, "---`nid: 16`ngroup: 06`n---`n`n# 06-16 repo-lens`n`n## Eigen aan deze repo`n`nSchone lei: hier staan alleen repo-eigen regels. Nog niets vastgelegd.")
+    $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
+    Assert-True ($r.Out -match [regex]::Escape('06-16-extension.md') ) 'own convention: the lens appears in the report'
+    Assert-True (Test-Path -LiteralPath $emptyByConvention) 'own convention: WITHOUT a declared pattern it is kept (safe default)'
+    Assert-True (-not ($r.Out -match 'filled in')) 'own convention: the report no longer claims the file was filled in'
+    Assert-True ($r.Out -match 'does not judge it') 'own convention: it states what it actually knows'
+    $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply', '-EmptyLensPattern', 'Nog niets vastgelegd')
+    Assert-True (-not (Test-Path -LiteralPath $emptyByConvention)) 'own convention: WITH the pattern declared it is removed'
 
     # --- 7. A repo that never adopted is a no-op, not an error --------------------------------------
     $bare = Join-Path ([System.IO.Path]::GetTempPath()) 'specialists-teardown-bare'
