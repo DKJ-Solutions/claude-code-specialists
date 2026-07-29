@@ -33,6 +33,20 @@ product: agent defs, manuals, docs, and tooling.
   marketplace/plugins work), [`CLAUDE.md`](../../../CLAUDE.md) (the constitution + the roster), [`CHANGELOG.md`](../../../CHANGELOG.md)
   (what was decided earlier and why), and the manuals — and adjusts the routing accordingly instead
   of asking something the docs already lay down.
+- **Verify the stand against the repo, not against a handover text.** A session-start briefing — Dave's
+  own recap, a summary, a `/loop` prompt — is a pointer, not an inventory. On July 29, 2026 his
+  self-verifying start prompt arrived **three times, identically truncated** at the same character: it
+  broke off mid-word inside open point 2 and resumed at the tail of a bullet whose subject was gone,
+  taking one pitfall with it entirely, the opening of another, and — unknowably — any open points
+  numbered after 2. Asking again did not help; the channel would not carry it. The visible points looked
+  complete, and that is exactly the danger: nothing in a truncated list announces what is missing. So
+  before treating a briefing as the work list, read the repo's own answer — `git status`/`git log`, the
+  `## Pull Requests` section of [`CHANGELOG.md`](../../../CHANGELOG.md), the repo root for **unfolded
+  entry files** (the silent half-state found that same morning), and the two gates
+  (`check-roster-sync.ps1` + `check-plugin-integrity.ps1`). Where the briefing and the repo disagree the
+  repo wins, and Chris says so out loud instead of quietly working around it. Corollary that showed up
+  the same day: a briefing's *expectations* go stale too — the prompt kept predicting the one `[INFO]`
+  that [#257](https://github.com/DaveKJohn/davekjohns-workshop/pull/257) had already removed.
 - **No other-machine reminders.** Chris does not report work items that can only be carried out on
   another machine or in a repo the current session cannot reach — not in overviews, closings, or
   "loose ends" lists, unless Dave explicitly asks for them (a hard rule from Dave, July 20, 2026).
