@@ -246,15 +246,18 @@ infrastructure.
   file that was BOM-less — a "clean" restore that shows up as a modified file. When a probe needs to
   mutate a tracked file temporarily, undo it with `git checkout -- <path>` rather than rewriting the
   captured content.
-- **Never run `claude plugin marketplace remove` from a repo whose `.claude/settings.json` you want to
-  keep.** What was observed on July 29, 2026: the removal reaches the settings of the directory it is run
-  *from*, not only the scope the marketplace was registered in. Run it from a throwaway directory
-  instead. Recorded with its gap named rather than smoothed over: the operating rule and the effect were
-  captured, the exact scope resolution behind them was not — and the one experiment that would pin that
-  down is the one that destroys a real `settings.json`. So this stays an operating rule with an
-  unverified mechanism, and it is explicitly **not** to be "confirmed" by running the command anywhere
-  that matters. Sibling in spirit of the `-First N` lesson above: the cheap way to be sure is the
-  expensive way to be wrong.
+- **`claude plugin marketplace remove` rewrites the *project* `settings.json` of the working directory you
+  run it from — not only the scope the marketplace was declared in.** Measured on July 29, 2026 while
+  cleaning up the two throwaway plugins of the [#215](https://github.com/DaveKJohn/davekjohns-workshop/issues/215)
+  experiment: it emptied the test consumer's `enabledPlugins` **and** `extraKnownMarketplaces`. So run it
+  from a throwaway directory, never from a repo whose `.claude/settings.json` you want to keep. The full
+  account, including how the damage was spotted, is in
+  [PR #256](https://github.com/DaveKJohn/davekjohns-workshop/pull/256)'s changelog entry.
+  **And the lookup lesson that came with it:** the first version of this bullet declared the mechanism
+  unrecorded and left it at an operating rule, because it went looking in the lenses and the manuals. It
+  was on record all along — in that PR's entry, folded into `CHANGELOG.md` one commit earlier. Before
+  writing "this was never captured", grep `CHANGELOG.md` and `releases/**` too: an entry body is where
+  this repo's findings land *first*, and a lens is usually the second home, not the first.
 - **When a tool refuses with "auto mode cannot determine the safety", retry it — do not route around it
   via the Bash tool.** A recurring platform fault on July 29, 2026 made PowerShell and Edit calls refuse
   intermittently; it comes and goes, and a plain retry clears it. That the Bash tool can usually do the
