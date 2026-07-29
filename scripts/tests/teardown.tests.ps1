@@ -287,6 +287,43 @@ function Get-LintScript { return `$script:LintScript }
     $md = [System.IO.File]::ReadAllText((Join-Path $bare 'CLAUDE.md'), [System.Text.Encoding]::UTF8)
     Assert-True ($md -match 'nothing to do with specialists') 'never adopted: the file is untouched'
     Remove-Item -Recurse -Force -LiteralPath $bare -ErrorAction SilentlyContinue
+
+    # --- 8. A RUNTIME DEPENDENCY ON THE PLUGIN: warned about, never removed -------------------------
+    #     The one leftover a teardown cannot classify away (measured in davekokbwj/smartwatchbanden,
+    #     2026-07-29): the consumer's own resolver locates the marketplace cache and throws once it is
+    #     gone, and three operational scripts dot-source it -- so the uninstall took the daily git
+    #     workflow down rather than leaving debris. Two properties are asserted here, and the second
+    #     matters more than the first: the report NAMES it, and -Apply still does not TOUCH it. A check
+    #     that deleted the consumer's own scripts to make its summary look clean would be doing exactly
+    #     the damage the whole classification exists to prevent.
+    New-BootstrappedConsumer | Out-Null
+    $resolver = Join-Path $Fixture 'scripts\lib\plugin-paths.ps1'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $resolver) -Force | Out-Null
+    [System.IO.File]::WriteAllText($resolver, (@(
+        '# Resolves the shared scripts in the marketplace cache.',
+        '$cache = Join-Path $env:USERPROFILE ''.claude\plugins\marketplaces\davekjohns-workshop''',
+        'if (-not (Test-Path $cache)) { throw ''the specialists plugin is not installed'' }'
+    ) -join "`n"))
+    $starter = Join-Path $Fixture 'scripts\task\start-task.ps1'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $starter) -Force | Out-Null
+    [System.IO.File]::WriteAllText($starter, (@(
+        '. "$PSScriptRoot\..\lib\plugin-paths.ps1"',
+        'Write-Host ''starting a task'''
+    ) -join "`n"))
+    $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
+    Assert-Equal 0 $r.Code 'runtime dependency: exit-code 0 -- a warning is not a failure'
+    Assert-True ($r.Out -match 'resolves the plugin cache') 'runtime dependency: the resolver is named'
+    Assert-True ($r.Out -match [regex]::Escape('start-task.ps1')) 'runtime dependency: what depends on it is named too'
+    Assert-True ($r.Out -match 'No teardown can fix this') 'runtime dependency: says plainly that no teardown fixes it'
+    Assert-True ($r.Out -match 'keep local copies') 'runtime dependency: offers the way out before the uninstall'
+    $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
+    Assert-True (Test-Path -LiteralPath $resolver) "runtime dependency: -Apply leaves the consumer's resolver alone"
+    Assert-True (Test-Path -LiteralPath $starter) "runtime dependency: -Apply leaves the dependent script alone"
+
+    # No false alarm: a consumer whose scripts never reach into the plugin hears nothing about it.
+    New-BootstrappedConsumer | Out-Null
+    $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
+    Assert-True (-not ($r.Out -match 'resolves the plugin cache')) 'no false alarm: no resolver, no warning'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

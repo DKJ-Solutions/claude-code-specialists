@@ -251,6 +251,59 @@ if (Test-Path -LiteralPath $settings -PathType Leaf) {
 }
 $notes += "The plugin install itself is untouched: run 'claude plugin uninstall' if you want it gone from this machine as well."
 
+# --- 6. Runtime dependencies on the plugin: reported loudly, never removed ------------------------
+# The finding that made this section necessary (measured by hand in davekokbwj/smartwatchbanden,
+# 2026-07-29). The plugin owns the operational scripts as their single source of truth (issue #81), and
+# a consumer reaches them through a resolver of its OWN that locates the marketplace cache -- and
+# THROWS once that cache is gone. In the measured repo, scripts/lib/plugin-paths.ps1 was that resolver
+# and three operational scripts dot-sourced it (start-task, open-pr, fold-changelog-entry), so a
+# teardown plus uninstall did not leave clutter behind: it took the repo's daily git workflow down.
+#
+# No option to this script can fix that, because adopting the shared-script model is what creates the
+# dependency. What it CAN stop doing is being silent about it. Everything above answers "what did the
+# bootstrap put here"; this answers "what will break after you uninstall", which is the question a
+# reader actually has before trusting the word REVERSIBLE. So this section is REPORT-ONLY by
+# construction -- these files are the consumer's own code, and a script that deletes them to make its
+# own summary look clean would be doing the exact damage the classification above exists to prevent.
+$resolverFindings = @()
+$scriptsDir = Join-Path $root 'scripts'
+if (Test-Path -LiteralPath $scriptsDir) {
+    # Two ways a consumer script can reach into the plugin: the marketplace cache path, or the
+    # CLAUDE_PLUGIN_ROOT the harness only sets while the plugin is installed. Both stop working at the
+    # same moment, and neither leaves a trace in git.
+    $cacheRefPattern = 'plugins[\\/]marketplaces|CLAUDE_PLUGIN_ROOT'
+    $ps1Files = @(Get-ChildItem -LiteralPath $scriptsDir -Recurse -Filter '*.ps1' -File -ErrorAction SilentlyContinue)
+    $texts = @{}
+    foreach ($f in $ps1Files) {
+        $texts[$f.FullName] = [System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8)
+    }
+    foreach ($f in $ps1Files) {
+        if ($texts[$f.FullName] -notmatch $cacheRefPattern) { continue }
+        # Who leans on this resolver? Named by filename rather than by parsing the dot-source syntax:
+        # a consumer may reach it via $PSScriptRoot, a variable, or Join-Path, and this report only has
+        # to point a human at the right files -- not resolve them.
+        $dependents = @(
+            $ps1Files |
+                Where-Object { $_.FullName -ne $f.FullName -and $texts[$_.FullName] -match [regex]::Escape($f.Name) } |
+                ForEach-Object { $_.FullName.Substring($root.Length).TrimStart('\', '/') }
+        )
+        $resolverFindings += [pscustomobject]@{
+            Rel        = $f.FullName.Substring($root.Length).TrimStart('\', '/')
+            Dependents = $dependents
+        }
+    }
+}
+if ($resolverFindings.Count -gt 0) {
+    Write-Host ''
+    foreach ($finding in $resolverFindings) {
+        Write-Host ("  [WARN]   " + $finding.Rel + " resolves the plugin cache -- it throws once the plugin is uninstalled") -ForegroundColor Red
+        if ($finding.Dependents.Count -gt 0) {
+            Write-Host ("           depended on by: " + ($finding.Dependents -join ', ')) -ForegroundColor Red
+        }
+    }
+    $notes += "$($resolverFindings.Count) script(s) under scripts/ resolve the plugin install at runtime and stop working after 'claude plugin uninstall' -- listed above as [WARN], and deliberately NOT removed: they are your code. No teardown can fix this, because the shared-script model (#81) is what creates the dependency. Two ways out, both yours to pick BEFORE you uninstall: keep local copies of the operational scripts, or make the resolver degrade to one clear, actionable failure instead of a throw. Note this scan covers scripts/ only, so a resolver living elsewhere is not counted."
+}
+
 # --- Summary --------------------------------------------------------------------------------------
 Write-Host ''
 # "kept", not "kept (authored)". The script cannot establish authorship, and saying so was measurably
