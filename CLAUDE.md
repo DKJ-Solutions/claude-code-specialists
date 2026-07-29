@@ -159,68 +159,22 @@ def you modify on a branch only takes effect after merge + push.
 
 ### Language
 
-The system-wide norm — repo content is English (the entire script layer included: comments,
-docstrings, console output, and script-generated document content), the session-reply language
-stays separate and follows the user, with three explicit exceptions — lives in
-[Tessa #16's portable manual](claude-code-plugins/claude-specialists/specialists/manuals/06-16-manual.md#what-tessa-covers),
-under **"Guarding the language convention,"** so it travels to every consuming repo, not just this
-one. This slot records this repo's own concrete instances of that norm across **every layer of the
-repo**, not just docs/manuals/agent-defs. The list below is meant to be exhaustive; if it ever
-undercounts a layer, that is a gap to close on discovery (as this pass did for
-`.github/workflows/ci.yml`), not a quiet exception to the norm:
+**Repo content is English** — every layer, the script layer included: comments, docstrings, console
+output, and script-generated document content. **The session-reply language is separate and follows
+the user.** That second half applies to every turn regardless of which files it touches, which is why
+it lives here rather than in a path-scoped rule. The system-wide norm (and its three exceptions) is in
+[Tessa #16's portable manual](claude-code-plugins/claude-specialists/specialists/manuals/06-16-manual.md#what-tessa-covers)
+under **"Guarding the language convention,"** so it travels to every consuming repo.
 
-- **The script layer is fully in scope.** Every `.ps1` file under `scripts/**` (and the shared
-  mirrors under `claude-code-plugins/claude-specialists/*/scripts/`), the hooks, the tests, and
-  `.github/**` (the workflows, the issue templates, and the PR template) are English throughout —
-  comments, docstrings, console output (`Write-Host`/`Write-Error`/`Write-Warning`/`throw` text), and
-  workflow/template body text. `ci.yml` was translated in this pass (July 26, 2026), closing the gap
-  a documentation audit found between this claim and the actual repo state — a CI workflow,
-  matching none of the exceptions below, had simply been missed. New scripts and edits are written
-  in English; no new non-English text is added anywhere in scope.
-- **Script-*generated* document content is in scope too.** The CHANGELOG.md sections,
-  release-notes, and per-plugin CHANGELOGs that `scripts/lib/release-lib.ps1` builds are English
-  going forward: its document-generating template strings (the category labels, the reference line,
-  the `## Releases`/plugin-CHANGELOG intro texts, the date label) were translated in this pass.
-  `CHANGELOG.md` itself is now fully English (its intro paragraphs and every `## Releases`
-  reference line were translated on July 22, 2026 — Dave's decision). The archived
-  `releases/development/*.md` notes stay in their original language, so older ones remain Dutch.
-- **Technical identifiers/flags** keep their original form — the scaffold marker `VUL-IN` (used
-  across the plugin's scaffold scripts, e.g. `bootstrap.ps1`, `new-branch.ps1`) is one example;
-  Dave's explicit decision. The job id **`lint-en-tests`** in
-  [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is a second, higher-stakes one: it is the
-  exact name GitHub's `main` ruleset requires as a passing status check before any PR can merge.
-  This is not a forgotten translation — renaming it would silently break that binding, and every
-  future PR would sit unmergeable (`BLOCKED`, waiting on a check that no longer exists) until
-  someone traced it back to this rename, a failure that would only surface at the next PR, not at
-  the moment of the change. It stays Dutch-shaped on purpose.
-- **Legacy back-compat markers** deliberately keep recognizing existing, not-yet-migrated consumer
-  content and are not translation debt: the slot heading `## Specific to this repo` alongside its
-  legacy predecessor in the drift-check (`scripts/lint/check-consumer-drift.ps1`) and the bootstrap
-  templates, and the `[ERROR]` marker alongside its legacy predecessor in the connector session
-  hook (`connector-sessioncheck.ps1`).
-- **History** — the archived per-release notes under `releases/development/*.md` are this repo's
-  narrow exception to the norm and may remain in their original language (older ones are Dutch).
-  `CHANGELOG.md` and `releases/README.md` are themselves fully English (translated July 22, 2026,
-  Dave's decision), so the exception no longer covers them.
-
-Decision by Dave, July 20, 2026 (repo-wide English) — the decision that in turn prompted the
-system-wide norm above — sharpened July 21, 2026 to make explicit that it covers the script layer
-and script-generated content, not only docs/manuals/agent-defs, and sharpened again July 26, 2026
-to make explicit that `.github/**` (workflows, issue templates, PR template) is covered too, after
-a documentation audit found `ci.yml` had been missed.
-
-**A verification lesson from that same audit, worth keeping even though its concrete exception has
-since closed:** a name that looks non-English is not automatically translation debt. Check first
-whether it is the live name of an *external* object — one this repo doesn't define and can't
-rename unilaterally from a documentation pass. If it is, the doc may cite that name as-is (citing
-reality is not a language violation), and the fix runs in one direction only: the object gets
-renamed first, by whoever owns that object's security/binding, and the doc follows — never the
-reverse. This section once cited the repo ruleset enforcing the CI gate under that reasoning, as
-`main-ci-poort` (verified via the GitHub API rather than assumed). Dave has since renamed it to
-`main-ci-gate` (July 26, 2026); a field-by-field API re-check confirmed only the name changed —
-required check, enforcement, target branch, rules, and bypass actors are all unchanged. See
-[Sylvester #15's lens](.claude/plugins/claude-specialists/specialists/05-15-extension.md) for where
-the ruleset lives operationally. With the name now English, no exception remains to list above.
+**The per-layer detail — which layers are in scope, and the deliberate exceptions (`VUL-IN`,
+`lint-en-tests`, the legacy markers, the archived release notes) — is in
+[`.claude/rules/language-layers.md`](.claude/rules/language-layers.md).** It is path-scoped to
+`scripts/**`, `.github/**`, `releases/**` and `CHANGELOG.md`, so it loads when you touch one of those
+layers instead of in every session. Two things to know before moving anything else there: a
+`paths:`-scoped rule is **lost after a `/compact`** until a matching file is read again, and a rule
+*without* `paths:` loads unconditionally and therefore **saves nothing** — the scoping is the saving.
+So only content that is inert until you open a matching file belongs there. Decision by Dave,
+July 20, 2026; sharpened July 21 and July 26, 2026.
 
 ### The team: roster & routing
 

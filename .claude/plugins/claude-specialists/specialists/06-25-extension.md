@@ -111,9 +111,47 @@ this look like the same kind of target, and it is not. Two traps, both hit while
   already in context twice, and it is Dave's to make, not a mechanical trim.
 
 **The lever this leaves.** Reduce cost by moving content *off* the automatic path rather than deleting
-it: `CLAUDE.md` at ~6.600 tokens is the biggest item and is 277 lines against the documented target of
+it: `CLAUDE.md` at ~6.600 tokens is the biggest item and was 277 lines against the documented target of
 under 200, and path-scoped `.claude/rules/` files load only when Claude touches matching files. That is
 the direction with room in it — not Chris's lens.
+
+### `.claude/rules/` — the verified rules of the lever (July 29, 2026)
+
+The lever above rests on a claim that was **unverified** when it was written. It has now been checked
+against the docs, and the answer constrains it in a way worth knowing *before* moving anything:
+
+| at `/compact` | what happens |
+|---|---|
+| project-root `CLAUDE.md` and rules **without** `paths:` | re-injected from disk |
+| rules **with** `paths:` frontmatter | **lost until a matching file is read again** |
+
+Two consequences, and together they define the whole trade:
+
+- **A rule without `paths:` saves nothing.** It loads unconditionally with the same priority as
+  `CLAUDE.md`, so relocating text there is filing, not trimming. **The scoping is the saving** — if a
+  candidate cannot be given a `paths:` list, it is not a candidate.
+- **A `paths:`-scoped rule is not always-on, by design.** After a compaction it is gone until Claude
+  reads a matching file. So the test for a candidate is: *is this content inert until someone opens a
+  matching file?* If yes, the scoping is self-healing — touching the layer reloads the rule. If the
+  content must hold regardless of which files a turn touches, it belongs in `CLAUDE.md` and no amount
+  of tidiness changes that.
+
+**Worked example, and the trap inside it.** The `### Language` section (65 lines, the largest in
+`CLAUDE.md`) was mostly per-layer detail about `scripts/**`, `.github/**` and `releases/**` — textbook
+path-scoped material, and it moved to `.claude/rules/language-layers.md`, taking `CLAUDE.md` from 328 to
+**282 lines**. But the section also contained one sentence that had to stay: *the session-reply language
+follows the user*. That governs every turn regardless of files touched, so path-scoping it would have
+silently weakened it after the first compaction — and it is a rule that had already been broken in
+practice earlier the same day. **Read a candidate section for the one sentence that is not about the
+files, before moving the block.** The docs' own phrasing of the escape hatch is the tell: *"If a rule
+must persist across compaction, drop the `paths:` frontmatter or move it to the project-root
+`CLAUDE.md`."*
+
+Remaining candidates in `CLAUDE.md`, by size, with the test applied: the roster/routing table (53 lines)
+**fails** it — routing is needed at intake, before any file is read; the safety rules (34 + 31 lines)
+**fail** it — they must survive compaction; `## The Claude Specialists` (46 lines) **fails** it. So the
+easy room is now spent, and what is left is the judgement call recorded above rather than more
+relocation.
 
 ### Boundaries with the other roles
 
