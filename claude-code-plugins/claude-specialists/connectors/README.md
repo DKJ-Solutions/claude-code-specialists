@@ -170,7 +170,7 @@ signal category that may be security-relevant (e.g. an indication of tampering) 
 classified as `[INFO]`, but as `[ERROR]` — otherwise it silently stays out of sight at session
 start.
 
-**One named exception to that silence: `[UNREGISTERED]`** (July 28, 2026). "This repo has no manifest
+**First named exception to that silence: `[UNREGISTERED]`** (July 28, 2026). "This repo has no manifest
 in the register" was filed as `[INFO]`, and the consequence was the worst possible reading: a
 brand-new consumer got `connector-sessioncheck: no errors.` — a positive all-clear for a repo this
 workshop cannot see at all (no plugin-version check, no lens inventory, no agent-def drift). Found
@@ -186,6 +186,23 @@ session is in, and it is actionable there. The mechanism is the same one `check-
 `[ORPHANS]` (inbound #204): a dedicated non-counting token, rather than promoting the finding to
 `[ERROR]` and putting a red line plus a non-zero exit code in every session of a repo somebody
 deliberately chose not to register.
+
+**Second named exception, one step further in: `[INVENTORY]`** (July 29, 2026). The repo *is*
+registered, but its entry lists fewer lenses than the repo actually holds — the `[INFO]` at check 3.
+Same failure mode as the first exception, and it had already happened: a deliberate run found eleven
+of these at once, six of them in **this repo's own entry**, where the lenses had landed with the
+adopt-the-six change (PR #212) and the inventory was simply never updated alongside. Nothing had
+surfaced it for a day, because the finding is an `[INFO]` and the hook shows only `[ERROR]` lines. The
+["update the inventory in the same change"](#maintenance-drift-lint) rule was added at the same time,
+but a rule alone was demonstrably not enough — the earlier "after a refresh, also update the manifest"
+rule was already on the books when this drift happened.
+
+Scoped exactly as narrowly as the reasoning allows: `check-connectors.ps1` emits the marker **only for
+the connector whose checkout is the repo the session is in** — the workshop's own `localCheckout: "."`
+entry on a full sweep, or the consumer's own entry under `-OnlyConsumer`. Every other connector's
+inventory drift stays an `[INFO]` and stays silent, so the `[INFO]` rule's justification ("often the
+business of another machine or user") keeps applying wherever it is actually true. Decision by Dave,
+July 29, 2026.
 
 **Registering a new consumer is a workshop-side, manual step, and nothing can do it for you.** The
 manifest lives here while the install happens in the consumer, and this registry never writes

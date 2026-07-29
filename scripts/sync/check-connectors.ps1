@@ -15,7 +15,9 @@
       2. Per plugin: enabled in .claude/settings.json?  no -> [ERROR]
       3. Per plugin: all registered extensions present?  one missing -> [ERROR]
          Extensions of that plugin that exist in the consumer but are NOT registered
-         -> [INFO] (inbound signal: update the register or bring the change back here).
+         -> [INFO] (inbound signal: update the register or bring the change back here), plus a
+         non-counting [INVENTORY] line the session hook surfaces when that drifted register is
+         the one describing the repo the session is in -- the only case a reader here can act on.
       4. Per plugin: machine record (installed_plugins.json) older than source -> [ERROR];
          no record/no administration -> [INFO] (machine-specific, not a gate breach)
     The register no longer keeps a syncedVersion bookkeeping: the check reads the actual installed
@@ -27,7 +29,8 @@
     Guardrail (Sean's advice): manifest fields are data from a public repo and are never blindly
     trusted -- absolute or out-of-scope localCheckout paths and invalid plugin ids are rejected.
 
-    Exit code: 0 = no errors (SKIP/INFO do not count), 1 = at least one error.
+    Exit code: 0 = no errors (SKIP/INFO and the non-counting [UNREGISTERED]/[INVENTORY] markers do
+    not count), 1 = at least one error.
 
 .PARAMETER Manifest
     (Optional) Path to a single manifest instead of all connectors manifests.
@@ -116,6 +119,18 @@ $onlyPath = ''
 if ($OnlyConsumer) {
     $onlyResolved = Resolve-Path -LiteralPath $OnlyConsumer -ErrorAction SilentlyContinue
     if ($onlyResolved) { $onlyPath = $onlyResolved.Path }
+}
+
+# Is this checkout the repo the current session is in? Two shapes, because the check runs two ways:
+# a consumer's hook passes -OnlyConsumer <its own root>, while the workshop runs the full sweep with
+# no scoping and finds itself as the connector whose localCheckout is '.'. Used to decide whether a
+# register finding is actionable HERE (see the [INVENTORY] marker below); with -OnlyConsumer set,
+# $onlyPath is authoritative -- falling back to $RepoRoot in that case would attribute a consumer's
+# finding to the workshop.
+function Test-IsSessionRepo {
+    param([Parameter(Mandatory = $true)][string]$Checkout)
+    if ($onlyPath) { return $Checkout -eq $onlyPath }
+    return $Checkout -eq $RepoRoot
 }
 
 Write-Host "== check-connectors -- $($manifestFiles.Count) manifest(s) ==" -ForegroundColor Cyan
@@ -238,6 +253,27 @@ foreach ($mf in $manifestFiles) {
         $unregistered = @($present | Sort-Object -Unique | Where-Object { ($ownedIds -contains $_) -and ($p.extensions -notcontains $_) })
         foreach ($id in $unregistered) {
             Write-Info "extension '$id' exists in the consumer but is not in the register -- update the register or review the change."
+        }
+
+        # Non-counting marker the session hook DOES surface -- but only when the drifted register is
+        # the one describing the repo this session is actually in, which is the only case a reader
+        # here can act on. Third instance of the [UNREGISTERED]/[ORPHANS] shape, and for the same
+        # reason: the [INFO] above stays (it counts, and a deliberate run should list every id),
+        # while this line carries the actionable text for a session start.
+        #
+        # Why it was needed (2026-07-29): a deliberate run found eleven of these at once, six of them
+        # in the register of THIS repo -- the lenses had landed with the adopt-the-six change (PR #212)
+        # and the inventory was never updated alongside. Nothing had surfaced it, because the finding
+        # is an [INFO] and the hook shows only [ERROR] lines. The connectors README already carried an
+        # "after a refresh, also update the manifest" rule; it was not enough, precisely because it
+        # reads as a follow-up step and nothing reported the omission.
+        #
+        # Deliberately NOT promoted for every connector: that would reintroduce exactly the
+        # other-machine noise the [INFO]-silence rule removed (Dave, July 20, 2026). Scoped this way
+        # the rule's justification -- "often the business of another machine or user" -- simply does
+        # not apply: this register is in the repo the reader has open. Decision by Dave, July 29, 2026.
+        if ($unregistered.Count -gt 0 -and (Test-IsSessionRepo $checkout)) {
+            Write-Host "  [INVENTORY] this repo has $($unregistered.Count) lens(es) that its own entry in the connector register does not list ($($unregistered -join ', ')) -- add them to the 'extensions' array in $($mf.Name), in the same change that landed the lens. Nothing is broken: the register's view of this repo is simply behind reality." -ForegroundColor Yellow
         }
 
         # 4. Machine record vs. source.

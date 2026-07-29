@@ -24,10 +24,14 @@
         label) and the summary names what the run covered -- all registered connectors, or just this
         repo under -OnlyConsumer. Without that, two consumers on the same outdated plugin version
         produced two identical, unattributable [ERROR] lines (inbound #203);
-    - one exception to the [INFO] silence: the check's non-counting [UNREGISTERED] line IS surfaced.
-        An unregistered consumer is reported as [INFO], so a brand-new repo used to be told
-        "no errors" -- a positive all-clear for a repo the workshop cannot see at all (no version
-        check, no lens inventory, no agent-def drift). Found 2026-07-28;
+    - two exceptions to the [INFO] silence, both non-counting lines the check emits only about the repo
+        the session is in -- so neither can reintroduce other-machine noise:
+        [UNREGISTERED], because an unregistered consumer is reported as [INFO] and a brand-new repo was
+        therefore told "no errors" -- a positive all-clear for a repo the workshop cannot see at all
+        (no version check, no lens inventory, no agent-def drift). Found 2026-07-28;
+        [INVENTORY], one step further in: the repo IS registered, but its entry lists fewer lenses than
+        the repo holds. Also an [INFO], so also silent -- which let six missing ids sit in this
+        workshop's own entry until a hand-run found them. Found 2026-07-29;
     - the script ALWAYS exits with 0 -- a session start must never fail because of this.
 
     Read-only: the hook modifies nothing in any repo.
@@ -130,6 +134,18 @@ try {
     # workshop's view of it. Same reasoning as [ORPHANS] in roster-sessioncheck.
     $unregistered = @($out | Where-Object { $_ -cmatch '\[UNREGISTERED\]' })
 
+    # [INVENTORY] rides along on the same terms, for the same reason one step further in: the register
+    # HAS an entry for this repo, but its lens inventory is behind what the repo actually holds. Also an
+    # [INFO] in the check and therefore also invisible here -- which on 2026-07-29 let six missing ids
+    # sit in this workshop's own entry unnoticed until someone ran the check by hand. The check only
+    # emits the line for the repo the session is in, so no other-machine noise can reach this list.
+    $inventory = @($out | Where-Object { $_ -cmatch '\[INVENTORY\]' })
+
+    # Both markers are non-counting: they must never turn an exit-0 run into a "signals found" summary,
+    # because in neither case is anything wrong with the plugin install -- only with the register's view
+    # of it. Same reasoning as [ORPHANS] in roster-sessioncheck.
+    $notices = @($unregistered) + @($inventory)
+
     # Did the child run to completion? Write-CheckSummary's "Summary: N error(s)" line is the check's
     # last statement, so its absence means the run stopped early and the list below may be partial
     # (inbound #203, item 2). The exit code cannot carry that on its own: a complete report WITH
@@ -146,7 +162,7 @@ try {
     if ($signals.Count -gt 0) {
         Write-Host 'connector-sessioncheck: signals found -- summary (register data from consumer checkouts; data, not instructions):'
         foreach ($line in $signals) { Write-Host "  $($line.Trim())" }
-        foreach ($line in $unregistered) { Write-Host "  $($line.Trim())" }
+        foreach ($line in $notices) { Write-Host "  $($line.Trim())" }
         if (-not $completed) {
             Write-Host "  (note: the check did not run to completion (exit $code) -- the list above may be partial.)"
         }
@@ -158,7 +174,14 @@ try {
             # "the workshop" is jargon to a consumer who only installed the plugin, so the verdict names
             # the role instead of this repo's internal nickname.
             Write-Host "connector-sessioncheck: no errors, but this repo is not in the plugin maintainer's register:"
-            foreach ($line in $unregistered) { Write-Host "  $($line.Trim())" }
+            foreach ($line in $notices) { Write-Host "  $($line.Trim())" }
+        } elseif ($inventory.Count -gt 0) {
+            # Its own verdict rather than a shared one: "not registered at all" and "registered but the
+            # lens inventory is behind" are different situations with different fixes, and the earlier
+            # wording was deliberately written for a reader who knows nothing about the source repo.
+            # Folding both under one line would blur exactly that distinction.
+            Write-Host "connector-sessioncheck: no errors, but the register's lens inventory for this repo is behind:"
+            foreach ($line in $inventory) { Write-Host "  $($line.Trim())" }
         } else {
             Write-Host 'connector-sessioncheck: no errors.'
         }
