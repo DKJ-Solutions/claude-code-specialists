@@ -460,6 +460,72 @@ the untangling, so the seam is worth settling before more content lands on that 
 from the other side, not merely a token saving: a plugin-delivered Chris removes the `@`-import, which
 is the worst artifact in the table above.
 
+### The seam, specified
+
+The shape above, made concrete. **One file, one line** — a fresh consumer's whole specialist surface:
+
+```text
+<consumer>/
+├── CLAUDE.md                          # ONE specialists line, nothing else
+└── .claude/specialists/
+    ├── SPECIALISTS.md                 # the inclusion: body import, lens import, roster slot
+    └── lenses/
+        ├── 01-01-extension.md
+        ├── 05-05-extension.md
+        └── <group>-<id>-extension.md  # one per specialist, flat: ids are unique family-wide
+```
+
+`CLAUDE.md` carries `@.claude/specialists/SPECIALISTS.md` and nothing more. Everything that used to be
+woven through it — the two imports, the roster table, the routing, the chains — lives behind that line.
+
+**Four verified facts this rests on, each of which would have sunk it:**
+
+1. **Nested imports work.** *"Imported files can recursively import other files, with a maximum depth
+   of four hops."* The seam spends two: `CLAUDE.md` → `SPECIALISTS.md` → body/lens. A lens may still
+   import something of its own without hitting the ceiling.
+2. **A path in backticks is not an import.** *"Import parsing skips Markdown code spans and fenced code
+   blocks."* So documentation may name `` `@.claude/specialists/SPECIALISTS.md` `` freely, and only the
+   bare line loads.
+3. **The roster survives compaction.** *"Project-root CLAUDE.md survives compaction: after `/compact`,
+   Claude re-reads it from disk and re-injects it."* An import is part of that file's expansion, so the
+   roster comes back with it — unlike a `paths:`-scoped rule, which does not.
+4. **It is not a token saving, and must not be sold as one.** *"Splitting into `@path` imports helps
+   organization but doesn't reduce context, since imported files load at launch."* The seam buys
+   **removability**, nothing else.
+
+**What it changes about a teardown.** Today an authored lens survives while the import that loaded it is
+removed, leaving an orphan — and the roster is 43 lines scattered across 6 sections that no script can
+safely cut. After the seam there is exactly **one** orphan with a name: `SPECIALISTS.md`, holding the
+roster the owner wrote, reported as *"no longer loaded by anything — move what you still want into
+`CLAUDE.md`, or delete it."* An unbounded hand-editing job becomes one file and one decision.
+
+The import line is still removed even when `SPECIALISTS.md` is authored, and that is deliberate: it is
+the line that makes the content *live*, which is exactly what the requirement bites on.
+
+**Existing consumers are not moved.** The bootstrap stays strictly additive — it never relocates a file
+somebody else's repo owns — so:
+
+| consumer state | the bootstrap writes | readers accept |
+|---|---|---|
+| **fresh** (no lens anywhere) | the seam | the seam **and** all three legacy layouts |
+| **already adopted** (lenses in a legacy dir) | keeps using that dir, adds new lenses beside the existing ones | unchanged |
+
+Readers change in exactly one place: `Get-LensDirCandidates` gains the seam as its most canonical
+candidate, ahead of the three it already walks. Writers pick their target from whether a legacy tree
+exists. **Migrating is the owner's act**, four steps, none of them automatic:
+
+1. `git mv .claude/plugins/<family>/<plugin>/*-extension.md .claude/specialists/lenses/`
+2. Create `.claude/specialists/SPECIALISTS.md` and move the roster, routing table and chains into it.
+3. Replace the two `@`-imports in `CLAUDE.md` with the single seam line.
+4. Run the roster check and the lint gate, then restart the session.
+
+**The one fragility the seam concentrates rather than removes.** The body import resolves into the
+marketplace cache, which is *outside* the working directory, and for such an import Claude Code shows a
+one-time approval dialog — *"If you decline, the imports stay disabled and the dialog doesn't appear
+again."* That was already true of the two-line form. What changes is the blast radius: decline once and
+the single line delivers nothing, silently and permanently, until you clear that decision. Worth knowing
+before diagnosing "the specialists stopped loading" as a bug in this repo.
+
 ## Adding a new plugin group
 
 A domain group is its own plugin folder — but adding one touches more than that folder. The drift
