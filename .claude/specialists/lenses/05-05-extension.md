@@ -107,7 +107,18 @@ gh pr merge <branch> --merge --delete-branch --subject "merge: <branch> (#<PR-nu
 
 `--merge` creates a **merge commit** (no squash/rebase — preserves the individual commits).
 `--subject` gives the merge commit the `merge:` prefix. `--delete-branch` cleans up the branch
-(remote + local). Then synchronize: `git checkout main && git pull --ff-only`.
+(remote + local). Then synchronize: `git checkout main` followed by `git pull --ff-only` (two
+statements — see the `&&` note just below).
+
+**Never chain `gh pr checks --watch` onto a merge in one command (lesson of July 29, 2026).** The
+watch only waits when there is something to wait for: if no run has started yet it returns
+**immediately** with `no checks reported` — a success-looking exit that means "I found nothing", not
+"the gate is green". A merge chained behind it therefore fires while `lint-en-tests` is still
+unevaluated, the `main` ruleset blocks it, and the chain ends with an unmerged PR while every step
+looked like it passed. **Fix:** keep them separate steps, and confirm a run exists for the head SHA
+before watching (the `head_sha` query below) — the same check that distinguishes a missing run from a
+late one. Note also that PowerShell 5.1 has no `&&`, so any such chain here is `;` or
+`if ($?) { ... }`, which happily runs the merge regardless of what the watch concluded.
 
 **If the required check `lint-en-tests` never shows up (lesson of July 23, 2026, PR #152):**
 recognize it by the merge staying blocked with no rollup appearing on the PR at all —

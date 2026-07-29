@@ -299,19 +299,31 @@ path turns on whether it exists:
   wording was internally inconsistent anyway: ritual step 5 has always said *"execute according to
   their trade rules"*.
 
-**So why is the switch still off?** Three reasons, and the first is the one that decides it:
+**So why is the switch still off?** Three reasons. The first used to be an unknown and is now a
+measured fact — which changes its weight without removing it:
 
-1. **What happens when two enabled plugins both set `agent` is not documented** — not on the plugins
-   page, not in the reference. A consumer who enables any other plugin that also sets it gets
-   behaviour nobody has written down. That is a poor thing to discover through your main thread.
+1. **Two enabled plugins that both set `agent`: the last one silently wins.** Settled by experiment
+   on July 29, 2026 (Claude Code 2.1.220), because it is not on the plugins page and not in the
+   reference. Two throwaway plugins, each with an `agent` in its root `settings.json` pointing at its
+   own agent, run in both orders along **both** load paths — repeated `--plugin-dir`, and the real
+   consumer path (`enabledPlugins` + `extraKnownMarketplaces`). In all four runs the **last-listed**
+   plugin won, and not merely its system prompt: the winner's `model` came through too (sonnet-5 for
+   one, haiku for the other), so the whole agent config travels. Ordering is positional, not
+   alphabetical — reversing the order reverses the winner. There is **no error and no warning**; the
+   harness knows and says so only at debug level:
+   `[DEBUG] Plugin "expbeta" overrides setting "agent" (previously set by another plugin)`.
+   So the behaviour is now written down, but the hazard is real and worse than a hard failure: a
+   consumer who enables any other plugin that also sets `agent` loses their orchestrator to
+   whichever plugin happens to sit last, with nothing on screen to say so.
 2. **It changes every consumer's main loop on their next plugin update**, from a version bump they did
    not read. Outward-facing and effectively irreversible for anyone who pulls it before a revert.
 3. **Chris ships as a persona, not a subagent, so there is no `agents/01-01-agent.md` to point at.**
    Creating one is not a formality: that file's `tools:` and `model` would become **the whole main
    thread's** tool policy and model.
 
-The body is therefore ready and the switch is not thrown. Flipping it is Dave's call, and the honest
-prerequisite is settling point 1 by experiment rather than by reading.
+The body is therefore ready and the switch is not thrown. Flipping it is Dave's call, now on a fact
+instead of an unknown: the collision resolves silently and positionally, so a consumer who enables a
+second `agent`-setting plugin gets a different orchestrator without being told.
 
 - **Step 0 (manual).** Put the marketplace source + `enabledPlugins` in `.claude/settings.json`
   (see [Consumption](../../README.md#consumption) in the root README) and **restart** the session —
