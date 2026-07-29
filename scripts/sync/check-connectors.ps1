@@ -284,7 +284,19 @@ foreach ($mf in $manifestFiles) {
             if (Test-Path -LiteralPath $adminPath) {
                 $admin = Get-Content -LiteralPath $adminPath -Raw -Encoding UTF8 | ConvertFrom-Json
                 $prop = $admin.plugins.PSObject.Properties | Where-Object { $_.Name -eq $p.id }
-                $record = $null
+                # EVERY matching record, not the first one (#240). The old loop stopped at the first
+                # hit -- an arbitrary pick dressed up as a fact. Measured on Dave's machine
+                # (2026-07-29): `claude plugin list` showed `specialists` three times for one repo
+                # (2.13.1, 2.11.0, 2.9.0), because ~/.claude.json holds several project records for
+                # that checkout, in two path spellings. The [OK]/[ERROR] the session hook prints every
+                # single start therefore rested on whichever record happened to come first in the JSON.
+                #
+                # Same defect family as #227, #235 and the teardown's docstring-VUL-IN: evidence that
+                # looks conclusive while being satisfied by something other than what it claims to
+                # measure. This one did not lie about a string -- it lied about WHICH of several
+                # answers it had found. An honest "I cannot tell" is worth more than a confident wrong
+                # number, and unlike the wrong number it is actionable.
+                $recordMatches = @()
                 if ($prop) {
                     # A record can carry a projectPath that no longer exists on this machine;
                     # Resolve-Path then returns $null and must never be blindly read via .Path
@@ -292,15 +304,25 @@ foreach ($mf in $manifestFiles) {
                     foreach ($rec in @($prop.Value)) {
                         if (-not ($rec.PSObject.Properties.Name -contains 'projectPath')) { continue }
                         $resolved = Resolve-Path -LiteralPath $rec.projectPath -ErrorAction SilentlyContinue
-                        if ($resolved -and $resolved.Path -eq $checkout) { $record = $rec; break }
+                        if (-not $resolved) { continue }
+                        # Case-insensitively and without a trailing separator: the observed duplicates
+                        # differ only in spelling, and on Windows that is the same directory. Two
+                        # spellings of one path are not two answers.
+                        if ($resolved.Path.TrimEnd('\', '/') -ieq $checkout.TrimEnd('\', '/')) { $recordMatches += $rec }
                     }
                 }
-                if ($null -eq $record) {
+                $recordVersions = @($recordMatches | ForEach-Object { $_.version } | Sort-Object -Unique)
+                if ($recordMatches.Count -eq 0) {
                     Write-Info "no machine record for this consumer (the install may run via a different machine)."
-                } elseif ($record.version -eq $sourceVersion) {
+                } elseif ($recordVersions.Count -gt 1) {
+                    # Deliberately a failure, not an INFO: as long as the records disagree, every other
+                    # version statement about this consumer is unreliable, and that is exactly what the
+                    # reader must not take on trust.
+                    Write-Failure "$($recordMatches.Count) machine records for this consumer disagree (v$($recordVersions -join ', v')) -- cannot determine which version is running here, so the source comparison (v$sourceVersion) is withheld. Clean up the duplicate project records for this checkout, then re-run."
+                } elseif ($recordVersions[0] -eq $sourceVersion) {
                     Write-Ok "machine record is on the source version (v$sourceVersion)"
                 } else {
-                    Write-Failure "machine record is on v$($record.version), source on v$sourceVersion -- update the plugin from the consumer (scope lesson)."
+                    Write-Failure "machine record is on v$($recordVersions[0]), source on v$sourceVersion -- update the plugin from the consumer (scope lesson)."
                 }
             } else {
                 Write-Info "no plugin administration found on this machine -- version check skipped."

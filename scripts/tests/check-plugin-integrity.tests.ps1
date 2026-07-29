@@ -494,6 +494,39 @@ try {
     $r15 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($r15.Out -match $SkillListFindingPattern)) 'scenario 15: a fenced END reports no [skill-list] finding'
     Assert-True ($r15.Out -match [regex]::Escape('0 <!-- skills:all --> span(s) found')) 'scenario 15: the masked END never becomes an orphan finding -- it is invisible, same as a masked BEGIN'
+
+    # --- Scenario 16: root changelog ENTRY files are IN the scan set (#234) --------------------------
+    # The window this closes: an entry file's text sits outside every scanned path while the PR is
+    # open, and only lands in a scanned file at FOLD time -- which happens directly on main, past every
+    # PR gate. v2.13.0 was blocked by exactly that: a marker quoted in changelog prose became an
+    # unpaired BEGIN in CHANGELOG.md, discovered only when cut-release ran the full gate on main.
+    # Both halves are asserted here: the dead link (check 4) AND the quoted marker (check 10, the
+    # original case), because they share this file set and the window covered both.
+    Write-Host "check 4 + 10 -- a root changelog entry file is scanned BEFORE the fold" -ForegroundColor Cyan
+    $midDot = [char]0x00B7
+    $entryPath = Join-Path $Fixture 'fix-my-branch.md'
+    $s16Lines = @(
+        "### My change $midDot Fix $midDot 2026-07-29"
+        ''
+        "See [nope]($deadLink) for details."
+        'The gate caught the skill missing from a `<!-- skills:all -->` span.'
+    )
+    [System.IO.File]::WriteAllText($entryPath, (($s16Lines -join "`n") + "`n"), $Utf8NoBom)
+
+    $r16 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-Equal 1 $r16.Code 'scenario 16: exit 1 -- an entry file is scanned, so its findings surface while the PR is open'
+    Assert-True ($r16.Out -match [regex]::Escape('.\fix-my-branch.md') -and $r16.Out -match '\[link\]') 'scenario 16: a dead link in an entry body is reported BEFORE the fold, not after'
+    Assert-True ($r16.Out -match [regex]::Escape("'<!-- skills:all -->' at line 4 has no matching")) 'scenario 16: the original #234 case -- a marker quoted in entry prose is caught on the PR instead of on main'
+    # The decoy from scenario A is still sitting in the fixture root with the same dead link, and it
+    # opens with an H1. It must STILL be ignored: the new rule keys on the entry format, not on "any
+    # root .md", so a permanent root doc (README, CONTRIBUTING, SECURITY, ...) never joins the set.
+    Assert-True (-not ($r16.Out -match [regex]::Escape('NOTES.md'))) 'scenario 16: an H1 root doc is still NOT read as an entry file -- the scan stayed scope-limited'
+
+    # And once the fold has taken it away, it simply drops out of the set again -- no stale reference,
+    # no error about a file that no longer exists.
+    Remove-Item -LiteralPath $entryPath -Force
+    $r17 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r17.Out -match [regex]::Escape('fix-my-branch.md'))) 'scenario 16: after the fold removes it, the entry file is gone from the set without complaint'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

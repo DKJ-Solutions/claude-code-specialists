@@ -220,6 +220,17 @@ infrastructure.
   only real use produces.** A placeholder in an assignment's *value*, an unfilled slot *heading*, an
   empty table. And for a script that deletes, resolve every remaining doubt toward keeping: a false
   keep leaves clutter, a false remove destroys someone's work.
+- **A gate can only fail on the files it scans — and a *transient* file is where that goes wrong.** The
+  lint gate's scan set (`$linkFiles`, feeding both check 4's link scan and check 10's skill spans) listed
+  every permanent doc but not the root changelog **entry** files. So an entry's text was invisible while
+  the PR was open and became visible only at **fold** time — directly on `main`, in one of the two
+  sanctioned direct-on-`main` actions, past every PR gate. The error then surfaced at the next full gate
+  run, `cut-release.ps1`, which is why v2.13.0 was blocked by a changelog sentence. Note the shape: no
+  check was wrong, the *timing* was — the gate's verdict was "green so far", not "green" (#234, closed
+  July 29, 2026 by adding root entry files to the set, keyed on the entry format's `###` heading, so a
+  permanent root doc with its `#` heading never joins). **The rule: when a gate checks file A and some
+  other step copies text into A, the gate must also check where that text was authored.** Ask which file
+  the content was *written* in, not which file it ends up in.
 - **A check that scans a file for a token can be satisfied by a *path* containing that token.**
   `check-roster-sync` looks for each `<group>-<id>` in the roster file, and the bootstrap writes
   `@.claude/plugins/claude-specialists/specialists/01-01-extension.md` into `CLAUDE.md`. That import

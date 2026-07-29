@@ -86,6 +86,11 @@ try {
     Assert-True ($mdText -match [regex]::Escape('@.claude/plugins/claude-specialists/specialists/01-01-extension.md')) 'CLAUDE.md carries the lens @-import (plugin path)'
     Assert-True ($mdText -match '(?m)^@[^\r\n]*personas/01-01-persona\.md') 'CLAUDE.md carries the body @-import (from the plugin install)'
     Assert-True (Test-Path -LiteralPath (Join-Path $Fixture '.claude\settings.suggested.jsonc')) 'settings.suggested.jsonc placed'
+    # The FULL path, not the relative name (#241). Many consumers gitignore '.claude/*', so this file
+    # never appears in 'git status' and 'git checkout .' does not clean it up -- an operator verifying a
+    # round-trip with git alone cannot see it exists. The stdout line is the only pointer they get, so
+    # it has to be a path they can act on.
+    Assert-True ($r1.Out -match [regex]::Escape((Join-Path $Fixture '.claude\settings.suggested.jsonc'))) 'the proposal is announced by FULL path -- git cannot announce it in a repo that ignores .claude/*'
 
     # --- 1b. Register proposal: the bootstrap points at the workshop register (gap found 2026-07-28) --
     #     Bootstrapping a consumer used to leave no trace towards the connector register, and nothing
