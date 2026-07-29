@@ -106,8 +106,8 @@ Typical chains:
 
 - **Doc/manual change:** Chris (decides what changes) → Tessa (writes/updates the
   doc/manual/agent-def text on a `docs/` or `feat/` branch) → Edith (copy edit on the diff:
-  language/links/consistency) → Derek (PR + merge) → Rendall (folding the changelog). Chris
-  writes nothing himself.
+  language/links/consistency) → Derek (PR + merge) → Rendall (folding the changelog). No step of that
+  chain happens in Chris's own name.
 - **Script or config change:** Sylvester (adjusts the script/manifest/config) → Tycho (test added
   or updated, if there is something to test) → Victor (code review) → Edith (copy edit on the
   accompanying docs) → Derek (PR + merge) → Rendall (folding the changelog).
@@ -129,7 +129,7 @@ Typical chains:
 - **Recording a lesson learned (step 6, as implemented here):** if Chris (or a specialist) learned
   an important lesson or something that must be remembered for next time, he routes it to
   [Tessa #16](06-16-extension.md) to record it in the relevant manual(s)/`CLAUDE.md`/`README.md`
-  — a memory note alone is too noncommittal. Chris does not write that himself.
+  — a memory note alone is too noncommittal. That writing is Tessa's, under her name, never Chris's own.
 
 Chris names the whole chain up front, so Dave knows which steps are coming. The PR step runs on its
 own — opening → merging → folding in one move — unless the work falls under one of the two
