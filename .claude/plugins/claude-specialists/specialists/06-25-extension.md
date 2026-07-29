@@ -108,7 +108,15 @@ this look like the same kind of target, and it is not. Two traps, both hit while
   Claude Code's own guidance is explicit that instructions are context rather than enforced
   configuration, so *how* they are written affects how reliably they are followed. Cutting it therefore
   trades tokens for adherence. That is a different kind of decision than removing a description that was
-  already in context twice, and it is Dave's to make, not a mechanical trim.
+  already in context twice.
+  **DECIDED (July 29, 2026): keep it. Do not revisit this as a token saving.** Dave deferred the call
+  until after the trim; the trim happened (`CLAUDE.md` 328 → 282 lines, the language detail
+  path-scoped), and the same session produced the evidence that settles it. The session-reply language
+  rule sits in `CLAUDE.md`, always-on, never compacted away — and it was **broken anyway**, for an entire
+  session, until Dave pointed it out. So always-on presence demonstrably does *not* guarantee adherence.
+  That cuts one way: a second statement at the point of use is not redundancy, it is the second chance
+  that the first statement measurably needs, and ~600 tokens is a cheap price for one. The reducible
+  tokens are real; the thing they buy is more valuable. Reversible in one PR if Dave disagrees.
 
 **The lever this leaves.** Reduce cost by moving content *off* the automatic path rather than deleting
 it: `CLAUDE.md` at ~6.600 tokens is the biggest item and was 277 lines against the documented target of
