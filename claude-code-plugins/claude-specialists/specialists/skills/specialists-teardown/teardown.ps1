@@ -86,6 +86,25 @@ $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path -LiteralPath $ConsumerRoot).Path
 $midDot = [char]0x00B7
 
+# THE SEAM (issue #221). The literals come from Get-SeamPaths rather than being retyped here, because
+# the bootstrap WRITES them and this script MATCHES them: a drift between the two leaves a consumer with
+# a dangling import that nothing errors on. Same $PSScriptRoot-relative dot-source the bootstrap uses --
+# the lib travels in this plugin's own payload. A missing lib must not stop a teardown either, so the
+# fallback is the same literal the lib returns.
+$seamLib = Join-Path $PSScriptRoot '../../scripts/lib/check-report-lib.ps1'
+if (Test-Path -LiteralPath $seamLib -PathType Leaf) { . $seamLib }
+$seam = if (Get-Command Get-SeamPaths -ErrorAction SilentlyContinue) {
+    Get-SeamPaths -RepoRoot $root
+} else {
+    [pscustomobject]@{
+        Dir        = (Join-Path $root '.claude\specialists')
+        LensDir    = (Join-Path $root '.claude\specialists\lenses')
+        Inclusion  = (Join-Path $root '.claude\specialists\SPECIALISTS.md')
+        ImportLine = '@.claude/specialists/SPECIALISTS.md'
+        RelDir     = '.claude/specialists'
+    }
+}
+
 Write-Host "== specialists-teardown $midDot $root ==" -ForegroundColor Cyan
 if (-not $Apply) {
     Write-Host "   DRY RUN -- nothing will be removed. Re-run with -Apply to act." -ForegroundColor Yellow
@@ -152,6 +171,7 @@ function Remove-IfApplying {
 # --- 1. Lens files on the plugin path ------------------------------------------------------------
 # Both layouts the bootstrap has ever used, so a repo adopted before #179 is torn down too.
 $lensDirs = @(
+    $seam.LensDir,
     (Join-Path $root '.claude\plugins'),
     (Join-Path $root '.claude\extensions')
 )
@@ -173,10 +193,32 @@ foreach ($dir in $lensDirs) {
     }
 }
 
-# Prune the plugin lens tree only when it is genuinely empty -- an authored lens must not lose its
-# directory out from under it.
+# --- 1b. The seam's inclusion file -----------------------------------------------------------------
+# SPECIALISTS.md is classified exactly like a lens, and for the same reason: an unfilled slot heading
+# means the bootstrap wrote it and nobody touched it; a filled-in roster is the owner's work.
+#
+# THE ONE ORPHAN, AND WHY IT IS AN IMPROVEMENT. When it IS authored it is kept while the import line
+# that loaded it is removed -- so it survives as a file nothing reads. That is the same shape as the
+# orphaned orchestrator lens the pre-seam layout left behind, with one decisive difference: it is ONE
+# file with a name, holding the roster in one piece, instead of 43 lines scattered through six sections
+# of CLAUDE.md. An unbounded hand-editing job becomes one file and one decision, which is the whole
+# point of the seam. The import is still removed either way: that line is what makes the content LIVE,
+# and a live reference is exactly what the requirement bites on.
+if (Test-Path -LiteralPath $seam.Inclusion -PathType Leaf) {
+    $inclRel = $seam.Inclusion.Substring($root.Length).TrimStart('\', '/')
+    if (Test-LooksGenerated -Path $seam.Inclusion -Kind 'lens') {
+        Remove-IfApplying -Path $seam.Inclusion -Label $inclRel
+    } else {
+        $kept += $inclRel
+        Write-Host ("  [KEEP]   $inclRel -- not recognised as an unfilled scaffold; this script does not judge it") -ForegroundColor Yellow
+        $notes += "$inclRel is kept, and after this run nothing loads it: the import line in CLAUDE.md is gone. It holds whatever roster/routing you wrote there -- move what you still want into CLAUDE.md by hand, or delete the file. This is the seam paying off: one named file to decide about, instead of a roster woven through CLAUDE.md."
+    }
+}
+
+# Prune the lens trees and the seam directory only when genuinely empty -- an authored lens or a kept
+# SPECIALISTS.md must not lose its directory out from under it.
 if ($Apply) {
-    foreach ($dir in $lensDirs) {
+    foreach ($dir in ($lensDirs + @($seam.Dir))) {
         if (-not (Test-Path -LiteralPath $dir)) { continue }
         $leftovers = @(Get-ChildItem -LiteralPath $dir -Recurse -File -ErrorAction SilentlyContinue)
         if ($leftovers.Count -eq 0) {
@@ -196,6 +238,7 @@ if (Test-Path -LiteralPath $claudeMd -PathType Leaf) {
     $lines = [System.IO.File]::ReadAllLines($claudeMd)
     $isSpecialistImport = {
         param($line)
+        if ($line.Trim() -eq $seam.ImportLine) { return $true }   # the seam: one line, knowably ours
         ($line -match '^\s*@') -and ($line -match '(-persona\.md|-extension\.md)\s*$')
     }
     # The explanatory line the bootstrap writes above the imports. Removed too, and matched on its

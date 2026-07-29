@@ -143,9 +143,45 @@ if ($durablePersonaDir.StartsWith($homeDir, [System.StringComparison]::OrdinalIg
 }
 $personaTilde = $personaTilde -replace '\\', '/'
 
-# Plugin path in the consumer (standard location for lenses).
+# Plugin path in the consumer (the PRE-SEAM location for lenses; still written for a consumer that
+# already has a lens tree there).
 $padRel = ".claude/plugins/$family"
 $padDirRoot = Join-Path $ConsumerRoot (".claude/plugins/$family")
+
+# THE SEAM (issue #221). A FRESH consumer gets one directory and one line: lenses flat in
+# .claude/specialists/lenses/, everything specialist-shaped behind .claude/specialists/SPECIALISTS.md,
+# and a single '@'-import in CLAUDE.md -- so an uninstall is "remove one directory and one line" instead
+# of hand-cutting a roster woven through six sections.
+#
+# An ALREADY-ADOPTED consumer keeps its existing tree. Get-LensWriteDir makes that call, and the reason
+# it is not "always the seam" matters: writing seam lenses beside a legacy tree would split the surface
+# in two, leaving the teardown to reason about both at once and a reader to find half a roster in each.
+# Migrating is the owner's act (four steps, in the family README); once they have moved the files, this
+# follows them automatically because the legacy tree is gone.
+#
+# Same fallback discipline as $family above: a missing lib must never stop a bootstrap, and without it
+# the script simply behaves as it did before the seam existed.
+$seam = if (Get-Command Get-SeamPaths -ErrorAction SilentlyContinue) { Get-SeamPaths -RepoRoot $ConsumerRoot } else { $null }
+$seamMode = $false
+if ($seam -and (Get-Command Get-LensWriteDir -ErrorAction SilentlyContinue)) {
+    $seamMode = ((Get-LensWriteDir -RepoRoot $ConsumerRoot -PluginName $personaPlugin) -eq $seam.LensDir)
+}
+
+function Get-LensDest {
+    <# Where THIS run writes the lens for <group>-<id> of $Plugin. One function, so the persona-lens
+       loop and the scaffold loop cannot drift into two slightly different notions of "where lenses go"
+       -- the bug class this repo keeps meeting. In seam mode the tree is FLAT: <group>-<id> is unique
+       family-wide, so a per-plugin subdirectory would only add a path segment for the teardown to walk. #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Plugin,
+        [Parameter(Mandatory = $true)][string]$Id
+    )
+    if ($script:seamMode) { return (Join-Path $script:seam.LensDir "$Id-extension.md") }
+    return (Join-Path (Join-Path $script:padDirRoot $Plugin) "$Id-extension.md")
+}
+
+# What the console lines and the closing "next steps" call the lens location.
+$lensRelDisplay = if ($seamMode) { "$($seam.RelDir)/lenses" } else { "$padRel/<plugin>" }
 
 Write-Host "== specialists-init bootstrap -- $ConsumerRoot ==" -ForegroundColor Cyan
 
@@ -165,15 +201,16 @@ function Add-RegisterId {
     if (-not $Inventory[$Plugin].Contains($Id)) { [void]$Inventory[$Plugin].Add($Id) }
 }
 
-# --- 1. Persona lenses (LENS-ONLY) to plugin path (never overwrite) ------------------------
-$personaDest = Join-Path $padDirRoot $personaPlugin
+# --- 1. Persona lenses (LENS-ONLY), never overwritten --------------------------------------
+# Destination comes from Get-LensDest: the seam for a fresh consumer, the existing tree otherwise.
+$personaDest = Split-Path (Get-LensDest -Plugin $personaPlugin -Id '01-01') -Parent
 if (-not (Test-Path -LiteralPath $personaDest)) { New-Item -ItemType Directory -Path $personaDest -Force | Out-Null }
 
 $copied = 0; $kept = 0
 Get-ChildItem -Path $personaDir -Filter '*-persona.md' -File | Sort-Object Name | ForEach-Object {
     if ($_.BaseName -notmatch '^(\d{2})-(\d{2})-persona$') { return }
     $g = $Matches[1]; $id = $Matches[2]
-    $dest = Join-Path $personaDest "$g-$id-extension.md"
+    $dest = Get-LensDest -Plugin $personaPlugin -Id "$g-$id"
     Add-RegisterId -Inventory $registerInventory -Plugin $personaPlugin -Id "$g-$id"
     if (Test-Path -LiteralPath $dest -PathType Leaf) {
         Write-Host "  [keep]  $(Split-Path $dest -Leaf) already exists -- not overwritten." -ForegroundColor DarkGray
@@ -189,7 +226,11 @@ Get-ChildItem -Path $personaDir -Filter '*-persona.md' -File | Sort-Object Name 
     if (-not $title) { $title = "# $g-$id" }
     $bodyPath = "$personaTilde/$($_.Name)"
     if ($g -eq '01' -and $id -eq '01') {
-        $loadNote = 'Chris loads his body automatically via the `@` import at the bottom of `CLAUDE.md`; other personas are read on-demand from this path.'
+        $loadNote = if ($script:seamMode) {
+            'Chris loads his body automatically -- `CLAUDE.md` imports `.claude/specialists/SPECIALISTS.md`, which imports this lens and the body; other personas are read on-demand from this path.'
+        } else {
+            'Chris loads his body automatically via the `@` import at the bottom of `CLAUDE.md`; other personas are read on-demand from this path.'
+        }
     } else {
         $loadNote = 'The body is read on-demand from this path when Chris brings in this persona (no static `@` import).'
     }
@@ -214,7 +255,7 @@ $title
      plugin persona; only repo-specific matters belong here. -->
 "@
     [System.IO.File]::WriteAllText($dest, ($content.TrimEnd() + "`n"), $Utf8NoBom)
-    Write-Host "  [create] lens-only $padRel/$personaPlugin/$(Split-Path $dest -Leaf)" -ForegroundColor Green
+    Write-Host "  [create] lens-only $lensRelDisplay/$(Split-Path $dest -Leaf)" -ForegroundColor Green
     $script:copied++
 }
 
@@ -289,12 +330,12 @@ foreach ($pluginName in ($pluginNames | Sort-Object -Unique)) {
         Write-Host "  [notice] agents directory of plugin '$pluginName' not found -- skipped." -ForegroundColor Yellow
         continue
     }
-    $pluginPad = Join-Path $padDirRoot $pluginName
+    $pluginPad = Split-Path (Get-LensDest -Plugin $pluginName -Id '00-00') -Parent
     if (-not (Test-Path -LiteralPath $pluginPad)) { New-Item -ItemType Directory -Path $pluginPad -Force | Out-Null }
     Get-ChildItem -Path $agentsDir -Filter '*-agent.md' -File | Sort-Object Name | ForEach-Object {
         if ($_.BaseName -notmatch '^(\d{2})-(\d{2})-agent$') { return }
         $group = $Matches[1]; $id = $Matches[2]
-        $dest = Join-Path $pluginPad "$group-$id-extension.md"
+        $dest = Get-LensDest -Plugin $pluginName -Id "$group-$id"
         Add-RegisterId -Inventory $registerInventory -Plugin $pluginName -Id "$group-$id"
         if (Test-Path -LiteralPath $dest -PathType Leaf) { $script:lensKept++; return }
         $midDot = [char]0x00B7
@@ -323,7 +364,7 @@ group: $group
      Portable expertise remains in plugin manual; only repo-specific matters belong here. -->
 "@
         [System.IO.File]::WriteAllText($dest, $template, $Utf8NoBom)
-        Write-Host "  [create] lens scaffold $padRel/$pluginName/$group-$id-extension.md" -ForegroundColor Green
+        Write-Host "  [create] lens scaffold $lensRelDisplay/$group-$id-extension.md" -ForegroundColor Green
         $script:scaffolded++
     }
 }
@@ -555,27 +596,78 @@ foreach ($s in $scriptScaffolds) {
     $scriptScaffolded++
 }
 
-# --- 2. The two @-imports at the bottom of CLAUDE.md (plugin body + repo lens) --------------------
+# --- 2. The import(s) at the bottom of CLAUDE.md ---------------------------------------------------
+# Pre-seam: two lines (plugin body + repo lens). Seam mode: ONE line pointing at SPECIALISTS.md, which
+# carries those two imports itself. Verified before this was designed: "Imported files can recursively
+# import other files, with a maximum depth of four hops" -- the seam spends two (CLAUDE.md ->
+# SPECIALISTS.md -> body/lens), and a relative import resolves against the file that CONTAINS it, which
+# is why SPECIALISTS.md can say '@lenses/...'.
 $bodyImport = "@$personaTilde/01-01-persona.md"
-$lensImport = "@$padRel/$personaPlugin/01-01-extension.md"
 $claudeMd = Join-Path $ConsumerRoot 'CLAUDE.md'
+
 # The explanatory line is kept as its own variable so BOTH the idempotence guard below and
-# specialists-teardown can recognise it literally. Measured in a real consumer round-trip
-# (davekokbwj/smartwatchbanden, 2026-07-29): the guard used to test only for $lensImport, so after a
+# specialists-teardown can recognise it literally, and it is deliberately IDENTICAL in both modes:
+# the teardown matches this exact sentence to tidy a leftover copy, and a mode-dependent wording would
+# silently stop that from working. Measured in a real consumer round-trip
+# (davekokbwj/smartwatchbanden, 2026-07-29): the guard used to test only for the lens import, so after a
 # teardown -- which removes '@' lines and deliberately nothing else -- the paragraph was still there
 # while the import was gone. The guard then read "not present" and re-appended the WHOLE block,
 # paragraph included. One extra copy per teardown->init cycle, counted 1 -> 2 -> 3, and no gate
 # reported it. Idempotence has to cover everything the script WRITES, not just the line it happens
 # to look for.
 $importNote = 'The orchestrator (Chris) is always loaded -- portable body from plugin install and repo lens'
-$importBlock = @"
+# Inside SPECIALISTS.md the same sentence needs no "from ..." tail: the reader is already in the file.
+$importNoteSeam = $importNote + ' from `lenses/`.'
 
-$importNote
-from plugin path; routes on-demand to specialists in ``$padRel/``.
+if ($seamMode) {
+    # The inclusion itself. Never overwritten -- once the owner has put their roster in here it is
+    # authored content, exactly like a filled-in lens.
+    if (-not (Test-Path -LiteralPath $seam.Dir)) { New-Item -ItemType Directory -Path $seam.Dir -Force | Out-Null }
+    if (Test-Path -LiteralPath $seam.Inclusion -PathType Leaf) {
+        Write-Host "  [keep]   $($seam.RelDir)/SPECIALISTS.md already exists -- not overwritten." -ForegroundColor DarkGray
+    } else {
+        # The TITLE deliberately carries no (VUL-IN): only the roster slot does. Filling in the roster
+        # therefore removes the marker, and the teardown -- which keys on an unfilled slot HEADING --
+        # then correctly reads the file as authored. A (VUL-IN) title would survive a filled-in roster
+        # and make the teardown delete somebody's work.
+        $inclusion = @"
+# The Claude Specialists -- this repo's inclusion
+
+<!-- Written by specialists-init. CLAUDE.md imports THIS ONE FILE; everything specialist-shaped lives
+     here or under lenses/. That is the whole point: an uninstall is "remove one directory and one
+     line". Keep the roster below rather than in CLAUDE.md, or that property is lost again. -->
+
+$importNoteSeam
 
 $bodyImport
 
-$lensImport
+@lenses/01-01-extension.md
+
+## The roster (VUL-IN)
+
+<!-- TODO (fill in after bootstrap): the roster, the routing table and the chains belong HERE, not in
+     CLAUDE.md -- which specialist takes which signal, and in what order they hand off. Leaving this
+     heading in place tells the teardown the file is still an untouched scaffold and may be removed;
+     replace it once you have written your roster. -->
+"@
+        [System.IO.File]::WriteAllText($seam.Inclusion, ($inclusion.TrimEnd() + "`n"), $Utf8NoBom)
+        Write-Host "  [create] $($seam.RelDir)/SPECIALISTS.md -- the single inclusion (roster slot: VUL-IN)." -ForegroundColor Green
+    }
+    $guardImport = $seam.ImportLine
+    $importBody = $seam.ImportLine
+    $importTail = "from ``$($seam.RelDir)/``; that file carries the body import, the lens import and this repo's roster."
+} else {
+    $lensImport = "@$padRel/$personaPlugin/01-01-extension.md"
+    $guardImport = $lensImport
+    $importBody = "$bodyImport`n`n$lensImport"
+    $importTail = "from plugin path; routes on-demand to specialists in ``$padRel/``."
+}
+$importBlock = @"
+
+$importNote
+$importTail
+
+$importBody
 "@
 
 if (-not (Test-Path -LiteralPath $claudeMd -PathType Leaf)) {
@@ -590,8 +682,8 @@ $importBlock
     Write-Host "  [create] CLAUDE.md scaffold created with orchestrator imports." -ForegroundColor Green
 } else {
     $md = [System.IO.File]::ReadAllText($claudeMd, [System.Text.Encoding]::UTF8)
-    if ($md -match [regex]::Escape($lensImport)) {
-        Write-Host "  [keep]   CLAUDE.md already has orchestrator imports." -ForegroundColor DarkGray
+    if ($md -match [regex]::Escape($guardImport)) {
+        Write-Host "  [keep]   CLAUDE.md already has the orchestrator import(s)." -ForegroundColor DarkGray
     } else {
         # Drop a leftover explanatory line from an earlier cycle before appending, so a
         # teardown -> init round-trip cannot accumulate copies of it. Matches the literal generated
@@ -657,7 +749,10 @@ Write-Host "  [create] $suggestPath placed (proposal -- not active; gitignored i
 Write-Host ""
 Write-Host "Done: $copied persona-lens(es) created, $kept already present; $scaffolded lens-scaffold(s) created, $lensKept already present; $scriptScaffolded script-scaffold(s) created, $scriptKept already present." -ForegroundColor Cyan
 Write-Host "Next steps (manual -- script intentionally leaves settings.json/hooks untouched):" -ForegroundColor Cyan
-Write-Host "  1. Fill '## Specific to this repo' slot in each $padRel/*/*-extension.md with repo lens (VUL-IN scaffolds can stay empty until specialist has work here)." -ForegroundColor Gray
+Write-Host "  1. Fill '## Specific to this repo' slot in each $lensRelDisplay/*-extension.md with repo lens (VUL-IN scaffolds can stay empty until specialist has work here)." -ForegroundColor Gray
+if ($seamMode) {
+    Write-Host "  1b. Put this repo's roster, routing table and chains in $($seam.RelDir)/SPECIALISTS.md (the '## The roster (VUL-IN)' slot) -- NOT in CLAUDE.md, which keeps exactly one import line." -ForegroundColor Gray
+}
 if ($repoConfigDerived) {
     Write-Host "  2. Want to use shared workflow skills (open-pr / fold-changelog)? RepoName already derived from git remote ($derivedRepo) -- fill Get-LintScript in scripts/repo-config.ps1 and branch prefix table in scripts/lib/branch-info.ps1." -ForegroundColor Gray
 } else {

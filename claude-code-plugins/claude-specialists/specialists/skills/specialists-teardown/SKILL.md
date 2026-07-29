@@ -174,6 +174,14 @@ removed, being knowably bootstrap-written. The file therefore survives as an orp
 and read by nothing. Both halves are correct, and the combination is worth naming, because a `[KEEP]`
 line reads as "still working" when all it means is "still there".
 
+**On a seam consumer this leftover shrinks to one named file.** Where the specialist surface sits behind
+`.claude/specialists/` (issue #221), a teardown removes that whole directory and the single import line.
+If `SPECIALISTS.md` still carries its `## The roster (VUL-IN)` slot it goes with the rest; if the owner
+filled the roster in, it is kept, the import is still removed -- that line is what made the content
+*live* -- and the report says outright that nothing loads it any more. So the orphan is not gone, but it
+is **one file with a name, holding the roster in one piece**, instead of 43 lines scattered through six
+sections of `CLAUDE.md`. That trade is what the seam actually buys.
+
 **4. A consumer gate that goes blind rather than red.** A consumer that lints its own lens files keeps
 that check afterwards, and in the measured repo the lens category **silently skips** once the directory
 is gone: nothing errors, nothing is reported, and the gate stays green while checking nothing. That is

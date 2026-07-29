@@ -280,6 +280,8 @@ $linkFiles += (Get-ChildItem -Path (Join-Path $RepoRoot 'claude-code-plugins\cla
 # The repo lenses live on the plugin path (.claude/plugins/claude-specialists/specialists/, the
 # standard) or on the legacy path (.claude/extensions/) -- scan both, wherever they are.
 foreach ($extDir in @(
+    (Join-Path $RepoRoot '.claude\specialists\lenses'),
+    (Join-Path $RepoRoot '.claude\specialists'),
     (Join-Path $RepoRoot '.claude\plugins\claude-specialists\specialists'),
     (Join-Path $RepoRoot '.claude\extensions'))) {
     if (Test-Path -LiteralPath $extDir) {

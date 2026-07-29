@@ -23,8 +23,15 @@ $Bootstrap  = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists\specia
 $DriftLint  = Join-Path $RepoRoot 'scripts\lint\check-consumer-drift.ps1'
 $Integrity  = Join-Path $RepoRoot 'scripts\lint\check-plugin-integrity.ps1'
 $Fixture    = Join-Path ([System.IO.Path]::GetTempPath()) 'specialists-init-test-fixture'
-# Plugin path in a consumer bootstrapped from the source repo (family = claude-specialists).
-$Pp         = '.claude\plugins\claude-specialists\specialists'
+# Where a FRESH consumer's lenses land as of the seam (issue #221): one flat directory, no per-plugin
+# segment, because <group>-<id> is unique family-wide.
+$Pp         = '.claude\specialists\lenses'
+$Seam       = '.claude\specialists'
+$SeamInclusion = '.claude\specialists\SPECIALISTS.md'
+$SeamImport = '@.claude/specialists/SPECIALISTS.md'
+# The pre-seam plugin path (family = claude-specialists). Still READ by every reader, and still WRITTEN
+# for a consumer that already has a lens tree there -- the bootstrap never relocates one.
+$PpLegacy   = '.claude\plugins\claude-specialists\specialists'
 $PersonaSrc = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists\specialists\personas\01-01-persona.md'
 
 $script:pass = 0
@@ -63,17 +70,19 @@ function Reset-Fixture {
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 try {
-    # --- 1. Bootstrap against a fresh repo: lens-only personas on the plugin path --------------------
-    Write-Host "bootstrap.ps1 -- fresh repo (plugin path + lens-only)" -ForegroundColor Cyan
+    # --- 1. Bootstrap against a fresh repo: lens-only personas in the seam --------------------------
+    Write-Host "bootstrap.ps1 -- fresh repo (the seam + lens-only)" -ForegroundColor Cyan
     Reset-Fixture
     $r1 = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $Fixture)
     Assert-Equal 0 $r1.Code 'bootstrap exit 0 on a fresh repo'
     foreach ($f in '01-01-extension.md', '05-05-extension.md', '05-06-extension.md') {
-        Assert-True (Test-Path -LiteralPath (Join-Path $Fixture "$Pp\$f")) "persona lens $f on the plugin path"
+        Assert-True (Test-Path -LiteralPath (Join-Path $Fixture "$Pp\$f")) "persona lens $f in the seam"
     }
     foreach ($f in '06-16-extension.md', '06-23-extension.md') {
-        Assert-True (Test-Path -LiteralPath (Join-Path $Fixture "$Pp\$f")) "lens scaffold $f on the plugin path"
+        Assert-True (Test-Path -LiteralPath (Join-Path $Fixture "$Pp\$f")) "lens scaffold $f in the seam"
     }
+    # Nothing lands on the pre-seam path for a fresh consumer -- one surface, not two.
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture $PpLegacy))) 'fresh repo: nothing written to the pre-seam plugin path'
     $lensText = [System.IO.File]::ReadAllText((Join-Path $Fixture "$Pp\06-16-extension.md"), [System.Text.Encoding]::UTF8)
     Assert-True ($lensText -match 'VUL-IN') 'lens scaffold carries the VUL-IN marker'
     # Rename-proof (issue #145): the agent-lens header carries the stable g-id slug, not the persona
@@ -83,8 +92,21 @@ try {
     $claudeMd = Join-Path $Fixture 'CLAUDE.md'
     Assert-True (Test-Path -LiteralPath $claudeMd) 'CLAUDE.md scaffold created'
     $mdText = [System.IO.File]::ReadAllText($claudeMd, [System.Text.Encoding]::UTF8)
-    Assert-True ($mdText -match [regex]::Escape('@.claude/plugins/claude-specialists/specialists/01-01-extension.md')) 'CLAUDE.md carries the lens @-import (plugin path)'
-    Assert-True ($mdText -match '(?m)^@[^\r\n]*personas/01-01-persona\.md') 'CLAUDE.md carries the body @-import (from the plugin install)'
+    # THE SEAM: CLAUDE.md carries exactly ONE specialist line, and the two imports it used to hold now
+    # live in SPECIALISTS.md. That single-line property is the whole reason a teardown can be "remove one
+    # directory and one line", so it is asserted as a COUNT, not just as a presence.
+    Assert-True ($mdText -match [regex]::Escape($SeamImport)) 'CLAUDE.md carries the single seam import'
+    Assert-Equal 1 (@([System.IO.File]::ReadAllLines($claudeMd) | Where-Object { $_ -match '^\s*@' }).Count) 'CLAUDE.md carries exactly ONE import line'
+    $inclusion = Join-Path $Fixture $SeamInclusion
+    Assert-True (Test-Path -LiteralPath $inclusion) 'the seam inclusion SPECIALISTS.md is placed'
+    $inclText = [System.IO.File]::ReadAllText($inclusion, [System.Text.Encoding]::UTF8)
+    Assert-True ($inclText -match '(?m)^@[^\r\n]*personas/01-01-persona\.md') 'SPECIALISTS.md carries the body @-import (from the plugin install)'
+    # Relative, because "relative paths resolve relative to the file containing the import".
+    Assert-True ($inclText -match '(?m)^@lenses/01-01-extension\.md') 'SPECIALISTS.md imports the lens relative to itself'
+    # The roster slot carries the marker; the TITLE deliberately does not. Filling in the roster removes
+    # the marker, so a teardown reads the file as authored instead of deleting somebody's roster.
+    Assert-True ($inclText -match '(?m)^##\s.*\(VUL-IN\)\s*$') 'SPECIALISTS.md has a VUL-IN roster slot'
+    Assert-True (-not ($inclText -match '(?m)^#\s[^\r\n]*\(VUL-IN\)')) 'SPECIALISTS.md title carries NO VUL-IN -- only the roster slot does'
     Assert-True (Test-Path -LiteralPath (Join-Path $Fixture '.claude\settings.suggested.jsonc')) 'settings.suggested.jsonc placed'
     # The FULL path, not the relative name (#241). Many consumers gitignore '.claude/*', so this file
     # never appears in 'git status' and 'git checkout .' does not clean it up -- an operator verifying a
@@ -238,14 +260,17 @@ try {
     $cachedBootstrap = Join-Path $ownCache 'skills\specialists-init\bootstrap.ps1'
     $rc = Invoke-Script -Path $cachedBootstrap -ScriptArgs @('-ConsumerRoot', $cacheConsumer)
     Assert-Equal 0 $rc.Code 'version cache: bootstrap exit 0'
-    $ppCache = '.claude\plugins\claude-specialists\specialists-lifehub'
-    Assert-True (Test-Path -LiteralPath (Join-Path $cacheConsumer "$ppCache\04-99-extension.md")) 'version cache: scaffold from the highest version (1.10.0)'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $cacheConsumer "$ppCache\04-88-extension.md"))) 'version cache: older version (1.9.0) not used'
-    # Regression #179: the family segment must be the plugin family, never the marketplace the plugin
-    # was installed from -- a lens under 'davekjohns-workshop' is invisible to every reader.
+    # A second plugin's lenses land in the SAME flat seam directory -- no per-plugin segment, since
+    # <group>-<id> is unique family-wide. That is what makes "remove one directory" true for a consumer
+    # with several plugins enabled, not just for a single-plugin one.
+    Assert-True (Test-Path -LiteralPath (Join-Path $cacheConsumer "$Pp\04-99-extension.md")) 'version cache: scaffold from the highest version (1.10.0)'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $cacheConsumer "$Pp\04-88-extension.md"))) 'version cache: older version (1.9.0) not used'
+    # Regression #179: nothing may land under the MARKETPLACE name. The seam makes the family segment
+    # moot for a fresh consumer, but the assertion is kept: it guards the fallback path that still
+    # derives one, and a lens under 'davekjohns-workshop' is invisible to every reader.
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $cacheConsumer '.claude\plugins\davekjohns-workshop'))) 'version cache: no lenses under the marketplace name (#179)'
     $cacheMd = [System.IO.File]::ReadAllText((Join-Path $cacheConsumer 'CLAUDE.md'), [System.Text.Encoding]::UTF8)
-    Assert-True ($cacheMd -match [regex]::Escape('@.claude/plugins/claude-specialists/specialists/01-01-extension.md')) 'version cache: the CLAUDE.md lens @-import follows the canonical path (#179)'
+    Assert-True ($cacheMd -match [regex]::Escape($SeamImport)) 'version cache: CLAUDE.md carries the single seam import'
 
     # --- 2c. Durable body path: cache install -> @-import points to the marketplaces clone (Gap C) -----
     # Mimics the real user-scope layout: .../plugins/cache/<mp>/<plugin>/<version>/ next to a
@@ -266,9 +291,14 @@ try {
     New-Item -ItemType Directory -Path $durConsumer -Force | Out-Null
     $rd = Invoke-Script -Path (Join-Path $cacheInit 'skills\specialists-init\bootstrap.ps1') -ScriptArgs @('-ConsumerRoot', $durConsumer)
     Assert-Equal 0 $rd.Code 'durable body path: bootstrap exit 0'
+    # The body import now lives in SPECIALISTS.md, not in CLAUDE.md -- so that is where the durability
+    # property has to be asserted. Reading the wrong file here would make this pass vacuously.
+    $durIncl = [System.IO.File]::ReadAllText((Join-Path $durConsumer $SeamInclusion), [System.Text.Encoding]::UTF8)
+    Assert-True ($durIncl -match [regex]::Escape("marketplaces/$mp/claude-code-plugins/claude-specialists/specialists/personas/01-01-persona.md")) 'durable body path: @-import points to the marketplaces clone'
+    Assert-True (-not ($durIncl -match '/cache/')) 'durable body path: @-import does NOT point to the version-pinned cache'
+    # And CLAUDE.md itself must be free of the cache path too -- the one line it carries is repo-relative.
     $durMd = [System.IO.File]::ReadAllText((Join-Path $durConsumer 'CLAUDE.md'), [System.Text.Encoding]::UTF8)
-    Assert-True ($durMd -match [regex]::Escape("marketplaces/$mp/claude-code-plugins/claude-specialists/specialists/personas/01-01-persona.md")) 'durable body path: @-import points to the marketplaces clone'
-    Assert-True (-not ($durMd -match '/cache/')) 'durable body path: @-import does NOT point to the version-pinned cache'
+    Assert-True (-not ($durMd -match '/cache/')) 'durable body path: CLAUDE.md carries no cache path at all'
 
     # --- 3. Drift on a fresh bootstrap: LENS-ONLY (no body to compare) --------------------
     Write-Host "check-consumer-drift.ps1 -- fresh lens-only bootstrap = LENS-ONLY" -ForegroundColor Cyan

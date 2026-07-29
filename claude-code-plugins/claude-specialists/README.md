@@ -318,13 +318,21 @@ prerequisite is settling point 1 by experiment rather than by reading.
   only then is the skill available.
 - **Step 1 (the skill).** Invoke `specialists-init`. The bundled
   [`bootstrap.ps1`](specialists/skills/specialists-init/bootstrap.ps1) performs only **additive**
-  actions: it copies the persona templates to `.claude/plugins/claude-specialists/specialists/<group>-<id>-extension.md`
-  (never overwriting), places an **empty lens scaffold** for every subagent of the enabled
-  plugin(s) (`VUL-IN` — the spot where repo-specific tasks per specialist are
-  filled in), adds the `@.claude/plugins/claude-specialists/specialists/01-01-extension.md` import at the bottom of `CLAUDE.md`
-  (or creates a scaffold), and writes a `settings.suggested.jsonc` with a `permissions.deny` +
-  hooks **stub**. It does not touch `settings.json` — that merge and filling in the repo lens are
-  manual work afterwards (repo-specific), after which one more **restart** activates the new context.
+  actions: for a **fresh** consumer it writes the seam — lens-only persona templates and an empty
+  `VUL-IN` lens scaffold per enabled subagent into `.claude/specialists/lenses/` (never overwriting),
+  `.claude/specialists/SPECIALISTS.md` carrying the body import, the lens import and the roster slot,
+  and **one** `@`-import at the bottom of `CLAUDE.md` (or a scaffold if there is none). A consumer that
+  already has a lens tree on the pre-seam path keeps it, and keeps its two imports — see
+  [The seam, specified](#the-seam-specified). It also writes a `settings.suggested.jsonc` with a
+  `permissions.deny` + hooks **stub**. It does not touch `settings.json` — that merge and filling in the
+  repo lens are manual work afterwards (repo-specific), after which one more **restart** activates the
+  new context.
+
+  > **The agent defs and manuals still name the pre-seam path** (`.claude/plugins/<family>/<plugin>/…`)
+  > when they tell a specialist where its lens lives. That is accurate rather than stale: both layouts
+  > are read, and every consumer that adopted before this release still has its lenses exactly there.
+  > Sweeping those 57 files is a documentation pass for the day the consumers have migrated, deliberately
+  > not folded into the mechanism change.
 
 ## Removal: the teardown gap
 
