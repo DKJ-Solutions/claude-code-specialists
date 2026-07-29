@@ -64,15 +64,42 @@ $kept    = @()
 $notes   = @()
 
 function Test-LooksGenerated {
-    <# A file the bootstrap wrote and nobody has filled in yet still carries the VUL-IN marker: that is
-       the exact contract bootstrap.ps1 writes it under. Its absence means somebody edited the file, so
-       the file is theirs and this script leaves it alone. Deliberately a content test rather than a
-       timestamp or a hash -- a consumer may have reformatted line endings or been through a merge, and
-       neither of those makes the content authored. #>
-    param([Parameter(Mandatory = $true)][string]$Path)
+    <# Is this file still an unfilled scaffold?
+
+       A content test rather than a timestamp or hash, deliberately: a consumer may have reformatted
+       line endings or been through a merge, and neither makes the content authored.
+
+       CRITICAL: the test keys on an UNFILLED PLACEHOLDER, not on the string 'VUL-IN' appearing
+       anywhere. The first version did the latter and would have deleted a fully configured
+       repo-config.ps1 in a real consumer -- found by a dry run against davekokbwj/smartwatchbanden on
+       2026-07-29, where all eight contract functions carry real values and the only 'VUL-IN' left is
+       in the scaffold's own DOCSTRING, which a consumer has no reason to strip. That is not an edge
+       case, it is the normal state of a filled-in scaffold, so the naive rule would have removed the
+       file that open-pr, fold-changelog, new-branch and check-roster-sync all depend on.
+
+       Third instance of one pattern in a single day -- a content test that matches a MENTION rather
+       than a USE. The roster check counted an '@'-import path as a roster row (#227); the lint gate
+       read a marker quoted in changelog prose as a real enumeration (#235); this one read a docstring
+       explaining placeholders as a placeholder. When a check's evidence is "this string appears in the
+       file", ask what else in that file legitimately contains it -- and for a script that DELETES,
+       resolve every doubt toward keeping. #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        # 'lens'        -> the scaffold's unfilled slot heading, e.g. '## Specific to this repo (VUL-IN)'
+        #                  or the nameless '# 06-16 <dot> repo lens (VUL-IN)' header.
+        # 'repo-config' -> an assignment whose VALUE is still a placeholder ($script:LintScript = 'VUL-IN').
+        # 'branch-info' -> the empty prefix table the bootstrap writes; a repo that filled its taxonomy
+        #                  has entries there, and that is the only signal that cannot be faked by prose.
+        [Parameter(Mandatory = $true)][ValidateSet('lens', 'repo-config', 'branch-info')][string]$Kind
+    )
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
     $text = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
-    return ($text -match 'VUL-IN')
+    switch ($Kind) {
+        'lens'        { return ($text -match '(?m)^#{1,6}\s.*\(VUL-IN\)\s*$') }
+        'repo-config' { return ($text -match "=\s*'[^']*VUL-IN") }
+        'branch-info' { return ($text -match '(?m)\$script:BranchPrefixTable\s*=\s*@\{\s*\}') }
+    }
+    return $false
 }
 
 function Remove-IfApplying {
@@ -93,7 +120,7 @@ foreach ($dir in $lensDirs) {
     $lenses = @(Get-ChildItem -LiteralPath $dir -Recurse -Filter '*-extension.md' -File -ErrorAction SilentlyContinue)
     foreach ($lens in $lenses) {
         $rel = $lens.FullName.Substring($root.Length).TrimStart('\', '/')
-        if (Test-LooksGenerated -Path $lens.FullName) {
+        if (Test-LooksGenerated -Path $lens.FullName -Kind 'lens') {
             Remove-IfApplying -Path $lens.FullName -Label $rel
         } else {
             $kept += $rel
@@ -153,12 +180,12 @@ if (Test-Path -LiteralPath $claudeMd -PathType Leaf) {
 # Category 3: these describe THIS repo's conventions (its branch taxonomy, its lint gate) and stay
 # useful with the plugin gone. Removed only while still untouched placeholders.
 foreach ($pair in @(
-    @{ Rel = 'scripts\repo-config.ps1';    What = 'repo config' },
-    @{ Rel = 'scripts\lib\branch-info.ps1'; What = 'branch taxonomy' }
+    @{ Rel = 'scripts\repo-config.ps1';     What = 'repo config';      Kind = 'repo-config' },
+    @{ Rel = 'scripts\lib\branch-info.ps1'; What = 'branch taxonomy';  Kind = 'branch-info' }
 )) {
     $path = Join-Path $root $pair.Rel
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { continue }
-    if (Test-LooksGenerated -Path $path) {
+    if (Test-LooksGenerated -Path $path -Kind $pair.Kind) {
         Remove-IfApplying -Path $path -Label $pair.Rel
     } else {
         $kept += $pair.Rel
