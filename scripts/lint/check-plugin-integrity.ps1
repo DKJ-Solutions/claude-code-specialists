@@ -240,6 +240,21 @@ function Get-HeadingSlugs {
     return $slugs
 }
 
+function Test-IsChangelogEntryFile {
+    # A changelog entry file (new-changelog-entry.ps1) opens with the compact entry heading
+    # '### <title> <midDot> <type> <midDot> <date>' -- an H3. Permanent root docs (README, CHANGELOG,
+    # CONTRIBUTING, SECURITY, ...) open with an H1. Same structural signature fold-changelog-entry.ps1
+    # keys off, deliberately restated rather than imported: dot-sourcing that script would RUN it, and
+    # a lint gate must not invoke a release action to answer a question. The shared thing is the entry
+    # FORMAT, owned by new-changelog-entry.ps1; both readers derive from it.
+    param([Parameter(Mandatory = $true)][string]$Path)
+    foreach ($line in [System.IO.File]::ReadAllLines($Path, [System.Text.Encoding]::UTF8)) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        return ($line -match '^###\s')
+    }
+    return $false
+}
+
 $linkFiles = @()
 foreach ($root in 'README.md', 'CHANGELOG.md', 'CLAUDE.md', 'CONTRIBUTING.md') {
     $p = Join-Path $RepoRoot $root
@@ -284,6 +299,24 @@ if (Test-Path -LiteralPath $releasesDir) {
 # Every plugin-carried RELEASE.md card (check 9) links to the full notes and its own
 # CHANGELOG.md -- those links need to be validated too.
 $linkFiles += (Get-ChildItem -Path $RepoRoot -Recurse -Filter 'RELEASE.md' -File |
+    Select-Object -ExpandProperty FullName)
+# Root changelog ENTRY files (<branch-name>.md), added to close the window in #234. This is the whole
+# fix, and it is small because the gap was structural rather than subtle: an entry file's text lives
+# outside every scanned path while the PR is open, and only enters a scanned file at FOLD time --
+# which happens directly on main, past every PR gate. So the sequence was: CI green on the PR (text in
+# an unscanned file) -> the fold introduces the error on main -> nothing reviews the fold, because it
+# is one of the two sanctioned direct-on-main actions -> the next full gate run is cut-release.ps1,
+# which refuses to release. That is how v2.13.0 was blocked by a changelog sentence.
+#
+# Scanning them here means the PR gate sees exactly the text the fold will paste into CHANGELOG.md,
+# so the error surfaces where it can still be reviewed. Their links are validated at ROOT position,
+# which is correct twice over: the entry file sits in the root now, and CHANGELOG.md -- where it is
+# headed -- is in the root too, so a relative link that resolves here resolves there.
+#
+# Note this covers check 10 (the skills:all spans) as well, since that check reuses this same set --
+# and check 10 is precisely what #234 tripped over.
+$linkFiles += @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
+    Where-Object { Test-IsChangelogEntryFile -Path $_.FullName } |
     Select-Object -ExpandProperty FullName)
 
 $linkRegex = [regex]'\[(?:[^\]]*)\]\(([^)]+)\)'

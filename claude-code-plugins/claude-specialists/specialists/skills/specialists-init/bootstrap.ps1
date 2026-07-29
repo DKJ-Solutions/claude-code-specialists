@@ -646,7 +646,12 @@ $suggestion = @'
 }
 '@
 [System.IO.File]::WriteAllText($suggestPath, $suggestion, $Utf8NoBom)
-Write-Host "  [create] .claude/settings.suggested.jsonc placed (proposal -- not active)." -ForegroundColor Green
+# The FULL path, not the relative name (#241). This file is the one artifact that can go completely
+# unnoticed: many consumers gitignore '.claude/*' (measured in davekokbwj/smartwatchbanden), so it
+# never shows up in 'git status' and 'git checkout .' does not clean it up either -- an operator
+# verifying a round-trip with git alone will not see it exists. It cannot be made to announce itself
+# through git, so it announces itself here, in the only output that is guaranteed to be read.
+Write-Host "  [create] $suggestPath placed (proposal -- not active; gitignored in many repos, so this path is your only pointer to it)." -ForegroundColor Green
 
 # --- Report ----------------------------------------------------------------------------------------
 Write-Host ""
@@ -658,7 +663,7 @@ if ($repoConfigDerived) {
 } else {
     Write-Host "  2. Want to use shared workflow skills (open-pr / fold-changelog)? Fill scripts/repo-config.ps1 (RepoName + LintScript) and scripts/lib/branch-info.ps1 (branch prefix table) -- VUL-IN scaffolds ready." -ForegroundColor Gray
 }
-Write-Host "  3. Copy desired parts from .claude/settings.suggested.jsonc to settings.json and delete proposal." -ForegroundColor Gray
+Write-Host "  3. Copy desired parts from $suggestPath to settings.json and delete proposal (it is gitignored in many repos, so git will not remind you)." -ForegroundColor Gray
 Write-Host "  4. Restart Claude Code session to activate new @-imports + config." -ForegroundColor Gray
 Write-Host "  5. Register this repo in the workshop's connector register -- paste-ready block below." -ForegroundColor Gray
 

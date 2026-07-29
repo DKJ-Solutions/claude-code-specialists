@@ -76,6 +76,15 @@ accepted degree of transparency (security review, July 16, 2026).
   2026): the check reads the actually installed version from the machine record
   (`installed_plugins.json`), and a `syncedVersion` field duplicating those numbers produced
   nothing but maintenance PRs while nobody was watching the signals anymore.
+- **A machine can hold several records for one checkout, and then the check refuses to guess**
+  (#240, July 29, 2026). Measured: one repo registered at three versions at once, because
+  `~/.claude.json` held several project records for it in two path spellings. The check used to take
+  the first record whose path resolved and stop — an arbitrary pick presented as a fact, on which the
+  session hook's `[OK]`/`[ERROR]` then rested. It now collects every match: agreeing records (two
+  spellings of one directory are not two answers) are reported as before, while disagreeing ones
+  produce an `[ERROR]` naming all versions found and withholding the source comparison, because while
+  they disagree no version claim about that consumer can be trusted. Cleaning up the duplicate project
+  records is Claude Code's own state, not something this repo writes to.
 
 ## The check
 

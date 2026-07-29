@@ -289,6 +289,34 @@ try {
         $r = Invoke-Ps $Script @('-SkipDrift', '-Manifest', $mf, '-ConsumerPathOverride', $Fixture)
         Assert-Equal 1 $r.Code 'outdated record: exit code 1'
         Assert-Match '\[ERROR\].*machine record is on v0\.0\.1' $r.Out 'outdated record: ERROR message'
+
+        # 8c. SEVERAL records for one checkout, at DIFFERENT versions -> say so, do not pick one (#240).
+        #     The old loop took the first match and stopped, so the [OK]/[ERROR] the session hook shows
+        #     every start depended on JSON ordering. Measured on Dave's machine: three registered
+        #     versions for one repo. An honest "cannot determine" is the only defensible output, and it
+        #     must NOT be an INFO -- while the records disagree, every version claim about this consumer
+        #     is unreliable.
+        Set-FixtureAdmin ('{ "version": 2, "plugins": { "specialists@davekjohns-workshop": [ ' +
+            '{ "scope": "project", "projectPath": "' + $fixtureEscaped + '", "installPath": "x", "version": "0.0.1" }, ' +
+            '{ "scope": "project", "projectPath": "' + $fixtureEscaped + '", "installPath": "x", "version": "0.0.2" }, ' +
+            '{ "scope": "project", "projectPath": "' + $fixtureEscaped + '", "installPath": "x", "version": "0.0.3" } ] } }')
+        $r = Invoke-Ps $Script @('-SkipDrift', '-Manifest', $mf, '-ConsumerPathOverride', $Fixture)
+        Assert-Equal 1 $r.Code 'disagreeing records: exit code 1'
+        Assert-Match '\[ERROR\].*3 machine records for this consumer disagree' $r.Out 'disagreeing records: reports the count instead of a version'
+        Assert-Match 'v0\.0\.1, v0\.0\.2, v0\.0\.3' $r.Out 'disagreeing records: names every version it found'
+        Assert-Match 'cannot determine' $r.Out 'disagreeing records: says outright that it cannot tell'
+
+        # 8d. Several records, SAME version, different path spellings -> agreement, not a disagreement.
+        #     Two spellings of one directory are not two answers: on Windows the trailing separator and
+        #     the casing are noise, and reporting them as a conflict would trade a confident wrong
+        #     number for a confident false alarm.
+        $fixtureLowerEscaped = ($Fixture.ToLowerInvariant() -replace '\\', '\\')
+        Set-FixtureAdmin ('{ "version": 2, "plugins": { "specialists@davekjohns-workshop": [ ' +
+            '{ "scope": "project", "projectPath": "' + $fixtureEscaped + '\\", "installPath": "x", "version": "0.0.1" }, ' +
+            '{ "scope": "project", "projectPath": "' + $fixtureLowerEscaped + '", "installPath": "x", "version": "0.0.1" } ] } }')
+        $r = Invoke-Ps $Script @('-SkipDrift', '-Manifest', $mf, '-ConsumerPathOverride', $Fixture)
+        Assert-Match '\[ERROR\].*machine record is on v0\.0\.1' $r.Out 'same version, two spellings: still the plain version verdict'
+        Assert-NotMatch 'disagree' $r.Out 'same version, two spellings: NOT reported as a disagreement'
     } finally {
         $env:USERPROFILE = $oldProfile
     }
