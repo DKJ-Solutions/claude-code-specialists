@@ -123,9 +123,15 @@ working.** No option to this script can fix that: adopting the shared-script mod
 dependency, and undoing it means the consumer holding local copies of those scripts (or its resolver
 degrading instead of throwing). State the promise precisely, then: what the bootstrap *wrote* is
 reversible; what the consumer *built on top of the plugin* is not, and a consumer that relies on the
-shared scripts has to plan that step itself. Note also that the dry run says nothing about this today --
-it reports what it would remove and what it keeps, not what breaks afterwards. Warning about it would be
-a change to the script, not to this page.
+shared scripts has to plan that step itself.
+
+**What the script does do about it: warn.** Any `.ps1` under `scripts/` that references the marketplace
+cache or `CLAUDE_PLUGIN_ROOT` is reported as a `[WARN]` line, together with the scripts that depend on
+it, and is **never removed** -- it is your code. Everything else in the report answers "what did the
+bootstrap put here"; this answers "what breaks after you uninstall", which is the question a reader
+actually has before trusting the word *reversible*. A warning is not a fix, but silence was worse: the
+first version of this page had to admit the dry run said nothing at all about the one leftover that
+breaks a run. The scan covers `scripts/` only, so a resolver living elsewhere is still yours to spot.
 
 **2. Authored text this script refuses to touch.** By design, per
 [the section above](#what-it-deliberately-will-not-do) -- and measured, so the size of the hand work is
