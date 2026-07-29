@@ -1,104 +1,57 @@
-# Release v2.11.0
+# Release v2.12.0
 
-**Date:** 2026-07-28  
+**Date:** 2026-07-29  
 **Type:** Minor
 
-Session hooks survive compaction, the consumer is served instead of put to work, and the ignore-list is empty
+Inventory drift in a repo's own connector entry becomes visible at session start, and the register catches up with reality
 
 You are on this release.
 
 ## Fixes
 
-### #213 · Hooks survive compaction, and consumer messages stop pointing at the workshop · Fix · 2026-07-28
+### #220 · Inventory drift in the session's own repo is visible at session start · Fix · 2026-07-29
 
-Two findings from Dave's principle: **assume a consumer knows nothing about this workshop.** A
-colleague who merely installs the plugin must be served by it, not put to work for it.
+The register's `extensions` inventory is meant to follow reality. When it does not, the check reports
+an `[INFO]` — and the session hook surfaces only `[ERROR]` lines, so the finding is invisible where
+someone would act on it. That is not theoretical: the run that prompted this found eleven of them at
+once, six in **this repo's own entry**, where the lenses had landed with the adopt-the-six change
+(PR #212) and the inventory was never updated alongside. It sat there until someone ran the check by
+hand.
 
-**1. The three session hooks went silent after the first `/compact`.** `hooks.json` matched only
-`startup`, while a SessionStart hook's injected stdout does not survive a compaction on its own — the
-[documented](https://code.claude.com/docs/en/hooks) way to keep it is to let the hook run again, which
-it does only for the sources its matcher names (`startup`, `resume`, `clear`, `compact`, `fork`). So
-every report — roster drift, script-contract drift, connector signals — disappeared from the context at
-the first compaction and never came back. Now `startup|resume|clear|compact`.
+The connectors README had carried an "after a refresh, also update the manifest" rule the whole time.
+That rule is why this is filed as a fix rather than a feature: it was on the books, it was not
+followed, and nothing reported the omission — so nothing prompted anyone. A sharper sentence would
+have changed nothing.
 
-`fork` is deliberately excluded: a forked session inherits the parent's context, so re-running would
-only duplicate the report. The cost was **measured** before widening rather than assumed — all three
-hooks together take ~4.6s (the connector check ~2.6s of it, since it runs the drift check per consumer),
-less than the compaction they now run alongside. Because `hooks.json` is JSON and cannot carry a
-comment, the reasoning lives in the hook docstrings.
+`check-connectors.ps1` now also emits a **non-counting `[INVENTORY]`** line that the hook surfaces,
+on its own verdict (`no errors, but the register's lens inventory for this repo is behind`) rather
+than folded under the not-registered one — those are different situations with different fixes. The
+third instance of the `[UNREGISTERED]`/`[ORPHANS]` shape: the `[INFO]` stays for the count and the
+deliberate run, the exit code stays 0, and nothing about the plugin install is implied to be broken.
 
-This was filed in inbound #204 as one of two closing observations *"offered as data rather than as
-asks"*, and left out of scope then. It turned out to be the load-bearing one.
+**Scoped as narrowly as the reasoning allows.** The marker fires only for the connector whose checkout
+*is* the repo the session is in — the workshop's own `localCheckout: "."` entry on a full sweep, or the
+consumer's own entry under `-OnlyConsumer`. Every other connector's drift stays silent, so the
+`[INFO]`-silence rule keeps applying wherever its justification ("often the business of another machine
+or user") is actually true. Promoting it for all connectors would have reintroduced exactly the noise
+that rule removed. Decision by Dave, July 29, 2026.
 
-**2. Two consumer-facing messages handed out homework in a repo the reader may not have.**
+Fifteen tests cover it (99 pass, up from 84), including the two that matter most: that drift in
+*another* repo's entry produces the `[INFO]` and **no** marker, and that the marker still surfaces when
+real `[ERROR]` signals are present too — a regression there would drop it exactly when a session is
+busiest.
 
-- **`[UNREGISTERED]`** said *"add connectors/<repo>.json in the workshop"*. Who benefits from
-  registration is the plugin's maintainer; who was being instructed was the consumer. It now states that
-  nothing there is broken (the plugin works normally; only the maintainer's view is missing) and
-  addresses the fix conditionally — *"if you maintain the plugin source … if you just use the plugin, no
-  action is needed on your side."* The hook's verdict line drops the word "workshop" too: internal
-  nickname, meaningless to that reader.
-- **A missing script-contract function** ended with *"update it from the workshop's own
-  scripts\repo-config.ps1"* — useless advice for exactly the reader most likely to hit it. Each contract
-  record now carries a `Returns` line stating in one sentence what the function must give back, so the
-  finding is **self-contained**: the reader can write the function from the report alone. Example:
+Two verification lessons are recorded in
+[Sylvester #15's lens](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/.claude/plugins/claude-specialists/specialists/05-15-extension.md): a
+`Write-Host` line is invisible to a same-process pipeline, so an in-process assertion about one passes
+whether the line is there or not (both cases read 0 — which makes a negative scoping assertion
+worthless unless it runs the check as a child process, the way the hook does); and
+`Set-Content -Encoding utf8` restores a file *with* a BOM under PowerShell 5.1, so undo a temporary
+probe with `git checkout --` instead.
 
-  > `[ERROR] 'Get-RosterPath' missing from scripts\repo-config.ps1 (required by: check-roster-sync) --
-  > this lib predates the contract the shared script(s) call; add the function. It must return the
-  > repo-root-relative path to the file holding the specialist roster -- 'CLAUDE.md' unless this repo
-  > keeps it elsewhere.`
-
-`Get-RecordReturns` degrades to the shorter message when a record has no `Returns`, so nothing breaks —
-which is precisely why a record could be added without one and nobody would notice. A drift guard
-asserts the `Returns` count equals the record count, so a ninth record without one turns the suite red.
-
-Two test-quality notes worth keeping. The "no workshop jargon" assertion first failed on the *fixture*
-rather than the hook: the stub still carried the old message text, making the hook look guilty of words
-it never produced. Stubs that exist to prove a wording must carry the real wording. And the intended
-demonstration against smartwatchbanden could not run — that repo's session had already repaired its
-script contract while this branch was being built, so its eight functions now report `[OK]`. The
-demonstration moved to a throwaway fixture instead.
-
-[PR #213](https://github.com/DaveKJohn/davekjohns-workshop/pull/213)
-
-## Documentation
-
-### #211 · Adopting a new specialist is the default, not a question · Docs · 2026-07-28
-
-Dave, during the smartwatchbanden catch-up: the session asked him, one by one, which of five new
-specialists to adopt. His answer — *it should always just be adopted after a plugin update.*
-
-**The asking came from a hand-written handover prompt, not from the system.** Nothing in the plugin or
-the repo docs said to ask; the prompt for that session did, explicitly. That is the interesting part:
-the rule had no home, so whoever writes the next prompt is free to invent the approval step again. It
-now lives in the two places a session actually reads at that moment — the `sync-roster` skill (where
-the catch-up is staged) and `check-roster-sync.ps1`'s docstring (where the `[ERROR]` comes from) —
-rather than in a prompt that is written once and forgotten.
-
-**The reasoning, because "always adopt" sounds careless and is not.** The lens scaffold is empty on
-purpose: a `VUL-IN` lens may sit untouched until that specialist actually has work in the repo — that
-is what the scaffold is *for*, not an unfinished task. So adopting costs a file nobody has to fill in
-yet, while asking costs an interruption over a decision with no downside either way. That is exactly
-the shape of approval question the governance rule already rules out: reserve them for the
-irreversible, the outward-facing, and the genuinely risky.
-
-What stays a judgment call is the *content* — what the lens says once the specialist has work, and
-where the roster row belongs — and those are writes to the governance doc, which `sync-roster`
-deliberately never makes. Adoption and lens content were being treated as one decision; they are two,
-and only the second needs a human.
-
-**The ignore-list keeps its role, with its character corrected.** `Get-RosterIgnoredIds` is for a
-specialist that genuinely has no place in a repo, recorded on your own initiative with a comment
-naming who and why. It is a statement, not an answer to a per-update question.
-
-Also corrected in the same pass: the ordering advice given for the smartwatchbanden catch-up. Fixing
-the script contract still has to come first, but for a different reason than was written down. It is
-not "so that skipping becomes possible" — it is that `check-roster-sync` needs `Get-RosterPath` and
-`Get-RosterIgnoredIds` to run without a hard error at all.
-
-[PR #211](https://github.com/DaveKJohn/davekjohns-workshop/pull/211)
+[PR #220](https://github.com/DaveKJohn/davekjohns-workshop/pull/220)
 
 ---
 
-Full workshop notes: [releases/development/2.x/2.11.0.md](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/releases/development/2.x/2.11.0.md)
+Full workshop notes: [releases/development/2.x/2.12.0.md](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/releases/development/2.x/2.12.0.md)
 Cumulative plugin history: [CHANGELOG.md](CHANGELOG.md)
