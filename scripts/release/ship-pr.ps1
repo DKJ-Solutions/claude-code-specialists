@@ -130,9 +130,21 @@ $co = Invoke-NativeCapture -FilePath 'git' -Arguments @('checkout', 'main')
 $co.Output | ForEach-Object { Write-Host $_ }
 if ($co.ExitCode -ne 0) { Write-Error "git checkout main failed."; exit 1 }
 
-$pull = Invoke-NativeCapture -FilePath 'git' -Arguments @('pull', '--ff-only')
-$pull.Output | ForEach-Object { Write-Host $_ }
-if ($pull.ExitCode -ne 0) { Write-Error "git pull --ff-only of main failed."; exit 1 }
+# Fetch + an EXPLICIT ff-only merge of origin/main, not a bare `git pull --ff-only` (lesson of
+# July 29, 2026, PR #257). The bare pull aborted with "Cannot fast-forward to multiple branches" on a
+# clean main immediately after a merge + prune -- and it aborts HERE, in the one gap between the merge
+# and the fold, which is the state nothing reports: the PR is merged, the entry file is still in the
+# root, and every gate stays green until a release trips over it. Git raises that error when handed more
+# than one ref to merge; naming origin/main explicitly hands it exactly one, so this step cannot reach
+# that failure mode, whereas a bare pull depends on whatever FETCH_HEAD happens to hold. Why the pull
+# got more than one ref was deliberately not guessed at -- see Derek's lens for that reasoning.
+$fetch = Invoke-NativeCapture -FilePath 'git' -Arguments @('fetch', '--prune', 'origin')
+$fetch.Output | ForEach-Object { Write-Host $_ }
+if ($fetch.ExitCode -ne 0) { Write-Error "git fetch of origin failed."; exit 1 }
+
+$ff = Invoke-NativeCapture -FilePath 'git' -Arguments @('merge', '--ff-only', 'origin/main')
+$ff.Output | ForEach-Object { Write-Host $_ }
+if ($ff.ExitCode -ne 0) { Write-Error "git merge --ff-only of origin/main failed."; exit 1 }
 
 Write-Host "ship-pr: folding the changelog entry..." -ForegroundColor Cyan
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'fold-changelog-entry.ps1') -Branch $branch
