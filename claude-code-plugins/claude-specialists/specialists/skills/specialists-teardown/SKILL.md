@@ -27,6 +27,9 @@ powershell -NoProfile -File "<plugin>/skills/specialists-teardown/teardown.ps1"
 
 # Act
 powershell -NoProfile -File "<plugin>/skills/specialists-teardown/teardown.ps1" -Apply
+
+# Act, and keep a working git workflow afterwards (see the runtime dependency below)
+powershell -NoProfile -File "<plugin>/skills/specialists-teardown/teardown.ps1" -Apply -VendorScripts
 ```
 
 **Dry run by default.** A destructive script that runs on somebody's repo should have to be asked
@@ -125,13 +128,33 @@ degrading instead of throwing). State the promise precisely, then: what the boot
 reversible; what the consumer *built on top of the plugin* is not, and a consumer that relies on the
 shared scripts has to plan that step itself.
 
-**What the script does do about it: warn.** Any `.ps1` under `scripts/` that references the marketplace
-cache or `CLAUDE_PLUGIN_ROOT` is reported as a `[WARN]` line, together with the scripts that depend on
-it, and is **never removed** -- it is your code. Everything else in the report answers "what did the
-bootstrap put here"; this answers "what breaks after you uninstall", which is the question a reader
-actually has before trusting the word *reversible*. A warning is not a fix, but silence was worse: the
-first version of this page had to admit the dry run said nothing at all about the one leftover that
-breaks a run. The scan covers `scripts/` only, so a resolver living elsewhere is still yours to spot.
+**What the script does about it, first: warn.** Any `.ps1` under `scripts/` that references the
+marketplace cache or `CLAUDE_PLUGIN_ROOT` is reported as a `[WARN]` line, together with the scripts that
+depend on it, and is **never removed** -- it is your code. Everything else in the report answers "what
+did the bootstrap put here"; this answers "what breaks after you uninstall", which is the question a
+reader actually has before trusting the word *reversible*. The scan covers `scripts/` only, so a resolver
+living elsewhere is still yours to spot.
+
+**And second: `-VendorScripts` hands the scripts back, which is the actual way out.** It copies the
+plugin's shared script payload (`scripts/task`, `scripts/release`, `scripts/lib`, `scripts/sync`) into
+your own `scripts/`, structure preserved, so the workflow keeps running with the plugin gone. This works
+because the payload was built to travel: the scripts locate the repo through `CLAUDE_PROJECT_DIR` /
+`git rev-parse --show-toplevel` -- never their own location -- and dot-source their siblings
+`$PSScriptRoot`-relative, so a copy behaves identically anywhere inside the repo. The source repo is the
+standing proof: its `scripts/` copies are byte-identical to the plugin's, and that is asserted on every
+vendor test run.
+
+Three things to know before using it:
+
+- **It is the one additive act in a subtractive script**, which is why it is opt-in rather than default.
+- **It never overwrites.** A destination that exists and differs is reported and left alone -- that file
+  is typically your own wrapper around the shared script, so the rule protecting a filled-in lens
+  protects it too. Reconciling those is yours; an identical destination is reported as already current,
+  so re-running is safe.
+- **The vendored scripts still need the repo-owned script contract** they dot-source
+  (`scripts/lib/branch-info.ps1`, `scripts/repo-config.ps1`). Keep those whatever else you drop. If the
+  same run removed them because they were still unfilled scaffolds, the report says so outright: that
+  repo never had a working workflow to preserve.
 
 **2. Authored text this script refuses to touch.** By design, per
 [the section above](#what-it-deliberately-will-not-do) -- and measured, so the size of the hand work is

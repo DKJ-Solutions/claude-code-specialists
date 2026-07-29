@@ -324,6 +324,48 @@ function Get-LintScript { return `$script:LintScript }
     New-BootstrappedConsumer | Out-Null
     $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
     Assert-True (-not ($r.Out -match 'resolves the plugin cache')) 'no false alarm: no resolver, no warning'
+
+    # --- 9. -VendorScripts: the way out, and the one additive act in a subtractive script -----------
+    #     Warning about the runtime dependency was half the answer; this is the other half. Three
+    #     properties, and the middle one is the important one: the payload lands with its STRUCTURE
+    #     intact (the scripts dot-source siblings $PSScriptRoot-relative, so a flattened copy would
+    #     break at the next branch rather than here), it is BYTE-IDENTICAL to the plugin's (a copy that
+    #     drifts is worse than no copy), and a destination that already exists and DIFFERS is left
+    #     alone -- that file is the consumer's own wrapper, i.e. authored content.
+    New-BootstrappedConsumer | Out-Null
+    $pluginPayload = Join-Path $Plugin 'scripts'
+    # A consumer wrapper sitting exactly where a vendored script wants to go.
+    $wrapper = Join-Path $Fixture 'scripts\release\open-pr.ps1'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $wrapper) -Force | Out-Null
+    [System.IO.File]::WriteAllText($wrapper, "# my own wrapper around the shared open-pr`nWrite-Host 'wrapping'")
+    $wrapperBefore = [System.IO.File]::ReadAllText($wrapper, [System.Text.Encoding]::UTF8)
+
+    $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-VendorScripts')
+    Assert-Equal 0 $r.Code 'vendor dry run: exit-code 0'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\task\new-branch.ps1'))) 'vendor dry run: writes NOTHING without -Apply'
+    Assert-True ($r.Out -match 'would be written') 'vendor dry run: says what it would write'
+
+    $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply', '-VendorScripts')
+    Assert-Equal 0 $r.Code 'vendor: exit-code 0'
+    $vendoredBranch = Join-Path $Fixture 'scripts\task\new-branch.ps1'
+    Assert-True (Test-Path -LiteralPath $vendoredBranch) 'vendor: the operational script is now local'
+    Assert-True (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\lib\native-capture-lib.ps1')) 'vendor: the sibling lib it dot-sources came along'
+    Assert-Equal (Get-FileHash -LiteralPath (Join-Path $pluginPayload 'task\new-branch.ps1')).Hash `
+                 (Get-FileHash -LiteralPath $vendoredBranch).Hash `
+                 "vendor: byte-identical to the plugin's copy -- no drift on arrival"
+    # THE SAFETY PROPERTY, same family as "an authored lens is kept".
+    Assert-Equal $wrapperBefore ([System.IO.File]::ReadAllText($wrapper, [System.Text.Encoding]::UTF8)) "vendor: the consumer's own wrapper is NOT overwritten"
+    Assert-True ($r.Out -match 'yours, not overwritten') 'vendor: the collision is reported, not silent'
+
+    # Idempotent, and honest about it: a second run recognises its own work instead of rewriting it.
+    $r2 = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply', '-VendorScripts')
+    Assert-Equal 0 $r2.Code 'vendor: second run exit-code 0'
+    Assert-True ($r2.Out -match 'already current') 'vendor: a second run reports the copies as already current'
+
+    # Default behaviour is untouched: no switch, no writing.
+    New-BootstrappedConsumer | Out-Null
+    $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\task\new-branch.ps1'))) 'vendor: nothing is vendored without the switch'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

@@ -402,9 +402,13 @@ finish the job without guessing where a roster row ends and the owner's prose be
   purpose (#81), but the consumer-side resolver that reaches them throws once the plugin is gone, so an
   uninstall breaks the repo's git workflow rather than merely leaving debris behind. Either the resolver
   degrades to a clear, actionable failure, or the consumer keeps local copies — and whichever it is
-  should be a stated part of adoption, since no teardown can decide it afterwards. **Since July 29, 2026
-  the teardown at least warns:** it reports every `.ps1` under `scripts/` that reaches into the cache,
-  plus what depends on it, and removes none of them. That is the honest half — a warning, not a fix.
+  should be a stated part of adoption, since no teardown can decide it afterwards. **Settled on
+  July 29, 2026, in two steps.** The teardown first learned to *warn*: it reports every `.ps1` under
+  `scripts/` that reaches into the cache, plus what depends on it, and removes none of them. Then it
+  learned to *solve* it — `-VendorScripts` copies the shared payload into the consumer's own `scripts/`
+  (structure preserved, never overwriting), so the workflow survives the uninstall. This repo is the
+  proof the model works: its own `scripts/` copies are byte-identical to the plugin's, asserted on every
+  test run.
 - **Consumer gates that announce when they stop applying.** A consumer that lints its own lens files
   keeps that check after the teardown, and in the measured repo it *silently skips* the lens category
   once the directory is gone: green, and checking nothing. Right for a deliberate teardown, wrong for an
