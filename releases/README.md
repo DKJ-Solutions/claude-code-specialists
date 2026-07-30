@@ -25,6 +25,7 @@ refuses that rather than doing it quietly (see [Cutting a release](#cutting-a-re
 
 | Version | Date | Type | Title |
 |---|---|---|---|
+| [3.0.1](development/3.x/3.0.1.md) | 2026-07-30 | Patch | Patch release |
 | [3.0.0](development/3.x/3.0.0.md) | 2026-07-30 | Major | Chapter 2 consolidated (v2.2.0 -> v2.16.0) |
 
 ### 2.x
