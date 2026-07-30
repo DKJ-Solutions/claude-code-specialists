@@ -76,8 +76,11 @@ The full picture, top-level folder by folder:
 ## Consumption
 
 A consuming repo adds this marketplace via `extraKnownMarketplaces` in `.claude/settings.json` and
-enables the desired plugins via `enabledPlugins`. The canonical enable-a-plugin walkthrough (the
-settings snippet, the restart, running the bootstrap skill) is in the family
+enables the desired plugins via `enabledPlugins` — and then, because an install is **project-scoped**,
+runs `claude plugin install <plugin>@<marketplace>` from that repo's root for each of them; the
+settings keys alone install nothing. The canonical enable-a-plugin walkthrough (the settings snippet,
+the per-plugin install, the restart, the `claude plugin list` self-check, running the bootstrap skill)
+is in the family
 [Quickstart](claude-code-plugins/claude-specialists/QUICKSTART.md) — connect in three steps, for
 those who didn't build the system. This root README keeps only the two marketplace-wide facts that
 matter beyond any one consumer:
