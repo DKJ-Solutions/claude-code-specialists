@@ -348,6 +348,16 @@ second `agent`-setting plugin gets a different orchestrator without being told.
 
 ## Removal: the teardown gap
 
+> **Status: closed on July 30, 2026.** Every item of the target shape below carries its own *Settled on*
+> marker, and [issue #221](https://github.com/DaveKJohn/davekjohns-workshop/issues/221) is closed. The
+> section is kept in full rather than trimmed to a verdict, because the **measurements** are the reason
+> the design ended up the way it did — the 26 orphaned lens files, the import that actively broke, the
+> 101 specialist mentions across 492 lines, the resolver that took the daily git workflow down with it.
+> A future change that finds this shape inconvenient should have to argue with the numbers, not with a
+> conclusion. What is *not* closed and deliberately so: delivering Chris from the plugin's own
+> `settings.json` ([#215](https://github.com/DaveKJohn/davekjohns-workshop/issues/215)) — the mechanism
+> is verified and the switch is Dave's to throw.
+
 **The requirement, set by Dave on July 29, 2026.** A consumer must be able to **install and uninstall
 these plugins at any moment**, and after an uninstall it must be able to *stand fully free*: no
 lingering reference to a specialist, a manual, a persona, or a roster anywhere in the repo. Adoption
@@ -448,7 +458,15 @@ finish the job without guessing where a roster row ends and the owner's prose be
 ### What the ideal shape looks like
 
 - **Category 2 behind a single seam.** All specialist content reachable through one inclusion, so
-  teardown is "remove one directory and one line" instead of editing 492 lines by hand.
+  teardown is "remove one directory and one line" instead of editing 492 lines by hand. **Settled on
+  July 29, 2026** — specified below, written by the bootstrap and matched by the teardown
+  ([#253](https://github.com/DaveKJohn/davekjohns-workshop/pull/253),
+  [#254](https://github.com/DaveKJohn/davekjohns-workshop/pull/254)), with this repo migrated onto it as
+  the first consumer ([#255](https://github.com/DaveKJohn/davekjohns-workshop/pull/255)). The paperwork
+  lagged a day behind the machinery: 120 occurrences of the pre-seam path across 57 files were still
+  telling every consumer the old location
+  ([#261](https://github.com/DaveKJohn/davekjohns-workshop/pull/261)), and `sync-roster` was still
+  *writing* there ([#262](https://github.com/DaveKJohn/davekjohns-workshop/pull/262)).
 - **Category 3 written plugin-neutrally**, so it stays true after an uninstall instead of pointing at
   a departed persona. **Settled on July 30, 2026 — and the honest version of "settled" is worth stating,
   because the item as written could not be done at all.** The rewording is the *owner's* governance prose:
