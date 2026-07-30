@@ -2,9 +2,9 @@
 name: specialists-init
 description: >-
   Bootstrap the Claude Specialists system in a new consuming repo: hook up the orchestrator
-  (Chris) via two @-imports in CLAUDE.md (the portable body from the plugin install + his
-  lens-only repo lens on the plugin path), put the other main-loop personas (Derek, Rendall) and the
-  subagents in place as lens-only scaffolds on the plugin path plus the script-config scaffolds, and
+  (Chris) via one @-import in CLAUDE.md pointing at the seam (which in turn imports his portable
+  body from the plugin install + his lens-only repo lens), put the other main-loop personas (Derek,
+  Rendall) and the subagents in place as lens-only scaffolds in the seam plus the script-config scaffolds, and
   deliver a governance/safety-hooks proposal.
   Use this when the shared `specialists` plugin is enabled but the conductor and the
   governance layer are still missing ("the workers are there, Chris is not").
@@ -13,11 +13,19 @@ description: >-
 # specialists-init — the adoption path for a new consumer
 
 The shared `specialists` plugin delivers the **worker subagents** (Sylvester, Tessa, Edith, Victor,
-Tycho, …). What a plugin **cannot** do is inject always-on main-loop context or edit a consumer's
-`CLAUDE.md`. That is exactly where the gap sits: **Chris** (the orchestrator) is loaded via an
-`@`-import at the bottom of the repo `CLAUDE.md`; **Derek** and **Rendall** stand ready as lens-only
-personas on the plugin path and are read on demand. This skill sets that up, plus the governance and
-safety layer that differs per repo.
+Tycho, …). What a plugin **cannot** do is edit a consumer's `CLAUDE.md`. That is exactly where the gap
+sits: **Chris** (the orchestrator) is loaded via an `@`-import in the repo `CLAUDE.md`; **Derek** and
+**Rendall** stand ready as lens-only personas in the seam and are read on demand. This skill sets that
+up, plus the governance and safety layer that differs per repo.
+
+> **One half of that used to be stated too broadly, and the correction matters here.** A plugin *can*
+> inject always-on main-loop context — a root `settings.json` with an `agent` key activates one of its
+> own agents as the main thread. Verified, and deliberately **not** switched on: it would change every
+> consumer's main loop from a version bump they did not read, and a second `agent`-setting plugin
+> silently wins on load order. The reasoning is in the
+> [family README](../../../README.md#delivering-the-orchestrator-from-the-plugin--verified-deliberately-not-switched-on)
+> and [issue #215](https://github.com/DaveKJohn/davekjohns-workshop/issues/215). So this skill exists
+> because of the `CLAUDE.md` half, which is true on its own.
 
 ## Chicken-and-egg — step 0 is done by the user
 
@@ -87,7 +95,7 @@ across both paths would be worse than either. Migrating is your act, four steps,
 
 After the script:
 
-1. **Fill in the repo lens.** Every `*-extension.md` put in place on the plugin path has an
+1. **Fill in the repo lens.** Every `*-extension.md` put in place in the seam has an
    `## Specific to this repo (VUL-IN)` slot. Replace it with the repo-specific context: the roster/
    routing (Chris), the branch/PR conventions (Derek), the release mechanics (Rendall). The portable
    body lives in the plugin install (not in the lens) and is loaded along via the `@`-import — the

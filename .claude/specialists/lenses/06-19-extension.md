@@ -18,7 +18,7 @@ not that Victor reviews, but which code he gets to see here.**
   missing files, exit codes), Windows/PowerShell quirks (encoding, quoting), and whether a script
   does not silently succeed where it should fail.
 - **Agent-def and manifest *changes*** for correctness: is the frontmatter right, does an agent def
-  point to existing paths (`${CLAUDE_PLUGIN_ROOT}/manuals/…` + `.claude/plugins/claude-specialists/specialists/…`), is a
+  point to existing paths (`${CLAUDE_PLUGIN_ROOT}/manuals/…` + `.claude/specialists/lenses/…`), is a
   `plugin.json`/`marketplace.json` valid and consistent?
 
 ### Working method in this repo

@@ -86,7 +86,7 @@ involved in every assignment. The other specialists are read **on demand**, at t
 
 mechanism works (portable playbook + repo lens) is described in the **Specialists handbook**
 
-[`.claude/plugins/claude-specialists/README.md`](README.md#persona-or-subagent--one-specialist-two-representations).
+[`.claude/specialists/README.md`](README.md#persona-or-subagent--one-specialist-two-representations).
 
 
 
@@ -94,7 +94,7 @@ mechanism works (portable playbook + repo lens) is described in the **Specialist
 
 vs. subagent, the two-part manual split, the stable-id system) live in the **Specialists handbook**
 
-[`.claude/plugins/claude-specialists/README.md`](README.md). The roster and the routing are also listed below in
+[`.claude/specialists/README.md`](README.md). The roster and the routing are also listed below in
 
 the repo slot.
 
@@ -108,7 +108,7 @@ the repo slot.
 
 Small and maintenance-focused. The portable playbooks come from the `specialists` plugin; each
 
-specialist's repo lens lives in [`.claude/plugins/claude-specialists/specialists/`](lenses/).
+specialist's repo lens lives in [`.claude/specialists/lenses/`](lenses/).
 
 
 
@@ -160,7 +160,7 @@ Editor) · `06-19` Victor (Code Reviewer) · `06-23` Sebastian (Security Enginee
 
 
 
-Each has a repo lens at `.claude/plugins/claude-specialists/specialists/<g>-<id>-extension.md`. For a
+Each has a repo lens at `.claude/specialists/lenses/<g>-<id>-extension.md`. For a
 
 full description, run `claude plugin details specialists@davekjohns-workshop` or read their manual.
 
