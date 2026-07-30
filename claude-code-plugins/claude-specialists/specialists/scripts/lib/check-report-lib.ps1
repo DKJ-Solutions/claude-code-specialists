@@ -397,6 +397,51 @@ function Get-SeamPaths {
     }
 }
 
+function Get-OrchestratorNote {
+    <# The explanatory note the bootstrap writes above the orchestrator import(s), as ONE source for the
+       writer and both removers (inbound #271).
+
+       WHY THIS MOVED HERE. The note is a single sentence wrapped over TWO lines: a fixed head and a tail
+       that names where the imports point. Both cleanup paths -- the teardown, and the bootstrap's own
+       [tidy] guard -- matched the HEAD only, by re-typing that literal. So every teardown left the tail
+       behind and the next bootstrap wrote a fresh two-line note above the orphan. Measured over two
+       cycles in DaveKJohn/life-hub on 2026-07-30: 1 orphan tail after the first teardown, 2 after the
+       second, and CLAUDE.md +4 lines from a round trip that should have returned to zero.
+
+       THE INVISIBILITY WAS THE WORSE HALF. Every counter in the documented verification -- and the
+       regression test written for the earlier accumulation bug -- keys on the head, so it read 0 after a
+       teardown and 1 after a bootstrap: exactly the healthy values, at every step, while the file grew.
+       Same failure class as the 1 -> 2 -> 3 accumulation fixed after smartwatchbanden, moved one line
+       down into the only line nothing checked. The lesson already written above that fix --
+       "idempotence has to cover everything the script WRITES, not just the line it happens to look
+       for" -- was true of the note itself, and this is the second time it had to be learned.
+
+       So the shape of the fix is the same as Get-SeamPaths': the pair that must never drift apart gets
+       one definition. A literal mirrored by hand in two scripts is what created this bug.
+
+       Head is an exact literal. Tail is a REGEX, because the tail interpolates a path that differs per
+       consumer and per layout (the seam names the seam dir; the pre-seam form names the plugin path).
+       It stays anchored on the distinctive generated clauses, so the existing rule holds unchanged: a
+       consumer who reworded or translated the note has AUTHORED that text, and neither remover touches
+       it. #>
+    [pscustomobject]@{
+        Head        = 'The orchestrator (Chris) is always loaded -- portable body from plugin install and repo lens'
+        # Either generated tail, and nothing else. Deliberately not '^from ' alone: that would match a
+        # sentence an owner happened to start with the same word.
+        TailPattern = "^from\s.*(that file carries the body import, the lens import and this repo's roster\.|routes on-demand to specialists in\s)"
+    }
+}
+
+function Test-IsOrchestratorNoteLine {
+    <# Is this line part of the note block the bootstrap writes? Head or either tail. Trimmed, so an
+       indentation change in a consumer's editor does not hide it from the remover. #>
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Line)
+    $note = Get-OrchestratorNote
+    $t = $Line.Trim()
+    if ($t -eq $note.Head) { return $true }
+    return [bool]($t -match $note.TailPattern)
+}
+
 function Get-LensDirCandidates {
     <# The ordered directories a repo lens for $PluginName may live in, most canonical first:
          0. .claude/specialists/lenses/                  -- THE SEAM (#221); where writers write for a

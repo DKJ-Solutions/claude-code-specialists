@@ -241,13 +241,21 @@ if (Test-Path -LiteralPath $claudeMd -PathType Leaf) {
         if ($line.Trim() -eq $seam.ImportLine) { return $true }   # the seam: one line, knowably ours
         ($line -match '^\s*@') -and ($line -match '(-persona\.md|-extension\.md)\s*$')
     }
-    # The explanatory line the bootstrap writes above the imports. Removed too, and matched on its
+    # The explanatory note the bootstrap writes above the imports. Removed too, and matched on its
     # LITERAL generated wording only -- a consumer who reworded or translated it has authored that
     # text. Leaving it behind is what made the round-trip accumulate a copy per cycle: the bootstrap's
     # guard saw the paragraph gone-but-not-gone and re-appended the whole block (measured 1 -> 2 -> 3
     # in davekokbwj/smartwatchbanden, 2026-07-29, with every gate reporting "in sync").
-    $bootstrapNote = 'The orchestrator (Chris) is always loaded -- portable body from plugin install and repo lens'
-    $noteHits = @($lines | Where-Object { $_.Trim() -eq $bootstrapNote })
+    #
+    # AND THEN IT HAPPENED AGAIN ONE LINE LOWER (inbound #271, DaveKJohn/life-hub, 2026-07-30). The note
+    # is a sentence wrapped over TWO lines, and this matched only the first: every teardown left the tail
+    # behind, and the next bootstrap wrote a fresh two-line note above the orphan. Measured 1 orphan
+    # after cycle 1, 2 after cycle 2, CLAUDE.md +4 lines from a round trip that should return to zero --
+    # while every counter, including the regression test for the FIRST version of this bug, keyed on the
+    # head and read healthy throughout. Test-IsOrchestratorNoteLine (check-report-lib.ps1) now matches
+    # the whole block and is the single source shared with the bootstrap's own tidy guard, because a
+    # literal mirrored by hand in two scripts is what produced both instances.
+    $noteHits = @($lines | Where-Object { Test-IsOrchestratorNoteLine -Line $_ })
     foreach ($n in $noteHits) {
         Write-Host "  [remove] CLAUDE.md: the bootstrap's orchestrator note line" -ForegroundColor Green
         $removed += "CLAUDE.md: bootstrap orchestrator note line"
@@ -261,7 +269,7 @@ if (Test-Path -LiteralPath $claudeMd -PathType Leaf) {
         }
         if ($Apply) {
             $keptLines = @($lines | Where-Object {
-                (-not (& $isSpecialistImport $_)) -and ($_.Trim() -ne $bootstrapNote)
+                (-not (& $isSpecialistImport $_)) -and (-not (Test-IsOrchestratorNoteLine -Line $_))
             })
             # Trailing blank lines the imports left behind, so the file does not end in a growing gap.
             while ($keptLines.Count -gt 0 -and [string]::IsNullOrWhiteSpace($keptLines[-1])) {

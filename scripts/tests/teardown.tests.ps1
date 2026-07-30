@@ -199,24 +199,53 @@ function Get-LintScript { return `$script:LintScript }
     #     One extra copy of the note per teardown->init cycle, counted 1 -> 2 -> 3, with all three
     #     session hooks reporting "in sync" throughout. Two runs of the cycle here, since one cycle
     #     cannot distinguish "does not accumulate" from "accumulates once".
-    $note = 'The orchestrator (Chris) is always loaded -- portable body from plugin install and repo lens'
-    function Get-NoteCount {
+    #
+    #     AND THE SECOND TIME, ONE LINE LOWER (inbound #271, DaveKJohn/life-hub, 2026-07-30). The note is
+    #     a sentence wrapped over TWO lines, and everything -- both removers AND this test -- keyed on the
+    #     head. So the tail orphaned, the next bootstrap wrote a fresh note above it, and CLAUDE.md grew
+    #     by 4 lines over a round trip that should return to zero. Get-NoteCount read 1 / 0 / 1 / 0
+    #     throughout: exactly the healthy values.
+    #
+    #     THAT is why the counters below are split. Get-NoteHeadCount is the old measurement, kept
+    #     because the head must still behave; Get-NoteTailCount is the one that was missing, and it is
+    #     asserted at every step. A counter that watches one line of a two-line block certifies half a
+    #     file. Both derive from the shared source (Get-OrchestratorNote) rather than re-typing the
+    #     literal -- re-typing is what produced both instances of this bug.
+    . (Join-Path $RepoRoot 'scripts\lib\check-report-lib.ps1')
+    $noteSrc = Get-OrchestratorNote
+    function Get-NoteHeadCount {
         $p = Join-Path $Fixture 'CLAUDE.md'
         if (-not (Test-Path -LiteralPath $p)) { return 0 }
-        return @([System.IO.File]::ReadAllLines($p) | Where-Object { $_.Trim() -eq $note }).Count
+        return @([System.IO.File]::ReadAllLines($p) | Where-Object { $_.Trim() -eq $noteSrc.Head }).Count
     }
+    function Get-NoteTailCount {
+        $p = Join-Path $Fixture 'CLAUDE.md'
+        if (-not (Test-Path -LiteralPath $p)) { return 0 }
+        return @([System.IO.File]::ReadAllLines($p) | Where-Object { $_.Trim() -match $noteSrc.TailPattern }).Count
+    }
+    # Kept as an alias so the surrounding assertions read unchanged; it now means "head", explicitly.
+    function Get-NoteCount { return (Get-NoteHeadCount) }
     New-BootstrappedConsumer | Out-Null
-    Assert-Equal 1 (Get-NoteCount) 'round-trip: one note line after the first init'
+    $mdBaseline = [System.IO.File]::ReadAllLines((Join-Path $Fixture 'CLAUDE.md')).Count
+    Assert-Equal 1 (Get-NoteHeadCount) 'round-trip: one note HEAD after the first init'
+    Assert-Equal 1 (Get-NoteTailCount) 'round-trip: one note TAIL after the first init -- the line inbound #271 found nobody was counting'
     foreach ($cycle in 1, 2) {
         $null = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
-        Assert-Equal 0 (Get-NoteCount) "round-trip cycle ${cycle}: the teardown removes the note line too"
+        Assert-Equal 0 (Get-NoteHeadCount) "round-trip cycle ${cycle}: the teardown removes the note head"
+        Assert-Equal 0 (Get-NoteTailCount) "round-trip cycle ${cycle}: and the TAIL with it -- a half-removed note is what accumulated"
         $prevPlugin = $env:CLAUDE_PLUGIN_ROOT
         $env:CLAUDE_PLUGIN_ROOT = $Plugin
         try { $ri = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $Fixture) }
         finally { $env:CLAUDE_PLUGIN_ROOT = $prevPlugin }
         Assert-Equal 0 $ri.Code "round-trip cycle ${cycle}: re-init exit 0"
-        Assert-Equal 1 (Get-NoteCount) "round-trip cycle ${cycle}: STILL exactly one note line -- no accumulation"
+        Assert-Equal 1 (Get-NoteHeadCount) "round-trip cycle ${cycle}: STILL exactly one note head -- no accumulation"
+        Assert-Equal 1 (Get-NoteTailCount) "round-trip cycle ${cycle}: STILL exactly one note tail -- no orphan left to grow on"
         Assert-Equal 1 (Get-ImportCount) "round-trip cycle ${cycle}: exactly one import restored"
+        # The measurement that catches ANY leftover, named or not: the file must be the same length as
+        # after the first bootstrap. Counting known lines only ever finds the leak you already know about,
+        # which is exactly how this bug survived its own regression test.
+        Assert-Equal $mdBaseline ([System.IO.File]::ReadAllLines((Join-Path $Fixture 'CLAUDE.md')).Count) `
+            "round-trip cycle ${cycle}: CLAUDE.md is the same LENGTH as after the first init -- nothing accumulated under any name"
     }
 
     # --- 6b2. The bootstrap's own guard, ISOLATED ----------------------------------------------------
