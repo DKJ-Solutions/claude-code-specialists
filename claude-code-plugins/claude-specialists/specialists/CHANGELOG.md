@@ -4,6 +4,267 @@ Consumer-facing history of this plugin: per release, the changes that touched th
 Automatically appended by `cut-release.ps1` of the marketplace repo (davekjohns-workshop); the full
 workshop history lives there in `CHANGELOG.md` and `releases/`.
 
+## v2.16.0 — 2026-07-30
+
+### Features
+
+#### #264 · The teardown proves standing free instead of claiming it · Feat · 2026-07-30
+
+The last open item of [#221](https://github.com/DaveKJohn/davekjohns-workshop/issues/221)'s target shape,
+and the one that could not be done as written.
+
+**The item was "reword category 3 plugin-neutrally, so it stays true after an uninstall"** — turning
+*"Derek opens the PR"* back into *"changes go in via a branch and a PR"*, a rule that survives the plugin
+because it never needed the character. **A script must not do that.** It is the repo owner's governance
+prose, and a plugin rewriting an owner's `CLAUDE.md` on its way out is precisely the damage the
+three-category classification exists to prevent. Delivering the item literally would have meant building
+the thing the design forbids.
+
+**So the deliverable is the half a script legitimately can do: find them.** The teardown now closes with a
+**free-standing audit** that answers the question the requirement actually poses — *after this, does the
+repo stand free?* — instead of the question every other section answers, which is *what did the bootstrap
+put here*.
+
+```
+-- free-standing audit: LIVE references left after this teardown --
+   scanned 24 file(s) under CLAUDE.md, .claude/ and scripts/ against 19 known specialist name(s)
+  [LIVE]   CLAUDE.md:3 -- name 'Derek'
+  [LIVE]   CLAUDE.md:6 -- specialist id + name 'Derek'
+  [LIVE]   scripts\repo-config.ps1:3 -- plugin-only contract function
+```
+
+Three kinds of hit, because they have three different answers — and the choice is **per line, not per
+file**, which is why it reports lines:
+
+| hit | answer |
+|---|---|
+| a **specialist id** (`05-05`) — a roster row, a routing table | usually **delete**: it only ever existed for the plugin |
+| a **name** (`Derek`) — a valid rule phrased through a character | usually **reword**: keep the rule, drop the name |
+| a **plugin-only contract function** (`Get-RosterPath`, `Get-RosterIgnoredIds`) | **delete the line**, keep the file |
+
+That third one is new information rather than a restatement: `repo-config.ps1` is category 3 and is
+correctly *kept* — but two of its eight contract functions exist only to serve the roster check, and "keep
+this file" and "keep every line in this file" are different answers. Nothing said so before.
+
+**Report-only, unconditional, and it runs on a dry run too.** It removes nothing, so it needs no `-Apply`,
+and a preview that cannot tell you what would still be left is not the inventory a reader needs in order
+to say yes. A clean repo gets `[FREE]`, which is the requirement met *verified rather than assumed*.
+
+**The closed loop is the assertion that makes it more than a grep.** A test applies the exact reword the
+audit advises and asserts the audit then reaches `[FREE]`. Without that, an audit could name references
+that no reasonable edit ever clears — findings that are technically true and practically noise.
+
+**Three boundaries, each of which would otherwise be a quiet false claim:**
+
+- **The names come from the plugin's own payload** (an agent def's `name:`, a persona's H1), never a
+  hardcoded list that rots on the next rename. But this skill ships inside **one** plugin and sees only
+  that plugin's specialists — a consumer running a domain plugin has names it does not know. The **id scan
+  is the general net** (a `<gg>-<ii>` token is name-independent, so it catches a specialist from any
+  plugin) and the name scan is the extra pass. Stated in the skill rather than left for someone to discover.
+- **Matching is case-insensitive, deliberately biased toward over-reporting.** For an audit whose purpose
+  is establishing that nothing was missed, the expensive failure is the reference it did not find — not the
+  one a reader dismisses in five seconds. Every hit carries `file:line`, so a false positive is cheap and a
+  false negative is silent. Same direction `Test-LooksGenerated` resolves its doubt, for the same reason.
+- **History is out of scope and never rewritten.** `CHANGELOG.md` and `releases/` are excluded entirely;
+  other root prose is **counted, not listed** — a pointer, not a work queue, since nothing loads, resolves
+  or gates on it.
+
+**A bug in the audit's own pattern, found by running it rather than by reading it.** The first version
+anchored the plugin-only-function check as `\b(Get-RosterPath|...|\$script:RosterPath|...)`. A shared
+leading `\b` in front of `\$` demands a word character immediately before the dollar, so it can never match
+an assignment at the start of a line — which is exactly where `$script:RosterPath = 'CLAUDE.md'` lives. The
+fixture caught it immediately: line 4 (`function Get-RosterPath`) was reported, line 3 was not. Each
+alternative now carries its own anchor, and the regression is asserted. **A pattern that matches some of
+what it claims is worse than one that matches none — the partial hit reads as coverage.**
+
+[PR #264](https://github.com/DaveKJohn/davekjohns-workshop/pull/264)
+
+---
+
+#### #263 · A gate states its coverage, not just its verdict · Feat · 2026-07-30
+
+The last open item of [#221](https://github.com/DaveKJohn/davekjohns-workshop/issues/221)'s target
+shape: *"consumer gates that announce when they stop applying."*
+
+**The defect was sharper than the issue described, and the difference matters.** The family README said
+the gate *silently skips* the lens category once the directory is gone. It does not skip quietly and
+print nothing — it prints a **verdict with no coverage**. `check-consumer-drift`'s persona section closed
+with:
+
+```
+-- Personas (portable body vs. the <g>-<id>-extension.md copy in the consumer) --
+  Persona drift is INFORMATIONAL (does not affect the exit code): 0 drifted.
+```
+
+Measured today against a directory holding a `CLAUDE.md` and nothing else: that was the section's
+*entire* output. Four personas exist in the source; zero were compared; the reader was told "0 drifted".
+**"0 drifted of 0 compared" and "0 drifted of 4 compared" were the same sentence.** That is not a false
+pass — it is a true statement that reads as a different, false one, which is harder to catch than
+silence, because there is nothing missing to notice.
+
+Worse, the asymmetry was visible in the same output the whole time: the agent-def section right above it
+*does* state its coverage (*"26 missing, 0 identical, 0 drifted"*). One half of the report had the
+denominator and the other half did not.
+
+**The fix.** One shared, non-counting `Write-Coverage` in
+[`scripts/lib/check-report-lib.ps1`](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/scripts/lib/check-report-lib.ps1) — plugin-owned, so it travels to
+every consumer with the payload — emitting `[<category>] checked N of M -- <why, when empty>`:
+
+- **`check-consumer-drift`** — the persona section is now printed **unconditionally** (it used to be
+  wrapped in `if ($personaResults.Count -gt 0)`, so it could vanish entirely), and its verdict carries
+  its denominator: *"0 drifted of 0 compared"*, plus a line naming why nothing was compared. A reader
+  can now tell a deliberate teardown from a bad merge or a wrong `-ConsumerPath`.
+- **`check-plugin-integrity`** — a `[COVERAGE]` line closes **all ten** categories, with
+  `link-scan/lenses` counted separately from the scan total precisely because it is the category a
+  teardown removes.
+
+**Applied to all ten on purpose.** A partial rollout recreates the exact asymmetry that caused this: the
+agent-def section was honest and the persona section was not, and that is why nobody noticed for months.
+Uniformity is the fix, not thoroughness for its own sake.
+
+**Coverage is context, never a finding.** `[COVERAGE]` is non-counting like `[OK]`/`[SKIP]`/`[SCOPE]`: it
+moves no exit code and no signal count, and a unit test asserts exactly that — a legitimately empty
+category must not break its own gate, or the honesty would cost more than the silence did.
+
+**Two things the work produced beyond the feature:**
+
+- **The gate caught its own change.** Editing `check-report-lib.ps1` made the plugin mirror drift, and
+  check 8 reported it on the first run. The shared-script model working as designed, worth stating
+  because it is the kind of thing that only ever gets noticed when it fails.
+- **The integrity fixture was already the perfect witness, and its own docstring said so.** That fixture
+  carries no agent def, no manual, no persona and no plugin manifest — it recorded those categories as
+  *"expected noise, asserted on nowhere below"*. They are asserted on now: six categories that report
+  `checked 0`, two that report a real count (so the line cannot be hardcoded), and the empty lens
+  category's stated reason. As a side effect three redundant recursive directory walks collapsed into
+  the sets already collected.
+
+**What this deliberately does not fix, said out loud instead of quietly scoped away.** A consumer's own
+lint — whatever `Get-LintScript` points at — is the repo owner's code. The measured silent skip lives
+there, and no plugin can make someone else's gate honest. The helper is available to it; adopting it is
+the owner's act. Recorded in the family README as the owner's item rather than counted as closed here.
+
+[PR #263](https://github.com/DaveKJohn/davekjohns-workshop/pull/263)
+
+### Fixes
+
+#### #262 · sync-roster wrote its scaffolds to the pre-seam path · Fix · 2026-07-30
+
+The seam ([#221](https://github.com/DaveKJohn/davekjohns-workshop/issues/221)) made
+`.claude/specialists/lenses/` the place a consumer's lenses live, and taught the bootstrap to resolve
+that destination through `Get-LensWriteDir` — the seam for a fresh or migrated consumer, the existing
+tree for one that has not migrated. **`sync-roster` never got the same treatment.** It hardcoded
+`.claude/plugins/<family>/<plugin>/<group>-<id>-extension.md` in three places: the scaffold it writes,
+the link in the roster row it proposes, and the path it prints for a stale header.
+
+**What that costs a real consumer.** Run `sync-roster` after a plugin update — which is exactly what the
+session hook tells you to do when the roster drifts — and a migrated repo gets its new scaffolds in the
+pre-seam directory while the rest of its lenses sit in the seam. `Get-LensWriteDir`'s own docstring names
+that outcome: *"splitting the surface in two, which is worse than either layout alone."* On top of that
+`check-roster-sync` then reports the fresh scaffolds as off-path, and the proposed roster row a human
+pastes links to a file that is not there — worse than no row, because it looks authoritative.
+
+Both writers now resolve through the one helper, so they cannot disagree about a repo's layout.
+
+**Why the suite stayed green through all of it, which is the more useful half of this entry.** Every one
+of the six existing scenarios built its fixture consumer with a **pre-seam lens tree** — and
+`Get-LensWriteDir` follows an existing tree by design. So the suite exercised the one branch where the
+hardcoded literal happened to be correct, 39 asserts deep, and never the fresh or migrated cases. **A
+fixture that always arrives in the same state tests one branch, however many asserts hang off it.** The
+suite now builds three: fresh (no tree), migrated (lenses in the seam), and pre-seam (lenses on the old
+path), plus a fourth check that the proposed roster row's link follows too. Verified by running the new
+asserts against the unfixed script: **7 fail, and the pre-seam case passes both ways** — which is the
+proof that the test targets the defect rather than the implementation.
+
+`Get-LensFamily` is no longer called anywhere in this script: with the seam there is no family segment
+left for it to compose.
+
+**On the unparseable-plugin case.** The stale-header branch used to print `<plugin>` as a placeholder
+segment. In the seam there is no plugin segment to placeholder, so an unknown plugin now resolves to the
+seam — and deliberately does *not* pass the placeholder on to `Get-LensWriteDir`, whose candidate list
+documents that the caller slug-validates any name that becomes a path segment (a `<plugin>` literal would
+break that contract, and `Test-Path` on the illegal characters with it). Everywhere the id *did* parse it
+is passed through, still slug-validated by `Split-PluginId`.
+
+The `SKILL.md` line describing where scaffolds land was deliberately held back from
+[#261](https://github.com/DaveKJohn/davekjohns-workshop/pull/261)'s prose sweep and lands here instead:
+the doc follows the behaviour, never the other way round.
+
+[PR #262](https://github.com/DaveKJohn/davekjohns-workshop/pull/262)
+
+### Documentation
+
+#### #261 · The seam migration left stale lens paths in the prose · Docs · 2026-07-30
+
+The seam shipped its **machinery** in v2.15.0 ([#253](https://github.com/DaveKJohn/davekjohns-workshop/pull/253)
+specified it, [#254](https://github.com/DaveKJohn/davekjohns-workshop/pull/254) taught the bootstrap
+and the teardown to write and remove it, [#255](https://github.com/DaveKJohn/davekjohns-workshop/pull/255)
+migrated this repo onto it). Its **prose** did not come along. Measured today: **120 occurrences of the
+pre-seam lens path across 57 files**, in all four plugins — every agent def, every manual, `QUICKSTART.md`,
+the family README, the connectors README, and the shared `agent-shared/inbound-behaviour.md` block that
+is filled verbatim into 19 agent defs.
+
+That is not cosmetic. Those texts are the instruction a specialist reads *while working in a consuming
+repo*: "repo-specific additions belong in the repo lens
+(`.claude/plugins/claude-specialists/<plugin>/<group>-<id>-extension.md`)". A specialist who follows it
+writes a file the seam does not hold and `check-roster-sync` reports as off-path.
+
+**Why no gate caught it.** Two independent reasons, and both are worth keeping:
+
+1. **The paths appear in prose and in code spans, not as links.** The dead-link scan resolves link
+   *targets*; it never reads a label or a backticked path. So a document may describe a layout that no
+   longer exists and stay green.
+2. **In this repo's own `.claude/specialists/`, the labels were wrong while the targets were right.**
+   `README.md` was still titled `# .claude/plugins/claude-specialists`, its layout section still
+   described `plugins/claude-specialists/specialists/`, and its whole index table used
+   `specialists/<id>-extension.md` labels over `lenses/<id>-extension.md` targets. Every link resolved.
+   Exactly the class [#260](https://github.com/DaveKJohn/davekjohns-workshop/pull/260) named a day
+   earlier: the description and the thing described drift apart, and nothing announces it.
+
+**History is left alone.** The per-plugin `CHANGELOG.md` files and the archived release notes keep the
+pre-seam path — they record what was true then, and this repo does not rewrite history (the same
+reasoning that lets those notes keep their original language). Two analytical mentions are also kept
+deliberately, because the old path is their *subject* rather than their instruction: the teardown-gap
+bullet in the family README (now marked settled) and the #227 lesson in
+[Sylvester's lens](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/.claude/specialists/lenses/05-15-extension.md), where the citation now says which
+path the bootstrap wrote at the time.
+
+**Two things found while chasing the prose, both bigger than a path:**
+
+- **`sync-roster` still writes to the pre-seam path** — a real defect, not a wording slip, and split off
+  to its own `fix/` branch rather than buried here. Its `SKILL.md` line is therefore the one stale path
+  left in this diff: the doc follows the behaviour, not the other way round.
+- **`specialists-init`'s SKILL.md still carried the claim [#215](https://github.com/DaveKJohn/davekjohns-workshop/issues/215)
+  disproved** — *"what a plugin cannot do is inject always-on main-loop context"*. The family README has
+  carried the correction since July 29; the skill a consumer actually reads did not. Corrected with a
+  pointer to both, and stating that the switch is deliberately off — the wording was wrong regardless of
+  whether Dave ever flips it.
+
+Also reworded: "on the plugin path" as a *description of the seam*, in `QUICKSTART.md` (3),
+`specialists-init/SKILL.md` (3) and the connectors README (1). The seam is not the plugin path — that
+was the point of moving it, so calling it that undoes the sentence.
+
+**One regression the sweep would have introduced, caught on the copy-edit pass.** Every agent def and
+manual tells its specialist where the repo lens lives, with a fallback: *"or the legacy path
+`.claude/extensions/…`"*. Before the sweep that sentence named the **pre-seam plugin path** as the
+primary and the pre-plugin-path one as the fallback; a naive replacement left it naming the seam and the
+oldest path while dropping the middle one — which is exactly where the two un-migrated consumers
+(`life-hub`, `smartwatchbanden`) keep their lenses today. A specialist reading only the new sentence
+would look in two places and miss the one holding the file. `Get-LensDirCandidates` reads all three
+regardless, so no check would have failed. The parenthetical now names both fallbacks in one shape across
+all 27 files: *"or, if this repo has not migrated to the seam, at its pre-seam
+`.claude/plugins/<family>/<plugin>/` or `.claude/extensions/` location"*. **A mechanical replacement
+inherits the old sentence's assumptions — read what the sentence claimed, not just the token you
+changed.**
+
+**Found and deliberately left alone:** `check-consumer-drift` reports `03-02-extension.md` (Bianca) as
+`[DRIFTED]` — her lens carries a body copy instead of following the lens-only model. Informational, it
+does not affect the exit code, and it predates this branch: she was adopted onto the roster on July 28,
+2026. Recorded here so it is on the record rather than in a session.
+
+[PR #261](https://github.com/DaveKJohn/davekjohns-workshop/pull/261)
+
+---
+
 ## v2.15.1 — 2026-07-29
 
 ### Fixes
