@@ -83,19 +83,32 @@ The worker specialists can be invoked directly as `@specialists:<name>`.
 
 ## Staying up to date
 
-Updates reach you via **releases**. Run it from your repo's root, once per plugin, **with the same
-scope flag you installed with**:
+Updates reach you via **releases**, and getting one takes **two** commands, from your repo's root:
 
 ```powershell
-claude plugin update specialists@davekjohns-workshop --scope project
+claude plugin marketplace update davekjohns-workshop          # 1. refresh the marketplace cache
+claude plugin update specialists@davekjohns-workshop --scope project   # 2. then update, per plugin
 ```
 
-Without the flag it defaults to user scope and fails on a project-scoped install with *"Plugin
-`specialists` is not installed at scope user"* — literally true, and easy to misread as "not
-installed at all" on a machine where it is. Do not answer that by re-running the install: a scopeless
-install adds a **second, machine-wide record** beside the project one. `claude plugin update`
-compares version numbers only, so you get changes as soon as the workshop has cut a new version — not
-before. Each plugin carries its own
+**Do not skip the first one — without it the second happily installs the previous version and reports
+success.** Measured on July 30, 2026, minutes after `v3.0.2` was tagged and pushed: the cached
+marketplace clone still sat on the commit from *before* the release, so a fresh
+`claude plugin install … --scope project` in a repo produced **3.0.1** and said `✔ Successfully
+installed`. Nothing about that output hints the version is stale. After
+`claude plugin marketplace update`, the same plugin moved `3.0.1 -> 3.0.2` in one step. There is a
+refresh mechanism (the command reports `Refreshing marketplace cache (timeout: 120s)`), so a cache
+does not stay stale forever; on what schedule it refreshes by itself was not established, which is
+exactly why the explicit command belongs in the procedure rather than a hope that it has caught up.
+
+So a version number is one of **two** gates. `claude plugin update` compares version numbers only —
+but it compares them against *its cached copy of the marketplace*, not against the workshop. You get
+a change once the workshop has cut a new version **and** your cache has seen it.
+
+**The scope flag on the second command is not optional either.** Without it the command defaults to
+user scope and fails on a project-scoped install with *"Plugin `specialists` is not installed at
+scope user"* — literally true, and easy to misread as "not installed at all" on a machine where it
+is. Do not answer that by re-running the install: a scopeless install adds a **second, machine-wide
+record** beside the project one. Each plugin carries its own
 `CHANGELOG.md` that travels with the plugin cache and describes per release what changed for that
 plugin; the full history lives in the workshop itself
 ([`CHANGELOG.md`](../../CHANGELOG.md) and [`releases/`](../../releases/README.md)). Each plugin
