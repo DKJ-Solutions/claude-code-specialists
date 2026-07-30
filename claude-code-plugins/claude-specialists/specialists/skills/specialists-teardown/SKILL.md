@@ -205,3 +205,53 @@ Which is why the goal is *no live reference* rather than *no reference*: nothing
 **script resolves**, or a **gate depends on** may still point at the plugin. Read that way the four
 leftovers sort by what they actually cost -- (1) breaks a run, (2) and (3) mislead a reader, (4) misleads
 a gate, and the changelog is simply the record of having adopted the plugin in the first place.
+
+## The free-standing audit -- the run proves it instead of claiming it
+
+Every section above answers *"what did the bootstrap put here, and what did I take away"*. None of them
+answers the question the requirement actually poses: **after this, does the repo stand free?** So the run
+closes with an audit that goes looking, and lists what it finds by **file and line**:
+
+```
+-- free-standing audit: LIVE references left after this teardown --
+   scanned 24 file(s) under CLAUDE.md, .claude/ and scripts/ against 19 known specialist name(s)
+  [LIVE]   CLAUDE.md:3 -- name 'Derek'
+  [LIVE]   CLAUDE.md:6 -- specialist id + name 'Derek'
+  [LIVE]   scripts\repo-config.ps1:3 -- plugin-only contract function
+```
+
+**Report-only, unconditional, and it runs on a dry run too** -- it removes nothing, so it needs no
+`-Apply`, and a preview that cannot tell you what would still be left is not the inventory a reader needs
+in order to say yes. A clean repo gets `[FREE]` instead, and that line is the requirement met *verified
+rather than assumed*.
+
+**Why it finds rather than fixes.** The target shape's second item is *"reword category 3 plugin-neutrally
+so it stays true after an uninstall"* -- turning *"Derek opens the PR"* back into *"changes go in via a
+branch and a PR"*, a rule that stays true with the plugin gone. That was never something a script could
+do: it is the owner's governance prose, and a plugin rewriting it would be the exact damage the
+[classification](#what-it-classifies-and-why-that-is-the-whole-design) exists to prevent. What a script
+*can* do is turn an unbounded hand-audit into a checklist. Three kinds of hit, each with a different
+answer:
+
+| hit | what it means | what to do |
+|---|---|---|
+| a **specialist id** (`05-05`) | a roster row, a routing table, a chain | usually **delete** -- it only ever existed for the plugin |
+| a **name** (`Derek`, `Tessa`) | a still-valid rule phrased through a character | usually **reword** -- keep the rule, drop the name |
+| a **plugin-only contract function** (`Get-RosterPath`, `Get-RosterIgnoredIds`) | a line inside a file that is otherwise yours | **delete the line**, keep the file |
+
+The choice is per line, not per file -- which is why the audit reports lines.
+
+**Three deliberate boundaries, so the output can be trusted:**
+
+- **The names come from the plugin's own payload**, never a hardcoded list that would rot on the next
+  rename: an agent def's `name:` frontmatter, and a persona's H1. But this skill ships inside **one**
+  plugin and can only see that plugin's specialists -- a consumer that also enables a domain plugin has
+  names this scan does not know. The **id scan is the general net** (a `<gg>-<ii>` token is
+  name-independent and catches a specialist from any plugin); the name scan is the extra pass on top.
+- **Matching is case-insensitive, biased toward over-reporting.** The expensive failure for an audit whose
+  purpose is proving nothing was missed is a reference it did not find, not one a reader dismisses in five
+  seconds -- and every hit carries `file:line`, which makes a false positive cheap and a false negative
+  silent.
+- **History is out of scope and never rewritten.** `CHANGELOG.md` and `releases/` are excluded entirely.
+  Other root prose (`README.md`, `CONTRIBUTING.md`) is outside the live set by the reading above, so it is
+  **counted, not listed** -- a pointer, not a work queue.

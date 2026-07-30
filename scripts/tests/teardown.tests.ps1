@@ -399,6 +399,64 @@ function Get-LintScript { return `$script:LintScript }
     Assert-Equal 0 (Get-ImportCount) 'authored inclusion: the import is STILL removed -- that line is what made it live'
     Assert-True ($r.Out -match 'nothing loads it') 'authored inclusion: the report says outright that nothing loads it any more'
     Assert-True ($r.Out -match 'one named file to decide about') 'authored inclusion: the report names the trade the seam makes'
+
+    # --- The free-standing audit: proving it, not claiming it (issue #221) ---------------------------
+    # Everything above answers "what did the bootstrap put here". The audit answers the question the
+    # requirement actually poses -- after this, does the repo STAND FREE? -- and it is the only half of
+    # target-shape item 2 a script may legitimately do: find the references, never reword the owner's
+    # governance prose.
+    Write-Host "the free-standing audit -- live references are named, by file and line" -ForegroundColor Cyan
+    if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'scripts') -Force | Out-Null
+    # A category-3 CLAUDE.md: every rule below still holds after an uninstall, but two of them are
+    # PHRASED in specialist terms, which is precisely what turns a valid rule into a reference to a
+    # character that no longer exists.
+    [System.IO.File]::WriteAllLines((Join-Path $Fixture 'CLAUDE.md'), @(
+        '# My repo',
+        '',
+        '- Never directly on main -- Derek opens the PR and merges it.',
+        '- All changes go via a branch.',
+        '',
+        '| Derek 05-05 | DevOps | lens |'
+    ))
+    # A filled-in repo-config: the file is the repo's own (category 3, kept), but two of its contract
+    # functions exist ONLY to serve the roster check.
+    [System.IO.File]::WriteAllLines((Join-Path $Fixture 'scripts\repo-config.ps1'), @(
+        '$script:RepoName = "me/mine"',
+        'function Get-RepoName { return $script:RepoName }',
+        '$script:RosterPath = "CLAUDE.md"',
+        'function Get-RosterPath { return $script:RosterPath }'
+    ))
+    $a = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
+    Assert-Equal 0 $a.Code 'audit: exit-code 0 -- the audit reports, it never fails a run'
+    Assert-True ($a.Out -match 'free-standing audit') 'audit: the section runs on a DRY RUN too -- a preview that cannot say what is left is not an inventory'
+    Assert-True ($a.Out -match "CLAUDE\.md:3 -- name 'Derek'") "audit: 'Derek opens the PR' is named with its line number -- the category-3 reword case"
+    Assert-True ($a.Out -match 'CLAUDE\.md:6 -- specialist id') 'audit: the roster row is found by id, which works for a specialist from any plugin'
+    # The regression that made this test worth writing: '\b' before '\$' never matches at the start of a
+    # line, so an assignment on line 3 was missed while the function on line 4 was found.
+    Assert-True ($a.Out -match 'repo-config\.ps1:3 -- plugin-only contract function') 'audit: the $script:RosterPath ASSIGNMENT is caught, not just the function (the \b\$ anchor bug)'
+    Assert-True ($a.Out -match 'repo-config\.ps1:4 -- plugin-only contract function') 'audit: the Get-RosterPath function is caught too'
+    Assert-True ($a.Out -match 'REWORD it if the rule still holds without the character') 'audit: the note tells the owner HOW to clear a hit, per line rather than per file'
+    Assert-True (-not ($a.Out -match '(?m)^\s*\[LIVE\]\s+CHANGELOG')) 'audit: history is excluded -- CHANGELOG.md is never a finding, and never rewritten'
+
+    # The closed loop: apply the advice the note gives, and the audit says FREE. Without this the audit
+    # could name references that no reasonable edit ever clears, which would make it noise.
+    Write-Host "the free-standing audit -- the reword it advises actually reaches FREE" -ForegroundColor Cyan
+    [System.IO.File]::WriteAllLines((Join-Path $Fixture 'CLAUDE.md'), @(
+        '# My repo',
+        '',
+        '- Never directly on main -- changes go in via a branch and a PR.',
+        '- All changes go via a branch.'
+    ))
+    [System.IO.File]::WriteAllLines((Join-Path $Fixture 'scripts\repo-config.ps1'), @(
+        '$script:RepoName = "me/mine"',
+        'function Get-RepoName { return $script:RepoName }'
+    ))
+    $a2 = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
+    Assert-Equal 0 $a2.Code 'audit (reworded): exit-code 0'
+    Assert-True ($a2.Out -match '\[FREE\]') 'audit (reworded): the repo now reports FREE -- the advice is reachable, so the findings are actionable rather than noise'
+    Assert-True (-not ($a2.Out -match '(?m)^\s*\[LIVE\]')) 'audit (reworded): no live reference is left at all'
+    Assert-True ($a2.Out -match 'verified rather than assumed') 'audit (reworded): the clean verdict says it was verified, which is the whole point of the requirement'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

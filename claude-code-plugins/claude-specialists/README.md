@@ -450,7 +450,18 @@ finish the job without guessing where a roster row ends and the owner's prose be
 - **Category 2 behind a single seam.** All specialist content reachable through one inclusion, so
   teardown is "remove one directory and one line" instead of editing 492 lines by hand.
 - **Category 3 written plugin-neutrally**, so it stays true after an uninstall instead of pointing at
-  a departed persona.
+  a departed persona. **Settled on July 30, 2026 — and the honest version of "settled" is worth stating,
+  because the item as written could not be done at all.** The rewording is the *owner's* governance prose:
+  a plugin that rewrote *"Derek opens the PR"* into *"changes go in via a branch and a PR"* on its way out
+  would be doing exactly the damage the three-category classification exists to prevent. What a script can
+  do is **find** them, and that is what the teardown now closes with — a **free-standing audit** listing
+  every live reference by `file:line`, split into the three cases that have different answers: an **id**
+  (a roster row — usually delete), a **name** (a still-valid rule phrased through a character — usually
+  reword), and a **plugin-only contract function** (`Get-RosterPath`/`Get-RosterIgnoredIds` — delete the
+  line, keep the file). The choice is per line, which is why it reports lines. A clean repo gets `[FREE]`,
+  and a test asserts the closed loop: apply the reword the audit advises and the audit reaches `[FREE]`,
+  so its findings are actionable rather than noise. Report-only, and it runs on a dry run too — a preview
+  that cannot say what would still be left is not an inventory.
 - **A `specialists-teardown` beside `specialists-init`.** Symmetric by construction: whatever the
   bootstrap puts down, the teardown can take away, because it is the same inventory. **Built on
   July 29, 2026** — see [the section above](#what-exists-now-the-specialists-teardown-skill).
