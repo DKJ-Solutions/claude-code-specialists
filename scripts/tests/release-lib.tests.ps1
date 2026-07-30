@@ -170,6 +170,24 @@ Assert-Match $notes '## Fixes' 'Fix category section'
 Assert-Match $notes '(?s)## Features.*## Fixes' 'Feat comes before Fix (category order)'
 Assert-Match $notes '### #2 .* Second feature' 'entry #2 present with full heading'
 Assert-Match $notes '\[PR #1\]' 'PR link of entry #1 preserved'
+# -Summary is opt-in: an ordinary release must be byte-identical to before the parameter existed.
+$notesNoSummary = Build-ReleaseNotes -Entries $entries -Version '0.2.0' -Date '2026-07-14' -Type 'Minor' -Title 'Test-release' -Summary ''
+Assert-Equal $notes $notesNoSummary 'no -Summary: output byte-identical to the call without the parameter'
+
+Write-Host "Build-ReleaseNotes -Summary (a milestone release carries an authored block)" -ForegroundColor Cyan
+# The arc across many releases fits in neither -Title (one sentence) nor the entries (per-PR), and
+# hand-editing a generated file is not a repeatable release. Assertions are about POSITION and
+# BOUNDARY, because that is what makes an authored block readable as authored.
+$sum = "## What 2.x was about`r`n`r`nA sentence with CRLF endings and a [root link](README.md)."
+$ms = Build-ReleaseNotes -Entries $entries -Version '3.0.0' -Date '2026-07-30' -Type 'Major' -Title 'A milestone' -Summary $sum
+Assert-Match $ms '## What 2\.x was about' 'summary: the authored heading is present'
+Assert-Match $ms '(?s)\*\*Type:\*\* Major.*A milestone.*## What 2\.x was about' 'summary: sits after the header and the title line'
+Assert-Match $ms '(?s)## What 2\.x was about.*\n---\n.*## Features' 'summary: separated from the generated entries by a horizontal rule'
+Assert-Equal $false ([bool]($ms -match "`r")) 'summary: CRLF input is normalized to LF like every other block in this file'
+# A root-relative link inside the SUMMARY is deliberately NOT rewritten: unlike an entry (which was
+# authored in the root CHANGELOG and then moved three folders deeper), a summary is authored for this
+# file and its links are already relative to it. Rewriting them would break the ones that were right.
+Assert-Match $ms '\[root link\]\(README\.md\)' 'summary: its links are left exactly as authored -- it was written for this file, not moved into it'
 
 Write-Host "Build-ReleaseNotes (full category label coverage: Docs, Chore, Other)" -ForegroundColor Cyan
 # Feat/Fix are already covered above; this closes the gap for the other two canonical category

@@ -135,7 +135,8 @@ fold commit, the release commit is a permitted **direct-on-`main` action** — t
 exception to "everything via branch + PR". `cut-release.ps1` therefore runs on `main` itself and
 does everything in one motion:
 
-`cut-release.ps1 (-Version <X.Y.Z> | -Bump <major|minor|patch>) [-Title "…"]` on a clean `main`:
+`cut-release.ps1 (-Version <X.Y.Z> | -Bump <major|minor|patch>) [-Title "…"] [-SummaryFile <path>]` on
+a clean `main`:
 1. bumps all plugin versions in lockstep to `X.Y.Z`;
 2. generates `releases/development/<X>.x/<X.Y.Z>.md`, adds a row to `releases/README.md`, and puts a
    reference in `CHANGELOG.md` under `## Releases` (the Pull Requests section is emptied down to its
@@ -161,6 +162,26 @@ Guardrails: on a clean `main`, no unfolded entry files in the root, lint gate gr
 must not exist yet. There is deliberately **no release branch and no `release` prefix** — the release
 does not touch the branch workflow. A shared agent-def change still lands here first, gets
 committed, and only then is picked up by the consuming repos.
+
+**A milestone release: `-SummaryFile <path>`.** An ordinary release's notes are the diff since the last
+one — `-Title` gives it one sentence and the entries carry the detail. A **milestone** is a different
+claim: the arc across many releases, which fits in neither. `-SummaryFile` puts an authored markdown
+block between the title line and the generated entries, closed off with a horizontal rule so a reader
+can see where the authored part stops and the per-PR record begins. Three things to know:
+
+- **The file may live outside the repo, and normally should.** Its canonical home becomes the generated
+  notes file; a second copy under `releases/` purely to feed the parameter would be duplication.
+- **A missing or empty file is a hard stop.** An empty one would otherwise produce an ordinary release
+  while you believe you cut a milestone.
+- **Links in the summary are left exactly as authored** — unlike an entry, which was written in the root
+  `CHANGELOG.md` and then moved three folders deeper, a summary is written *for* the notes file. Rewriting
+  its links would break the ones that were already right.
+
+**And say plainly whether anything breaks.** A `major` bump reads as "breaking" to anyone applying semver
+mechanically, and in this repo a milestone may well break nothing (the seam, the largest change in 2.x, is
+backward compatible by construction — every reader accepts the old layouts). If nothing breaks, the
+summary's opening lines have to say so, or a consumer sits on an old version waiting for a migration that
+does not exist.
 
 ### Rendall's toolkit
 

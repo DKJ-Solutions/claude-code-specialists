@@ -579,6 +579,12 @@ function Build-ReleaseNotes {
         [Parameter(Mandatory)][string]$Date,
         [Parameter(Mandatory)][string]$Type,
         [string]$Title = '',
+        # An AUTHORED block placed between the one-line title and the generated entries -- for a
+        # milestone release whose point is the arc across many releases rather than the diff since the
+        # last one. $Title is one sentence and the entries are per-PR; neither can carry "here is what
+        # changed between 2.2.0 and 2.16.0", and hand-editing a generated file is not a repeatable
+        # release. Empty by default, so an ordinary release is byte-identical to before.
+        [string]$Summary = '',
         # Prefix to resolve repo-root-relative links in entry bodies from the deeper location of
         # the notes file (releases/development/<X>.x/ = 3 folders deep -> '../../../').
         [string]$LinkPrefix = '../../../'
@@ -593,6 +599,13 @@ function Build-ReleaseNotes {
     $body = Format-CategorizedEntries -Entries $linked -CategoryLevel 2
 
     $titleLine = if ($Title) { "$Title`n`n" } else { '' }
-    $header = "# Release notes v$Version`n`n**Date:** $Date  `n**Type:** $Type`n`n$titleLine"
+    # Normalized to LF like everything else that enters this file, and separated from the generated
+    # entries by a horizontal rule -- so a reader can see where the authored part stops and the
+    # per-PR record begins. Without that boundary a milestone summary reads as if it were generated,
+    # which is the one thing it must not be mistaken for.
+    $summaryBlock = if ($Summary) {
+        (($Summary -replace "`r`n", "`n").TrimEnd() + "`n`n---`n`n")
+    } else { '' }
+    $header = "# Release notes v$Version`n`n**Date:** $Date  `n**Type:** $Type`n`n$titleLine$summaryBlock"
     return ($header + $body + "`n")
 }

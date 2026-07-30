@@ -48,6 +48,21 @@
     Short description of the release as a whole (1 sentence, optional) -- goes into the notes +
     the table row.
 
+.PARAMETER SummaryFile
+    Path to a markdown file whose content is placed in the release notes between the -Title line and
+    the generated per-PR entries, followed by a horizontal rule.
+
+    FOR A MILESTONE RELEASE, where the point is the arc across many releases rather than the diff since
+    the last one. -Title is one sentence and the entries are per-PR, so neither can carry "here is what
+    changed between 2.2.0 and 2.16.0" -- and hand-editing a generated file afterwards is not a
+    repeatable release, which is the whole reason this script exists.
+
+    The file may live outside the repo (a scratch path is fine, and is the expected case): its canonical
+    home becomes the generated notes file itself, so keeping a second copy under releases/ purely to
+    feed this parameter would duplicate content for no gain. A missing or empty file is a hard stop --
+    an empty one would otherwise produce an ordinary release while the operator believes they cut a
+    milestone.
+
 .PARAMETER NoPush
     Everything locally (commit + tag) but do not push main/tag -- for inspection beforehand.
 
@@ -59,12 +74,17 @@
 
 .EXAMPLE
     ./scripts/release/cut-release.ps1 -Bump minor -NoPush
+
+.EXAMPLE
+    ./scripts/release/cut-release.ps1 -Bump major -Title "A new milestone" -SummaryFile ..\summary.md -NoPush
+    # Milestone release: the authored summary opens the notes, the pending entries follow it.
 #>
 [CmdletBinding()]
 param(
     [string]$Version,
     [ValidateSet('major', 'minor', 'patch')][string]$Bump,
     [string]$Title = '',
+    [string]$SummaryFile = '',
     [switch]$NoPush,
     [switch]$SkipLint
 )
@@ -167,7 +187,27 @@ $today = (Get-Date -Format 'yyyy-MM-dd')
 $changelogPath = Join-Path $repoRoot 'CHANGELOG.md'
 $changelogRaw = Get-Content -Path $changelogPath -Raw -Encoding UTF8
 $entries = @(Get-PullRequestEntries -Content $changelogRaw)
-$notesContent = Build-ReleaseNotes -Entries $entries -Version $new -Date $today -Type $typeLabel -Title $Title
+
+# -SummaryFile: an authored milestone block, read here rather than passed as a string, because a
+# multi-page summary does not survive a command line. Deliberately NOT required to live in the repo:
+# its canonical home becomes the generated notes file, and keeping a second copy under releases/ just
+# to feed this parameter would be the duplication this repo removes elsewhere.
+$summaryText = ''
+if ($SummaryFile) {
+    if (-not (Test-Path -LiteralPath $SummaryFile -PathType Leaf)) {
+        Write-Error "-SummaryFile '$SummaryFile' does not exist. Nothing was written."
+        exit 1
+    }
+    $summaryText = [System.IO.File]::ReadAllText((Resolve-Path -LiteralPath $SummaryFile).Path, [System.Text.Encoding]::UTF8)
+    if (-not $summaryText.Trim()) {
+        # An empty file is a mistake worth stopping on: it would silently produce an ordinary release
+        # while the operator believes they cut a milestone.
+        Write-Error "-SummaryFile '$SummaryFile' is empty. Nothing was written."
+        exit 1
+    }
+}
+
+$notesContent = Build-ReleaseNotes -Entries $entries -Version $new -Date $today -Type $typeLabel -Title $Title -Summary $summaryText
 $changelogNew = Convert-ChangelogForRelease -Content $changelogRaw -Version $new -Date $today -Type $typeLabel -NotesRelPath $notesRelPath
 
 # --- Write the release-notes file -------------------------------------------------------------
