@@ -1,270 +1,235 @@
-# Release v2.16.0
+# Release v3.0.0
 
 **Date:** 2026-07-30  
-**Type:** Minor
+**Type:** Major
 
-Adoption is reversible by design, and a gate now says what it checked
+Chapter 2 consolidated (v2.2.0 -> v2.16.0)
 
 You are on this release.
 
-## Features
+## Fixes
 
-### #264 · The teardown proves standing free instead of claiming it · Feat · 2026-07-30
+### #273 · Four secondary findings from the life-hub round (inbound #271) · Fix · 2026-07-30
 
-The last open item of [#221](https://github.com/DaveKJohn/davekjohns-workshop/issues/221)'s target shape,
-and the one that could not be done as written.
+The four lower-severity findings from
+[#271](https://github.com/DaveKJohn/davekjohns-workshop/issues/271), fixed together because all four sit
+in the same install/uninstall path — and **three of them are defects in work shipped earlier the same day**,
+which is the argument for a second pair of eyes outside this repo.
 
-**The item was "reword category 3 plugin-neutrally, so it stays true after an uninstall"** — turning
-*"Derek opens the PR"* back into *"changes go in via a branch and a PR"*, a rule that survives the plugin
-because it never needed the character. **A script must not do that.** It is the repo owner's governance
-prose, and a plugin rewriting an owner's `CLAUDE.md` on its way out is precisely the damage the
-three-category classification exists to prevent. Delivering the item literally would have meant building
-the thing the design forbids.
+**1. The audit missed a Dutch possessive, which is a false negative in a scan built to over-report.**
+`Dereks` takes no apostrophe in Dutch, so the trailing `\b` rejected it and a live reference in a
+consumer's own tracked prose went unreported — in a scan whose skill documents itself as biased toward
+over-reporting *precisely because a miss is the expensive failure*. The name group now accepts an optional
+possessive (`Dereks`, `Derek's`, `Alex'`). **Applies to every non-English consumer, so not an edge case.**
 
-**So the deliverable is the half a script legitimately can do: find them.** The teardown now closes with a
-**free-standing audit** that answers the question the requirement actually poses — *after this, does the
-repo stand free?* — instead of the question every other section answers, which is *what did the bootstrap
-put here*.
+Fixing it exposed a second, smaller lie in the same line: the hit was reported from the capture group, so a
+match on `Dereks` printed `name 'Derek'` — sending a reader to search for a string that is not on that
+line. It now reports the text **as it appears in the file**.
 
-```
--- free-standing audit: LIVE references left after this teardown --
-   scanned 24 file(s) under CLAUDE.md, .claude/ and scripts/ against 19 known specialist name(s)
-  [LIVE]   CLAUDE.md:3 -- name 'Derek'
-  [LIVE]   CLAUDE.md:6 -- specialist id + name 'Derek'
-  [LIVE]   scripts\repo-config.ps1:3 -- plugin-only contract function
-```
+**2. The dry-run audit showed the wrong 40 lines.** The preview is explicitly the inventory a reader says
+yes to, and it was filled entirely by the ~20 lens files the same run had just listed under `[remove]`:
+every one mentions a specialist, they consumed the whole cap, and the hits that actually matter only became
+visible after `-Apply`. Files on the removal list are now **excluded** rather than sorted last — a
+reference inside a file that is going away is not a surviving reference, so listing it would be wrong and
+not merely noisy. The exclusion is counted and stated, because a silent narrowing is the thing this audit
+exists to prevent.
 
-Three kinds of hit, because they have three different answers — and the choice is **per line, not per
-file**, which is why it reports lines:
+**3. `[keep]` on an occupied `repo-config.ps1` left a broken contract silently.** Keeping it is correct —
+these addresses are inhabited in any repo that predates the plugin, since the scaffolds are the files that
+were *extracted from* repos like these. But an existing one has no reason to define the plugin's own
+contract functions, so `check-roster-sync` then calls `Get-RosterPath` on a file that does not have it and
+the consumer gets `[ERROR]` lines at every session start with nothing connecting them to the bootstrap.
+The `[keep]` line now names the missing functions — **only the missing ones**, since listing all four at a
+repo that already has them is the noise that teaches people to skim.
 
-| hit | answer |
-|---|---|
-| a **specialist id** (`05-05`) — a roster row, a routing table | usually **delete**: it only ever existed for the plugin |
-| a **name** (`Derek`) — a valid rule phrased through a character | usually **reword**: keep the rule, drop the name |
-| a **plugin-only contract function** (`Get-RosterPath`, `Get-RosterIgnoredIds`) | **delete the line**, keep the file |
+**4. The per-item `[KEEP]` line claimed authorship the script cannot establish.** It printed *"filled
+in"* while the summary block below it correctly hedges with *"not recognised as an unfilled scaffold"* —
+the `smartwatchbanden` correction landed in the summary and not in the line above it, so one run asserted
+and hedged about the same file. The line now says what the script actually knows.
 
-That third one is new information rather than a restatement: `repo-config.ps1` is category 3 and is
-correctly *kept* — but two of its eight contract functions exist only to serve the roster check, and "keep
-this file" and "keep every line in this file" are different answers. Nothing said so before.
+**All four are asserted**, including the two that could only be caught by looking at real-world shapes: a
+Dutch possessive in a consumer's prose, and an occupied scaffold that lacks the contract. The
+possessive test also asserts that a line naming **no** specialist is still not a hit — a looser boundary
+must not become a boundary that matches everything.
 
-**Report-only, unconditional, and it runs on a dry run too.** It removes nothing, so it needs no `-Apply`,
-and a preview that cannot tell you what would still be left is not the inventory a reader needs in order
-to say yes. A clean repo gets `[FREE]`, which is the requirement met *verified rather than assumed*.
-
-**The closed loop is the assertion that makes it more than a grep.** A test applies the exact reword the
-audit advises and asserts the audit then reaches `[FREE]`. Without that, an audit could name references
-that no reasonable edit ever clears — findings that are technically true and practically noise.
-
-**Three boundaries, each of which would otherwise be a quiet false claim:**
-
-- **The names come from the plugin's own payload** (an agent def's `name:`, a persona's H1), never a
-  hardcoded list that rots on the next rename. But this skill ships inside **one** plugin and sees only
-  that plugin's specialists — a consumer running a domain plugin has names it does not know. The **id scan
-  is the general net** (a `<gg>-<ii>` token is name-independent, so it catches a specialist from any
-  plugin) and the name scan is the extra pass. Stated in the skill rather than left for someone to discover.
-- **Matching is case-insensitive, deliberately biased toward over-reporting.** For an audit whose purpose
-  is establishing that nothing was missed, the expensive failure is the reference it did not find — not the
-  one a reader dismisses in five seconds. Every hit carries `file:line`, so a false positive is cheap and a
-  false negative is silent. Same direction `Test-LooksGenerated` resolves its doubt, for the same reason.
-- **History is out of scope and never rewritten.** `CHANGELOG.md` and `releases/` are excluded entirely;
-  other root prose is **counted, not listed** — a pointer, not a work queue, since nothing loads, resolves
-  or gates on it.
-
-**A bug in the audit's own pattern, found by running it rather than by reading it.** The first version
-anchored the plugin-only-function check as `\b(Get-RosterPath|...|\$script:RosterPath|...)`. A shared
-leading `\b` in front of `\$` demands a word character immediately before the dollar, so it can never match
-an assignment at the start of a line — which is exactly where `$script:RosterPath = 'CLAUDE.md'` lives. The
-fixture caught it immediately: line 4 (`function Get-RosterPath`) was reported, line 3 was not. Each
-alternative now carries its own anchor, and the regression is asserted. **A pattern that matches some of
-what it claims is worse than one that matches none — the partial hit reads as coverage.**
-
-[PR #264](https://github.com/DaveKJohn/davekjohns-workshop/pull/264)
+[PR #273](https://github.com/DaveKJohn/davekjohns-workshop/pull/273)
 
 ---
 
-### #263 · A gate states its coverage, not just its verdict · Feat · 2026-07-30
+### #272 · The orchestrator note was removed by its first line only (inbound #271) · Fix · 2026-07-30
 
-The last open item of [#221](https://github.com/DaveKJohn/davekjohns-workshop/issues/221)'s target
-shape: *"consumer gates that announce when they stop applying."*
+Reported from `DaveKJohn/life-hub`'s first real adoption round-trip
+([#271](https://github.com/DaveKJohn/davekjohns-workshop/issues/271)), two full `init` → `teardown` cycles
+with a filesystem inventory after every phase. **Confirmed, and reproduced exactly.**
 
-**The defect was sharper than the issue described, and the difference matters.** The family README said
-the gate *silently skips* the lens category once the directory is gone. It does not skip quietly and
-print nothing — it prints a **verdict with no coverage**. `check-consumer-drift`'s persona section closed
-with:
+The note the bootstrap writes above the orchestrator import is **one sentence wrapped over two lines**: a
+fixed head and a generated tail naming where the imports point. Both cleanup paths matched the **head
+only** — the teardown, and the bootstrap's own `[tidy]` guard, each by re-typing that literal. So every
+teardown left the tail behind, and the next bootstrap wrote a fresh two-line note above the orphan.
+
+Reproduced on a fixture with the fix reverted, and it matches the reported table line for line:
+
+| phase | note head | note tail | `CLAUDE.md` lines |
+|---|---|---|---|
+| after first init | 1 | 1 | 10 |
+| after teardown 1 | **0** | **1** | 12 |
+| after bootstrap 2 | **1** | **2** | 12 |
+| after teardown 2 | **0** | **2** | 14 |
+
+**The invisibility was the worse half, and the report is right that it is the same failure class as the
+1 → 2 → 3 accumulation fixed after `smartwatchbanden` — moved one line down into the only line nothing
+checked.** Every counter in the documented verification keyed on the head, so it read 1 / 0 / 1 / 0
+throughout: exactly the healthy values. **Including the regression test written for the first version of
+this bug.** The lesson already recorded above that fix — *"idempotence has to cover everything the script
+WRITES, not just the line it happens to look for"* — was true of the note itself, and had to be learned
+twice.
+
+**Why it happened, which is the part that generalises.** One literal, mirrored by hand into two scripts.
+That is exactly the shape `Get-SeamPaths` exists to prevent — *"the pair that must never drift apart"* —
+so the note now lives beside it: `Get-OrchestratorNote` supplies the head and a tail **pattern**, and
+`Test-IsOrchestratorNoteLine` is the single matcher both removers use. The tail has to be a regex rather
+than a literal because it interpolates a path that differs per consumer and per layout (the seam names the
+seam dir; the pre-seam form names the plugin path), and it stays anchored on the distinctive generated
+clauses so the existing rule holds unchanged: **a consumer who reworded or translated the note has
+authored it, and neither remover touches it.**
+
+**The test now asserts on the tail, as the report asked — and on one thing it did not.** Alongside a
+head counter and a tail counter at every step, the round-trip asserts that `CLAUDE.md` has the same
+**length** as after the first bootstrap. A counter watching one line of a two-line block certifies half a
+file; a length check catches a leftover **under any name**, including the next one nobody has thought of.
+That is the assertion that would have caught this bug without knowing it existed. Verified against the
+unfixed scripts: 6 assertions fail, and every head assertion still passes.
+
+**Found on the way, and worth its own line:** the plugin's mirror of `check-report-lib.ps1` was stale
+after the source edit, and the suite failed with *"Get-OrchestratorNote is not recognized"* — because the
+skills dot-source the mirror, not the root copy. `build-shared-scripts.ps1` fixed it. The shared-script
+model catching its own drift, twice today, in two different gates.
+
+**On the report's finding 2 — the `$kept` fix being on `main` but not in a release — it is right, and the
+answer is a release rather than a code change.** That is already queued as the `3.0.0` milestone, and the
+policy question it raises is the sharper half: *a consumer cannot tell "fixed" from "fixed and
+released."* Recorded here so the next release note says which version a fix actually lands in, rather than
+the adoption docs claiming `v2.16.0+` for something `2.16.0` does not contain.
+
+**The four secondary findings are accepted and not fixed here** — deliberately, so this branch stays the
+one thing it is. Each is real: the audit's word boundary misses a Dutch possessive (`Dereks`), the dry-run
+audit's 40-line cap is filled by lens files the same run is about to delete, a `[keep]` on an occupied
+`repo-config.ps1` leaves `check-roster-sync` calling functions that file does not have without saying so,
+and the per-item `[KEEP]` line still claims *"filled in"* where the summary correctly hedges. They are
+listed on the issue and will be picked up from there.
+
+[PR #272](https://github.com/DaveKJohn/davekjohns-workshop/pull/272)
+
+---
+
+### #268 · The bootstrap report printed CLAUDE.md instead of a count · Fix · 2026-07-30
+
+Found by **measuring** rather than reasoning, while checking a blocking report from the first real
+adoption attempt (`life-hub`, July 30, 2026). The report itself turned out to be about something else
+entirely — see below — but running the measurement it demanded surfaced this:
 
 ```
--- Personas (portable body vs. the <g>-<id>-extension.md copy in the consumer) --
-  Persona drift is INFORMATIONAL (does not affect the exit code): 0 drifted.
+Done: 4 persona-lens(es) created, # life-hub-achtig  Eigen governance.  already present; ...
 ```
 
-Measured today against a directory holding a `CLAUDE.md` and nothing else: that was the section's
-*entire* output. Four personas exist in the source; zero were compared; the reader was told "0 drifted".
-**"0 drifted of 0 compared" and "0 drifted of 4 compared" were the same sentence.** That is not a false
-pass — it is a true statement that reads as a different, false one, which is harder to catch than
-silence, because there is nothing missing to notice.
+`$kept` is the persona-lens *"already present"* **counter**, declared at the top of `bootstrap.ps1`. The
+note-tidy block near the end assigned an **array of `CLAUDE.md` lines** to that same name, so by the time
+the summary line ran, PowerShell interpolated the consumer's whole `CLAUDE.md` where a number belonged.
+Renamed to `$keptLines`; the counter is left alone.
 
-Worse, the asymmetry was visible in the same output the whole time: the agent-def section right above it
-*does* state its coverage (*"26 missing, 0 identical, 0 drifted"*). One half of the report had the
-denominator and the other half did not.
+**Why every suite stayed green, which is the part worth keeping.** That block runs *only* when the
+consumer already has a `CLAUDE.md` that does not yet carry the guard import — **exactly the path a real
+adoption takes**, and never the path a fixture takes: a fixture with no `CLAUDE.md` gets one written by
+the bootstrap and goes down the other branch. So the bug was reachable only where no test looked, and it
+corrupted the one number the round-trip protocol tells an operator to write down first.
 
-**The fix.** One shared, non-counting `Write-Coverage` in
-[`scripts/lib/check-report-lib.ps1`](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/scripts/lib/check-report-lib.ps1) — plugin-owned, so it travels to
-every consumer with the payload — emitting `[<category>] checked N of M -- <why, when empty>`:
+Third instance of one lesson in this repo — after the `$pid` note in `check-roster-sync` and the
+shared-counter collision behind it: **a name reused for a second purpose in the same scope breaks
+somewhere else entirely, and a report line is the last place anyone looks.**
 
-- **`check-consumer-drift`** — the persona section is now printed **unconditionally** (it used to be
-  wrapped in `if ($personaResults.Count -gt 0)`, so it could vanish entirely), and its verdict carries
-  its denominator: *"0 drifted of 0 compared"*, plus a line naming why nothing was compared. A reader
-  can now tell a deliberate teardown from a bad merge or a wrong `-ConsumerPath`.
-- **`check-plugin-integrity`** — a `[COVERAGE]` line closes **all ten** categories, with
-  `link-scan/lenses` counted separately from the scan total precisely because it is the category a
-  teardown removes.
+**The blocking report itself was a defect in the test, not in the plugin — and the plugin's behaviour
+already was what the reporter proposed.** They found both scaffold addresses occupied in `life-hub`:
+`scripts/repo-config.ps1` (55 lines) and `scripts/lib/branch-info.ps1` (88 lines, named by that repo's own
+`CLAUDE.md` as its single source of truth for the branch taxonomy). Their proposal was to treat scaffolds
+like lenses — neither placed nor removed once inhabited. Measured on a fixture built to match:
 
-**Applied to all ten on purpose.** A partial rollout recreates the exact asymmetry that caused this: the
-agent-def section was honest and the persona section was not, and that is why nobody noticed for months.
-Uniformity is the fix, not thoroughness for its own sake.
+- **Bootstrap:** `[keep] scripts/repo-config.ps1 already exists -- not overwritten`, both files
+  byte-identical afterwards.
+- **Teardown `-Apply`:** `[KEEP] ... filled in; it describes this repo's branch taxonomy, which outlives
+  the plugin` — both kept, both byte-identical, while the 25 items the plugin *did* write are removed and
+  the audit reports `[FREE]`.
 
-**Coverage is context, never a finding.** `[COVERAGE]` is non-counting like `[OK]`/`[SKIP]`/`[SCOPE]`: it
-moves no exit code and no signal count, and a unit test asserts exactly that — a legitimately empty
-category must not break its own gate, or the honesty would cost more than the silence did.
+So the round trip on an occupied consumer was already correct in both directions. What was wrong were the
+**expectations in the test prompt**, which read "both scaffolds present" as a success criterion after the
+bootstrap and "both scaffolds gone" after the teardown — true only for a repo that never had them. Stopping
+before installing was the right call, and the second half of their note ("a fixture cannot measure this by
+definition") is exactly right.
 
-**Two things the work produced beyond the feature:**
+**Both halves are now pinned by tests** — an *occupied consumer* scenario in `teardown.tests.ps1`: the
+bootstrap keeps and reports, the teardown keeps and reports, both files byte-identical across the full
+round trip, and the report line asserted to carry digits. Verified against the unfixed script: **the two
+report assertions fail and the thirteen behavioural ones pass either way**, which is the proof that the
+behaviour was always right and only the report was broken.
 
-- **The gate caught its own change.** Editing `check-report-lib.ps1` made the plugin mirror drift, and
-  check 8 reported it on the first run. The shared-script model working as designed, worth stating
-  because it is the kind of thing that only ever gets noticed when it fails.
-- **The integrity fixture was already the perfect witness, and its own docstring said so.** That fixture
-  carries no agent def, no manual, no persona and no plugin manifest — it recorded those categories as
-  *"expected noise, asserted on nowhere below"*. They are asserted on now: six categories that report
-  `checked 0`, two that report a real count (so the line cannot be hardcoded), and the empty lens
-  category's stated reason. As a side effect three redundant recursive directory walks collapsed into
-  the sets already collected.
+**And the protocol that misled the prompt is corrected at the source.** The round-trip section of
+[`specialists-teardown`](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/claude-code-plugins/claude-specialists/specialists/skills/specialists-teardown/SKILL.md#verifying-a-round-trip--and-why-git-status-is-not-enough)
+now states that the two `Test-Path` lines are an **inventory, not an expectation**, with a table for the
+occupied case and the instruction to read `[create]`/`[keep]` and `[remove]`/`[KEEP]` rather than the
+booleans. The general form: **the plugin scaffolds precisely the files that were extracted from repos like
+these** — free real estate on a fixture, inhabited in any real consumer.
 
-**What this deliberately does not fix, said out loud instead of quietly scoped away.** A consumer's own
-lint — whatever `Get-LintScript` points at — is the repo owner's code. The measured silent skip lives
-there, and no plugin can make someone else's gate honest. The helper is available to it; adopting it is
-the owner's act. Recorded in the family README as the owner's item rather than counted as closed here.
+**One correction to the report, for the record.** It concluded that the prompt's ~20 mid-word truncations
+were *"in the source file, not in the transfer."* The source file is intact: line 64 reads
+`Where-Object { $_ -match '^\s*@' }`, not the reported `Where-Obount`, and no scratchpad file contains a
+single broken token. So the damage is in the channel — the same failure
+[#260](https://github.com/DaveKJohn/davekjohns-workshop/pull/260) recorded on July 29, now on a different
+route. Worth stating plainly because the two diagnoses lead somewhere different: a corrupt source is fixed
+by rewriting it, a corrupt channel is not. The prompt's own truncation guard did its job — the session saw
+the damage, stopped at step 2, and said so instead of guessing.
 
-[PR #263](https://github.com/DaveKJohn/davekjohns-workshop/pull/263)
-
-## Fixes
-
-### #262 · sync-roster wrote its scaffolds to the pre-seam path · Fix · 2026-07-30
-
-The seam ([#221](https://github.com/DaveKJohn/davekjohns-workshop/issues/221)) made
-`.claude/specialists/lenses/` the place a consumer's lenses live, and taught the bootstrap to resolve
-that destination through `Get-LensWriteDir` — the seam for a fresh or migrated consumer, the existing
-tree for one that has not migrated. **`sync-roster` never got the same treatment.** It hardcoded
-`.claude/plugins/<family>/<plugin>/<group>-<id>-extension.md` in three places: the scaffold it writes,
-the link in the roster row it proposes, and the path it prints for a stale header.
-
-**What that costs a real consumer.** Run `sync-roster` after a plugin update — which is exactly what the
-session hook tells you to do when the roster drifts — and a migrated repo gets its new scaffolds in the
-pre-seam directory while the rest of its lenses sit in the seam. `Get-LensWriteDir`'s own docstring names
-that outcome: *"splitting the surface in two, which is worse than either layout alone."* On top of that
-`check-roster-sync` then reports the fresh scaffolds as off-path, and the proposed roster row a human
-pastes links to a file that is not there — worse than no row, because it looks authoritative.
-
-Both writers now resolve through the one helper, so they cannot disagree about a repo's layout.
-
-**Why the suite stayed green through all of it, which is the more useful half of this entry.** Every one
-of the six existing scenarios built its fixture consumer with a **pre-seam lens tree** — and
-`Get-LensWriteDir` follows an existing tree by design. So the suite exercised the one branch where the
-hardcoded literal happened to be correct, 39 asserts deep, and never the fresh or migrated cases. **A
-fixture that always arrives in the same state tests one branch, however many asserts hang off it.** The
-suite now builds three: fresh (no tree), migrated (lenses in the seam), and pre-seam (lenses on the old
-path), plus a fourth check that the proposed roster row's link follows too. Verified by running the new
-asserts against the unfixed script: **7 fail, and the pre-seam case passes both ways** — which is the
-proof that the test targets the defect rather than the implementation.
-
-`Get-LensFamily` is no longer called anywhere in this script: with the seam there is no family segment
-left for it to compose.
-
-**On the unparseable-plugin case.** The stale-header branch used to print `<plugin>` as a placeholder
-segment. In the seam there is no plugin segment to placeholder, so an unknown plugin now resolves to the
-seam — and deliberately does *not* pass the placeholder on to `Get-LensWriteDir`, whose candidate list
-documents that the caller slug-validates any name that becomes a path segment (a `<plugin>` literal would
-break that contract, and `Test-Path` on the illegal characters with it). Everywhere the id *did* parse it
-is passed through, still slug-validated by `Split-PluginId`.
-
-The `SKILL.md` line describing where scaffolds land was deliberately held back from
-[#261](https://github.com/DaveKJohn/davekjohns-workshop/pull/261)'s prose sweep and lands here instead:
-the doc follows the behaviour, never the other way round.
-
-[PR #262](https://github.com/DaveKJohn/davekjohns-workshop/pull/262)
+[PR #268](https://github.com/DaveKJohn/davekjohns-workshop/pull/268)
 
 ## Documentation
 
-### #261 · The seam migration left stale lens paths in the prose · Docs · 2026-07-30
+### #266 · A seam migration can move a consumer's lenses out of git · Docs · 2026-07-30
 
-The seam shipped its **machinery** in v2.15.0 ([#253](https://github.com/DaveKJohn/davekjohns-workshop/pull/253)
-specified it, [#254](https://github.com/DaveKJohn/davekjohns-workshop/pull/254) taught the bootstrap
-and the teardown to write and remove it, [#255](https://github.com/DaveKJohn/davekjohns-workshop/pull/255)
-migrated this repo onto it). Its **prose** did not come along. Measured today: **120 occurrences of the
-pre-seam lens path across 57 files**, in all four plugins — every agent def, every manual, `QUICKSTART.md`,
-the family README, the connectors README, and the shared `agent-shared/inbound-behaviour.md` block that
-is filled verbatim into 19 agent defs.
+Found while running the teardown skill's own pre-flight instruction — *"establish whether `.claude/` is
+tracked **before** running with `-Apply`"* — ahead of the first real adoption test round. The instruction
+existed because `git status` proved partly blind in `davekokbwj/smartwatchbanden` on July 29. Following it
+turned up something that is **not** about the repo being tested.
 
-That is not cosmetic. Those texts are the instruction a specialist reads *while working in a consuming
-repo*: "repo-specific additions belong in the repo lens
-(`.claude/plugins/claude-specialists/<plugin>/<group>-<id>-extension.md`)". A specialist who follows it
-writes a file the seam does not hold and `check-roster-sync` reports as off-path.
+**Measured across both real consumers, July 30, 2026:**
 
-**Why no gate caught it.** Two independent reasons, and both are worth keeping:
+| repo | `.gitignore` | consequence |
+|---|---|---|
+| `DaveKJohn/life-hub` | no `.claude` entry at all | the whole tree is tracked — a wrongly removed lens is one `git checkout` away |
+| `davekokbwj/smartwatchbanden` | `.claude/*` with `!.claude/plugins/` | tracked **only** on the pre-seam path |
 
-1. **The paths appear in prose and in code spans, not as links.** The dead-link scan resolves link
-   *targets*; it never reads a label or a backticked path. So a document may describe a layout that no
-   longer exists and stay green.
-2. **In this repo's own `.claude/specialists/`, the labels were wrong while the targets were right.**
-   `README.md` was still titled `# .claude/plugins/claude-specialists`, its layout section still
-   described `plugins/claude-specialists/specialists/`, and its whole index table used
-   `specialists/<id>-extension.md` labels over `lenses/<id>-extension.md` targets. Every link resolved.
-   Exactly the class [#260](https://github.com/DaveKJohn/davekjohns-workshop/pull/260) named a day
-   earlier: the description and the thing described drift apart, and nothing announces it.
+That second row is correct today and **breaks silently on migration.** The exception un-ignores
+`.claude/plugins/` — the *pre-seam* location. Move the lenses to `.claude/specialists/` and they match
+`.claude/*` with no exception covering them, so the tree leaves version control **without a single line of
+the migration looking wrong**: every gate stays green (the readers accept the seam — that is the whole
+point of [#253](https://github.com/DaveKJohn/davekjohns-workshop/pull/253)), `git status` shows nothing
+because they are ignored, and the teardown's undo is gone. A repo would discover it at the moment it most
+needed that undo.
 
-**History is left alone.** The per-plugin `CHANGELOG.md` files and the archived release notes keep the
-pre-seam path — they record what was true then, and this repo does not rewrite history (the same
-reasoning that lets those notes keep their original language). Two analytical mentions are also kept
-deliberately, because the old path is their *subject* rather than their instruction: the teardown-gap
-bullet in the family README (now marked settled) and the #227 lesson in
-[Sylvester's lens](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/.claude/specialists/lenses/05-15-extension.md), where the citation now says which
-path the bootstrap wrote at the time.
+**So the migration is now five steps, and the new one is step 0:** add `!.claude/specialists/` and commit
+it *before* moving anything. Reversed, the move lands untracked and the commit that would have captured it
+has nothing to capture.
 
-**Two things found while chasing the prose, both bigger than a path:**
+**The general form, which is the part worth keeping:** *an ignore rule written against a path is a bet that
+the path will not move.* A migration is exactly when that bet is called in — and no gate in this family can
+see a consumer's `.gitignore`, which is why this belongs in the operator's pre-flight rather than in a
+check.
 
-- **`sync-roster` still writes to the pre-seam path** — a real defect, not a wording slip, and split off
-  to its own `fix/` branch rather than buried here. Its `SKILL.md` line is therefore the one stale path
-  left in this diff: the doc follows the behaviour, not the other way round.
-- **`specialists-init`'s SKILL.md still carried the claim [#215](https://github.com/DaveKJohn/davekjohns-workshop/issues/215)
-  disproved** — *"what a plugin cannot do is inject always-on main-loop context"*. The family README has
-  carried the correction since July 29; the skill a consumer actually reads did not. Corrected with a
-  pointer to both, and stating that the switch is deliberately off — the wording was wrong regardless of
-  whether Dave ever flips it.
+**One clearance for the upcoming test round, since that is the question the pre-flight was run for:**
+`life-hub` tracks `.claude/` in full, so its round-trip has a working undo and `-Apply` is safe there. It is
+`smartwatchbanden` that needs the `.gitignore` step first — and only if and when it migrates, since an
+update alone leaves it on the pre-seam path, where it is tracked.
 
-Also reworded: "on the plugin path" as a *description of the seam*, in `QUICKSTART.md` (3),
-`specialists-init/SKILL.md` (3) and the connectors README (1). The seam is not the plugin path — that
-was the point of moving it, so calling it that undoes the sentence.
-
-**One regression the sweep would have introduced, caught on the copy-edit pass.** Every agent def and
-manual tells its specialist where the repo lens lives, with a fallback: *"or the legacy path
-`.claude/extensions/…`"*. Before the sweep that sentence named the **pre-seam plugin path** as the
-primary and the pre-plugin-path one as the fallback; a naive replacement left it naming the seam and the
-oldest path while dropping the middle one — which is exactly where the two un-migrated consumers
-(`life-hub`, `smartwatchbanden`) keep their lenses today. A specialist reading only the new sentence
-would look in two places and miss the one holding the file. `Get-LensDirCandidates` reads all three
-regardless, so no check would have failed. The parenthetical now names both fallbacks in one shape across
-all 27 files: *"or, if this repo has not migrated to the seam, at its pre-seam
-`.claude/plugins/<family>/<plugin>/` or `.claude/extensions/` location"*. **A mechanical replacement
-inherits the old sentence's assumptions — read what the sentence claimed, not just the token you
-changed.**
-
-**Found and deliberately left alone:** `check-consumer-drift` reports `03-02-extension.md` (Bianca) as
-`[DRIFTED]` — her lens carries a body copy instead of following the lens-only model. Informational, it
-does not affect the exit code, and it predates this branch: she was adopted onto the roster on July 28,
-2026. Recorded here so it is on the record rather than in a session.
-
-[PR #261](https://github.com/DaveKJohn/davekjohns-workshop/pull/261)
+[PR #266](https://github.com/DaveKJohn/davekjohns-workshop/pull/266)
 
 ---
 
-Full workshop notes: [releases/development/2.x/2.16.0.md](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/releases/development/2.x/2.16.0.md)
+Full workshop notes: [releases/development/3.x/3.0.0.md](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/releases/development/3.x/3.0.0.md)
 Cumulative plugin history: [CHANGELOG.md](CHANGELOG.md)
