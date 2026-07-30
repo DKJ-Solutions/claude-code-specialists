@@ -184,10 +184,13 @@ $prosey = @('# Notes', '', '## Overview', '', '### 9.x', '', 'Prose only, no tab
 Assert-Equal '2' (Get-OverviewTargetMajor -ReadmeContent $prosey) 'a section heading with no table under it is not the target -- the last one before the first table is'
 Assert-Equal $null (Get-OverviewTargetMajor -ReadmeContent "# Empty`n`nNo table at all.") 'no table anywhere -> $null, so the guardrail stays silent rather than guessing'
 Assert-Equal $null (Get-OverviewTargetMajor -ReadmeContent "| Version | Date | Type | Title |`n|---|---|---|---|`n") 'a table with no section heading above it -> $null (an ungrouped overview is not this failure mode)'
-# The live document: today it must answer '2', which is exactly why cutting 3.0.0 would misfile.
+# The live document, asserted on deliberately: this is the value the next release depends on, so it is
+# pinned rather than left to inspection. It answered '2' until the 3.x section was opened, which is
+# exactly what made a 3.0.0 cut misfile -- and this assertion is what forced that change to be stated
+# instead of quietly landing. Update it, with a reason, whenever a new major section is opened.
 $liveReadme = Join-Path $PSScriptRoot '..\..\releases\README.md'
 if (Test-Path -LiteralPath $liveReadme) {
-    Assert-Equal '2' (Get-OverviewTargetMajor -ReadmeContent (Get-Content -LiteralPath $liveReadme -Raw -Encoding UTF8)) "this repo's own overview currently targets 2.x -- the guardrail will fire on a 3.0.0 bump, as intended"
+    Assert-Equal '3' (Get-OverviewTargetMajor -ReadmeContent (Get-Content -LiteralPath $liveReadme -Raw -Encoding UTF8)) "this repo's own overview now targets 3.x -- a 3.0.0 cut lands under its own major, and a 2.x cut would be refused"
 }
 
 Write-Host "Build-ReleaseNotes" -ForegroundColor Cyan

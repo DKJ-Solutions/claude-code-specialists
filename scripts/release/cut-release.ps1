@@ -181,17 +181,27 @@ $relReadmePath = Join-Path $repoRoot 'releases\README.md'
 if (Test-Path -LiteralPath $relReadmePath) {
     $targetMajor = Get-OverviewTargetMajor -ReadmeContent (Get-Content -LiteralPath $relReadmePath -Raw -Encoding UTF8)
     if ($null -ne $targetMajor -and $targetMajor -ne $newMajor) {
+        # The message must state what is actually KNOWN, not assume a direction. The mismatch is
+        # reachable both ways, and the two ways need different remedies:
+        #   newMajor > target -- the usual case: a new major whose section does not exist yet.
+        #   newMajor < target -- the section exists but is not on top, because a HIGHER major was opened
+        #     already. Saying "has no '### 2.x' section yet" there would be plainly false, and a
+        #     guardrail that misdescribes the repo teaches people to bypass it.
+        $advice = if ([int]$newMajor -lt [int]$targetMajor) {
+            "'### $newMajor.x' does exist, but '### $targetMajor.x' sits above it, so that is where the row goes.`n" +
+            "Releasing an older major after a newer one has been opened needs a decision this script will not make for`n" +
+            "you: either move the row by hand after cutting, or reconsider the version."
+        } else {
+            "Add the section first -- directly under '## Overview', ABOVE '### $targetMajor.x':`n`n" +
+            "### $newMajor.x`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n`n" +
+            "Then run this again. Opening a new major's section is a deliberate milestone moment, which is why it`n" +
+            "is not done for you."
+        }
         Write-Error @"
-releases/README.md has no '### $newMajor.x' section yet, so the new row would be filed under '### $targetMajor.x'.
-Nothing was written. Add the section first -- directly under '## Overview', ABOVE '### $targetMajor.x':
+This release is v$new, but a new row in releases/README.md would be filed under '### $targetMajor.x'
+(the first table in the overview). Nothing was written.
 
-### $newMajor.x
-
-| Version | Date | Type | Title |
-|---|---|---|---|
-
-Then run this again. Starting a new major section is a deliberate milestone moment, which is why it is
-not done for you.
+$advice
 "@
         exit 1
     }

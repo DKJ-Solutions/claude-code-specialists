@@ -16,7 +16,17 @@ consumers see (version + short notes, travelling along with the plugin cache via
 ## Overview
 
 Grouped by major version, newest first. New releases are added to the current major's table (the
-top one).
+top one) — which is why **opening a new major's section is a deliberate act, done before the release is
+cut**: `cut-release.ps1` inserts the new row after the first table header it finds, so without the
+section below a `v3.0.0` row would be filed under `### 2.x` without anything erroring. A guardrail now
+refuses that rather than doing it quietly (see [Cutting a release](#cutting-a-release)).
+
+### 3.x
+
+*Open, no releases cut yet — the section exists so the first `3.0.0` row lands under its own major.*
+
+| Version | Date | Type | Title |
+|---|---|---|---|
 
 ### 2.x
 
