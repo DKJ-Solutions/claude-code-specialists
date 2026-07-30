@@ -564,6 +564,32 @@ function Build-PluginReleaseCard {
     return ($header + $body + "`n`n" + $footer)
 }
 
+function Get-OverviewTargetMajor {
+    <# Which '### <n>.x' section of releases/README.md a new row would land in, or $null when the
+       overview carries no table at all. Pure string in, string out.
+
+       WHY THIS EXISTS. The row inserter finds the FIRST '| Version | Date | Type | Title |' header and
+       inserts directly after it -- correct for every minor and patch, because the current major's table
+       sits at the top. A NEW MAJOR has no table yet, so its row lands under the PREVIOUS major's
+       heading: a v3.0.0 row filed under '### 2.x'. Not a crash -- a quietly wrong overview, in the one
+       document whose whole job is to say which release is which.
+
+       Never caught before because it cannot have been: the grouping-by-major was introduced in v2.0.1,
+       one release AFTER the only major this repo ever cut. So a major has never met this structure.
+
+       The answer is the LAST section heading before the first table header, not simply the first
+       heading in the file: that is precisely the section the inserter will write into, and deriving it
+       any other way would be a second, drifting definition of the same thing. #>
+    param([Parameter(Mandatory)][string]$ReadmeContent)
+    $headerRe = [regex]"(?m)^\| Version \| Date \| Type \| Title \|\r?\n\|[-| ]+\|\r?\n"
+    $hm = $headerRe.Match($ReadmeContent)
+    if (-not $hm.Success) { return $null }
+    $before = $ReadmeContent.Substring(0, $hm.Index)
+    $sections = [regex]::Matches($before, '(?m)^###\s+(\d+)\.x\s*$')
+    if ($sections.Count -eq 0) { return $null }
+    return $sections[$sections.Count - 1].Groups[1].Value
+}
+
 function Build-ReleaseNotes {
     <#
         Builds the full release notes (the releases/development/<X>.x/<X.Y.Z>.md file) from the

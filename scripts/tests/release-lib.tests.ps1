@@ -159,6 +159,37 @@ Write-Host "Convert-ChangelogForRelease (genesis intro, no prior releases)" -For
 $genesisResult = Convert-ChangelogForRelease -Content $sample -Version '0.1.0' -Date '2026-07-14' -Type 'Minor' -NotesRelPath $notesPath
 Assert-Match $genesisResult 'The recorded versions of the marketplace .* newest at the top' 'genesis ## Releases intro (no prior releases yet) is English'
 
+Write-Host "Get-OverviewTargetMajor (where a new row would actually land)" -ForegroundColor Cyan
+# The row inserter matches the FIRST '| Version | Date | Type | Title |' header, so on a major bump a
+# v3.0.0 row lands under '### 2.x' and nothing errors -- a quietly wrong overview in the one document
+# whose job is to say which release is which. Never hit before: grouping-by-major arrived in v2.0.1,
+# one release AFTER the only major this repo ever cut.
+$twoSections = @(
+    '# Release notes', '', '## Overview', '', 'Grouped by major version, newest first.', '',
+    '### 2.x', '', '| Version | Date | Type | Title |', '|---|---|---|---|',
+    '| [2.16.0](development/2.x/2.16.0.md) | 2026-07-30 | Minor | Something |', '',
+    '### 1.x', '', '| Version | Date | Type | Title |', '|---|---|---|---|',
+    '| [1.18.0](development/1.x/1.18.0.md) | 2026-07-22 | Minor | Older |'
+) -join "`n"
+Assert-Equal '2' (Get-OverviewTargetMajor -ReadmeContent $twoSections) 'the row lands in the TOP section (2.x), not the last one in the file'
+# The whole point: with a 3.x section added on top, the same content answers differently.
+$withThree = $twoSections -replace '### 2\.x', "### 3.x`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n`n### 2.x"
+Assert-Equal '3' (Get-OverviewTargetMajor -ReadmeContent $withThree) 'once a 3.x section exists on top, that becomes the target -- the guardrail clears'
+# It must be the LAST heading before the first table, not the first heading in the file: a document
+# whose prose mentions a version heading before the sections start must not fool it.
+# NB the trailing '' -- the header pattern requires a newline AFTER the separator row, which every real
+# file has and a naively built fixture does not. Without it this asserts $null and blames the function.
+$prosey = @('# Notes', '', '## Overview', '', '### 9.x', '', 'Prose only, no table here.', '',
+            '### 2.x', '', '| Version | Date | Type | Title |', '|---|---|---|---|', '') -join "`n"
+Assert-Equal '2' (Get-OverviewTargetMajor -ReadmeContent $prosey) 'a section heading with no table under it is not the target -- the last one before the first table is'
+Assert-Equal $null (Get-OverviewTargetMajor -ReadmeContent "# Empty`n`nNo table at all.") 'no table anywhere -> $null, so the guardrail stays silent rather than guessing'
+Assert-Equal $null (Get-OverviewTargetMajor -ReadmeContent "| Version | Date | Type | Title |`n|---|---|---|---|`n") 'a table with no section heading above it -> $null (an ungrouped overview is not this failure mode)'
+# The live document: today it must answer '2', which is exactly why cutting 3.0.0 would misfile.
+$liveReadme = Join-Path $PSScriptRoot '..\..\releases\README.md'
+if (Test-Path -LiteralPath $liveReadme) {
+    Assert-Equal '2' (Get-OverviewTargetMajor -ReadmeContent (Get-Content -LiteralPath $liveReadme -Raw -Encoding UTF8)) "this repo's own overview currently targets 2.x -- the guardrail will fire on a 3.0.0 bump, as intended"
+}
+
 Write-Host "Build-ReleaseNotes" -ForegroundColor Cyan
 $notes = Build-ReleaseNotes -Entries $entries -Version '0.2.0' -Date '2026-07-14' -Type 'Minor' -Title 'Test-release'
 Assert-Match $notes '^# Release notes v0\.2\.0' 'heading with version'
