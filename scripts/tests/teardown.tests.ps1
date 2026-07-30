@@ -581,6 +581,52 @@ function Get-LintScript { return `$script:LintScript }
     Assert-True (-not ($prev.Out -match '(?m)^\s*\[LIVE\]\s+\.claude')) 'preview scope: no lens file appears as a LIVE hit -- every one of them is on the [remove] list'
     Assert-True ($prev.Out -match 'were excluded -- a reference inside a file that is going away is not a leftover') 'preview scope: the exclusion is stated, not silent'
     Assert-True ($prev.Out -match 'would remove') 'preview scope: on a dry run it says "would remove", not "removed"'
+
+    # --- inbound #275: the preview and the apply run must report the SAME total ---------------------
+    #     Measured in a consumer over two full cycles: "29 item(s) to remove" against "31 item(s)
+    #     removed", for the same work and with identical [remove] lines. The gap was the two directories
+    #     the run cleans up, pruned and tallied only under -Apply. A preview that undercounts its own
+    #     execution is the one thing the dry run exists not to do.
+    #
+    #     Both counts are read out of the real output, deliberately -- asserting a literal (29, 31) would
+    #     pin the test to today's lens inventory and break on the next added specialist, which is the
+    #     opposite of what this guards.
+    Write-Host "inbound #275 -- the dry run and the apply run count the same items" -ForegroundColor Cyan
+    New-BootstrappedConsumer | Out-Null
+    $pv = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
+    $ap = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
+    Assert-Equal 0 $pv.Code 'same total: preview exit-code 0'
+    Assert-Equal 0 $ap.Code 'same total: apply exit-code 0'
+    $mPrev  = [regex]::Match($pv.Out, 'Summary:\s+(\d+) item\(s\) to remove')
+    $mApply = [regex]::Match($ap.Out, 'Summary:\s+(\d+) item\(s\) removed')
+    Assert-True ($mPrev.Success -and $mApply.Success) 'same total: both runs print a summary count'
+    Assert-Equal $mPrev.Groups[1].Value $mApply.Groups[1].Value 'same total: the preview count equals the apply count'
+    # And the two directories are visible in BOTH, because a directory disappearing is something a reader
+    # should see coming rather than discover in the tally afterwards.
+    Assert-True ($pv.Out -match '(?m)^\s*\[remove\].*lenses\\ \(empty directory\)') 'same total: the preview lists the emptied lens directory'
+    Assert-True ($ap.Out -match '(?m)^\s*\[remove\].*lenses\\ \(empty directory\)') 'same total: so does the apply run'
+    Assert-True ($pv.Out -match '(?m)^\s*\[remove\].*specialists\\ \(empty directory\)') 'same total: and the seam directory'
+
+    # --- inbound #275: the audit excludes the LINES the same run removes, not just whole files -------
+    #     The bootstrap's orchestrator note is on the [remove] list AND was reported as a surviving
+    #     "name 'Chris'" hit in the same preview -- so the audit dropped from 5 live references to 4 after
+    #     -Apply on a consumer that changed nothing in between. The fixture carries one genuinely authored
+    #     reference, so "no CLAUDE.md hits at all" cannot make this pass for the wrong reason: the
+    #     authored line must still be found while the bootstrap's own lines must not.
+    Write-Host "inbound #275 -- the audit excludes removed CLAUDE.md LINES (line granularity)" -ForegroundColor Cyan
+    New-BootstrappedConsumer -ExtraClaudeMdLines @('', '- Derek opens the PR for every change.') | Out-Null
+    $lp = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
+    Assert-Equal 0 $lp.Code 'line scope: preview exit-code 0'
+    $lpHits = @([regex]::Matches($lp.Out, '(?m)^\s*\[LIVE\]\s+CLAUDE\.md:'))
+    Assert-Equal 1 $lpHits.Count 'line scope: exactly one CLAUDE.md hit -- the authored line, not the bootstrap note'
+    Assert-True ($lp.Out -match "(?m)^\s*\[LIVE\]\s+CLAUDE\.md:\d+ -- name 'Derek'") 'line scope: and it IS the authored line'
+    Assert-True ($lp.Out -match 'at line granularity') 'line scope: the line-level exclusion is stated, not silent'
+    # The number the finding was actually about: the same audit, before and after -Apply, over a repo whose
+    # own text did not change. It used to fall by one.
+    $la = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
+    Assert-Equal 0 $la.Code 'line scope: apply exit-code 0'
+    $laHits = @([regex]::Matches($la.Out, '(?m)^\s*\[LIVE\]\s+CLAUDE\.md:'))
+    Assert-Equal $lpHits.Count $laHits.Count 'line scope: the live count is the same before and after -Apply'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

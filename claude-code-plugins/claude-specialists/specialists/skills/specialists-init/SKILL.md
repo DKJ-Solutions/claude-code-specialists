@@ -3,8 +3,8 @@ name: specialists-init
 description: >-
   Bootstrap the Claude Specialists system in a new consuming repo: hook up the orchestrator
   (Chris) via one @-import in CLAUDE.md pointing at the seam (which in turn imports his portable
-  body from the plugin install + his lens-only repo lens), put the other main-loop personas (Derek,
-  Rendall) and the subagents in place as lens-only scaffolds in the seam plus the script-config scaffolds, and
+  body from the plugin install + his lens-only repo lens), put the plugin's other main-loop personas
+  and the subagents in place as lens-only scaffolds in the seam plus the script-config scaffolds, and
   deliver a governance/safety-hooks proposal.
   Use this when the shared `specialists` plugin is installed and enabled but the conductor and the
   governance layer are still missing ("the workers are there, Chris is not").
@@ -14,9 +14,9 @@ description: >-
 
 The shared `specialists` plugin delivers the **worker subagents** (Sylvester, Tessa, Edith, Victor,
 Tycho, …). What a plugin **cannot** do is edit a consumer's `CLAUDE.md`. That is exactly where the gap
-sits: **Chris** (the orchestrator) is loaded via an `@`-import in the repo `CLAUDE.md`; **Derek** and
-**Rendall** stand ready as lens-only personas in the seam and are read on demand. This skill sets that
-up, plus the governance and safety layer that differs per repo.
+sits: **Chris** (the orchestrator) is loaded via an `@`-import in the repo `CLAUDE.md`; the plugin's
+**other personas** stand ready as lens-only files in the seam and are read on demand. This skill sets
+that up, plus the governance and safety layer that differs per repo.
 
 > **One half of that used to be stated too broadly, and the correction matters here.** A plugin *can*
 > inject always-on main-loop context — a root `settings.json` with an `agent` key activates one of its
@@ -86,10 +86,14 @@ writing there — this script never relocates a file the repo owner owns, and sp
 across both paths would be worse than either. Migrating is your act, four steps, described in the
 [family README](../../../README.md#the-seam-specified). Every reader accepts both layouts.
 
-1. **Persona lenses (lens-only)** — for each main-loop persona (Chris `01-01`, Derek `05-05`,
-   Rendall `05-06`), puts a `*-extension.md` in place in the lens directory chosen above, only if it
-   is not already there. The lens carries **no body copy** — only the repo-lens slot; the portable
-   body comes via an `@`-import directly from the plugin install.
+1. **Persona lenses (lens-only)** — for **every** main-loop persona the plugin ships, puts a
+   `*-extension.md` in place in the lens directory chosen above, only if it is not already there. The
+   lens carries **no body copy** — only the repo-lens slot; the portable body comes via an `@`-import
+   directly from the plugin install. The set is read from the plugin's own `personas/` payload rather
+   than from a list here, and it currently holds **four**: Chris `01-01`, Bianca `03-02`, Derek `05-05`,
+   Rendall `05-06`. The closing line of the run states the number it actually placed — that count is
+   the authority, and it grows on its own when a release adds a persona (inbound #275: this text named
+   three while the script placed four, so a reader had to reconcile the prose with the counter).
 2. **Empty lens scaffolds** — for each subagent of the **enabled** plugin(s), puts an empty
    `VUL-IN` scaffold in place in that same directory (never overwriting). This makes it
    visible from the first install where the repo-specific tasks per specialist are to be filled in;

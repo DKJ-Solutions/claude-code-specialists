@@ -229,6 +229,31 @@ try {
     Assert-True ($lens -match '(?m)^## Specific to this repo \(VUL-IN\)') 'persona lens carries a fresh VUL-IN slot (English heading)'
     Assert-True (-not ($lens -match 'fixed ritual')) 'persona lens contains NO body copy'
 
+    # --- 1c. The skill's prose must not undercount what the script places (inbound #275) ------------
+    #     SKILL.md named three main-loop personas (01-01, 05-05, 05-06) while the bootstrap enumerates
+    #     personas/ and places FOUR. Nothing miscounted -- the closing line reported 4 honestly and the
+    #     total was right -- but the description was narrower than the behaviour, which costs a reader a
+    #     detour to reconcile the prose with the counter. The doc now derives the set from the payload
+    #     and lists it; this test is what keeps those two from drifting apart again when a release adds
+    #     a persona.
+    Write-Host "bootstrap.ps1 -- the skill doc lists every persona the payload ships (inbound #275)" -ForegroundColor Cyan
+    $personaIds = @(
+        Get-ChildItem -LiteralPath (Split-Path $PersonaSrc -Parent) -Filter '*-persona.md' -File |
+            ForEach-Object { if ($_.BaseName -match '^(\d{2}-\d{2})-persona$') { $Matches[1] } }
+    )
+    Assert-True ($personaIds.Count -gt 0) "payload ships personas ($($personaIds.Count))"
+    $initSkill = [System.IO.File]::ReadAllText(
+        (Join-Path (Split-Path (Split-Path $PersonaSrc -Parent) -Parent) 'skills\specialists-init\SKILL.md'),
+        [System.Text.Encoding]::UTF8)
+    # NOT $pid: that is a read-only automatic variable (the process id), and assigning it in a foreach
+    # aborts the suite with a runtime error rather than a failed assertion.
+    foreach ($personaId in $personaIds) {
+        Assert-True ($initSkill -match [regex]::Escape($personaId)) "specialists-init SKILL.md names persona $personaId"
+    }
+    # And the count the bootstrap reported for the fresh consumer above is that same number -- the run's
+    # own counter stays the authority, so a doc claim can never be the only place a reader is told.
+    Assert-True ($r1.Out -match "$($personaIds.Count) persona-lens\(es\) created") 'the run reports exactly the payload persona count'
+
     # --- 2. Idempotence: second run overwrites nothing ----------------------------------------------
     Write-Host "bootstrap.ps1 -- idempotent (second run)" -ForegroundColor Cyan
     $r2 = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $Fixture)
