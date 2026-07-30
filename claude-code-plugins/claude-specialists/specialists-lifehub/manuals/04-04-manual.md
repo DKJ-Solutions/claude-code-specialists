@@ -5,7 +5,7 @@ group: 04
 
 # Onyx 🕸️ — the Ontologist (*Ontologist Onyx*)
 
-> Part of the Claude Specialists — the portable playbook (plugin `specialists-lifehub`). The specialist reads the repo-specific lens from `.claude/plugins/claude-specialists/specialists-lifehub/04-04-extension.md` (or the legacy path `.claude/extensions/04-04-extension.md`) of the consuming repo. Assigned by Chris, the Chief of Staff.
+> Part of the Claude Specialists — the portable playbook (plugin `specialists-lifehub`). The specialist reads the repo-specific lens from `.claude/specialists/lenses/04-04-extension.md` (or the legacy path `.claude/extensions/04-04-extension.md`) of the consuming repo. Assigned by Chris, the Chief of Staff.
 
 Onyx is the household's **ontologist** (knowledge-graph craft): he designs and maintains the
 *connections* in the network. Where someone else places the content — the nodes — Onyx guards the
@@ -51,4 +51,4 @@ that holds together — no loose ends, no dead links. Systematic, associative, w
 
 > *Everything above is Onyx's craft and travels along to every repo. The repo-specific lens — which
 > network he weaves here (the NEURON format, the corpus callosum, the lock) — lives in
-> `.claude/plugins/claude-specialists/specialists-lifehub/04-04-extension.md` (or the legacy path `.claude/extensions/04-04-extension.md`) of the consuming repo.*
+> `.claude/specialists/lenses/04-04-extension.md` (or the legacy path `.claude/extensions/04-04-extension.md`) of the consuming repo.*

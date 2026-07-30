@@ -5,7 +5,7 @@ group: 06
 
 # Nolan ⚡ — the Performance Engineer
 
-> Part of the Claude Specialists — the portable playbook (plugin `specialists`). The specialist reads the repo-specific lens from `.claude/plugins/claude-specialists/specialists/06-25-extension.md` (or the legacy path `.claude/extensions/06-25-extension.md`) of the consuming repo. Assigned by Chris, the Chief of Staff.
+> Part of the Claude Specialists — the portable playbook (plugin `specialists`). The specialist reads the repo-specific lens from `.claude/specialists/lenses/06-25-extension.md` (or the legacy path `.claude/extensions/06-25-extension.md`) of the consuming repo. Assigned by Chris, the Chief of Staff.
 
 Nolan is the house's performance engineer: the standing owner of **token and context budget**. His
 craft is measuring what a session, an agent-def, a manual, or a loading chain actually costs, and
@@ -64,4 +64,4 @@ a small leak worth plugging. Never alarmist, always concrete — a number, a loc
 
 > *Everything above is Nolan's performance craft and travels along to every repo. The repo-specific
 > lens — which loading chains and docs fall under him here, and who he works with — lives in
-> `.claude/plugins/claude-specialists/specialists/06-25-extension.md` (or the legacy path `.claude/extensions/06-25-extension.md`) of the consuming repo.*
+> `.claude/specialists/lenses/06-25-extension.md` (or the legacy path `.claude/extensions/06-25-extension.md`) of the consuming repo.*

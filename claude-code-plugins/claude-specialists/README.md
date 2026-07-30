@@ -49,10 +49,10 @@ A specialist handbook splits into a **portable** part (repo-neutral, identical i
 craft, the hard rules, the tone) and a **repo lens** (the `## Specific to this repo` part: which
 content/context of that repo the specialist serves). The portable part lives in
 `<plugin>/manuals/<group>-<id>-manual.md` in this marketplace; the consuming repo keeps only the
-lens in `.claude/plugins/claude-specialists/specialists/<group>-<id>-extension.md`. The agent def points to both.
+lens in `.claude/specialists/lenses/<group>-<id>-extension.md`. The agent def points to both.
 
 **All four groups have now been migrated** — every handbook lives here in the `manuals/` folder of
-its plugin, and every consuming repo keeps only its repo lens in `.claude/plugins/claude-specialists/specialists/`:
+its plugin, and every consuming repo keeps only its repo lens in `.claude/specialists/lenses/`:
 
 - **`specialists` (group 1)** → `specialists/manuals/` (Paula, Rebecca, Vera, Gwen, Cody, Tycho,
   Sylvester, Tessa, Edith, Victor, Sebastian, Ravi, Nolan, Marlowe, Auden).
@@ -108,7 +108,7 @@ deliberately have **no** agent def; their portable source lives in
 `specialists/personas/<group>-<id>-persona.md` as a **self-contained template** (portable body + a
 repo-lens placeholder). The consumer loads the **portable body straight from the plugin install**
 via an `@` import in its `CLAUDE.md` (the orchestrator always, the other personas on demand). The
-local extension `.claude/plugins/claude-specialists/specialists/<group>-<id>-extension.md` is
+local extension `.claude/specialists/lenses/<group>-<id>-extension.md` is
 therefore **lens-only**: only the repo-specific `## Specific to this repo` part, no body copy. The
 drift lint (see the [connectors README](connectors/README.md#maintenance-drift-lint)) recognizes
 such a lens-only extension and reports it as `LENS-ONLY`. The lint's agent-def↔manual coupling
@@ -472,7 +472,8 @@ finish the job without guessing where a roster row ends and the owner's prose be
   skip that says it skipped costs one line and keeps the gate honest.
 - **Lens files off the plugin path.** `.claude/plugins/claude-specialists/` looks like plugin
   property and is in fact git-tracked consumer content — which is exactly why it reads as orphaned
-  debris after an uninstall.
+  debris after an uninstall. **Settled on July 29, 2026** as part of the seam: lenses live in
+  `.claude/specialists/lenses/`, a path that says whose content it is.
 
 **Order matters here.** Every further addition woven into a consumer's `CLAUDE.md` raises the cost of
 the untangling, so the seam is worth settling before more content lands on that path — and

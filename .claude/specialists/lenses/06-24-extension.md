@@ -20,7 +20,7 @@ deduplicates, but which artifacts fall under him here and with which mechanism h
   the specialists system, so a duplication eliminated here propagates through a release to all
   consuming repos.
 - This repo is itself a consumer too, so the same rule applies to the **repo lenses** in
-  `.claude/plugins/claude-specialists/specialists/` wherever those behavioral rules would duplicate.
+  `.claude/specialists/lenses/` wherever those behavioral rules would duplicate.
 
 ### The mechanism in place here
 

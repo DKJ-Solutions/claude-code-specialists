@@ -232,8 +232,9 @@ infrastructure.
   other step copies text into A, the gate must also check where that text was authored.** Ask which file
   the content was *written* in, not which file it ends up in.
 - **A check that scans a file for a token can be satisfied by a *path* containing that token.**
-  `check-roster-sync` looks for each `<group>-<id>` in the roster file, and the bootstrap writes
-  `@.claude/plugins/claude-specialists/specialists/01-01-extension.md` into `CLAUDE.md`. That import
+  `check-roster-sync` looks for each `<group>-<id>` in the roster file, and the bootstrap wrote
+  `@.claude/plugins/claude-specialists/specialists/01-01-extension.md` into `CLAUDE.md` (the pre-seam
+  lens path of the time; since #253 it writes the one seam line instead). That import
   line contains `01-01`, so Chris counts as rostered without a roster row ever existing — measured
   July 29, 2026: 18 ids reported missing after a bootstrap, not 19, with `01-01` the one silently
   passing. It is the worst possible id to lose, because a persona appears in no always-on listing at

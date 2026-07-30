@@ -17,10 +17,12 @@ the governance of the entire specialists system live here.
 
 - **`CLAUDE.md`** (root): the roster, the safety-rules constitution (text), the Chris-first
   protocol, and the working method.
-- **`README.md`** (root) + **`.claude/plugins/claude-specialists/README.md`** (the Specialists handbook): how the marketplace and
+- **`README.md`** (root) + **`.claude/specialists/README.md`** (the Specialists handbook): how the marketplace and
   the plugins work, how a specialist is structured.
+- **`.claude/specialists/SPECIALISTS.md`** — the seam's inclusion file: the roster, the routing, and
+  the two `@`-imports `CLAUDE.md` reaches them through.
 - **The manuals in the plugins** (`<plugin>/manuals/<group>-<id>-manual.md`) and the **repo lenses**
-  in `.claude/plugins/claude-specialists/specialists/`: creating, updating, restructuring.
+  in `.claude/specialists/lenses/`: creating, updating, restructuring.
 - **The agent-def *texts*** (`<plugin>/agents/*.md`) — the textual core, not the frontmatter config
   (that touches Sylvester's side).
 
@@ -28,7 +30,7 @@ the governance of the entire specialists system live here.
 
 - **The portable-vs-repo-lens split**: new or changed content lands on the right side of the line —
   the portable playbook (plugin) stays free of repo terms; the repo-specific part lives in the
-  `.claude/plugins/claude-specialists/specialists/` lens of the consuming repo.
+  `.claude/specialists/lenses/` lens of the consuming repo.
 - **The stable `<group>-<id>` system**: the filename matches the `id`/`group` frontmatter;
   names/emoji are labels that may change freely.
 - **Consistency first**: one source of truth per topic — link from the other docs instead of

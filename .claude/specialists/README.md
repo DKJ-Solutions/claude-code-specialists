@@ -1,4 +1,4 @@
-# .claude/plugins/claude-specialists
+# .claude/specialists
 
 The home of the **Claude Specialists** system *as this repo consumes it itself*, plus the harness it
 runs in. This document is both the floor plan of this directory and the **specialists handbook** —
@@ -16,13 +16,20 @@ themselves**. It is **not a replacement** for the safety rules or the routing.
 
 - The constitution remains [`../../CLAUDE.md#safety-rules`](../../CLAUDE.md#safety-rules).
 - **Chris still takes in and routes every assignment** — see his fixed ritual in
-  [`specialists/01-01-extension.md`](lenses/01-01-extension.md).
+  [`lenses/01-01-extension.md`](lenses/01-01-extension.md).
 
 ## Layout of this directory
 
-- **`plugins/claude-specialists/specialists/`** — the **repo layer** of the specialists system (the
-  repo lenses on the **plugin path**, the standard location): one file per specialist,
-  `<group>-<id>-extension.md`. There are two kinds:
+This directory **is the seam** (issue #221): `../../CLAUDE.md` carries one line —
+`@.claude/specialists/SPECIALISTS.md` — and everything specialist-shaped hangs off it. The point is
+removability: a teardown is "one directory and one line", not an edit through hundreds of woven-in
+lines. It buys nothing in tokens, and must not be sold that way — an imported file loads at launch
+just like inline text.
+
+- **`SPECIALISTS.md`** — the **inclusion**: Chris's body import, his lens import, and this repo's
+  roster + routing. The single file `CLAUDE.md` names.
+- **`lenses/`** — the **repo layer** of the specialists system: one file per specialist,
+  `<group>-<id>-extension.md`, flat (ids are unique family-wide). There are two kinds:
   - **Subagent lens** — for the specialists that come out of the `specialists` plugin as subagents
     (Sylvester, Tessa, Edith, Victor, Tycho, Sebastian, Ravi, Nolan, Marlowe): only the `## Specific to this repo` part, which
     supplements the portable playbook in the plugin with the context of this repo. The subagent
@@ -30,8 +37,9 @@ themselves**. It is **not a replacement** for the safety rules or the routing.
   - **Persona lens (lens-only)** — for the persona-only specialists (Chris, Derek, Rendall), who run
     in the main conversation instead of as subagents. The main loop loads no plugin subagents, so the
     **portable body** comes straight from the plugin install via an `@` import: Chris always
-    (`@~/.claude/plugins/marketplaces/davekjohns-workshop/claude-code-plugins/claude-specialists/specialists/personas/01-01-persona.md`
-    at the bottom of `../../CLAUDE.md`), Derek and Rendall on demand from that same path. The
+    (`@~/.claude/plugins/marketplaces/davekjohns-workshop/claude-code-plugins/claude-specialists/specialists/personas/01-01-persona.md`,
+    stated in [`SPECIALISTS.md`](SPECIALISTS.md) rather than in `CLAUDE.md` itself — the seam spends
+    two of the four allowed import hops), Derek and Rendall on demand from that same path. The
     extension itself is therefore **lens-only**: only the repo-specific `## Specific to this repo`
     part, no copy of the body — just like the subagent lens. That way every portable behavioral rule
     lives in one place (the plugin), not duplicated.
@@ -89,24 +97,25 @@ Small and maintenance-focused. Chris leads; the rest executes.
 
 ## Index of the extensions present
 
-The full roster + routing lives in [`../../CLAUDE.md`](SPECIALISTS.md#the-team-roster--routing);
-the list below is purely navigation to the repo extensions themselves.
+The full roster + routing lives in [`SPECIALISTS.md`](SPECIALISTS.md#the-team-roster--routing) — the
+seam's inclusion file, which `../../CLAUDE.md` imports; the list below is purely navigation to the
+repo lenses themselves.
 
-| # | Specialist | Repo extension | Agent def |
+| # | Specialist | Repo lens | Agent def |
 |---|---|---|---|
-| 01 | Chris 🧭 — Chief of Staff | [`specialists/01-01-extension.md`](lenses/01-01-extension.md) | — (persona-only) |
-| 05 | Derek 🐙 — DevOps Engineer | [`specialists/05-05-extension.md`](lenses/05-05-extension.md) | — (persona-only) |
-| 06 | Rendall 🎬 — Release Manager | [`specialists/05-06-extension.md`](lenses/05-06-extension.md) | — (persona-only) |
-| 07 | Rebecca 🔬 — Research Specialist | [`specialists/03-07-extension.md`](lenses/03-07-extension.md) | `@specialists:rebecca` |
-| 15 | Sylvester ⚙️ — System Administrator | [`specialists/05-15-extension.md`](lenses/05-15-extension.md) | `@specialists:sylvester` |
-| 16 | Tessa 📜 — Technical Writer | [`specialists/06-16-extension.md`](lenses/06-16-extension.md) | `@specialists:tessa` |
-| 17 | Edith 🔍 — Copy Editor | [`specialists/06-17-extension.md`](lenses/06-17-extension.md) | `@specialists:edith` |
-| 18 | Tycho 🧪 — Test Engineer | [`specialists/04-18-extension.md`](lenses/04-18-extension.md) | `@specialists:tycho` |
-| 19 | Victor 🧐 — Code Reviewer | [`specialists/06-19-extension.md`](lenses/06-19-extension.md) | `@specialists:victor` |
-| 23 | Sebastian 🛡️ — Security Engineer | [`specialists/06-23-extension.md`](lenses/06-23-extension.md) | `@specialists:sebastian` |
-| 24 | Ravi ♻️ — Refactoring Specialist | [`specialists/06-24-extension.md`](lenses/06-24-extension.md) | `@specialists:ravi` |
-| 25 | Nolan ⚡ — Performance Engineer | [`specialists/06-25-extension.md`](lenses/06-25-extension.md) | `@specialists:nolan` |
-| 29 | Marlowe 🕵️ — Investigative Journalist | [`specialists/06-29-extension.md`](lenses/06-29-extension.md) | `@specialists:marlowe` |
+| 01 | Chris 🧭 — Chief of Staff | [`lenses/01-01-extension.md`](lenses/01-01-extension.md) | — (persona-only) |
+| 05 | Derek 🐙 — DevOps Engineer | [`lenses/05-05-extension.md`](lenses/05-05-extension.md) | — (persona-only) |
+| 06 | Rendall 🎬 — Release Manager | [`lenses/05-06-extension.md`](lenses/05-06-extension.md) | — (persona-only) |
+| 07 | Rebecca 🔬 — Research Specialist | [`lenses/03-07-extension.md`](lenses/03-07-extension.md) | `@specialists:rebecca` |
+| 15 | Sylvester ⚙️ — System Administrator | [`lenses/05-15-extension.md`](lenses/05-15-extension.md) | `@specialists:sylvester` |
+| 16 | Tessa 📜 — Technical Writer | [`lenses/06-16-extension.md`](lenses/06-16-extension.md) | `@specialists:tessa` |
+| 17 | Edith 🔍 — Copy Editor | [`lenses/06-17-extension.md`](lenses/06-17-extension.md) | `@specialists:edith` |
+| 18 | Tycho 🧪 — Test Engineer | [`lenses/04-18-extension.md`](lenses/04-18-extension.md) | `@specialists:tycho` |
+| 19 | Victor 🧐 — Code Reviewer | [`lenses/06-19-extension.md`](lenses/06-19-extension.md) | `@specialists:victor` |
+| 23 | Sebastian 🛡️ — Security Engineer | [`lenses/06-23-extension.md`](lenses/06-23-extension.md) | `@specialists:sebastian` |
+| 24 | Ravi ♻️ — Refactoring Specialist | [`lenses/06-24-extension.md`](lenses/06-24-extension.md) | `@specialists:ravi` |
+| 25 | Nolan ⚡ — Performance Engineer | [`lenses/06-25-extension.md`](lenses/06-25-extension.md) | `@specialists:nolan` |
+| 29 | Marlowe 🕵️ — Investigative Journalist | [`lenses/06-29-extension.md`](lenses/06-29-extension.md) | `@specialists:marlowe` |
 
 The rest of the `specialists` plugin (Paula #09, Vera #11, Gwen #12, Cody #13, Auden #30) is also enabled and
 invocable as `@specialists:<name>`, but rarely has work in this repo and therefore has no repo lens

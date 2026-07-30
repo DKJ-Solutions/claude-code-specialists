@@ -40,8 +40,8 @@ the skill from step 2) available.
 
 **Step 2 — run the bootstrap skill.** In the new session, invoke `specialists-init`. It sets up —
 purely additively, without overwriting anything — the **lens-only** persona lenses (including
-Chris) + an empty repo-lens scaffold per specialist on the **plugin path**
-(`.claude/plugins/claude-specialists/<plugin>/`), the two Chris `@`-imports in your `CLAUDE.md`
+Chris) + an empty repo-lens scaffold per specialist in **the seam**
+(`.claude/specialists/lenses/`), the two Chris `@`-imports in your `CLAUDE.md`
 (his portable body from the plugin install + his repo lens), and a proposal for safety settings
 (`settings.suggested.jsonc`, for your own
 review). The details of this path are in the
@@ -50,7 +50,7 @@ as "step 0" (the enabling above) and "step 1" (the skill).
 
 **Step 3 — restart and verify.** Start again and check that Chris takes the floor (every turn opens
 with a sender header such as `🧭 Chris — intake & routing`). Then, at your own pace, fill in the
-repo lenses on the plugin path (`.claude/plugins/claude-specialists/<plugin>/`): that is where you tell each specialist what it serves in your repo.
+repo lenses in the seam (`.claude/specialists/lenses/`): that is where you tell each specialist what it serves in your repo.
 The worker specialists can be invoked directly as `@specialists:<name>`.
 
 ## Staying up to date
@@ -88,5 +88,5 @@ The only reliable check is the slash list itself.
   [issue template](../../.github/ISSUE_TEMPLATE/inbound-improvement.md) is ready for that. The
   workshop processes it through its own chain, and the improvement comes back to all consumers via
   a release.
-- **Repo-specific additions** belong in your own repo lenses on the plugin path
-  (`.claude/plugins/claude-specialists/<plugin>/`) — those are yours and do not travel with the plugin.
+- **Repo-specific additions** belong in your own repo lenses in the seam
+  (`.claude/specialists/lenses/`) — those are yours and do not travel with the plugin.

@@ -132,8 +132,8 @@ structural path difference.
   model: repo-specific content belongs in the `## Specific to this repo` slot (the lens), and a
   desired change to the portable part goes through the inbound route above — never as a permanent
   local divergence. So the check does not need to facilitate or mark deliberate drift.
-- **Lens-only personas produce no body drift.** A correctly set-up persona lens (on the plugin
-  path `.claude/plugins/claude-specialists/<plugin>/`) no longer carries a body copy -- the
+- **Lens-only personas produce no body drift.** A correctly set-up persona lens (in the seam,
+  `.claude/specialists/lenses/`) no longer carries a body copy -- the
   portable body comes from the plugin install via an `@`-import. Since #64 the index line is
   location-independent plain text (no path-depth link), so there is nothing left to normalize.
   `check-consumer-drift.ps1` recognizes the `> Repo-lens (lens-only persona)` blockquote and
