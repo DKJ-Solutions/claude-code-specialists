@@ -172,6 +172,16 @@ use single quotes), and pass text that genuinely needs them through a file —
 `git commit -F <file>`, `gh … --body-file` — exactly as `open-pr.ps1` already delivers the PR body
 via a temporary file.
 
+**A multiline body is the same trap one level up, and it fails differently (lesson of July 30, 2026).**
+A `--comment`/`--body` argument holding newlines does not get mangled — it gets **split**: PowerShell
+hands each line to the exe as its own argument, and `gh` answers `accepts 1 arg(s), received 4`. Worse
+is the half-success: `gh issue close 275 --comment "<multiline>"` **closed the issue and dropped the
+comment**, reporting only the close. So the rule is not "quote it carefully" but **never pass a
+multiline body inline** — write it to a file and use `--body-file` (`gh issue comment <n> --body-file`,
+`gh pr create --body-file`; note `gh issue close` has no `--body-file`, so comment first, then close).
+And after any `gh` call that was supposed to leave text behind, verify the text is there rather than
+trusting the exit line — this one printed its success while silently dropping half the work.
+
 ### Branch & repo hygiene
 
 - Everything goes through a `feat/`/`fix/`/`docs/`/`chore/` branch + PR to `main` — **no direct
