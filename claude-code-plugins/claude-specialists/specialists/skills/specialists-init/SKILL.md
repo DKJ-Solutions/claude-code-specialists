@@ -6,7 +6,7 @@ description: >-
   body from the plugin install + his lens-only repo lens), put the other main-loop personas (Derek,
   Rendall) and the subagents in place as lens-only scaffolds in the seam plus the script-config scaffolds, and
   deliver a governance/safety-hooks proposal.
-  Use this when the shared `specialists` plugin is enabled but the conductor and the
+  Use this when the shared `specialists` plugin is installed and enabled but the conductor and the
   governance layer are still missing ("the workers are there, Chris is not").
 ---
 
@@ -29,9 +29,11 @@ up, plus the governance and safety layer that differs per repo.
 
 ## Chicken-and-egg — step 0 is done by the user
 
-This skill lives inside the `specialists` plugin. A plugin skill only becomes available after the
-repo has enabled the plugin **and the session has been restarted**. So the skill cannot hook itself
-up. Step 0 is therefore manual — verify that the consumer already has this in `.claude/settings.json`:
+This skill lives inside the `specialists` plugin, so it only becomes available once the plugin is
+**installed for this repo** and the session has been restarted. The skill cannot hook itself up. Step 0
+is therefore manual, and it is **three acts, in this order**.
+
+**0a — enable.** Verify that the consumer has this in `.claude/settings.json`:
 
 ```jsonc
 "extraKnownMarketplaces": {
@@ -43,8 +45,28 @@ up. Step 0 is therefore manual — verify that the consumer already has this in 
 }
 ```
 
-If that is not there, put it in first, **restart the session**, and then invoke this skill again.
-If it is there, continue.
+**0b — install, per plugin, from the repo root.** Those settings keys on their own install nothing.
+A plugin install is **project-scoped**: `~/.claude/plugins/installed_plugins.json` keys every install
+by `projectPath`, and `enabledPlugins` + `extraKnownMarketplaces` produce no entry for this repo by
+themselves. So run, from the root of the consuming repo, one command per plugin listed in
+`enabledPlugins`:
+
+```powershell
+claude plugin install specialists@davekjohns-workshop
+# plus each domain plugin, e.g.:
+claude plugin install specialists-shopify@davekjohns-workshop
+```
+
+**0c — restart, then verify before invoking.** After the restart, `claude plugin list` must report
+every plugin from `enabledPlugins` as `enabled`. Run that check rather than assuming it, because
+**the failure it catches is silent and self-camouflaging**: in a session where the install never
+happened, this skill is absent *and* the session-start hooks are absent — and "no hooks because the
+plugin is not loaded" reads exactly like "no hooks because everything is in order". Nothing else in
+the session tells the two apart. One caveat on reading that list: it can show the same plugin more
+than once for a repo (one line per project record in `~/.claude.json`, sometimes several versions and
+path spellings side by side). What you need from it is that each plugin appears as `enabled` at all.
+
+Once the list is green, invoke this skill.
 
 ## What the skill does
 

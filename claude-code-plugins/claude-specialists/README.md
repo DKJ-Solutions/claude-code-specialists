@@ -325,9 +325,21 @@ The body is therefore ready and the switch is not thrown. Flipping it is Dave's 
 instead of an unknown: the collision resolves silently and positionally, so a consumer who enables a
 second `agent`-setting plugin gets a different orchestrator without being told.
 
-- **Step 0 (manual).** Put the marketplace source + `enabledPlugins` in `.claude/settings.json`
-  (see [Consumption](../../README.md#consumption) in the root README) and **restart** the session —
-  only then is the skill available.
+- **Step 0 (manual, three acts in order).** Put the marketplace source + `enabledPlugins` in
+  `.claude/settings.json` (see [Consumption](../../README.md#consumption) in the root README), then run
+  `claude plugin install <plugin>@<marketplace>` **from the consumer's root, once per enabled plugin**,
+  then **restart** the session — only then is the skill available.
+
+  > **The install is not a formality, and leaving it out fails silently** (inbound
+  > [#274](https://github.com/DaveKJohn/davekjohns-workshop/issues/274), measured in a consumer during
+  > the 3.0.0 adoption round). An install is **project-scoped** — `installed_plugins.json` keys every
+  > record by `projectPath` — so the two settings keys plus a restart produce *no* install and no error.
+  > What the reader gets instead is a session with neither the skill nor the session-start hooks, which
+  > is indistinguishable from a healthy one: "no hooks because the plugin is not loaded" and "no hooks
+  > because all is well" print the same nothing. Hence the one-command self-check before step 1:
+  > `claude plugin list` must report every plugin from `enabledPlugins` as `enabled`. This documentation
+  > path is the only thing a new consumer has, because until the plugin loads, the skill that would say
+  > otherwise does not exist.
 - **Step 1 (the skill).** Invoke `specialists-init`. The bundled
   [`bootstrap.ps1`](specialists/skills/specialists-init/bootstrap.ps1) performs only **additive**
   actions: for a **fresh** consumer it writes the seam — lens-only persona templates and an empty

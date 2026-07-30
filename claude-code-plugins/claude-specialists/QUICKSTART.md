@@ -19,8 +19,9 @@ meant for is covered in the [family README](README.md).
 
 ## Connecting in three steps
 
-**Step 1 — enable the plugins.** In your repo's `.claude/settings.json`, set the marketplace source
-and the plugins you want (always the core; a domain group only if your repo has that domain):
+**Step 1 — enable *and* install the plugins.** In your repo's `.claude/settings.json`, set the
+marketplace source and the plugins you want (always the core; a domain group only if your repo has
+that domain):
 
 ```jsonc
 // .claude/settings.json (your repo)
@@ -35,18 +36,29 @@ and the plugins you want (always the core; a domain group only if your repo has 
 ```
 
 This repo is public, so the source can be read without GitHub authentication; Claude Code clones
-and caches it by itself. **Then restart your Claude Code session** — only then are the plugins (and
-the skill from step 2) available.
+and caches it by itself. **Those keys do not install anything, though** — an install is *per repo*,
+so run one command per plugin you listed, from the root of your repo:
+
+```powershell
+claude plugin install specialists@davekjohns-workshop
+# and the same line again for each domain group you enabled
+```
+
+**Then restart your Claude Code session** and check that it worked: `claude plugin list` must show
+every plugin you listed as `enabled`. Do run that check — if the install did not happen, the skill
+from step 2 and the session hooks are simply absent, and that looks exactly like a session where
+everything is fine. (The list may show the same plugin more than once, one line per project record
+Claude Code holds for your repo; all you need is that it appears as `enabled`.)
 
 **Step 2 — run the bootstrap skill.** In the new session, invoke `specialists-init`. It sets up —
 purely additively, without overwriting anything — the **lens-only** persona lenses (including
 Chris) + an empty repo-lens scaffold per specialist in **the seam**
-(`.claude/specialists/lenses/`), the two Chris `@`-imports in your `CLAUDE.md`
-(his portable body from the plugin install + his repo lens), and a proposal for safety settings
-(`settings.suggested.jsonc`, for your own
+(`.claude/specialists/lenses/`), one `@`-import at the bottom of your `CLAUDE.md` pointing at that
+seam (which in turn imports Chris's portable body from the plugin install + his repo lens), and a
+proposal for safety settings (`settings.suggested.jsonc`, for your own
 review). The details of this path are in the
 [family README › Adoption](README.md#adoption-the-bootstrap-path) — which counts the steps there
-as "step 0" (the enabling above) and "step 1" (the skill).
+as "step 0" (enabling + installing, above) and "step 1" (the skill).
 
 **Step 3 — restart and verify.** Start again and check that Chris takes the floor (every turn opens
 with a sender header such as `🧭 Chris — intake & routing`). Then, at your own pace, fill in the
