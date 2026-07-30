@@ -689,11 +689,23 @@ $importBlock
         # teardown -> init round-trip cannot accumulate copies of it. Matches the literal generated
         # sentence only: a consumer who reworded or translated it has authored that text, and this
         # must not touch it.
+        # $keptLines, NOT $kept: $kept is the persona-lens "already present" COUNTER declared at the
+        # top of this script, and assigning an array to it here silently destroyed the final report --
+        # PowerShell then interpolated the whole of CLAUDE.md into the summary line where a number
+        # belonged. Measured 2026-07-30 against a consumer that already had its own CLAUDE.md.
+        #
+        # WHY NO TEST CAUGHT IT, which is the part worth keeping: this block runs ONLY when the
+        # consumer already has a CLAUDE.md without the guard import -- i.e. on exactly the path a real
+        # adoption takes, and never on the path where the report is asserted. A fresh fixture with no
+        # CLAUDE.md takes the other branch, so every suite stayed green while the normal case printed
+        # garbage. Third instance of the same lesson in this repo (the $pid note in check-roster-sync,
+        # and the shared-counter collision here): a name reused for a second purpose in the same scope
+        # breaks somewhere else entirely, and the report is the last place anyone looks.
         $mdLines = @($md -split "`r?`n")
-        $kept = @($mdLines | Where-Object { $_.Trim() -ne $importNote })
-        $dropped = $mdLines.Count - $kept.Count
+        $keptLines = @($mdLines | Where-Object { $_.Trim() -ne $importNote })
+        $dropped = $mdLines.Count - $keptLines.Count
         if ($dropped -gt 0) {
-            $md = $kept -join "`n"
+            $md = $keptLines -join "`n"
             Write-Host "  [tidy]   removed $dropped leftover orchestrator note line(s) from a previous cycle." -ForegroundColor DarkGray
         }
         # Match the file's own line endings. WriteAllText with a "`n"-built block used to paste LF
