@@ -362,7 +362,11 @@ if (Test-Path -LiteralPath $settings -PathType Leaf) {
         $notes += ".claude/settings.json still enables the plugin. That file is yours -- this script never edits it. Remove the entry from 'enabledPlugins' (and the marketplace source, if nothing else uses it), then restart the session. Until then the subagents and the session hooks stay active."
     }
 }
-$notes += "The plugin install itself is untouched: run 'claude plugin uninstall' if you want it gone from this machine as well."
+# The scope flag is not decoration: 'claude plugin uninstall' defaults to --scope user (verified via
+# its own --help, July 30, 2026), so on a project-scoped install -- which is the model this family
+# documents -- the bare command targets a record that is not there. Same default, and same failure,
+# as 'plugin install' and 'plugin update' (inbound #279).
+$notes += "The plugin install itself is untouched: run 'claude plugin uninstall <plugin>@<marketplace> --scope project' from this repo's root if you want it gone here as well. The scope flag matters -- the command defaults to user scope and will not find a project-scoped install without it."
 
 # --- 6. Runtime dependencies on the plugin: reported loudly, never removed ------------------------
 # The finding that made this section necessary (measured by hand in davekokbwj/smartwatchbanden,

@@ -327,8 +327,8 @@ second `agent`-setting plugin gets a different orchestrator without being told.
 
 - **Step 0 (manual, three acts in order).** Put the marketplace source + `enabledPlugins` in
   `.claude/settings.json` (see [Consumption](../../README.md#consumption) in the root README), then run
-  `claude plugin install <plugin>@<marketplace>` **from the consumer's root, once per enabled plugin**,
-  then **restart** the session — only then is the skill available.
+  `claude plugin install <plugin>@<marketplace> --scope project` **from the consumer's root, once per
+  enabled plugin**, then **restart** the session — only then is the skill available.
 
   > **The install is not a formality, and leaving it out fails silently** (inbound
   > [#274](https://github.com/DaveKJohn/davekjohns-workshop/issues/274), measured in a consumer during
@@ -336,10 +336,22 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > record by `projectPath` — so the two settings keys plus a restart produce *no* install and no error.
   > What the reader gets instead is a session with neither the skill nor the session-start hooks, which
   > is indistinguishable from a healthy one: "no hooks because the plugin is not loaded" and "no hooks
-  > because all is well" print the same nothing. Hence the one-command self-check before step 1:
-  > `claude plugin list` must report every plugin from `enabledPlugins` as `enabled`. This documentation
-  > path is the only thing a new consumer has, because until the plugin loads, the skill that would say
-  > otherwise does not exist.
+  > because all is well" print the same nothing.
+  >
+  > **`--scope project` carries that same weight, and so does the matching `claude plugin update
+  > <plugin>@<marketplace> --scope project`** (inbound
+  > [#279](https://github.com/DaveKJohn/davekjohns-workshop/issues/279), the 3.0.1 round). Both
+  > commands default to `--scope user`; the install then writes a machine-wide record with no
+  > `projectPath`, and the update refuses outright on a project-scoped install. Project scope is the
+  > intended model for this family (Dave, July 30, 2026) — it is what keeps a consumer pinned to the
+  > version it was tested against, and every other document here assumes it.
+  >
+  > **Verify with the `projectPath` record, not with `claude plugin list`** — that command is not
+  > repo-scoped and reported a plugin as `enabled`, at `project` scope, in this very repo while it
+  > held no install record of its own and loaded nothing. The exact query is in
+  > [`specialists-init` step 0c](specialists/skills/specialists-init/SKILL.md). This documentation
+  > path is the only thing a new consumer has, because until the plugin loads, the skill that would
+  > say otherwise does not exist.
 - **Step 1 (the skill).** Invoke `specialists-init`. The bundled
   [`bootstrap.ps1`](specialists/skills/specialists-init/bootstrap.ps1) performs only **additive**
   actions: for a **fresh** consumer it writes the seam — lens-only persona templates and an empty
