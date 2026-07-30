@@ -615,7 +615,13 @@ $claudeMd = Join-Path $ConsumerRoot 'CLAUDE.md'
 # paragraph included. One extra copy per teardown->init cycle, counted 1 -> 2 -> 3, and no gate
 # reported it. Idempotence has to cover everything the script WRITES, not just the line it happens
 # to look for.
-$importNote = 'The orchestrator (Chris) is always loaded -- portable body from plugin install and repo lens'
+#
+# SECOND TIME (inbound #271): the note is TWO lines -- this head plus a generated tail -- and both this
+# guard and the teardown matched the head only, each by re-typing the literal. So the tail orphaned and
+# accumulated, invisibly, because every counter keys on the head. The head now comes from
+# Get-OrchestratorNote in check-report-lib.ps1, and both removers use Test-IsOrchestratorNoteLine from
+# that same source: a literal mirrored by hand in two scripts is what caused this.
+$importNote = (Get-OrchestratorNote).Head
 # Inside SPECIALISTS.md the same sentence needs no "from ..." tail: the reader is already in the file.
 $importNoteSeam = $importNote + ' from `lenses/`.'
 
@@ -702,7 +708,9 @@ $importBlock
         # and the shared-counter collision here): a name reused for a second purpose in the same scope
         # breaks somewhere else entirely, and the report is the last place anyone looks.
         $mdLines = @($md -split "`r?`n")
-        $keptLines = @($mdLines | Where-Object { $_.Trim() -ne $importNote })
+        # Filters the whole note BLOCK (head + either tail), not just the head -- the omission behind
+        # inbound #271. One source with the teardown: Test-IsOrchestratorNoteLine.
+        $keptLines = @($mdLines | Where-Object { -not (Test-IsOrchestratorNoteLine -Line $_) })
         $dropped = $mdLines.Count - $keptLines.Count
         if ($dropped -gt 0) {
             $md = $keptLines -join "`n"
