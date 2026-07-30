@@ -544,6 +544,43 @@ function Get-LintScript { return `$script:LintScript }
     Assert-Equal $hashBranch (Get-FileHash -LiteralPath (Join-Path $Fixture 'scripts\lib\branch-info.ps1')).Hash 'occupied: branch taxonomy still byte-identical after the full round trip'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture '.claude\specialists'))) 'occupied: what the plugin DID write is gone -- the seam directory'
     Assert-True ([System.IO.File]::ReadAllText((Join-Path $Fixture 'CLAUDE.md')) -match 'Feature work goes on a branch') "occupied: the consumer's own prose survived both directions"
+    # The occupied repo-config has Get-RepoName but none of the plugin's own contract functions -- which
+    # is normal for a file that predates the plugin. Keeping it is right; saying nothing about it left the
+    # consumer with [ERROR] lines at every session start and nothing tying them to this moment.
+    Assert-True ($ob.Out -match 'it does not define .*Get-RosterPath') 'occupied: the bootstrap names the contract functions the kept file lacks'
+    Assert-True (-not ($ob.Out -match 'it does not define .*Get-RepoName')) 'occupied: and names ONLY the missing ones -- Get-RepoName is present, so it is not listed'
+
+    # --- The four secondary findings from inbound #271 ------------------------------------------------
+    Write-Host "inbound #271 secondaries -- possessives, preview scope, and an authorship claim" -ForegroundColor Cyan
+    if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'scripts\lib') -Force | Out-Null
+    # A Dutch possessive takes no apostrophe, so the old trailing \b rejected it -- a false NEGATIVE in a
+    # scan that documents itself as biased toward over-reporting. Every non-English consumer, not an edge.
+    [System.IO.File]::WriteAllLines((Join-Path $Fixture 'CLAUDE.md'), @(
+        '# My repo', '',
+        '- Dereks taak is de PR openen.',
+        "- Tessa's manual is leidend.",
+        '- Niets over specialisten in deze regel.'))
+    [System.IO.File]::WriteAllLines((Join-Path $Fixture 'scripts\repo-config.ps1'), @(
+        '$script:RepoName = "me/mine"', 'function Get-RepoName { return $script:RepoName }'))
+    $s1 = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
+    Assert-Equal 0 $s1.Code 'secondaries: exit-code 0'
+    Assert-True ($s1.Out -match "CLAUDE\.md:3 -- name 'Dereks'") "secondaries: the Dutch possessive 'Dereks' is found -- it was invisible behind the trailing word boundary"
+    Assert-True ($s1.Out -match "CLAUDE\.md:4 -- name 'Tessa's'") "secondaries: the English possessive is found too"
+    Assert-True (-not ($s1.Out -match 'CLAUDE\.md:5')) 'secondaries: a line naming no specialist is still not a hit -- the looser boundary did not make it match everything'
+    Assert-True ($s1.Out -match "not recognised as an unfilled scaffold; it holds this repo's repo config") 'secondaries: the per-item KEEP line no longer claims the file was "filled in"'
+    Assert-True (-not ($s1.Out -match '\[KEEP\].*filled in')) 'secondaries: no KEEP line asserts authorship the script cannot establish'
+
+    # The dry-run preview used to be swamped by the lens files the SAME run listed under [remove]: they
+    # all mention a specialist, they filled the 40-line cap, and the hits that matter only appeared after
+    # -Apply. A reference inside a file that is going away is not a surviving reference.
+    Write-Host "inbound #271 -- the dry-run audit excludes what the same run is about to delete" -ForegroundColor Cyan
+    New-BootstrappedConsumer | Out-Null
+    $prev = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
+    Assert-Equal 0 $prev.Code 'preview scope: exit-code 0'
+    Assert-True (-not ($prev.Out -match '(?m)^\s*\[LIVE\]\s+\.claude')) 'preview scope: no lens file appears as a LIVE hit -- every one of them is on the [remove] list'
+    Assert-True ($prev.Out -match 'were excluded -- a reference inside a file that is going away is not a leftover') 'preview scope: the exclusion is stated, not silent'
+    Assert-True ($prev.Out -match 'would remove') 'preview scope: on a dry run it says "would remove", not "removed"'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
