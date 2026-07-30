@@ -22,6 +22,11 @@
 
     Supplies:
       - Write-Ok / Write-Skip                        -- plain report lines, no counting.
+      - Write-Coverage                               -- ONE non-counting [COVERAGE] line per category
+                                                          stating how many items it examined, so a
+                                                          verdict is never read without its coverage
+                                                          and an empty category announces itself
+                                                          instead of passing in silence (issue #221).
       - Write-Info / Write-Failure                       -- report lines that also bump
                                                           $script:infos / $script:errors.
       - Write-CheckSummary                            -- the "Summary: N error(s), N info
@@ -123,6 +128,44 @@ function Write-Ok   ([string]$Msg) { Write-Host "  [OK]    $Msg" -ForegroundColo
 function Write-Skip ([string]$Msg) { Write-Host "  [SKIP]  $Msg" -ForegroundColor DarkGray }
 function Write-Info ([string]$Msg) { $script:infos++;  Write-Host "  [INFO]  $(Format-CheckScoped $Msg)" -ForegroundColor Yellow }
 function Write-Failure ([string]$Msg) { $script:errors++; Write-Host "  [ERROR] $(Format-CheckScoped $Msg)" -ForegroundColor Red }
+
+function Write-Coverage {
+    <# ONE [COVERAGE] line stating how many items a category actually examined -- so a verdict is
+       never read without its coverage (issue #221).
+
+       THE DEFECT THIS EXISTS FOR, measured 2026-07-30. check-consumer-drift's persona section ended
+       with "Persona drift is INFORMATIONAL: 0 drifted." Run against a repo holding no lens files at
+       all, it printed exactly that: a clean verdict over four personas it never compared. "0 drifted
+       out of 0 compared" and "0 drifted out of 4 compared" were the same sentence, and the reader had
+       no way to tell a torn-down repo from a healthy one. A gate that iterates a category and finds it
+       empty must SAY the category was empty; the alternative is not a false pass, it is worse -- a
+       true statement that reads as a different, false one.
+
+       Right for a deliberate teardown, wrong for an accidental loss: a silent skip cannot distinguish
+       an operator's removal from a bad merge or a wrong path, and the one line it costs is what keeps
+       the gate honest.
+
+       [COVERAGE] is a NON-COUNTING token, like [OK]/[SKIP]/[SCOPE]: coverage is context about the
+       run, not a finding about the repo, so it must never move an exit code or a signal count. A
+       category that is legitimately empty is not an error -- it is a fact the reader needs.
+
+       -Of is optional: pass it when the category has a known denominator (4 personas exist, 0 were
+       compared), omit it when the count IS the whole story (57 files scanned). -Note carries the
+       reason an empty category is empty, which is the part a reader cannot infer from a zero. #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Category,
+        [Parameter(Mandatory = $true)][int]$Checked,
+        [int]$Of = -1,
+        [string]$Note = ''
+    )
+    $what = if ($Of -ge 0) { "checked $Checked of $Of" } else { "checked $Checked" }
+    $msg = "[$Category] $what"
+    if ($Note) { $msg += " -- $Note" }
+    # An empty category is the case this helper exists to make visible, so it is the one that does not
+    # blend into the dark-gray run chatter.
+    $color = if ($Checked -eq 0) { 'Yellow' } else { 'DarkGray' }
+    Write-Host "  $msg" -ForegroundColor $color
+}
 
 function Write-CheckSummary {
     <# Prints "Summary: N error(s), N info signal(s)." (green if no errors, red otherwise) and

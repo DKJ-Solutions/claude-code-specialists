@@ -111,6 +111,9 @@ $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $IntegritySrc      = Join-Path $RepoRoot 'scripts\lint\check-plugin-integrity.ps1'
 $AgentSharedLibSrc = Join-Path $RepoRoot 'scripts\lib\agent-shared-lib.ps1'
 $SharedScriptsLibSrc = Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1'
+# Third dot-sourced dependency since #221: check-report-lib.ps1, for the non-counting Write-Coverage
+# line every category closes with. Copied like the other two, so the fixture runs the REAL script.
+$CheckReportLibSrc = Join-Path $RepoRoot 'scripts\lib\check-report-lib.ps1'
 $Fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("check-plugin-integrity-test-$PID")
 
 $script:pass = 0
@@ -158,6 +161,7 @@ try {
     Copy-Item -Path $IntegritySrc -Destination (Join-Path $Fixture 'scripts\lint\check-plugin-integrity.ps1') -Force
     Copy-Item -Path $AgentSharedLibSrc -Destination (Join-Path $Fixture 'scripts\lib\agent-shared-lib.ps1') -Force
     Copy-Item -Path $SharedScriptsLibSrc -Destination (Join-Path $Fixture 'scripts\lib\shared-scripts-lib.ps1') -Force
+    Copy-Item -Path $CheckReportLibSrc -Destination (Join-Path $Fixture 'scripts\lib\check-report-lib.ps1') -Force
 
     $skillAlphaMd = "---`nname: skill-alpha`ndescription: Fixture skill alpha.`n---`n`n# Skill Alpha`n"
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'claude-code-plugins\claude-specialists\specialists\skills\skill-alpha\SKILL.md'), $skillAlphaMd, $Utf8NoBom)
@@ -527,6 +531,35 @@ try {
     Remove-Item -LiteralPath $entryPath -Force
     $r17 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($r17.Out -match [regex]::Escape('fix-my-branch.md'))) 'scenario 16: after the fold removes it, the entry file is gone from the set without complaint'
+
+    # --- [COVERAGE]: every category states what it examined, and an empty one says so (issue #221) ---
+    # This fixture is the ideal witness and always has been: it carries no agent def, no manual, no
+    # persona, no plugin manifest and no lens tree, so those categories are GENUINELY empty. Before
+    # #221 the run was therefore green while silently checking nothing in half its categories -- the
+    # docstring above even records that as "expected noise, asserted on nowhere below". It is asserted
+    # on now: a category that finds nothing must say the number out loud.
+    #
+    # Deliberately asserts the ZERO cases (the ones that used to be invisible) AND two non-zero cases,
+    # because a coverage line that always printed "0" would satisfy the first half while being useless.
+    Write-Host "[COVERAGE] every category reports its count, and an empty category is visible" -ForegroundColor Cyan
+    $rc = Invoke-Integrity -FixtureRoot $Fixture
+    foreach ($cat in @('agent-def', 'manual', 'persona', 'specialist', 'shared', 'release-card')) {
+        Assert-True ($rc.Out -match "\[$([regex]::Escape($cat))\] checked 0\b") `
+            "coverage: the genuinely empty category '$cat' reports 'checked 0' instead of staying silent"
+    }
+    Assert-True ($rc.Out -match '\[link-scan/lenses\] checked 0\b') `
+        'coverage: the lens category -- the one a teardown removes -- reports 0 on a repo with no lens tree'
+    Assert-True ($rc.Out -match '\[link-scan/lenses\] checked 0 -- no repo-lens file') `
+        'coverage: the empty lens category also states WHY it is empty, so a reader can tell a teardown from a loss'
+    Assert-True ($rc.Out -match '\[link-scan\] checked [1-9]') `
+        'coverage: a non-empty category reports its real count -- the line is not hardcoded to 0'
+    Assert-True ($rc.Out -match '\[parse\] checked [1-9]') `
+        'coverage: parse counts the .ps1 files it actually parsed (the copied script + its libs)'
+    # Coverage is context, never a finding: it must not move the exit code or manufacture an error.
+    # Scenario 16 left the fixture with a real finding, so this run legitimately exits 1 -- what is
+    # asserted here is that no coverage line was itself counted as one.
+    Assert-True (-not ($rc.Out -match '(?m)^\s*\[COVERAGE\]')) `
+        'coverage: the token is the category name, not a literal [COVERAGE] tag -- one line per category, no extra noise'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

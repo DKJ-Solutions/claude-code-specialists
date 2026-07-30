@@ -470,6 +470,26 @@ finish the job without guessing where a roster row ends and the owner's prose be
   once the directory is gone: green, and checking nothing. Right for a deliberate teardown, wrong for an
   accidental loss — a silent skip cannot tell an operator's removal from a bad merge or a wrong path. A
   skip that says it skipped costs one line and keeps the gate honest.
+
+  **Settled on July 30, 2026, and the defect was sharper than this bullet described.** The gate did not
+  skip the category quietly and print nothing; it printed a **verdict with no coverage**.
+  `check-consumer-drift`'s persona section closed with *"Persona drift is INFORMATIONAL: 0 drifted."* —
+  and against a repo with no lens files at all, that was the whole output of the section. *"0 drifted of
+  0 compared"* and *"0 drifted of 4 compared"* were the same sentence. Not a false pass: a true
+  statement that reads as a different, false one, which is harder to catch than silence.
+
+  The fix is one shared, non-counting `Write-Coverage` helper in `scripts/lib/check-report-lib.ps1` —
+  plugin-owned, so it travels — and a `[COVERAGE]` line closing **every** category in
+  `check-plugin-integrity` (ten of them) and the persona section of `check-consumer-drift`. Coverage is
+  context, never a finding: it moves no exit code and no signal count, because a legitimately empty
+  category must not break its own gate. Applied to all ten deliberately — a partial rollout recreates
+  exactly the asymmetry that caused this, and the lens category (the one a teardown removes) is counted
+  separately from the scan total for the same reason.
+
+  **What this cannot reach, stated plainly rather than implied.** A consumer's *own* lint — the script
+  its `Get-LintScript` points at — is the repo owner's code. No plugin can make it honest; the helper is
+  available to it, and adopting it is the owner's act. The measured repo's silent skip lives there, and
+  it is listed here as the owner's item, not as one this family can close for them.
 - **Lens files off the plugin path.** `.claude/plugins/claude-specialists/` looks like plugin
   property and is in fact git-tracked consumer content — which is exactly why it reads as orphaned
   debris after an uninstall. **Settled on July 29, 2026** as part of the seam: lenses live in

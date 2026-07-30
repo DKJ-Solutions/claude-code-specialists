@@ -306,6 +306,33 @@ try {
     Assert-Equal 0 $d1.Code 'drift exit 0 (no agent-def drift)'
     Assert-True ($d1.Out -match 'LENS-ONLY\] 01-01-persona') 'persona 01-01 reported as LENS-ONLY'
     Assert-True (-not ($d1.Out -match 'DRIFTED\]')) 'no DRIFTED at all on a fresh bootstrap'
+    # A verdict travels with its coverage (issue #221): on a bootstrapped consumer the personas were
+    # genuinely examined, so the count must say so rather than leaving "0 drifted" to be interpreted.
+    Assert-True ($d1.Out -match '\[personas\] checked [1-9]') 'coverage: the personas it DID compare are counted'
+    Assert-True ($d1.Out -match 'drifted of [1-9]\d* compared') 'coverage: the verdict names its own denominator'
+
+    # --- 3a. The silent-skip case: a consumer with NO lens file at all (issue #221) ---------------
+    # THE DEFECT THIS GUARDS, measured 2026-07-30. The persona section used to be wrapped in
+    # `if ($personaResults.Count -gt 0)` and closed with "Persona drift is INFORMATIONAL: 0 drifted."
+    # Against a repo holding no lens files -- a torn-down consumer, a bad merge, a wrong -ConsumerPath
+    # -- that printed a clean persona verdict over personas it had never compared, and "0 drifted of 0
+    # compared" was word-for-word the same sentence as "0 drifted of 4 compared". Right for a
+    # deliberate teardown, wrong for an accidental loss, and indistinguishable between them.
+    Write-Host "check-consumer-drift.ps1 -- a consumer with no lens tree says so (issue #221)" -ForegroundColor Cyan
+    $bare = Join-Path ([System.IO.Path]::GetTempPath()) "drift-bare-consumer-$PID"
+    if (Test-Path -LiteralPath $bare) { Remove-Item -Recurse -Force -LiteralPath $bare }
+    New-Item -ItemType Directory -Path $bare -Force | Out-Null
+    try {
+        [System.IO.File]::WriteAllText((Join-Path $bare 'CLAUDE.md'), "# A repo that never adopted, or just tore down`n", $Utf8NoBom)
+        $d0 = Invoke-Script -Path $DriftLint -ScriptArgs @('-ConsumerPath', $bare, '-Quiet')
+        Assert-Equal 0 $d0.Code 'bare consumer: exit 0 -- an empty category is not a failure'
+        Assert-True ($d0.Out -match 'Personas \(portable body') 'bare consumer: the persona SECTION is printed at all -- it used to vanish entirely'
+        Assert-True ($d0.Out -match '\[personas\] checked 0 of [1-9]') 'bare consumer: 0 compared out of the personas that exist -- the zero is stated, not implied'
+        Assert-True ($d0.Out -match 'the consumer holds no lens file for any persona') 'bare consumer: the line says WHY, so a teardown is distinguishable from a loss'
+        Assert-True ($d0.Out -match 'drifted of 0 compared') 'bare consumer: the verdict carries its denominator, so "0 drifted" cannot read as "all clean"'
+    } finally {
+        if (Test-Path -LiteralPath $bare) { Remove-Item -Recurse -Force -LiteralPath $bare -ErrorAction SilentlyContinue }
+    }
 
     # --- 3b. Root fix #64: the index line is location-independent (no path-depth link) ------------
     Write-Host "persona index line -- location-independent (inbound #64)" -ForegroundColor Cyan
