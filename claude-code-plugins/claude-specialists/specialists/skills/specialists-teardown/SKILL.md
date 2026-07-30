@@ -125,6 +125,26 @@ Test-Path scripts\repo-config.ps1; Test-Path scripts\lib\branch-info.ps1
 Test-Path .claude\settings.suggested.jsonc
 ```
 
+**Read the two scaffold lines correctly, or the whole protocol tells you the wrong thing.** They are an
+*inventory*, not an expectation — and what the right answer is depends on something the numbers cannot
+show you: **whether the repo already had those files.** This tripped up the first real adoption attempt
+(life-hub, July 30, 2026), which stopped before installing and was right to:
+
+| the repo before adoption | after bootstrap | after teardown `-Apply` |
+|---|---|---|
+| the addresses were **empty** | placed as `VUL-IN` scaffolds | **removed** — nobody filled them in |
+| the addresses were **occupied** (a real `repo-config.ps1`, a filled prefix table) | `[keep] ... already exists -- not overwritten` | **kept** — the teardown never removes what it did not write |
+
+So "both scaffolds present after the bootstrap" is trivially true in an occupied repo and measures
+nothing, and "both scaffolds gone after the teardown" can only go green there by deleting two
+load-bearing files. **Check the report lines, not just the `Test-Path` results:** `[create]` versus
+`[keep]` on the way in, and `[remove]` versus `[KEEP]` on the way out, are what actually tell you which
+of the two rows above you are in.
+
+This is not a special case. The plugin scaffolds precisely the files that were *extracted from* repos
+like these, so on a fresh fixture the addresses are free and in any real consumer they are inhabited —
+which is why the round-trip suite now carries an explicit *occupied consumer* scenario.
+
 Two further checks the hooks will not do for you, both of which caught real defects:
 
 - **Count the bootstrap's note line.** A `teardown` → `init` cycle used to add one copy per cycle

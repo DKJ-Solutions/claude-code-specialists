@@ -457,6 +457,64 @@ function Get-LintScript { return `$script:LintScript }
     Assert-True ($a2.Out -match '\[FREE\]') 'audit (reworded): the repo now reports FREE -- the advice is reachable, so the findings are actionable rather than noise'
     Assert-True (-not ($a2.Out -match '(?m)^\s*\[LIVE\]')) 'audit (reworded): no live reference is left at all'
     Assert-True ($a2.Out -match 'verified rather than assumed') 'audit (reworded): the clean verdict says it was verified, which is the whole point of the requirement'
+
+    # --- THE OCCUPIED CONSUMER: the scaffold paths are already inhabited ------------------------------
+    # Reported from the first real adoption attempt (life-hub, 2026-07-30), which stopped before
+    # installing and was right to. Both scaffold addresses this plugin writes to were live, tracked
+    # files there: scripts/repo-config.ps1 (55 lines) and scripts/lib/branch-info.ps1 (88 lines, named
+    # by that repo's own CLAUDE.md as its single source of truth for the branch taxonomy).
+    #
+    # WHY NO FIXTURE COULD HAVE TOLD US: every scenario above starts from an address that is EMPTY. The
+    # plugin scaffolds precisely the files that were extracted FROM repos like these, so on a fixture
+    # they are free real estate and in a real consumer they are occupied. Same shape as the sync-roster
+    # gap (#262) -- a fixture that always arrives in one state tests one branch.
+    #
+    # The measured answer is that the behaviour was already right on both ends, and the defect was in
+    # the TEST's expectations. This scenario pins that down so the question cannot be reopened by guess:
+    # the bootstrap must not place over an occupied address, and the teardown must not remove what it
+    # therefore never wrote.
+    Write-Host "the occupied consumer -- scaffold addresses that were already inhabited" -ForegroundColor Cyan
+    if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
+    New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'scripts\lib') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.json'),
+        '{ "enabledPlugins": { "specialists@davekjohns-workshop": true } }')
+    # The consumer's OWN CLAUDE.md, which is also what triggers the report path that used to be broken:
+    # this block only runs when a CLAUDE.md exists and does not yet carry the guard import.
+    [System.IO.File]::WriteAllLines((Join-Path $Fixture 'CLAUDE.md'), @(
+        '# My own project', '', '## Conventions', '', '- Feature work goes on a branch.'))
+    $ownConfig = @('$script:RepoName = "me/mine"', 'function Get-RepoName { return $script:RepoName }')
+    $ownBranch = @('$script:BranchPrefixTable = @{', '  feat = @{ Label = "enhancement"; Type = "Feat" }', '}')
+    [System.IO.File]::WriteAllLines((Join-Path $Fixture 'scripts\repo-config.ps1'), $ownConfig)
+    [System.IO.File]::WriteAllLines((Join-Path $Fixture 'scripts\lib\branch-info.ps1'), $ownBranch)
+    $hashConfig = (Get-FileHash -LiteralPath (Join-Path $Fixture 'scripts\repo-config.ps1')).Hash
+    $hashBranch = (Get-FileHash -LiteralPath (Join-Path $Fixture 'scripts\lib\branch-info.ps1')).Hash
+
+    $prevPlugin = $env:CLAUDE_PLUGIN_ROOT
+    $env:CLAUDE_PLUGIN_ROOT = $Plugin
+    try { $ob = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $Fixture) }
+    finally { $env:CLAUDE_PLUGIN_ROOT = $prevPlugin }
+
+    Assert-Equal 0 $ob.Code 'occupied: bootstrap exit 0'
+    Assert-True ($ob.Out -match '\[keep\]\s+scripts/repo-config\.ps1 already exists') 'occupied: the bootstrap says outright it did not overwrite the repo-config'
+    Assert-True ($ob.Out -match '\[keep\]\s+scripts/lib/branch-info\.ps1 already exists') 'occupied: same for the branch taxonomy -- the file this repo calls its single source of truth'
+    Assert-Equal $hashConfig (Get-FileHash -LiteralPath (Join-Path $Fixture 'scripts\repo-config.ps1')).Hash 'occupied: the repo-config is byte-identical after the bootstrap'
+    Assert-Equal $hashBranch (Get-FileHash -LiteralPath (Join-Path $Fixture 'scripts\lib\branch-info.ps1')).Hash 'occupied: the branch taxonomy is byte-identical after the bootstrap'
+    Assert-True ($ob.Out -match '0 script-scaffold\(s\) created, 2 already present') 'occupied: the report counts both addresses as already present, so an operator can see nothing was placed'
+    # THE REGRESSION. $kept was the persona-lens counter AND, from 2026-07-30, an array of CLAUDE.md
+    # lines assigned in the note-tidy block -- so this line printed the whole of CLAUDE.md where a
+    # number belonged. Only on this path: a fixture without its own CLAUDE.md never reaches it.
+    Assert-True ($ob.Out -match 'Done: \d+ persona-lens\(es\) created, \d+ already present;') 'occupied: the report line carries NUMBERS -- the persona counter is not clobbered by the note-tidy block'
+    Assert-True (-not ($ob.Out -match 'My own project.*already present')) 'occupied: the consumer CLAUDE.md content does not leak into the report'
+
+    $ot = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
+    Assert-Equal 0 $ot.Code 'occupied: teardown exit 0'
+    Assert-True (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\repo-config.ps1')) 'occupied: the teardown did NOT remove a file it never wrote'
+    Assert-True (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\lib\branch-info.ps1')) 'occupied: nor the branch taxonomy -- removing it would take the repo workflow with it'
+    Assert-Equal $hashConfig (Get-FileHash -LiteralPath (Join-Path $Fixture 'scripts\repo-config.ps1')).Hash 'occupied: repo-config still byte-identical after the full round trip'
+    Assert-Equal $hashBranch (Get-FileHash -LiteralPath (Join-Path $Fixture 'scripts\lib\branch-info.ps1')).Hash 'occupied: branch taxonomy still byte-identical after the full round trip'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture '.claude\specialists'))) 'occupied: what the plugin DID write is gone -- the seam directory'
+    Assert-True ([System.IO.File]::ReadAllText((Join-Path $Fixture 'CLAUDE.md')) -match 'Feature work goes on a branch') "occupied: the consumer's own prose survived both directions"
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
