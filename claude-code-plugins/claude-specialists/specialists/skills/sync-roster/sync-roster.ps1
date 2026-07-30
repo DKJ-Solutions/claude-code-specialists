@@ -12,12 +12,13 @@
         single source of truth for what counts as drift) as a child process and parses its [ERROR]
         lines. That avoids duplicating the enabled-plugins / highest-version-cache / agent-id
         resolution logic -- if the detection rule changes, it changes in one place.
-      - For each agent MISSING A LENS it creates an empty lens scaffold at
-        .claude/plugins/<Get-LensFamily>/<plugin>/<group>-<id>-extension.md, using the SAME
-        additive, BOM-less-LF, never-overwrite format that specialists-init/bootstrap.ps1 writes
-        (the lens-only blockquote intro + a "## Specific to this repo (VUL-IN)" slot). The family
-        segment comes from check-report-lib.ps1, the single source both writers and the check use
-        (issue #179) -- so a scaffold can never land where the check does not look.
+      - For each agent MISSING A LENS it creates an empty lens scaffold, using the SAME additive,
+        BOM-less-LF, never-overwrite format that specialists-init/bootstrap.ps1 writes (the lens-only
+        blockquote intro + a "## Specific to this repo (VUL-IN)" slot). WHERE it lands is resolved by
+        Get-LensWriteDir from check-report-lib.ps1 -- the same helper the bootstrap uses: the seam
+        (.claude/specialists/lenses/) for a fresh or migrated consumer, the existing tree for one that
+        has not migrated. Both writers therefore agree by construction, and a scaffold can never land
+        where the check does not look (issues #179 and #221).
       - For each agent MISSING A ROSTER ROW it reads the agent's frontmatter (name + description) and
         PRINTS a proposed roster row to stdout for the human to paste. It NEVER edits the roster /
         CLAUDE.md.
@@ -109,6 +110,38 @@ function Resolve-CheckScript {
 # Resolve-PluginDir comes from the dot-sourced check-report-lib.ps1 above (shared with
 # check-roster-sync.ps1, so the frontmatter we read comes from the SAME cache dir the check
 # inspected -- semantically highest version; [version]-sort so 1.10.0 beats 1.9.0).
+
+function Get-LensRelPath {
+    <# Repo-relative, forward-slashed path of a lens, resolved through Get-LensWriteDir -- the SAME
+       writer helper specialists-init/bootstrap.ps1 uses. The seam for a fresh or migrated consumer,
+       the consumer's existing tree for one that has not migrated.
+
+       WHY THIS IS A FUNCTION AND NOT A LITERAL. Three places here used to hardcode
+       '.claude/plugins/<family>/<plugin>/' -- the PRE-SEAM path. Since the seam (issue #221) the
+       bootstrap writes to .claude/specialists/lenses/, so this script created scaffolds in a layout
+       its own sibling had stopped using: run sync-roster after a plugin update and a migrated
+       consumer's lens surface splits across two directories. Get-LensWriteDir's own docstring calls
+       that outcome worse than either layout alone, and the check would then report the fresh
+       scaffolds as off-path. A writer and the writer it mirrors must resolve their destination
+       through one function, not through two literals that agree until one of them moves.
+
+       PluginName may be empty when the plugin id could not be parsed (the stale-header case). It is
+       then NOT passed on: Get-LensDirCandidates documents that the caller slug-validates the name
+       before it becomes a path segment, and a placeholder like '<plugin>' would break that contract
+       (and Test-Path on the illegal characters with it). The seam needs no plugin segment, so an
+       unknown plugin resolves there -- which is also the only honest answer. #>
+    param(
+        [Parameter(Mandatory = $true)][string]$LensName,
+        [string]$PluginName = ''
+    )
+    $dir = if ($PluginName) {
+        Get-LensWriteDir -RepoRoot $repoRoot -PluginName $PluginName
+    } else {
+        (Get-SeamPaths -RepoRoot $repoRoot).LensDir
+    }
+    $rel = $dir.Substring($repoRoot.Length).TrimStart('\', '/')
+    return (($rel -replace '\\', '/') + '/' + $LensName)
+}
 
 # Read an agent's display name + a short description from its cache file's frontmatter. Returns a
 # hashtable @{ Name; Description } (both best-effort, may be empty). The description is a YAML folded
@@ -271,7 +304,7 @@ foreach ($e in $missingLens) {
     $pi = Split-PluginId -PluginId $e.PluginId
     if ($null -eq $pi) { Write-Failure "skipping lens for '$id' -- invalid plugin id '$($e.PluginId)'."; continue }
 
-    $lensRel = ".claude/plugins/$(Get-LensFamily)/$($pi.Name)/$id-extension.md"
+    $lensRel = Get-LensRelPath -LensName "$id-extension.md" -PluginName $pi.Name
     $dest = Join-Path $repoRoot $lensRel
     if (Test-Path -LiteralPath $dest -PathType Leaf) {
         Write-Info "lens $id-extension.md already exists -- left untouched (additive only)."
@@ -344,7 +377,7 @@ foreach ($e in $missingRoster) {
     if ($short.Length -gt 160) { $short = $short.Substring(0, 157).TrimEnd() + '...' }
 
     $lensName = "$id-extension.md"
-    $lensPath = ".claude/plugins/$(Get-LensFamily)/$($pi.Name)/$lensName"
+    $lensPath = Get-LensRelPath -LensName $lensName -PluginName $pi.Name
     if ($rosterStyle -eq 'list') {
         $row = "- **$displayName** #$idNum -- $short ([``$lensName``]($lensPath))"
     } else {
@@ -368,11 +401,13 @@ Write-Host "`n-- proposed lens-header reconciles -- replace the stale header in 
 if ($staleHeaders.Count -eq 0) { Write-Info "no lens carries a stale scaffold header." }
 foreach ($h in $staleHeaders) {
     $pi = Split-PluginId -PluginId $h.PluginId
-    # Without a parseable plugin id the plugin segment is genuinely unknown; print a placeholder
-    # rather than the family name, which is a different thing entirely (the family/plugin mix-up
+    # Without a parseable plugin id the plugin segment is genuinely unknown. In the seam that segment
+    # does not exist at all, so there is nothing left to placeholder: Get-LensRelPath resolves an
+    # unknown plugin to the seam. On a consumer still using the pre-seam tree the name IS the segment,
+    # which is why it is passed on whenever it parsed (and never invented -- the family/plugin mix-up
     # behind issue #179).
-    $pname = if ($pi) { $pi.Name } else { '<plugin>' }
-    $lensPath = ".claude/plugins/$(Get-LensFamily)/$pname/$($h.Id)-extension.md"
+    $pname = if ($pi) { $pi.Name } else { '' }
+    $lensPath = Get-LensRelPath -LensName "$($h.Id)-extension.md" -PluginName $pname
     Write-Host "  $lensPath -- header names '$($h.Stale)', but agent '$($h.Id)' is now '$($h.Current)':" -ForegroundColor Yellow
     Write-Host "    # $($h.Id) $midDot repo-lens" -ForegroundColor Green
     Write-Host "    (also update any remaining '$($h.Stale)' mention in the intro line just below the header.)" -ForegroundColor Gray

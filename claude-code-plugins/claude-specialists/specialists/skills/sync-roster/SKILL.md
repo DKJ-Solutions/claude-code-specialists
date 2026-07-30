@@ -67,8 +67,10 @@ The script:
 1. **Delegates detection** to `check-roster-sync.ps1` (the single source of truth for what counts as
    drift) -- it runs the check and parses its `[ERROR]` lines, rather than re-implementing the
    enabled-plugins / cache-version / specialist-id logic.
-2. **Creates a lens scaffold** for each specialist **missing a lens** -- agent or persona -- at
-   `.claude/plugins/claude-specialists/<plugin>/<group>-<id>-extension.md`, using the same additive,
+2. **Creates a lens scaffold** for each specialist **missing a lens** -- agent or persona -- where
+   `specialists-init` would put it: the seam (`.claude/specialists/lenses/<group>-<id>-extension.md`)
+   for a fresh or migrated consumer, and the repo's existing lens tree for one that has not migrated.
+   Both writers resolve that through the one shared helper, so they cannot disagree. Uses the same additive,
    BOM-less-LF, never-overwrite format `specialists-init` writes (the lens-only blockquote intro + a
    `## Specific to this repo (VUL-IN)` slot). The scaffold is nameless (issue #145), which is why it
    needs no persona-specific variant.

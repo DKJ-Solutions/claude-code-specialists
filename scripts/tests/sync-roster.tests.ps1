@@ -100,9 +100,17 @@ function New-FixtureCache {
     return $cache
 }
 
-# Fixture consumer. RosterIds -> written into CLAUDE.md; LensIds -> lens files on the plugin path.
+# Fixture consumer. RosterIds -> written into CLAUDE.md; LensIds -> lens files on the PRE-SEAM plugin
+# path; SeamLensIds -> lens files in the seam (.claude/specialists/lenses/).
+#
+# THE TEST GAP THIS PARAMETER CLOSES (issue #221). Every scenario below used to hand the fixture a
+# pre-seam lens tree, and Get-LensWriteDir follows an existing tree by design -- so the suite only ever
+# exercised an ALREADY-ADOPTED consumer, and stayed green while sync-roster hardcoded the pre-seam path
+# for the fresh and migrated cases it never covered. A fixture that always arrives in one state tests
+# one branch, however many asserts hang off it.
 function New-FixtureConsumer {
-    param([string[]]$RosterIds = @(), [string[]]$LensIds = @(), [string]$RosterStyle = 'table', [hashtable]$LensContent = @{})
+    param([string[]]$RosterIds = @(), [string[]]$LensIds = @(), [string]$RosterStyle = 'table', [hashtable]$LensContent = @{},
+          [string[]]$SeamLensIds = @())
     $root = Join-Path $Fixture 'consumer'
     if (Test-Path -LiteralPath $root) { Remove-Item -Recurse -Force -LiteralPath $root }
     New-Item -ItemType Directory -Path (Join-Path $root '.claude') -Force | Out-Null
@@ -122,6 +130,14 @@ function New-FixtureConsumer {
         foreach ($id in $LensIds) {
             $body = if ($LensContent.ContainsKey($id)) { $LensContent[$id] } else { "existing-lens-$id" }
             [System.IO.File]::WriteAllText((Join-Path $pdir "$id-extension.md"), $body)
+        }
+    }
+    if ($SeamLensIds.Count -gt 0) {
+        $sdir = Join-Path $root '.claude\specialists\lenses'
+        New-Item -ItemType Directory -Path $sdir -Force | Out-Null
+        foreach ($id in $SeamLensIds) {
+            $body = if ($LensContent.ContainsKey($id)) { $LensContent[$id] } else { "existing-lens-$id" }
+            [System.IO.File]::WriteAllText((Join-Path $sdir "$id-extension.md"), $body)
         }
     }
     return $root
@@ -294,6 +310,60 @@ try {
     Assert-Match '1 header reconcile' $r.Out 'header reconcile: counted in the summary'
     Assert-NotMatch "'06-17'.*header still names" $r.Out 'header reconcile: matching header (06-17=Edith) not flagged'
     Assert-Equal $lens16Before (Get-B64 $lens16Path) 'header reconcile: lens file bytes unchanged (propose-only)'
+
+    # --- 7. WHERE the scaffold lands: the seam for a fresh/migrated consumer (issue #221) ------------
+    #   The branch the suite above never reached. sync-roster must resolve its destination through the
+    #   same Get-LensWriteDir the bootstrap uses, so the two writers cannot disagree about a repo's
+    #   layout. Three cases, because each one used to be answered by a hardcoded literal:
+    #     7a. fresh consumer  (no lens tree at all)      -> the seam
+    #     7b. migrated consumer (lenses in the seam)     -> the seam, alongside them
+    #     7c. pre-seam consumer (lenses on the old path) -> that tree, NOT the seam (never relocate)
+    $seamRel    = '.claude\specialists\lenses'
+    $preSeamRel = ".claude\plugins\claude-specialists\$PluginName"
+    $cache = New-FixtureCache -Agents @{
+        '06-16' = @{ Name = 'victor'; Desc = 'Code Reviewer.' }
+        '06-24' = @{ Name = 'ravi';   Desc = 'Refactoring Specialist.' }
+    }
+
+    # 7a. Fresh: nothing anywhere. 06-24 is in the roster but has no lens -> scaffold expected.
+    $c7a = New-FixtureConsumer -RosterIds @('06-16', '06-24')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c7a, '-CacheRootOverride', $cache)
+    Assert-Equal 0 $r.Code 'seam 7a: exit-code 0'
+    Assert-True (Test-Path -LiteralPath (Join-Path $c7a "$seamRel\06-24-extension.md") -PathType Leaf) `
+        'seam 7a: a fresh consumer gets the scaffold in the seam'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c7a "$preSeamRel\06-24-extension.md") -PathType Leaf)) `
+        'seam 7a: nothing written to the pre-seam plugin path -- the defect this test exists for'
+    Assert-Match '\.claude/specialists/lenses/06-24-extension\.md' $r.Out `
+        'seam 7a: the reported path is the seam, forward-slashed'
+
+    # 7b. Migrated: a lens already sits in the seam, so the writer must stay there.
+    $c7b = New-FixtureConsumer -RosterIds @('06-24') -SeamLensIds @('06-16')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c7b, '-CacheRootOverride', $cache)
+    Assert-Equal 0 $r.Code 'seam 7b: exit-code 0'
+    Assert-True (Test-Path -LiteralPath (Join-Path $c7b "$seamRel\06-24-extension.md") -PathType Leaf) `
+        'seam 7b: a migrated consumer keeps its lenses together in the seam'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c7b "$preSeamRel\06-24-extension.md") -PathType Leaf)) `
+        'seam 7b: the lens surface is NOT split across two layouts'
+
+    # 7c. Pre-seam: an un-migrated consumer is followed, never relocated. This is the case the old
+    #     literal got right by accident, and it must keep working -- migrating is the owner's act.
+    $c7c = New-FixtureConsumer -RosterIds @('06-24') -LensIds @('06-16')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c7c, '-CacheRootOverride', $cache)
+    Assert-Equal 0 $r.Code 'seam 7c: exit-code 0'
+    Assert-True (Test-Path -LiteralPath (Join-Path $c7c "$preSeamRel\06-24-extension.md") -PathType Leaf) `
+        'seam 7c: an un-migrated consumer keeps writing to its own tree'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c7c "$seamRel\06-24-extension.md") -PathType Leaf)) `
+        'seam 7c: no seam copy created next to it -- the writer follows, it does not migrate'
+
+    # 7d. The PROPOSED ROSTER ROW's link is the second site the literal was hardcoded in. A row a human
+    #     pastes with a path that does not exist is worse than no row: it looks authoritative.
+    $c7d = New-FixtureConsumer -RosterIds @() -SeamLensIds @('06-16')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c7d, '-CacheRootOverride', $cache)
+    Assert-Equal 0 $r.Code 'seam 7d: exit-code 0'
+    Assert-Match '\(\.claude/specialists/lenses/06-16-extension\.md\)' $r.Out `
+        'seam 7d: the proposed roster row links into the seam, not the pre-seam path'
+    Assert-NotMatch '\.claude/plugins/claude-specialists' $r.Out `
+        'seam 7d: no pre-seam path anywhere in the output of a migrated consumer'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
 }
