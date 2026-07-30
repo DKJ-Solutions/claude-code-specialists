@@ -4,6 +4,44 @@ Consumer-facing history of this plugin: per release, the changes that touched th
 Automatically appended by `cut-release.ps1` of the marketplace repo (davekjohns-workshop); the full
 workshop history lives there in `CHANGELOG.md` and `releases/`.
 
+## v3.0.3 — 2026-07-30
+
+### Fixes
+
+#### #282 · the marketplace cache is a second update gate · Fix · 2026-07-30
+
+Found by using v3.0.2 rather than by reading about it: minutes after that release was tagged and
+pushed, installing the plugin in this repo produced **3.0.1** and reported `✔ Successfully installed
+plugin: specialists@davekjohns-workshop (scope: project)`. The `github` marketplace source is a
+**cached clone**, and it was still sitting on `96aa5a1` — the commit before PR #281 merged, let alone
+before the release. `claude plugin marketplace update davekjohns-workshop` followed by a single
+`claude plugin update … --scope project` then moved it `3.0.1 -> 3.0.2`.
+
+**So the version number is one of two gates, and the docs only knew about one.** `plugin
+install`/`plugin update` compare against the consumer's cached copy of the marketplace, not against
+this repo — a distinction with no visible symptom, because a stale cache produces a success message
+and a plausible version number. The sentence this corrects was written the same afternoon, in the
+release that fixed the previous round of doc-versus-behaviour defects: *"you get changes as soon as
+the workshop has cut a new version — not before."* True of the version comparison, and wrong about
+what a consumer actually experiences.
+
+Recorded in four places, each stating what was measured rather than a mechanism: the
+[Quickstart](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/claude-code-plugins/claude-specialists/QUICKSTART.md#staying-up-to-date)'s *Staying up to
+date* (now two commands, with the stale-install measurement as the reason), `specialists-init` step 0b
+(both the install and the update block), the root README's update-gate paragraph, and
+[Rendall #06's lens](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/.claude/specialists/lenses/05-06-extension.md#versioning--releases) — where it
+also changes the closing act of a release: **pushing the tag is not the end.** A release cannot
+refresh a consumer's cache, so the closing report has to name the command that can.
+
+Deliberately not claimed: that the cache never refreshes on its own. `claude plugin marketplace
+update` reports `Refreshing marketplace cache (timeout: 120s)`, so a mechanism exists; on what
+schedule it fires unprompted was not established, and the docs say so instead of guessing. The
+explicit command is in the procedure because "wait an unknown while" is not a step anyone can follow.
+
+[PR #282](https://github.com/DaveKJohn/davekjohns-workshop/pull/282)
+
+---
+
 ## v3.0.2 — 2026-07-30
 
 ### Fixes
