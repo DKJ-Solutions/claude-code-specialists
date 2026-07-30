@@ -247,20 +247,36 @@ if ($personaDirs.Count -gt 0) {
     }
 }
 
-if ($personaResults.Count -gt 0) {
-    Write-Host ""
-    Write-Host "-- Personas (portable body vs. the <g>-<id>-extension.md copy in the consumer) --" -ForegroundColor Cyan
-    $pDrift = 0
-    foreach ($r in $personaResults) {
-        switch ($r.Status) {
-            'MISSING'   { if (-not $Quiet) { Write-Host "  [MISSING]   $($r.Name) -- no extension-file copy in the consumer (not bootstrapped yet)." -ForegroundColor DarkGray } }
-            'IDENTICAL' { Write-Host "  [IDENTICAL] $($r.Name) -- body identical to the canonical source." -ForegroundColor Green }
-            'LENS-ONLY' { Write-Host "  [LENS-ONLY] $($r.Name) -- lens-only model: body comes from the plugin, nothing to compare." -ForegroundColor Green }
-            'DRIFTED'   { $pDrift++; Write-Host "  [DRIFTED]   $($r.Name) -- body differs from the canonical source: $($r.Path)" -ForegroundColor Yellow }
-        }
+# The section is printed UNCONDITIONALLY, and that is the fix rather than a detail (issue #221). It
+# used to be wrapped in `if ($personaResults.Count -gt 0)`, and its closing line stated a verdict with
+# no coverage: "Persona drift is INFORMATIONAL: 0 drifted." Run against a repo with no lens files --
+# a torn-down consumer, a bad merge, a wrong -ConsumerPath -- that printed a clean persona verdict over
+# personas it had never compared, and "0 drifted of 0 compared" read exactly like "0 drifted of 4
+# compared". The count is now always stated, so the zero is visible instead of implied.
+Write-Host ""
+Write-Host "-- Personas (portable body vs. the <g>-<id>-extension.md copy in the consumer) --" -ForegroundColor Cyan
+$pDrift = 0; $pMissing = 0; $pCompared = 0
+foreach ($r in $personaResults) {
+    switch ($r.Status) {
+        'MISSING'   { $pMissing++; if (-not $Quiet) { Write-Host "  [MISSING]   $($r.Name) -- no extension-file copy in the consumer (not bootstrapped yet)." -ForegroundColor DarkGray } }
+        'IDENTICAL' { $pCompared++; Write-Host "  [IDENTICAL] $($r.Name) -- body identical to the canonical source." -ForegroundColor Green }
+        # LENS-ONLY counts as covered, not as compared: the check positively established that this lens
+        # carries no body, which is a real finding about a real file -- unlike MISSING, where there was
+        # no file to establish anything about.
+        'LENS-ONLY' { $pCompared++; Write-Host "  [LENS-ONLY] $($r.Name) -- lens-only model: body comes from the plugin, nothing to compare." -ForegroundColor Green }
+        'DRIFTED'   { $pDrift++; $pCompared++; Write-Host "  [DRIFTED]   $($r.Name) -- body differs from the canonical source: $($r.Path)" -ForegroundColor Yellow }
     }
-    Write-Host "  Persona drift is INFORMATIONAL (does not affect the exit code): $pDrift drifted." -ForegroundColor DarkGray
 }
+if ($personaDirs.Count -eq 0) {
+    Write-Coverage -Category 'personas' -Checked 0 `
+        -Note "no personas/ directory found under $PluginRoot, so no persona could be compared -- this is a problem with the SOURCE tree, not with the consumer"
+} else {
+    $note = if ($pCompared -eq 0) {
+        'the consumer holds no lens file for any persona -- expected after a deliberate teardown, and a red flag if you did not run one'
+    } else { '' }
+    Write-Coverage -Category 'personas' -Checked $pCompared -Of $personaResults.Count -Note $note
+}
+Write-Host "  Persona drift is INFORMATIONAL (does not affect the exit code): $pDrift drifted of $pCompared compared." -ForegroundColor DarkGray
 
 if ($driftCount -gt 0) {
     Write-Host ""

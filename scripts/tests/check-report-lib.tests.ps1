@@ -83,6 +83,31 @@ try {
     New-Item -ItemType Directory -Path $seam.LensDir -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $seam.LensDir '06-16-extension.md'), "# 06-16 repo lens`n")
     Assert-Equal $seam.LensDir (Get-LensWriteDir -RepoRoot $Fixture -PluginName 'specialists') 'after a hand migration the writer follows to the seam automatically'
+
+    # --- 4. Write-Coverage: a verdict never travels without its coverage (issue #221) ----------------
+    #     The line exists so an empty category cannot pass in silence, so the assertions are about
+    #     exactly that: the zero must be PRESENT and must be distinguishable from a healthy count.
+    Write-Host "Write-Coverage -- the non-counting [COVERAGE] line" -ForegroundColor Cyan
+    # $script:errors/$script:infos are what the lib's Write-Info/Write-Failure bump. Coverage is
+    # context, not a signal, so these must be untouched afterwards -- otherwise a legitimately empty
+    # category would break its own gate, which is the opposite of the point.
+    $script:errors = 0
+    $script:infos = 0
+
+    $out = (Write-Coverage -Category 'lenses' -Checked 0 -Of 4 -Note 'nothing to compare' 6>&1 | Out-String)
+    Assert-True ($out -match '\[lenses\] checked 0 of 4 -- nothing to compare') 'empty category: category, count, denominator and reason all on one line'
+    Assert-Equal 0 $script:errors 'empty category does NOT count as an error -- an empty category is a fact, not a failure'
+    Assert-Equal 0 $script:infos  'empty category does NOT count as an info signal either -- [COVERAGE] is non-counting, like [OK]/[SKIP]/[SCOPE]'
+
+    $out = (Write-Coverage -Category 'lenses' -Checked 4 -Of 4 6>&1 | Out-String)
+    Assert-True ($out -match '\[lenses\] checked 4 of 4') 'healthy category: states the real count'
+    Assert-True (-not ($out -match ' -- ')) 'healthy category: no reason appended when none was given'
+
+    # -Of omitted: a category whose count IS the whole story (files scanned) reads as a plain number,
+    # not as "of -1".
+    $out = (Write-Coverage -Category 'parse' -Checked 51 6>&1 | Out-String)
+    Assert-True ($out -match '\[parse\] checked 51') 'no denominator: plain count'
+    Assert-True (-not ($out -match 'of -1')) 'no denominator: the sentinel never leaks into the output'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

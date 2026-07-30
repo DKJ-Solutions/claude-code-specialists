@@ -68,6 +68,13 @@ $errors = New-Object System.Collections.Generic.List[string]
 
 function Add-Error([string]$Msg) { $script:errors.Add($Msg) }
 
+# Write-Coverage: the shared, non-counting [COVERAGE] line (issue #221), so every category below states
+# how many items it examined and an empty one announces itself instead of passing in silence. Only that
+# function is used from this lib; its counting report helpers (Write-Info/Write-Failure) stay unused and
+# would in fact be wrong here -- this script's $errors is a List[string], not an int counter -- exactly
+# the deliberate, documented non-collision check-consumer-drift.ps1 already relies on.
+. (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
+
 function Test-JsonFile {
     param([string]$Path)
     try {
@@ -124,8 +131,14 @@ Get-ChildItem -Path $RepoRoot -Recurse -Filter 'plugin.json' -File |
     }
 
 # --- 3. agent-def frontmatter: name/id/group ---------------------------------------------------------
-Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-agent.md' -File |
-    Where-Object { $_.FullName -match '\\agents\\' } | ForEach-Object {
+# Each of checks 3/3b/3c/4/5/7/8/9 discovers its own file set and would report NOTHING if that set came
+# back empty -- a tree that moved, a renamed directory, or a bad merge would read as a clean gate. Every
+# one of them therefore closes with a [COVERAGE] line (issue #221): the verdict never travels without
+# the count behind it. Applied to all of them on purpose -- a partial rollout recreates exactly the
+# asymmetry that let check-consumer-drift's persona section state a clean verdict over 0 comparisons.
+$agentDefs = @(Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-agent.md' -File |
+    Where-Object { $_.FullName -match '\\agents\\' })
+$agentDefs | ForEach-Object {
         $text = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)
         $rel = $_.FullName.Replace($RepoRoot, '.')
         foreach ($key in 'name', 'id', 'group') {
@@ -134,10 +147,13 @@ Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-agent.md' -File |
             }
         }
     }
+Write-Coverage -Category 'agent-def' -Checked $agentDefs.Count `
+    -Note $(if ($agentDefs.Count -eq 0) { 'no */agents/*-agent.md anywhere under the repo root -- the plugin tree is not where this check looked' } else { '' })
 
 # --- 3b. manual frontmatter: id/group + file name <group>-<id>-manual.md -----------------------------
-Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-manual.md' -File |
-    Where-Object { $_.FullName -match '\\manuals\\' } | ForEach-Object {
+$manuals = @(Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-manual.md' -File |
+    Where-Object { $_.FullName -match '\\manuals\\' })
+$manuals | ForEach-Object {
         $text = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)
         $rel = $_.FullName.Replace($RepoRoot, '.')
         foreach ($key in 'id', 'group') {
@@ -159,6 +175,8 @@ Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-manual.md' -File |
             Add-Error "[manual] $rel`: file name does not follow the <group>-<id>-manual pattern."
         }
     }
+Write-Coverage -Category 'manual' -Checked $manuals.Count `
+    -Note $(if ($manuals.Count -eq 0) { 'no */manuals/*-manual.md found -- every specialist playbook is either missing or somewhere this check does not look' } else { '' })
 
 # --- 3c. persona frontmatter: id/group + file name <group>-<id>-persona.md ----------------------------
 # Personas (Chris/Derek/Rendall etc.) run in the MAIN LOOP, not as a subagent, so they deliberately
@@ -166,8 +184,9 @@ Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-manual.md' -File |
 # skill copies to a consumer's repo layer (.claude/extensions/<g>-<id>-extension.md). Check 6
 # (agent-def<->manual link) therefore ignores them; here we validate their frontmatter + file name
 # on their own (mirrors 3b).
-Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-persona.md' -File |
-    Where-Object { $_.FullName -match '\\personas\\' } | ForEach-Object {
+$personas = @(Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-persona.md' -File |
+    Where-Object { $_.FullName -match '\\personas\\' })
+$personas | ForEach-Object {
         $text = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)
         $rel = $_.FullName.Replace($RepoRoot, '.')
         foreach ($key in 'id', 'group') {
@@ -189,13 +208,15 @@ Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-persona.md' -File |
             Add-Error "[persona] $rel`: file name does not follow the <group>-<id>-persona pattern."
         }
     }
+Write-Coverage -Category 'persona' -Checked $personas.Count `
+    -Note $(if ($personas.Count -eq 0) { 'no */personas/*-persona.md found -- the main-loop specialists appear in no always-on listing, so nothing else would report their absence' } else { '' })
 
 # --- 4. dead relative links + broken anchors ---------------------------------------------------------
-# Scanned files: README.md, CHANGELOG.md, CLAUDE.md, CONTRIBUTING.md, every .claude/extensions/*.md,
-# every <plugin>/skills/*/SKILL.md, every <plugin>/manuals/*-manual.md, every releases/**/*.md and
-# the connectors README. For every relative link it is checked (a) that the linked file exists, and
-# (b) if the link has a #anchor: that anchor exists as a heading in the target file (GitHub slug
-# rules). External http(s)/mailto links are skipped.
+# Scanned files: README.md, CHANGELOG.md, CLAUDE.md, CONTRIBUTING.md, the repo lenses (the seam
+# .claude/specialists/, its pre-seam and legacy locations), every <plugin>/skills/*/SKILL.md, every
+# <plugin>/manuals/*-manual.md, every releases/**/*.md and the connectors README. For every relative
+# link it is checked (a) that the linked file exists, and (b) if the link has a #anchor: that anchor
+# exists as a heading in the target file (GitHub slug rules). External http(s)/mailto links are skipped.
 
 function Test-FenceDelimiterLine {
     # A single source for what counts as a fenced-code-block delimiter line, so the fence syntax
@@ -277,17 +298,25 @@ if (Test-Path -LiteralPath $connectorsReadme) { $linkFiles += $connectorsReadme 
 $linkFiles += (Get-ChildItem -Path (Join-Path $RepoRoot 'claude-code-plugins\claude-specialists') -Recurse -Filter 'CHANGELOG.md' -File |
     Where-Object { $_.FullName -notmatch '\\connectors\\' } |
     Select-Object -ExpandProperty FullName)
-# The repo lenses live on the plugin path (.claude/plugins/claude-specialists/specialists/, the
-# standard) or on the legacy path (.claude/extensions/) -- scan both, wherever they are.
+# The repo lenses live in the seam (.claude/specialists/, the canonical location since #253), on the
+# pre-seam plugin path, or on the legacy path -- scan all of them, wherever they are.
+#
+# THIS IS THE CATEGORY THAT DISAPPEARS ON A TEARDOWN, which is why it is counted separately from the
+# scan total below. `if (Test-Path)` per directory is correct -- a consumer has one layout, not four --
+# but it also means all four being absent contributes zero files and says nothing. Green, and checking
+# nothing (issue #221). Right after a deliberate teardown, wrong after a bad merge or a wrong path, and
+# a silent skip cannot tell those apart.
+$lensLinkFiles = @()
 foreach ($extDir in @(
     (Join-Path $RepoRoot '.claude\specialists\lenses'),
     (Join-Path $RepoRoot '.claude\specialists'),
     (Join-Path $RepoRoot '.claude\plugins\claude-specialists\specialists'),
     (Join-Path $RepoRoot '.claude\extensions'))) {
     if (Test-Path -LiteralPath $extDir) {
-        $linkFiles += (Get-ChildItem -Path $extDir -Filter '*.md' -File | Select-Object -ExpandProperty FullName)
+        $lensLinkFiles += (Get-ChildItem -Path $extDir -Filter '*.md' -File | Select-Object -ExpandProperty FullName)
     }
 }
+$linkFiles += $lensLinkFiles
 $linkFiles += (Get-ChildItem -Path $RepoRoot -Recurse -Filter 'SKILL.md' -File |
     Where-Object { $_.FullName -match '\\skills\\' } | Select-Object -ExpandProperty FullName)
 $linkFiles += (Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-manual.md' -File |
@@ -320,6 +349,11 @@ $linkFiles += (Get-ChildItem -Path $RepoRoot -Recurse -Filter 'RELEASE.md' -File
 $linkFiles += @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
     Where-Object { Test-IsChangelogEntryFile -Path $_.FullName } |
     Select-Object -ExpandProperty FullName)
+
+Write-Coverage -Category 'link-scan' -Checked $linkFiles.Count `
+    -Note $(if ($linkFiles.Count -eq 0) { 'the scan set is empty -- no dead link anywhere could be found, which is not the same as there being none' } else { '' })
+Write-Coverage -Category 'link-scan/lenses' -Checked $lensLinkFiles.Count `
+    -Note $(if ($lensLinkFiles.Count -eq 0) { 'no repo-lens file in the seam, its pre-seam location, or the legacy path -- expected after a deliberate teardown, otherwise the lens tree has moved or been lost' } else { '' })
 
 $linkRegex = [regex]'\[(?:[^\]]*)\]\(([^)]+)\)'
 $slugCache = @{}
@@ -389,6 +423,8 @@ $psScripts | ForEach-Object {
         Add-Error "[parse] $rel`: $($parseErrors[0].Message)"
     }
 }
+Write-Coverage -Category 'parse' -Checked $psScripts.Count `
+    -Note $(if ($psScripts.Count -eq 0) { 'no .ps1 found under scripts/ or in any plugin -- a syntax error anywhere could not have been seen' } else { '' })
 
 # --- 6. specialists-system integrity -------------------------------------------------------------------
 # This repo is the source of the specialists system, so the agent-def<->manual link must be at
@@ -400,8 +436,7 @@ $psScripts | ForEach-Object {
 # (The roster->lens link is already covered by the dead-link scan above, since that scans CLAUDE.md.)
 
 $idOwner = @{}
-Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-agent.md' -File |
-    Where-Object { $_.FullName -match '\\agents\\' } | ForEach-Object {
+$agentDefs | ForEach-Object {
         $rel = $_.FullName.Replace($RepoRoot, '.')
         if ($_.BaseName -notmatch '^(\d{2})-(\d{2})-agent$') {
             Add-Error "[specialist] $rel does not follow the <group>-<id>-agent.md pattern."
@@ -430,8 +465,7 @@ Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-agent.md' -File |
         }
     }
 
-Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-manual.md' -File |
-    Where-Object { $_.FullName -match '\\manuals\\' } | ForEach-Object {
+$manuals | ForEach-Object {
         if ($_.BaseName -match '^(\d{2})-(\d{2})-manual$') {
             $g = $Matches[1]; $id = $Matches[2]
             $pluginRoot = Split-Path (Split-Path $_.FullName -Parent) -Parent
@@ -442,6 +476,8 @@ Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-manual.md' -File |
             }
         }
     }
+Write-Coverage -Category 'specialist' -Checked ($agentDefs.Count + $manuals.Count) `
+    -Note $(if (($agentDefs.Count + $manuals.Count) -eq 0) { 'neither an agent def nor a manual was found -- the agent-def/manual coupling could not be checked in either direction' } else { '' })
 
 # --- 7. shared agent-def blocks in sync with their source ---------------------------------------------
 # Verbatim-shared bullets (e.g. the inbound rule, 19/19) are maintained in ONE place in
@@ -451,8 +487,7 @@ Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-manual.md' -File |
 # rebuild.
 . (Join-Path $PSScriptRoot '..\lib\agent-shared-lib.ps1')
 $agentSharedDir = Get-AgentSharedDir -RepoRoot $RepoRoot
-Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-agent.md' -File |
-    Where-Object { $_.FullName -match '\\agents\\' } | ForEach-Object {
+$agentDefs | ForEach-Object {
         $raw = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)
         $rel = $_.FullName.Replace($RepoRoot, '.')
         $sharedProblems = New-Object System.Collections.Generic.List[string]
@@ -462,6 +497,8 @@ Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-agent.md' -File |
             Add-Error "[shared] ${rel}: shared block deviates from the source -- run scripts/agents/build-agent-defs.ps1."
         }
     }
+Write-Coverage -Category 'shared' -Checked $agentDefs.Count `
+    -Note $(if ($agentDefs.Count -eq 0) { 'no agent def to expand, so no shared block could be compared with its source' } else { '' })
 
 # --- 8. shared workflow scripts in sync with their source ----------------------------------------------
 # Repo-agnostic scripts are shared with consumers as a plugin mirror (issue #81): the root copy is
@@ -469,7 +506,8 @@ Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-agent.md' -File |
 # still LF-identical to its source -- this catches a hand-edit in the mirror or a forgotten rebuild
 # (scripts/sync/build-shared-scripts.ps1) before it lands on main via a PR.
 . (Join-Path $PSScriptRoot '..\lib\shared-scripts-lib.ps1')
-foreach ($pair in @(Get-SharedScriptPairs -RepoRoot $RepoRoot)) {
+$sharedPairs = @(Get-SharedScriptPairs -RepoRoot $RepoRoot)
+foreach ($pair in $sharedPairs) {
     $src = Get-NormalizedScriptContent -Path $pair.SourcePath
     if ($null -eq $src) {
         Add-Error "[shared-script] source is missing: $($pair.SourceRel)."
@@ -482,14 +520,17 @@ foreach ($pair in @(Get-SharedScriptPairs -RepoRoot $RepoRoot)) {
         Add-Error "[shared-script] $($pair.MirrorRel) deviates from $($pair.SourceRel) -- run scripts/sync/build-shared-scripts.ps1."
     }
 }
+Write-Coverage -Category 'shared-script' -Checked $sharedPairs.Count `
+    -Note $(if ($sharedPairs.Count -eq 0) { 'the source/mirror pair list is empty -- a mirror could not have been found out of sync, however far it had drifted' } else { '' })
 
 # --- 9. RELEASE.md present per plugin + version match --------------------------------------------------
 # Model A (plugin-carried, see CHANGELOG/#115-like inbound issue): cut-release.ps1 writes this
 # card on EVERY release for EVERY plugin (lockstep version), even a plugin not touched this time.
 # Because RELEASE.md and plugin.json only change together -- via cut-release.ps1 -- an ordinary
 # feature PR can never trip this; only a forgotten regeneration or hand-edit gets caught.
-Get-ChildItem -Path $RepoRoot -Recurse -Filter 'plugin.json' -File |
-    Where-Object { $_.FullName -match '\.claude-plugin\\plugin\.json$' } | ForEach-Object {
+$pluginManifests = @(Get-ChildItem -Path $RepoRoot -Recurse -Filter 'plugin.json' -File |
+    Where-Object { $_.FullName -match '\.claude-plugin\\plugin\.json$' })
+$pluginManifests | ForEach-Object {
         $pluginDir = Split-Path (Split-Path $_.FullName -Parent) -Parent
         $pluginName = Split-Path $pluginDir -Leaf
         $pj = Test-JsonFile -Path $_.FullName
@@ -512,6 +553,8 @@ Get-ChildItem -Path $RepoRoot -Recurse -Filter 'plugin.json' -File |
             Add-Error "[release-card] $pluginName/RELEASE.md carries v$($vm.Groups[1].Value), but plugin.json says v$pjVersion -- run cut-release.ps1 again."
         }
     }
+Write-Coverage -Category 'release-card' -Checked $pluginManifests.Count `
+    -Note $(if ($pluginManifests.Count -eq 0) { 'no .claude-plugin/plugin.json found -- there is no plugin here whose card and version could be compared' } else { '' })
 
 # --- 10. marked "all skills" enumerations vs. the canonical skillset -----------------------------------
 # A prose bullet list that claims to enumerate "all skills" is a maintenance trap: it silently
