@@ -116,10 +116,23 @@ script; a **Patch** release skips that step (tag only). See
 [releases/README.md](../../../releases/README.md#cutting-a-release) for the full mechanics. The
 `version` in each
 `.claude-plugin/plugin.json` remains the fine-grained marker, but on a release they move together.
-Note: that number is also the **update gate** — `claude plugin update` compares version numbers
+Note: that number is one of **two** update gates — `claude plugin update` compares version numbers
 only, so consumers (and this repo itself, which consumes itself) only receive merged changes after
 a bump. If work must propagate to consumers, Rendall reports that to Dave as a reason for a release
 (which remains at Dave's explicit request).
+
+**The second gate is the consumer's marketplace cache, and it makes a fresh release invisible for a
+while (lesson of July 30, 2026, immediately after `v3.0.2`).** The `github` marketplace source is a
+cached clone, and `plugin install`/`plugin update` compare against *that*, not against this repo. The
+tag and the push had both gone through, and an install in this very repo still produced **3.0.1**
+with a `✔ Successfully installed` line — the cached clone was sitting on the pre-release commit.
+`claude plugin marketplace update davekjohns-workshop` then made a single `plugin update` move it
+`3.0.1 -> 3.0.2`. So **pushing the tag is not the end of a release**: the closing report says plainly
+that a consumer needs `claude plugin marketplace update <marketplace>` before the update command can
+see the new version. A refresh mechanism exists (`Refreshing marketplace cache (timeout: 120s)`), so
+the staleness is temporary; its schedule was not established, which is why the explicit command is
+what gets reported rather than "wait a bit". Nothing here is Rendall's to run on a consumer's
+machine — this is the one thing a release cannot do for its consumers, so it must at least be said.
 
 The `releases/` directory (modeled on life-hub):
 - **`releases/development/<X>.x/<X.Y.Z>.md`** — the full release notes, from the `## Pull Requests`

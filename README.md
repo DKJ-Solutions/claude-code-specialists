@@ -108,9 +108,13 @@ run into this: update the marketplace registration (a marketplace update) or re-
 
 Every plugin (one folder per group under `claude-code-plugins/claude-specialists/`) carries its own
 `version` in its `plugin.json`. On a release those versions move **in lockstep** — they all get the
-same number under one repo-wide tag `vX.Y.Z`. **That version number is also the update gate**:
+same number under one repo-wide tag `vX.Y.Z`. **That version number is one of two update gates**:
 `claude plugin update <plugin>@<marketplace> --scope project` compares nothing but version numbers
-(and needs that same scope flag, for the same reason the install does), so a consuming repo (including this
+(and needs that same scope flag, for the same reason the install does) — but it compares them against
+the consumer's **cached** copy of this marketplace, not against this repo. So `claude plugin
+marketplace update <marketplace>` comes first; without it, an install or update minutes after a
+release serves the previous version and reports success (measured July 30, 2026, right after
+`v3.0.2`). With both gates passed, a consuming repo (including this
 repo itself, which consumes itself) only pulls in merged changes after the `version` has been
 bumped — a merge without a release stays invisible to consumers, and a shared agent-def change
 therefore always lands here first, never the other way around. The full mechanics — cutting a

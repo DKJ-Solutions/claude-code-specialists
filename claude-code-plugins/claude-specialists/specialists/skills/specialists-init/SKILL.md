@@ -52,10 +52,21 @@ for this repo by themselves. So run, from the root of the consuming repo, one co
 listed in `enabledPlugins`:
 
 ```powershell
+claude plugin marketplace update davekjohns-workshop   # first: refresh the cached marketplace
 claude plugin install specialists@davekjohns-workshop --scope project
 # plus each domain plugin, e.g.:
 claude plugin install specialists-shopify@davekjohns-workshop --scope project
 ```
+
+**That first line matters if the marketplace is already cached on this machine, and skipping it
+installs an old version with a success message.** Measured in `davekjohns-workshop` on July 30, 2026,
+minutes after `v3.0.2` was tagged and pushed: the cached clone still sat on the pre-release commit, so
+the install produced **3.0.1** and reported `✔ Successfully installed`. Nothing in that output says
+the version is stale. `claude plugin marketplace update davekjohns-workshop` followed by a `plugin
+update` then moved it `3.0.1 -> 3.0.2` in one step. A refresh mechanism exists (the command reports
+`Refreshing marketplace cache (timeout: 120s)`), so a cache does not stay stale indefinitely; on what
+schedule it refreshes by itself was not established, which is why the explicit line is in the
+procedure. On a machine that has never seen this marketplace the first line is a harmless no-op.
 
 **`--scope project` is not optional here, and leaving it off fails quietly.** `claude plugin install`
 defaults to `--scope user` (`claude plugin install --help` states it outright), which writes a record
@@ -79,13 +90,16 @@ user-scope record** beside the project one and makes the plugin appear machine-w
 flag instead, from the consuming repo's root, one command per plugin:
 
 ```powershell
+claude plugin marketplace update davekjohns-workshop
 claude plugin update specialists@davekjohns-workshop --scope project
 ```
 
-This is the command every "pick up the new release" pointer in this family means — in
+Both lines, for the reason above: the update compares version numbers against the **cached** copy of
+the marketplace, so a stale cache means a no-op reported as up-to-date. This pair is what every "pick
+up the new release" pointer in this family means — in
 [`sync-roster`](../sync-roster/SKILL.md), in `scripts/sync/check-script-contract.ps1`, in the
 [QUICKSTART](../../../QUICKSTART.md#staying-up-to-date), and in the release notes. Read a bare
-`claude plugin update` anywhere as shorthand for this line.
+`claude plugin update` anywhere as shorthand for these two lines.
 
 **0c — restart, then verify before invoking.** Verify rather than assume, because **the failure this
 catches is silent and self-camouflaging**: in a session where the install never happened, this skill
