@@ -299,10 +299,19 @@ The choice is per line, not per file -- which is why the audit reports lines.
   plugin and can only see that plugin's specialists -- a consumer that also enables a domain plugin has
   names this scan does not know. The **id scan is the general net** (a `<gg>-<ii>` token is
   name-independent and catches a specialist from any plugin); the name scan is the extra pass on top.
-- **Matching is case-insensitive, biased toward over-reporting.** The expensive failure for an audit whose
-  purpose is proving nothing was missed is a reference it did not find, not one a reader dismisses in five
-  seconds -- and every hit carries `file:line`, which makes a false positive cheap and a false negative
-  silent.
+- **Matching is case-insensitive and covers possessives, biased toward over-reporting.** The expensive
+  failure for an audit whose purpose is proving nothing was missed is a reference it did not find, not one
+  a reader dismisses in five seconds -- and every hit carries `file:line`, which makes a false positive
+  cheap and a false negative silent. **Possessive forms count as the name**: Dutch takes no apostrophe, so
+  a trailing word boundary silently rejected `Dereks` and a live reference in a non-English consumer's own
+  prose went unreported (found in a Dutch consumer, inbound #271 -- and it applies to every non-English
+  repo, not to an edge case). The hit reports the text **as it appears in the file**, possessive included,
+  so a reader can search for what they were shown.
+- **Files this run is about to delete are excluded, and the exclusion is stated.** A reference inside a file
+  that is going away is not a surviving reference. Without this, a dry run's list was filled entirely by the
+  lens files the same run had just put on the `[remove]` list -- they all mention a specialist -- and the
+  handful of hits that actually matter only appeared after `-Apply`. That inverts the purpose of a preview
+  that is explicitly the inventory you say yes to.
 - **History is out of scope and never rewritten.** `CHANGELOG.md` and `releases/` are excluded entirely.
   Other root prose (`README.md`, `CONTRIBUTING.md`) is outside the live set by the reading above, so it is
   **counted, not listed** -- a pointer, not a work queue.

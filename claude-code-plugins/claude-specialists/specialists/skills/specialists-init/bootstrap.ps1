@@ -575,12 +575,36 @@ $scriptScaffolds = @(
     @{ Rel = 'scripts/repo-config.ps1';     Content = $repoConfigScaffold }
     @{ Rel = 'scripts/lib/branch-info.ps1'; Content = $branchInfoScaffold }
 )
+# The functions the shared workflow scripts call on each lib. Kept next to the scaffolds that define
+# them, so a contract that grows is noticed here rather than at a consumer's next session start.
+$contractFunctions = @{
+    'scripts/repo-config.ps1'     = @('Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds')
+    'scripts/lib/branch-info.ps1' = @('Get-BranchInfo', 'Test-BranchName')
+}
+
 $scriptScaffolded = 0; $scriptKept = 0
 $repoConfigDerived = $false
 foreach ($s in $scriptScaffolds) {
     $dest = Join-Path $ConsumerRoot $s.Rel
     if (Test-Path -LiteralPath $dest -PathType Leaf) {
         Write-Host "  [keep]   $($s.Rel) already exists -- not overwritten." -ForegroundColor DarkGray
+        # KEEPING IT IS RIGHT; SAYING NOTHING ELSE IS NOT (inbound #271). These addresses are occupied in
+        # any repo that predates the plugin -- the scaffolds are precisely the files that were extracted
+        # FROM repos like these -- and an existing one has no reason to carry the plugin's own contract
+        # functions. check-roster-sync then calls Get-RosterPath on a file that does not define it, and
+        # the consumer gets [ERROR] lines at every session start with nothing connecting them to this
+        # moment. Reported by a consumer who hit exactly that.
+        #
+        # Only the MISSING ones are named: listing all four at a repo that already has them would be the
+        # noise that teaches people to skim this output.
+        $missing = @()
+        if ($contractFunctions.ContainsKey($s.Rel)) {
+            $existing = [System.IO.File]::ReadAllText($dest, [System.Text.Encoding]::UTF8)
+            $missing = @($contractFunctions[$s.Rel] | Where-Object { $existing -notmatch "(?m)^\s*function\s+$([regex]::Escape($_))\b" })
+        }
+        if ($missing.Count -gt 0) {
+            Write-Host "           it does not define $($missing -join ', ') -- the shared scripts call those, so add them or check-roster-sync/open-pr will report them missing at every session start." -ForegroundColor Yellow
+        }
         $scriptKept++
         continue
     }

@@ -303,7 +303,12 @@ foreach ($pair in @(
         Remove-IfApplying -Path $path -Label $pair.Rel
     } else {
         $kept += $pair.Rel
-        Write-Host ("  [KEEP]   $($pair.Rel) -- filled in; it describes this repo's $($pair.What), which outlives the plugin") -ForegroundColor Yellow
+        # "not recognised as an unfilled scaffold", NOT "filled in" (inbound #271). The summary block at
+        # the end was corrected after davekokbwj/smartwatchbanden -- where 20 genuinely empty lenses were
+        # reported as authored because they used that repo's own convention -- but this per-item line kept
+        # the old claim, so the run asserted authorship in one place and hedged in the other. The script
+        # cannot establish who wrote a file; it can only say the content does not match a shape it knows.
+        Write-Host ("  [KEEP]   $($pair.Rel) -- not recognised as an unfilled scaffold; it holds this repo's $($pair.What), which outlives the plugin") -ForegroundColor Yellow
     }
 }
 
@@ -509,7 +514,20 @@ $idPattern = if (Get-Command Get-RosterIdTokenPattern -ErrorAction SilentlyConti
 # expensive failure is a reference it did not find, not one a reader dismisses in five seconds. Every hit
 # carries file:line, which makes a false positive cheap and a false negative silent -- so the doubt is
 # resolved toward reporting, the same direction Test-LooksGenerated resolves its doubt toward keeping.
-$namePattern = if ($knownNames.Count -gt 0) { '\b(' + (($knownNames | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')\b' } else { $null }
+#
+# POSSESSIVE FORMS ARE PART OF THE NAME (inbound #271). The trailing \b used to reject 'Dereks' -- the
+# Dutch possessive, which takes no apostrophe -- so a genuinely live reference in a non-English consumer's
+# own tracked prose went unreported. That is a false NEGATIVE in a scan that documents itself as biased
+# toward over-reporting precisely because a miss is the expensive failure. Reported from a Dutch consumer,
+# and it is not an edge case: it applies to every non-English repo.
+#
+# The optional group covers Dutch ('Dereks'), English ("Derek's"), and the apostrophe-only form Dutch uses
+# after s/x/z ("Alex'"). Bare 's' risks nothing here: these are specialist first names, and 'Codys' or
+# 'Veras' is not a word that appears by accident -- and if it did, the hit carries file:line and costs a
+# reader five seconds.
+$namePattern = if ($knownNames.Count -gt 0) {
+    '\b(' + (($knownNames | ForEach-Object { [regex]::Escape($_) }) -join '|') + ")(?:'s|s'|'|s)?\b"
+} else { $null }
 
 $auditFiles = @()
 foreach ($r in $auditRoots) {
@@ -523,15 +541,32 @@ foreach ($r in $auditRoots) {
 }
 $auditFiles = @($auditFiles | Sort-Object -Property FullName -Unique)
 
+# FILES THIS RUN IS ABOUT TO DELETE ARE NOT LEFTOVERS (inbound #271). On a dry run the audit used to be
+# swamped by the ~20 lens files the same run had just listed under [remove]: every one of them mentions a
+# specialist, they filled the 40-line cap entirely, and the handful of hits that actually matter only
+# became visible AFTER -Apply. That inverts the purpose -- the preview is explicitly the inventory a
+# reader says yes to, and it was showing them the one category that is guaranteed to be gone.
+#
+# Excluded rather than sorted last: a reference inside a file that is being removed is not a surviving
+# reference at all, so listing it would be wrong, not merely noisy. $removed carries rel paths for files
+# (plus a few non-path labels for imports, which simply never match an audit path).
+$removedPaths = [System.Collections.Generic.HashSet[string]]::new([string[]]$removed, [System.StringComparer]::OrdinalIgnoreCase)
+
 $liveHits = @()
+$skippedBecauseRemoved = 0
 foreach ($f in $auditFiles) {
     $rel = $f.FullName.Substring($root.Length).TrimStart('\', '/')
+    if ($removedPaths.Contains($rel)) { $skippedBecauseRemoved++; continue }
     $lineNo = 0
     foreach ($line in [System.IO.File]::ReadAllLines($f.FullName)) {
         $lineNo++
         $what = @()
         if ($line -match $idPattern) { $what += 'specialist id' }
-        if ($namePattern -and ($line -match $namePattern)) { $what += "name '$($Matches[1])'" }
+        # $Matches[0], not [1]: report the text as it appears in the FILE, possessive included. The
+        # capture group holds the bare name, so a hit on 'Dereks' used to be reported as 'Derek' -- a
+        # reader then searches for a string that is not on that line. An audit exists to point at real
+        # text.
+        if ($namePattern -and ($line -match $namePattern)) { $what += "name '$($Matches[0])'" }
         # A repo-config that survives is category 3 -- the repo's own conventions -- but two of the
         # contract functions in it exist ONLY for the plugin. Named separately, because "keep this file"
         # and "keep every line in this file" are different answers.
@@ -551,7 +586,11 @@ foreach ($f in $auditFiles) {
 
 Write-Host ''
 Write-Host "-- free-standing audit: LIVE references left after this teardown --" -ForegroundColor Cyan
-Write-Host ("   scanned $($auditFiles.Count) file(s) under CLAUDE.md, .claude/ and scripts/ against $($knownNames.Count) known specialist name(s); history (CHANGELOG.md, releases/) is excluded on purpose and never rewritten.") -ForegroundColor DarkGray
+# The count states what was SCANNED, not what was found in the tree -- and the excluded files are named,
+# because a silent exclusion is exactly the kind of quiet narrowing this audit exists to prevent.
+$scannedCount = $auditFiles.Count - $skippedBecauseRemoved
+$skipNote = if ($skippedBecauseRemoved -gt 0) { " $skippedBecauseRemoved file(s) this run $(if ($Apply) { 'removed' } else { 'would remove' }) were excluded -- a reference inside a file that is going away is not a leftover." } else { '' }
+Write-Host ("   scanned $scannedCount file(s) under CLAUDE.md, .claude/ and scripts/ against $($knownNames.Count) known specialist name(s); history (CHANGELOG.md, releases/) is excluded on purpose and never rewritten.$skipNote") -ForegroundColor DarkGray
 if ($liveHits.Count -eq 0) {
     Write-Host "  [FREE]   no live reference to a specialist, persona, roster or lens is left in the scanned set." -ForegroundColor Green
     $notes += "Free-standing audit: clean. Nothing a session loads, a script resolves, or a gate depends on still points at the plugin. That is the requirement met, verified rather than assumed."
