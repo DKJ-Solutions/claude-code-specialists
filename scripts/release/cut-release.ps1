@@ -167,6 +167,36 @@ $typeLabel = @{ major = 'Major'; minor = 'Minor'; patch = 'Patch' }[$bumpType]
 $tagName = "v$new"
 if ((git tag --list $tagName)) { Write-Error "Tag $tagName already exists."; exit 1 }
 
+# --- Guardrail: a NEW MAJOR needs its own overview section before the row can land ----------------
+# Placed here, with the other guardrails, because it must stop the run BEFORE anything is written: the
+# row insertion happens after the notes file already exists, and failing there would leave a release
+# half-cut. Get-OverviewTargetMajor (release-lib, tested) answers where the row would actually go.
+#
+# The failure this prevents is silent, not loud: the inserter matches the FIRST table header, so on a
+# major bump a 'v3.0.0' row is filed neatly under '### 2.x' and nothing errors. And it has never been
+# hit, because the grouping-by-major arrived in v2.0.1 -- one release after the only major ever cut.
+# Rare plus silent is the worst combination for a manual step, which is why this speaks up instead.
+$newMajor = ($new -split '\.')[0]
+$relReadmePath = Join-Path $repoRoot 'releases\README.md'
+if (Test-Path -LiteralPath $relReadmePath) {
+    $targetMajor = Get-OverviewTargetMajor -ReadmeContent (Get-Content -LiteralPath $relReadmePath -Raw -Encoding UTF8)
+    if ($null -ne $targetMajor -and $targetMajor -ne $newMajor) {
+        Write-Error @"
+releases/README.md has no '### $newMajor.x' section yet, so the new row would be filed under '### $targetMajor.x'.
+Nothing was written. Add the section first -- directly under '## Overview', ABOVE '### $targetMajor.x':
+
+### $newMajor.x
+
+| Version | Date | Type | Title |
+|---|---|---|---|
+
+Then run this again. Starting a new major section is a deliberate milestone moment, which is why it is
+not done for you.
+"@
+        exit 1
+    }
+}
+
 # --- Lint gate ----------------------------------------------------------------------------------
 if (-not $SkipLint) {
     $lintPath = Join-Path $PSScriptRoot '..\lint\check-plugin-integrity.ps1'
