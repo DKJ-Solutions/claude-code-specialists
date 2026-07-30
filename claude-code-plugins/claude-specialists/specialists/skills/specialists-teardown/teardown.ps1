@@ -116,6 +116,25 @@ $removed = @()
 $kept    = @()
 $notes   = @()
 
+# WHAT COUNTS AS ONE OF OUR OWN LINES IN CLAUDE.md. Defined here rather than inside section 2, because
+# two sections need the same answer: section 2 REMOVES these lines, and the free-standing audit in
+# section 8 must not report them as surviving references (inbound #275). A predicate mirrored by hand in
+# two places is exactly what produced both instances of the orphaned-note defect, so there is one.
+#
+# Matching on CONTENT rather than on line numbers is deliberate: after -Apply the file has been rewritten
+# and every number has shifted, so a number-based exclusion would silently skip the wrong lines on the
+# very run where the check matters least. Content-based, the exclusion simply finds nothing after -Apply,
+# because the lines are gone.
+$isSpecialistImport = {
+    param($line)
+    if ($line.Trim() -eq $seam.ImportLine) { return $true }   # the seam: one line, knowably ours
+    ($line -match '^\s*@') -and ($line -match '(-persona\.md|-extension\.md)\s*$')
+}
+$isOurClaudeMdLine = {
+    param($line)
+    (& $isSpecialistImport $line) -or (Test-IsOrchestratorNoteLine -Line $line)
+}
+
 function Test-LooksGenerated {
     <# Is this file still an unfilled scaffold?
 
@@ -217,15 +236,33 @@ if (Test-Path -LiteralPath $seam.Inclusion -PathType Leaf) {
 
 # Prune the lens trees and the seam directory only when genuinely empty -- an authored lens or a kept
 # SPECIALISTS.md must not lose its directory out from under it.
-if ($Apply) {
-    foreach ($dir in ($lensDirs + @($seam.Dir))) {
-        if (-not (Test-Path -LiteralPath $dir)) { continue }
-        $leftovers = @(Get-ChildItem -LiteralPath $dir -Recurse -File -ErrorAction SilentlyContinue)
-        if ($leftovers.Count -eq 0) {
-            Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
-            $removed += ($dir.Substring($root.Length).TrimStart('\', '/') + '\ (empty)')
-        }
-    }
+#
+# REPORTED AND TALLIED IN BOTH MODES (inbound #275). This whole block used to sit inside `if ($Apply)`,
+# so the directories it cleans up were counted on the apply run and never mentioned in the preview: the
+# same run, over the same work, reported "29 item(s) to remove" and then "31 item(s) removed", while both
+# outputs listed identical [remove] lines. The dry run is explicitly the inventory a reader needs in order
+# to say yes, so a preview that undercounts its own execution weakens exactly the property it exists to
+# provide. Either count them in both or in neither -- and a directory that disappears is something a
+# reader should see coming, so: both.
+#
+# On a dry run the emptiness is PREDICTED rather than observed: a directory counts as empty when every
+# file still in it is already on the remove list. That is the same question -Apply answers by looking,
+# because by then those files are gone -- which is why one code path serves both and the two counts
+# cannot drift apart again.
+$plannedRemovals = [System.Collections.Generic.HashSet[string]]::new([string[]]$removed, [System.StringComparer]::OrdinalIgnoreCase)
+foreach ($dir in ($lensDirs + @($seam.Dir))) {
+    if (-not (Test-Path -LiteralPath $dir)) { continue }
+    $leftovers = @(
+        Get-ChildItem -LiteralPath $dir -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { -not $plannedRemovals.Contains($_.FullName.Substring($root.Length).TrimStart('\', '/')) }
+    )
+    if ($leftovers.Count -gt 0) { continue }
+    # One label for the printed line and the tally, so the list a reader reads and the number they are
+    # given cannot describe the same item differently.
+    $dirLabel = $dir.Substring($root.Length).TrimStart('\', '/') + '\ (empty directory)'
+    if ($Apply) { Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue }
+    $removed += $dirLabel
+    Write-Host ("  [remove] " + $dirLabel) -ForegroundColor Green
 }
 
 # --- 2. The @-imports in CLAUDE.md ---------------------------------------------------------------
@@ -236,11 +273,6 @@ $claudeMd = Join-Path $root 'CLAUDE.md'
 if (Test-Path -LiteralPath $claudeMd -PathType Leaf) {
     $text0 = [System.IO.File]::ReadAllText($claudeMd, [System.Text.Encoding]::UTF8)
     $lines = [System.IO.File]::ReadAllLines($claudeMd)
-    $isSpecialistImport = {
-        param($line)
-        if ($line.Trim() -eq $seam.ImportLine) { return $true }   # the seam: one line, knowably ours
-        ($line -match '^\s*@') -and ($line -match '(-persona\.md|-extension\.md)\s*$')
-    }
     # The explanatory note the bootstrap writes above the imports. Removed too, and matched on its
     # LITERAL generated wording only -- a consumer who reworded or translated it has authored that
     # text. Leaving it behind is what made the round-trip accumulate a copy per cycle: the bootstrap's
@@ -550,13 +582,25 @@ $auditFiles = @($auditFiles | Sort-Object -Property FullName -Unique)
 # Excluded rather than sorted last: a reference inside a file that is being removed is not a surviving
 # reference at all, so listing it would be wrong, not merely noisy. $removed carries rel paths for files
 # (plus a few non-path labels for imports, which simply never match an audit path).
+#
+# AND THE SAME RULE AT LINE GRANULARITY (inbound #275). The exclusion above covers files this run
+# DELETES; the bootstrap's orchestrator note and the `@`-imports are lines this run deletes inside a file
+# that STAYS. Without them excluded, a dry run reported `CLAUDE.md:<n> -- name 'Chris'` as a surviving
+# live reference on the very run that lists that same line under [remove] -- and the audit dropped from 5
+# live references to 4 after -Apply, on a consumer whose CLAUDE.md held nothing but its own governance
+# text plus the bootstrap's output. One order of granularity smaller than the 40-lens defect fixed in
+# 3.0.0, and identical in kind: over-reporting by exactly what the run is about to remove, in the mode
+# where a reader is least able to tell. $isOurClaudeMdLine (hoisted to the top) is the shared predicate,
+# so what section 2 removes and what this section discounts cannot drift apart.
 $removedPaths = [System.Collections.Generic.HashSet[string]]::new([string[]]$removed, [System.StringComparer]::OrdinalIgnoreCase)
 
 $liveHits = @()
 $skippedBecauseRemoved = 0
+$skippedLines = 0
 foreach ($f in $auditFiles) {
     $rel = $f.FullName.Substring($root.Length).TrimStart('\', '/')
     if ($removedPaths.Contains($rel)) { $skippedBecauseRemoved++; continue }
+    $isClaudeMd = ($rel -eq 'CLAUDE.md')
     $lineNo = 0
     foreach ($line in [System.IO.File]::ReadAllLines($f.FullName)) {
         $lineNo++
@@ -578,9 +622,13 @@ foreach ($f in $auditFiles) {
         if ($line -match '(?:\bGet-RosterPath\b|\bGet-RosterIgnoredIds\b|\$script:Roster(?:Path|IgnoredIds)\b)') {
             $what += 'plugin-only contract function'
         }
-        if ($what.Count -gt 0) {
-            $liveHits += [pscustomobject]@{ Rel = $rel; Line = $lineNo; What = ($what -join ' + '); Text = $line.Trim() }
-        }
+        if ($what.Count -eq 0) { continue }
+        # LINE GRANULARITY: ours, and going away, so not a leftover. Tested AFTER the match rather than
+        # before it, deliberately -- that way the number the scan line states is references excluded, not
+        # lines skipped. Most of the removed lines (a bare seam import) carry no reference at all, and
+        # counting those would inflate an exclusion notice into a claim about references that never were.
+        if ($isClaudeMd -and (& $isOurClaudeMdLine $line)) { $skippedLines++; continue }
+        $liveHits += [pscustomobject]@{ Rel = $rel; Line = $lineNo; What = ($what -join ' + '); Text = $line.Trim() }
     }
 }
 
@@ -589,7 +637,11 @@ Write-Host "-- free-standing audit: LIVE references left after this teardown --"
 # The count states what was SCANNED, not what was found in the tree -- and the excluded files are named,
 # because a silent exclusion is exactly the kind of quiet narrowing this audit exists to prevent.
 $scannedCount = $auditFiles.Count - $skippedBecauseRemoved
-$skipNote = if ($skippedBecauseRemoved -gt 0) { " $skippedBecauseRemoved file(s) this run $(if ($Apply) { 'removed' } else { 'would remove' }) were excluded -- a reference inside a file that is going away is not a leftover." } else { '' }
+$didOrWould = if ($Apply) { 'removed' } else { 'would remove' }
+$skipNote = if ($skippedBecauseRemoved -gt 0) { " $skippedBecauseRemoved file(s) this run $didOrWould were excluded -- a reference inside a file that is going away is not a leftover." } else { '' }
+# Stated, never silent -- for the same reason the file-level exclusion is stated. On -Apply this is 0
+# because the lines are already gone, which is the honest number rather than a missing one.
+if ($skippedLines -gt 0) { $skipNote += " $skippedLines reference(s) on CLAUDE.md line(s) this run $didOrWould (the bootstrap's orchestrator note, its @-import(s)) were excluded for the same reason, at line granularity." }
 Write-Host ("   scanned $scannedCount file(s) under CLAUDE.md, .claude/ and scripts/ against $($knownNames.Count) known specialist name(s); history (CHANGELOG.md, releases/) is excluded on purpose and never rewritten.$skipNote") -ForegroundColor DarkGray
 if ($liveHits.Count -eq 0) {
     Write-Host "  [FREE]   no live reference to a specialist, persona, roster or lens is left in the scanned set." -ForegroundColor Green

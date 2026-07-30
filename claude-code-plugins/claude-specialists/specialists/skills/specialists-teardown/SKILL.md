@@ -35,6 +35,14 @@ powershell -NoProfile -File "<plugin>/skills/specialists-teardown/teardown.ps1" 
 **Dry run by default.** A destructive script that runs on somebody's repo should have to be asked
 twice, and the preview doubles as the inventory a reader needs in order to say yes.
 
+**The preview and the apply run report the same total** (inbound #275). They used to differ by two: the
+directories the run cleans up (`lenses/`, then `specialists/`) were pruned, listed and tallied only under
+`-Apply`, so the same work read as "29 item(s) to remove" and then "31 item(s) removed". A preview that
+undercounts its own execution weakens exactly the property it exists to provide, so both modes now list
+those directories under `[remove]`. On a dry run the emptiness is predicted -- a directory counts as empty
+when every file still in it is already on the remove list -- which is the question `-Apply` answers by
+looking, off one shared code path.
+
 ## What it classifies, and why that is the whole design
 
 Consumer-side content is three things and only one is disposable. Deleting indiscriminately would
@@ -312,6 +320,12 @@ The choice is per line, not per file -- which is why the audit reports lines.
   lens files the same run had just put on the `[remove]` list -- they all mention a specialist -- and the
   handful of hits that actually matter only appeared after `-Apply`. That inverts the purpose of a preview
   that is explicitly the inventory you say yes to.
+- **And so are the *lines* it is about to delete, in a file that stays** (inbound #275). The exclusion above
+  is per file; the bootstrap's orchestrator note and the `@`-import(s) are lines removed from a `CLAUDE.md`
+  that survives. A dry run used to report the note as a live `name 'Chris'` hit on the very run that lists it
+  under `[remove]`, so the audit dropped from 5 live references to 4 after `-Apply` on a consumer that had
+  changed nothing in between. Same defect as the lens-file one, one order of granularity smaller, and the
+  line count is stated in the scan line exactly like the file count.
 - **History is out of scope and never rewritten.** `CHANGELOG.md` and `releases/` are excluded entirely.
   Other root prose (`README.md`, `CONTRIBUTING.md`) is outside the live set by the reading above, so it is
   **counted, not listed** -- a pointer, not a work queue.
