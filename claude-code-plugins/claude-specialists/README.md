@@ -582,8 +582,17 @@ somebody else's repo owns — so:
 
 Readers change in exactly one place: `Get-LensDirCandidates` gains the seam as its most canonical
 candidate, ahead of the three it already walks. Writers pick their target from whether a legacy tree
-exists. **Migrating is the owner's act**, four steps, none of them automatic:
+exists. **Migrating is the owner's act**, five steps, none of them automatic — and **step 0 is the one that can
+cost you the tree**:
 
+0. **Check your `.gitignore` first.** If it ignores `.claude/*` with an exception for the old path (e.g.
+   `!.claude/plugins/`), add `!.claude/specialists/` and **commit that before moving anything**. Measured
+   in `davekokbwj/smartwatchbanden` on July 30, 2026: its lenses are tracked *only* because of the
+   pre-seam exception, so moving them to the seam would drop them out of version control **with nothing
+   looking wrong** — every gate stays green (the readers accept the seam, which is the point) and
+   `git status` is silent (they are ignored). Reversed order and the move lands untracked, so the commit
+   that would have captured it has nothing to capture. An ignore rule written against a path is a bet
+   that the path will not move; this is the moment that bet is called in.
 1. `git mv .claude/plugins/<family>/<plugin>/*-extension.md .claude/specialists/lenses/`
 2. Create `.claude/specialists/SPECIALISTS.md` and move the roster, routing table and chains into it.
 3. Replace the two `@`-imports in `CLAUDE.md` with the single seam line.

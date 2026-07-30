@@ -84,6 +84,37 @@ clean it up. Since `.claude/` is where most of what the bootstrap writes lives, 
 it. Worse, in such a repo git cannot **restore** a wrongly deleted lens either — so establish whether
 `.claude/` is tracked *before* running with `-Apply`.
 
+### Pre-flight: is your lens tree actually under version control?
+
+One command, and it decides whether this whole procedure has an undo:
+
+```powershell
+git ls-files .claude | Select-String 'extension\.md|SPECIALISTS\.md'   # empty = NOT tracked
+```
+
+**And the answer can change when you migrate to the seam, which is the trap.** Measured across the two
+real consumers on July 30, 2026:
+
+| repo | `.gitignore` | consequence |
+|---|---|---|
+| `DaveKJohn/life-hub` | no `.claude` entry at all | the whole tree is tracked — a wrongly removed lens is one `git checkout` away |
+| `davekokbwj/smartwatchbanden` | `.claude/*` with `!.claude/plugins/` | tracked **only** on the pre-seam path |
+
+That second row is fine today and breaks silently on migration: the exception un-ignores
+`.claude/plugins/`, the **pre-seam** location. Move the lenses to `.claude/specialists/` and they match
+`.claude/*` with no exception covering them — so the tree leaves version control **without a single line
+of the migration looking wrong.** Every gate stays green (the readers accept the seam, which is the
+point), `git status` shows nothing (they are ignored), and the teardown's undo is gone.
+
+**So a seam migration in a repo that ignores `.claude/*` is two steps, in this order:** add the
+`!.claude/specialists/` exception (and commit it), *then* move the files. Reversed, the move lands
+untracked and the commit that would have captured it has nothing to capture.
+
+More generally: **an ignore rule written against a path is a bet that the path will not move.** The
+migration is exactly the moment that bet is called in, and nothing in this family's tooling can see the
+consumer's `.gitignore` for you — which is why this is a pre-flight step for the operator rather than a
+check.
+
 Take a **filesystem** inventory at each stage instead, and compare the numbers:
 
 ```powershell
