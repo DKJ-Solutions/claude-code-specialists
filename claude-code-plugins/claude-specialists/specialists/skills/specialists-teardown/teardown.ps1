@@ -437,6 +437,144 @@ if ($VendorScripts) {
     }
 }
 
+# --- 8. The free-standing audit: what LIVE references are left ------------------------------------
+# THE HALF THE REQUIREMENT WAS MISSING (issue #221). Everything above answers "what did the bootstrap
+# put here, and what did I take away". None of it answers the question Dave's requirement actually
+# poses: after this, does the repo STAND FREE? Section 2 gets closest with a count of CLAUDE.md lines
+# holding a specialist id -- one narrow slice of one file -- and the target shape's second item,
+# "reword category 3 plugin-neutrally", was never something a script could do: that prose belongs to
+# the repo owner, and a plugin rewriting an owner's governance text would be the exact damage the
+# classification in this script exists to prevent.
+#
+# So this section does the part a script legitimately CAN do: it finds the references and lists them by
+# file and line, turning an unbounded hand-audit into a checklist. Reword-or-delete stays the owner's
+# call, on evidence instead of on faith.
+#
+# REPORT-ONLY AND UNCONDITIONAL, including on a dry run. It removes nothing and so needs no -Apply, and
+# a preview that cannot tell you what would still be left is not the inventory a reader needs in order
+# to say yes.
+#
+# WHAT "LIVE" MEANS HERE, and why the scope is what it is. The family README settles the reading: the
+# requirement bites on what a session LOADS, a script RESOLVES, or a gate DEPENDS ON -- not on every
+# occurrence of a name. So the scanned set is CLAUDE.md, everything under .claude/, and everything
+# under scripts/. History is deliberately excluded and never rewritten: CHANGELOG.md and releases/
+# record that the adoption happened, which is accurate. Other tracked prose (README.md,
+# CONTRIBUTING.md) is outside the live set by that same reading, so it is COUNTED rather than listed --
+# a pointer, not a work item, and labelled as such instead of quietly dropped.
+$auditRoots = @(
+    @{ Rel = 'CLAUDE.md'; Recurse = $false },
+    @{ Rel = '.claude';   Recurse = $true },
+    @{ Rel = 'scripts';   Recurse = $true }
+)
+# The names come from THIS plugin's own payload -- never a hardcoded list, which would be a guess that
+# rots on the next rename. Two sources, matching the two shapes a specialist ships in: an agent def's
+# `name:` frontmatter, and a persona's H1 (personas deliberately have no agent def).
+#
+# HONEST LIMIT, stated because it changes how the output should be read: this skill ships inside ONE
+# plugin and can only see that plugin's specialists. A consumer that also enables a domain plugin has
+# names this scan does not know. The ID scan below is the general net -- '<gg>-<ii>' tokens are
+# name-independent and catch a specialist from any plugin -- and the name scan is the extra pass on top.
+$knownNames = @()
+foreach ($dir in @('agents', 'personas')) {
+    $srcDir = Join-Path $PSScriptRoot "../../$dir"
+    if (-not (Test-Path -LiteralPath $srcDir)) { continue }
+    foreach ($f in @(Get-ChildItem -LiteralPath $srcDir -Filter '*.md' -File -ErrorAction SilentlyContinue)) {
+        $txt = [System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8)
+        $m = [regex]::Match($txt, '(?m)^name:\s*([A-Za-z0-9_-]+)\s*$')
+        if ($m.Success) { $knownNames += (Get-DisplayName -RawName $m.Groups[1].Value); continue }
+        # Persona: the display name is the first word of the H1 ('# Derek <emoji> -- the DevOps ...').
+        $h = [regex]::Match($txt, '(?m)^#\s+([A-Za-z][A-Za-z0-9_-]*)')
+        if ($h.Success) { $knownNames += (Get-DisplayName -RawName $h.Groups[1].Value) }
+    }
+}
+$knownNames = @($knownNames | Where-Object { $_ } | Sort-Object -Unique)
+
+$idPattern = if (Get-Command Get-RosterIdTokenPattern -ErrorAction SilentlyContinue) {
+    Get-RosterIdTokenPattern
+} else {
+    '(?<![\d-])\d{2}-\d{2}(?!\d)'
+}
+# Word-bounded, so 'Cody' does not match inside 'Codyssey' and a name is never reported off a substring.
+#
+# Matching stays CASE-INSENSITIVE (PowerShell's -match default), and that is a deliberate bias toward
+# OVER-reporting. This is an audit whose whole purpose is establishing that nothing was missed, so its
+# expensive failure is a reference it did not find, not one a reader dismisses in five seconds. Every hit
+# carries file:line, which makes a false positive cheap and a false negative silent -- so the doubt is
+# resolved toward reporting, the same direction Test-LooksGenerated resolves its doubt toward keeping.
+$namePattern = if ($knownNames.Count -gt 0) { '\b(' + (($knownNames | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')\b' } else { $null }
+
+$auditFiles = @()
+foreach ($r in $auditRoots) {
+    $p = Join-Path $root $r.Rel
+    if (-not (Test-Path -LiteralPath $p)) { continue }
+    if ($r.Recurse) {
+        $auditFiles += @(Get-ChildItem -LiteralPath $p -Recurse -File -Include '*.md', '*.ps1', '*.json', '*.jsonc' -ErrorAction SilentlyContinue)
+    } else {
+        $auditFiles += @(Get-Item -LiteralPath $p)
+    }
+}
+$auditFiles = @($auditFiles | Sort-Object -Property FullName -Unique)
+
+$liveHits = @()
+foreach ($f in $auditFiles) {
+    $rel = $f.FullName.Substring($root.Length).TrimStart('\', '/')
+    $lineNo = 0
+    foreach ($line in [System.IO.File]::ReadAllLines($f.FullName)) {
+        $lineNo++
+        $what = @()
+        if ($line -match $idPattern) { $what += 'specialist id' }
+        if ($namePattern -and ($line -match $namePattern)) { $what += "name '$($Matches[1])'" }
+        # A repo-config that survives is category 3 -- the repo's own conventions -- but two of the
+        # contract functions in it exist ONLY for the plugin. Named separately, because "keep this file"
+        # and "keep every line in this file" are different answers.
+        # The '$script:' variants must NOT sit behind a shared leading \b: '$' is not a word character,
+        # so '\b\$' demands a word char immediately before the dollar and therefore never matches an
+        # assignment at the start of a line -- which is exactly where these live. Caught by running the
+        # audit against a hand-built fixture, where '$script:RosterPath = ...' on line 3 was missed while
+        # 'function Get-RosterPath' on line 4 was found. Each alternative now carries its own anchor.
+        if ($line -match '(?:\bGet-RosterPath\b|\bGet-RosterIgnoredIds\b|\$script:Roster(?:Path|IgnoredIds)\b)') {
+            $what += 'plugin-only contract function'
+        }
+        if ($what.Count -gt 0) {
+            $liveHits += [pscustomobject]@{ Rel = $rel; Line = $lineNo; What = ($what -join ' + '); Text = $line.Trim() }
+        }
+    }
+}
+
+Write-Host ''
+Write-Host "-- free-standing audit: LIVE references left after this teardown --" -ForegroundColor Cyan
+Write-Host ("   scanned $($auditFiles.Count) file(s) under CLAUDE.md, .claude/ and scripts/ against $($knownNames.Count) known specialist name(s); history (CHANGELOG.md, releases/) is excluded on purpose and never rewritten.") -ForegroundColor DarkGray
+if ($liveHits.Count -eq 0) {
+    Write-Host "  [FREE]   no live reference to a specialist, persona, roster or lens is left in the scanned set." -ForegroundColor Green
+    $notes += "Free-standing audit: clean. Nothing a session loads, a script resolves, or a gate depends on still points at the plugin. That is the requirement met, verified rather than assumed."
+} else {
+    # No silent caps: a bounded list must say what it bounded, or a truncated report reads as a complete
+    # one -- the same rule the release notes and the connector summary follow.
+    $show = 40
+    foreach ($h in ($liveHits | Select-Object -First $show)) {
+        Write-Host ("  [LIVE]   " + $h.Rel + ":" + $h.Line + " -- " + $h.What) -ForegroundColor Yellow
+    }
+    if ($liveHits.Count -gt $show) {
+        Write-Host ("  ... and $($liveHits.Count - $show) more, not listed (showing the first $show)") -ForegroundColor Yellow
+    }
+    $byFile = @($liveHits | Group-Object Rel | Sort-Object Count -Descending)
+    $notes += "Free-standing audit: $($liveHits.Count) live reference(s) across $($byFile.Count) file(s) -- densest: $(($byFile | Select-Object -First 3 | ForEach-Object { "$($_.Name) ($($_.Count))" }) -join ', '). These are YOURS: authored governance text, not bootstrap leftovers, so this script names them and changes nothing. Two ways to clear one, and the choice is per line rather than per file: DELETE it if the rule only ever existed for the plugin, or REWORD it if the rule still holds without the character -- 'Derek opens the PR' becomes 'changes go in via a branch and a PR', which stays true with the plugin gone. A 'plugin-only contract function' hit is the third case: the surrounding file is yours to keep, but that particular function existed only to serve the roster check."
+}
+
+# Outside the live set: counted, not listed. Prose and history are not what the requirement bites on,
+# and an owner deciding what to do with their own README should get a pointer, not a work queue.
+$proseHits = 0
+foreach ($f in @(Get-ChildItem -LiteralPath $root -Filter '*.md' -File -ErrorAction SilentlyContinue)) {
+    if ($f.Name -eq 'CLAUDE.md' -or $f.Name -eq 'CHANGELOG.md') { continue }
+    $txt = [System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8)
+    foreach ($line in ($txt -split "`r?`n")) {
+        if (($line -match $idPattern) -or ($namePattern -and $line -match $namePattern)) { $proseHits++ }
+    }
+}
+if ($proseHits -gt 0) {
+    $notes += "Outside the live set: $proseHits line(s) in other root markdown (README.md, CONTRIBUTING.md, ...) mention a specialist or an id. Counted, not listed, and not part of the requirement: nothing loads, resolves or gates on them. Yours to reword whenever you feel like it. CHANGELOG.md and releases/ are excluded entirely -- they record that the adoption happened, which stays true."
+}
+
 # --- Summary --------------------------------------------------------------------------------------
 Write-Host ''
 # "kept", not "kept (authored)". The script cannot establish authorship, and saying so was measurably
