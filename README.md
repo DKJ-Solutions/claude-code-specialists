@@ -77,9 +77,10 @@ The full picture, top-level folder by folder:
 
 A consuming repo adds this marketplace via `extraKnownMarketplaces` in `.claude/settings.json` and
 enables the desired plugins via `enabledPlugins` — and then, because an install is **project-scoped**,
-runs `claude plugin install <plugin>@<marketplace>` from that repo's root for each of them; the
-settings keys alone install nothing. The canonical enable-a-plugin walkthrough (the settings snippet,
-the per-plugin install, the restart, the `claude plugin list` self-check, running the bootstrap skill)
+runs `claude plugin install <plugin>@<marketplace> --scope project` from that repo's root for each of
+them; the settings keys alone install nothing, and without the flag the command defaults to a
+machine-wide `user` install instead. The canonical enable-a-plugin walkthrough (the settings snippet,
+the per-plugin install, the restart, the install-record self-check, running the bootstrap skill)
 is in the family
 [Quickstart](claude-code-plugins/claude-specialists/QUICKSTART.md) — connect in three steps, for
 those who didn't build the system. This root README keeps only the two marketplace-wide facts that
@@ -108,7 +109,8 @@ run into this: update the marketplace registration (a marketplace update) or re-
 Every plugin (one folder per group under `claude-code-plugins/claude-specialists/`) carries its own
 `version` in its `plugin.json`. On a release those versions move **in lockstep** — they all get the
 same number under one repo-wide tag `vX.Y.Z`. **That version number is also the update gate**:
-`claude plugin update` compares nothing but version numbers, so a consuming repo (including this
+`claude plugin update <plugin>@<marketplace> --scope project` compares nothing but version numbers
+(and needs that same scope flag, for the same reason the install does), so a consuming repo (including this
 repo itself, which consumes itself) only pulls in merged changes after the `version` has been
 bumped — a merge without a release stays invisible to consumers, and a shared agent-def change
 therefore always lands here first, never the other way around. The full mechanics — cutting a

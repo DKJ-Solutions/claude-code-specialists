@@ -40,15 +40,31 @@ and caches it by itself. **Those keys do not install anything, though** — an i
 so run one command per plugin you listed, from the root of your repo:
 
 ```powershell
-claude plugin install specialists@davekjohns-workshop
+claude plugin install specialists@davekjohns-workshop --scope project
 # and the same line again for each domain group you enabled
 ```
 
-**Then restart your Claude Code session** and check that it worked: `claude plugin list` must show
-every plugin you listed as `enabled`. Do run that check — if the install did not happen, the skill
-from step 2 and the session hooks are simply absent, and that looks exactly like a session where
-everything is fine. (The list may show the same plugin more than once, one line per project record
-Claude Code holds for your repo; all you need is that it appears as `enabled`.)
+**Keep `--scope project` on that line.** `claude plugin install` defaults to `--scope user`, which
+installs machine-wide and writes no `projectPath` at all — so you would get the one thing the
+sentence above says this step is for, wrong, without any error. Same flag on the way back out:
+`claude plugin update` has the same default and simply fails on a project-scoped install (see
+[Staying up to date](#staying-up-to-date)).
+
+**Then restart your Claude Code session** and check that it worked — but **not with `claude plugin
+list`**. That command is not repo-scoped: it reports install records beyond your repo, so it can show
+a plugin as `enabled` in a repo that has no install at all. Check the record for *your* repo, from
+its root:
+
+```powershell
+$root = (Get-Location).Path
+(Get-Content "$env:USERPROFILE\.claude\plugins\installed_plugins.json" -Raw | ConvertFrom-Json).plugins.PSObject.Properties |
+  ForEach-Object { $n = $_.Name; $_.Value | Where-Object { $_.projectPath -eq $root } |
+    ForEach-Object { "$n -> $($_.scope) $($_.version)" } }
+```
+
+One `project` line per plugin you listed is what you want; empty output means nothing was installed
+here. Do run it — if the install did not happen, the skill from step 2 and the session hooks are
+simply absent, and that looks exactly like a session where everything is fine.
 
 **Step 2 — run the bootstrap skill.** In the new session, invoke `specialists-init`. It sets up —
 purely additively, without overwriting anything — the **lens-only** persona lenses (including
@@ -67,8 +83,19 @@ The worker specialists can be invoked directly as `@specialists:<name>`.
 
 ## Staying up to date
 
-Updates reach you via **releases**: `claude plugin update` compares version numbers only, so you
-get changes as soon as the workshop has cut a new version — not before. Each plugin carries its own
+Updates reach you via **releases**. Run it from your repo's root, once per plugin, **with the same
+scope flag you installed with**:
+
+```powershell
+claude plugin update specialists@davekjohns-workshop --scope project
+```
+
+Without the flag it defaults to user scope and fails on a project-scoped install with *"Plugin
+`specialists` is not installed at scope user"* — literally true, and easy to misread as "not
+installed at all" on a machine where it is. Do not answer that by re-running the install: a scopeless
+install adds a **second, machine-wide record** beside the project one. `claude plugin update`
+compares version numbers only, so you get changes as soon as the workshop has cut a new version — not
+before. Each plugin carries its own
 `CHANGELOG.md` that travels with the plugin cache and describes per release what changed for that
 plugin; the full history lives in the workshop itself
 ([`CHANGELOG.md`](../../CHANGELOG.md) and [`releases/`](../../releases/README.md)). Each plugin

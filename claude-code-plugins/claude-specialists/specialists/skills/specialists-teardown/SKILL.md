@@ -81,7 +81,11 @@ authored.
   ends and your own prose begins. The only lines it touches there are the two `@`-imports, which are
   knowably bootstrap-written and cannot be anything else -- the same property that let
   `check-roster-sync` stop counting them as roster rows.
-- **It never touches the plugin install or cache.** `claude plugin uninstall` is a separate step.
+- **It never touches the plugin install or cache.** `claude plugin uninstall <plugin>@<marketplace>
+  --scope project`, run from this repo's root, is a separate step. Keep the scope flag: like `plugin
+  install` and `plugin update`, `uninstall` defaults to `--scope user` and will not find a
+  project-scoped install without it (inbound
+  [#279](https://github.com/DaveKJohn/davekjohns-workshop/issues/279)).
 
 ## Verifying a round-trip — and why `git status` is not enough
 
@@ -94,11 +98,42 @@ it. Worse, in such a repo git cannot **restore** a wrongly deleted lens either �
 
 ### Pre-flight: is your lens tree actually under version control?
 
-One command, and it decides whether this whole procedure has an undo:
+Two commands, because one cannot decide it. They answer different questions, and only the first is
+about whether this procedure *can* have an undo:
 
 ```powershell
-git ls-files .claude | Select-String 'extension\.md|SPECIALISTS\.md'   # empty = NOT tracked
+# 1. Can this repo track the lens tree at all?
+git check-ignore -v .claude/specialists/lenses/   # a hit = ignored -> there is NO undo, stop here
+
+# 2. Is it tracked right now?
+git ls-files .claude | Select-String 'extension\.md|SPECIALISTS\.md'   # empty = not committed yet
 ```
+
+**Why not the second command on its own — it used to be, and it gave the alarming answer for the safe
+repo.** Measured in `DaveKJohn/life-hub` on July 30, 2026, immediately after the bootstrap and before
+`-Apply`, which is exactly when this section tells you to look: `git ls-files` came back **empty**
+while `.claude/` was genuinely under version control — 16 files tracked, `settings.json` among them,
+nothing about the path ignored, and 19 freshly written lenses sitting in `git status` as `??`. The
+command lists **committed** files only, and the lenses the bootstrap has just written are new.
+
+So an empty result collapses two states that call for opposite responses:
+
+| state | what it means | what to do |
+|---|---|---|
+| `.claude/*` is **ignored** (the `smartwatchbanden` row below) | this repo can never protect its lenses | stop — this is what the section exists to catch |
+| `.claude/` is **tracked, lenses not committed yet** (the normal state right after any bootstrap) | the undo is available, you have not claimed it | commit the lens tree, *then* proceed |
+
+Read strictly, "empty = not tracked" is not wrong about that second row — an uncommitted file has no
+git copy either. But only the first row is a reason not to proceed, and a verdict that fires loudest
+in the safe case is one an operator learns to ignore. Command 1 separates them: it asks the
+`.gitignore` question directly and answers it whether or not anything has been committed.
+
+**And note where the undo actually begins: at the commit, not at the bootstrap.** The table below
+says a wrongly removed lens in `life-hub` is one `git checkout` away — true of a *committed* lens
+tree, and of nothing else. In a repo that tracks `.claude/`, committing the lens tree before `-Apply`
+is the step that buys the safety net. As this section already argues about ignore rules: *a rule
+written against a path is a bet that the path will not move.* A tracking claim written against files
+that are not committed yet is the same kind of bet.
 
 **And the answer can change when you migrate to the seam, which is the trap.** Measured across the two
 real consumers on July 30, 2026:

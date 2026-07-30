@@ -45,28 +45,89 @@ is therefore manual, and it is **three acts, in this order**.
 }
 ```
 
-**0b — install, per plugin, from the repo root.** Those settings keys on their own install nothing.
-A plugin install is **project-scoped**: `~/.claude/plugins/installed_plugins.json` keys every install
-by `projectPath`, and `enabledPlugins` + `extraKnownMarketplaces` produce no entry for this repo by
-themselves. So run, from the root of the consuming repo, one command per plugin listed in
-`enabledPlugins`:
+**0b — install, per plugin, from the repo root, at project scope.** Those settings keys on their own
+install nothing. A plugin install is **project-scoped**: `~/.claude/plugins/installed_plugins.json`
+keys every install by `projectPath`, and `enabledPlugins` + `extraKnownMarketplaces` produce no entry
+for this repo by themselves. So run, from the root of the consuming repo, one command per plugin
+listed in `enabledPlugins`:
 
 ```powershell
-claude plugin install specialists@davekjohns-workshop
+claude plugin install specialists@davekjohns-workshop --scope project
 # plus each domain plugin, e.g.:
-claude plugin install specialists-shopify@davekjohns-workshop
+claude plugin install specialists-shopify@davekjohns-workshop --scope project
 ```
 
-**0c — restart, then verify before invoking.** After the restart, `claude plugin list` must report
-every plugin from `enabledPlugins` as `enabled`. Run that check rather than assuming it, because
-**the failure it catches is silent and self-camouflaging**: in a session where the install never
-happened, this skill is absent *and* the session-start hooks are absent — and "no hooks because the
-plugin is not loaded" reads exactly like "no hooks because everything is in order". Nothing else in
-the session tells the two apart. One caveat on reading that list: it can show the same plugin more
-than once for a repo (one line per project record in `~/.claude.json`, sometimes several versions and
-path spellings side by side). What you need from it is that each plugin appears as `enabled` at all.
+**`--scope project` is not optional here, and leaving it off fails quietly.** `claude plugin install`
+defaults to `--scope user` (`claude plugin install --help` states it outright), which writes a record
+with **no `projectPath` at all** — machine-wide, active in every repo on the machine, and precisely
+not the per-`projectPath` entry the paragraph above says this step exists to create. Nothing errors:
+the install reports success, and the only word distinguishing the two is `(scope: user)` in its own
+output line. Project scope is the intended model for this family — it is what both real consumers
+carry, it is what keeps a repo pinned to the version it was tested against, and every other document
+here is written against it.
 
-Once the list is green, invoke this skill.
+**The same default bites on the way back out, which is where it is actually expensive.** `claude
+plugin update` also defaults to user scope, so on a project-scoped install the plain command fails:
+
+```
+✘ Failed to update plugin "specialists@davekjohns-workshop": Plugin "specialists" is not installed at scope user
+```
+
+That message is literally true and reads as *"this plugin is not installed"* on a machine where it
+demonstrably is — so the obvious next move is to re-run the install, which adds a **second,
+user-scope record** beside the project one and makes the plugin appear machine-wide. Update with the
+flag instead, from the consuming repo's root, one command per plugin:
+
+```powershell
+claude plugin update specialists@davekjohns-workshop --scope project
+```
+
+This is the command every "pick up the new release" pointer in this family means — in
+[`sync-roster`](../sync-roster/SKILL.md), in `scripts/sync/check-script-contract.ps1`, in the
+[QUICKSTART](../../../QUICKSTART.md#staying-up-to-date), and in the release notes. Read a bare
+`claude plugin update` anywhere as shorthand for this line.
+
+**0c — restart, then verify before invoking.** Verify rather than assume, because **the failure this
+catches is silent and self-camouflaging**: in a session where the install never happened, this skill
+is absent *and* the session-start hooks are absent — and "no hooks because the plugin is not loaded"
+reads exactly like "no hooks because everything is in order". Nothing in the session announces the
+difference.
+
+**Do not verify with `claude plugin list` alone — it is not repo-scoped, and it will tell you
+everything is fine in a repo that has no install.** Measured in `DaveKJohn/davekjohns-workshop` on
+July 30, 2026: that repo has `enabledPlugins` set and **no install record of its own** (the only
+`projectPath` in `installed_plugins.json` pointed at a different repo), and the plugin was
+demonstrably not loaded — no `specialists:*` subagents, no skills, no session hooks. Run from that
+repo's root, the list nevertheless reported:
+
+```
+❯ specialists@davekjohns-workshop   Version: 3.0.1   Scope: project   Status: ✔ enabled
+```
+
+The command enumerates install records beyond the current repo, so a green line is no evidence that
+*this* repo is installed. Exactly why it reports the way it does was not established and is
+deliberately not recorded here as a mechanism; what matters is that the output cannot carry the
+verdict. Note too that the "you may see duplicates, just check each plugin appears as `enabled` at
+all" reading — which earlier editions of this step recommended — steers you past the one signal that
+would expose a stray second record.
+
+**Check the record for this repo instead.** Run from the root of the consuming repo:
+
+```powershell
+$root = (Get-Location).Path
+(Get-Content "$env:USERPROFILE\.claude\plugins\installed_plugins.json" -Raw | ConvertFrom-Json).plugins.PSObject.Properties |
+  ForEach-Object { $n = $_.Name; $_.Value | Where-Object { $_.projectPath -eq $root } |
+    ForEach-Object { "$n -> $($_.scope) $($_.version)" } }
+```
+
+One line per plugin you enabled, each saying `project`, is the green you need. **Empty output means
+this repo has no install** — go back to step 0b. A plugin that shows up as `user` is the scopeless
+install from 0b's warning; it works machine-wide but is not the model the rest of these documents
+assume.
+
+Then confirm the session actually loaded it: after the restart the `specialists-init` skill is in
+your slash list and the session-start hooks have reported. Once both checks are green, invoke this
+skill.
 
 ## What the skill does
 
