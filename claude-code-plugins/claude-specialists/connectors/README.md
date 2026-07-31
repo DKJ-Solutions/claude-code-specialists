@@ -221,9 +221,10 @@ inventory per plugin, `visibility` and `localCheckout` left as `VUL-IN` because 
 which then lands here through the normal branch + PR flow. This hook is — alongside the `specialists-init` skill and the `roster-sessioncheck` hook
 (the roster-sync feature) — one of the named, repo-neutral exceptions to the rule that plugins
 carry no hooks/skills (see the root README). Mind the **version gate**: consumers only receive the
-hook after a release bump plus a `claude plugin update <plugin>@<marketplace> --scope project`
-(the scope flag is not optional — see
-[Staying up to date](../QUICKSTART.md#staying-up-to-date)) + session restart on their side.
+hook after a release bump plus `claude plugin marketplace update <marketplace>` and
+`claude plugin update <plugin>@<marketplace> --scope project` (neither the refresh nor the scope flag
+is optional — see [Staying up to date](../QUICKSTART.md#staying-up-to-date)) + session restart on
+their side.
 
 The same gate applies to a newly added **skill** file — see
 [Staying up to date](../QUICKSTART.md#staying-up-to-date) in the Quickstart for the full mechanics.

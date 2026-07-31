@@ -37,12 +37,23 @@ that domain):
 
 This repo is public, so the source can be read without GitHub authentication; Claude Code clones
 and caches it by itself. **Those keys do not install anything, though** — an install is *per repo*,
-so run one command per plugin you listed, from the root of your repo:
+so run one command per plugin you listed, from the root of your repo, preceded once by a refresh of
+that cached clone:
 
 ```powershell
-claude plugin install specialists@davekjohns-workshop --scope project
-# and the same line again for each domain group you enabled
+claude plugin marketplace update davekjohns-workshop                     # 1. refresh the cache first
+claude plugin install specialists@davekjohns-workshop --scope project    # 2. then install, per plugin
+# and line 2 again for each domain group you enabled
 ```
+
+**Line 1 is not only an update-time step, and this is where the evidence for it came from.** Without
+it, the install happily gives you the **previous** version and reports `✔ Successfully installed` —
+measured on July 30, 2026 with a fresh `install`, not an `update` (the full account is under
+[Staying up to date](#staying-up-to-date)). A stale cache produces a green line and a plausible
+version number, so the only symptom is a session quietly missing whatever the release added. That is
+easily mistaken for the restart problem described under
+[Staying up to date](#staying-up-to-date) — a new skill needing a session restart — and is a
+different cause with a different fix.
 
 **Keep `--scope project` on that line.** `claude plugin install` defaults to `--scope user`, which
 installs machine-wide and writes no `projectPath` at all — so you would get the one thing the
