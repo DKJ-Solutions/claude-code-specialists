@@ -103,11 +103,36 @@ about whether this procedure *can* have an undo:
 
 ```powershell
 # 1. Can this repo track the lens tree at all?
-git check-ignore -v .claude/specialists/lenses/   # a hit = ignored -> there is NO undo, stop here
+#    A line that SURVIVES the filter = ignored -> there is NO undo, stop here
+git check-ignore -v .claude/specialists/lenses/ |
+  Where-Object { ($_ -split '\t')[0] -notmatch ':$' }   # keep only hits with a filled pattern field
 
 # 2. Is it tracked right now?
 git ls-files .claude | Select-String 'extension\.md|SPECIALISTS\.md'   # empty = not committed yet
 ```
+
+**Command 1 filters its own output, and leaving that filter off is what makes it lie.** `check-ignore
+-v` prints `<source>:<line>:<pattern>` + TAB + `<path>`, and in a `.gitignore` with **CRLF line endings
+and at least one blank line** that blank line is read as a pattern of a single `\r` — which matches
+**every** path with a trailing slash. The result is a hit whose **pattern field is empty**, and only
+someone who knows the field should be filled can tell it from a real one. Measured in
+`DaveKJohn/life-hub` on July 30, 2026 (git 2.54.0.windows.1): `.gitignore:19:` + TAB +
+`.claude/specialists/lenses/`, exit `0` — while nothing about that path was ignored at all (no `claude`
+line anywhere in `.gitignore`, 16 files under `.claude` tracked, no `core.excludesFile`, a default
+`info/exclude`), and line 19 of that file is blank. A CRLF `.gitignore` with a blank line is the
+**normal** state of a repo on Windows and both real consumers are Windows repos, so unfiltered this
+command hands the loudest verdict in the section — *stop here* — to the repo the table below lists as
+the safe one.
+
+**Do not reach for "just drop the trailing slash" instead: that trades the false positive for a false
+negative.** Measured on July 31, 2026 across the six fixtures now carried as a regression suite in the
+source repo (`scripts/tests/teardown-protocol.tests.ps1`, which runs *this* filter, extracted from this
+page): in a CRLF repo that genuinely ignores
+`node_modules/`, `git check-ignore -v node_modules` (no slash, directory absent from disk) exits `1` —
+a real ignore rule, missed. Filtering is the safe half of that trade, because the artefact never
+outranks a real pattern: with a genuine rule placed **before** and **after** the blank line, git
+reported the genuine one, pattern field filled, in both orders. Dropping empty-pattern lines can
+therefore only ever remove a false hit — never suppress a true one.
 
 **Why not the second command on its own — it used to be, and it gave the alarming answer for the safe
 repo.** Measured in `DaveKJohn/life-hub` on July 30, 2026, immediately after the bootstrap and before
@@ -161,12 +186,38 @@ check.
 Take a **filesystem** inventory at each stage instead, and compare the numbers:
 
 ```powershell
-# count of lenses, imports, scaffolds, and the settings proposal
+# count of lenses, imports, lone LFs, scaffolds, and the settings proposal
+$root = (Get-Location).Path
+$text = Get-Content (Join-Path $root 'CLAUDE.md') -Raw
 @(Get-ChildItem .claude -Recurse -Filter '*-extension.md' -File).Count
-@([System.IO.File]::ReadAllLines('CLAUDE.md') | Where-Object { $_ -match '^\s*@' }).Count
+@($text -split '\r?\n' | Where-Object { $_ -match '^\s*@' }).Count
+([regex]::Matches($text, '(?<!\r)\n')).Count
 Test-Path scripts\repo-config.ps1; Test-Path scripts\lib\branch-info.ps1
 Test-Path .claude\settings.suggested.jsonc
 ```
+
+**Read `CLAUDE.md` once, into `$text`, from a path anchored to the repo root — the two lines that skip
+that both fail to green.** This block used to count the imports with
+`[System.IO.File]::ReadAllLines('CLAUDE.md')` and the lone LFs against a bare `$text`, and both were
+silently measuring nothing:
+
+- **A .NET static method with a relative path does not follow `Set-Location`.** It resolves against
+  `[Environment]::CurrentDirectory`, which `cd` leaves untouched — so in one and the same block the
+  cmdlet lines measured the repo you are standing in while that one line measured whatever directory
+  the process started in. Measured in a fresh consumer on July 30, 2026: `19` lenses from the
+  disposable folder and `0` imports read out of **`life-hub`'s** `CLAUDE.md`, with
+  `[System.IO.Path]::GetFullPath('CLAUDE.md')` confirming the other repo. Nothing in the output names
+  a path, so the block looks internally consistent while one line reports on a repo that plays no part
+  in the measurement — and this goes wrong in exactly the fresh disposable folder step 1 of the test
+  protocol prescribes.
+- **`[regex]::Matches($null, …)` does not throw, it returns zero matches.** `$text` was never assigned
+  anywhere in this document, so the lone-LF line printed `0` without reading a byte; the same file read
+  properly gave `8`.
+
+Both wrong answers are the **green** one: a `0` reads as "the import was removed cleanly" and as "no
+line-ending pollution" — precisely the two defects this protocol exists to catch. Hence the two setup
+lines at the top, and hence `Get-Content -Raw`, which follows the PowerShell location like every other
+line here.
 
 **Read the two scaffold lines correctly, or the whole protocol tells you the wrong thing.** They are an
 *inventory*, not an expectation — and what the right answer is depends on something the numbers cannot
@@ -190,11 +241,16 @@ which is why the round-trip suite now carries an explicit *occupied consumer* sc
 
 Two further checks the hooks will not do for you, both of which caught real defects:
 
-- **Count the bootstrap's note line.** A `teardown` → `init` cycle used to add one copy per cycle
-  (measured 1 → 2 → 3) while all three session hooks reported "in sync". Run the cycle **twice**: once
-  cannot distinguish "does not accumulate" from "accumulates once".
-- **Count lone LFs in `CLAUDE.md`.** `([regex]::Matches($text, "(?<!\`r)\`n")).Count` — the bootstrap
-  used to paste LF into a CRLF file, invisible to every gate.
+- **Count the bootstrap's note on its head line — and know what the report says instead.** The note is
+  a **two-line block**, so "count the note" only means something once you name the unit: count the
+  **head** line, in `CLAUDE.md` itself. A `teardown` → `init` cycle used to add one copy per cycle
+  (measured 1 → 2 → 3 on that head line) while all three session hooks reported "in sync". Run the
+  cycle **twice**: once cannot distinguish "does not accumulate" from "accumulates once". Do **not**
+  take this count from the teardown report, which is the tempting source because the word is right
+  there: the report lists the block **per line**, so a healthy repo shows **two** `[remove]` lines —
+  the first value of the defective series, dressed as the normal case.
+- **Count lone LFs in `CLAUDE.md`** — the third counter in the block above. The bootstrap used to paste
+  LF into a CRLF file, invisible to every gate.
 
 And declare your own empty-lens convention if you have one, or the report will keep files it cannot
 recognise: `-EmptyLensPattern '<your marker>'`.

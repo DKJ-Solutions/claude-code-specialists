@@ -627,6 +627,41 @@ function Get-LintScript { return `$script:LintScript }
     Assert-Equal 0 $la.Code 'line scope: apply exit-code 0'
     $laHits = @([regex]::Matches($la.Out, '(?m)^\s*\[LIVE\]\s+CLAUDE\.md:'))
     Assert-Equal $lpHits.Count $laHits.Count 'line scope: the live count is the same before and after -Apply'
+
+    # --- inbound #286: the note's two [remove] lines are DISTINGUISHABLE ------------------------------
+    #     Removing per line is correct -- both lines must go -- but the report printed the same sentence
+    #     twice, so a HEALTHY repo showed "2" for a check SKILL.md frames as the defective series
+    #     1 -> 2 -> 3. The loudest reading of a clean run was therefore the accumulation defect itself,
+    #     and two identical lines carried no information about WHICH of the block's two lines was meant.
+    #     Asserted against the file: a line number that does not resolve to a note line is a label that
+    #     looks precise and is not, which would be a worse failure than the vague one it replaced.
+    Write-Host "inbound #286 -- the note's [remove] lines name which line they mean" -ForegroundColor Cyan
+    New-BootstrappedConsumer | Out-Null
+    $np = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
+    Assert-Equal 0 $np.Code 'note report: preview exit-code 0'
+    $noteRx    = "(?m)^\s*\[remove\]\s+CLAUDE\.md:(?<line>\d+) -- the bootstrap's orchestrator note \((?<part>head|tail)\)\s*$"
+    $noteLines = @([regex]::Matches($np.Out, $noteRx))
+    Assert-Equal 2 $noteLines.Count 'note report: two [remove] lines for the two-line note block'
+    Assert-Equal 2 (@($noteLines | ForEach-Object { $_.Value.Trim() } | Sort-Object -Unique).Count) `
+        'note report: and they are DISTINCT -- the finding was two byte-identical lines'
+    Assert-Equal 'head,tail' ((@($noteLines | ForEach-Object { $_.Groups['part'].Value } | Sort-Object) -join ',')) `
+        'note report: one is labelled head, the other tail'
+    # The line numbers must be real. Resolved against the file the run was about to edit.
+    $fxLines = [System.IO.File]::ReadAllLines((Join-Path $Fixture 'CLAUDE.md'))
+    foreach ($m in $noteLines) {
+        $n = [int]$m.Groups['line'].Value
+        $ok = ($n -ge 1 -and $n -le $fxLines.Count) -and (Test-IsOrchestratorNoteLine -Line $fxLines[$n - 1])
+        Assert-True $ok "note report: CLAUDE.md:$n really is a note line in the file"
+        $expected = if ($fxLines[$n - 1].Trim() -eq $noteSrc.Head) { 'head' } else { 'tail' }
+        Assert-Equal $expected $m.Groups['part'].Value "note report: CLAUDE.md:$n is labelled with the half it actually is"
+    }
+    # Preview and apply must agree here too, for the same reason the totals must: the reader says yes to
+    # the preview.
+    $na = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
+    Assert-Equal 0 $na.Code 'note report: apply exit-code 0'
+    $naLines = @([regex]::Matches($na.Out, $noteRx))
+    Assert-Equal (@($noteLines | ForEach-Object { $_.Value.Trim() }) -join '|') (@($naLines | ForEach-Object { $_.Value.Trim() }) -join '|') `
+        'note report: the apply run prints the same two lines as the preview'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
