@@ -119,6 +119,28 @@ infrastructure.
   load failure (a real syntax error) should degrade to a sane default or a reported `[ERROR]`, not
   abort the check. Recognized while building the script-contract check for inbound #147 (#148) and
   immediately found in its sibling `check-roster-sync.ps1` (#149).
+- **Mask fenced code blocks before you pair inline backticks — a fence silently shifts every span
+  after it.** A `` `[^`]+` `` pattern cannot open a span on the first two backticks of a ``` `` ``` run,
+  opens one on the third, and closes it on the *first* backtick of the closing fence; from there every
+  real inline span in the file pairs one position out. Nothing errors, so a scan built on those spans
+  reads the wrong text and reports a plausible answer. Measured on July 31, 2026 while building check
+  11: a command whose flag sat on the next line of its own span came back looking **flagless**, i.e.
+  the gate under-reported rather than raising. `Get-FenceMaskedText` in
+  [`check-plugin-integrity.ps1`](../../../scripts/lint/check-plugin-integrity.ps1) already solves this
+  and keeps offsets and newline positions identical, so a span found in the mask indexes straight back
+  into the real text — reuse it rather than writing a second fence walker. Sibling rule for the same
+  scan: judge one command's own arguments, not the whole span, or two commands in one span let the
+  second borrow the first one's flags (Victor, same build).
+- **`return @($x)` does not return an array when `$x` is one item — and indexing the result then yields
+  a character.** PowerShell unrolls a single-element array on return, so a helper written as
+  `return @(...)` hands back a bare `[string]`; `$result[0]` is then its first *letter*, and
+  `$result.Count` is `1` either way, so the length guard that was supposed to protect the index passes.
+  Measured the same day in `teardown-protocol.tests.ps1`, where a check-ignore line's first field read
+  as `.` instead of `.gitignore:2:`. Rule: wrap at the **call site** too — `$r = @(Get-Thing ...)` —
+  whenever you are going to index or slice, and do not rely on `@()` inside the function. Same family
+  as the two rules above: the wrong answer arrives as a plausible value instead of an error, which is
+  the failure mode this repo's gates exist to catch and therefore the one its own tooling must not
+  have.
 - **A check's `[ERROR]` text is a consumed interface, not just prose.** `skills/sync-roster/sync-roster.ps1`
   does not re-implement detection — it *parses* `check-roster-sync.ps1`'s finding lines with a regex
   (`\[ERROR\]\s+(?:agent|persona) '(?<id>\d{2}-\d{2})' \(...\) has no (roster row|repo-lens)`). So
