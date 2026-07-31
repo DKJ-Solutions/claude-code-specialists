@@ -209,8 +209,26 @@ would expose a stray second record.
 $root = (Get-Location).Path
 (Get-Content "$env:USERPROFILE\.claude\plugins\installed_plugins.json" -Raw | ConvertFrom-Json).plugins.PSObject.Properties |
   ForEach-Object { $n = $_.Name; $_.Value | Where-Object { $_.projectPath -eq $root } |
-    ForEach-Object { "$n -> $($_.scope) $($_.version)" } }
+    ForEach-Object { "$n -> $($_.scope) $($_.version) $($_.gitCommitSha)" } }
 ```
+
+**Read the two right-hand fields as two different answers, because they are: `version` identifies the
+*release*, `gitCommitSha` identifies the *code*.** They can disagree, and when they do only the second one
+is true. Round v8 measured a consumer whose record read `version 3.0.8` while the sha was three commits
+past the `v3.0.8` tag — unreleased `main` — and the payload genuinely differed (the same file hashed
+differently on the tag and in the installed cache). `plugin.json` carries `3.0.8` on both commits, so the
+version string cannot express the difference; the sha was the only field that could, and it was printed
+nowhere (inbound
+[#313](https://github.com/DaveKJohn/davekjohns-workshop/issues/313)). To tell which you are on, compare it
+with the tag in the cached marketplace clone:
+
+```powershell
+git -C "$env:USERPROFILE\.claude\plugins\marketplaces\davekjohns-workshop" rev-list -n1 v3.0.8
+```
+
+Equal means you are on that release. Different means you are on `main` — see
+[Staying up to date](../../../QUICKSTART.md#staying-up-to-date) for why that happens without anyone asking
+for it, and why it is not something you can fix from here.
 
 **One** line per plugin you enabled, each saying `project`, is the green you need — and the *count*
 carries as much of the verdict as the word does. **Empty output means this repo has no install** — go
