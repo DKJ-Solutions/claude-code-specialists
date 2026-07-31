@@ -37,6 +37,15 @@
                                                           block below for why).
       - Resolve-CheckRoot / Write-CheckScope /        -- naming WHICH repo a finding is about
         Set-CheckScope                                  (inbound #203).
+      - Format-SafeToken / Format-SuspectToken        -- make a value from a consumer-owned JSON file
+                                                          safe to PRINT into a line the session hooks
+                                                          forward (inbound #309). A plugin id is an
+                                                          'enabledPlugins' KEY NAME, i.e. an arbitrary
+                                                          JSON string that may carry newlines -- so an
+                                                          unsanitized one could forge a line in the
+                                                          session context. Display only; the slug
+                                                          guards below remain what decides whether a
+                                                          value may become a PATH.
       - Test-PluginNameSlug / Test-PluginMarketplaceSlug -- the plugin-id / '@marketplace' slug
                                                           guards (values from settings.json /
                                                           manifests become filesystem paths, so
@@ -113,24 +122,68 @@
 # the error/info counts or the exit code.
 $script:CheckScopeLabel = ''
 
+function Format-SafeToken {
+    <# Make a value from a consumer-owned JSON file safe to PRINT into a report line.
+
+       WHY THIS IS A FUNCTION NOW (inbound #309). This sanitization was written inline in
+       Set-CheckScope, with the reasoning recorded there: a JSON string may carry newlines and control
+       characters, so an unsanitized value printed into output the SessionStart hooks forward could
+       FORGE AN EXTRA LINE in the session context -- and "the hook labels its output 'data, not
+       instructions'" does not cover a value that fabricates a line of its own. That reasoning was
+       correct and it was applied to exactly one value: the scope label.
+       Everything else printed from the same untrusted source -- above all the plugin ids, which are
+       'enabledPlugins' KEY NAMES from a settings file and therefore arbitrary JSON strings -- went out
+       raw. Since #302 more of those lines are surfaced by the hooks than before ([NOT-INSTALLED-HERE]
+       joins ids into one line), so the surface grows with each marker added. One definition, applied at
+       every point where such a value enters a message, is the same move Get-SeamPaths and
+       Get-OrchestratorNote exist for: the pair that must not drift gets one source.
+
+       Restricted to the charset real repo/plugin/specialist ids need ('a-z', '0-9', '.', '_', '/',
+       '@', '-', space), whitespace collapsed to single spaces, trimmed, and length-capped. Note what
+       this deliberately does NOT do: it is not validation and never rejects. Test-PluginNameSlug and
+       Test-PluginMarketplaceSlug are the guards that decide whether a value may become a PATH; this
+       one only decides how it may be DISPLAYED. A caller that reports a value *because* it is
+       suspect should say when the display differs from the raw value -- otherwise a sanitized id
+       reads as a valid one, which would hide the very thing being complained about. #>
+    param(
+        [AllowEmptyString()][string]$Value = '',
+        [int]$MaxLength = 120
+    )
+    $clean = ($Value -replace '[^A-Za-z0-9 ._/@-]', '') -replace '\s+', ' '
+    $clean = $clean.Trim()
+    if ($clean.Length -gt $MaxLength) { $clean = $clean.Substring(0, $MaxLength) }
+    return $clean
+}
+
+function Format-SuspectToken {
+    <# For the case where the value IS the complaint: an invalid plugin id, a malformed marketplace.
+
+       Returns the safe display form, plus an explicit note when sanitizing changed something -- so a
+       reader is never shown a clean-looking id as the subject of an "invalid id" error while the real
+       defect (a newline, a control character, sheer length) is exactly what was stripped out to make it
+       printable. Without the note the message would be self-defeating: it would complain about a value
+       and then show a different, plausible one. #>
+    param([AllowEmptyString()][string]$Value = '', [int]$MaxLength = 120)
+    $clean = Format-SafeToken -Value $Value -MaxLength $MaxLength
+    if ($clean -ne $Value) {
+        if (-not $clean) { return "<unprintable> (the raw value held nothing displayable; $($Value.Length) character(s))" }
+        return "$clean (shown sanitized -- the raw value held characters that cannot be printed)"
+    }
+    return $clean
+}
+
 function Set-CheckScope {
     <# Set (or, with no argument, clear) the short label Write-Info/Write-Failure prepend to every
        subsequent finding. Call it when entering a per-scope block and clear it when leaving, so
        findings that belong to the run as a whole are not attributed to the last scope walked.
 
-       The label is SANITIZED, because it is the one piece of this report built from untrusted input:
-       check-connectors derives it from a connector manifest's 'repo' and plugin 'id' fields, and
-       unlike the '== connector: <repo>' header -- which the session hooks filter away -- the label
-       now travels INTO the session context. A JSON string may carry newlines and control characters,
-       so an unsanitized label could forge extra lines there (the hook labels its output "data, not
-       instructions", but forging a line is a step past that). Same defense-in-depth reasoning as
-       Test-PluginNameSlug and Get-DisplayName: manifest values are never used raw. Restricted to the
-       charset real repo/plugin ids need, collapsed to single spaces, and length-capped. #>
+       The label is SANITIZED via Format-SafeToken -- see that function for the reasoning and for why it
+       is no longer inline here. check-connectors derives this label from a connector manifest's 'repo'
+       and plugin 'id' fields, and unlike the '== connector: <repo>' header -- which the session hooks
+       filter away -- the label travels INTO the session context. Same defense-in-depth reasoning as
+       Test-PluginNameSlug and Get-DisplayName: manifest values are never used raw. #>
     param([string]$Label = '')
-    $clean = ($Label -replace '[^A-Za-z0-9 ._/@-]', '') -replace '\s+', ' '
-    $clean = $clean.Trim()
-    if ($clean.Length -gt 120) { $clean = $clean.Substring(0, 120) }
-    $script:CheckScopeLabel = $clean
+    $script:CheckScopeLabel = Format-SafeToken -Value $Label
 }
 
 function Format-CheckScoped {

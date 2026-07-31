@@ -457,7 +457,13 @@ if ($enabledIds.Count -gt 0) {
     # also runs in check-connectors, from the workshop, ABOUT each registered consumer: the one vantage
     # point that still has a voice when a consumer has gone silent.
     if ($notInstalledHere.Count -gt 0) {
-        Write-Host "  [NOT-INSTALLED-HERE] $($notInstalledHere.Count) of $($enabledIds.Count) enabled plugin(s) have no install record for this path ($($notInstalledHere -join ', ')) -- a session here will not load them, so anything reported below about them concerns a surface this repo does not have. Fix: 'claude plugin install <id> --scope project' from this root." -ForegroundColor Yellow
+        # Format-SafeToken on every id before it is joined into this line (inbound #309). A plugin id is
+        # an 'enabledPlugins' KEY NAME, so it is an arbitrary JSON string that may carry newlines -- and
+        # this is a line the session hooks forward into the session context, where an unsanitized value
+        # could forge a line of its own. Same reasoning Set-CheckScope has carried since #203; it just
+        # was not applied to the ids.
+        $shownIds = (@($notInstalledHere | ForEach-Object { Format-SafeToken -Value $_ }) -join ', ')
+        Write-Host "  [NOT-INSTALLED-HERE] $($notInstalledHere.Count) of $($enabledIds.Count) enabled plugin(s) have no install record for this path ($shownIds) -- a session here will not load them, so anything reported below about them concerns a surface this repo does not have. Fix: 'claude plugin install <id> --scope project' from this root." -ForegroundColor Yellow
         # NON-COUNTING supporting facts, deliberately not [INFO]. The roll-up above is the signal; these
         # add the enabling layer (the #294 promise: never leave a reader guessing WHERE an enable came
         # from) and the administration path that was consulted. Two reasons they must not count:
@@ -468,7 +474,7 @@ if ($enabledIds.Count -gt 0) {
         #     grounds that the repo is not broken. Counting it would have smuggled the severity back in
         #     through the summary line.
         foreach ($plugId in $notInstalledHere) {
-            Write-Skip "'$plugId' is enabled in $($enabled.LayerById[$plugId]) but has no record for this path in $($installRecord.Path) -- enabled is not installed."
+            Write-Skip "'$(Format-SafeToken -Value $plugId)' is enabled in $($enabled.LayerById[$plugId]) but has no record for this path in $($installRecord.Path) -- enabled is not installed."
         }
     } elseif (-not $installRecord.Exists) {
         # Said out loud rather than passed over: 'no administration file' is the one shape in which every
@@ -523,24 +529,35 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
     $name = $parts[0]
     $marketplace = if ($parts.Count -gt 1) { $parts[1] } else { '' }
 
+    # The DISPLAY form of this id, bound once per iteration (inbound #309). $plugId itself must stay raw:
+    # it is a hashtable key ($enabled.LayerById) and the source of the path segments below, so sanitizing
+    # it in place would break lookups and silently change which directory is resolved. Two variables, with
+    # one job each -- the raw value for logic, this one for every message. Bound here rather than wrapped
+    # at each of the dozen call sites below, so a message added later cannot forget it.
+    $plugIdShown = Format-SafeToken -Value $plugId
+
     # Guardrail: plugin-name/marketplace come from settings and become path segments -- validate as
     # slugs before touching the filesystem (mirrors check-connectors' Get-PluginDir).
+    #
+    # These two use Format-SuspectToken, not Format-SafeToken: here the id IS the complaint, so showing a
+    # cleaned-up version without saying so would present a plausible id as the subject of an "invalid id"
+    # error -- hiding the very characters that made it invalid.
     if (-not (Test-PluginNameSlug -Name $name)) {
-        Write-Failure "invalid plugin id '$plugId' in $($enabled.LayerById[$plugId]) -- skipped."
+        Write-Failure "invalid plugin id '$(Format-SuspectToken -Value $plugId)' in $($enabled.LayerById[$plugId]) -- skipped."
         continue
     }
     if (-not $marketplace) {
-        Write-Info "plugin '$plugId' has no '@marketplace' suffix -- cannot resolve its cache dir, skipped."
+        Write-Info "plugin '$plugIdShown' has no '@marketplace' suffix -- cannot resolve its cache dir, skipped."
         continue
     }
     if (-not (Test-PluginMarketplaceSlug -Marketplace $marketplace)) {
-        Write-Failure "invalid marketplace in plugin id '$plugId' -- skipped."
+        Write-Failure "invalid marketplace in plugin id '$(Format-SuspectToken -Value $plugId)' -- skipped."
         continue
     }
 
     $pluginDir = Resolve-PluginDir -Name $name -Marketplace $marketplace -CacheRoot $cacheRoot
     if ($null -eq $pluginDir) {
-        Write-Info "plugin '$plugId' is enabled but not found in the cache ($cacheRoot) -- skipped (the install may run on another machine)."
+        Write-Info "plugin '$plugIdShown' is enabled but not found in the cache ($cacheRoot) -- skipped (the install may run on another machine)."
         continue
     }
 
@@ -554,8 +571,8 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
     # reader who is surprised that a plugin is being checked here at all needs the one fact that explains
     # it, and with a three-file chain -- one of which is outside the repo -- "enabled" is no longer
     # self-evidently a property of .claude/settings.json.
-    Write-Host "`n-- plugin: $plugId (cache $(Split-Path $pluginDir -Leaf), enabled in $($enabled.LayerById[$plugId]))" -ForegroundColor Cyan
-    if ($specialists.Count -eq 0) { Write-Info "no agents or personas found for '$plugId'."; continue }
+    Write-Host "`n-- plugin: $plugIdShown (cache $(Split-Path $pluginDir -Leaf), enabled in $($enabled.LayerById[$plugId]))" -ForegroundColor Cyan
+    if ($specialists.Count -eq 0) { Write-Info "no agents or personas found for '$plugIdShown'."; continue }
 
     $onPathLensDirs   = @(Get-OnPathLensDirs -RepoRoot $repoRoot -PluginName $name)
     $canonicalLensDir = $onPathLensDirs[0]
@@ -568,7 +585,7 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
         $id   = $spec.Id
         $kind = $spec.Kind
         if ($ignoredIds -contains $id) {
-            Write-Info "$kind '$id' ($plugId) deliberately kept out of the roster/lenses (repo-config ignore-list) -- skipped."
+            Write-Info "$kind '$id' ($plugIdShown) deliberately kept out of the roster/lenses (repo-config ignore-list) -- skipped."
             continue
         }
         $inRoster = Test-InRoster -RosterText $rosterText -Id $id
@@ -581,10 +598,10 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
             $suppressedForBootstrap++
         } else {
             if (-not $inRoster) {
-                Write-Failure "$kind '$id' ($plugId) has no roster row in $rosterRel -- add it to the roster."
+                Write-Failure "$kind '$id' ($plugIdShown) has no roster row in $rosterRel -- add it to the roster."
             }
             if (-not $hasLens) {
-                Write-Failure "$kind '$id' ($plugId) has no repo-lens (.claude/specialists/lenses/$id-extension.md, the pre-seam .claude/plugins/$(Get-LensFamily)/$name/ path, or the legacy .claude/extensions/ path)."
+                Write-Failure "$kind '$id' ($plugIdShown) has no repo-lens (.claude/specialists/lenses/$id-extension.md, the pre-seam .claude/plugins/$(Get-LensFamily)/$name/ path, or the legacy .claude/extensions/ path)."
             }
         }
         if ($inRoster -and $hasLens) { Write-Ok "$kind '$id' present in roster + lens" }
@@ -624,7 +641,7 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
             if ($staleName -and $staleName -ne $id) {
                 $current = Get-DisplayName -RawName (Get-AgentName -PluginDir $pluginDir -Id $id) -Fallback $id
                 if ($current -and $staleName -ne $current) {
-                    Write-Info "lens '$id' ($plugId) header still names '$staleName' (agent is now '$current') -- run the sync-roster skill to reconcile the header."
+                    Write-Info "lens '$id' ($plugIdShown) header still names '$staleName' (agent is now '$current') -- run the sync-roster skill to reconcile the header."
                 }
             }
         }
@@ -633,7 +650,7 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
     $canonicalRel = Get-RelativeToRoot -RepoRoot $repoRoot -Path $canonicalLensDir
     foreach ($d in ($offPathDirs.Keys | Sort-Object)) {
         $rel = Get-RelativeToRoot -RepoRoot $repoRoot -Path $d
-        Write-Info "$($offPathDirs[$d]) lens file(s) for '$plugId' live in '$rel' instead of the canonical '$canonicalRel' -- they are found and counted as present; move them (and the CLAUDE.md @-import along with them) to align with the standard."
+        Write-Info "$($offPathDirs[$d]) lens file(s) for '$plugIdShown' live in '$rel' instead of the canonical '$canonicalRel' -- they are found and counted as present; move them (and the CLAUDE.md @-import along with them) to align with the standard."
     }
 }
 
