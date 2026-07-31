@@ -217,7 +217,14 @@ because the hooks are *in* the plugin. So it looks exactly like a session where 
 Since `v3.0.7` the checks run the `projectPath` query for you and say
 `[NOT-INSTALLED-HERE]` when an enabled plugin has no record for this path; the workshop's connector check
 says it about each registered consumer, which is the vantage point that still works when a consumer has
-gone quiet. None of this is a reason to avoid project scope — it is a reason not to treat "the version I
+gone quiet. **Do not expect that line at a session start, though, and this is measured rather than
+assumed** (inbound [#314](https://github.com/DaveKJohn/davekjohns-workshop/issues/314)): a session start
+*writes the missing record itself*, so by the time any hook can look the state has healed. Run against
+exactly that fixture — three plugins enabled, one with no record anywhere on the machine — the hook
+printed the line on no branch at all. It is reachable by a **deliberate** run in a repo where a record
+went missing and no session has started since, and from the workshop about a consumer. What survives a
+session start is a record of the wrong *shape*, which since `v3.0.9` the checks report as
+`[RECORD-SHAPE]`: `local` where this family assumes `project`, or two records where it assumes one. None of this is a reason to avoid project scope — it is a reason not to treat "the version I
 installed" as a lasting fact. The `projectPath` query from
 [Step 1](#connecting-in-three-steps) is the answer to *"what am I actually running?"* — not the last
 release notes you read, and not the install output, which names no version at all. If it comes back

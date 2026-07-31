@@ -408,6 +408,69 @@ try {
     $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
     Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'bare@m') 'record without scope/version: still matches on path'
     Assert-Equal '' $r.RecordsById['bare@m'][0].Version 'record without version: an empty field, not a crash'
+
+    # --- Get-RecordShape (inbound #314/#315) ------------------------------------------------------
+    # The second predicate over the same records, and the reason it is separate is asserted here rather
+    # than only argued in a comment: Test-PluginInstalledHere must stay PERMISSIVE (a false
+    # [NOT-INSTALLED-HERE] is the cry-wolf failure #294 removed), while this one is STRICT about a shape
+    # -- exactly one record, scoped 'project'. The pairs below therefore assert both predicates on the
+    # same fixture: "installed here" stays true in every case where this one reports a finding.
+    Write-Host "Get-RecordShape -- one record, scoped project (inbound #314/#315)" -ForegroundColor Cyan
+    $pathJson = ($repoA -replace '\\', '\\')
+
+    # The assumed shape: silent.
+    [System.IO.File]::WriteAllText($adminFile, "{ `"plugins`": { `"p@m`": [ { `"scope`": `"project`", `"projectPath`": `"$pathJson`" } ] } }")
+    $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
+    Assert-True ($null -eq (Get-RecordShape -InstallRecord $r -PluginId 'p@m')) 'one project record: no finding'
+
+    # THE #314 CASE: what a session start leaves behind. Note the pairing -- the plugin IS installed here,
+    # so only this predicate may speak. If both fired, a reader would be told to run the install that
+    # produces the #315 duplicate.
+    [System.IO.File]::WriteAllText($adminFile, "{ `"plugins`": { `"p@m`": [ { `"scope`": `"local`", `"projectPath`": `"$pathJson`" } ] } }")
+    $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
+    $shape = Get-RecordShape -InstallRecord $r -PluginId 'p@m'
+    Assert-True ($null -ne $shape) 'local-scoped record: a finding'
+    Assert-True ($shape.Shapes -contains 'no-project-scope') 'local-scoped record: named as the no-project-scope shape'
+    Assert-True (-not ($shape.Shapes -contains 'duplicate')) 'local-scoped record: and NOT as a duplicate -- there is only one'
+    Assert-True (-not $shape.HasProject) 'local-scoped record: HasProject is false'
+    Assert-Equal 1 $shape.Count 'local-scoped record: the count is stated'
+    Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'p@m') 'local-scoped record: STILL installed here -- the two predicates disagree on purpose'
+
+    # THE #315 CASE: the repair install's duplicate. A project record is present, so only the duplicate
+    # half may fire -- the two shapes have different remedies and must not be conflated.
+    [System.IO.File]::WriteAllText($adminFile, "{ `"plugins`": { `"p@m`": [ { `"scope`": `"project`", `"projectPath`": `"$pathJson`" }, { `"scope`": `"local`", `"projectPath`": `"$pathJson`" } ] } }")
+    $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
+    $shape = Get-RecordShape -InstallRecord $r -PluginId 'p@m'
+    Assert-True ($shape.Shapes -contains 'duplicate') 'two records: named as a duplicate'
+    Assert-True (-not ($shape.Shapes -contains 'no-project-scope')) 'two records incl. project: the no-project-scope half does NOT fire'
+    Assert-True $shape.HasProject 'two records incl. project: HasProject is true'
+    Assert-Equal 2 $shape.Count 'two records: the count is what a reader needs'
+
+    # Both shapes at once: two records, neither scoped project.
+    [System.IO.File]::WriteAllText($adminFile, "{ `"plugins`": { `"p@m`": [ { `"scope`": `"local`", `"projectPath`": `"$pathJson`" }, { `"scope`": `"local`", `"projectPath`": `"$pathJson`" } ] } }")
+    $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
+    $shape = Get-RecordShape -InstallRecord $r -PluginId 'p@m'
+    Assert-True ($shape.Shapes -contains 'duplicate') 'two local records: duplicate'
+    Assert-True ($shape.Shapes -contains 'no-project-scope') 'two local records: AND no-project-scope -- both shapes can hold at once'
+    Assert-Equal 1 $shape.Scopes.Count 'two local records: the scope list is deduplicated'
+
+    # The three states that are somebody else's subject, asserted so this predicate cannot grow into them.
+    # A pathless (user-scope) record is 0b's documented warning; 'user' is also "not project", which is
+    # exactly why the silence has to be pinned.
+    [System.IO.File]::WriteAllText($adminFile, '{ "plugins": { "p@m": [ { "scope": "user" } ] } }')
+    $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
+    Assert-True ($null -eq (Get-RecordShape -InstallRecord $r -PluginId 'p@m')) 'pathless record: not this predicate -- it judges only records scoped to THIS path'
+    # No record at all is [NOT-INSTALLED-HERE]'s state.
+    Assert-True ($null -eq (Get-RecordShape -InstallRecord $r -PluginId 'absent@m')) 'no record: not this predicate either'
+    # And an unstated scope is a gap in the administration, not a wrong answer. Same direction of error as
+    # Test-PluginInstalledHere: this may suppress a finding, never invent one.
+    [System.IO.File]::WriteAllText($adminFile, "{ `"plugins`": { `"p@m`": [ { `"projectPath`": `"$pathJson`" } ] } }")
+    $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
+    Assert-True ($null -eq (Get-RecordShape -InstallRecord $r -PluginId 'p@m')) 'record with no scope field: silent, not reported as a mismatch'
+    # An unreadable authority: nothing may be concluded from it, in either predicate.
+    [System.IO.File]::WriteAllText($adminFile, '{ "plugins": { oops')
+    $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
+    Assert-True ($null -eq (Get-RecordShape -InstallRecord $r -PluginId 'p@m')) 'unparseable administration: no shape finding invented'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

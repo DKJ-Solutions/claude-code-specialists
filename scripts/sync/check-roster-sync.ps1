@@ -64,6 +64,16 @@
         is not broken and the state is usually one install command away from intended; never silent,
         because "no hooks because the plugin is not loaded" reads exactly like "no hooks because all is
         well". See Get-InstallRecord in check-report-lib.ps1.
+      - plugin enabled AND recorded for this path, but the record is not the shape the documents assume
+        (exactly one, scoped 'project') -> one [RECORD-SHAPE] roll-up (non-counting) plus a non-counting
+        detail line per plugin naming the shape and its remedy (inbound #314/#315). Two measured shapes: a
+        record scoped 'local', which is what a SESSION START leaves behind, and more than one record for
+        one path, which the prescribed repair install produces. Round v8 established why this marker is
+        needed at all: the session start CREATES a missing record before any hook can look, so
+        [NOT-INSTALLED-HERE] heals itself out of existence and the state a consumer is actually left in --
+        a wrongly shaped record -- was reported by nothing. Not an error: the plugin loads from a 'local'
+        record just as well, and neither shape can indicate tampering (the CLI writes both). See
+        Get-RecordShape in check-report-lib.ps1.
 
     Personas: main-loop specialists (Chris 01-01, Derek 05-05, Rendall 05-06, ...) ship as
     <plugin>/personas/<g>-<id>-persona.md, NOT as agents, yet legitimately have a roster row and a
@@ -483,6 +493,43 @@ if ($enabledIds.Count -gt 0) {
         # same reason as above -- it is a statement about what could not be checked, not a finding about
         # this repo.
         Write-Skip "no plugin administration found at $($installRecord.Path) -- whether the enabled plugins are installed for this path could not be checked."
+    }
+
+    # --- Installed here, but is the record the shape we assume? (inbound #314/#315) ----------------
+    # [RECORD-SHAPE]: the fifth instance of the non-counting marker pattern, after [ORPHANS] (#204),
+    # [UNREGISTERED] (#208), [INVENTORY] (#220) and [BOOTSTRAP] (#225) -- reached for rather than invented,
+    # exactly as the pattern's own rule says to.
+    #
+    # It closes the gap round v8 opened between what [NOT-INSTALLED-HERE] was built to catch and what a
+    # consumer is actually left in. That marker fires when there is NO record for this path; v8 measured
+    # that a session start CREATES the missing record before any hook can look, so the state it names heals
+    # itself and the marker is practically unreachable from a session. What survives the healing is a
+    # record of the wrong shape -- 'local' instead of 'project' -- and until now nothing reported it at all.
+    # See Get-RecordShape for both measured shapes and for why this is not an [ERROR].
+    #
+    # Ordered after the [NOT-INSTALLED-HERE] branch and asking only about records that ARE scoped to this
+    # path, so the two markers can never describe the same plugin: no record is that one's subject, a
+    # wrongly shaped record is this one's.
+    $recordShapes = @($enabledIds | ForEach-Object { Get-RecordShape -InstallRecord $installRecord -PluginId $_ } | Where-Object { $_ })
+    if ($recordShapes.Count -gt 0) {
+        # Format-SafeToken on every id, same reasoning as the roll-up above (inbound #309): a plugin id is
+        # an arbitrary JSON key that may carry newlines, and this line is forwarded into session context.
+        $shapeIds = (@($recordShapes | ForEach-Object { Format-SafeToken -Value $_.Id }) -join ', ')
+        Write-Host "  [RECORD-SHAPE] $($recordShapes.Count) of $($enabledIds.Count) enabled plugin(s) have an install record for this path that is not the assumed shape -- exactly one record, scoped 'project' ($shapeIds). The plugin still loads; what is wrong is the administration, and nothing else reports it. Details below." -ForegroundColor Yellow
+        # NON-COUNTING per-plugin detail, for the same two reasons as [NOT-INSTALLED-HERE]'s: a permanent
+        # info signal would make 'this repo reports 0 signals' unassertable, and the severity must not
+        # re-enter through the summary line. Each line names the shape AND its remedy, because the two
+        # differ: a wrong scope is removed at that scope, a duplicate is removed by dropping the stale one.
+        foreach ($shape in $recordShapes) {
+            $safeId = Format-SafeToken -Value $shape.Id
+            $scopeList = (@($shape.Scopes | ForEach-Object { Format-SafeToken -Value $_ }) -join ', ')
+            if ($shape.Shapes -contains 'no-project-scope') {
+                Write-Skip "'$safeId' has $($shape.Count) record(s) for this path, scoped '$scopeList' and none 'project' -- the shape a SESSION START leaves behind (it creates a missing record and flips 'project' to 'local'). Remove it at that scope, then re-install at project scope from this root."
+            }
+            if ($shape.Shapes -contains 'duplicate') {
+                Write-Skip "'$safeId' has $($shape.Count) records for this path (scopes: $scopeList) -- the stray second record specialists-init step 0c warns about, which a repair install produces rather than prevents. Remove the stale one at ITS scope; one 'project' record must remain."
+            }
+        }
     }
 }
 
