@@ -197,9 +197,16 @@ That second row is fine today and breaks silently on migration: the exception un
 of the migration looking wrong.** Every gate stays green (the readers accept the seam, which is the
 point), `git status` shows nothing (they are ignored), and the teardown's undo is gone.
 
-**So a seam migration in a repo that ignores `.claude/*` is two steps, in this order:** add the
-`!.claude/specialists/` exception (and commit it), *then* move the files. Reversed, the move lands
-untracked and the commit that would have captured it has nothing to capture.
+**So the two ignore-critical acts inside step 0 have an order:** add the `!.claude/specialists/`
+exception (and commit it), *then* move the files. Reversed, the move lands untracked and the commit that
+would have captured it has nothing to capture.
+
+> **Two acts here, out of the five steps (0–4) a full seam migration takes — a different unit, not a
+> different path.** The numbered list lives in
+> [the family README](../../../README.md#the-seam-specified); this page zooms in on step 0, the one that
+> can lose files. Said explicitly because the family now counts this procedure in four places, and
+> inbound [#305](https://github.com/DaveKJohn/davekjohns-workshop/issues/305) found this one had been
+> left out of the sweep that aligned the other three.
 
 More generally: **an ignore rule written against a path is a bet that the path will not move.** The
 migration is exactly the moment that bet is called in, and nothing in this family's tooling can see the

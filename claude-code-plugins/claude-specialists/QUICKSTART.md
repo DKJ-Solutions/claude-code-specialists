@@ -77,12 +77,32 @@ because `.claude/settings.json` is usually a **tracked** file, so the change sho
 and looks like something went wrong. Measured on July 31, 2026 in throwaway repos with
 `core.autocrlf false`: `claude plugin install … --scope project` re-serialises the whole file — key
 order changes, nested objects get expanded onto separate lines — and in two of the fixtures it also
-**removed a UTF-8 BOM** and **added a missing final newline**. The content stays equivalent; only the
-formatting moves, and the plugin's own scripts never touch this file. `claude plugin uninstall …
---scope project` edits it too, on purpose: it removes your plugin's entry and leaves
-`"enabledPlugins": {}` behind. Both are the CLI's doing, so a diff here is **expected rather than
-suspect** — and if your repo has an opinion about JSON formatting, this is the file that will lose the
-argument.
+**removed a UTF-8 BOM** and **added a missing final newline**. It may also write LF into a CRLF file
+(git says `LF will be replaced by CRLF the next time Git touches it`), which on a Windows repo is a
+second, lasting source of diff.
+
+**Whether that diff is only formatting depends on one thing: was `enabledPlugins` already there?**
+Both halves are measured (inbound
+[#303](https://github.com/DaveKJohn/davekjohns-workshop/issues/303), July 31, 2026):
+
+- **Key already present** — the order above, where act 1 (enable) writes it before act 3 (install)
+  runs. Then the content really does stay equivalent and only the formatting moves. Verified in
+  `davekjohns-workshop`,
+  where the key was already set: the same command left `settings.json` **byte-identical** (SHA256 equal
+  before and after, tree clean). The install writes only when there is something to write.
+- **Key absent** — then the install **adds `enabledPlugins`, with `true` per plugin**, and that is not
+  formatting: it switches the plugins **on** in a tracked governance file. Measured in
+  `DaveKJohn/life-hub`, which is deliberately plugin-clean between adoption rounds, so the key was
+  nowhere. And this is not an exotic ordering: it is exactly what a **repair install** or a reinstall
+  does — the prescribed move after a record has gone missing (see
+  [Staying up to date](#staying-up-to-date)).
+
+`claude plugin uninstall … --scope project` edits it too, on purpose: it removes your plugin's entry
+and leaves `"enabledPlugins": {}` behind. All of it is the CLI's doing — the plugin's own scripts never
+touch this file, which the `specialists-teardown` skill says of itself as well. So a **formatting** diff
+here is expected rather than suspect; an **added `enabledPlugins` block** is the one change in this
+paragraph you would want to see in code review. And if your repo has an opinion about JSON formatting,
+this is the file that will lose the argument.
 
 **Then restart your Claude Code session** and check that it worked — but **not with `claude plugin
 list`**. That command is not repo-scoped: it reports install records beyond your repo, so it can show
@@ -171,15 +191,34 @@ plugin; the full history lives in the workshop itself
 folder also carries a `RELEASE.md` card next to its `CHANGELOG.md` — open it in your plugin cache
 after an update to see, at a glance, exactly which release you're now on.
 
-**Read your install record rather than assume it, because it can move without you asking** (inbound
-[#296](https://github.com/DaveKJohn/davekjohns-workshop/issues/296)). Project scope gives your repo its
-own record; it does not freeze it. Measured on July 31, 2026: both project-scoped records of a real
-consumer moved `3.0.4 → 3.0.5` in a **single** write, their timestamps 70 ms apart, while that repo's
-session ran no `claude plugin` command at all — checked afterwards against every session transcript on
-the machine for that day. Nothing broke, and this is not a reason to avoid project scope; it is a reason
-not to treat "the version I installed" as a lasting fact. The `projectPath` query from
+**Read your install record rather than assume it, because it can move — or be taken away — without you
+asking** (inbound [#296](https://github.com/DaveKJohn/davekjohns-workshop/issues/296) and
+[#301](https://github.com/DaveKJohn/davekjohns-workshop/issues/301)). Project scope gives your repo its
+own record; it does not freeze it, and it does not guarantee it will still be there tomorrow.
+
+- **It moves.** Measured July 31, 2026: both project-scoped records of a real consumer went
+  `3.0.4 → 3.0.5` in a **single** write, timestamps 70 ms apart, while that repo's session ran no
+  `claude plugin` command at all — checked afterwards against every session transcript on the machine for
+  that day.
+- **It can be taken.** Same day, reproduced **twice**: a *session start* in an unrelated directory
+  rewrote this file and **adopted an existing record**, leaving the repo it belonged to with no install.
+  Once the victim was a real consumer; once it was the workshop repo itself. The `installedAt` stamps are
+  the proof — the CLI sets that to *now* on a real install, so a record carrying an older repo's stamp was
+  not created where it ended up.
+
+**The second one is the expensive one, because nothing tells you.** No command was run, no file in your
+repo changed, `git status` is clean — and a session that loads no plugin has no hooks to complain,
+because the hooks are *in* the plugin. So it looks exactly like a session where everything is fine.
+
+Since `v3.0.7` the checks run the `projectPath` query for you and say
+`[NOT-INSTALLED-HERE]` when an enabled plugin has no record for this path; the workshop's connector check
+says it about each registered consumer, which is the vantage point that still works when a consumer has
+gone quiet. None of this is a reason to avoid project scope — it is a reason not to treat "the version I
+installed" as a lasting fact. The `projectPath` query from
 [Step 1](#connecting-in-three-steps) is the answer to *"what am I actually running?"* — not the last
-release notes you read, and not the install output, which names no version at all.
+release notes you read, and not the install output, which names no version at all. If it comes back
+empty, re-install from that root — and note that this is the case where the install **adds
+`enabledPlugins`** rather than merely reformatting it (see [Step 1](#connecting-in-three-steps)).
 
 When an update adds a **new specialist**, your repo's roster (the specialists table in your
 `CLAUDE.md`) and its lenses don't update themselves. The `roster-sessioncheck` SessionStart hook

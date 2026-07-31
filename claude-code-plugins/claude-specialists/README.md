@@ -346,6 +346,17 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > an act because leaving it out is the failure the next blockquote calls silent and self-camouflaging:
   > a reader who ticks off four and stops has never checked that the install exists.
 
+  > **And if you sweep for these counts, make the sweep emphasis-tolerant** (inbound
+  > [#305](https://github.com/DaveKJohn/davekjohns-workshop/issues/305)). The sweep that aligned the
+  > entries above was shaped `(one|two|…|seven) (acts?|steps?)`, and that regex **misses markdown
+  > emphasis**: against `specialists-init/SKILL.md` it found nothing, because the text there reads
+  > `**five** steps` — the asterisks sit between the two words. Written
+  > `(…)\*{0,2} \*{0,2}(acts?|steps?)` it surfaces that line, and one more the original sweep never
+  > showed: a fourth counting of the seam migration in
+  > [`specialists-teardown`](specialists/skills/specialists-teardown/SKILL.md). Two lessons worth keeping
+  > if count-linting is ever built: a sweep that returns few hits is not evidence of few instances, and a
+  > file the same PR touched is not automatically covered by that PR's verification.
+
   > **The marketplace is a cached clone, which is why the refresh is an act and not a formality**
   > (inbound [#282](https://github.com/DaveKJohn/davekjohns-workshop/issues/282) for the behaviour,
   > [#284](https://github.com/DaveKJohn/davekjohns-workshop/issues/284) for this page having omitted

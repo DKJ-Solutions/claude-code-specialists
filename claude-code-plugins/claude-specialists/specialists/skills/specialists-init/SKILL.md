@@ -98,9 +98,41 @@ measurement: on July 31, 2026 both of `life-hub`'s project-scoped records moved 
 **single** write, `lastUpdated` stamps 70 ms apart, while that repo's session issued no `claude plugin`
 command — confirmed afterwards against every session transcript on the machine for that day (26
 invocations, none in the window of the write). So "pinned" was a property of the bookkeeping, not of the
-repo. The practical consequence is small but real: **read your record instead of trusting it.**
+repo.
+
+**And the consequence is not small, which is what the next round established** (inbound
+[#301](https://github.com/DaveKJohn/davekjohns-workshop/issues/301)). A project-scoped record can also be
+**taken away**: a *session start* in another directory rewrites this file and does so by **adopting an
+existing record**, leaving the repo it belonged to with no install at all. Reproduced twice on July 31,
+2026 (CLI `2.1.220`), with no `claude plugin` command run in either case:
+
+| | what was taken, and from whom |
+|---|---|
+| 14:32:31.795Z | a throwaway directory gained three records; two carried `installedAt` stamps belonging to **`life-hub`**, whose two `project` records were gone. All three `lastUpdated` identical — one write. |
+| 16:01:48.239Z | same recipe, fresh directory; one record carried **`davekjohns-workshop`'s own** `installedAt`. The workshop — this very repo — had lost its project install to a scratch folder. |
+
+`installedAt` is what proves adoption rather than creation: the CLI sets it to *now* on a real install,
+so a record bearing an older repo's stamp did not come into being there. Restored with
+`claude plugin install … --scope project` from each real root.
+
+**So the record is not merely mutable, it is removable by something outside your repo** — and then there
+is no version to read, only silence. The owner gets no signal: no command run, no file in the repo
+changed, `git status` clean. Only `installed_plugins.json` got quieter. That is precisely the state
+step 0c below calls silent and self-camouflaging, arrived at *after* a correct adoption. **Read your
+record instead of trusting it**, and read it more than once:
 `~/.claude/plugins/installed_plugins.json` is the only place your version is written down — the install
 success line names the scope and no version at all — and the query for it is in step 0c below.
+
+Since `v3.0.7` you do not have to remember to: the checks run that same `projectPath` query themselves
+(inbound [#302](https://github.com/DaveKJohn/davekjohns-workshop/issues/302)). `check-roster-sync` emits
+a `[NOT-INSTALLED-HERE]` line, and the workshop's `check-connectors` says it about each registered
+consumer — which matters here, because a repo that loads nothing cannot report for itself: the hook that
+would is inside the plugin that is not loading. What was **not** established is the trigger. Two
+attempts with a barer setup (a git repo, one enabled plugin, a session, no bootstrap) produced no record
+and no adoption; the recipe that fired had three enabled plugins — one of them with no record anywhere —
+plus a bootstrapped tree with an `@`-import. Which of those factors carries the weight is unknown, as is
+the rule by which a victim record is chosen. This is CLI behaviour, not plugin code; the reproduction
+above stands on its own for anyone reporting it upstream.
 
 **The same default bites on the way back out, which is where it is actually expensive.** `claude
 plugin update` also defaults to user scope, so on a project-scoped install the plain command fails:
@@ -142,8 +174,12 @@ difference.
 everything is fine in a repo that has no install.** Measured in `DaveKJohn/davekjohns-workshop` on
 July 30, 2026: that repo has `enabledPlugins` set and **no install record of its own** (the only
 `projectPath` in `installed_plugins.json` pointed at a different repo), and the plugin was
-demonstrably not loaded — no `specialists:*` subagents, no skills, no session hooks. Run from that
-repo's root, the list nevertheless reported:
+demonstrably not loaded — no `specialists:*` subagents, no skills, no session hooks. That "no record of
+its own, and the only one points elsewhere" is now diagnosed rather than merely observed: it is the
+record adoption described in step 0b, measured here a day before the mechanism was reproduced. The
+record had **moved**, not never existed — worth knowing, because the two call for different actions
+(re-install here, versus go find out whether this repo was ever adopted). Run from that repo's root, the
+list nevertheless reported:
 
 ```
 ❯ specialists@davekjohns-workshop   Version: 3.0.1   Scope: project   Status: ✔ enabled
