@@ -104,11 +104,17 @@ claude plugin update specialists@davekjohns-workshop --scope project   # 2. then
 **Keep line 1 in the procedure — and here is exactly what each command was measured to do, because
 the two differ and an earlier version of this page generalised them.**
 
-- **`install` served a stale version once, and that is the measurement this whole warning came from.**
-  On July 30, 2026, minutes after `v3.0.2` was tagged and pushed, the cached marketplace clone still
-  sat on the commit from *before* the release, so a fresh `claude plugin install … --scope project`
-  produced **3.0.1** and said `✔ Successfully installed`. Nothing in that output hints the version is
-  stale.
+- **`install` does not refresh the cache, and that is now measured twice.** First on July 30, 2026,
+  minutes after `v3.0.2`: the cached clone still sat on the pre-release commit, so a fresh
+  `claude plugin install … --scope project` produced **3.0.1**. Reproduced on July 31 right after
+  `v3.0.5` was tagged, deliberately and as a **controlled pair on the same machine within the same
+  minute**: without the refresh the install produced **3.0.4** and left the clone exactly where it was,
+  and with the refresh a second fresh folder produced **3.0.5**. So the refresh is what makes the
+  difference for this verb — nothing else.
+  **And the output cannot warn you, even in principle:** `✔ Successfully installed plugin:
+  specialists@davekjohns-workshop (scope: project)` names the scope and **no version at all**. The
+  install record is the only place the version appears, which is exactly why the verification step in
+  Step 1 queries `installed_plugins.json` instead of reading a success line.
 - **`update` refreshed the cache by itself when measured.** On July 31, 2026 (CLI `2.1.220`), with the
   cached clone verifiably still on the pre-release commit — it did not even contain the release commit
   — a bare `claude plugin update … --scope project` from a consumer's root moved `3.0.3 -> 3.0.4`, and
@@ -118,17 +124,18 @@ the two differ and an earlier version of this page generalised them.**
   gate enforces flags on — the repo's convention for quoting a command as the *subject* of a
   measurement is the ellipsis.)
 
-**Why line 1 stays anyway:** the refresh is idempotent, it costs one command, and the behaviour above
-is one measurement on one CLI version — while a stale cache is invisible by construction, since it
-produces a success message and a plausible version number. The procedure therefore guarantees
-freshness instead of depending on the CLI continuing to do it for you. What is *not* claimed anymore
-is that skipping it makes `update` serve the previous version; that was a generalisation from the
+**Why line 1 stays in front of both:** for `install` it is load-bearing — skip it and you get the
+previous version, twice measured. For `update` it is idempotent insurance: the `update` behaviour is one
+measurement on one CLI version, and a stale cache is invisible by construction, so the procedure
+guarantees freshness instead of depending on the CLI continuing to do it for you. What is *not* claimed
+is that skipping it makes an `update` serve the previous version; that was a generalisation from the
 `install` measurement, and it did not survive being tested.
 
 So a version number is one of **two** gates. `claude plugin update` compares version numbers only, and
 it compares them against a **cached copy** of the marketplace rather than against the workshop
-directly — a copy that this measurement shows the command can refresh for itself, and whose
-self-refresh schedule when nothing asks was never established.
+directly — a copy that `update` was measured to refresh for itself and `install` was measured not to.
+On what schedule the cache refreshes when nothing asks was never established, which is why the explicit
+command belongs in the procedure rather than a hope that it has caught up.
 
 **The scope flag on the second command is not optional either.** Without it the command defaults to
 user scope and fails on a project-scoped install with *"Plugin `specialists` is not installed at

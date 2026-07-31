@@ -61,8 +61,12 @@ claude plugin install specialists-shopify@davekjohns-workshop --scope project
 **That first line matters if the marketplace is already cached on this machine, and skipping it
 installs an old version with a success message.** Measured in `davekjohns-workshop` on July 30, 2026,
 minutes after `v3.0.2` was tagged and pushed: the cached clone still sat on the pre-release commit, so
-the install produced **3.0.1** and reported `✔ Successfully installed`. Nothing in that output says
-the version is stale. `claude plugin marketplace update davekjohns-workshop` followed by a `plugin
+the install produced **3.0.1** and reported `✔ Successfully installed`. Reproduced as a controlled pair
+on July 31 right after `v3.0.5`, same machine and same minute: **without** the refresh a fresh folder got
+`3.0.4` and the clone did not move; **with** it, a second fresh folder got `3.0.5`. Unlike `plugin
+update`, `install` does **not** refresh for itself — so for this command the line is load-bearing rather
+than insurance. And the output cannot tell you: the success line names the **scope and no version at
+all**, which is why step 0c below verifies against the install record. `claude plugin marketplace update davekjohns-workshop` followed by a `plugin
 update` then moved it `3.0.1 -> 3.0.2` in one step. A refresh mechanism exists (the command reports
 `Refreshing marketplace cache (timeout: 120s)`), so a cache does not stay stale indefinitely; on what
 schedule it refreshes by itself was not established, which is why the explicit line is in the
