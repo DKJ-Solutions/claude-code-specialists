@@ -113,11 +113,12 @@ its root:
 $root = (Get-Location).Path
 (Get-Content "$env:USERPROFILE\.claude\plugins\installed_plugins.json" -Raw | ConvertFrom-Json).plugins.PSObject.Properties |
   ForEach-Object { $n = $_.Name; $_.Value | Where-Object { $_.projectPath -eq $root } |
-    ForEach-Object { "$n -> $($_.scope) $($_.version)" } }
+    ForEach-Object { "$n -> $($_.scope) $($_.version) $($_.gitCommitSha)" } }
 ```
 
 **One** `project` line per plugin you listed is what you want — the count is part of the check, not a
-detail. Empty output means nothing was installed here. *Two* lines for the same plugin is a stray second
+detail. The last field is the commit the payload came from, and it answers a different question than the
+version does: see [Staying up to date](#staying-up-to-date) under *"the version is not the code"*. Empty output means nothing was installed here. *Two* lines for the same plugin is a stray second
 record, which a repair install can create rather than prevent, and a line reading `local` was written by
 a session start rather than by you; both are covered under
 [Staying up to date](#staying-up-to-date). Do run it — if the install did not happen, the skill from
@@ -141,7 +142,10 @@ The worker specialists can be invoked directly as `@specialists:<name>`.
 
 ## Staying up to date
 
-Updates reach you via **releases**, and getting one takes **two** commands, from your repo's root:
+Updates are *announced* via **releases** — the version bump, the notes, the `RELEASE.md` card — and
+getting one takes **two** commands, from your repo's root. What actually lands in your cache is a
+different question, answered under [the version is not the code](#staying-up-to-date) further down: the
+clone these commands read tracks `main`, not the tag.
 
 ```powershell
 claude plugin marketplace update davekjohns-workshop          # 1. refresh the marketplace cache
@@ -194,6 +198,34 @@ plugin; the full history lives in the workshop itself
 ([`CHANGELOG.md`](../../CHANGELOG.md) and [`releases/`](../../releases/README.md)). Each plugin
 folder also carries a `RELEASE.md` card next to its `CHANGELOG.md` — open it in your plugin cache
 after an update to see, at a glance, exactly which release you're now on.
+
+**The version is not the code, and on this marketplace the two routinely disagree.** The cached clone
+this family installs from **checks out `main` and tracks `origin/main`** — not the newest tag. So any
+refresh fast-forwards it to `main` and the install copies *that* tree, while `plugin.json` still carries
+whatever version the last release bumped it to. Every commit merged after a release therefore ships to
+consumers immediately, under the previous release's version number.
+
+Measured twice, from both directions (inbound
+[#313](https://github.com/DaveKJohn/davekjohns-workshop/issues/313), July 31 – August 1, 2026, CLI
+`2.1.220`):
+
+- **Without a command.** A consumer moved `3.0.6 → 3.0.8` on its own and landed on `main`, three commits
+  past the `v3.0.8` tag. `version` read `3.0.8`; `gitCommitSha` was the fold commit of a PR merged after
+  the release. The payload genuinely differed — the same `SKILL.md` hashed differently on the tag and in
+  the installed cache — and `3.0.7` was never cached at all, so that release's fixes were skipped over
+  entirely.
+- **With the documented commands.** The two-command procedure at the top of this section, run
+  deliberately in the workshop repo, produced exactly the same state: `version 3.0.8`, sha on `main`. So
+  this is not an artefact of some unknown scheduler — **the documented update path cannot deliver a tagged
+  release**, because the source it reads is a branch.
+
+What that means for you, plainly: the version number tells you which release notes to read, and the sha
+tells you which code you are running. Only the second is the truth about your session. Two practical
+consequences — the family's own measuring discipline of *"pin source locations against the release tag"*
+does not hold in a consumer, so pin against the sha your record names; and a bug you cannot reproduce
+against the tag may still be real, because you were never on it. What remains genuinely unestablished is
+what *triggers* the unasked refresh — that a refresh moves you to `main` is settled, when one happens by
+itself is not.
 
 **Read your install record rather than assume it, because it can move — or be taken away — without you
 asking** (inbound [#296](https://github.com/DaveKJohn/davekjohns-workshop/issues/296) and
