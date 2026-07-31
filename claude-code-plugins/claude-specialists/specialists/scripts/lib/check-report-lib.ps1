@@ -47,6 +47,17 @@
                                                           (inbound #294). Single source for the
                                                           bootstrap, check-roster-sync and
                                                           check-connectors.
+      - Get-InstallRecord / Test-PluginInstalledHere  -- the OTHER half Claude Code needs: an install
+                                                          record for THIS project path in
+                                                          ~/.claude/plugins/installed_plugins.json
+                                                          (inbound #302). An enable without a record
+                                                          loads nothing, and every check used to
+                                                          report the full specialist surface anyway.
+      - Get-UserClaudeHome / Get-JsonField / Format-LabelList -- the small shared pieces those two
+                                                          rest on: where '~/.claude' is, a
+                                                          StrictMode-safe field read on
+                                                          consumer-owned JSON, and the one place a
+                                                          list of layer labels becomes prose.
       - Resolve-PluginDir                             -- resolve a plugin's versioned dir under a
                                                           plugin cache root (honors
                                                           $env:CLAUDE_PLUGIN_ROOT when it points at
@@ -308,24 +319,50 @@ function Test-PluginMarketplaceSlug {
 # enable, so the worst case is a visible, actionable drift report -- never the false green that is the
 # whole reason this helper exists.
 
+function Get-UserClaudeHome {
+    <# The home directory that '~/.claude' hangs off, for the two things in this lib that live there:
+       the user settings layer (Get-SettingsChainPaths) and the plugin administration
+       (Get-InstallRecord).
+
+       $env:USERPROFILE first -- the convention the rest of these scripts use for the plugin cache, and
+       the variable the connector test already redirects to point a child process at a throwaway home --
+       falling back to $HOME so the plugin's non-Windows consumers resolve something sensible rather than
+       a path rooted in the empty string. Returns '' when neither is set, which every caller must read as
+       "cannot look" rather than "looked and found nothing". #>
+    param([string]$UserHomeOverride = '')
+    if ($UserHomeOverride) { return $UserHomeOverride }
+    if ($env:USERPROFILE)  { return $env:USERPROFILE }
+    if ($HOME)             { return $HOME }
+    return ''
+}
+
+function Get-JsonField {
+    <# Read one field off a ConvertFrom-Json object without dying on a shape that does not have it.
+
+       Under Set-StrictMode -Version Latest a plain '$obj.field' on a PSCustomObject that lacks the field
+       is a terminating error, and these scripts read files a consumer owns -- a record written by a
+       newer (or older) CLI is an ordinary state, not a corrupt file. The per-item filter is the same
+       idiom Get-EnabledPlugins documents at length: it touches no member on the (possibly empty)
+       property collection itself, which the '-contains' idiom used elsewhere in this repo does. #>
+    param($Object, [Parameter(Mandatory = $true)][string]$Name, $Default = '')
+    if ($null -eq $Object) { return $Default }
+    $p = @($Object.PSObject.Properties | Where-Object { $_.Name -eq $Name })
+    if ($p.Count -eq 0)      { return $Default }
+    if ($null -eq $p[0].Value) { return $Default }
+    return $p[0].Value
+}
+
 function Get-SettingsChainPaths {
     <# The settings files that can carry 'enabledPlugins', LOWEST precedence FIRST -- so a caller that
        walks this list in order and lets each layer overwrite the previous one ends up with Claude
        Code's precedence (local > project > user) for free.
 
-       -UserHomeOverride is for fixtures. The user layer otherwise resolves from $env:USERPROFILE (the
-       convention the rest of these scripts use for the plugin cache, and the variable the connector
-       test already redirects to point a child process at a throwaway home), falling back to $HOME so
-       the plugin's non-Windows consumers resolve something sensible rather than a path rooted in the
-       empty string. #>
+       -UserHomeOverride is for fixtures. See Get-UserClaudeHome for how the user home resolves. #>
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
         [string]$UserHomeOverride = ''
     )
-    $userHome = if ($UserHomeOverride) { $UserHomeOverride }
-                elseif ($env:USERPROFILE) { $env:USERPROFILE }
-                elseif ($HOME) { $HOME }
-                else { '' }
+    $userHome = Get-UserClaudeHome -UserHomeOverride $UserHomeOverride
 
     $chain = @()
     if ($userHome) {
@@ -343,6 +380,25 @@ function Get-SettingsChainPaths {
         Path  = (Join-Path $RepoRoot '.claude\settings.local.json')
     }
     return $chain
+}
+
+function Format-LabelList {
+    <# 'a', 'a and b', 'a, b and c' -- the one place this report's prose joins a list of layer labels.
+
+       Extracted (inbound #304) because the phrasing was inline in Get-EnabledPlugins' $summary and a
+       SECOND list of layers now needs the identical wording. Two hand-rolled joins producing "almost
+       the same sentence" is the shape that made #294 and #304 possible in the first place.
+
+       -IfEmpty is the caller's word for "there is nothing to list", since that sentence differs per
+       question: no settings file at all vs. no layer carrying the key. #>
+    param(
+        [string[]]$Labels = @(),
+        [string]$IfEmpty = 'none'
+    )
+    $l = @($Labels)
+    if ($l.Count -eq 0) { return $IfEmpty }
+    if ($l.Count -eq 1) { return $l[0] }
+    return (($l[0..($l.Count - 2)]) -join ', ') + ' and ' + $l[-1]
 }
 
 function Get-EnabledPlugins {
@@ -365,7 +421,23 @@ function Get-EnabledPlugins {
          Unreadable     -- labels of layers that exist but did not parse.
          Consulted      -- labels of the layers that exist (what a message should claim was checked).
          Summary        -- ready-made 'a, b and c' phrasing of Consulted, or 'no settings file' when
-                           the chain is empty, so the three callers word this identically. #>
+                           the chain is empty, so the three callers word this identically.
+         KeyIn          -- labels of the layers that actually CARRY an 'enabledPlugins' key (the
+                           HasKey subset of Consulted).
+         KeySummary     -- ready-made phrasing of KeyIn, for a message about where the key LIVES.
+
+       WHY KeyIn EXISTS, AND WHY IT IS NOT Summary (inbound #304, measured 2026-07-31 against 3.0.6).
+       Summary is the phrasing of Consulted, and Consulted is "the layers that EXIST" -- so it answers
+       "what did you look at?", never "where is the key?". check-roster-sync used it for the second
+       question and therefore claimed 'enabledPlugins' was "present in" all three layers of a repo that
+       carried it in exactly one (life-hub: the user layer, as an empty object; the two repo-owned files
+       had no key at all). The two files a reader opens first are the two that demonstrably do not have
+       it.
+       That inverts the promise #294 was fixed to make -- every verdict names the layer an enable came
+       from, "so an enable arriving from outside the repo is diagnosable instead of mysterious" -- in the
+       one line where the layer is the whole answer. The data was already here (Layers[].HasKey); what was
+       missing was a ready-made phrasing, so the fix is a second Summary rather than a filter re-typed at
+       each call site. Same reasoning that put Summary here to begin with. #>
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
         [string]$UserHomeOverride = ''
@@ -438,13 +510,7 @@ function Get-EnabledPlugins {
     $ids = [string[]]@($decided.Keys | Where-Object { $decided[$_] })
     if ($ids.Count -gt 1) { [array]::Sort($ids, [System.StringComparer]::Ordinal) }
 
-    $summary = if ($consulted.Count -eq 0) {
-        'no settings file'
-    } elseif ($consulted.Count -eq 1) {
-        $consulted[0]
-    } else {
-        (($consulted[0..($consulted.Count - 2)]) -join ', ') + ' and ' + $consulted[-1]
-    }
+    $keyIn = @($layers | Where-Object { $_.HasKey } | ForEach-Object { $_.Label })
 
     return [pscustomobject]@{
         Ids           = $ids
@@ -454,8 +520,180 @@ function Get-EnabledPlugins {
         AnyKeyFound   = $anyKey
         Unreadable    = $unreadable
         Consulted     = $consulted
-        Summary       = $summary
+        Summary       = (Format-LabelList -Labels $consulted -IfEmpty 'no settings file')
+        KeyIn         = $keyIn
+        KeySummary    = (Format-LabelList -Labels $keyIn -IfEmpty 'no settings layer')
     }
+}
+
+# --- Is the plugin actually INSTALLED for this path? (inbound #302) -------------------------------
+# Claude Code needs TWO things before a session loads a plugin: an ENABLE in the settings chain, and an
+# INSTALL RECORD for this project path in ~/.claude/plugins/installed_plugins.json. #294 taught these
+# checks to read the first one properly. Nothing read the second -- so a mirror image of #294 lived in
+# the same scripts, pointing the other way.
+#
+# THE DEFECT, measured 2026-07-31 against 3.0.6 in a throwaway consumer with three plugins enabled and
+# no install record for its path. What the session saw: zero specialists skills, zero subagents, zero
+# hook output. What check-roster-sync said about that same directory: "27 specialisten", one [ERROR]
+# each. What the bootstrap did there: 27 lens files on disk, for specialists that exist in no session of
+# that repo. Where #294's blindness produced a reassuring lie in one check and a spurious error in
+# another, this one produces a confident, fully detailed report about a plugin surface that is not there.
+#
+# The state is not exotic, and since 3.0.6 it is not even self-inflicted: it arises from a forgotten
+# install, an uninstall that left the enable behind, a renamed or moved repo directory (the record is
+# keyed on projectPath) -- and from a session start in ANOTHER directory taking this repo's record over,
+# reproduced twice and filed as inbound #301. In that last case a correctly adopted repo enters this
+# state without its owner doing anything at all: no command run, no file changed, git status clean.
+#
+# WHY THIS IS A LIB FUNCTION AND NOT A NEW READER. The query already existed, hand-rolled inside
+# check-connectors' version check -- which is why inbound #302's grep for 'installed_plugins' over the
+# PLUGIN tree came back with prose only: that reader lives in the workshop-owned scripts/sync/, outside
+# the tree it searched. The claim was right as scoped; the fix is to lift that one reader out rather than
+# add a second, since "one reader per call site, tightened in none of them" is the sentence #294 was
+# filed about. check-connectors' record-matching rules (#240: EVERY match, not the first; case- and
+# trailing-separator-insensitive, because two spellings of one path are not two answers) are preserved
+# here verbatim, and its call site now asks this function instead.
+#
+# WHY A PATHLESS RECORD COUNTS FOR EVERY REPO. check-connectors skipped records without a 'projectPath'
+# and was right to -- it is comparing versions for one specific checkout. A "is it installed HERE?"
+# question cannot skip them: a record that is not scoped to a path does not exclude this path. They are
+# therefore kept separately rather than dropped, so a caller states which kind of evidence it found. Note
+# honestly what is measured and what is not: every record observed on this machine is scope 'project' or
+# 'local' and carries a projectPath, so the pathless shape is INFERRED from the field's absence being
+# meaningful, not from a user-scope install that was watched being written. Erring this way is deliberate
+# -- it can only suppress a warning, never invent one, and a false [NOT-INSTALLED-HERE] against a working
+# repo is precisely the cry-wolf failure #294 spent a release removing.
+
+function Get-InstallRecord {
+    <# The install administration's answer to "is <plugin> installed for $RepoRoot?", read from
+       ~/.claude/plugins/installed_plugins.json.
+
+       Returns:
+         Path          -- the administration file consulted ('' when no user home could be resolved).
+         Exists        -- did that file exist?
+         Readable      -- did it parse? A file that does not parse is reported, never thrown: a check
+                          must be able to say "I could not read the authority" instead of dying.
+         Error         -- the parse error message, or ''.
+         AnyRecord     -- does the file hold ANY record, for any path? Distinguishes "no installs
+                          administered on this machine at all" from "installs, but none for this repo".
+         RecordsById   -- hashtable id -> ALL records whose projectPath IS this repo (#240: never just
+                          the first one -- several disagreeing records is its own answer).
+         Ids           -- ordinally sorted ids that have at least one record for this repo.
+         PathlessById  -- hashtable id -> records carrying no projectPath (see the block above).
+         PathlessIds   -- ordinally sorted ids of those.
+
+       Records are projected onto a fixed shape (Id/Scope/Version/InstallPath/ProjectPath/InstalledAt/
+       LastUpdated) so callers never reach into raw JSON -- the field a caller reads is then a decision
+       made once, here, rather than at each call site.
+
+       -UserHomeOverride is for fixtures, same as Get-EnabledPlugins'. Note that the two checks
+       deliberately do NOT pass their own -UserHomeOverride through to this function: that parameter is
+       documented as pinning the USER LAYER OF THE SETTINGS CHAIN, and the administration is a different
+       file answering a different question. A fixture that wants to control the administration redirects
+       $env:USERPROFILE for the child process, which is what the connector version test already does. #>
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [string]$UserHomeOverride = ''
+    )
+
+    $userHome = Get-UserClaudeHome -UserHomeOverride $UserHomeOverride
+    $path = if ($userHome) { Join-Path $userHome '.claude\plugins\installed_plugins.json' } else { '' }
+    $exists = [bool]($path -and (Test-Path -LiteralPath $path -PathType Leaf))
+
+    $readable = $false
+    $err = ''
+    $anyRecord = $false
+    $forPath = @{}
+    $pathless = @{}
+
+    # Normalize the repo root once, the same way the record side is normalized below. Best-effort
+    # Resolve-Path: the root normally exists (it is the repo being inspected), but a fixture may name one
+    # that does not, and a check must not die on that -- fall back to the literal string.
+    $rootResolved = Resolve-Path -LiteralPath $RepoRoot -ErrorAction SilentlyContinue
+    $rootKey = if ($rootResolved) { $rootResolved.Path.TrimEnd('\', '/') } else { ([string]$RepoRoot).TrimEnd('\', '/') }
+
+    if ($exists) {
+        try {
+            $admin = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
+            $readable = $true
+            $pluginsMap = Get-JsonField $admin 'plugins' $null
+            if ($null -ne $pluginsMap) {
+                foreach ($entry in @($pluginsMap.PSObject.Properties)) {
+                    $id = $entry.Name
+                    foreach ($rec in @($entry.Value)) {
+                        if ($null -eq $rec) { continue }
+                        $anyRecord = $true
+                        $projected = [pscustomobject]@{
+                            Id          = $id
+                            Scope       = (Get-JsonField $rec 'scope')
+                            Version     = (Get-JsonField $rec 'version')
+                            InstallPath = (Get-JsonField $rec 'installPath')
+                            ProjectPath = (Get-JsonField $rec 'projectPath')
+                            InstalledAt = (Get-JsonField $rec 'installedAt')
+                            LastUpdated = (Get-JsonField $rec 'lastUpdated')
+                        }
+                        if (-not $projected.ProjectPath) {
+                            if (-not $pathless.ContainsKey($id)) { $pathless[$id] = @() }
+                            $pathless[$id] += $projected
+                            continue
+                        }
+                        # A record can name a projectPath that no longer exists on this machine (a
+                        # deleted throwaway directory is the case that produced inbound #301);
+                        # Resolve-Path then returns $null and must never be read via .Path under
+                        # StrictMode. Such a record cannot be about THIS repo, so skipping it is both
+                        # safe and correct -- carried over verbatim from check-connectors.
+                        $recResolved = Resolve-Path -LiteralPath $projected.ProjectPath -ErrorAction SilentlyContinue
+                        if (-not $recResolved) { continue }
+                        if ($recResolved.Path.TrimEnd('\', '/') -ieq $rootKey) {
+                            if (-not $forPath.ContainsKey($id)) { $forPath[$id] = @() }
+                            $forPath[$id] += $projected
+                        }
+                    }
+                }
+            }
+        } catch {
+            $err = $_.Exception.Message
+        }
+    }
+
+    # ORDINAL sort, for the same reason Get-EnabledPlugins sorts that way: a check whose output order
+    # depends on the machine's culture is not a check you can diff between machines.
+    $ids = [string[]]@($forPath.Keys)
+    if ($ids.Count -gt 1) { [array]::Sort($ids, [System.StringComparer]::Ordinal) }
+    $plIds = [string[]]@($pathless.Keys)
+    if ($plIds.Count -gt 1) { [array]::Sort($plIds, [System.StringComparer]::Ordinal) }
+
+    return [pscustomobject]@{
+        Path         = $path
+        Exists       = $exists
+        Readable     = $readable
+        Error        = $err
+        AnyRecord    = $anyRecord
+        RecordsById  = $forPath
+        Ids          = $ids
+        PathlessById = $pathless
+        PathlessIds  = $plIds
+    }
+}
+
+function Test-PluginInstalledHere {
+    <# Does $PluginId have install evidence covering this repo? One predicate, so the three call sites
+       cannot each decide differently what "installed here" means -- the exact drift that produced #294.
+
+       Returns $true for a record scoped to this repo's path OR a record scoped to no path at all (see
+       the block above for why the second counts). Deliberately also $true when the administration could
+       not be read at all: an unreadable or absent authority is not evidence of absence, and a check that
+       treats "I could not look" as "it is not installed" would fire its loudest new signal exactly where
+       it knows least. The caller reports the unreadable file separately. #>
+    param(
+        [Parameter(Mandatory = $true)]$InstallRecord,
+        [Parameter(Mandatory = $true)][string]$PluginId
+    )
+    if ($null -eq $InstallRecord) { return $true }
+    if (-not $InstallRecord.Exists -or -not $InstallRecord.Readable) { return $true }
+    if ($InstallRecord.RecordsById.ContainsKey($PluginId)) { return $true }
+    if ($InstallRecord.PathlessById.ContainsKey($PluginId)) { return $true }
+    return $false
 }
 
 function Resolve-PluginDir {

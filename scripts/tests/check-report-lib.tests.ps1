@@ -199,6 +199,158 @@ try {
     Assert-True (Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome).AnyKeyFound 'empty enabledPlugins: AnyKeyFound is true'
     [System.IO.File]::WriteAllText($projFile, '{ }')
     Assert-True (-not (Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome).AnyKeyFound) 'no enabledPlugins key: AnyKeyFound is false'
+
+    # --- KeyIn / KeySummary: WHERE the key lives, not what was looked at (inbound #304) ------------
+    #     Summary answers "what did you inspect?" and was used for "where is the key?", so a repo
+    #     carrying it in one of three layers had all three named -- and the two a reader opens first were
+    #     the two that demonstrably did not have it. The fixture below is life-hub's EXACT measured
+    #     shape, because that is the one that produced the wrong sentence: the key in the user layer only,
+    #     as an empty object, with both repo-owned layers present and key-less.
+    Write-Host "Get-EnabledPlugins -- KeyIn/KeySummary (inbound #304)" -ForegroundColor Cyan
+    [System.IO.File]::WriteAllText($userFile,  '{ "enabledPlugins": { } }')
+    [System.IO.File]::WriteAllText($projFile,  '{ "permissions": { "allow": [] } }')
+    [System.IO.File]::WriteAllText($localFile, '{ "permissions": { "allow": [] } }')
+    $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
+    Assert-Equal 3 @($e.Consulted).Count 'life-hub shape: all three layers exist, so all three were consulted'
+    Assert-Equal 'user ~/.claude/settings.json' ($e.KeyIn -join ',') 'life-hub shape: KeyIn names ONLY the layer carrying the key'
+    Assert-Equal 'user ~/.claude/settings.json' $e.KeySummary 'life-hub shape: KeySummary is that one layer, not all three'
+    Assert-True $e.AnyKeyFound 'life-hub shape: the key WAS found (empty object is an answer)'
+    # The two must not be confused, and the regression is easiest to spot by asserting they DIFFER here.
+    Assert-True ($e.Summary -ne $e.KeySummary) 'life-hub shape: Summary and KeySummary are different sentences'
+    Assert-True ($e.Summary -match 'and') 'life-hub shape: Summary still names every consulted layer'
+
+    # Several layers carrying the key -> the joined phrasing, so the fix is not "always print one label".
+    [System.IO.File]::WriteAllText($projFile, '{ "enabledPlugins": { } }')
+    $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
+    Assert-Equal 'user ~/.claude/settings.json and .claude/settings.json' $e.KeySummary 'two layers with the key: both named, joined with "and"'
+    # No layer carries it -> a sentence, never an empty string dangling in a message.
+    [System.IO.File]::WriteAllText($userFile, '{ }')
+    [System.IO.File]::WriteAllText($projFile, '{ }')
+    $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
+    Assert-Equal 0 @($e.KeyIn).Count 'no layer with the key: KeyIn is empty'
+    Assert-Equal 'no settings layer' $e.KeySummary 'no layer with the key: KeySummary is a sentence, not an empty string'
+
+    # --- Format-LabelList: the one place a list of labels becomes prose ---------------------------
+    Write-Host "Format-LabelList -- the shared joining" -ForegroundColor Cyan
+    Assert-Equal 'nothing' (Format-LabelList -Labels @() -IfEmpty 'nothing') 'empty list: the caller word'
+    Assert-Equal 'a' (Format-LabelList -Labels @('a')) 'one label: bare'
+    Assert-Equal 'a and b' (Format-LabelList -Labels @('a', 'b')) 'two labels: "and", no comma'
+    Assert-Equal 'a, b and c' (Format-LabelList -Labels @('a', 'b', 'c')) 'three labels: commas then "and"'
+
+    # --- Get-JsonField: StrictMode-safe reads over consumer-owned JSON ----------------------------
+    Write-Host "Get-JsonField -- absent fields are answers, not crashes" -ForegroundColor Cyan
+    $obj = '{ "a": "x", "n": null }' | ConvertFrom-Json
+    Assert-Equal 'x' (Get-JsonField $obj 'a') 'present field: read'
+    Assert-Equal '' (Get-JsonField $obj 'missing') 'absent field: the default, no throw'
+    Assert-Equal 'fb' (Get-JsonField $obj 'missing' 'fb') 'absent field: the caller default'
+    Assert-Equal 'fb' (Get-JsonField $obj 'n' 'fb') 'explicit null: treated as absent'
+    # The shape that produced the #294 mislabelling: an object with NO properties at all.
+    Assert-Equal '' (Get-JsonField ('{ }' | ConvertFrom-Json) 'a') 'empty object: an answer, not a StrictMode crash'
+    Assert-Equal '' (Get-JsonField $null 'a') 'null object: an answer'
+
+    # --- Get-InstallRecord / Test-PluginInstalledHere (inbound #302) ------------------------------
+    #     The other half of what Claude Code needs. An enable without a record for THIS projectPath loads
+    #     nothing, and every check reported the full specialist surface anyway. Asserted directly, because
+    #     the two rules that matter here -- EVERY matching record (#240) and "a pathless record does not
+    #     exclude this path" -- are both invisible to the callers' own tests.
+    Write-Host "Get-InstallRecord -- the install administration (inbound #302)" -ForegroundColor Cyan
+    $adminHome = Join-Path $Fixture 'adminhome'
+    $repoA = Join-Path $Fixture 'repoA'
+    $repoB = Join-Path $Fixture 'repoB'
+    New-Item -ItemType Directory -Path (Join-Path $adminHome '.claude\plugins') -Force | Out-Null
+    New-Item -ItemType Directory -Path $repoA -Force | Out-Null
+    New-Item -ItemType Directory -Path $repoB -Force | Out-Null
+    $adminFile = Join-Path $adminHome '.claude\plugins\installed_plugins.json'
+
+    # No administration at all: "could not look", NOT "not installed". The predicate must stay permissive
+    # here -- absence of the authority is not evidence of absence, and a check that fires its loudest new
+    # signal where it knows least is the cry-wolf failure #294 spent a release removing.
+    $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
+    Assert-True (-not $r.Exists) 'no administration: Exists is false'
+    Assert-True (-not $r.AnyRecord) 'no administration: AnyRecord is false'
+    Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'specialists@m') 'no administration: the predicate does NOT claim "not installed"'
+
+    # A record for THIS path, and one for another path. Only the first counts as installed here -- this is
+    # the whole measurement behind #302 and #301.
+    $adminJson = @"
+{
+  "version": 2,
+  "plugins": {
+    "specialists@m": [
+      { "scope": "project", "projectPath": "$($repoA -replace '\\', '\\')", "version": "3.0.6" }
+    ],
+    "other@m": [
+      { "scope": "project", "projectPath": "$($repoB -replace '\\', '\\')", "version": "3.0.6" }
+    ]
+  }
+}
+"@
+    [System.IO.File]::WriteAllText($adminFile, $adminJson)
+    $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
+    Assert-True $r.Exists 'administration present: Exists is true'
+    Assert-True $r.Readable 'administration present: Readable is true'
+    Assert-Equal 'specialists@m' ($r.Ids -join ',') 'path match: only the plugin recorded for THIS path'
+    Assert-Equal '3.0.6' $r.RecordsById['specialists@m'][0].Version 'path match: the record is projected onto a fixed shape'
+    Assert-Equal 'project' $r.RecordsById['specialists@m'][0].Scope 'path match: Scope travels along'
+    Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'specialists@m') 'path match: installed here'
+    Assert-True (-not (Test-PluginInstalledHere -InstallRecord $r -PluginId 'other@m')) 'THE #302 CASE: a record for another path is NOT installed here'
+    Assert-True (-not (Test-PluginInstalledHere -InstallRecord $r -PluginId 'absent@m')) 'no record at all: not installed here'
+    Assert-True $r.AnyRecord 'AnyRecord distinguishes "no installs administered" from "none for this repo"'
+
+    # Case- and trailing-separator-insensitive: two spellings of one directory are not two answers (#240).
+    $r = Get-InstallRecord -RepoRoot ($repoA.ToUpper() + '\') -UserHomeOverride $adminHome
+    Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'specialists@m') 'a different spelling of the same path still matches'
+
+    # EVERY matching record, never just the first (#240): several disagreeing records is its own answer,
+    # and the caller can only report that honestly if it receives all of them.
+    $dupJson = @"
+{ "plugins": { "specialists@m": [
+    { "scope": "project", "projectPath": "$($repoA -replace '\\', '\\')", "version": "3.0.6" },
+    { "scope": "project", "projectPath": "$($repoA -replace '\\', '\\')", "version": "2.11.0" }
+] } }
+"@
+    [System.IO.File]::WriteAllText($adminFile, $dupJson)
+    $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
+    Assert-Equal 2 @($r.RecordsById['specialists@m']).Count 'duplicate records: BOTH returned, not the first one'
+    Assert-Equal '2.11.0,3.0.6' ((@($r.RecordsById['specialists@m']) | ForEach-Object { $_.Version } | Sort-Object) -join ',') 'duplicate records: the disagreement is visible to the caller'
+
+    # A PATHLESS record covers every repo, so it must never produce a "not installed here" claim. Erring
+    # this way can only suppress a warning, never invent one.
+    [System.IO.File]::WriteAllText($adminFile, '{ "plugins": { "userwide@m": [ { "scope": "user", "version": "3.0.6" } ] } }')
+    $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
+    Assert-Equal 0 $r.Ids.Count 'pathless record: not counted as a path match'
+    Assert-Equal 'userwide@m' ($r.PathlessIds -join ',') 'pathless record: kept separately rather than dropped'
+    Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'userwide@m') 'pathless record: does NOT exclude this path'
+
+    # A record naming a directory that no longer exists cannot be about this repo -- and must not crash on
+    # a $null from Resolve-Path under StrictMode. This is the deleted-throwaway-folder case from #301.
+    [System.IO.File]::WriteAllText($adminFile, "{ `"plugins`": { `"gone@m`": [ { `"scope`": `"project`", `"projectPath`": `"$($repoA -replace '\\', '\\')\\does-not-exist`", `"version`": `"3.0.6`" } ] } }")
+    $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
+    Assert-True $r.Readable 'vanished projectPath: still readable, no crash'
+    Assert-True (-not (Test-PluginInstalledHere -InstallRecord $r -PluginId 'gone@m')) 'vanished projectPath: not installed here'
+
+    # An administration that does not parse is REPORTED, never thrown -- and the predicate stays permissive,
+    # because an authority the check could not read is not evidence about the repo.
+    [System.IO.File]::WriteAllText($adminFile, '{ "plugins": { oops')
+    $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
+    Assert-True $r.Exists 'unparseable administration: Exists is true'
+    Assert-True (-not $r.Readable) 'unparseable administration: Readable is false'
+    Assert-True ($r.Error -ne '') 'unparseable administration: the reason is carried, not swallowed'
+    Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'specialists@m') 'unparseable administration: the predicate does not claim "not installed"'
+
+    # Shapes that are valid but easy to crash on, same class as the settings-chain block above.
+    foreach ($shape in @('{ }', '{ "plugins": { } }', '{ "plugins": null }', '{ "plugins": { "p@m": [] } }')) {
+        [System.IO.File]::WriteAllText($adminFile, $shape)
+        $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
+        Assert-True $r.Readable "valid administration shape '$shape': parsed, not reported as corrupt"
+        Assert-Equal 0 $r.Ids.Count "valid administration shape '$shape': nothing matched"
+    }
+    # A record missing 'version'/'scope' entirely is an ordinary state (a newer or older CLI): it must
+    # still match on path and simply carry empty fields.
+    [System.IO.File]::WriteAllText($adminFile, "{ `"plugins`": { `"bare@m`": [ { `"projectPath`": `"$($repoA -replace '\\', '\\')`" } ] } }")
+    $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
+    Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'bare@m') 'record without scope/version: still matches on path'
+    Assert-Equal '' $r.RecordsById['bare@m'][0].Version 'record without version: an empty field, not a crash'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

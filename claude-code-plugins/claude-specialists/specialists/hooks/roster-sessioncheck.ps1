@@ -22,6 +22,11 @@
         in both the drift and the in-sync branch, because "a lens left behind by a removed
         specialist" was otherwise visible only to whoever deliberately ran the script -- in practice
         nobody. The per-orphan [INFO] lines still stay out (inbound #204);
+      - the same holds for [NOT-INSTALLED-HERE] (inbound #302): a plugin that is enabled for this repo
+        but has no install record for this path loads nothing here, so it gets its own verdict AND rides
+        along with the drift and bootstrap branches, whose headlines would otherwise describe a
+        specialist surface no session in this repo has. Its per-plugin [INFO] lines stay out, as with
+        orphans;
       - the check's [SCOPE] line travels along with those signals, so a surfaced finding always names
         the repo the check resolved -- and whether that root came from CLAUDE_PROJECT_DIR or from the
         working-directory git-root fallback (inbound #203);
@@ -119,6 +124,19 @@ try {
     # repo that deliberately enables nothing is not broken -- but never "in sync" either.
     $nothingEnabledLines = @($out | Where-Object { $_ -cmatch '\[NOTHING-ENABLED\]' })
 
+    # [NOT-INSTALLED-HERE] rides along the same way (inbound #302). The mirror image of the state above:
+    # the plugin IS enabled, so the check walks its whole specialist list, but there is no install record
+    # for this path -- and a session here therefore loads none of it. Every drift line in that run is
+    # about a surface the repo does not have, which is why this marker has to reach BOTH branches below:
+    # on its own it is a third verdict, and alongside real [ERROR] lines it is the qualification without
+    # which the drift headline overstates what was found.
+    #
+    # Its blind spot, stated rather than glossed: when NO plugin is installed for this path, this hook
+    # does not run at all, because the hook itself ships in the plugin. It covers the partial case (one of
+    # several plugins lost its record) and a deliberate run; the total case is covered from the workshop
+    # by check-connectors, which can still speak about a consumer that has gone silent.
+    $notInstalledLines = @($out | Where-Object { $_ -cmatch '\[NOT-INSTALLED-HERE\]' })
+
     # Did the child run to completion? Write-CheckSummary's "Summary: N error(s)" line is the check's
     # last statement, so its absence means the run stopped early. The exit code cannot tell us on its
     # own: a complete drift report and a crash halfway both leave a -File child on exit 1, which is
@@ -138,6 +156,10 @@ try {
         # from the roster/lenses" about a run that compared nothing at all -- the same species of
         # misdescription this whole change is about, one branch over.
         foreach ($line in $nothingEnabledLines) { Write-Host "  $($line.Trim())" }
+        # Same reasoning, one state over: without this line the headline says a specialist is missing from
+        # the roster, about a plugin no session in this repo loads. The finding is real and the roster
+        # genuinely lags -- but the reader's first move should be the install, not the roster.
+        foreach ($line in $notInstalledLines) { Write-Host "  $($line.Trim())" }
         if (-not $completed -or $code -ne 1) {
             Write-Host "  (note: the check did not run to completion (exit $code) -- the list above may be partial.)"
         }
@@ -151,12 +173,23 @@ try {
         # 38 [ERROR] lines a fresh consumer used to get from this check alone.
         Write-Host 'roster-sessioncheck: the plugin is enabled but this repo has not been set up yet:'
         foreach ($line in $bootstrapLines) { Write-Host "  $($line.Trim())" }
+        # Rides along here too: "run specialists-init" is the right advice for an unbootstrapped repo, and
+        # incomplete for one where a plugin is also not installed for this path -- the bootstrap would then
+        # place lenses for a surface that still will not load. Both facts, in the order they must be acted
+        # on.
+        foreach ($line in $notInstalledLines) { Write-Host "  $($line.Trim())" }
     } elseif ($nothingEnabledLines.Count -gt 0) {
         # Deliberately worded as what the check DID, not as a verdict about the repo: the honest answer
         # is that nothing was compared. A reader who did expect a plugin here now has the one fact that
         # explains it (which files were consulted), instead of a green line that hides the question.
         Write-Host 'roster-sessioncheck: no plugin is enabled for this repo -- the roster was not checked:'
         foreach ($line in $nothingEnabledLines) { Write-Host "  $($line.Trim())" }
+    } elseif ($notInstalledLines.Count -gt 0) {
+        # Its own verdict, above the in-sync line and below drift: the roster may well be in sync, but
+        # saying so as the headline answers a question nobody is in a position to care about yet. What the
+        # reader needs first is that a plugin they enabled is not loading here.
+        Write-Host 'roster-sessioncheck: a plugin is enabled for this repo but not installed for this path:'
+        foreach ($line in $notInstalledLines) { Write-Host "  $($line.Trim())" }
     } elseif ($code -eq 0) {
         Write-Host 'roster-sessioncheck: roster in sync with the enabled plugins.'
         # The in-sync line is literally true -- no specialist is missing -- but an orphan left behind is

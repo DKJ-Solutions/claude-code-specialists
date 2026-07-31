@@ -12,14 +12,21 @@
 
     Per connector this script checks:
       1. Checkout present on this machine?          no -> [SKIP] (not an error)
-      2. Per plugin: enabled in .claude/settings.json?  no -> [ERROR]
+      2. Per plugin: enabled anywhere in the consumer's settings CHAIN? no -> [ERROR]. Read via
+         Get-EnabledPlugins, so the verdict names the layer it came from (inbound #294); this line used
+         to say '.claude/settings.json', which is the single-file reading that produced that inbound.
       3. Per plugin: all registered extensions present?  one missing -> [ERROR]
          Extensions of that plugin that exist in the consumer but are NOT registered
          -> [INFO] (inbound signal: update the register or bring the change back here), plus a
          non-counting [INVENTORY] line the session hook surfaces when that drifted register is
          the one describing the repo the session is in -- the only case a reader here can act on.
-      4. Per plugin: machine record (installed_plugins.json) older than source -> [ERROR];
-         no record/no administration -> [INFO] (machine-specific, not a gate breach)
+      4. Per plugin: machine record older than source -> [ERROR]; no record/no administration -> [INFO]
+         (machine-specific, not a gate breach). The record comes from Get-InstallRecord
+         (check-report-lib.ps1) -- the shared reader of ~/.claude/plugins/installed_plugins.json this
+         block used to be the sole owner of (inbound #302). When a plugin has no record for a checkout
+         while being ENABLED there, that [INFO] additionally states the consequence: a session in that
+         checkout loads none of it, and that repo's own hooks cannot say so, because they are in the
+         plugin that is not loading.
     The register no longer keeps a syncedVersion bookkeeping: the check reads the actual installed
     version from the machine record, and register administration that only duplicates numbers
     produced nothing but maintenance PRs (Dave's decision, July 20, 2026).
@@ -206,6 +213,25 @@ foreach ($mf in $manifestFiles) {
     # The user layer legitimately counts here too: it belongs to the machine and the user running this
     # check, which is the same machine and user the consumer checkout is used from.
     $consumerEnabled = Get-EnabledPlugins -RepoRoot $checkout -UserHomeOverride $UserHomeOverride
+
+    # The install administration for this checkout, read once per connector (inbound #302). Deliberately
+    # WITHOUT -UserHomeOverride: that parameter is documented as pinning the user layer of the SETTINGS
+    # CHAIN, and this is a different file answering a different question -- the version test controls it
+    # by redirecting $env:USERPROFILE for the child process, which is where Get-InstallRecord reads it.
+    #
+    # Behind the -SkipVersions guard, because everything that reads it is: the administration is the
+    # authority for check 4 and nothing else here. Reading it anyway would widen what a -SkipVersions run
+    # does -- and could newly report an unparseable administration in a run that was explicitly asked not
+    # to look at versions at all. Once per connector rather than once per plugin, so a consumer with
+    # several plugin blocks still reads the file once.
+    $consumerInstalled = $null
+    if (-not $SkipVersions) {
+        $consumerInstalled = Get-InstallRecord -RepoRoot $checkout
+        if ($consumerInstalled.Exists -and -not $consumerInstalled.Readable) {
+            Write-Failure "$($consumerInstalled.Path) does not parse as JSON ($($consumerInstalled.Error)) -- no install record could be read for this consumer, so every version verdict below is withheld."
+        }
+    }
+
     if (-not $consumerEnabled.AnyFileExists) {
         Write-Failure "no settings file found for '$checkout' (looked for $(($consumerEnabled.Layers | ForEach-Object { $_.Label }) -join ', '))"
     }
@@ -293,43 +319,56 @@ foreach ($mf in $manifestFiles) {
         }
 
         # 4. Machine record vs. source.
+        #
+        # The record read here is now Get-InstallRecord's (inbound #302). This block used to hold the
+        # ONLY reader of installed_plugins.json anywhere in these scripts -- which is why #302's grep for
+        # it over the plugin tree found prose only, and concluded no code read it: true of the plugin
+        # tree, and this file is workshop-owned. Its matching rules did not change; they moved, so the
+        # roster check and the bootstrap can ask the same question rather than each growing a reader of
+        # their own. The rules themselves, preserved verbatim in the lib:
+        #
+        # EVERY matching record, not the first one (#240). The old loop stopped at the first hit -- an
+        # arbitrary pick dressed up as a fact. Measured on Dave's machine (2026-07-29): `claude plugin
+        # list` showed `specialists` three times for one repo (2.13.1, 2.11.0, 2.9.0), because the
+        # administration holds several project records for that checkout, in two path spellings. The
+        # [OK]/[ERROR] the session hook prints every single start therefore rested on whichever record
+        # happened to come first in the JSON. Same defect family as #227, #235 and the teardown's
+        # docstring-VUL-IN: evidence that looks conclusive while being satisfied by something other than
+        # what it claims to measure. This one did not lie about a string -- it lied about WHICH of several
+        # answers it had found. An honest "I cannot tell" is worth more than a confident wrong number,
+        # and unlike the wrong number it is actionable.
+        #
+        # Read once per connector, outside the plugin loop, and asked per plugin id here.
         if (-not $SkipVersions) {
             $pluginJsonPath = Join-Path $pluginDir '.claude-plugin\plugin.json'
             $sourceVersion = (Get-Content -LiteralPath $pluginJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json).version
-            $adminPath = Join-Path $env:USERPROFILE '.claude\plugins\installed_plugins.json'
-            if (Test-Path -LiteralPath $adminPath) {
-                $admin = Get-Content -LiteralPath $adminPath -Raw -Encoding UTF8 | ConvertFrom-Json
-                $prop = $admin.plugins.PSObject.Properties | Where-Object { $_.Name -eq $p.id }
-                # EVERY matching record, not the first one (#240). The old loop stopped at the first
-                # hit -- an arbitrary pick dressed up as a fact. Measured on Dave's machine
-                # (2026-07-29): `claude plugin list` showed `specialists` three times for one repo
-                # (2.13.1, 2.11.0, 2.9.0), because ~/.claude.json holds several project records for
-                # that checkout, in two path spellings. The [OK]/[ERROR] the session hook prints every
-                # single start therefore rested on whichever record happened to come first in the JSON.
-                #
-                # Same defect family as #227, #235 and the teardown's docstring-VUL-IN: evidence that
-                # looks conclusive while being satisfied by something other than what it claims to
-                # measure. This one did not lie about a string -- it lied about WHICH of several
-                # answers it had found. An honest "I cannot tell" is worth more than a confident wrong
-                # number, and unlike the wrong number it is actionable.
+            # Readable, not merely present. An administration that exists but does not parse yields an
+            # EMPTY record set, and running the branches below on that would report "no machine record for
+            # this consumer" -- a statement about absence, drawn from a file that could not be read. That is
+            # the exact species of claim inbound #302 is about, so the unreadable case gets no verdict at
+            # all here; the [ERROR] at connector level already named the file and said the verdicts are
+            # withheld.
+            if ($consumerInstalled.Exists -and $consumerInstalled.Readable) {
                 $recordMatches = @()
-                if ($prop) {
-                    # A record can carry a projectPath that no longer exists on this machine;
-                    # Resolve-Path then returns $null and must never be blindly read via .Path
-                    # (StrictMode crash, Victor's finding).
-                    foreach ($rec in @($prop.Value)) {
-                        if (-not ($rec.PSObject.Properties.Name -contains 'projectPath')) { continue }
-                        $resolved = Resolve-Path -LiteralPath $rec.projectPath -ErrorAction SilentlyContinue
-                        if (-not $resolved) { continue }
-                        # Case-insensitively and without a trailing separator: the observed duplicates
-                        # differ only in spelling, and on Windows that is the same directory. Two
-                        # spellings of one path are not two answers.
-                        if ($resolved.Path.TrimEnd('\', '/') -ieq $checkout.TrimEnd('\', '/')) { $recordMatches += $rec }
-                    }
-                }
-                $recordVersions = @($recordMatches | ForEach-Object { $_.version } | Sort-Object -Unique)
+                if ($consumerInstalled.RecordsById.ContainsKey($p.id)) { $recordMatches = @($consumerInstalled.RecordsById[$p.id]) }
+                $recordVersions = @($recordMatches | ForEach-Object { $_.Version } | Sort-Object -Unique)
                 if ($recordMatches.Count -eq 0) {
-                    Write-Info "no machine record for this consumer (the install may run via a different machine)."
+                    # Sharpened for the case that actually bites (inbound #302). "No record" was worded
+                    # purely as a version check that could not run, which is right when the plugin is not
+                    # enabled there either. When it IS enabled, the same fact means something much
+                    # louder: a session in that checkout loads none of this plugin, while both this
+                    # register and that repo's own settings say it is present. And that repo cannot
+                    # report it -- the hook that would is inside the plugin that is not loading. This
+                    # check, from the workshop, is the one vantage point that still has a voice.
+                    #
+                    # [INFO], not [ERROR], and deliberately so: a consumer legitimately used from
+                    # another machine has no record here either, so the state is not conclusive. The
+                    # honest move is to name both readings and the one command that settles it.
+                    if ($consumerEnabled.Ids -contains $p.id) {
+                        Write-Info "no machine record for this consumer, while the plugin IS enabled in $($consumerEnabled.LayerById[$p.id]) -- a session in that checkout loads none of this plugin (no skills, no subagents, no hooks). Either the install belongs to another machine, or it was never made for this path (or was taken over -- see inbound #301): 'claude plugin install $($p.id) --scope project' from that root settles it. Version check skipped."
+                    } else {
+                        Write-Info "no machine record for this consumer (the install may run via a different machine)."
+                    }
                 } elseif ($recordVersions.Count -gt 1) {
                     # Deliberately a failure, not an INFO: as long as the records disagree, every other
                     # version statement about this consumer is unreliable, and that is exactly what the
@@ -340,9 +379,12 @@ foreach ($mf in $manifestFiles) {
                 } else {
                     Write-Failure "machine record is on v$($recordVersions[0]), source on v$sourceVersion -- update the plugin from the consumer (scope lesson)."
                 }
-            } else {
+            } elseif (-not $consumerInstalled.Exists) {
                 Write-Info "no plugin administration found on this machine -- version check skipped."
             }
+            # No else: an unreadable administration was already reported as an [ERROR] at connector level,
+            # and repeating it per plugin would say the same thing N times (the noise the per-plugin scope
+            # label was introduced to make actionable, not to multiply).
         }
     }
 
