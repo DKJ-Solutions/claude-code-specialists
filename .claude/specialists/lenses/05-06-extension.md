@@ -139,10 +139,23 @@ refreshed for itself, and the earlier claim that skipping the refresh makes an *
 previous version does not hold. What Rendall reports at the close of a release is therefore the
 refresh as the **safe first step** — idempotent, one command, and a stale cache is invisible by
 construction because it reports success with a plausible version number — not a mechanism claim about
-what breaks without it. Whether `install` behaves the same is still unmeasured: that needs the next
-release's stale window, since the state cannot be recreated afterwards. Nothing here is Rendall's to
-run on a consumer's machine — this is the one thing a release cannot do for its consumers, so it must
-at least be said.
+what breaks without it.
+
+**And the `install` half is now measured too, by using the very next release for it (`v3.0.5`, July 31,
+2026).** The stale window a release opens lasts only until something refreshes, so it was measured the
+minute it existed rather than left for a round: a controlled pair on the same machine, same minute, two
+fresh folders. **Without** the refresh the install produced `3.0.4` — the previous release — and left the
+cached clone exactly where it was; **with** the refresh it produced `3.0.5`. So `install` does *not*
+refresh and `update` does, the per-command distinction holds, and the `install` half rests on two
+independent measurements now (July 30 and July 31, different releases). Worth knowing for the closing
+report: the install's success line names the **scope and no version at all**, so a consumer cannot detect
+staleness from the output even in principle — only from the install record.
+
+**The practical lesson for cutting a release: the stale window is a measurement opportunity that expires.**
+If a question about cache behaviour is open, the minutes after `cut-release.ps1` pushes the tag are when it
+can be answered; an hour later the cache has moved on and the answer waits for the next release. Nothing
+here is Rendall's to run on a consumer's machine — this is the one thing a release cannot do for its
+consumers, so it must at least be said.
 
 The `releases/` directory (modeled on life-hub):
 - **`releases/development/<X>.x/<X.Y.Z>.md`** — the full release notes, from the `## Pull Requests`

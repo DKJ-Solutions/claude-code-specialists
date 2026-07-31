@@ -115,11 +115,11 @@ same number under one repo-wide tag `vX.Y.Z`. **That version number is one of tw
 (and needs that same scope flag, for the same reason the install does) — but it compares them against
 the consumer's **cached** copy of this marketplace, not against this repo. So `claude plugin
 marketplace update <marketplace>` belongs in front of it. What each command was measured to do differs,
-and the Quickstart states it per command: a fresh **install** served the *previous* version and
-reported success minutes after `v3.0.2` (July 30, 2026), while a bare **update** refreshed the cached
-clone itself and still moved `3.0.3 -> 3.0.4` (July 31, 2026). The refresh stays in the procedure
-because it is idempotent and a stale cache is invisible by construction, not because skipping it was
-measured to break an update. With both gates passed, a consuming repo (including this
+and the Quickstart states it per command: **`install` does not refresh** — it served the *previous*
+version minutes after `v3.0.2` (July 30, 2026) and again after `v3.0.5` (July 31, as a controlled pair:
+without the refresh `3.0.4`, with it `3.0.5`) — while a bare **`update`** refreshed the cached clone
+itself and still moved `3.0.3 -> 3.0.4`. So the refresh is load-bearing in front of an install and
+idempotent insurance in front of an update; it stays in front of both. With both gates passed, a consuming repo (including this
 repo itself, which consumes itself) only pulls in merged changes after the `version` has been
 bumped — a merge without a release stays invisible to consumers, and a shared agent-def change
 therefore always lands here first, never the other way around. The full mechanics — cutting a
