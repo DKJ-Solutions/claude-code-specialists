@@ -253,6 +253,147 @@ Assert-True ($openPrText -match "Invoke-NativeCapture -FilePath 'git' -Arguments
 Assert-True ($openPrText -match "Invoke-NativeCapture -FilePath 'gh' -Arguments \(@\('pr', 'create'") 'open-pr runs gh pr create via Invoke-NativeCapture'
 Assert-True (-not ($openPrText -match "ErrorActionPreference = 'Continue'")) 'open-pr no longer re-derives the EAP dance inline (centralized in the helper)'
 
+Write-Host "native-command stderr pitfall -- repo-wide guard over every call site" -ForegroundColor Cyan
+# Why this is here on top of (c). The assertions above name call sites BY HAND -- open-pr's push,
+# its gh pr create. They prove those two did not regress; they say nothing about the next one. A new
+# script (or a new line in an existing one) can reach for a bare `git ... 2>$null` under EAP=Stop and
+# every test above stays green, because no test is looking there. That is not hypothetical: the same
+# class of bug was found four times in the smartwatchbanden consumer on July 29, 2026 -- once in the
+# consumer's own ship-pr fork (a successful `git fetch` killed the run right before the fold step),
+# and three more that nobody had noticed at all: `lint-brain` fell over the moment -Path pointed
+# outside a git repo, `switch-account` died on `gh auth status` before it could switch anything, and
+# `archive-and-remove-theme` plus `rename-specialist` made their own clear error messages
+# unreachable. Each was a call site that no per-site assertion covered. A rule this repo enforces by
+# convention is worth enforcing by scan.
+#
+# Two forms count as protected, and only these two:
+#   1. the call sits inside a function that sets EAP=Continue first (what Invoke-NativeCapture does);
+#   2. the statement sits inside a try/catch, so the terminating ErrorRecord is caught and the script
+#      picks its own fallback deliberately.
+# A file that never sets EAP=Stop is not at risk and is skipped.
+
+$nativeExeAlternation = 'git|gh|npm|node|powershell|shopify'
+# Single quotes on purpose: inside a double-quoted PowerShell string '\$null' is not an escape but a
+# backslash followed by the VARIABLE $null, which interpolates to an empty string -- the pattern then
+# quietly stops matching the very thing it is meant to catch.
+$nativeRedirectRx = [regex]('\b(' + $nativeExeAlternation + ')\b[^\r\n]*\s2>(&1|\$null)')
+
+function Get-UnprotectedNativeRedirects {
+    <#
+        Return one string per unprotected call site ("<relative path>:<line> (<scope>) -- <code>").
+        $Files are scanned as text; the try-depth is tracked with a plain brace balance, which is
+        coarse but ample for these scripts -- and the fixture below fails loudly if it ever becomes
+        so lax that it stops finding a real violation.
+    #>
+    param([System.IO.FileInfo[]]$Files, [string]$BasePath)
+    $found = New-Object System.Collections.Generic.List[string]
+    foreach ($sf in $Files) {
+        $lines = @(Get-Content -LiteralPath $sf.FullName -Encoding UTF8)
+        $rel = $sf.FullName
+        if ($BasePath -and $rel.StartsWith($BasePath, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $rel = $rel.Substring($BasePath.Length).TrimStart('\')
+        }
+        if (-not ($lines -match "^\s*\`$ErrorActionPreference\s*=\s*['`"]Stop['`"]")) { continue }
+
+        $inBlockComment = $false
+        $currentFn = ''
+        $fnHasContinue = $false
+        $balance = 0
+        $tryStack = New-Object System.Collections.Generic.List[int]
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            $line = $lines[$i]
+            $trim = $line.Trim()
+
+            # Skip block comments: the .DESCRIPTION of these very scripts DOCUMENTS the pitfall and
+            # therefore contains a literal `2>$null` that is prose, not a call.
+            if ($trim -like '<#*') { $inBlockComment = $true }
+            if ($inBlockComment) {
+                if ($trim -like '*#>*') { $inBlockComment = $false }
+                continue
+            }
+            if ($trim.StartsWith('#')) { continue }
+
+            $balanceBefore = $balance
+            $hasTry = ($trim -match '\btry\s*\{')
+            $balance += ([regex]::Matches($line, '\{').Count - [regex]::Matches($line, '\}').Count)
+
+            if ($trim -match '^function\s+([\w-]+)') {
+                $currentFn = $Matches[1]
+                $fnHasContinue = $false
+            } elseif ($trim -match "^\`$ErrorActionPreference\s*=\s*['`"]Continue['`"]") {
+                if ($currentFn) { $fnHasContinue = $true }
+            } elseif ($nativeRedirectRx.IsMatch($line)) {
+                $inTry = ($tryStack.Count -gt 0) -or $hasTry
+                if (-not (($currentFn -and $fnHasContinue) -or $inTry)) {
+                    $scope = if ($currentFn) { "function '$currentFn'" } else { 'top-level' }
+                    $found.Add("${rel}:$($i + 1) ($scope) -- $trim")
+                }
+            }
+
+            if ($hasTry) { $tryStack.Add($balanceBefore) }
+            while ($tryStack.Count -gt 0 -and $balance -le $tryStack[$tryStack.Count - 1]) {
+                $tryStack.RemoveAt($tryStack.Count - 1)
+            }
+        }
+    }
+    return $found
+}
+
+# The scan covers the whole repo: the workshop's own scripts/ AND the plugin payload (hooks/,
+# skills/, and every plugin's scripts/ mirror). The tests themselves are excluded -- they exercise
+# the bare pattern on purpose, in (a) above.
+$scanFiles = @(Get-ChildItem -Path $RepoRoot -Recurse -File -Filter '*.ps1' |
+    Where-Object { $_.FullName -notmatch '\\(\.git|node_modules)\\' -and $_.DirectoryName -notlike '*\scripts\tests*' })
+Assert-True ($scanFiles.Count -ge 10) "the scan sees a plausible number of scripts (found: $($scanFiles.Count))"
+
+$unprotected = @(Get-UnprotectedNativeRedirects -Files $scanFiles -BasePath $RepoRoot)
+Assert-Equal 0 $unprotected.Count 'no unprotected native stderr redirect anywhere in the repo'
+foreach ($u in $unprotected) { Write-Host "         $u" -ForegroundColor Red }
+
+# A guard that can no longer find anything is not a guard. Run the same scan over a fixture holding
+# all four shapes side by side, so an over-eager try/catch exemption turns this red instead of
+# silently exonerating the whole repo.
+$guardFixture = Join-Path ([System.IO.Path]::GetTempPath()) "native-guard-fixture-$PID"
+New-Item -ItemType Directory -Force -Path $guardFixture | Out-Null
+try {
+    $badSrc = @'
+$ErrorActionPreference = 'Stop'
+$x = git rev-parse --show-toplevel 2>$null
+'@
+    $goodFnSrc = @'
+$ErrorActionPreference = 'Stop'
+function Invoke-GitQuiet {
+    $ErrorActionPreference = 'Continue'
+    git @args 2>$null
+}
+'@
+    $goodTrySrc = @'
+$ErrorActionPreference = 'Stop'
+try {
+    $x = git rev-parse --show-toplevel 2>$null
+} catch {
+    $x = $null
+}
+'@
+    $noStopSrc = @'
+$y = git status --porcelain 2>$null
+'@
+    [System.IO.File]::WriteAllText((Join-Path $guardFixture 'bad.ps1'), $badSrc)
+    [System.IO.File]::WriteAllText((Join-Path $guardFixture 'good-function.ps1'), $goodFnSrc)
+    [System.IO.File]::WriteAllText((Join-Path $guardFixture 'good-try.ps1'), $goodTrySrc)
+    [System.IO.File]::WriteAllText((Join-Path $guardFixture 'no-stop.ps1'), $noStopSrc)
+
+    $fixtureHits = @(Get-UnprotectedNativeRedirects -Files @(Get-ChildItem -Path $guardFixture -File -Filter '*.ps1') -BasePath $guardFixture)
+    $fixtureText = ($fixtureHits -join "`n")
+    Assert-Equal 1 $fixtureHits.Count 'the scan finds exactly the one unprotected call site'
+    Assert-True ($fixtureText -match 'bad\.ps1:2') 'the bare top-level call is the one reported'
+    Assert-True (-not ($fixtureText -match 'good-function')) 'an EAP=Continue wrapper is exonerated'
+    Assert-True (-not ($fixtureText -match 'good-try')) 'a try/catch is exonerated'
+    Assert-True (-not ($fixtureText -match 'no-stop')) 'a script without EAP=Stop is not at risk'
+} finally {
+    Remove-Item -Path $guardFixture -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # Sweep guard (after the v1.12.0 breakage): the other release scripts that mutate native git/gh must
 # not carry the #107 pitfall. cut-release.ps1 now routes its git mutations through the same shared
 # Invoke-NativeCapture helper (#114 follow-up) instead of a bare 'git add' under a hand-rolled
