@@ -131,8 +131,19 @@ would is inside the plugin that is not loading. What was **not** established is 
 attempts with a barer setup (a git repo, one enabled plugin, a session, no bootstrap) produced no record
 and no adoption; the recipe that fired had three enabled plugins — one of them with no record anywhere —
 plus a bootstrapped tree with an `@`-import. Which of those factors carries the weight is unknown, as is
-the rule by which a victim record is chosen. This is CLI behaviour, not plugin code; the reproduction
-above stands on its own for anyone reporting it upstream.
+the rule by which a victim record is chosen. This is CLI behaviour, not plugin code.
+
+**Reported upstream on July 31, 2026:**
+[anthropics/claude-code#76759](https://github.com/anthropics/claude-code/issues/76759#issuecomment-5146633011).
+That issue already documented the *write* — a session start driven by `enabledPlugins` writing
+`installed_plugins.json` — on Linux and CLI `2.1.207`; the reproduction above was added there as the
+**consequence** it had not covered: the write can carry another project's `installedAt`, and that project's
+record is gone afterwards. A comment rather than a new issue, deliberately: same root behaviour, and
+duplicating a well-written report is worse than adding to it. The plausible mechanism named there is
+[#75392](https://github.com/anthropics/claude-code/issues/75392) — `install --scope project` overwriting
+that file instead of merging — which, if the session-start write shares those semantics, explains the loss
+directly. **Nothing in this plugin depends on that being fixed**: the checks now detect the state locally
+(see the paragraph above), which is the part this repo controls.
 
 **The same default bites on the way back out, which is where it is actually expensive.** `claude
 plugin update` also defaults to user scope, so on a project-scoped install the plain command fails:
