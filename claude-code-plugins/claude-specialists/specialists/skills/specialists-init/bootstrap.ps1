@@ -21,8 +21,13 @@
          <ConsumerRoot>/.claude/plugins/<family>/<plugin>/<g>-<id>-extension.md -- only if it does
          not exist yet. The body comes from the plugin install; the extension only carries the repo lens slot.
       1b. Places an empty lens scaffold on the plugin path for each subagent of the ENABLED
-         plugin(s) (enabledPlugins in the consumer's settings; without settings, only its own plugin),
-         clearly marked as VUL-IN.
+         plugin(s), clearly marked as VUL-IN. Enabled plugins are read via Get-EnabledPlugins
+         (check-report-lib.ps1) from the whole settings chain Claude Code honors -- the user
+         ~/.claude/settings.json, .claude/settings.json and .claude/settings.local.json, per plugin id,
+         local winning. With no 'enabledPlugins' key anywhere in that chain: only its own plugin, and it
+         SAYS so. Reading settings.json alone is what once made this script place 19 lenses instead of
+         24 without a word about the 5 it never considered (inbound #294): the second plugin was enabled
+         in settings.local.json, the file the proposal in step 3 points the reader at.
       1c. Places the repo-specific script config scaffolds required by the shared workflow skills
          (open-pr / fold-changelog / new-branch / check-roster-sync): scripts/repo-config.ps1 and
          scripts/lib/branch-info.ps1. Both as VUL-IN scaffolds with an EMPTY branch table -- taxonomy
@@ -297,26 +302,56 @@ function Get-PluginAgentsDir([string]$PluginName, [string]$OwnPluginRoot) {
 $ownPluginRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
 $ownPluginName = Get-OwnPluginName $ownPluginRoot
 
-# Enabled plugins from consumer settings; without (readable) settings, only own plugin.
+# Enabled plugins from the consumer's whole settings chain (inbound #294 -- Get-EnabledPlugins carries
+# the measurement and the reasoning). Without an 'enabledPlugins' key anywhere: only own plugin.
 # Plugin names validated as slugs before converting to paths.
 $pluginNames = @($ownPluginName)
 # The FULL plugin ids ('<name>@<marketplace>'), kept alongside the bare names: the workshop's
 # connector manifest identifies a plugin by its full id, so the register proposal at the end of this
 # script needs the '@marketplace' part that the name-only list above deliberately drops.
 $pluginIdByName = @{}
-$consumerSettings = Join-Path $ConsumerRoot '.claude/settings.json'
-if (Test-Path -LiteralPath $consumerSettings -PathType Leaf) {
-    try {
-        $cs = Get-Content -LiteralPath $consumerSettings -Raw -Encoding UTF8 | ConvertFrom-Json
-        if ($cs.PSObject.Properties.Name -contains 'enabledPlugins') {
-            $enabledEntries = @($cs.enabledPlugins.PSObject.Properties | Where-Object { $_.Value -eq $true })
-            $enabledNames = @($enabledEntries | ForEach-Object { $_.Name.Split('@')[0] })
-            foreach ($e in $enabledEntries) { $pluginIdByName[$e.Name.Split('@')[0]] = $e.Name }
-            if ($enabledNames.Count -gt 0) { $pluginNames = $enabledNames }
-        }
-    } catch {
-        Write-Host "  [notice] .claude/settings.json unreadable -- lens scaffolds only for '$ownPluginName'." -ForegroundColor Yellow
+# Same defensive shape as $family above: the lib is dot-sourced only IF PRESENT, because a missing lib
+# must never stop the script that sets a repo up in the first place. Deliberately NO inline settings
+# reader as a fallback -- re-typing a narrower version of the chain here is precisely the duplication
+# that produced inbound #294 (one reader per call site, tightened in none of them). Saying out loud that
+# the enable state could not be read is the honest degraded mode.
+$enabledPlugins = $null
+if (Get-Command Get-EnabledPlugins -ErrorAction SilentlyContinue) {
+    $enabledPlugins = Get-EnabledPlugins -RepoRoot $ConsumerRoot
+} else {
+    Write-Host "  [notice] check-report-lib.ps1 not found -- the enabled-plugin state was not read; lens scaffolds only for '$ownPluginName'." -ForegroundColor Yellow
+}
+
+if ($null -ne $enabledPlugins) {
+    foreach ($badLayer in @($enabledPlugins.Unreadable)) {
+        Write-Host "  [notice] $badLayer does not parse as JSON -- its enabledPlugins entries were not read." -ForegroundColor Yellow
     }
+    if ($enabledPlugins.Ids.Count -gt 0) {
+        $pluginNames = @($enabledPlugins.Ids | ForEach-Object { $_.Split('@')[0] })
+        foreach ($id in $enabledPlugins.Ids) { $pluginIdByName[$id.Split('@')[0]] = $id }
+    }
+}
+
+# Say what was NOT considered, and why (inbound #294, proposal 3). The old version only spoke up for an
+# UNREADABLE settings.json, so the one case that actually happened -- a perfectly valid settings.json
+# without the key, while the enable sat in settings.local.json -- passed in complete silence, and the
+# closing "19 lens-scaffold(s) created" was consistent with what this script decided rather than with
+# what the consumer has switched on. A count that matches the wrong thing is worse than a missing count:
+# nothing in it invites a second look.
+if ($null -eq $enabledPlugins) {
+    # Already reported above -- nothing to add beyond which plugin this fell back to.
+} elseif ($enabledPlugins.Ids.Count -eq 0) {
+    if (-not $enabledPlugins.AnyFileExists) {
+        Write-Host "  [notice] no settings file in this repo's chain -- lens scaffolds only for '$ownPluginName'." -ForegroundColor Yellow
+    } elseif (-not $enabledPlugins.AnyKeyFound) {
+        Write-Host "  [notice] no 'enabledPlugins' key in $($enabledPlugins.Summary) -- lens scaffolds only for '$ownPluginName'." -ForegroundColor Yellow
+    } else {
+        Write-Host "  [notice] 'enabledPlugins' enables nothing in $($enabledPlugins.Summary) -- lens scaffolds only for '$ownPluginName'." -ForegroundColor Yellow
+    }
+} elseif ($pluginNames -notcontains $ownPluginName) {
+    # Its own case on purpose: this script's own plugin is demonstrably enabled (it is running), so a
+    # chain that does not name it means the reader is looking at a partial answer.
+    Write-Host "  [notice] '$ownPluginName' is not among the enabled plugins in $($enabledPlugins.Summary) -- no lens scaffolds for it." -ForegroundColor Yellow
 }
 
 $scaffolded = 0; $lensKept = 0
@@ -751,6 +786,12 @@ $importBlock
 }
 
 # --- 3. Settings/hooks proposal (DOES NOT touch settings.json) -------------------------------------
+# The header below offers settings.local.json as an equal alternative, and as of inbound #294 that is
+# finally true of this family's own checks: the enable state is read from the whole chain, so a reader
+# who follows this advice is no longer invisible to the bootstrap, the roster check and the connector
+# check. Before that fix this line pointed at the one file none of the three read -- the plugin
+# recommending a configuration it could not see. Keep the two in step: widening this hint again means
+# widening Get-SettingsChainPaths first.
 $claudeDir = Join-Path $ConsumerRoot '.claude'
 if (-not (Test-Path -LiteralPath $claudeDir)) { New-Item -ItemType Directory -Path $claudeDir -Force | Out-Null }
 $suggestPath = Join-Path $claudeDir 'settings.suggested.jsonc'

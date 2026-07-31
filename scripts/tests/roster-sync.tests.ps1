@@ -69,6 +69,14 @@ function Assert-NotMatch {
 
 function Invoke-Ps {
     param([string[]]$ScriptArgs)
+    # Pin the USER layer of the settings chain to a throwaway dir unless a case sets it itself (inbound
+    # #294). The check now reads ~/.claude/settings.json as the lowest-precedence layer, so without this
+    # every fixture would inherit whatever the machine running the suite happens to have enabled
+    # globally -- green here, red on the next machine, for reasons no assertion mentions. The dir does
+    # not need to exist; an absent layer is exactly the isolation wanted.
+    if ($ScriptArgs -notcontains '-UserHomeOverride') {
+        $ScriptArgs = @($ScriptArgs) + @('-UserHomeOverride', (Join-Path $Fixture 'no-user-home'))
+    }
     $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $Script @ScriptArgs
     return [pscustomobject]@{ Code = $LASTEXITCODE; Out = ($out -join "`n") }
 }
@@ -119,6 +127,13 @@ function New-FixtureConsumer {
         [string]$OffPathFamily = 'davekjohns-workshop',
         [bool]$Enabled = $true,
         [bool]$WriteSettings = $true,
+        # inbound #294: write an 'enabledPlugins' block into .claude/settings.local.json -- the layer
+        # Claude Code honors, the plugin's own settings proposal points at, and the three call sites used
+        # to ignore. Combined with -WriteSettings $false this builds the exact repo shape that made the
+        # roster check answer "in sync" for a repo with no roster at all. A hashtable of
+        # 'name@marketplace' -> $true/$false, so a case can also test that a local 'false' overrides a
+        # project 'true' (per-key precedence, local wins).
+        [hashtable]$LocalSettings = @{},
         [string]$RosterFile = 'CLAUDE.md',
         [string]$RepoConfig = '',
         [string]$EnabledPluginId = $PluginId,
@@ -146,6 +161,15 @@ function New-FixtureConsumer {
         foreach ($extraId in $ExtraEnabledPluginIds) { $entries += '"' + $extraId + '": true' }
         $settings = '{ "enabledPlugins": { ' + ($entries -join ', ') + ' } }'
         [System.IO.File]::WriteAllText((Join-Path $root '.claude\settings.json'), $settings)
+    }
+
+    if ($LocalSettings.Count -gt 0) {
+        $localEntries = @()
+        foreach ($k in ($LocalSettings.Keys | Sort-Object)) {
+            $localEntries += '"' + $k + '": ' + $(if ($LocalSettings[$k]) { 'true' } else { 'false' })
+        }
+        $local = '{ "enabledPlugins": { ' + ($localEntries -join ', ') + ' } }'
+        [System.IO.File]::WriteAllText((Join-Path $root '.claude\settings.local.json'), $local)
     }
 
     $lines = @('# Roster', '')
@@ -329,8 +353,54 @@ try {
     $c = New-FixtureConsumer -RosterIds @() -Enabled $false
     $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
     Assert-Equal 0 $r.Code 'plugin disabled: exit-code 0'
-    Assert-Match 'no enabled plugins' $r.Out 'plugin disabled: reported'
+    Assert-Match 'enables nothing' $r.Out 'plugin disabled: reported'
     Assert-NotMatch '\[ERROR\]' $r.Out 'plugin disabled: no errors'
+    # inbound #294: "nothing was enabled" gets a roll-up of its own, so the session hook can give it a
+    # verdict instead of falling through to "roster in sync with the enabled plugins". Non-counting like
+    # [ORPHANS]/[BOOTSTRAP] -- a repo that deliberately enables nothing is not broken.
+    Assert-Match '\[NOTHING-ENABLED\]' $r.Out 'plugin disabled: a [NOTHING-ENABLED] roll-up states nothing was compared'
+    Assert-Match '1 info signal' $r.Out 'plugin disabled: the [NOTHING-ENABLED] roll-up is non-counting'
+
+    # --- 5c. THE #294 CASE: the enable lives ONLY in settings.local.json -------------------------
+    #     Measured in DaveKJohn/life-hub against 3.0.5: with enabledPlugins in settings.local.json and
+    #     no such key in settings.json, this check saw 0 enabled plugins -- so the [BOOTSTRAP] branch
+    #     could not fire, the run exited 0 with no findings, and the session hook printed "roster in sync
+    #     with the enabled plugins" for a repo with 0 lenses and 0 roster rows. The regression this pins
+    #     down is therefore NOT a wrong message but a MISSING one: the drift has to be found at all.
+    $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') }
+    $c = New-FixtureConsumer -RosterIds @('06-16') -SeamLensIds @('06-16') -WriteSettings $false `
+            -LocalSettings @{ $PluginId = $true }
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 0 $r.Code 'local-only enable: exit-code 0 (this fixture is genuinely in sync)'
+    Assert-NotMatch '\[NOTHING-ENABLED\]' $r.Out 'local-only enable: the plugin is SEEN, so no nothing-enabled verdict'
+    Assert-Match 'settings\.local\.json' $r.Out 'local-only enable: the layer that carried the enable is named'
+    Assert-Match '-- plugin: ' $r.Out 'local-only enable: the plugin block actually ran'
+
+    # And the failure half of the same case: a local-only enable in a repo with NO roster and NO lenses
+    # must reach [BOOTSTRAP], the branch #225 added and #294 had silently disabled.
+    $c = New-FixtureConsumer -RosterIds @() -WriteSettings $false -LocalSettings @{ $PluginId = $true }
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Match '\[BOOTSTRAP\]' $r.Out 'local-only enable, empty repo: [BOOTSTRAP] fires instead of a silent green'
+    Assert-NotMatch '\[NOTHING-ENABLED\]' $r.Out 'local-only enable, empty repo: not reported as nothing-enabled'
+
+    # --- 5d. Per-key precedence: a local 'false' switches off a project 'true' -------------------
+    #     Documented in Get-EnabledPlugins as a deliberate choice (per-key merge, local wins) rather than
+    #     a wholesale layer replacement. Pinned here so the choice cannot drift silently.
+    $c = New-FixtureConsumer -RosterIds @() -Enabled $true -LocalSettings @{ $PluginId = $false }
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 0 $r.Code 'local false over project true: exit-code 0'
+    Assert-Match '\[NOTHING-ENABLED\]' $r.Out 'local false over project true: local wins, so nothing is enabled'
+
+    # --- 5e. A settings layer that does not parse is an ERROR, not a crash -----------------------
+    #     It used to be the latter: under $ErrorActionPreference = 'Stop' a malformed settings.json killed
+    #     the run, and the hook could only say "could not complete (exit N)" without naming the file.
+    #     Naming the layer AND still reading the rest of the chain is the point.
+    $c = New-FixtureConsumer -RosterIds @('06-16') -SeamLensIds @('06-16') -Enabled $true
+    [System.IO.File]::WriteAllText((Join-Path $c '.claude\settings.local.json'), '{ "enabledPlugins": { oops')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 1 $r.Code 'unparseable layer: exit-code 1 (an unreadable chain is an error)'
+    Assert-Match '\[ERROR\].*settings\.local\.json does not parse' $r.Out 'unparseable layer: the broken layer is named'
+    Assert-Match '-- plugin: ' $r.Out 'unparseable layer: the readable layers still counted'
 
     # --- 5b. Enabled but not in cache -> INFO, exit 0 (install may be on another machine) --------
     $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') }
@@ -655,6 +725,41 @@ try {
     Assert-Match 'specialists-init' $r.Out 'hook bootstrap: the session is told which skill to run'
     Assert-NotMatch 'in sync' $r.Out 'hook bootstrap: NOT reported as in sync -- there is no roster to be in sync'
     Assert-NotMatch 'drift found' $r.Out 'hook bootstrap: NOT reported as drift either'
+
+    # H6d. inbound #294: [NOTHING-ENABLED] gets its OWN verdict too. THE MEASURED DEFECT -- in
+    #      DaveKJohn/life-hub this hook printed "roster in sync with the enabled plugins" for a repo with
+    #      0 lenses, 0 roster rows and no '@'-import, in the very session that had loaded four of its
+    #      skills and all three of its hooks, because the enable lived in settings.local.json and the
+    #      check read settings.json only. With nothing enabled, [BOOTSTRAP] cannot fire either (it needs
+    #      at least one enabled plugin), so the run reached the exit-0 branch and produced the single most
+    #      reassuring line this hook owns for the least configured repo it had ever seen.
+    #      DO NOT DELETE -- this pins the failure SHAPE, independently of the chain fix that removed the
+    #      cause: any future route to zero enabled plugins must still be unable to read as a healthy roster.
+    $stub = New-StubCheck -Name 'stub-nothing-enabled' -ExitCode 0 -OutputLines @(
+        '  [NOTHING-ENABLED] no plugin is enabled for this repo -- checked .claude/settings.json and .claude/settings.local.json; nothing was compared against the roster.',
+        'Summary: 0 error(s), 1 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Equal 0 $r.Code 'hook nothing-enabled: exit 0 (the hook never blocks)'
+    Assert-Match 'no plugin is enabled' $r.Out 'hook nothing-enabled: its own verdict line'
+    Assert-Match 'nothing was compared' $r.Out 'hook nothing-enabled: the marker line reaches the session context'
+    Assert-NotMatch 'in sync' $r.Out 'hook nothing-enabled: NOT reported as in sync -- nothing was checked'
+    Assert-NotMatch 'drift found' $r.Out 'hook nothing-enabled: NOT reported as drift either'
+    Assert-NotMatch 'has not been set up yet' $r.Out 'hook nothing-enabled: distinct from the [BOOTSTRAP] verdict'
+
+    # H6e. Both markers at once -- the one state that reaches the DRIFT branch with nothing compared: a
+    #      settings layer that does not parse is an [ERROR], and if the readable layers enable nothing the
+    #      run carries [ERROR] and [NOTHING-ENABLED] together. The drift headline then talks about a
+    #      missing specialist, so the nothing-enabled line has to travel with it (as [ORPHANS] does) --
+    #      otherwise the session is told a specialist is missing from a run that compared nothing.
+    $stub = New-StubCheck -Name 'stub-broken-layer' -ExitCode 1 -OutputLines @(
+        '  [SCOPE] check-roster-sync inspected C:\fixture\consumer (from CLAUDE_PROJECT_DIR)',
+        '  [ERROR] .claude/settings.local.json does not parse as JSON -- its enabledPlugins entries were not read.',
+        '  [NOTHING-ENABLED] no plugin is enabled for this repo -- checked .claude/settings.json and .claude/settings.local.json; nothing was compared against the roster.',
+        'Summary: 1 error(s), 1 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Equal 0 $r.Code 'hook broken layer: exit 0 (the hook never blocks)'
+    Assert-Match 'does not parse' $r.Out 'hook broken layer: the unreadable layer is named'
+    Assert-Match 'nothing was compared' $r.Out 'hook broken layer: the nothing-enabled line travels with the drift headline'
 
     # H6c. A clean bootstrapped repo gains nothing -- the guard against this becoming a line every
     #      session start carries, which is the noise the quieter session start removed.

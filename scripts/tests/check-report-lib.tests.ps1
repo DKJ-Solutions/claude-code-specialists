@@ -108,6 +108,97 @@ try {
     $out = (Write-Coverage -Category 'parse' -Checked 51 6>&1 | Out-String)
     Assert-True ($out -match '\[parse\] checked 51') 'no denominator: plain count'
     Assert-True (-not ($out -match 'of -1')) 'no denominator: the sentinel never leaks into the output'
+
+    # --- Get-SettingsChainPaths / Get-EnabledPlugins (inbound #294) -------------------------------
+    #     The shared answer to "which plugins are enabled here", after three call sites each read
+    #     .claude/settings.json alone and produced a false green, a silent skip and a false alarm from
+    #     the identical blind spot. Direct assertions, because the ORDER and the PRECEDENCE are the
+    #     substance: get either wrong and the callers are wrong in ways their own tests cannot see.
+    Write-Host "Get-EnabledPlugins -- the settings chain" -ForegroundColor Cyan
+    $chainRoot = Join-Path $Fixture 'chain'
+    $userHome  = Join-Path $Fixture 'userhome'
+    New-Item -ItemType Directory -Path (Join-Path $chainRoot '.claude') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $userHome '.claude') -Force | Out-Null
+    $projFile  = Join-Path $chainRoot '.claude\settings.json'
+    $localFile = Join-Path $chainRoot '.claude\settings.local.json'
+    $userFile  = Join-Path $userHome  '.claude\settings.json'
+
+    # Lowest precedence FIRST, so a caller that walks the list and overwrites gets local > project > user
+    # for free. This order IS the contract -- reversing it silently inverts every precedence below.
+    $chain = @(Get-SettingsChainPaths -RepoRoot $chainRoot -UserHomeOverride $userHome)
+    Assert-Equal 3 $chain.Count 'chain: three layers (user, project, local)'
+    Assert-Equal $userFile  $chain[0].Path 'chain: the user layer comes first (lowest precedence)'
+    Assert-Equal $projFile  $chain[1].Path 'chain: .claude/settings.json second'
+    Assert-Equal $localFile $chain[2].Path 'chain: .claude/settings.local.json last (highest precedence)'
+
+    # Nothing anywhere: no file, no key -- distinguishable from "a key that enables nothing", because the
+    # two mean different things to a reader (never configured vs. deliberately empty).
+    $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
+    Assert-Equal 0 $e.Ids.Count 'no files: nothing enabled'
+    Assert-True (-not $e.AnyFileExists) 'no files: AnyFileExists is false'
+    Assert-True (-not $e.AnyKeyFound) 'no files: AnyKeyFound is false'
+    Assert-Equal 'no settings file' $e.Summary 'no files: Summary says so instead of naming paths that do not exist'
+
+    # THE #294 CASE: the enable lives only in settings.local.json, the file the plugin's own settings
+    # proposal points the reader at and all three call sites used to ignore.
+    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "specialists@davekjohns-workshop": true } }')
+    $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
+    Assert-Equal 'specialists@davekjohns-workshop' ($e.Ids -join ',') 'local-only: the enable is seen'
+    Assert-Equal '.claude/settings.local.json' $e.LayerById['specialists@davekjohns-workshop'] 'local-only: the deciding layer is reported'
+    Assert-True $e.AnyKeyFound 'local-only: AnyKeyFound is true'
+
+    # Per-key precedence, the deliberate choice documented on the helper: a local 'false' switches off a
+    # project 'true' rather than the layers replacing one another wholesale.
+    [System.IO.File]::WriteAllText($projFile,  '{ "enabledPlugins": { "specialists@davekjohns-workshop": true } }')
+    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "specialists@davekjohns-workshop": false } }')
+    $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
+    Assert-Equal 0 $e.Ids.Count 'precedence: a local false overrides a project true'
+    Assert-True $e.AnyKeyFound 'precedence: the key WAS found -- "enables nothing", not "never configured"'
+    Assert-Equal '.claude/settings.json and .claude/settings.local.json' $e.Summary 'precedence: Summary names both existing layers'
+
+    # Per-key merge, the other half: a project enable and a local enable of a DIFFERENT plugin both count.
+    # Wholesale replacement would drop the project one, which is the failure direction this helper must
+    # never take -- losing an enable is how the false green happened.
+    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "specialists-lifehub@davekjohns-workshop": true } }')
+    $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
+    Assert-Equal 'specialists-lifehub@davekjohns-workshop,specialists@davekjohns-workshop' ($e.Ids -join ',') 'merge: layers combine per plugin id, they do not replace each other'
+
+    # The user layer counts, and is overridable per key by the repo -- a plugin enabled machine-wide IS
+    # loaded in every session, so excluding this layer would rebuild the same false green one level up.
+    Remove-Item -LiteralPath $localFile -Force
+    [System.IO.File]::WriteAllText($userFile, '{ "enabledPlugins": { "specialists-shopify@davekjohns-workshop": true } }')
+    $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
+    Assert-True ($e.Ids -contains 'specialists-shopify@davekjohns-workshop') 'user layer: a machine-wide enable counts'
+    Assert-Equal 'user ~/.claude/settings.json' $e.LayerById['specialists-shopify@davekjohns-workshop'] 'user layer: named as the deciding layer'
+
+    # A layer that does not parse is REPORTED, never thrown, and never silently turns the answer into
+    # "nothing enabled" -- the rest of the chain still counts.
+    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { oops')
+    $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
+    Assert-Equal '.claude/settings.local.json' ($e.Unreadable -join ',') 'unparseable layer: reported by label, not thrown'
+    Assert-True ($e.Ids -contains 'specialists@davekjohns-workshop') 'unparseable layer: the readable layers still counted'
+
+    # --- Shapes that are VALID but easy to crash on -----------------------------------------------
+    #     Found live, not by reasoning: a settings.json holding exactly '{ }' was reported as "does not
+    #     parse". Under Set-StrictMode -Version Latest the usual
+    #     '$obj.PSObject.Properties.Name -contains ...' idiom throws on an object with NO properties, and
+    #     the catch then relabelled a perfectly good file as corrupt. These three shapes are all ordinary
+    #     consumer states, so each must produce an ANSWER and never an Unreadable entry.
+    Remove-Item -LiteralPath $userFile -Force
+    foreach ($shape in @('{ }', '{ "enabledPlugins": { } }', '{ "enabledPlugins": null }', '{ "permissions": { "allow": [] } }')) {
+        [System.IO.File]::WriteAllText($projFile, $shape)
+        Remove-Item -LiteralPath $localFile -Force -ErrorAction SilentlyContinue
+        $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
+        Assert-Equal 0 @($e.Unreadable).Count "valid shape '$shape': not reported as unparseable"
+        Assert-Equal 0 $e.Ids.Count "valid shape '$shape': nothing enabled"
+        Assert-True $e.AnyFileExists "valid shape '$shape': the file is seen"
+    }
+    # ... and the key-present cases are still distinguishable from the no-key ones, because the two mean
+    # different things to a reader ("deliberately empty" vs "never configured").
+    [System.IO.File]::WriteAllText($projFile, '{ "enabledPlugins": { } }')
+    Assert-True (Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome).AnyKeyFound 'empty enabledPlugins: AnyKeyFound is true'
+    [System.IO.File]::WriteAllText($projFile, '{ }')
+    Assert-True (-not (Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome).AnyKeyFound) 'no enabledPlugins key: AnyKeyFound is false'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
