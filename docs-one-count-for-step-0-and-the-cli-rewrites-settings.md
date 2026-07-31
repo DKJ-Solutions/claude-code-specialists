@@ -1,0 +1,67 @@
+### one count for step 0, and say that the CLI rewrites settings.json · Docs · 2026-07-31
+
+Three documentary findings from adoption round **v6**, grouped in one PR because they touch the same
+paragraphs of [`QUICKSTART.md`](claude-code-plugins/claude-specialists/QUICKSTART.md), the
+[family README](claude-code-plugins/claude-specialists/README.md) and
+[`specialists-init/SKILL.md`](claude-code-plugins/claude-specialists/specialists/skills/specialists-init/SKILL.md)
+— run separately they collide in the same prose. Round v6 proposed keeping
+[#296](https://github.com/DaveKJohn/davekjohns-workshop/issues/296) for last *because* its size depended
+on a question it could not answer itself; that question is answered below, so it joins the other two.
+
+**[#297](https://github.com/DaveKJohn/davekjohns-workshop/issues/297) — one count, on all three entry
+points.** The same manual step 0 was described as *four acts* in the family README, *three acts* in
+`specialists-init` and *three steps* in the QUICKSTART. No step was missing anywhere — the count was the
+only thing that differed, on pages that link to each other for exactly this step, and a reader following
+it the first time has that count as their only check on whether they skipped something. It is now **five
+acts** everywhere (enable → refresh → install → restart → **verify**), with the QUICKSTART's three
+*steps* kept and explicitly named as a different unit ("Step 1 *is* those five acts"). Verifying became
+an act because omitting it is the failure `specialists-init` itself calls silent and self-camouflaging: a
+reader who ticked off four and stopped had never checked that the install exists.
+
+**A second instance of that same class, found while fixing the first — and the worse of the two.**
+`specialists-init` described the seam **migration** as *four steps* while linking to the README list that
+numbers them **0 to 4**. Step 0 is the `.gitignore` check, which the README calls out as the one that can
+cost you the lens tree: in a repo that ignores `.claude/*` with an exception for the old path, moving the
+lenses drops them out of version control with every gate green and `git status` silent. So the miscounted
+step and the destructive step were the same step, and a reader counting items 1–4 would skip it for the
+very reason it is numbered zero. Corrected to five, with step 0 named in the sentence rather than left to
+the count.
+
+**[#295](https://github.com/DaveKJohn/davekjohns-workshop/issues/295) — the CLI rewrites the file the
+teardown promises never to touch.** Re-measured here rather than taken on report, since the claim now
+sits in consumer-facing docs. In a throwaway repo with `core.autocrlf false` and a committed
+`settings.json` carrying a **UTF-8 BOM and no final newline**, `claude plugin install … --scope project`
+produced all four effects at once: the BOM removed, the key order changed, the nested `source` object
+expanded onto separate lines, and a final newline added. `claude plugin uninstall … --scope project` then
+removed the entry and left `"enabledPlugins": {}`. Both real consumers **track** that file, so this lands
+as a diff in a governance file. Three changes: the QUICKSTART's Step 1 says a diff there is expected
+rather than suspect; `specialists-teardown/SKILL.md` names the actor (*this script* never edits it — the
+CLI commands around it do), which makes the symmetry claim exact instead of merely reassuring; and the
+teardown's **two closing notes stop contradicting each other** — note 1 told the reader to hand-edit an
+entry that note 2's command removes for them, one line later, in the same output.
+
+**[#296](https://github.com/DaveKJohn/davekjohns-workshop/issues/296) — "pinned" did not survive
+measurement, and the discriminator is answered.** The open question was whether any session had run a
+`claude plugin` command in the window where `life-hub`'s two project-scoped records moved
+`3.0.4 → 3.0.5`. **Answer: no.** Every session transcript on this machine for July 31 was searched — **26**
+`claude plugin` invocations that day, **none** in that window; the records moved in a *single* write with
+`lastUpdated` stamps 70 ms apart. The one thing the search did explain is the half that was suspicious for
+the wrong reason: the marketplace clone advancing minutes earlier was a deliberate `marketplace update`
+from another session on the machine, so that is not mysterious. By the issue's own rule, a "no" makes this
+a behaviour finding rather than a doc omission: project scope gives a repo **its own install record**, not
+a guarantee that nothing moves it. The claim that it *"keeps a consumer pinned to the version it was
+tested against"* is corrected on both pages, and the practical consequence is stated — **read your record
+instead of trusting it**, since `installed_plugins.json` is the only place your version is written down
+and the install success line names no version at all.
+
+Also corrected in `specialists-teardown/SKILL.md`, from round v6's §6: the pre-flight's evidence said
+nothing under `.claude` was ignored. Git reads a global ignore from the XDG default location **even with
+no `core.excludesFile` set**, and on this machine that file does ignore
+`**/.claude/settings.local.json`. The measurement stands — the lens tree is demonstrably tracked — but
+that paragraph is written to be reused as evidence, so it is now scoped to the lens tree.
+
+**Verified:** a sweep for `(two|three|four|five|six) (acts|steps)` across the three entry points leaves
+one number per procedure (five acts for adoption, five steps for migration), with the QUICKSTART's three
+*steps* named as a deliberate level difference. **Gates:** `check-plugin-integrity` 0 errors — including
+check 11 over the new paragraphs that print `claude plugin` commands, the collision round v6 warned this
+PR would risk — and **18/18** suites green.

@@ -72,10 +72,24 @@ authored.
 
 ## What it deliberately will not do
 
-- **It never edits `.claude/settings.json`.** Disabling or uninstalling the plugin is the owner's act,
-  and the bootstrap never wrote that file either -- the symmetry that makes this safe to run cuts both
-  ways. It is reported instead, with the note that the subagents and session hooks stay active until
-  the entry is gone and the session restarted.
+- **This script never edits `.claude/settings.json`.** Disabling or uninstalling the plugin is the
+  owner's act, and the bootstrap never wrote that file either -- the symmetry that makes this safe to run
+  cuts both ways. It is reported instead, with the note that the subagents and session hooks stay active
+  until the entry is gone and the session restarted.
+
+  > **The scripts keep that promise; the CLI commands around them do not** (inbound
+  > [#295](https://github.com/DaveKJohn/davekjohns-workshop/issues/295)). This bullet used to say "it
+  > never edits" without naming the *it*, and a reader two paragraphs later is told to run
+  > `claude plugin uninstall`, which **does** edit that file. Both halves were measured on July 31, 2026
+  > in throwaway repos: with `bootstrap.ps1` and `teardown.ps1 -Apply` run and **no** `claude` command at
+  > all, `git diff .claude/settings.json` stays empty -- so the symmetry above holds exactly as claimed.
+  > But `claude plugin install … --scope project` re-serialises the whole file (key order, nested-object
+  > indentation, and in two fixtures a removed UTF-8 BOM and an added final newline), and
+  > `claude plugin uninstall … --scope project` removes your plugin's entry and leaves
+  > `"enabledPlugins": {}`. In both real consumers that file is **tracked**, so this shows up as a diff in
+  > a governance file the reader has just been told this procedure never touches. Naming the actor makes
+  > the promise stronger rather than weaker: it is a statement about what these scripts do, and it is
+  > exact.
 - **It never removes roster rows or repo-specific prose from `CLAUDE.md`.** Those are authored text in a
   file full of other authored text, and no rule this script could apply safely tells where a roster row
   ends and your own prose begins. The only lines it touches there are the two `@`-imports, which are
@@ -117,9 +131,18 @@ and at least one blank line** that blank line is read as a pattern of a single `
 **every** path with a trailing slash. The result is a hit whose **pattern field is empty**, and only
 someone who knows the field should be filled can tell it from a real one. Measured in
 `DaveKJohn/life-hub` on July 30, 2026 (git 2.54.0.windows.1): `.gitignore:19:` + TAB +
-`.claude/specialists/lenses/`, exit `0` — while nothing about that path was ignored at all (no `claude`
+`.claude/specialists/lenses/`, exit `0` — while **the lens tree** was not ignored at all (no `claude`
 line anywhere in `.gitignore`, 16 files under `.claude` tracked, no `core.excludesFile`, a default
-`info/exclude`), and line 19 of that file is blank. A CRLF `.gitignore` with a blank line is the
+`info/exclude`), and line 19 of that file is blank.
+
+> **Scoped to the lens tree on purpose, because the broader claim is not true on this machine.** An
+> earlier wording said nothing under `.claude` was ignored, and a later round found that git reads a
+> global ignore file from the XDG default location **even with no `core.excludesFile` set** — here
+> `~/.config/git/ignore`, which does ignore `**/.claude/settings.local.json`. That changes nothing about
+> the measurement above (the lens tree is demonstrably tracked), but the paragraph is written to be
+> reused as evidence, and "nothing under `.claude` is ignored" was a step stronger than what was
+> checked. If you reuse the pre-flight's reasoning elsewhere, remember that an absent
+> `core.excludesFile` does not mean an absent global ignore. A CRLF `.gitignore` with a blank line is the
 **normal** state of a repo on Windows and both real consumers are Windows repos, so unfiltered this
 command hands the loudest verdict in the section — *stop here* — to the repo the table below lists as
 the safe one.
