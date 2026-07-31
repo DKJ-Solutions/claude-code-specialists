@@ -240,7 +240,14 @@ foreach ($mf in $manifestFiles) {
     }
 
     foreach ($p in @($m.plugins)) {
-        Write-Host "  -- plugin: $($p.id)" -ForegroundColor Cyan
+        # The DISPLAY form of this manifest's plugin id (inbound #309), bound once per block for the same
+        # reason check-roster-sync binds $plugIdShown: $p.id stays raw because Get-PluginDir derives a path
+        # from it and the enable/record lookups key on it, while every printed line uses this. Manifest
+        # fields are lower-risk than settings keys -- they live in this repo and pass a PR -- but the
+        # guardrail note at the top of this file already says manifest values are never blindly trusted,
+        # and 'never blindly trusted' had a hole in it for display.
+        $pluginIdShown = Format-SafeToken -Value ([string]$p.id)
+        Write-Host "  -- plugin: $pluginIdShown" -ForegroundColor Cyan
 
         # Narrow the label to this plugin block. A consumer can register SEVERAL plugins, and a shared
         # cause (one outdated install) then produces one finding per plugin -- word-for-word identical
@@ -252,7 +259,7 @@ foreach ($mf in $manifestFiles) {
 
         $pluginDir = Get-PluginDir $p.id
         if ($null -eq $pluginDir) {
-            Write-Failure "invalid or unknown plugin field '$($p.id)' in $($mf.Name) -- plugin block skipped."
+            Write-Failure "invalid or unknown plugin field '$(Format-SuspectToken -Value ([string]$p.id))' in $($mf.Name) -- plugin block skipped."
             continue
         }
 
@@ -263,7 +270,7 @@ foreach ($mf in $manifestFiles) {
             if ($consumerEnabled.Ids -contains $p.id) {
                 Write-Ok "plugin is enabled in $($consumerEnabled.LayerById[$p.id])"
             } else {
-                Write-Failure "plugin '$($p.id)' is NOT (or no longer) enabled in $($consumerEnabled.Summary)"
+                Write-Failure "plugin '$pluginIdShown' is NOT (or no longer) enabled in $($consumerEnabled.Summary)"
             }
         }
 
@@ -365,7 +372,7 @@ foreach ($mf in $manifestFiles) {
                     # another machine has no record here either, so the state is not conclusive. The
                     # honest move is to name both readings and the one command that settles it.
                     if ($consumerEnabled.Ids -contains $p.id) {
-                        Write-Info "no machine record for this consumer, while the plugin IS enabled in $($consumerEnabled.LayerById[$p.id]) -- a session in that checkout loads none of this plugin (no skills, no subagents, no hooks). Either the install belongs to another machine, or it was never made for this path (or was taken over -- see inbound #301): 'claude plugin install $($p.id) --scope project' from that root settles it. Version check skipped."
+                        Write-Info "no machine record for this consumer, while the plugin IS enabled in $($consumerEnabled.LayerById[$p.id]) -- a session in that checkout loads none of this plugin (no skills, no subagents, no hooks). Either the install belongs to another machine, or it was never made for this path (or was taken over -- see inbound #301): 'claude plugin install $pluginIdShown --scope project' from that root settles it. Version check skipped."
                     } else {
                         Write-Info "no machine record for this consumer (the install may run via a different machine)."
                     }
