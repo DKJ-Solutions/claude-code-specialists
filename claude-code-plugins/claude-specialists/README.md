@@ -349,13 +349,16 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > is indistinguishable from a healthy one: "no hooks because the plugin is not loaded" and "no hooks
   > because all is well" print the same nothing.
   >
-  > **`--scope project` carries that same weight, and so does the matching `claude plugin update
-  > <plugin>@<marketplace> --scope project`** (inbound
-  > [#279](https://github.com/DaveKJohn/davekjohns-workshop/issues/279), the 3.0.1 round). Both
-  > commands default to `--scope user`; the install then writes a machine-wide record with no
-  > `projectPath`, and the update refuses outright on a project-scoped install. Project scope is the
-  > intended model for this family (Dave, July 30, 2026) — it is what keeps a consumer pinned to the
-  > version it was tested against, and every other document here assumes it.
+  > **`--scope project` carries that same weight, and the later update is the same pair of commands:**
+  > `claude plugin marketplace update <marketplace>` and then
+  > **`claude plugin update <plugin>@<marketplace> --scope project`** (inbound
+  > [#279](https://github.com/DaveKJohn/davekjohns-workshop/issues/279), the 3.0.1 round; the refresh
+  > half is inbound [#282](https://github.com/DaveKJohn/davekjohns-workshop/issues/282)). All of them
+  > default to `--scope user`; the install then writes a machine-wide record with no `projectPath`, and
+  > the update refuses outright on a project-scoped install. Project scope is the intended model for
+  > this family (Dave, July 30, 2026) — it is what keeps a consumer pinned to the version it was tested
+  > against, and every other document here assumes it. Full mechanics of the refresh half:
+  > [Staying up to date](QUICKSTART.md#staying-up-to-date).
   >
   > **Verify with the `projectPath` record, not with `claude plugin list`** — that command is not
   > repo-scoped and reported a plugin as `enabled`, at `project` scope, in this very repo while it

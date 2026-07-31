@@ -146,8 +146,11 @@ The constitution above, concretely implemented here:
   [Derek #05](.claude/specialists/lenses/05-05-extension.md#classifying-naming-and-creating-a-branch).
 - **The lint and test gates are the safety guard before every PR.**
   [`scripts/lint/check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1) validates the
-  manifests (`marketplace.json` + every `plugin.json`) and the agent-def and manual frontmatter, and
-  scans for dead links; after that all test suites run (`scripts/tests/*.tests.ps1`), exactly as CI
+  manifests (`marketplace.json` + every `plugin.json`) and the agent-def and manual frontmatter,
+  scans for dead links, and holds every **printed** `claude plugin install`/`update`/`uninstall` to
+  its flags (`--scope project`, plus the marketplace refresh for install/update) — the class of doc
+  defect three adoption rounds in a row kept producing; after that all test suites run
+  (`scripts/tests/*.tests.ps1`), exactly as CI
   does. `open-pr.ps1` runs both gates first; on an error or a failing suite nothing is pushed and
   no PR is opened (`-SkipLint`/`-SkipTests` are the escape valves). See [Sylvester #15](.claude/specialists/lenses/05-15-extension.md).
 - **Two deliberate exceptions to "never directly on `main`":**

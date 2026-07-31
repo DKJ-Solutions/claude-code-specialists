@@ -16,7 +16,8 @@ changelog entry — the same workflow as the consuming repos. The steps:
    the rest of the work.
 3. **Open the PR:** [`scripts/release/open-pr.ps1`](scripts/release/open-pr.ps1)`-Title "…"` first runs
    the **lint gate** [`scripts/lint/check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1)
-   (valid manifests, agent-def frontmatter, no dead links) and then the **test gate** (all
+   (valid manifests, agent-def frontmatter, no dead links, and the flags on every printed
+   `claude plugin install`/`update`/`uninstall`) and then the **test gate** (all
    `scripts/tests/*.tests.ps1`, exactly as CI does); on an error or a failing suite nothing is pushed and
    no PR is opened. If both gates pass, the script pushes and opens the PR with label + auto-filled body.
    The same gate also runs as **CI** on GitHub ([`.github/workflows/ci.yml`](.github/workflows/ci.yml):
