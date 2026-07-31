@@ -23,7 +23,14 @@ infrastructure.
   region in an agent def still equals its source in `agent-shared/`, and guards (check 9) that
   every plugin's consumer-facing `RELEASE.md` card is present and its `vX.Y.Z` matches that
   plugin's `plugin.json` — since both only ever change together, via `cut-release.ps1`, a
-  mismatch can only mean a forgotten regeneration or a hand-edit. This is the safety guard that
+  mismatch can only mean a forgotten regeneration or a hand-edit. **Check 11 is the one that guards a
+  doc against reality rather than against itself:** every printed `claude plugin
+  install`/`update`/`uninstall` — recognised by its `@`-target, which is what separates an instruction
+  from prose discussing the command — must carry `--scope project`, and `install`/`update` must name
+  the marketplace refresh nearby. Both fail *silently* when missing, which is why three adoption
+  rounds in a row found this same class and four doc fixes only ever closed the instances. History
+  (`CHANGELOG.md`, `releases/**`, `RELEASE.md`, root entry files) is excluded permanently: it records
+  what was true then. This is the safety guard that
   [Derek #05](05-05-extension.md)'s `open-pr.ps1` runs before every push — and that `cut-release.ps1`
   runs before a release.
 - **`.github/workflows/ci.yml`** — the CI gate on GitHub: runs the same lint gate + all test suites

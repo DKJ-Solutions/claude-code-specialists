@@ -54,6 +54,19 @@
          directions, EXCEPT when a marker sits inside a fenced example (masked out before matching,
          so it is never seen at all, paired or not). Deliberately opt-in (no generic prose scan): a
          doc with zero spans passes without warning.
+     11. printed lifecycle commands: every 'claude plugin install|update|uninstall' that carries an
+         @-target (i.e. is an instruction someone RUNS, not prose discussing the command) must carry
+         '--scope project', and install/update must have 'claude plugin marketplace update' or a link
+         to 'staying-up-to-date' within 12 lines above or 6 below. Both flags fail SILENTLY when
+         missing -- a scopeless install writes a machine-wide record and reports success (#274/#279),
+         a stale cache serves the previous version and reports success (#282/#284) -- which is why
+         three adoption rounds in a row found this same class of doc defect. The @-target is what
+         makes a generic scan viable here where check 10 had to be opt-in: measured 11 targeted
+         instructions against 13 bare mentions. History is excluded permanently and on purpose
+         (CHANGELOG.md root + per-plugin, releases/**, RELEASE.md, root entry files): it records what
+         was true then and is never rewritten. The unit is the enclosing inline-code span (a printed
+         command wraps across lines), computed over check 10's fence-masked text so a ```-fence
+         cannot throw off backtick pairing; inside a fence the unit is the physical line.
 
     Exit code: 0 = no errors. 1 = at least one error (usable as a gate in open-pr.ps1).
 .EXAMPLE
@@ -714,6 +727,129 @@ if ($skillSpanCount -eq 0) {
 } else {
     Write-Host "  [skill-list] checked $skillSpanCount <!-- skills:all --> span(s) against $($skillCanonicalSet.Count) canonical skill(s)." -ForegroundColor DarkGray
 }
+
+# --- 11. printed lifecycle commands carry their flags --------------------------------------------------
+# THE CLASS THIS CLOSES. Three adoption rounds in a row (v3, v4, v5) found the same kind of defect and
+# nothing else: a doc place printing a command, a count or a step that no longer holds. v3 was the
+# adoption path plus three reporting errors, v4 was inbound #279 + #280, v5 was all four of its findings
+# -- and three of the five repairs in 3.0.3 were of that kind too. Four doc fixes close four instances;
+# the instances came back every round. This closes the half of the class a regex can actually decide:
+# a printed `claude plugin install|update|uninstall` must carry `--scope project`, and install/update
+# must have the marketplace refresh named nearby. Both are things a reader COPIES, and both fail
+# silently when wrong -- a scopeless install writes a machine-wide record with no projectPath and
+# reports success (inbound #274/#279), a stale cache serves an older version and reports success
+# (inbound #282/#284).
+#
+# THE DISCRIMINATOR, and it is the whole reason this can be a generic scan where check 10 could not be.
+# A command with an explicit @-TARGET is an instruction someone runs:
+#     claude plugin install specialists@davekjohns-workshop --scope project
+#     claude plugin update <plugin>@<marketplace> --scope project
+# A BARE mention is prose discussing the command, and demanding flags there would be nonsense:
+#     "`claude plugin update` has the same default", "Because `claude plugin update` pins the cache"
+# Measured over the scan set before this check was written: 10 targeted, 13 bare. That separation is
+# what keeps this from becoming the 147-hit over-detection that made check 10 opt-in instead.
+#
+# HISTORY IS EXCLUDED, deliberately and permanently: CHANGELOG.md (root and per-plugin), releases/**,
+# every RELEASE.md card, and the root changelog ENTRY files. Those record what was true at the time and
+# are never rewritten -- the same principle the teardown's own audit applies when it excludes history
+# from its scan. specialists/CHANGELOG.md:162 proves the need: it prints a targeted install with no
+# scope flag, correctly, because that is what the release it describes actually said.
+#
+# SPANS, NOT LINES. A printed command wraps across a newline in running prose -- the teardown SKILL's
+# `claude plugin uninstall <plugin>@<marketplace>` carries its `--scope project` on the NEXT line, inside
+# the same inline-code span. A line-based check calls that a violation (it did, on the first probe run).
+# So the unit is the enclosing inline-code span where there is one, and the rest of the physical line
+# otherwise (which is the right unit inside a fenced block, where one command is one line).
+#
+# And the spans are computed over the FENCE-MASKED text, reusing check 10's Get-FenceMaskedText. Without
+# that, a ```-fence delimiter throws off backtick pairing for the whole rest of the file: the regex
+# cannot start a span on the first two backticks of a ``` run, starts one on the third, and closes it on
+# the first backtick of the CLOSING fence -- after which every real inline span downstream is paired one
+# position out. That is what made the wrapped uninstall above look flagless on the second run, and it is
+# a silent misread rather than an error, so it is worth naming here. Masking keeps offsets and newline
+# positions identical, so a span found in the mask indexes straight back into the real text.
+#
+# PRESENCE, NOT ORDER. The refresh window reaches 12 lines back and 6 forward, so a doc that names the
+# refresh in the sentence just below the block still passes. Whether the refresh is described BEFORE the
+# install in reading order is a judgement about prose, not something this regex should pretend to make;
+# the check guarantees the step is named in the same instruction context, and a reviewer judges the rest.
+$lcCmdRegex     = [regex]'claude\s+plugin\s+(?<verb>install|update|uninstall)\b'
+$lcTargetRegex  = [regex]'(?:<plugin>@<marketplace>|[A-Za-z0-9_.\-]+@[A-Za-z0-9_.\-]+)'
+$lcSpanRegex    = [regex]'(?s)`[^`]+`'
+$lcScopeRegex   = [regex]'--scope\s+project'
+$lcRefreshRegex = [regex]'claude\s+plugin\s+marketplace\s+update|staying-up-to-date'
+
+$lifecycleFiles = @($linkFiles | Where-Object {
+    $rel = $_.Substring($RepoRoot.Length).TrimStart('\', '/')
+    if ($rel -eq 'CHANGELOG.md') { return $false }
+    if ($rel -match '\\CHANGELOG\.md$') { return $false }
+    if ($rel -match '(^|\\)RELEASE\.md$') { return $false }
+    if ($rel -match '^releases\\') { return $false }
+    # A root <branch-name>.md entry file is history in the making; same reasoning as CHANGELOG.md.
+    if (($rel -notmatch '\\') -and (Test-IsChangelogEntryFile -Path $_)) { return $false }
+    return $true
+})
+
+$lcEnforced = 0
+$lcBare = 0
+foreach ($lf in ($lifecycleFiles | Sort-Object -Unique)) {
+    $rel = $lf.Substring($RepoRoot.Length).TrimStart('\', '/')
+    $content = [System.IO.File]::ReadAllText($lf, [System.Text.Encoding]::UTF8)
+    $lcLines = $content -split "`r?`n"
+    $lcMasked = Get-FenceMaskedText -Text $content
+    # Inline-code spans, once per file, found in the MASKED text and read out of the real one.
+    $spans = @($lcSpanRegex.Matches($lcMasked) | ForEach-Object {
+        [pscustomobject]@{ Start = $_.Index; End = ($_.Index + $_.Length) }
+    })
+    foreach ($m in $lcCmdRegex.Matches($content)) {
+        # Inside a fence the mask has whitespace where the real text has the command, and there the unit
+        # is the physical line -- a fenced command is one line, and its own backticks (if any) are not
+        # span delimiters.
+        $inFence = ($lcMasked[$m.Index] -ne $content[$m.Index])
+        $cmdText = $null
+        $cmdStart = -1
+        if (-not $inFence) {
+            foreach ($s in $spans) {
+                if ($m.Index -ge $s.Start -and $m.Index -lt $s.End) {
+                    $cmdText = $content.Substring($s.Start, $s.End - $s.Start)
+                    $cmdStart = $s.Start
+                    break
+                }
+            }
+        }
+        if (-not $cmdText) {
+            $eol = $content.IndexOfAny([char[]]@("`r", "`n"), $m.Index)
+            if ($eol -lt 0) { $eol = $content.Length }
+            $cmdText = $content.Substring($m.Index, $eol - $m.Index)
+            $cmdStart = $m.Index
+        }
+        # Everything after THIS match's verb decides whether this is an instruction or a mention. The
+        # offset is derived from the match position, not from IndexOf($verb) in the span: a span holding
+        # two commands with the same verb would otherwise judge the second one on the first one's tail.
+        # Clamped: a malformed span whose closing backtick lands mid-command would otherwise throw and
+        # take the whole gate down over a typo in a doc. An empty tail simply reads as "no target".
+        $verbEnd = [Math]::Min([Math]::Max(0, ($m.Groups['verb'].Index + $m.Groups['verb'].Length) - $cmdStart), $cmdText.Length)
+        $afterVerb = $cmdText.Substring($verbEnd)
+        # THIS command's arguments only: from its own verb up to the next lifecycle command, or the end
+        # of the span/line. Both rules below judge that slice rather than the whole span, because a span
+        # can hold two commands -- and then the second would borrow the first one's `--scope project`
+        # and read as correct while a reader copies a scopeless line (Victor, on this check's own code).
+        $nextCmd = [regex]::Match($afterVerb, 'claude\s+plugin\s+(?:install|update|uninstall)\b')
+        $cmdArgs = if ($nextCmd.Success) { $afterVerb.Substring(0, $nextCmd.Index) } else { $afterVerb }
+        if (-not $lcTargetRegex.IsMatch($cmdArgs)) { $lcBare++; continue }
+        $lcEnforced++
+        $lineNo = 1 + [regex]::Matches($content.Substring(0, $m.Index), "`n").Count
+        $verb = $m.Groups['verb'].Value
+        if (-not $lcScopeRegex.IsMatch($cmdArgs)) {
+            Add-Error "[lifecycle] ${rel}:${lineNo}: printed 'claude plugin $verb' with an @-target but no '--scope project'. All three default to --scope user, which writes a machine-wide record with no projectPath and reports success (inbound #274/#279). Add the flag, or drop the @-target if this line is discussing the command rather than telling a reader to run it."
+        }
+        if ($verb -ne 'uninstall' -and -not $lcRefreshRegex.IsMatch(($lcLines[[Math]::Max(0, $lineNo - 13)..[Math]::Min($lcLines.Count - 1, $lineNo + 5)] -join "`n"))) {
+            Add-Error "[lifecycle] ${rel}:${lineNo}: printed 'claude plugin $verb' with an @-target, but neither 'claude plugin marketplace update' nor a link to 'staying-up-to-date' appears within 12 lines above or 6 below. The marketplace is a cached clone, so without the refresh this command serves the PREVIOUS version and reports success (inbound #282/#284)."
+        }
+    }
+}
+Write-Coverage -Category 'lifecycle' -Checked $lcEnforced `
+    -Note $(if ($lcEnforced -eq 0) { 'no printed lifecycle command with an @-target anywhere in the scan set -- nothing to enforce, which is not the same as the docs being right' } else { "$lcBare bare mention(s) skipped as discussion; history (CHANGELOG.md, releases/, RELEASE.md, entry files) excluded" })
 
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {

@@ -84,6 +84,32 @@
      15. An END inside a code fence is invisible too, exactly like a fenced BEGIN (scenarios 9/10) --
          proves the masking is symmetric for both sentinels.
 
+    Check 11 (printed lifecycle commands carry their flags), scenarios 17-24, same CONTRIBUTING.md
+    fixture. The class these guard is the one three adoption rounds in a row kept producing: a doc
+    place printing a command that no longer holds, failing silently when copied.
+     17. A complete block (refresh, then install with --scope project) reports nothing -- and the
+         coverage count proves the command WAS examined, so the pass is not an empty scan.
+     18. A targeted install without --scope project fails, naming file and line, and the refresh rule
+         does NOT also fire (it is satisfied two lines below) -- the two rules are independent.
+     19. A targeted install with the flag but no refresh named nearby fails, and the scope rule does
+         not fire. The mirror image of 18.
+     20. (THE DISCRIMINATOR) bare mentions -- prose discussing the command with no @-target -- are not
+         flagged, are counted as skipped, and the skip is stated. This is the case that decides whether
+         a generic scan is viable at all; the same question made check 10 opt-in instead.
+     21. A command WRAPPED across a newline inside one inline-code span keeps its flag. Regression
+         guard: the first build was line-based and called the teardown SKILL's own uninstall line a
+         violation because its flag sits on the next line.
+     22. A fenced code block EARLIER in the file does not shift inline-span pairing. The second real
+         bug: without fence masking a ```-delimiter opens a phantom span and every real span
+         downstream pairs one position out, so scenario 21's command silently looked flagless -- a
+         misread, not an error, which is why it gets its own case.
+     23. uninstall needs the scope flag but is exempt from the refresh: a stale cache cannot affect a
+         removal.
+     24. History (CHANGELOG.md, and by the same rule releases/**, RELEASE.md, root entry files) is
+         excluded and not even counted. The real repo proves the need -- specialists/CHANGELOG.md
+         prints a targeted install with no scope flag, correctly, because that is what the release it
+         describes actually said.
+
     Deliberately NOT added: a dedicated "two separate, fully valid spans in one file -> neither's own
     END is misreported as an orphan" scenario. Judgment call, not an oversight: scenario 1 (and 7, 11)
     already assert "no [skill-list] finding" for a normal, single complete span -- since the
@@ -532,6 +558,167 @@ try {
     $r17 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($r17.Out -match [regex]::Escape('fix-my-branch.md'))) 'scenario 16: after the fold removes it, the entry file is gone from the set without complaint'
 
+    # --- check 11: printed lifecycle commands carry their flags --------------------------------------
+    # The class three adoption rounds in a row kept producing: a doc place printing a command that no
+    # longer holds. The cases below are ordered by what they protect -- first the two rules, then the
+    # DISCRIMINATOR (a bare mention must never be flagged; that over-detection is what forced check 10
+    # to be opt-in), then the two real bugs this check hit while being built, then the exclusions.
+    #
+    # Matched on the error phrase, not the bare '[lifecycle]' tag: that tag also prefixes the coverage
+    # line, which is present on every run. Same trap the check 10 pattern above documents.
+    $LifecycleFindingPattern = "\[lifecycle\].*printed 'claude plugin"
+
+    # --- Scenario 17: a correctly printed install passes ---------------------------------------------
+    Write-Host "check 11 -- refresh + install + scope flag reports nothing" -ForegroundColor Cyan
+    $s17Lines = @(
+        '# Contributing'
+        ''
+        'From the root of your repo:'
+        ''
+        '```powershell'
+        'claude plugin marketplace update davekjohns-workshop'
+        'claude plugin install specialists@davekjohns-workshop --scope project'
+        '```'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s17Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rL17 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rL17.Out -match $LifecycleFindingPattern)) 'scenario 17: a complete install block reports no [lifecycle] finding'
+    Assert-True ($rL17.Out -match '\[lifecycle\] checked [1-9]') 'scenario 17: and the command WAS examined -- the pass is not an empty scan'
+
+    # --- Scenario 18: a targeted install without --scope project fails -------------------------------
+    #     Fails silently in reality: the scopeless install writes a machine-wide record with no
+    #     projectPath and still reports success (inbound #274/#279).
+    Write-Host "check 11 -- a targeted install without --scope project fails" -ForegroundColor Cyan
+    $s18Lines = @(
+        '# Contributing'
+        ''
+        'Run `claude plugin install specialists@davekjohns-workshop` from the repo root.'
+        ''
+        'Refresh first with `claude plugin marketplace update davekjohns-workshop`.'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s18Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rL18 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-Equal 1 $rL18.Code 'scenario 18: exit 1 -- a missing scope flag is an error'
+    Assert-True ($rL18.Out -match [regex]::Escape('CONTRIBUTING.md:3') + ".*no '--scope project'") 'scenario 18: the finding names the file and the line'
+    Assert-True (-not ($rL18.Out -match 'nor a link')) 'scenario 18: and NOT the refresh rule -- that one is satisfied two lines below'
+
+    # --- Scenario 19: a targeted install with no refresh named nearby fails --------------------------
+    Write-Host "check 11 -- a targeted install with no refresh nearby fails" -ForegroundColor Cyan
+    $s19Lines = @(
+        '# Contributing'
+        ''
+        'Run `claude plugin install specialists@davekjohns-workshop --scope project` from the root.'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s19Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rL19 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-Equal 1 $rL19.Code 'scenario 19: exit 1 -- a missing refresh is an error'
+    Assert-True ($rL19.Out -match [regex]::Escape('CONTRIBUTING.md:3') + '.*nor a link') 'scenario 19: the refresh rule fires, naming file and line'
+    Assert-True (-not ($rL19.Out -match "no '--scope project'")) 'scenario 19: and NOT the scope rule -- the flag is present'
+
+    # --- Scenario 20 (THE DISCRIMINATOR): a bare mention is never flagged ----------------------------
+    #     Prose discussing the command carries no @-target, and demanding flags there would be
+    #     nonsense. This is the case that decides whether the check can be a generic scan at all: the
+    #     147-hit over-detection measured on check 10 is what made THAT one opt-in.
+    Write-Host "check 11 -- a bare mention in prose is NOT flagged (the over-detection guard)" -ForegroundColor Cyan
+    $s20Lines = @(
+        '# Contributing'
+        ''
+        'Note that `claude plugin update` defaults to user scope, and so does `claude plugin install`.'
+        'Because `claude plugin update` pins the cache to a version, the card is always exact.'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s20Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rL20 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rL20.Out -match $LifecycleFindingPattern)) 'scenario 20: three bare mentions, zero findings -- discussion is not instruction'
+    Assert-True ($rL20.Out -match '\[lifecycle\] checked 0') 'scenario 20: they are counted as skipped, not as enforced'
+    Assert-True ($rL20.Out -match 'bare mention|nothing to enforce') 'scenario 20: and the skip is stated rather than silent'
+
+    # --- Scenario 21: a command WRAPPED across a newline inside one inline-code span -----------------
+    #     Regression guard. The first build of this check was line-based and called the teardown
+    #     SKILL's own `claude plugin uninstall ...` / `--scope project` pair a violation, because the
+    #     flag sits on the next line of the same span.
+    Write-Host "check 11 -- a command wrapped across lines in one inline span keeps its flag" -ForegroundColor Cyan
+    $s21Lines = @(
+        '# Contributing'
+        ''
+        'Removing it is a separate step: `claude plugin uninstall specialists@davekjohns-workshop'
+        '--scope project`, run from the repo root.'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s21Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rL21 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rL21.Out -match $LifecycleFindingPattern)) 'scenario 21: the wrapped span is read as one command, flag included'
+
+    # --- Scenario 22: a fenced block earlier in the file must not shift span pairing -----------------
+    #     The second real bug: without fence masking, a ```-delimiter starts a phantom inline span and
+    #     every real span downstream pairs one position out -- so scenario 21's command silently looked
+    #     flagless. A silent misread, not an error, which is why it gets its own case.
+    Write-Host 'check 11 -- a fenced code block earlier in the file does not break span pairing' -ForegroundColor Cyan
+    $s22Lines = @(
+        '# Contributing'
+        ''
+        '```powershell'
+        'Write-Host "an unrelated example"'
+        '```'
+        ''
+        'Removing it: `claude plugin uninstall specialists@davekjohns-workshop'
+        '--scope project`, from the root.'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s22Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rL22 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rL22.Out -match $LifecycleFindingPattern)) 'scenario 22: the fence is masked, so the wrapped span downstream is still read correctly'
+
+    # --- Scenario 23: uninstall needs the scope flag, and is exempt from the refresh -----------------
+    #     Asymmetric on purpose: a stale cache cannot affect a removal.
+    Write-Host "check 11 -- uninstall needs the scope flag but not the refresh" -ForegroundColor Cyan
+    $s23Lines = @(
+        '# Contributing'
+        ''
+        'Afterwards run `claude plugin uninstall specialists@davekjohns-workshop` to detach.'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s23Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rL23 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($rL23.Out -match [regex]::Escape('CONTRIBUTING.md:3') + ".*no '--scope project'") 'scenario 23: a scopeless uninstall is still an error'
+    Assert-True (-not ($rL23.Out -match 'nor a link')) 'scenario 23: but the refresh is never demanded of an uninstall'
+
+    # --- Scenario 24: history is excluded, permanently and on purpose -------------------------------
+    #     CHANGELOG.md and the release notes record what was true at the time and are never rewritten.
+    #     The real repo proves the need: specialists/CHANGELOG.md prints a targeted install with no
+    #     scope flag, correctly, because that is what the release it describes actually said.
+    Write-Host "check 11 -- a lifecycle command in CHANGELOG.md history is not flagged" -ForegroundColor Cyan
+    $s24Contributing = @('# Contributing', '', 'Nothing to run here.')
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s24Contributing -join "`n") + "`n"), $Utf8NoBom)
+    $s24Changelog = @(
+        '# Changelog'
+        ''
+        'The install back then was `claude plugin install specialists@davekjohns-workshop`, with no'
+        'scope flag and no refresh -- which is exactly what that release documented.'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CHANGELOG.md'), (($s24Changelog -join "`n") + "`n"), $Utf8NoBom)
+    $rL24 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rL24.Out -match $LifecycleFindingPattern)) 'scenario 24: history is not held to the current rules'
+    Assert-True ($rL24.Out -match '\[lifecycle\] checked 0') 'scenario 24: the history command was not even counted as enforced'
+
+    # --- Scenario 25: two commands with the SAME verb in one span are judged separately --------------
+    #     Victor's review finding on the check itself: the tail was originally taken from
+    #     IndexOf($verb) in the span, so a second `install` in the same span was judged on the FIRST
+    #     one's arguments -- a scopeless command reading as flagged correctly. The offset now comes from
+    #     the match position. The first command here is complete, the second is not, and only the second
+    #     may be reported.
+    Write-Host 'check 11 -- two same-verb commands in one span are judged on their own arguments' -ForegroundColor Cyan
+    $s25Lines = @(
+        '# Contributing'
+        ''
+        'Refresh with `claude plugin marketplace update davekjohns-workshop` first.'
+        ''
+        'Then `claude plugin install specialists@davekjohns-workshop --scope project ; claude plugin install specialists-ecomm@davekjohns-workshop` for both.'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s25Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rL25 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($rL25.Out -match [regex]::Escape('CONTRIBUTING.md:5') + ".*no '--scope project'") 'scenario 25: the second, scopeless install IS reported'
+    Assert-Equal 1 (@([regex]::Matches($rL25.Out, "no '--scope project'")).Count) 'scenario 25: and exactly once -- the first command is complete and must not be flagged too'
+
+    # Leaves the fixture with a history-only mention again, which the coverage block below relies on.
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s24Contributing -join "`n") + "`n"), $Utf8NoBom)
+
     # --- [COVERAGE]: every category states what it examined, and an empty one says so (issue #221) ---
     # This fixture is the ideal witness and always has been: it carries no agent def, no manual, no
     # persona, no plugin manifest and no lens tree, so those categories are GENUINELY empty. Before
@@ -555,6 +742,11 @@ try {
         'coverage: a non-empty category reports its real count -- the line is not hardcoded to 0'
     Assert-True ($rc.Out -match '\[parse\] checked [1-9]') `
         'coverage: parse counts the .ps1 files it actually parsed (the copied script + its libs)'
+    # Scenario 24 left the fixture with only a history mention, so this category is legitimately empty
+    # here -- and an empty lifecycle scan is exactly the state a reader must not mistake for "the docs
+    # are right", so it states its own reason like the lens category does.
+    Assert-True ($rc.Out -match '\[lifecycle\] checked 0 -- no printed lifecycle command') `
+        'coverage: an empty lifecycle scan says WHY it is empty, so "nothing to enforce" cannot read as "nothing wrong"'
     # Coverage is context, never a finding: it must not move the exit code or manufacture an error.
     # Scenario 16 left the fixture with a real finding, so this run legitimately exits 1 -- what is
     # asserted here is that no coverage line was itself counted as one.
