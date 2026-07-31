@@ -127,12 +127,22 @@ cached clone, and `plugin install`/`plugin update` compare against *that*, not a
 tag and the push had both gone through, and an install in this very repo still produced **3.0.1**
 with a `✔ Successfully installed` line — the cached clone was sitting on the pre-release commit.
 `claude plugin marketplace update davekjohns-workshop` then made a single `plugin update` move it
-`3.0.1 -> 3.0.2`. So **pushing the tag is not the end of a release**: the closing report says plainly
-that a consumer needs `claude plugin marketplace update <marketplace>` before the update command can
-see the new version. A refresh mechanism exists (`Refreshing marketplace cache (timeout: 120s)`), so
-the staleness is temporary; its schedule was not established, which is why the explicit command is
-what gets reported rather than "wait a bit". Nothing here is Rendall's to run on a consumer's
-machine — this is the one thing a release cannot do for its consumers, so it must at least be said.
+`3.0.1 -> 3.0.2`. So **pushing the tag is not the end of a release**: the closing report names the
+refresh command a consumer runs before updating.
+
+**Say it as the two measurements, though, not as one rule — the generalisation was tested and broke
+(July 31, 2026, cutting `v3.0.4`).** The measurement above is on **`install`**. Measured immediately
+after that release on the consumer side, with the cached clone verifiably still on the pre-release
+commit and not even containing it, a bare `claude plugin update <plugin>@<marketplace> --scope project`
+moved `3.0.3 -> 3.0.4` **and advanced the clone itself during the run** (CLI `2.1.220`). So `update`
+refreshed for itself, and the earlier claim that skipping the refresh makes an *update* serve the
+previous version does not hold. What Rendall reports at the close of a release is therefore the
+refresh as the **safe first step** — idempotent, one command, and a stale cache is invisible by
+construction because it reports success with a plausible version number — not a mechanism claim about
+what breaks without it. Whether `install` behaves the same is still unmeasured: that needs the next
+release's stale window, since the state cannot be recreated afterwards. Nothing here is Rendall's to
+run on a consumer's machine — this is the one thing a release cannot do for its consumers, so it must
+at least be said.
 
 The `releases/` directory (modeled on life-hub):
 - **`releases/development/<X>.x/<X.Y.Z>.md`** — the full release notes, from the `## Pull Requests`

@@ -737,8 +737,20 @@ if ($skillSpanCount -eq 0) {
 # a printed `claude plugin install|update|uninstall` must carry `--scope project`, and install/update
 # must have the marketplace refresh named nearby. Both are things a reader COPIES, and both fail
 # silently when wrong -- a scopeless install writes a machine-wide record with no projectPath and
-# reports success (inbound #274/#279), a stale cache serves an older version and reports success
+# reports success (inbound #274/#279), a stale cache reports success with a plausible version number
 # (inbound #282/#284).
+#
+# THE TWO RULES REST ON DIFFERENT FOOTING, AND THE COMMENT SAYS SO RATHER THAN FLATTENING IT. The scope
+# rule and the refresh-next-to-INSTALL rule each rest on a measured silent failure. The
+# refresh-next-to-UPDATE half does not: measured 2026-07-31 (CLI 2.1.220) right after v3.0.4, with the
+# cached clone verifiably still on the pre-release commit, a bare project-scoped update moved
+# 3.0.3 -> 3.0.4 AND advanced the clone itself during the run -- so `update` refreshed for itself, and
+# the older claim that skipping the refresh makes an update serve the previous version did not survive
+# testing. The rule is kept anyway (Dave, 2026-07-31): the refresh is idempotent, it is one command, and
+# a stale cache is invisible by construction, so the docs should keep naming it. What changed is the
+# wording -- prudence, not a mechanism claim. Keeping that distinction visible here is the point: this
+# check exists because doc claims drifted from measured reality, and it must not become an instance of
+# that itself.
 #
 # THE DISCRIMINATOR, and it is the whole reason this can be a generic scan where check 10 could not be.
 # A command with an explicit @-TARGET is an instruction someone runs:
@@ -844,7 +856,7 @@ foreach ($lf in ($lifecycleFiles | Sort-Object -Unique)) {
             Add-Error "[lifecycle] ${rel}:${lineNo}: printed 'claude plugin $verb' with an @-target but no '--scope project'. All three default to --scope user, which writes a machine-wide record with no projectPath and reports success (inbound #274/#279). Add the flag, or drop the @-target if this line is discussing the command rather than telling a reader to run it."
         }
         if ($verb -ne 'uninstall' -and -not $lcRefreshRegex.IsMatch(($lcLines[[Math]::Max(0, $lineNo - 13)..[Math]::Min($lcLines.Count - 1, $lineNo + 5)] -join "`n"))) {
-            Add-Error "[lifecycle] ${rel}:${lineNo}: printed 'claude plugin $verb' with an @-target, but neither 'claude plugin marketplace update' nor a link to 'staying-up-to-date' appears within 12 lines above or 6 below. The marketplace is a cached clone, so without the refresh this command serves the PREVIOUS version and reports success (inbound #282/#284)."
+            Add-Error "[lifecycle] ${rel}:${lineNo}: printed 'claude plugin $verb' with an @-target, but neither 'claude plugin marketplace update' nor a link to 'staying-up-to-date' appears within 12 lines above or 6 below. The marketplace is a cached clone and a stale one reports success with a plausible version number, so the refresh belongs next to a printed install/update. Measured for 'install' on 2026-07-30 (it served the previous version); a bare 'update' refreshed the clone for itself on 2026-07-31, so for that verb this is prudence rather than a measured failure. Quoting a command as the SUBJECT of prose rather than as an instruction? Elide the target as '...', the repo's convention."
         }
     }
 }

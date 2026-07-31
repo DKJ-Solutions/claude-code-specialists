@@ -94,9 +94,15 @@ claude plugin marketplace update davekjohns-workshop
 claude plugin update specialists@davekjohns-workshop --scope project
 ```
 
-Both lines, for the reason above: the update compares version numbers against the **cached** copy of
-the marketplace, so a stale cache means a no-op reported as up-to-date. This pair is what every "pick
-up the new release" pointer in this family means — in
+Both lines — but the reason is stated per command now, because the shared version of it was tested and
+broke. The stale-cache measurement above is on **`install`**. On **`update`**, measured July 31, 2026
+(CLI `2.1.220`) right after `v3.0.4` with the cached clone verifiably still on the pre-release commit, a
+bare `claude plugin update … --scope project` moved `3.0.3 -> 3.0.4` **and advanced the clone itself
+during the run** — so the refresh was not required there, and "a stale cache means a no-op reported as
+up-to-date" does not hold for `update`. Keep the pair anyway: it is idempotent, it is one extra command,
+and a stale cache is invisible by construction because it reports success with a plausible version
+number — so the procedure guarantees freshness rather than relying on the CLI to keep doing it. This
+pair is what every "pick up the new release" pointer in this family means — in
 [`sync-roster`](../sync-roster/SKILL.md), in `scripts/sync/check-script-contract.ps1`, in the
 [QUICKSTART](../../../QUICKSTART.md#staying-up-to-date), and in the release notes. Read a bare
 `claude plugin update` anywhere as shorthand for these two lines.

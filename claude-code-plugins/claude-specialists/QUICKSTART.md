@@ -46,10 +46,10 @@ claude plugin install specialists@davekjohns-workshop --scope project    # 2. th
 # and line 2 again for each domain group you enabled
 ```
 
-**Line 1 is not only an update-time step, and this is where the evidence for it came from.** Without
+**Line 1 matters most right here, because this is the command the failure was measured on.** Without
 it, the install happily gives you the **previous** version and reports `✔ Successfully installed` —
-measured on July 30, 2026 with a fresh `install`, not an `update` (the full account is under
-[Staying up to date](#staying-up-to-date)). A stale cache produces a green line and a plausible
+measured on July 30, 2026 with a fresh `install`, not an `update` (the full account, and what `update`
+does differently, is under [Staying up to date](#staying-up-to-date)). A stale cache produces a green line and a plausible
 version number, so the only symptom is a session quietly missing whatever the release added. That is
 easily mistaken for the restart problem described under
 [Staying up to date](#staying-up-to-date) — a new skill needing a session restart — and is a
@@ -101,19 +101,34 @@ claude plugin marketplace update davekjohns-workshop          # 1. refresh the m
 claude plugin update specialists@davekjohns-workshop --scope project   # 2. then update, per plugin
 ```
 
-**Do not skip the first one — without it the second happily installs the previous version and reports
-success.** Measured on July 30, 2026, minutes after `v3.0.2` was tagged and pushed: the cached
-marketplace clone still sat on the commit from *before* the release, so a fresh
-`claude plugin install … --scope project` in a repo produced **3.0.1** and said `✔ Successfully
-installed`. Nothing about that output hints the version is stale. After
-`claude plugin marketplace update`, the same plugin moved `3.0.1 -> 3.0.2` in one step. There is a
-refresh mechanism (the command reports `Refreshing marketplace cache (timeout: 120s)`), so a cache
-does not stay stale forever; on what schedule it refreshes by itself was not established, which is
-exactly why the explicit command belongs in the procedure rather than a hope that it has caught up.
+**Keep line 1 in the procedure — and here is exactly what each command was measured to do, because
+the two differ and an earlier version of this page generalised them.**
 
-So a version number is one of **two** gates. `claude plugin update` compares version numbers only —
-but it compares them against *its cached copy of the marketplace*, not against the workshop. You get
-a change once the workshop has cut a new version **and** your cache has seen it.
+- **`install` served a stale version once, and that is the measurement this whole warning came from.**
+  On July 30, 2026, minutes after `v3.0.2` was tagged and pushed, the cached marketplace clone still
+  sat on the commit from *before* the release, so a fresh `claude plugin install … --scope project`
+  produced **3.0.1** and said `✔ Successfully installed`. Nothing in that output hints the version is
+  stale.
+- **`update` refreshed the cache by itself when measured.** On July 31, 2026 (CLI `2.1.220`), with the
+  cached clone verifiably still on the pre-release commit — it did not even contain the release commit
+  — a bare `claude plugin update … --scope project` from a consumer's root moved `3.0.3 -> 3.0.4`, and
+  the clone itself advanced to the release commit during that run. So for `update`, the explicit
+  refresh was **not** required here. (The command is elided as `…` on purpose: spelled out with its
+  `plugin@marketplace` target it reads as an instruction to run, which is what check 11 in the lint
+  gate enforces flags on — the repo's convention for quoting a command as the *subject* of a
+  measurement is the ellipsis.)
+
+**Why line 1 stays anyway:** the refresh is idempotent, it costs one command, and the behaviour above
+is one measurement on one CLI version — while a stale cache is invisible by construction, since it
+produces a success message and a plausible version number. The procedure therefore guarantees
+freshness instead of depending on the CLI continuing to do it for you. What is *not* claimed anymore
+is that skipping it makes `update` serve the previous version; that was a generalisation from the
+`install` measurement, and it did not survive being tested.
+
+So a version number is one of **two** gates. `claude plugin update` compares version numbers only, and
+it compares them against a **cached copy** of the marketplace rather than against the workshop
+directly — a copy that this measurement shows the command can refresh for itself, and whose
+self-refresh schedule when nothing asks was never established.
 
 **The scope flag on the second command is not optional either.** Without it the command defaults to
 user scope and fails on a project-scoped install with *"Plugin `specialists` is not installed at
