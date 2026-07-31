@@ -77,11 +77,13 @@ The full picture, top-level folder by folder:
 
 A consuming repo adds this marketplace via `extraKnownMarketplaces` in `.claude/settings.json` and
 enables the desired plugins via `enabledPlugins` — and then, because an install is **project-scoped**,
-runs `claude plugin install <plugin>@<marketplace> --scope project` from that repo's root for each of
-them; the settings keys alone install nothing, and without the flag the command defaults to a
-machine-wide `user` install instead. The canonical enable-a-plugin walkthrough (the settings snippet,
-the per-plugin install, the restart, the install-record self-check, running the bootstrap skill)
-is in the family
+runs `claude plugin marketplace update <marketplace>` followed by
+`claude plugin install <plugin>@<marketplace> --scope project` from that repo's root for each of
+them; the settings keys alone install nothing, without the flag the command defaults to a
+machine-wide `user` install instead, and without the refresh it can serve an *older* version and
+still report success (see [Versioning](#versioning)). The canonical enable-a-plugin walkthrough (the
+settings snippet, the cache refresh, the per-plugin install, the restart, the install-record
+self-check, running the bootstrap skill) is in the family
 [Quickstart](claude-code-plugins/claude-specialists/QUICKSTART.md) — connect in three steps, for
 those who didn't build the system. This root README keeps only the two marketplace-wide facts that
 matter beyond any one consumer:

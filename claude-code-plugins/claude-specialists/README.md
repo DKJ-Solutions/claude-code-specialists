@@ -325,10 +325,21 @@ The body is therefore ready and the switch is not thrown. Flipping it is Dave's 
 instead of an unknown: the collision resolves silently and positionally, so a consumer who enables a
 second `agent`-setting plugin gets a different orchestrator without being told.
 
-- **Step 0 (manual, three acts in order).** Put the marketplace source + `enabledPlugins` in
-  `.claude/settings.json` (see [Consumption](../../README.md#consumption) in the root README), then run
+- **Step 0 (manual, four acts in order).** Put the marketplace source + `enabledPlugins` in
+  `.claude/settings.json` (see [Consumption](../../README.md#consumption) in the root README), then
+  refresh the cached marketplace with `claude plugin marketplace update <marketplace>`, then run
   `claude plugin install <plugin>@<marketplace> --scope project` **from the consumer's root, once per
   enabled plugin**, then **restart** the session — only then is the skill available.
+
+  > **The marketplace is a cached clone, which is why the refresh is an act and not a formality**
+  > (inbound [#282](https://github.com/DaveKJohn/davekjohns-workshop/issues/282) for the behaviour,
+  > [#284](https://github.com/DaveKJohn/davekjohns-workshop/issues/284) for this page having omitted
+  > it). `plugin install` compares against the consumer's cached copy of the marketplace, not against
+  > the workshop: minutes after `v3.0.2` was tagged and pushed, a fresh project-scoped **install**
+  > produced `3.0.1` and reported `✔ Successfully installed`. Nothing in that output hints the version
+  > is stale. And the correct version of this block in `specialists-init`'s own step 0b cannot cover
+  > for the omission here, for the same reason this path exists at all: that skill does not exist until
+  > the install has happened.
 
   > **The install is not a formality, and leaving it out fails silently** (inbound
   > [#274](https://github.com/DaveKJohn/davekjohns-workshop/issues/274), measured in a consumer during
