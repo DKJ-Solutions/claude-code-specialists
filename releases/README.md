@@ -25,6 +25,7 @@ refuses that rather than doing it quietly (see [Cutting a release](#cutting-a-re
 
 | Version | Date | Type | Title |
 |---|---|---|---|
+| [3.0.4](development/3.x/3.0.4.md) | 2026-07-31 | Patch | the checks that reported the wrong answer -- and a gate for the class |
 | [3.0.3](development/3.x/3.0.3.md) | 2026-07-30 | Patch | the second update gate: refresh the marketplace before you update |
 | [3.0.2](development/3.x/3.0.2.md) | 2026-07-30 | Patch | the adoption and teardown paths, measured against the actual CLI |
 | [3.0.1](development/3.x/3.0.1.md) | 2026-07-30 | Patch | Patch release |
