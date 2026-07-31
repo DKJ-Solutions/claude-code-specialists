@@ -54,6 +54,16 @@
         the first name into the lens header ("# Sean <midDot> repo-lens"); after a rename that name is
         stale, but the lens is present, so it is a cosmetic mismatch, not missing-lens drift. Soft on
         purpose (silent at session start); the sync-roster skill stages a paste-ready reconcile.
+      - plugin ENABLED but with no install record for this path -> one [NOT-INSTALLED-HERE] roll-up
+        (non-counting, like [ORPHANS]) plus a non-counting detail line per plugin naming the enabling
+        layer and the administration consulted (inbound #302). Enabling is only half
+        of what Claude Code needs; without a record in ~/.claude/plugins/installed_plugins.json for THIS
+        projectPath a session loads none of that plugin -- no skills, no subagents, no hooks -- and every
+        drift line this check prints about it then describes a surface the repo does not have. Measured:
+        27 [ERROR] lines about a session that had loaded zero specialists. Not an error, because the repo
+        is not broken and the state is usually one install command away from intended; never silent,
+        because "no hooks because the plugin is not loaded" reads exactly like "no hooks because all is
+        well". See Get-InstallRecord in check-report-lib.ps1.
 
     Personas: main-loop specialists (Chris 01-01, Derek 05-05, Rendall 05-06, ...) ship as
     <plugin>/personas/<g>-<id>-persona.md, NOT as agents, yet legitimately have a roster row and a
@@ -89,7 +99,10 @@
 .PARAMETER UserHomeOverride
     (Optional, for tests) Use this dir as the user home when resolving the user layer of the settings
     chain (~/.claude/settings.json), instead of $env:USERPROFILE -- lets a fixture exercise the chain
-    without touching the real machine's user settings.
+    without touching the real machine's user settings. Scoped to the SETTINGS CHAIN only: the install
+    administration (inbound #302) is a different file answering a different question and is read via
+    $env:USERPROFILE, so a fixture that wants to control it redirects that env var for the child process
+    -- the pattern the connector version test already uses.
 
 .EXAMPLE
     .\scripts\sync\check-roster-sync.ps1
@@ -397,7 +410,73 @@ if ($enabledIds.Count -eq 0) {
     } elseif (-not $enabled.AnyKeyFound) {
         Write-Info "no 'enabledPlugins' key in $($enabled.Summary) -- nothing to check."
     } else {
-        Write-Info "'enabledPlugins' is present in $($enabled.Summary) but enables nothing -- nothing to check."
+        # KeySummary, not Summary (inbound #304). Summary phrases the layers that EXIST, which is exactly
+        # right one line up ("-- checked <Summary>": a claim about what was inspected) and wrong here,
+        # where the layer IS the answer. Measured against life-hub: the key sat in one of three layers --
+        # the user one, as an empty object -- and this line named all three, sending a reader looking for
+        # it to two repo-owned files that demonstrably do not have it. See Get-EnabledPlugins' KeyIn.
+        Write-Info "'enabledPlugins' is present in $($enabled.KeySummary) but enables nothing -- nothing to check."
+    }
+}
+
+# --- Enabled, but is it installed for THIS path? (inbound #302) -----------------------------------
+# The second half of what Claude Code needs, and until now the half no check read. An enable without an
+# install record for this project path loads nothing -- no skills, no subagents, no hooks -- while this
+# script happily reports every specialist of that plugin as drift. See Get-InstallRecord for the
+# measurement (27 [ERROR] lines about a session surface that was not there) and for why a record without
+# a projectPath still counts.
+#
+# Only asked when something is enabled at all. With nothing enabled the question has no subject, and the
+# [NOTHING-ENABLED] roll-up above has already said everything there is to say -- adding a second line
+# about an administration nobody is waiting for is the session-start noise PR #99 removed.
+if ($enabledIds.Count -gt 0) {
+    $installRecord = Get-InstallRecord -RepoRoot $repoRoot
+
+    # An administration that exists but does not parse is an [ERROR], on the same reasoning as an
+    # unreadable settings layer above: it is the authority on this question, and an authority the check
+    # could not read is exactly the state in which any conclusion drawn from it is unearned.
+    if ($installRecord.Exists -and -not $installRecord.Readable) {
+        Write-Failure "$($installRecord.Path) does not parse as JSON ($($installRecord.Error)) -- whether the enabled plugins are installed for this path was not checked."
+    }
+
+    $notInstalledHere = @($enabledIds | Where-Object { -not (Test-PluginInstalledHere -InstallRecord $installRecord -PluginId $_) })
+
+    # [NOT-INSTALLED-HERE]: its own non-counting roll-up, in the family of [NOTHING-ENABLED]/[BOOTSTRAP]/
+    # [ORPHANS]. NOT an error -- the repo is not broken, and the state is usually one command away from
+    # intended -- but it must never read as a checked, healthy roster, because every finding printed below
+    # it is about a specialist surface no session in this repo can see.
+    #
+    # ONE line, naming the count and the ids, rather than one line per plugin: the session hooks surface
+    # this marker, and a repo with several enabled plugins would otherwise produce a wall of
+    # near-identical lines at every start -- the noise PR #99 removed. The per-plugin detail follows as
+    # [INFO], visible on a deliberate run.
+    #
+    # Worth knowing about its own reach: in the WORST case of this state -- no plugin installed for this
+    # path at all -- nothing in this repo runs the hook that would surface this line, because the hook
+    # ships in the plugin. That is not an argument against the marker but the reason the same query now
+    # also runs in check-connectors, from the workshop, ABOUT each registered consumer: the one vantage
+    # point that still has a voice when a consumer has gone silent.
+    if ($notInstalledHere.Count -gt 0) {
+        Write-Host "  [NOT-INSTALLED-HERE] $($notInstalledHere.Count) of $($enabledIds.Count) enabled plugin(s) have no install record for this path ($($notInstalledHere -join ', ')) -- a session here will not load them, so anything reported below about them concerns a surface this repo does not have. Fix: 'claude plugin install <id> --scope project' from this root." -ForegroundColor Yellow
+        # NON-COUNTING supporting facts, deliberately not [INFO]. The roll-up above is the signal; these
+        # add the enabling layer (the #294 promise: never leave a reader guessing WHERE an enable came
+        # from) and the administration path that was consulted. Two reasons they must not count:
+        #   - one enabled plugin without a record would otherwise add a permanent info signal to every
+        #     run, and "this repo reports 0 signals" is an assertion the test suite leans on to mean
+        #     something. A baseline that can never be zero is a baseline nobody reads twice.
+        #   - inbound #302 asked for this as a verdict, not an error and not a counting signal, on the
+        #     grounds that the repo is not broken. Counting it would have smuggled the severity back in
+        #     through the summary line.
+        foreach ($plugId in $notInstalledHere) {
+            Write-Skip "'$plugId' is enabled in $($enabled.LayerById[$plugId]) but has no record for this path in $($installRecord.Path) -- enabled is not installed."
+        }
+    } elseif (-not $installRecord.Exists) {
+        # Said out loud rather than passed over: 'no administration file' is the one shape in which every
+        # plugin looks installed to the predicate above (absence of the authority is not evidence of
+        # absence), so a reader must not mistake that silence for a positive answer. Non-counting for the
+        # same reason as above -- it is a statement about what could not be checked, not a finding about
+        # this repo.
+        Write-Skip "no plugin administration found at $($installRecord.Path) -- whether the enabled plugins are installed for this path could not be checked."
     }
 }
 

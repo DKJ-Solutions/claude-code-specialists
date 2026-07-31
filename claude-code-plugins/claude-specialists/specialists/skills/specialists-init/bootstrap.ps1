@@ -354,6 +354,27 @@ if ($null -eq $enabledPlugins) {
     Write-Host "  [notice] '$ownPluginName' is not among the enabled plugins in $($enabledPlugins.Summary) -- no lens scaffolds for it." -ForegroundColor Yellow
 }
 
+# The OTHER asymmetry (inbound #302). Since #294 this script says what it SKIPPED ("agents directory of
+# plugin '...' not found"); it said nothing about what it placed for a plugin that is enabled here but has
+# no install record for this path. Measured in a throwaway consumer: 27 lens files written, 4 personas and
+# 23 scaffolds, for specialists that exist in no session of that repo -- and the closing count read as a
+# clean, complete setup.
+#
+# Reported here rather than refused: the scaffolds are harmless and the state is usually one install
+# command away from intended, so placing them is right. What was wrong is placing them silently. Counted
+# into one line after the loop, mirroring the closing report's own shape.
+# FULL plugin ids, not the bare names: the remedy this line names is 'claude plugin install <id>', and an
+# id without its '@marketplace' part is not a command the reader can copy.
+$notInstalledIds = @()
+if ($null -ne $enabledPlugins -and $enabledPlugins.Ids.Count -gt 0 -and (Get-Command Get-InstallRecord -ErrorAction SilentlyContinue)) {
+    $ownInstalls = Get-InstallRecord -RepoRoot $ConsumerRoot
+    if ($ownInstalls.Exists -and -not $ownInstalls.Readable) {
+        Write-Host "  [notice] $($ownInstalls.Path) does not parse as JSON -- whether the enabled plugins are installed for this path was not checked." -ForegroundColor Yellow
+    }
+    $notInstalledIds = @($enabledPlugins.Ids |
+        Where-Object { -not (Test-PluginInstalledHere -InstallRecord $ownInstalls -PluginId $_) })
+}
+
 $scaffolded = 0; $lensKept = 0
 foreach ($pluginName in ($pluginNames | Sort-Object -Unique)) {
     if ($pluginName -notmatch '^[a-z0-9][a-z0-9-]*$') {
@@ -833,6 +854,13 @@ Write-Host "  [create] $suggestPath placed (proposal -- not active; gitignored i
 # --- Report ----------------------------------------------------------------------------------------
 Write-Host ""
 Write-Host "Done: $copied persona-lens(es) created, $kept already present; $scaffolded lens-scaffold(s) created, $lensKept already present; $scriptScaffolded script-scaffold(s) created, $scriptKept already present." -ForegroundColor Cyan
+if ($notInstalledIds.Count -gt 0) {
+    # Directly under the closing count, because that count is what this line qualifies (inbound #302).
+    Write-Host "  [notice] $($notInstalledIds.Count) of the enabled plugin(s) have no install record for this path -- a session here loads none of them, so the lenses above are in place for a specialist surface this repo does not yet have. Run this from this root (step 3 of the QUICKSTART):" -ForegroundColor Yellow
+    foreach ($id in ($notInstalledIds | Sort-Object -Unique)) {
+        Write-Host "             claude plugin install $id --scope project" -ForegroundColor Yellow
+    }
+}
 Write-Host "Next steps (manual -- script intentionally leaves settings.json/hooks untouched):" -ForegroundColor Cyan
 Write-Host "  1. Fill '## Specific to this repo' slot in each $lensRelDisplay/*-extension.md with repo lens (VUL-IN scaffolds can stay empty until specialist has work here)." -ForegroundColor Gray
 if ($seamMode) {

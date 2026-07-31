@@ -349,6 +349,50 @@ try {
         $r = Invoke-Ps $Script @('-SkipDrift', '-Manifest', $mf, '-ConsumerPathOverride', $Fixture)
         Assert-Match '\[ERROR\].*machine record is on v0\.0\.1' $r.Out 'same version, two spellings: still the plain version verdict'
         Assert-NotMatch 'disagree' $r.Out 'same version, two spellings: NOT reported as a disagreement'
+
+        # 8e. inbound #302: "no machine record" while the plugin IS enabled there means something much
+        #     louder than a version check that could not run -- a session in that checkout loads none of
+        #     the plugin. And that repo cannot report it itself: the hook that would is inside the plugin
+        #     that is not loading, so this check, from the workshop, is the only vantage point left.
+        #     Stays [INFO], deliberately: a consumer legitimately used from another machine has no record
+        #     here either, so the state is not conclusive -- the message names both readings.
+        Set-FixtureAdmin '{ "version": 2, "plugins": { } }'
+        $r = Invoke-Ps $Script @('-SkipDrift', '-Manifest', $mf, '-ConsumerPathOverride', $Fixture)
+        Assert-Equal 0 $r.Code 'enabled but no record: exit 0 -- INFO, never a gate breach'
+        Assert-Match '\[INFO\].*no machine record for this consumer, while the plugin IS enabled' $r.Out 'enabled but no record: the consequence is stated, not just the skipped version check'
+        Assert-Match 'loads none of this plugin' $r.Out 'enabled but no record: says what a session there actually gets'
+        Assert-Match 'claude plugin install specialists@davekjohns-workshop --scope project' $r.Out 'enabled but no record: names the one command that settles it'
+
+        # 8f. The same fact when the plugin is NOT enabled there keeps the old, milder wording: nothing is
+        #     silently loading or failing to load, so the loud reading would be a false alarm.
+        #     Order matters: New-FixtureConsumer wipes $Fixture, and both the manifest and the
+        #     administration live inside it, so they are rebuilt after it -- not before.
+        New-FixtureConsumer -ExtensionIds @('06-16') -PluginEnabled $false
+        $mf = New-FixtureManifest -Extensions @('06-16')
+        Set-FixtureAdmin '{ "version": 2, "plugins": { } }'
+        $r = Invoke-Ps $Script @('-SkipDrift', '-Manifest', $mf, '-ConsumerPathOverride', $Fixture)
+        Assert-Match '\[INFO\].*no machine record for this consumer \(the install may run via a different machine\)' $r.Out 'not enabled, no record: the milder wording is kept'
+        Assert-NotMatch 'loads none of this plugin' $r.Out 'not enabled, no record: no loud claim about a session that was never going to load it'
+
+        # 8g. An administration that EXISTS but does not parse must not be read as "no record". Found while
+        #     reviewing this change: an unreadable file yields an empty record set, and the branches above
+        #     would then have reported "no machine record for this consumer" -- a statement about absence,
+        #     drawn from a file nothing could read. That is the exact species of claim #302 is about, one
+        #     level down. The verdict is withheld and the file is named instead.
+        New-FixtureConsumer -ExtensionIds @('06-16')
+        $mf = New-FixtureManifest -Extensions @('06-16')
+        Set-FixtureAdmin '{ "version": 2, "plugins": { oops'
+        $r = Invoke-Ps $Script @('-SkipDrift', '-Manifest', $mf, '-ConsumerPathOverride', $Fixture)
+        Assert-Equal 1 $r.Code 'unreadable administration: exit 1 -- the authority for this check could not be read'
+        Assert-Match '\[ERROR\].*does not parse as JSON' $r.Out 'unreadable administration: the file is named'
+        Assert-Match 'version verdict below is withheld' $r.Out 'unreadable administration: says the verdicts are withheld'
+        Assert-NotMatch 'no machine record for this consumer' $r.Out 'unreadable administration: NOT reported as an absent record'
+        Assert-NotMatch 'no plugin administration found' $r.Out 'unreadable administration: nor as an absent file'
+
+        # 8h. And with -SkipVersions the administration is not read at all, so an unreadable one is silent:
+        #     a run explicitly asked not to look at versions must not fail on the version authority.
+        $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+        Assert-NotMatch 'does not parse as JSON' $r.Out '-SkipVersions: the administration is not read, so not reported'
     } finally {
         $env:USERPROFILE = $oldProfile
     }

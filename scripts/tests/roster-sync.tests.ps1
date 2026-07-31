@@ -68,7 +68,7 @@ function Assert-NotMatch {
 }
 
 function Invoke-Ps {
-    param([string[]]$ScriptArgs)
+    param([string[]]$ScriptArgs, [string]$UserProfile = '')
     # Pin the USER layer of the settings chain to a throwaway dir unless a case sets it itself (inbound
     # #294). The check now reads ~/.claude/settings.json as the lowest-precedence layer, so without this
     # every fixture would inherit whatever the machine running the suite happens to have enabled
@@ -77,8 +77,48 @@ function Invoke-Ps {
     if ($ScriptArgs -notcontains '-UserHomeOverride') {
         $ScriptArgs = @($ScriptArgs) + @('-UserHomeOverride', (Join-Path $Fixture 'no-user-home'))
     }
-    $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $Script @ScriptArgs
-    return [pscustomobject]@{ Code = $LASTEXITCODE; Out = ($out -join "`n") }
+    # And pin $env:USERPROFILE for the child, for the same reason one level over (inbound #302). The
+    # install administration is read from there, NOT from -UserHomeOverride (that parameter is scoped to
+    # the settings chain), so without this every fixture consumer would be measured against the real
+    # machine's installed_plugins.json -- where a temp-dir fixture never has a record. The whole suite
+    # would then print [NOT-INSTALLED-HERE] on every case, which is both noise and, worse, makes an
+    # assertion ON that marker prove nothing: it would be there whatever the code did. A throwaway
+    # profile makes the default state "no administration found", and the cases that care build one.
+    #
+    # Safe because every case passes -CacheRootOverride: the only other thing the check reads from
+    # USERPROFILE is the default plugin-cache root.
+    $profileDir = if ($UserProfile) { $UserProfile } else { Join-Path $Fixture 'no-user-profile' }
+    $oldProfile = $env:USERPROFILE
+    try {
+        $env:USERPROFILE = $profileDir
+        $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $Script @ScriptArgs
+        $code = $LASTEXITCODE
+    } finally {
+        $env:USERPROFILE = $oldProfile
+    }
+    return [pscustomobject]@{ Code = $code; Out = ($out -join "`n") }
+}
+
+# Builds a throwaway ~/.claude/plugins/installed_plugins.json and returns the profile dir to point
+# $env:USERPROFILE at (inbound #302). -Records: @{ 'specialists@davekjohns-workshop' = '<projectPath>' };
+# pass an empty string as the value for a record carrying NO projectPath (the user-scope shape, which
+# covers every repo).
+function New-FixtureAdmin {
+    param([hashtable]$Records = @{}, [string]$Name = 'admin-profile')
+    $profileDir = Join-Path $Fixture $Name
+    $pluginsDir = Join-Path $profileDir '.claude\plugins'
+    if (Test-Path -LiteralPath $profileDir) { Remove-Item -Recurse -Force -LiteralPath $profileDir }
+    New-Item -ItemType Directory -Path $pluginsDir -Force | Out-Null
+    $blocks = @()
+    foreach ($id in $Records.Keys) {
+        $p = $Records[$id]
+        $rec = if ($p) { '{ "scope": "project", "version": "9.9.9", "projectPath": ' + (ConvertTo-Json $p) + ' }' }
+               else     { '{ "scope": "user", "version": "9.9.9" }' }
+        $blocks += (ConvertTo-Json $id) + ': [' + $rec + ']'
+    }
+    $json = '{ "version": 2, "plugins": { ' + ($blocks -join ', ') + ' } }'
+    [System.IO.File]::WriteAllText((Join-Path $pluginsDir 'installed_plugins.json'), $json)
+    return $profileDir
 }
 
 # Builds a fixture plugin cache. -VersionAgents: @{ '1.11.0' = @('06-16','06-24') }.
@@ -639,6 +679,95 @@ try {
     Assert-Match "\[INFO\].*'04-11'.*deliberately kept out" $r.Out 'ignore-list: 04-11 reported as skipped'
     Assert-NotMatch "'04-11'.*no roster row" $r.Out 'ignore-list: 04-11 not an ERROR'
 
+    # --- 10b. Enabled but NOT INSTALLED for this path (inbound #302) -------------------------------
+    #     Numbered 10b, not 11: the numbers 11-17 are taken by scenarios that live after the hook block,
+    #     and the suite's own convention for a scenario inserted among the check cases is a letter suffix
+    #     (5c, 9c, H6d). This one belongs here, with the other check-behaviour cases.
+    #     The mirror image of #294, in the same script, pointing the other way. Enabling is only half of
+    #     what Claude Code needs; without an install record for THIS projectPath a session loads none of
+    #     the plugin -- no skills, no subagents, no hooks -- and this check happily reported all 27
+    #     specialists as drift. Measured against a throwaway consumer: 27 [ERROR] lines about a session
+    #     surface that was not there, plus a bootstrap that wrote 27 lens files for it.
+    Write-Host "11. enabled but not installed for this path (inbound #302)" -ForegroundColor Cyan
+    $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') }
+
+    # 11a. A record for a DIFFERENT path -- the exact shape of the record takeover in inbound #301: the
+    #      administration holds a record for this plugin, just not for this repo.
+    $c = New-FixtureConsumer -RosterIds @('06-16') -SeamLensIds @('06-16')
+    $elsewhere = Join-Path $Fixture 'some-other-repo'
+    New-Item -ItemType Directory -Path $elsewhere -Force | Out-Null
+    $adminProfile = New-FixtureAdmin -Records @{ $PluginId = $elsewhere }
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache) -UserProfile $adminProfile
+    Assert-Match '\[NOT-INSTALLED-HERE\]' $r.Out 'record for another path: the roll-up fires'
+    Assert-Match "1 of 1 enabled plugin\(s\) have no install record" $r.Out 'record for another path: the roll-up counts what it stands for'
+    Assert-Match ([regex]::Escape($PluginId)) $r.Out 'record for another path: the roll-up names the plugin id'
+    Assert-Match 'claude plugin install' $r.Out 'record for another path: the roll-up carries the one command that fixes it'
+    # Non-counting, exactly like [ORPHANS]/[NOTHING-ENABLED]: the repo is not broken. This is the assertion
+    # that stops the marker from quietly becoming a gate breach later.
+    Assert-Equal 0 $r.Code 'record for another path: exit 0 -- the roll-up is NOT an error'
+    Assert-Match 'Summary: 0 error\(s\), 0 info signal\(s\)' $r.Out 'record for another path: neither the roll-up nor its detail line counts'
+    Assert-Match "'$PluginId' is enabled in .claude/settings.json but has no record for this path" $r.Out 'record for another path: the detail line names the enabling layer (the #294 promise)'
+
+    # 11b. A record FOR this path -> completely silent. The guard against the marker becoming a line every
+    #      correctly installed repo carries at every session start.
+    $adminProfile = New-FixtureAdmin -Records @{ $PluginId = $c } -Name 'admin-profile-ok'
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache) -UserProfile $adminProfile
+    Assert-Equal 0 $r.Code 'installed here: exit 0'
+    Assert-NotMatch '\[NOT-INSTALLED-HERE\]' $r.Out 'installed here: no roll-up'
+    Assert-NotMatch 'no plugin administration found' $r.Out 'installed here: no "could not check" line either'
+    Assert-Match 'Summary: 0 error\(s\), 0 info signal\(s\)' $r.Out 'installed here: still completely clean'
+
+    # 11c. A PATHLESS record (the user-scope shape) covers every repo, so it must NOT fire the marker.
+    #      Erring this way can only suppress a warning, never invent one -- a false [NOT-INSTALLED-HERE]
+    #      against a working repo is the cry-wolf failure #294 spent a release removing.
+    $adminProfile = New-FixtureAdmin -Records @{ $PluginId = '' } -Name 'admin-profile-userwide'
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache) -UserProfile $adminProfile
+    Assert-NotMatch '\[NOT-INSTALLED-HERE\]' $r.Out 'pathless record: does not exclude this path, so no roll-up'
+    Assert-Match 'Summary: 0 error\(s\), 0 info signal\(s\)' $r.Out 'pathless record: clean'
+
+    # 11d. No administration at all -> "could not check", never "not installed". Absence of the authority
+    #      is not evidence of absence, and it must not read as a positive answer either.
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-NotMatch '\[NOT-INSTALLED-HERE\]' $r.Out 'no administration: the marker does NOT fire'
+    Assert-Match 'no plugin administration found' $r.Out 'no administration: said out loud, not passed over in silence'
+    Assert-Match 'Summary: 0 error\(s\), 0 info signal\(s\)' $r.Out 'no administration: non-counting'
+
+    # 11e. Nothing enabled -> the question has no subject, so not a word about the administration. Guards
+    #      against re-adding the session-start noise PR #99 removed.
+    $c2 = New-FixtureConsumer -RosterIds @('06-16') -SeamLensIds @('06-16') -Enabled $false
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c2, '-CacheRootOverride', $cache)
+    Assert-Match '\[NOTHING-ENABLED\]' $r.Out 'nothing enabled: still the nothing-enabled roll-up'
+    Assert-NotMatch '\[NOT-INSTALLED-HERE\]' $r.Out 'nothing enabled: no install-record marker'
+    Assert-NotMatch 'no plugin administration found' $r.Out 'nothing enabled: not a word about the administration'
+
+    # 11e2. An administration that EXISTS but does not parse -> an [ERROR] naming the file, and NOT a
+    #       "not installed" claim. Absence of a readable authority is not evidence of absence, and this is
+    #       the same trap the connector check's 8g pins one level down.
+    #       The consumer is rebuilt first, on purpose: every New-FixtureConsumer writes to the SAME
+    #       $Fixture\consumer path, so 11e's deliberately disabled consumer is still sitting there. Without
+    #       this line the run has nothing enabled, the install-record block is skipped entirely, and the two
+    #       assertions below pass or fail for a reason that has nothing to do with what they claim to test.
+    $c = New-FixtureConsumer -RosterIds @('06-16') -SeamLensIds @('06-16')
+    $badProfile = Join-Path $Fixture 'admin-profile-broken'
+    New-Item -ItemType Directory -Path (Join-Path $badProfile '.claude\plugins') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $badProfile '.claude\plugins\installed_plugins.json'), '{ "plugins": { oops')
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache) -UserProfile $badProfile
+    Assert-Equal 1 $r.Code 'unreadable administration: exit 1 -- the authority could not be read'
+    Assert-Match '\[ERROR\].*installed_plugins\.json does not parse as JSON' $r.Out 'unreadable administration: the file is named'
+    Assert-NotMatch '\[NOT-INSTALLED-HERE\]' $r.Out 'unreadable administration: NOT turned into a "not installed" verdict'
+    Assert-NotMatch 'no plugin administration found' $r.Out 'unreadable administration: nor into an "absent file" verdict'
+
+    # 11f. THE FULL MEASURED CASE: a drift report that is entirely about a surface the repo does not have.
+    #      An unbootstrapped-but-rostered consumer with lenses missing gives real [ERROR] lines, and the
+    #      marker has to travel with them -- otherwise the reader fixes the roster while the actual first
+    #      move is the install.
+    $c3 = New-FixtureConsumer -RosterIds @() -SeamLensIds @('06-16')
+    $adminProfile = New-FixtureAdmin -Records @{ $PluginId = $elsewhere } -Name 'admin-profile-drift'
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c3, '-CacheRootOverride', $cache) -UserProfile $adminProfile
+    Assert-Equal 1 $r.Code 'drift + not installed: real drift still exits 1'
+    Assert-Match 'no roster row' $r.Out 'drift + not installed: the drift finding is still reported'
+    Assert-Match '\[NOT-INSTALLED-HERE\]' $r.Out 'drift + not installed: the marker qualifies that report'
+
     # --- Hook (roster-sessioncheck.ps1): soft, surfaces only [ERROR], always exit 0 ---------------
     $Hook = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists\specialists\hooks\roster-sessioncheck.ps1'
     # A stub "check" script with fixed output + exit code, so the hook is tested in isolation.
@@ -811,6 +940,53 @@ try {
     Assert-Match 'in sync' $r.Out 'hook no-orphans: in-sync message'
     Assert-NotMatch '\[ORPHANS\]' $r.Out 'hook no-orphans: no roll-up line when there is nothing to roll up'
     Assert-NotMatch 'to see which ids' $r.Out 'hook no-orphans: no pointer line either'
+
+    # H10. inbound #302: [NOT-INSTALLED-HERE] gets its OWN verdict, above the in-sync line. The roster may
+    #      genuinely be in sync, but leading with that answers a question nobody can act on yet -- the
+    #      reader's first move is the install, not the roster.
+    $stub = New-StubCheck -Name 'stub-not-installed' -ExitCode 0 -OutputLines @(
+        '  [NOT-INSTALLED-HERE] 1 of 2 enabled plugin(s) have no install record for this path (specialists-lifehub@davekjohns-workshop) -- a session here will not load them.',
+        '  [OK]    all present',
+        'Summary: 0 error(s), 0 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Equal 0 $r.Code 'hook not-installed: exit 0 (the hook never blocks)'
+    Assert-Match 'not installed for this path' $r.Out 'hook not-installed: its own verdict line'
+    Assert-Match 'specialists-lifehub@davekjohns-workshop' $r.Out 'hook not-installed: the marker reaches the session context, naming the plugin'
+    Assert-NotMatch 'in sync' $r.Out 'hook not-installed: NOT reported as in sync'
+    Assert-NotMatch 'drift found' $r.Out 'hook not-installed: NOT reported as drift either'
+
+    # H10b. And alongside real [ERROR] lines it must travel WITH the drift headline. Without it the session
+    #       is told a specialist is missing from the roster, about a plugin it does not load -- true, and
+    #       misleading about which end to start at. Same reasoning as [ORPHANS] in H8.
+    $stub = New-StubCheck -Name 'stub-not-installed-drift' -ExitCode 1 -OutputLines @(
+        "  [ERROR]  agent '06-24' has no roster row in CLAUDE.md -- add it to the roster.",
+        '  [NOT-INSTALLED-HERE] 1 of 1 enabled plugin(s) have no install record for this path (specialists@davekjohns-workshop) -- a session here will not load them.',
+        'Summary: 1 error(s), 0 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Match 'roster drift found' $r.Out 'hook not-installed-drift: the drift branch still fires'
+    Assert-Match "agent '06-24'" $r.Out 'hook not-installed-drift: the real finding still surfaces'
+    Assert-Match '\[NOT-INSTALLED-HERE\]' $r.Out 'hook not-installed-drift: the marker qualifies that headline'
+
+    # H10c. And with [BOOTSTRAP]: "run specialists-init" is right for an unbootstrapped repo and incomplete
+    #       for one where the plugin also is not installed here -- the bootstrap would place lenses for a
+    #       surface that still will not load.
+    $stub = New-StubCheck -Name 'stub-not-installed-bootstrap' -ExitCode 0 -OutputLines @(
+        '  [BOOTSTRAP] this repo has no lenses and no roster rows -- run the specialists-init skill.',
+        '  [NOT-INSTALLED-HERE] 1 of 1 enabled plugin(s) have no install record for this path (specialists@davekjohns-workshop) -- a session here will not load them.',
+        'Summary: 0 error(s), 0 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Match 'has not been set up yet' $r.Out 'hook not-installed-bootstrap: the bootstrap verdict still leads'
+    Assert-Match '\[NOT-INSTALLED-HERE\]' $r.Out 'hook not-installed-bootstrap: the install fact travels with it'
+
+    # H10d. A correctly installed repo gains no line -- the guard against this marker becoming the noise it
+    #       was meant to prevent.
+    $stub = New-StubCheck -Name 'stub-installed-fine' -ExitCode 0 -OutputLines @(
+        '  [OK]    all present',
+        'Summary: 0 error(s), 0 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Match 'in sync' $r.Out 'hook installed-fine: the plain in-sync line is unchanged'
+    Assert-NotMatch 'NOT-INSTALLED' $r.Out 'hook installed-fine: no install marker'
+    Assert-NotMatch 'not installed for this path' $r.Out 'hook installed-fine: no install wording at all'
 
     # --- 11. Guardrail: a malformed plugin id in settings.json is rejected before filesystem access ---
     #     An uppercase/underscore plugin name fails the slug regex; the script must ERROR ("invalid
