@@ -120,6 +120,23 @@
          verb-specific -- nothing measured says a local-scoped install is ever what a reader wants --
          and without this case the widening quietly becomes global.
 
+    Check 12 (printed install-record queries name the disambiguating fields), scenarios 28-32, same
+    fixture. This is the gate for the CLASS behind round v8's three findings rather than any one of them:
+    the query every document points a reader at printed a green that under-determined the state.
+     28. The complete four-field query passes, and the coverage count proves it was examined.
+     29. Dropping `gitCommitSha` fails (the #313 field), anchored on the first line INSIDE the fence, and
+         the "does not name" clause lists only what is missing while the message still names the full
+         required set as context.
+     30. Dropping `projectPath` fails: without it the query reports records beyond this repo, the
+         `claude plugin list` mistake these same docs warn against -- so it is a required field, not part
+         of the discriminator. The message names the mistake it reproduces.
+     31. (THE DISCRIMINATOR) a fenced JSON snippet ILLUSTRATING the file is not a subject, even though it
+         names the same fields and lacks `gitCommitSha`. Without this case the check would forbid
+         documenting the file's own shape. It is counted as skipped and the skip is stated -- which is the
+         assertion that made the check report its skip count on the empty-scan branch too, since "saw
+         nothing" and "saw one block and did not judge it" are different states.
+     32. Prose naming the file outside any fence is never an instruction.
+
     Deliberately NOT added: a dedicated "two separate, fully valid spans in one file -> neither's own
     END is misreported as an orphan" scenario. Judgment call, not an oversight: scenario 1 (and 7, 11)
     already assert "no [skill-list] finding" for a normal, single complete span -- since the
@@ -760,6 +777,95 @@ try {
     Assert-Equal 1 $rL27.Code 'scenario 27: exit 1 -- local scope does not satisfy the rule for install'
     Assert-True ($rL27.Out -match [regex]::Escape('CONTRIBUTING.md:5') + ".*no '--scope project'") 'scenario 27: the finding names the file and the line'
     Assert-True (-not ($rL27.Out -match 'nor a link')) 'scenario 27: and NOT the refresh rule -- that one is satisfied above'
+
+    # --- check 12: a printed install-record query names the disambiguating fields ------------------
+    # The class behind all three findings of round v8 rather than any one of them. Ordered like check 11's
+    # block: the rule first, then the DISCRIMINATOR (an illustration must never be flagged), then the
+    # exclusion that keeps prose out.
+    $RecordQueryFindingPattern = "\[record-query\].*does not name"
+    # The complete query, as both real docs now print it. Reused across the cases below with one field
+    # removed at a time, so each case differs from the passing one in exactly one way.
+    $rqFull = @(
+        '```powershell'
+        '$root = (Get-Location).Path'
+        '(Get-Content "$env:USERPROFILE\.claude\plugins\installed_plugins.json" -Raw | ConvertFrom-Json).plugins.PSObject.Properties |'
+        '  ForEach-Object { $n = $_.Name; $_.Value | Where-Object { $_.projectPath -eq $root } |'
+        '    ForEach-Object { "$n -> $($_.scope) $($_.version) $($_.gitCommitSha)" } }'
+        '```'
+    )
+
+    # --- Scenario 28: the complete query passes, and WAS examined ------------------------------------
+    Write-Host 'check 12 -- a query naming all four fields reports nothing' -ForegroundColor Cyan
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), ((@('# Contributing', '') + $rqFull) -join "`n") + "`n", $Utf8NoBom)
+    $rQ28 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rQ28.Out -match $RecordQueryFindingPattern)) 'scenario 28: the complete query is accepted'
+    Assert-True ($rQ28.Out -match '\[record-query\] checked [1-9]') 'scenario 28: and it WAS examined -- the pass is not an empty scan'
+
+    # --- Scenario 29: a query without gitCommitSha fails (THE #313 CASE) ----------------------------
+    #     The field whose absence let a consumer run main while every documented way of asking said 3.0.8.
+    Write-Host 'check 12 -- a query without gitCommitSha fails (inbound #313)' -ForegroundColor Cyan
+    $rq29 = @($rqFull) -replace ' \$\(\$_\.gitCommitSha\)', ''
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), ((@('# Contributing', '') + $rq29) -join "`n") + "`n", $Utf8NoBom)
+    $rQ29 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-Equal 1 $rQ29.Code 'scenario 29: exit 1 -- a missing field is an error'
+    # Line 4, not 3: the fence delimiter sits on line 3, and the anchor is the first line INSIDE it --
+    # where the reader's eye has to go to fix the query.
+    Assert-True ($rQ29.Out -match [regex]::Escape('CONTRIBUTING.md:4') + ".*does not name 'gitCommitSha'") 'scenario 29: the finding names the file, the first line INSIDE the fence, and the missing field'
+    # The "does not name" clause lists ONLY what is missing. The message then goes on to name all four
+    # required fields as context, deliberately, so the assertion pins the clause rather than the whole line.
+    Assert-True ($rQ29.Out -match "does not name 'gitCommitSha'\.") 'scenario 29: the clause ends after the one missing field'
+    Assert-True (-not ($rQ29.Out -match "does not name 'scope'")) 'scenario 29: the fields that ARE present are not reported as missing'
+
+    # --- Scenario 30: a query without projectPath fails (the claude-plugin-list mistake) -----------
+    #     Required rather than assumed: without it the query reports records beyond this repo, which is
+    #     precisely the defect both documents spend a paragraph warning against. A doc printing that would
+    #     be reproducing the mistake it warns about.
+    Write-Host 'check 12 -- a query without projectPath fails (it would report other repos)' -ForegroundColor Cyan
+    $rq30 = @(
+        '```powershell'
+        '(Get-Content "$env:USERPROFILE\.claude\plugins\installed_plugins.json" -Raw | ConvertFrom-Json).plugins.PSObject.Properties |'
+        '  ForEach-Object { $n = $_.Name; $_.Value | ForEach-Object { "$n -> $($_.scope) $($_.version) $($_.gitCommitSha)" } }'
+        '```'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), ((@('# Contributing', '') + $rq30) -join "`n") + "`n", $Utf8NoBom)
+    $rQ30 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-Equal 1 $rQ30.Code 'scenario 30: exit 1'
+    Assert-True ($rQ30.Out -match "does not name 'projectPath'") 'scenario 30: the missing filter is the finding'
+    Assert-True ($rQ30.Out -match 'claude plugin list') 'scenario 30: and the message says WHY, by naming the mistake it reproduces'
+
+    # --- Scenario 31 (THE DISCRIMINATOR): a JSON illustration is not a subject ----------------------
+    #     It names the same fields and is not a command anyone reads a verdict off. Same mention-versus-use
+    #     question check 11 answers with its @-target, and the third time this repo has had to answer it.
+    #     Without this case the check would forbid documenting the file's own shape.
+    Write-Host 'check 12 -- a fenced JSON snippet illustrating the file is NOT flagged' -ForegroundColor Cyan
+    $rq31 = @(
+        '# Contributing'
+        ''
+        'A record in `installed_plugins.json` looks like this:'
+        ''
+        '```json'
+        '{ "plugins": { "specialists@davekjohns-workshop": ['
+        '  { "scope": "project", "version": "3.0.8", "projectPath": "C:\\repo" } ] } }'
+        '```'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($rq31 -join "`n") + "`n"), $Utf8NoBom)
+    $rQ31 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rQ31.Out -match $RecordQueryFindingPattern)) 'scenario 31: an illustration is not held to the query rule, even though it lacks gitCommitSha'
+    Assert-True ($rQ31.Out -match '\[record-query\] checked 0') 'scenario 31: and it is counted as skipped, not as enforced'
+    Assert-True ($rQ31.Out -match 'skipped as illustration') 'scenario 31: the skip is STATED -- an empty scan must not read as "the docs are right"'
+
+    # --- Scenario 32: a prose mention outside any fence is not a subject either ---------------------
+    Write-Host 'check 12 -- prose naming the file is not a subject' -ForegroundColor Cyan
+    $rq32 = @(
+        '# Contributing'
+        ''
+        'Your version is written down in `installed_plugins.json` and nowhere else; the install'
+        'success line names no version at all.'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($rq32 -join "`n") + "`n"), $Utf8NoBom)
+    $rQ32 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rQ32.Out -match $RecordQueryFindingPattern)) 'scenario 32: prose discussing the file is never an instruction'
+    Assert-True ($rQ32.Out -match '\[record-query\] checked 0') 'scenario 32: nothing enforced'
 
     # Leaves the fixture with a history-only mention again, which the coverage block below relies on.
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s24Contributing -join "`n") + "`n"), $Utf8NoBom)

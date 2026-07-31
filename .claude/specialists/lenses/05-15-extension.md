@@ -30,7 +30,18 @@ infrastructure.
   the marketplace refresh nearby. Both fail *silently* when missing, which is why three adoption
   rounds in a row found this same class and four doc fixes only ever closed the instances. History
   (`CHANGELOG.md`, `releases/**`, `RELEASE.md`, root entry files) is excluded permanently: it records
-  what was true then. This is the safety guard that
+  what was true then. Since #315 the scope rule is **verb-specific** — `uninstall` also accepts
+  `--scope local`, because that is the only command that removes a record a session start left at that
+  scope, and a gate demanding `project` there would have rejected the correct instruction and enforced the
+  assumption round v8 disproved. **Check 12 is check 11's sibling, the same idea one level up:** a fenced
+  block that reads `installed_plugins.json` *in code* must select `projectPath`, `scope`, `version` **and**
+  `gitCommitSha`. It came out of round v8, whose three findings (#313/#314/#315) read as unrelated and were
+  one class — the family's own verification query printed a green that could not distinguish the release
+  from `main` after it, one record from two, or `project` from `local`. Closing those three by hand would
+  have been the fourth round in a row to close *instances* of a class that kept coming back. Both checks
+  answer the same **mention vs. use** question with a positional discriminator (check 11 the `@`-target,
+  check 12 "does the block actually parse the file"), which makes this the third instance of that reasoning
+  in this file. This is the safety guard that
   [Derek #05](05-05-extension.md)'s `open-pr.ps1` runs before every push — and that `cut-release.ps1`
   runs before a release.
 - **`.github/workflows/ci.yml`** — the CI gate on GitHub: runs the same lint gate + all test suites
