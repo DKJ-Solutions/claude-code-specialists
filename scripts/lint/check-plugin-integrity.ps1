@@ -69,6 +69,18 @@
          was true then and is never rewritten. The unit is the enclosing inline-code span (a printed
          command wraps across lines), computed over check 10's fence-masked text so a ```-fence
          cannot throw off backtick pairing; inside a fence the unit is the physical line.
+     12. printed install-record queries: a fenced block that READS installed_plugins.json in code (names
+         the file and parses it) must select 'projectPath', 'scope', 'version' AND 'gitCommitSha'. This is
+         the class behind all three findings of adoption round v8 rather than any one of them: the query
+         every document points a reader at could not distinguish the release from main after it (#313),
+         one record from two (#315), or 'project' from 'local' (#314) -- so it printed a green that
+         under-determined the state it claimed to prove. projectPath is required rather than assumed: a
+         query without it reports records beyond this repo, which is the 'claude plugin list' mistake
+         these same docs warn against. A fenced JSON snippet illustrating the file's shape is NOT a
+         subject (it names the fields but is not a command anyone reads a verdict off) -- the same
+         mention-versus-use discriminator check 11 makes with its @-target. Shares check 11's scan set,
+         so history is excluded identically. Matching is case-insensitive, since PowerShell property
+         access is and a working query must not be reported as broken.
 
     Exit code: 0 = no errors. 1 = at least one error (usable as a gate in open-pr.ps1).
 .EXAMPLE
@@ -878,6 +890,85 @@ foreach ($lf in ($lifecycleFiles | Sort-Object -Unique)) {
 }
 Write-Coverage -Category 'lifecycle' -Checked $lcEnforced `
     -Note $(if ($lcEnforced -eq 0) { 'no printed lifecycle command with an @-target anywhere in the scan set -- nothing to enforce, which is not the same as the docs being right' } else { "$lcBare bare mention(s) skipped as discussion; history (CHANGELOG.md, releases/, RELEASE.md, entry files) excluded" })
+
+# --- Check 12: a printed install-record query must name the fields that disambiguate the state -----
+# THE CLASS, and why this is a gate rather than three doc fixes. Round v8 produced three findings that
+# read as unrelated and are one: the family's own verification query -- the thing every document points a
+# reader at to answer "what am I actually running?" -- printed a green that UNDER-DETERMINED the state it
+# claimed to prove. It could not distinguish
+#   - the release from `main` after it            (#313: `version` reads 3.0.8 on both; only gitCommitSha
+#                                                  differs, and that field was printed nowhere),
+#   - one record from two                         (#315: the prescribed repair install ADDS a record, and
+#                                                  the line count was the only signal),
+#   - `project` from `local`                      (#314: which is what a session start leaves behind).
+# Three instances closed by three doc edits would have been the fourth adoption round in a row to close
+# instances of a class that came back. This closes the half a regex can decide: whether the query a doc
+# PRINTS still selects every field a reader needs to tell those states apart. Sibling of check 11 in
+# footing and in shape -- both hold a copied instruction to what was measured rather than to itself -- and
+# it shares check 11's scan set, so history is excluded here for the same reason.
+#
+# THE DISCRIMINATOR: the block must READ the administration IN CODE (it names installed_plugins.json and
+# parses it). That is what separates an instruction someone copies from a doc merely discussing the file --
+# the same mention-versus-use question check 11 answers with the @-target, and the third time this repo has
+# had to answer it (see the MENTION vs USE rule in Sylvester's lens). A JSON snippet ILLUSTRATING a record
+# is therefore out of scope even though it names the same fields: it teaches the file's shape, it is not a
+# command whose output someone reads a verdict off.
+#
+# projectPath IS ONE OF THE REQUIRED FIELDS, not part of the discriminator, and that is deliberate: a query
+# that reads the administration WITHOUT filtering on projectPath is exactly the `claude plugin list` mistake
+# both documents spend a paragraph warning about -- it reports records beyond this repo and so cannot carry
+# a verdict about this one. A doc printing that would be reproducing the very defect it warns against.
+#
+# Matching is case-INSENSITIVE on purpose. The reader copies these to run them, and PowerShell property
+# access is case-insensitive, so `$_.Version` is as correct as `$_.version`; demanding the JSON file's exact
+# casing would report a working query as broken. Erring this way can only miss a miscased field, never
+# invent a finding -- the same direction check 11 and Get-RecordShape both chose.
+$irRequiredFields = @('projectPath', 'scope', 'version', 'gitCommitSha')
+
+$irChecked = 0
+$irMentions = 0
+foreach ($lf in ($lifecycleFiles | Sort-Object -Unique)) {
+    $rel = $lf.Substring($RepoRoot.Length).TrimStart('\', '/')
+    $content = [System.IO.File]::ReadAllText($lf, [System.Text.Encoding]::UTF8)
+    $irLines = $content -split "`r?`n"
+    # Fenced blocks, walked with the SHARED fence-toggle primitive (Test-FenceDelimiterLine) that
+    # Get-HeadingSlugs and Get-FenceMaskedText already use -- one fence notion in this file, not a third
+    # hand-rolled one. The mask itself is no use here: it replaces a fence's contents with whitespace, and
+    # this check needs exactly those contents.
+    $inFence = $false
+    $blockBody = @()
+    $blockLine = 0
+    for ($i = 0; $i -lt $irLines.Count; $i++) {
+        if (Test-FenceDelimiterLine -Line $irLines[$i]) {
+            if (-not $inFence) {
+                $inFence = $true
+                $blockBody = @()
+                $blockLine = $i + 2   # 1-based line of the first line INSIDE the fence
+            } else {
+                $inFence = $false
+                $body = ($blockBody -join "`n")
+                if ($body -match 'installed_plugins\.json' -and $body -match 'ConvertFrom-Json') {
+                    $irChecked++
+                    $missing = @($irRequiredFields | Where-Object { $body -notmatch [regex]::Escape($_) })
+                    if ($missing.Count -gt 0) {
+                        Add-Error "[record-query] ${rel}:${blockLine}: a printed query that reads installed_plugins.json does not name $(($missing | ForEach-Object { "'$_'" }) -join ', '). A reader runs this to answer 'what am I actually running?', and without every one of $(($irRequiredFields | ForEach-Object { "'$_'" }) -join ', ') the output cannot carry that verdict: 'version' cannot tell the release from main after it (inbound #313), the record COUNT is the only signal of the stray second record a repair install leaves (#315), 'scope' is what a session start silently flips to 'local' (#314), and without 'projectPath' the query reports records beyond this repo -- the 'claude plugin list' mistake these same docs warn about. Add the field, or move the snippet out of a fenced code block if it is illustrating the file's shape rather than telling a reader to run it."
+                    }
+                } elseif ($body -match 'installed_plugins\.json') {
+                    $irMentions++
+                }
+            }
+            continue
+        }
+        if ($inFence) { $blockBody += $irLines[$i] }
+    }
+}
+# The skip count belongs in BOTH branches, which the test suite established rather than the design: an
+# empty scan that had skipped an illustration reads identically to one that saw nothing about the file at
+# all, and those are different states. "Nothing to enforce" plus "and one block was deliberately not
+# judged" is the honest pair -- the same reasoning as the [COVERAGE] rule itself (issue #221).
+$irSkipNote = "$irMentions fenced block(s) naming the file without parsing it skipped as illustration"
+Write-Coverage -Category 'record-query' -Checked $irChecked `
+    -Note $(if ($irChecked -eq 0) { "no printed query reads installed_plugins.json anywhere in the scan set -- nothing to enforce, which is not the same as the docs being right ($irSkipNote)" } else { "$irSkipNote; history excluded as in check 11" })
 
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {
