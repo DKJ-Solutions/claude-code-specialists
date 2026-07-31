@@ -287,10 +287,23 @@ if (Test-Path -LiteralPath $claudeMd -PathType Leaf) {
     # head and read healthy throughout. Test-IsOrchestratorNoteLine (check-report-lib.ps1) now matches
     # the whole block and is the single source shared with the bootstrap's own tidy guard, because a
     # literal mirrored by hand in two scripts is what produced both instances.
-    $noteHits = @($lines | Where-Object { Test-IsOrchestratorNoteLine -Line $_ })
-    foreach ($n in $noteHits) {
-        Write-Host "  [remove] CLAUDE.md: the bootstrap's orchestrator note line" -ForegroundColor Green
-        $removed += "CLAUDE.md: bootstrap orchestrator note line"
+    #
+    # AND THE REPORT NAMES WHICH LINE (inbound #286, test round v5). Removing per line is right -- both
+    # lines must go -- but printing the same sentence twice told a reader nothing about which half of the
+    # block was meant, and made a HEALTHY repo print "2" for a check the doc frames as the series
+    # 1 -> 2 -> 3. So the loudest reading of a clean run was the accumulation defect itself. The audit
+    # below already names file:line for this exact reason (the choice is per line, not per file); this
+    # follows its format. head/tail comes from the shared source rather than a re-typed literal, because
+    # re-typing that literal is what produced both instances of the accumulation bug.
+    $noteSrc  = Get-OrchestratorNote
+    $noteHits = @()
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if (-not (Test-IsOrchestratorNoteLine -Line $lines[$i])) { continue }
+        $part  = if ($lines[$i].Trim() -eq $noteSrc.Head) { 'head' } else { 'tail' }
+        $label = "CLAUDE.md:$($i + 1) -- the bootstrap's orchestrator note ($part)"
+        $noteHits += $lines[$i]
+        Write-Host ("  [remove] " + $label) -ForegroundColor Green
+        $removed += $label
     }
 
     $hits = @($lines | Where-Object { & $isSpecialistImport $_ })
