@@ -1,9 +1,9 @@
-# Release v3.0.6
+# Release v3.0.7
 
 **Date:** 2026-07-31  
 **Type:** Patch
 
-the enable state is read from the whole settings chain, and three claims are corrected to what was measured
+the checks read the install record, and three adoption claims match the measurement
 
 You are on this release.
 
@@ -11,5 +11,5 @@ No changes to this plugin in this release — see the full notes.
 
 ---
 
-Full workshop notes: [releases/development/3.x/3.0.6.md](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/releases/development/3.x/3.0.6.md)
+Full workshop notes: [releases/development/3.x/3.0.7.md](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/releases/development/3.x/3.0.7.md)
 Cumulative plugin history: [CHANGELOG.md](CHANGELOG.md)

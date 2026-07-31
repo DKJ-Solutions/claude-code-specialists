@@ -2,7 +2,7 @@
   "name": "specialists-ecomm",
   "displayName": "Claude Specialists — E-commerce domain",
   "description": "Domain plugin for commercial webshop repos (any platform): the SEO specialist Sergio, the CRO specialist Craig, and the performance/SEA specialist Sean, with room to grow into the wider e-commerce craft (lifecycle/email, analytics). Deliberately NOT repo-neutral — only a commercial webshop repo enables this plugin. The governance layer (CLAUDE.md + repo lenses) and the shared core (plugin 'specialists') stay separate.",
-  "version": "3.0.6",
+  "version": "3.0.7",
   "author": { "name": "DaveKJohn" },
   "keywords": ["specialists", "workflow", "claude-code", "ecommerce", "seo", "cro", "sea", "webshop"]
 }
