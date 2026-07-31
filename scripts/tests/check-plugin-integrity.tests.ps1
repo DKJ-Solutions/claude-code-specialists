@@ -84,7 +84,7 @@
      15. An END inside a code fence is invisible too, exactly like a fenced BEGIN (scenarios 9/10) --
          proves the masking is symmetric for both sentinels.
 
-    Check 11 (printed lifecycle commands carry their flags), scenarios 17-24, same CONTRIBUTING.md
+    Check 11 (printed lifecycle commands carry their flags), scenarios 17-27, same CONTRIBUTING.md
     fixture. The class these guard is the one three adoption rounds in a row kept producing: a doc
     place printing a command that no longer holds, failing silently when copied.
      17. A complete block (refresh, then install with --scope project) reports nothing -- and the
@@ -109,6 +109,16 @@
          excluded and not even counted. The real repo proves the need -- specialists/CHANGELOG.md
          prints a targeted install with no scope flag, correctly, because that is what the release it
          describes actually said.
+     25. Two commands with the SAME verb in one span are judged on their own arguments, and only the
+         incomplete one is reported. Victor's review finding on this check's own code: the tail used to
+         be taken from IndexOf($verb), so the second command borrowed the first one's flag.
+     26. `uninstall --scope local` PASSES. Round v8 (inbound #314/#315) measured that a session start
+         can leave a record at `scope=local` and that `--scope project` refuses to remove one, so this
+         is the only command that does the job; a gate demanding `project` would reject the correct
+         instruction and enforce the assumption that round disproved.
+     27. The guard that must ship with 26: `install --scope local` still FAILS. The exception is
+         verb-specific -- nothing measured says a local-scoped install is ever what a reader wants --
+         and without this case the widening quietly becomes global.
 
     Deliberately NOT added: a dedicated "two separate, fully valid spans in one file -> neither's own
     END is misreported as an orphan" scenario. Judgment call, not an oversight: scenario 1 (and 7, 11)
@@ -715,6 +725,41 @@ try {
     $rL25 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True ($rL25.Out -match [regex]::Escape('CONTRIBUTING.md:5') + ".*no '--scope project'") 'scenario 25: the second, scopeless install IS reported'
     Assert-Equal 1 (@([regex]::Matches($rL25.Out, "no '--scope project'")).Count) 'scenario 25: and exactly once -- the first command is complete and must not be flagged too'
+
+    # --- Scenario 26: `uninstall --scope local` passes -- the verb-specific exception ----------------
+    #     Round v8 (inbound #314/#315) measured that a SESSION START can leave a record at
+    #     `scope=local`, and that `claude plugin uninstall ... --scope project` refuses to remove one
+    #     ("installed in local scope, not project"). So `--scope local` is the only command that does the
+    #     job, and a gate demanding `project` here would reject the correct instruction -- enforcing the
+    #     very assumption that round disproved. This is the case that keeps that fix documentable.
+    Write-Host 'check 11 -- uninstall at --scope local passes (the state a session start leaves)' -ForegroundColor Cyan
+    $s26Lines = @(
+        '# Contributing'
+        ''
+        'Remove a record a session start left behind with'
+        '`claude plugin uninstall specialists@davekjohns-workshop --scope local`, then re-install.'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s26Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rL26 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rL26.Out -match $LifecycleFindingPattern)) 'scenario 26: a local-scoped uninstall is accepted'
+    Assert-True ($rL26.Out -match '\[lifecycle\] checked [1-9]') 'scenario 26: and it WAS examined -- the pass is not an empty scan'
+
+    # --- Scenario 27: the exception is verb-specific -- `install --scope local` still fails ----------
+    #     The guard case that must ship with scenario 26, or the widening quietly becomes global. Nothing
+    #     measured says a `local` INSTALL is ever what a reader wants; only the removal needs it.
+    Write-Host 'check 11 -- install at --scope local is still an error (the exception is uninstall-only)' -ForegroundColor Cyan
+    $s27Lines = @(
+        '# Contributing'
+        ''
+        'Refresh with `claude plugin marketplace update davekjohns-workshop` first.'
+        ''
+        'Then run `claude plugin install specialists@davekjohns-workshop --scope local` from the root.'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s27Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rL27 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-Equal 1 $rL27.Code 'scenario 27: exit 1 -- local scope does not satisfy the rule for install'
+    Assert-True ($rL27.Out -match [regex]::Escape('CONTRIBUTING.md:5') + ".*no '--scope project'") 'scenario 27: the finding names the file and the line'
+    Assert-True (-not ($rL27.Out -match 'nor a link')) 'scenario 27: and NOT the refresh rule -- that one is satisfied above'
 
     # Leaves the fixture with a history-only mention again, which the coverage block below relies on.
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s24Contributing -join "`n") + "`n"), $Utf8NoBom)

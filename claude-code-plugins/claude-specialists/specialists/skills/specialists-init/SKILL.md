@@ -212,10 +212,31 @@ $root = (Get-Location).Path
     ForEach-Object { "$n -> $($_.scope) $($_.version)" } }
 ```
 
-One line per plugin you enabled, each saying `project`, is the green you need. **Empty output means
-this repo has no install** — go back to step 0b. A plugin that shows up as `user` is the scopeless
-install from 0b's warning; it works machine-wide but is not the model the rest of these documents
-assume.
+**One** line per plugin you enabled, each saying `project`, is the green you need — and the *count*
+carries as much of the verdict as the word does. **Empty output means this repo has no install** — go
+back to step 0b.
+
+**Two lines for the same plugin is the stray second record this step warns about just above, and it is
+not hypothetical: the repair install prescribed for a missing record produces it.** Measured in
+`DaveKJohn/life-hub` on July 31, 2026, CLI `2.1.220` (inbound
+[#315](https://github.com/DaveKJohn/davekjohns-workshop/issues/315)): a project-scoped install run
+against a path that already had a record **added a second record beside it** rather than correcting the
+first, and both reported `✔ Successfully installed`. So the state this step calls green can be broken by
+the remedy this document prescribes, and the line count is the only thing that shows it.
+
+Three scopes can turn up in that output, and the third one is not in the CLI's flag list:
+
+- **`project`** — what you want: this repo's own record, keyed by `projectPath`.
+- **`user`** — the scopeless install from 0b's warning. It works machine-wide, but it is not the model
+  the rest of these documents assume.
+- **`local`** — **written by a session start, not by you.** Enabling a plugin is enough: a session start
+  creates a missing record itself, and flips an existing `project` record to `local`, with no command run
+  and nothing announcing it (inbound
+  [#314](https://github.com/DaveKJohn/davekjohns-workshop/issues/314)). It changes what the green above
+  means without changing a single file in your repo. Remove such a record with `claude plugin uninstall
+  <plugin>@<marketplace> --scope local` — at `--scope project` the same command refuses with *"Plugin
+  … is installed in local scope, not project"*, which is easy to misread as "not installed" — and then
+  re-install at project scope from this repo's root, refresh first, per step 0b.
 
 Then confirm the session actually loaded it: after the restart the `specialists-init` skill is in
 your slash list and the session-start hooks have reported. Once both checks are green, invoke this

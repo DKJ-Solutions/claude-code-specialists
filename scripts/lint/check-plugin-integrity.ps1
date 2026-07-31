@@ -56,7 +56,9 @@
          doc with zero spans passes without warning.
      11. printed lifecycle commands: every 'claude plugin install|update|uninstall' that carries an
          @-target (i.e. is an instruction someone RUNS, not prose discussing the command) must carry
-         '--scope project', and install/update must have 'claude plugin marketplace update' or a link
+         '--scope project' -- or, for 'uninstall' only, '--scope local' (inbound #315: that is the only
+         command that removes a record a session start left at local scope). install/update must have
+         'claude plugin marketplace update' or a link
          to 'staying-up-to-date' within 12 lines above or 6 below. Both flags fail SILENTLY when
          missing -- a scopeless install writes a machine-wide record and reports success (#274/#279),
          a stale cache serves the previous version and reports success (#282/#284) -- which is why
@@ -785,10 +787,22 @@ if ($skillSpanCount -eq 0) {
 # refresh in the sentence just below the block still passes. Whether the refresh is described BEFORE the
 # install in reading order is a judgement about prose, not something this regex should pretend to make;
 # the check guarantees the step is named in the same instruction context, and a reviewer judges the rest.
+# THE SCOPE RULE IS VERB-SPECIFIC, and `uninstall` is the exception rather than a loophole in it. For
+# `install`/`update`, `project` is the only correct value and the rule rests on a measured silent failure
+# (#274/#279). For `uninstall` it does not: a record sitting at `scope=local` is what a SESSION START
+# leaves behind -- enabling a plugin is enough for one to create a record, and to flip an existing
+# `project` record to `local`, with no command run (inbound #314) -- and `claude plugin uninstall ...
+# --scope project` REFUSES to remove such a record ("Plugin ... is installed in local scope, not
+# project", inbound #315). Demanding `project` on every printed uninstall would therefore make this gate
+# reject the only command that does the job, i.e. it would enforce the very assumption round v8 disproved:
+# that `project` is the only scope a consumer can be in. So `uninstall` accepts `project` OR `local`, and
+# the other two verbs keep the stricter rule. Widening this to install/update would be wrong: nothing
+# measured says a `local` install is ever what a reader wants.
 $lcCmdRegex     = [regex]'claude\s+plugin\s+(?<verb>install|update|uninstall)\b'
 $lcTargetRegex  = [regex]'(?:<plugin>@<marketplace>|[A-Za-z0-9_.\-]+@[A-Za-z0-9_.\-]+)'
 $lcSpanRegex    = [regex]'(?s)`[^`]+`'
 $lcScopeRegex   = [regex]'--scope\s+project'
+$lcScopeUninstallRegex = [regex]'--scope\s+(?:project|local)'
 $lcRefreshRegex = [regex]'claude\s+plugin\s+marketplace\s+update|staying-up-to-date'
 
 $lifecycleFiles = @($linkFiles | Where-Object {
@@ -852,8 +866,10 @@ foreach ($lf in ($lifecycleFiles | Sort-Object -Unique)) {
         $lcEnforced++
         $lineNo = 1 + [regex]::Matches($content.Substring(0, $m.Index), "`n").Count
         $verb = $m.Groups['verb'].Value
-        if (-not $lcScopeRegex.IsMatch($cmdArgs)) {
-            Add-Error "[lifecycle] ${rel}:${lineNo}: printed 'claude plugin $verb' with an @-target but no '--scope project'. All three default to --scope user, which writes a machine-wide record with no projectPath and reports success (inbound #274/#279). Add the flag, or drop the @-target if this line is discussing the command rather than telling a reader to run it."
+        $scopeOk = if ($verb -eq 'uninstall') { $lcScopeUninstallRegex.IsMatch($cmdArgs) } else { $lcScopeRegex.IsMatch($cmdArgs) }
+        if (-not $scopeOk) {
+            $wanted = if ($verb -eq 'uninstall') { "'--scope project' (or '--scope local', the only way to remove a record a session start left at local scope -- inbound #314/#315)" } else { "'--scope project'" }
+            Add-Error "[lifecycle] ${rel}:${lineNo}: printed 'claude plugin $verb' with an @-target but no $wanted. All three default to --scope user, which writes a machine-wide record with no projectPath and reports success (inbound #274/#279). Add the flag, or drop the @-target if this line is discussing the command rather than telling a reader to run it."
         }
         if ($verb -ne 'uninstall' -and -not $lcRefreshRegex.IsMatch(($lcLines[[Math]::Max(0, $lineNo - 13)..[Math]::Min($lcLines.Count - 1, $lineNo + 5)] -join "`n"))) {
             Add-Error "[lifecycle] ${rel}:${lineNo}: printed 'claude plugin $verb' with an @-target, but neither 'claude plugin marketplace update' nor a link to 'staying-up-to-date' appears within 12 lines above or 6 below. The marketplace is a cached clone and a stale one reports success with a plausible version number, so the refresh belongs next to a printed install/update. Measured for 'install' on 2026-07-30 (it served the previous version); a bare 'update' refreshed the clone for itself on 2026-07-31, so for that verb this is prudence rather than a measured failure. Quoting a command as the SUBJECT of prose rather than as an instruction? Elide the target as '...', the repo's convention."
