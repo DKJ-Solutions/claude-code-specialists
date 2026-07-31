@@ -196,8 +196,9 @@ infrastructure.
   One produced a false pass, this one a false failure — so the rule is not "distrust green" or
   "distrust red" but: before believing either verdict, confirm the check was observed from the same
   place its real consumer observes it. Both instances happened on July 29, 2026, within one session.
-- **The non-counting marker is a standing pattern now, not a series of exceptions.** Four instances:
-  `[ORPHANS]` (inbound #204), `[UNREGISTERED]` (#208), `[INVENTORY]` (#220) and `[BOOTSTRAP]` (#225).
+- **The non-counting marker is a standing pattern now, not a series of exceptions.** Five instances:
+  `[ORPHANS]` (inbound #204), `[UNREGISTERED]` (#208), `[INVENTORY]` (#220), `[BOOTSTRAP]` (#225) and
+  `[RECORD-SHAPE]` (#314/#315 — reached for rather than invented, which is this bullet working as intended).
   Each solves the same problem — a finding that is **real, actionable, and about the repo the session is
   in**, but that would be wrong as an `[ERROR]` because nothing is broken and a red line plus exit 1
   would be a lie. Each is also the answer to a specific failure: an `[INFO]` the session hook suppresses

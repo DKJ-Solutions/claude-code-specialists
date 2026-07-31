@@ -27,6 +27,12 @@
         along with the drift and bootstrap branches, whose headlines would otherwise describe a
         specialist surface no session in this repo has. Its per-plugin [INFO] lines stay out, as with
         orphans;
+      - and for [RECORD-SHAPE] (inbound #314/#315), which is the marker that catches what a session start
+        leaves BEHIND rather than what it removed: a record scoped 'local' instead of 'project', or two
+        records where the documents assume one. It gets its own verdict and rides along with the drift,
+        bootstrap and not-installed branches. That verdict is the point of it -- on a clean run the state
+        would otherwise arrive as "roster in sync", which is true about the roster and the most misleading
+        thing this hook could say to that reader;
       - the check's [SCOPE] line travels along with those signals, so a surfaced finding always names
         the repo the check resolved -- and whether that root came from CLAUDE_PROJECT_DIR or from the
         working-directory git-root fallback (inbound #203);
@@ -131,11 +137,27 @@ try {
     # on its own it is a third verdict, and alongside real [ERROR] lines it is the qualification without
     # which the drift headline overstates what was found.
     #
-    # Its blind spot, stated rather than glossed: when NO plugin is installed for this path, this hook
-    # does not run at all, because the hook itself ships in the plugin. It covers the partial case (one of
-    # several plugins lost its record) and a deliberate run; the total case is covered from the workshop
-    # by check-connectors, which can still speak about a consumer that has gone silent.
+    # Its blind spot was stated here rather than glossed -- and ROUND v8 MEASURED IT WIDER THAN WRITTEN,
+    # so the correction belongs in the same place the claim did (inbound #314). What this comment said: the
+    # total case (no plugin installed for this path) cannot be reported, because the hook ships in the
+    # plugin, but the PARTIAL case (one of several plugins lost its record) is covered here. Measured in
+    # life-hub on 2026-07-31 with exactly that partial fixture -- three plugins enabled, one with no record
+    # anywhere on the machine -- the hook printed no [NOT-INSTALLED-HERE] line on any branch. The reason is
+    # not a bug in the predicate, which is right: the SESSION START WRITES THE RECORD ITSELF before any hook
+    # can look, with a fresh installedAt, so the state had already healed. So this marker is reachable only
+    # by a DELIBERATE run, in a repo where a record went missing and no session has started since -- a much
+    # narrower window than "the partial case is covered". The state that actually survives a session start
+    # is a record of the wrong SHAPE, which is what [RECORD-SHAPE] below reports; the total case is still
+    # covered from the workshop by check-connectors, which can speak about a consumer that has gone silent.
     $notInstalledLines = @($out | Where-Object { $_ -cmatch '\[NOT-INSTALLED-HERE\]' })
+
+    # [RECORD-SHAPE] rides along the same way (inbound #314/#315), and it exists because of the measurement
+    # in the comment just above: what a session start leaves behind is not "no record" but a record scoped
+    # 'local' instead of 'project' -- and, after the prescribed repair install, sometimes two records where
+    # the documents assume one. Both are real, both are actionable, the plugin loads either way, and until
+    # v8 nothing reported either. Kept out of $signals for the same reason as the other four markers: an
+    # exit code and a red line would claim something is broken when nothing is.
+    $recordShapeLines = @($out | Where-Object { $_ -cmatch '\[RECORD-SHAPE\]' })
 
     # Did the child run to completion? Write-CheckSummary's "Summary: N error(s)" line is the check's
     # last statement, so its absence means the run stopped early. The exit code cannot tell us on its
@@ -160,6 +182,10 @@ try {
         # the roster, about a plugin no session in this repo loads. The finding is real and the roster
         # genuinely lags -- but the reader's first move should be the install, not the roster.
         foreach ($line in $notInstalledLines) { Write-Host "  $($line.Trim())" }
+        # And one state further over again: the record exists but is shaped wrong. Rides along here for the
+        # same reason as the line above -- a reader whose plugin is administered at 'local' scope should see
+        # that alongside the drift, not instead of it, and never only on a deliberate run.
+        foreach ($line in $recordShapeLines) { Write-Host "  $($line.Trim())" }
         if (-not $completed -or $code -ne 1) {
             Write-Host "  (note: the check did not run to completion (exit $code) -- the list above may be partial.)"
         }
@@ -178,6 +204,9 @@ try {
         # place lenses for a surface that still will not load. Both facts, in the order they must be acted
         # on.
         foreach ($line in $notInstalledLines) { Write-Host "  $($line.Trim())" }
+        # Same order-of-operations argument: bootstrapping a repo whose record is administered at the wrong
+        # scope is not wrong, but the reader should know both facts before starting.
+        foreach ($line in $recordShapeLines) { Write-Host "  $($line.Trim())" }
     } elseif ($nothingEnabledLines.Count -gt 0) {
         # Deliberately worded as what the check DID, not as a verdict about the repo: the honest answer
         # is that nothing was compared. A reader who did expect a plugin here now has the one fact that
@@ -190,6 +219,16 @@ try {
         # reader needs first is that a plugin they enabled is not loading here.
         Write-Host 'roster-sessioncheck: a plugin is enabled for this repo but not installed for this path:'
         foreach ($line in $notInstalledLines) { Write-Host "  $($line.Trim())" }
+        foreach ($line in $recordShapeLines) { Write-Host "  $($line.Trim())" }
+    } elseif ($recordShapeLines.Count -gt 0) {
+        # Its own verdict, and this is the branch the marker exists for. On an exit-0 run with no drift it
+        # would otherwise fall through to 'roster in sync with the enabled plugins' -- literally true, since
+        # no specialist is missing, and for this reader the single most misleading thing the hook could say:
+        # the one state nothing else on the machine reports would arrive dressed as a clean bill of health.
+        # Same argument that gave [BOOTSTRAP] its own line, and the reason the pattern's recipe insists on
+        # one rather than folding a new marker under an existing verdict.
+        Write-Host 'roster-sessioncheck: the plugin is installed here, but its record is not the shape the docs assume:'
+        foreach ($line in $recordShapeLines) { Write-Host "  $($line.Trim())" }
     } elseif ($code -eq 0) {
         Write-Host 'roster-sessioncheck: roster in sync with the enabled plugins.'
         # The in-sync line is literally true -- no specialist is missing -- but an orphan left behind is

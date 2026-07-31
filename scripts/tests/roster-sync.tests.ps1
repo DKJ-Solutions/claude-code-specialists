@@ -103,8 +103,15 @@ function Invoke-Ps {
 # $env:USERPROFILE at (inbound #302). -Records: @{ 'specialists@davekjohns-workshop' = '<projectPath>' };
 # pass an empty string as the value for a record carrying NO projectPath (the user-scope shape, which
 # covers every repo).
+#
+# -Scoped covers the shapes round v8 measured (inbound #314/#315), which -Records cannot express because
+# it hardcodes one 'project' record per id: @{ '<id>' = @(@{ Scope='local'; Path=$c }, ...) } writes one
+# record per entry, in order, so a caller can build a 'local'-only record (what a session start leaves) or
+# two records for one path (what the repair install leaves). Kept as a separate parameter rather than by
+# generalising -Records: every existing caller means "one normal project record", and rewriting them all
+# to say so would put the fixture's simplest case at the mercy of a typo in the noisiest one.
 function New-FixtureAdmin {
-    param([hashtable]$Records = @{}, [string]$Name = 'admin-profile')
+    param([hashtable]$Records = @{}, [hashtable]$Scoped = @{}, [string]$Name = 'admin-profile')
     $profileDir = Join-Path $Fixture $Name
     $pluginsDir = Join-Path $profileDir '.claude\plugins'
     if (Test-Path -LiteralPath $profileDir) { Remove-Item -Recurse -Force -LiteralPath $profileDir }
@@ -115,6 +122,16 @@ function New-FixtureAdmin {
         $rec = if ($p) { '{ "scope": "project", "version": "9.9.9", "projectPath": ' + (ConvertTo-Json $p) + ' }' }
                else     { '{ "scope": "user", "version": "9.9.9" }' }
         $blocks += (ConvertTo-Json $id) + ': [' + $rec + ']'
+    }
+    foreach ($id in $Scoped.Keys) {
+        $recs = @()
+        foreach ($spec in @($Scoped[$id])) {
+            $fields = @('"version": "9.9.9"')
+            if ($spec.ContainsKey('Scope') -and $spec['Scope']) { $fields += '"scope": ' + (ConvertTo-Json $spec['Scope']) }
+            if ($spec.ContainsKey('Path')  -and $spec['Path'])  { $fields += '"projectPath": ' + (ConvertTo-Json $spec['Path']) }
+            $recs += '{ ' + ($fields -join ', ') + ' }'
+        }
+        $blocks += (ConvertTo-Json $id) + ': [' + ($recs -join ', ') + ']'
     }
     $json = '{ "version": 2, "plugins": { ' + ($blocks -join ', ') + ' } }'
     [System.IO.File]::WriteAllText((Join-Path $pluginsDir 'installed_plugins.json'), $json)
@@ -768,6 +785,66 @@ try {
     Assert-Match 'no roster row' $r.Out 'drift + not installed: the drift finding is still reported'
     Assert-Match '\[NOT-INSTALLED-HERE\]' $r.Out 'drift + not installed: the marker qualifies that report'
 
+    # --- 11g-11l. [RECORD-SHAPE]: installed here, but not the shape the docs assume (#314/#315) -----
+    #     The state [NOT-INSTALLED-HERE] cannot catch. Round v8 measured that a SESSION START writes the
+    #     missing record itself -- so that marker heals out of existence before any hook can look -- while
+    #     what survives is a record scoped 'local' instead of 'project', or two records where one is
+    #     assumed. Neither was reported by anything on the machine.
+    Write-Host "11g. a 'local'-scoped record fires [RECORD-SHAPE], not [NOT-INSTALLED-HERE]" -ForegroundColor Cyan
+    $c = New-FixtureConsumer -RosterIds @('06-16') -SeamLensIds @('06-16')
+    $adminProfile = New-FixtureAdmin -Scoped @{ $PluginId = @(@{ Scope = 'local'; Path = $c }) } -Name 'admin-local'
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache) -UserProfile $adminProfile
+    Assert-Match '\[RECORD-SHAPE\]' $r.Out "local scope: the marker fires"
+    Assert-Match "1 of 1 enabled plugin\(s\) have an install record for this path that is not the assumed shape" $r.Out 'local scope: the roll-up counts what it stands for'
+    Assert-Match "none 'project'" $r.Out 'local scope: the detail line names WHY the shape is wrong'
+    Assert-Match 'SESSION START' $r.Out 'local scope: and names what produces it, which is the fact a reader cannot look up anywhere else'
+    # The discriminator between the two markers. A record for this path exists, so "not installed here" is
+    # simply false -- and if both fired, the reader would be told to run an install that would make it worse
+    # (that install is exactly what leaves the duplicate of #315).
+    Assert-NotMatch '\[NOT-INSTALLED-HERE\]' $r.Out 'local scope: the OTHER marker stays silent -- a record does exist for this path'
+    # Non-counting, same as its four siblings: the plugin loads from a local record just as well.
+    Assert-Equal 0 $r.Code 'local scope: exit 0 -- the marker is NOT an error'
+    Assert-Match 'Summary: 0 error\(s\), 0 info signal\(s\)' $r.Out 'local scope: neither the roll-up nor its detail line counts'
+
+    Write-Host "11h. two records for one path fire the duplicate shape (#315)" -ForegroundColor Cyan
+    $adminProfile = New-FixtureAdmin -Scoped @{ $PluginId = @(@{ Scope = 'project'; Path = $c }, @{ Scope = 'local'; Path = $c }) } -Name 'admin-dup'
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache) -UserProfile $adminProfile
+    Assert-Match '\[RECORD-SHAPE\]' $r.Out 'duplicate: the marker fires'
+    Assert-Match 'has 2 records for this path' $r.Out 'duplicate: the detail line names the count, which is the whole signal step 0c teaches'
+    Assert-Match 'stray second record' $r.Out 'duplicate: and ties it to the doc that already warned about it'
+    # A 'project' record IS present here, so the no-project-scope half must NOT also fire: the two shapes
+    # are distinct states with different remedies, and reporting both would misdescribe this one.
+    Assert-NotMatch "none 'project'" $r.Out 'duplicate: the no-project-scope half does not also fire -- a project record is present'
+    Assert-Equal 0 $r.Code 'duplicate: exit 0'
+
+    Write-Host "11i. one project record: completely silent (the cry-wolf guard)" -ForegroundColor Cyan
+    $adminProfile = New-FixtureAdmin -Scoped @{ $PluginId = @(@{ Scope = 'project'; Path = $c }) } -Name 'admin-shape-ok'
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache) -UserProfile $adminProfile
+    Assert-NotMatch '\[RECORD-SHAPE\]' $r.Out 'one project record: no marker -- the assumed shape is silent'
+    Assert-Match 'Summary: 0 error\(s\), 0 info signal\(s\)' $r.Out 'one project record: clean'
+
+    Write-Host "11j. a pathless (user-scope) record does not fire it either" -ForegroundColor Cyan
+    #      0b's documented warning, and [NOT-INSTALLED-HERE]'s permissive case -- not this marker's subject.
+    #      Asserted because the opposite is the easy mistake: 'user' is also "not project".
+    $adminProfile = New-FixtureAdmin -Records @{ $PluginId = '' } -Name 'admin-shape-userwide'
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache) -UserProfile $adminProfile
+    Assert-NotMatch '\[RECORD-SHAPE\]' $r.Out 'pathless record: not this marker -- it judges only records scoped to THIS path'
+
+    Write-Host "11k. a record for another path does not fire it (that is the other marker's state)" -ForegroundColor Cyan
+    $adminProfile = New-FixtureAdmin -Scoped @{ $PluginId = @(@{ Scope = 'local'; Path = $elsewhere }) } -Name 'admin-shape-elsewhere'
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache) -UserProfile $adminProfile
+    Assert-Match '\[NOT-INSTALLED-HERE\]' $r.Out "another path at local scope: still the not-installed marker"
+    Assert-NotMatch '\[RECORD-SHAPE\]' $r.Out 'another path at local scope: and NOT this one -- a record elsewhere says nothing about this path'
+
+    Write-Host "11l. a record with no 'scope' field at all is not read as a mismatch" -ForegroundColor Cyan
+    #      The direction-of-error guard, matching Test-PluginInstalledHere's: an unstated scope is a gap in
+    #      the administration, not a statement that the scope is wrong. The predicate may suppress a marker,
+    #      never invent one.
+    $adminProfile = New-FixtureAdmin -Scoped @{ $PluginId = @(@{ Path = $c }) } -Name 'admin-shape-noscope'
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache) -UserProfile $adminProfile
+    Assert-NotMatch '\[RECORD-SHAPE\]' $r.Out 'no scope field: silent -- absence is not a wrong answer'
+    Assert-Equal 0 $r.Code 'no scope field: exit 0'
+
     # --- 10c. A crafted plugin id cannot forge a line in the session context (inbound #309) --------
     #     A plugin id is an 'enabledPlugins' KEY NAME, so it is an arbitrary JSON string -- and JSON
     #     permits an escaped newline in a key. The reported lines below are forwarded into the session
@@ -1020,6 +1097,47 @@ try {
     Assert-Match 'in sync' $r.Out 'hook installed-fine: the plain in-sync line is unchanged'
     Assert-NotMatch 'NOT-INSTALLED' $r.Out 'hook installed-fine: no install marker'
     Assert-NotMatch 'not installed for this path' $r.Out 'hook installed-fine: no install wording at all'
+    Assert-NotMatch 'not the shape' $r.Out 'hook installed-fine: and no record-shape wording either'
+
+    # H11. inbound #314/#315: [RECORD-SHAPE] gets its OWN verdict too, and this is the branch the marker
+    #      exists for. On an exit-0 run with no drift the state would otherwise fall through to "roster in
+    #      sync with the enabled plugins" -- true about the roster, and for this reader the most misleading
+    #      thing the hook can say, because a record administered at 'local' scope is reported by nothing
+    #      else on the machine. Same argument that gave [BOOTSTRAP] its own line.
+    $stub = New-StubCheck -Name 'stub-record-shape' -ExitCode 0 -OutputLines @(
+        "  [RECORD-SHAPE] 1 of 1 enabled plugin(s) have an install record for this path that is not the assumed shape (specialists@davekjohns-workshop).",
+        '  [OK]    all present',
+        'Summary: 0 error(s), 0 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Equal 0 $r.Code 'hook record-shape: exit 0 (the hook never blocks)'
+    Assert-Match 'not the shape the docs assume' $r.Out 'hook record-shape: its own verdict line'
+    Assert-Match 'specialists@davekjohns-workshop' $r.Out 'hook record-shape: the marker reaches the session context, naming the plugin'
+    Assert-NotMatch 'in sync' $r.Out 'hook record-shape: NOT reported as in sync -- the whole point of the branch'
+    Assert-NotMatch 'drift found' $r.Out 'hook record-shape: NOT reported as drift either'
+
+    # H11b. And it travels WITH the drift headline, for the same reason [NOT-INSTALLED-HERE] does: a reader
+    #       whose record sits at the wrong scope should see that next to the drift, not only on a deliberate
+    #       run -- an [INFO] the hook suppresses is indistinguishable from no finding at all.
+    $stub = New-StubCheck -Name 'stub-record-shape-drift' -ExitCode 1 -OutputLines @(
+        "  [ERROR]  agent '06-24' has no roster row in CLAUDE.md -- add it to the roster.",
+        "  [RECORD-SHAPE] 1 of 1 enabled plugin(s) have an install record for this path that is not the assumed shape (specialists@davekjohns-workshop).",
+        'Summary: 1 error(s), 0 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Match 'roster drift found' $r.Out 'hook record-shape-drift: the drift branch still leads'
+    Assert-Match "agent '06-24'" $r.Out 'hook record-shape-drift: the real finding still surfaces'
+    Assert-Match '\[RECORD-SHAPE\]' $r.Out 'hook record-shape-drift: the marker travels with that headline'
+
+    # H11c. Both install markers at once: the record is missing for one plugin and misshapen for another.
+    #       Ordering matters here -- not-installed leads, because its remedy comes first -- but neither may
+    #       swallow the other.
+    $stub = New-StubCheck -Name 'stub-both-install-markers' -ExitCode 0 -OutputLines @(
+        '  [NOT-INSTALLED-HERE] 1 of 2 enabled plugin(s) have no install record for this path (specialists-lifehub@davekjohns-workshop).',
+        "  [RECORD-SHAPE] 1 of 2 enabled plugin(s) have an install record for this path that is not the assumed shape (specialists@davekjohns-workshop).",
+        'Summary: 0 error(s), 0 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Match 'not installed for this path' $r.Out 'hook both-markers: the not-installed verdict leads'
+    Assert-Match '\[RECORD-SHAPE\]' $r.Out 'hook both-markers: and the record-shape line rides along rather than being dropped'
+    Assert-NotMatch 'in sync' $r.Out 'hook both-markers: not in sync'
 
     # --- 11. Guardrail: a malformed plugin id in settings.json is rejected before filesystem access ---
     #     An uppercase/underscore plugin name fails the slug regex; the script must ERROR ("invalid

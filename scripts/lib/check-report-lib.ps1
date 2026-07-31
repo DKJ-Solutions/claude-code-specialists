@@ -749,6 +749,72 @@ function Test-PluginInstalledHere {
     return $false
 }
 
+# WHY THERE IS A SECOND PREDICATE ABOUT THE SAME RECORDS, and why it is not folded into the one above.
+# Test-PluginInstalledHere answers "is there evidence covering this repo?" -- a yes/no that must stay
+# permissive, because a false [NOT-INSTALLED-HERE] against a working repo is the cry-wolf failure #294
+# spent a release removing. The question below is different in kind: GIVEN that evidence exists, is it the
+# shape this family's documents assume everywhere -- exactly ONE record, scoped 'project'? Merging the two
+# would force one predicate to be permissive and strict at once.
+#
+# Round v8 measured both ways that shape breaks, and neither was reported by anything (inbound #314/#315):
+#   - NO 'project' RECORD. A SESSION START writes install records for enabled plugins: it creates a
+#     missing one and flips an existing 'project' record to 'local'. No command runs, no file in the repo
+#     changes, and nothing announces it. Two consequences that matter here: the "enabled but not
+#     installed" state HEALS ITSELF, so [NOT-INSTALLED-HERE] is practically unreachable from a session --
+#     and the state a consumer is actually left in is 'local', which no document in this family assumes
+#     anywhere.
+#   - MORE THAN ONE RECORD. The repair install prescribed for a missing record ADDS a record beside the
+#     existing one instead of correcting it, reporting success both times. specialists-init step 0c
+#     already teaches the reader that two lines is the signal -- but only a human eyeballing that query
+#     ever saw it, which is exactly the "a rule nobody has a mechanism for" shape.
+# Both are real, actionable, and about the repo the session is in, and in both the repo still WORKS -- the
+# plugin loads from a 'local' record just as well. So this is a non-counting marker, not an [ERROR]: a red
+# line plus exit 1 would be a lie. Classification question asked first, per the connectors README rule:
+# neither shape can indicate tampering -- both are written by the CLI itself.
+function Get-RecordShape {
+    <# Given an install record set and a plugin id, is the administration for this repo the shape the
+       documents assume (exactly one 'project'-scoped record)?
+
+       Returns $null when it is -- and when there is nothing to judge at all, which is deliberate: no
+       record for this path is [NOT-INSTALLED-HERE]'s subject, not this one's, and a pathless (user-scope)
+       record is 0b's documented warning rather than either. Answering only about records that ARE scoped
+       to this path keeps the three markers from reporting the same state three times.
+
+       Otherwise returns Id / Count / Scopes (ordinally sorted, deduplicated) / HasProject / Shapes, where
+       Shapes holds 'no-project-scope' and/or 'duplicate'. #>
+    param(
+        [Parameter(Mandatory = $true)]$InstallRecord,
+        [Parameter(Mandatory = $true)][string]$PluginId
+    )
+    if ($null -eq $InstallRecord) { return $null }
+    if (-not $InstallRecord.Exists -or -not $InstallRecord.Readable) { return $null }
+    if (-not $InstallRecord.RecordsById.ContainsKey($PluginId)) { return $null }
+
+    $recs = @($InstallRecord.RecordsById[$PluginId])
+    if ($recs.Count -eq 0) { return $null }
+
+    # A record whose 'scope' field is absent or empty is NOT read as a mismatch: this predicate reports
+    # what the administration positively says, and an unstated scope is a gap in the file rather than a
+    # statement that the scope is wrong. Same direction of error as Test-PluginInstalledHere -- it can
+    # suppress a marker but never invent one.
+    $scopes = [string[]]@($recs | ForEach-Object { [string]$_.Scope } | Where-Object { $_ } | Sort-Object -Unique)
+    if ($scopes.Count -gt 1) { [array]::Sort($scopes, [System.StringComparer]::Ordinal) }
+    $hasProject = [bool](@($scopes | Where-Object { $_ -ieq 'project' }).Count -gt 0)
+
+    $shapes = @()
+    if ($scopes.Count -gt 0 -and -not $hasProject) { $shapes += 'no-project-scope' }
+    if ($recs.Count -gt 1) { $shapes += 'duplicate' }
+    if ($shapes.Count -eq 0) { return $null }
+
+    return [pscustomobject]@{
+        Id         = $PluginId
+        Count      = $recs.Count
+        Scopes     = $scopes
+        HasProject = $hasProject
+        Shapes     = [string[]]$shapes
+    }
+}
+
 function Resolve-PluginDir {
     <# Resolve the versioned plugin dir for Name+Marketplace under CacheRoot: honors
        $env:CLAUDE_PLUGIN_ROOT (hook context) only when it points at THIS plugin (its parent dir
