@@ -41,6 +41,12 @@
                                                           guards (values from settings.json /
                                                           manifests become filesystem paths, so
                                                           never trusted unvalidated).
+      - Get-SettingsChainPaths / Get-EnabledPlugins    -- WHICH plugins this repo has enabled, read
+                                                          from the same settings chain Claude Code
+                                                          honors instead of settings.json alone
+                                                          (inbound #294). Single source for the
+                                                          bootstrap, check-roster-sync and
+                                                          check-connectors.
       - Resolve-PluginDir                             -- resolve a plugin's versioned dir under a
                                                           plugin cache root (honors
                                                           $env:CLAUDE_PLUGIN_ROOT when it points at
@@ -259,6 +265,197 @@ function Test-PluginMarketplaceSlug {
        path segment. #>
     param([Parameter(Mandatory = $true)][string]$Marketplace)
     return ($Marketplace -match '^[A-Za-z0-9][A-Za-z0-9._-]*$')
+}
+
+# --- Which plugins are enabled here? (inbound #294) ----------------------------------------------
+# THE DEFECT THIS EXISTS FOR, measured 2026-07-31 against 3.0.5. Three places read 'enabledPlugins'
+# from .claude/settings.json and nothing else, while Claude Code honors a CHAIN of settings files --
+# and this plugin's own settings proposal points the reader at the other end of it ("Copy desired
+# blocks to .claude/settings.json (or settings.local.json)"). One blind spot, three symptoms, in both
+# directions at once:
+#
+#   1. FALSE GREEN. roster-sessioncheck reported "roster in sync with the enabled plugins" for
+#      DaveKJohn/life-hub while that repo had 0 lenses, 0 roster rows and no '@'-import -- in the very
+#      session that loaded four of its skills and all three of its hooks. The check saw 0 enabled
+#      plugins, so the [BOOTSTRAP] branch could not fire and the run fell through to the exit-0
+#      "in sync" verdict. That is the one sentence roster-sessioncheck.ps1 says in as many words it
+#      must never print: "roster in sync would be a bald-faced lie for a repo that has no roster."
+#      Same class as the gap #225 closed, reached through a different door.
+#   2. SILENT SKIP. bootstrap.ps1 placed 19 lenses instead of 24 and said nothing about the 5 it
+#      never considered, because 'specialists-lifehub' was enabled in a file it did not read. The
+#      closing count was consistent with what the bootstrap DECIDED and not with what the consumer has
+#      switched on -- and the docstring's "without settings, only its own plugin" does not cover this
+#      case at all: there ARE settings, they are one file over.
+#   3. FALSE ALARM. check-connectors reported "plugin is NOT (or no longer) enabled" for that same
+#      repo in that same session. Literally true about settings.json, false about the session.
+#
+# The pair is what makes this worth a shared helper rather than three local fixes: the identical
+# blindness yields a reassuring lie in one check and a spurious error in another, so a reader who
+# cross-references them learns to trust neither.
+#
+# WHY THE USER LAYER IS IN. A plugin enabled at user scope IS loaded in every session, so a repo that
+# does not roster it genuinely has drift -- excluding that layer would rebuild the same false green one
+# level up. Verified before including it that this widens nothing silently on the machine this was
+# measured on: ~/.claude/settings.json carries 'enabledPlugins' as an EMPTY object, so the chain reads
+# exactly as before there. Every finding names the layer it came from, so an enable arriving from
+# outside the repo is diagnosable instead of mysterious.
+#
+# WHY PER-KEY PRECEDENCE. The layers are merged per plugin id (local > project > user), not
+# wholesale-replaced, and an explicit 'false' in a higher layer therefore switches off an enable from a
+# lower one. Claude Code's merge semantics for this particular map are not documented, and the
+# measurement cannot distinguish the two (life-hub's settings.json had no key at all). Per-key was
+# chosen deliberately because it errs in the safe direction for these three callers: it never LOSES an
+# enable, so the worst case is a visible, actionable drift report -- never the false green that is the
+# whole reason this helper exists.
+
+function Get-SettingsChainPaths {
+    <# The settings files that can carry 'enabledPlugins', LOWEST precedence FIRST -- so a caller that
+       walks this list in order and lets each layer overwrite the previous one ends up with Claude
+       Code's precedence (local > project > user) for free.
+
+       -UserHomeOverride is for fixtures. The user layer otherwise resolves from $env:USERPROFILE (the
+       convention the rest of these scripts use for the plugin cache, and the variable the connector
+       test already redirects to point a child process at a throwaway home), falling back to $HOME so
+       the plugin's non-Windows consumers resolve something sensible rather than a path rooted in the
+       empty string. #>
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [string]$UserHomeOverride = ''
+    )
+    $userHome = if ($UserHomeOverride) { $UserHomeOverride }
+                elseif ($env:USERPROFILE) { $env:USERPROFILE }
+                elseif ($HOME) { $HOME }
+                else { '' }
+
+    $chain = @()
+    if ($userHome) {
+        $chain += [pscustomobject]@{
+            Label = 'user ~/.claude/settings.json'
+            Path  = (Join-Path $userHome '.claude\settings.json')
+        }
+    }
+    $chain += [pscustomobject]@{
+        Label = '.claude/settings.json'
+        Path  = (Join-Path $RepoRoot '.claude\settings.json')
+    }
+    $chain += [pscustomobject]@{
+        Label = '.claude/settings.local.json'
+        Path  = (Join-Path $RepoRoot '.claude\settings.local.json')
+    }
+    return $chain
+}
+
+function Get-EnabledPlugins {
+    <# Read the enable state for $RepoRoot from the whole settings chain and report both the answer and
+       how it was reached. Never throws on a malformed file: an unreadable layer is reported as such and
+       the rest of the chain still counts, because a typo in one file must not silently turn a
+       drift check into a green one.
+
+       Returns:
+         Ids            -- the enabled plugin ids ('<name>@<marketplace>') after precedence, sorted
+                           ORDINALLY (see the sort below -- a culture-dependent order would make this
+                           check's output depend on the machine it runs on).
+         LayerById      -- hashtable id -> the layer label that DECIDED its value (for messages).
+         Layers         -- per layer: Label, Path, Exists, Readable, HasKey, TrueCount.
+         AnyFileExists  -- did any layer's file exist at all?
+         AnyKeyFound    -- did any existing layer carry an 'enabledPlugins' key? A present-but-empty
+                           key is a real answer ("nothing is enabled here"), and deliberately
+                           distinguished from "no file and no key anywhere", which is a repo that was
+                           never configured.
+         Unreadable     -- labels of layers that exist but did not parse.
+         Consulted      -- labels of the layers that exist (what a message should claim was checked).
+         Summary        -- ready-made 'a, b and c' phrasing of Consulted, or 'no settings file' when
+                           the chain is empty, so the three callers word this identically. #>
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [string]$UserHomeOverride = ''
+    )
+
+    $decided = @{}          # id -> $true/$false, last layer to speak wins
+    $decidedBy = @{}        # id -> layer label
+    $layers = @()
+    $unreadable = @()
+    $consulted = @()
+    $anyKey = $false
+
+    foreach ($layer in (Get-SettingsChainPaths -RepoRoot $RepoRoot -UserHomeOverride $UserHomeOverride)) {
+        $exists = Test-Path -LiteralPath $layer.Path -PathType Leaf
+        $readable = $false
+        $hasKey = $false
+        $trueCount = 0
+
+        if ($exists) {
+            $consulted += $layer.Label
+            try {
+                $parsed = Get-Content -LiteralPath $layer.Path -Raw -Encoding UTF8 | ConvertFrom-Json
+                $readable = $true
+                # Deliberately NOT '$parsed.PSObject.Properties.Name -contains ...', the idiom used
+                # everywhere else in this repo. Under Set-StrictMode -Version Latest that member
+                # enumeration THROWS on an object with no properties at all ("The property 'Name' cannot
+                # be found on this object") -- and a settings.json holding exactly '{ }' is an ordinary
+                # consumer state, not a corrupt file. Measured 2026-07-31 against a throwaway consumer:
+                # the old inline reader hit this too, where $ErrorActionPreference = 'Stop' turned it into
+                # a dead check reported as "could not complete"; routing it through this function's catch
+                # merely relabelled it as "does not parse", which is worse -- a confident false statement
+                # about the file instead of an obvious failure. Filtering the properties per item touches
+                # no member on the (possibly empty) collection itself.
+                $epProp = @($parsed.PSObject.Properties | Where-Object { $_.Name -eq 'enabledPlugins' })
+                if ($epProp.Count -gt 0) {
+                    $hasKey = $true
+                    $anyKey = $true
+                    # '"enabledPlugins": null' is a present key that enables nothing -- same reasoning:
+                    # report it as an answer, do not throw reaching into it.
+                    $epValue = $epProp[0].Value
+                    if ($null -ne $epValue) {
+                        foreach ($prop in @($epValue.PSObject.Properties)) {
+                            $decided[$prop.Name] = ($prop.Value -eq $true)
+                            $decidedBy[$prop.Name] = $layer.Label
+                            if ($prop.Value -eq $true) { $trueCount++ }
+                        }
+                    }
+                }
+            } catch {
+                $unreadable += $layer.Label
+            }
+        }
+
+        $layers += [pscustomobject]@{
+            Label     = $layer.Label
+            Path      = $layer.Path
+            Exists    = $exists
+            Readable  = $readable
+            HasKey    = $hasKey
+            TrueCount = $trueCount
+        }
+    }
+
+    # ORDINAL sort, not Sort-Object's culture-aware default. Measured while writing the test for this
+    # helper: under the invariant/en-US collation Sort-Object puts 'specialists@...' before
+    # 'specialists-lifehub@...' because punctuation carries a lower weight, while an ordinal comparison
+    # orders '-' (0x2D) before '@' (0x40). Either order is defensible; a check whose output order depends
+    # on the machine's culture is not, since this list drives both the report order and the order the
+    # bootstrap walks its plugins in.
+    $ids = [string[]]@($decided.Keys | Where-Object { $decided[$_] })
+    if ($ids.Count -gt 1) { [array]::Sort($ids, [System.StringComparer]::Ordinal) }
+
+    $summary = if ($consulted.Count -eq 0) {
+        'no settings file'
+    } elseif ($consulted.Count -eq 1) {
+        $consulted[0]
+    } else {
+        (($consulted[0..($consulted.Count - 2)]) -join ', ') + ' and ' + $consulted[-1]
+    }
+
+    return [pscustomobject]@{
+        Ids           = $ids
+        LayerById     = $decidedBy
+        Layers        = $layers
+        AnyFileExists = @($layers | Where-Object { $_.Exists }).Count -gt 0
+        AnyKeyFound   = $anyKey
+        Unreadable    = $unreadable
+        Consulted     = $consulted
+        Summary       = $summary
+    }
 }
 
 function Resolve-PluginDir {

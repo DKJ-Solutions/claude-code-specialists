@@ -48,6 +48,12 @@
 .PARAMETER SkipVersions
     Skip the machine-record check (e.g. on CI, where no plugin administration exists).
 
+.PARAMETER UserHomeOverride
+    (Optional, for tests) Use this dir as the user home when resolving the user layer of a consumer's
+    settings chain (~/.claude/settings.json), instead of $env:USERPROFILE. Without it a fixture would
+    inherit whatever the machine running the suite has enabled globally, so a "plugin not enabled" case
+    would pass here and fail on the next machine for a reason no assertion mentions.
+
 .EXAMPLE
     .\scripts\sync\check-connectors.ps1
 .EXAMPLE
@@ -58,7 +64,8 @@ param(
     [string]$ConsumerPathOverride = '',
     [string]$OnlyConsumer = '',
     [switch]$SkipDrift,
-    [switch]$SkipVersions
+    [switch]$SkipVersions,
+    [string]$UserHomeOverride = ''
 )
 
 Set-StrictMode -Version Latest
@@ -188,13 +195,22 @@ foreach ($mf in $manifestFiles) {
 
     Write-Host "`n== connector: $($m.repo)" -ForegroundColor Cyan
 
-    # Read the consumer's settings.json once.
-    $settings = $null
-    $settingsPath = Join-Path $checkout '.claude\settings.json'
-    if (Test-Path -LiteralPath $settingsPath) {
-        $settings = Get-Content -LiteralPath $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    } else {
-        Write-Failure ".claude/settings.json not found in '$checkout'"
+    # Read the consumer's enable state once, from the whole settings chain rather than settings.json
+    # alone (inbound #294 -- Get-EnabledPlugins carries the measurement and the reasoning). This check
+    # produced the mirror-image symptom of the roster check's false green: a flat
+    # "is NOT (or no longer) enabled" for DaveKJohn/life-hub in the very session that had loaded four of
+    # its skills and all three of its hooks, because the enable sat in settings.local.json. Literally
+    # true about settings.json, false about the session -- and a gate that cries wolf about a working
+    # setup is a gate whose next real finding gets waved away.
+    #
+    # The user layer legitimately counts here too: it belongs to the machine and the user running this
+    # check, which is the same machine and user the consumer checkout is used from.
+    $consumerEnabled = Get-EnabledPlugins -RepoRoot $checkout -UserHomeOverride $UserHomeOverride
+    if (-not $consumerEnabled.AnyFileExists) {
+        Write-Failure "no settings file found for '$checkout' (looked for $(($consumerEnabled.Layers | ForEach-Object { $_.Label }) -join ', '))"
+    }
+    foreach ($badLayer in @($consumerEnabled.Unreadable)) {
+        Write-Failure "$badLayer does not parse as JSON in '$checkout' -- its enabledPlugins entries were not read."
     }
 
     foreach ($p in @($m.plugins)) {
@@ -214,15 +230,15 @@ foreach ($mf in $manifestFiles) {
             continue
         }
 
-        # 2. Plugin enabled in the consumer?
-        if ($null -ne $settings) {
-            $enabled = $false
-            if ($settings.PSObject.Properties.Name -contains 'enabledPlugins') {
-                $prop = $settings.enabledPlugins.PSObject.Properties | Where-Object { $_.Name -eq $p.id }
-                if ($prop -and $prop.Value -eq $true) { $enabled = $true }
+        # 2. Plugin enabled in the consumer? Both verdicts name the LAYER, so an enable arriving from
+        # outside .claude/settings.json is diagnosable instead of mysterious -- and so the negative
+        # verdict states what it actually checked rather than a single path it happened to look at.
+        if ($consumerEnabled.AnyFileExists) {
+            if ($consumerEnabled.Ids -contains $p.id) {
+                Write-Ok "plugin is enabled in $($consumerEnabled.LayerById[$p.id])"
+            } else {
+                Write-Failure "plugin '$($p.id)' is NOT (or no longer) enabled in $($consumerEnabled.Summary)"
             }
-            if ($enabled) { Write-Ok "plugin is enabled in .claude/settings.json" }
-            else          { Write-Failure "plugin '$($p.id)' is NOT (or no longer) enabled in $settingsPath" }
         }
 
         # 3. Registered extensions present? + unregistered extensions of this plugin.

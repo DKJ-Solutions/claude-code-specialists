@@ -69,6 +69,15 @@ function Reset-Fixture {
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
+# Isolate the USER layer of the settings chain for every child process this suite starts (inbound #294).
+# bootstrap.ps1 now reads enabledPlugins from ~/.claude/settings.json as well as the consumer's own two
+# files, so without this the lens counts asserted below would depend on what the machine running the
+# suite happens to have enabled globally -- green here, red elsewhere, for a reason no assertion names.
+# $env:USERPROFILE is what Get-SettingsChainPaths resolves and what a child process inherits, so
+# redirecting it once covers every Invoke-Script call (the same technique connectors.tests.ps1 uses).
+$OldUserProfile = $env:USERPROFILE
+$env:USERPROFILE = Join-Path $Fixture '..\bootstrap-drift-no-user-home'
+
 try {
     # --- 1. Bootstrap against a fresh repo: lens-only personas in the seam --------------------------
     Write-Host "bootstrap.ps1 -- fresh repo (the seam + lens-only)" -ForegroundColor Cyan
@@ -392,6 +401,7 @@ try {
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
+    $env:USERPROFILE = $OldUserProfile
 }
 
 Write-Host ""

@@ -8,9 +8,14 @@
     gets no signal that its roster (a table/list in CLAUDE.md) and its repo lenses now lag behind.
     This script surfaces that drift by comparing three sources:
 
-      (a) Specialists of the ENABLED plugins -- agents AND personas. Enabled plugins are read from
-          .claude/settings.json (enabledPlugins: a plugin id like 'specialists@davekjohns-workshop'
-          counts as enabled when its value is $true -- mirrors bootstrap.ps1). For each enabled plugin
+      (a) Specialists of the ENABLED plugins -- agents AND personas. Enabled plugins are read via
+          Get-EnabledPlugins (check-report-lib.ps1) from the SAME settings chain Claude Code honors --
+          the user ~/.claude/settings.json, .claude/settings.json and .claude/settings.local.json, per
+          plugin id, local winning (enabledPlugins: a plugin id like 'specialists@davekjohns-workshop'
+          counts as enabled when its value is $true). Reading only .claude/settings.json is what made
+          this check answer "roster in sync" for a repo with no roster at all (inbound #294): the enable
+          lived in settings.local.json, so the check saw nothing enabled, the [BOOTSTRAP] branch could
+          not fire, and an exit-0 run with no findings reads as health. For each enabled plugin
           the versioned dir is resolved in the local plugin cache (semantically highest version,
           [version]-sort -- the same approach bootstrap.ps1 uses so 1.10.0 beats 1.9.0). Agent ids
           ('<group>-<id>', e.g. 06-24) come from <plugin-dir>/agents/<g>-<id>-agent.md, persona ids
@@ -81,12 +86,18 @@
     (Optional, for tests) Use this dir as the plugin cache root instead of
     $env:USERPROFILE/.claude/plugins/cache -- lets a fixture supply a controlled agent set / versions.
 
+.PARAMETER UserHomeOverride
+    (Optional, for tests) Use this dir as the user home when resolving the user layer of the settings
+    chain (~/.claude/settings.json), instead of $env:USERPROFILE -- lets a fixture exercise the chain
+    without touching the real machine's user settings.
+
 .EXAMPLE
     .\scripts\sync\check-roster-sync.ps1
 #>
 param(
     [string]$ConsumerPathOverride = '',
-    [string]$CacheRootOverride = ''
+    [string]$CacheRootOverride = '',
+    [string]$UserHomeOverride = ''
 )
 
 Set-StrictMode -Version Latest
@@ -359,21 +370,35 @@ if (Test-Path -LiteralPath $rosterPath -PathType Leaf) {
 # because the real roster row exists. Same accepted class as the prose false positives in #182.
 $rosterText = (($rosterText -split "`r?`n") | Where-Object { $_ -notmatch '^\s*@' }) -join "`n"
 
-# Enabled plugins from .claude/settings.json (mirrors bootstrap.ps1).
-$settingsPath = Join-Path $repoRoot '.claude\settings.json'
-$enabledIds = @()
-if (Test-Path -LiteralPath $settingsPath -PathType Leaf) {
-    $settings = Get-Content -LiteralPath $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ($settings.PSObject.Properties.Name -contains 'enabledPlugins') {
-        $enabledIds = @($settings.enabledPlugins.PSObject.Properties |
-            Where-Object { $_.Value -eq $true } | ForEach-Object { $_.Name })
-    }
-} else {
-    Write-Info "no .claude/settings.json in the repo-root -- nothing enabled to check."
+# Enabled plugins from the whole settings chain, not settings.json alone (inbound #294 -- the shared
+# Get-EnabledPlugins carries the measurement and the reasoning; same source the bootstrap uses).
+$enabled = Get-EnabledPlugins -RepoRoot $repoRoot -UserHomeOverride $UserHomeOverride
+$enabledIds = @($enabled.Ids)
+
+# A settings file that does not parse is an ERROR, not a crash. It used to be the latter: under
+# $ErrorActionPreference = 'Stop' a malformed settings.json killed the run, and the hook could only say
+# "the roster check could not complete (exit N)" without naming the file. Get-EnabledPlugins keeps
+# reading the rest of the chain, so the check still reports everything it can AND says which layer is
+# broken -- and it must stay an error, because a chain the check could not fully read is exactly the
+# state in which "nothing enabled" would be an unearned conclusion.
+foreach ($badLayer in @($enabled.Unreadable)) {
+    Write-Failure "$badLayer does not parse as JSON -- its enabledPlugins entries were not read."
 }
 
-if ($enabledIds.Count -eq 0 -and (Test-Path -LiteralPath $settingsPath -PathType Leaf)) {
-    Write-Info "no enabled plugins in .claude/settings.json -- nothing to check."
+# [NOTHING-ENABLED]: its own non-counting roll-up, so the session hook can give this state its own
+# verdict instead of letting it fall through to "roster in sync with the enabled plugins" (inbound
+# #294, symptom 1). Same shape as [ORPHANS]/[BOOTSTRAP]: the [INFO] lines below stay for a deliberate
+# run, and this one line is what reaches a session. It is NOT an error -- a repo that has genuinely
+# enabled nothing is not broken -- but it must never read as a checked, healthy roster.
+if ($enabledIds.Count -eq 0) {
+    Write-Host "  [NOTHING-ENABLED] no plugin is enabled for this repo -- checked $($enabled.Summary); nothing was compared against the roster." -ForegroundColor Yellow
+    if (-not $enabled.AnyFileExists) {
+        Write-Info "no settings file in the chain ($(($enabled.Layers | ForEach-Object { $_.Label }) -join ', ')) -- nothing enabled to check."
+    } elseif (-not $enabled.AnyKeyFound) {
+        Write-Info "no 'enabledPlugins' key in $($enabled.Summary) -- nothing to check."
+    } else {
+        Write-Info "'enabledPlugins' is present in $($enabled.Summary) but enables nothing -- nothing to check."
+    }
 }
 
 # --- Is this repo bootstrapped at all? (issue #225) -----------------------------------------------
@@ -422,7 +447,7 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
     # Guardrail: plugin-name/marketplace come from settings and become path segments -- validate as
     # slugs before touching the filesystem (mirrors check-connectors' Get-PluginDir).
     if (-not (Test-PluginNameSlug -Name $name)) {
-        Write-Failure "invalid plugin id '$plugId' in .claude/settings.json -- skipped."
+        Write-Failure "invalid plugin id '$plugId' in $($enabled.LayerById[$plugId]) -- skipped."
         continue
     }
     if (-not $marketplace) {
@@ -446,7 +471,11 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
     # only ever held for the orphan side.
     $specialists = @(Get-CheckedSpecialists -PluginDir $pluginDir)
 
-    Write-Host "`n-- plugin: $plugId (cache $(Split-Path $pluginDir -Leaf))" -ForegroundColor Cyan
+    # The enabling LAYER travels in this header (inbound #294). Same reasoning as the [SCOPE] line: a
+    # reader who is surprised that a plugin is being checked here at all needs the one fact that explains
+    # it, and with a three-file chain -- one of which is outside the repo -- "enabled" is no longer
+    # self-evidently a property of .claude/settings.json.
+    Write-Host "`n-- plugin: $plugId (cache $(Split-Path $pluginDir -Leaf), enabled in $($enabled.LayerById[$plugId]))" -ForegroundColor Cyan
     if ($specialists.Count -eq 0) { Write-Info "no agents or personas found for '$plugId'."; continue }
 
     $onPathLensDirs   = @(Get-OnPathLensDirs -RepoRoot $repoRoot -PluginName $name)

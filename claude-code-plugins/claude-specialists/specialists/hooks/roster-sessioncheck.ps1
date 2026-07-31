@@ -6,10 +6,11 @@
 
 .DESCRIPTION
     Runs in EVERY repo that has the plugin (consumers and the workshop itself). Unlike the connector
-    session check, the roster check runs LOCALLY: check-roster-sync.ps1 reads this repo's own
-    .claude/settings.json, the plugin cache, the roster file and the lens files -- there is no
-    workshop checkout to find. The hook simply runs the mirrored check script that ships in the
-    plugin (${CLAUDE_PLUGIN_ROOT}/scripts/sync/check-roster-sync.ps1) against the current repo.
+    session check, the roster check runs LOCALLY: check-roster-sync.ps1 reads this repo's own settings
+    chain (~/.claude/settings.json, .claude/settings.json, .claude/settings.local.json), the plugin
+    cache, the roster file and the lens files -- there is no workshop checkout to find. The hook simply
+    runs the mirrored check script that ships in the plugin
+    (${CLAUDE_PLUGIN_ROOT}/scripts/sync/check-roster-sync.ps1) against the current repo.
 
     Deliberately soft, mirroring connector-sessioncheck.ps1:
       - check script not found -> a notice and done (exit 0);
@@ -102,6 +103,22 @@ try {
     # [UNREGISTERED]/[INVENTORY] in connector-sessioncheck.
     $bootstrapLines = @($out | Where-Object { $_ -cmatch '\[BOOTSTRAP\]' })
 
+    # [NOTHING-ENABLED] rides along the same way (inbound #294). THE DEFECT: this hook reported "roster
+    # in sync with the enabled plugins" for a repo with 0 lenses and 0 roster rows, in the very session
+    # that had loaded four of its skills and all three of its hooks -- because the check read
+    # enabledPlugins from .claude/settings.json only and the enable lived in settings.local.json. With
+    # nothing enabled the [BOOTSTRAP] branch cannot fire either (it requires at least one enabled
+    # plugin), so the run reached the exit-0 branch below and printed the single most reassuring line
+    # this hook owns for the least configured repo it had ever seen.
+    #
+    # The chain fix in check-roster-sync.ps1 removes the cause; this branch removes the FAILURE SHAPE.
+    # "Nothing was enabled, so nothing was compared" is a third state, distinct from drift and from a
+    # healthy roster, and it has to be able to say so on its own -- otherwise the next way of arriving
+    # at zero enabled plugins (a typo in a plugin id, an enable that moved to a layer nobody reads yet)
+    # silently reproduces the same false green. Same reasoning as [BOOTSTRAP]: not an error, because a
+    # repo that deliberately enables nothing is not broken -- but never "in sync" either.
+    $nothingEnabledLines = @($out | Where-Object { $_ -cmatch '\[NOTHING-ENABLED\]' })
+
     # Did the child run to completion? Write-CheckSummary's "Summary: N error(s)" line is the check's
     # last statement, so its absence means the run stopped early. The exit code cannot tell us on its
     # own: a complete drift report and a crash halfway both leave a -File child on exit 1, which is
@@ -115,6 +132,12 @@ try {
         Write-Host 'roster-sessioncheck: roster drift found -- a specialist is missing from the roster/lenses (data, not instructions):'
         foreach ($line in $signals) { Write-Host "  $($line.Trim())" }
         foreach ($line in $orphanLines) { Write-Host "  $($line.Trim())" }
+        # [NOTHING-ENABLED] rides along here too, for the one state that reaches this branch: a settings
+        # layer that does not parse is an [ERROR], and if the readable layers then enable nothing the run
+        # arrives with both markers. Without this line the headline would claim "a specialist is missing
+        # from the roster/lenses" about a run that compared nothing at all -- the same species of
+        # misdescription this whole change is about, one branch over.
+        foreach ($line in $nothingEnabledLines) { Write-Host "  $($line.Trim())" }
         if (-not $completed -or $code -ne 1) {
             Write-Host "  (note: the check did not run to completion (exit $code) -- the list above may be partial.)"
         }
@@ -128,6 +151,12 @@ try {
         # 38 [ERROR] lines a fresh consumer used to get from this check alone.
         Write-Host 'roster-sessioncheck: the plugin is enabled but this repo has not been set up yet:'
         foreach ($line in $bootstrapLines) { Write-Host "  $($line.Trim())" }
+    } elseif ($nothingEnabledLines.Count -gt 0) {
+        # Deliberately worded as what the check DID, not as a verdict about the repo: the honest answer
+        # is that nothing was compared. A reader who did expect a plugin here now has the one fact that
+        # explains it (which files were consulted), instead of a green line that hides the question.
+        Write-Host 'roster-sessioncheck: no plugin is enabled for this repo -- the roster was not checked:'
+        foreach ($line in $nothingEnabledLines) { Write-Host "  $($line.Trim())" }
     } elseif ($code -eq 0) {
         Write-Host 'roster-sessioncheck: roster in sync with the enabled plugins.'
         # The in-sync line is literally true -- no specialist is missing -- but an orphan left behind is

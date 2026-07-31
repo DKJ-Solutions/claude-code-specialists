@@ -116,7 +116,11 @@ function New-StubWorkshop {
 
 try {
     Write-Host "== connectors.tests ==" -ForegroundColor Cyan
-    $base = @('-SkipDrift', '-SkipVersions')
+    # -UserHomeOverride pins the USER layer of the settings chain to a dir that does not exist (inbound
+    # #294). The enable state is now read from the whole chain, so without this every case would inherit
+    # whatever the machine running the suite has enabled globally -- and case 3 below, which asserts that
+    # a NOT-enabled plugin is an error, would silently invert on such a machine.
+    $base = @('-SkipDrift', '-SkipVersions', '-UserHomeOverride', (Join-Path $Fixture 'no-user-home'))
 
     # --- 1. Happy path: everything present and enabled -> exit 0 -------------------------------------
     New-FixtureConsumer -ExtensionIds @('06-16', '06-17')
@@ -157,6 +161,34 @@ try {
     $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
     Assert-Equal 1 $r.Code 'plugin disabled: exit code 1'
     Assert-Match '\[ERROR\].*is NOT' $r.Out 'plugin disabled: ERROR message'
+    # Only settings.json exists in this fixture, so that is what the verdict names -- the message states
+    # what was actually consulted, not a chain it merely looked for. Case 3c covers the two-layer wording.
+    Assert-Match 'is NOT \(or no longer\) enabled in \.claude/settings\.json' $r.Out 'plugin disabled: the ERROR names the layer it consulted'
+
+    # --- 3b. inbound #294, symptom 3: the enable lives ONLY in settings.local.json ----------------
+    #     Measured against 3.0.5: this check reported "plugin is NOT (or no longer) enabled" for
+    #     DaveKJohn/life-hub in the very session that had loaded four of its skills and all three of its
+    #     hooks -- literally true about settings.json, false about the session. The mirror image of the
+    #     roster check's false green, from the identical blindness: same cause, opposite direction, so a
+    #     reader who cross-referenced the two gates learned to trust neither.
+    New-FixtureConsumer -ExtensionIds @('06-16') -PluginEnabled $false
+    [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.local.json'),
+        '{ "enabledPlugins": { "specialists@davekjohns-workshop": true } }')
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 0 $r.Code 'local-only enable: exit code 0 (no false alarm)'
+    Assert-Match '\[OK\]\s+plugin is enabled in .*settings\.local\.json' $r.Out 'local-only enable: enabled, and the layer that says so is named'
+    Assert-NotMatch 'is NOT \(or no longer\) enabled' $r.Out 'local-only enable: the false ERROR is gone'
+
+    # --- 3c. Both layers present, neither enables -> the verdict names BOTH -----------------------
+    #     The point of the wording: a reader who disagrees with a "not enabled" finding needs to know
+    #     which files were read before going to look for the enable somewhere else.
+    New-FixtureConsumer -ExtensionIds @('06-16') -PluginEnabled $false
+    [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.local.json'), '{ "enabledPlugins": { } }')
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 1 $r.Code 'both layers, neither enables: exit code 1'
+    Assert-Match 'is NOT \(or no longer\) enabled in \.claude/settings\.json and \.claude/settings\.local\.json' $r.Out 'both layers: the ERROR names the whole chain it consulted'
 
     # --- 4. Checkout not present -> SKIP, exit 0 -----------------------------------------------
     New-FixtureConsumer -ExtensionIds @('06-16')
