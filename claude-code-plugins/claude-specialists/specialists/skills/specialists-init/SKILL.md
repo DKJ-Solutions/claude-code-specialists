@@ -31,7 +31,17 @@ that up, plus the governance and safety layer that differs per repo.
 
 This skill lives inside the `specialists` plugin, so it only becomes available once the plugin is
 **installed for this repo** and the session has been restarted. The skill cannot hook itself up. Step 0
-is therefore manual, and it is **three acts, in this order**.
+is therefore manual, and it is **five acts, in this order** — enable, refresh, install, restart, verify —
+grouped below as `0a` (act 1), `0b` (acts 2 and 3) and `0c` (acts 4 and 5).
+
+> **The count is deliberately the same five as in the
+> [family README](../../../README.md#adoption-the-bootstrap-path)** (inbound
+> [#297](https://github.com/DaveKJohn/davekjohns-workshop/issues/297)). This page said *three acts* while
+> that one said *four* and the [QUICKSTART](../../../QUICKSTART.md#connecting-in-three-steps) said *three
+> steps* — the same path, nothing missing anywhere, three different numbers, and the pages link to each
+> other for exactly this step. For a reader following it the first time the count is the only check they
+> have on whether they skipped something. The letters stay, because they are what the rest of this page
+> refers to; the number now counts the same unit as the README.
 
 **0a — enable.** Verify that the consumer has this in `.claude/settings.json`:
 
@@ -78,8 +88,19 @@ with **no `projectPath` at all** — machine-wide, active in every repo on the m
 not the per-`projectPath` entry the paragraph above says this step exists to create. Nothing errors:
 the install reports success, and the only word distinguishing the two is `(scope: user)` in its own
 output line. Project scope is the intended model for this family — it is what both real consumers
-carry, it is what keeps a repo pinned to the version it was tested against, and every other document
-here is written against it.
+carry, it gives each repo **its own install record**, and every other document here is written against
+it.
+
+**It does not, however, promise that the record stays put** (inbound
+[#296](https://github.com/DaveKJohn/davekjohns-workshop/issues/296)). This paragraph used to claim
+project scope *"keeps a repo pinned to the version it was tested against"*, and that did not survive
+measurement: on July 31, 2026 both of `life-hub`'s project-scoped records moved `3.0.4 → 3.0.5` in a
+**single** write, `lastUpdated` stamps 70 ms apart, while that repo's session issued no `claude plugin`
+command — confirmed afterwards against every session transcript on the machine for that day (26
+invocations, none in the window of the write). So "pinned" was a property of the bookkeeping, not of the
+repo. The practical consequence is small but real: **read your record instead of trusting it.**
+`~/.claude/plugins/installed_plugins.json` is the only place your version is written down — the install
+success line names the scope and no version at all — and the query for it is in step 0c below.
 
 **The same default bites on the way back out, which is where it is actually expensive.** `claude
 plugin update` also defaults to user scope, so on a project-scoped install the plain command fails:
@@ -168,8 +189,18 @@ line: lenses flat in `.claude/specialists/lenses/`, everything else behind
 `.claude/specialists/SPECIALISTS.md`, and a single `@`-import in `CLAUDE.md`. A consumer that
 **already has a lens tree** on the pre-seam plugin path (`.claude/plugins/<family>/<plugin>/`) keeps
 writing there — this script never relocates a file the repo owner owns, and splitting the surface
-across both paths would be worse than either. Migrating is your act, four steps, described in the
-[family README](../../../README.md#the-seam-specified). Every reader accepts both layouts.
+across both paths would be worse than either. Migrating is your act, **five** steps — numbered 0 to 4 —
+described in the [family README](../../../README.md#the-seam-specified). Every reader accepts both
+layouts. **Step 0 is the `.gitignore` check, and it is the one that can cost you the lens tree**, so it
+is named here rather than left to the count: in a repo that ignores `.claude/*` with an exception for the
+old path, moving the lenses to the seam drops them out of version control with every gate still green
+and `git status` silent.
+
+> Found while fixing inbound [#297](https://github.com/DaveKJohn/davekjohns-workshop/issues/297), which
+> was about the *adoption* path being counted three different ways. This line said *four steps* about a
+> list the README numbers **0 to 4**, and it links to that list — so a reader who counted items 1 to 4
+> would skip step 0 for the very reason it is numbered zero. Same class, higher stakes: the miscount and
+> the destructive step were the same step.
 
 1. **Persona lenses (lens-only)** — for **every** main-loop persona the plugin ships, puts a
    `*-extension.md` in place in the lens directory chosen above, only if it is not already there. The

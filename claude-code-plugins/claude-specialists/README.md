@@ -325,11 +325,26 @@ The body is therefore ready and the switch is not thrown. Flipping it is Dave's 
 instead of an unknown: the collision resolves silently and positionally, so a consumer who enables a
 second `agent`-setting plugin gets a different orchestrator without being told.
 
-- **Step 0 (manual, four acts in order).** Put the marketplace source + `enabledPlugins` in
-  `.claude/settings.json` (see [Consumption](../../README.md#consumption) in the root README), then
-  refresh the cached marketplace with `claude plugin marketplace update <marketplace>`, then run
+- **Step 0 (manual, five acts in order).** (1) Put the marketplace source + `enabledPlugins` in
+  `.claude/settings.json` (see [Consumption](../../README.md#consumption) in the root README), (2) refresh
+  the cached marketplace with `claude plugin marketplace update <marketplace>`, (3) run
   `claude plugin install <plugin>@<marketplace> --scope project` **from the consumer's root, once per
-  enabled plugin**, then **restart** the session — only then is the skill available.
+  enabled plugin**, (4) **restart** the session — only then is the skill available — and (5) **verify the
+  install record** before going on.
+
+  > **Why five, and why the same five everywhere** (inbound
+  > [#297](https://github.com/DaveKJohn/davekjohns-workshop/issues/297)). This procedure is described at
+  > three entry points, and they used to count it as *four acts* here, *three acts* in
+  > [`specialists-init`](specialists/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
+  > and *three steps* in the [QUICKSTART](QUICKSTART.md#connecting-in-three-steps) — the same path, no
+  > step missing anywhere, three different numbers. A reader following it for the first time has the
+  > count as their only check on whether they skipped something, and three counts remove exactly that.
+  > Two of the three were also counting different things: #284 raised this page from three to four by
+  > making the refresh an act, while `specialists-init`'s step 0 has that refresh too and still said
+  > three. The unit is now **acts** — individual things you do — on both pages; the QUICKSTART keeps its
+  > three *steps* because its Step 1 **is** all five acts below, and it now says so. Verifying counts as
+  > an act because leaving it out is the failure the next blockquote calls silent and self-camouflaging:
+  > a reader who ticks off four and stops has never checked that the install exists.
 
   > **The marketplace is a cached clone, which is why the refresh is an act and not a formality**
   > (inbound [#282](https://github.com/DaveKJohn/davekjohns-workshop/issues/282) for the behaviour,
@@ -356,8 +371,26 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > half is inbound [#282](https://github.com/DaveKJohn/davekjohns-workshop/issues/282)). All of them
   > default to `--scope user`; the install then writes a machine-wide record with no `projectPath`, and
   > the update refuses outright on a project-scoped install. Project scope is the intended model for
-  > this family (Dave, July 30, 2026) — it is what keeps a consumer pinned to the version it was tested
-  > against, and every other document here assumes it. Full mechanics of the refresh half:
+  > this family (Dave, July 30, 2026) — it gives each repo **its own install record**, and every other
+  > document here assumes it. Full mechanics of the refresh half:
+  > [Staying up to date](QUICKSTART.md#staying-up-to-date).
+  >
+  > **What project scope does *not* promise is that the record stays put** (inbound
+  > [#296](https://github.com/DaveKJohn/davekjohns-workshop/issues/296)). This sentence used to say it
+  > keeps a consumer *"pinned to the version it was tested against"*, and that claim did not survive
+  > being measured. On July 31, 2026 both of `life-hub`'s project-scoped records moved `3.0.4 → 3.0.5`
+  > in a **single** write to `installed_plugins.json`, their `lastUpdated` stamps 70 ms apart — while
+  > that repo's own session issued no `claude plugin` command at all. Checked afterwards against every
+  > session transcript on the machine for that day: **26** `claude plugin` invocations, and not one in
+  > the window the write falls in. So something other than an explicit command can advance a
+  > project-scoped record, and "pinned" was a property of the bookkeeping rather than of the repo.
+  > (What the same measurement *did* explain: the marketplace clone moving minutes earlier was a
+  > deliberate `marketplace update` from another session on the machine — that half is not mysterious.)
+  >
+  > Practically: project scope is still the right model and still what every document here assumes —
+  > what changes is that you should **read your record rather than trust it**. On a machine with several
+  > consumers and several sessions, `installed_plugins.json` is the only place your actual version is
+  > written down; the install output does not name a version at all. The query is under
   > [Staying up to date](QUICKSTART.md#staying-up-to-date).
   >
   > **Verify with the `projectPath` record, not with `claude plugin list`** — that command is not
