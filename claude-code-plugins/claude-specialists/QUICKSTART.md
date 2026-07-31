@@ -116,9 +116,13 @@ $root = (Get-Location).Path
     ForEach-Object { "$n -> $($_.scope) $($_.version)" } }
 ```
 
-One `project` line per plugin you listed is what you want; empty output means nothing was installed
-here. Do run it — if the install did not happen, the skill from step 2 and the session hooks are
-simply absent, and that looks exactly like a session where everything is fine.
+**One** `project` line per plugin you listed is what you want — the count is part of the check, not a
+detail. Empty output means nothing was installed here. *Two* lines for the same plugin is a stray second
+record, which a repair install can create rather than prevent, and a line reading `local` was written by
+a session start rather than by you; both are covered under
+[Staying up to date](#staying-up-to-date). Do run it — if the install did not happen, the skill from
+step 2 and the session hooks are simply absent, and that looks exactly like a session where everything
+is fine.
 
 **Step 2 — run the bootstrap skill.** In the new session, invoke `specialists-init`. It sets up —
 purely additively, without overwriting anything — the **lens-only** persona lenses (including
@@ -219,6 +223,26 @@ installed" as a lasting fact. The `projectPath` query from
 release notes you read, and not the install output, which names no version at all. If it comes back
 empty, re-install from that root — and note that this is the case where the install **adds
 `enabledPlugins`** rather than merely reformatting it (see [Step 1](#connecting-in-three-steps)).
+
+**Check that query again *after* a repair install, because the repair can leave two records where you
+wanted one.** Measured in `DaveKJohn/life-hub` on July 31, 2026, CLI `2.1.220` (inbound
+[#315](https://github.com/DaveKJohn/davekjohns-workshop/issues/315)): re-installing at project scope
+against a path that already carried a record **added a second one beside it** instead of correcting it,
+reporting `✔ Successfully installed … (scope: project)` both times. Two lines for one plugin is not a
+display quirk — it is the stray second record, and the count in that query is the only signal you get.
+
+**And there is a third scope the CLI's own flag list does not mention: `local`.** It is what a *session
+start* writes — enabling a plugin is enough for one to create a missing record, and to flip an existing
+`project` record to `local`, with no command run, no file in your repo changed, and nothing reporting it
+(inbound [#314](https://github.com/DaveKJohn/davekjohns-workshop/issues/314)). Two consequences worth
+holding on to: the "enabled but not installed" state **heals itself**, so a check that looks for it will
+usually find nothing rather than confirm health; and the state you are actually left in is `local`, which
+the rest of this family's documents do not assume anywhere. Remove such a record with `claude plugin
+uninstall <plugin>@<marketplace> --scope local` — at `--scope project` it refuses with *"Plugin … is
+installed in local scope, not project"*, literally true and easy to misread as "not installed at all" —
+then re-install at project scope from the repo root, refresh first. That `uninstall` also writes
+`"enabledPlugins": {}` into `.claude/settings.local.json`, the same way the project-scoped one does in
+`.claude/settings.json`.
 
 When an update adds a **new specialist**, your repo's roster (the specialists table in your
 `CLAUDE.md`) and its lenses don't update themselves. The `roster-sessioncheck` SessionStart hook
