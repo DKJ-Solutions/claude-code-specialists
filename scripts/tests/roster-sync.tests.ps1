@@ -179,6 +179,13 @@ function New-FixtureConsumer {
         # The seam lens dir is flat and plugin-independent on purpose (ids are unique family-wide), so
         # unlike $LensIds this takes no plugin segment -- a second plugin's lenses land in the same dir.
         [string[]]$SeamLensIds = @(),
+        # Content for the seam lens files. Default 'lens' = a FILLED-IN lens, which is what every existing
+        # case means. Pass a text containing 'VUL-IN' to build the unfilled scaffolds a fresh bootstrap
+        # leaves, which is the discriminator for [ROSTER-PENDING] (inbound #333).
+        [string]$SeamLensText = 'lens',
+        # Per-id override on top of $SeamLensText, so one lens can be filled in while the rest stay
+        # scaffolds -- the state in which the repo IS being maintained and drift must error again.
+        [hashtable]$SeamLensContent = @{},
         [string[]]$LegacyLensIds = @(),
         [string[]]$OffPathLensIds = @(),
         [string]$OffPathFamily = 'davekjohns-workshop',
@@ -245,7 +252,10 @@ function New-FixtureConsumer {
     if ($SeamLensIds.Count -gt 0) {
         $sdir = Join-Path $root '.claude\specialists\lenses'
         New-Item -ItemType Directory -Path $sdir -Force | Out-Null
-        foreach ($id in $SeamLensIds) { [System.IO.File]::WriteAllText((Join-Path $sdir "$id-extension.md"), "lens") }
+        foreach ($id in $SeamLensIds) {
+            $txt = if ($SeamLensContent.ContainsKey($id)) { $SeamLensContent[$id] } else { $SeamLensText }
+            [System.IO.File]::WriteAllText((Join-Path $sdir "$id-extension.md"), $txt)
+        }
     }
     if ($LegacyLensIds.Count -gt 0) {
         $ldir = Join-Path $root '.claude\extensions'
@@ -876,6 +886,73 @@ try {
     Assert-NotMatch '\[RECORD-SHAPE\]' $r.Out 'no scope field: silent -- absence is not a wrong answer'
     Assert-Equal 0 $r.Code 'no scope field: exit 0'
 
+    # --- 11m-11q. [ROSTER-PENDING]: bootstrapped, nothing filled in yet (inbound #333) --------------
+    #     MEASURED ON THE DOCUMENTED HAPPY PATH: the session right after a completely successful
+    #     specialists-init printed NINETEEN [ERROR] lines, one per specialist. Nothing was broken -- the
+    #     QUICKSTART tells that reader to fill the lenses in at their own pace. The cost is habituation:
+    #     whoever learns to ignore nineteen false errors ignores the twentieth too.
+    #
+    #     The four boundary cases matter more than the marker itself: the moment ANY of it is filled in the
+    #     [ERROR] lines must return, or this fix has traded false alarms for a blind spot over a repo someone
+    #     is actually working in. Its own cache with TWO agents, built here rather than reusing the block's
+    #     single-agent one, so "the other specialist is still missing" is a state the fixture can express.
+    $cacheTwo = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16', '06-24') }
+
+    Write-Host "11m. bootstrapped + everything still a scaffold: one [ROSTER-PENDING], no errors" -ForegroundColor Cyan
+    $cPend = New-FixtureConsumer -RosterIds @() -SeamLensIds @('06-16', '06-24') -SeamLensText 'VUL-IN scaffold'
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $cPend, '-CacheRootOverride', $cacheTwo)
+    Assert-Match '\[ROSTER-PENDING\]' $r.Out 'roster pending: the marker fires'
+    Assert-Match '2 specialist\(s\) have a lens scaffold and no roster row' $r.Out 'roster pending: it states how much it stands in for'
+    Assert-Match 'nothing has drifted' $r.Out 'roster pending: it says plainly that this is not drift'
+    Assert-NotMatch '\[ERROR\]' $r.Out 'roster pending: NOT one error per specialist -- the nineteen-error state is gone'
+    Assert-NotMatch '\[BOOTSTRAP\]' $r.Out 'roster pending: and NOT [BOOTSTRAP] -- that advice is "run specialists-init", which this reader just did'
+    Assert-Equal 0 $r.Code 'roster pending: exit 0 -- a correct adoption is not a failure'
+    Assert-Match 'Summary: 0 error\(s\)' $r.Out 'roster pending: non-counting, like its siblings'
+    # The trap the assert above caught on its first run, pinned in its own right: the marker text must not
+    # MENTION the error token. The hook counts its signals by matching that literal over the whole output, so
+    # a marker that names it would be counted as an error and push the hook into "roster drift found" -- about
+    # the one state this marker exists to call fine. Any future marker text is held to the same rule here.
+    $pendLine = @($r.Out -split "`n" | Where-Object { $_ -cmatch '\[ROSTER-PENDING\]' })[0]
+    Assert-NotMatch '\[ERROR\]' $pendLine 'roster pending: the marker text does not contain the error token the hook counts on'
+
+    Write-Host "11n. one lens FILLED IN: it is a maintained repo again, so drift errors return" -ForegroundColor Cyan
+    #      The load-bearing boundary. If this passed silently, the fix would have replaced nineteen false
+    #      errors with permanent silence.
+    $cMixed = New-FixtureConsumer -RosterIds @() -SeamLensIds @('06-16', '06-24') -SeamLensText 'VUL-IN scaffold' -SeamLensContent @{ '06-16' = 'a real, filled-in lens' }
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $cMixed, '-CacheRootOverride', $cacheTwo)
+    Assert-NotMatch '\[ROSTER-PENDING\]' $r.Out 'one lens filled in: the marker does NOT fire -- work exists, so drift is real'
+    Assert-Match '\[ERROR\]' $r.Out 'one lens filled in: the roster errors come back'
+    Assert-Equal 1 $r.Code 'one lens filled in: exit 1 again'
+
+    Write-Host "11o. one ROSTER ROW present: same conclusion from the other direction" -ForegroundColor Cyan
+    $cRow = New-FixtureConsumer -RosterIds @('06-16') -SeamLensIds @('06-16', '06-24') -SeamLensText 'VUL-IN scaffold'
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $cRow, '-CacheRootOverride', $cacheTwo)
+    Assert-NotMatch '\[ROSTER-PENDING\]' $r.Out 'one roster row: the marker does NOT fire'
+    Assert-Match "'06-24'" $r.Out 'one roster row: the specialist that IS missing is named'
+    Assert-Equal 1 $r.Code 'one roster row: exit 1'
+
+    Write-Host "11p. a specialist that arrived LATER has no lens: that half still errors" -ForegroundColor Cyan
+    #      A plugin update adds a specialist after the bootstrap, so it has neither lens nor roster row while
+    #      the rest are untouched scaffolds. The suppression is scoped to ids that HAVE a lens precisely so
+    #      this one stays visible.
+    $cLate = New-FixtureConsumer -RosterIds @() -SeamLensIds @('06-16') -SeamLensText 'VUL-IN scaffold'
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $cLate, '-CacheRootOverride', $cacheTwo)
+    Assert-Match '\[ROSTER-PENDING\]' $r.Out 'late specialist: the scaffolded one is still covered by the marker'
+    Assert-Match '1 specialist\(s\) have a lens scaffold' $r.Out 'late specialist: and the count covers only that one'
+    Assert-Match 'has no repo-lens' $r.Out 'late specialist: while the lens-less one IS reported as drift'
+    Assert-Equal 1 $r.Code 'late specialist: exit 1 -- there is a real finding'
+
+    Write-Host "11q. a repo that was NEVER bootstrapped still gets [BOOTSTRAP], not the new marker" -ForegroundColor Cyan
+    #      The other boundary: no lenses at all. The two markers give different advice, so they must not
+    #      swap places.
+    $cNever = New-FixtureConsumer -RosterIds @() -SeamLensIds @()
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $cNever, '-CacheRootOverride', $cacheTwo)
+    Assert-Match '\[BOOTSTRAP\]' $r.Out 'never bootstrapped: still the bootstrap marker'
+    Assert-NotMatch '\[ROSTER-PENDING\]' $r.Out 'never bootstrapped: and not the pending one -- it would advise filling in a roster for lenses that do not exist'
+
+    # Restore the single-agent cache for anything downstream that reuses $cache.
+    $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') }
+
     # --- 10c. A crafted plugin id cannot forge a line in the session context (inbound #309) --------
     #     A plugin id is an 'enabledPlugins' KEY NAME, so it is an arbitrary JSON string -- and JSON
     #     permits an escaped newline in a key. The reported lines below are forwarded into the session
@@ -1169,6 +1246,43 @@ try {
     Assert-Match 'not installed for this path' $r.Out 'hook both-markers: the not-installed verdict leads'
     Assert-Match '\[RECORD-SHAPE\]' $r.Out 'hook both-markers: and the record-shape line rides along rather than being dropped'
     Assert-NotMatch 'in sync' $r.Out 'hook both-markers: not in sync'
+
+    # H12. inbound #333: [ROSTER-PENDING] gets its own verdict, between "not set up yet" and "in sync".
+    #      This is the branch that replaces the nineteen [ERROR] lines a CORRECT adoption produced. Neither
+    #      neighbour will do: [BOOTSTRAP] advises running specialists-init, which this reader has just done
+    #      successfully, and "in sync" is worse still for a repo whose roster is empty.
+    $stub = New-StubCheck -Name 'stub-roster-pending' -ExitCode 0 -OutputLines @(
+        '  [ROSTER-PENDING] this repo was bootstrapped but the roster is still empty: 19 specialist(s) have a lens scaffold and no roster row in .claude/specialists/SPECIALISTS.md.',
+        'Summary: 0 error(s), 0 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Equal 0 $r.Code 'hook roster-pending: exit 0 (the hook never blocks)'
+    Assert-Match 'still to be filled in' $r.Out 'hook roster-pending: its own verdict line'
+    Assert-Match '19 specialist\(s\)' $r.Out 'hook roster-pending: the marker reaches the session with its count'
+    Assert-NotMatch 'in sync' $r.Out 'hook roster-pending: NOT reported as in sync -- the roster is empty'
+    Assert-NotMatch 'has not been set up yet' $r.Out 'hook roster-pending: NOT the bootstrap verdict -- the setup DID happen'
+    Assert-NotMatch 'drift found' $r.Out 'hook roster-pending: and not drift either'
+
+    # H12b. Mixed: a specialist that arrived later is genuinely missing its lens, so a real error rides
+    #       alongside. The drift headline leads, but without the pending line the reader would be told one
+    #       specialist is missing with no hint that the other eighteen are deliberately absent.
+    $stub = New-StubCheck -Name 'stub-roster-pending-drift' -ExitCode 1 -OutputLines @(
+        "  [ERROR]  agent '06-24' has no repo-lens (.claude/specialists/lenses/06-24-extension.md).",
+        '  [ROSTER-PENDING] this repo was bootstrapped but the roster is still empty: 18 specialist(s) have a lens scaffold and no roster row in .claude/specialists/SPECIALISTS.md.',
+        'Summary: 1 error(s), 0 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Match 'roster drift found' $r.Out 'hook roster-pending-drift: the drift branch leads'
+    Assert-Match "agent '06-24'" $r.Out 'hook roster-pending-drift: the real finding surfaces'
+    Assert-Match '\[ROSTER-PENDING\]' $r.Out 'hook roster-pending-drift: and the pending line rides along, so 18 deliberate absences are not read as drift'
+
+    # H12c. A repo with a filled-in roster gains no such line -- the guard against this marker becoming the
+    #       noise it exists to remove.
+    $stub = New-StubCheck -Name 'stub-roster-done' -ExitCode 0 -OutputLines @(
+        '  [OK]    all present',
+        'Summary: 0 error(s), 0 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Match 'in sync' $r.Out 'hook roster-done: the plain in-sync line is unchanged'
+    Assert-NotMatch 'still to be filled in' $r.Out 'hook roster-done: no pending wording'
+    Assert-NotMatch 'ROSTER-PENDING' $r.Out 'hook roster-done: no pending marker at all'
 
     # --- 11. Guardrail: a malformed plugin id in settings.json is rejected before filesystem access ---
     #     An uppercase/underscore plugin name fails the slug regex; the script must ERROR ("invalid

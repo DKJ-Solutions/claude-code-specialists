@@ -21,7 +21,11 @@
           ('<group>-<id>', e.g. 06-24) come from <plugin-dir>/agents/<g>-<id>-agent.md, persona ids
           from <plugin-dir>/personas/<g>-<id>-persona.md (inbound #204 -- see the persona note below).
       (b) The consumer's roster. Its path comes from Get-RosterPath in scripts/repo-config.ps1
-          (default 'CLAUDE.md', repo-root-relative). "Present in the roster" is decided by scanning the
+          (repo-root-relative; the bootstrap scaffolds it to the seam inclusion
+          .claude/specialists/SPECIALISTS.md, which is where specialists-init writes the roster slot --
+          it used to scaffold 'CLAUDE.md' and that made this check read a file holding only the
+          @-import, inbound #333). 'CLAUDE.md' remains the fallback when repo-config is absent
+          entirely. "Present in the roster" is decided by scanning the
           roster text for each '<group>-<id>' token (format-agnostic -- works for a table OR a list;
           deliberately NOT a brittle table parser).
       (c) The lens files, looked up via Get-LensDirCandidates (check-report-lib.ps1 -- the same source
@@ -570,10 +574,13 @@ if ($enabledIds.Count -gt 0) {
 # never bootstrapped -- and the [BOOTSTRAP] line would then swallow every real finding behind advice to
 # run specialists-init on a repo that already has its whole lens tree in place.
 $anyLensFile = $false
+$lensFiles = @()
 foreach ($dir in @((Get-SeamPaths -RepoRoot $repoRoot).Dir, (Join-Path $repoRoot '.claude\plugins'), (Join-Path $repoRoot '.claude\extensions'))) {
     if (-not (Test-Path -LiteralPath $dir)) { continue }
-    if (@(Get-ChildItem -LiteralPath $dir -Recurse -Filter '*-extension.md' -File -ErrorAction SilentlyContinue).Count -gt 0) {
-        $anyLensFile = $true; break
+    $found = @(Get-ChildItem -LiteralPath $dir -Recurse -Filter '*-extension.md' -File -ErrorAction SilentlyContinue)
+    if ($found.Count -gt 0) {
+        $anyLensFile = $true
+        $lensFiles += $found
     }
 }
 # Any '<gg>-<ii>' token at all in the roster, using the same boundary rule as Test-InRoster so a
@@ -581,6 +588,36 @@ foreach ($dir in @((Get-SeamPaths -RepoRoot $repoRoot).Dir, (Join-Path $repoRoot
 $anyRosterRow = $rosterText -match '(?<![\d-])\d{2}-\d{2}(?![\d-])'
 
 $unbootstrapped = ($enabledIds.Count -gt 0) -and (-not $anyLensFile) -and (-not $anyRosterRow)
+
+# --- The third state: bootstrapped, but nobody has filled anything in yet (inbound #333) ----------
+# MEASURED ON THE DOCUMENTED HAPPY PATH. On a virgin profile, immediately after a completely successful
+# specialists-init plus restart -- every count correct -- the next session start printed NINETEEN [ERROR]
+# lines, one per specialist, saying each has no roster row. Nothing was broken; the QUICKSTART tells the
+# reader to fill the lenses in "at your own pace", and [ERROR] is the heaviest level these checks have.
+# The risk is habituation: whoever learns to ignore nineteen false errors ignores the twentieth too.
+#
+# The state was invisible to the predicate above because that one is strict on purpose -- no lens ANYWHERE
+# and no roster row for ANY id -- and a bootstrapped repo HAS lenses. So it fell through to full drift
+# reporting, which is right for a maintained repo and wrong for one whose owner has not started.
+#
+# THE DISCRIMINATOR IS MEASURABLE, which is what makes this safe to add: every lens file the bootstrap
+# writes is a VUL-IN scaffold. If lenses exist, EVERY ONE of them is still an unfilled scaffold, and no
+# roster row exists for any id, then nobody has written anything yet -- there is no work to have drifted
+# from. The moment one lens is filled in, or one roster row appears, the repo is being maintained and the
+# [ERROR] lines are correct again. A repo that lost its roster while carrying real lens content therefore
+# still errors, which is the case the strictness above exists for.
+$allLensesAreScaffolds = $false
+if ($anyLensFile) {
+    # -notmatch over the whole file: a scaffold carries the marker, a filled-in lens does not. Read
+    # failures count as "not a scaffold" -- erring toward reporting, never toward silence.
+    $filled = @($lensFiles | Where-Object {
+        $text = ''
+        try { $text = [System.IO.File]::ReadAllText($_.FullName) } catch { $text = '' }
+        (-not $text) -or ($text -notmatch 'VUL-IN')
+    })
+    $allLensesAreScaffolds = ($filled.Count -eq 0)
+}
+$rosterPending = ($enabledIds.Count -gt 0) -and $anyLensFile -and $allLensesAreScaffolds -and (-not $anyRosterRow) -and (-not $unbootstrapped)
 # Counts specialists actually resolved from a cache dir, so the marker below only fires when there was
 # genuinely something to report. Deliberately NOT an early exit before the plugin loop: a first version
 # did that and broke the "plugin enabled but not in the cache" case, telling the reader to run
@@ -588,6 +625,9 @@ $unbootstrapped = ($enabledIds.Count -gt 0) -and (-not $anyLensFile) -and (-not 
 # The loop therefore still runs and still reports everything else it knows -- not-in-cache, orphans,
 # off-path lenses -- and only the two "missing twice over" findings per specialist are replaced.
 $suppressedForBootstrap = 0
+# Counted separately from the one above, because they stand for different states with different advice:
+# "run specialists-init" versus "fill in the roster when you get to it".
+$suppressedForRosterPending = 0
 $allBackingIds = @{}
 $pluginNames = @()
 
@@ -665,7 +705,15 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
             $suppressedForBootstrap++
         } else {
             if (-not $inRoster) {
-                Write-Failure "$kind '$id' ($plugIdShown) has no roster row in $rosterRel -- add it to the roster."
+                if ($rosterPending -and $hasLens) {
+                    # Freshly bootstrapped and untouched: the row is missing because nobody has written the
+                    # roster yet, which the marker after the loop says once. Scoped to ids that DO have a
+                    # lens on purpose -- a specialist that arrived later with a plugin update has neither,
+                    # and that IS drift a reader must see even in this state.
+                    $suppressedForRosterPending++
+                } else {
+                    Write-Failure "$kind '$id' ($plugIdShown) has no roster row in $rosterRel -- add it to the roster."
+                }
             }
             if (-not $hasLens) {
                 Write-Failure "$kind '$id' ($plugIdShown) has no repo-lens (.claude/specialists/lenses/$id-extension.md, the pre-seam .claude/plugins/$(Get-LensFamily)/$name/ path, or the legacy .claude/extensions/ path)."
@@ -762,6 +810,19 @@ if ($suppressedForBootstrap -gt 0) {
     # exit 1 in every session of a repo whose owner has simply not got round to the bootstrap -- and
     # not shouting at that person is the entire point of issue #225.
     Write-Host "  [BOOTSTRAP] the specialists plugin is enabled here but this repo has not been set up yet: no repo lenses and no roster rows exist, so all $suppressedForBootstrap specialist(s) would each be reported missing twice over. Nothing is broken -- the subagents work; what is missing is the orchestrator and the repo-specific setup. Run the 'specialists-init' skill to put them in place: it is additive and never overwrites anything you have written." -ForegroundColor Yellow
+}
+
+if ($suppressedForRosterPending -gt 0) {
+    # The sixth non-counting marker, and the one that exists because the DOCUMENTED HAPPY PATH ended in
+    # nineteen [ERROR] lines (inbound #333). Its own line rather than folding under [BOOTSTRAP]: that one
+    # says "run specialists-init", which this reader has just done successfully, and being told to run it
+    # again is exactly the kind of advice that teaches people the checks are wrong.
+    # NO LITERAL '[ERROR]' IN THIS TEXT, and that is a correctness rule rather than a style one: the session
+    # hook counts its error signals by matching '\[ERROR\]' over the check's whole output, so a marker line
+    # merely MENTIONING the token would be counted as an error and push the hook into its drift branch --
+    # announcing "roster drift found" about the one state this marker exists to say is fine. Caught by the
+    # fixture on the first run. Same trap for any future marker text.
+    Write-Host "  [ROSTER-PENDING] this repo was bootstrapped but the roster is still empty: $suppressedForRosterPending specialist(s) have a lens scaffold and no roster row in $rosterRel. Nothing is broken and nothing has drifted -- every lens is still an unfilled VUL-IN scaffold, so there is no work to have drifted from. Fill in the roster and the lenses at your own pace; this turns into real drift, reported per specialist, as soon as some of it is filled in and some is not." -ForegroundColor Yellow
 }
 
 Write-CheckSummary

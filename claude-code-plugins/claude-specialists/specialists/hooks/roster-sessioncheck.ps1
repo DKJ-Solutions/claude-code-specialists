@@ -119,6 +119,15 @@ try {
     # [UNREGISTERED]/[INVENTORY] in connector-sessioncheck.
     $bootstrapLines = @($out | Where-Object { $_ -cmatch '\[BOOTSTRAP\]' })
 
+    # [ROSTER-PENDING] rides along the same way (inbound #333), and it exists because the DOCUMENTED HAPPY
+    # PATH ended in nineteen [ERROR] lines: measured on a virgin profile, in the session right after a
+    # completely successful specialists-init, one error per specialist saying it has no roster row. Nothing
+    # was broken -- the QUICKSTART tells that reader to fill the lenses in at their own pace -- and [ERROR]
+    # is the heaviest level these checks have. The cost is habituation: whoever learns to ignore nineteen
+    # false errors ignores the twentieth too. Deliberately NOT folded under [BOOTSTRAP], whose advice is
+    # "run specialists-init" -- advice this reader has just followed successfully.
+    $rosterPendingLines = @($out | Where-Object { $_ -cmatch '\[ROSTER-PENDING\]' })
+
     # [NOTHING-ENABLED] rides along the same way (inbound #294). THE DEFECT: this hook reported "roster
     # in sync with the enabled plugins" for a repo with 0 lenses and 0 roster rows, in the very session
     # that had loaded four of its skills and all three of its hooks -- because the check read
@@ -191,6 +200,12 @@ try {
         # from the roster/lenses" about a run that compared nothing at all -- the same species of
         # misdescription this whole change is about, one branch over.
         foreach ($line in $nothingEnabledLines) { Write-Host "  $($line.Trim())" }
+        # And the pending-roster marker, for the mixed state it can genuinely reach: every lens is still a
+        # scaffold and no roster row exists, while a specialist that arrived LATER with a plugin update has
+        # no lens either -- that one is real drift and errors, so both markers arrive together. Without this
+        # line the reader would be told a specialist is missing from the roster with no hint that the other
+        # eighteen are deliberately absent.
+        foreach ($line in $rosterPendingLines) { Write-Host "  $($line.Trim())" }
         # Same reasoning, one state over: without this line the headline says a specialist is missing from
         # the roster, about a plugin no session in this repo loads. The finding is real and the roster
         # genuinely lags -- but the reader's first move should be the install, not the roster.
@@ -219,6 +234,17 @@ try {
         foreach ($line in $notInstalledLines) { Write-Host "  $($line.Trim())" }
         # Same order-of-operations argument: bootstrapping a repo whose record is administered at the wrong
         # scope is not wrong, but the reader should know both facts before starting.
+        foreach ($line in $recordShapeLines) { Write-Host "  $($line.Trim())" }
+    } elseif ($rosterPendingLines.Count -gt 0) {
+        # Between [BOOTSTRAP] and the in-sync line, because that is where the state sits: the setup HAS
+        # happened, so "not set up yet" is wrong, and the roster is empty, so "in sync" is worse. The
+        # headline says what is true and what the reader is expected to do -- nothing, until they feel like
+        # it. This is the branch that replaces the nineteen [ERROR] lines a correct adoption used to produce.
+        Write-Host 'roster-sessioncheck: this repo is set up; the roster and lenses are still to be filled in:'
+        foreach ($line in $rosterPendingLines) { Write-Host "  $($line.Trim())" }
+        # The same order-of-operations lines as the branches above: a reader about to fill in a roster should
+        # know first if the plugin is not installed for this path or its record is shaped wrong.
+        foreach ($line in $notInstalledLines) { Write-Host "  $($line.Trim())" }
         foreach ($line in $recordShapeLines) { Write-Host "  $($line.Trim())" }
     } elseif ($nothingEnabledLines.Count -gt 0) {
         # Deliberately worded as what the check DID, not as a verdict about the repo: the honest answer
