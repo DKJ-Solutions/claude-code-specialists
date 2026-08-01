@@ -815,7 +815,7 @@ files and no tool that can still tell which of them it wrote Ã¢â‚¬â€ 
 in the files. Same class of trap, one step later: `-VendorScripts` has to be used while the plugin is
 still installed, or a consumer that built on the shared scripts loses its daily git workflow.
 
-## Two things measured while writing it, both of which the docs had wrong or missing
+#### Two things measured while writing it, both of which the docs had wrong or missing
 
 **1. The Quickstart said the CLI does not name `local`. It does.** The sentence read *"a third scope the
 CLI's own flag list does not mention"*. Re-measured August 1, 2026 on CLI `2.1.220` Ã¢â‚¬â€ the same version
@@ -840,7 +840,7 @@ names the plugin **heals its own uninstall**, silently, on the next session. Rem
 re-checking the record, or the verification keeps finding a record with a fresh timestamp and nothing to
 explain it.
 
-## The gate could not see the new page, and that is the part that got closed properly
+#### The gate could not see the new page, and that is the part that got closed properly
 
 `UNINSTALL.md` landed in the family directory and **no check looked at it**: not the dead-link scan, not
 check 11 (printed lifecycle commands), not check 12 (the install-record query) Ã¢â‚¬â€ all three take their
