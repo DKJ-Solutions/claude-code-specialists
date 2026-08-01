@@ -776,6 +776,15 @@ function Test-PluginInstalledHere {
 #     "installed" on the pathless record, while Get-RecordShape saw nothing to judge because it reads
 #     only records scoped to this path. Reported here since #323.
 #
+# A SECOND, INDEPENDENT REASON [NOT-INSTALLED-HERE] NEVER FIRES AT A SESSION START (inbound #327). The
+# reasoning below is about the record being written away before a hook can look. Round v10 measured the other
+# half: the session that writes the record LOADS NOTHING -- no skills, no subagents, no hook output at all,
+# because the record is written after the load phase and the hooks ship in the plugin that session did not
+# load. So even if the state survived, there would be nothing running to report it. Both halves have to be
+# true for the marker to be reachable from a session, and neither is. That is why this marker is documented
+# as reachable only by a DELIBERATE run, and why the workshop's own check-connectors -- which speaks about a
+# consumer from outside -- remains the only thing that can report the total case.
+#
 # "THE STATE HEALS ITSELF" WAS WRONG, AND IT IS WORTH KEEPING WHY. This block used to argue that
 # [NOT-INSTALLED-HERE] is practically unreachable because the missing-record state heals itself. Round v9
 # falsified that by the only test that settles it: after the first session start rewrote the
