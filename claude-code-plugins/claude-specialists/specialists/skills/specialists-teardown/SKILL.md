@@ -2,8 +2,8 @@
 name: specialists-teardown
 description: >-
   Remove what specialists-init put into a consuming repo, so the repo can stand free of the plugin:
-  the generated lens scaffolds, the two @-imports in CLAUDE.md, the untouched script-config
-  scaffolds and the settings proposal. Strictly subtractive and the mirror image of the bootstrap --
+  the generated lens scaffolds, the one @-import in CLAUDE.md plus the two inside the seam, the
+  untouched script-config scaffolds and the settings proposal. Strictly subtractive and the mirror image of the bootstrap --
   it never deletes anything the repo owner filled in, and never edits settings.json. Dry run by
   default. Use this when a consumer is being disconnected from the plugin, or to verify that
   adoption is genuinely reversible before relying on it.
@@ -102,9 +102,14 @@ authored.
   > exact.
 - **It never removes roster rows or repo-specific prose from `CLAUDE.md`.** Those are authored text in a
   file full of other authored text, and no rule this script could apply safely tells where a roster row
-  ends and your own prose begins. The only lines it touches there are the two `@`-imports, which are
+  ends and your own prose begins. The only line it touches there is the **single** seam `@`-import, which is
   knowably bootstrap-written and cannot be anything else -- the same property that let
-  `check-roster-sync` stop counting them as roster rows.
+  `check-roster-sync` stop counting them as roster rows. (The other two imports -- the persona body and the
+  lens -- live inside `.claude/specialists/SPECIALISTS.md`, which this script removes whole, so they need no
+  line-level handling. This page and the skill description said "the two `@`-imports in `CLAUDE.md`" until
+  August 1, 2026: a description left behind on the pre-seam layout, where both did sit in `CLAUDE.md`. It set
+  a false expectation for the very step the `[create]` -> `[remove]` table rests on, inbound
+  [#337](https://github.com/DaveKJohn/davekjohns-workshop/issues/337).)
 - **It never touches the plugin install or cache.** `claude plugin uninstall <plugin>@<marketplace>
   --scope project`, run from this repo's root, is a separate step. Keep the scope flag: like `plugin
   install` and `plugin update`, `uninstall` defaults to `--scope user` and will not find a

@@ -189,11 +189,21 @@ second, lasting source of diff.
 Both halves are measured (inbound
 [#303](https://github.com/DaveKJohn/davekjohns-workshop/issues/303), July 31, 2026):
 
-- **Key already present** — the order above, where act 1 (enable) writes it before act 3 (install)
-  runs. Then the content really does stay equivalent and only the formatting moves. Verified in
-  `davekjohns-workshop`,
-  where the key was already set: the same command left `settings.json` **byte-identical** (SHA256 equal
-  before and after, tree clean). The install writes only when there is something to write.
+- **Key already present** — the order above, where act 1 (enable) writes it before act 3 (install) runs.
+  Then the content stays **equivalent**: no plugin is switched on that was not on before, and any diff is
+  formatting. What you cannot count on is that there will be **no diff at all**. An earlier edition of this
+  page said the file stays *byte-identical* and that *"the install writes only when there is something to
+  write"*, on the strength of a single SHA256 comparison in `davekjohns-workshop`. Round v10 falsified the
+  general form (inbound
+  [#336](https://github.com/DaveKJohn/davekjohns-workshop/issues/336)): on a fresh Windows profile, with the
+  key present and written in exactly this order, `claude plugin install … --scope project` **rewrote the
+  file anyway** — `enabledPlugins` moved in front of `extraKnownMarketplaces` and the nested `source` object
+  was expanded onto separate lines. The likeliest reading is that the workshop's file already happened to
+  match the serialiser's own layout, which makes the old claim true of *that file* rather than of "key
+  already present" as a category. So: **expect a formatting diff even when the key is there, and expect no
+  behavioural change.** Honest note on the evidence: v10 did not capture a hash pair at the moment of the
+  install, so this is a description of what changed rather than a before/after hash — the ordering and the
+  expanded object are both observable in the after-state, and neither matches this page's own fragment.
 - **Key absent** — then the install **adds `enabledPlugins`, with `true` per plugin**, and that is not
   formatting: it switches the plugins **on** in a tracked governance file. Measured in
   `DaveKJohn/life-hub`, which is deliberately plugin-clean between adoption rounds, so the key was
@@ -249,6 +259,29 @@ proposal for safety settings (`settings.suggested.jsonc`, for your own
 review). The details of this path are in the
 [family README › Adoption](README.md#adoption-the-bootstrap-path) — which counts the steps there
 as "step 0" (enabling + installing, above) and "step 1" (the skill).
+
+**What it should report, so you can check it rather than trust it** (inbound
+[#337](https://github.com/DaveKJohn/davekjohns-workshop/issues/337)). With only the core `specialists`
+plugin enabled, the closing line reads:
+
+```
+Done: 4 persona-lens(es) created, 0 already present; 15 lens-scaffold(s) created, 0 already present;
+0 script-scaffold(s) created, 2 already present.
+```
+
+**4 personas + 15 subagent scaffolds = 19 lens files** in `.claude/specialists/lenses/`, plus 2 script
+scaffolds and 1 `@`-import. Those figures used to appear only in the skill's own `SKILL.md`, which a reader
+sees *after* invoking it — i.e. after the moment they would have needed them. This page is meticulous about
+counting everywhere else (*"the count is part of the check, not a detail"*, two steps up), and this was the
+one step where the script prints numbers with nothing to compare them against. If you enabled a domain group
+as well, expect its specialists on top; if a count is lower than this, something was already present or was
+skipped, and the skill says which.
+
+**And one thing it does that no document mentioned:** every file it writes uses **LF** line endings and
+`CLAUDE.md` gets **no trailing newline**, on Windows too. Harmless while nothing is committed, but on a repo
+whose files are CRLF this is the same class of lasting diff that `claude plugin install` is warned about a
+few paragraphs up — and the missing final newline turns any later hand-edit of `CLAUDE.md` into a two-line
+diff. If your repo cares, normalise once after the bootstrap.
 
 **Step 3 — restart and verify.** Start again and check that Chris takes the floor (every turn opens
 with a sender header such as `🧭 Chris — intake & routing`). Then, at your own pace, fill in the
