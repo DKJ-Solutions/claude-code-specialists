@@ -978,6 +978,48 @@ try {
     Assert-True ($r34e.Out -match 'entry-heading. CHANGELOG\.md:7') 'scenario 34: a numberless H3 in Pull Requests is reported, with its line'
     Assert-True ($r34e.Out -match 'cut-release') 'scenario 34: and the message names what would break'
 
+    # The H2 case, which is the one Rendall's lens actually documented (v2.13.2) and which the first version
+    # of this check MISSED: it gated H3 only, and the next release cut put two H2s from an older entry body
+    # into the generated notes as siblings of '## Fixes'. A gate that covers the instance you just met and
+    # not the one the docs warned about is half a gate.
+    $s34ClH2 = @(
+        '# Changelog'
+        ''
+        '## Pull Requests'
+        ''
+        '### #123 ' + [char]0x00B7 + ' A real entry ' + [char]0x00B7 + ' Fix ' + [char]0x00B7 + ' 2026-08-01'
+        ''
+        '## A sub-heading that climbs out of its category'
+        ''
+        '### Tested'
+        ''
+        '## Releases'
+        ''
+    )
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClH2 -join "`n") + "`n"), $Utf8NoBom)
+    $r34g = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34g.Out -match 'entry-heading. CHANGELOG\.md:7') 'scenario 34: an H2 inside Pull Requests is reported too, with its line'
+    Assert-True ($r34g.Out -match 'climbs out of its release category') 'scenario 34: and the message names the consequence in the notes'
+    # THE TRAP THIS GUARDS, tested on the property rather than on the error total (the fixture has its own
+    # expected noise, so a count assert would be brittle): the section scan must end at '## Releases'
+    # specifically, NOT at the next H2. Otherwise a stray H2 ends the scan at the very defect it is looking
+    # for and everything after it passes silently. The numberless H3 on line 9 sits AFTER the stray H2, so it
+    # can only be reported if the scan kept going. Measured: the first version broke on any H2 and reported
+    # neither of them.
+    Assert-True ($r34g.Out -match 'entry-heading. CHANGELOG\.md:9') 'scenario 34: and a defect AFTER the stray H2 is still reported -- the scan did not stop at it'
+
+    # An entry FILE with an H2 in its body: caught at the moment the author can still fix it.
+    $s34EntryH2 = @(
+        '### A fixture entry ' + [char]0x00B7 + ' Fix ' + [char]0x00B7 + ' 2026-08-01'
+        ''
+        '## Not allowed here'
+    )
+    [System.IO.File]::WriteAllText($s34Entry, (($s34EntryH2 -join "`n") + "`n"), $Utf8NoBom)
+    $r34h = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34h.Out -match 'entry-heading.*fix-a-branch-name\.md:3') 'scenario 34: an H2 in an entry body is reported on the PR'
+    Assert-True ($r34h.Out -match "a '## ' heading") 'scenario 34: and the message names the level it found'
+    Remove-Item -LiteralPath $s34Entry -Force
+
     # Scoped to the Pull Requests section: the Releases section legitimately holds '### vX.Y.Z' headings,
     # and reporting those would make the check fire on every repo that has ever released.
     $s34ClRel = @(

@@ -993,9 +993,15 @@ Write-Coverage -Category 'record-query' -Checked $irChecked `
 # '## On the tests' rendered as a release category). The warning did not stop it, which is the argument for
 # a gate rather than a sharper sentence: the rule is exactly checkable, so nobody should have to remember it.
 #
+# BOTH LEVELS, H2 AND H3, and the H2 half is the one the lens actually warned about. The first version of
+# this check gated H3 only -- and the very next release cut showed two H2 headings from an older entry body
+# sitting in the generated notes as siblings of '## Fixes' and '## Documentation', which is v2.13.2's defect
+# verbatim. A gate that covers the instance you just met and not the one the documentation warned about is
+# half a gate. An entry body may use '####' or bold; nothing above that.
+#
 # TWO PLACES, because they catch it at two different moments:
 #   - the root ENTRY FILES, which is where the author can still fix it on the PR. An entry file holds
-#     exactly ONE H3: its own heading, on the first line. Use '####' or bold for a sub-heading.
+#     exactly ONE heading at H3 or above: its own, on the first line.
 #   - CHANGELOG.md's '## Pull Requests' section, which is what cut-release actually parses. This half also
 #     catches damage that arrived through the fold -- the one write that happens directly on main, past
 #     every PR gate (the #234 lesson, one section over).
@@ -1012,8 +1018,10 @@ foreach ($ef in $entryFilesForHeadings) {
     $masked = Get-FenceMaskedText -Text ([System.IO.File]::ReadAllText($ef.FullName, [System.Text.Encoding]::UTF8))
     $ehLines = $masked -split "`r?`n"
     for ($i = 1; $i -lt $ehLines.Count; $i++) {
-        if ($ehLines[$i] -match '^###\s') {
-            $errors += "[entry-heading] ${rel}:$($i + 1): a second '### ' heading in an entry body. The entry's own heading is an H3, so this becomes a SEPARATE entry when the fold pastes it into CHANGELOG.md -- and cut-release.ps1 then emits it as an entry with no PR number, no type and no Plugins line. Use '#### ' or bold instead."
+        # '#', '##' or '###' -- anything at or above the entry's own level. '####' and deeper are fine.
+        if ($ehLines[$i] -match '^#{1,3}\s') {
+            $lvl = ($ehLines[$i] -replace '^(#+).*$', '$1')
+            $errors += "[entry-heading] ${rel}:$($i + 1): a '$lvl ' heading in an entry body, at or above the entry's own level. The entry heading is an H3, so an H3 becomes a SEPARATE entry when the fold pastes it into CHANGELOG.md -- and an H1/H2 climbs out of its release category and renders beside '## Fixes' in the generated notes (seen in v2.13.2). Use '#### ' or bold instead."
         }
     }
 }
@@ -1023,11 +1031,19 @@ if (Test-Path -LiteralPath $clForHeadings) {
     $ehChecked++
     $clMasked = Get-FenceMaskedText -Text ([System.IO.File]::ReadAllText($clForHeadings, [System.Text.Encoding]::UTF8))
     $clLines = $clMasked -split "`r?`n"
+    # The section ends at '## Releases' specifically, NOT at the next H2. That distinction is the point: a
+    # stray H2 from an entry body IS an H2, so breaking on any '## ' would end the scan at the very defect it
+    # is looking for -- and then silently pass everything after it. Measured: the first version broke on any
+    # H2 and reported nothing about the two stray ones in #321's entry.
     $inPr = $false
     for ($i = 0; $i -lt $clLines.Count; $i++) {
         if ($clLines[$i] -match '^##\s+Pull Requests\s*$') { $inPr = $true; continue }
-        if ($inPr -and $clLines[$i] -match '^##\s' ) { break }
-        if ($inPr -and $clLines[$i] -match '^###\s' -and $clLines[$i] -notmatch '^###\s+#\d+\s') {
+        if (-not $inPr) { continue }
+        if ($clLines[$i] -match '^##\s+Releases\s*$') { break }
+        if ($clLines[$i] -match '^#{1,2}\s') {
+            $lvl = ($clLines[$i] -replace '^(#+).*$', '$1')
+            $errors += "[entry-heading] CHANGELOG.md:$($i + 1): a '$lvl ' heading inside the Pull Requests section. It comes from an entry body and climbs out of its release category -- in the generated notes it renders beside '## Fixes' as if it were one (seen in v2.13.2). Demote it to '#### '."
+        } elseif ($clLines[$i] -match '^###\s' -and $clLines[$i] -notmatch '^###\s+#\d+\s') {
             $errors += "[entry-heading] CHANGELOG.md:$($i + 1): a '### ' heading in the Pull Requests section without a PR number. cut-release.ps1 splits entries on every '### ' line, so this is read as an entry it cannot categorise -- it is almost certainly a sub-heading from an entry body that should be '#### '."
         }
     }
