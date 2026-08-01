@@ -712,6 +712,31 @@ function Get-LintScript { return `$script:LintScript }
     Assert-Equal $scaffold.Prose.Count @($afterMd | Where-Object { Test-IsClaudeMdScaffoldProseLine -Line $_ }).Count `
         'fresh: and they are KEPT on disk -- reporting them is the fix, deleting prose is not this script''s job'
 
+    # --- inbound #356: the summary's figure must equal the markers printed above it ------------------
+    # This exact fixture is where they diverged, on the row #331 was filed for: two [KEEP] lines, a
+    # [note] saying "2 line(s)", and a summary saying "0 kept" -- because the scaffold-prose loop printed
+    # its own marker straight to the host and never touched $kept.
+    #
+    # Asserted as the INVARIANT (every marker is counted) rather than against the literal 2. Two reasons,
+    # and the second is the load-bearing one: a fixture that grows a third prose line must not need this
+    # test rewritten, and a hardcoded expectation could pass while both sides carried the same error --
+    # which is the failure this test exists to catch. Both modes, because #275 was preview and apply
+    # disagreeing over the other counter.
+    foreach ($run in @(@{ N = 'preview'; R = $fp }, @{ N = 'apply'; R = $fa })) {
+        $markers = @([regex]::Matches($run.R.Out, '(?m)^\s*\[KEEP\]\s')).Count
+        $sm = [regex]::Match($run.R.Out, 'Summary:\s+\d+ item\(s\) (?:to remove|removed),\s+(?<kept>\d+) kept\.')
+        Assert-True $sm.Success "fresh/$($run.N): the summary line is present and parseable"
+        Assert-Equal $markers ([int]$sm.Groups['kept'].Value) `
+            "fresh/$($run.N): the summary's kept figure equals the [KEEP] markers above it (#356)"
+        Assert-True ($markers -gt 0) "fresh/$($run.N): and it is a real check -- this fixture does print [KEEP] markers"
+    }
+    # The remedy is grouped, because the -EmptyLensPattern escape hatch is true of an unrecognised
+    # scaffold and false of a prose line in a governance file.
+    Assert-True ($fp.Out -match '(?m)^\s+Kept -- generated prose in a governance file') `
+        'fresh: kept prose is listed under its own remedy, not under the -EmptyLensPattern advice'
+    Assert-True (-not ($fp.Out -match "(?s)Kept -- generated prose in a governance file.*?EmptyLensPattern")) `
+        'fresh: and that advice is not repeated underneath it'
+
     # The second half of #331: scripts\lib\ survived every round as an empty directory, because the single
     # pruning pass ran before the only file in it was planned for removal.
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\lib'))) `

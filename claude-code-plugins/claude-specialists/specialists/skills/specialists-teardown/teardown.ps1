@@ -187,6 +187,32 @@ function Remove-IfApplying {
     Write-Host ("  [remove] " + $Label) -ForegroundColor Green
 }
 
+function Add-Kept {
+    <# THE ONE DOOR EVERY [KEEP] MARKER GOES THROUGH, so the markers a reader sees and the figure they
+       skim to cannot disagree. They did: the scaffold-prose lines in section 2 printed their own
+       [KEEP] line straight to the host and never touched $kept, so a run that printed two [KEEP]
+       markers and a [note] saying "2 line(s)" summarised itself as "0 kept" (inbound #356, test round
+       v11). Measured on the fresh-consumer row -- a repo with no CLAUDE.md before adoption -- which is
+       exactly the case #331 added that reporting for.
+
+       The same shape as the #275 preview/apply drift one category over: a second, private tally kept
+       beside the real one. The lesson there was one list, one number, one label per item; this applies
+       it to the kept side, which is the half that lesson did not reach.
+
+       $Advice groups the listing in the summary rather than describing the item. It has to: the
+       -EmptyLensPattern remedy is true of a file whose shape this script did not recognise, and simply
+       false of a prose line inside CLAUDE.md. One blanket paragraph over both would have to be wrong
+       for one of them, and the wrong half would be the advice to delete lines out of a governance
+       file. #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][string]$Detail,
+        [Parameter(Mandatory = $true)][ValidateSet('scaffold-shape', 'claude-md-prose')][string]$Advice
+    )
+    $script:kept += [pscustomobject]@{ Label = $Label; Detail = $Detail; Advice = $Advice }
+    Write-Host ("  [KEEP]   $Label -- $Detail") -ForegroundColor Yellow
+}
+
 # --- 1. Lens files on the plugin path ------------------------------------------------------------
 # Both layouts the bootstrap has ever used, so a repo adopted before #179 is torn down too.
 $lensDirs = @(
@@ -206,8 +232,8 @@ foreach ($dir in $lensDirs) {
             # establish authorship -- it can only say the file does not match a scaffold shape it
             # recognises. Claiming otherwise was measurably false in a real consumer, where 20 empty
             # lenses were reported as repo knowledge because they used that repo's own convention.
-            $kept += $rel
-            Write-Host ("  [KEEP]   $rel -- not recognised as an unfilled scaffold; this script does not judge it") -ForegroundColor Yellow
+            Add-Kept -Label $rel -Advice 'scaffold-shape' `
+                -Detail 'not recognised as an unfilled scaffold; this script does not judge it'
         }
     }
 }
@@ -228,8 +254,8 @@ if (Test-Path -LiteralPath $seam.Inclusion -PathType Leaf) {
     if (Test-LooksGenerated -Path $seam.Inclusion -Kind 'lens') {
         Remove-IfApplying -Path $seam.Inclusion -Label $inclRel
     } else {
-        $kept += $inclRel
-        Write-Host ("  [KEEP]   $inclRel -- not recognised as an unfilled scaffold; this script does not judge it") -ForegroundColor Yellow
+        Add-Kept -Label $inclRel -Advice 'scaffold-shape' `
+            -Detail 'not recognised as an unfilled scaffold; this script does not judge it'
         $notes += "$inclRel is kept, and after this run nothing loads it: the import line in CLAUDE.md is gone. It holds whatever roster/routing you wrote there -- move what you still want into CLAUDE.md by hand, or delete the file. This is the seam paying off: one named file to decide about, instead of a roster woven through CLAUDE.md."
     }
 }
@@ -356,12 +382,14 @@ if (Test-Path -LiteralPath $claudeMd -PathType Leaf) {
     # does not. Deleting sentences out of somebody's governance file to satisfy a counter is the wrong side
     # of that line. Per LINE rather than per file, following the same reasoning as the note above (#286):
     # the choice a reader makes here is per line. Literal from the shared source, never re-typed.
-    $scaffoldKept = 0
     for ($i = 0; $i -lt $lines.Count; $i++) {
         if (-not (Test-IsClaudeMdScaffoldProseLine -Line $lines[$i])) { continue }
-        Write-Host ("  [KEEP]   CLAUDE.md:$($i + 1) -- the bootstrap's scaffold prose; generated, but this script does not delete prose from a governance file") -ForegroundColor Yellow
-        $scaffoldKept++
+        Add-Kept -Label "CLAUDE.md:$($i + 1)" -Advice 'claude-md-prose' `
+            -Detail 'the bootstrap''s scaffold prose; generated, but this script does not delete prose from a governance file'
     }
+    # DERIVED from the one list, never counted alongside it. The note below and the summary's figure are
+    # two readings of the same thing, and the whole of #356 was them disagreeing.
+    $scaffoldKept = @($kept | Where-Object { $_.Advice -eq 'claude-md-prose' }).Count
     if ($scaffoldKept -gt 0) {
         $notes += "CLAUDE.md still holds $scaffoldKept line(s) of the scaffold prose specialists-init wrote when it CREATED that file. Generated rather than yours, but reported instead of removed: this script does not delete prose from a governance file. If your CLAUDE.md exists only because of the bootstrap, those line(s) plus the '# CLAUDE.md' heading are now all that is in it, and deleting the file outright is yours to decide."
     }
@@ -386,13 +414,13 @@ foreach ($pair in @(
     if (Test-LooksGenerated -Path $path -Kind $pair.Kind) {
         Remove-IfApplying -Path $path -Label $pair.Rel
     } else {
-        $kept += $pair.Rel
         # "not recognised as an unfilled scaffold", NOT "filled in" (inbound #271). The summary block at
         # the end was corrected after davekokbwj/smartwatchbanden -- where 20 genuinely empty lenses were
         # reported as authored because they used that repo's own convention -- but this per-item line kept
         # the old claim, so the run asserted authorship in one place and hedged in the other. The script
         # cannot establish who wrote a file; it can only say the content does not match a shape it knows.
-        Write-Host ("  [KEEP]   $($pair.Rel) -- not recognised as an unfilled scaffold; it holds this repo's $($pair.What), which outlives the plugin") -ForegroundColor Yellow
+        Add-Kept -Label $pair.Rel -Advice 'scaffold-shape' `
+            -Detail "not recognised as an unfilled scaffold; it holds this repo's $($pair.What), which outlives the plugin"
     }
 }
 
@@ -749,12 +777,28 @@ Write-Host ''
 # "kept", not "kept (authored)". The script cannot establish authorship, and saying so was measurably
 # wrong: 20 empty lenses in a real consumer were reported as authored because they used that repo's own
 # convention rather than this plugin's scaffold shape.
+#
+# THE NUMBER IS NOW THE MARKERS, because it was not (inbound #356). Every [KEEP] line goes through
+# Add-Kept, so this figure counts exactly what the run printed. A reader skims to this line before they
+# read anything above it, which is why a summary contradicting its own markers is worse than a missing
+# one: it is the failure mode #331 was filed about, occurring inside the repair for it.
 Write-Host ("Summary: " + $removed.Count + " item(s) " + $(if ($Apply) { 'removed' } else { 'to remove' }) + ", " + $kept.Count + " kept.") -ForegroundColor Cyan
-if ($kept.Count -gt 0) {
+# Grouped by remedy rather than listed flat. The -EmptyLensPattern escape hatch answers "this file is
+# empty under a convention you do not know"; it says nothing useful about a prose line in CLAUDE.md, and
+# printing it over both would advise deleting sentences out of a governance file -- the one thing this
+# script refuses to do itself.
+$keptScaffold = @($kept | Where-Object { $_.Advice -eq 'scaffold-shape' })
+$keptProse    = @($kept | Where-Object { $_.Advice -eq 'claude-md-prose' })
+if ($keptScaffold.Count -gt 0) {
     Write-Host "  Kept -- not recognised as an unfilled scaffold. Review them: some may be empty under a" -ForegroundColor Yellow
     Write-Host "  convention this plugin does not know, in which case they are yours to delete (or re-run" -ForegroundColor Yellow
     Write-Host "  with -EmptyLensPattern '<your marker>' to have them recognised):" -ForegroundColor Yellow
-    foreach ($k in $kept) { Write-Host "    $k" }
+    foreach ($k in $keptScaffold) { Write-Host "    $($k.Label)" }
+}
+if ($keptProse.Count -gt 0) {
+    Write-Host "  Kept -- generated prose in a governance file. Reported rather than removed; deleting" -ForegroundColor Yellow
+    Write-Host "  sentences out of your CLAUDE.md is your call, not this script's:" -ForegroundColor Yellow
+    foreach ($k in $keptProse) { Write-Host "    $($k.Label)" }
 }
 foreach ($n in $notes) { Write-Host "  [note] $n" }
 if (-not $Apply -and $removed.Count -gt 0) {

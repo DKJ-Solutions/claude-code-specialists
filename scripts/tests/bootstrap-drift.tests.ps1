@@ -123,6 +123,22 @@ try {
     # it has to be a path they can act on.
     Assert-True ($r1.Out -match [regex]::Escape((Join-Path $Fixture '.claude\settings.suggested.jsonc'))) 'the proposal is announced by FULL path -- git cannot announce it in a repo that ignores .claude/*'
 
+    # --- inbound #363: the proposal must not invite copying a hook that points at nothing -------------
+    # The Stop hook names a script this bootstrap does not create and nothing else ships. The file itself
+    # said "STUB" twice already; what it lacked was a path a reader could not mistake for a real one, and
+    # a console step 3 that named the exception while inviting "copy desired parts". Both asserted,
+    # because the warning being present somewhere is exactly what made this survive to v11.
+    $suggestText = [System.IO.File]::ReadAllText((Join-Path $Fixture '.claude\settings.suggested.jsonc'))
+    Assert-True ($suggestText -match 'scripts/maintenance/<[^>]+>\.ps1') `
+        'the proposed hook path is visibly a placeholder, not a plausible-looking real path (#363)'
+    Assert-True (-not ($suggestText -match 'lint-changed-hook\.ps1')) `
+        'and the old copyable-looking name is gone'
+    Assert-True ($r1.Out -match "(?s)Copy desired parts.*?'permissions' block is ready to use.*?'hooks' block is NOT") `
+        'step 3 names which block is ready to use and which is not -- the caveat sits where the invitation is'
+    # Trailing newline. The here-string ends at its closing brace and WriteAllText adds nothing; the
+    # #337.2 warning covers CLAUDE.md and not this file, so nothing pointed at it.
+    Assert-True ($suggestText.EndsWith("`n")) 'settings.suggested.jsonc ends in a newline (#363)'
+
     # --- 1b. Register proposal: the bootstrap points at the workshop register (gap found 2026-07-28) --
     #     Bootstrapping a consumer used to leave no trace towards the connector register, and nothing
     #     else filled that gap -- a third consumer ran unregistered for days while the workshop stayed
