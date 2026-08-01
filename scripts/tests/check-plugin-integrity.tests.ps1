@@ -867,6 +867,47 @@ try {
     Assert-True (-not ($rQ32.Out -match $RecordQueryFindingPattern)) 'scenario 32: prose discussing the file is never an instruction'
     Assert-True ($rQ32.Out -match '\[record-query\] checked 0') 'scenario 32: nothing enforced'
 
+    # --- Scenario 33: a NEW family-level doc is in the scan set without being named ------------------
+    #     The scan set for checks 11 and 12 (and the dead-link scan) used to be a hardcoded list of two
+    #     family docs, 'README.md' and 'QUICKSTART.md'. UNINSTALL.md was then written beside them and no
+    #     gate saw it -- a brand-new consumer-facing page printing exactly the class of command these two
+    #     checks exist to police, invisible on the run that introduced it. #103 had closed the same gap by
+    #     ADDING the two names, which is why a third name would have repeated the fix instead of closing
+    #     the class: such a list is only ever correct until the next document is written, and nothing
+    #     announces the omission.
+    #
+    #     So the assertion is deliberately about a file this suite has never heard of either. Its name is
+    #     arbitrary on purpose -- if this scenario ever has to be updated because a real doc got that
+    #     name, the enumeration has stopped being an enumeration.
+    Write-Host 'scan set -- a family doc nobody named is still scanned (checks 11 + 12)' -ForegroundColor Cyan
+    $s33Path = Join-Path $Fixture 'claude-code-plugins\claude-specialists\ZZ-NEWLY-WRITTEN-PAGE.md'
+    $s33 = @(
+        '# A page written after the scan set was last touched'
+        ''
+        'Remove it again:'
+        ''
+        '```powershell'
+        'claude plugin uninstall specialists@davekjohns-workshop'
+        '```'
+    )
+    [System.IO.File]::WriteAllText($s33Path, (($s33 -join "`n") + "`n"), $Utf8NoBom)
+    $r33 = Invoke-Integrity -FixtureRoot $Fixture
+    # NOT asserted on the exit code, and that is a measurement rather than an oversight. Run against the
+    # pre-fix scan set this scenario's exit code was 1 either way, so `Assert-Equal 1 $r33.Code` passed in
+    # both worlds -- a green that proves nothing, which is the exact failure mode this suite keeps
+    # catching in the checks it tests. The discriminating assertions are the ones naming the file.
+    Assert-True ($r33.Out -match [regex]::Escape('ZZ-NEWLY-WRITTEN-PAGE.md')) 'scenario 33: the finding names the file that no line of the scan set mentions'
+    Assert-True ($r33.Out -match 'scope') 'scenario 33: and it is the scope rule that catches it'
+    # The same file is a subject for check 12 as well, which is the half that would fail if the widening
+    # had been applied to only one of the two checks that share $linkFiles.
+    [System.IO.File]::WriteAllText($s33Path, ((@('# Still unnamed', '') + (@($rqFull) -replace ' \$\(\$_\.gitCommitSha\)', '')) -join "`n") + "`n", $Utf8NoBom)
+    $r33b = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r33b.Out -match [regex]::Escape('ZZ-NEWLY-WRITTEN-PAGE.md') + ".*does not name 'gitCommitSha'") 'scenario 33: check 12 reaches the same unnamed file'
+    Remove-Item -LiteralPath $s33Path -Force
+    # And the removal is itself asserted, so a later scenario cannot inherit a stray subject from this one.
+    $r33c = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r33c.Out -match [regex]::Escape('ZZ-NEWLY-WRITTEN-PAGE.md'))) 'scenario 33: the fixture is left as it was found'
+
     # Leaves the fixture with a history-only mention again, which the coverage block below relies on.
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s24Contributing -join "`n") + "`n"), $Utf8NoBom)
 

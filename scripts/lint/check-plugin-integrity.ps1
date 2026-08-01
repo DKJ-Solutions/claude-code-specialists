@@ -311,13 +311,24 @@ foreach ($root in 'README.md', 'CHANGELOG.md', 'CLAUDE.md', 'CONTRIBUTING.md') {
 # The specialists handbook lives next to the lenses (at family level) -- validate its links too.
 $handbook = Join-Path $RepoRoot '.claude\plugins\claude-specialists\README.md'
 if (Test-Path -LiteralPath $handbook) { $linkFiles += $handbook }
-# The family README + QUICKSTART.md of the specialists family (claude-code-plugins/claude-specialists/)
-# and every plugin's own CHANGELOG.md (the consumer-facing card that cut-release.ps1 updates)
-# did not yet belong to the scan set -- added (#103).
-foreach ($familyDoc in 'README.md', 'QUICKSTART.md') {
-    $p = Join-Path $RepoRoot "claude-code-plugins\claude-specialists\$familyDoc"
-    if (Test-Path -LiteralPath $p) { $linkFiles += $p }
-}
+# The family-level docs of the specialists family (claude-code-plugins/claude-specialists/*.md) and
+# every plugin's own CHANGELOG.md (the consumer-facing card that cut-release.ps1 updates) did not yet
+# belong to the scan set -- added (#103).
+#
+# ENUMERATED, NOT NAMED, AND THAT IS THE POINT. This was a hardcoded list of two ('README.md',
+# 'QUICKSTART.md') until UNINSTALL.md was written beside them and no gate saw it: not the dead-link
+# scan, not check 11 (printed lifecycle commands), not check 12 (the install-record query) -- all three
+# derive their scan set from $linkFiles. A brand-new consumer-facing page, printing exactly the class of
+# command those two checks exist to police, was invisible on the run that introduced it.
+#
+# The same gap is what #103 closed by ADDING the two names, which is why naming a third would have been
+# repeating the fix rather than closing the class: the list is only ever correct until the next document
+# is written, and nothing announces the omission. This directory holds the family's consumer-facing
+# pages and nothing else, so its own *.md IS the set -- non-recursive on purpose, since the per-plugin
+# subdirectories are gathered by their own rules below (CHANGELOG.md here, RELEASE.md and SKILL.md
+# further down) and would otherwise be picked up twice.
+$linkFiles += (Get-ChildItem -Path (Join-Path $RepoRoot 'claude-code-plugins\claude-specialists') -Filter '*.md' -File |
+    Select-Object -ExpandProperty FullName)
 # The connectors README (claude-code-plugins/claude-specialists/connectors/) did not yet belong to
 # the scan set either -- added alongside CONTRIBUTING.md (#159 follow-up, spotted by Edith).
 $connectorsReadme = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists\connectors\README.md'

@@ -270,8 +270,12 @@ against a path that already carried a record **added a second one beside it** in
 reporting `✔ Successfully installed … (scope: project)` both times. Two lines for one plugin is not a
 display quirk — it is the stray second record, and the count in that query is the only signal you get.
 
-**And there is a third scope the CLI's own flag list does not mention: `local`.** It is what a *session
-start* writes — enabling a plugin is enough for one to create a missing record, and to flip an existing
+**And there is a third scope this family's documents had not accounted for: `local`.** The CLI does name
+it — re-measured on August 1, 2026, CLI `2.1.220`, and worth stating precisely because an earlier version
+of this sentence claimed the opposite: `install`, `uninstall` and `disable` each print
+*"user, project, or local"* in their own `--help`, and `update` prints a fourth, `managed`. So the flag
+list was never the gap; **these pages were**, which is why the state was met by a reader with nothing to
+look it up in. It is what a *session start* writes — enabling a plugin is enough for one to create a missing record, and to flip an existing
 `project` record to `local`, with no command run, no file in your repo changed, and nothing reporting it
 (inbound [#314](https://github.com/DaveKJohn/davekjohns-workshop/issues/314)). Two consequences worth
 holding on to: the "enabled but not installed" state **heals itself**, so a check that looks for it will
@@ -300,6 +304,15 @@ it excludes any skill with `disable-model-invocation: true`. Several of `special
 (`cut-release`, `fold-changelog`, `open-pr`, `park`) are slash-only for exactly that reason, so an
 unchanged count, or even `0 skills`, proves nothing about whether a new skill has actually landed.
 The only reliable check is the slash list itself.
+
+## Getting out again
+
+Adoption is reversible by design, and the procedure has its own page: **[UNINSTALL.md](UNINSTALL.md)** —
+the mirror of this one. Two things from it are worth knowing *before* you adopt rather than after. The
+removal is **two** removals, out of your repo and off your machine, and they are done in that order
+because the teardown skill ships inside the plugin you would be uninstalling. And if you build on the
+shared workflow scripts, that dependency is not something a teardown can undo for you — the page says
+what to do about it while you still can.
 
 ## Reporting back or improving something
 
