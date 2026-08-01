@@ -97,7 +97,15 @@ exit 1
         $out = (& powershell @shipArgs 2>&1 | Out-String)
         $code = $LASTEXITCODE
         $log = if (Test-Path $callLog) { Get-Content -Path $callLog } else { @() }
-        return [pscustomobject]@{ Output = $out; ExitCode = $code; Log = @($log) }
+        # Output is whitespace-NORMALIZED here, once, for every scenario. The child renders
+        # Write-Host/Write-Warning at ITS OWN console buffer width, so any phrase an assert matches can
+        # be split by a line wrap -- and the wrap point depends on the width and on the repo's path
+        # length, which differ between a dev machine and CI. This suite learned that the expensive way:
+        # a 'gh issue list' assert passed locally and failed on CI, in the same class of bug a
+        # copy-edit pass had just reported for the sibling suite. Fixing it per-assert there and not
+        # here is precisely the instance-instead-of-class mistake, so it is centralized: no assert in
+        # this file CAN be width-fragile.
+        return [pscustomobject]@{ Output = ($out -replace '\s+', ' '); ExitCode = $code; Log = @($log) }
     }
 
     Write-Host "A declared issue that GitHub left open is closed, comment first" -ForegroundColor Cyan

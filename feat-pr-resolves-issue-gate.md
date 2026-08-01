@@ -72,8 +72,17 @@ page boundary would read as "not open" and let the gate pass in silence.
 **Edith found a test that passes or fails depending on console width.** The blocked-gate assert matched
 a literal phrase in `Write-Error` output, and the child renders that at its own buffer width — with
 this repo's path length the wrap can land mid-phrase, so it failed consistently at width 120 while
-passing at another. Both gate-output asserts now normalize whitespace first. The same wrap hazard was
-already documented in this suite for the #86 pre-flight pointers; this is its second instance.
+passing at another. The same wrap hazard was already documented in this suite for the #86 pre-flight
+pointers; this was its second instance.
+
+**And then it cost a red CI run, because the first fix was per-assert.** Both gate-output asserts in
+`shared-scripts.tests.ps1` were normalized — and the *sibling* suite, written the same afternoon, kept
+matching `gh issue list` in a `Write-Warning`. Locally green, red on CI at its width, one assert out of
+31, nothing merged. Fixing the two visible asserts instead of the shape that produced them is exactly
+the instance-instead-of-class mistake this repo has a standing rule against, and the rule caught its own
+author. The fixture now normalizes whitespace **once, centrally**, so no assert in that file *can* be
+width-fragile. Verified against the failing phrase directly: with the wrap in place the raw match is
+`False` and the normalized match is `True`.
 
 ### Tested
 
