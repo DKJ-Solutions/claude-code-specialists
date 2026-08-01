@@ -236,16 +236,51 @@ past the `v3.0.8` tag — unreleased `main` — and the payload genuinely differ
 differently on the tag and in the installed cache). `plugin.json` carries `3.0.8` on both commits, so the
 version string cannot express the difference; the sha was the only field that could, and it was printed
 nowhere (inbound
-[#313](https://github.com/DaveKJohn/davekjohns-workshop/issues/313)). To tell which you are on, compare it
-with the tag in the cached marketplace clone:
+[#313](https://github.com/DaveKJohn/davekjohns-workshop/issues/313)).
+
+**Do not try to resolve the release tag in the cached clone — that comparison is not answerable there**
+(inbound [#322](https://github.com/DaveKJohn/davekjohns-workshop/issues/322)). Earlier editions of this step
+prescribed `git … rev-list -n1 v3.0.8` against
+`~\.claude\plugins\marketplaces\davekjohns-workshop` and offered a binary reading: equal means the release,
+different means `main`. Three measured facts about that clone break it:
+
+- it is **shallow** (`.git/shallow` present), and its fetch refspec is
+  `+refs/heads/main:refs/remotes/origin/main` — **`main` only, no tags**;
+- so its tag set is frozen at whatever came along when the clone was created, and drifts further behind
+  with every release. Measured the same day on two machines: newest tag **`v2.7.3`** on one and
+  **`v3.0.8`** on another, while both served a `3.0.9` payload;
+- **the command therefore succeeds on one machine and fails on another, for the same version.** The
+  example above resolved fine where the clone happened to carry `v3.0.8` and returned
+  `fatal: ambiguous argument 'v3.0.8'` where it did not.
+
+That last one is why this is worse than a broken command: the reading had no branch for `fatal:`, and the
+natural interpretation of a failure is *"not equal, so I am on `main`"* — which in the measured case was
+**exactly backwards**, because that consumer's sha *was* the release tag's commit. An instruction that
+inverts its answer on some machines and not others cannot be verified by the reader who runs it once.
+
+**If the `fatal: ambiguous argument` line is what you get, that is expected and it is evidence of
+nothing** — the tag is simply not in your clone.
+
+**What you can answer locally** is a narrower question — is the cache I installed from at the same commit
+the clone sits on now?
 
 ```powershell
-git -C "$env:USERPROFILE\.claude\plugins\marketplaces\davekjohns-workshop" rev-list -n1 v3.0.8
+git -C "$env:USERPROFILE\.claude\plugins\marketplaces\davekjohns-workshop" rev-parse HEAD
 ```
 
-Equal means you are on that release. Different means you are on `main` — see
-[Staying up to date](../../../QUICKSTART.md#staying-up-to-date) for why that happens without anyone asking
-for it, and why it is not something you can fix from here.
+That works on a shallow, tag-less clone. Note what it is not: the clone and the version-pinned install
+cache your record names in `installPath` are **two different directories**, so this tells you about the
+clone, not about your payload. It is honest about what is knowable here.
+
+**To identify the release, ask the source rather than the cache** — the tags live there:
+
+```powershell
+gh api repos/DaveKJohn/davekjohns-workshop/tags --jq '.[] | select(.name=="v3.0.9") | .commit.sha'
+```
+
+Equal to your record's `gitCommitSha` means you are on that release; different means you are on `main` —
+see [Staying up to date](../../../QUICKSTART.md#staying-up-to-date) for why that happens without anyone
+asking for it, and why it is not something you can fix from here.
 
 **One** line per plugin you enabled, each saying `project`, is the green you need — and the *count*
 carries as much of the verdict as the word does.
@@ -260,13 +295,27 @@ own repo's query while 4 skills and 15 subagents were loaded from it. The action
 the reason matters, because "empty" reads as "nothing installed" and here it meant "installed, but no
 longer keyed to this path".
 
-**Two lines for the same plugin is the stray second record this step warns about just above, and it is
-not hypothetical: the repair install prescribed for a missing record produces it.** Measured in
-`DaveKJohn/life-hub` on July 31, 2026, CLI `2.1.220` (inbound
-[#315](https://github.com/DaveKJohn/davekjohns-workshop/issues/315)): a project-scoped install run
-against a path that already had a record **added a second record beside it** rather than correcting the
-first, and both reported `✔ Successfully installed`. So the state this step calls green can be broken by
-the remedy this document prescribes, and the line count is the only thing that shows it.
+**Two lines for the same plugin is the stray second record this step warns about just above, and it is not
+hypothetical — but the trigger is narrower than it first looks: it is a scope MISMATCH, not the mere
+existence of a record.** Both halves are measured, a day apart, CLI `2.1.220`:
+
+- **A record at a *different* scope accumulates.** In `DaveKJohn/life-hub` on July 31, 2026 (inbound
+  [#315](https://github.com/DaveKJohn/davekjohns-workshop/issues/315)) a project-scoped install run against
+  a path that already carried a **`local`** record **added a second record beside it** rather than
+  correcting it, and both reported `✔ Successfully installed`.
+- **A record at the *same* scope is replaced cleanly.** Reproduced deliberately on August 1, 2026 against
+  `3.0.9` (inbound [#325](https://github.com/DaveKJohn/davekjohns-workshop/issues/325)): a project-scoped
+  install against a path that already had a **`project`** record left **one** record, with a fresh
+  `installedAt` — and the query afterwards printed exactly the one-line-per-plugin green this step defines.
+
+**Why the narrower statement matters more than the correction.** Read as *"a path that already had a
+record"*, the warning fires against the **normal, safe** repair — re-installing at project scope over a
+project record, which is the ordinary way to restore a repo, and precisely what step 0b prescribes. A reader
+who believed the broad version had no safe repair left at all. So the rule to carry away is one line:
+**before a repair install, read the scope of what is already there** — remove at *that* scope first, or the
+install adds beside it. That also fits the CLI's uninstall behaviour, which is scope-keyed throughout, and it
+makes the fourth state below consistent: a repair install against a demoted, pathless record is itself a
+scope mismatch, so the duplicate would come back.
 
 Three scopes can turn up in that output, and the third one is not in the CLI's flag list. A fourth state
 turns up as **no output at all**:
