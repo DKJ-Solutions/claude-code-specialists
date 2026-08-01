@@ -981,6 +981,61 @@ $irSkipNote = "$irMentions fenced block(s) naming the file without parsing it sk
 Write-Coverage -Category 'record-query' -Checked $irChecked `
     -Note $(if ($irChecked -eq 0) { "no printed query reads installed_plugins.json anywhere in the scan set -- nothing to enforce, which is not the same as the docs being right ($irSkipNote)" } else { "$irSkipNote; history excluded as in check 11" })
 
+# --- 13. entry heading levels: a sub-heading inside an entry body cannot be an entry itself --------------
+# THE DEFECT, and it is this repo's own, four times in one day. An entry body used '### Tested' as a
+# sub-heading. The entry heading is ITSELF an H3, so those became siblings: after the fold, CHANGELOG.md's
+# '## Pull Requests' section carried four headings with no PR number. That is not cosmetic --
+# release-lib.ps1's Read-Changelog splits entries on EVERY unfenced '^###\s' line, so cut-release.ps1 would
+# have emitted four extra "entries" with no number, no type and no Plugins line, and grouped them under
+# whatever category came last.
+#
+# Rendall's lens already warned about the '##' version of this (seen in v2.13.2, where a body's
+# '## On the tests' rendered as a release category). The warning did not stop it, which is the argument for
+# a gate rather than a sharper sentence: the rule is exactly checkable, so nobody should have to remember it.
+#
+# TWO PLACES, because they catch it at two different moments:
+#   - the root ENTRY FILES, which is where the author can still fix it on the PR. An entry file holds
+#     exactly ONE H3: its own heading, on the first line. Use '####' or bold for a sub-heading.
+#   - CHANGELOG.md's '## Pull Requests' section, which is what cut-release actually parses. This half also
+#     catches damage that arrived through the fold -- the one write that happens directly on main, past
+#     every PR gate (the #234 lesson, one section over).
+# Fence-aware in both, via the same Get-FenceMaskedText the other checks use: an entry that QUOTES a '###'
+# line inside a code fence is discussing structure, not creating it -- the mention-versus-use question this
+# file has now answered four times.
+$ehChecked = 0
+
+$entryFilesForHeadings = @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
+    Where-Object { Test-IsChangelogEntryFile -Path $_.FullName })
+foreach ($ef in $entryFilesForHeadings) {
+    $ehChecked++
+    $rel = $ef.FullName.Substring($RepoRoot.Length).TrimStart('\', '/')
+    $masked = Get-FenceMaskedText -Text ([System.IO.File]::ReadAllText($ef.FullName, [System.Text.Encoding]::UTF8))
+    $ehLines = $masked -split "`r?`n"
+    for ($i = 1; $i -lt $ehLines.Count; $i++) {
+        if ($ehLines[$i] -match '^###\s') {
+            $errors += "[entry-heading] ${rel}:$($i + 1): a second '### ' heading in an entry body. The entry's own heading is an H3, so this becomes a SEPARATE entry when the fold pastes it into CHANGELOG.md -- and cut-release.ps1 then emits it as an entry with no PR number, no type and no Plugins line. Use '#### ' or bold instead."
+        }
+    }
+}
+
+$clForHeadings = Join-Path $RepoRoot 'CHANGELOG.md'
+if (Test-Path -LiteralPath $clForHeadings) {
+    $ehChecked++
+    $clMasked = Get-FenceMaskedText -Text ([System.IO.File]::ReadAllText($clForHeadings, [System.Text.Encoding]::UTF8))
+    $clLines = $clMasked -split "`r?`n"
+    $inPr = $false
+    for ($i = 0; $i -lt $clLines.Count; $i++) {
+        if ($clLines[$i] -match '^##\s+Pull Requests\s*$') { $inPr = $true; continue }
+        if ($inPr -and $clLines[$i] -match '^##\s' ) { break }
+        if ($inPr -and $clLines[$i] -match '^###\s' -and $clLines[$i] -notmatch '^###\s+#\d+\s') {
+            $errors += "[entry-heading] CHANGELOG.md:$($i + 1): a '### ' heading in the Pull Requests section without a PR number. cut-release.ps1 splits entries on every '### ' line, so this is read as an entry it cannot categorise -- it is almost certainly a sub-heading from an entry body that should be '#### '."
+        }
+    }
+}
+
+Write-Coverage -Category 'entry-heading' -Checked $ehChecked `
+    -Note $(if ($entryFilesForHeadings.Count -eq 0) { 'no unfolded entry file in the root, so only CHANGELOG.md was judged -- normal between merges' } else { "$($entryFilesForHeadings.Count) unfolded entry file(s) plus CHANGELOG.md" })
+
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {
     Write-Host "  No findings." -ForegroundColor Green
