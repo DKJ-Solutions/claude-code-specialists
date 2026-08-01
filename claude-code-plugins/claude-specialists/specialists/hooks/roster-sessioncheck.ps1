@@ -27,12 +27,17 @@
         along with the drift and bootstrap branches, whose headlines would otherwise describe a
         specialist surface no session in this repo has. Its per-plugin [INFO] lines stay out, as with
         orphans;
-      - and for [RECORD-SHAPE] (inbound #314/#315), which is the marker that catches what a session start
-        leaves BEHIND rather than what it removed: a record scoped 'local' instead of 'project', or two
-        records where the documents assume one. It gets its own verdict and rides along with the drift,
-        bootstrap and not-installed branches. That verdict is the point of it -- on a clean run the state
-        would otherwise arrive as "roster in sync", which is true about the roster and the most misleading
-        thing this hook could say to that reader;
+      - and for [RECORD-SHAPE] (inbound #314/#315/#323), which is the marker that catches what a session
+        start leaves BEHIND rather than what it removed: a record scoped 'local' instead of 'project', two
+        records where the documents assume one, or a 'project' record demoted to a pathless 'user' one. It
+        gets its own verdict and rides along with the drift, bootstrap and not-installed branches. That
+        verdict is the point of it -- on a clean run the state would otherwise arrive as "roster in sync",
+        which is true about the roster and the most misleading thing this hook could say to that reader.
+        UNLIKE the two markers above, its per-plugin detail lines DO come through (inbound #324): they
+        carry the marker themselves for that reason. The difference is not inconsistency but content --
+        an orphan's [INFO] line restates the headline, while these lines carry the REMEDY, and the three
+        shapes have three different ones. A roll-up that names a problem and withholds the only actionable
+        half is where the previous version stopped;
       - the check's [SCOPE] line travels along with those signals, so a surfaced finding always names
         the repo the check resolved -- and whether that root came from CLAUDE_PROJECT_DIR or from the
         working-directory git-root fallback (inbound #203);
@@ -151,12 +156,20 @@ try {
     # covered from the workshop by check-connectors, which can speak about a consumer that has gone silent.
     $notInstalledLines = @($out | Where-Object { $_ -cmatch '\[NOT-INSTALLED-HERE\]' })
 
-    # [RECORD-SHAPE] rides along the same way (inbound #314/#315), and it exists because of the measurement
-    # in the comment just above: what a session start leaves behind is not "no record" but a record scoped
-    # 'local' instead of 'project' -- and, after the prescribed repair install, sometimes two records where
-    # the documents assume one. Both are real, both are actionable, the plugin loads either way, and until
-    # v8 nothing reported either. Kept out of $signals for the same reason as the other four markers: an
-    # exit code and a red line would claim something is broken when nothing is.
+    # [RECORD-SHAPE] rides along the same way (inbound #314/#315/#323), and it exists because of the
+    # measurement in the comment just above: what a session start leaves behind is not "no record" but a
+    # record of the wrong shape -- scoped 'local' instead of 'project', or two records where the documents
+    # assume one, or (v9) an existing 'project' record DEMOTED to a pathless 'user' one. All three are real
+    # and actionable, the plugin loads in each, and until v8/v9 nothing reported any of them. Kept out of
+    # $signals for the same reason as the other four markers: an exit code and a red line would claim
+    # something is broken when nothing is.
+    #
+    # This filter now also carries the PER-PLUGIN DETAIL lines, and that is deliberate (inbound #324). They
+    # used to be [SKIP] lines and were therefore dropped here, while the roll-up ended with "Details below."
+    # -- a promise that was true when the check is run by hand and false in exactly the context that needs
+    # it most, because the REMEDY lives only in those lines. They now carry the marker themselves, so no
+    # change is needed here beyond knowing that a run can forward more than one line per plugin: at most
+    # one roll-up plus one detail per enabled plugin. That is bounded and it is the actionable half.
     $recordShapeLines = @($out | Where-Object { $_ -cmatch '\[RECORD-SHAPE\]' })
 
     # Did the child run to completion? Write-CheckSummary's "Summary: N error(s)" line is the check's

@@ -454,14 +454,32 @@ try {
     Assert-True ($shape.Shapes -contains 'no-project-scope') 'two local records: AND no-project-scope -- both shapes can hold at once'
     Assert-Equal 1 $shape.Scopes.Count 'two local records: the scope list is deduplicated'
 
-    # The three states that are somebody else's subject, asserted so this predicate cannot grow into them.
-    # A pathless (user-scope) record is 0b's documented warning; 'user' is also "not project", which is
-    # exactly why the silence has to be pinned.
+    # THE #323 CASE: a 'project' record demoted to a pathless one. THIS ASSERTION IS THE REVERSE OF WHAT IT
+    # USED TO BE, deliberately. It used to read "pathless record: not this predicate -- it judges only
+    # records scoped to THIS path", pinning the silence on the grounds that a pathless record is step 0b's
+    # scopeless-install warning. Round v9 measured the case the old reasoning had no room for: a session
+    # start REWRITES a correct 'project' record into a pathless 'user' one, with no command run, so the
+    # owner cannot be an install warning. The repo is then absent from its own verification query while the
+    # plugin loads, and neither marker said anything -- each correct by its own rule. It is this predicate's
+    # subject now.
     [System.IO.File]::WriteAllText($adminFile, '{ "plugins": { "p@m": [ { "scope": "user" } ] } }')
     $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
-    Assert-True ($null -eq (Get-RecordShape -InstallRecord $r -PluginId 'p@m')) 'pathless record: not this predicate -- it judges only records scoped to THIS path'
-    # No record at all is [NOT-INSTALLED-HERE]'s state.
-    Assert-True ($null -eq (Get-RecordShape -InstallRecord $r -PluginId 'absent@m')) 'no record: not this predicate either'
+    $shape = Get-RecordShape -InstallRecord $r -PluginId 'p@m'
+    Assert-True ($null -ne $shape) 'pathless record: a finding since #323 -- the demotion is reported'
+    Assert-True ($shape.Shapes -contains 'pathless-only') 'pathless record: named as the pathless-only shape'
+    Assert-True (-not ($shape.Shapes -contains 'no-project-scope')) 'pathless record: and NOT as no-project-scope -- the remedies differ, so the shapes must not be conflated'
+    Assert-True (-not ($shape.Shapes -contains 'duplicate')) 'pathless record: nor as a duplicate'
+    Assert-Equal 0 $shape.Count 'pathless record: Count is 0 -- no records for this path IS the finding'
+    Assert-Equal 'user' ($shape.Scopes -join ',') 'pathless record: the pathless scope is reported, so the line can name what it found'
+    Assert-True (-not $shape.HasProject) 'pathless record: HasProject is false'
+    # The pairing that matters: the permissive predicate must NOT change with it. A pathless record really
+    # does load here, so [NOT-INSTALLED-HERE] would be a false alarm -- which is why this shape needed a
+    # second reporter rather than a stricter first one.
+    Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'p@m') 'pathless record: STILL installed here -- the two predicates disagree on purpose'
+    # No record of ANY kind is [NOT-INSTALLED-HERE]'s state, and stays out of this predicate. This is the
+    # boundary that keeps the two markers from describing one plugin twice.
+    Assert-True ($null -eq (Get-RecordShape -InstallRecord $r -PluginId 'absent@m')) 'no record at all: not this predicate -- no evidence is the other marker''s subject'
+    Assert-True (-not (Test-PluginInstalledHere -InstallRecord $r -PluginId 'absent@m')) 'no record at all: and NOT installed here -- so exactly one marker speaks'
     # And an unstated scope is a gap in the administration, not a wrong answer. Same direction of error as
     # Test-PluginInstalledHere: this may suppress a finding, never invent one.
     [System.IO.File]::WriteAllText($adminFile, "{ `"plugins`": { `"p@m`": [ { `"projectPath`": `"$pathJson`" } ] } }")
