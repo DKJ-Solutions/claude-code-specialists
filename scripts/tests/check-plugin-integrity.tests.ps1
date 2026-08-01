@@ -908,6 +908,95 @@ try {
     $r33c = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($r33c.Out -match [regex]::Escape('ZZ-NEWLY-WRITTEN-PAGE.md'))) 'scenario 33: the fixture is left as it was found'
 
+    # --- Scenario 34: check 13, entry heading levels (this repo's own defect, four times in one day) ---
+    #     An entry body used '### Tested' as a sub-heading. The entry's own heading is an H3, so after the
+    #     fold CHANGELOG.md carried four headings with no PR number -- and release-lib.ps1 splits entries on
+    #     EVERY unfenced '### ' line, so cut-release.ps1 would have shipped four "entries" with no number,
+    #     no type and no Plugins line. Rendall's lens warned about the '##' form of this and the warning did
+    #     not stop it, which is the whole argument for a gate: the rule is exactly checkable.
+    Write-Host 'check 13 -- a second H3 in an entry body is an error, at both moments' -ForegroundColor Cyan
+    $s34Entry = Join-Path $Fixture 'fix-a-branch-name.md'
+    $s34Good = @(
+        '### A fixture entry ' + [char]0x00B7 + ' Fix ' + [char]0x00B7 + ' 2026-08-01'
+        ''
+        'A body with a correctly demoted sub-heading.'
+        ''
+        '#### Tested'
+        ''
+        'All green.'
+    )
+    [System.IO.File]::WriteAllText($s34Entry, (($s34Good -join "`n") + "`n"), $Utf8NoBom)
+    $r34a = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r34a.Out -match 'entry-heading.*fix-a-branch-name')) 'scenario 34: a "####" sub-heading is accepted'
+    Assert-True ($r34a.Out -match '\[entry-heading\] checked') 'scenario 34: and the entry file WAS examined -- the pass is not an empty scan'
+
+    # The defect itself.
+    $s34Bad = @($s34Good) -replace '^#### Tested$', '### Tested'
+    [System.IO.File]::WriteAllText($s34Entry, (($s34Bad -join "`n") + "`n"), $Utf8NoBom)
+    $r34b = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34b.Out -match 'entry-heading.*fix-a-branch-name\.md:5') 'scenario 34: a second H3 is reported, with its line number'
+    Assert-True ($r34b.Out -match 'SEPARATE entry') 'scenario 34: and the message says WHY, by naming the consequence at fold time'
+
+    # Fence-aware: an entry that QUOTES a heading is discussing structure, not creating it -- the
+    # mention-versus-use question this file answers in four other checks.
+    $s34Fenced = @(
+        '### A fixture entry ' + [char]0x00B7 + ' Fix ' + [char]0x00B7 + ' 2026-08-01'
+        ''
+        'The wrong form looks like this:'
+        ''
+        '```markdown'
+        '### Tested'
+        '```'
+    )
+    [System.IO.File]::WriteAllText($s34Entry, (($s34Fenced -join "`n") + "`n"), $Utf8NoBom)
+    $r34c = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r34c.Out -match 'entry-heading.*fix-a-branch-name')) 'scenario 34: a fenced heading example is not a finding -- it is a mention, not a use'
+    Remove-Item -LiteralPath $s34Entry -Force
+
+    # The CHANGELOG half, which is what cut-release actually parses -- and the half that catches damage
+    # arriving through the fold, the one write that happens directly on main past every PR gate.
+    $s34Cl = Join-Path $Fixture 'CHANGELOG.md'
+    $s34ClGood = @(
+        '# Changelog'
+        ''
+        '## Pull Requests'
+        ''
+        '### #123 ' + [char]0x00B7 + ' A real entry ' + [char]0x00B7 + ' Fix ' + [char]0x00B7 + ' 2026-08-01'
+        ''
+        '#### Tested'
+        ''
+        '## Releases'
+        ''
+    )
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClGood -join "`n") + "`n"), $Utf8NoBom)
+    $r34d = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r34d.Out -match 'entry-heading. CHANGELOG')) 'scenario 34: a well-formed Pull Requests section is silent'
+
+    $s34ClBad = @($s34ClGood) -replace '^#### Tested$', '### Tested'
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClBad -join "`n") + "`n"), $Utf8NoBom)
+    $r34e = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34e.Out -match 'entry-heading. CHANGELOG\.md:7') 'scenario 34: a numberless H3 in Pull Requests is reported, with its line'
+    Assert-True ($r34e.Out -match 'cut-release') 'scenario 34: and the message names what would break'
+
+    # Scoped to the Pull Requests section: the Releases section legitimately holds '### vX.Y.Z' headings,
+    # and reporting those would make the check fire on every repo that has ever released.
+    $s34ClRel = @(
+        '# Changelog'
+        ''
+        '## Pull Requests'
+        ''
+        '### #123 ' + [char]0x00B7 + ' A real entry ' + [char]0x00B7 + ' Fix ' + [char]0x00B7 + ' 2026-08-01'
+        ''
+        '## Releases'
+        ''
+        '### v1.2.3 ' + [char]0x00B7 + ' 2026-07-01'
+        ''
+    )
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClRel -join "`n") + "`n"), $Utf8NoBom)
+    $r34f = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r34f.Out -match 'entry-heading. CHANGELOG')) 'scenario 34: a version heading under ## Releases is NOT a finding -- the check stops at the section boundary'
+    Remove-Item -LiteralPath $s34Cl -Force
+
     # Leaves the fixture with a history-only mention again, which the coverage block below relies on.
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s24Contributing -join "`n") + "`n"), $Utf8NoBom)
 
