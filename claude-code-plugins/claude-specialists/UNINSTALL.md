@@ -12,7 +12,7 @@ They are independent, they are done in a fixed order, and neither one does the o
 | | what it removes | how |
 |---|---|---|
 | **Out of your repo** | the seam (`.claude/specialists/`), the `@`-import in your `CLAUDE.md`, the settings proposal, the unfilled scaffolds | the `specialists-teardown` skill |
-| **Off your machine** | the install record, the enable keys, the marketplace registration, the cached clone, the plugin's data directory | `claude plugin` commands + your settings files |
+| **Off your machine** | the install record, the enable keys, the marketplace registration, the cached clone, the plugin's data directory — plus the unpacked cache, which no command removes | `claude plugin` commands + your settings files, then one delete by hand |
 
 A repo teardown leaves the plugin installed and loading. A plugin uninstall leaves your repo full of
 lenses and a broken import. You almost certainly want both.
@@ -24,6 +24,19 @@ plugin**. Uninstall the plugin first and the skill goes with it — leaving you 
 files and no tool that knows which of them it wrote, because the distinction it makes (see
 [Step 1](#step-1--take-the-plugin-out-of-your-repo)) lives in the skill and not in the files. Everything
 else in this procedure can be redone in any order; this one cannot.
+
+**The same trap applies to this page itself, so keep a copy before you begin.** `UNINSTALL.md` is not
+part of the plugin payload — it ships only in the cached marketplace clone, and
+[Step 5](#step-5--drop-the-marketplace-registration-last) deletes that clone (measured: 2.9 MB, gone).
+After that the document exists **nowhere on this machine**, so a reader who is interrupted, stops for the
+day, or just wants to re-read a step has nothing left to read (inbound
+[#328](https://github.com/DaveKJohn/davekjohns-workshop/issues/328)). Keep this page open or save it to
+disk; the durable copy is
+[on GitHub](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/claude-code-plugins/claude-specialists/UNINSTALL.md).
+That is the paragraph above applied to the manual instead of the tool: this page made the argument for
+`specialists-teardown` and then missed it for itself. It missed it a second time for its own audit tool —
+[Step 1](#step-1--take-the-plugin-out-of-your-repo) now says so. Both only surfaced when someone walked
+the procedure end to end for the first time.
 
 **Check whether your lens tree is under version control, because that is your undo.** Two commands, from
 your repo root — they answer different questions and only the first decides whether this procedure *can*
@@ -90,6 +103,13 @@ The run closes with a free-standing audit that goes looking for what still point
 and line. `[FREE]` is the clean answer; anything else is a checklist for
 [Step 4](#step-4--verify-that-you-actually-stand-free).
 
+**Keep that output, because this is the last point at which you can produce it.** The audit is part of
+`teardown.ps1`, which lives in the payload that [Step 2](#step-2--uninstall-the-plugin-one-command-per-plugin)
+removes — so by the time Step 4 asks you for the audit line, the tool that prints it is gone (inbound
+[#328](https://github.com/DaveKJohn/davekjohns-workshop/issues/328)). Re-run it here as often as you like;
+it removes nothing and needs no `-Apply`. Afterwards it is unavailable at any price short of re-installing
+the plugin, which is why Step 4 reads the output you saved here rather than asking for a fresh run.
+
 ## Step 2 — uninstall the plugin, one command per plugin
 
 From your repo root:
@@ -134,15 +154,12 @@ The uninstall clears the *entry*; the keys you added in Quickstart Step 1 are yo
 - `enabledPlugins` — the `specialists@davekjohns-workshop` entries, or the whole key if it is now `{}`;
 - `extraKnownMarketplaces` — the `davekjohns-workshop` block.
 
-Then drop the marketplace registration itself, which lives outside your repo:
+**Then restart your Claude Code session** — the subagents and the session hooks stay active until the
+entry is gone *and* the session has restarted.
 
-```powershell
-claude plugin marketplace remove davekjohns-workshop
-```
-
-It takes an optional `--scope <user|project|local>`; omit it and the declaration is removed from every
-scope. **Then restart your Claude Code session** — the subagents and the session hooks stay active until
-the entry is gone *and* the session has restarted.
+The marketplace registration itself lives outside your repo and is deliberately **not** removed here: it
+is [Step 5](#step-5--drop-the-marketplace-registration-last), after the verification, because removing it
+takes this document off the machine with it.
 
 **Do Step 3 before you re-check Step 2, or you will keep finding a record you just deleted.** An enable
 key alone is enough for a session start to write a missing install record by itself. So a machine where
@@ -153,13 +170,51 @@ your verification will show a fresh record with a fresh timestamp and nothing to
 
 - **The record query from Step 2 comes back empty.** Empty output means nothing is installed for this
   path. Run it from the repo root; it is keyed on `projectPath`.
-- **`claude plugin marketplace list` no longer names `davekjohns-workshop`.**
 - **A fresh session has no `specialists-*` skills and no specialist hooks.** Beware of how this reads: a
   session that loads no plugin has no hooks to complain, because the hooks are *in* the plugin. Absence of
   complaint is not evidence — check the skill list itself.
 - **Chris no longer takes the floor**, and your `CLAUDE.md` has no `@`-import pointing at the seam.
-- **The teardown's audit says `[FREE]`.** If you still have the plugin installed you can run it again for
-  that line alone; it removes nothing and needs no `-Apply`.
+- **The teardown's audit said `[FREE]`** — in the output you kept from
+  [Step 1](#step-1--take-the-plugin-out-of-your-repo). This is a check you read back rather than re-run:
+  the audit ships in the payload Step 2 removed, so there is nothing left to run it with. If you did not
+  keep it and you want the line, the honest route is to re-install the plugin, re-run the audit, and
+  uninstall again — which is why Step 1 says to keep it.
+
+Everything above is verifiable with the marketplace still registered, which is why the registration comes
+off last.
+
+## Step 5 — drop the marketplace registration, last
+
+This is the step that also takes the cached clone — and with it this page — off the machine, which is why
+it waits until Step 4 is done:
+
+```powershell
+claude plugin marketplace remove davekjohns-workshop
+```
+
+It takes an optional `--scope <user|project|local>`; omit it and the declaration is removed from every
+scope. Then the last verification: **`claude plugin marketplace list` no longer names
+`davekjohns-workshop`.**
+
+**What that command does and does not delete, measured rather than assumed** (inbound
+[#339](https://github.com/DaveKJohn/davekjohns-workshop/issues/339), August 1, 2026, on a virgin Windows
+profile — the one environment where the answer was not obscured by an earlier install):
+
+| location | before | after |
+|---|---|---|
+| `~/.claude/plugins/marketplaces/davekjohns-workshop/` — the cached clone | 2,930,310 bytes | **gone** |
+| `~/.claude/plugins/cache/davekjohns-workshop/` — the unpacked payload | 939,860 bytes | **still there** |
+
+**So the unpacked cache belongs to the marketplace, not to the install**, and that rule is worth carrying
+rather than the two numbers. `claude plugin marketplace add` *creates* it — measured on the same profile,
+absent → 939,768 bytes, while the install record stayed at `{}` — `marketplace remove` does not take it
+away, and no `plugin install` or `plugin uninstall` is involved in either direction. This page used to say
+the question was unestablished and told you to go look; the looking has been done. Delete the leftover by
+hand if you want the machine genuinely untouched:
+
+```powershell
+Remove-Item "$env:USERPROFILE\.claude\plugins\cache\davekjohns-workshop" -Recurse -Force
+```
 
 ## What is left behind, honestly
 
@@ -193,10 +248,23 @@ repo lives under `~/.claude/`, and the list below was taken from a machine that 
 | `~/.claude/plugins/known_marketplaces.json` | the marketplace registration |
 | `~/.claude/settings.json` | a user-level `enabledPlugins` / `extraKnownMarketplaces`, if you used one |
 
-Steps 2 and 3 address the first, second, fourth, fifth and sixth of those. What is **not** established is
-whether `marketplace remove` also deletes the cached clone and the unpacked cache from disk — so check
-those two paths yourself rather than assuming, and delete what is left over if you need the machine to be
-genuinely untouched.
+Which step closes which — including the one entry that no step closes for you (inbound
+[#339](https://github.com/DaveKJohn/davekjohns-workshop/issues/339)):
+
+| location | what closes it |
+|---|---|
+| `installed_plugins.json` | Step 2 removes the record; the file itself stays, holding `{"version": 2, "plugins": {}}` |
+| `marketplaces/<marketplace>/` | Step 5 — `marketplace remove` deletes the clone |
+| `cache/<marketplace>/` | **no step** — it follows the marketplace, not the install. Delete it by hand in Step 5 |
+| `data/<plugin>-<marketplace>/` | Step 2's uninstall, unless you passed `--keep-data` |
+| `known_marketplaces.json` | Step 5 removes the entry; the file stays |
+| `~/.claude/settings.json` | Step 3, by your own edit |
+
+**And a torn-down profile is not byte-identical to a virgin one** — a more useful answer than "clean".
+Measured after the full procedure, three files exist that were absent before adoption:
+`installed_plugins.json` (35 bytes, `{"version": 2, "plugins": {}}`), `known_marketplaces.json` (288
+bytes, no longer naming this marketplace) and `~/.claude/settings.json` (22 bytes, `{"theme": "dark"}`).
+None of them holds anything belonging to this family. What remains is those three files, empty of ours.
 
 **Do not hand-edit `installed_plugins.json`.** It is this family's standing rule for its own test rounds
 and it applies here too: the `installedAt` stamps are how a record that was *adopted* from another repo is
