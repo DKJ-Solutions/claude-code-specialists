@@ -326,14 +326,17 @@ The body is therefore ready and the switch is not thrown. Flipping it is Dave's 
 instead of an unknown: the collision resolves silently and positionally, so a consumer who enables a
 second `agent`-setting plugin gets a different orchestrator without being told.
 
-- **Step 0 (manual, five acts in order).** (1) Put the marketplace source + `enabledPlugins` in
-  `.claude/settings.json` (see [Consumption](../../README.md#consumption) in the root README), (2) refresh
-  the cached marketplace with `claude plugin marketplace update <marketplace>`, (3) run
+- **Step 0 (manual, six acts in order).** (1) Put the marketplace source + `enabledPlugins` in
+  `.claude/settings.json` (see [Consumption](../../README.md#consumption) in the root README),
+  (2) **restart** the session once — a session start is what registers the marketplace, and without this
+  act 3 fails with `Marketplace '<marketplace>' not found` (inbound
+  [#329](https://github.com/DaveKJohn/davekjohns-workshop/issues/329)), (3) refresh
+  the cached marketplace with `claude plugin marketplace update <marketplace>`, (4) run
   `claude plugin install <plugin>@<marketplace> --scope project` **from the consumer's root, once per
-  enabled plugin**, (4) **restart** the session — only then is the skill available — and (5) **verify the
+  enabled plugin**, (5) **restart** the session — only then is the skill available — and (6) **verify the
   install record** before going on.
 
-  > **Why five, and why the same five everywhere** (inbound
+  > **Why six, and why the same six everywhere** (inbound
   > [#297](https://github.com/DaveKJohn/davekjohns-workshop/issues/297)). This procedure is described at
   > three entry points, and they used to count it as *four acts* here, *three acts* in
   > [`specialists-init`](specialists/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
@@ -343,9 +346,13 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > Two of the three were also counting different things: #284 raised this page from three to four by
   > making the refresh an act, while `specialists-init`'s step 0 has that refresh too and still said
   > three. The unit is now **acts** — individual things you do — on both pages; the QUICKSTART keeps its
-  > three *steps* because its Step 1 **is** all five acts below, and it now says so. Verifying counts as
+  > three *steps* because its Step 1 **is** all six acts above, and it now says so. Verifying counts as
   > an act because leaving it out is the failure the next blockquote calls silent and self-camouflaging:
-  > a reader who ticks off four and stops has never checked that the install exists.
+  > a reader who ticks off five and stops has never checked that the install exists.
+  >
+  > **It was five until August 1, 2026**, when #329 made the first restart an act of its own on all three
+  > pages at once. Folding it into act 1 would have kept the number at five, and folding it into another
+  > act is exactly what had kept it unwritten while it was already required.
 
   > **And if you sweep for these counts, make the sweep emphasis-tolerant** (inbound
   > [#305](https://github.com/DaveKJohn/davekjohns-workshop/issues/305)). The sweep that aligned the
