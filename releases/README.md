@@ -25,6 +25,7 @@ refuses that rather than doing it quietly (see [Cutting a release](#cutting-a-re
 
 | Version | Date | Type | Title |
 |---|---|---|---|
+| [3.1.0](development/3.x/3.1.0.md) | 2026-08-01 | Minor | Every finding of test rounds v9 and v10, processed -- and a gate so a PR closes what it fixes |
 | [3.0.9](development/3.x/3.0.9.md) | 2026-08-01 | Patch | Round v8: the install record now says what you are actually running -- plus the gate for the class behind all three findings |
 | [3.0.8](development/3.x/3.0.8.md) | 2026-07-31 | Patch | a crafted plugin id can no longer forge a line, and a repo-wide guard keeps every native call site honest |
 | [3.0.7](development/3.x/3.0.7.md) | 2026-07-31 | Patch | the checks read the install record, and three adoption claims match the measurement |

@@ -1,9 +1,9 @@
-# Release v3.0.9
+# Release v3.1.0
 
 **Date:** 2026-08-01  
-**Type:** Patch
+**Type:** Minor
 
-Round v8: the install record now says what you are actually running -- plus the gate for the class behind all three findings
+Every finding of test rounds v9 and v10, processed -- and a gate so a PR closes what it fixes
 
 You are on this release.
 
@@ -11,5 +11,5 @@ No changes to this plugin in this release — see the full notes.
 
 ---
 
-Full workshop notes: [releases/development/3.x/3.0.9.md](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/releases/development/3.x/3.0.9.md)
+Full workshop notes: [releases/development/3.x/3.1.0.md](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/releases/development/3.x/3.1.0.md)
 Cumulative plugin history: [CHANGELOG.md](CHANGELOG.md)
