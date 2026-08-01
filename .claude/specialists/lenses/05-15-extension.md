@@ -58,6 +58,25 @@ infrastructure.
 - **`scripts/lib/branch-info.ps1`** — the prefix→label→changelog-type table (shared with the
   release scripts). Deliberately no `release` prefix: a release does not go via a branch/PR but
   directly on `main`.
+- **`scripts/lib/pr-issues-lib.ps1`** — the pure decision table of the **resolves gate**: which issues
+  a text mentions, which a body actually *closes*, and whether a PR may open without declaring either.
+  Deliberately pure (no `git`, no `gh`, no filesystem) so [Tycho #18](04-18-extension.md) can assert
+  every branch of it offline; the one impure part — asking GitHub which issues are open — stays in
+  `open-pr.ps1`. Shared/mirrored, since `open-pr.ps1` dot-sources it. The rule it enforces and the
+  incident behind it are [Derek #05](05-05-extension.md#opening-a-pull-request)'s.
+  **Two traps that cost real debugging while building this lib**, both measured and both now pinned by
+  asserts:
+  - **`powershell -File` cannot bind an `[int[]]`.** `-Resolves 332,340` arrives as the string
+    `'332,340'` and is cast to the single number **332340** — the comma read as a *thousands
+    separator*. No error, just a wrong issue. Hence a `[string]` parameter parsed by
+    `ConvertTo-IssueNumberList`, and hence the fixture passes it over that same `-File` hop.
+  - **`@(… | ConvertFrom-Json)` does not flatten a JSON array in PowerShell 5.1.** 5.1 emits the
+    parsed array as *one* pipeline object, so `@()` collects a single element that IS the array, and
+    `$_.number` then does member enumeration and hands `[int]` an `Object[]` that throws. Assign
+    first, then wrap: `$parsed = … | ConvertFrom-Json; @(@($parsed) | …)`. That throw was swallowed by
+    a `catch` that degrades the gate to "cannot check" — so the gate silently never blocked **while
+    every pure unit test stayed green**. Only the wiring fixture caught it, which is the general
+    lesson: a pure decision table proves the decision, never that it is reached.
 - **`scripts/lib/release-lib.ps1`** — the pure release helpers (version bump, CHANGELOG
   transformation to a `## Releases` reference, and the assembly of the `releases/development/` notes)
   that [`cut-release.ps1`](../../../scripts/release/cut-release.ps1) dot-sources; deliberately

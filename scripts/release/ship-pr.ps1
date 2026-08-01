@@ -21,14 +21,25 @@
       4. Merge (gh pr merge <pr> --merge). No --admin: the CI gate is never bypassed.
       5. Check out main, fast-forward, fold the entry (fold-changelog-entry.ps1 -Branch <branch>),
          and commit + push the fold directly on main (the permitted fold exception).
+      6. Verify the issues the PR declared it closes are actually CLOSED, and close any that are not
+         (verify-resolved-issues.ps1 -- its own script, and tested there).
+
+    Step 6 is the second half of the resolves gate (a lesson from PRs #341-#343, where eight repaired
+    findings stayed open because the bodies carried plain mentions instead of closing keywords).
+    open-pr.ps1 writes the `Closes #<n>` lines; GitHub honours them on merge into the default branch.
+    Step 6 then checks the outcome. A belt on top of a brace: if it never fires, the keyword did its
+    job. It cannot fail the ship -- the merge has already happened by then.
 
     -NoMerge stops after step 1 (open the PR only) -- the same as calling open-pr.ps1 directly, but
     handy when scripting. The native git/gh calls run through Invoke-NativeCapture (the #107 stderr
     guard). Pure ASCII (repo convention for .ps1).
 
     NOTE (test gap): like open-pr.ps1 this orchestrator drives live git/gh against a real remote and
-    is not covered by an automated suite -- the sub-steps it calls (open-pr, fold, the helpers) are
-    tested on their own.
+    is not covered by an automated suite -- the sub-steps it calls (open-pr, fold,
+    verify-resolved-issues, the helpers) are tested on their own. Step 6 was deliberately extracted
+    into its own script for exactly that reason: it is the one step here that MUTATES state outside
+    this repo (it posts comments and closes issues), so leaving it inline would have meant untestable
+    write access. What remains untested here is only the orchestration order.
 
 .PARAMETER Title
     PR title, e.g. "feat: new domain plugin".
@@ -45,8 +56,20 @@
 .PARAMETER PollSeconds
     Poll interval (seconds) for the CI watch. Default 15.
 
+.PARAMETER Resolves
+    Passed through to open-pr.ps1: the issue numbers this PR resolves, as a string ('331,332').
+    Step 6 verifies them. A string and not an [int[]] for the reason documented on open-pr.ps1's own
+    parameter: across `powershell -File` a comma list is cast to one number via the thousands
+    separator ('332,340' -> 332340), silently and without an error.
+
+.PARAMETER NoResolves
+    Passed through to open-pr.ps1: declare that this PR closes no issue.
+
 .EXAMPLE
     ./scripts/release/ship-pr.ps1 -Title "feat: group release output by category"
+
+.EXAMPLE
+    ./scripts/release/ship-pr.ps1 -Title "fix: the pre-flight reads commits" -Resolves 331,332
 #>
 [CmdletBinding()]
 param(
@@ -54,7 +77,9 @@ param(
     [switch]$SkipLint,
     [switch]$SkipTests,
     [switch]$NoMerge,
-    [int]$PollSeconds = 15
+    [int]$PollSeconds = 15,
+    [string]$Resolves = '',
+    [switch]$NoResolves
 )
 $ErrorActionPreference = 'Stop'
 
@@ -73,6 +98,10 @@ if ($branch -eq 'main') { Write-Error "You are on main; ship-pr runs from a bran
 $openArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'open-pr.ps1'), '-Title', $Title)
 if ($SkipLint)  { $openArgs += '-SkipLint' }
 if ($SkipTests) { $openArgs += '-SkipTests' }
+# Handed over as the raw string. open-pr.ps1 parses it itself precisely BECAUSE this hop goes through
+# `powershell -File`, where an [int[]] parameter would silently collapse '331,332' into 331332.
+if ($Resolves) { $openArgs += @('-Resolves', $Resolves) }
+if ($NoResolves) { $openArgs += '-NoResolves' }
 Write-Host "ship-pr: opening the PR..." -ForegroundColor Cyan
 & powershell @openArgs
 if ($LASTEXITCODE -ne 0) { Write-Error "open-pr failed -- ship-pr stops (nothing merged)."; exit 1 }
@@ -159,5 +188,12 @@ if ($commit.ExitCode -ne 0) { Write-Error "git commit of the fold failed."; exit
 $push = Invoke-NativeCapture -FilePath 'git' -Arguments @('push', 'origin', 'main')
 $push.Output | ForEach-Object { Write-Host $_ }
 if ($push.ExitCode -ne 0) { Write-Error "git push of the fold failed."; exit 1 }
+
+# --- Step 6: the issues the PR declared it closes are actually closed -----------------------------
+# Its own script, so this state-MUTATING logic (it comments and closes) is testable against a fake gh
+# instead of only reachable through a full live ship -- and so the same check is usable on its own to
+# repair bookkeeping after the fact. It never fails the ship: the merge already succeeded.
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'verify-resolved-issues.ps1') -Pr $pr -Repo $repo
+if ($LASTEXITCODE -ne 0) { Write-Warning "the issue-closing check reported a problem -- verify by hand with: gh issue list --repo $repo --state open" }
 
 Write-Host "Done: PR #$pr shipped -- opened, CI green, merged, folded on main." -ForegroundColor Green

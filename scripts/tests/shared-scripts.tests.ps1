@@ -64,7 +64,12 @@ Write-Host "Dual-context resolution guarded in every source" -ForegroundColor Cy
 # that. Exception: a dot-sourced LIB (issue #114's check-report-lib) is not itself a standalone
 # entry point -- it never resolves a repo root; it is reached via a $PSScriptRoot-relative
 # dot-source from a caller that already resolved one, so this invariant does not apply to it.
-$libOnlyPairs = @('check-report-lib', 'native-capture-lib')
+# The lib exception is declared in the REGISTRY (LibOnly), not in a list kept here. This used to be a
+# hand-written array of names, which meant every new shared lib arrived as a failing assert about an
+# invariant that does not apply to it -- and the fix was to edit a second literal that nothing tied to
+# the registration. Registering a lib now carries its own exception.
+$libOnlyPairs = @($pairs | Where-Object { $_.LibOnly } | ForEach-Object { $_.Name })
+Assert-True ($libOnlyPairs.Count -ge 1) 'the registry declares at least one dot-sourced lib (LibOnly)'
 # Two ways to satisfy the invariant since inbound #203: resolve CLAUDE_PROJECT_DIR inline, or delegate
 # to check-report-lib's shared Resolve-CheckRoot (which the two sync checks now do, so they can also
 # report HOW the root was resolved). A bare '-match CLAUDE_PROJECT_DIR' would still pass on the two
@@ -447,6 +452,14 @@ try {
     # fold, not by open-pr) returns an empty JSON array, i.e. "no PR found" -- both exit 0.
     New-Item -ItemType Directory -Path $fakeBin -Force | Out-Null
     $ghImpl = @'
+if ($args -contains 'issue' -and $args -contains 'list') {
+    # The resolves gate asks which issues are open. GH_OPEN_ISSUES lets a scenario decide; unset
+    # means "no open issues", which is what every pre-gate scenario expects.
+    # GH_FAIL_ISSUE_LIST simulates an unreachable/erroring gh for the degraded-path scenario.
+    if ($env:GH_FAIL_ISSUE_LIST) { [Console]::Error.WriteLine('fake gh: issue list unavailable'); exit 1 }
+    if ($env:GH_OPEN_ISSUES) { Write-Output $env:GH_OPEN_ISSUES } else { Write-Output '[]' }
+    exit 0
+}
 if ($args -contains 'create') {
     if ($env:GH_ARGS_CAPTURE) {
         [System.IO.File]::WriteAllText($env:GH_ARGS_CAPTURE, ($args -join "`n"), [System.Text.Encoding]::UTF8)
@@ -561,6 +574,91 @@ function Get-PrMilestone { return 'v9.9.9' }
     Assert-True ($bodyB -notmatch '<!-- CUSTOM PLACEHOLDER TEXT -->') 'override path: custom description placeholder was replaced (override function actually used)'
     Assert-True ($bodyB -match 'This is the test description text\.') 'override path: description still filled in from the changelog entry'
     Assert-True ($bodyB -match '- \[x\] Custom approval line') 'override path: custom approval pattern (Get-PrApprovalPattern) ticked the custom checklist line'
+
+    # --- Scenario C: the resolves gate, wired into open-pr (not just its decision table) ----------
+    # pr-issues.tests.ps1 asserts the table; this asserts the WIRING -- that the gate actually runs,
+    # blocks BEFORE the push/gh call, and that the closing keyword reaches the PR body. The gate is
+    # the answer to PRs #341-#343, where eight repaired findings stayed open after the merge.
+    Write-Host "  open-pr: the resolves gate" -ForegroundColor DarkCyan
+    # Back to the default repo-config + template, so this scenario is not read through scenario B's
+    # custom markers.
+    Copy-Item -Path (Join-Path $RepoRoot 'scripts\repo-config.ps1') -Destination (Join-Path $prFixtureRoot 'scripts\repo-config.ps1') -Force
+    Copy-Item -Path (Join-Path $RepoRoot '.github\pull_request_template.md') -Destination (Join-Path $prFixtureRoot '.github\pull_request_template.md') -Force
+    $gateEntry = @'
+### Open-PR 101 test - Feat - 2026-07-21
+
+This is the test description text. It repairs the thing reported in #332.
+'@
+    [System.IO.File]::WriteAllText((Join-Path $prFixtureRoot 'feat-openpr-101-test.md'), $gateEntry, $Utf8NoBomTest)
+    $env:GH_OPEN_ISSUES = '[{"number":332},{"number":340}]'
+
+    # C1: an open issue is mentioned and no decision is declared -> BLOCKED, and nothing reached gh.
+    Remove-Item -Path $prArgsCapture, $prBodyCapture -Force -ErrorAction SilentlyContinue
+    $gateOutRaw = (& powershell -NoProfile -ExecutionPolicy Bypass -File $openPrSrc -Title 'feat-openpr-101-test' -SkipLint -SkipTests 2>&1 | Out-String)
+    $gateCode = $LASTEXITCODE
+    # Whitespace-normalized before matching. The child renders Write-Error at ITS OWN console buffer
+    # width, so with this repo's path length the wrap can land mid-phrase -- 'resolves\n gate:' -- and
+    # a literal substring assert then fails on one machine and passes on another. Exactly the wrap
+    # hazard this suite already documents for the #86 pre-flight pointers a few scenarios up; found
+    # here by a copy-edit pass that reproduced it consistently at width 120 while it passed at
+    # another width.
+    $gateOut = ($gateOutRaw -replace '\s+', ' ')
+    Assert-Equal 1 $gateCode 'resolves gate: open-pr exits 1 when an open issue is mentioned without a decision'
+    # The gate must have actually CHECKED. Without this, the degraded path ("cannot check, not
+    # blocking") satisfies every other assert in this scenario while the gate never blocks -- which
+    # is exactly what a ConvertFrom-Json bug did here: 5.1 hands a parsed JSON array to the pipeline
+    # as one object, the [int] cast threw, and the failure was swallowed as "cannot check".
+    Assert-True ($gateOut -notmatch 'cannot check') 'resolves gate: it really checked (did not fall back to the degraded path)'
+    Assert-True ($gateOut -match 'resolves gate') 'resolves gate: the error names the gate'
+    Assert-True ($gateOut -match '#332') 'resolves gate: the error names the blocking issue'
+    Assert-True (-not (Test-Path $prArgsCapture)) 'resolves gate: no PR was created while blocked'
+
+    # C2: -NoResolves is the deliberate way past it, and it closes nothing.
+    Remove-Item -Path $prArgsCapture, $prBodyCapture -Force -ErrorAction SilentlyContinue
+    (& powershell -NoProfile -ExecutionPolicy Bypass -File $openPrSrc -Title 'feat-openpr-101-test' -SkipLint -SkipTests -NoResolves 2>&1 | Out-String) | Out-Null
+    Assert-Equal 0 $LASTEXITCODE 'resolves gate: -NoResolves lets the PR through'
+    $bodyNo = if (Test-Path $prBodyCapture) { Get-Content -Path $prBodyCapture -Raw } else { '' }
+    Assert-True ($bodyNo -ne '') 'resolves gate: -NoResolves still creates the PR'
+    Assert-True ($bodyNo -notmatch 'Closes #') 'resolves gate: -NoResolves writes no closing keyword'
+
+    # C3: -Resolves writes one closing line per issue into the body that reaches gh.
+    Remove-Item -Path $prArgsCapture, $prBodyCapture -Force -ErrorAction SilentlyContinue
+    # Passed exactly as ship-pr.ps1 passes it: one string, over `powershell -File`. This IS the hop
+    # where an [int[]] parameter silently became 332340 (comma read as a thousands separator), so the
+    # assert below that BOTH numbers come out is the regression guard for that trap.
+    (& powershell -NoProfile -ExecutionPolicy Bypass -File $openPrSrc -Title 'feat-openpr-101-test' -SkipLint -SkipTests -Resolves '332,340' 2>&1 | Out-String) | Out-Null
+    Assert-Equal 0 $LASTEXITCODE 'resolves gate: -Resolves lets the PR through'
+    $bodyRes = if (Test-Path $prBodyCapture) { Get-Content -Path $prBodyCapture -Raw } else { '' }
+    Assert-True ($bodyRes -match '(?m)^Closes #332$') 'resolves gate: the body closes #332'
+    Assert-True ($bodyRes -match '(?m)^Closes #340$') 'resolves gate: the body closes #340'
+    Assert-True ($bodyRes -match 'This is the test description text') 'resolves gate: the description survives alongside the closing block'
+    Assert-True ($bodyRes -notmatch '332340') 'resolves gate: the comma list did NOT collapse into one number (the -File thousands-separator trap)'
+
+    # C4: the cry-wolf guard, end to end. An entry that only cites PRs must NOT block -- a gate that
+    # fires on every branch gets routinely bypassed, which is how it would silently stop working.
+    $prOnlyEntry = @'
+### Open-PR 101 test - Feat - 2026-07-21
+
+This follows the shape PRs #341-#343 established, see https://github.com/o/r/pull/343.
+'@
+    [System.IO.File]::WriteAllText((Join-Path $prFixtureRoot 'feat-openpr-101-test.md'), $prOnlyEntry, $Utf8NoBomTest)
+    Remove-Item -Path $prArgsCapture, $prBodyCapture -Force -ErrorAction SilentlyContinue
+    (& powershell -NoProfile -ExecutionPolicy Bypass -File $openPrSrc -Title 'feat-openpr-101-test' -SkipLint -SkipTests 2>&1 | Out-String) | Out-Null
+    Assert-Equal 0 $LASTEXITCODE 'resolves gate: an entry citing only PRs does not block'
+    Assert-True (Test-Path $prArgsCapture) 'resolves gate: that PR was created'
+
+    # C5: an unreachable gh must WARN, not wedge -- the deliberate escape hatch. GH_FAIL_ISSUE_LIST
+    # makes the issue query fail while the rest of the fake gh keeps working.
+    [System.IO.File]::WriteAllText((Join-Path $prFixtureRoot 'feat-openpr-101-test.md'), $gateEntry, $Utf8NoBomTest)
+    $env:GH_FAIL_ISSUE_LIST = '1'
+    Remove-Item -Path $prArgsCapture, $prBodyCapture -Force -ErrorAction SilentlyContinue
+    # Same whitespace normalization as C1, for the same console-width wrap reason.
+    $degradedOut = ((& powershell -NoProfile -ExecutionPolicy Bypass -File $openPrSrc -Title 'feat-openpr-101-test' -SkipLint -SkipTests 2>&1 | Out-String) -replace '\s+', ' ')
+    Assert-Equal 0 $LASTEXITCODE 'resolves gate: a failing issue query does not block the PR'
+    Assert-True ($degradedOut -match 'resolves gate cannot check') 'resolves gate: it says out loud that it could not check'
+    Remove-Item Env:\GH_FAIL_ISSUE_LIST -ErrorAction SilentlyContinue
+    Remove-Item Env:\GH_OPEN_ISSUES -ErrorAction SilentlyContinue
+    [System.IO.File]::WriteAllText((Join-Path $prFixtureRoot 'feat-openpr-101-test.md'), $prEntryContent, $Utf8NoBomTest)
 
     Write-Host "  fold-changelog-entry: -RepoRoot override vs. default path" -ForegroundColor DarkCyan
     $changelogSkeleton = @'

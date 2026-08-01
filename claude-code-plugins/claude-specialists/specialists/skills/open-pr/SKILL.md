@@ -4,8 +4,10 @@ description: >-
   Push the current branch and open a Pull Request to main via the shared, centralized
   open-pr script from the plugin (single source of truth, issue #81) -- so a consumer does not have
   to duplicate this script locally. Runs the repo's own lint and test gate first; on an error,
-  nothing is pushed and no PR is opened. Use this when a branch is ready and the repo's governance
-  rule allows the PR to be opened.
+  nothing is pushed and no PR is opened. Also forces the issue-closing decision: a branch that
+  mentions an open issue must pass -Resolves or -NoResolves, so a repaired issue cannot stay open
+  after the merge. Use this when a branch is ready and the repo's governance rule allows the PR to be
+  opened.
 disable-model-invocation: true
 ---
 
@@ -25,12 +27,45 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1" 
 
 The script:
 
-1. Runs the **repo's own lint gate** (via `Get-LintScript` from `repo-config`) and then **all
+1. Runs the **resolves gate** first, because it needs no network and nothing has left the machine
+   yet. See [The resolves gate](#the-resolves-gate-which-issues-does-this-pr-close) below.
+2. Runs the **repo's own lint gate** (via `Get-LintScript` from `repo-config`) and then **all
    test suites** (`scripts/tests/*.tests.ps1`) -- exactly like CI. An error blocks: nothing is
    pushed and no PR is opened. `-SkipLint` / `-SkipTests` are the deliberate escape valves.
-2. Pushes the current branch and opens a PR to `main` via `gh`, with a label based on the
+3. Pushes the current branch and opens a PR to `main` via `gh`, with a label based on the
    branch prefix and a pre-filled PR body from `.github/pull_request_template.md` +
    the changelog entry file.
+
+## The resolves gate: which issues does this PR close?
+
+**A plain `#332` in a PR body closes nothing.** GitHub only auto-closes an issue when the body uses a
+*closing keyword* (`Closes #332`), so a PR that repairs an issue and merely mentions it leaves that
+issue open — and the changelog then says "done" about something the tracker still lists as open. That
+is not hypothetical: three consecutive PRs in the source repo did exactly this and left **eight**
+repaired findings open.
+
+So the decision is forced rather than remembered:
+
+```powershell
+# this PR resolves them -- each gets its own 'Closes #<n>' line in the body
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1" -Title "fix: short title" -Resolves "331,332"
+
+# this PR resolves no issue (they are cited as context)
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1" -Title "docs: short title" -NoResolves
+```
+
+- **Neither flag, while the changelog entry mentions an issue that is currently open** → the script
+  stops **before** the lint, the tests, and the push, and names the issues it saw.
+- **PR references do not count.** `PR #341`, `PRs #341-#343` and `/pull/341` links are excluded, so
+  citing the PR you follow on from does not trip the gate. A gate that fires on every branch gets
+  bypassed, which is how it would quietly stop working.
+- **A `-Body` you supply that already says `Closes #332`** satisfies the gate on its own.
+- **If the open/closed state cannot be determined** (no `gh`, or it errors), the gate **warns and
+  lets the PR through**. Wedging the PR flow on a network hiccup would be worse than the bookkeeping
+  slip it guards against.
+- `-Resolves` takes a **string** (`"331,332"`; a leading `#`, spaces or semicolons are fine).
+  Deliberately not an array: across `powershell -File` a comma list is cast to a single number via
+  the thousands separator, so `-Resolves 332,340` would silently become issue `332340`.
 
 ## Requirements in the consumer
 
