@@ -96,7 +96,28 @@ is still installed.
 ## Step 1 — take the plugin out of your repo
 
 From the root of the consuming repo. Dry run by default, because a script that deletes things in
-somebody's repo should have to be asked twice — and the preview doubles as the inventory you say yes to:
+somebody's repo should have to be asked twice — and the preview doubles as the inventory you say yes to.
+
+**`<plugin>` below is your installed plugin directory, and it is worth pinning down before you paste**
+(inbound [#330](https://github.com/DaveKJohn/davekjohns-workshop/issues/330)): the previous edition left the
+placeholder unexplained, and a reader had to reason it out. It is the **version-pinned cache** copy, which is
+the `installPath` field of your own install record:
+
+```powershell
+$root = (Get-Location).Path
+(Get-Content "$env:USERPROFILE\.claude\plugins\installed_plugins.json" -Raw | ConvertFrom-Json).plugins.PSObject.Properties |
+  ForEach-Object { $n = $_.Name; $_.Value | Where-Object { $_.projectPath -eq $root } |
+    ForEach-Object { "$n -> $($_.scope) $($_.version) $($_.gitCommitSha) $($_.installPath)" } }
+```
+
+It prints the same four fields as the install check plus the path, and that is not padding: **read the scope
+before you tear anything down.** Step 2's uninstall is scope-keyed and refuses at the wrong one, and one line
+per plugin each saying `project` is the state the rest of this document assumes. Typically the path is
+`~\.claude\plugins\cache\<marketplace>\<plugin>\<version>`. **Do not use the path from your
+`SPECIALISTS.md` imports** — those point into `~\.claude\plugins\marketplaces\<marketplace>\`, the git clone,
+which is a *different directory* carrying the sources in a different layout. Both exist on a machine that has
+run this family, which is exactly why picking the wrong one is easy; the QUICKSTART's
+[Staying up to date](QUICKSTART.md#staying-up-to-date) section explains why there are two.
 
 ```powershell
 # Preview -- nothing is removed
