@@ -31,10 +31,10 @@ that up, plus the governance and safety layer that differs per repo.
 
 This skill lives inside the `specialists` plugin, so it only becomes available once the plugin is
 **installed for this repo** and the session has been restarted. The skill cannot hook itself up. Step 0
-is therefore manual, and it is **five acts, in this order** — enable, refresh, install, restart, verify —
-grouped below as `0a` (act 1), `0b` (acts 2 and 3) and `0c` (acts 4 and 5).
+is therefore manual, and it is **six acts, in this order** — enable, restart, refresh, install, restart,
+verify — grouped below as `0a` (acts 1 and 2), `0b` (acts 3 and 4) and `0c` (acts 5 and 6).
 
-> **The count is deliberately the same five as in the
+> **The count is deliberately the same six as in the
 > [family README](../../../README.md#adoption-the-bootstrap-path)** (inbound
 > [#297](https://github.com/DaveKJohn/davekjohns-workshop/issues/297)). This page said *three acts* while
 > that one said *four* and the [QUICKSTART](../../../QUICKSTART.md#connecting-in-three-steps) said *three
@@ -42,8 +42,14 @@ grouped below as `0a` (act 1), `0b` (acts 2 and 3) and `0c` (acts 4 and 5).
 > other for exactly this step. For a reader following it the first time the count is the only check they
 > have on whether they skipped something. The letters stay, because they are what the rest of this page
 > refers to; the number now counts the same unit as the README.
+>
+> **It was five until August 1, 2026**, when
+> [#329](https://github.com/DaveKJohn/davekjohns-workshop/issues/329) measured that a session start is
+> what registers the marketplace — making the first restart an act of its own here, in the family README
+> and in the QUICKSTART in the same change. The letters absorbed it (`0a` is now two acts) rather than the
+> count staying at five.
 
-**0a — enable.** Verify that the consumer has this in `.claude/settings.json`:
+**0a — enable, then restart once.** Verify that the consumer has this in `.claude/settings.json`:
 
 ```jsonc
 "extraKnownMarketplaces": {
@@ -55,11 +61,22 @@ grouped below as `0a` (act 1), `0b` (acts 2 and 3) and `0c` (acts 4 and 5).
 }
 ```
 
-**0b — install, per plugin, from the repo root, at project scope.** Those settings keys on their own
-install nothing. A plugin install is **project-scoped**: `~/.claude/plugins/installed_plugins.json`
-keys every install by `projectPath`, and `enabledPlugins` + `extraKnownMarketplaces` produce no entry
-for this repo by themselves. So run, from the root of the consuming repo, one command per plugin
-listed in `enabledPlugins`:
+**Then restart the session once, before `0b`.** Writing `extraKnownMarketplaces` does not register the
+marketplace; a **session start** does. Measured on a virgin profile in three states (inbound
+[#329](https://github.com/DaveKJohn/davekjohns-workshop/issues/329)): without the settings file the
+refresh below fails, with the settings file in the same session it still fails, and after one session
+start it succeeds — reporting `Marketplace 'davekjohns-workshop' not found` until then, which reads as a
+misspelled name rather than a missing act. `claude plugin marketplace add <owner>/<repo> --scope project`
+registers it without a restart if that is preferable; keep the scope flag, because `add` defaults to
+`user`.
+
+**0b — install, per plugin, from the repo root, at project scope.** A plugin install is
+**project-scoped**: `~/.claude/plugins/installed_plugins.json` keys every install by `projectPath`. Do
+not count on the settings keys to produce that entry — they are not the documented route, and what they
+do on their own is now an open question rather than "nothing": on a virgin profile with the marketplace
+registered, a single session start was measured to write a full project-scoped record by itself (inbound
+[#327](https://github.com/DaveKJohn/davekjohns-workshop/issues/327)), in a session that loaded no plugin.
+So run, from the root of the consuming repo, one command per plugin listed in `enabledPlugins`:
 
 ```powershell
 claude plugin marketplace update davekjohns-workshop   # first: refresh the cached marketplace

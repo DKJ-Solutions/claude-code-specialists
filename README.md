@@ -8,6 +8,14 @@ portable core plus three domain groups. This repo is the **single source of trut
 subagent definitions — every consuming repo points to it instead of maintaining its own copies, and
 enables or disables **per plugin** which groups it needs.
 
+> **Connecting your own repo? Start at the
+> [Quickstart](claude-code-plugins/claude-specialists/QUICKSTART.md)** — three steps, written for someone
+> who did not build this, and its *Before you start* section first if the machine is new. The way back out
+> is its mirror, [UNINSTALL.md](claude-code-plugins/claude-specialists/UNINSTALL.md). Both are linked
+> again under [Consumption](#consumption) below; they are up here because a reader who is handed only
+> this repository had to get two-thirds of the way down the page to find them (inbound
+> [#338](https://github.com/DaveKJohn/davekjohns-workshop/issues/338)).
+
 ## The plugin families
 
 Every plugin family lives in its own folder under `claude-code-plugins/`, with its **own README**

@@ -17,6 +17,16 @@ any moment, and afterwards carry no *live* reference to a specialist, manual, pe
 nothing a session loads, a script resolves, or a gate depends on. Its own changelog history is
 exempt, and stays as written.
 
+**This skill is only the repo half of leaving, and the other half is not in this payload.** The machine
+half -- the `claude plugin uninstall`/`marketplace remove` commands, the settings keys to take back out,
+and the order the two halves have to run in -- is in
+[`UNINSTALL.md`](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/claude-code-plugins/claude-specialists/UNINSTALL.md),
+which ships in the marketplace clone rather than in the plugin. The pointer is here because it was
+measured to be missing exactly here: a reader who wanted to leave found this skill without trouble and
+reached the machine half **only by grepping blindly** (inbound
+[#338](https://github.com/DaveKJohn/davekjohns-workshop/issues/338)). Read that page before running this
+one -- the order is not free, and it is the page that says why.
+
 ## Run it
 
 From the root of the consuming repo:
