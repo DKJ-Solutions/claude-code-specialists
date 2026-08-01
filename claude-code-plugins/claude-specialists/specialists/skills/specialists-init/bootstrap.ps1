@@ -856,17 +856,22 @@ $suggestion = @'
       "Bash(rm -rf:*)"
     ]
   },
-  // Safety hooks: STUB. Point to actual scripts in this repo (e.g. scripts/maintenance/*.ps1) or
-  // remove unused hooks. Example: Stop hook running lint on changes.
+  // Safety hooks: STUB, and the path below is a PLACEHOLDER -- this bootstrap does not create that
+  // script and nothing else ships it. Copying this block as-is activates a hook pointing at nothing.
+  // Replace the angle-bracketed name with a real script in this repo, or drop the "hooks" key.
   "hooks": {
     "Stop": [
       { "hooks": [ { "type": "command",
-          "command": "powershell -NoProfile -File scripts/maintenance/lint-changed-hook.ps1",
+          "command": "powershell -NoProfile -File scripts/maintenance/<your-check>.ps1",
           "timeout": 30 } ] }
     ]
   }
 }
 '@
+# TRAILING NEWLINE, because the here-string above ends at its closing brace and WriteAllText adds
+# nothing (inbound #363). Same defect the #337.2 warning names for CLAUDE.md, one file over -- and that
+# warning does not cover this one, so nothing pointed at it.
+$suggestion = $suggestion.TrimEnd("`r", "`n") + "`n"
 [System.IO.File]::WriteAllText($suggestPath, $suggestion, $Utf8NoBom)
 # The FULL path, not the relative name (#241). This file is the one artifact that can go completely
 # unnoticed: many consumers gitignore '.claude/*' (measured in davekokbwj/smartwatchbanden), so it
@@ -919,6 +924,13 @@ $suggestReminder = if ($suggestIgnored -eq $true) { 'it is gitignored here, so g
                    elseif ($suggestIgnored -eq $false) { 'it is not gitignored here, so git status will keep showing it until you do' }
                    else { 'it is gitignored in many repos, so git may not remind you' }
 Write-Host "  3. Copy desired parts from $suggestPath to settings.json and delete proposal ($suggestReminder)." -ForegroundColor Gray
+# THE CAVEAT BELONGS WHERE THE INVITATION IS (inbound #363). The proposal file says twice that its hooks
+# are a stub, but this line -- "copy desired parts" -- is the instruction a reader actually acts on, and
+# it named no exception. The permissions block is ready to use; the hook block points at a script no
+# part of this family creates. A reader who copied both got a Stop hook firing at a missing file.
+Write-Host "     Note: the 'permissions' block is ready to use as-is. The 'hooks' block is NOT -- its" -ForegroundColor Gray
+Write-Host "     script path is a placeholder this bootstrap does not create. Point it at a real script" -ForegroundColor Gray
+Write-Host "     in this repo or leave the block out." -ForegroundColor Gray
 Write-Host "  4. Restart Claude Code session to activate new @-imports + config." -ForegroundColor Gray
 Write-Host "  5. Register this repo in the workshop's connector register -- paste-ready block below." -ForegroundColor Gray
 
