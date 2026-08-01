@@ -823,12 +823,43 @@ try {
     Assert-NotMatch '\[RECORD-SHAPE\]' $r.Out 'one project record: no marker -- the assumed shape is silent'
     Assert-Match 'Summary: 0 error\(s\), 0 info signal\(s\)' $r.Out 'one project record: clean'
 
-    Write-Host "11j. a pathless (user-scope) record does not fire it either" -ForegroundColor Cyan
-    #      0b's documented warning, and [NOT-INSTALLED-HERE]'s permissive case -- not this marker's subject.
-    #      Asserted because the opposite is the easy mistake: 'user' is also "not project".
+    Write-Host "11j. a pathless record now FIRES it -- the demotion (#323)" -ForegroundColor Cyan
+    #      THIS ASSERTION IS THE REVERSE OF WHAT IT USED TO BE. It read 'pathless record: not this marker --
+    #      it judges only records scoped to THIS path', on the grounds that a pathless record is step 0b's
+    #      scopeless-install warning. Round v9 measured a session start REWRITING a correct 'project' record
+    #      into a pathless 'user' one -- no command run, original installedAt preserved -- so an install
+    #      warning cannot be the owner. In that state the repo is absent from its own step-0c query while the
+    #      plugin demonstrably loads, and both markers stayed silent, each correct by its own rule. That was
+    #      the blind spot; this is the fixture for closing it.
     $adminProfile = New-FixtureAdmin -Records @{ $PluginId = '' } -Name 'admin-shape-userwide'
     $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache) -UserProfile $adminProfile
-    Assert-NotMatch '\[RECORD-SHAPE\]' $r.Out 'pathless record: not this marker -- it judges only records scoped to THIS path'
+    Assert-Match '\[RECORD-SHAPE\]' $r.Out 'pathless record: the marker fires since #323'
+    Assert-Match 'no record for this path, only a pathless one' $r.Out 'pathless record: the detail names the shape'
+    Assert-Match 'demotes' $r.Out 'pathless record: and names what produces it -- a session start, not the reader'
+    Assert-Match 'prints NOTHING' $r.Out 'pathless record: warns that the prescribed query is silent about it, which is the only visible evidence otherwise'
+    Assert-Match 'Re-install at project scope' $r.Out 'pathless record: the remedy is in the line'
+    # The permissive predicate must stay permissive: a pathless record really does load here.
+    Assert-NotMatch '\[NOT-INSTALLED-HERE\]' $r.Out 'pathless record: the OTHER marker stays silent -- it loads machine-wide'
+    Assert-Equal 0 $r.Code 'pathless record: exit 0 -- nothing is broken'
+    Assert-Match 'Summary: 0 error\(s\), 0 info signal\(s\)' $r.Out 'pathless record: non-counting, like its siblings'
+
+    Write-Host "11j-2. the detail line carries the marker, so a SESSION receives the remedy (#324)" -ForegroundColor Cyan
+    #      The roll-up ends with 'Details below.' The hook forwards only lines matching \[RECORD-SHAPE\], and
+    #      the details used to be [SKIP] lines -- so in a session that sentence was false, and the REMEDY,
+    #      which lives only in those lines, never arrived. Measured in life-hub: the reader was told an
+    #      administration problem exists, told the details follow, and got neither the detail nor a pointer.
+    #      Asserting the MARKER on the detail line is what makes the promise true in both contexts, and it is
+    #      the property the hook depends on -- so it is pinned here rather than left to the hook's own tests.
+    $adminProfile = New-FixtureAdmin -Scoped @{ $PluginId = @(@{ Scope = 'local'; Path = $c }) } -Name 'admin-detail-marker'
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache) -UserProfile $adminProfile
+    # Counted rather than pattern-matched, because the property under test is "how many lines the hook's
+    # filter will pick up" -- one roll-up plus one detail. A bare -match would pass on the roll-up alone,
+    # which is exactly the state this fixture exists to distinguish.
+    $shapeLines = @($r.Out -split "`n" | Where-Object { $_ -cmatch '\[RECORD-SHAPE\]' })
+    Assert-Equal 2 $shapeLines.Count 'detail marker: two [RECORD-SHAPE] lines -- the roll-up AND its detail, which is what the hook forwards'
+    Assert-Equal 1 (@($shapeLines | Where-Object { $_ -match 'Remove it at that scope' }).Count) 'detail marker: the line carrying the remedy is one of them'
+    Assert-Equal 0 (@($shapeLines | Where-Object { $_ -match '\[SKIP\]' }).Count) 'detail marker: and it is no longer a [SKIP] line, which the hook would drop'
+    Assert-Match 'Summary: 0 error\(s\), 0 info signal\(s\)' $r.Out 'detail marker: carrying the marker did NOT make it counting -- the severity stays out of the summary'
 
     Write-Host "11k. a record for another path does not fire it (that is the other marker's state)" -ForegroundColor Cyan
     $adminProfile = New-FixtureAdmin -Scoped @{ $PluginId = @(@{ Scope = 'local'; Path = $elsewhere }) } -Name 'admin-shape-elsewhere'

@@ -248,8 +248,17 @@ Equal means you are on that release. Different means you are on `main` — see
 for it, and why it is not something you can fix from here.
 
 **One** line per plugin you enabled, each saying `project`, is the green you need — and the *count*
-carries as much of the verdict as the word does. **Empty output means this repo has no install** — go
-back to step 0b.
+carries as much of the verdict as the word does.
+
+**No line at all for a plugin means this repo has no record for its own path** — go back to step 0b. Note
+what that does *not* mean: it is not evidence that the plugin is not loading. A session start can demote an
+existing `project` record to a pathless `user` one (see the fourth bullet below), and this query filters on
+`projectPath` — so a plugin can be missing from the output entirely while its skills and subagents are
+plainly present in the session. Measured in `DaveKJohn/life-hub` on August 1, 2026 (inbound
+[#323](https://github.com/DaveKJohn/davekjohns-workshop/issues/323)): the core plugin was absent from its
+own repo's query while 4 skills and 15 subagents were loaded from it. The action is the same either way;
+the reason matters, because "empty" reads as "nothing installed" and here it meant "installed, but no
+longer keyed to this path".
 
 **Two lines for the same plugin is the stray second record this step warns about just above, and it is
 not hypothetical: the repair install prescribed for a missing record produces it.** Measured in
@@ -259,7 +268,8 @@ against a path that already had a record **added a second record beside it** rat
 first, and both reported `✔ Successfully installed`. So the state this step calls green can be broken by
 the remedy this document prescribes, and the line count is the only thing that shows it.
 
-Three scopes can turn up in that output, and the third one is not in the CLI's flag list:
+Three scopes can turn up in that output, and the third one is not in the CLI's flag list. A fourth state
+turns up as **no output at all**:
 
 - **`project`** — what you want: this repo's own record, keyed by `projectPath`.
 - **`user`** — the scopeless install from 0b's warning. It works machine-wide, but it is not the model
@@ -272,6 +282,21 @@ Three scopes can turn up in that output, and the third one is not in the CLI's f
   <plugin>@<marketplace> --scope local` — at `--scope project` the same command refuses with *"Plugin
   … is installed in local scope, not project"*, which is easy to misread as "not installed" — and then
   re-install at project scope from this repo's root, refresh first, per step 0b.
+- **nothing — the `project` record was demoted to a pathless `user` one.** Also written by a session start,
+  and the most confusing of the four because the plugin **vanishes from this query** while it keeps working.
+  Measured in `DaveKJohn/life-hub` on August 1, 2026 (inbound
+  [#323](https://github.com/DaveKJohn/davekjohns-workshop/issues/323)): in a single write, an existing
+  `project` record was rewritten to `scope: user` with its `projectPath` **removed** — the original
+  `installedAt` preserved, so it is a rewrite and not a fresh install. The repo then has no record of its
+  own, and the fix is the same as for `local`: re-install at project scope from this root. **You do not have
+  to spot this by eye.** Since inbound
+  [#323](https://github.com/DaveKJohn/davekjohns-workshop/issues/323) the roster session check reports it as
+  a `[RECORD-SHAPE]` line with that remedy, so an ordinary session start names it for you.
+
+**Do not expect a second session to repair any of these.** It was the natural assumption — a session start
+writes records, so surely the next one restores what it broke — and it is wrong. Measured: after the first
+session start rewrote the administration, a second fresh session left `installed_plugins.json` untouched to
+the tick and reported exactly the same thing. The state is stable, so it waits for you.
 
 Then confirm the session actually loaded it: after the restart the `specialists-init` skill is in
 your slash list and the session-start hooks have reported. Once both checks are green, invoke this

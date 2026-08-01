@@ -501,15 +501,18 @@ if ($enabledIds.Count -gt 0) {
     # exactly as the pattern's own rule says to.
     #
     # It closes the gap round v8 opened between what [NOT-INSTALLED-HERE] was built to catch and what a
-    # consumer is actually left in. That marker fires when there is NO record for this path; v8 measured
-    # that a session start CREATES the missing record before any hook can look, so the state it names heals
-    # itself and the marker is practically unreachable from a session. What survives the healing is a
-    # record of the wrong shape -- 'local' instead of 'project' -- and until now nothing reported it at all.
-    # See Get-RecordShape for both measured shapes and for why this is not an [ERROR].
+    # consumer is actually left in. That marker fires when there is no evidence for this path at all; a
+    # session start writes the missing record itself before any hook can look, so from a session it is
+    # practically unreachable. What survives that write is a record of the wrong SHAPE -- and nothing
+    # reported any of them until #314/#315/#323. See Get-RecordShape for all three measured shapes, for why
+    # this is not an [ERROR], and for why "the state heals itself" (this comment's earlier claim) was
+    # falsified: a SECOND session start writes nothing, so the post-write state persists rather than heals.
     #
-    # Ordered after the [NOT-INSTALLED-HERE] branch and asking only about records that ARE scoped to this
-    # path, so the two markers can never describe the same plugin: no record is that one's subject, a
-    # wrongly shaped record is this one's.
+    # Ordered after the [NOT-INSTALLED-HERE] branch, and the two still cannot describe the same plugin --
+    # but the boundary moved with #323 and is now drawn by EVIDENCE rather than by path: no evidence at all
+    # is that marker's subject, while any evidence of the wrong shape is this one's, INCLUDING a pathless
+    # record with none for this path. That last case is the one both markers used to stay silent about,
+    # each correctly by its own rule.
     $recordShapes = @($enabledIds | ForEach-Object { Get-RecordShape -InstallRecord $installRecord -PluginId $_ } | Where-Object { $_ })
     if ($recordShapes.Count -gt 0) {
         # Format-SafeToken on every id, same reasoning as the roll-up above (inbound #309): a plugin id is
@@ -518,16 +521,33 @@ if ($enabledIds.Count -gt 0) {
         Write-Host "  [RECORD-SHAPE] $($recordShapes.Count) of $($enabledIds.Count) enabled plugin(s) have an install record for this path that is not the assumed shape -- exactly one record, scoped 'project' ($shapeIds). The plugin still loads; what is wrong is the administration, and nothing else reports it. Details below." -ForegroundColor Yellow
         # NON-COUNTING per-plugin detail, for the same two reasons as [NOT-INSTALLED-HERE]'s: a permanent
         # info signal would make 'this repo reports 0 signals' unassertable, and the severity must not
-        # re-enter through the summary line. Each line names the shape AND its remedy, because the two
-        # differ: a wrong scope is removed at that scope, a duplicate is removed by dropping the stale one.
+        # re-enter through the summary line. Each line names the shape AND its remedy, because they differ:
+        # a wrong scope is removed at that scope, a duplicate by dropping the stale one, a demotion by
+        # re-installing at project scope.
+        #
+        # THE DETAIL LINES CARRY THE [RECORD-SHAPE] MARKER THEMSELVES, and that is the fix for inbound #324
+        # rather than a formatting whim. They used to be [SKIP] lines, and roster-sessioncheck forwards only
+        # lines matching \[RECORD-SHAPE\] -- so in a SESSION the roll-up's closing "Details below." was
+        # false: the reader was told an administration problem exists, told the details follow, and got
+        # neither the detail nor a way to reach it. The remedy lives ONLY in these lines, and the whole
+        # point of giving this marker its own verdict line was to make that reader actionable. Marking them
+        # makes the promise true in both contexts and needs no change in the hook's filter. Still plain
+        # Write-Host, NOT Write-Info: carrying the marker must not smuggle the severity back in through the
+        # counting summary.
         foreach ($shape in $recordShapes) {
             $safeId = Format-SafeToken -Value $shape.Id
             $scopeList = (@($shape.Scopes | ForEach-Object { Format-SafeToken -Value $_ }) -join ', ')
             if ($shape.Shapes -contains 'no-project-scope') {
-                Write-Skip "'$safeId' has $($shape.Count) record(s) for this path, scoped '$scopeList' and none 'project' -- the shape a SESSION START leaves behind (it creates a missing record and flips 'project' to 'local'). Remove it at that scope, then re-install at project scope from this root."
+                Write-Host "  [RECORD-SHAPE] '$safeId' has $($shape.Count) record(s) for this path, scoped '$scopeList' and none 'project' -- the shape a SESSION START leaves behind (it creates a missing record and flips 'project' to 'local'). Remove it at that scope, then re-install at project scope from this root." -ForegroundColor DarkGray
             }
             if ($shape.Shapes -contains 'duplicate') {
-                Write-Skip "'$safeId' has $($shape.Count) records for this path (scopes: $scopeList) -- the stray second record specialists-init step 0c warns about, which a repair install produces rather than prevents. Remove the stale one at ITS scope; one 'project' record must remain."
+                Write-Host "  [RECORD-SHAPE] '$safeId' has $($shape.Count) records for this path (scopes: $scopeList) -- the stray second record specialists-init step 0c warns about, which a repair install at a DIFFERENT scope produces rather than prevents. Remove the stale one at ITS scope; one 'project' record must remain." -ForegroundColor DarkGray
+            }
+            if ($shape.Shapes -contains 'pathless-only') {
+                # The shape nothing reported before #323. Named in full, because the reader's own
+                # verification query prints NOTHING for this plugin while it is plainly loading -- so
+                # without this line the only visible evidence is an absence.
+                Write-Host "  [RECORD-SHAPE] '$safeId' has no record for this path, only a pathless one (scope: '$scopeList') -- the shape a SESSION START leaves behind when it demotes a 'project' record and drops its projectPath. The plugin loads machine-wide, so nothing is broken; this repo simply no longer has its own record, and it prints NOTHING in the specialists-init step 0c query while it is plainly loading. Re-install at project scope from this root." -ForegroundColor DarkGray
             }
         }
     }

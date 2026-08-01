@@ -756,42 +756,90 @@ function Test-PluginInstalledHere {
 # shape this family's documents assume everywhere -- exactly ONE record, scoped 'project'? Merging the two
 # would force one predicate to be permissive and strict at once.
 #
-# Round v8 measured both ways that shape breaks, and neither was reported by anything (inbound #314/#315):
+# Rounds v8 and v9 measured THREE ways that shape breaks, and none was reported by anything
+# (inbound #314/#315/#323):
 #   - NO 'project' RECORD. A SESSION START writes install records for enabled plugins: it creates a
 #     missing one and flips an existing 'project' record to 'local'. No command runs, no file in the repo
-#     changes, and nothing announces it. Two consequences that matter here: the "enabled but not
-#     installed" state HEALS ITSELF, so [NOT-INSTALLED-HERE] is practically unreachable from a session --
-#     and the state a consumer is actually left in is 'local', which no document in this family assumes
-#     anywhere.
-#   - MORE THAN ONE RECORD. The repair install prescribed for a missing record ADDS a record beside the
+#     changes, and nothing announces it. The state a consumer is left in is 'local', which no document in
+#     this family assumes anywhere.
+#   - MORE THAN ONE RECORD. The repair install prescribed for a missing record can ADD a record beside the
 #     existing one instead of correcting it, reporting success both times. specialists-init step 0c
 #     already teaches the reader that two lines is the signal -- but only a human eyeballing that query
-#     ever saw it, which is exactly the "a rule nobody has a mechanism for" shape.
-# Both are real, actionable, and about the repo the session is in, and in both the repo still WORKS -- the
-# plugin loads from a 'local' record just as well. So this is a non-counting marker, not an [ERROR]: a red
-# line plus exit 1 would be a lie. Classification question asked first, per the connectors README rule:
-# neither shape can indicate tampering -- both are written by the CLI itself.
+#     ever saw it, which is exactly the "a rule nobody has a mechanism for" shape. Note the trigger is
+#     narrower than first written: measured on 3.0.9, a SAME-scope install replaces cleanly, and it is a
+#     SCOPE MISMATCH that accumulates (inbound #325).
+#   - A 'project' RECORD DEMOTED TO A PATHLESS ONE. A session start can rewrite an existing, correct
+#     'project' record into a 'user'-scope record with the 'projectPath' REMOVED -- measured in v9, one
+#     write, timestamp preserved. The repo then has no record for its own path for the plugin that is
+#     demonstrably loading, and it DISAPPEARS from the verification query the documents prescribe. This
+#     is the shape that used to fall between the two predicates: permissive Test-PluginInstalledHere says
+#     "installed" on the pathless record, while Get-RecordShape saw nothing to judge because it reads
+#     only records scoped to this path. Reported here since #323.
+#
+# "THE STATE HEALS ITSELF" WAS WRONG, AND IT IS WORTH KEEPING WHY. This block used to argue that
+# [NOT-INSTALLED-HERE] is practically unreachable because the missing-record state heals itself. Round v9
+# falsified that by the only test that settles it: after the first session start rewrote the
+# administration, a SECOND fresh session wrote nothing at all -- installed_plugins.json kept its mtime to
+# the tick, and the hook's verdict was identical. So the honest statement is the opposite of self-healing:
+# the FIRST session start rewrites the administration and later ones do not, which makes the post-write
+# state stable, persistent and observable. That is what makes these shapes worth a marker at all -- a
+# state that really healed itself would need no reporting.
+#
+# All three are real, actionable, and about the repo the session is in, and in all three the repo still
+# WORKS -- the plugin loads from a 'local' or user-scope record just as well. So this is a non-counting
+# marker, not an [ERROR]: a red line plus exit 1 would be a lie. Classification question asked first, per
+# the connectors README rule: no shape can indicate tampering -- all are written by the CLI itself.
 function Get-RecordShape {
     <# Given an install record set and a plugin id, is the administration for this repo the shape the
        documents assume (exactly one 'project'-scoped record)?
 
-       Returns $null when it is -- and when there is nothing to judge at all, which is deliberate: no
-       record for this path is [NOT-INSTALLED-HERE]'s subject, not this one's, and a pathless (user-scope)
-       record is 0b's documented warning rather than either. Answering only about records that ARE scoped
-       to this path keeps the three markers from reporting the same state three times.
+       Returns $null when it is, and when there is nothing to judge at all -- no record for this path AND
+       no pathless one, which is [NOT-INSTALLED-HERE]'s subject rather than this one's. Keeping the two
+       questions apart is what stops the markers reporting one state twice.
 
        Otherwise returns Id / Count / Scopes (ordinally sorted, deduplicated) / HasProject / Shapes, where
-       Shapes holds 'no-project-scope' and/or 'duplicate'. #>
+       Shapes holds 'no-project-scope', 'duplicate' and/or 'pathless-only'.
+
+       WHY 'pathless-only' IS JUDGED HERE (inbound #323). A pathless record used to end the function early:
+       Get-RecordShape read only RecordsById, so with the projectPath gone there was nothing to judge, and
+       the case was assigned to step 0b's scopeless-install warning instead. Measurement moved it. A
+       pathless record is not only something a user TYPES -- a session start manufactures one out of a
+       correct 'project' record, dropping the projectPath, with no command run. In that reading "0b's
+       documented warning" is the wrong owner, because nobody ran an install. And the state is exactly what
+       this predicate is for: the administration for this repo is not the assumed shape. It is the most
+       consequential of the three shapes, because it is the one that makes the repo's own record vanish
+       from the query the documents tell a reader to trust, while Test-PluginInstalledHere stays
+       (correctly) permissive and says nothing. Count is 0 for this shape -- there are no records for this
+       path, which is the finding -- and Scopes carries the pathless records' own scopes so the report can
+       name what it found instead. #>
     param(
         [Parameter(Mandatory = $true)]$InstallRecord,
         [Parameter(Mandatory = $true)][string]$PluginId
     )
     if ($null -eq $InstallRecord) { return $null }
     if (-not $InstallRecord.Exists -or -not $InstallRecord.Readable) { return $null }
-    if (-not $InstallRecord.RecordsById.ContainsKey($PluginId)) { return $null }
+
+    $hasForPath = [bool]($InstallRecord.RecordsById.ContainsKey($PluginId) -and @($InstallRecord.RecordsById[$PluginId]).Count -gt 0)
+    $hasPathless = [bool]($InstallRecord.PathlessById.ContainsKey($PluginId) -and @($InstallRecord.PathlessById[$PluginId]).Count -gt 0)
+
+    if (-not $hasForPath) {
+        # No record for this path. Only a finding when a PATHLESS one exists -- that is the demotion; with
+        # neither, the plugin has no evidence here at all and that belongs to [NOT-INSTALLED-HERE].
+        if (-not $hasPathless) { return $null }
+
+        $plRecs = @($InstallRecord.PathlessById[$PluginId])
+        $plScopes = [string[]]@($plRecs | ForEach-Object { [string]$_.Scope } | Where-Object { $_ } | Sort-Object -Unique)
+        if ($plScopes.Count -gt 1) { [array]::Sort($plScopes, [System.StringComparer]::Ordinal) }
+        return [pscustomobject]@{
+            Id         = $PluginId
+            Count      = 0
+            Scopes     = $plScopes
+            HasProject = $false
+            Shapes     = [string[]]@('pathless-only')
+        }
+    }
 
     $recs = @($InstallRecord.RecordsById[$PluginId])
-    if ($recs.Count -eq 0) { return $null }
 
     # A record whose 'scope' field is absent or empty is NOT read as a mismatch: this predicate reports
     # what the administration positively says, and an unstated scope is a gap in the file rather than a
