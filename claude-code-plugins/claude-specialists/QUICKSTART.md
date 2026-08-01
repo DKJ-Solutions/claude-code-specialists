@@ -342,6 +342,24 @@ against the tag may still be real, because you were never on it. What remains ge
 what *triggers* the unasked refresh — that a refresh moves you to `main` is settled, when one happens by
 itself is not.
 
+**One part of what your session loads is not covered by that sha at all: the persona bodies** (inbound
+[#330](https://github.com/DaveKJohn/davekjohns-workshop/issues/330)). Look at the imports
+`specialists-init` writes into `.claude/specialists/SPECIALISTS.md` and you will see they point into
+`~/.claude/plugins/marketplaces/<marketplace>/…`, **the clone** — while your install record's `installPath`,
+`version` and `gitCommitSha` describe a different directory, the version-pinned copy under
+`…/plugins/cache/<marketplace>/<plugin>/<version>/`. The two were hash-identical when this was measured, so
+there was no divergence to see; they are simply not the same source, and nothing keeps them in step. A
+`marketplace update` fast-forwards the clone — and therefore the body your next session loads — while
+`version` and `gitCommitSha` do not move, because the refresh does not touch the cache.
+
+**This is deliberate, and worth knowing before anyone "fixes" it.** The import points at the clone because
+that path is *durable*: the version-pinned cache directory is cleaned up after an update, so an import into
+it would leave the orchestrator's body failing to load at all after your first refresh. A stale-but-loading
+body beats a pinned-and-gone one. The cost is this asymmetry, and the honest statement is that
+`gitCommitSha` is the truth about the payload the record names, not about every file your session reads.
+If a persona behaves differently from what the release notes describe, the clone is where to look:
+`git -C "$env:USERPROFILE\.claude\plugins\marketplaces\<marketplace>" rev-parse HEAD`.
+
 **Read your install record rather than assume it, because it can move — or be taken away — without you
 asking** (inbound [#296](https://github.com/DaveKJohn/davekjohns-workshop/issues/296) and
 [#301](https://github.com/DaveKJohn/davekjohns-workshop/issues/301)). Project scope gives your repo its
