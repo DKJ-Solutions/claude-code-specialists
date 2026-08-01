@@ -54,7 +54,7 @@ Plugins: specialists
 
 ---
 
-### #351 Ã‚Â· The state that reads as healthy from every angle Ã‚Â· Docs Ã‚Â· 2026-08-01
+### #351 · The state that reads as healthy from every angle · Docs · 2026-08-01
 
 The last of test round v10's findings (#327), and the part of it that was still open. Its first half Ã¢â‚¬â€ the
 bold claim *"Those keys do not install anything, though"* Ã¢â‚¬â€ was already false-by-measurement and was
@@ -106,7 +106,7 @@ Plugins: specialists
 
 ---
 
-### #349 Ã‚Â· The settings claim is narrowed, and six papercuts from a full walk Ã‚Â· Docs Ã‚Â· 2026-08-01
+### #349 · The settings claim is narrowed, and six papercuts from a full walk · Docs · 2026-08-01
 
 The last content group of test round v10 (#340): the `settings.json` claim (#336) and the six small
 inaccuracies #337 deliberately bundled. Individually trivial; together they are what a first reader
@@ -176,7 +176,7 @@ Plugins: specialists
 
 ---
 
-### #348 Ã‚Â· The import path tracks main, and the plugin placeholder is explained Ã‚Â· Docs Ã‚Â· 2026-08-01
+### #348 · The import path tracks main, and the plugin placeholder is explained · Docs · 2026-08-01
 
 Test round v10's #330, both halves. They are one PR because they are one fact seen twice: **a machine that
 has run this family has two plugin directories, and the documents never said so.**
@@ -221,7 +221,7 @@ Plugins: specialists
 
 ---
 
-### #347 Ã‚Â· The roster hook names the right file, and a fresh bootstrap is not nineteen errors Ã‚Â· Fix Ã‚Â· 2026-08-01
+### #347 · The roster hook names the right file, and a fresh bootstrap is not nineteen errors · Fix · 2026-08-01
 
 Test round v10's #333, reported as two problems in one hook output. Measured here, the first half turned
 out to be a real bug rather than a wrong message Ã¢â‚¬â€ and it is the cause of part of the second.
@@ -293,7 +293,7 @@ Plugins: specialists
 
 ---
 
-### #346 Ã‚Â· Step 0c: an executable version check and a repair warning that fits Ã‚Â· Docs Ã‚Â· 2026-08-01
+### #346 · Step 0c: an executable version check and a repair warning that fits · Docs · 2026-08-01
 
 The two remaining findings of test round v9 (#326), both in `specialists-init/SKILL.md` step 0c, on
 non-overlapping lines Ã¢â‚¬â€ the grouping the dossier proposed.
@@ -359,7 +359,7 @@ Plugins: specialists
 
 ---
 
-### #345 Ã‚Â· The demoted record is reported, and the details reach the session Ã‚Â· Fix Ã‚Â· 2026-08-01
+### #345 · The demoted record is reported, and the details reach the session · Fix · 2026-08-01
 
 Two findings from test round v9 (#326), taken together because the second decides what the first's new
 lines are allowed to say Ã¢â‚¬â€ the dossier's own reason for ordering them, satisfied better by one PR than by
@@ -439,13 +439,13 @@ Plugins: specialists
 
 ---
 
-### #344 Ã‚Â· The PR closes the issues it resolves Ã‚Â· Feat Ã‚Â· 2026-08-01
+### #344 · The PR closes the issues it resolves · Feat · 2026-08-01
 
 Dave, reading the changelog: *"a lot of new things in the changelog but all 20 issues are still open.
 How does that work?"* Two separate answers, and only the second is a defect.
 
 **Eight of them were done and simply never closed.** PRs #341, #342 and #343 repaired real findings Ã¢â‚¬â€
-#334, #329, #335, #338 Ã‚Â· #328, #339 Ã‚Â· #332, #331 Ã¢â‚¬â€ and every one of them referenced its issue as a
+#334, #329, #335, #338 · #328, #339 · #332, #331 Ã¢â‚¬â€ and every one of them referenced its issue as a
 **plain mention**. GitHub auto-closes only on a *closing keyword*, so nothing closed on merge, and the
 manual `gh issue close` afterwards was skipped **three times running**. The changelog said done; the
 tracker said open. The eight were closed by hand, each with a comment naming the PR that fixed it.
@@ -568,7 +568,7 @@ Plugins: specialists
 
 ---
 
-### #343 Ã‚Â· The teardown reports what it keeps, and the pre-flight measures commits Ã‚Â· Fix Ã‚Â· 2026-08-01
+### #343 · The teardown reports what it keeps, and the pre-flight measures commits · Fix · 2026-08-01
 
 Two findings from test round v10 (#340), both on the teardown's own correctness Ã¢â‚¬â€ and the second is the
 third generation of one defect, so it arrives with a fixture rather than a third correction.
@@ -632,7 +632,7 @@ Plugins: specialists
 
 ---
 
-### #342 Ã‚Â· UNINSTALL step order: the document and the audit survive until the end Ã‚Â· Docs Ã‚Â· 2026-08-01
+### #342 · UNINSTALL step order: the document and the audit survive until the end · Docs · 2026-08-01
 
 Test round v10 (#340) was the **first time anyone followed `UNINSTALL.md` end to end** Ã¢â‚¬â€ it had travelled
 since PR #321 and had never been walked. It broke on itself twice, in the same pattern it warns about one
@@ -674,7 +674,7 @@ matching edit. Both new anchors follow the existing `#step-N--<slug>` pattern.
 
 ---
 
-### #341 Ã‚Â· QUICKSTART entry path: prerequisites, the settings fragment, and the first command Ã‚Â· Docs Ã‚Â· 2026-08-01
+### #341 · QUICKSTART entry path: prerequisites, the settings fragment, and the first command · Docs · 2026-08-01
 
 The first four findings of test round v10 (#340), all of them on the stretch a consumer walks *before*
 the adoption path begins. v10 was the first round run on a **virgin Windows user profile**, which is why
@@ -737,7 +737,7 @@ Plugins: specialists
 
 ---
 
-### #321 Ã‚Â· An UNINSTALL document beside the QUICKSTART Ã‚Â· Docs Ã‚Â· 2026-08-01
+### #321 · An UNINSTALL document beside the QUICKSTART · Docs · 2026-08-01
 
 **The Quickstart has had no counterpart since the day the reversibility requirement was set.** Adoption
 had to be reversible *"at any moment"* (Dave, July 29, 2026), and the machinery for it exists Ã¢â‚¬â€ the
