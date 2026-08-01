@@ -1036,6 +1036,53 @@ if (Test-Path -LiteralPath $clForHeadings) {
 Write-Coverage -Category 'entry-heading' -Checked $ehChecked `
     -Note $(if ($entryFilesForHeadings.Count -eq 0) { 'no unfolded entry file in the root, so only CHANGELOG.md was judged -- normal between merges' } else { "$($entryFilesForHeadings.Count) unfolded entry file(s) plus CHANGELOG.md" })
 
+# --- 14. mojibake: a double-encoded character is a silent content change -----------------------------------
+# MEASURED HERE, August 1, 2026, and it nearly shipped. Demoting four headings in CHANGELOG.md with
+# Get-Content + WriteAllLines mangled 35 separators into 105 double-encoded sequences: Windows PowerShell
+# 5.1's Get-Content reads a BOM-less UTF-8 file as ANSI, so a middot (U+00B7, bytes C2 B7) comes back as two
+# characters, and writing that back as UTF-8 stores the mangled pair. Nothing errors -- the file stays valid
+# UTF-8, it just says something else.
+#
+# WHY THIS IS A GATE AND NOT A CONVENTION. The middot IS the field delimiter in an entry heading
+# ('### #NN <middot> title <middot> type <middot> date'), so cut-release.ps1 could no longer read the entry
+# TYPE: eleven entries fell into a catch-all category instead of Features/Fixes/Documentation. It was caught
+# by inspecting the generated notes before pushing (-NoPush), i.e. by one person looking carefully at the
+# right moment -- which is precisely the thing not to rely on. Third repo to meet this class
+# (smartwatchbanden -> life-hub -> here), and life-hub's own tool documents a v2.1.0 release that needed a
+# manual fix for the same reason.
+#
+# The detector is the repair tool's own table, dot-sourced rather than restated: one source for
+# "what does damage look like", so a sequence added to the repair cannot be invisible to the gate.
+$mjChecked = 0
+$mjScript = Join-Path $RepoRoot 'scripts\maintenance\fix-mojibake.ps1'
+if (Test-Path -LiteralPath $mjScript) {
+    # -Check reports and changes nothing; exit 1 = damage found. Run as a child process because the script
+    # calls exit itself, and a lint gate must not be terminated by the tool it consults.
+    #
+    # Via Invoke-NativeCapture, not a bare '2>&1'. The first version used the bare form and this repo's own
+    # shared-scripts guard caught it: under ErrorActionPreference=Stop a native command's stderr line
+    # becomes a terminating NativeCommandError before the exit code is ever read (the #107 pitfall), so the
+    # gate would have died on the tool's own output instead of reporting it.
+    . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
+    $mjRun = Invoke-NativeCapture -FilePath 'powershell' -Arguments @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $mjScript, '-Check')
+    $mjOut = $mjRun.Output
+    $mjCode = $mjRun.ExitCode
+    $mjChecked = 1
+    if ($mjCode -ne 0) {
+        foreach ($line in @($mjOut | Where-Object { $_ -match '\[mojibake\]' })) {
+            $errors += ("[mojibake] " + ($line -replace '^\s*\[mojibake\]\s*', '') + " -- a UTF-8 character was read as ANSI and written back, so the file's text changed without any error. In an entry heading the separator IS the field delimiter, so cut-release.ps1 stops being able to read the entry type. Repair with scripts/maintenance/fix-mojibake.ps1; avoid it by never reading a non-ASCII file with bare Get-Content.")
+        }
+        if (@($mjOut | Where-Object { $_ -match '\[mojibake\]' }).Count -eq 0) {
+            $errors += "[mojibake] scripts/maintenance/fix-mojibake.ps1 -Check exited $mjCode without naming a file -- the mojibake gate could not complete, so nothing is asserted about encoding."
+        }
+    }
+} else {
+    $errors += "[mojibake] scripts/maintenance/fix-mojibake.ps1 is missing -- the encoding gate cannot run."
+}
+
+Write-Coverage -Category 'mojibake' -Checked $mjChecked `
+    -Note $(if ($mjChecked -eq 0) { 'the repair tool is absent, so no file was examined for double-encoded characters' } else { 'the root docs, every per-plugin CHANGELOG.md and every RELEASE.md, via the repair tool''s own table' })
+
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {
     Write-Host "  No findings." -ForegroundColor Green
