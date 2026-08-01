@@ -26,6 +26,13 @@ function Get-SharedScriptPairs {
     <#
         The registry of shared scripts. Each pair: the canonical root source (Source) and the
         plugin mirror (Mirror), both repo-root-relative. Extend per centralized script.
+
+        LibOnly = $true marks a DOT-SOURCED library rather than a standalone entry point. Such a
+        file never resolves a repo root of its own -- it is reached via a $PSScriptRoot-relative
+        dot-source from a caller that already resolved one -- so the dual-context invariant does not
+        apply to it. The flag lives HERE, next to the registration, because the test used to keep
+        its own hand-written list of lib names: a second literal that a new lib silently fell out of
+        (the accumulation shape of #275/#331). Registering a lib now declares its own exception.
     #>
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
@@ -66,14 +73,22 @@ function Get-SharedScriptPairs {
             Mirror = 'claude-code-plugins\claude-specialists\specialists\scripts\task\park-branch.ps1'
         },
         @{
-            Name   = 'check-report-lib'
-            Source = 'scripts\lib\check-report-lib.ps1'
-            Mirror = 'claude-code-plugins\claude-specialists\specialists\scripts\lib\check-report-lib.ps1'
+            Name    = 'check-report-lib'
+            Source  = 'scripts\lib\check-report-lib.ps1'
+            Mirror  = 'claude-code-plugins\claude-specialists\specialists\scripts\lib\check-report-lib.ps1'
+            LibOnly = $true
         },
         @{
-            Name   = 'native-capture-lib'
-            Source = 'scripts\lib\native-capture-lib.ps1'
-            Mirror = 'claude-code-plugins\claude-specialists\specialists\scripts\lib\native-capture-lib.ps1'
+            Name    = 'native-capture-lib'
+            Source  = 'scripts\lib\native-capture-lib.ps1'
+            Mirror  = 'claude-code-plugins\claude-specialists\specialists\scripts\lib\native-capture-lib.ps1'
+            LibOnly = $true
+        },
+        @{
+            Name    = 'pr-issues-lib'
+            Source  = 'scripts\lib\pr-issues-lib.ps1'
+            Mirror  = 'claude-code-plugins\claude-specialists\specialists\scripts\lib\pr-issues-lib.ps1'
+            LibOnly = $true
         }
     )
 
@@ -84,6 +99,9 @@ function Get-SharedScriptPairs {
             MirrorRel  = $p.Mirror
             SourcePath = Join-Path $RepoRoot $p.Source
             MirrorPath = Join-Path $RepoRoot $p.Mirror
+            # Absent on an entry-point script -- normalized to $false so a caller can test the
+            # property without ContainsKey gymnastics under StrictMode.
+            LibOnly    = [bool]($p.ContainsKey('LibOnly') -and $p.LibOnly)
         }
     }
 }

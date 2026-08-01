@@ -87,6 +87,36 @@ The script also automatically sets the right GitHub label (see the prefix→labe
 continue without an intermediate question to [Merging to main](#merging-to-main) and
 [folding the changelog entry #06](05-06-extension.md#changelog).
 
+**Name the issues the PR closes — the gate now insists.** A PR that repairs an issue passes
+`-Resolves "331,332"`; a PR that repairs none passes `-NoResolves`. Leave both off while the changelog
+entry mentions an **open** issue and `open-pr.ps1` stops before the lint, the tests, and the push,
+naming what it saw.
+
+```sh
+.\scripts\release\open-pr.ps1 -Title "fix: short title" -Resolves "331,332"
+```
+
+**Why this is a gate and not a habit (lesson of August 1, 2026).** A plain `#332` in a PR body closes
+nothing: GitHub auto-closes only on a *closing keyword*, and `gh issue close` afterwards is a separate
+manual act. PRs [#341](https://github.com/DaveKJohn/davekjohns-workshop/pull/341),
+[#342](https://github.com/DaveKJohn/davekjohns-workshop/pull/342) and
+[#343](https://github.com/DaveKJohn/davekjohns-workshop/pull/343) each repaired real findings, each
+referenced them as plain mentions, and the manual close was skipped **three times running** — leaving
+**eight** repaired issues open while `CHANGELOG.md` reported them done. Dave spotted it from the
+outside ("a lot of new things in the changelog but all 20 issues are still open"), which is the tell
+that the tracker had stopped being trustworthy. The eight were closed by hand; the gate is what makes
+a fourth time impossible. Two details worth keeping:
+- **One keyword per issue, one per line.** GitHub does not distribute a keyword over a list, so
+  `Closes #331, #332` closes only #331 and leaves the second silently open — the exact failure being
+  gated. `New-ResolvesBlock` writes one line each, and the suite asserts the shape, not just the text.
+- **PR references are not issue mentions.** `PR #341`, `PRs #341-#343` and `/pull/341` are excluded on
+  purpose: a gate that fires on every branch gets bypassed, and then it guards nothing.
+
+`ship-pr.ps1` closes the loop after the merge: it reads the closing keywords back **out of the merged
+body** and verifies each issue really went to `CLOSED`, closing any that did not. Reading them back
+rather than re-using the parameter is deliberate — a second tally is how the #275 preview/apply drift
+started.
+
 **The PR body fills itself in** via `open-pr.ps1` — simply leave out `-Body`. The script ticks the
 right "Type of change" box (from the branch prefix), fills "What does this change do?" with the
 description from the changelog entry file (`<branch>.md`), and checks the two always-true

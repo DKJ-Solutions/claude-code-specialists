@@ -48,21 +48,58 @@
     test suites run (scripts/tests/*.tests.ps1), exactly as CI does. A failing suite blocks the
     push and the PR. Use -SkipTests to deliberately skip this gate (escape valve).
 
+    Resolves gate (a lesson from PRs #341-#343): a PR that repairs an issue must say so with a
+    CLOSING KEYWORD, or the issue stays open after the merge. Those three PRs each referenced their
+    issues as a plain mention (`#332`), GitHub therefore auto-closed nothing, and the manual
+    `gh issue close` was skipped three times running -- leaving eight repaired findings OPEN while
+    the changelog said they were done. So the decision is now forced rather than remembered:
+      - `-Resolves 331,332` writes a `## Resolved issues` block with one `Closes #<n>` per issue
+        (one per line, because GitHub does not distribute a single keyword over a list -- a comma
+        form would close the first and silently leave the rest open);
+      - `-NoResolves` declares "this PR closes no issue" and is the deliberate way past the gate;
+      - neither, while the changelog entry mentions an issue that is currently OPEN -> the gate
+        BLOCKS before the lint, the tests, and the push. PR references (`PR #341`, `/pull/341`) are
+        not counted, so citing the PR you follow on from does not trip it.
+    A `-Body` you supply that already carries a closing keyword satisfies the gate on its own. If the
+    open/closed state cannot be determined (gh unavailable or failing), the gate WARNS and lets the PR
+    through -- wedging the PR flow on a network hiccup would be worse than the slip it guards against.
+    The decision table lives in scripts/lib/pr-issues-lib.ps1 and is covered by
+    scripts/tests/pr-issues.tests.ps1.
+
 .PARAMETER Title
     PR title, e.g. "feat: new domain plugin" or "fix: broken agent-def frontmatter".
 
 .PARAMETER Body
     (Optional) PR description. Default: the filled-in .github/pull_request_template.md.
 
+.PARAMETER Resolves
+    (Optional) Issue numbers this PR resolves, as a string: -Resolves '331,332' (a leading '#' and
+    spaces or semicolons as separators are fine too). Each number gets its own `Closes #<n>` line in
+    the PR body, so GitHub closes them when the PR merges.
+
+    A STRING and not an [int[]] on purpose: `powershell -File` (how ship-pr.ps1 and the test fixtures
+    call this script) never builds an array from the command line -- '332,340' would arrive as one
+    string and be cast to the single number 332340, reading the comma as a thousands separator. That
+    is silent, not an error, so the parameter takes the raw text and
+    ConvertTo-IssueNumberList parses it.
+
+.PARAMETER NoResolves
+    Declare that this PR closes no issue. The deliberate way past the resolves gate.
+
 .EXAMPLE
     ./scripts/release/open-pr.ps1 -Title "feat: new domain plugin"
+
+.EXAMPLE
+    ./scripts/release/open-pr.ps1 -Title "fix: the pre-flight reads commits" -Resolves 331,332
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$Title,
     [string]$Body = '',
     [switch]$SkipLint,
-    [switch]$SkipTests
+    [switch]$SkipTests,
+    [string]$Resolves = '',
+    [switch]$NoResolves
 )
 $ErrorActionPreference = 'Stop'
 
@@ -96,6 +133,10 @@ $repo = Get-RepoName
 # workshop root, a consumer's plugin cache, or the plugin mirror tree alike.
 . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
 
+# The resolves-gate decision table. Same not-repo-owned, travels-with-the-payload reasoning as the
+# line above (registered in shared-scripts-lib.ps1 for the mirror + drift lint).
+. (Join-Path $PSScriptRoot '..\lib\pr-issues-lib.ps1')
+
 # Pre-flight (#86): an unfilled scaffold (repo-config still at VUL-IN) would otherwise only fail
 # further down with an unclear gh error. Stop here with a clear pointer.
 if ($repo -match 'VUL-IN' -or (Get-LintScript) -match 'VUL-IN') {
@@ -105,6 +146,102 @@ if ($repo -match 'VUL-IN' -or (Get-LintScript) -match 'VUL-IN') {
 
 $branch = (git rev-parse --abbrev-ref HEAD).Trim()
 if ($branch -eq 'main') { Write-Error "You are on main; a PR is created from a branch."; exit 1 }
+
+# Resolved BEFORE the gates (it is a pure function of the branch name), because the resolves gate
+# below needs the entry-file path and the label logic further down needs the same object.
+$info = Get-BranchInfo -Branch $branch
+$entryPath = Join-Path $repoRoot ($info.SafeName + '.md')
+
+# --- Resolves gate --------------------------------------------------------------------------------
+# Runs FIRST, before lint/tests/push: a forgotten closing keyword should not cost the author forty
+# test suites before it is reported, and nothing has left the machine yet at this point.
+$resolveList = @(ConvertTo-IssueNumberList -Value $Resolves)
+$resolveIssues = @()
+if (-not $NoResolves -or $resolveList.Count -gt 0) {
+    # What the branch itself mentions: the changelog entry (always present on a branch) plus a
+    # -Body the caller supplied, since either can carry the reference.
+    $mentionText = ''
+    if (Test-Path $entryPath) {
+        $mentionText = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
+    }
+    if ($Body) { $mentionText = $mentionText + "`n" + $Body }
+
+    # The open-issue list, fetched ONCE and used for both the gate verdict and the typo check below.
+    # It used to be two near-identical query blocks, each carrying its own copy of the 5.1 flatten
+    # trick -- a second hand-copied instance of a subtle workaround, which is the accumulation shape
+    # this repo already paid for twice (#275, #331). Returns $null when it cannot be determined.
+    function Get-OpenIssueNumbers {
+        param([string]$Repo)
+        # --limit 1000, not 200: an issue past the page boundary would read as "not open" and let the
+        # gate pass in silence, which is the one outcome this whole feature exists to prevent.
+        $q = Invoke-NativeCapture -FilePath 'gh' -Arguments @('issue', 'list', '--repo', $Repo, '--state', 'open', '--limit', '1000', '--json', 'number') -DiscardStderr
+        if ($q.ExitCode -ne 0) {
+            Write-Warning "could not ask gh which issues are open (exit $($q.ExitCode)) -- the resolves gate cannot check and will not block."
+            return $null
+        }
+        try {
+            # ASSIGN the parse result first, THEN wrap it in @(). Windows PowerShell 5.1 emits a
+            # parsed JSON array as a SINGLE pipeline object, so `@(... | ConvertFrom-Json)` collects
+            # one element that IS the whole Object[] -- and `$_.number` on an array does member
+            # enumeration, handing the [int] cast an Object[] that throws. Assigning first gives @()
+            # a real array to flatten. That throw was swallowed as "cannot check", so the gate
+            # silently never blocked while every pure unit test stayed green; only the wiring fixture
+            # caught it.
+            $parsed = ($q.Output -join "`n") | ConvertFrom-Json
+            return @(@($parsed) | ForEach-Object { [int]$_.number })
+        } catch {
+            Write-Warning "could not parse the open-issue list from gh ($($_.Exception.Message)) -- the resolves gate cannot check and will not block."
+            return $null
+        }
+    }
+
+    # Which mentioned numbers are OPEN issues right now. $null = could not determine, which the
+    # decision table treats as "do not block" (it only warns).
+    $openMentions = $null
+    $openAll = $null
+    $mentions = @(Get-IssueMentions -Text $mentionText)
+    if ($mentions.Count -gt 0 -or $resolveList.Count -gt 0) {
+        $openAll = Get-OpenIssueNumbers -Repo $repo
+        if ($null -ne $openAll) {
+            $openMentions = @($mentions | Where-Object { $openAll -contains $_ })
+        }
+    }
+
+    $decision = Get-ResolvesDecision -Resolves $resolveList -NoResolves:$NoResolves -Body $Body -OpenMentions $openMentions
+    if (-not $decision.Allowed) {
+        $list = ($decision.Blocked | ForEach-Object { "#$_" }) -join ', '
+        $flag = '-Resolves ' + (($decision.Blocked | ForEach-Object { "$_" }) -join ',')
+        Write-Error @"
+resolves gate: this branch mentions open issue(s) $list, but the PR declares neither -Resolves nor -NoResolves - nothing pushed, no PR opened.
+
+A plain mention does not close anything: GitHub only auto-closes on a closing keyword, so without this the issue stays open after the merge (exactly what happened to eight findings across PRs #341-#343).
+
+Pick one:
+  $flag   -- this PR resolves them; each gets its own 'Closes #<n>' line in the body
+  -NoResolves        -- this PR resolves none of them (they are cited as context)
+
+Both are honest answers; the gate only refuses to guess.
+"@
+        exit 1
+    }
+    $resolveIssues = @($decision.Issues)
+
+    # Mentioned, open, and covered by nothing the author declared. Reported, never blocking: closing
+    # one of two mentioned issues is a legitimate choice, but leaving the second unmentioned in the
+    # output is how the original slip happened.
+    if (@($decision.Undeclared).Count -gt 0) {
+        Write-Warning ("resolves gate: open issue(s) " + ((@($decision.Undeclared) | ForEach-Object { "#$_" }) -join ', ') + " are mentioned on this branch but are NOT closed by this PR. If that is deliberate (cited as context), nothing to do -- they simply stay open.")
+    }
+
+    # A number passed to -Resolves that is not an open issue is worth a word but not a block: it may
+    # be a closed issue being re-reported, or a typo the author should see. Reuses the single query.
+    if ($resolveList.Count -gt 0 -and $null -ne $openAll) {
+        $notOpen = @($resolveIssues | Where-Object { $openAll -notcontains $_ })
+        if ($notOpen.Count -gt 0) {
+            Write-Warning ("-Resolves names issue(s) that are not open right now: " + (($notOpen | ForEach-Object { "#$_" }) -join ', ') + " -- check for a typo. The closing keyword is written anyway (harmless on an already-closed issue).")
+        }
+    }
+}
 
 # Lint gate: catch invalid manifests/frontmatter/dead links before they land on main via a PR.
 # The lint script is repo-specific (via repo-config); errors block (exit code 1). -SkipLint
@@ -155,7 +292,6 @@ $push = Invoke-NativeCapture -FilePath 'git' -Arguments @('push', '-u', 'origin'
 $push.Output | ForEach-Object { Write-Host $_ }
 if ($push.ExitCode -ne 0) { Write-Error "git push failed."; exit 1 }
 
-$info = Get-BranchInfo -Branch $branch
 if ($info.IsKnown) {
     $label = $info.Label
 } else {
@@ -170,8 +306,8 @@ if (-not $Body) {
 
         # Description from the changelog entry file <SafeName>.md: everything after the compact
         # ###-heading line ("### title - type - date"). This file always exists on the branch.
+        # $entryPath was resolved before the gates, alongside $info.
         $desc = ''
-        $entryPath = Join-Path $repoRoot ($info.SafeName + '.md')
         if (Test-Path $entryPath) {
             $entryLines = Get-Content -Path $entryPath -Encoding UTF8
             $h3Idx = -1
@@ -227,6 +363,16 @@ if (-not $Body) {
         }
         $Body = ($filled -join "`n")
     }
+}
+
+# The closing block goes in LAST, so it lands on both paths -- the auto-filled template and a -Body
+# supplied by the caller. Add-ResolvesBlock is idempotent per issue: a number the body already
+# closes is not repeated.
+if ($resolveIssues.Count -gt 0) {
+    $Body = Add-ResolvesBlock -Body $Body -Issues $resolveIssues
+    Write-Host ("resolves gate: the PR body closes " + (($resolveIssues | ForEach-Object { "#$_" }) -join ', ') + " on merge.") -ForegroundColor Green
+} else {
+    Write-Host "resolves gate: this PR closes no issue." -ForegroundColor DarkGray
 }
 
 # Body via a temp file: --body $Body would let PowerShell 5.1 mangle embedded quotes on native
