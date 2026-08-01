@@ -186,6 +186,25 @@ try {
     Assert-True (-not ($rc.Out -match '\[BOOTSTRAP\]')) 'scaffolds vs contract: the libs exist, so the check really did probe them'
     Assert-True ($rc.Out -match "\[OK\]\s+'Test-BranchName'") 'scaffolds vs contract: Test-BranchName probed and present'
     Assert-True ($rc.Out -match "\[OK\]\s+'Get-RosterPath'") 'scaffolds vs contract: Get-RosterPath probed and present'
+
+    # --- 1c3. Get-RosterPath must POINT AT THE SEAM, not merely exist (inbound #333) -----------------
+    #     Present-and-wrong was the actual defect, and it was invisible to the assertion above. The
+    #     scaffold said 'CLAUDE.md' -- where the roster lived before the seam existed -- while this same
+    #     bootstrap writes the roster slot into .claude/specialists/SPECIALISTS.md and its own next-steps
+    #     block says the roster does NOT go in CLAUDE.md. So on a freshly bootstrapped consumer the check
+    #     read a file containing only the @-import, found no roster rows, and reported every specialist as
+    #     missing -- naming the wrong file as the place to fix it. Measured on a virgin profile: nineteen
+    #     [ERROR] lines on the documented happy path.
+    Assert-True ($rcText -match [regex]::Escape("'.claude/specialists/SPECIALISTS.md'")) 'roster path: the scaffold points at the seam inclusion'
+    Assert-True (-not ($rcText -match "RosterPath = 'CLAUDE\.md'")) 'roster path: and NOT at CLAUDE.md, which the bootstrap itself rules out'
+    # The placeholder must be gone: a consumer receiving the literal token would be worse off than with the
+    # wrong-but-real path this replaced.
+    Assert-True (-not ($rcText -match '__SEAM_ROSTER_PATH__')) 'roster path: the template placeholder was substituted, not shipped'
+    # And the value the scaffold writes must be the SAME literal the shared source hands out, so the writer
+    # and the check that reads it back cannot drift apart again.
+    . (Join-Path $RepoRoot 'scripts\lib\check-report-lib.ps1')
+    $seamRel = (Get-SeamPaths -RepoRoot $Fixture).RelInclusion
+    Assert-True ($rcText -match [regex]::Escape("'$seamRel'")) 'roster path: it is Get-SeamPaths'' own value, not a second hand-typed copy'
     Assert-True ($rc.Out -match "\[OK\]\s+'Get-RosterIgnoredIds'") 'scaffolds vs contract: Get-RosterIgnoredIds probed and present'
     # The two required functions that were never missing -- guards against a "fix" that adds the three
     # new ones while dropping an old one.

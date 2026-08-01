@@ -464,10 +464,15 @@ function Get-LintScript {
 }
 
 # Repo-root-relative path to the file holding the specialist roster, read by check-roster-sync.
-# 'CLAUDE.md' unless this repo keeps its roster somewhere else. Required by the contract, so the
-# scaffold defines it rather than leaving the session check to report it against a missing function
-# (issue #226).
-$script:RosterPath = 'CLAUDE.md'
+# Points at the seam inclusion, because that is where specialists-init puts the roster slot -- change it
+# only if you move the roster somewhere else. Required by the contract, so the scaffold defines it rather
+# than leaving the session check to report it against a missing function (issue #226).
+#
+# It used to say 'CLAUDE.md', which is where the roster lived BEFORE the seam existed. The consequence was
+# not cosmetic: the check read a file containing only the @-import, found no roster rows, and reported
+# every specialist as missing -- naming CLAUDE.md as the place to fix it, while this bootstrap's own
+# next-steps block says the roster does NOT go there (inbound #333).
+$script:RosterPath = '__SEAM_ROSTER_PATH__'
 
 function Get-RosterPath {
     return $script:RosterPath
@@ -614,6 +619,17 @@ function Get-DerivedRepoName([string]$Root) {
     if (-not $m.Success) { return $null }
     return "$($m.Groups['owner'].Value)/$($m.Groups['repo'].Value)"
 }
+
+# The roster path comes from Get-SeamPaths, the same source that decides where this bootstrap WRITES the
+# roster slot -- so the writer and the value the consumer's check reads back cannot drift apart. It was a
+# hand-typed 'CLAUDE.md' in the scaffold above and it was simply wrong (inbound #333). A single-quoted
+# here-string cannot interpolate, hence the placeholder rather than a $(...) in the template.
+#
+# The fallback matters for the one path where the lib is absent: without it the consumer would receive a
+# literal '__SEAM_ROSTER_PATH__' as its roster path, which is worse than the bug being fixed. It repeats the
+# literal knowingly, and the test asserts the two agree.
+$seamRosterRel = if ($seam) { $seam.RelInclusion } else { '.claude/specialists/SPECIALISTS.md' }
+$repoConfigScaffold = $repoConfigScaffold.Replace('__SEAM_ROSTER_PATH__', $seamRosterRel)
 
 # Insert derived name into repo config scaffold (before $scriptScaffolds assembly so new content is included).
 # If derivation fails, VUL-IN placeholder remains.

@@ -987,15 +987,22 @@ function Get-SeamPaths {
        ImportLine is what goes into CLAUDE.md, forward-slashed: an '@'-import path is not a filesystem
        path, and it must read identically on every platform. Verified against the memory reference:
        imports nest to a maximum of four hops, and the seam spends two (CLAUDE.md -> SPECIALISTS.md ->
-       body/lens), so a lens may still import something of its own. #>
+       body/lens), so a lens may still import something of its own.
+
+       RelInclusion is the same file as Inclusion, repo-root-relative and forward-slashed -- the form a
+       repo-config's Get-RosterPath takes. It lives here because the bootstrap has to WRITE that value
+       into a consumer's scaffold while check-roster-sync READS it back, which is the writer/recogniser
+       pair this function exists for. It was a hand-typed literal in the scaffold, and it was typed
+       wrong: 'CLAUDE.md', while the bootstrap puts the roster slot in SPECIALISTS.md (inbound #333). #>
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
     $dir = Join-Path $RepoRoot '.claude\specialists'
     return [pscustomobject]@{
-        Dir        = $dir
-        LensDir    = Join-Path $dir 'lenses'
-        Inclusion  = Join-Path $dir 'SPECIALISTS.md'
-        ImportLine = '@.claude/specialists/SPECIALISTS.md'
-        RelDir     = '.claude/specialists'
+        Dir          = $dir
+        LensDir      = Join-Path $dir 'lenses'
+        Inclusion    = Join-Path $dir 'SPECIALISTS.md'
+        ImportLine   = '@.claude/specialists/SPECIALISTS.md'
+        RelDir       = '.claude/specialists'
+        RelInclusion = '.claude/specialists/SPECIALISTS.md'
     }
 }
 
