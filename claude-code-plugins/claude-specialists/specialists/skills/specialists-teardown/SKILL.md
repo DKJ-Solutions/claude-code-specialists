@@ -131,8 +131,10 @@ about whether this procedure *can* have an undo:
 git check-ignore -v .claude/specialists/lenses/ |
   Where-Object { ($_ -split '\t')[0] -notmatch ':$' }   # keep only hits with a filled pattern field
 
-# 2. Is it tracked right now?
-git ls-files .claude | Select-String 'extension\.md|SPECIALISTS\.md'   # empty = not committed yet
+# 2. Is it COMMITTED right now? Staged does not count -- this reads the commit, not the index
+git ls-tree -r --name-only HEAD .claude | Select-String 'extension\.md|SPECIALISTS\.md'
+#    empty output      = not committed yet
+#    "fatal: ... HEAD" = no commits in this repo at all, so also not committed
 ```
 
 **Command 1 filters its own output, and leaving that filter off is what makes it lie.** `check-ignore
@@ -169,10 +171,21 @@ therefore only ever remove a false hit — never suppress a true one.
 
 **Why not the second command on its own — it used to be, and it gave the alarming answer for the safe
 repo.** Measured in `DaveKJohn/life-hub` on July 30, 2026, immediately after the bootstrap and before
-`-Apply`, which is exactly when this section tells you to look: `git ls-files` came back **empty**
+`-Apply`, which is exactly when this section tells you to look: the command came back **empty**
 while `.claude/` was genuinely under version control — 16 files tracked, `settings.json` among them,
 nothing about the path ignored, and 19 freshly written lenses sitting in `git status` as `??`. The
-command lists **committed** files only, and the lenses the bootstrap has just written are new.
+lenses the bootstrap has just written are new, so a command that reports what is *recorded* says nothing
+about whether the repo *can* record them. That is command 1's question, and only command 1 answers it.
+
+> **This command was `git ls-files` until August 1, 2026, and that was the third generation of one defect**
+> (inbound [#332](https://github.com/DaveKJohn/davekjohns-workshop/issues/332)). `ls-files` reports the
+> **index**, not the commits — so a `git add` with a *failed* commit behind it made the command flip from
+> empty to 20 lines with zero commits in the repository, and the paragraph above explained the emptiness by
+> saying `ls-files` "lists committed files only", which was itself wrong. Both are corrected: the command is
+> now `git ls-tree -r --name-only HEAD`, which reads the commit. The lineage is #280 (`ls-files` cannot tell
+> *"this repo cannot"* from *"you have not yet"*), #283 (the CRLF artefact in command 1) and this one, which
+> is why the fix arrived with a seventh fixture in the suite below rather than as a third correction to the
+> prose: staged-but-not-committed, asserting the command stays empty.
 
 So an empty result collapses two states that call for opposite responses:
 

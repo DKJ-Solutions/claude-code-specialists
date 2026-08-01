@@ -996,6 +996,42 @@ function Test-IsOrchestratorNoteLine {
     return [bool]($t -match $note.TailPattern)
 }
 
+function Get-ClaudeMdScaffold {
+    <# The CLAUDE.md scaffold the bootstrap writes when the consumer has NO CLAUDE.md at all -- the heading
+       plus the two prose lines above the orchestrator import block. One source for the writer
+       (bootstrap.ps1) and the reporter (teardown.ps1), for the same reason Get-OrchestratorNote is one:
+       a literal mirrored by hand in two scripts produced BOTH instances of the accumulation bug documented
+       above, and this is the third literal that crosses the same boundary.
+
+       WHY THE TEARDOWN NEEDS TO RECOGNISE IT (inbound #331, test round v10). On a consumer that had no
+       CLAUDE.md before adoption, every byte of that file was written by specialists-init -- so after a full
+       teardown these two lines are the only thing left in it, and they were reported as NEITHER [remove]
+       nor [KEEP]. Three things were true at once: they stayed, they were unreported, and the free-standing
+       audit said [FREE]. The audit's own claim was narrowly true (the lines name no specialist, persona,
+       roster or lens, so nothing loads because of them), which is exactly what made the silence worse: the
+       document tells a reader that '[remove] versus [KEEP] is what tells you which case you were in', and
+       here it was neither.
+
+       Matched on the LITERAL generated wording only, like the note above: a consumer who reworded or
+       translated these lines has authored that text, and the teardown reports nothing about it. #>
+    [pscustomobject]@{
+        Heading = '# CLAUDE.md'
+        Prose   = @(
+            'This repo is governed by **Claude Specialists** -- a team of specialized Claudes led by a Chief of Staff.',
+            'This scaffold was created by `specialists-init` skill; expand with governance and safety rules for this repo.'
+        )
+    }
+}
+
+function Test-IsClaudeMdScaffoldProseLine {
+    <# Is this line one of the scaffold's generated prose lines? Trimmed, so an indentation change in a
+       consumer's editor does not hide it from the reporter. #>
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Line)
+    $t = $Line.Trim()
+    foreach ($p in (Get-ClaudeMdScaffold).Prose) { if ($t -eq $p) { return $true } }
+    return $false
+}
+
 function Get-LensDirCandidates {
     <# The ordered directories a repo lens for $PluginName may live in, most canonical first:
          0. .claude/specialists/lenses/                  -- THE SEAM (#221); where writers write for a

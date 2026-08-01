@@ -45,12 +45,34 @@ be reversed:
 ```powershell
 # 1. Can this repo track the lens tree at all?
 #    A line that SURVIVES the filter = ignored -> there is NO undo, stop and read the skill first
+#    No output together with exit code 1 is the answer you WANT here (see below)
 git check-ignore -v .claude/specialists/lenses/ |
   Where-Object { ($_ -split '\t')[0] -notmatch ':$' }   # keep only hits with a filled pattern field
 
-# 2. Is it committed right now?
-git ls-files .claude | Select-String 'extension\.md|SPECIALISTS\.md'   # empty = not committed yet
+# 2. Is it COMMITTED right now? Staged does not count -- this reads the commit, not the index
+git ls-tree -r --name-only HEAD .claude | Select-String 'extension\.md|SPECIALISTS\.md'
+#    empty output              = not committed yet
+#    "fatal: ... HEAD"         = this repo has no commits at all, so also not committed
 ```
+
+**Command 2 reads the commit rather than the index, and that distinction is the whole point of this
+section** (inbound [#332](https://github.com/DaveKJohn/davekjohns-workshop/issues/332)). It used to be
+`git ls-files`, which reports the **index**. Measured in round v10: a `git add -A` went through, the
+following `git commit` failed, and the command flipped from empty to 20 lines with **zero commits added to
+the repository**. Its old comment — `# empty = not committed yet` — was therefore false in the direction
+that matters: non-empty did not mean committed. A reader whose commit fails on a hook, a missing git
+identity, or a typo in the message got a green pre-flight and went on believing there was an undo.
+
+**That is the third generation of the same defect in this one pre-flight, so the fix ships with a test
+rather than as a third correction.** #280 was `git ls-files` failing to tell *"this repo cannot"* from
+*"you have not yet"*; #283 was the CRLF blank-line artefact in command 1; this is the surviving half, still
+measuring the wrong object. The fixtures live in `scripts/tests/teardown-protocol.tests.ps1` in the source
+repo, and one of them now stages without committing and asserts this command stays empty.
+
+**Command 1's success case exits `1`, and that is the answer you want.** `git check-ignore` returns 1 when
+nothing matches. In an interactive shell that is invisible; an agent harness reads a non-zero exit as a
+failed command and has to decide whether to trust it. Nothing is wrong — no output plus exit 1 means the
+lens tree is not ignored.
 
 The filter on command 1 is load-bearing rather than tidiness: on Windows a `.gitignore` with CRLF line
 endings and a blank line makes git report a hit with an **empty pattern field** for any path ending in a
@@ -58,7 +80,11 @@ slash, which reads exactly like a real ignore rule. The full measurement is in t
 [skill](specialists/skills/specialists-teardown/SKILL.md#pre-flight-is-your-lens-tree-actually-under-version-control).
 And note where the undo really begins: at the **commit**, not at the bootstrap. If command 2 comes back
 empty because the lenses were never committed, commit them first — a wrongly removed file is only one
-`git checkout` away once git has a copy.
+`git checkout` away once git has a copy. **Commit more than the lens tree, though.** This paragraph used to
+name only that tree, while the teardown also edits `CLAUDE.md` and, with `-VendorScripts`, writes under
+`scripts/` — both of which were *also* untracked at that moment in the v10 measurement. A reader who
+committed literally what was named had no undo for two of the three things about to change. `git add
+CLAUDE.md .claude scripts` covers it.
 
 **If your own scripts reach into the plugin, plan that before you uninstall.** This family is the single
 source of truth for the shared workflow scripts, and a consumer that adopted them reaches them through a
@@ -218,7 +244,7 @@ Remove-Item "$env:USERPROFILE\.claude\plugins\cache\davekjohns-workshop" -Recurs
 
 ## What is left behind, honestly
 
-A repo that adopted this family and then tore down is **not** blank, and three of these are correct rather
+A repo that adopted this family and then tore down is **not** blank, and four of these are correct rather
 than debt:
 
 - **Your history stays.** `CHANGELOG.md` and release notes that mention specialists are an accurate record
@@ -229,6 +255,16 @@ than debt:
   where a roster row ends and your prose begins. The audit lists them by line so you can reword the ones
   that were rules phrased through a character (*"Derek opens the PR"* → *"changes go in via a branch and a
   PR"*) and delete the ones that only ever existed for the plugin.
+- **The scaffold prose stays in a `CLAUDE.md` the bootstrap created** — the one entry in this list the
+  plugin itself wrote. If you had no `CLAUDE.md` before adoption, two of its lines are `specialists-init`'s
+  (*"This repo is governed by **Claude Specialists** …"*), and the teardown reports them as `[KEEP]` instead
+  of deleting them. The line it keeps is deliberate: an `@`-import *loads* something, so removing it is
+  safe and necessary; prose loads nothing, and cutting sentences out of somebody's governance file to
+  satisfy a counter is the wrong side of that boundary. On such a repo those two lines plus the
+  `# CLAUDE.md` heading are all that is left in the file, so deleting it outright is a reasonable call —
+  and yours. Until August 1, 2026 they were reported as **neither** `[remove]` nor `[KEEP]` while the audit
+  printed `[FREE]`, which is what got this row written (inbound
+  [#331](https://github.com/DaveKJohn/davekjohns-workshop/issues/331)).
 - **A gate of your own that lints lens files may go quiet rather than red.** Once the directory is gone
   the category silently skips: nothing errors, nothing is reported, and the gate stays green while
   checking nothing. Right for a deliberate teardown, wrong for an accidental loss.

@@ -249,21 +249,36 @@ if (Test-Path -LiteralPath $seam.Inclusion -PathType Leaf) {
 # file still in it is already on the remove list. That is the same question -Apply answers by looking,
 # because by then those files are gone -- which is why one code path serves both and the two counts
 # cannot drift apart again.
-$plannedRemovals = [System.Collections.Generic.HashSet[string]]::new([string[]]$removed, [System.StringComparer]::OrdinalIgnoreCase)
-foreach ($dir in ($lensDirs + @($seam.Dir))) {
-    if (-not (Test-Path -LiteralPath $dir)) { continue }
-    $leftovers = @(
-        Get-ChildItem -LiteralPath $dir -Recurse -File -ErrorAction SilentlyContinue |
-            Where-Object { -not $plannedRemovals.Contains($_.FullName.Substring($root.Length).TrimStart('\', '/')) }
-    )
-    if ($leftovers.Count -gt 0) { continue }
-    # One label for the printed line and the tally, so the list a reader reads and the number they are
-    # given cannot describe the same item differently.
-    $dirLabel = $dir.Substring($root.Length).TrimStart('\', '/') + '\ (empty directory)'
-    if ($Apply) { Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue }
-    $removed += $dirLabel
-    Write-Host ("  [remove] " + $dirLabel) -ForegroundColor Green
+# ONE code path, called twice (inbound #331). It used to be a loop right here over the lens trees and the
+# seam only -- and `scripts\lib\` was therefore left behind as an empty directory after -Apply, because the
+# file inside it is not planned for removal until section 3, further down. Rather than copy the loop, it
+# became a callable: here for the lens/seam directories, and again after section 3 for the script-config
+# ones. Deepest first in both calls, because a parent only reads as empty once its child is gone.
+#
+# It RETURNS the labels it handled instead of appending to $removed itself: a scriptblock cannot append to
+# its caller's variable, and quietly keeping a second tally is exactly how the preview/apply drift in #275
+# started. One list, one number, one label per item.
+$pruneEmptyDirs = {
+    param([string[]]$Dirs, [string[]]$PlannedSoFar)
+    $planned = [System.Collections.Generic.HashSet[string]]::new([string[]]$PlannedSoFar, [System.StringComparer]::OrdinalIgnoreCase)
+    $handled = @()
+    foreach ($dir in $Dirs) {
+        if (-not (Test-Path -LiteralPath $dir)) { continue }
+        $leftovers = @(
+            Get-ChildItem -LiteralPath $dir -Recurse -File -ErrorAction SilentlyContinue |
+                Where-Object { -not $planned.Contains($_.FullName.Substring($root.Length).TrimStart('\', '/')) }
+        )
+        if ($leftovers.Count -gt 0) { continue }
+        # One label for the printed line and the tally, so the list a reader reads and the number they are
+        # given cannot describe the same item differently.
+        $dirLabel = $dir.Substring($root.Length).TrimStart('\', '/') + '\ (empty directory)'
+        if ($Apply) { Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue }
+        $handled += $dirLabel
+        Write-Host ("  [remove] " + $dirLabel) -ForegroundColor Green
+    }
+    return $handled
 }
+$removed += @(& $pruneEmptyDirs -Dirs ($lensDirs + @($seam.Dir)) -PlannedSoFar $removed)
 
 # --- 2. The @-imports in CLAUDE.md ---------------------------------------------------------------
 # The only lines in that file this script will touch. Safe precisely because an @-import naming a
@@ -327,6 +342,30 @@ if (Test-Path -LiteralPath $claudeMd -PathType Leaf) {
             [System.IO.File]::WriteAllText($claudeMd, (($keptLines -join $nl) + $nl))
         }
     }
+    # The scaffold prose the bootstrap writes when it CREATES CLAUDE.md. REPORTED, never removed -- and it
+    # is here because being reported as neither was the defect (inbound #331, test round v10). On a consumer
+    # that had no CLAUDE.md before adoption, every byte of the file is bootstrap-written, so after a full
+    # teardown these lines are all that is left in it -- and they appeared as neither [remove] nor [KEEP]
+    # while the audit below printed [FREE]. That audit was narrowly right (the lines name no specialist,
+    # persona, roster or lens, so nothing loads because of them), which is what made the silence the real
+    # finding: this script's contract with the reader is that [remove] versus [KEEP] tells them which case
+    # they were in, and here it was neither.
+    #
+    # Not removed, deliberately: the boundary this script keeps is that it takes out lines whose authorship
+    # is knowable AND whose removal cannot cost the owner anything -- an @-import loads something, prose
+    # does not. Deleting sentences out of somebody's governance file to satisfy a counter is the wrong side
+    # of that line. Per LINE rather than per file, following the same reasoning as the note above (#286):
+    # the choice a reader makes here is per line. Literal from the shared source, never re-typed.
+    $scaffoldKept = 0
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if (-not (Test-IsClaudeMdScaffoldProseLine -Line $lines[$i])) { continue }
+        Write-Host ("  [KEEP]   CLAUDE.md:$($i + 1) -- the bootstrap's scaffold prose; generated, but this script does not delete prose from a governance file") -ForegroundColor Yellow
+        $scaffoldKept++
+    }
+    if ($scaffoldKept -gt 0) {
+        $notes += "CLAUDE.md still holds $scaffoldKept line(s) of the scaffold prose specialists-init wrote when it CREATED that file. Generated rather than yours, but reported instead of removed: this script does not delete prose from a governance file. If your CLAUDE.md exists only because of the bootstrap, those line(s) plus the '# CLAUDE.md' heading are now all that is in it, and deleting the file outright is yours to decide."
+    }
+
     # Everything else in CLAUDE.md is authored text, and a roster row is not distinguishable from
     # ordinary prose by any rule this script could apply safely. Reported as the owner's call.
     $rosterish = @($lines | Where-Object { $_ -match '(?<![\d-])\d{2}-\d{2}(?![\d])' -and $_ -notmatch '^\s*@' })
@@ -356,6 +395,12 @@ foreach ($pair in @(
         Write-Host ("  [KEEP]   $($pair.Rel) -- not recognised as an unfilled scaffold; it holds this repo's $($pair.What), which outlives the plugin") -ForegroundColor Yellow
     }
 }
+
+# The second call of the pruner above, now that section 3's files are on the list. `scripts\lib\` survived
+# every round up to v10 as an empty directory for exactly this reason: its only file leaves here, and the
+# single pruning pass had already run. A repo that keeps a filled-in branch table or has scripts of its own
+# fails the emptiness test and is untouched, which is why this can be unconditional.
+$removed += @(& $pruneEmptyDirs -Dirs @((Join-Path $root 'scripts\lib'), (Join-Path $root 'scripts')) -PlannedSoFar $removed)
 
 # --- 4. The settings proposal --------------------------------------------------------------------
 # A proposal the bootstrap prints for the owner to merge. If it is still lying around it was never

@@ -99,6 +99,51 @@ try {
     # the shape: only the pre-flight section, only a Where-Object body, and only one containing no braces
     # of its own. Do not widen this into "run the doc's code blocks"; the value is one known predicate
     # being the same object in the doc and in the test, not a document that executes.
+    # --- 1b. inbound #332: command 2 measures the COMMIT, not the index ------------------------------
+    # THE THIRD GENERATION of one defect in this one pre-flight, which is why it arrives with a fixture
+    # instead of a third correction to the prose: #280 was `git ls-files` being unable to tell "this repo
+    # cannot" from "you have not yet", #283 is the section above, and this was the surviving half still
+    # reading the wrong object. Measured in round v10: a `git add -A` went through, the following commit
+    # FAILED, and the printed command flipped from empty to 20 lines with zero commits in the repository --
+    # a green pre-flight handed to a reader who had no undo at all.
+    Write-Host 'inbound #332 -- the pre-flight reads commits, not the index' -ForegroundColor Cyan
+    # Scoped to the FENCED COMMAND BLOCK, not to the section. The prose around it must be free to name
+    # `git ls-files` -- it explains what the command used to be and why that was wrong, and a test that
+    # forbade the string anywhere would force the document to drop its own history to stay green.
+    $cmdBlockMatch = [regex]::Match($preflight, '(?s)```powershell(?<body>.*?)```')
+    Assert-True $cmdBlockMatch.Success 'pre-flight: the fenced command block is still there'
+    $cmdBlock = if ($cmdBlockMatch.Success) { $cmdBlockMatch.Groups['body'].Value } else { '' }
+    Assert-True (-not ($cmdBlock -match 'git\s+ls-files')) `
+        'pre-flight: the commands no longer run git ls-files (it reports the INDEX, so staged reads as committed)'
+    Assert-True ($cmdBlock -match [regex]::Escape('git ls-tree -r --name-only HEAD')) `
+        'pre-flight: command 2 reads the commit, via git ls-tree'
+    Assert-True ($cmdBlock -match 'fatal') `
+        'pre-flight: the block names the "no commits at all" outcome, so a fatal line is not misread as a broken command'
+
+    # The fixture none of the three generations had: a tree that is STAGED and NOT committed.
+    $staged = Join-Path $Fixture 'staged-not-committed'
+    New-Item -ItemType Directory -Path (Join-Path $staged '.claude\specialists\lenses') -Force | Out-Null
+    $sInit = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $staged, 'init', '-q')
+    if ($sInit.ExitCode -ne 0) { throw "git init failed in $staged : $($sInit.Output -join ' ')" }
+    [System.IO.File]::WriteAllText((Join-Path $staged '.claude\specialists\lenses\01-01-extension.md'), "# lens`n")
+    [System.IO.File]::WriteAllText((Join-Path $staged '.claude\specialists\SPECIALISTS.md'), "# seam`n")
+    $sAdd = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $staged, 'add', '-A')
+    if ($sAdd.ExitCode -ne 0) { throw "git add failed in $staged : $($sAdd.Output -join ' ')" }
+    # Deliberately NO commit. That is the whole fixture.
+
+    $docPattern = 'extension\.md|SPECIALISTS\.md'
+    $oldRaw = (Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $staged, 'ls-files', '.claude') -DiscardStderr).Output
+    $newRaw = (Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $staged, 'ls-tree', '-r', '--name-only', 'HEAD', '.claude') -DiscardStderr).Output
+    $oldHits = @($oldRaw | Where-Object { "$_" -match $docPattern })
+    $newHits = @($newRaw | Where-Object { "$_" -match $docPattern })
+
+    # The fixture has to be DISCRIMINATING, or the assertion after it proves nothing: the old command must
+    # report this state as committed. That false green is the finding.
+    Assert-True ($oldHits.Count -gt 0) `
+        'staged fixture: the OLD command (git ls-files) reports this state -- so the fixture discriminates'
+    Assert-Equal 0 $newHits.Count `
+        'staged fixture: the NEW command stays empty -- staged is not committed, so there is no undo yet'
+
     $filterMatch = [regex]::Match($preflight, 'Where-Object\s*\{(?<body>[^{}]+)\}')
     Assert-True $filterMatch.Success 'pre-flight: the command still filters its output with a Where-Object'
     $docFilter = $null
