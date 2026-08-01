@@ -192,6 +192,12 @@ Two more things this command does that are worth expecting rather than discoveri
 - **It deletes the plugin's data directory** (`~/.claude/plugins/data/<plugin>-<marketplace>/`) unless you
   pass `--keep-data`. On a machine that has run this family, that directory exists. It is empty in the
   measured case, so the default is fine — but if you ever put state there, that is the flag.
+- **It leaves an `.orphaned_at` file behind** (inbound
+  [#337](https://github.com/DaveKJohn/davekjohns-workshop/issues/337)). Measured in round v10 and named in no
+  document until now, which is why it stood out: this section predicts its own side effects carefully, so the
+  one it missed reads as an omission rather than a detail. It is the CLI's own bookkeeping, harmless, and it
+  is cleaned up along with the cache directory in Step 4 below. Expect it; do not go hunting for what wrote
+  it.
 
 ## Step 3 — remove the keys you wrote, then restart
 
@@ -199,7 +205,18 @@ The uninstall clears the *entry*; the keys you added in Quickstart Step 1 are yo
 `.claude/settings.json` (and `.claude/settings.local.json` if you used it), remove:
 
 - `enabledPlugins` — the `specialists@davekjohns-workshop` entries, or the whole key if it is now `{}`;
-- `extraKnownMarketplaces` — the `davekjohns-workshop` block.
+- `extraKnownMarketplaces` — the `davekjohns-workshop` block;
+- **any `permissions` entry pointing into the plugin directory** (inbound
+  [#337](https://github.com/DaveKJohn/davekjohns-workshop/issues/337)). After a full teardown, round v10
+  found this still sitting in `.claude/settings.local.json`:
+
+  ```json
+  { "permissions": { "allow": [ "Read(//c/Users/<you>/.claude/plugins/**)" ] } }
+  ```
+
+  It is not something this family writes, but `settings.suggested.jsonc` is a plausible route for one to get
+  there, and an allow-rule pointing at a directory you are about to delete is exactly the kind of leftover a
+  teardown is supposed to leave you free of. Check both settings files for `plugins` inside `permissions`.
 
 **Then restart your Claude Code session** — the subagents and the session hooks stay active until the
 entry is gone *and* the session has restarted.

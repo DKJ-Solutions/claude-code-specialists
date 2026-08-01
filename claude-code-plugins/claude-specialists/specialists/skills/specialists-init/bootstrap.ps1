@@ -785,7 +785,11 @@ $($sc.Prose -join "`n")
 $importBlock
 "@
     [System.IO.File]::WriteAllText($claudeMd, $scaffold, $Utf8NoBom)
-    Write-Host "  [create] CLAUDE.md scaffold created with orchestrator imports." -ForegroundColor Green
+    # SINGULAR: since the seam, CLAUDE.md carries exactly ONE import. The plural was left over from the
+    # pre-seam layout, where the body and the lens imports both sat here -- and this script's own next-step
+    # 1b already got it right ("CLAUDE.md, which keeps exactly one import line"), so the two disagreed
+    # (inbound #337).
+    Write-Host "  [create] CLAUDE.md scaffold created with the orchestrator import." -ForegroundColor Green
 } else {
     $md = [System.IO.File]::ReadAllText($claudeMd, [System.Text.Encoding]::UTF8)
     if ($md -match [regex]::Escape($guardImport)) {
@@ -822,7 +826,7 @@ $importBlock
         $block = (($importBlock -replace "`r`n", "`n") -replace "`n", $nl)
         $md = $md.TrimEnd() + $nl + $block + $nl
         [System.IO.File]::WriteAllText($claudeMd, $md, $Utf8NoBom)
-        Write-Host "  [add]    orchestrator imports added to bottom of CLAUDE.md." -ForegroundColor Green
+        Write-Host "  [add]    orchestrator import added to bottom of CLAUDE.md." -ForegroundColor Green
     }
 }
 
@@ -869,7 +873,27 @@ $suggestion = @'
 # never shows up in 'git status' and 'git checkout .' does not clean it up either -- an operator
 # verifying a round-trip with git alone will not see it exists. It cannot be made to announce itself
 # through git, so it announces itself here, in the only output that is guaranteed to be read.
-Write-Host "  [create] $suggestPath placed (proposal -- not active; gitignored in many repos, so this path is your only pointer to it)." -ForegroundColor Green
+#
+# ASK GIT WHICH SIDE THIS REPO IS ON rather than hedging (inbound #337). The old wording -- "gitignored in
+# many repos, so this path is your only pointer to it" -- is conditional and gave the reader no way to tell
+# whether it applied to them. For a fresh consumer (this script's own audience) "no .gitignore yet" is the
+# likely case, and the measured v10 repo had none, so the file DID show up in git status and the warning was
+# simply wrong there. check-ignore answers it in one call; git absent or erroring falls back to the honest
+# conditional rather than claiming either way.
+$suggestIgnored = $null
+try {
+    & git -C $ConsumerRoot check-ignore --quiet -- $suggestPath 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { $suggestIgnored = $true } elseif ($LASTEXITCODE -eq 1) { $suggestIgnored = $false }
+} catch { $suggestIgnored = $null }
+
+$suggestNote = if ($suggestIgnored -eq $true) {
+    'gitignored in this repo, so this path is your only pointer to it'
+} elseif ($suggestIgnored -eq $false) {
+    'NOT gitignored in this repo, so it will show up in git status until you delete it'
+} else {
+    'gitignored in many repos, so this path may be your only pointer to it'
+}
+Write-Host "  [create] $suggestPath placed (proposal -- not active; $suggestNote)." -ForegroundColor Green
 
 # --- Report ----------------------------------------------------------------------------------------
 Write-Host ""
@@ -891,7 +915,10 @@ if ($repoConfigDerived) {
 } else {
     Write-Host "  2. Want to use shared workflow skills (open-pr / fold-changelog)? Fill scripts/repo-config.ps1 (RepoName + LintScript) and scripts/lib/branch-info.ps1 (branch prefix table) -- VUL-IN scaffolds ready." -ForegroundColor Gray
 }
-Write-Host "  3. Copy desired parts from $suggestPath to settings.json and delete proposal (it is gitignored in many repos, so git will not remind you)." -ForegroundColor Gray
+$suggestReminder = if ($suggestIgnored -eq $true) { 'it is gitignored here, so git will not remind you' }
+                   elseif ($suggestIgnored -eq $false) { 'it is not gitignored here, so git status will keep showing it until you do' }
+                   else { 'it is gitignored in many repos, so git may not remind you' }
+Write-Host "  3. Copy desired parts from $suggestPath to settings.json and delete proposal ($suggestReminder)." -ForegroundColor Gray
 Write-Host "  4. Restart Claude Code session to activate new @-imports + config." -ForegroundColor Gray
 Write-Host "  5. Register this repo in the workshop's connector register -- paste-ready block below." -ForegroundColor Gray
 
