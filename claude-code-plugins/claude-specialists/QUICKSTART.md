@@ -250,6 +250,33 @@ a session start rather than by you; both are covered under
 step 2 and the session hooks are simply absent, and that looks exactly like a session where everything
 is fine.
 
+> **The installed record with the inert session — the one state that reads as healthy from every angle**
+> (inbound [#327](https://github.com/DaveKJohn/davekjohns-workshop/issues/327)). It is worth naming, because
+> the query above cannot catch it. Measured on a virgin profile: a **single session start**, with no command
+> run, wrote a full `project`-scoped record with the correct version and sha — and **that same session loaded
+> nothing at all**: no `specialists-*` skills, no subagents, no session-hook output, no sender header, while
+> the whole payload sat in the cache. The record is written *after* the session's load phase, so only the
+> **next** session gets the plugin.
+>
+> Every angle you would normally trust says fine. The record says installed, project scope, correct sha. The
+> checks that read that record agree. And the session is completely inert. So do not verify the adoption by
+> the record alone — **verify it by the surface**: is `specialists-init` in your slash list, did the
+> session-start hooks print anything, does Chris open the turn? `UNINSTALL.md` makes the same point from the
+> other side (*"a session that loads no plugin has no hooks to complain"*), and it is the same discipline in
+> both directions: absence of complaint is not evidence, because the thing that would complain is the thing
+> that did not load.
+>
+> **What follows from this, and what deliberately does not.** It is a second, independent reason why the
+> `[NOT-INSTALLED-HERE]` marker never appears at a session start: not only has the state already been written
+> away, there is **no hook running to report it** — the hooks ship in the plugin this session did not load.
+> What is *not* established is whether this makes the two `claude plugin` commands above redundant. The two
+> halves were measured separately (a session start registers the marketplace; a session start writes the
+> record once that marketplace is reachable) and never as one chain, and the second ran via a manual
+> `marketplace add` rather than via a session start. **One round on a fresh profile settles it:** write the
+> two keys, restart, restart, then read the six locations and the skill list without running a single
+> `claude plugin` command. Until that has been done, run the commands — they are the route this page can
+> vouch for.
+
 **Step 2 — run the bootstrap skill.** In the new session, invoke `specialists-init`. It sets up —
 purely additively, without overwriting anything — the **lens-only** persona lenses (including
 Chris) + an empty repo-lens scaffold per specialist in **the seam**
