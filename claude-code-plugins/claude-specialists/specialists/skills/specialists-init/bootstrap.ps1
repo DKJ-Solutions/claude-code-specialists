@@ -757,11 +757,15 @@ $importBody
 "@
 
 if (-not (Test-Path -LiteralPath $claudeMd -PathType Leaf)) {
+    # The heading and the two prose lines come from Get-ClaudeMdScaffold in check-report-lib.ps1, for the
+    # same reason $importNote does: the teardown has to RECOGNISE this exact wording to report it, and a
+    # literal re-typed in a second script is what produced both instances of the accumulation bug (inbound
+    # #271, #331). Written by one script, recognised by another, defined in one place.
+    $sc = Get-ClaudeMdScaffold
     $scaffold = @"
-# CLAUDE.md
+$($sc.Heading)
 
-This repo is governed by **Claude Specialists** -- a team of specialized Claudes led by a Chief of Staff.
-This scaffold was created by ``specialists-init`` skill; expand with governance and safety rules for this repo.
+$($sc.Prose -join "`n")
 $importBlock
 "@
     [System.IO.File]::WriteAllText($claudeMd, $scaffold, $Utf8NoBom)

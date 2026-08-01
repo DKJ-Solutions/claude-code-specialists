@@ -662,6 +662,62 @@ function Get-LintScript { return `$script:LintScript }
     $naLines = @([regex]::Matches($na.Out, $noteRx))
     Assert-Equal (@($noteLines | ForEach-Object { $_.Value.Trim() }) -join '|') (@($naLines | ForEach-Object { $_.Value.Trim() }) -join '|') `
         'note report: the apply run prints the same two lines as the preview'
+
+    # --- inbound #331: the FRESH consumer -- no CLAUDE.md before adoption ----------------------------
+    #     Every fixture above hands the bootstrap a CLAUDE.md it already has, so the branch that CREATES
+    #     one -- scaffold heading plus two prose lines -- was never exercised by this suite at all. On that
+    #     path every byte of the file is bootstrap-written, and after -Apply those two lines were the only
+    #     thing left in it while being reported as NEITHER [remove] nor [KEEP], with the audit printing
+    #     [FREE]. The audit was narrowly right (the lines name no specialist), which is what made the
+    #     silence the finding: this script's contract is that [remove] versus [KEEP] tells the reader which
+    #     case they were in. Same blind-spot shape the bootstrap documents about itself one file over: the
+    #     path a real adoption takes was the path no fixture took.
+    Write-Host "inbound #331 -- the fresh consumer: scaffold prose and the emptied scripts dir" -ForegroundColor Cyan
+    if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
+    New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.json'),
+        '{ "enabledPlugins": { "specialists@davekjohns-workshop": true } }')
+    # Deliberately NO CLAUDE.md. That is the whole fixture.
+    $prevPlugin = $env:CLAUDE_PLUGIN_ROOT
+    $env:CLAUDE_PLUGIN_ROOT = $Plugin
+    try {
+        $fb = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $Fixture)
+        if ($fb.Code -ne 0) { throw "fresh bootstrap failed (exit $($fb.Code)): $($fb.Out)" }
+    } finally { $env:CLAUDE_PLUGIN_ROOT = $prevPlugin }
+
+    $scaffold = Get-ClaudeMdScaffold
+    $freshMd  = [System.IO.File]::ReadAllLines((Join-Path $Fixture 'CLAUDE.md'))
+    Assert-True (@($freshMd | Where-Object { Test-IsClaudeMdScaffoldProseLine -Line $_ }).Count -eq $scaffold.Prose.Count) `
+        'fresh: the bootstrap wrote the scaffold prose from the shared source (so the literal is not mirrored by hand)'
+
+    $fp = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
+    Assert-Equal 0 $fp.Code 'fresh: preview exit-code 0'
+    $keepRx    = "(?m)^\s*\[KEEP\]\s+CLAUDE\.md:(?<line>\d+) -- the bootstrap's scaffold prose"
+    $keepPrev  = @([regex]::Matches($fp.Out, $keepRx))
+    Assert-Equal $scaffold.Prose.Count $keepPrev.Count 'fresh: every scaffold prose line is REPORTED as [KEEP] -- it was neither before'
+    # The line numbers must resolve, for the same reason #286 required it of the note: a label that looks
+    # precise and is not would be worse than the silence it replaced.
+    foreach ($m in $keepPrev) {
+        $n = [int]$m.Groups['line'].Value
+        Assert-True (($n -ge 1 -and $n -le $freshMd.Count) -and (Test-IsClaudeMdScaffoldProseLine -Line $freshMd[$n - 1])) `
+            "fresh: CLAUDE.md:$n really is a scaffold prose line in the file"
+    }
+
+    $fa = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
+    Assert-Equal 0 $fa.Code 'fresh: apply exit-code 0'
+    Assert-Equal $keepPrev.Count @([regex]::Matches($fa.Out, $keepRx)).Count 'fresh: the apply run reports them identically'
+    # Reported, NOT removed -- deleting prose out of somebody's governance file is the other side of this
+    # script's boundary, so the lines must still be on disk after -Apply.
+    $afterMd = [System.IO.File]::ReadAllLines((Join-Path $Fixture 'CLAUDE.md'))
+    Assert-Equal $scaffold.Prose.Count @($afterMd | Where-Object { Test-IsClaudeMdScaffoldProseLine -Line $_ }).Count `
+        'fresh: and they are KEPT on disk -- reporting them is the fix, deleting prose is not this script''s job'
+
+    # The second half of #331: scripts\lib\ survived every round as an empty directory, because the single
+    # pruning pass ran before the only file in it was planned for removal.
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\lib'))) `
+        'fresh: scripts\lib\ is gone rather than left behind as an empty directory'
+    Assert-True ($fp.Out -match '(?m)^\s*\[remove\].*scripts\\lib\\ \(empty directory\)') `
+        'fresh: and the preview said it would go -- same rule as the lens directory (#275)'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
