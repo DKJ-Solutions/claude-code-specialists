@@ -85,7 +85,8 @@ still report success (see [Versioning](#versioning)). The canonical enable-a-plu
 settings snippet, the cache refresh, the per-plugin install, the restart, the install-record
 self-check, running the bootstrap skill) is in the family
 [Quickstart](claude-code-plugins/claude-specialists/QUICKSTART.md) — connect in three steps, for
-those who didn't build the system. This root README keeps only the two marketplace-wide facts that
+those who didn't build the system; the way back out is its mirror,
+[UNINSTALL.md](claude-code-plugins/claude-specialists/UNINSTALL.md). This root README keeps only the two marketplace-wide facts that
 matter beyond any one consumer:
 
 **Seeing which release you're on — `RELEASE.md`.** Each plugin folder carries a `RELEASE.md` card

@@ -261,7 +261,8 @@ skill counters `/reload-plugins`/`/reload-skills` print are not reliable evidenc
 
 > **New here?** The shareable beginner route is in the
 > [Quickstart](QUICKSTART.md) — get connected in three steps,
-> for those who didn't build the system. Below is the underlying explanation.
+> for those who didn't build the system, with [UNINSTALL.md](UNINSTALL.md) as its mirror for the way
+> back out. Below is the underlying explanation.
 
 Enabling the plugin delivers the **worker subagents**, but not the **conductor** (Chris) or the
 governance/hooks layer, so the skill **`specialists-init`** (group 1) closes that gap in a consuming
@@ -717,6 +718,9 @@ checklist (learned from adding `specialists-ecomm`):
 
 **Connecting your own repo?** Follow the [Quickstart](QUICKSTART.md) — connect in three steps, for
 those who didn't build the system.
+
+**Disconnecting it again?** [UNINSTALL.md](UNINSTALL.md) is its mirror — the repo teardown and the
+machine-side removal, in the order they have to happen.
 
 How a repo consumes these plugins (marketplace source, `enabledPlugins`) is covered in the
 workshop's [root README](../../README.md), which also holds the marketplace-wide `RELEASE.md`/
