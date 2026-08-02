@@ -238,7 +238,9 @@ The uninstall clears the *entry*; the keys you added in Quickstart Step 1 are yo
 `.claude/settings.json` (and `.claude/settings.local.json` if you used it), remove:
 
 - `enabledPlugins` — the `specialists@davekjohns-workshop` entries, or the whole key if it is now `{}`;
-- `extraKnownMarketplaces` — the `davekjohns-workshop` block;
+- `extraKnownMarketplaces` — the `davekjohns-workshop` block. **Of the two, this is the one to be sure
+  about**: left behind, it can put the marketplace back and the machine rebuilds its own install without a
+  command being run (the measured detail is a few paragraphs below);
 - **any `permissions` entry pointing into the plugin directory** (inbound
   [#337](https://github.com/DaveKJohn/davekjohns-workshop/issues/337)). After a full teardown, round v10
   found this still sitting in `.claude/settings.local.json`:
@@ -259,25 +261,54 @@ is [Step 5](#step-5--drop-the-marketplace-registration-last), after the verifica
 takes this document off the machine with it.
 
 **Do Step 3 before you re-check Step 2, or you will keep finding a record you just deleted.** An enable
-key alone is enough for a session start to write a missing install record by itself. So a machine where
+key alone is enough for a session start to write a missing install record by itself — as long as the
+marketplace registration is still standing, which at this point in the procedure it is. So a machine where
 `enabledPlugins` still names this plugin heals its own uninstall, silently, on the next session — and
 your verification will show a fresh record with a fresh timestamp and nothing to explain it.
 
-**The trap needs two things present, and finishing this procedure takes both away.** Round v12 measured all
-three states on one profile, with a stray enable key left in place each time (inbound
-[#327](https://github.com/DaveKJohn/davekjohns-workshop/issues/327), August 2, 2026):
+**The trap needs the marketplace registration standing, and finishing this procedure takes it away — but
+only if you remove both keys.** Round v12 measured three states on one profile with a stray enable key left
+in place each time; round v13 re-measured the last of them with **both** keys deliberately left behind
+(inbound [#327](https://github.com/DaveKJohn/davekjohns-workshop/issues/327) and
+[#382](https://github.com/DaveKJohn/davekjohns-workshop/issues/382), August 2, 2026):
 
 | state of the machine | does a session start write a record? |
 |---|---|
-| keys set, but no marketplace and no cache at the session's start | **no** — `plugins: {}`. That session did register the marketplace and create the clone, but wrote no record |
-| marketplace registered **and** cache present | **yes** — a full, correct `project` record, from a session that itself loaded nothing |
-| after a full teardown including Step 5's manual cache delete | **no** — the record stayed `{}`, and nothing re-registered itself |
+| keys set, but no marketplace and no clone at the session's start | **no** — `plugins: {}`. That session did register the marketplace and create the clone, but wrote no record |
+| marketplace registered and the clone present | **yes** — a full, correct `project` record, from a session that itself loaded nothing. The **unpacked cache does not have to be there**: round v13 got a full record whose `installPath` pointed into a `cache/davekjohns-workshop/…` directory that did not exist |
+| after a full teardown including Step 5's manual cache delete, with only `enabledPlugins` left behind | **no** — the record stayed `{}`, and nothing re-registered itself |
+| after that same teardown, with `extraKnownMarketplaces` left behind as well | **yes, in two session starts** — row 1 fires, and it *produces* what row 2 needs: session 1 re-registered the marketplace and rebuilt the clone (4,665,111 bytes) while the record stayed `{}`, and session 2 wrote the full record |
 
-So self-healing fires only in the middle row. That is reassuring in one direction and a warning in the
-other: a **half-finished** teardown — plugin uninstalled, marketplace and cache still standing — is exactly
-the state that regenerates records behind you, which is why Step 3's key removal matters most while you are
-still mid-procedure. **Walk it through to the end of Step 5 and the mechanism is disarmed**, stray key or
-not.
+Read the first two rows as a sequence, not as alternatives: the state row 1 leaves behind **is** the state
+row 2 fires on. That is what makes the last row possible without a single command being run.
+
+A **half-finished** teardown — plugin uninstalled, marketplace and clone still standing — is therefore the
+state that regenerates records behind you, which is why Step 3's key removal matters most while you are
+still mid-procedure.
+
+**What disarms the mechanism is Step 3 taking out both keys, not reaching the end of Step 5.** Finish the
+whole procedure with `enabledPlugins` left behind and the machine does stay free — that was measured, and it
+is the reassuring half. Leave **`extraKnownMarketplaces`** behind and it does not, however far you got: that
+is the dangerous one of the two, because it is the key that can put the marketplace back, and the rest of
+the table follows from there. Round v13 walked the procedure through to the end of Step 5 — record `{}`,
+`known_marketplaces.json` `{}`, clone gone, cache gone — left both keys, opened two sessions and ran no
+commands at all, and stood on an install record again.
+
+**A record a session start wrote is recognisable by its key order** (inbound
+[#389](https://github.com/DaveKJohn/davekjohns-workshop/issues/389)). A real
+`claude plugin install --scope project` puts `projectPath` second; a session start puts it last:
+
+```jsonc
+// written by the install
+{ "scope": "project", "projectPath": "…", "installPath": "…", "version": "3.1.2", … }
+// written by a session start
+{ "scope": "project", "installPath": "…", "version": "3.1.2", …, "projectPath": "…" }
+```
+
+Two writers, two serialisation orders. That is a second signal next to `installedAt`, and independent of it:
+reading it costs no edit, which matters here because the standing advice is *not* to hand-edit
+`installed_plugins.json` — an edit being exactly what wipes the evidence you were after. Treat it as
+confirmation and not as proof: this is CLI `2.1.220` behaviour and can shift with any version.
 
 ## Step 4 — verify that you actually stand free
 
