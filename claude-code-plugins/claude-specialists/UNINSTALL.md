@@ -398,7 +398,7 @@ Remove-Item "$env:USERPROFILE\.claude\plugins\cache\davekjohns-workshop" -Recurs
 
 ## What is left behind, honestly
 
-A repo that adopted this family and then tore down is **not** blank. Three of the five below are correct
+A repo that adopted this family and then tore down is **not** blank. Four of the six below are correct
 rather than debt — they stay, and that is the right outcome. The last two are things to act on, and they
 are marked as such:
 
@@ -410,6 +410,14 @@ are marked as such:
   where a roster row ends and your prose begins. The audit lists them by line so you can reword the ones
   that were rules phrased through a character (*"Derek opens the PR"* → *"changes go in via a branch and a
   PR"*) and delete the ones that only ever existed for the plugin.
+- **A `.claude/settings.json` you created for Quickstart Step 1 stays, holding `{}`.** For a repo that
+  had no `.claude/` before adoption — the first-time consumer this family documents — that file and its
+  directory exist *because* of the adoption. [Step 3](#step-3--remove-the-keys-you-wrote-then-restart)
+  takes the keys out and says so; the empty file it leaves is 3 bytes, harmless, and yours to delete if
+  you want the repo back to where it started. Named here rather than left out because this list claims to
+  be the whole of it (inbound [#386](https://github.com/DaveKJohn/davekjohns-workshop/issues/386), round
+  v13), and the `CLAUDE.md` row below covers the same category: a file that would not exist without the
+  adoption.
 - **The scaffold prose stays in a `CLAUDE.md` the bootstrap created — and unlike everything else in this
   list, it keeps talking.** The one entry here the plugin itself wrote. If you had no `CLAUDE.md` before
   adoption, two of its lines are `specialists-init`'s (*"This repo is governed by **Claude Specialists**
@@ -419,11 +427,24 @@ are marked as such:
 
   **But `CLAUDE.md` is itself loaded into every session as project instructions**, so this is the one
   leftover that is not merely inert — it tells every future session, in the channel that outranks its
-  defaults, that the repo is governed by a system that is no longer installed. Measured in round v11: two
-  separate fresh sessions flagged the contradiction unprompted, one noting that the named
-  `specialists-init` skill *"is not present in my available-skills list"* (inbound
-  [#362](https://github.com/DaveKJohn/davekjohns-workshop/issues/362)). So this row is a **to-do**, not a
-  note. Two ways to close it, both one edit:
+  defaults, that the repo is governed by a system that is no longer installed. Measured over three rounds,
+  two fresh sessions each (inbound [#362](https://github.com/DaveKJohn/davekjohns-workshop/issues/362) and
+  [#392](https://github.com/DaveKJohn/davekjohns-workshop/issues/392)): **v11 flagged it 2 out of 2, v12
+  and v13 both 1 out of 2.** The v11 pair is where the quotable line came from — one session noted that
+  the named `specialists-init` skill *"is not present in my available-skills list"* — and it is not the
+  rate to plan around.
+
+  What the later rounds add is *when* it surfaces. Of the four sessions across v12 and v13, the ones that
+  said something were asked to **orient** (*"what is this and what conventions apply here?"*); the ones
+  that did not were given a **task** (*"small clarification in the README, how do I go about it?"*). A
+  task-shaped session looks at what there is to do, not at what the repo claims about itself — one of them
+  did flag `CLAUDE.md` as an untracked leftover *"that does not belong in the fixture"* while walking
+  straight past the contradiction inside it. Four observations over two rounds is a pattern and not a law,
+  but it is more use than a bare number.
+
+  **So this row is a to-do rather than a note, and 1-in-2 is the argument for that, not against it**: a
+  leftover that only sometimes announces itself is exactly the one you close by hand. Two ways to do it,
+  both one edit:
 
   ```powershell
   # If the bootstrap created the file, it now holds nothing else -- delete it.
