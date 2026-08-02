@@ -24,9 +24,15 @@ Usage:
   .\scripts\release\fold-changelog-entry.ps1 -Branch feat/new-plugin
   .\scripts\release\fold-changelog-entry.ps1              # folds all present entry files
   .\scripts\release\fold-changelog-entry.ps1 -RepoRoot C:\path\to\worktree   # explicit root (#101)
+  .\scripts\release\fold-changelog-entry.ps1 -Branch feat/x -Push            # fold, commit and push
 
-Run this on main, right after merging a branch (after Dave has approved the merge).
-Commit the result (CHANGELOG.md + removed entry files) directly to main afterward.
+Run this on main, right after merging a branch.
+
+COMMITTING IS OPT-IN (-Commit, or -Push which implies it). Without either, the fold is left on disk for
+you to commit -- the behaviour this script always had. With them it makes the commit itself, naming
+CHANGELOG.md and the entry files as the commit's pathspec so nothing else can be swept in: this commit
+lands directly on the main branch under one of the two named exceptions to "never commit directly", and
+an exception only stays safe while it stays the size it was granted at.
 #>
 
 param(
@@ -35,7 +41,19 @@ param(
     # temporary/detached worktree (e.g. a ship-pr.ps1 that checks out main elsewhere) and wants to
     # write to that tree instead of whatever CLAUDE_PROJECT_DIR/git-root would resolve to. Default
     # (omitted): unchanged behavior below.
-    [string]$RepoRoot
+    [string]$RepoRoot,
+    # Commit the fold. OFF BY DEFAULT, deliberately: this commit lands directly on the main branch,
+    # which is one of the two named exceptions to "never commit directly" -- so it has to be asked for,
+    # exactly like teardown.ps1 requires -Apply before it removes anything.
+    #
+    # The scope limit the exception grants is enforced by git rather than by care: the commit names its
+    # paths, so CHANGELOG.md and the entry files this run folded are the only things that can end up in
+    # it, whatever else is lying around in the tree or already staged.
+    [switch]$Commit,
+    # Push the fold commit. Implies -Commit. Separate because a fold commit sitting unpushed on main is
+    # its own silent half-state -- the repo looks folded locally and unfolded to everyone else -- and
+    # that is precisely the class of half-finished state this repo keeps finding the expensive way.
+    [switch]$Push
 )
 
 $ErrorActionPreference = "Stop"
@@ -152,6 +170,9 @@ if (Get-Command Get-ChangelogHeading -ErrorAction SilentlyContinue) {
 }
 $headingPattern = '(?m)^' + [regex]::Escape($foldHeading) + '\s*?$'
 
+# What this run actually folded -- the source for both the commit message and the committed pathspec.
+$folded = @()
+
 foreach ($file in $entryFiles) {
     $filePath = Join-Path $repoRoot $file
     if (-not (Test-Path $filePath)) {
@@ -235,6 +256,79 @@ foreach ($file in $entryFiles) {
     Write-Utf8NoBom -Path $changelogPath -Content $changelogContent
     Remove-Item -Path $filePath -Force
     Write-Host "Folded and removed: $file" -ForegroundColor Green
+    # Captured per iteration rather than read back afterwards. $num in particular survives from one loop
+    # pass to the next, so an entry whose PR lookup found nothing would otherwise inherit the previous
+    # entry's number -- into a commit message, where a wrong PR reference is worse than none.
+    $folded += [pscustomobject]@{
+        File   = $file
+        Branch = $branchForPr
+        Pr     = $(if ($prs.Count -ge 1) { $prs[0].number } else { $null })
+    }
 }
 
 Write-Host "CHANGELOG.md updated." -ForegroundColor Green
+
+# --- The fold commit ------------------------------------------------------------------------------
+# WHY THIS IS IN THE SCRIPT AT ALL. The fold has always ended with a hand-typed commit, and on
+# August 2, 2026 that happened four times in one session -- the exact "noticed once, automated the
+# second time" trigger this house works by. It is also the step where a mistake is least visible: the
+# fold itself is verified by the lint gate, while the commit around it is typed from memory each time.
+#
+# THE SCOPE IS ENFORCED BY GIT, NOT BY CARE. 'git commit -- <paths>' commits exactly those paths and
+# ignores the index, so whatever else is modified or already staged cannot ride along. That matters
+# more here than anywhere else in this repo: this commit goes straight to the main branch under a named
+# exception to "never commit directly", and an exception is only safe while it stays the size it was
+# granted at.
+if ($Push) { $Commit = $true }
+if ($Commit) {
+    if ($folded.Count -eq 0) {
+        Write-Host "Nothing was folded, so there is nothing to commit." -ForegroundColor Yellow
+        exit 0
+    }
+    $subjects = @($folded | ForEach-Object {
+        if ($_.Pr) { "$($_.Branch) (#$($_.Pr))" } else { $_.Branch }
+    })
+    $message = if ($folded.Count -eq 1) {
+        "chore: fold changelog entry $($subjects[0])"
+    } else {
+        "chore: fold $($folded.Count) changelog entries: " + ($subjects -join ', ')
+    }
+    # CHANGELOG.md plus the entry files -- named, and nothing else. The entry files are gone from disk
+    # by now; naming a deleted path is how git is told to record the deletion.
+    #
+    # ONLY THE ONES GIT ALREADY KNOWS. In the normal flow the entry file was committed on the branch and
+    # came to main with the merge, so it is tracked and its deletion belongs in this commit. But an entry
+    # written and folded without ever being committed is untracked, and naming an untracked path makes
+    # 'git commit' fail on the pathspec -- after the fold has already deleted the file, which is the
+    # worst possible moment for an avoidable error. Read from the index rather than from disk, because by
+    # now the file is gone from disk and still in the index, which is exactly the state that needs
+    # recording.
+    $entryPaths = @($folded | ForEach-Object { $_.File })
+    $lsFiles = Invoke-NativeCapture -FilePath 'git' -Arguments (@('ls-files', '--') + $entryPaths)
+    # git reports its own paths with forward slashes; the entry names are plain file names in the repo
+    # root, so normalising both sides costs nothing and removes the one way this could silently drop a
+    # deletion from the commit.
+    $tracked = @($lsFiles.Output | Where-Object { $_ } | ForEach-Object { ($_ -replace '/', '\').Trim() })
+    $paths = @('CHANGELOG.md') + @($entryPaths | Where-Object { $tracked -contains ($_ -replace '/', '\') })
+    $untracked = @($entryPaths | Where-Object { $tracked -notcontains ($_ -replace '/', '\') })
+    if ($untracked.Count -gt 0) {
+        Write-Host "  (not in the commit, because git never tracked them: $($untracked -join ', ') -- they were folded and deleted all the same.)" -ForegroundColor DarkYellow
+    }
+    $commitRun = Invoke-NativeCapture -FilePath 'git' -Arguments (@('commit', '-m', $message, '--') + $paths)
+    if ($commitRun.ExitCode -ne 0) {
+        Write-Host ($commitRun.Output -join "`n") -ForegroundColor Red
+        Write-Host "The fold is on disk but NOT committed (git commit exited $($commitRun.ExitCode)). Commit it by hand; do not re-run the fold, it has already removed the entry files." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "Committed: $message" -ForegroundColor Green
+
+    if ($Push) {
+        $pushRun = Invoke-NativeCapture -FilePath 'git' -Arguments @('push')
+        if ($pushRun.ExitCode -ne 0) {
+            Write-Host ($pushRun.Output -join "`n") -ForegroundColor Red
+            Write-Host "Committed locally but NOT pushed (git push exited $($pushRun.ExitCode)) -- the state this flag exists to avoid. Push by hand." -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "Pushed." -ForegroundColor Green
+    }
+}

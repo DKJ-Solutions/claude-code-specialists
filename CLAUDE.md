@@ -155,8 +155,11 @@ The constitution above, concretely implemented here:
   no PR is opened (`-SkipLint`/`-SkipTests` are the escape valves). See [Sylvester #15](.claude/specialists/lenses/05-15-extension.md).
 - **Two deliberate exceptions to "never directly on `main`":**
   1. The **fold commit** after a merge: [`fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)
-     folds the entry file into `CHANGELOG.md` and removes it — scope limited to `CHANGELOG.md` +
-     the entry file. See [Rendall #06](.claude/specialists/lenses/05-06-extension.md#changelog).
+     folds the entry file into `CHANGELOG.md` and removes it, and with `-Commit`/`-Push` makes that
+     commit itself — scope limited to `CHANGELOG.md` + the entry file, and since August 2, 2026
+     enforced rather than merely intended: the commit names its paths, so nothing else in the tree
+     can ride along. Committing stays opt-in, because it is this exception being used.
+     See [Rendall #06](.claude/specialists/lenses/05-06-extension.md#changelog).
   2. The **release commit** (only on explicit request): [`cut-release.ps1`](scripts/release/cut-release.ps1)
      bumps all plugin versions in lockstep, generates the release notes in `releases/development/`,
      references them from `## Releases`, (re)generates each plugin's consumer-facing `RELEASE.md`

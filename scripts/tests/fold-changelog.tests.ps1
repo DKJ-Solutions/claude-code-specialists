@@ -121,11 +121,48 @@ function New-DocFile {
     [System.IO.File]::WriteAllText((Join-Path $Dir $Name), "# $Heading`n`nSome prose.`n", $Utf8NoBom)
 }
 
+function Initialize-FoldGitRepo {
+    <# Turn a fixture into a real git repo with the baseline committed, so -Commit has something to
+       commit ONTO.
+
+       Identity and autocrlf are set LOCALLY. Identity, because a machine without a global user.email
+       would otherwise fail inside the script under test and read as a defect in it. autocrlf, because
+       git's "LF will be replaced by CRLF" warning goes to stderr, and on Windows PowerShell that is
+       enough to fail the suite for a reason that has nothing to do with folding.
+
+       NO '2>&1' ON A NATIVE COMMAND -- the #107 pitfall this repo documents and that its own shared-
+       scripts guard exists to catch. Under ErrorActionPreference=Stop a single stderr line from git
+       becomes a terminating NativeCommandError before any exit code is read. EAP is dropped to Continue
+       for the duration instead. #>
+    param([Parameter(Mandatory = $true)][string]$Dir)
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & git -C $Dir init --quiet                          | Out-Null
+        & git -C $Dir config user.name  'fold test'         | Out-Null
+        & git -C $Dir config user.email 'fold@test.invalid' | Out-Null
+        & git -C $Dir config core.autocrlf false            | Out-Null
+        & git -C $Dir add -A                                | Out-Null
+        & git -C $Dir commit -m 'baseline' --quiet          | Out-Null
+    } finally { $ErrorActionPreference = $prevEap }
+}
+
+function Invoke-Git {
+    <# Read a fact back out of a fixture repo. Same EAP discipline as above, for the same reason. #>
+    param([Parameter(Mandatory = $true)][string]$Dir, [Parameter(Mandatory = $true)][string[]]$GitArgs)
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        return @(& git -C $Dir @GitArgs)
+    } finally { $ErrorActionPreference = $prevEap }
+}
+
 function Invoke-Fold {
-    param([Parameter(Mandatory = $true)][string]$Dir, [string]$Branch)
+    param([Parameter(Mandatory = $true)][string]$Dir, [string]$Branch, [string[]]$ExtraArgs = @())
     $scriptPath = Join-Path $Dir 'scripts\release\fold-changelog-entry.ps1'
     $callArgs = @('-RepoRoot', $Dir)
     if ($PSBoundParameters.ContainsKey('Branch')) { $callArgs += @('-Branch', $Branch) }
+    $callArgs += $ExtraArgs
     $prevPd  = $env:CLAUDE_PROJECT_DIR
     $prevEap = $ErrorActionPreference
     try {
@@ -227,6 +264,78 @@ $posPr    = $changelog7.IndexOf('## Pull Requests')
 $posEnt7  = $changelog7.IndexOf('Legacy config')
 $posRel7  = $changelog7.IndexOf('## Releases')
 Assert-True ($posPr -lt $posEnt7 -and $posEnt7 -lt $posRel7)               'legacy config: placement unchanged (between the two headings)'
+
+# ---------------------------------------------------------------------------------------------------
+Write-Host "Committing is opt-in, and the default is unchanged" -ForegroundColor Cyan
+#      The fold has always left its result uncommitted. That stays the default: this commit lands on the
+#      main branch under a named exception, so it has to be asked for.
+$dir8 = New-FoldFixture -Label 'nocommit'
+Initialize-FoldGitRepo -Dir $dir8
+New-EntryFile -Dir $dir8 -Name 'fix-no-commit.md' -Title 'Not committed'
+$r8 = Invoke-Fold -Dir $dir8
+Assert-True ($r8.ExitCode -eq 0)                                            'default: exits 0'
+$status8 = (Invoke-Git -Dir $dir8 -GitArgs @('status', '--porcelain')) -join "`n"
+Assert-True ($status8 -match 'CHANGELOG\.md')                              'default: the fold is left in the working tree, uncommitted'
+Assert-True (@(Invoke-Git -Dir $dir8 -GitArgs @('log', '--oneline')).Count -eq 1) 'default: no commit was made'
+
+# ---------------------------------------------------------------------------------------------------
+Write-Host "-Commit commits the fold, and names the branch and PR in the subject" -ForegroundColor Cyan
+#      Entry file created BEFORE the repo is initialised, so it is tracked -- which mirrors the real
+#      flow, where the entry was committed on the branch and arrived on main with the merge.
+$dir9 = New-FoldFixture -Label 'commit'
+New-EntryFile -Dir $dir9 -Name 'fix-commits-itself.md' -Title 'Commits itself'
+Initialize-FoldGitRepo -Dir $dir9
+$r9 = Invoke-Fold -Dir $dir9 -ExtraArgs @('-Commit')
+Assert-True ($r9.ExitCode -eq 0)                                            '-Commit: exits 0'
+$subject9 = ((Invoke-Git -Dir $dir9 -GitArgs @('log', '-1', '--pretty=%s')) -join '').Trim()
+Assert-True ($subject9 -match '^chore: fold changelog entry fix/commits-itself') `
+    '-Commit: the subject follows the established format and names the branch'
+Assert-True ((((Invoke-Git -Dir $dir9 -GitArgs @('status', '--porcelain')) -join '').Trim()) -eq '') `
+    '-Commit: the working tree is clean afterwards -- nothing half-done is left behind'
+
+# THE SCOPE PROPERTY, which is the whole reason this may commit to main at all. An unrelated modified
+# file -- and one already STAGED, which is the case a plain 'git commit' would sweep in -- must not end
+# up in the fold commit.
+$dir10 = New-FoldFixture -Label 'commitscope'
+New-EntryFile -Dir $dir10 -Name 'fix-scope.md' -Title 'Scoped'
+Initialize-FoldGitRepo -Dir $dir10
+[System.IO.File]::WriteAllText((Join-Path $dir10 'UNRELATED.md'), "# Not part of the fold`n", $Utf8NoBom)
+[System.IO.File]::WriteAllText((Join-Path $dir10 'STAGED.md'),    "# Staged before the fold ran`n", $Utf8NoBom)
+Invoke-Git -Dir $dir10 -GitArgs @('add', 'STAGED.md') | Out-Null
+$r10 = Invoke-Fold -Dir $dir10 -ExtraArgs @('-Commit')
+Assert-True ($r10.ExitCode -eq 0)                                           'scope: exits 0'
+$touched10 = @((Invoke-Git -Dir $dir10 -GitArgs @('show', '--name-only', '--pretty=format:', 'HEAD')) | Where-Object { $_ })
+Assert-True ($touched10.Count -eq 2)                                        'scope: the commit holds exactly two paths'
+Assert-True (($touched10 -contains 'CHANGELOG.md') -and ($touched10 -contains 'fix-scope.md')) `
+    'scope: and they are CHANGELOG.md plus the entry file'
+Assert-True ($touched10 -notcontains 'STAGED.md')                          'scope: a file staged before the run is NOT swept into the fold commit'
+Assert-True ($touched10 -notcontains 'UNRELATED.md')                       'scope: and neither is an unrelated modified file'
+
+# ---------------------------------------------------------------------------------------------------
+Write-Host "The entry file's deletion is part of the commit, not left dangling" -ForegroundColor Cyan
+#      The fold removes the entry file from disk. If the commit recorded only CHANGELOG.md, the deletion
+#      would sit unstaged afterwards -- an unfolded-looking entry file returning on the next checkout,
+#      which is exactly the silent half-state this repo keeps rediscovering.
+$statusKind10 = (Invoke-Git -Dir $dir10 -GitArgs @('show', '--name-status', '--pretty=format:', 'HEAD')) -join "`n"
+Assert-True ($statusKind10 -match '(?m)^D\s+fix-scope\.md')                'the entry file is recorded as deleted in the commit'
+
+# ---------------------------------------------------------------------------------------------------
+Write-Host "An entry git never tracked does not break the commit" -ForegroundColor Cyan
+#      Found by this suite before it reached anyone: naming an untracked path makes 'git commit' fail on
+#      the pathspec -- and by then the fold has already deleted the file, so the run ends with the
+#      changelog updated, the entry gone and nothing committed. The normal flow never hits it (the entry
+#      arrives on main with the merge), which is precisely why it would have waited for the one time
+#      somebody folded an entry they had not committed.
+$dir11 = New-FoldFixture -Label 'untracked'
+Initialize-FoldGitRepo -Dir $dir11
+New-EntryFile -Dir $dir11 -Name 'fix-never-committed.md' -Title 'Never committed'
+$r11 = Invoke-Fold -Dir $dir11 -ExtraArgs @('-Commit')
+Assert-True ($r11.ExitCode -eq 0)                                          'untracked entry: exits 0 rather than failing on the pathspec'
+Assert-True ($r11.Output -match 'git never tracked them')                  'untracked entry: and says which file was left out of the commit'
+$touched11 = @((Invoke-Git -Dir $dir11 -GitArgs @('show', '--name-only', '--pretty=format:', 'HEAD')) | Where-Object { $_ })
+Assert-True ($touched11 -contains 'CHANGELOG.md')                          'untracked entry: the changelog is still committed'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $dir11 'fix-never-committed.md'))) `
+    'untracked entry: and the entry file is still folded away'
 
 # ---------------------------------------------------------------------------------------------------
 foreach ($f in $script:fixtures) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }
