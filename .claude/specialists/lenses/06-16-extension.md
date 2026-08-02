@@ -35,6 +35,19 @@ the governance of the entire specialists system live here.
   names/emoji are labels that may change freely.
 - **Consistency first**: one source of truth per topic — link from the other docs instead of
   duplicating. `README.md` describes the mechanics; `CLAUDE.md` refers to it.
+- **A captured sample says what it is bound to.** When she pastes output a reader is meant to compare
+  against — a CLI message, a script's closing line, a byte count, a sample of what an agent emits — the
+  surrounding prose names the thing that could make it differ: the CLI version, the date, the platform,
+  the state the repo was in. Four of test round v11's nine findings were this one omission
+  ([#358](https://github.com/DaveKJohn/davekjohns-workshop/issues/358),
+  [#359](https://github.com/DaveKJohn/davekjohns-workshop/issues/359),
+  [#360](https://github.com/DaveKJohn/davekjohns-workshop/issues/360),
+  [#361](https://github.com/DaveKJohn/davekjohns-workshop/issues/361)), and the pattern is nastier than
+  a plain error: every one of those samples was accurate when captured, so nothing looked wrong — the
+  reader is simply told to expect something that cannot happen on their machine. **Prefer stating the
+  invariant over quoting the string**; quote the string as illustration when it genuinely helps.
+  Enforced by check 15 (`[expected-output]`) of the lint gate for the consumer-facing docs, which is
+  where a stale sample costs the most; everywhere else it is hers to hold.
 
 ### Boundaries with the other roles
 
