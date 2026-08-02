@@ -1067,8 +1067,15 @@ Write-Coverage -Category 'entry-heading' -Checked $ehChecked `
 # (smartwatchbanden -> life-hub -> here), and life-hub's own tool documents a v2.1.0 release that needed a
 # manual fix for the same reason.
 #
-# The detector is the repair tool's own table, dot-sourced rather than restated: one source for
-# "what does damage look like", so a sequence added to the repair cannot be invisible to the gate.
+# The detector is the repair tool itself, run rather than restated: one source for "what does damage look
+# like", so what the repair can fix and what the gate can see cannot drift apart.
+#
+# THAT SHARED SOURCE WAS ONCE SHARED BLINDNESS (August 2, 2026). While the tool worked off a hand-written
+# table of known sequences, this gate inherited its coverage exactly -- and the table held only the
+# single-layer form of most characters. 517 doubly-encoded runs across four files, three of them inside
+# this check's own stated scope, were reported here as "No findings" for as long as they existed, and the
+# damage rode into the v3.1.0 release notes and the consumer-facing RELEASE.md card. The tool now peels by
+# the inverse operation instead of by enumeration, which is what makes this line an assertion again.
 $mjChecked = 0
 $mjScript = Join-Path $RepoRoot 'scripts\maintenance\fix-mojibake.ps1'
 if (Test-Path -LiteralPath $mjScript) {
@@ -1096,8 +1103,23 @@ if (Test-Path -LiteralPath $mjScript) {
     $errors += "[mojibake] scripts/maintenance/fix-mojibake.ps1 is missing -- the encoding gate cannot run."
 }
 
-Write-Coverage -Category 'mojibake' -Checked $mjChecked `
-    -Note $(if ($mjChecked -eq 0) { 'the repair tool is absent, so no file was examined for double-encoded characters' } else { 'the root docs, every per-plugin CHANGELOG.md and every RELEASE.md, via the repair tool''s own table' })
+# THE COUNT IS FILES, NOT TOOL RUNS. It used to report 'checked 1' -- true of the invocation and useless
+# as coverage, since the one number a reader wants here is how much was looked at. The tool states it on
+# its own closing line; parsed rather than re-derived, so the gate cannot claim a scope the tool did not
+# walk. A run that does not state it falls back to naming that, instead of quietly reporting 1.
+$mjFiles = 0
+if ($mjChecked -eq 1) {
+    $mjMatch = [regex]::Match(($mjOut -join "`n"), '(\d+)\s+file\(s\)\s+examined')
+    if ($mjMatch.Success) { $mjFiles = [int]$mjMatch.Groups[1].Value }
+}
+Write-Coverage -Category 'mojibake' -Checked $mjFiles `
+    -Note $(if ($mjChecked -eq 0) {
+        'the repair tool is absent, so no file was examined for double-encoded characters'
+    } elseif ($mjFiles -eq 0) {
+        'the repair tool ran but did not state how many files it examined, so this count is not evidence of scope'
+    } else {
+        'the root docs, every per-plugin CHANGELOG.md and RELEASE.md, and every note under releases/ -- peeled by the inverse round trip rather than matched against a table of known sequences'
+    })
 
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {

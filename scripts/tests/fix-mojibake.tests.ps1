@@ -98,6 +98,40 @@ try {
     Assert-Equal 2 (@([regex]::Matches($t2, [regex]::Escape($MIDDOT))).Count) 'doubly mangled separators come out as middots'
     Assert-True ($t2 -notmatch [regex]::Escape($ONCE)) 'and no half-peeled remainder is left behind'
 
+    Write-Host 'DOUBLE damage in a character the table never listed' -ForegroundColor Cyan
+    #      THE GAP THAT SHIPPED (August 2, 2026). The case above works because the table happens to carry a
+    #      peel rule for the outer layer of a 0xC2 sequence. Nothing covered the outer layer of an 0xE2
+    #      sequence, so a doubly-mangled em dash, arrow or ellipsis matched no rule at all: the fixpoint
+    #      loop exited on its first pass and the file was pronounced clean. Measured on this repo at
+    #      v3.1.0 -- 517 damaged runs across four files, three of them inside the gate's own stated scope,
+    #      while the gate reported "No findings".
+    #
+    #      Asserted per character rather than once, because the table's coverage was exactly the thing that
+    #      looked complete and was not. These four are the ones the repo actually carried; the point of the
+    #      general inverse is that it does not need them enumerated, and this test would keep passing if a
+    #      fifth turned up.
+    foreach ($case in @(
+        @{ Name = 'em dash';  Good = (C 0x2014); Bad = (C 0xC3, 0xA2, 0xE2, 0x201A, 0xAC, 0xE2, 0x20AC, 0x9D) },
+        @{ Name = 'arrow';    Good = (C 0x2192); Bad = (C 0xC3, 0xA2, 0xE2, 0x20AC, 0xA0, 0xE2, 0x20AC, 0x2122) },
+        @{ Name = 'ellipsis'; Good = (C 0x2026); Bad = (C 0xC3, 0xA2, 0xE2, 0x201A, 0xAC, 0xC2, 0xA6) },
+        @{ Name = 'en dash';  Good = (C 0x2013); Bad = (C 0xC3, 0xA2, 0xE2, 0x201A, 0xAC, 0xE2, 0x20AC, 0x153) }
+    )) {
+        $fd = Set-Fixture -Name ("double-" + ($case.Name -replace ' ', '-') + '.md') -Text ("before $($case.Bad) after")
+        Invoke-Fix -FilePath $fd | Out-Null
+        $td = Get-FixtureText -Path $fd
+        Assert-Equal "before $($case.Good) after" $td "doubly mangled $($case.Name) is peeled all the way back"
+    }
+
+    Write-Host 'Correct text survives the general inverse untouched' -ForegroundColor Cyan
+    #      The round trip is only safe because it FAILS on text that was never mojibake. If either encoder
+    #      is ever given a lenient fallback, this is the assert that catches it -- a lenient Windows-1252
+    #      encoder turns every one of these into '?' without raising anything.
+    $intact = "em dash $EMDASH arrow $(C 0x2192) middot $MIDDOT e-acute $(C 0xE9) u-diaeresis $(C 0xFC)$(C 0xFC) bulb $([System.Char]::ConvertFromUtf32(0x1F4A1))"
+    $fi = Set-Fixture -Name 'intact.md' -Text $intact
+    $ri = Invoke-Fix -FilePath $fi
+    Assert-Equal $intact (Get-FixtureText -Path $fi) 'every correctly encoded character survives the round trip'
+    Assert-True ($ri.Out -match 'Nothing to repair') 'and the tool reports nothing to do'
+
     Write-Host 'Idempotent: a second run changes nothing' -ForegroundColor Cyan
     $before = Get-FixtureText -Path $f2
     $r3 = Invoke-Fix -FilePath $f2
@@ -149,8 +183,16 @@ try {
     #      drop. The damage-detected direction is covered by the -Check asserts above, on a fixture --
     #      deliberately, because deliberately corrupting the real CHANGELOG.md to test a gate is how a
     #      suite leaves damage behind when it fails halfway.
+    #      The count is FILES, and asserted as "more than one" rather than as a literal (August 2, 2026).
+    #      It used to read 'checked 1' -- the number of tool invocations, which is true of every possible
+    #      scope and therefore evidence of none. Pinning the exact figure here would only mean editing this
+    #      test whenever a release note is added, so the assert is on the property: the gate reports a real
+    #      file count that grew past the old placeholder.
     $lintOut = (& powershell -NoProfile -ExecutionPolicy Bypass -File $Lint 2>&1 | Out-String)
-    Assert-True ($lintOut -match '\[mojibake\] checked 1') 'the lint gate ran the encoding check'
+    $mjCov = [regex]::Match($lintOut, '\[mojibake\] checked (\d+)')
+    Assert-True $mjCov.Success 'the lint gate ran the encoding check'
+    Assert-True ([int]$mjCov.Groups[1].Value -gt 1) 'and reports how many files it examined, not how many times it ran the tool'
+    Assert-True ($lintOut -match 'releases/') 'and its coverage line names the releases/ notes, which were outside the scope until #360-era'
     Assert-True ($lintOut -match 'Summary: 0 error') 'and the repo is clean of mojibake'
 } finally {
     Remove-Item -LiteralPath $Fixture -Recurse -Force -ErrorAction SilentlyContinue

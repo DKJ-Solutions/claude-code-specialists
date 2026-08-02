@@ -14,24 +14,24 @@ You are on this release.
 Dave, reading the changelog: *"a lot of new things in the changelog but all 20 issues are still open.
 How does that work?"* Two separate answers, and only the second is a defect.
 
-**Eight of them were done and simply never closed.** PRs #341, #342 and #343 repaired real findings Ã¢â‚¬â€
-#334, #329, #335, #338 · #328, #339 · #332, #331 Ã¢â‚¬â€ and every one of them referenced its issue as a
+**Eight of them were done and simply never closed.** PRs #341, #342 and #343 repaired real findings —
+#334, #329, #335, #338 · #328, #339 · #332, #331 — and every one of them referenced its issue as a
 **plain mention**. GitHub auto-closes only on a *closing keyword*, so nothing closed on merge, and the
 manual `gh issue close` afterwards was skipped **three times running**. The changelog said done; the
 tracker said open. The eight were closed by hand, each with a comment naming the PR that fixed it.
 The other twelve are genuinely open work (#322-#325, #327, #330, #333, #336, #337, the round dossiers
-#326 and #340, and the older #215) Ã¢â‚¬â€ nothing was wrong with those.
+#326 and #340, and the older #215) — nothing was wrong with those.
 
 **This entry is the gate, because a third generation of the same slip is a class, not an instance.**
 `open-pr.ps1` now forces the decision instead of trusting anyone to remember it:
 
 - `-Resolves "331,332"` writes a `## Resolved issues` block with **one closing keyword per line**. Not
   a style choice: GitHub does not distribute a keyword over a comma list, so the list form closes the
-  first and leaves the rest silently open Ã¢â‚¬â€ the very failure being gated. The suite asserts the
+  first and leaves the rest silently open — the very failure being gated. The suite asserts the
   *shape*, and asserts that the comma form reads back as closing only the first number, so the
   recogniser cannot report a false green.
 - `-NoResolves` declares "this PR closes nothing" and is the honest way past.
-- **Neither**, while the changelog entry mentions an issue that is currently **open** Ã¢â€ â€™ it stops
+- **Neither**, while the changelog entry mentions an issue that is currently **open** → it stops
   before the lint, the tests, and the push, and names what it saw. It runs first precisely so a
   forgotten keyword does not cost forty test suites.
 - **PR references are excluded** (`PR #341`, `PRs #341-#343`, `/pull/341`). A gate that fires on every
@@ -42,17 +42,17 @@ The other twelve are genuinely open work (#322-#325, #327, #330, #333, #336, #33
 
 **The post-merge half is its own script.** `verify-resolved-issues.ps1` reads the closing keywords back
 out of the **merged body** and checks that each issue really reached `CLOSED`, closing any that did not
-(comment first, then close Ã¢â‚¬â€ `gh issue close --comment` with a multiline body drops the comment).
+(comment first, then close — `gh issue close --comment` with a multiline body drops the comment).
 Reading them back rather than reusing the parameter is deliberate: a second tally is how the #275
 preview/apply drift started. It is a separate script rather than a step inside `ship-pr.ps1` because it
-is the one part of that chain that **mutates state outside this repo** Ã¢â‚¬â€ it posts comments and closes
-issues Ã¢â‚¬â€ so inline would have meant untestable write access. It doubles as the tool for the manual
+is the one part of that chain that **mutates state outside this repo** — it posts comments and closes
+issues — so inline would have meant untestable write access. It doubles as the tool for the manual
 catch-up above, and `-ReportOnly` inspects without touching anything.
 
 #### What the reviews changed, and the one that mattered
 
 **Victor found a way this branch could have closed an unrelated issue.** A document explaining the gate
-necessarily writes the pattern it explains Ã¢â‚¬â€ this entry did, in prose about GitHub's comma behaviour Ã¢â‚¬â€
+necessarily writes the pattern it explains — this entry did, in prose about GitHub's comma behaviour —
 and `open-pr.ps1` copies the entry body verbatim into the PR body. The recogniser read that example as
 a real declaration, so the PR would have reported a close and the post-merge step would have
 force-closed that issue with a comment crediting a PR that had nothing to do with it. Reproduced on
@@ -60,11 +60,11 @@ this file before the fix.
 
 The fix is not an escape: **GitHub does not link a reference inside a code span, so it closes nothing
 there either.** Stripping fenced blocks and inline spans makes the recogniser *agree with GitHub*
-rather than merely dodge the case. One detail worth keeping Ã¢â‚¬â€ the filler is a run of `|`, not spaces:
+rather than merely dodge the case. One detail worth keeping — the filler is a run of `|`, not spaces:
 blanking with spaces would leave `` Closes `x` #332 `` looking adjacent and reading as live, while
 GitHub needs the keyword directly before the reference. That correction came out of a failing assert.
 
-Three more from the same review, each a silent false negative Ã¢â‚¬â€ the direction that matters, because a
+Three more from the same review, each a silent false negative — the direction that matters, because a
 missed mention means the gate never fires:
 
 - **A slash-separated list lost all but the first number.** `#334/#329/#335/#338` yielded only `334`:
@@ -81,13 +81,13 @@ numbers; and the open-issue query is capped, now at 1000 rather than 200, becaus
 page boundary would read as "not open" and let the gate pass in silence.
 
 **Edith found a test that passes or fails depending on console width.** The blocked-gate assert matched
-a literal phrase in `Write-Error` output, and the child renders that at its own buffer width Ã¢â‚¬â€ with
+a literal phrase in `Write-Error` output, and the child renders that at its own buffer width — with
 this repo's path length the wrap can land mid-phrase, so it failed consistently at width 120 while
 passing at another. The same wrap hazard was already documented in this suite for the #86 pre-flight
 pointers; this was its second instance.
 
 **And then it cost a red CI run, because the first fix was per-assert.** Both gate-output asserts in
-`shared-scripts.tests.ps1` were normalized Ã¢â‚¬â€ and the *sibling* suite, written the same afternoon, kept
+`shared-scripts.tests.ps1` were normalized — and the *sibling* suite, written the same afternoon, kept
 matching `gh issue list` in a `Write-Warning`. Locally green, red on CI at its width, one assert out of
 31, nothing merged. Fixing the two visible asserts instead of the shape that produced them is exactly
 the instance-instead-of-class mistake this repo has a standing rule against, and the rule caught its own
@@ -97,17 +97,17 @@ width-fragile. Verified against the failing phrase directly: with the wrap in pl
 
 #### Tested
 
-- `scripts/tests/pr-issues.tests.ps1` Ã¢â‚¬â€ new, 104 asserts on the decision table, fully offline.
-- `scripts/tests/verify-resolved-issues.tests.ps1` Ã¢â‚¬â€ new, 31 asserts driving the post-merge script end
+- `scripts/tests/pr-issues.tests.ps1` — new, 104 asserts on the decision table, fully offline.
+- `scripts/tests/verify-resolved-issues.tests.ps1` — new, 31 asserts driving the post-merge script end
   to end against a fake `gh` that records every call: the comment lands **before** the close and via
   `--body-file`, an already-closed issue is not re-closed, a plain mention closes nothing, a backticked
   or fenced example closes nothing, `-ReportOnly` mutates nothing, and an unreadable body warns without
   failing a ship that already merged.
-- `shared-scripts.tests.ps1` Ã¢â‚¬â€ five wiring scenarios against the offline fake `gh`, because a pure
+- `shared-scripts.tests.ps1` — five wiring scenarios against the offline fake `gh`, because a pure
   decision table proves the decision, never that it is *reached*: blocked with nothing reaching `gh`,
   `-NoResolves` through without a keyword, `-Resolves` writing both lines, a PR-only entry not
   blocking, and a failing `gh` warning instead of wedging. One of them asserts the gate **really
-  checked** rather than taking the degraded path Ã¢â‚¬â€ without it, the blocked scenario passes while the
+  checked** rather than taking the degraded path — without it, the blocked scenario passes while the
   gate does nothing, which is precisely what one bug below did.
 
 **Two PowerShell 5.1 traps, both now pinned by asserts** and recorded in
@@ -115,13 +115,13 @@ width-fragile. Verified against the failing phrase directly: with the wrap in pl
 them too:
 
 1. **`powershell -File` cannot bind an `[int[]]`.** `-Resolves 332,340` arrives as one string and casts
-   to the single number **332340** Ã¢â‚¬â€ the comma read as a *thousands separator*. Silent, not an error.
+   to the single number **332340** — the comma read as a *thousands separator*. Silent, not an error.
    Every `-File` form fails, so the parameter is a `[string]` with its own parser, and the fixture
    passes it over that same hop.
-2. **`@(Ã¢â‚¬Â¦ | ConvertFrom-Json)` does not flatten.** The parsed array arrives as *one* pipeline object,
+2. **`@(… | ConvertFrom-Json)` does not flatten.** The parsed array arrives as *one* pipeline object,
    so `@()` wraps a single element that IS the array; `$_.number` then does member enumeration and
    hands `[int]` an `Object[]` that throws. The throw landed in a `catch` that degrades the gate to
-   "cannot check" Ã¢â‚¬â€ so **the gate silently never blocked while every pure unit assert stayed green.**
+   "cannot check" — so **the gate silently never blocked while every pure unit assert stayed green.**
    Assign first, then wrap.
 
 **One duplication closed along the way.** The shared-scripts suite kept its own hand-written list of
@@ -277,17 +277,17 @@ The four headings are demoted to `####`. No content changed — the same words, 
 ### #347 · The roster hook names the right file, and a fresh bootstrap is not nineteen errors · Fix · 2026-08-01
 
 Test round v10's #333, reported as two problems in one hook output. Measured here, the first half turned
-out to be a real bug rather than a wrong message Ã¢â‚¬â€ and it is the cause of part of the second.
+out to be a real bug rather than a wrong message — and it is the cause of part of the second.
 
 **The scaffold pointed at the wrong file.** `bootstrap.ps1` wrote `$script:RosterPath = 'CLAUDE.md'` into
 every consumer's `repo-config.ps1`, while that same bootstrap puts the roster slot in
 `.claude/specialists/SPECIALISTS.md` and its own next-steps block says, in so many words, that the roster
 does **NOT** go in `CLAUDE.md`. So `check-roster-sync` dutifully read a file containing nothing but the
-`@`-import, found no roster rows, and reported every specialist as missing Ã¢â‚¬â€ naming `CLAUDE.md` as the place
+`@`-import, found no roster rows, and reported every specialist as missing — naming `CLAUDE.md` as the place
 to fix it. The issue reported this as the hook pointing at the wrong file; it was the check *reading* the
 wrong file, and the message was merely honest about it.
 
-The value now comes from `Get-SeamPaths`, the same source that decides where the bootstrap writes the slot Ã¢â‚¬â€
+The value now comes from `Get-SeamPaths`, the same source that decides where the bootstrap writes the slot —
 so the writer and the reader cannot drift apart again. `RelInclusion` is new there for exactly that reason:
 it was a hand-typed literal in the scaffold, and it was typed wrong. A single-quoted here-string cannot
 interpolate, hence a placeholder substituted after the fact, with the fallback repeating the literal
@@ -295,48 +295,48 @@ knowingly (shipping a consumer the token `__SEAM_ROSTER_PATH__` would be worse t
 a fixture asserting the two agree.
 
 **The documented happy path ended in nineteen `[ERROR]` lines.** Measured on a virgin profile, in the session
-right after a completely successful `specialists-init` Ã¢â‚¬â€ every count correct Ã¢â‚¬â€ one error per specialist
+right after a completely successful `specialists-init` — every count correct — one error per specialist
 saying it has no roster row. Nothing was broken: the QUICKSTART tells that reader to fill the lenses in *at
 your own pace*, and `[ERROR]` is the heaviest level these checks have. The cost is habituation, which is the
 real damage: whoever learns to ignore nineteen false errors ignores the twentieth too.
 
-The state was invisible to the existing `[BOOTSTRAP]` predicate because that one is strict on purpose Ã¢â‚¬â€ no
-lens **anywhere** and no roster row for **any** id Ã¢â‚¬â€ and a bootstrapped repo has lenses. So it fell through
+The state was invisible to the existing `[BOOTSTRAP]` predicate because that one is strict on purpose — no
+lens **anywhere** and no roster row for **any** id — and a bootstrapped repo has lenses. So it fell through
 to full drift reporting, which is right for a maintained repo and wrong for one whose owner has not started.
 
 **The discriminator is measurable, and that is what makes the new state safe to add rather than a guess:**
 every lens the bootstrap writes is a `VUL-IN` scaffold. If lenses exist, **every one** is still an unfilled
-scaffold, and no roster row exists for any id, then nobody has written anything Ã¢â‚¬â€ there is no work to have
+scaffold, and no roster row exists for any id, then nobody has written anything — there is no work to have
 drifted from. `[ROSTER-PENDING]` says that once, non-counting, exit 0. It is deliberately not folded under
-`[BOOTSTRAP]`, whose advice is *"run specialists-init"* Ã¢â‚¬â€ advice this reader has just followed successfully,
+`[BOOTSTRAP]`, whose advice is *"run specialists-init"* — advice this reader has just followed successfully,
 and being told to run it again is how a reader learns the checks are wrong.
 
 **The boundary cases carry more weight than the marker**, because the failure mode of this fix is trading
-false alarms for silence. Four fixtures pin it: one lens filled in Ã¢â€ â€™ drift errors return; one roster row
-present Ã¢â€ â€™ the same, from the other direction; a specialist that arrived later with a plugin update has no lens
-at all Ã¢â€ â€™ that half still errors while the scaffolded ones stay quiet (the suppression is scoped to ids that
+false alarms for silence. Four fixtures pin it: one lens filled in → drift errors return; one roster row
+present → the same, from the other direction; a specialist that arrived later with a plugin update has no lens
+at all → that half still errors while the scaffolded ones stay quiet (the suppression is scoped to ids that
 *have* a lens for exactly this reason); and a repo that was never bootstrapped still gets `[BOOTSTRAP]`, not
 this one.
 
 **A real bug the fixture caught on its first run.** The marker text originally ended with *"this becomes real
-drift (and `[ERROR]` lines) as soon asÃ¢â‚¬Â¦"*. The session hook counts its error signals by matching the literal
-`[ERROR]` over the check's whole output Ã¢â‚¬â€ so a marker line merely **mentioning** the token would have been
+drift (and `[ERROR]` lines) as soon as…"*. The session hook counts its error signals by matching the literal
+`[ERROR]` over the check's whole output — so a marker line merely **mentioning** the token would have been
 counted as an error and pushed the hook into its drift branch, announcing *"roster drift found"* about the one
 state this marker exists to call fine. Reworded, and pinned by its own assert so the next marker text is held
 to the same rule.
 
 #### Tested
 
-- `roster-sync.tests.ps1` (307 asserts) Ã¢â‚¬â€ 11mÃ¢â‚¬â€œ11q for the new state and its four boundaries, plus
+- `roster-sync.tests.ps1` (307 asserts) — 11m–11q for the new state and its four boundaries, plus
   H12/H12b/H12c for the hook: its own verdict between "not set up yet" and "in sync", riding along with a real
   drift finding, and adding nothing to a repo whose roster is filled in.
-- `bootstrap-drift.tests.ps1` (104 asserts) Ã¢â‚¬â€ the scaffold points at the seam, not at `CLAUDE.md`, the
+- `bootstrap-drift.tests.ps1` (104 asserts) — the scaffold points at the seam, not at `CLAUDE.md`, the
   placeholder is substituted rather than shipped, and the value equals `Get-SeamPaths`' own.
 
 **Process note, stated because it is exactly the check that exists to prevent it:** the first edits of this
 work were made on `main`, before the branch existed. Derek's rule is that not a single file is written before
 `git status` + `git branch`, and it was skipped. Nothing was committed there, so the changes moved onto this
-branch intact and `main` never carried them Ã¢â‚¬â€ but what catches this is the habit, not the recovery.
+branch intact and `main` never carried them — but what catches this is the habit, not the recovery.
 
 [PR #347](https://github.com/DaveKJohn/davekjohns-workshop/pull/347)
 
@@ -345,13 +345,13 @@ branch intact and `main` never carried them Ã¢â‚¬â€ but what catches 
 ### #345 · The demoted record is reported, and the details reach the session · Fix · 2026-08-01
 
 Two findings from test round v9 (#326), taken together because the second decides what the first's new
-lines are allowed to say Ã¢â‚¬â€ the dossier's own reason for ordering them, satisfied better by one PR than by
+lines are allowed to say — the dossier's own reason for ordering them, satisfied better by one PR than by
 two touching the same block twice.
 
-**#323 Ã¢â‚¬â€ a `project` record demoted to a pathless one, reported by nothing.** Measured in `life-hub`: a
+**#323 — a `project` record demoted to a pathless one, reported by nothing.** Measured in `life-hub`: a
 single session start rewrote a correct `project` record into a `user`-scope record with the `projectPath`
 **removed**, one write, original `installedAt` preserved. The repo then had no record for its own path for
-the plugin that was demonstrably loading Ã¢â‚¬â€ 4 skills and 15 subagents present Ã¢â‚¬â€ and it **disappeared from the
+the plugin that was demonstrably loading — 4 skills and 15 subagents present — and it **disappeared from the
 verification query the documents prescribe**. Both predicates stayed silent, each correct by its own rule:
 `Test-PluginInstalledHere` returns `$true` on a pathless record (a user-scope install really does load
 here, and a false `[NOT-INSTALLED-HERE]` is the cry-wolf failure #294 spent a release removing), while
@@ -360,7 +360,7 @@ here, and a false `[NOT-INSTALLED-HERE]` is the cry-wolf failure #294 spent a re
 `Get-RecordShape` now judges it as a third shape, `pathless-only`. That is the right owner rather than a
 convenient one: the question this predicate asks is *"is the administration for this repo the shape the
 documents assume?"*, and a repo whose record has lost its path is the sharpest possible no. `Count` is `0`
-for this shape Ã¢â‚¬â€ there being no records for this path **is** the finding Ã¢â‚¬â€ and `Scopes` carries the pathless
+for this shape — there being no records for this path **is** the finding — and `Scopes` carries the pathless
 record's own scope so the report can name what it found instead. The permissive predicate is deliberately
 left permissive; the boundary between the two markers moved from *path* to *evidence*: no evidence at all is
 `[NOT-INSTALLED-HERE]`'s subject, any evidence of the wrong shape is this one's, and they still cannot
@@ -369,19 +369,19 @@ describe the same plugin.
 **The design note that said this state heals itself was wrong, and that is worth more than the fix.** The
 block argued `[NOT-INSTALLED-HERE]` was practically unreachable because the missing-record state *"HEALS
 ITSELF"*. Round v9 settled it with the only test that can: after the first session start rewrote the
-administration, a **second** fresh session wrote nothing at all Ã¢â‚¬â€ `installed_plugins.json` kept its mtime to
+administration, a **second** fresh session wrote nothing at all — `installed_plugins.json` kept its mtime to
 the tick and the verdict was identical. So the truth is the opposite of self-healing: the *first* session
 start rewrites the administration and later ones do not, which makes the post-write state stable,
 persistent and observable. A state that really healed itself would need no marker; this one waits for you.
 Corrected in `check-report-lib.ps1`, in `check-roster-sync.ps1`'s and the hook's copies of the same claim,
 and turned into a sentence a reader can act on in `specialists-init/SKILL.md`.
 
-**#324 Ã¢â‚¬â€ the roll-up promised details that the hook filtered away.** `[RECORD-SHAPE]`'s roll-up ends with
+**#324 — the roll-up promised details that the hook filtered away.** `[RECORD-SHAPE]`'s roll-up ends with
 *"Details below."* It is true when the check is run by hand and false in a session, because
 `roster-sessioncheck.ps1` forwards only lines matching `[RECORD-SHAPE]` and the details were `[SKIP]` lines.
 That is the context that needs them most: **the remedy lives only in the detail lines**, and the three
 shapes have three different ones. A reader was told an administration problem exists, told the details
-follow, and given neither the detail nor a way to reach it Ã¢â‚¬â€ a fix that stopped one sentence short of being
+follow, and given neither the detail nor a way to reach it — a fix that stopped one sentence short of being
 actionable.
 
 The detail lines now carry the marker themselves, so the promise holds in both contexts and the hook's
@@ -394,21 +394,21 @@ the hook's docstring now says so rather than leaving it to look like inconsisten
 **One correction pulled in from the neighbouring issue.** The `duplicate` detail line said a repair install
 produces the stray second record; #325 measured that a **same-scope** install replaces cleanly and it is a
 **scope mismatch** that accumulates. The line now says so. The full narrowing, in `SKILL.md` and in the
-design note, belongs to #325's own PR Ã¢â‚¬â€ leaving a measured-false clause standing in a line this PR rewrites
+design note, belongs to #325's own PR — leaving a measured-false clause standing in a line this PR rewrites
 was not defensible.
 
 #### Tested
 
-- `check-report-lib.tests.ps1` (154 asserts) Ã¢â‚¬â€ the `pathless-only` shape, asserted with its pairing: the
+- `check-report-lib.tests.ps1` (154 asserts) — the `pathless-only` shape, asserted with its pairing: the
   permissive predicate must *not* move with it, and a plugin with no record of any kind must stay out of
   this predicate so exactly one marker ever speaks.
-- `roster-sync.tests.ps1` (275 asserts) Ã¢â‚¬â€ 11j **reversed**, plus a new 11j-2 that counts the
+- `roster-sync.tests.ps1` (275 asserts) — 11j **reversed**, plus a new 11j-2 that counts the
   `[RECORD-SHAPE]` lines rather than pattern-matching them: the property under test is *how many lines the
   hook's filter picks up*, and a bare `-match` would pass on the roll-up alone, which is the exact state the
   fixture exists to distinguish.
 
-**Two asserts changed direction, and both say why in place.** They used to pin the silence Ã¢â‚¬â€ *"pathless
-record: not this marker Ã¢â‚¬â€ it judges only records scoped to THIS path"* Ã¢â‚¬â€ on the reasoning that a pathless
+**Two asserts changed direction, and both say why in place.** They used to pin the silence — *"pathless
+record: not this marker — it judges only records scoped to THIS path"* — on the reasoning that a pathless
 record is step 0b's scopeless-install warning. That reasoning was not wrong about what it had seen; it was
 wrong about the population. A pathless record is also something a session start **manufactures** out of a
 correct one, and an install warning cannot own a state nobody ran a command to produce. A test that reverses
@@ -420,43 +420,43 @@ without recording that is indistinguishable from a test someone weakened to get 
 
 ### #343 · The teardown reports what it keeps, and the pre-flight measures commits · Fix · 2026-08-01
 
-Two findings from test round v10 (#340), both on the teardown's own correctness Ã¢â‚¬â€ and the second is the
+Two findings from test round v10 (#340), both on the teardown's own correctness — and the second is the
 third generation of one defect, so it arrives with a fixture rather than a third correction.
 
-**#332 Ã¢â‚¬â€ the pre-flight measured the index, not the commits.** `git ls-files .claude` reports the
+**#332 — the pre-flight measured the index, not the commits.** `git ls-files .claude` reports the
 **index**: measured in v10, a `git add -A` went through, the following `git commit` failed, and the command
-flipped from empty to 20 lines with **zero commits in the repository**. Its comment Ã¢â‚¬â€ `# empty = not
-committed yet` Ã¢â‚¬â€ was therefore false in the direction that matters, and this is the one section whose whole
+flipped from empty to 20 lines with **zero commits in the repository**. Its comment — `# empty = not
+committed yet` — was therefore false in the direction that matters, and this is the one section whose whole
 purpose is answering *"do I have an undo?"*. Both printed copies (`UNINSTALL.md` and the skill's own
 pre-flight) now run `git ls-tree -r --name-only HEAD`, with the `fatal: ... HEAD` outcome named as the
-"no commits at all" case. The skill's *explanation* was wrong in the same way Ã¢â‚¬â€ it said `ls-files` "lists
-committed files only" Ã¢â‚¬â€ and is corrected too.
+"no commits at all" case. The skill's *explanation* was wrong in the same way — it said `ls-files` "lists
+committed files only" — and is corrected too.
 
-**The gate, because the lineage is #280 Ã¢â€ â€™ #283 Ã¢â€ â€™ this.** `teardown-protocol.tests.ps1` gains a seventh
+**The gate, because the lineage is #280 → #283 → this.** `teardown-protocol.tests.ps1` gains a seventh
 fixture: a tree that is **staged and not committed**. It asserts both directions, because a fixture that
-only checks the new command proves nothing Ã¢â‚¬â€ the old command must *also* be shown reporting this state as
+only checks the new command proves nothing — the old command must *also* be shown reporting this state as
 committed, which is the false green a reader was handed. The command assertions are scoped to the **fenced
 block** rather than the section, so the prose stays free to name `git ls-files` while explaining what it
 used to be; a test that banned the string outright would force the document to drop its own history to stay
 green.
 
 Two companion observations from the same pre-flight, both now written down: **command 1's success case exits
-`1`** (invisible in a shell, reads as a failed command in an agent harness Ã¢â‚¬â€ it is the answer you want), and
-**the safety-net commit was scoped too narrowly** Ã¢â‚¬â€ it named only the lens tree, while the teardown also
+`1`** (invisible in a shell, reads as a failed command in an agent harness — it is the answer you want), and
+**the safety-net commit was scoped too narrowly** — it named only the lens tree, while the teardown also
 edits `CLAUDE.md` and, with `-VendorScripts`, writes under `scripts/`.
 
-**#331 Ã¢â‚¬â€ `[FREE]` while bootstrap-written prose survived, reported as neither `[remove]` nor `[KEEP]`.** On
+**#331 — `[FREE]` while bootstrap-written prose survived, reported as neither `[remove]` nor `[KEEP]`.** On
 a consumer that had no `CLAUDE.md` before adoption, every byte of that file is `specialists-init`'s, and
-after `-Apply` two prose lines stayed Ã¢â‚¬â€ unreported, while the audit printed `[FREE]`. The audit's claim was
+after `-Apply` two prose lines stayed — unreported, while the audit printed `[FREE]`. The audit's claim was
 narrowly *true* (those lines name no specialist, persona, roster or lens, so nothing loads because of them),
 and that is exactly what made the silence the finding: this script's contract with a reader is that
 `[remove]` versus `[KEEP]` tells them which case they were in.
 
-They are now reported per line as `[KEEP]`, with a note, and **not removed** Ã¢â‚¬â€ deliberately. The boundary
+They are now reported per line as `[KEEP]`, with a note, and **not removed** — deliberately. The boundary
 the teardown keeps is that it takes out lines whose authorship is knowable *and* whose removal costs the
 owner nothing: an `@`-import loads something, prose does not, and cutting sentences out of a governance file
 to satisfy a counter is the wrong side of that line. `UNINSTALL.md` gains the fifth row in *"What is left
-behind, honestly"* Ã¢â‚¬â€ the only entry in that list the plugin itself wrote Ã¢â‚¬â€ and the section's intro count
+behind, honestly"* — the only entry in that list the plugin itself wrote — and the section's intro count
 moved from three to four to match.
 
 **The literal lives in one place.** `Get-ClaudeMdScaffold` + `Test-IsClaudeMdScaffoldProseLine` join
@@ -465,15 +465,15 @@ scaffold from that source. Third literal to cross the writer/recogniser boundary
 literal is what produced *both* instances of the accumulation bug those functions exist for.
 
 **Second half of #331: `scripts\lib\` was left behind as an empty directory.** The single pruning pass ran
-before section 3 put the only file in it on the removal list. It is now one callable invoked twice Ã¢â‚¬â€ deepest
+before section 3 put the only file in it on the removal list. It is now one callable invoked twice — deepest
 first, returning its labels so the caller keeps one tally, because a second tally is how the #275
 preview/apply drift started.
 
 **Verified.** Lint 0 errors, all suites green. `teardown.tests.ps1` gains the **fresh-consumer** fixture
-this suite never had Ã¢â‚¬â€ every existing fixture hands the bootstrap a `CLAUDE.md` it already has, so the
+this suite never had — every existing fixture hands the bootstrap a `CLAUDE.md` it already has, so the
 branch that *creates* one was never exercised, which is the same blind-spot shape `bootstrap.ps1` documents
 about itself. And the refactor was checked against the series' own anchor: a freshly generated `CLAUDE.md`
-is still **463 bytes, 0 CRLF, 8 lone LFs** Ã¢â‚¬â€ byte-identical to v10's virgin-profile measurement and to
+is still **463 bytes, 0 CRLF, 8 lone LFs** — byte-identical to v10's virgin-profile measurement and to
 v5/v6 on a different machine and release.
 
 [PR #343](https://github.com/DaveKJohn/davekjohns-workshop/pull/343)
@@ -482,13 +482,13 @@ v5/v6 on a different machine and release.
 
 ### #351 · The state that reads as healthy from every angle · Docs · 2026-08-01
 
-The last of test round v10's findings (#327), and the part of it that was still open. Its first half Ã¢â‚¬â€ the
-bold claim *"Those keys do not install anything, though"* Ã¢â‚¬â€ was already false-by-measurement and was
+The last of test round v10's findings (#327), and the part of it that was still open. Its first half — the
+bold claim *"Those keys do not install anything, though"* — was already false-by-measurement and was
 corrected in [PR #341](https://github.com/DaveKJohn/davekjohns-workshop/pull/341), in the same paragraph that
 PR was rewriting. What remained was the half the issue itself called the largest of the round: **the state
 deserves naming, because it reads as healthy from every angle.**
 
-**What was measured.** On a virgin profile, a **single session start** Ã¢â‚¬â€ no command run, no file changed Ã¢â‚¬â€
+**What was measured.** On a virgin profile, a **single session start** — no command run, no file changed —
 wrote a full `project`-scoped install record with the correct version and sha, byte-for-byte the size of the
 one the documented command produces. And **that same session loaded nothing**: no `specialists-*` skills, no
 subagents, no session-hook output, no sender header, while the entire payload sat in the cache. The record is
@@ -497,8 +497,8 @@ written *after* the load phase, so only the next session gets the plugin.
 That combination is why it is worth a name rather than a footnote. Every angle a reader would normally trust
 agrees: the record says installed, project scope, correct sha; every check that reads that record sees a
 healthy repo; and the session is inert. The verification query in Step 1 **cannot** catch it, because the
-query reads the record. So the QUICKSTART now says to verify by the **surface** instead Ã¢â‚¬â€ is the skill in the
-slash list, did the hooks print, does Chris open the turn Ã¢â‚¬â€ and ties it to the discipline `UNINSTALL.md`
+query reads the record. So the QUICKSTART now says to verify by the **surface** instead — is the skill in the
+slash list, did the hooks print, does Chris open the turn — and ties it to the discipline `UNINSTALL.md`
 already states from the other direction: *"a session that loads no plugin has no hooks to complain."* Absence
 of complaint is not evidence when the thing that would complain is the thing that did not load.
 
@@ -507,7 +507,7 @@ design note next to the "heals itself" correction from
 [PR #345](https://github.com/DaveKJohn/davekjohns-workshop/pull/345). That note explains the marker is
 unreachable because the record is written away before a hook can look. v10 measured the other half: there is
 **no hook running at all** in that session, because the hooks ship in the plugin it did not load. Both halves
-must hold for the marker to be reachable from a session, and neither does Ã¢â‚¬â€ which is exactly why it is
+must hold for the marker to be reachable from a session, and neither does — which is exactly why it is
 documented as reachable only by a deliberate run, and why `check-connectors`, speaking about a consumer from
 outside, remains the only thing that can report the total case.
 
@@ -515,7 +515,7 @@ outside, remains the only thing that can report the total case.
 commands in Step 1 are redundant: a session start registers the marketplace (#329) and a later session start
 writes the record (this issue). **That chain has never been run end to end.** The two halves were measured
 separately, and the second ran via a manual `marketplace add` rather than via a session start. It is a
-measurement, not a documentation choice, and it cannot be made in this repo Ã¢â‚¬â€ so it is written down with its
+measurement, not a documentation choice, and it cannot be made in this repo — so it is written down with its
 exact recipe rather than guessed at or quietly dropped: *write the two keys, restart, restart, then read the
 six locations and the skill list without running a single `claude plugin` command.* Until that has been done
 the page tells the reader to run the commands, because that is the route it can vouch for.
@@ -534,9 +534,9 @@ The last content group of test round v10 (#340): the `settings.json` claim (#336
 inaccuracies #337 deliberately bundled. Individually trivial; together they are what a first reader
 accumulates as *"the documentation is approximately right"*.
 
-**#336 Ã¢â‚¬â€ a claim the page backed with a hash comparison, and a consumer will trust it because of that.**
+**#336 — a claim the page backed with a hash comparison, and a consumer will trust it because of that.**
 The QUICKSTART said that with `enabledPlugins` already present the install leaves `settings.json`
-**byte-identical**, and that *"the install writes only when there is something to write"* Ã¢â‚¬â€ verified by
+**byte-identical**, and that *"the install writes only when there is something to write"* — verified by
 SHA256 in `davekjohns-workshop`. On a fresh Windows profile, key present, written in exactly the prescribed
 order, the install **rewrote the file anyway**: `enabledPlugins` moved in front of `extraKnownMarketplaces`
 and the nested `source` object was expanded onto separate lines. The likeliest reading is that the workshop's
@@ -545,38 +545,38 @@ own file already matched the serialiser's layout, which makes the old claim true
 
 The half that holds is kept and the half that does not is dropped: content stays **equivalent** (nothing is
 switched on that was not on before), but **expect a formatting diff even when the key is there**. Getting a
-prediction about a tracked governance file wrong in the reassuring direction is the expensive way round Ã¢â‚¬â€ the
+prediction about a tracked governance file wrong in the reassuring direction is the expensive way round — the
 reader is told to expect nothing and gets a diff. The entry also carries v10's own caveat: no hash pair was
 captured at the moment of the install, so this is a description of what changed rather than a before/after
 hash.
 
 **#337, six of them, each verified here rather than taken from the report:**
 
-1. **"the two `@`-imports in `CLAUDE.md`" Ã¢â‚¬â€ there is one.** The teardown's frontmatter and its body both said
+1. **"the two `@`-imports in `CLAUDE.md`" — there is one.** The teardown's frontmatter and its body both said
    two: a description left behind on the pre-seam layout, where both did sit there. Since the seam,
    `CLAUDE.md` keeps exactly one import and the other two live inside `SPECIALISTS.md`, which the teardown
-   removes whole. It set a false expectation for the very step the `[create]` Ã¢â€ â€™ `[remove]` table rests on.
+   removes whole. It set a false expectation for the very step the `[create]` → `[remove]` table rests on.
 2. **The bootstrap writes LF-only files with no trailing newline, on Windows, and no document said so.** The
-   QUICKSTART already devotes a paragraph to exactly this class Ã¢â‚¬â€ for `claude plugin install`. Now stated for
+   QUICKSTART already devotes a paragraph to exactly this class — for `claude plugin install`. Now stated for
    the bootstrap's own output too, including why the missing final newline matters: it turns any later
    hand-edit of `CLAUDE.md` into a two-line diff.
 3. **Step 2 gave no counts to check against.** The figures print in the skill's own `SKILL.md`, which a reader
-   sees *after* invoking it. This page is meticulous about counting everywhere else Ã¢â‚¬â€ *"the count is part of
-   the check, not a detail"*, two steps up Ã¢â‚¬â€ and this was the one step where the script prints numbers with
+   sees *after* invoking it. This page is meticulous about counting everywhere else — *"the count is part of
+   the check, not a detail"*, two steps up — and this was the one step where the script prints numbers with
    nothing to compare them to. The closing line and the arithmetic are now in the QUICKSTART, **counted
    against the payload rather than copied from the report**: 4 personas + 15 agents = 19 lens files, plus 2
    script scaffolds and 1 import.
 4. **Two inaccuracies in the bootstrap's own output.** *"scaffold created with orchestrator imports"* was
-   plural while it places one Ã¢â‚¬â€ and the script's own next-step 1b already got it right, so two of its lines
+   plural while it places one — and the script's own next-step 1b already got it right, so two of its lines
    disagreed. Fixed in both places (`[create]` and `[add]`). The second was the `settings.suggested.jsonc`
-   warning: *"gitignored in many repos, so git will not remind you"* Ã¢â‚¬â€ conditional, with no way for the
+   warning: *"gitignored in many repos, so git will not remind you"* — conditional, with no way for the
    reader to tell which side they are on, and for a fresh consumer (this script's own audience) "no
    `.gitignore` yet" is the likely case. The v10 repo had none, so the file *did* show up in `git status` and
    the warning was simply wrong there. **The script now asks git instead of hedging** (`git check-ignore`) and
    says which side this repo is on; if git is absent or errors it falls back to the honest conditional rather
    than claiming either way.
 5. **The uninstall leaves an undocumented `.orphaned_at`.** Named now, in the section that otherwise predicts
-   its own side effects carefully Ã¢â‚¬â€ which is exactly why the one it missed reads as an omission rather than a
+   its own side effects carefully — which is exactly why the one it missed reads as an omission rather than a
    detail.
 6. **A plugin-pointing `permissions` entry survives a full teardown.** Not something this family writes, but
    `settings.suggested.jsonc` is a plausible route, and an allow-rule pointing into a directory you are about
@@ -587,7 +587,7 @@ hash.
 of the `installPath` snippet added for #330 in the previous PR; the same gate passed everything here, over
 four printed record queries. Nothing in this branch needed a gate exception.
 
-Lint green, all suites green (307 + 104 asserts unchanged Ã¢â‚¬â€ no test asserted the old output strings, which is
+Lint green, all suites green (307 + 104 asserts unchanged — no test asserted the old output strings, which is
 its own small finding: the bootstrap's report text is not pinned anywhere).
 
 [PR #349](https://github.com/DaveKJohn/davekjohns-workshop/pull/349)
@@ -600,13 +600,13 @@ Test round v10's #330, both halves. They are one PR because they are one fact se
 has run this family has two plugin directories, and the documents never said so.**
 
 **The `@`-imports resolve through the clone; the install record describes the cache.** The imports
-`specialists-init` writes point into `~/.claude/plugins/marketplaces/<marketplace>/Ã¢â‚¬Â¦`, while the record's
-`installPath`, `version` and `gitCommitSha` describe `Ã¢â‚¬Â¦/plugins/cache/<marketplace>/<plugin>/<version>/`. The
-two were hash-identical when measured, so there was nothing to see Ã¢â‚¬â€ which is exactly why it is worth writing
+`specialists-init` writes point into `~/.claude/plugins/marketplaces/<marketplace>/…`, while the record's
+`installPath`, `version` and `gitCommitSha` describe `…/plugins/cache/<marketplace>/<plugin>/<version>/`. The
+two were hash-identical when measured, so there was nothing to see — which is exactly why it is worth writing
 down now rather than after the first divergence. A `marketplace update` fast-forwards the clone, and with it
 the persona body your next session loads, while `version` and `gitCommitSha` do not move because the refresh
-does not touch the cache. So the QUICKSTART's own rule Ã¢â‚¬â€ *"the sha tells you which code you are running; only
-the second is the truth about your session"* Ã¢â‚¬â€ is not true of the persona bodies, and that rule is the
+does not touch the cache. So the QUICKSTART's own rule — *"the sha tells you which code you are running; only
+the second is the truth about your session"* — is not true of the persona bodies, and that rule is the
 family's own hard-won conclusion from #313.
 
 **The issue offered two repairs and this takes the second, for a reason already on record here.** Pointing the
@@ -614,7 +614,7 @@ import at the cache would make `gitCommitSha` true about everything, and it was 
 built: the version-pinned cache directory is **cleaned up after an update**, so an import into it would leave
 the orchestrator's body failing to load at all after the first refresh. `bootstrap-drift.tests.ps1` still pins
 that choice ("the `@`-import points to the marketplaces clone", "does NOT point to the version-pinned cache").
-A stale-but-loading body beats a pinned-and-gone one, so the asymmetry stays and is now stated Ã¢â‚¬â€ including
+A stale-but-loading body beats a pinned-and-gone one, so the asymmetry stays and is now stated — including
 *why*, so the next reader does not "fix" it back. The QUICKSTART also names the one command that answers the
 question the sha cannot: `git -C <clone> rev-parse HEAD`.
 
@@ -629,7 +629,7 @@ a printed query that reads `installed_plugins.json` must name `projectPath`, `sc
 `gitCommitSha`, because a reader runs such a query to answer *"what am I actually running?"*. Mine only wanted
 a path. Satisfying the gate turned out to be the better document: at the moment you are choosing a teardown
 target, the **scope** is exactly what you need to see, since Step 2's uninstall is scope-keyed and refuses at
-the wrong one Ã¢â‚¬â€ the #325 class of mistake, one document over. The snippet prints all five fields and says why.
+the wrong one — the #325 class of mistake, one document over. The snippet prints all five fields and says why.
 
 Lint green, all suites green. No script changed; this is documentation of measured behaviour.
 
@@ -640,24 +640,24 @@ Lint green, all suites green. No script changed; this is documentation of measur
 ### #346 · Step 0c: an executable version check and a repair warning that fits · Docs · 2026-08-01
 
 The two remaining findings of test round v9 (#326), both in `specialists-init/SKILL.md` step 0c, on
-non-overlapping lines Ã¢â‚¬â€ the grouping the dossier proposed.
+non-overlapping lines — the grouping the dossier proposed.
 
-**#322 Ã¢â‚¬â€ the prescribed tag comparison cannot be answered in a consumer's clone.** The step told a reader
+**#322 — the prescribed tag comparison cannot be answered in a consumer's clone.** The step told a reader
 to resolve the release tag in the cached marketplace clone and offered a binary reading: equal means the
 release, different means `main`. Three measured facts about that clone break it, and this branch
 **re-measured all three locally** rather than adopting them:
 
 - it is **shallow** (`.git/shallow` present) and its fetch refspec is `+refs/heads/main:refs/remotes/origin/main`
-  Ã¢â‚¬â€ `main` only, **no tags**;
+  — `main` only, **no tags**;
 - so its tag set is frozen at whatever came along with the clone. The consumer that filed the issue had
-  newest tag **`v2.7.3`**; the clone on this machine has **66 tags, newest `v3.0.8`** Ã¢â‚¬â€ both serving a
+  newest tag **`v2.7.3`**; the clone on this machine has **66 tags, newest `v3.0.8`** — both serving a
   `3.0.9` payload;
 - **and therefore the step's own example command succeeds on one machine and fails on the other.** Verified
   here: `rev-list -n1 v3.0.8` returned a sha, `rev-list -n1 v3.0.9` returned
   `fatal: ambiguous argument`. On the filing consumer the same `v3.0.8` line failed.
 
 That third point sharpens the issue rather than confirming it. The finding was reported as "the command
-cannot run on a consumer"; measured across two machines it is worse than that Ã¢â‚¬â€ **it is machine-dependent**.
+cannot run on a consumer"; measured across two machines it is worse than that — **it is machine-dependent**.
 A command that always failed would announce itself. This one answers on some machines, which means a reader
 who runs it once and gets a sha has no way to know the answer was unreliable. And the failure mode inverts:
 with no branch for `fatal:`, the natural reading of an error is *"not equal, so I am on `main`"*, while the
@@ -666,24 +666,24 @@ clean was the one the procedure called unclean.
 
 So the comparison is no longer prescribed. In its place: the clone's shape stated once, `fatal: ambiguous
 argument` named as an expected third outcome that is **evidence of nothing**, `rev-parse HEAD` offered as
-the narrower question that *is* answerable locally Ã¢â‚¬â€ with the honest caveat that the clone and the
+the narrower question that *is* answerable locally — with the honest caveat that the clone and the
 version-pinned install cache in `installPath` are two different directories, so it speaks about the clone
-and not the payload Ã¢â‚¬â€ and `gh api Ã¢â‚¬Â¦/tags` given for identifying the release, because that is where tags
+and not the payload — and `gh api …/tags` given for identifying the release, because that is where tags
 actually live.
 
-**#325 Ã¢â‚¬â€ the repair warning fired against the safe repair.** The step warned that a project-scoped install
+**#325 — the repair warning fired against the safe repair.** The step warned that a project-scoped install
 *"against a path that already had a record"* adds a second record instead of correcting the first. Measured
 against `3.0.9`, that condition is too broad: a **same-scope** install replaces cleanly (one record, fresh
 `installedAt`, and the query afterwards prints exactly the one-line green the step defines). What
-accumulates is a **scope mismatch** Ã¢â‚¬â€ v8's duplicate had a pre-existing `local` record and the install added
+accumulates is a **scope mismatch** — v8's duplicate had a pre-existing `local` record and the install added
 a `project` one beside it.
 
 The consequence of leaving it broad is the reason this counts as more than an accuracy fix: read broadly, the
-warning fires against re-installing at project scope over a project record Ã¢â‚¬â€ the ordinary way to restore a
+warning fires against re-installing at project scope over a project record — the ordinary way to restore a
 repo, and **exactly what step 0b prescribes two paragraphs earlier**. A reader who believed it had no safe
 repair left at all. Both halves are now stated with their measurement, and the rule a reader can act on is
 one line: read the scope of what is already there before a repair install; remove at *that* scope first, or
-the install adds beside it. That also makes the fourth state consistent Ã¢â‚¬â€ a repair install against a demoted,
+the install adds beside it. That also makes the fourth state consistent — a repair install against a demoted,
 pathless record is itself a scope mismatch, so the duplicate would return.
 
 The mirrored broad phrasing in `check-report-lib.ps1`'s design note was corrected in
@@ -709,25 +709,25 @@ ago.
 - **A `Before you start` section, which the QUICKSTART did not have** (#334). Claude Code installed and
   `claude` actually running (pointing at Anthropic's own [setup
   documentation](https://code.claude.com/docs/en/setup) rather than an install command that would go
-  stale here), signed in, and on Windows raising the execution policy Ã¢â‚¬â€ a fresh profile defaults to
+  stale here), signed in, and on Windows raising the execution policy — a fresh profile defaults to
   `Restricted`, which blocks every `.ps1` **including `claude.ps1` itself** on an npm install, so this
   page's own first command failed with a `PSSecurityException`. The `PATH`/full-restart symptom is
   recorded as context rather than as a defect, because it is partly an artefact of the install route that
   measurement took.
 - **The first executable command was a dead end, and now it is not** (#329). The marketplace is
-  registered by a **session start**, not by writing `extraKnownMarketplaces` Ã¢â‚¬â€ measured in three states,
+  registered by a **session start**, not by writing `extraKnownMarketplaces` — measured in three states,
   and the CLI's own error (`Marketplace 'davekjohns-workshop' not found. Available marketplaces:
   claude-plugins-official`) reads as a typo rather than as a missing step. Step 1 now restarts first, with
   `claude plugin marketplace add <source> --scope project` as the no-restart alternative. That command
   gets its own caveats because it breaks the page's pattern twice: it takes a **source** where everything
-  else uses the marketplace *name*, and it defaults to `--scope user` Ã¢â‚¬â€ which would rebuild #279 in a
+  else uses the marketplace *name*, and it defaults to `--scope user` — which would rebuild #279 in a
   fourth command. Its `--scope project` is flagged as **documented rather than measured** (from the CLI
   `--help`; #329's measurement was taken at the default scope).
 - **Step 1's fragment now parses when pasted, and `.claude` no longer means two things silently**
   (#335). The `jsonc` block with a comment and no outer braces is a complete `json` file, with the
   merge case named for readers who already have a `settings.json`. The repo-level `.claude/` is
   identified as a directory to **create**, and a blockquote separates it from the machine-level
-  `~/.claude/` the verification query reads Ã¢â‚¬â€ one consumer read the former as something still to be
+  `~/.claude/` the verification query reads — one consumer read the former as something still to be
   *installed*.
 - **Reaching the documents at all** (#338). A pointer to the Quickstart and UNINSTALL.md at the **top**
   of the root README, where a reader handed only the repository stands, instead of two-thirds down under
@@ -739,19 +739,19 @@ ago.
   contain.
 
 **The act count moved from five to six, in all three places at once.** Adding the registering restart made
-the `enable Ã¢â€ â€™ refresh Ã¢â€ â€™ install Ã¢â€ â€™ restart Ã¢â€ â€™ verify` line wrong Ã¢â‚¬â€ the exact cross-document count that #297
+the `enable → refresh → install → restart → verify` line wrong — the exact cross-document count that #297
 and #305 exist to keep aligned, asserted in the QUICKSTART, the family README and `specialists-init`'s
-step 0. It is now `enable Ã¢â€ â€™ restart Ã¢â€ â€™ refresh Ã¢â€ â€™ install Ã¢â€ â€™ restart Ã¢â€ â€™ verify` in all three, with
+step 0. It is now `enable → restart → refresh → install → restart → verify` in all three, with
 `specialists-init`'s letters absorbing it (`0a` is two acts). Folding the restart into act 1 would have
 kept the number at five and was rejected deliberately: being folded into another act is what kept this
-step unwritten while it was already required. Verified with the emphasis-tolerant sweep #305 prescribes Ã¢â‚¬â€
-the remaining `five steps` hits all belong to the **migration** path (steps 0Ã¢â‚¬â€œ4), a different procedure.
+step unwritten while it was already required. Verified with the emphasis-tolerant sweep #305 prescribes —
+the remaining `five steps` hits all belong to the **migration** path (steps 0–4), a different procedure.
 
 **One correction pulled in from outside this branch's four issues.** The bold claim *"Those keys do not
 install anything, though"* sits in the exact paragraph #329 rewrites, and #327 falsifies it: on a virgin
 profile with the marketplace registered, a single session start wrote a full project-scoped install
 record, indistinguishable from the one the documented command produces. Leaving a measured-false sentence
-standing inside a paragraph being rewritten was not defensible, so it is corrected here Ã¢â‚¬â€ stating what was
+standing inside a paragraph being rewritten was not defensible, so it is corrected here — stating what was
 measured, that the session doing the writing still loads nothing itself, and that whether this makes Step
 1's two commands redundant is **untested end to end**. That last question needs one round on a fresh
 profile and stays open.
@@ -763,32 +763,32 @@ profile and stays open.
 ### #321 · An UNINSTALL document beside the QUICKSTART · Docs · 2026-08-01
 
 **The Quickstart has had no counterpart since the day the reversibility requirement was set.** Adoption
-had to be reversible *"at any moment"* (Dave, July 29, 2026), and the machinery for it exists Ã¢â‚¬â€ the
+had to be reversible *"at any moment"* (Dave, July 29, 2026), and the machinery for it exists — the
 `specialists-teardown` skill, measured across five adoption rounds. What did not exist is the page a
 consumer reads. The removal was documented only inside a 452-line skill written for the people who
 maintain it, and split across two more places: the machine-side half lived in the Quickstart's *Staying
 up to date* section, under a heading nobody looking to leave would open.
 
-[`UNINSTALL.md`](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/claude-code-plugins/claude-specialists/UNINSTALL.md) is that page Ã¢â‚¬â€ the mirror of the
+[`UNINSTALL.md`](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/claude-code-plugins/claude-specialists/UNINSTALL.md) is that page — the mirror of the
 Quickstart, four steps, same reader. **Its organising claim is that there are two removals, not one:**
-out of your repo (the seam, the import, the scaffolds Ã¢â‚¬â€ the skill) and off your machine (the record, the
+out of your repo (the seam, the import, the scaffolds — the skill) and off your machine (the record, the
 keys, the registration, the cache). Confusing them is the ordinary failure: a repo teardown leaves the
 plugin loading, a plugin uninstall leaves a repo full of lenses and a broken import.
 
 **And the order between them is the one irreversible mistake in the whole procedure.** The teardown skill
 *ships inside the plugin*. Uninstall first and the skill goes with it, leaving a repo full of generated
-files and no tool that can still tell which of them it wrote Ã¢â‚¬â€ the classification lives in the skill, not
+files and no tool that can still tell which of them it wrote — the classification lives in the skill, not
 in the files. Same class of trap, one step later: `-VendorScripts` has to be used while the plugin is
 still installed, or a consumer that built on the shared scripts loses its daily git workflow.
 
 #### Two things measured while writing it, both of which the docs had wrong or missing
 
 **1. The Quickstart said the CLI does not name `local`. It does.** The sentence read *"a third scope the
-CLI's own flag list does not mention"*. Re-measured August 1, 2026 on CLI `2.1.220` Ã¢â‚¬â€ the same version
+CLI's own flag list does not mention"*. Re-measured August 1, 2026 on CLI `2.1.220` — the same version
 [#315](https://github.com/DaveKJohn/davekjohns-workshop/issues/315) was measured on: `install`,
 `uninstall` and `disable` each print *"user, project, or local"* in their own `--help`, and `update`
-prints a **fourth**, `managed`. The finding underneath was always right Ã¢â‚¬â€ a reader who met a `local`
-record had nothing in this family to look it up in Ã¢â‚¬â€ but the sentence blamed the wrong party. Corrected
+prints a **fourth**, `managed`. The finding underneath was always right — a reader who met a `local`
+record had nothing in this family to look it up in — but the sentence blamed the wrong party. Corrected
 to say what is true: the flag list was never the gap, **these pages were**.
 
 **2. Three machine-level locations this family had never named.** Taken from a machine that has run it,
@@ -797,7 +797,7 @@ not estimated: `~/.claude/plugins/data/<plugin>-<marketplace>/` (a persistent da
 payload, beside the git clone under `marketplaces/`), and `~/.claude/plugins/known_marketplaces.json`
 (the registration, removed by `claude plugin marketplace remove`). `git grep` over the whole payload:
 **no hits for any of them.** So "get this machine back to a clean state" was not answerable from the
-family's own documents. It is now, including the honest gap Ã¢â‚¬â€ whether `marketplace remove` also deletes
+family's own documents. It is now, including the honest gap — whether `marketplace remove` also deletes
 the two cache paths from disk is *not* established, and the page says to check rather than assume.
 
 **One trap that follows from #314 and is worth its own line:** an enable key alone is enough for a
@@ -809,7 +809,7 @@ explain it.
 #### The gate could not see the new page, and that is the part that got closed properly
 
 `UNINSTALL.md` landed in the family directory and **no check looked at it**: not the dead-link scan, not
-check 11 (printed lifecycle commands), not check 12 (the install-record query) Ã¢â‚¬â€ all three take their
+check 11 (printed lifecycle commands), not check 12 (the install-record query) — all three take their
 scan set from `$linkFiles`, and the family's entry there was a hardcoded list of two names,
 `'README.md', 'QUICKSTART.md'`. A brand-new consumer-facing page, printing exactly the class of command
 those two checks exist to police, was invisible on the run that introduced it.
@@ -818,18 +818,18 @@ those two checks exist to police, was invisible on the run that introduced it.
 that the list itself came from [#103](https://github.com/DaveKJohn/davekjohns-workshop/issues/103),
 which closed this same gap the same way. A named list is only correct until the next document is
 written, and nothing announces the omission. The directory holds the family's consumer-facing pages and
-nothing else, so it is enumerated now Ã¢â‚¬â€ non-recursive, since the per-plugin subdirectories are gathered
+nothing else, so it is enumerated now — non-recursive, since the per-plugin subdirectories are gathered
 by their own rules and would otherwise be counted twice. Effect on the real repo: `[link-scan]`
-144 Ã¢â€ â€™ 145, `[lifecycle]` 14 Ã¢â€ â€™ 16, `[record-query]` 2 Ã¢â€ â€™ 3, still **0 errors**.
+144 → 145, `[lifecycle]` 14 → 16, `[record-query]` 2 → 3, still **0 errors**.
 
 Scenario 33 in `check-plugin-integrity.tests.ps1` pins it, deliberately using a file name this suite has
-never heard of Ã¢â‚¬â€ if that scenario ever needs updating because a real document took the name, the
+never heard of — if that scenario ever needs updating because a real document took the name, the
 enumeration has stopped being one. **Proven load-bearing:** run against the pre-fix scan set, three of
-its assertions fail. The fourth is the interesting one Ã¢â‚¬â€ `Assert-Equal 1 $r33.Code` passed in **both**
+its assertions fail. The fourth is the interesting one — `Assert-Equal 1 $r33.Code` passed in **both**
 worlds, so it was removed rather than kept as decoration, with the measurement recorded in place. A green
 that proves nothing is the exact failure this suite exists to catch, and it had just produced one.
 
-All 18 suites green (`check-plugin-integrity` 83 Ã¢â€ â€™ 88 asserts), lint gate `0 error(s)`.
+All 18 suites green (`check-plugin-integrity` 83 → 88 asserts), lint gate `0 error(s)`.
 
 [PR #321](https://github.com/DaveKJohn/davekjohns-workshop/pull/321)
 
