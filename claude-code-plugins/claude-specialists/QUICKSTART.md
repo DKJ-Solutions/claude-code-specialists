@@ -424,7 +424,10 @@ a **second, machine-wide record** beside the project one. Each plugin carries it
 plugin; the full history lives in the workshop itself
 ([`CHANGELOG.md`](../../CHANGELOG.md) and [`releases/`](../../releases/README.md)). Each plugin
 folder also carries a `RELEASE.md` card next to its `CHANGELOG.md` — open it in your plugin cache
-after an update to see, at a glance, exactly which release you're now on.
+after an update to see, at a glance, which release the card describes and what changed in it. It
+does not tell you where *you* are, and since August 2, 2026 it says so rather than claiming
+otherwise (inbound [#384](https://github.com/DaveKJohn/davekjohns-workshop/issues/384)); the section
+directly below is the check for that.
 
 **The version is not the code, and on this marketplace the two routinely disagree.** The cached clone
 this family installs from **checks out `main` and tracks `origin/main`** — not the newest tag. So any

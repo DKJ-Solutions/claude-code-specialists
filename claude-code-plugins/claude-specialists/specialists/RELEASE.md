@@ -5,7 +5,7 @@
 
 Round v12 processed: the teardown papers corrected, and the staleness gate reaches into prose
 
-You are on this release.
+This card describes v3.1.2, the version your plugin manifest carries. Whether it is the code you are running is a separate question: the documented update path installs from `main`, so a `main` that has moved past the tag reports this same number. [The version is not the code](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/claude-code-plugins/claude-specialists/QUICKSTART.md#staying-up-to-date) in the QUICKSTART is the check.
 
 ## Documentation
 

@@ -31,10 +31,11 @@
           travels along with the plugin cache. Root-relative links are rewritten to absolute
           GitHub URLs in the process.
       3c. Writes/overwrites, for EVERY plugin (not just the touched ones -- the version bumps
-          lockstep), <plugin>/RELEASE.md: a short card ("You are on this release") that shows a
-          consumer which release they are on, with or without its own entries this time, plus
-          links to the full notes and its own CHANGELOG.md. Model A (plugin-carried), deliberately
-          without a session-start hook.
+          lockstep), <plugin>/RELEASE.md: a short card naming the release it describes, with or
+          without its own entries this time, plus links to the full notes and its own CHANGELOG.md.
+          Model A (plugin-carried), deliberately without a session-start hook. The card states what
+          it describes rather than where the reader is -- it is written at cut time and cannot know
+          which commit a consumer will install from (inbound #384).
       4. Commits that directly to main (release: vX.Y.Z) and sets an annotated tag vX.Y.Z.
       5. Pushes main + the tag (unless -NoPush).
 
