@@ -207,9 +207,21 @@ Both halves are measured (inbound
   the install, key already present, written in exactly this order — SHA256
   `F694FB44…BF15EFA8` (224 bytes) before, `EB8834F7…AB275E4A` (246 bytes) after. Not byte-identical, and
   the 22 added bytes are precisely the two changes described above. **Behaviourally equivalent, textually
-  different** is now measured rather than inferred. Those two hashes are that profile's and are not
-  something to match — they are here to show a *pair that differs*; yours will differ from each other too,
-  at different values.
+  different** is now measured rather than inferred.
+
+  **On the path this page prescribes, that pair is reproducible — so it is a check you can actually use**
+  (inbound [#385](https://github.com/DaveKJohn/davekjohns-workshop/issues/385)). Round v13 hit both hashes
+  exactly, on a second profile: `F694FB44…BF15EFA8` at 224 bytes before, `EB8834F7…AB275E4A` at 246 after,
+  and the +22 is the two changes described above, to the byte. That is not luck. Step 1 has you paste the
+  printed block into a file that does not exist yet, so the "before" bytes are the block; and the CLI's
+  serialiser is deterministic, so the "after" follows from it. Matching them tells you two things at once:
+  you pasted the block intact, and the install did what it is supposed to do.
+
+  **Only match them if that is the path you took.** An earlier edition of this line said the hashes were
+  not something to match at all, which took a usable check away from the reader following the instructions.
+  The warning still holds for everyone else: if you already had a `.claude/settings.json`, formatted it
+  yourself, or merged the keys into an existing file, your two values will differ from these *and* from
+  each other, and only the difference between them means anything.
 - **Key absent** — then the install **adds `enabledPlugins`, with `true` per plugin**, and that is not
   formatting: it switches the plugins **on** in a tracked governance file. Measured in
   `DaveKJohn/life-hub`, which is deliberately plugin-clean between adoption rounds, so the key was

@@ -458,8 +458,23 @@ After the script:
 6. **Register the repo in the workshop.** Take the printed manifest block, fill in the two `VUL-IN`
    fields, and land it as `connectors/<repo>.json` in the marketplace repo via that repo's normal
    branch + PR flow. Skip this and the workshop stays blind to this repo: no plugin-version check, no
-   lens-inventory check, no agent-def drift check. Until it is registered, this repo's own session
-   start says so — `connector-sessioncheck` surfaces an `[UNREGISTERED]` line next to its verdict.
+   lens-inventory check, no agent-def drift check.
+
+   **Do not count on a reminder — on a plain consumer there is none.** The `[UNREGISTERED]` line does
+   exist, but it comes from `check-connectors.ps1`, and `connector-sessioncheck` only runs that script
+   when it finds a **verified workshop checkout on this machine**. A consumer does not have one; the
+   workshop's own maintainer does. Measured in round v13 on an unregistered repo — every session of the
+   round printed exactly this and nothing further (inbound
+   [#383](https://github.com/DaveKJohn/davekjohns-workshop/issues/383)):
+
+   ```text
+   connector-sessioncheck: no verified workshop checkout found on this machine -- check skipped.
+   ```
+
+   That is defensible behaviour: the check has nothing to check against. It does mean the safety net
+   under this step catches the reader who needs it least. And this is the step most easily left lying —
+   it asks for a PR in *another* repo, afterwards, once the adoption already works — so treat it as one
+   nobody will nudge you about.
 
 ## Important
 
