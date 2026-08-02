@@ -244,13 +244,17 @@ prescribed `git … rev-list -n1 v3.0.8` against
 `~\.claude\plugins\marketplaces\davekjohns-workshop` and offered a binary reading: equal means the release,
 different means `main`. Three measured facts about that clone break it:
 
-- it is **shallow** (`.git/shallow` present), and its fetch refspec is
-  `+refs/heads/main:refs/remotes/origin/main` — **`main` only, no tags**;
-- so its tag set is frozen at whatever came along when the clone was created, and drifts further behind
+- it is **shallow** (`.git/shallow` present) and its fetch refspec is
+  `+refs/heads/main:refs/remotes/origin/main` — main-only. **That does not mean the clone is tag-less**
+  (inbound [#372](https://github.com/DaveKJohn/davekjohns-workshop/issues/372)): the initial `git clone`
+  brings along any tag pointing at history it fetched, and both measured clones had them — a fresh one
+  carrying `v3.1.1`, an older one carrying 66 tags. An earlier edition of this bullet said *"no tags"*, and
+  that was simply wrong;
+- **its tag set is frozen at whatever came along when the clone was created**, and drifts further behind
   with every release. Measured the same day on two machines: newest tag **`v2.7.3`** on one and
   **`v3.0.8`** on another, while both served a `3.0.9` payload;
-- **the command therefore succeeds on one machine and fails on another, for the same version.** The
-  example above resolved fine where the clone happened to carry `v3.0.8` and returned
+- **so the command succeeds on one machine and fails on another, for the same version.** The example above
+  resolved fine where the clone happened to carry `v3.0.8` and returned
   `fatal: ambiguous argument 'v3.0.8'` where it did not.
 
 That last one is why this is worse than a broken command: the reading had no branch for `fatal:`, and the
@@ -261,6 +265,23 @@ inverts its answer on some machines and not others cannot be verified by the rea
 **If the `fatal: ambiguous argument` line is what you get, that is expected and it is evidence of
 nothing** — the tag is simply not in your clone.
 
+**And there is a third outcome, which is the one to actually worry about: the tag resolves, and lies.**
+This family's release tags are **annotated**, so `rev-parse <tag>` returns the *tag object*, not the commit
+it points at. Measured on a clone sitting exactly on the `v3.1.1` release commit (round v12, August 2,
+2026):
+
+```text
+git rev-parse v3.1.1        -> 12b2d1b6a80a336c134fb7b86f2d4ec6fe21b1ee   (the annotated tag OBJECT)
+git rev-parse HEAD          -> 4b1a74dadbd2e37b1e254ad4f6f233451ea7cde3
+git rev-parse "v3.1.1^{}"   -> 4b1a74dadbd2e37b1e254ad4f6f233451ea7cde3   (the COMMIT -- equals HEAD)
+```
+
+No `fatal:`, no missing tag — just two different shas on a clone that is **on** the release. The naive
+reading, *"different, so I am on `main`"*, is the same inversion this whole block exists to prevent,
+reached from the opposite direction: the old failure mode was *the tag is absent*, this one is *the tag is
+present and needs peeling*. **If you resolve a tag locally at all, peel it with `^{}`** — otherwise you are
+comparing a tag object against a commit, which can never match.
+
 **What you can answer locally** is a narrower question — is the cache I installed from at the same commit
 the clone sits on now?
 
@@ -268,7 +289,8 @@ the clone sits on now?
 git -C "$env:USERPROFILE\.claude\plugins\marketplaces\davekjohns-workshop" rev-parse HEAD
 ```
 
-That works on a shallow, tag-less clone. Note what it is not: the clone and the version-pinned install
+That works on a shallow clone and does not care which tags it happens to carry — it names no tag at all,
+which is the point. Note what it is not: the clone and the version-pinned install
 cache your record names in `installPath` are **two different directories**, so this tells you about the
 clone, not about your payload. It is honest about what is knowable here.
 
@@ -278,9 +300,10 @@ clone, not about your payload. It is honest about what is knowable here.
 gh api repos/DaveKJohn/davekjohns-workshop/tags --jq '.[] | select(.name=="v3.0.9") | .commit.sha'
 ```
 
-Equal to your record's `gitCommitSha` means you are on that release; different means you are on `main` —
-see [Staying up to date](../../../QUICKSTART.md#staying-up-to-date) for why that happens without anyone
-asking for it, and why it is not something you can fix from here.
+That route has no peeling problem to worry about: the API's `.commit.sha` is the commit already, annotated
+tag or not. Equal to your record's `gitCommitSha` means you are on that release; different means you are
+on `main` — see [Staying up to date](../../../QUICKSTART.md#staying-up-to-date) for why that happens
+without anyone asking for it, and why it is not something you can fix from here.
 
 **One** line per plugin you enabled, each saying `project`, is the green you need — and the *count*
 carries as much of the verdict as the word does.
