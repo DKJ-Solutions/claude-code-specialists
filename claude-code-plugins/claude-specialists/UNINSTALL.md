@@ -150,12 +150,26 @@ The run closes with a free-standing audit that goes looking for what still point
 and line. `[FREE]` is the clean answer; anything else is a checklist for
 [Step 4](#step-4--verify-that-you-actually-stand-free).
 
-**Keep that output, because this is the last point at which you can produce it.** The audit is part of
-`teardown.ps1`, which lives in the payload that [Step 2](#step-2--uninstall-the-plugin-one-command-per-plugin)
-removes — so by the time Step 4 asks you for the audit line, the tool that prints it is gone (inbound
-[#328](https://github.com/DaveKJohn/davekjohns-workshop/issues/328)). Re-run it here as often as you like;
-it removes nothing and needs no `-Apply`. Afterwards it is unavailable at any price short of re-installing
-the plugin, which is why Step 4 reads the output you saved here rather than asking for a fresh run.
+**Keep that output.** You can reproduce it for longer than an earlier edition of this page claimed, but not
+for the whole procedure, and saving it now costs nothing.
+
+**Be precise about where the tool actually dies, because this page used to get it wrong** (inbound
+[#373](https://github.com/DaveKJohn/davekjohns-workshop/issues/373)). Earlier editions said the audit goes
+with [Step 2](#step-2--uninstall-the-plugin-one-command-per-plugin). It does not. `teardown.ps1` sits in the
+**version-pinned cache** — the same `<plugin>` path you resolved at the top of this step — and the cache
+follows the *marketplace*, not the install, which is what the
+[#339 table](#starting-from-a-genuinely-clean-machine) at the foot of this page has said all along.
+Measured walking the steps in their printed order (rounds v11 and v12, August 1–2, 2026, CLI `2.1.220`):
+after `claude plugin uninstall … --scope project`, both `teardown.ps1` and this `UNINSTALL.md` were still
+on disk and the cache directory was still there. Step 2 takes the install record and the plugin's **data**
+directory and drops an `.orphaned_at` marker; the instruments survive it.
+
+What finally takes them is the **manual cache delete in
+[Step 5](#step-5--drop-the-marketplace-registration-last)** — the one removal no command does for you. So the
+real shape of the constraint is the one [#328](https://github.com/DaveKJohn/davekjohns-workshop/issues/328)
+was filed about, just one step further down the page: the procedure does remove its own instruments, at the
+end rather than in the middle. Re-run the audit as often as you like at any point before that; it removes
+nothing and needs no `-Apply`.
 
 ## Step 2 — uninstall the plugin, one command per plugin
 
@@ -247,6 +261,22 @@ key alone is enough for a session start to write a missing install record by its
 `enabledPlugins` still names this plugin heals its own uninstall, silently, on the next session — and
 your verification will show a fresh record with a fresh timestamp and nothing to explain it.
 
+**The trap needs two things present, and finishing this procedure takes both away.** Round v12 measured all
+three states on one profile, with a stray enable key left in place each time (inbound
+[#327](https://github.com/DaveKJohn/davekjohns-workshop/issues/327), August 2, 2026):
+
+| state of the machine | does a session start write a record? |
+|---|---|
+| keys set, but no marketplace and no cache at the session's start | **no** — `plugins: {}`. That session did register the marketplace and create the clone, but wrote no record |
+| marketplace registered **and** cache present | **yes** — a full, correct `project` record, from a session that itself loaded nothing |
+| after a full teardown including Step 5's manual cache delete | **no** — the record stayed `{}`, and nothing re-registered itself |
+
+So self-healing fires only in the middle row. That is reassuring in one direction and a warning in the
+other: a **half-finished** teardown — plugin uninstalled, marketplace and cache still standing — is exactly
+the state that regenerates records behind you, which is why Step 3's key removal matters most while you are
+still mid-procedure. **Walk it through to the end of Step 5 and the mechanism is disarmed**, stray key or
+not.
+
 ## Step 4 — verify that you actually stand free
 
 - **The record query from Step 2 comes back empty.** Empty output means nothing is installed for this
@@ -255,11 +285,12 @@ your verification will show a fresh record with a fresh timestamp and nothing to
   session that loads no plugin has no hooks to complain, because the hooks are *in* the plugin. Absence of
   complaint is not evidence — check the skill list itself.
 - **Chris no longer takes the floor**, and your `CLAUDE.md` has no `@`-import pointing at the seam.
-- **The teardown's audit said `[FREE]`** — in the output you kept from
-  [Step 1](#step-1--take-the-plugin-out-of-your-repo). This is a check you read back rather than re-run:
-  the audit ships in the payload Step 2 removed, so there is nothing left to run it with. If you did not
-  keep it and you want the line, the honest route is to re-install the plugin, re-run the audit, and
-  uninstall again — which is why Step 1 says to keep it.
+- **The teardown's audit said `[FREE]`** — read it back from the output you kept in
+  [Step 1](#step-1--take-the-plugin-out-of-your-repo). **If you did not keep it, run it again from the
+  cache**: `teardown.ps1` survives Step 2 and is still at the `<plugin>` path Step 1 resolved, right up
+  until you delete the cache by hand in Step 5. It removes nothing and needs no `-Apply`, so a re-run here
+  is free. Only once Step 5 is done is re-installing the plugin the honest route — and by then the question
+  has stopped mattering, because the marketplace is gone too.
 
 Everything above is verifiable with the marketplace still registered, which is why the registration comes
 off last.
@@ -277,9 +308,10 @@ It takes an optional `--scope <user|project|local>`; omit it and the declaration
 scope. Then the last verification: **`claude plugin marketplace list` no longer names
 `davekjohns-workshop`.**
 
-**Expect it to edit `~/.claude/settings.json`, and to leave an empty key behind** (inbound
-[#357](https://github.com/DaveKJohn/davekjohns-workshop/issues/357)). The `davekjohns-workshop` block goes,
-`"extraKnownMarketplaces": {}` stays, and the file is re-serialised so the key order may shift:
+**If you declared the marketplace at *user* scope, expect it to edit `~/.claude/settings.json` and to leave
+an empty key behind** (inbound [#357](https://github.com/DaveKJohn/davekjohns-workshop/issues/357)). The
+`davekjohns-workshop` block goes, `"extraKnownMarketplaces": {}` stays, and the file is re-serialised so the
+key order may shift:
 
 ```jsonc
 // before
@@ -289,10 +321,22 @@ scope. Then the last verification: **`claude plugin marketplace list` no longer 
 ```
 
 Exactly the mirror image of what Step 2 says about `"enabledPlugins": {}`, and the same reading applies:
-a diff there is the command working, not a fault. It does mean the "no `enabledPlugins`, no
-`extraKnownMarketplaces`" row of a clean-machine check is **never** literally clean after a by-the-book
-teardown — the keys are empty, not absent. Remove the empty keys by hand if you want the file back to
+a diff there is the command working, not a fault. Remove the empty key by hand if you want the file back to
 where it started.
+
+**On the path the QUICKSTART prescribes, none of that happens — and that is the expected result, not an
+anomaly** (inbound [#374](https://github.com/DaveKJohn/davekjohns-workshop/issues/374)). Two independent
+reasons: the QUICKSTART's pasteable block puts `extraKnownMarketplaces` in **your repo's**
+`.claude/settings.json`, and its `marketplace add` alternative is given as `--scope project` for exactly
+this reason; and [Step 3](#step-3--remove-the-keys-you-wrote-then-restart) already removed that key several
+steps ago, so in the printed order there is nothing left here for `marketplace remove` to empty out.
+Measured on a virgin Windows profile (round v12, August 2, 2026, CLI `2.1.220`): `~/.claude/settings.json`
+did not exist before or after, `known_marketplaces.json` came back to `{}` at 2 bytes, and
+`claude plugin marketplace list` printed `No marketplaces configured`.
+
+So a clean-machine check after a by-the-book project-scoped teardown **is** literally clean; it is only a
+user-scope declaration that leaves keys behind, empty rather than absent. An earlier edition said *never*
+literally clean, full stop — which sent a project-scope reader hunting for a key that was never there.
 
 **What that command does and does not delete, measured rather than assumed** (inbound
 [#339](https://github.com/DaveKJohn/davekjohns-workshop/issues/339), August 1, 2026, on a virgin Windows
@@ -384,11 +428,21 @@ Which step closes which — including the one entry that no step closes for you 
 | `known_marketplaces.json` | Step 5 removes the entry; the file stays |
 | `~/.claude/settings.json` | Step 3, by your own edit |
 
-**And a torn-down profile is not byte-identical to a virgin one** — a more useful answer than "clean".
-Measured after the full procedure, three files exist that were absent before adoption:
-`installed_plugins.json` (35 bytes, `{"version": 2, "plugins": {}}`), `known_marketplaces.json` (288
-bytes, no longer naming this marketplace) and `~/.claude/settings.json` (22 bytes, `{"theme": "dark"}`).
-None of them holds anything belonging to this family. What remains is those three files, empty of ours.
+**A torn-down profile is not necessarily byte-identical to a virgin one** — a more useful answer than
+"clean". What is left over is **whatever the teardown could not un-create**, so it depends on what your
+profile looked like going in, and two measurements bracket the range:
+
+| file | a profile that had run other plugins | a profile that had only ever run this one |
+|---|---|---|
+| `installed_plugins.json` | 35 bytes, `{"version": 2, "plugins": {}}` | same — 35 bytes |
+| `known_marketplaces.json` | 288 bytes, no longer naming this marketplace | **2 bytes**, `{}` |
+| `~/.claude/settings.json` | 22 bytes, `{"theme": "dark"}` | **absent** — never created |
+
+Neither state holds anything belonging to this family; the difference is only how much of the surrounding
+file survives. The right-hand column is round v12 on a virgin Windows profile (August 2, 2026), where all
+six rows of the check above came back literally clean. **Read your own numbers against your own starting
+point, not against either column** — a file this family never wrote is not evidence of a teardown that
+under-performed.
 
 **Do not hand-edit `installed_plugins.json`.** It is this family's standing rule for its own test rounds
 and it applies here too: the `installedAt` stamps are how a record that was *adopted* from another repo is

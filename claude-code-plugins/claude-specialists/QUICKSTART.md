@@ -203,9 +203,13 @@ Both halves are measured (inbound
   was expanded onto separate lines. The likeliest reading is that the workshop's file already happened to
   match the serialiser's own layout, which makes the old claim true of *that file* rather than of "key
   already present" as a category. So: **expect a formatting diff even when the key is there, and expect no
-  behavioural change.** Honest note on the evidence: v10 did not capture a hash pair at the moment of the
-  install, so this is a description of what changed rather than a before/after hash — the ordering and the
-  expanded object are both observable in the after-state, and neither matches this page's own fragment.
+  behavioural change.** Round v12 closed the evidence gap v10 left: a hash pair captured at the moment of
+  the install, key already present, written in exactly this order — SHA256
+  `F694FB44…BF15EFA8` (224 bytes) before, `EB8834F7…AB275E4A` (246 bytes) after. Not byte-identical, and
+  the 22 added bytes are precisely the two changes described above. **Behaviourally equivalent, textually
+  different** is now measured rather than inferred. Those two hashes are that profile's and are not
+  something to match — they are here to show a *pair that differs*; yours will differ from each other too,
+  at different values.
 - **Key absent** — then the install **adds `enabledPlugins`, with `true` per plugin**, and that is not
   formatting: it switches the plugins **on** in a tracked governance file. Measured in
   `DaveKJohn/life-hub`, which is deliberately plugin-clean between adoption rounds, so the key was
