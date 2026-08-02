@@ -46,8 +46,13 @@ the governance of the entire specialists system live here.
   a plain error: every one of those samples was accurate when captured, so nothing looked wrong — the
   reader is simply told to expect something that cannot happen on their machine. **Prefer stating the
   invariant over quoting the string**; quote the string as illustration when it genuinely helps.
-  Enforced by check 15 (`[expected-output]`) of the lint gate for the consumer-facing docs, which is
-  where a stale sample costs the most; everywhere else it is hers to hold.
+  Enforced for the consumer-facing docs by two checks of the lint gate, which between them cover the
+  sample wherever it sits: check 15 (`[expected-output]`) holds captured output **inside a fence**, and
+  check 16 (`[measured-figure]`) holds byte counts and file sizes **in the prose around it** — the same
+  class one step outside check 15's reach, added after test round v12 found it there
+  ([#374](https://github.com/DaveKJohn/davekjohns-workshop/issues/374) and its unfiled twin one section
+  down). Both take a named opt-out (`<!-- unbound-sample: … -->`, `<!-- unbound-figure: … -->`) that has
+  to state a reason. Everywhere else — other docs, other kinds of sample — it is hers to hold.
 - **Claims here come in pairs, and only one of them gets filed.** The portable rule is *repairing a
   claim means finding its other sites*; what this repo adds is how reliably that pays. All three of
   test round v12's core findings had a second, unreported site in the same document, and in two of
