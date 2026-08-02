@@ -73,6 +73,19 @@ destructive actions above happen only on Dave's explicit request.
   immediately in the relevant doc(s) — `README.md`, this `CLAUDE.md`, or a manual/agent def
   — a memory note alone is too noncommittal. (In this repo that is the technical-writer specialist,
   [Tessa #16](.claude/specialists/lenses/06-16-extension.md).)
+- **A reported finding's *reason* is verified before it is repaired, not just its symptom.** A report
+  says both what went wrong and why, and the second half is an inference by someone who was measuring
+  the outside. Read the code, the doc, or the output that would have to be true for that explanation
+  to hold — and if it does not, the repair changes with it. Building the proposed fix on an unverified
+  reason produces a change that satisfies the report and is wrong, which is worse than the original
+  defect: it now carries a citation. Inbound
+  [#388](https://github.com/DaveKJohn/davekjohns-workshop/issues/388) is the measured instance
+  (August 2, 2026). It reported that the teardown does not count a fixture's `README.md` "even as
+  prose", and proposed deleting the sentence that promised the count. The symptom was real — nothing
+  about that file appears in the output — but the reason was not: the prose pass *does* scan the root
+  markdown, and the file scores **0** because it deliberately names no specialist, with the note
+  printed only above zero. Following the proposal would have deleted a correct sentence and left the
+  next reader with the same confusion, minus the explanation.
 - Within a branch, be proactive about creating new folders/files as soon as a new topic comes up.
   Don't ask permission first for the file structure itself; do ask for the content if something is
   sensitive or uncertain.
