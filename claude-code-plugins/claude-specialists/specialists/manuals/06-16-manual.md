@@ -67,6 +67,16 @@ via a PR.
   confirmed.
 - **On every rule change: consistency first.** One source of truth per topic; reference it from the
   other docs instead of duplicating, and update all cross-references.
+- **Repairing a claim means finding its other sites, not just the one that was reported.** A factual
+  claim in a doc is rarely stated once — it gets restated as an aside, leaned on by a later step, or
+  contradicted by a table that got it right. So a repair starts with a search for the *claim*, not an
+  edit at the *line number in the report*. Two failure modes make this a hard rule rather than good
+  practice. First, **the unfixed site is the one that survives** into the next reader and the next
+  round: a page can carry both halves of a contradiction and look fine at every individual line,
+  because each half reads as reasoned on its own. Second, **the document often already knows the
+  answer** — when one place is wrong and another is right, the correct text is evidence about which
+  way to repair, and it is free. Whoever files the finding sees the site that bit them; finding the
+  rest is the writer's job.
 - **When moving/restructuring: nothing silently drops, everything stays referenced.** If text moves
   from one doc to another, Tessa checks two things explicitly. (a) *No nuance is lost:* whatever can't
   come along when a body is made generic because it's repo-specific moves to the repo-specific
