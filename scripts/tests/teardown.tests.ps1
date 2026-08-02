@@ -743,6 +743,73 @@ function Get-LintScript { return `$script:LintScript }
         'fresh: scripts\lib\ is gone rather than left behind as an empty directory'
     Assert-True ($fp.Out -match '(?m)^\s*\[remove\].*scripts\\lib\\ \(empty directory\)') `
         'fresh: and the preview said it would go -- same rule as the lens directory (#275)'
+
+    # --- inbound #381: the untouched-install note is a READING, not an assertion ---------------------
+    # Round v13 reached this note by the route UNINSTALL.md Step 4 now offers -- re-run the audit from
+    # the cache AFTER the uninstall -- and was told the install was untouched one step after seeing
+    # "Successfully uninstalled". So the three states are pinned separately, because "no record" and
+    # "could not look" are different claims and the old code could make neither.
+    Write-Host "-- inbound #381: the install-record gate --" -ForegroundColor Cyan
+    $null = New-BootstrappedConsumer
+    $fakeHome = Join-Path ([System.IO.Path]::GetTempPath()) 'specialists-teardown-claudehome'
+    $prevCfg  = $env:CLAUDE_CONFIG_DIR
+    try {
+        New-Item -ItemType Directory -Path (Join-Path $fakeHome 'plugins') -Force | Out-Null
+        $recordsFile = Join-Path $fakeHome 'plugins\installed_plugins.json'
+        $env:CLAUDE_CONFIG_DIR = $fakeHome
+
+        # State 1 -- a record points here. The note names it, with the scope off the record rather than
+        # an assumed 'project': an uninstall aimed at the wrong scope is the failure UNINSTALL.md spends
+        # a paragraph on, and a session start can put a record in 'local' by itself.
+        [System.IO.File]::WriteAllText($recordsFile, (@{
+            plugins = @{ 'specialists@davekjohns-workshop' = @(@{
+                scope = 'local'; projectPath = $Fixture; version = '3.1.2'
+            }) }
+        } | ConvertTo-Json -Depth 6))
+        $g1 = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
+        Assert-True ($g1.Out -match 'still has a record: specialists@davekjohns-workshop \(scope local\)') `
+            'gate/record: the note names the plugin and the scope the record is actually in'
+        Assert-True ($g1.Out -match 'claude plugin uninstall specialists@davekjohns-workshop --scope local') `
+            'gate/record: and the command it prints carries that same scope'
+        Assert-True (-not ($g1.Out -match 'No install record points at this repo')) `
+            'gate/record: it does not also claim the repo is clean'
+
+        # State 2 -- readable, nothing points here. THE case from #381: this is what the Step 4 re-run
+        # must read like, and the old note said the opposite.
+        [System.IO.File]::WriteAllText($recordsFile, (@{
+            plugins = @{ 'specialists@davekjohns-workshop' = @(@{
+                scope = 'project'; projectPath = 'C:\somewhere\else'; version = '3.1.2'
+            }) }
+        } | ConvertTo-Json -Depth 6))
+        $g2 = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
+        Assert-True ($g2.Out -match 'No install record points at this repo any more') `
+            'gate/clean: a record for another repo does not count as one for this one'
+        Assert-True (-not ($g2.Out -match 'The plugin install itself is untouched')) `
+            'gate/clean: and the untouched-install claim is gone rather than merely reworded (#381)'
+        Assert-True (-not ($g2.Out -match 'claude plugin uninstall')) `
+            'gate/clean: it does not advise a command the reader has already run'
+
+        # State 3 -- no file to read. Reported as "could not look", never as state 2: a teardown that
+        # cannot measure must not report clean, which is the whole point of gating this note.
+        Remove-Item -LiteralPath $recordsFile -Force
+        $g3 = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
+        Assert-True ($g3.Out -match 'could not read .*installed_plugins\.json \(missing or not parseable\)') `
+            'gate/blind: a missing records file is named as a gap in the reading'
+        Assert-True (-not ($g3.Out -match 'No install record points at this repo')) `
+            'gate/blind: and is NOT reported as a clean machine'
+
+        # State 3 again, via the other route into it: a file that exists but is not JSON. Same claim,
+        # because the honest answer to both is "I did not measure this".
+        [System.IO.File]::WriteAllText($recordsFile, 'not json at all {{{')
+        $g4 = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
+        Assert-True ($g4.Out -match 'could not read .*installed_plugins\.json \(missing or not parseable\)') `
+            'gate/blind: an unparseable records file reads the same way, and does not crash the teardown'
+        Assert-Equal 0 $g4.Code 'gate/blind: the teardown still exits 0 on a broken records file'
+    }
+    finally {
+        $env:CLAUDE_CONFIG_DIR = $prevCfg
+        if (Test-Path -LiteralPath $fakeHome) { Remove-Item -Recurse -Force -LiteralPath $fakeHome -ErrorAction SilentlyContinue }
+    }
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
