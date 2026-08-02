@@ -122,14 +122,16 @@ free.**
 start**, not by writing the key — measured in three states on a virgin profile (inbound
 [#329](https://github.com/DaveKJohn/davekjohns-workshop/issues/329)): without the settings file the
 refresh command below fails; **with** the settings file, in the same session, it still fails; after one
-session start in the repo it succeeds. The failure is easy to misread:
+session start in the repo it succeeds. The failure is easy to misread — on CLI `2.1.220` it reads:
 
 ```
 ✘ Failed to update marketplace(s): Marketplace 'davekjohns-workshop' not found.
   Available marketplaces: claude-plugins-official
 ```
 
-That reads as a typo in the name, and it is not — it is a missing step. Until this was measured it was
+The wording is version-bound and may differ on your CLI; what does not vary is that a "not found" here
+means the marketplace has not been registered yet, never that you typed the name wrong. That reads as a
+typo in the name, and it is not — it is a missing step. Until this was measured it was
 the state of the very first executable command on this page for every consumer who had never had this
 marketplace: a dead end, with nothing in the document to get past it.
 

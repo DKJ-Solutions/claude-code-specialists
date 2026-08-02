@@ -1075,6 +1075,83 @@ try {
     # asserted here is that no coverage line was itself counted as one.
     Assert-True (-not ($rc.Out -match '(?m)^\s*\[COVERAGE\]')) `
         'coverage: the token is the category name, not a literal [COVERAGE] tag -- one line per category, no extra noise'
+
+    # --- check 15: a captured output sample must say what it is bound to ----------------------------
+    # The class behind four of test round v11's nine findings. Each case below is one of the two ways
+    # this check can fail badly: missing a real unbound sample, or firing on something that is not one.
+    # The false-positive half is not optional politeness -- a gate that cries wolf gets an opt-out
+    # pasted over every finding and then reports green while asserting nothing.
+    $qs = Join-Path $Fixture 'claude-code-plugins\claude-specialists\QUICKSTART.md'
+    # Fence and box drawing from codepoints, never as literals. The first version wrote the fence
+    # literally and silently produced an opening fence with the language on the NEXT line, so the
+    # "a command block is not examined" case was testing a language-less block and failing for a
+    # reason that had nothing to do with the check. Same discipline as fix-mojibake's ASCII-only
+    # source, and for the same class of reason.
+    #
+    # AND EVERY '$fence + <lang>' BELOW IS PARENTHESISED, which is not style. In PowerShell the comma
+    # binds TIGHTER than '+', so @('a', $fence + 'powershell', 'b') parses as ('a', $fence) +
+    # ('powershell', 'b') -- four elements, and the language lands on its own line. That is what
+    # actually broke the command-block case, twice, while the check under test was correct throughout.
+    $bt    = [string][char]0x60
+    $fence = $bt + $bt + $bt
+    $tree  = 'repo/' + "`n" + [char]0x251C + [char]0x2500 + ' CLAUDE.md'
+
+    # 1. THE FINDING: output quoted with nothing saying what it came from.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'The closing line reads:', '', $fence,
+        'Done: 4 created, 0 already present.', $fence, '', 'Compare it against yours.'
+    ) -join "`n", $Utf8NoBom)
+    $s1 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($s1.Out -match '\[expected-output\].*QUICKSTART\.md') `
+        'expected-output: an output sample with no stated binding is reported'
+    Assert-True ($s1.Out -match 'expected-output. checked [1-9]') `
+        'expected-output: and the coverage line counts samples examined, not check runs'
+
+    # 2. BOUND, three ways -- a version, a date, and a hedge. Each must clear it on its own.
+    foreach ($binding in @('Measured on CLI 2.1.220.', 'Measured on 1 August 2026.', 'This varies by repo.')) {
+        [System.IO.File]::WriteAllText($qs, @(
+            '# Quickstart', '', 'The closing line reads:', '', $fence,
+            'Done: 4 created, 0 already present.', $fence, '', $binding
+        ) -join "`n", $Utf8NoBom)
+        $s2 = Invoke-Integrity -FixtureRoot $Fixture
+        Assert-True (-not ($s2.Out -match '\[expected-output\].*QUICKSTART\.md')) `
+            "expected-output: a sample bound by '$binding' passes"
+    }
+
+    # 3. A COMMAND IS NOT A SAMPLE. Tagged blocks are things to run; they cannot go stale under a reader
+    #    the way a captured transcript can.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'Run this:', '', ($fence + 'powershell'),
+        'claude plugin install specialists@davekjohns-workshop --scope project', $fence
+    ) -join "`n", $Utf8NoBom)
+    $s3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($s3.Out -match '\[expected-output\].*QUICKSTART\.md')) `
+        'expected-output: a powershell block is a command to run, not examined'
+
+    # 4. A DIAGRAM IS DRAWN, NOT CAPTURED. The check's first real false positive, on the seam diagram in
+    #    the family README.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'The shape is:', '', ($fence + 'text'), $tree, $fence
+    ) -join "`n", $Utf8NoBom)
+    $s4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($s4.Out -match '\[expected-output\].*QUICKSTART\.md')) `
+        'expected-output: a box-drawing diagram is not a captured sample'
+
+    # 5. THE OPT-OUT HAS TO NAME A REASON. A bare marker must not silence the check, or the escape hatch
+    #    becomes the way the gate is defeated rather than the way an exception is recorded.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'Reads:', '', $fence, 'Done: 4 created.', $fence, '', '<!-- unbound-sample: -->'
+    ) -join "`n", $Utf8NoBom)
+    $s5 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($s5.Out -match '\[expected-output\].*QUICKSTART\.md') `
+        'expected-output: an opt-out marker with no reason does not silence the check'
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'Reads:', '', $fence, 'Done: 4 created.', $fence, '',
+        '<!-- unbound-sample: invented for the test fixture, bound to nothing real -->'
+    ) -join "`n", $Utf8NoBom)
+    $s6 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($s6.Out -match '\[expected-output\].*QUICKSTART\.md')) `
+        'expected-output: an opt-out that names a reason does silence it'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

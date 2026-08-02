@@ -1121,6 +1121,92 @@ Write-Coverage -Category 'mojibake' -Checked $mjFiles `
         'the root docs, every per-plugin CHANGELOG.md and RELEASE.md, and every note under releases/ -- peeled by the inverse round trip rather than matched against a table of known sequences'
     })
 
+# --- 15. unbound output samples: an expectation that cannot hold everywhere -------------------------------
+# THE CLASS TEST ROUND v11 KEPT PRODUCING. Four of its nine findings were one shape: a captured sample
+# handed to the reader as a fixed expectation, without saying what the capture was bound to.
+#   #358  the bootstrap's 'Done:' line, captured in a repo that already had the script scaffolds, so the
+#         third pair was inverted for the fresh repo the section was written for
+#   #359  a CLI error string that CLI 2.1.220 no longer emits -- and whose replacement suggests a
+#         different command than the procedure
+#   #360  a byte baseline that was the LF figure, on a platform where every round measures the CRLF one
+#   #361  a sender header the reader was told to look for, which no bootstrapped repo emits
+# Individually four documentation fixes. Together a rule nobody was holding: an expectation is only
+# checkable if the reader can tell when it does not apply to them.
+#
+# WHY THIS CAN BE A GATE AT ALL, where "is this prose accurate" cannot. The distinction it needs is
+# already in the markup. A fenced block carrying a language (powershell, json, jsonc) is something to
+# RUN; a fenced block with no language, or 'text', is something to COMPARE AGAINST -- and only the second
+# kind can go stale under the reader. Measured before building: 34 fenced blocks across the two
+# consumer-facing documents, of which exactly 4 are the second kind, and those 4 are precisely the
+# findings above plus one instance the round missed. A check with a four-item haystack does not need a
+# heuristic.
+#
+# AND IT MUST NOT BECOME A CHECK THAT PASSES BY BEING IGNORED. A fuzzy gate gets an opt-out pasted over
+# every finding and then reports green while asserting nothing -- the exact failure mode of the mojibake
+# table one check up. So the escape hatch is a visible marker that has to name a reason, and the coverage
+# line below reports how many samples were examined rather than how many times the check ran.
+$sampleChecked = 0
+$sampleDocs = @(
+    'claude-code-plugins\claude-specialists\QUICKSTART.md',
+    'claude-code-plugins\claude-specialists\UNINSTALL.md',
+    'claude-code-plugins\claude-specialists\README.md'
+)
+# What counts as saying "here is what this is bound to". A version or a year pins the capture in time; the
+# hedges pin it to a condition. Deliberately not 'measured' on its own -- that says the author saw it,
+# which is exactly what was true of all four findings.
+$bindingMarker = '(\d+\.\d+\.\d+)|(\b(19|20)\d{2}\b)|version-bound|varies|may differ|will differ|depends on|illustrative|not a fixed string|fresh repo|already present|whatever the phrasing|on Windows|CRLF'
+# The opt-out has to NAME something. '(?!-->)' is the whole point: without it, the empty marker
+# '<!-- unbound-sample: -->' satisfies '\S' on the comment terminator itself, and the escape hatch
+# becomes a way to switch the check off rather than a way to record an exception.
+$sampleOptOut  = '<!--\s*unbound-sample:\s*(?!-->)\S'
+foreach ($rel in $sampleDocs) {
+    $full = Join-Path $RepoRoot $rel
+    if (-not (Test-Path -LiteralPath $full)) { continue }
+    $lines = [System.IO.File]::ReadAllLines($full, [System.Text.Encoding]::UTF8)
+    $open = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -notmatch '^```') { continue }
+        if ($open -lt 0) { $open = $i; continue }
+        $close = $i
+        $lang = ($lines[$open] -replace '^```', '').Trim().ToLowerInvariant()
+        $open2 = $open; $open = -1
+        # A block with a language is a command to run, not an expectation to match.
+        if ($lang -ne '' -and $lang -ne 'text') { continue }
+        # AND A DIAGRAM IS DRAWN, NOT CAPTURED. The class is text a tool emitted, which can therefore
+        # emit something else tomorrow; a directory tree is authored by the writer and goes stale only
+        # when the writer changes it. The seam diagram in README.md was this check's first false
+        # positive, and box drawing is what separates the two without a judgement call. Named here and
+        # in the coverage line rather than left as a silent narrowing -- an exclusion nobody can see is
+        # how a gate quietly stops covering what it claims.
+        # Built from codepoints, never written as literal box-drawing characters. This file is read by
+        # Windows PowerShell 5.1, which takes a BOM-less UTF-8 script as ANSI -- writing the range
+        # literally mangled it into a broken character class on the first run, which is check 14's own
+        # subject arriving in check 15's source.
+        $body = if ($close -gt $open2 + 1) { ($lines[($open2 + 1)..($close - 1)] -join "`n") } else { '' }
+        $boxDrawing = '[' + [char]0x2500 + '-' + [char]0x257F + ']'
+        if ($body -match $boxDrawing) { continue }
+        $sampleChecked++
+        # The window: the paragraph that introduces the sample, and the prose that follows it. Bounded
+        # rather than section-wide on purpose -- a version number three screens away in another
+        # subsection is not something the reader of THIS block is going to connect to it.
+        # THE SAMPLE'S OWN BODY IS NOT CONTEXT. Caught by the first test written against this check: a
+        # block whose text happened to contain 'already present' satisfied the binding with its own
+        # content, so the very sample under examination vouched for itself. The binding has to be
+        # something the DOCUMENT says about the sample, never something the sample says.
+        $from = [Math]::Max(0, $open2 - 5)
+        $to   = [Math]::Min($lines.Count - 1, $close + 14)
+        $before = if ($open2 -gt $from) { ($lines[$from..($open2 - 1)] -join "`n") } else { '' }
+        $after  = if ($to -gt $close) { ($lines[($close + 1)..$to] -join "`n") } else { '' }
+        $context = $before + "`n" + $after
+        if ($context -match $sampleOptOut) { continue }
+        if ($context -notmatch $bindingMarker) {
+            $errors += "[expected-output] ${rel}:$($open2 + 1) -- a fenced block with no language is a sample the reader compares against, and nothing near it says what the capture is bound to (a CLI version, a date, a platform, a repo state, or a hedge such as 'varies' / 'illustrative'). Four of test round v11's nine findings were exactly this. Name the binding, or mark the block deliberate with '<!-- unbound-sample: <reason> -->'."
+        }
+    }
+}
+Write-Coverage -Category 'expected-output' -Checked $sampleChecked `
+    -Note 'captured output samples in the consumer-facing docs -- language-less or text-tagged fenced blocks, i.e. the ones a reader compares against rather than runs. Two kinds are deliberately not examined and both are stated rather than assumed: blocks tagged powershell/json/jsonc (commands to run) and blocks containing box drawing (diagrams, which are drawn rather than captured)'
+
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {
     Write-Host "  No findings." -ForegroundColor Green
