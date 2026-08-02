@@ -238,11 +238,16 @@ its root:
 $root = (Get-Location).Path
 (Get-Content "$env:USERPROFILE\.claude\plugins\installed_plugins.json" -Raw | ConvertFrom-Json).plugins.PSObject.Properties |
   ForEach-Object { $n = $_.Name; $_.Value | Where-Object { $_.projectPath -eq $root } |
-    ForEach-Object { "$n -> $($_.scope) $($_.version) $($_.gitCommitSha)" } }
+    ForEach-Object {
+      $payload = if ($_.installPath -and (Test-Path -LiteralPath $_.installPath)) { 'payload present' } else { 'PAYLOAD MISSING' }
+      "$n -> $($_.scope) $($_.version) $($_.gitCommitSha) [$payload]" } }
 ```
 
 **One** `project` line per plugin you listed is what you want — the count is part of the check, not a
-detail. The last field is the commit the payload came from, and it answers a different question than the
+detail. **And it has to end in `payload present`.** The record names an `installPath`; nothing writes
+that record and the files it points at in the same act, so the path can be absent while every other
+field is correct. That last check is why this query has a fourth field at all — see the blockquote
+below. The last field is the commit the payload came from, and it answers a different question than the
 version does: see [Staying up to date](#staying-up-to-date) under *"the version is not the code"*. Empty output means nothing was installed here. *Two* lines for the same plugin is a stray second
 record, which a repair install can create rather than prevent, and a line reading `local` was written by
 a session start rather than by you; both are covered under
@@ -251,12 +256,18 @@ step 2 and the session hooks are simply absent, and that looks exactly like a se
 is fine.
 
 > **The installed record with the inert session — the one state that reads as healthy from every angle**
-> (inbound [#327](https://github.com/DaveKJohn/davekjohns-workshop/issues/327)). It is worth naming, because
-> the query above cannot catch it. Measured on a virgin profile: a **single session start**, with no command
-> run, wrote a full `project`-scoped record with the correct version and sha — and **that same session loaded
-> nothing at all**: no `specialists-*` skills, no subagents, no session-hook output, no sender header, while
-> the whole payload sat in the cache. The record is written *after* the session's load phase, so only the
-> **next** session gets the plugin.
+> (inbound [#327](https://github.com/DaveKJohn/davekjohns-workshop/issues/327)). Measured on a virgin profile:
+> a **single session start**, with no command run, wrote a full `project`-scoped record with the correct
+> version and sha — and **that same session loaded nothing at all**: no `specialists-*` skills, no subagents,
+> no session-hook output, no routing announcement. The record is written *after* the session's load phase.
+>
+> **And the second measurement was a notch worse than the first** (inbound
+> [#355](https://github.com/DaveKJohn/davekjohns-workshop/issues/355), round v11). Above, the payload at least
+> sat in the cache, so the *next* session got the plugin. Measured again on a fresh profile after **three**
+> session starts and still zero `claude plugin` commands, the record read `project 3.1.0` with the right sha
+> — and `installPath` pointed at a directory that **did not exist**. No cache directory, no payload, nothing
+> to load in any session, ever. That is why the query above now checks the path instead of only the fields:
+> a record is a claim, not evidence.
 >
 > Every angle you would normally trust says fine. The record says installed, project scope, correct sha. The
 > checks that read that record agree. And the session is completely inert. So do not verify the adoption by
@@ -266,16 +277,17 @@ is fine.
 > both directions: absence of complaint is not evidence, because the thing that would complain is the thing
 > that did not load.
 >
-> **What follows from this, and what deliberately does not.** It is a second, independent reason why the
-> `[NOT-INSTALLED-HERE]` marker never appears at a session start: not only has the state already been written
-> away, there is **no hook running to report it** — the hooks ship in the plugin this session did not load.
-> What is *not* established is whether this makes the two `claude plugin` commands above redundant. The two
-> halves were measured separately (a session start registers the marketplace; a session start writes the
-> record once that marketplace is reachable) and never as one chain, and the second ran via a manual
-> `marketplace add` rather than via a session start. **One round on a fresh profile settles it:** write the
-> two keys, restart, restart, then read the six locations and the skill list without running a single
-> `claude plugin` command. Until that has been done, run the commands — they are the route this page can
-> vouch for.
+> **What follows from this.** It is a second, independent reason why the `[NOT-INSTALLED-HERE]` marker never
+> appears at a session start: not only has the state already been written away, there is **no hook running to
+> report it** — the hooks ship in the plugin this session did not load.
+>
+> **And it settles the question this blockquote used to leave open** (inbound
+> [#350](https://github.com/DaveKJohn/davekjohns-workshop/issues/350)): whether a session start makes the two
+> `claude plugin` commands redundant. **It does not.** The experiment this page asked for has been run — the
+> two keys, two restarts, six locations read without a single command — and the answer is that a session
+> start does *half* the job: it registers the marketplace and writes a complete, correct-looking record, but
+> never fetches the payload. `marketplace update` + `install` are the pair that does. So the commands stay,
+> and now for a measured reason rather than caution.
 
 **Step 2 — run the bootstrap skill.** In the new session, invoke `specialists-init`. It sets up —
 purely additively, without overwriting anything — the **lens-only** persona lenses (including
@@ -293,16 +305,28 @@ plugin enabled, the closing line reads:
 
 ```
 Done: 4 persona-lens(es) created, 0 already present; 15 lens-scaffold(s) created, 0 already present;
-0 script-scaffold(s) created, 2 already present.
+2 script-scaffold(s) created, 0 already present.
 ```
 
 **4 personas + 15 subagent scaffolds = 19 lens files** in `.claude/specialists/lenses/`, plus 2 script
 scaffolds and 1 `@`-import. Those figures used to appear only in the skill's own `SKILL.md`, which a reader
 sees *after* invoking it — i.e. after the moment they would have needed them. This page is meticulous about
 counting everywhere else (*"the count is part of the check, not a detail"*, two steps up), and this was the
-one step where the script prints numbers with nothing to compare them against. If you enabled a domain group
-as well, expect its specialists on top; if a count is lower than this, something was already present or was
-skipped, and the skill says which.
+one step where the script prints numbers with nothing to compare them against.
+
+**Read each pair as `created + already present`, not as a fixed number.** The sum is what this page
+promises; the split depends on what your repo already had. A **fresh** repo — this step's own audience —
+gets everything under `created`, which is the sample above. A repo that already had, say,
+`scripts/repo-config.ps1` sees that one move to `already present` instead. So a figure that is *higher*
+than the sample is not an error, and neither is one that is lower: what matters is that each pair adds up
+and that the skill names anything it skipped. If you enabled a domain group as well, expect its
+specialists on top of these.
+
+> The sample above was itself the finding: until August 2, 2026 it showed `0 script-scaffold(s) created,
+> 2 already present` — captured in a repo that already had them, and therefore inverted for exactly the
+> fresh-repo reader this section was written for (inbound
+> [#358](https://github.com/DaveKJohn/davekjohns-workshop/issues/358)). The guidance covered only the
+> "lower than this" direction, so the one number that could not match had no explanation.
 
 **And one thing it does that no document mentioned:** every file it writes uses **LF** line endings and
 `CLAUDE.md` gets **no trailing newline**, on Windows too. Harmless while nothing is committed, but on a repo
@@ -310,10 +334,27 @@ whose files are CRLF this is the same class of lasting diff that `claude plugin 
 few paragraphs up — and the missing final newline turns any later hand-edit of `CLAUDE.md` into a two-line
 diff. If your repo cares, normalise once after the bootstrap.
 
-**Step 3 — restart and verify.** Start again and check that Chris takes the floor (every turn opens
-with a sender header such as `🧭 Chris — intake & routing`). Then, at your own pace, fill in the
-repo lenses in the seam (`.claude/specialists/lenses/`): that is where you tell each specialist what it serves in your repo.
-The worker specialists can be invoked directly as `@specialists:<name>`.
+**Step 3 — restart and verify.** Start again and check that Chris takes the floor. What that looks
+like: the turn **names the specialist the work belongs to, and why**, before doing it — Chris's ritual
+step is *"This one is for \<name\> — \<reason\>."* So on an ordinary request you should see something
+like:
+
+```text
+**This one is for Rebecca (Research Specialist)** — "what's in this repo" is internal repo
+exploration, her domain.
+```
+
+**Check for the invariant, not for a fixed string** (inbound
+[#361](https://github.com/DaveKJohn/davekjohns-workshop/issues/361)). A named owner with a stated reason
+is what the persona guarantees and what proves the orchestrator loaded; the exact shape is not fixed.
+Some repos add a house style on top — a fixed header line per turn, emoji and all — but that is a rule
+those repos write into their own `CLAUDE.md`, not something this plugin ships. Until August 2, 2026 this
+step told you to look for `🧭 Chris — intake & routing`, which no bootstrapped repo emits: a
+verification a fresh consumer could not pass, on the step that exists to prove the install worked.
+
+Then, at your own pace, fill in the repo lenses in the seam (`.claude/specialists/lenses/`): that is
+where you tell each specialist what it serves in your repo. The worker specialists can be invoked
+directly as `@specialists:<name>`.
 
 ## Staying up to date
 
@@ -364,10 +405,15 @@ On what schedule the cache refreshes when nothing asks was never established, wh
 command belongs in the procedure rather than a hope that it has caught up.
 
 **The scope flag on the second command is not optional either.** Without it the command defaults to
-user scope and fails on a project-scoped install with *"Plugin `specialists` is not installed at
-scope user"* — literally true, and easy to misread as "not installed at all" on a machine where it
-is. Do not answer that by re-running the install: a scopeless install adds a **second, machine-wide
-record** beside the project one. Each plugin carries its own
+user scope and does not act on a project-scoped install. **What it prints depends on your CLI version,
+so treat the wording as version-bound and the flag as the invariant** (inbound
+[#359](https://github.com/DaveKJohn/davekjohns-workshop/issues/359)). On `2.1.220` it names the scope
+and the settings file, and then suggests `claude plugin disable … --scope local` — **which is not the
+step to follow**: that writes a local disable key on top of your project setting and leaves the install
+in place. Earlier releases said *"Plugin `specialists` is not installed at scope user"*, literally true
+and easy to misread as "not installed at all". Whatever the phrasing, the failure means the command
+looked in the wrong scope. Do not answer it by re-running the install either: a scopeless install adds
+a **second, machine-wide record** beside the project one. Each plugin carries its own
 `CHANGELOG.md` that travels with the plugin cache and describes per release what changed for that
 plugin; the full history lives in the workshop itself
 ([`CHANGELOG.md`](../../CHANGELOG.md) and [`releases/`](../../releases/README.md)). Each plugin
