@@ -48,6 +48,21 @@ the governance of the entire specialists system live here.
   invariant over quoting the string**; quote the string as illustration when it genuinely helps.
   Enforced by check 15 (`[expected-output]`) of the lint gate for the consumer-facing docs, which is
   where a stale sample costs the most; everywhere else it is hers to hold.
+- **Claims here come in pairs, and only one of them gets filed.** The portable rule is *repairing a
+  claim means finding its other sites*; what this repo adds is how reliably that pays. All three of
+  test round v12's core findings had a second, unreported site in the same document, and in two of
+  them the document **already stated the truth somewhere else**:
+  [#373](https://github.com/DaveKJohn/davekjohns-workshop/issues/373) — `UNINSTALL.md` had the audit
+  tool dying at Step 2 three paragraphs after telling the reader to resolve it to a cache path, while
+  its own #339 table said no step removes the cache;
+  [#374](https://github.com/DaveKJohn/davekjohns-workshop/issues/374) — the same over-generalised
+  clean-machine claim appeared twice, one section apart, and only the first was filed;
+  [#372](https://github.com/DaveKJohn/davekjohns-workshop/issues/372) — *"no tags"* sat one bullet
+  above *"its tag set is frozen at whatever came along"*, and a third *"tag-less"* further down.
+  So in this repo the search is not optional diligence: **grep the claim across the page before
+  editing the reported line**, and treat a passage that disagrees as the likely-correct one until
+  measured otherwise. These pages are long, heavily cross-referenced, and revised issue by issue,
+  which is exactly the shape that accumulates half-updated claims.
 
 ### Boundaries with the other roles
 
