@@ -539,10 +539,23 @@ function Build-PluginReleaseCard {
     $notesRelPath = "releases/development/$majorDir/$Version.md"
     $notesUrl = "$RepoBlobUrl$notesRelPath"
 
+    # WHAT THE CARD CAN KNOW, AND WHAT IT CANNOT (inbound #384). This line used to read "You are on
+    # this release." -- written at cut time, about a reader the card has never met. Round v13 measured
+    # it false in the ordinary case: the payload came from `main`, three commits past the tag whose
+    # number the card and plugin.json both carried. And it contradicted the reader's own correct
+    # conclusion, because the QUICKSTART's tag comparison had just told them they were on `main` and
+    # not on the release. So the card now states what it describes and hands the "where am I" question
+    # to the check that can answer it.
+    $backtick = [char]0x60
+    $quickstartUrl = $RepoBlobUrl + 'claude-code-plugins/claude-specialists/QUICKSTART.md#staying-up-to-date'
+    $mainRef = "$backtick" + 'main' + "$backtick"
     $titleLine = if ($Title) { "$Title`n`n" } else { '' }
     $header = "# Release v$Version`n`n" +
         "**Date:** $Date  `n**Type:** $Type`n`n" +
-        "${titleLine}You are on this release.`n`n"
+        "${titleLine}This card describes v$Version, the version your plugin manifest carries. Whether it is " +
+        "the code you are running is a separate question: the documented update path installs from $mainRef, " +
+        "so a $mainRef that has moved past the tag reports this same number. " +
+        "[The version is not the code]($quickstartUrl) in the QUICKSTART is the check.`n`n"
 
     $emDash = [char]0x2014
     $realEntries = @($Entries | Where-Object { $_ -and $_.Trim() })

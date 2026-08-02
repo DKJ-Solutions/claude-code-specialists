@@ -373,8 +373,10 @@ Assert-Match $card '^# Release v1\.5\.0' 'heading with version'
 Assert-Match $card '\*\*Date:\*\* 2026-07-19' 'date line'
 Assert-Match $card '\*\*Type:\*\* Minor' 'type line'
 Assert-Match $card 'Test-title' 'title included'
-Assert-Match $card 'You are on this release\.' 'you-are-on-this-release line'
-Assert-Match $card '(?s)Test-title.*You are on this release\.' 'title comes before the you-are-on-this-release line'
+Assert-Match $card 'This card describes v1\.5\.0, the version your plugin manifest carries\.' 'the card states what it describes rather than where the reader is (#384)'
+Assert-Equal $false ([bool]($card -match 'You are on this release')) 'and does not claim the reader is on it -- v13 measured that false in the ordinary case'
+Assert-Match $card '\[The version is not the code\]\(https://gh\.test/blob/main/claude-code-plugins/claude-specialists/QUICKSTART\.md\#staying-up-to-date\)' 'the "where am I" question is handed to the check that can answer it, as an absolute URL (the card is read from a plugin cache)'
+Assert-Match $card '(?s)Test-title.*This card describes v1\.5\.0' 'title comes before the describes-line'
 Assert-Match $card '(?m)^## Fixes' 'card groups entries under a category heading (## Fixes), single-release view'
 Assert-Equal $false ([bool]($card -match '(?m)^## v1\.5\.0 ')) 'card carries no redundant inner ## vX.Y.Z heading (the # Release header already states the version)'
 Assert-Match $card '(?m)^### #3 .* Something' 'entry fragment included in the body, at ### under the ## category'
@@ -389,7 +391,7 @@ Assert-Match $card '\[CHANGELOG\.md\]\(CHANGELOG\.md\)' 'footer: folder-relative
 Assert-Match $card2 '\[releases/development/1\.x/1\.5\.0\.md\]\(https://gh\.test/blob/main/releases/development/1\.x/1\.5\.0\.md\)' 'empty-entries branch: footer links stay correct'
 
 $cardNoTitle = Build-PluginReleaseCard -PluginName 'specialists' -Version '2.0.0' -Date '2026-07-19' -Type 'Major' -Entries @()
-Assert-Match $cardNoTitle '(?s)\*\*Type:\*\* Major\n\nYou are on this release\.' 'without -Title exactly one blank line (no extra) before you-are-on-this-release'
+Assert-Match $cardNoTitle '(?s)\*\*Type:\*\* Major\n\nThis card describes v2\.0\.0' 'without -Title exactly one blank line (no extra) before the describes-line'
 
 Write-Host ""
 if ($script:fail -gt 0) {
