@@ -88,9 +88,14 @@ description while building; ownership of the entry mechanism stays Rendall's.
 1. **Branch** → the entry file is created *at branch creation* (Derek's `new-branch.ps1`); you fill
    in the description while building. Never touch `CHANGELOG.md`.
 2. **Merge to `main`** ([Derek #05](05-05-extension.md#merging-to-main)) → the entry file travels
-   along. Rendall runs `fold-changelog-entry.ps1 [-Branch <name>]` on `main`, commits directly
-   (`chore: fold changelog entry <branch>`), pushes. If you omit `-Branch`, all entry files present
-   are folded in one go. **Before the fold, check that you are really on `main`**
+   along. Rendall runs `fold-changelog-entry.ps1 [-Branch <name>] -Push` on `main`: that folds,
+   commits directly (`chore: fold changelog entry <branch> (#NN)`) and pushes, in one step. If you
+   omit `-Branch`, all entry files present are folded in one go. **`-Push` is opt-in and so is its
+   weaker sibling `-Commit`** — without either, the fold is left in the working tree for you to
+   commit by hand, which is how this ran until August 2, 2026 (four hand-typed fold commits in one
+   session is what earned it a flag). The commit names its paths, so `CHANGELOG.md` and the entry
+   files are the only things that can land in it however messy the tree is; that scope limit is what
+   the direct-on-`main` exception was granted for, and it is now enforced by git rather than by care. **Before the fold, check that you are really on `main`**
    (`git branch --show-current`): `gh pr merge --delete-branch` promises in its help to clean up
    the local branch too, but in practice turned out to be able to simply leave the local checkout
    on the merged branch — lesson of July 16, 2026, when the fold consequently ran on that
@@ -228,7 +233,7 @@ does not exist.
   indirectly, at branch creation, via
   [Derek #05](05-05-extension.md#classifying-naming-and-creating-a-branch)'s `new-branch.ps1` — you
   rarely call it standalone anymore.
-- `scripts/release/fold-changelog-entry.ps1 [-Branch <name>] [-RepoRoot <path>]` — fold entry(ies) into
+- `scripts/release/fold-changelog-entry.ps1 [-Branch <name>] [-RepoRoot <path>] [-Commit] [-Push]` — fold entry(ies) into
   `## Pull Requests` on `main` after a merge. `-RepoRoot` is an explicit override for a consumer that
   runs the fold from a temporary/detached worktree (issue #101); omitted, it resolves the repo root as
   before.
