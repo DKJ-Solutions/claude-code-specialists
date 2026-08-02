@@ -27,7 +27,9 @@ else in this procedure can be redone in any order; this one cannot.
 
 **The same trap applies to this page itself, so keep a copy before you begin.** `UNINSTALL.md` is not
 part of the plugin payload — it ships only in the cached marketplace clone, and
-[Step 5](#step-5--drop-the-marketplace-registration-last) deletes that clone (measured: 2.9 MB, gone).
+[Step 5](#step-5--drop-the-marketplace-registration-last) deletes that clone in its entirety — the measured
+before/after sizes are in the [#339 table](#step-5--drop-the-marketplace-registration-last), with the
+profile they were taken on.
 After that the document exists **nowhere on this machine**, so a reader who is interrupted, stops for the
 day, or just wants to re-read a step has nothing left to read (inbound
 [#328](https://github.com/DaveKJohn/davekjohns-workshop/issues/328)). Keep this page open or save it to
@@ -348,8 +350,9 @@ profile — the one environment where the answer was not obscured by an earlier 
 | `~/.claude/plugins/cache/davekjohns-workshop/` — the unpacked payload | 939,860 bytes | **still there** |
 
 **So the unpacked cache belongs to the marketplace, not to the install**, and that rule is worth carrying
-rather than the two numbers. `claude plugin marketplace add` *creates* it — measured on the same profile,
-absent → 939,768 bytes, while the install record stayed at `{}` — `marketplace remove` does not take it
+rather than the two numbers. `claude plugin marketplace add` *creates* it — measured on that same virgin
+Windows profile on August 1, 2026: absent → 939,768 bytes, while the install record stayed at `{}` —
+`marketplace remove` does not take it
 away, and no `plugin install` or `plugin uninstall` is involved in either direction. This page used to say
 the question was unestablished and told you to go look; the looking has been done. Delete the leftover by
 hand if you want the machine genuinely untouched:

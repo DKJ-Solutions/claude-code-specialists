@@ -1146,7 +1146,11 @@ Write-Coverage -Category 'mojibake' -Checked $mjFiles `
 # table one check up. So the escape hatch is a visible marker that has to name a reason, and the coverage
 # line below reports how many samples were examined rather than how many times the check ran.
 $sampleChecked = 0
-$sampleDocs = @(
+# THE CONSUMER-FACING SET, DECLARED ONCE. Checks 15 and 16 hold the same class of defect on the same three
+# documents and differ only in where they look (inside a fence, or in the prose around it). Two copies of
+# this list would drift the moment a fourth document joins -- which is check 16's own subject arriving in
+# its source, so it is one variable shared by both.
+$consumerDocs = @(
     'claude-code-plugins\claude-specialists\QUICKSTART.md',
     'claude-code-plugins\claude-specialists\UNINSTALL.md',
     'claude-code-plugins\claude-specialists\README.md'
@@ -1159,7 +1163,7 @@ $bindingMarker = '(\d+\.\d+\.\d+)|(\b(19|20)\d{2}\b)|version-bound|varies|may di
 # '<!-- unbound-sample: -->' satisfies '\S' on the comment terminator itself, and the escape hatch
 # becomes a way to switch the check off rather than a way to record an exception.
 $sampleOptOut  = '<!--\s*unbound-sample:\s*(?!-->)\S'
-foreach ($rel in $sampleDocs) {
+foreach ($rel in $consumerDocs) {
     $full = Join-Path $RepoRoot $rel
     if (-not (Test-Path -LiteralPath $full)) { continue }
     $lines = [System.IO.File]::ReadAllLines($full, [System.Text.Encoding]::UTF8)
@@ -1206,6 +1210,74 @@ foreach ($rel in $sampleDocs) {
 }
 Write-Coverage -Category 'expected-output' -Checked $sampleChecked `
     -Note 'captured output samples in the consumer-facing docs -- language-less or text-tagged fenced blocks, i.e. the ones a reader compares against rather than runs. Two kinds are deliberately not examined and both are stated rather than assumed: blocks tagged powershell/json/jsonc (commands to run) and blocks containing box drawing (diagrams, which are drawn rather than captured)'
+
+# --- 16. A measured figure in prose names what it was measured on -----------------------------------------
+# CHECK 15'S SUBJECT, ONE STEP OUTSIDE ITS REACH. Check 15 holds captured samples inside fenced blocks,
+# because a fence is a markup boundary a gate can see. Test round v12 found the same defect class in
+# running prose, where there is no fence:
+#   #374  "never literally clean" -- true of a user-scope declaration, written as true of every reader
+#   ---   the same over-generalisation one section down, carrying three byte figures from a single machine
+#         (~/.claude/settings.json at 22 bytes) on a profile where that file had never existed
+# The figures were accurate when captured. What was missing is the sentence saying whose machine they came
+# from, and without it a reader whose own numbers differ cannot tell whether they mis-installed or the page
+# is stale. Round v12's step-0 table came back fully clean against a page that said clean was impossible.
+#
+# WHY THIS ONE IS GATEABLE WHERE "IS THIS PROSE ACCURATE" IS NOT. It does not judge the claim; it judges
+# whether a binding is present near a figure whose SHAPE is unambiguous. A byte count or a file size is
+# always a measurement of something -- there is no authored, non-measured reason to write "939,860 bytes"
+# -- so the haystack needs no heuristic to identify. Measured before building, exactly as check 15 was:
+# 9 figures across 8 lines in the three consumer-facing documents. A haystack that small is enumerable, and
+# the check was run against it before the rule was written rather than after.
+#
+# THE WINDOW IS THE PARAGRAPH NEIGHBOURHOOD, NOT A LINE COUNT. A figure in a table row is bound by the
+# paragraph introducing the table, which sits an arbitrary number of rows above; a figure in prose is bound
+# by its own sentence. Both are "the block this line is in, plus the block either side", so that is the
+# window -- it adapts to a 3-row table and a 12-row one without a magic number, and it stops at a blank
+# line rather than wandering into an unrelated subsection.
+#
+# 'measured' IS DELIBERATELY NOT A BINDING, for the same reason check 15 rejects it: it says the author saw
+# the number, which was true of every finding this check exists for. The binding has to pin the figure to a
+# time, a version, a platform, or a stated condition.
+$figureChecked = 0
+# A digit immediately before the unit is what makes this a measurement rather than a word. 'byte-identical'
+# carries no leading number and is therefore not a figure, which is the distinction the leading \d makes.
+$figurePattern = '\d[\d,]*(\.\d+)?\s*(bytes?|KB|MB|GB)\b'
+# What counts as pinning a figure down: a year or a date, a test round, a semver, a named machine state, or
+# an explicit hedge. Kept close to check 15's list so the two gates teach the writer one habit, not two.
+$figureBinding = '(\b(19|20)\d{2}\b)|(round v\d+)|(\d+\.\d+\.\d+)|virgin|fresh profile|clean machine|before adoption|a profile that|varies|may differ|will differ|depends on|illustrative|approximately|roughly'
+$figureOptOut  = '<!--\s*unbound-figure:\s*(?!-->)\S'
+foreach ($rel in $consumerDocs) {
+    $full = Join-Path $RepoRoot $rel
+    if (-not (Test-Path -LiteralPath $full)) { continue }
+    $lines = [System.IO.File]::ReadAllLines($full, [System.Text.Encoding]::UTF8)
+    # Fenced blocks belong to check 15. Counting them here would double-report the same sample and would
+    # also flag command output that is deliberately verbatim.
+    $inFence = $false
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '^```') { $inFence = -not $inFence; continue }
+        if ($inFence) { continue }
+        if ($lines[$i] -notmatch $figurePattern) { continue }
+        $figureChecked++
+        # The block this line sits in ...
+        $bStart = $i; while ($bStart -gt 0 -and $lines[$bStart - 1].Trim() -ne '') { $bStart-- }
+        $bEnd = $i; while ($bEnd -lt $lines.Count - 1 -and $lines[$bEnd + 1].Trim() -ne '') { $bEnd++ }
+        # ... plus the block before it (an intro paragraph above a table) ...
+        $pEnd = $bStart - 1; while ($pEnd -gt 0 -and $lines[$pEnd].Trim() -eq '') { $pEnd-- }
+        $pStart = $pEnd; while ($pStart -gt 0 -and $lines[$pStart - 1].Trim() -ne '') { $pStart-- }
+        # ... and the block after it (a note below a table saying which column came from where).
+        $nStart = $bEnd + 1; while ($nStart -lt $lines.Count -and $lines[$nStart].Trim() -eq '') { $nStart++ }
+        $nEnd = $nStart; while ($nEnd -lt $lines.Count - 1 -and $lines[$nEnd + 1].Trim() -ne '') { $nEnd++ }
+        $from = [Math]::Max(0, $pStart)
+        $to   = [Math]::Min($lines.Count - 1, $nEnd)
+        $context = ($lines[$from..$to] -join "`n")
+        if ($context -match $figureOptOut) { continue }
+        if ($context -notmatch $figureBinding) {
+            $errors += "[measured-figure] ${rel}:$($i + 1) -- a byte count or file size in prose is a measurement of somebody's machine, and nothing in the surrounding paragraphs says whose (a date, a test round, a CLI version, a named profile state, or a hedge such as 'varies' / 'approximately'). Round v12 filed exactly this as #374: a reader whose own number differs cannot tell whether they mis-installed or the page went stale. Name the binding, or mark it deliberate with '<!-- unbound-figure: <reason> -->'."
+        }
+    }
+}
+Write-Coverage -Category 'measured-figure' -Checked $figureChecked `
+    -Note 'byte counts and file sizes in the PROSE of the consumer-facing docs -- the same staleness class as check 15, outside a fence where no markup marks it. Figures inside fenced blocks are deliberately not counted here: those are check 15''s, and counting them twice would report one sample as two'
 
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {

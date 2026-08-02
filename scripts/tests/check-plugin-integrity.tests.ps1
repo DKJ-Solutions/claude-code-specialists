@@ -1152,6 +1152,110 @@ try {
     $s6 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($s6.Out -match '\[expected-output\].*QUICKSTART\.md')) `
         'expected-output: an opt-out that names a reason does silence it'
+
+    # --- check 16: a measured figure in prose names what it was measured on -------------------------
+    # Check 15's class, one step outside its reach: the same staleness, in running prose where there is
+    # no fence to mark it. Test round v12's #374 and its unfiled twin one section down. The cases below
+    # are again the two ways this fails badly -- missing a real unbound figure, and firing on something
+    # that is not one -- plus the three design decisions that could otherwise erode silently: the window
+    # is bounded, a fence belongs to check 15, and 'measured' is not a binding.
+
+    # 1. THE FINDING: a byte count with nothing saying whose machine it came from.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'After the teardown the file is 288 bytes and holds nothing of ours.'
+    ) -join "`n", $Utf8NoBom)
+    $f1 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($f1.Out -match '\[measured-figure\].*QUICKSTART\.md') `
+        'measured-figure: a byte count in prose with no stated binding is reported'
+    Assert-True ($f1.Out -match 'measured-figure. checked [1-9]') `
+        'measured-figure: and the coverage line counts figures examined, not check runs'
+
+    # 2. BOUND, five ways -- a date, a test round, a version, a named profile state, and a hedge. Each
+    #    must clear it on its own, because a writer will reach for whichever one fits the sentence.
+    foreach ($binding in @(
+        'Measured on 1 August 2026.', 'Measured in round v12.', 'Measured on CLI 2.1.220.',
+        'Measured on a virgin profile.', 'The figure varies by platform.'
+    )) {
+        [System.IO.File]::WriteAllText($qs, @(
+            '# Quickstart', '', "After the teardown the file is 288 bytes. $binding"
+        ) -join "`n", $Utf8NoBom)
+        $f2 = Invoke-Integrity -FixtureRoot $Fixture
+        Assert-True (-not ($f2.Out -match '\[measured-figure\].*QUICKSTART\.md')) `
+            "measured-figure: a figure bound by '$binding' passes"
+    }
+
+    # 3. THE WINDOW REACHES THE NEIGHBOURING BLOCKS, IN BOTH DIRECTIONS. A table row is bound by the
+    #    paragraph introducing the table (the #339 table) or by the note underneath it saying which
+    #    column came from where (the bracket table). Neither binding sits on the row itself, and a
+    #    line-count window would have to guess how many rows the table has.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'Measured on a virgin profile, 1 August 2026:', '',
+        '| file | size |', '|---|---|', '| settings.json | 288 bytes |'
+    ) -join "`n", $Utf8NoBom)
+    $f3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($f3.Out -match '\[measured-figure\].*QUICKSTART\.md')) `
+        'measured-figure: a binding in the paragraph ABOVE a table binds its rows'
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'The sizes:', '',
+        '| file | size |', '|---|---|', '| settings.json | 288 bytes |', '',
+        'The right-hand column is round v12.'
+    ) -join "`n", $Utf8NoBom)
+    $f4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($f4.Out -match '\[measured-figure\].*QUICKSTART\.md')) `
+        'measured-figure: a binding in the paragraph BELOW a table binds its rows too'
+
+    # 4. AND IT STOPS THERE. A binding two blocks away does NOT count -- otherwise the gate is satisfied
+    #    by a date in an unrelated subsection, which is how a window quietly becomes section-wide.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'Measured on a virgin profile, 1 August 2026.', '',
+        'An unrelated paragraph sits in between.', '', 'The file is 288 bytes.'
+    ) -join "`n", $Utf8NoBom)
+    $f5 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($f5.Out -match '\[measured-figure\].*QUICKSTART\.md') `
+        'measured-figure: a binding two blocks away is out of reach -- the window is bounded'
+
+    # 5. A FENCED FIGURE BELONGS TO CHECK 15. Counting it here would report one sample as two findings,
+    #    and would flag verbatim command output that is deliberately reproduced.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'Measured in round v12, the output reads:', '', ($fence + 'text'),
+        'known_marketplaces.json  288 bytes', $fence
+    ) -join "`n", $Utf8NoBom)
+    $f6 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($f6.Out -match '\[measured-figure\] checked 0') `
+        'measured-figure: a figure inside a fence is check 15''s, and is not counted twice'
+
+    # 6. 'measured' ON ITS OWN IS NOT A BINDING. It says the author saw the number, which was true of
+    #    every finding this check exists for. Same rejection as check 15 makes, and for the same reason.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'The clone is deleted (measured: 288 bytes, gone).'
+    ) -join "`n", $Utf8NoBom)
+    $f7 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($f7.Out -match '\[measured-figure\].*QUICKSTART\.md') `
+        'measured-figure: the word ''measured'' alone does not bind a figure'
+
+    # 7. NOT EVERY 'byte' IS A FIGURE. 'byte-identical' is a word, and a check that flagged it would be
+    #    training writers to paste opt-outs over prose. The leading digit is what makes it a measurement.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'The install leaves the file byte-identical, so the diff is empty.'
+    ) -join "`n", $Utf8NoBom)
+    $f8 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($f8.Out -match '\[measured-figure\] checked 0') `
+        'measured-figure: ''byte-identical'' carries no number and is not a figure'
+
+    # 8. THE OPT-OUT HAS TO NAME A REASON, exactly as check 15's does.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'The file is 288 bytes.', '', '<!-- unbound-figure: -->'
+    ) -join "`n", $Utf8NoBom)
+    $f9 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($f9.Out -match '\[measured-figure\].*QUICKSTART\.md') `
+        'measured-figure: an opt-out marker with no reason does not silence the check'
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'The file is 288 bytes.', '',
+        '<!-- unbound-figure: invented for the test fixture, bound to nothing real -->'
+    ) -join "`n", $Utf8NoBom)
+    $f10 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($f10.Out -match '\[measured-figure\].*QUICKSTART\.md')) `
+        'measured-figure: an opt-out that names a reason does silence it'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }
