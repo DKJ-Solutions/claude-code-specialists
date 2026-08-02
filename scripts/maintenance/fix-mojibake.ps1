@@ -3,9 +3,17 @@
     Repairs double-encoded characters (mojibake) in text files.
 
 .DESCRIPTION
-    Replaces known mojibake sequences -- UTF-8 that was once read as Windows-1252 and then saved as
-    UTF-8 again -- with the correct character. Targeted replacements only: correctly encoded characters
-    (em dash, arrow, accents) are left alone. Idempotent.
+    Repairs mojibake -- UTF-8 that was once read as Windows-1252 and then saved as UTF-8 again -- by
+    running that operation backwards: each run of non-ASCII text is re-encoded to Windows-1252 and
+    decoded as UTF-8, repeatedly, for as long as the result gets shorter. Correctly encoded characters
+    (em dash, arrow, accents) fail that round trip and are left alone, which is what makes it safe.
+    Idempotent.
+
+    IT USED TO WORK OFF A TABLE OF KNOWN SEQUENCES, and that is why this section leads with the method.
+    A table repairs the characters somebody thought to write down; on August 2, 2026 this repo held 517
+    doubly-encoded runs -- em dashes, arrows, ellipses, en dashes -- that matched no rule in it, in files
+    the gate beside this tool reported as clean. The table survives below as a net for the cases the
+    round trip cannot reach, but it is no longer the method.
 
     HOW THE DAMAGE HAPPENS, because knowing this is what prevents it. Windows PowerShell 5.1's
     Get-Content reads a BOM-less UTF-8 file as ANSI unless told otherwise, so a middot (U+00B7, bytes
@@ -28,12 +36,12 @@
     by the very round trip it repairs. That is not decoration -- a mojibake table written as literal
     characters corrupts on the first careless edit and then silently repairs nothing.
 
-    WHY THE TABLE REPEATS TO A FIXPOINT. Text can have been through the mangle twice; the middot from a
-    changelog heading then comes out as four characters rather than two. A single pass peels one layer
-    and leaves a remainder that matches no rule -- which is what cost life-hub a manual fix in PR #106
-    at its v2.1.0. Two things solve it: the peel rule for the outer layer (0xC3,0x201A -> 0xC2) and
-    repeating the whole table until nothing changes. Termination is guaranteed: every replacement makes
-    the text strictly shorter.
+    WHY BOTH THE ROUND TRIP AND THE TABLE REPEAT TO A FIXPOINT. Text can have been through the mangle
+    twice; the middot from a changelog heading then comes out as four characters rather than two. A
+    single pass peels one layer and leaves a remainder -- which is what cost life-hub a manual fix in
+    PR #106 at its v2.1.0, and what hid the 517 sequences here. Both loops repeat until nothing changes,
+    and termination is guaranteed the same way in both: every accepted step makes the text strictly
+    shorter.
 
     A UTF-8 BOM on the file is preserved; a file without one does not gain one.
 
@@ -78,7 +86,18 @@ if (-not $Path -or @($Path).Count -eq 0) {
         $Path += @(Get-ChildItem -LiteralPath $pluginRoot -Recurse -File -Include 'CHANGELOG.md', 'RELEASE.md' |
             Select-Object -ExpandProperty FullName)
     }
-    $Path = @($Path | Where-Object { Test-Path -LiteralPath $_ })
+    # THE ARCHIVED RELEASE NOTES, added August 2, 2026 after they turned out to hold the largest single
+    # concentration of damage in the repo (474 sequences in 3.1.0.md alone, more than the root changelog).
+    # They were outside this list for the same reason they are outside the language rule -- they are
+    # history -- but the two are not the same question: not translating an old note preserves what it
+    # said, while leaving mojibake in it preserves a mis-decode nobody wrote. cut-release.ps1 generates
+    # these from the entry text, so they are downstream of exactly the file this tool already guards.
+    $releasesRoot = Join-Path $repoRoot 'releases'
+    if (Test-Path -LiteralPath $releasesRoot) {
+        $Path += @(Get-ChildItem -LiteralPath $releasesRoot -Recurse -File -Filter '*.md' |
+            Select-Object -ExpandProperty FullName)
+    }
+    $Path = @($Path | Where-Object { Test-Path -LiteralPath $_ } | Sort-Object -Unique)
 }
 
 # Build a string from codepoints, so this source stays ASCII-only.
@@ -105,9 +124,82 @@ $map = [ordered]@{
     (C 0xC3, 0x201A)              = (C 0xC2)    # outer layer of a doubly-encoded 0xC2 sequence
 }
 
+# THE GENERAL METHOD, and why the table above is no longer the primary one.
+#
+# Mojibake is one specific operation: UTF-8 bytes decoded as Windows-1252. So its inverse is equally
+# specific -- encode the text back to Windows-1252 bytes and decode those as UTF-8 -- and running that
+# inverse repairs ANY character, not the seventeen somebody happened to write down.
+#
+# The table was the whole method until August 2, 2026, and it was measurably not enough. It carries the
+# single-layer form of the em dash, en dash, ellipsis and arrow, and one lone outer-layer peel rule
+# (0xC3,0x201A -> 0xC2) added when double encoding first bit. Damage that is double-encoded in any OTHER
+# character matches nothing: the fixpoint loop has no first rule to apply, so it exits on the first pass
+# and the file is declared clean. Measured on this repo at v3.1.0: 1551 double-encoded sequences across
+# CHANGELOG.md, the specialists CHANGELOG.md, its consumer-facing RELEASE.md and the 3.1.0 release notes
+# -- 315 em dashes, 43 arrows, 10 ellipses, 4 en dashes -- while the gate that reads this tool reported
+# "No findings" over three of those four files. A gate that cannot see the damage it exists to catch is
+# worse than no gate, because it is also a claim.
+#
+# BOTH ENCODERS THROW ON ANYTHING UNEXPECTED, and that is the safety property the whole approach rests
+# on. With the default fallbacks, a character Windows-1252 cannot represent becomes '?' and a byte
+# sequence that is not valid UTF-8 becomes U+FFFD -- silently, which would turn a repair tool into a
+# corruption tool on exactly the files it is pointed at. Strict, the round trip simply FAILS on text that
+# was never mojibake, and failure means "leave this alone".
+#
+# Verified before adoption, because "it should be safe" is not a measurement: a correct em dash, arrow,
+# middot, e-acute and a two-character run of u-diaeresis all fail the round trip and are left untouched,
+# while the eight-character double-encoded em dash peels to three characters and then to U+2014. The
+# undefined Windows-1252 positions (0x81, 0x8D, 0x8F, 0x90, 0x9D) round-trip byte-for-byte in .NET, which
+# matters because 0x9D is the last byte of the double-encoded em dash -- the single most common sequence
+# in the measured damage.
+$cp1252 = [System.Text.Encoding]::GetEncoding(1252,
+    [System.Text.EncoderExceptionFallback]::new(),
+    [System.Text.DecoderExceptionFallback]::new())
+$utf8Strict = [System.Text.UTF8Encoding]::new($false, $true)
+
+# Maximal runs of non-ASCII characters. ASCII is a fixpoint of the round trip in both directions, so
+# including it would only fuse every run in the file into one and make a single un-peelable character
+# block the repair of everything else on that line.
+$nonAsciiRun = [regex]'[^\x00-\x7F]+'
+
+function Repair-Run([string]$Run) {
+    <# One run, peeled to a fixpoint. Returns the text and how many layers came off (0 = not mojibake).
+
+       STRICTLY SHORTER OR STOP. Every real peel collapses n UTF-8 bytes into one character, so a result
+       that is not shorter is not a peel -- and the guard doubles as the termination proof, the same
+       argument the table's loop uses. #>
+    $cur = $Run
+    $layers = 0
+    while ($true) {
+        try { $peeled = $utf8Strict.GetString($cp1252.GetBytes($cur)) } catch { break }
+        if ($peeled.Length -ge $cur.Length) { break }
+        $cur = $peeled
+        $layers++
+    }
+    return [pscustomobject]@{ Text = $cur; Layers = $layers }
+}
+
 function Repair-Text([string]$Text) {
-    <# The table to a fixpoint. Returns the repaired text and the replacement count. #>
+    <# The general inverse first, then the table as a net under it. Returns the repaired text and the
+       number of damaged runs found. #>
     $n = 0
+    $sb = [System.Text.StringBuilder]::new()
+    $pos = 0
+    foreach ($m in $nonAsciiRun.Matches($Text)) {
+        [void]$sb.Append($Text, $pos, $m.Index - $pos)
+        $r = Repair-Run -Run $m.Value
+        if ($r.Layers -gt 0) { $n++ }
+        [void]$sb.Append($r.Text)
+        $pos = $m.Index + $m.Length
+    }
+    [void]$sb.Append($Text.Substring($pos))
+    $Text = $sb.ToString()
+
+    # THE TABLE, KEPT AS A NET rather than deleted. The general method needs every intermediate layer to
+    # be valid UTF-8; a run where that chain breaks -- or where damaged text sits directly against a
+    # legitimate non-ASCII character, so the run as a whole will not round-trip -- still matches a literal
+    # rule here. It costs one pass over text that is almost always already clean, and the alternative is
+    # discovering the gap the way this one was discovered.
     $changed = $true
     while ($changed) {
         $changed = $false
