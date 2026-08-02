@@ -166,9 +166,26 @@ claude plugin uninstall specialists@davekjohns-workshop --scope project
 # and once more for each domain group you enabled
 ```
 
-**Keep the scope flag.** `uninstall` defaults to `--scope user` like its siblings, and without the flag it
-will not find a project-scoped install — it reports the plugin as not installed at that scope, which is
-literally true and easy to misread as *not installed at all* on a machine where it is.
+**Keep the scope flag.** `uninstall` defaults to `--scope user` like its siblings, so without it the
+command does not act on a project-scoped install. What it says instead depends on your CLI version — on
+`2.1.220` (measured, round v11) it is:
+
+```text
+✘ Failed to uninstall plugin "specialists@davekjohns-workshop": Plugin "specialists@davekjohns-workshop"
+  is enabled at project scope (.claude/settings.json, shared with your team). To disable just for you:
+  claude plugin disable specialists@davekjohns-workshop --scope local
+```
+
+**Do not follow the remedy the CLI suggests there.** `plugin disable --scope local` is a different
+operation: it writes a local *disable* key on top of your project setting and leaves the install in
+place, so Step 4's verification will not come back empty and you will have added a key instead of
+removed one. The command you want is the one above, with `--scope project`.
+
+> **The exact wording is version-bound; the flag is not.** Earlier releases phrased this as *"Plugin
+> `specialists` is not installed at scope user"* — literally true and easy to misread as *not installed
+> at all*. If your CLI says something different again, the sentence to trust is this one: the scope flag
+> is required, and the failure means the command looked in the wrong scope, never that the plugin is
+> absent.
 
 **If that refuses with *"installed in local scope, not project"*, you are in the third scope and it is not
 your doing.** A session start can write a record by itself and flip an existing `project` record to
@@ -260,6 +277,23 @@ It takes an optional `--scope <user|project|local>`; omit it and the declaration
 scope. Then the last verification: **`claude plugin marketplace list` no longer names
 `davekjohns-workshop`.**
 
+**Expect it to edit `~/.claude/settings.json`, and to leave an empty key behind** (inbound
+[#357](https://github.com/DaveKJohn/davekjohns-workshop/issues/357)). The `davekjohns-workshop` block goes,
+`"extraKnownMarketplaces": {}` stays, and the file is re-serialised so the key order may shift:
+
+```jsonc
+// before
+{ "extraKnownMarketplaces": { "davekjohns-workshop": { … } }, "theme": "dark" }
+// after
+{ "extraKnownMarketplaces": {}, "theme": "dark" }
+```
+
+Exactly the mirror image of what Step 2 says about `"enabledPlugins": {}`, and the same reading applies:
+a diff there is the command working, not a fault. It does mean the "no `enabledPlugins`, no
+`extraKnownMarketplaces`" row of a clean-machine check is **never** literally clean after a by-the-book
+teardown — the keys are empty, not absent. Remove the empty keys by hand if you want the file back to
+where it started.
+
 **What that command does and does not delete, measured rather than assumed** (inbound
 [#339](https://github.com/DaveKJohn/davekjohns-workshop/issues/339), August 1, 2026, on a virgin Windows
 profile — the one environment where the answer was not obscured by an earlier install):
@@ -282,8 +316,9 @@ Remove-Item "$env:USERPROFILE\.claude\plugins\cache\davekjohns-workshop" -Recurs
 
 ## What is left behind, honestly
 
-A repo that adopted this family and then tore down is **not** blank, and four of these are correct rather
-than debt:
+A repo that adopted this family and then tore down is **not** blank. Three of the five below are correct
+rather than debt — they stay, and that is the right outcome. The last two are things to act on, and they
+are marked as such:
 
 - **Your history stays.** `CHANGELOG.md` and release notes that mention specialists are an accurate record
   of something that happened. History is finished business and is never rewritten.
@@ -293,14 +328,29 @@ than debt:
   where a roster row ends and your prose begins. The audit lists them by line so you can reword the ones
   that were rules phrased through a character (*"Derek opens the PR"* → *"changes go in via a branch and a
   PR"*) and delete the ones that only ever existed for the plugin.
-- **The scaffold prose stays in a `CLAUDE.md` the bootstrap created** — the one entry in this list the
-  plugin itself wrote. If you had no `CLAUDE.md` before adoption, two of its lines are `specialists-init`'s
-  (*"This repo is governed by **Claude Specialists** …"*), and the teardown reports them as `[KEEP]` instead
-  of deleting them. The line it keeps is deliberate: an `@`-import *loads* something, so removing it is
-  safe and necessary; prose loads nothing, and cutting sentences out of somebody's governance file to
-  satisfy a counter is the wrong side of that boundary. On such a repo those two lines plus the
-  `# CLAUDE.md` heading are all that is left in the file, so deleting it outright is a reasonable call —
-  and yours. Until August 1, 2026 they were reported as **neither** `[remove]` nor `[KEEP]` while the audit
+- **The scaffold prose stays in a `CLAUDE.md` the bootstrap created — and unlike everything else in this
+  list, it keeps talking.** The one entry here the plugin itself wrote. If you had no `CLAUDE.md` before
+  adoption, two of its lines are `specialists-init`'s (*"This repo is governed by **Claude Specialists**
+  …"*), and the teardown reports them as `[KEEP]` instead of deleting them. The line it keeps is
+  deliberate: an `@`-import *loads* something, so removing it is safe and necessary; cutting sentences out
+  of somebody's governance file to satisfy a counter is the wrong side of that boundary.
+
+  **But `CLAUDE.md` is itself loaded into every session as project instructions**, so this is the one
+  leftover that is not merely inert — it tells every future session, in the channel that outranks its
+  defaults, that the repo is governed by a system that is no longer installed. Measured in round v11: two
+  separate fresh sessions flagged the contradiction unprompted, one noting that the named
+  `specialists-init` skill *"is not present in my available-skills list"* (inbound
+  [#362](https://github.com/DaveKJohn/davekjohns-workshop/issues/362)). So this row is a **to-do**, not a
+  note. Two ways to close it, both one edit:
+
+  ```powershell
+  # If the bootstrap created the file, it now holds nothing else -- delete it.
+  Remove-Item CLAUDE.md
+  # If you have since written your own governance text, replace just those two lines with what is true,
+  # e.g. "Conventions for this repo" -- and drop the sentence naming Claude Specialists.
+  ```
+
+  Until August 1, 2026 those lines were reported as **neither** `[remove]` nor `[KEEP]` while the audit
   printed `[FREE]`, which is what got this row written (inbound
   [#331](https://github.com/DaveKJohn/davekjohns-workshop/issues/331)).
 - **A gate of your own that lints lens files may go quiet rather than red.** Once the directory is gone
