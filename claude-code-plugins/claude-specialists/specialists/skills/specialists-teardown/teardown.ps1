@@ -438,6 +438,58 @@ if (Test-Path -LiteralPath $suggested -PathType Leaf) {
     Remove-IfApplying -Path $suggested -Label '.claude\settings.suggested.jsonc'
 }
 
+function Get-InstallRecordState {
+    <# Does the CLI still hold an install record pointing at THIS repo?
+
+       The same question UNINSTALL.md asks twice (Step 2 to find the record, Step 4 to prove it is
+       gone), asked here so a note can be gated on the answer instead of asserting one (inbound #381).
+
+       Three outcomes, and the caller has to distinguish all three, because "no record" and "could not
+       look" are not the same claim:
+         Readable = $false          -> no file, or unparseable. Say so; do not report it as clean.
+         Readable, 0 records        -> nothing points here. That IS the post-uninstall reading.
+         Readable, >= 1 record      -> name them, with the scope each one is actually in.
+
+       The scope comes off the record rather than being assumed to be 'project': a session start can
+       write a record in 'local' scope by itself, and an uninstall aimed at the wrong scope is exactly
+       the failure UNINSTALL.md spends a paragraph on.
+
+       Path comparison is trailing-separator and case insensitive: $root is a resolved path and
+       projectPath is whatever the CLI wrote, and on Windows those differ in ways that mean nothing. #>
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $claudeHome = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $env:USERPROFILE '.claude' }
+    $path       = Join-Path $claudeHome 'plugins\installed_plugins.json'
+    $state      = [pscustomobject]@{ Path = $path; Readable = $false; Records = @() }
+
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $state }
+
+    # A teardown must not die on its bookkeeping. An unreadable or reshaped file is reported as
+    # "could not look", never as "nothing there" -- the whole point of this gate is to stop the
+    # script claiming things about a state it did not measure.
+    try {
+        $data = [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
+    } catch { return $state }
+    $state.Readable = $true
+    if (-not $data -or -not $data.plugins) { return $state }
+
+    $want = $RepoRoot.TrimEnd('\', '/')
+    $hits = @()
+    foreach ($entry in @($data.plugins.PSObject.Properties)) {
+        foreach ($record in @($entry.Value)) {
+            if (-not $record.projectPath) { continue }
+            if ("$($record.projectPath)".TrimEnd('\', '/') -ieq $want) {
+                $hits += [pscustomobject]@{
+                    Name  = $entry.Name
+                    Scope = if ($record.scope) { $record.scope } else { 'project' }
+                }
+            }
+        }
+    }
+    $state.Records = $hits
+    return $state
+}
+
 # --- 5. What only the owner can do ---------------------------------------------------------------
 # Reported, never done. Disabling the plugin is the actual uninstall, and the bootstrap never wrote
 # settings.json either -- the symmetry that keeps this script safe to run cuts both ways.
@@ -460,7 +512,24 @@ if (Test-Path -LiteralPath $settings -PathType Leaf) {
 # its own --help, July 30, 2026), so on a project-scoped install -- which is the model this family
 # documents -- the bare command targets a record that is not there. Same default, and same failure,
 # as 'plugin install' and 'plugin update' (inbound #279).
-$notes += "The plugin install itself is untouched: run 'claude plugin uninstall <plugin>@<marketplace> --scope project' from this repo's root if you want it gone here as well. The scope flag matters -- the command defaults to user scope and will not find a project-scoped install without it. Expect it to edit .claude/settings.json: it removes the 'enabledPlugins' entry and leaves 'enabledPlugins': {}, so a diff there is the command working, not a fault (inbound #295)."
+#
+# GATED, like the settings note above it, and for the same reason (inbound #381). This note used to
+# print unconditionally, which the Step 4 re-run in UNINSTALL.md turned into a falsehood: that re-run
+# happens AFTER the uninstall, so a reader who had just seen 'Successfully uninstalled' was told one
+# step later that the install was untouched, with the advice to go and do it again. The settings note
+# had already gone quiet by then, which made the contradiction louder rather than softer -- the script
+# visibly knew things about the state, just not this one. The condition was lying around: it is the
+# same projectPath query UNINSTALL.md prints twice, in Step 2 and again in Step 4.
+$install = Get-InstallRecordState -RepoRoot $root
+if ($install.Records.Count -gt 0) {
+    $which = @($install.Records | ForEach-Object { "$($_.Name) (scope $($_.Scope))" } | Sort-Object -Unique) -join ', '
+    $cmds  = @($install.Records | ForEach-Object { "claude plugin uninstall $($_.Name) --scope $($_.Scope)" } | Sort-Object -Unique) -join ' ; '
+    $notes += "The plugin install itself is untouched, and this repo still has a record: $which. Run '$cmds' from this repo's root if you want it gone here as well. The scope flag matters -- the command defaults to user scope and will not find a project-scoped install without it. Expect it to edit .claude/settings.json: it removes the 'enabledPlugins' entry and leaves 'enabledPlugins': {}, so a diff there is the command working, not a fault (inbound #295)."
+} elseif ($install.Readable) {
+    $notes += "No install record points at this repo any more, so there is nothing left to uninstall here. Checked on projectPath against $($install.Path) -- the same query UNINSTALL.md runs in Step 2 and again in Step 4. If you are re-running this audit after the uninstall, this line IS the expected reading, not a step you skipped."
+} else {
+    $notes += "The plugin install itself is untouched -- though this run could not read $($install.Path) (missing or not parseable), so take that as the general case and not as a reading of your machine. Run 'claude plugin uninstall <plugin>@<marketplace> --scope project' from this repo's root if you want it gone here as well. The scope flag matters -- the command defaults to user scope and will not find a project-scoped install without it. Expect it to edit .claude/settings.json: it removes the 'enabledPlugins' entry and leaves 'enabledPlugins': {}, so a diff there is the command working, not a fault (inbound #295)."
+}
 
 # --- 6. Runtime dependencies on the plugin: reported loudly, never removed ------------------------
 # The finding that made this section necessary (measured by hand in davekokbwj/smartwatchbanden,

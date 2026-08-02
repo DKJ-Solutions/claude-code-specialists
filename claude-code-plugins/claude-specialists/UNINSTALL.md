@@ -322,7 +322,11 @@ confirmation and not as proof: this is CLI `2.1.220` behaviour and can shift wit
   [Step 1](#step-1--take-the-plugin-out-of-your-repo). **If you did not keep it, run it again from the
   cache**: `teardown.ps1` survives Step 2 and is still at the `<plugin>` path Step 1 resolved, right up
   until you delete the cache by hand in Step 5. It removes nothing and needs no `-Apply`, so a re-run here
-  is free. Only once Step 5 is done is re-installing the plugin the honest route — and by then the question
+  is free. Run at this point it also *confirms* Step 2 rather than contradicting it: its note reads
+  *"No install record points at this repo any more"*, because it asks the same `projectPath` question you
+  just did (inbound [#381](https://github.com/DaveKJohn/davekjohns-workshop/issues/381)). If it instead says
+  it could not read `installed_plugins.json`, that is a gap in the reading and not a verdict — check the
+  path it names. Only once Step 5 is done is re-installing the plugin the honest route — and by then the question
   has stopped mattering, because the marketplace is gone too.
 
 Everything above is verifiable with the marketplace still registered, which is why the registration comes
