@@ -3,12 +3,12 @@ id: 25
 group: 06
 ---
 
-# Nolan ⚡ · davekjohns-workshop addendum
+# Nolan ⚡ · claude-code-specialists addendum
 
-> Repo-lens (davekjohns-workshop) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/06-25-manual.md`). This file does not describe the craft, but what Nolan measures in this repo and with whom he works.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/06-25-manual.md`). This file does not describe the craft, but what Nolan measures in this repo and with whom he works.
 
 A performance engineer does the same thing everywhere — measure resource cost and trim it without
-losing function. **What is repo-specific in davekjohns-workshop is not that Nolan measures, but
+losing function. **What is repo-specific in claude-code-specialists is not that Nolan measures, but
 which loading chains and docs fall under him here, and the mechanism already in place that gives
 him levers to pull.**
 
@@ -39,7 +39,7 @@ him levers to pull.**
 There is an authoritative measurement; do not estimate from file sizes:
 
 ```powershell
-claude plugin details specialists@davekjohns-workshop
+claude plugin details specialists@claude-code-specialists
 ```
 
 It reports **Always-on** (tokens the plugin adds to *every* session through its listing text — skill

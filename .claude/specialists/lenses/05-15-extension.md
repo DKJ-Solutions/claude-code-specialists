@@ -3,12 +3,12 @@ id: 15
 group: 05
 ---
 
-# Sylvester ⚙️ · davekjohns-workshop addendum
+# Sylvester ⚙️ · claude-code-specialists addendum
 
-> Repo-lens (davekjohns-workshop) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/05-15-manual.md`). This file does not describe the craft, but what Sylvester does in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/05-15-manual.md`). This file does not describe the craft, but what Sylvester does in this repo.
 
 A system administrator does the same thing everywhere — manage the harness and the tooling the team
-works in: scripts, config, the safety guards. **What is repo-specific in davekjohns-workshop is not
+works in: scripts, config, the safety guards. **What is repo-specific in claude-code-specialists is not
 that Sylvester maintains the harness, but which scripts, manifests, and config that involves here.**
 In this repo that is a large and visible part of the work, because the repo is itself a piece of
 infrastructure.
@@ -90,7 +90,7 @@ infrastructure.
   on drift. The pure expansion logic lives in the lib, so [Tycho #18](04-18-extension.md) can test
   it in isolation — mirroring the `release-lib` setup. **Never edit between the sentinels by hand.**
 - **`.claude/settings.json`** — this repo's harness config: the `extraKnownMarketplaces` (the
-  `github` source `DaveKJohn/davekjohns-workshop`) and `enabledPlugins` with which the repo enables
+  `github` source `DaveKJohn/claude-code-specialists`) and `enabledPlugins` with which the repo enables
   its own `specialists` plugin (group 1).
 - **The manifests** `.claude-plugin/marketplace.json` and every `<plugin>/.claude-plugin/plugin.json`
   (structure + `version`) — their *structure/config*; the descriptive *texts* he coordinates with
@@ -309,11 +309,11 @@ infrastructure.
   captured content.
 - **`claude plugin marketplace remove` rewrites the *project* `settings.json` of the working directory you
   run it from — not only the scope the marketplace was declared in.** Measured on July 29, 2026 while
-  cleaning up the two throwaway plugins of the [#215](https://github.com/DaveKJohn/davekjohns-workshop/issues/215)
+  cleaning up the two throwaway plugins of the [#215](https://github.com/DaveKJohn/claude-code-specialists/issues/215)
   experiment: it emptied the test consumer's `enabledPlugins` **and** `extraKnownMarketplaces`. So run it
   from a throwaway directory, never from a repo whose `.claude/settings.json` you want to keep. The full
   account, including how the damage was spotted, is in
-  [PR #256](https://github.com/DaveKJohn/davekjohns-workshop/pull/256)'s changelog entry.
+  [PR #256](https://github.com/DaveKJohn/claude-code-specialists/pull/256)'s changelog entry.
   **And the lookup lesson that came with it:** the first version of this bullet declared the mechanism
   unrecorded and left it at an operating rule, because it went looking in the lenses and the manuals. It
   was on record all along — in that PR's entry, folded into `CHANGELOG.md` one commit earlier. Before

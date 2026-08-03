@@ -924,8 +924,8 @@ function Get-LensFamily {
        A CONSTANT, deliberately not derived from the install path (issue #179). specialists-init used
        to derive it, and in the plugin-cache layout (~/.claude/plugins/cache/<marketplace>/<plugin>/
        <version>/) that derivation yields the MARKETPLACE name instead of the plugin family. A repo
-       installed through 'specialists@davekjohns-workshop' therefore got its lenses written to
-       .claude/plugins/davekjohns-workshop/<plugin>/, while every reader looked only under
+       installed through 'specialists@claude-code-specialists' therefore got its lenses written to
+       .claude/plugins/claude-code-specialists/<plugin>/, while every reader looked only under
        'claude-specialists' -- so existing lenses were reported as missing, and following that advice
        would have produced a second copy of every lens on a second path. The family is a property of
        the plugin family, not of the marketplace it happens to be fetched from, so it is fixed here:

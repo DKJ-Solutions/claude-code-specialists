@@ -14,7 +14,7 @@ disable-model-invocation: true
 
 # cut-release — the closing-steps checklist for a release
 
-Inbound [issue #177](https://github.com/DaveKJohn/davekjohns-workshop/issues/177) (source:
+Inbound [issue #177](https://github.com/DaveKJohn/claude-code-specialists/issues/177) (source:
 `DaveKJohn/djcylow-react`) asked for `cut-release.ps1` as a shared skill, on the assumption that a
 shareable version of it exists. It does not: this workshop's own
 `scripts/release/cut-release.ps1` is 284 lines of marketplace-specific machinery (it reads

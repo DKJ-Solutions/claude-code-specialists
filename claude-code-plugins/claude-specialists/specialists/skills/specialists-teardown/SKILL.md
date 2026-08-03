@@ -20,11 +20,11 @@ exempt, and stays as written.
 **This skill is only the repo half of leaving, and the other half is not in this payload.** The machine
 half -- the `claude plugin uninstall`/`marketplace remove` commands, the settings keys to take back out,
 and the order the two halves have to run in -- is in
-[`UNINSTALL.md`](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/claude-code-plugins/claude-specialists/UNINSTALL.md),
+[`UNINSTALL.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/claude-code-plugins/claude-specialists/UNINSTALL.md),
 which ships in the marketplace clone rather than in the plugin. The pointer is here because it was
 measured to be missing exactly here: a reader who wanted to leave found this skill without trouble and
 reached the machine half **only by grepping blindly** (inbound
-[#338](https://github.com/DaveKJohn/davekjohns-workshop/issues/338)). Read that page before running this
+[#338](https://github.com/DaveKJohn/claude-code-specialists/issues/338)). Read that page before running this
 one -- the order is not free, and it is the page that says why.
 
 ## Run it
@@ -88,7 +88,7 @@ authored.
   until the entry is gone and the session restarted.
 
   > **The scripts keep that promise; the CLI commands around them do not** (inbound
-  > [#295](https://github.com/DaveKJohn/davekjohns-workshop/issues/295)). This bullet used to say "it
+  > [#295](https://github.com/DaveKJohn/claude-code-specialists/issues/295)). This bullet used to say "it
   > never edits" without naming the *it*, and a reader two paragraphs later is told to run
   > `claude plugin uninstall`, which **does** edit that file. Both halves were measured on July 31, 2026
   > in throwaway repos: with `bootstrap.ps1` and `teardown.ps1 -Apply` run and **no** `claude` command at
@@ -109,12 +109,12 @@ authored.
   line-level handling. This page and the skill description said "the two `@`-imports in `CLAUDE.md`" until
   August 1, 2026: a description left behind on the pre-seam layout, where both did sit in `CLAUDE.md`. It set
   a false expectation for the very step the `[create]` -> `[remove]` table rests on, inbound
-  [#337](https://github.com/DaveKJohn/davekjohns-workshop/issues/337).)
+  [#337](https://github.com/DaveKJohn/claude-code-specialists/issues/337).)
 - **It never touches the plugin install or cache.** `claude plugin uninstall <plugin>@<marketplace>
   --scope project`, run from this repo's root, is a separate step. Keep the scope flag: like `plugin
   install` and `plugin update`, `uninstall` defaults to `--scope user` and will not find a
   project-scoped install without it (inbound
-  [#279](https://github.com/DaveKJohn/davekjohns-workshop/issues/279)).
+  [#279](https://github.com/DaveKJohn/claude-code-specialists/issues/279)).
 
 ## Verifying a round-trip — and why `git status` is not enough
 
@@ -183,7 +183,7 @@ lenses the bootstrap has just written are new, so a command that reports what is
 about whether the repo *can* record them. That is command 1's question, and only command 1 answers it.
 
 > **This command was `git ls-files` until August 1, 2026, and that was the third generation of one defect**
-> (inbound [#332](https://github.com/DaveKJohn/davekjohns-workshop/issues/332)). `ls-files` reports the
+> (inbound [#332](https://github.com/DaveKJohn/claude-code-specialists/issues/332)). `ls-files` reports the
 > **index**, not the commits — so a `git add` with a *failed* commit behind it made the command flip from
 > empty to 20 lines with zero commits in the repository, and the paragraph above explained the emptiness by
 > saying `ls-files` "lists committed files only", which was itself wrong. Both are corrected: the command is
@@ -233,7 +233,7 @@ would have captured it has nothing to capture.
 > different path.** The numbered list lives in
 > [the family README](../../../README.md#the-seam-specified); this page zooms in on step 0, the one that
 > can lose files. Said explicitly because the family now counts this procedure in four places, and
-> inbound [#305](https://github.com/DaveKJohn/davekjohns-workshop/issues/305) found this one had been
+> inbound [#305](https://github.com/DaveKJohn/claude-code-specialists/issues/305) found this one had been
 > left out of the sweep that aligned the other three.
 
 More generally: **an ignore rule written against a path is a bet that the path will not move.** The
@@ -325,7 +325,7 @@ the requirement itself in the [family README](../../../README.md#removal-the-tea
 **1. A runtime dependency no teardown can undo -- the one that actually hurts.** The plugin is the
 single source of truth for the operational scripts (`new-branch.ps1`, `park-branch.ps1`,
 `new-changelog-entry.ps1`, `open-pr.ps1`, `fold-changelog-entry.ps1`;
-[issue #81](https://github.com/DaveKJohn/davekjohns-workshop/issues/81)), and a consumer reaches them
+[issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81)), and a consumer reaches them
 through a resolver of its own that locates the marketplace cache and **throws** when that cache is gone.
 In the measured consumer that resolver is `scripts/lib/plugin-paths.ps1`, and three operational scripts
 dot-source it: `start-task.ps1`, `open-pr.ps1`, `fold-changelog-entry.ps1`. So after a teardown plus a
@@ -373,7 +373,7 @@ sections. Outside that file the mentions are loose and few -- `README.md` (5),
 `.github/pull_request_template.md` (1). As long as specialist content is woven through `CLAUDE.md`
 rather than sitting behind a single inclusion, a script cannot finish this without guessing where a
 roster row ends and the owner's prose begins. Closing it is the seam in
-[issue #221](https://github.com/DaveKJohn/davekjohns-workshop/issues/221) -- this skill is the half that
+[issue #221](https://github.com/DaveKJohn/claude-code-specialists/issues/221) -- this skill is the half that
 can be built and tested today.
 
 **3. A lens that outlives the import which loaded it.** The orchestrator's lens

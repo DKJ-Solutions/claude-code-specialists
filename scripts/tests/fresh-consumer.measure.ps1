@@ -70,11 +70,11 @@ New-Item -ItemType Directory -Path (Join-Path $FixtureRoot '.claude') -Force | O
 @'
 {
   "extraKnownMarketplaces": {
-    "davekjohns-workshop": {
-      "source": { "source": "github", "repo": "DaveKJohn/davekjohns-workshop" }
+    "claude-code-specialists": {
+      "source": { "source": "github", "repo": "DaveKJohn/claude-code-specialists" }
     }
   },
-  "enabledPlugins": { "specialists@davekjohns-workshop": true }
+  "enabledPlugins": { "specialists@claude-code-specialists": true }
 }
 '@ | Set-Content -LiteralPath (Join-Path $FixtureRoot '.claude\settings.json') -Encoding utf8
 

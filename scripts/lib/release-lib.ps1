@@ -376,7 +376,7 @@ function Convert-EntryLinksForPluginChangelog {
         [Parameter(Mandatory)][string]$EntryText,
         # Live value is injected by cut-release.ps1 from repo-config (Get-RepoBlobUrl); this
         # literal is only the fallback if the function is called without -RepoBlobUrl.
-        [string]$RepoBlobUrl = 'https://github.com/DaveKJohn/davekjohns-workshop/blob/main/'
+        [string]$RepoBlobUrl = 'https://github.com/DaveKJohn/claude-code-specialists/blob/main/'
     )
     return Convert-RootRelativeLinks -EntryText $EntryText -Prefix $RepoBlobUrl
 }
@@ -494,7 +494,7 @@ function Add-PluginChangelogSection {
         $intro = "# Changelog $emDash $PluginName`n`n" +
             "Consumer-facing history of this plugin: per release, the changes that touched this`n" +
             "plugin. Automatically appended by ``cut-release.ps1`` of the marketplace repo`n" +
-            "(davekjohns-workshop); the full workshop history lives there in ``CHANGELOG.md`` and`n" +
+            "(claude-code-specialists); the full workshop history lives there in ``CHANGELOG.md`` and`n" +
             "``releases/``.`n`n"
         return ($intro + $Section.TrimEnd() + "`n")
     }
@@ -533,7 +533,7 @@ function Build-PluginReleaseCard {
         [Parameter(Mandatory)][string]$Type,
         [string]$Title = '',
         [string[]]$Entries = @(),
-        [string]$RepoBlobUrl = 'https://github.com/DaveKJohn/davekjohns-workshop/blob/main/'
+        [string]$RepoBlobUrl = 'https://github.com/DaveKJohn/claude-code-specialists/blob/main/'
     )
     $majorDir = ($Version -split '\.')[0] + '.x'
     $notesRelPath = "releases/development/$majorDir/$Version.md"

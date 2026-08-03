@@ -116,8 +116,8 @@ try {
     #     been applied to exactly one value, and #302 added markers that print ids.
     Write-Host "Format-SafeToken -- untrusted values that get PRINTED" -ForegroundColor Cyan
     # A legitimate id must survive completely untouched, or this guard would corrupt every normal report.
-    Assert-Equal 'specialists@davekjohns-workshop' (Format-SafeToken -Value 'specialists@davekjohns-workshop') 'a real plugin id passes through unchanged'
-    Assert-Equal 'specialists-lifehub@davekjohns-workshop' (Format-SafeToken -Value 'specialists-lifehub@davekjohns-workshop') 'hyphens and @ survive'
+    Assert-Equal 'specialists@claude-code-specialists' (Format-SafeToken -Value 'specialists@claude-code-specialists') 'a real plugin id passes through unchanged'
+    Assert-Equal 'specialists-lifehub@claude-code-specialists' (Format-SafeToken -Value 'specialists-lifehub@claude-code-specialists') 'hyphens and @ survive'
     Assert-Equal '06-16' (Format-SafeToken -Value '06-16') 'a specialist id survives'
     Assert-Equal 'a.b_c/d' (Format-SafeToken -Value 'a.b_c/d') 'dot, underscore and slash are in the charset'
 
@@ -198,16 +198,16 @@ try {
 
     # THE #294 CASE: the enable lives only in settings.local.json, the file the plugin's own settings
     # proposal points the reader at and all three call sites used to ignore.
-    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "specialists@davekjohns-workshop": true } }')
+    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "specialists@claude-code-specialists": true } }')
     $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
-    Assert-Equal 'specialists@davekjohns-workshop' ($e.Ids -join ',') 'local-only: the enable is seen'
-    Assert-Equal '.claude/settings.local.json' $e.LayerById['specialists@davekjohns-workshop'] 'local-only: the deciding layer is reported'
+    Assert-Equal 'specialists@claude-code-specialists' ($e.Ids -join ',') 'local-only: the enable is seen'
+    Assert-Equal '.claude/settings.local.json' $e.LayerById['specialists@claude-code-specialists'] 'local-only: the deciding layer is reported'
     Assert-True $e.AnyKeyFound 'local-only: AnyKeyFound is true'
 
     # Per-key precedence, the deliberate choice documented on the helper: a local 'false' switches off a
     # project 'true' rather than the layers replacing one another wholesale.
-    [System.IO.File]::WriteAllText($projFile,  '{ "enabledPlugins": { "specialists@davekjohns-workshop": true } }')
-    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "specialists@davekjohns-workshop": false } }')
+    [System.IO.File]::WriteAllText($projFile,  '{ "enabledPlugins": { "specialists@claude-code-specialists": true } }')
+    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "specialists@claude-code-specialists": false } }')
     $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
     Assert-Equal 0 $e.Ids.Count 'precedence: a local false overrides a project true'
     Assert-True $e.AnyKeyFound 'precedence: the key WAS found -- "enables nothing", not "never configured"'
@@ -216,24 +216,24 @@ try {
     # Per-key merge, the other half: a project enable and a local enable of a DIFFERENT plugin both count.
     # Wholesale replacement would drop the project one, which is the failure direction this helper must
     # never take -- losing an enable is how the false green happened.
-    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "specialists-lifehub@davekjohns-workshop": true } }')
+    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "specialists-lifehub@claude-code-specialists": true } }')
     $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
-    Assert-Equal 'specialists-lifehub@davekjohns-workshop,specialists@davekjohns-workshop' ($e.Ids -join ',') 'merge: layers combine per plugin id, they do not replace each other'
+    Assert-Equal 'specialists-lifehub@claude-code-specialists,specialists@claude-code-specialists' ($e.Ids -join ',') 'merge: layers combine per plugin id, they do not replace each other'
 
     # The user layer counts, and is overridable per key by the repo -- a plugin enabled machine-wide IS
     # loaded in every session, so excluding this layer would rebuild the same false green one level up.
     Remove-Item -LiteralPath $localFile -Force
-    [System.IO.File]::WriteAllText($userFile, '{ "enabledPlugins": { "specialists-shopify@davekjohns-workshop": true } }')
+    [System.IO.File]::WriteAllText($userFile, '{ "enabledPlugins": { "specialists-shopify@claude-code-specialists": true } }')
     $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
-    Assert-True ($e.Ids -contains 'specialists-shopify@davekjohns-workshop') 'user layer: a machine-wide enable counts'
-    Assert-Equal 'user ~/.claude/settings.json' $e.LayerById['specialists-shopify@davekjohns-workshop'] 'user layer: named as the deciding layer'
+    Assert-True ($e.Ids -contains 'specialists-shopify@claude-code-specialists') 'user layer: a machine-wide enable counts'
+    Assert-Equal 'user ~/.claude/settings.json' $e.LayerById['specialists-shopify@claude-code-specialists'] 'user layer: named as the deciding layer'
 
     # A layer that does not parse is REPORTED, never thrown, and never silently turns the answer into
     # "nothing enabled" -- the rest of the chain still counts.
     [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { oops')
     $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
     Assert-Equal '.claude/settings.local.json' ($e.Unreadable -join ',') 'unparseable layer: reported by label, not thrown'
-    Assert-True ($e.Ids -contains 'specialists@davekjohns-workshop') 'unparseable layer: the readable layers still counted'
+    Assert-True ($e.Ids -contains 'specialists@claude-code-specialists') 'unparseable layer: the readable layers still counted'
 
     # --- Shapes that are VALID but easy to crash on -----------------------------------------------
     #     Found live, not by reasoning: a settings.json holding exactly '{ }' was reported as "does not

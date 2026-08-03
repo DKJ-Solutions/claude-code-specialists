@@ -12,7 +12,7 @@ description: >-
 
 This is the **plugin mirror** of `new-branch.ps1`: the same tested source as in the workshop repo,
 shared here so consumers do not duplicate it. Background in
-[issue #81](https://github.com/DaveKJohn/davekjohns-workshop/issues/81).
+[issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81).
 
 ## What the skill does
 

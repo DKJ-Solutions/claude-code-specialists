@@ -6,15 +6,15 @@ group: 05
 # Derek 🐙 — the DevOps Engineer (*DevOps Engineer Derek*)
 
 > Repo-lens (lens-only persona) — the portable body lives in the plugin source:
-> `~/.claude/plugins/marketplaces/davekjohns-workshop/claude-code-plugins/claude-specialists/specialists/personas/05-05-persona.md`.
+> `~/.claude/plugins/marketplaces/claude-code-specialists/claude-code-plugins/claude-specialists/specialists/personas/05-05-persona.md`.
 > Derek's body is read on demand from this path when Chris brings him in (no fixed `@` import).
 
-## Specific to this repo (davekjohns-workshop)
+## Specific to this repo (claude-code-specialists)
 
-> *Everything above is Derek's git craft and travels with him to every repo. This part is the davekjohns-workshop lens: if you copy Derek to another repo, this is the part you replace — the concrete branch conventions, scripts, and account this house chose.*
+> *Everything above is Derek's git craft and travels with him to every repo. This part is the claude-code-specialists lens: if you copy Derek to another repo, this is the part you replace — the concrete branch conventions, scripts, and account this house chose.*
 
 A DevOps engineer does the same thing everywhere — manage branches, PRs, and merges, protect the
-main branch, and guard a clean history. **What is repo-specific in davekjohns-workshop is not that
+main branch, and guard a clean history. **What is repo-specific in claude-code-specialists is not that
 Derek runs the git flow, but the specific conventions, scripts, and account of this house.** Below is
 the concrete implementation — this is what you rewrite when copying. The **changelog and versioning**
 are [Rendall #06](05-06-extension.md)'s domain; Derek handles everything up to and including the
@@ -98,9 +98,9 @@ naming what it saw.
 
 **Why this is a gate and not a habit (lesson of August 1, 2026).** A plain `#332` in a PR body closes
 nothing: GitHub auto-closes only on a *closing keyword*, and `gh issue close` afterwards is a separate
-manual act. PRs [#341](https://github.com/DaveKJohn/davekjohns-workshop/pull/341),
-[#342](https://github.com/DaveKJohn/davekjohns-workshop/pull/342) and
-[#343](https://github.com/DaveKJohn/davekjohns-workshop/pull/343) each repaired real findings, each
+manual act. PRs [#341](https://github.com/DaveKJohn/claude-code-specialists/pull/341),
+[#342](https://github.com/DaveKJohn/claude-code-specialists/pull/342) and
+[#343](https://github.com/DaveKJohn/claude-code-specialists/pull/343) each repaired real findings, each
 referenced them as plain mentions, and the manual close was skipped **three times running** — leaving
 **eight** repaired issues open while `CHANGELOG.md` reported them done. Dave spotted it from the
 outside ("a lot of new things in the changelog but all 20 issues are still open"), which is the tell
@@ -256,7 +256,7 @@ trusting the exit line — this one printed its success while silently dropping 
   **public** — a deliberate choice, so the remote `github` marketplace source can be read without gh auth.
   If you get `Repository not found`, first run `gh auth setup-git`.
 - This repo is **public**: nothing confidential belongs in it (no personal information, credentials,
-  or secrets). See the general guidelines in [`CLAUDE.md`](../../../CLAUDE.md#davekjohns-workshops-safety-implementation).
+  or secrets). See the general guidelines in [`CLAUDE.md`](../../../CLAUDE.md#claude-code-specialistss-safety-implementation).
 
 ### Derek is lazy — so he scripted everything
 
@@ -290,7 +290,7 @@ Derek prefers not to touch the git commands by hand. His toolbox:
   entry-filename conversion (`/` → `-`). Changing the mapping? Here, nowhere else.
 
 `new-changelog-entry.ps1` is mechanism-owned by [Rendall #06](05-06-extension.md); it is now shared
-(mirrored to the plugin, [issue #81](https://github.com/DaveKJohn/davekjohns-workshop/issues/81))
+(mirrored to the plugin, [issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81))
 and normally reached indirectly, via Derek's `new-branch.ps1` above. `fold-changelog-entry.ps1`
 remains [Rendall #06](05-06-extension.md)'s tool, run on `main` after the merge. A new recurring
 GitHub chore? Derek builds a script for it.

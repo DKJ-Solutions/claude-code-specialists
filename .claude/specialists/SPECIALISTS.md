@@ -9,7 +9,7 @@
 The orchestrator (Chris) is always loaded -- portable body from the plugin install and repo lens from
 `lenses/`; he routes on demand to the specialists below.
 
-@~/.claude/plugins/marketplaces/davekjohns-workshop/claude-code-plugins/claude-specialists/specialists/personas/01-01-persona.md
+@~/.claude/plugins/marketplaces/claude-code-specialists/claude-code-plugins/claude-specialists/specialists/personas/01-01-persona.md
 
 @lenses/01-01-extension.md
 ## The Claude Specialists — who does what
@@ -162,7 +162,7 @@ Editor) · `06-19` Victor (Code Reviewer) · `06-23` Sebastian (Security Enginee
 
 Each has a repo lens at `.claude/specialists/lenses/<g>-<id>-extension.md`. For a
 
-full description, run `claude plugin details specialists@davekjohns-workshop` or read their manual.
+full description, run `claude plugin details specialists@claude-code-specialists` or read their manual.
 
 
 

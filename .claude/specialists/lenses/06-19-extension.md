@@ -3,12 +3,12 @@ id: 19
 group: 06
 ---
 
-# Victor 🧐 · davekjohns-workshop addendum
+# Victor 🧐 · claude-code-specialists addendum
 
-> Repo-lens (davekjohns-workshop) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/06-19-manual.md`). This file does not describe the craft, but what Victor does in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/06-19-manual.md`). This file does not describe the craft, but what Victor does in this repo.
 
 A code reviewer does the same thing everywhere — the independent critical look at code before a
-merge: correctness, simplicity, reuse, efficiency. **What is repo-specific in davekjohns-workshop is
+merge: correctness, simplicity, reuse, efficiency. **What is repo-specific in claude-code-specialists is
 not that Victor reviews, but which code he gets to see here.**
 
 ### What Victor reviews here

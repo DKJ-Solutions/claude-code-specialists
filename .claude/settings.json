@@ -5,13 +5,13 @@
     ]
   },
   "enabledPlugins": {
-    "specialists@davekjohns-workshop": true
+    "specialists@claude-code-specialists": true
   },
   "extraKnownMarketplaces": {
-    "davekjohns-workshop": {
+    "claude-code-specialists": {
       "source": {
         "source": "github",
-        "repo": "DaveKJohn/davekjohns-workshop"
+        "repo": "DaveKJohn/claude-code-specialists"
       }
     }
   }

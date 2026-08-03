@@ -1,6 +1,6 @@
 # claude-specialists — the specialists family
 
-The first product family of [davekjohns-workshop](../../README.md): the **Claude Specialists system**,
+The first product family of [claude-code-specialists](../../README.md): the **Claude Specialists system**,
 designed by Dave (DaveKJohn). Instead of one generic Claude, you work with a **team of specialized
 Claudes** under one Chief of Staff: every assignment is classified and delivered to the specialist
 (subagent) with the right playbook — a DevOps engineer for branches and PRs, a technical writer
@@ -188,7 +188,7 @@ matters operationally for the skills/subagents/hooks split described in the root
 bundled in a plugin works across all three surfaces, but a **subagent** or a **hook** runs only in
 Cowork and in Claude Code — in a plain Claude.ai Chat session they show up grayed out (see
 [Use plugins in Claude](https://support.claude.com/en/articles/13837440-use-plugins-in-claude)).
-Concretely for davekjohns-workshop: the specialists roster (the subagents under Chris) and the three
+Concretely for claude-code-specialists: the specialists roster (the subagents under Chris) and the three
 SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`)
 function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `new-branch`, `park`, `specialists-init`, `specialists-teardown`,
@@ -197,7 +197,7 @@ function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session
 Skills themselves are Anthropic's general **Agent Skills** mechanism — organized folders of
 instructions/scripts/resources that an agent discovers and loads progressively (name + description
 always loaded, the `SKILL.md` body only on trigger, other resources on demand) — exactly what
-davekjohns-workshop already uses to distribute its skills via the marketplace (see the
+claude-code-specialists already uses to distribute its skills via the marketplace (see the
 [Anthropic engineering post](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills)
 and the [docs](https://code.claude.com/docs/en/skills)). Not confirmed: whether Cowork runs on the
 Claude Agent SDK, or whether a Cowork subagent shares its definition format with — or is
@@ -205,7 +205,7 @@ interchangeable with — a Claude Code subagent.
 
 ## How we use skills — and what we deliberately don't
 
-<!-- skills:all -->Most skills in davekjohns-workshop today (`fold-changelog`, `open-pr`, `new-branch`, `park`,
+<!-- skills:all -->Most skills in claude-code-specialists today (`fold-changelog`, `open-pr`, `new-branch`, `park`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`) are a thin wrapper around a
 script — procedural **mechanism** (branch, PR, fold, bootstrap, teardown, roster-sync).
 `cut-release`<!-- /skills:all --> is the deliberate exception:
@@ -236,7 +236,7 @@ closing step this workshop's own Minor/Major releases go through too (see
 [releases/README.md](../../releases/README.md#cutting-a-release)), just not one `cut-release.ps1`
 itself automates.
 
-Cowork is positioned for non-code knowledge work; davekjohns-workshop is a code/plugin-maintenance
+Cowork is positioned for non-code knowledge work; claude-code-specialists is a code/plugin-maintenance
 repo, so Claude Code is the right tool here and the repo stays deliberately Claude-Code-centric.
 Cowork's value sits in other, non-code work — not in this workshop.
 
@@ -274,7 +274,7 @@ repo. Because a plugin skill cannot hook itself in, the path is two-stage:
 > true and documented. The first is not: a plugin **can** activate one of its own agents as the main
 > thread via a root `settings.json` — and the `@`-import is both the only reason the bootstrap exists
 > and the single worst thing left behind on uninstall. Finding:
-> [issue #215](https://github.com/DaveKJohn/davekjohns-workshop/issues/215).
+> [issue #215](https://github.com/DaveKJohn/claude-code-specialists/issues/215).
 
 ### Delivering the orchestrator from the plugin — verified, deliberately not switched on
 
@@ -330,14 +330,14 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   `.claude/settings.json` (see [Consumption](../../README.md#consumption) in the root README),
   (2) **restart** the session once — a session start is what registers the marketplace, and without this
   act 3 fails with `Marketplace '<marketplace>' not found` (inbound
-  [#329](https://github.com/DaveKJohn/davekjohns-workshop/issues/329)), (3) refresh
+  [#329](https://github.com/DaveKJohn/claude-code-specialists/issues/329)), (3) refresh
   the cached marketplace with `claude plugin marketplace update <marketplace>`, (4) run
   `claude plugin install <plugin>@<marketplace> --scope project` **from the consumer's root, once per
   enabled plugin**, (5) **restart** the session — only then is the skill available — and (6) **verify the
   install record** before going on.
 
   > **Why six, and why the same six everywhere** (inbound
-  > [#297](https://github.com/DaveKJohn/davekjohns-workshop/issues/297)). This procedure is described at
+  > [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297)). This procedure is described at
   > three entry points, and they used to count it as *four acts* here, *three acts* in
   > [`specialists-init`](specialists/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
   > and *three steps* in the [QUICKSTART](QUICKSTART.md#connecting-in-three-steps) — the same path, no
@@ -355,7 +355,7 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > act is exactly what had kept it unwritten while it was already required.
 
   > **And if you sweep for these counts, make the sweep emphasis-tolerant** (inbound
-  > [#305](https://github.com/DaveKJohn/davekjohns-workshop/issues/305)). The sweep that aligned the
+  > [#305](https://github.com/DaveKJohn/claude-code-specialists/issues/305)). The sweep that aligned the
   > entries above was shaped `(one|two|…|seven) (acts?|steps?)`, and that regex **misses markdown
   > emphasis**: against `specialists-init/SKILL.md` it found nothing, because the text there reads
   > `**five** steps` — the asterisks sit between the two words. Written
@@ -366,8 +366,8 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > file the same PR touched is not automatically covered by that PR's verification.
 
   > **The marketplace is a cached clone, which is why the refresh is an act and not a formality**
-  > (inbound [#282](https://github.com/DaveKJohn/davekjohns-workshop/issues/282) for the behaviour,
-  > [#284](https://github.com/DaveKJohn/davekjohns-workshop/issues/284) for this page having omitted
+  > (inbound [#282](https://github.com/DaveKJohn/claude-code-specialists/issues/282) for the behaviour,
+  > [#284](https://github.com/DaveKJohn/claude-code-specialists/issues/284) for this page having omitted
   > it). `plugin install` compares against the consumer's cached copy of the marketplace, not against
   > the workshop: minutes after `v3.0.2` was tagged and pushed, a fresh project-scoped **install**
   > produced `3.0.1` and reported `✔ Successfully installed`. Nothing in that output hints the version
@@ -376,7 +376,7 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > the install has happened.
 
   > **The install is not a formality, and leaving it out fails silently** (inbound
-  > [#274](https://github.com/DaveKJohn/davekjohns-workshop/issues/274), measured in a consumer during
+  > [#274](https://github.com/DaveKJohn/claude-code-specialists/issues/274), measured in a consumer during
   > the 3.0.0 adoption round). An install is **project-scoped** — `installed_plugins.json` keys every
   > record by `projectPath` — so the two settings keys plus a restart produce *no* install and no error.
   > What the reader gets instead is a session with neither the skill nor the session-start hooks, which
@@ -386,8 +386,8 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > **`--scope project` carries that same weight, and the later update is the same pair of commands:**
   > `claude plugin marketplace update <marketplace>` and then
   > **`claude plugin update <plugin>@<marketplace> --scope project`** (inbound
-  > [#279](https://github.com/DaveKJohn/davekjohns-workshop/issues/279), the 3.0.1 round; the refresh
-  > half is inbound [#282](https://github.com/DaveKJohn/davekjohns-workshop/issues/282)). All of them
+  > [#279](https://github.com/DaveKJohn/claude-code-specialists/issues/279), the 3.0.1 round; the refresh
+  > half is inbound [#282](https://github.com/DaveKJohn/claude-code-specialists/issues/282)). All of them
   > default to `--scope user`; the install then writes a machine-wide record with no `projectPath`, and
   > the update refuses outright on a project-scoped install. Project scope is the intended model for
   > this family (Dave, July 30, 2026) — it gives each repo **its own install record**, and every other
@@ -395,7 +395,7 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > [Staying up to date](QUICKSTART.md#staying-up-to-date).
   >
   > **What project scope does *not* promise is that the record stays put** (inbound
-  > [#296](https://github.com/DaveKJohn/davekjohns-workshop/issues/296)). This sentence used to say it
+  > [#296](https://github.com/DaveKJohn/claude-code-specialists/issues/296)). This sentence used to say it
   > keeps a consumer *"pinned to the version it was tested against"*, and that claim did not survive
   > being measured. On July 31, 2026 both of `life-hub`'s project-scoped records moved `3.0.4 → 3.0.5`
   > in a **single** write to `installed_plugins.json`, their `lastUpdated` stamps 70 ms apart — while
@@ -439,13 +439,13 @@ second `agent`-setting plugin gets a different orchestrator without being told.
 ## Removal: the teardown gap
 
 > **Status: closed on July 30, 2026.** Every item of the target shape below carries its own *Settled on*
-> marker, and [issue #221](https://github.com/DaveKJohn/davekjohns-workshop/issues/221) is closed. The
+> marker, and [issue #221](https://github.com/DaveKJohn/claude-code-specialists/issues/221) is closed. The
 > section is kept in full rather than trimmed to a verdict, because the **measurements** are the reason
 > the design ended up the way it did — the 26 orphaned lens files, the import that actively broke, the
 > 101 specialist mentions across 492 lines, the resolver that took the daily git workflow down with it.
 > A future change that finds this shape inconvenient should have to argue with the numbers, not with a
 > conclusion. What is *not* closed and deliberately so: delivering Chris from the plugin's own
-> `settings.json` ([#215](https://github.com/DaveKJohn/davekjohns-workshop/issues/215)) — the mechanism
+> `settings.json` ([#215](https://github.com/DaveKJohn/claude-code-specialists/issues/215)) — the mechanism
 > is verified and the switch is Dave's to throw.
 
 **The requirement, set by Dave on July 29, 2026.** A consumer must be able to **install and uninstall
@@ -550,13 +550,13 @@ finish the job without guessing where a roster row ends and the owner's prose be
 - **Category 2 behind a single seam.** All specialist content reachable through one inclusion, so
   teardown is "remove one directory and one line" instead of editing 492 lines by hand. **Settled on
   July 29, 2026** — specified below, written by the bootstrap and matched by the teardown
-  ([#253](https://github.com/DaveKJohn/davekjohns-workshop/pull/253),
-  [#254](https://github.com/DaveKJohn/davekjohns-workshop/pull/254)), with this repo migrated onto it as
-  the first consumer ([#255](https://github.com/DaveKJohn/davekjohns-workshop/pull/255)). The paperwork
+  ([#253](https://github.com/DaveKJohn/claude-code-specialists/pull/253),
+  [#254](https://github.com/DaveKJohn/claude-code-specialists/pull/254)), with this repo migrated onto it as
+  the first consumer ([#255](https://github.com/DaveKJohn/claude-code-specialists/pull/255)). The paperwork
   lagged a day behind the machinery: 120 occurrences of the pre-seam path across 57 files were still
   telling every consumer the old location
-  ([#261](https://github.com/DaveKJohn/davekjohns-workshop/pull/261)), and `sync-roster` was still
-  *writing* there ([#262](https://github.com/DaveKJohn/davekjohns-workshop/pull/262)).
+  ([#261](https://github.com/DaveKJohn/claude-code-specialists/pull/261)), and `sync-roster` was still
+  *writing* there ([#262](https://github.com/DaveKJohn/claude-code-specialists/pull/262)).
 - **Category 3 written plugin-neutrally**, so it stays true after an uninstall instead of pointing at
   a departed persona. **Settled on July 30, 2026 — and the honest version of "settled" is worth stating,
   because the item as written could not be done at all.** The rewording is the *owner's* governance prose:
@@ -616,7 +616,7 @@ finish the job without guessing where a roster row ends and the owner's prose be
 
 **Order matters here.** Every further addition woven into a consumer's `CLAUDE.md` raises the cost of
 the untangling, so the seam is worth settling before more content lands on that path — and
-[issue #215](https://github.com/DaveKJohn/davekjohns-workshop/issues/215) is the same problem seen
+[issue #215](https://github.com/DaveKJohn/claude-code-specialists/issues/215) is the same problem seen
 from the other side, not merely a token saving: a plugin-delivered Chris removes the `@`-import, which
 is the worst artifact in the table above.
 

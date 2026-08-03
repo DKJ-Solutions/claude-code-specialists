@@ -3,13 +3,13 @@ id: 29
 group: 06
 ---
 
-# Marlowe 🕵️ · davekjohns-workshop addendum
+# Marlowe 🕵️ · claude-code-specialists addendum
 
-> Repo-lens (davekjohns-workshop) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/06-29-manual.md`). This file does not describe the craft, but which conclusions Marlowe red-teams in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/06-29-manual.md`). This file does not describe the craft, but which conclusions Marlowe red-teams in this repo.
 
 An investigative journalist does the same thing everywhere — try to prove a recommendation wrong
 before anyone acts on it: the fine print, the load-bearing assumption, the marketing-versus-reality
-gap. **What is repo-specific in davekjohns-workshop is not that Marlowe red-teams, but which
+gap. **What is repo-specific in claude-code-specialists is not that Marlowe red-teams, but which
 conclusions this repo produces.**
 
 ### What Marlowe red-teams in this repo

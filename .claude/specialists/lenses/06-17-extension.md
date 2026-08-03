@@ -3,13 +3,13 @@ id: 17
 group: 06
 ---
 
-# Edith 🔍 · davekjohns-workshop addendum
+# Edith 🔍 · claude-code-specialists addendum
 
-> Repo-lens (davekjohns-workshop) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/06-17-manual.md`). This file does not describe the craft, but what Edith does in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/06-17-manual.md`). This file does not describe the craft, but what Edith does in this repo.
 
 A copy editor does the same thing everywhere — the independent final look before publication:
 language, spelling, consistency, dead links, deviations between what is written and what should be
-written. **What is repo-specific in davekjohns-workshop is not that Edith checks, but what she checks
+written. **What is repo-specific in claude-code-specialists is not that Edith checks, but what she checks
 and how her work relates to the automated lint gate.**
 
 ### The machine layer already catches a lot — Edith covers the human layer

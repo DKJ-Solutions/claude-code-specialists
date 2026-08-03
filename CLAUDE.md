@@ -1,13 +1,13 @@
-# CLAUDE.md — davekjohns-workshop
+# CLAUDE.md — claude-code-specialists
 
 This file is the operating guide for this repo, which is run by the **Claude Specialists** — a team
 of specialized Claudes under a single Chief of Staff. It is structured like every specialist manual:
 **the portable way of working comes first** (the system and the constitution, valid in every repo
 that works with the Claude Specialists), and **everything specific to this repo comes last**, under
-[`## Specific to this repo (davekjohns-workshop)`](#specific-to-this-repo-davekjohns-workshop).
+[`## Specific to this repo (claude-code-specialists)`](#specific-to-this-repo-claude-code-specialists).
 
-> **This repo is a special case.** See [`README.md`](README.md) for what davekjohns-workshop is and
-> [`## Specific to this repo (davekjohns-workshop)`](#specific-to-this-repo-davekjohns-workshop)
+> **This repo is a special case.** See [`README.md`](README.md) for what claude-code-specialists is and
+> [`## Specific to this repo (claude-code-specialists)`](#specific-to-this-repo-claude-code-specialists)
 > below for the team that maintains it.
 
 ---
@@ -17,7 +17,7 @@ that works with the Claude Specialists), and **everything specific to this repo 
 **Constitution — read this first.** These rules are broadly shared and take precedence over any
 convenience; all other working practices live in the specialist manuals. The concrete implementation
 for this repo (the main branch, the lint gate, the fold exception, being public) is in
-[`## Specific to this repo (davekjohns-workshop)`](#specific-to-this-repo-davekjohns-workshop).
+[`## Specific to this repo (claude-code-specialists)`](#specific-to-this-repo-claude-code-specialists).
 
 ### Never without Dave's explicit permission
 
@@ -79,7 +79,7 @@ destructive actions above happen only on Dave's explicit request.
   to hold — and if it does not, the repair changes with it. Building the proposed fix on an unverified
   reason produces a change that satisfies the report and is wrong, which is worse than the original
   defect: it now carries a citation. Inbound
-  [#388](https://github.com/DaveKJohn/davekjohns-workshop/issues/388) is the measured instance
+  [#388](https://github.com/DaveKJohn/claude-code-specialists/issues/388) is the measured instance
   (August 2, 2026). It reported that the teardown does not count a fixture's `README.md` "even as
   prose", and proposed deleting the sentence that promised the count. The symptom was real — nothing
   about that file appears in the output — but the reason was not: the prose pass *does* scan the root
@@ -101,14 +101,14 @@ destructive actions above happen only on Dave's explicit request.
 
 ---
 
-## Specific to this repo (davekjohns-workshop)
+## Specific to this repo (claude-code-specialists)
 
 > *Everything above is the portable way of working of a repo run by the Claude Specialists. This
-> part is the davekjohns-workshop lens: if you copy this system to another repo, this is the part
+> part is the claude-code-specialists lens: if you copy this system to another repo, this is the part
 > you replace — it doesn't describe that there are specialists and safety rules, but what this repo
 > is, which team works here, and how the constitution is concretely implemented here.*
 
-`davekjohns-workshop` is the **workshop repo of Dave (DaveKJohn)**: the marketplace where all of his
+`claude-code-specialists` is the **workshop repo of Dave (DaveKJohn)**: the marketplace where all of his
 plugins are built and maintained, and the **single source of truth** for all shareable subagent
 definitions — every consuming repo (life-hub, smartwatchbanden) points here and enables or disables
 per plugin. The full story (the plugin/family structure and consumption) is in the
@@ -119,7 +119,7 @@ family does and how its plugins differ are in the
 
 **The repo consumes itself.** Via [`.claude/settings.json`](.claude/settings.json) this repo enables
 its own `specialists` plugin (group 1), with the `github` marketplace source
-`DaveKJohn/davekjohns-workshop` — so the repo points at itself. That way the maintenance team works
+`DaveKJohn/claude-code-specialists` — so the repo points at itself. That way the maintenance team works
 with exactly the product it maintains. One consequence to be aware of: through the `github` source
 the team sees the **last pushed** version of the plugins, not your ongoing branch work — an agent
 def you modify on a branch only takes effect after merge + push.
@@ -149,7 +149,7 @@ The full repo layout (`.claude-plugin/`, `claude-code-plugins/` incl. `connector
 `agent-shared/`, `scripts/`, `releases/`, `.claude/`, and the root docs + `.github/`) is described
 in [README.md](README.md#repo-layout).
 
-### davekjohns-workshop's safety implementation
+### claude-code-specialists's safety implementation
 
 The constitution above, concretely implemented here:
 

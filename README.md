@@ -1,4 +1,4 @@
-# davekjohns-workshop
+# claude-code-specialists
 
 The **workshop of Dave (DaveKJohn)**: the marketplace repo where all of his Claude Code plugins are
 built and maintained — designed by a human, executed with his team of specialists. The first
@@ -14,7 +14,7 @@ enables or disables **per plugin** which groups it needs.
 > is its mirror, [UNINSTALL.md](claude-code-plugins/claude-specialists/UNINSTALL.md). Both are linked
 > again under [Consumption](#consumption) below; they are up here because a reader who is handed only
 > this repository had to get two-thirds of the way down the page to find them (inbound
-> [#338](https://github.com/DaveKJohn/davekjohns-workshop/issues/338)).
+> [#338](https://github.com/DaveKJohn/claude-code-specialists/issues/338)).
 
 ## The plugin families
 
@@ -104,8 +104,8 @@ specific version (see [Versioning](#versioning)), the cached `RELEASE.md` copy i
 the installed release — a consumer opens it under the plugin path in their own cache to see which
 release they're on, without cross-referencing this workshop's own `releases/` history.
 
-**One canonical channel — mind the old repo name.** The marketplace is named `davekjohns-workshop`
-(repo `DaveKJohn/davekjohns-workshop`) and that is the only channel; use that name in
+**One canonical channel — mind the old repo name.** The marketplace is named `claude-code-specialists`
+(repo `DaveKJohn/claude-code-specialists`) and that is the only channel; use that name in
 `extraKnownMarketplaces`. This repo used to be named `claude-specialists`: that old
 name keeps pointing to the same repo via a **GitHub rename redirect**, so a marketplace still
 registered under `claude-specialists` refers to exactly the same repo — there is **no
@@ -113,7 +113,7 @@ second source** to mirror to. However, the local marketplace clone of such an ol
 lag behind (it was once cloned at an older commit and doesn't converge to the new
 `HEAD` on its own), so an install on that channel silently yields an older plugin version. If you
 run into this: update the marketplace registration (a marketplace update) or re-add it under
-`davekjohns-workshop` — a fresh install should always use `DaveKJohn/davekjohns-workshop`.
+`claude-code-specialists` — a fresh install should always use `DaveKJohn/claude-code-specialists`.
 
 ## Versioning
 

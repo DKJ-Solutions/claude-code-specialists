@@ -68,7 +68,7 @@ function New-FixtureConsumer {
         Join-Path $Fixture '.claude\extensions'
     }
     New-Item -ItemType Directory -Path $extDir -Force | Out-Null
-    $enabled = if ($PluginEnabled) { '{ "specialists@davekjohns-workshop": true }' } else { '{ }' }
+    $enabled = if ($PluginEnabled) { '{ "specialists@claude-code-specialists": true }' } else { '{ }' }
     $settings = '{ "enabledPlugins": ' + $enabled + ' }'
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.json'), $settings)
     foreach ($id in $ExtensionIds) {
@@ -82,7 +82,7 @@ function New-FixtureManifest {
     param(
         [string[]]$Extensions,
         [string]$LocalCheckout = 'nonexistent-fixture-path',
-        [string]$Plugin = 'specialists@davekjohns-workshop'
+        [string]$Plugin = 'specialists@claude-code-specialists'
     )
     $mfPath = Join-Path $Fixture 'manifest.json'
     $obj = [ordered]@{
@@ -107,7 +107,7 @@ function New-StubWorkshop {
     $root = Join-Path $Fixture $Name
     New-Item -ItemType Directory -Path (Join-Path $root 'scripts\sync') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $root '.claude-plugin') -Force | Out-Null
-    $markerName = if ($ValidMarker) { 'davekjohns-workshop' } else { 'fake-marketplace' }
+    $markerName = if ($ValidMarker) { 'claude-code-specialists' } else { 'fake-marketplace' }
     [System.IO.File]::WriteAllText((Join-Path $root '.claude-plugin\marketplace.json'), ('{ "name": "' + $markerName + '" }'))
     $body = (($OutputLines | ForEach-Object { 'Write-Host "' + $_ + '"' }) -join "`r`n") + "`r`nexit $ExitCode`r`n"
     [System.IO.File]::WriteAllText((Join-Path $root 'scripts\sync\check-connectors.ps1'), $body)
@@ -153,7 +153,7 @@ try {
     # identical to the character once the '-- plugin:' header is filtered out. Found live in this repo's
     # own register while verifying the connector-name fix, so the plugin id is part of the fix, not a
     # nice-to-have.
-    Assert-Match '\[ERROR\]\s+fixture/consumer / specialists@davekjohns-workshop:' $r.Out 'missing extension: the ERROR line names the connector AND the plugin block it belongs to'
+    Assert-Match '\[ERROR\]\s+fixture/consumer / specialists@claude-code-specialists:' $r.Out 'missing extension: the ERROR line names the connector AND the plugin block it belongs to'
 
     # --- 3. Plugin not enabled -> exit 1 --------------------------------------------------------
     New-FixtureConsumer -ExtensionIds @('06-16') -PluginEnabled $false
@@ -173,7 +173,7 @@ try {
     #     reader who cross-referenced the two gates learned to trust neither.
     New-FixtureConsumer -ExtensionIds @('06-16') -PluginEnabled $false
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.local.json'),
-        '{ "enabledPlugins": { "specialists@davekjohns-workshop": true } }')
+        '{ "enabledPlugins": { "specialists@claude-code-specialists": true } }')
     $mf = New-FixtureManifest -Extensions @('06-16')
     $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
     Assert-Equal 0 $r.Code 'local-only enable: exit code 0 (no false alarm)'
@@ -271,7 +271,7 @@ try {
     Assert-Equal 0 $r.Code 'unregistered consumer: still exit 0 -- not being registered is not a failure of the plugin install'
 
     # --- 6. Real manifests of this repo: the self-manifest always checks ----------------------
-    $selfManifest = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists\connectors\davekjohns-workshop.json'
+    $selfManifest = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists\connectors\claude-code-specialists.json'
     $r = Invoke-Ps $Script ($base + @('-Manifest', $selfManifest))
     Assert-Equal 0 $r.Code 'self-manifest (workshop consumes itself): exit code 0'
 
@@ -291,7 +291,7 @@ try {
     Assert-Match '\[ERROR\].*outside the allowed scope' $r.Out 'path traversal: scope message'
 
     # 7c. Plugin field with path characters -> rejected, exit 1.
-    $mf = New-FixtureManifest -Extensions @('06-16') -Plugin '..\..\evil@davekjohns-workshop'
+    $mf = New-FixtureManifest -Extensions @('06-16') -Plugin '..\..\evil@claude-code-specialists'
     $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
     Assert-Equal 1 $r.Code 'invalid plugin field: exit code 1'
     Assert-Match '\[ERROR\].*plugin field' $r.Out 'invalid plugin field: ERROR message'
@@ -309,7 +309,7 @@ try {
         # 8a. Stale record (projectPath does not exist) -> no crash, INFO, exit 0.
         New-FixtureConsumer -ExtensionIds @('06-16')
         $mf = New-FixtureManifest -Extensions @('06-16')
-        Set-FixtureAdmin '{ "version": 2, "plugins": { "specialists@davekjohns-workshop": [ { "scope": "project", "projectPath": "C:\\does-not-exist-connectors-fixture", "installPath": "x", "version": "0.0.1" } ] } }'
+        Set-FixtureAdmin '{ "version": 2, "plugins": { "specialists@claude-code-specialists": [ { "scope": "project", "projectPath": "C:\\does-not-exist-connectors-fixture", "installPath": "x", "version": "0.0.1" } ] } }'
         $env:USERPROFILE = $Fixture
         $r = Invoke-Ps $Script @('-SkipDrift', '-Manifest', $mf, '-ConsumerPathOverride', $Fixture)
         Assert-Equal 0 $r.Code 'stale record: exit code 0 (no crash)'
@@ -317,7 +317,7 @@ try {
 
         # 8b. Record points to the fixture but with an older version than the source -> ERROR, exit 1.
         $fixtureEscaped = ($Fixture -replace '\\', '\\')
-        Set-FixtureAdmin ('{ "version": 2, "plugins": { "specialists@davekjohns-workshop": [ { "scope": "project", "projectPath": "' + $fixtureEscaped + '", "installPath": "x", "version": "0.0.1" } ] } }')
+        Set-FixtureAdmin ('{ "version": 2, "plugins": { "specialists@claude-code-specialists": [ { "scope": "project", "projectPath": "' + $fixtureEscaped + '", "installPath": "x", "version": "0.0.1" } ] } }')
         $r = Invoke-Ps $Script @('-SkipDrift', '-Manifest', $mf, '-ConsumerPathOverride', $Fixture)
         Assert-Equal 1 $r.Code 'outdated record: exit code 1'
         Assert-Match '\[ERROR\].*machine record is on v0\.0\.1' $r.Out 'outdated record: ERROR message'
@@ -328,7 +328,7 @@ try {
         #     versions for one repo. An honest "cannot determine" is the only defensible output, and it
         #     must NOT be an INFO -- while the records disagree, every version claim about this consumer
         #     is unreliable.
-        Set-FixtureAdmin ('{ "version": 2, "plugins": { "specialists@davekjohns-workshop": [ ' +
+        Set-FixtureAdmin ('{ "version": 2, "plugins": { "specialists@claude-code-specialists": [ ' +
             '{ "scope": "project", "projectPath": "' + $fixtureEscaped + '", "installPath": "x", "version": "0.0.1" }, ' +
             '{ "scope": "project", "projectPath": "' + $fixtureEscaped + '", "installPath": "x", "version": "0.0.2" }, ' +
             '{ "scope": "project", "projectPath": "' + $fixtureEscaped + '", "installPath": "x", "version": "0.0.3" } ] } }')
@@ -343,7 +343,7 @@ try {
         #     the casing are noise, and reporting them as a conflict would trade a confident wrong
         #     number for a confident false alarm.
         $fixtureLowerEscaped = ($Fixture.ToLowerInvariant() -replace '\\', '\\')
-        Set-FixtureAdmin ('{ "version": 2, "plugins": { "specialists@davekjohns-workshop": [ ' +
+        Set-FixtureAdmin ('{ "version": 2, "plugins": { "specialists@claude-code-specialists": [ ' +
             '{ "scope": "project", "projectPath": "' + $fixtureEscaped + '\\", "installPath": "x", "version": "0.0.1" }, ' +
             '{ "scope": "project", "projectPath": "' + $fixtureLowerEscaped + '", "installPath": "x", "version": "0.0.1" } ] } }')
         $r = Invoke-Ps $Script @('-SkipDrift', '-Manifest', $mf, '-ConsumerPathOverride', $Fixture)
@@ -361,7 +361,7 @@ try {
         Assert-Equal 0 $r.Code 'enabled but no record: exit 0 -- INFO, never a gate breach'
         Assert-Match '\[INFO\].*no machine record for this consumer, while the plugin IS enabled' $r.Out 'enabled but no record: the consequence is stated, not just the skipped version check'
         Assert-Match 'loads none of this plugin' $r.Out 'enabled but no record: says what a session there actually gets'
-        Assert-Match 'claude plugin install specialists@davekjohns-workshop --scope project' $r.Out 'enabled but no record: names the one command that settles it'
+        Assert-Match 'claude plugin install specialists@claude-code-specialists --scope project' $r.Out 'enabled but no record: names the one command that settles it'
 
         # 8f. The same fact when the plugin is NOT enabled there keeps the old, milder wording: nothing is
         #     silently loading or failing to load, so the loud reading would be a false alarm.
@@ -537,8 +537,8 @@ try {
     #     wrong story -- its entry simply lists fewer lenses than the repo holds. The check emits the
     #     line only about the repo the session is in, so the hook can surface it unconditionally.
     $stub = New-StubWorkshop -Name 'stub-inventory' -ExitCode 0 -OutputLines @(
-        "  [INFO]  DaveKJohn/davekjohns-workshop / specialists@davekjohns-workshop: extension '04-11' exists in the consumer but is not in the register -- update the register or review the change.",
-        "  [INVENTORY] this repo has 1 lens(es) that its own entry in the connector register does not list (04-11) -- add them to the 'extensions' array in davekjohns-workshop.json, in the same change that landed the lens. Nothing is broken: the register's view of this repo is simply behind reality.",
+        "  [INFO]  DaveKJohn/claude-code-specialists / specialists@claude-code-specialists: extension '04-11' exists in the consumer but is not in the register -- update the register or review the change.",
+        "  [INVENTORY] this repo has 1 lens(es) that its own entry in the connector register does not list (04-11) -- add them to the 'extensions' array in claude-code-specialists.json, in the same change that landed the lens. Nothing is broken: the register's view of this repo is simply behind reality.",
         'Summary: 0 error(s), 1 info signal(s).'
     )
     $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
@@ -563,8 +563,8 @@ try {
     #     $unregistered -- a regression here would silently drop the marker whenever anything else is
     #     also wrong, which is exactly when a session is busiest).
     $stub = New-StubWorkshop -Name 'stub-inv-mixed' -ExitCode 1 -OutputLines @(
-        '  [ERROR] life-hub / specialists@davekjohns-workshop: machine record is on v2.9.0, source on v2.11.0',
-        "  [INVENTORY] this repo has 1 lens(es) that its own entry in the connector register does not list (04-11) -- add them to the 'extensions' array in davekjohns-workshop.json, in the same change that landed the lens. Nothing is broken: the register's view of this repo is simply behind reality.",
+        '  [ERROR] life-hub / specialists@claude-code-specialists: machine record is on v2.9.0, source on v2.11.0',
+        "  [INVENTORY] this repo has 1 lens(es) that its own entry in the connector register does not list (04-11) -- add them to the 'extensions' array in claude-code-specialists.json, in the same change that landed the lens. Nothing is broken: the register's view of this repo is simply behind reality.",
         'Summary: 1 error(s), 1 info signal(s).'
     )
     $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
@@ -574,7 +574,7 @@ try {
 
     # 9h. Real signals AND an unregistered notice in one run: both surface, neither crowds out the other.
     $stub = New-StubWorkshop -Name 'stub-unreg-mixed' -ExitCode 1 -OutputLines @(
-        '  [ERROR] life-hub / specialists@davekjohns-workshop: machine record is on v2.1.0, source on v2.9.0',
+        '  [ERROR] life-hub / specialists@claude-code-specialists: machine record is on v2.1.0, source on v2.9.0',
         '  [UNREGISTERED] this repo has no manifest in the workshop register.',
         'Summary: 1 error(s), 1 info signal(s).'
     )

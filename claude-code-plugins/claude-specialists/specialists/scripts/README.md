@@ -2,7 +2,7 @@
 
 This folder is the **single source of truth** home of the repo-agnostic workflow scripts, so that
 consumers (life-hub, smartwatchbanden, …) no longer duplicate them per repo. The rationale is in
-[issue #81](https://github.com/DaveKJohn/davekjohns-workshop/issues/81).
+[issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81).
 
 **The model — mirror, not a move:**
 - The **workshop root copy is the canonical, tested source** (`scripts/…` in this repo). That is where
@@ -66,7 +66,7 @@ needed.
 - **`repo-config.ps1`** is by definition repo data (repo name, blob URL) and belongs locally per repo.
   The `specialists-init` bootstrap places `repo-config.ps1` + `branch-info.ps1` as a `VUL-IN` scaffold,
   so that a clean consumer does not crash the shared skills on a missing file; the scripts moreover
-  pre-flight on it ([#86](https://github.com/DaveKJohn/davekjohns-workshop/issues/86)).
+  pre-flight on it ([#86](https://github.com/DaveKJohn/claude-code-specialists/issues/86)).
 
 ## Precedent
 

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Integrity check for the davekjohns-workshop marketplace: validates the manifests, the
+    Integrity check for the claude-code-specialists marketplace: validates the manifests, the
     agent-def frontmatter and the internal links before a change lands via a PR on main.
 .DESCRIPTION
     This repo's lint gate (invoked by scripts/release/open-pr.ps1). Read-only -- changes nothing.
@@ -779,7 +779,7 @@ if ($skillSpanCount -eq 0) {
 #
 # THE DISCRIMINATOR, and it is the whole reason this can be a generic scan where check 10 could not be.
 # A command with an explicit @-TARGET is an instruction someone runs:
-#     claude plugin install specialists@davekjohns-workshop --scope project
+#     claude plugin install specialists@claude-code-specialists --scope project
 #     claude plugin update <plugin>@<marketplace> --scope project
 # A BARE mention is prose discussing the command, and demanding flags there would be nonsense:
 #     "`claude plugin update` has the same default", "Because `claude plugin update` pins the cache"

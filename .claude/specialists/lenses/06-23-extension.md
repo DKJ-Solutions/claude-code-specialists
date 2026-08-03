@@ -3,13 +3,13 @@ id: 23
 group: 06
 ---
 
-# Sebastian 🛡️ · davekjohns-workshop addendum
+# Sebastian 🛡️ · claude-code-specialists addendum
 
-> Repo-lens (davekjohns-workshop) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/06-23-manual.md`). This file does not describe the craft, but what Sebastian guards in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/06-23-manual.md`). This file does not describe the craft, but what Sebastian guards in this repo.
 
 A security engineer does the same thing everywhere — the independent security look before a merge:
 secrets, injection surface, unsafe defaults, guardrail audits. **What is repo-specific in
-davekjohns-workshop is not that Sebastian audits, but which attack surface this repo has.** And here that
+claude-code-specialists is not that Sebastian audits, but which attack surface this repo has.** And here that
 is special: this repo is a **public supply chain**.
 
 ### This repo's attack surface

@@ -1,5 +1,5 @@
 {
-  "name": "davekjohns-workshop",
+  "name": "claude-code-specialists",
   "description": "Dave (DaveKJohn)'s workshop: the marketplace where all his Claude Code plugins are built. Houses, among other things, the Claude Specialists system (claude-code-plugins/claude-specialists/) across four plugins — the shared core plus three domain groups — consumable by multiple repos that toggle each plugin on or off.",
   "owner": { "name": "Dave (DaveKJohn)" },
   "plugins": [

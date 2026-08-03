@@ -32,9 +32,9 @@ before/after sizes are in the [#339 table](#step-5--drop-the-marketplace-registr
 profile they were taken on.
 After that the document exists **nowhere on this machine**, so a reader who is interrupted, stops for the
 day, or just wants to re-read a step has nothing left to read (inbound
-[#328](https://github.com/DaveKJohn/davekjohns-workshop/issues/328)). Keep this page open or save it to
+[#328](https://github.com/DaveKJohn/claude-code-specialists/issues/328)). Keep this page open or save it to
 disk; the durable copy is
-[on GitHub](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/claude-code-plugins/claude-specialists/UNINSTALL.md).
+[on GitHub](https://github.com/DaveKJohn/claude-code-specialists/blob/main/claude-code-plugins/claude-specialists/UNINSTALL.md).
 That is the paragraph above applied to the manual instead of the tool: this page made the argument for
 `specialists-teardown` and then missed it for itself. It missed it a second time for its own audit tool —
 [Step 1](#step-1--take-the-plugin-out-of-your-repo) now says so. Both only surfaced when someone walked
@@ -58,7 +58,7 @@ git ls-tree -r --name-only HEAD .claude | Select-String 'extension\.md|SPECIALIS
 ```
 
 **Command 2 reads the commit rather than the index, and that distinction is the whole point of this
-section** (inbound [#332](https://github.com/DaveKJohn/davekjohns-workshop/issues/332)). It used to be
+section** (inbound [#332](https://github.com/DaveKJohn/claude-code-specialists/issues/332)). It used to be
 `git ls-files`, which reports the **index**. Measured in round v10: a `git add -A` went through, the
 following `git commit` failed, and the command flipped from empty to 20 lines with **zero commits added to
 the repository**. Its old comment — `# empty = not committed yet` — was therefore false in the direction
@@ -101,7 +101,7 @@ From the root of the consuming repo. Dry run by default, because a script that d
 somebody's repo should have to be asked twice — and the preview doubles as the inventory you say yes to.
 
 **`<plugin>` below is your installed plugin directory, and it is worth pinning down before you paste**
-(inbound [#330](https://github.com/DaveKJohn/davekjohns-workshop/issues/330)): the previous edition left the
+(inbound [#330](https://github.com/DaveKJohn/claude-code-specialists/issues/330)): the previous edition left the
 placeholder unexplained, and a reader had to reason it out. It is the **version-pinned cache** copy, which is
 the `installPath` field of your own install record:
 
@@ -156,7 +156,7 @@ and line. `[FREE]` is the clean answer; anything else is a checklist for
 for the whole procedure, and saving it now costs nothing.
 
 **Be precise about where the tool actually dies, because this page used to get it wrong** (inbound
-[#373](https://github.com/DaveKJohn/davekjohns-workshop/issues/373)). Earlier editions said the audit goes
+[#373](https://github.com/DaveKJohn/claude-code-specialists/issues/373)). Earlier editions said the audit goes
 with [Step 2](#step-2--uninstall-the-plugin-one-command-per-plugin). It does not. `teardown.ps1` sits in the
 **version-pinned cache** — the same `<plugin>` path you resolved at the top of this step — and the cache
 follows the *marketplace*, not the install, which is what the
@@ -168,7 +168,7 @@ directory and drops an `.orphaned_at` marker; the instruments survive it.
 
 What finally takes them is the **manual cache delete in
 [Step 5](#step-5--drop-the-marketplace-registration-last)** — the one removal no command does for you. So the
-real shape of the constraint is the one [#328](https://github.com/DaveKJohn/davekjohns-workshop/issues/328)
+real shape of the constraint is the one [#328](https://github.com/DaveKJohn/claude-code-specialists/issues/328)
 was filed about, just one step further down the page: the procedure does remove its own instruments, at the
 end rather than in the middle. Re-run the audit as often as you like at any point before that; it removes
 nothing and needs no `-Apply`.
@@ -178,7 +178,7 @@ nothing and needs no `-Apply`.
 From your repo root:
 
 ```powershell
-claude plugin uninstall specialists@davekjohns-workshop --scope project
+claude plugin uninstall specialists@claude-code-specialists --scope project
 # and once more for each domain group you enabled
 ```
 
@@ -187,9 +187,9 @@ command does not act on a project-scoped install. What it says instead depends o
 `2.1.220` (measured, round v11) it is:
 
 ```text
-✘ Failed to uninstall plugin "specialists@davekjohns-workshop": Plugin "specialists@davekjohns-workshop"
+✘ Failed to uninstall plugin "specialists@claude-code-specialists": Plugin "specialists@claude-code-specialists"
   is enabled at project scope (.claude/settings.json, shared with your team). To disable just for you:
-  claude plugin disable specialists@davekjohns-workshop --scope local
+  claude plugin disable specialists@claude-code-specialists --scope local
 ```
 
 **Do not follow the remedy the CLI suggests there.** `plugin disable --scope local` is a different
@@ -206,7 +206,7 @@ removed one. The command you want is the one above, with `--scope project`.
 **If that refuses with *"installed in local scope, not project"*, you are in the third scope and it is not
 your doing.** A session start can write a record by itself and flip an existing `project` record to
 `local` — no command run, no file in your repo changed, nothing reporting it. Remove that one with
-`claude plugin uninstall specialists@davekjohns-workshop --scope local`. Which scope you are actually in
+`claude plugin uninstall specialists@claude-code-specialists --scope local`. Which scope you are actually in
 is the last thing this query prints:
 
 ```powershell
@@ -226,7 +226,7 @@ Two more things this command does that are worth expecting rather than discoveri
   pass `--keep-data`. On a machine that has run this family, that directory exists. It is empty in the
   measured case, so the default is fine — but if you ever put state there, that is the flag.
 - **It leaves an `.orphaned_at` file behind** (inbound
-  [#337](https://github.com/DaveKJohn/davekjohns-workshop/issues/337)). Measured in round v10 and named in no
+  [#337](https://github.com/DaveKJohn/claude-code-specialists/issues/337)). Measured in round v10 and named in no
   document until now, which is why it stood out: this section predicts its own side effects carefully, so the
   one it missed reads as an omission rather than a detail. It is the CLI's own bookkeeping, harmless, and it
   is cleaned up along with the cache directory in Step 4 below. Expect it; do not go hunting for what wrote
@@ -237,12 +237,12 @@ Two more things this command does that are worth expecting rather than discoveri
 The uninstall clears the *entry*; the keys you added in Quickstart Step 1 are yours to take back out. In
 `.claude/settings.json` (and `.claude/settings.local.json` if you used it), remove:
 
-- `enabledPlugins` — the `specialists@davekjohns-workshop` entries, or the whole key if it is now `{}`;
-- `extraKnownMarketplaces` — the `davekjohns-workshop` block. **Of the two, this is the one to be sure
+- `enabledPlugins` — the `specialists@claude-code-specialists` entries, or the whole key if it is now `{}`;
+- `extraKnownMarketplaces` — the `claude-code-specialists` block. **Of the two, this is the one to be sure
   about**: left behind, it can put the marketplace back and the machine rebuilds its own install without a
   command being run (the measured detail is a few paragraphs below);
 - **any `permissions` entry pointing into the plugin directory** (inbound
-  [#337](https://github.com/DaveKJohn/davekjohns-workshop/issues/337)). After a full teardown, round v10
+  [#337](https://github.com/DaveKJohn/claude-code-specialists/issues/337)). After a full teardown, round v10
   found this still sitting in `.claude/settings.local.json`:
 
   ```json
@@ -269,13 +269,13 @@ your verification will show a fresh record with a fresh timestamp and nothing to
 **The trap needs the marketplace registration standing, and finishing this procedure takes it away — but
 only if you remove both keys.** Round v12 measured three states on one profile with a stray enable key left
 in place each time; round v13 re-measured the last of them with **both** keys deliberately left behind
-(inbound [#327](https://github.com/DaveKJohn/davekjohns-workshop/issues/327) and
-[#382](https://github.com/DaveKJohn/davekjohns-workshop/issues/382), August 2, 2026):
+(inbound [#327](https://github.com/DaveKJohn/claude-code-specialists/issues/327) and
+[#382](https://github.com/DaveKJohn/claude-code-specialists/issues/382), August 2, 2026):
 
 | state of the machine | does a session start write a record? |
 |---|---|
 | keys set, but no marketplace and no clone at the session's start | **no** — `plugins: {}`. That session did register the marketplace and create the clone, but wrote no record |
-| marketplace registered and the clone present | **yes** — a full, correct `project` record, from a session that itself loaded nothing. The **unpacked cache does not have to be there**: round v13 got a full record whose `installPath` pointed into a `cache/davekjohns-workshop/…` directory that did not exist |
+| marketplace registered and the clone present | **yes** — a full, correct `project` record, from a session that itself loaded nothing. The **unpacked cache does not have to be there**: round v13 got a full record whose `installPath` pointed into a `cache/claude-code-specialists/…` directory that did not exist |
 | after a full teardown including Step 5's manual cache delete, with only `enabledPlugins` left behind | **no** — the record stayed `{}`, and nothing re-registered itself |
 | after that same teardown, with `extraKnownMarketplaces` left behind as well | **yes, in two session starts** — row 1 fires, and it *produces* what row 2 needs: session 1 re-registered the marketplace and rebuilt the clone (4,665,111 bytes) while the record stayed `{}`, and session 2 wrote the full record |
 
@@ -295,7 +295,7 @@ the table follows from there. Round v13 walked the procedure through to the end 
 commands at all, and stood on an install record again.
 
 **A record a session start wrote is recognisable by its key order** (inbound
-[#389](https://github.com/DaveKJohn/davekjohns-workshop/issues/389)). A real
+[#389](https://github.com/DaveKJohn/claude-code-specialists/issues/389)). A real
 `claude plugin install --scope project` puts `projectPath` second; a session start puts it last:
 
 ```jsonc
@@ -324,7 +324,7 @@ confirmation and not as proof: this is CLI `2.1.220` behaviour and can shift wit
   until you delete the cache by hand in Step 5. It removes nothing and needs no `-Apply`, so a re-run here
   is free. Run at this point it also *confirms* Step 2 rather than contradicting it: its note reads
   *"No install record points at this repo any more"*, because it asks the same `projectPath` question you
-  just did (inbound [#381](https://github.com/DaveKJohn/davekjohns-workshop/issues/381)). If it instead says
+  just did (inbound [#381](https://github.com/DaveKJohn/claude-code-specialists/issues/381)). If it instead says
   it could not read `installed_plugins.json`, that is a gap in the reading and not a verdict — check the
   path it names. Only once Step 5 is done is re-installing the plugin the honest route — and by then the question
   has stopped mattering, because the marketplace is gone too.
@@ -338,21 +338,21 @@ This is the step that also takes the cached clone — and with it this page — 
 it waits until Step 4 is done:
 
 ```powershell
-claude plugin marketplace remove davekjohns-workshop
+claude plugin marketplace remove claude-code-specialists
 ```
 
 It takes an optional `--scope <user|project|local>`; omit it and the declaration is removed from every
 scope. Then the last verification: **`claude plugin marketplace list` no longer names
-`davekjohns-workshop`.**
+`claude-code-specialists`.**
 
 **If you declared the marketplace at *user* scope, expect it to edit `~/.claude/settings.json` and to leave
-an empty key behind** (inbound [#357](https://github.com/DaveKJohn/davekjohns-workshop/issues/357)). The
-`davekjohns-workshop` block goes, `"extraKnownMarketplaces": {}` stays, and the file is re-serialised so the
+an empty key behind** (inbound [#357](https://github.com/DaveKJohn/claude-code-specialists/issues/357)). The
+`claude-code-specialists` block goes, `"extraKnownMarketplaces": {}` stays, and the file is re-serialised so the
 key order may shift:
 
 ```jsonc
 // before
-{ "extraKnownMarketplaces": { "davekjohns-workshop": { … } }, "theme": "dark" }
+{ "extraKnownMarketplaces": { "claude-code-specialists": { … } }, "theme": "dark" }
 // after
 { "extraKnownMarketplaces": {}, "theme": "dark" }
 ```
@@ -362,7 +362,7 @@ a diff there is the command working, not a fault. Remove the empty key by hand i
 where it started.
 
 **On the path the QUICKSTART prescribes, none of that happens — and that is the expected result, not an
-anomaly** (inbound [#374](https://github.com/DaveKJohn/davekjohns-workshop/issues/374)). Two independent
+anomaly** (inbound [#374](https://github.com/DaveKJohn/claude-code-specialists/issues/374)). Two independent
 reasons: the QUICKSTART's pasteable block puts `extraKnownMarketplaces` in **your repo's**
 `.claude/settings.json`, and its `marketplace add` alternative is given as `--scope project` for exactly
 this reason; and [Step 3](#step-3--remove-the-keys-you-wrote-then-restart) already removed that key several
@@ -376,13 +376,13 @@ user-scope declaration that leaves keys behind, empty rather than absent. An ear
 literally clean, full stop — which sent a project-scope reader hunting for a key that was never there.
 
 **What that command does and does not delete, measured rather than assumed** (inbound
-[#339](https://github.com/DaveKJohn/davekjohns-workshop/issues/339), August 1, 2026, on a virgin Windows
+[#339](https://github.com/DaveKJohn/claude-code-specialists/issues/339), August 1, 2026, on a virgin Windows
 profile — the one environment where the answer was not obscured by an earlier install):
 
 | location | before | after |
 |---|---|---|
-| `~/.claude/plugins/marketplaces/davekjohns-workshop/` — the cached clone | 2,930,310 bytes | **gone** |
-| `~/.claude/plugins/cache/davekjohns-workshop/` — the unpacked payload | 939,860 bytes | **still there** |
+| `~/.claude/plugins/marketplaces/claude-code-specialists/` — the cached clone | 2,930,310 bytes | **gone** |
+| `~/.claude/plugins/cache/claude-code-specialists/` — the unpacked payload | 939,860 bytes | **still there** |
 
 **So the unpacked cache belongs to the marketplace, not to the install**, and that rule is worth carrying
 rather than the two numbers. `claude plugin marketplace add` *creates* it — measured on that same virgin
@@ -393,7 +393,7 @@ the question was unestablished and told you to go look; the looking has been don
 hand if you want the machine genuinely untouched:
 
 ```powershell
-Remove-Item "$env:USERPROFILE\.claude\plugins\cache\davekjohns-workshop" -Recurse -Force
+Remove-Item "$env:USERPROFILE\.claude\plugins\cache\claude-code-specialists" -Recurse -Force
 ```
 
 ## What is left behind, honestly
@@ -415,7 +415,7 @@ are marked as such:
   directory exist *because* of the adoption. [Step 3](#step-3--remove-the-keys-you-wrote-then-restart)
   takes the keys out and says so; the empty file it leaves is 3 bytes, harmless, and yours to delete if
   you want the repo back to where it started. Named here rather than left out because this list claims to
-  be the whole of it (inbound [#386](https://github.com/DaveKJohn/davekjohns-workshop/issues/386), round
+  be the whole of it (inbound [#386](https://github.com/DaveKJohn/claude-code-specialists/issues/386), round
   v13), and the `CLAUDE.md` row below covers the same category: a file that would not exist without the
   adoption.
 - **The scaffold prose stays in a `CLAUDE.md` the bootstrap created — and unlike everything else in this
@@ -428,8 +428,8 @@ are marked as such:
   **But `CLAUDE.md` is itself loaded into every session as project instructions**, so this is the one
   leftover that is not merely inert — it tells every future session, in the channel that outranks its
   defaults, that the repo is governed by a system that is no longer installed. Measured over three rounds,
-  two fresh sessions each (inbound [#362](https://github.com/DaveKJohn/davekjohns-workshop/issues/362) and
-  [#392](https://github.com/DaveKJohn/davekjohns-workshop/issues/392)): **v11 flagged it 2 out of 2, v12
+  two fresh sessions each (inbound [#362](https://github.com/DaveKJohn/claude-code-specialists/issues/362) and
+  [#392](https://github.com/DaveKJohn/claude-code-specialists/issues/392)): **v11 flagged it 2 out of 2, v12
   and v13 both 1 out of 2.** The v11 pair is where the quotable line came from — one session noted that
   the named `specialists-init` skill *"is not present in my available-skills list"* — and it is not the
   rate to plan around.
@@ -455,7 +455,7 @@ are marked as such:
 
   Until August 1, 2026 those lines were reported as **neither** `[remove]` nor `[KEEP]` while the audit
   printed `[FREE]`, which is what got this row written (inbound
-  [#331](https://github.com/DaveKJohn/davekjohns-workshop/issues/331)).
+  [#331](https://github.com/DaveKJohn/claude-code-specialists/issues/331)).
 - **A gate of your own that lints lens files may go quiet rather than red.** Once the directory is gone
   the category silently skips: nothing errors, nothing is reported, and the gate stays green while
   checking nothing. Right for a deliberate teardown, wrong for an accidental loss.
@@ -476,7 +476,7 @@ repo lives under `~/.claude/`, and the list below was taken from a machine that 
 | `~/.claude/settings.json` | a user-level `enabledPlugins` / `extraKnownMarketplaces`, if you used one |
 
 Which step closes which — including the one entry that no step closes for you (inbound
-[#339](https://github.com/DaveKJohn/davekjohns-workshop/issues/339)):
+[#339](https://github.com/DaveKJohn/claude-code-specialists/issues/339)):
 
 | location | what closes it |
 |---|---|

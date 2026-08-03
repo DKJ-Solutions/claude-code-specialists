@@ -314,7 +314,7 @@ try {
     # install path and land the lenses under the MARKETPLACE name -- where no reader looks (issue
     # #179). The family is a constant now, so the scaffolds must appear on the canonical path here too.
     Write-Host "bootstrap.ps1 -- version cache picks the semantically highest version" -ForegroundColor Cyan
-    $cacheRoot = Join-Path $Fixture 'cache\davekjohns-workshop'
+    $cacheRoot = Join-Path $Fixture 'cache\claude-code-specialists'
     $ownCache  = Join-Path $cacheRoot 'specialists\1.4.0'
     New-Item -ItemType Directory -Path $ownCache -Force | Out-Null
     Copy-Item -Path (Join-Path $RepoRoot 'claude-code-plugins\claude-specialists\specialists\*') -Destination $ownCache -Recurse
@@ -325,7 +325,7 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $cacheRoot 'specialists-lifehub\1.10.0\agents\04-99-agent.md'), "---`nname: newest`nid: 99`ngroup: 04`n---`nfixture")
     $cacheConsumer = Join-Path $Fixture 'cache-consumer'
     New-Item -ItemType Directory -Path (Join-Path $cacheConsumer '.claude') -Force | Out-Null
-    [System.IO.File]::WriteAllText((Join-Path $cacheConsumer '.claude\settings.json'), '{ "enabledPlugins": { "specialists@davekjohns-workshop": true, "specialists-lifehub@davekjohns-workshop": true } }')
+    [System.IO.File]::WriteAllText((Join-Path $cacheConsumer '.claude\settings.json'), '{ "enabledPlugins": { "specialists@claude-code-specialists": true, "specialists-lifehub@claude-code-specialists": true } }')
     $cachedBootstrap = Join-Path $ownCache 'skills\specialists-init\bootstrap.ps1'
     $rc = Invoke-Script -Path $cachedBootstrap -ScriptArgs @('-ConsumerRoot', $cacheConsumer)
     Assert-Equal 0 $rc.Code 'version cache: bootstrap exit 0'
@@ -336,8 +336,8 @@ try {
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $cacheConsumer "$Pp\04-88-extension.md"))) 'version cache: older version (1.9.0) not used'
     # Regression #179: nothing may land under the MARKETPLACE name. The seam makes the family segment
     # moot for a fresh consumer, but the assertion is kept: it guards the fallback path that still
-    # derives one, and a lens under 'davekjohns-workshop' is invisible to every reader.
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $cacheConsumer '.claude\plugins\davekjohns-workshop'))) 'version cache: no lenses under the marketplace name (#179)'
+    # derives one, and a lens under 'claude-code-specialists' is invisible to every reader.
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $cacheConsumer '.claude\plugins\claude-code-specialists'))) 'version cache: no lenses under the marketplace name (#179)'
     $cacheMd = [System.IO.File]::ReadAllText((Join-Path $cacheConsumer 'CLAUDE.md'), [System.Text.Encoding]::UTF8)
     Assert-True ($cacheMd -match [regex]::Escape($SeamImport)) 'version cache: CLAUDE.md carries the single seam import'
 

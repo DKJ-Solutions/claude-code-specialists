@@ -7,7 +7,7 @@ itself; (2) **how a specialist is structured** — as persona or subagent, the t
 manual, and the stable-id system; and (3) **how the specialists here are organized among
 themselves**. It is **not a replacement** for the safety rules or the routing.
 
-> **This repo is an outlier.** davekjohns-workshop is Dave's workshop marketplace; the specialists
+> **This repo is an outlier.** claude-code-specialists is Dave's workshop marketplace; the specialists
 > system lives here as the first product family in `claude-code-plugins/claude-specialists/`
 > (see [`../../README.md`](../../README.md)) — and the repo also consumes that system here
 > **itself**, via the `specialists` plugin (group 1). The team here is therefore small and focused on
@@ -37,7 +37,7 @@ just like inline text.
   - **Persona lens (lens-only)** — for the persona-only specialists (Chris, Derek, Rendall), who run
     in the main conversation instead of as subagents. The main loop loads no plugin subagents, so the
     **portable body** comes straight from the plugin install via an `@` import: Chris always
-    (`@~/.claude/plugins/marketplaces/davekjohns-workshop/claude-code-plugins/claude-specialists/specialists/personas/01-01-persona.md`,
+    (`@~/.claude/plugins/marketplaces/claude-code-specialists/claude-code-plugins/claude-specialists/specialists/personas/01-01-persona.md`,
     stated in [`SPECIALISTS.md`](SPECIALISTS.md) rather than in `CLAUDE.md` itself — the seam spends
     two of the four allowed import hops), Derek and Rendall on demand from that same path. The
     extension itself is therefore **lens-only**: only the repo-specific `## Specific to this repo`
@@ -48,8 +48,8 @@ just like inline text.
   `.claude/agents/` directory: they come from the `specialists` plugin of this very marketplace,
   enabled via [`settings.json`](../settings.json) and invocable as `@specialists:<name>`.
 - **`settings.json`** — the harness config: `extraKnownMarketplaces` (the `github` source
-  `DaveKJohn/davekjohns-workshop` — the repo points to itself) + `enabledPlugins`
-  (`specialists@davekjohns-workshop`). [Sylvester #15](lenses/05-15-extension.md)'s domain.
+  `DaveKJohn/claude-code-specialists` — the repo points to itself) + `enabledPlugins`
+  (`specialists@claude-code-specialists`). [Sylvester #15](lenses/05-15-extension.md)'s domain.
 
 ## How a specialist is structured
 

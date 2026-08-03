@@ -14,7 +14,7 @@ disable-model-invocation: true
 
 This is the **plugin mirror** of `fold-changelog-entry.ps1`: the same tested source as in the
 workshop repo, shared here so consumers (life-hub, smartwatchbanden, …) do not duplicate it.
-The background is in [issue #81](https://github.com/DaveKJohn/davekjohns-workshop/issues/81).
+The background is in [issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81).
 
 ## What the skill does
 
