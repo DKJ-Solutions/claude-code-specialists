@@ -28,6 +28,27 @@ $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
 $script:pass = 0
 $script:fail = 0
 
+function Get-FlatOutput {
+    <#
+        Captured child output, whitespace collapsed to single spaces, so a phrase assert cannot fail on
+        line breaks that the behaviour under test does not decide. A native child's stderr captured with
+        2>&1 arrives as a NativeCommandError, which PowerShell renders with a 'powershell.exe : ' prefix
+        and WRAPS at the host width -- so the wrap point moves with the console width and with the length
+        of the fixture's temp path, neither of which park-branch.ps1 decides.
+
+        Applied here for the same reason it was applied to new-branch.tests.ps1 on August 3, 2026, where
+        a 176-column window split "must not be 'main'" MID-WORD and failed an assert about correct
+        behaviour. This suite's own asserts ('on main', 'parked on origin', 'nothing new to commit') sit
+        in exactly the same records and are one window width away from the same failure.
+
+        The newlines are removed rather than collapsed to a space, because a mid-word break leaves
+        'mus' + 't not be' and a space between them matches nothing. Precedent:
+        shared-scripts.tests.ps1's Test-OutputContains.
+    #>
+    param($Captured)
+    return (($Captured | Out-String) -replace "`r?`n", '')
+}
+
 function Assert-Equal {
     param($Expected, $Actual, [string]$Name)
     if ($Expected -eq $Actual) {
@@ -112,7 +133,7 @@ function Invoke-ParkBranch {
         $ErrorActionPreference = 'Continue'
         $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath @callArgs 2>&1
         $code = $LASTEXITCODE
-        return [pscustomobject]@{ Code = $code; Out = ($out | Out-String) }
+        return [pscustomobject]@{ Code = $code; Out = (Get-FlatOutput $out) }
     } finally {
         $ErrorActionPreference = $prevEap
         Set-Location -LiteralPath $prevLoc
