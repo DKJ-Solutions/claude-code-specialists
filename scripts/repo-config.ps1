@@ -163,3 +163,79 @@ function Get-EntryFallbackType {
        own branch table produces, since cut-release groups entries by it. #>
     return $script:EntryFallbackType
 }
+
+# --- Which files the mojibake tool examines by default (issue #413) -------------------------------
+#
+# scripts/maintenance/fix-mojibake.ps1 used to carry this list itself, and the list is workshop-shaped:
+# it walks plugins/** for the per-plugin CHANGELOG.md/RELEASE.md and releases/** for the archived notes.
+# In a consumer neither directory exists, so the tool's own Test-Path filter quietly reduced the set to
+# whatever root docs happened to be there -- a gate that examines almost nothing while reporting
+# "clean". Which files a repo has is a property of the repo, so the list belongs here.
+#
+# Takes the repo root as a parameter rather than resolving one of its own: the caller has already done
+# that (dual-context, CLAUDE_PROJECT_DIR or the git root), and a second resolution here is a second
+# answer to a one-answer question. The Get-ChildItem work sits INSIDE the function on purpose -- this
+# file is dot-sourced by every workflow script, and none of the others should pay for a directory walk
+# they never use.
+#
+# OPTIONAL in the contract: a consumer without this function gets the tool's own repo-agnostic
+# fallback -- every *.md in the repo root, which covers the changelog, the root docs and the unfolded
+# entry files in any repo. That fallback is deliberately broader than what this workshop's list used to
+# be, because an entry file is exactly the kind of freshly written, non-ASCII-carrying file the damage
+# shows up in first.
+function Get-MojibakePaths {
+    <# Absolute paths of the files fix-mojibake.ps1 examines when called without -Path. #>
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    # Every markdown file in the repo root: CHANGELOG.md, the root docs, and any unfolded entry file.
+    $paths = @(Get-ChildItem -LiteralPath $RepoRoot -Filter '*.md' -File |
+        Select-Object -ExpandProperty FullName)
+
+    # Every markdown file under plugins/: the per-plugin CHANGELOG.md and RELEASE.md that cut-release.ps1
+    # writes entry text into, and the manuals, agent defs and personas beside them -- all prose, all
+    # equally able to carry a mis-decode.
+    #
+    # -Filter, NOT -Include, and that is a bug fix rather than a preference. PowerShell SILENTLY IGNORES
+    # -Include when the path is given as -LiteralPath, so the previous form --
+    # `Get-ChildItem -LiteralPath $pluginRoot -Recurse -File -Include 'CHANGELOG.md','RELEASE.md'` --
+    # returned EVERY file under plugins/, .ps1 and .json included, while the comment above it named two
+    # file names. Nothing broke, because the extra files were clean and the tool leaves anything that is
+    # not mojibake alone; what was wrong is that the code and its own description disagreed, and the
+    # description is what the lint gate quotes to the reader as its coverage.
+    $pluginRoot = Join-Path $RepoRoot 'plugins'
+    if (Test-Path -LiteralPath $pluginRoot) {
+        $paths += @(Get-ChildItem -LiteralPath $pluginRoot -Recurse -File -Filter '*.md' |
+            Select-Object -ExpandProperty FullName)
+    }
+
+    # THE ARCHIVED RELEASE NOTES, added August 2, 2026 after they turned out to hold the largest single
+    # concentration of damage in the repo (474 sequences in 3.1.0.md alone, more than the root
+    # changelog). They sit outside the language rule because they are history, but the two questions are
+    # not the same: not translating an old note preserves what it said, while leaving mojibake in it
+    # preserves a mis-decode nobody wrote.
+    $releasesRoot = Join-Path $RepoRoot 'releases'
+    if (Test-Path -LiteralPath $releasesRoot) {
+        $paths += @(Get-ChildItem -LiteralPath $releasesRoot -Recurse -File -Filter '*.md' |
+            Select-Object -ExpandProperty FullName)
+    }
+
+    return @($paths | Sort-Object -Unique)
+}
+
+# --- How ship-pr.ps1 merges a PR (issue #411) -----------------------------------------------------
+#
+# 'merge', 'squash' or 'rebase' -- the flag ship-pr.ps1 hands `gh pr merge`. This workshop merges, so
+# every PR keeps its own commits on main; a repo that squashes says so here instead of keeping a
+# private copy of ship-pr.
+#
+# Declared even though inbound #411 argued a shared ship-pr would need NO new contract function. That
+# claim did not survive reading both files: the source merges with --merge while the reporting repo
+# describes its own flow as squash-merging, so the two genuinely differ on exactly this, and a shared
+# script with a hardcoded --merge would silently impose one repo's policy on the other. OPTIONAL, with
+# 'merge' as the fallback, so nothing changes for a consumer that does not care.
+$script:PrMergeMethod = 'merge'
+
+function Get-PrMergeMethod {
+    <# The merge method ship-pr.ps1 uses: 'merge', 'squash' or 'rebase'. #>
+    return $script:PrMergeMethod
+}

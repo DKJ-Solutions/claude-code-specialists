@@ -86,10 +86,12 @@
          becomes a SEPARATE entry when the fold pastes it into CHANGELOG.md, and an H1/H2 climbs out of
          its release category in the generated notes (seen in v2.13.2). Judged in every unfolded root
          entry file and in CHANGELOG.md's '## Pull Requests' section.
-     14. encoding: scripts/maintenance/fix-mojibake.ps1 -Check is run as the gate over the root docs,
-         every per-plugin CHANGELOG.md and RELEASE.md, and every note under releases/. A UTF-8 character
-         read as ANSI and written back changes the text with no error -- and in an entry heading the
-         separator IS the field delimiter, so cut-release.ps1 stops being able to read the entry type.
+     14. encoding: scripts/maintenance/fix-mojibake.ps1 -Check is run as the gate. WHICH files it walks
+         is repo-owned since issue #413 -- Get-MojibakePaths in scripts/repo-config.ps1 names them, here
+         every *.md in the root, every *.md under plugins/, and every note under releases/. A UTF-8
+         character read as ANSI and written back changes the text with no error -- and in an entry
+         heading the separator IS the field delimiter, so cut-release.ps1 stops being able to read the
+         entry type.
      15. unbound output samples: a fenced block with no language (or 'text') is something the reader
          COMPARES against, so something near it must say what the capture is bound to -- a version, a
          date, a platform, a repo state, or a hedge. Four of test round v11's nine findings were this
@@ -1155,7 +1157,7 @@ Write-Coverage -Category 'mojibake' -Checked $mjFiles `
     } elseif ($mjFiles -eq 0) {
         'the repair tool ran but did not state how many files it examined, so this count is not evidence of scope'
     } else {
-        'the root docs, every per-plugin CHANGELOG.md and RELEASE.md, and every note under releases/ -- peeled by the inverse round trip rather than matched against a table of known sequences'
+        'the set this repo names in Get-MojibakePaths (scripts/repo-config.ps1): every *.md in the root -- the changelog, the root docs and any unfolded entry file -- plus every *.md under plugins/ and every note under releases/. Peeled by the inverse round trip rather than matched against a table of known sequences'
     })
 
 # --- 15. unbound output samples: an expectation that cannot hold everywhere -------------------------------

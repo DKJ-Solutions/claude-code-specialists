@@ -73,6 +73,34 @@ function Get-SharedScriptPairs {
             Mirror = 'plugins\specialists\scripts\task\park-branch.ps1'
         },
         @{
+            # Issue #411. Was excluded as "workshop-only" on the reasoning that merge policy and the CI
+            # check name are repo-specific. Only the first half held: the check NAME never entered the
+            # logic (step 3 watches whatever checks exist and reads the exit code), and the merge METHOD
+            # moved into the seam as the optional Get-PrMergeMethod. Without this mirror, merge + fold is
+            # hand work in every consumer -- and it is the one sequence classified safety-critical,
+            # because it merges to main and then commits directly to main.
+            Name   = 'ship-pr'
+            Source = 'scripts\release\ship-pr.ps1'
+            Mirror = 'plugins\specialists\scripts\release\ship-pr.ps1'
+        },
+        @{
+            # Travels with ship-pr rather than on its own merit: it IS ship-pr's step 6, and a consumer
+            # whose ship-pr calls a file that is not in the mirror would fail at the last step of a
+            # sequence that has already merged. Portable as it stands -- dual-context root, Get-RepoName,
+            # and pr-issues-lib/native-capture-lib are both mirrored already.
+            Name   = 'verify-resolved-issues'
+            Source = 'scripts\release\verify-resolved-issues.ps1'
+            Mirror = 'plugins\specialists\scripts\release\verify-resolved-issues.ps1'
+        },
+        @{
+            # Issue #413. Three repos had written their own copy of this repair tool, which is the
+            # argument for one source rather than for a fourth. Its workshop-shaped default file set --
+            # the part that made it unusable elsewhere -- moved into the seam as Get-MojibakePaths.
+            Name   = 'fix-mojibake'
+            Source = 'scripts\maintenance\fix-mojibake.ps1'
+            Mirror = 'plugins\specialists\scripts\maintenance\fix-mojibake.ps1'
+        },
+        @{
             Name    = 'check-report-lib'
             Source  = 'scripts\lib\check-report-lib.ps1'
             Mirror  = 'plugins\specialists\scripts\lib\check-report-lib.ps1'
