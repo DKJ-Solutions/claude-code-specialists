@@ -116,10 +116,11 @@ A release here is a **recorded moment**: all plugins get the same version number
 nothing to GitHub Releases — only a git tag, the full notes in `releases/development/`, and a
 reference to them in `CHANGELOG.md`. For a **Minor or Major** bump, publishing a GitHub Release is a
 manual closing step Rendall walks through afterward, per the `cut-release` skill's checklist — not
-automated by the script; a **Patch** release skips that step (tag only). **The release body here is the
-development notes.** The skill's checklist describes a highlights file as the body with the notes as an
-attachment, and that is correct in a repo that generates one — this repo does not (see the highlights
-note below), so there is nothing to attach and the notes are the body. See
+automated by the script; a **Patch** release skips that step (tag only). **The body is the edited
+highlights file, the development notes go along as an attachment** — the split the skill's checklist
+describes, and it applies here since the highlights tier was turned on (August 3, 2026). It is not
+merely a style preference: `gh release create`'s body has a hard 125,000-character limit and this repo's
+development notes have exceeded that. See
 [releases/README.md](../../../releases/README.md#cutting-a-release) for the full mechanics. The
 `version` in each
 `.claude-plugin/plugin.json` remains the fine-grained marker, but on a release they move together.
@@ -171,14 +172,31 @@ The `releases/` directory (modeled on life-hub):
 - **`releases/README.md`** — an overview table of all versions (newest at the top).
 - In `CHANGELOG.md` the `## Releases` block becomes a short **reference** (`### [vX.Y.Z] - date — Type`)
   to the notes file, rather than the full contents inline.
-- **No `releases/highlights/`, and that is deliberate** (#417 phase 2, August 3, 2026). The shared
-  `cut-release.ps1` can generate a second, stakeholder-facing rendering of a release — written for
-  *non-developers*, with a print-ready `.html` beside it — but only where the repo names the bump types
-  in `Get-ReleaseHighlightsBumps`. This repo names none, because its release audience **is** developers:
-  a consumer reads `RELEASE.md` and the per-plugin `CHANGELOG.md` to decide whether to update. Rendall
-  therefore never has a highlights draft to edit here, and should not go looking for one. If Dave ever
-  wants stakeholder release notes, the tier is three empty knobs in
-  [`scripts/repo-config.ps1`](../../../scripts/repo-config.ps1) away — not a script change.
+- **`releases/highlights/<X>.x/<X.Y.Z>.md` + `.html`** — the consumer-facing tier, generated **only for
+  a minor or major** (`Get-ReleaseHighlightsBumps`). Written for the reader who decides whether to
+  *update*, not for the one who reviews the diff: entry metadata (PR number, branch type, date) is
+  stripped, and the `.html` beside it is self-contained and print-ready — open it, Ctrl+P, save as PDF.
+  **It is a draft and Rendall edits it before it is published.** Turned on August 3, 2026, after this
+  lens had briefly said the opposite.
+- **`releases/internal/<X>.x/<X.Y.Z>.md`** — the third tier, for colleagues and employers: *what the
+  work is worth*, at every release including a patch. **Not generated yet in this repo** — the port of
+  `new-internal-note.ps1` is its own piece of work. Until it lands, this row describes the intent, not
+  a file Rendall will find.
+- **All three group per major (`3.x`)**, from the single answer in `Get-ReleaseNotesGrouping`. The
+  consumer this model came from folders per minor; Dave chose to keep `<X>.x` here.
+
+**What Rendall must know before editing a highlights draft: the marker is a proposal, not a verdict.**
+The generated draft puts `Feat`/`Fix` above a "remove before publishing" marker and everything else
+below it. In the repo this tier was ported from that split is reliable, because a `Style` or `Content`
+branch there *is* a storefront change. **Here it measurably is not.** Held against the 19 entries pending
+at v3.2.0, the most consequential change a consumer could face — renaming the marketplace, which breaks
+every existing install — came in on a `chore/` branch and landed *below* the marker; "a folder rename
+silently unlinks plugin installs" did the same from a `docs/` branch. So the editing pass is not
+"delete the bottom half": it is reading both halves and promoting what a consumer would want to know.
+
+**And the tier's timing is the same test as the version number's.** A minor is cut when a consumer
+actually notices something; a patch is what is left. So Rendall never has to decide separately whether a
+release deserves highlights — if it earned a minor, it has a reader.
 
 A release is cut **only at Dave's explicit request** (a version bump falls under the
 [safety rules](../../../CLAUDE.md#safety-rules)) and deliberately does **not go via a branch + PR**. Like the

@@ -119,23 +119,37 @@ foreach ($mustHave in @('CHANGELOG.md', 'README.md', 'CLAUDE.md')) {
 Assert-True (($mjPaths | Where-Object { $_ -match '\\plugins\\' }).Count -gt 0) 'Get-MojibakePaths reaches the per-plugin CHANGELOG.md/RELEASE.md files'
 Assert-True (($mjPaths | Where-Object { $_ -match '\\releases\\' }).Count -gt 0) 'Get-MojibakePaths reaches the archived release notes'
 
-# The highlights tier (#417 phase 2, Optional in the contract). ASSERTED AS OFF ON PURPOSE, which is the
-# opposite of the usual "does the knob work" test -- that lives in release-lib.tests.ps1, where the tier
-# can be exercised. What matters HERE is that this repo answers empty, because the answer is a statement
-# about the product: the release audience is developers, so a stakeholder document would have no reader.
-# If someone switches the tier on, this turns red and the change becomes a decision (Dave's, since the
-# tier produces a visible result) rather than a release that quietly grows two files nobody asked for.
+# The highlights tier (#417, Optional in the contract). ON for minor/major since August 3, 2026 -- these
+# asserts were written the other way round one commit earlier, when the tier was off, and were flipped
+# with Dave's decision. Kept as asserts on the VALUE rather than deleted: the tier writes files into
+# releases/ and its output is judged by eye, so a silent change to either knob is worth a red test.
+# Whether the tier WORKS is release-lib.tests.ps1's job; this is only about what this repo answers.
 $hlBumps = @(Get-ReleaseHighlightsBumps)
-Assert-Equal 0 $hlBumps.Count 'Get-ReleaseHighlightsBumps is empty -- no highlights tier in this repo'
-$hlTypes = @(Get-ReleaseHighlightsStakeholderTypes)
-Assert-Equal 0 $hlTypes.Count 'Get-ReleaseHighlightsStakeholderTypes is empty (nothing to split while the tier is off)'
-$hlWording = Get-ReleaseHighlightsWording
-Assert-True ($hlWording -is [hashtable]) 'Get-ReleaseHighlightsWording returns a hashtable (merged over the English defaults)'
-Assert-Equal 0 $hlWording.Keys.Count 'Get-ReleaseHighlightsWording is empty -- an English repo needs no overrides'
+Assert-Equal 2 $hlBumps.Count 'Get-ReleaseHighlightsBumps names two bump types'
+Assert-True ($hlBumps -contains 'minor') 'Get-ReleaseHighlightsBumps includes minor'
+Assert-True ($hlBumps -contains 'major') 'Get-ReleaseHighlightsBumps includes major'
+# Patch is excluded BY DESIGN, not by omission: a minor here is cut when a consumer notices something,
+# so a patch has no highlights reader by definition. Asserted so adding 'patch' becomes a decision.
+Assert-True ($hlBumps -notcontains 'patch') 'Get-ReleaseHighlightsBumps excludes patch -- a patch has nothing a consumer would read'
 # A bump type that is not one of the three the script understands would silently never match, so the
 # tier would appear configured and generate nothing. Guarded here rather than at release time.
 $badBumps = @($hlBumps | Where-Object { @('major', 'minor', 'patch') -notcontains $_ })
 Assert-Equal 0 $badBumps.Count "Get-ReleaseHighlightsBumps names only major/minor/patch (stray: $($badBumps -join ', '))"
+
+$hlTypes = @(Get-ReleaseHighlightsStakeholderTypes)
+Assert-True ($hlTypes.Count -gt 0) 'Get-ReleaseHighlightsStakeholderTypes names at least one type, so the draft has a stakeholder half'
+# Held against this repo's OWN branch table rather than a literal list: a type named here that branch-info
+# never produces would put an empty category above the marker and silently drop the real ones below it.
+$knownTypes = @(Get-BranchTypes)
+$strayTypes = @($hlTypes | Where-Object { $knownTypes -notcontains $_ })
+Assert-Equal 0 $strayTypes.Count "every stakeholder type is a type this repo's branch table produces (stray: $($strayTypes -join ', '))"
+# And the complement must be non-empty, or the marker block never appears and the knob is doing nothing.
+$devTypes = @($knownTypes | Where-Object { $hlTypes -notcontains $_ })
+Assert-True ($devTypes.Count -gt 0) 'at least one type falls below the marker, so the developer block is really produced'
+
+$hlWording = Get-ReleaseHighlightsWording
+Assert-True ($hlWording -is [hashtable]) 'Get-ReleaseHighlightsWording returns a hashtable (merged over the English defaults)'
+Assert-Equal 0 $hlWording.Keys.Count 'Get-ReleaseHighlightsWording is empty -- an English repo needs no overrides'
 
 Write-Host ""
 if ($script:fail -gt 0) {
