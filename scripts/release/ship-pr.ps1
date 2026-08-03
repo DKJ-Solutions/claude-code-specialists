@@ -74,6 +74,10 @@
 .PARAMETER SkipTests
     Passed through to open-pr.ps1 (skip the test gate -- escape valve).
 
+.PARAMETER Force
+    Passed through to open-pr.ps1: ship an entry that still carries its scaffold wording (the scaffold
+    gate's escape valve).
+
 .PARAMETER NoMerge
     Open the PR and stop (do not wait for CI, merge, or fold).
 
@@ -100,6 +104,7 @@ param(
     [Parameter(Mandatory = $true)][string]$Title,
     [switch]$SkipLint,
     [switch]$SkipTests,
+    [switch]$Force,
     [switch]$NoMerge,
     [int]$PollSeconds = 15,
     [string]$Resolves = '',
@@ -152,6 +157,7 @@ if ($branch -eq 'main') { Write-Error "You are on main; ship-pr runs from a bran
 $openArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'open-pr.ps1'), '-Title', $Title)
 if ($SkipLint)  { $openArgs += '-SkipLint' }
 if ($SkipTests) { $openArgs += '-SkipTests' }
+if ($Force)     { $openArgs += '-Force' }
 # Handed over as the raw string. open-pr.ps1 parses it itself precisely BECAUSE this hop goes through
 # `powershell -File`, where an [int[]] parameter would silently collapse '331,332' into 331332.
 if ($Resolves) { $openArgs += @('-Resolves', $Resolves) }

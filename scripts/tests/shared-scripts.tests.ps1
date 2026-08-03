@@ -640,21 +640,33 @@ This is the test description text. It repairs the thing reported in #332.
     Remove-Item -Path $prArgsCapture, $prBodyCapture -Force -ErrorAction SilentlyContinue
     $gateOutRaw = (& powershell -NoProfile -ExecutionPolicy Bypass -File $openPrSrc -Title 'feat-openpr-101-test' -SkipLint -SkipTests 2>&1 | Out-String)
     $gateCode = $LASTEXITCODE
-    # Whitespace-normalized before matching. The child renders Write-Error at ITS OWN console buffer
-    # width, so with this repo's path length the wrap can land mid-phrase -- 'resolves\n gate:' -- and
-    # a literal substring assert then fails on one machine and passes on another. Exactly the wrap
-    # hazard this suite already documents for the #86 pre-flight pointers a few scenarios up; found
-    # here by a copy-edit pass that reproduced it consistently at width 120 while it passed at
-    # another width.
-    $gateOut = ($gateOutRaw -replace '\s+', ' ')
+    # ALL whitespace removed before matching, not collapsed to single spaces -- and that distinction is
+    # the whole fix. The child renders Write-Error at ITS OWN console buffer width, so the wrap point
+    # moves with how this suite's output is being consumed: measured August 3, 2026, the same assert
+    # failed four runs in a row when the suite's output was redirected to a file and passed four runs in
+    # a row when it went to the terminal, on one commit, with open-pr.ps1 behaving identically.
+    #
+    # Collapsing ('\s+' -> ' ') only survives a wrap that lands ON A SPACE. A wrap that lands MID-WORD
+    # yields 'resol' + 'ves gate', which collapses to 'resol ves gate' and still does not match -- the
+    # hazard new-branch.tests.ps1's Get-FlatOutput/Test-Phrase pair documents at length after #415 fixed
+    # it in the branch suites. This scenario kept the weaker form and was therefore still width-
+    # dependent: green on the terminal, red on a redirect, which is the worst kind of gate -- it reports
+    # success in exactly the setup a human watches and fails in the one CI uses.
+    #
+    # So: strip every whitespace character from the output AND from each expected phrase, and compare
+    # those. A phrase can then only fail to match if it is genuinely absent or has other content
+    # inserted into the middle of it (the NativeCommandError decoration case, which is why the asserts
+    # below deliberately match SHORT phrases rather than whole sentences).
+    $gateFlat = ($gateOutRaw -replace '\s', '')
+    function Test-GatePhrase { param([string]$Phrase) return $gateFlat.Contains(($Phrase -replace '\s', '')) }
     Assert-Equal 1 $gateCode 'resolves gate: open-pr exits 1 when an open issue is mentioned without a decision'
     # The gate must have actually CHECKED. Without this, the degraded path ("cannot check, not
     # blocking") satisfies every other assert in this scenario while the gate never blocks -- which
     # is exactly what a ConvertFrom-Json bug did here: 5.1 hands a parsed JSON array to the pipeline
     # as one object, the [int] cast threw, and the failure was swallowed as "cannot check".
-    Assert-True ($gateOut -notmatch 'cannot check') 'resolves gate: it really checked (did not fall back to the degraded path)'
-    Assert-True ($gateOut -match 'resolves gate') 'resolves gate: the error names the gate'
-    Assert-True ($gateOut -match '#332') 'resolves gate: the error names the blocking issue'
+    Assert-True (-not (Test-GatePhrase 'cannot check')) 'resolves gate: it really checked (did not fall back to the degraded path)'
+    Assert-True (Test-GatePhrase 'resolves gate') 'resolves gate: the error names the gate'
+    Assert-True (Test-GatePhrase '#332') 'resolves gate: the error names the blocking issue'
     Assert-True (-not (Test-Path $prArgsCapture)) 'resolves gate: no PR was created while blocked'
 
     # C2: -NoResolves is the deliberate way past it, and it closes nothing.

@@ -28,6 +28,10 @@ $BranchInfoSrc    = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 # new-branch -Park dot-sources this sibling shared lib for its git push (the #107 stderr guard),
 # so the fixture must carry it too.
 $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
+# new-changelog-entry.ps1 dot-sources this for the scaffold wording -- the single source it shares with
+# open-pr.ps1's scaffold gate. Without it in the fixture, every entry-writing case here dies on a raw
+# path-not-found instead of testing anything.
+$EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 # Direct Test-BranchName calls (separate from the CLI) for the empty/whitespace-only case --
 # PowerShell's mandatory-param binding catches an empty -Name via the CLI with a generic error, so
 # the exact Reason text can only be tested directly.
@@ -165,6 +169,7 @@ function New-Fixture {
     Copy-Item -LiteralPath $NewChangelogSrc  -Destination (Join-Path $dir 'scripts\release\new-changelog-entry.ps1') -Force
     Copy-Item -LiteralPath $BranchInfoSrc    -Destination (Join-Path $dir 'scripts\lib\branch-info.ps1')             -Force
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')      -Force
+    Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')      -Force
 
     $prevEap = $ErrorActionPreference
     try {
