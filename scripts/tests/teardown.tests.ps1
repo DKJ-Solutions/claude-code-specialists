@@ -487,6 +487,35 @@ function Get-LintScript { return `$script:LintScript }
     Assert-True (-not ($a2.Out -match '(?m)^\s*\[LIVE\]')) 'audit (reworded): no live reference is left at all'
     Assert-True ($a2.Out -match 'verified rather than assumed') 'audit (reworded): the clean verdict says it was verified, which is the whole point of the requirement'
 
+    # --- The audit walk is extension-agnostic, and that is the decision (issue #421) ------------------
+    # The walk used to carry `-Include '*.md','*.ps1','*.json','*.jsonc'` beside `-LiteralPath`, which
+    # PowerShell silently ignores -- so the code read every file while naming four extensions. #421 asked
+    # which of the two was right before anyone touched it, and the answer is the superset: a live
+    # reference is live regardless of the extension it sits in, and an allowlist here is a false-negative
+    # generator in a section whose whole bias is that a miss is the expensive failure.
+    #
+    # ASSERTED ON THE RESULT, NOT ON THE CODE -- deliberately, because that is the only reason the sibling
+    # instance in Get-MojibakePaths was ever found (#413): a test asserting on the OUTPUT caught it, while
+    # the line itself read correctly for years. A test that greps this script for '-Include' would pass
+    # against a rewrite that reintroduced the same blindness by another route.
+    Write-Host "issue #421 -- the audit reads every file under the roots, not four extensions" -ForegroundColor Cyan
+    if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'scripts') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude') -Force | Out-Null
+    [System.IO.File]::WriteAllLines((Join-Path $Fixture 'CLAUDE.md'), @('# My repo', '', 'Nothing of theirs here.'))
+    # Neither extension is on the old four-name list, and both hold a genuine live reference: a deploy
+    # script that names a specialist as the actor, and a note under .claude/ that a session reads.
+    [System.IO.File]::WriteAllLines((Join-Path $Fixture 'scripts\deploy.js'), @(
+        '// Derek opens the PR for every change',
+        'const roster = "05-05";'
+    ))
+    [System.IO.File]::WriteAllLines((Join-Path $Fixture '.claude\notes.txt'), @('Tessa maintains the manuals here.'))
+    $a3 = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
+    Assert-Equal 0 $a3.Code 'audit (#421): exit-code 0'
+    Assert-True ($a3.Out -match "deploy\.js:1 -- name 'Derek'") 'audit (#421): a .js file under scripts/ is scanned -- with the filter working this hit would not exist'
+    Assert-True ($a3.Out -match 'deploy\.js:2 -- specialist id') 'audit (#421): and the id scan reaches it too, not only the name scan'
+    Assert-True ($a3.Out -match "notes\.txt:1 -- name 'Tessa'") 'audit (#421): a .txt note under .claude/ is scanned as well -- the roots decide the scope, not the extension'
+
     # --- THE OCCUPIED CONSUMER: the scaffold paths are already inhabited ------------------------------
     # Reported from the first real adoption attempt (life-hub, 2026-07-30), which stopped before
     # installing and was right to. Both scaffold addresses this plugin writes to were live, tracked
