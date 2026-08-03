@@ -137,6 +137,26 @@
          nothing" and "saw one block and did not judge it" are different states.
      32. Prose naming the file outside any fence is never an instruction.
 
+    Check 17 (the per-plugin CHANGELOG intro still matches its generator), scenarios 33-37. These need a
+    marketplace.json in the fixture, since the expected text is DERIVED from its 'name' -- which also
+    switches checks 1/2/9 from "found nothing" to "found something incomplete". That noise is expected and
+    asserted on nowhere, exactly as check 8's missing-mirror noise already is.
+     33. A generated intro passes, and the coverage count proves the file was examined -- so the pass is
+         evidence rather than an empty scan.
+     34. (THE MEASURED DEFECT) an intro naming a marketplace the manifest does not is reported, naming the
+         file, and the finding states the expected text so the repair needs no second lookup.
+     35. The same sentences rewrapped at a different column PASS. A gate failing on layout would teach
+         "rewrap to satisfy the linter" about a file no human should be rewrapping by hand. The fixture is
+         DERIVED from the generator rather than retyped -- retyping the em-dash title as a plain hyphen was
+         this scenario's first failure, a content difference masquerading as a layout one.
+     36. A CHANGELOG with no '## vX.Y.Z' heading is REPORTED, not silently skipped: the intro's end cannot
+         be located, so nothing can be asserted -- and a check that quietly asserts nothing is the exact
+         failure mode this gate exists to prevent.
+     37. (THE DESIGN, NOT A BUG GUARD) renaming the marketplace in the fixture manifest -- and nothing else
+         -- flips the SAME file from failing to passing. Without this case the check could carry its own
+         hardcoded copy of the name and every scenario above would still pass, which is precisely the shape
+         of the defect it exists to catch.
+
     Deliberately NOT added: a dedicated "two separate, fully valid spans in one file -> neither's own
     END is misreported as an orphan" scenario. Judgment call, not an oversight: scenario 1 (and 7, 11)
     already assert "no [skill-list] finding" for a normal, single complete span -- since the
@@ -167,6 +187,12 @@ $SharedScriptsLibSrc = Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1'
 # Third dot-sourced dependency since #221: check-report-lib.ps1, for the non-counting Write-Coverage
 # line every category closes with. Copied like the other two, so the fixture runs the REAL script.
 $CheckReportLibSrc = Join-Path $RepoRoot 'scripts\lib\check-report-lib.ps1'
+# Fourth and fifth dot-sourced dependencies since check 17: release-lib.ps1 supplies
+# Build-PluginChangelogIntro + Get-MarketplaceName, and release-lib itself dot-sources branch-info.ps1
+# from its own folder. Both are copied for the same reason as the three above -- the fixture runs the
+# REAL script, so a missing dependency is a broken suite rather than one skipped check.
+$ReleaseLibSrc = Join-Path $RepoRoot 'scripts\lib\release-lib.ps1'
+$BranchInfoSrc = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 $Fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("check-plugin-integrity-test-$PID")
 
 $script:pass = 0
@@ -215,6 +241,8 @@ try {
     Copy-Item -Path $AgentSharedLibSrc -Destination (Join-Path $Fixture 'scripts\lib\agent-shared-lib.ps1') -Force
     Copy-Item -Path $SharedScriptsLibSrc -Destination (Join-Path $Fixture 'scripts\lib\shared-scripts-lib.ps1') -Force
     Copy-Item -Path $CheckReportLibSrc -Destination (Join-Path $Fixture 'scripts\lib\check-report-lib.ps1') -Force
+    Copy-Item -Path $ReleaseLibSrc -Destination (Join-Path $Fixture 'scripts\lib\release-lib.ps1') -Force
+    Copy-Item -Path $BranchInfoSrc -Destination (Join-Path $Fixture 'scripts\lib\branch-info.ps1') -Force
 
     $skillAlphaMd = "---`nname: skill-alpha`ndescription: Fixture skill alpha.`n---`n`n# Skill Alpha`n"
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\specialists\skills\skill-alpha\SKILL.md'), $skillAlphaMd, $Utf8NoBom)
@@ -1278,6 +1306,89 @@ try {
     $f10 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($f10.Out -match '\[measured-figure\].*QUICKSTART\.md')) `
         'measured-figure: an opt-out that names a reason does silence it'
+
+    # --- check 17: the per-plugin CHANGELOG intro still matches its generator ------------------------
+    # THE DEFECT THIS SHIPPED WITH, MEASURED August 3, 2026: cut-release.ps1 writes the intro only for a
+    # CHANGELOG that does not exist yet, so all four real files still opened by naming the marketplace the
+    # rename had retired -- in the most consumer-facing file each plugin has, past every existing gate.
+    # The fixture needs a marketplace.json for these (the expected text is derived from its 'name'), which
+    # also switches checks 1/2/9 from "found nothing" to "found something incomplete". That extra noise is
+    # never asserted on below, exactly as the suite's other checks treat check 8's missing-mirror noise.
+    Write-Host "check 17: per-plugin CHANGELOG intro vs. Build-PluginChangelogIntro" -ForegroundColor Cyan
+    [System.IO.File]::WriteAllText($qs, "# Quickstart`n", $Utf8NoBom)
+    New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude-plugin') -Force | Out-Null
+    $mpPath = Join-Path $Fixture '.claude-plugin\marketplace.json'
+    $plChangelog = Join-Path $Fixture 'plugins\specialists\CHANGELOG.md'
+    function Set-FixtureMarketplaceName([string]$Name) {
+        [System.IO.File]::WriteAllText($mpPath,
+            ('{{ "name": "{0}", "plugins": [ {{ "name": "specialists", "source": "./plugins/specialists" }} ] }}' -f $Name),
+            $Utf8NoBom)
+    }
+    # The generator is the authority on the expected text here too -- writing the sentences out by hand
+    # would make this suite a second copy of the very string whose copies are the defect.
+    . (Join-Path $Fixture 'scripts\lib\release-lib.ps1')
+    function Write-FixturePluginChangelog([string]$MarketplaceName, [string]$Tail = "## v1.0.0 - 2026-01-01`n`nAn entry.`n") {
+        [System.IO.File]::WriteAllText($plChangelog,
+            ((Build-PluginChangelogIntro -PluginName 'specialists' -MarketplaceName $MarketplaceName) + $Tail),
+            $Utf8NoBom)
+    }
+
+    # 33. The generated intro passes -- and the coverage count proves the file WAS examined, so the pass
+    #     is not an empty scan (the failure mode #221 made every category report its count for).
+    Set-FixtureMarketplaceName 'fixture-marketplace'
+    Write-FixturePluginChangelog 'fixture-marketplace'
+    $g1 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($g1.Out -match '\[changelog-intro\] checked 1') `
+        'changelog-intro: the intro is examined, so a pass is evidence rather than an empty scan'
+    Assert-True (-not ($g1.Out -match '\[changelog-intro\] \.')) `
+        'changelog-intro: an intro matching its generator reports nothing'
+
+    # 34. (THE MEASURED DEFECT) an intro naming a marketplace that marketplace.json does not is reported.
+    Write-FixturePluginChangelog 'the-retired-name'
+    $g2 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($g2.Out -match '\[changelog-intro\] \./plugins/specialists/CHANGELOG\.md') `
+        'changelog-intro: an intro naming a retired marketplace fails, naming the file'
+    Assert-True ($g2.Out -match 'fixture-marketplace') `
+        'changelog-intro: the finding states the expected text, so the repair needs no second lookup'
+
+    # 35. (THE GUARD THAT KEEPS THIS FROM BECOMING A WRAPPING POLICE) the same sentences, rewrapped at a
+    #     different column, pass. A gate failing on layout would teach "rewrap to satisfy the linter"
+    #     about a file no human should be rewrapping by hand.
+    #     Derived from the generated text rather than retyped: the title carries an em dash built via
+    #     [char]0x2014, and this suite is pure ASCII (repo convention for .ps1). Retyping it with a plain
+    #     hyphen was this scenario's first failure -- a content difference masquerading as a layout one,
+    #     which would have "proved" the opposite of what the case is for.
+    $genLines = @(((Build-PluginChangelogIntro -PluginName 'specialists' -MarketplaceName 'fixture-marketplace').TrimEnd() -split "`n"))
+    $titleLine = $genLines[0]
+    $paragraph = (@($genLines[1..($genLines.Count - 1)]) -join ' ').Trim()   # the whole paragraph on ONE line
+    [System.IO.File]::WriteAllText($plChangelog,
+        ($titleLine + "`n`n" + $paragraph + "`n`n## v1.0.0 - 2026-01-01`n`nAn entry.`n"),
+        $Utf8NoBom)
+    $g3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($g3.Out -match '\[changelog-intro\] \./plugins/specialists/CHANGELOG\.md')) `
+        'changelog-intro: rewrapping the same sentences is not a finding -- content is compared, layout is not'
+
+    # 36. A file with no version heading is REPORTED, not silently skipped: the intro's end cannot be
+    #     located, so the check cannot assert anything -- and a check that quietly asserts nothing is the
+    #     failure mode this whole gate exists to avoid.
+    [System.IO.File]::WriteAllText($plChangelog, "# Changelog - specialists`n`nSomething hand-written.`n", $Utf8NoBom)
+    $g4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($g4.Out -match "\[changelog-intro\] \./plugins/specialists/CHANGELOG\.md: no '## vX\.Y\.Z' heading") `
+        'changelog-intro: a file whose intro has no end boundary is reported rather than skipped in silence'
+
+    # 37. (THE DESIGN, NOT A BUG GUARD) the expected name comes from marketplace.json's 'name', never from
+    #     a literal in the gate. Renaming the marketplace in the fixture manifest -- and nothing else --
+    #     must flip the SAME file from failing to passing. Without this case the check could carry its own
+    #     hardcoded copy of the name and every scenario above would still pass, which is precisely the
+    #     shape of the defect it is here to catch.
+    Write-FixturePluginChangelog 'renamed-marketplace'
+    $g5 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($g5.Out -match '\[changelog-intro\] \./plugins/specialists/CHANGELOG\.md') `
+        'changelog-intro: an intro ahead of the manifest fails while the manifest still says the old name'
+    Set-FixtureMarketplaceName 'renamed-marketplace'
+    $g6 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($g6.Out -match '\[changelog-intro\] \./plugins/specialists/CHANGELOG\.md')) `
+        'changelog-intro: renaming the marketplace in the manifest alone makes that same file pass -- the expected text is derived, not hardcoded'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

@@ -120,16 +120,28 @@ function Write-Utf8NoBom([string]$Path, [string]$Content) {
 # the release that would have hit it.
 $reservedRootMd = @('CHANGELOG.md', 'CLAUDE.md', 'README.md', 'LICENSE.md', 'CONTRIBUTING.md', 'SECURITY.md', 'QUICKSTART.md', 'UNINSTALL.md')
 
+$script:marketplaceJsonText = $null
+function Get-MarketplaceJsonText {
+    # THE one read of marketplace.json, shared by the two things derived from it: which plugins exist,
+    # and what the marketplace is called. Cached rather than re-read per caller -- two reads of one
+    # file during a release that also WRITES files is exactly how the two answers start disagreeing,
+    # and a function whose comment promises a single read has to deliver one.
+    if ($null -eq $script:marketplaceJsonText) {
+        $marketplacePath = Join-Path $repoRoot '.claude-plugin\marketplace.json'
+        if (-not (Test-Path -LiteralPath $marketplacePath)) {
+            Write-Error ".claude-plugin/marketplace.json is missing."; exit 1
+        }
+        $script:marketplaceJsonText = (Get-Content -Path $marketplacePath -Raw -Encoding UTF8)
+    }
+    return $script:marketplaceJsonText
+}
+
 function Get-PluginManifests {
     # The marketplace definition is the source of truth about what a plugin is: the manifests are
     # derived from plugins[].source (incl. containment check) by Get-PluginManifestPaths in
     # release-lib.ps1 -- pure there and thus tested. Here only the IO: reading + existence check.
-    $marketplacePath = Join-Path $repoRoot '.claude-plugin\marketplace.json'
-    if (-not (Test-Path -LiteralPath $marketplacePath)) {
-        Write-Error ".claude-plugin/marketplace.json is missing."; exit 1
-    }
     $paths = @(Get-PluginManifestPaths -RepoRoot $repoRoot `
-        -MarketplaceJson (Get-Content -Path $marketplacePath -Raw -Encoding UTF8))
+        -MarketplaceJson (Get-MarketplaceJsonText))
     foreach ($manifest in $paths) {
         if (-not (Test-Path -LiteralPath $manifest)) {
             $pluginName = Split-Path (Split-Path (Split-Path $manifest -Parent) -Parent) -Leaf
@@ -155,6 +167,9 @@ if ($strayEntries.Count -gt 0) {
 # --- Determine version + bump type ------------------------------------------------------------
 $manifests = @(Get-PluginManifests)
 if ($manifests.Count -eq 0) { Write-Error "No plugin manifests found."; exit 1 }
+# Read once, outside the per-plugin loop that consumes it: the name is a property of the marketplace,
+# not of the plugin, so re-deriving it per plugin would invite four answers to a one-answer question.
+$marketplaceName = Get-MarketplaceName -MarketplaceJson (Get-MarketplaceJsonText)
 $manifestContents = @{}
 foreach ($m in $manifests) { $manifestContents[$m] = (Get-Content -Path $m -Raw -Encoding UTF8) }
 $current = Get-LockstepVersion -ManifestContents $manifestContents
@@ -316,7 +331,7 @@ foreach ($m in $manifests) {
         $section = Build-PluginChangelogSection -Entries $convertedEntries -Version $new -Date $today
         $plChangelogPath = Join-Path $pluginDir 'CHANGELOG.md'
         $existing = if (Test-Path -LiteralPath $plChangelogPath) { Get-Content -Path $plChangelogPath -Raw -Encoding UTF8 } else { '' }
-        Write-Utf8NoBom -Path $plChangelogPath -Content (Add-PluginChangelogSection -Existing $existing -Section $section -PluginName $pluginName)
+        Write-Utf8NoBom -Path $plChangelogPath -Content (Add-PluginChangelogSection -Existing $existing -Section $section -PluginName $pluginName -MarketplaceName $marketplaceName)
         Write-Host "  updated: $pluginName/CHANGELOG.md ($($pluginEntries.Count) entries)" -ForegroundColor DarkGray
     }
 

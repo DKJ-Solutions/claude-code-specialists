@@ -7,8 +7,8 @@ itself; (2) **how a specialist is structured** — as persona or subagent, the t
 manual, and the stable-id system; and (3) **how the specialists here are organized among
 themselves**. It is **not a replacement** for the safety rules or the routing.
 
-> **This repo is an outlier.** claude-code-specialists is Dave's workshop marketplace; the specialists
-> system lives here as the first product family in `plugins/`
+> **This repo is an outlier.** claude-code-specialists is the marketplace repo of one product; the
+> specialists system lives here as the four plugins under `plugins/`
 > (see [`../../README.md`](../../README.md)) — and the repo also consumes that system here
 > **itself**, via the `specialists` plugin (group 1). The team here is therefore small and focused on
 > maintaining this product (agent defs, manuals, docs, tooling), not the broad team of a

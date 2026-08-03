@@ -1,6 +1,6 @@
 # Changelog
 
-The history of the davekjohns-workshop marketplace: under **Pull Requests** every merged branch
+The history of the claude-code-specialists marketplace: under **Pull Requests** every merged branch
 with its PR, under **Releases** the recorded versions. How the mechanism works (entry files,
 folding) is described in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
