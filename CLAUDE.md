@@ -191,6 +191,20 @@ The constitution above, concretely implemented here:
   (`scripts/tests/*.tests.ps1`), exactly as CI
   does. `open-pr.ps1` runs both gates first; on an error or a failing suite nothing is pushed and
   no PR is opened (`-SkipLint`/`-SkipTests` are the escape valves). See [Sylvester #15](.claude/specialists/lenses/05-15-extension.md).
+- **A third gate, on the changelog entry itself: the scaffold gate** (August 3, 2026). `open-pr.ps1`
+  refuses to push a branch whose entry still carries the wording `new-changelog-entry.ps1` scaffolded
+  it with — the placeholder title, the "to do / where I left off" heading, or the fallback body.
+  **Measured, after it had already shipped:** three of v3.2.0's twenty-one entries kept that heading
+  with a status appended behind it, and it reached the release notes *and* the per-plugin
+  `CHANGELOG.md` files that travel to consumers in the plugin cache. The window closes at the merge and
+  closes **invisibly** — the fold moves the entry into `CHANGELOG.md`, the next release moves it on into
+  `releases/`, so by then the place a reviewer would look is the one place it no longer is. Fenced code
+  is excluded, so an entry documenting this mechanism is not accused of it; `-Force` is the escape
+  valve, deliberately separate from `-SkipLint`/`-SkipTests` because it overrules a judgement about
+  content rather than skipping a tool. The wording lives in **one** shared source
+  ([`entry-scaffold-lib.ps1`](scripts/lib/entry-scaffold-lib.ps1)) read by both the script that writes
+  it and the gate that refuses it — a copy in each would make the gate silently miss whatever the
+  writer changed.
 - **Two deliberate exceptions to "never directly on `main`":**
   1. The **fold commit** after a merge: [`fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)
      folds the entry file into `CHANGELOG.md` and removes it, and with `-Commit`/`-Push` makes that

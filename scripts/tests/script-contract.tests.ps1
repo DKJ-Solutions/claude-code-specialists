@@ -397,9 +397,15 @@ function Get-RosterIgnoredIds { return @() }
         # The four stub-wording knobs (issue #410). These DO belong in this loop, unlike Get-LiveStage:
         # they are attributed to 'new-changelog-entry', a genuinely registered shared script, so the
         # per-script assertions below apply to them unchanged.
-        @{ Function = 'Get-EntryTitlePlaceholder'; Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry') },
-        @{ Function = 'Get-EntryBodyHeading';      Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry') },
-        @{ Function = 'Get-EntryBodyPlaceholder';  Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry') },
+        # Three of the four gained a SECOND reader: open-pr.ps1's scaffold gate refuses a PR whose entry
+        # still carries this wording, through the same shared lib the writer uses. The per-script assertion
+        # below therefore now checks BOTH scripts really reference each one -- which is what would catch the
+        # gate being removed while the contract still promised it.
+        @{ Function = 'Get-EntryTitlePlaceholder'; Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry', 'open-pr'); ViaLib = 'entry-scaffold-lib' },
+        @{ Function = 'Get-EntryBodyHeading';      Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry', 'open-pr'); ViaLib = 'entry-scaffold-lib' },
+        @{ Function = 'Get-EntryBodyPlaceholder';  Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry', 'open-pr'); ViaLib = 'entry-scaffold-lib' },
+        # The fourth stays single-reader on purpose: a changelog TYPE is not scaffold prose, so 'Chore' is a
+        # legitimate final value and can never be evidence of an unedited entry.
         @{ Function = 'Get-EntryFallbackType';     Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry') },
         # The two knobs the newly mirrored scripts brought with them (issues #411 and #413). Both belong
         # in this loop for the same reason the Get-Entry* four do: they are attributed to real registered
@@ -451,11 +457,26 @@ function Get-RosterIgnoredIds { return @() }
             $actualSorted   = ($actualScripts | Sort-Object) -join ','
             Assert-Equal $expectedSorted $actualSorted "contract: '$($e.Function)' still required by exactly {$($e.Scripts -join ', ')}"
 
+            # A record may reach its function INDIRECTLY, through a shared library both callers dot-source
+            # (ViaLib). Then the proof is two-part and stricter than the direct match: the script must
+            # really dot-source that lib, and the lib must really name the function. The direct form was
+            # satisfiable by a mention in a docstring; this one is not, because a dot-source line is code.
+            $viaLib = if ($e.ContainsKey('ViaLib')) { $e.ViaLib } else { $null }
+            if ($viaLib) {
+                Assert-True $pairsByName.ContainsKey($viaLib) "contract: '$viaLib' is a registered shared lib (Get-SharedScriptPairs)"
+            }
             foreach ($scriptName in $actualScripts) {
                 Assert-True $pairsByName.ContainsKey($scriptName) "contract: '$scriptName' is a registered shared script (Get-SharedScriptPairs)"
                 if ($pairsByName.ContainsKey($scriptName)) {
                     $srcText = [System.IO.File]::ReadAllText($pairsByName[$scriptName].SourcePath)
-                    Assert-True ($srcText -match [regex]::Escape($e.Function)) "contract: shared script '$scriptName' really references '$($e.Function)' in its own real source (not a stale entry)"
+                    if ($viaLib -and $pairsByName.ContainsKey($viaLib)) {
+                        $libLeaf = Split-Path $pairsByName[$viaLib].SourcePath -Leaf
+                        Assert-True ($srcText -match [regex]::Escape($libLeaf)) "contract: shared script '$scriptName' really dot-sources '$libLeaf' (the route to '$($e.Function)')"
+                        $libText = [System.IO.File]::ReadAllText($pairsByName[$viaLib].SourcePath)
+                        Assert-True ($libText -match [regex]::Escape($e.Function)) "contract: shared lib '$libLeaf' really references '$($e.Function)' (not a stale entry)"
+                    } else {
+                        Assert-True ($srcText -match [regex]::Escape($e.Function)) "contract: shared script '$scriptName' really references '$($e.Function)' in its own real source (not a stale entry)"
+                    }
                 }
             }
         }

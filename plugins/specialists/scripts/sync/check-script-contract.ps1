@@ -179,15 +179,28 @@ $script:Contract = @(
     # gets working English stubs in a repo whose changelog is in another language, and discovers it at
     # entry time, once per branch, forever. An [INFO] naming the default turns that into a thing you
     # were told rather than a thing you noticed.
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryTitlePlaceholder'; Scripts = @('new-changelog-entry');
+    # THREE OF THE FOUR ARE NOW READ BY TWO SCRIPTS, and the second one is why the attribution matters:
+    # open-pr.ps1's scaffold gate REFUSES a PR whose entry still carries this wording, reading it through
+    # the shared entry-scaffold-lib.ps1 exactly as the writer does. A consumer that configures the wording
+    # but is told only about new-changelog-entry would not know the gate follows its answer too -- and a
+    # finding here has to be self-contained (Dave, July 28, 2026).
+    # ViaLib names the shared library through which these scripts reach the function, because NEITHER of
+    # them names it directly any more -- both call Get-EntryScaffoldWording. Declared rather than left
+    # implicit so the completeness guard can still prove the reference is real: it checks that each script
+    # dot-sources that lib AND that the lib names the function, which is a stricter test than the direct
+    # text match it replaces (that one was satisfiable by a mere mention in a docstring).
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryTitlePlaceholder'; Scripts = @('new-changelog-entry', 'open-pr');
+       ViaLib = 'entry-scaffold-lib';
        Optional = $true; Default = 'TODO: title';
-       Returns = 'the placeholder title for an entry created without an explicit -Title' },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryBodyHeading'; Scripts = @('new-changelog-entry');
+       Returns = 'the placeholder title for an entry created without an explicit -Title; open-pr refuses to ship an entry that still carries it' },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryBodyHeading'; Scripts = @('new-changelog-entry', 'open-pr');
+       ViaLib = 'entry-scaffold-lib';
        Optional = $true; Default = '**To do / where I left off:**';
-       Returns = 'the single bold line written above the entry body' },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryBodyPlaceholder'; Scripts = @('new-changelog-entry');
+       Returns = 'the single bold line written above the entry body; open-pr refuses to ship an entry that still carries it' },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryBodyPlaceholder'; Scripts = @('new-changelog-entry', 'open-pr');
+       ViaLib = 'entry-scaffold-lib';
        Optional = $true; Default = 'TODO: what still needs to happen on this branch, and where you left off.';
-       Returns = 'the fallback body used when no -Intent was given -- a directional prompt, not an empty line' },
+       Returns = 'the fallback body used when no -Intent was given -- a directional prompt, not an empty line; open-pr refuses to ship an entry that still carries it' },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryFallbackType'; Scripts = @('new-changelog-entry');
        Optional = $true; Default = 'Chore';
        Returns = "the changelog type an unknown branch prefix falls back to; it must be one of the types this repo's own branch table produces, since the release cut groups entries by it" },

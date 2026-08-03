@@ -6,8 +6,9 @@ description: >-
   to duplicate this script locally. Runs the repo's own lint and test gate first; on an error,
   nothing is pushed and no PR is opened. Also forces the issue-closing decision: a branch that
   mentions an open issue must pass -Resolves or -NoResolves, so a repaired issue cannot stay open
-  after the merge. Use this when a branch is ready and the repo's governance rule allows the PR to be
-  opened.
+  after the merge. And it refuses a changelog entry that still carries its scaffold wording, which
+  would otherwise become permanent in the release notes and the consumer-facing plugin CHANGELOGs.
+  Use this when a branch is ready and the repo's governance rule allows the PR to be opened.
 disable-model-invocation: true
 ---
 
@@ -29,12 +30,39 @@ The script:
 
 1. Runs the **resolves gate** first, because it needs no network and nothing has left the machine
    yet. See [The resolves gate](#the-resolves-gate-which-issues-does-this-pr-close) below.
-2. Runs the **repo's own lint gate** (via `Get-LintScript` from `repo-config`) and then **all
+2. Runs the **scaffold gate**: the branch's changelog entry must no longer carry the wording
+   `new-changelog-entry.ps1` scaffolded it with. See
+   [The scaffold gate](#the-scaffold-gate-has-the-entry-actually-been-written) below.
+3. Runs the **repo's own lint gate** (via `Get-LintScript` from `repo-config`) and then **all
    test suites** (`scripts/tests/*.tests.ps1`) -- exactly like CI. An error blocks: nothing is
    pushed and no PR is opened. `-SkipLint` / `-SkipTests` are the deliberate escape valves.
-3. Pushes the current branch and opens a PR to `main` via `gh`, with a label based on the
+4. Pushes the current branch and opens a PR to `main` via `gh`, with a label based on the
    branch prefix and a pre-filled PR body from `.github/pull_request_template.md` +
    the changelog entry file.
+
+## The scaffold gate: has the entry actually been written?
+
+`new-branch` creates a changelog entry as a **scaffold** — a placeholder title, a
+`**To do / where I left off:**` heading and a prompting body — for whoever finishes the branch to
+replace. This gate refuses to push while that wording is still there.
+
+**It is not a hypothetical.** In the source repo, three of one release's twenty-one entries kept that
+heading with a status appended behind it (`**To do / where I left off:** done -- lint gate green`). A
+progress note: correct on the branch, wrong the moment it is published. It reached the release notes
+*and* the per-plugin `CHANGELOG.md` files that travel to consumers in the plugin cache.
+
+**The window closes at the merge, and it closes invisibly.** The fold moves the entry into
+`CHANGELOG.md`; the next release moves it on into `releases/` and empties the Pull-Requests section. So
+by the time anyone would review it, the place they would look is the one place it no longer is.
+
+The wording is **repo-owned** — whatever `Get-EntryTitlePlaceholder`, `Get-EntryBodyHeading` and
+`Get-EntryBodyPlaceholder` say in your `scripts/repo-config.ps1`, or the English defaults. The gate and
+the script that writes the scaffold read it from the same shared library, so they cannot disagree.
+
+- **Fenced code is excluded**, so an entry that documents this mechanism is not accused of it.
+- **`-Force` ships anyway** (a warning instead of a block), for the rare entry that legitimately quotes
+  the wording outside a fence. Deliberately separate from `-SkipLint`/`-SkipTests`: those skip a tool,
+  this overrules a judgement about content.
 
 ## The resolves gate: which issues does this PR close?
 

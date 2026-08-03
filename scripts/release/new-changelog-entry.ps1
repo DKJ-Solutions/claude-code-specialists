@@ -87,24 +87,20 @@ if (-not (Test-Path -LiteralPath $branchInfoPath)) {
 # function is ever called, and the configured wording would silently read back as the default. That is
 # the collision already documented on $RepoRoot/$repoRoot in fold-changelog-entry.ps1; it costs nothing
 # to avoid and is invisible when you do not.
-$stubTitle        = 'TODO: title'
-$stubBodyHeading  = '**To do / where I left off:**'
-$stubBody         = 'TODO: what still needs to happen on this branch, and where you left off.'
+#
+# THE THREE PROSE STRINGS NO LONGER LIVE HERE. They moved to entry-scaffold-lib.ps1 when open-pr.ps1
+# gained the gate that REFUSES an entry still carrying them: the writer and the guard must not be able
+# to disagree about the wording, or the guard silently misses whatever the writer changed. The fallback
+# type stays here, because it is a changelog TYPE rather than scaffold prose -- 'Chore' is a legitimate
+# final value and can never be evidence of an unedited entry.
+. (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
+
 $stubFallbackType = 'Chore'
 
 $configPath = Join-Path $repoRoot 'scripts\repo-config.ps1'
 if (Test-Path -LiteralPath $configPath) {
     try {
         . $configPath
-        if (Get-Command Get-EntryTitlePlaceholder -ErrorAction SilentlyContinue) {
-            $v = Get-EntryTitlePlaceholder; if ($v) { $stubTitle = $v }
-        }
-        if (Get-Command Get-EntryBodyHeading -ErrorAction SilentlyContinue) {
-            $v = Get-EntryBodyHeading; if ($v) { $stubBodyHeading = $v }
-        }
-        if (Get-Command Get-EntryBodyPlaceholder -ErrorAction SilentlyContinue) {
-            $v = Get-EntryBodyPlaceholder; if ($v) { $stubBody = $v }
-        }
         if (Get-Command Get-EntryFallbackType -ErrorAction SilentlyContinue) {
             $v = Get-EntryFallbackType; if ($v) { $stubFallbackType = $v }
         }
@@ -112,6 +108,12 @@ if (Test-Path -LiteralPath $configPath) {
         Write-Warning "scripts\repo-config.ps1 could not be loaded ($($_.Exception.Message)) -- writing the entry with the built-in default wording."
     }
 }
+
+# Probed AFTER the dot-source above, so this repo's own answers win where it gives them.
+$scaffold         = Get-EntryScaffoldWording
+$stubTitle        = $scaffold.Title
+$stubBodyHeading  = $scaffold.BodyHeading
+$stubBody         = $scaffold.BodyPlaceholder
 
 # The caller named no title (see the param comment): use this repo's placeholder.
 if ($Title -eq "") { $Title = $stubTitle }

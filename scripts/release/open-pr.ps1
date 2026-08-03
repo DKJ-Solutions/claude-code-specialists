@@ -39,6 +39,15 @@
     follows the main categories of the PR template. Unknown prefix -> label 'question' + warning
     (= needs further classification).
 
+    Scaffold gate (measured at v3.2.0): the branch's changelog entry must no longer carry the wording
+    new-changelog-entry.ps1 scaffolded it with -- the placeholder title, the "to do / where I left off"
+    heading or the fallback body (whatever this repo configured them to be; entry-scaffold-lib.ps1 is the
+    single source, shared with the script that writes them). Three of v3.2.0's twenty-one entries kept
+    that heading with a status appended, and it reached the release notes and the per-plugin CHANGELOGs
+    that travel to consumers. The window closes at the merge and closes INVISIBLY, because by then the
+    text has moved out of CHANGELOG.md's Pull Requests section into files nobody re-reads. Fenced code is
+    excluded, so an entry documenting this mechanism is not accused of it. Use -Force to ship anyway.
+
     Lint gate (guardrail for main): before the push, scripts/lint/check-plugin-integrity.ps1 runs.
     If that finds errors (invalid marketplace/plugin manifests, missing agent-def frontmatter,
     dead links), the branch is NOT pushed and NO PR is opened. Use -SkipLint to deliberately skip
@@ -86,6 +95,12 @@
 .PARAMETER NoResolves
     Declare that this PR closes no issue. The deliberate way past the resolves gate.
 
+.PARAMETER Force
+    Ship an entry that still carries its scaffold wording -- the escape valve for the scaffold gate,
+    for the rare entry that legitimately quotes that wording outside a fence. Warns instead of blocking.
+    Deliberately separate from -SkipLint/-SkipTests: those skip a tool, this overrules a content
+    judgement, and conflating them would let a routine "skip the slow suites" also wave prose through.
+
 .EXAMPLE
     ./scripts/release/open-pr.ps1 -Title "feat: new domain plugin"
 
@@ -99,7 +114,8 @@ param(
     [switch]$SkipLint,
     [switch]$SkipTests,
     [string]$Resolves = '',
-    [switch]$NoResolves
+    [switch]$NoResolves,
+    [switch]$Force
 )
 $ErrorActionPreference = 'Stop'
 
@@ -239,6 +255,49 @@ Both are honest answers; the gate only refuses to guess.
         $notOpen = @($resolveIssues | Where-Object { $openAll -notcontains $_ })
         if ($notOpen.Count -gt 0) {
             Write-Warning ("-Resolves names issue(s) that are not open right now: " + (($notOpen | ForEach-Object { "#$_" }) -join ', ') + " -- check for a typo. The closing keyword is written anyway (harmless on an already-closed issue).")
+        }
+    }
+}
+
+# Scaffold gate: an entry that still carries its scaffold wording must not become a PR.
+#
+# MEASURED, AND IT HAD ALREADY SHIPPED. At v3.2.0 three of the twenty-one entries (#424, #425, #426)
+# still carried "**To do / where I left off:**" -- not untouched scaffolds, but the heading kept with a
+# status appended behind it ("done -- lint gate green"). A progress note, correct on the branch and
+# wrong the moment it is published.
+#
+# WHY THIS GATE AND NOT THE LINT ONE. The window closes at the merge, and it closes INVISIBLY: the fold
+# moves the entry into CHANGELOG.md, and the next release moves it on into releases/development/ and
+# into every per-plugin CHANGELOG.md that travels to consumers in the plugin cache. By then the place
+# a reviewer would look is the one place it no longer is -- CHANGELOG.md's Pull Requests section is
+# empty after a cut. Held against all 70 archived notes: one older instance, then three in one day, so
+# this is a real rate rather than a one-off.
+#
+# NOT -SkipLint-able and deliberately its own gate: it costs one read of a file already in hand, needs
+# no gh and no subprocess, and refusing it is a content decision rather than a tooling one. -Force is
+# the escape valve, for the rare entry that legitimately quotes the wording outside a fence.
+if (Test-Path -LiteralPath $entryPath) {
+    . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
+    $entryText = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
+    $scaffoldFindings = @(Get-EntryScaffoldFindings -EntryText $entryText -Wording (Get-EntryScaffoldWording))
+    if ($scaffoldFindings.Count -gt 0) {
+        $entryRel = Split-Path $entryPath -Leaf
+        $detail = ($scaffoldFindings | ForEach-Object { "  - $($_.Label): '$($_.Marker)'" }) -join "`n"
+        if ($Force) {
+            Write-Warning "scaffold gate: $entryRel still carries scaffold wording, but -Force was given:`n$detail"
+        } else {
+            Write-Error @"
+scaffold gate: $entryRel still carries the wording new-changelog-entry.ps1 scaffolded it with - nothing pushed, no PR opened.
+
+$detail
+
+That text describes what was still TO DO on the branch. It is about to become permanent: the fold pastes
+this entry into CHANGELOG.md, and the next release copies it into releases/ and into every per-plugin
+CHANGELOG.md that travels to consumers - where nobody will look for it again.
+
+Rewrite the body to say what the change DOES, then run again. Keeping it as-is is -Force.
+"@
+            exit 1
         }
     }
 }

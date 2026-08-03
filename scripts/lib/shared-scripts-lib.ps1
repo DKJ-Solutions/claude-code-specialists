@@ -119,6 +119,16 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # The changelog entry's scaffold wording, needed by TWO shared scripts that must not be able
+            # to disagree about it: new-changelog-entry.ps1 writes it, open-pr.ps1's scaffold gate refuses
+            # to ship it. A copy in each would make the gate silently miss whatever the writer changed --
+            # a drift guard that drifts. So it travels with both rather than living in either.
+            Name    = 'entry-scaffold-lib'
+            Source  = 'scripts\lib\entry-scaffold-lib.ps1'
+            Mirror  = 'plugins\specialists\scripts\lib\entry-scaffold-lib.ps1'
+            LibOnly = $true
+        },
+        @{
             # Issue #417, phase 1. Two repos ran two independently evolved files of this name, and the
             # owner's goal is one release workflow rather than two that resemble each other. The audit
             # that produced the issue named three divergences; reading both files found six, and the
