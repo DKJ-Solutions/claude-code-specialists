@@ -328,6 +328,37 @@ Assert-Match $conv '\[the lint\]\(https://gh\.test/blob/main/scripts/lint/x\.ps1
 Assert-Match $conv '\[site\]\(https://example\.com\)' 'external link untouched (plugin variant)'
 Assert-Match $conv '\[#heading\]\(#heading\)' 'anchor link untouched (plugin variant)'
 
+Write-Host "Get-MarketplaceName" -ForegroundColor Cyan
+Assert-Equal 'claude-code-specialists' (Get-MarketplaceName -MarketplaceJson '{ "name": "claude-code-specialists", "plugins": [] }') 'reads the name field'
+# Throwing beats returning empty: the two callers write this name into a consumer-facing file and
+# compare against it at the gate. An empty string would produce a plausible-looking '()' in the intro
+# and a gate holding every file against it, i.e. a wrong answer delivered quietly.
+$mpNoName = $false
+try { Get-MarketplaceName -MarketplaceJson '{ "plugins": [] }' | Out-Null } catch { $mpNoName = $true }
+Assert-Equal $true $mpNoName 'a manifest without a name throws instead of yielding an empty name'
+$mpEmptyName = $false
+try { Get-MarketplaceName -MarketplaceJson '{ "name": "", "plugins": [] }' | Out-Null } catch { $mpEmptyName = $true }
+Assert-Equal $true $mpEmptyName 'an empty name throws too -- present-but-blank is not a name'
+
+Write-Host "Build-PluginChangelogIntro" -ForegroundColor Cyan
+# THE WHOLE POINT OF THIS FUNCTION EXISTING SEPARATELY (measured August 3, 2026): the intro is written
+# once, at file creation, and never revisited -- so it is the one generated string in this library that
+# cannot self-heal on the next release. Extracting it gives check 17 of check-plugin-integrity.ps1 a
+# single source to hold the four existing CHANGELOGs against.
+$intro = Build-PluginChangelogIntro -PluginName 'specialists' -MarketplaceName 'claude-code-specialists'
+Assert-Match $intro '^# Changelog .* specialists' 'intro opens with the plugin title'
+Assert-Match $intro '\(claude-code-specialists\)' 'intro names the marketplace it was given'
+Assert-Equal $false ([bool]($intro -match 'workshop')) 'intro carries no trace of the retired workshop framing'
+# The name is a parameter, not a literal: a different marketplace must produce a different intro, which
+# is what lets the gate derive its expectation from marketplace.json instead of hardcoding a copy.
+$introOther = Build-PluginChangelogIntro -PluginName 'specialists' -MarketplaceName 'some-other-marketplace'
+Assert-Match $introOther '\(some-other-marketplace\)' 'the marketplace name is injected, not baked in'
+Assert-Equal $false ($intro -eq $introOther) 'a different marketplace name yields a different intro'
+# Add-PluginChangelogSection must emit exactly this text for a new file -- if the two ever diverge, the
+# gate would hold the real CHANGELOGs against a string cut-release.ps1 no longer writes.
+$freshForIntro = Add-PluginChangelogSection -Existing '' -Section '## v1.0.0 - 2026-01-01' -PluginName 'specialists' -MarketplaceName 'claude-code-specialists'
+Assert-Equal $true $freshForIntro.StartsWith($intro) 'a new CHANGELOG begins with exactly Build-PluginChangelogIntro output'
+
 Write-Host "Build-PluginChangelogSection + Add-PluginChangelogSection" -ForegroundColor Cyan
 $section = Build-PluginChangelogSection -Entries @($entryWithPlugins) -Version '1.5.0' -Date '2026-07-17'
 Assert-Match $section '^## v1\.5\.0 ' 'section heading with version'
@@ -336,11 +367,11 @@ Assert-Match $section '(?m)^#### #4 ' 'entry included in the section, demoted un
 Assert-Match $section '(?s)## v1\.5\.0 .*### Features.*#### #4 ' 'nesting: ## version -> ### category -> #### entry'
 $sectionClean = Build-PluginChangelogSection -Entries @(Remove-EntryPluginsLine -EntryText $entryWithPlugins) -Version '1.5.0' -Date '2026-07-17'
 Assert-Equal $false ([bool]($sectionClean -match '(?m)^Plugins:')) 'section via the cut-release path contains no Plugins line'
-$fresh = Add-PluginChangelogSection -Existing '' -Section $section -PluginName 'specialists'
+$fresh = Add-PluginChangelogSection -Existing '' -Section $section -PluginName 'specialists' -MarketplaceName 'fixture-marketplace'
 Assert-Match $fresh '^# Changelog .* specialists' 'new CHANGELOG gets an intro header'
 Assert-Match $fresh '(?s)# Changelog.*## v1\.5\.0' 'section comes after the intro'
 $section2 = Build-PluginChangelogSection -Entries @($entryWithPlugins) -Version '1.6.0' -Date '2026-07-18'
-$appended = Add-PluginChangelogSection -Existing $fresh -Section $section2 -PluginName 'specialists'
+$appended = Add-PluginChangelogSection -Existing $fresh -Section $section2 -PluginName 'specialists' -MarketplaceName 'fixture-marketplace'
 Assert-Match $appended '(?s)## v1\.6\.0.*## v1\.5\.0' 'newest release is at the top'
 Assert-Equal 1 (@([regex]::Matches($appended, '(?m)^# Changelog')).Count) 'intro header not duplicated'
 
@@ -350,7 +381,7 @@ Write-Host "Add-PluginChangelogSection (tightened ## v match, #103)" -Foreground
 # Notes heading or in the middle of it.
 $existingWithNotes = "# Changelog $emDash specialists`n`n## Notes`n`nManual note, no version.`n`n## v1.0.0 $emDash 2026-01-01`n`nOld content.`n"
 $sectionForNotesTest = "## v1.1.0 $emDash 2026-01-02`n`nNew content."
-$withNotesResult = Add-PluginChangelogSection -Existing $existingWithNotes -Section $sectionForNotesTest -PluginName 'specialists'
+$withNotesResult = Add-PluginChangelogSection -Existing $existingWithNotes -Section $sectionForNotesTest -PluginName 'specialists' -MarketplaceName 'fixture-marketplace'
 Assert-Match $withNotesResult '(?s)## Notes.*Manual note.*## v1\.1\.0.*## v1\.0\.0' 'new section inserted after the Notes heading, before the first real version heading'
 $notesHeadingMatches = @([regex]::Matches($withNotesResult, '(?m)^## Notes'))
 Assert-Equal 1 $notesHeadingMatches.Count 'Notes heading stays present exactly once (not duplicated or overwritten)'
@@ -361,7 +392,7 @@ Assert-Equal $true ($notesIdx -lt $v11Idx -and $v11Idx -lt $v10Idx) 'order is No
 # Normal case (only version headings, no non-version heading) still works -- the same outcome as
 # the existing 'newest release is at the top' test above, here as an explicit regression guard
 # for the tightened regex.
-$onlyVersionsResult = Add-PluginChangelogSection -Existing $fresh -Section $section2 -PluginName 'specialists'
+$onlyVersionsResult = Add-PluginChangelogSection -Existing $fresh -Section $section2 -PluginName 'specialists' -MarketplaceName 'fixture-marketplace'
 Assert-Match $onlyVersionsResult '(?s)## v1\.6\.0.*## v1\.5\.0' 'normal case (only version headings) keeps inserting correctly'
 
 Write-Host "Build-PluginChangelogSection (LF normalization, point e, #103)" -ForegroundColor Cyan

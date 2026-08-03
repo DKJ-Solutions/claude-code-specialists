@@ -82,6 +82,30 @@
          so history is excluded identically. Matching is case-insensitive, since PowerShell property
          access is and a working query must not be reported as broken.
 
+     13. entry-heading levels: a heading inside a changelog entry body at or above the entry's own H3
+         becomes a SEPARATE entry when the fold pastes it into CHANGELOG.md, and an H1/H2 climbs out of
+         its release category in the generated notes (seen in v2.13.2). Judged in every unfolded root
+         entry file and in CHANGELOG.md's '## Pull Requests' section.
+     14. encoding: scripts/maintenance/fix-mojibake.ps1 -Check is run as the gate over the root docs,
+         every per-plugin CHANGELOG.md and RELEASE.md, and every note under releases/. A UTF-8 character
+         read as ANSI and written back changes the text with no error -- and in an entry heading the
+         separator IS the field delimiter, so cut-release.ps1 stops being able to read the entry type.
+     15. unbound output samples: a fenced block with no language (or 'text') is something the reader
+         COMPARES against, so something near it must say what the capture is bound to -- a version, a
+         date, a platform, a repo state, or a hedge. Four of test round v11's nine findings were this
+         one shape. Blocks tagged powershell/json/jsonc are commands to RUN and are left alone; so are
+         blocks containing box drawing, which are drawn rather than captured.
+     16. measured figures in prose: check 15's subject one step outside a fence -- a byte count or file
+         size in the consumer-facing docs is a measurement of somebody's machine, and the surrounding
+         paragraphs must say whose (round v12 filed exactly this as #374).
+     17. per-plugin CHANGELOG intro: the header above each plugins/<plugin>/CHANGELOG.md's first
+         '## vX.Y.Z' heading must still match what Build-PluginChangelogIntro (scripts/lib/release-lib.ps1)
+         generates, with the marketplace name read from marketplace.json. cut-release.ps1 writes that
+         header ONLY for a CHANGELOG that does not exist yet, so it is never refreshed -- which is how all
+         four files kept naming the retired marketplace after the rename swept it out of 59 others.
+         Compared whitespace-normalized (content, not line wrapping); everything below the first version
+         heading is history and deliberately not examined, as in checks 11 and 12.
+
     Exit code: 0 = no errors. 1 = at least one error (usable as a gate in open-pr.ps1).
 .EXAMPLE
     ./scripts/lint/check-plugin-integrity.ps1
@@ -101,6 +125,12 @@ function Add-Error([string]$Msg) { $script:errors.Add($Msg) }
 # would in fact be wrong here -- this script's $errors is a List[string], not an int counter -- exactly
 # the deliberate, documented non-collision check-consumer-drift.ps1 already relies on.
 . (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
+
+# release-lib supplies the two pure helpers check 17 needs: Build-PluginChangelogIntro (the single source
+# of the per-plugin CHANGELOG header) and Get-MarketplaceName. Dot-sourced here with the other lib rather
+# than mid-file, so every import this gate depends on is visible in one place. release-lib deliberately
+# sets no strict mode of its own, so it cannot loosen this script's Set-StrictMode -Version Latest.
+. (Join-Path $PSScriptRoot '..\lib\release-lib.ps1')
 
 function Test-JsonFile {
     param([string]$Path)
@@ -1285,6 +1315,73 @@ foreach ($rel in $consumerDocs) {
 }
 Write-Coverage -Category 'measured-figure' -Checked $figureChecked `
     -Note 'byte counts and file sizes in the PROSE of the consumer-facing docs -- the same staleness class as check 15, outside a fence where no markup marks it. Figures inside fenced blocks are deliberately not counted here: those are check 15''s, and counting them twice would report one sample as two'
+
+# --- 17. the per-plugin CHANGELOG intro still matches the template that generated it -----------------------
+# THE CLASS: A GENERATED HEADER THAT IS WRITTEN ONCE AND THEREAFTER UNREACHABLE. Add-PluginChangelogSection
+# emits the intro only when the CHANGELOG does not exist yet (`if (-not $Existing)`), so every later release
+# appends below it and never revisits it. Editing the template therefore reaches future plugins and no
+# current one -- and nothing said so out loud.
+#
+# MEASURED August 3, 2026, and it had already shipped. The rename swept the retired marketplace name out of
+# 59 files; all four per-plugin CHANGELOGs still opened by naming it, in a sentence describing the present
+# mechanism, in the most consumer-facing file each plugin has. Every existing gate looked past it for a
+# defensible reason: checks 11 and 12 exclude per-plugin CHANGELOGs as history, and they are right about the
+# entries -- the intro is the one part of the file that is not history. So this check is deliberately narrow:
+# it judges the intro and nothing below it.
+#
+# WHY IT COMPARES AGAINST THE FUNCTION AND NOT AGAINST A LITERAL. A literal here would be a second copy of
+# the very text whose copies are the bug, and the gate would then guard a string that can itself go stale.
+# Build-PluginChangelogIntro is the single source; the marketplace name comes from marketplace.json through
+# Get-MarketplaceName, the same field cut-release.ps1 reads. There is no expected value written down in this
+# file, which is the whole point.
+#
+# WHITESPACE-NORMALIZED, ON PURPOSE. The generated text wraps at the column the template happens to break
+# at; a hand-rewrap of the same sentences is not the defect this exists for, and a gate that fails on it
+# would teach the wrong lesson (rewrap to satisfy the linter) about a file no human should be rewrapping.
+# Content is compared, layout is not.
+function Get-NormalizedIntroText([string]$Text) {
+    # One space for any whitespace run, trimmed: compares the sentences, not the line breaks.
+    return (($Text -replace '\s+', ' ').Trim())
+}
+$introChecked = 0
+$mpForIntro = Join-Path $RepoRoot '.claude-plugin\marketplace.json'
+$mpNameForIntro = $null
+if (Test-Path -LiteralPath $mpForIntro) {
+    try {
+        $mpNameForIntro = Get-MarketplaceName -MarketplaceJson ([System.IO.File]::ReadAllText($mpForIntro, [System.Text.Encoding]::UTF8))
+    } catch {
+        $errors += "[changelog-intro] .claude-plugin/marketplace.json has no readable 'name', so the expected intro cannot be derived: $($_.Exception.Message)"
+    }
+}
+if ($mpNameForIntro) {
+    # Enumerated from the plugin directories rather than by recursing for the filename: the subject is
+    # 'plugins/<plugin>/CHANGELOG.md' exactly, and a directory without one (agent-shared, or a plugin no
+    # release has touched yet) simply is not a subject -- no exclusion list to keep current.
+    foreach ($plDir in @(Get-ChildItem -Path (Join-Path $RepoRoot 'plugins') -Directory | Sort-Object Name)) {
+        $plChangelogPath = Join-Path $plDir.FullName 'CHANGELOG.md'
+        if (-not (Test-Path -LiteralPath $plChangelogPath)) { continue }
+        $plName = $plDir.Name
+        $rel = $plChangelogPath.Replace($RepoRoot, '.').Replace('\', '/')
+        $raw = ([System.IO.File]::ReadAllText($plChangelogPath, [System.Text.Encoding]::UTF8)) -replace "`r`n", "`n"
+        # The intro is everything above the first version heading -- the same boundary
+        # Add-PluginChangelogSection inserts at, so the two agree about where the intro ends.
+        $vMatch = [regex]::Match($raw, '(?m)^## v\d+\.\d+\.\d+\b')
+        if (-not $vMatch.Success) {
+            # No release section yet: nothing has been appended, so there is no intro/history split to
+            # judge. Stated rather than silently skipped.
+            $errors += "[changelog-intro] ${rel}: no '## vX.Y.Z' heading, so the intro's end cannot be located -- either the file was never written by cut-release.ps1 or its version headings were edited by hand."
+            continue
+        }
+        $introChecked++
+        $actual = Get-NormalizedIntroText $raw.Substring(0, $vMatch.Index)
+        $expected = Get-NormalizedIntroText (Build-PluginChangelogIntro -PluginName $plName -MarketplaceName $mpNameForIntro)
+        if ($actual -ne $expected) {
+            $errors += "[changelog-intro] ${rel}: the intro above the first '## vX.Y.Z' heading no longer matches what Build-PluginChangelogIntro (scripts/lib/release-lib.ps1) generates. cut-release.ps1 writes this header ONLY for a CHANGELOG that does not exist yet, so it is never refreshed and drifts unseen -- which is how all four files kept naming the retired marketplace after the rename. Bring the file's intro in line with the template (whitespace and line wrapping are ignored); do not edit the template to match a stale file. Expected: $expected"
+        }
+    }
+}
+Write-Coverage -Category 'changelog-intro' -Checked $introChecked `
+    -Note "each per-plugin CHANGELOG's intro header, held against Build-PluginChangelogIntro with the marketplace name read from marketplace.json -- the one part of these files that is NOT history, and the only text cut-release.ps1 writes once and never revisits. Compared whitespace-normalized: content is the subject, line wrapping is not. Everything below the first version heading is deliberately not examined -- that is history, excluded here for the same reason checks 11 and 12 exclude it"
 
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {

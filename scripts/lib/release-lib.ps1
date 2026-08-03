@@ -11,7 +11,8 @@
     Supplies Get-NextVersion, Get-BumpType, Get-LockstepVersion, Get-PluginManifestPaths,
     Get-PullRequestEntries, Convert-ChangelogForRelease, Build-ReleaseNotes, and for the
     per-plugin CHANGELOGs: Get-EntryPlugins, Convert-EntryLinksForPluginChangelog,
-    Build-PluginChangelogSection and Add-PluginChangelogSection. Also Build-PluginReleaseCard: the
+    Build-PluginChangelogSection, Build-PluginChangelogIntro and Add-PluginChangelogSection, plus
+    Get-MarketplaceName. Also Build-PluginReleaseCard: the
     per-plugin RELEASE.md card (Model A, plugin-carried) that shows which release the plugin is
     currently on, even if this particular release did not touch the plugin (lockstep version, the
     card may have no entries). These functions are deliberately pure (string/value in,
@@ -37,6 +38,19 @@
     sections and the releases/** notes stay in whatever language they were written in -- only
     FUTURE output from these templates changed, so a mix of Dutch history and English new content is
     expected and fine.
+
+    SHARPENED August 3, 2026 -- "only future output changed" is true of every template here EXCEPT
+    one, and the exception cost four consumer-facing files. A template that appends (a release
+    section, a reference line, a card that is fully regenerated) reaches its file again on the next
+    release, so editing it does propagate. The per-plugin CHANGELOG INTRO is the one that does not:
+    Add-PluginChangelogSection writes it only for a file that does not exist yet, so the four
+    existing CHANGELOGs kept an intro naming the retired marketplace long after the rename had swept
+    it out of 59 files. "Leave history alone" was the right instinct applied to the wrong text -- the
+    entries below the intro are history, the intro is a live statement about the present mechanism.
+    Repaired by extracting Build-PluginChangelogIntro as the single source and gating the existing
+    files against it (check 17 in check-plugin-integrity.ps1). The general rule, for the next
+    template added here: ask whether the string is rewritten on every release, and if it is not, it
+    needs a gate rather than a good intention.
 #>
 
 # The branch types (Feat/Fix/Docs/Chore) have a single source in branch-info.ps1; Build-ReleaseNotes
@@ -96,6 +110,25 @@ function Get-LockstepVersion {
         throw "Plugin versions are not in lockstep (must be equal for a repo-wide release):`n$detail"
     }
     return $distinct[0]
+}
+
+function Get-MarketplaceName {
+    <#
+        The marketplace's own name, read from 'name' in the marketplace JSON. Pure (does not touch
+        disk): input is the raw JSON text.
+
+        Exists so that the two places needing this name -- cut-release.ps1, which writes it into a
+        new per-plugin CHANGELOG intro, and check 17 of check-plugin-integrity.ps1, which holds the
+        existing intros against that same text -- read one field through one function instead of
+        each carrying a literal. A literal in either place is what let the retired name survive the
+        rename in four consumer-facing files.
+    #>
+    param([Parameter(Mandatory)][string]$MarketplaceJson)
+    $marketplace = $MarketplaceJson | ConvertFrom-Json
+    if (-not ($marketplace.PSObject.Properties.Name -contains 'name') -or -not $marketplace.name) {
+        throw "marketplace.json has no non-empty 'name'."
+    }
+    return [string]$marketplace.name
 }
 
 function Get-PluginManifestPaths {
@@ -485,6 +518,37 @@ function Build-PluginChangelogSection {
     return "## v$Version $emDash $Date`n`n$body`n"
 }
 
+function Build-PluginChangelogIntro {
+    <#
+        The intro header of a per-plugin CHANGELOG: the title plus the paragraph saying what the file
+        is and where the full history lives. Pure string in/out.
+
+        ITS OWN FUNCTION BECAUSE THIS TEXT IS WRITE-ONCE, AND WRITE-ONCE TEXT DRIFTS SILENTLY.
+        Add-PluginChangelogSection emits it only when the CHANGELOG does not exist yet, so an
+        existing file's intro is never rewritten -- editing the template below reaches future
+        plugins and no current one. Measured August 3, 2026: after the rename swept the old
+        marketplace name out of 59 files, all four per-plugin CHANGELOGs still opened by naming it,
+        because their intro had been written once at creation and no gate looked at it. Check 17 in
+        check-plugin-integrity.ps1 now holds those files against THIS function, which is only
+        trustworthy while the text has exactly one source -- hence the extraction.
+
+        $MarketplaceName is a parameter rather than a literal for the same reason one level up: the
+        name's authority is 'name' in .claude-plugin/marketplace.json, and a copy of it here is a
+        copy that can go stale. The caller reads it there and passes it; the gate reads the same
+        field, so the two agree by construction instead of by upkeep.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$PluginName,
+        [Parameter(Mandatory)][string]$MarketplaceName
+    )
+    $emDash = [char]0x2014
+    return "# Changelog $emDash $PluginName`n`n" +
+        "Consumer-facing history of this plugin: per release, the changes that touched this`n" +
+        "plugin. Automatically appended by ``cut-release.ps1`` of the marketplace repo`n" +
+        "($MarketplaceName); the full repository history lives there in ``CHANGELOG.md`` and`n" +
+        "``releases/``.`n`n"
+}
+
 function Add-PluginChangelogSection {
     <#
         Adds a release section to the top of a plugin CHANGELOG (after the intro, before the first
@@ -494,15 +558,11 @@ function Add-PluginChangelogSection {
     param(
         [string]$Existing = '',
         [Parameter(Mandatory)][string]$Section,
-        [Parameter(Mandatory)][string]$PluginName
+        [Parameter(Mandatory)][string]$PluginName,
+        [Parameter(Mandatory)][string]$MarketplaceName
     )
-    $emDash = [char]0x2014
     if (-not $Existing) {
-        $intro = "# Changelog $emDash $PluginName`n`n" +
-            "Consumer-facing history of this plugin: per release, the changes that touched this`n" +
-            "plugin. Automatically appended by ``cut-release.ps1`` of the marketplace repo`n" +
-            "(claude-code-specialists); the full workshop history lives there in ``CHANGELOG.md`` and`n" +
-            "``releases/``.`n`n"
+        $intro = Build-PluginChangelogIntro -PluginName $PluginName -MarketplaceName $MarketplaceName
         return ($intro + $Section.TrimEnd() + "`n")
     }
     # Tightened (#103, Victor #5): specifically matches a version heading ('## vX.Y.Z ...', exactly
