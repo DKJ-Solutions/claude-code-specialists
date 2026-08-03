@@ -14,8 +14,9 @@ its own copies, and enables or disables **per plugin** which groups it needs.
 
 | I want to… | Go to |
 |---|---|
-| **connect my own repo** | **[QUICKSTART.md](QUICKSTART.md)** — three steps, written for someone who did not build this. Read its *Before you start* section first if the machine is new. |
-| **disconnect it again** | [UNINSTALL.md](UNINSTALL.md) — the Quickstart's mirror: the repo teardown and the machine-side removal, in the order they have to happen. |
+| **connect my own repo — just the commands** | **[QUICKSTART.md](QUICKSTART.md)** — four steps, the commands and nothing else, linking out for every caveat. |
+| **connect my own repo — and know why** | **[ADOPTION.md](ADOPTION.md)** — the full, measurement-backed adoption manual for someone who did not build this, ~45 min (August 3, 2026). Read its *Before you start* section first if the machine is new or has adopted this family before. |
+| **disconnect it again** | [UNINSTALL.md](UNINSTALL.md) — the adoption page's mirror: the repo teardown and the machine-side removal, in the order they have to happen. |
 | know **which plugin does what** | [The four plugins](#the-four-plugins--whats-the-difference) |
 | know **how a specialist is built** | [Manuals — the split model](#manuals--the-split-model) |
 | know **how a repo consumes this** | [Consumption](#consumption) · [Versioning](#versioning) |
@@ -24,9 +25,9 @@ its own copies, and enables or disables **per plugin** which groups it needs.
 | see **the version history** | [`releases/README.md`](releases/README.md) |
 
 Everything below this table is the underlying explanation, and the page is long on purpose: it is the
-architecture record as much as the landing page. **The Quickstart is the short entrance** — this file
-is what you read when the Quickstart's answer was not enough, or when you are changing the system
-rather than adopting it.
+architecture record as much as the landing page. **[QUICKSTART.md](QUICKSTART.md) is the short
+entrance and [ADOPTION.md](ADOPTION.md) the full one** — this file is what you read when the adoption
+page's answer was not enough, or when you are changing the system rather than adopting it.
 
 ## One product, one repository
 
@@ -130,7 +131,8 @@ The full picture, top-level folder by folder:
   the Specialists handbook `specialists/README.md` next to them, `rules/` (path-scoped rules), and
   `settings.json` (harness config; see [Consumption](#consumption)).
 - **The root documents** — this `README.md`, `CLAUDE.md`, `CHANGELOG.md`, `CONTRIBUTING.md`,
-  `SECURITY.md`, and the two consumer-facing procedures `QUICKSTART.md` and `UNINSTALL.md` — and
+  `SECURITY.md`, and the three consumer-facing procedures `QUICKSTART.md`, `ADOPTION.md` and
+  `UNINSTALL.md` — and
   **`.github/`** (`pull_request_template.md`, the issue templates + `workflows/ci.yml`, the CI gate
   that runs the lint + test suites on every PR and push to `main`; see
   [`CONTRIBUTING.md`](CONTRIBUTING.md)).
@@ -145,8 +147,9 @@ them; the settings keys alone install nothing, without the flag the command defa
 machine-wide `user` install instead, and without the refresh it can serve an *older* version and
 still report success (see [Versioning](#versioning)). The canonical enable-a-plugin walkthrough (the
 settings snippet, the cache refresh, the per-plugin install, the restart, the install-record
-self-check, running the bootstrap skill) is in the [Quickstart](QUICKSTART.md) — connect in three
-steps, for those who didn't build the system; the way back out is its mirror,
+self-check, running the bootstrap skill) is in [ADOPTION.md](ADOPTION.md) — four steps, for those who
+didn't build the system, with [QUICKSTART.md](QUICKSTART.md) as its commands-only front door; the way
+back out is its mirror,
 [UNINSTALL.md](UNINSTALL.md). This section keeps only the two marketplace-wide facts that matter
 beyond any one consumer:
 
@@ -178,7 +181,7 @@ one repo-wide tag `vX.Y.Z`, which is correct precisely because this repository h
 (and needs that same scope flag, for the same reason the install does) — but it compares them against
 the consumer's **cached** copy of this marketplace, not against this repo. So `claude plugin
 marketplace update <marketplace>` belongs in front of it. What each command was measured to do differs,
-and the Quickstart states it per command: **`install` does not refresh** — it served the *previous*
+and the adoption page states it per command: **`install` does not refresh** — it served the *previous*
 version minutes after `v3.0.2` (July 30, 2026) and again after `v3.0.5` (July 31, as a controlled pair:
 without the refresh `3.0.4`, with it `3.0.5`) — while a bare **`update`** refreshed the cached clone
 itself and still moved `3.0.3 -> 3.0.4`. So the refresh is load-bearing in front of an install and
@@ -317,7 +320,7 @@ Three rules govern when and how to reach for it:
   the span counts as a claimed skill name — so the span must close around just the skill names,
   nothing else in backticks.
 - **Only for a genuinely complete enumeration.** A deliberately partial or illustrative list (e.g.
-  QUICKSTART.md's slash-only subset) gets no marker — marking it would turn an intentional subset
+  ADOPTION.md's slash-only subset) gets no marker — marking it would turn an intentional subset
   into a permanent false positive.
 - **Showing the syntax literally needs a fence, not inline code.** The check masks fenced code
   blocks before it looks for markers, precisely so a paragraph like this one can show the literal
@@ -408,14 +411,14 @@ See [Consumption](#consumption) above for the mechanics.
 
 A newly added **skill** additionally needs a session restart before it becomes visible, and the
 skill counters `/reload-plugins`/`/reload-skills` print are not reliable evidence either way — see
-[Staying up to date](QUICKSTART.md#staying-up-to-date) in the Quickstart for the full detail.
+[Staying up to date](ADOPTION.md#staying-up-to-date) in the adoption page for the full detail.
 
 ## Adoption: the bootstrap path
 
-> **New here?** The shareable beginner route is in the
-> [Quickstart](QUICKSTART.md) — get connected in three steps,
-> for those who didn't build the system, with [UNINSTALL.md](UNINSTALL.md) as its mirror for the way
-> back out. Below is the underlying explanation.
+> **New here?** The shareable beginner route is [ADOPTION.md](ADOPTION.md) — get connected in four
+> steps, for those who didn't build the system, with [QUICKSTART.md](QUICKSTART.md) as its
+> commands-only front door and [UNINSTALL.md](UNINSTALL.md) as its mirror for the way back out. Below
+> is the underlying explanation.
 
 Enabling the plugin delivers the **worker subagents**, but not the **conductor** (Chris) or the
 governance/hooks layer, so the skill **`specialists-init`** (group 1) closes that gap in a consuming
@@ -493,15 +496,23 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297)). This procedure is described at
   > three entry points, and they used to count it as *four acts* here, *three acts* in
   > [`specialists-init`](plugins/specialists/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
-  > and *three steps* in the [QUICKSTART](QUICKSTART.md#connecting-in-three-steps) — the same path, no
+  > and *three steps* in the [adoption page](ADOPTION.md#connecting-in-four-steps) — the same path, no
   > step missing anywhere, three different numbers. A reader following it for the first time has the
   > count as their only check on whether they skipped something, and three counts remove exactly that.
   > Two of the three were also counting different things: #284 raised this page from three to four by
   > making the refresh an act, while `specialists-init`'s step 0 has that refresh too and still said
-  > three. The unit is now **acts** — individual things you do — on both pages; the QUICKSTART keeps its
-  > three *steps* because its Step 1 **is** all six acts above, and it now says so. Verifying counts as
-  > an act because leaving it out is the failure the next blockquote calls silent and self-camouflaging:
-  > a reader who ticks off five and stops has never checked that the install exists.
+  > three. The unit is now **acts** — individual things you do — on both pages; the adoption page keeps
+  > *steps* as its own unit because its Step 1 **is** all six acts above, and it now says so. Verifying
+  > counts as an act because leaving it out is the failure the next blockquote calls silent and
+  > self-camouflaging: a reader who ticks off five and stops has never checked that the install exists.
+  >
+  > **The step count moved from three to four on August 3, 2026** (inbound
+  > [#408](https://github.com/DaveKJohn/claude-code-specialists/issues/408)), on the adoption page, in
+  > `specialists-init` and here in one change. Filling the lenses was always part of the procedure and
+  > was disclosed in a trailing clause reading *"at your own pace"*, which reads as optional polish on a
+  > page that had already announced three steps — while it is in fact the largest step and the one where
+  > the system starts being useful. That page was renamed `QUICKSTART.md` → `ADOPTION.md` in the same
+  > change, for the matching reason: the label promised a size the content never had.
   >
   > **It was five until August 1, 2026**, when #329 made the first restart an act of its own on all three
   > pages at once. Folding it into act 1 would have kept the number at five, and folding it into another
@@ -545,7 +556,7 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > the update refuses outright on a project-scoped install. Project scope is the intended model for
   > this family (Dave, July 30, 2026) — it gives each repo **its own install record**, and every other
   > document here assumes it. Full mechanics of the refresh half:
-  > [Staying up to date](QUICKSTART.md#staying-up-to-date).
+  > [Staying up to date](ADOPTION.md#staying-up-to-date).
   >
   > **What project scope does *not* promise is that the record stays put** (inbound
   > [#296](https://github.com/DaveKJohn/claude-code-specialists/issues/296)). This sentence used to say it
@@ -563,7 +574,7 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > what changes is that you should **read your record rather than trust it**. On a machine with several
   > consumers and several sessions, `installed_plugins.json` is the only place your actual version is
   > written down; the install output does not name a version at all. The query is under
-  > [Staying up to date](QUICKSTART.md#staying-up-to-date).
+  > [Staying up to date](ADOPTION.md#staying-up-to-date).
   >
   > **Verify with the `projectPath` record, not with `claude plugin list`** — that command is not
   > repo-scoped and reported a plugin as `enabled`, at `project` scope, in this very repo while it
@@ -868,7 +879,8 @@ checklist (learned from adding `specialists-ecomm`):
 5. **The docs that enumerate the plugins** — this README (the plugin count, the
    [four-plugins table](#the-four-plugins--whats-the-difference), the [invocation list](#invocation),
    the manuals list under [Manuals](#manuals--the-split-model), and whether the group is mutually
-   exclusive with the others or complementary) and [`QUICKSTART.md`](QUICKSTART.md).
+   exclusive with the others or complementary), [`QUICKSTART.md`](QUICKSTART.md) and
+   [`ADOPTION.md`](ADOPTION.md).
 6. **The gates** — `scripts/agents/build-agent-defs.ps1 -Check`,
    [`scripts/lint/check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1), and
    the `scripts/tests/*.tests.ps1` suites, all green.
@@ -885,8 +897,8 @@ the roster, the routing) is in [`CLAUDE.md`](CLAUDE.md).
 
 ## Want to know more?
 
-- **Connecting your own repo?** Follow the [Quickstart](QUICKSTART.md) — connect in three steps, for
-  those who didn't build the system.
+- **Connecting your own repo?** Follow [ADOPTION.md](ADOPTION.md) — connect in four steps, for those
+  who didn't build the system, or [QUICKSTART.md](QUICKSTART.md) if you only want the commands.
 - **Disconnecting it again?** [UNINSTALL.md](UNINSTALL.md) is its mirror — the repo teardown and the
   machine-side removal, in the order they have to happen.
 - **Releases** — the full version history and the cutting-a-release mechanics are in

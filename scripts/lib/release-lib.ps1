@@ -610,11 +610,17 @@ function Build-PluginReleaseCard {
     # this release." -- written at cut time, about a reader the card has never met. Round v13 measured
     # it false in the ordinary case: the payload came from `main`, three commits past the tag whose
     # number the card and plugin.json both carried. And it contradicted the reader's own correct
-    # conclusion, because the QUICKSTART's tag comparison had just told them they were on `main` and
+    # conclusion, because the adoption page's tag comparison had just told them they were on `main` and
     # not on the release. So the card now states what it describes and hands the "where am I" question
     # to the check that can answer it.
+    #
+    # ADOPTION.md, not QUICKSTART.md: the page was renamed on August 3, 2026 (inbound #408) and the
+    # detailed "Staying up to date" section went with it. QUICKSTART.md still exists and still carries
+    # that anchor, deliberately -- the archived release notes and the older per-plugin CHANGELOGs link
+    # to it and are not rewritten -- but a card generated from here points at the page that holds the
+    # measurement.
     $backtick = [char]0x60
-    $quickstartUrl = $RepoBlobUrl + 'QUICKSTART.md#staying-up-to-date'
+    $adoptionUrl = $RepoBlobUrl + 'ADOPTION.md#staying-up-to-date'
     $mainRef = "$backtick" + 'main' + "$backtick"
     $titleLine = if ($Title) { "$Title`n`n" } else { '' }
     $header = "# Release v$Version`n`n" +
@@ -622,7 +628,7 @@ function Build-PluginReleaseCard {
         "${titleLine}This card describes v$Version, the version your plugin manifest carries. Whether it is " +
         "the code you are running is a separate question: the documented update path installs from $mainRef, " +
         "so a $mainRef that has moved past the tag reports this same number. " +
-        "[The version is not the code]($quickstartUrl) in the QUICKSTART is the check.`n`n"
+        "[The version is not the code]($adoptionUrl) in ADOPTION.md is the check.`n`n"
 
     $emDash = [char]0x2014
     $realEntries = @($Entries | Where-Object { $_ -and $_.Trim() })

@@ -37,7 +37,7 @@ verify — grouped below as `0a` (acts 1 and 2), `0b` (acts 3 and 4) and `0c` (a
 > **The count is deliberately the same six as in the
 > [claude-code-specialists README](../../../../README.md#adoption-the-bootstrap-path)** (inbound
 > [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297)). This page said *three acts* while
-> that one said *four* and the [QUICKSTART](../../../../QUICKSTART.md#connecting-in-three-steps) said *three
+> that one said *four* and the [adoption page](../../../../ADOPTION.md#connecting-in-four-steps) said *three
 > steps* — the same path, nothing missing anywhere, three different numbers, and the pages link to each
 > other for exactly this step. For a reader following it the first time the count is the only check they
 > have on whether they skipped something. The letters stay, because they are what the rest of this page
@@ -46,8 +46,15 @@ verify — grouped below as `0a` (acts 1 and 2), `0b` (acts 3 and 4) and `0c` (a
 > **It was five until August 1, 2026**, when
 > [#329](https://github.com/DaveKJohn/claude-code-specialists/issues/329) measured that a session start is
 > what registers the marketplace — making the first restart an act of its own here, in the claude-code-specialists README
-> and in the QUICKSTART in the same change. The letters absorbed it (`0a` is now two acts) rather than the
-> count staying at five.
+> and in the adoption page in the same change. The letters absorbed it (`0a` is now two acts) rather than
+> the count staying at five.
+>
+> **That adoption page is `ADOPTION.md`, and it was `QUICKSTART.md` until August 3, 2026** (inbound
+> [#408](https://github.com/DaveKJohn/claude-code-specialists/issues/408)). Its own *step* count moved
+> from three to four in the same change — filling the lenses became a numbered step instead of a
+> trailing "at your own pace" clause — so if you are cross-reading, expect **four steps** there and
+> **six acts** here for step 0. `QUICKSTART.md` still exists as a genuinely short, commands-only page
+> that links back to it.
 
 **0a — enable, then restart once.** Verify that the consumer has this in `.claude/settings.json`:
 
@@ -189,7 +196,7 @@ and a stale cache is invisible by construction because it reports success with a
 number — so the procedure guarantees freshness rather than relying on the CLI to keep doing it. This
 pair is what every "pick up the new release" pointer in this family means — in
 [`sync-roster`](../sync-roster/SKILL.md), in `scripts/sync/check-script-contract.ps1`, in the
-[QUICKSTART](../../../../QUICKSTART.md#staying-up-to-date), and in the release notes. Read a bare
+[adoption page](../../../../ADOPTION.md#staying-up-to-date), and in the release notes. Read a bare
 `claude plugin update` anywhere as shorthand for these two lines.
 
 **0c — restart, then verify before invoking.** Verify rather than assume, because **the failure this
@@ -302,7 +309,7 @@ gh api repos/DaveKJohn/claude-code-specialists/tags --jq '.[] | select(.name=="v
 
 That route has no peeling problem to worry about: the API's `.commit.sha` is the commit already, annotated
 tag or not. Equal to your record's `gitCommitSha` means you are on that release; different means you are
-on `main` — see [Staying up to date](../../../../QUICKSTART.md#staying-up-to-date) for why that happens
+on `main` — see [Staying up to date](../../../../ADOPTION.md#staying-up-to-date) for why that happens
 without anyone asking for it, and why it is not something you can fix from here.
 
 **One** line per plugin you enabled, each saying `project`, is the green you need — and the *count*

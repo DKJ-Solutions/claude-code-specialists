@@ -1,6 +1,6 @@
 # Uninstall — how to disconnect your repo
 
-The counterpart to the [Quickstart](QUICKSTART.md), and written for the same reader: someone who did
+The counterpart to [ADOPTION.md](ADOPTION.md), and written for the same reader: someone who did
 **not** build this system and now wants it out again. Adoption is reversible by design — a consumer must
 be able to install *and* uninstall at any moment (Dave's requirement, July 29, 2026) — and this page is
 the procedure for the second half.
@@ -118,8 +118,8 @@ per plugin each saying `project` is the state the rest of this document assumes.
 `~\.claude\plugins\cache\<marketplace>\<plugin>\<version>`. **Do not use the path from your
 `SPECIALISTS.md` imports** — those point into `~\.claude\plugins\marketplaces\<marketplace>\`, the git clone,
 which is a *different directory* carrying the sources in a different layout. Both exist on a machine that has
-run this family, which is exactly why picking the wrong one is easy; the QUICKSTART's
-[Staying up to date](QUICKSTART.md#staying-up-to-date) section explains why there are two.
+run this family, which is exactly why picking the wrong one is easy; the adoption page's
+[Staying up to date](ADOPTION.md#staying-up-to-date) section explains why there are two.
 
 ```powershell
 # Preview -- nothing is removed
@@ -234,7 +234,7 @@ Two more things this command does that are worth expecting rather than discoveri
 
 ## Step 3 — remove the keys you wrote, then restart
 
-The uninstall clears the *entry*; the keys you added in Quickstart Step 1 are yours to take back out. In
+The uninstall clears the *entry*; the keys you added in adoption Step 1 are yours to take back out. In
 `.claude/settings.json` (and `.claude/settings.local.json` if you used it), remove:
 
 - `enabledPlugins` — the `specialists@claude-code-specialists` entries, or the whole key if it is now `{}`;
@@ -361,9 +361,9 @@ Exactly the mirror image of what Step 2 says about `"enabledPlugins": {}`, and t
 a diff there is the command working, not a fault. Remove the empty key by hand if you want the file back to
 where it started.
 
-**On the path the QUICKSTART prescribes, none of that happens — and that is the expected result, not an
+**On the path ADOPTION.md prescribes, none of that happens — and that is the expected result, not an
 anomaly** (inbound [#374](https://github.com/DaveKJohn/claude-code-specialists/issues/374)). Two independent
-reasons: the QUICKSTART's pasteable block puts `extraKnownMarketplaces` in **your repo's**
+reasons: the adoption page's pasteable block puts `extraKnownMarketplaces` in **your repo's**
 `.claude/settings.json`, and its `marketplace add` alternative is given as `--scope project` for exactly
 this reason; and [Step 3](#step-3--remove-the-keys-you-wrote-then-restart) already removed that key several
 steps ago, so in the printed order there is nothing left here for `marketplace remove` to empty out.
@@ -410,7 +410,7 @@ are marked as such:
   where a roster row ends and your prose begins. The audit lists them by line so you can reword the ones
   that were rules phrased through a character (*"Derek opens the PR"* → *"changes go in via a branch and a
   PR"*) and delete the ones that only ever existed for the plugin.
-- **A `.claude/settings.json` you created for Quickstart Step 1 stays, holding `{}`.** For a repo that
+- **A `.claude/settings.json` you created for adoption Step 1 stays, holding `{}`.** For a repo that
   had no `.claude/` before adoption — the first-time consumer this family documents — that file and its
   directory exist *because* of the adoption. [Step 3](#step-3--remove-the-keys-you-wrote-then-restart)
   takes the keys out and says so; the empty file it leaves is 3 bytes, harmless, and yours to delete if

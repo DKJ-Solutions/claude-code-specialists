@@ -18,7 +18,7 @@
          main-loop specialists) DELIBERATELY have no agent def -- they run in the main loop, not
          as a subagent -- and are therefore left alone by check 6's agent-def<->manual link.
       4. dead relative links AND broken anchors in every ROOT *.md (README.md, CHANGELOG.md, CLAUDE.md,
-         CONTRIBUTING.md, QUICKSTART.md, UNINSTALL.md, SECURITY.md and any unfolded changelog entry file
+         CONTRIBUTING.md, QUICKSTART.md, ADOPTION.md, UNINSTALL.md, SECURITY.md and any unfolded changelog entry file
          -- globbed, never named), every .claude/extensions/*.md, every <plugin>/skills/*/SKILL.md, every
          <plugin>/manuals/*-manual.md, every <plugin>/personas/*-persona.md, every releases/**/*.md,
          every <plugin>/RELEASE.md, connectors/README.md, and
@@ -636,7 +636,7 @@ Write-Coverage -Category 'release-card' -Checked $pluginManifests.Count `
 # --- 10. marked "all skills" enumerations vs. the canonical skillset -----------------------------------
 # A prose bullet list that claims to enumerate "all skills" is a maintenance trap: it silently
 # drifts as skills are added/removed, and a generic prose scan over-detects (tested and rejected --
-# 147 hits repo-wide, including QUICKSTART.md's deliberately incomplete illustrative list, which
+# 147 hits repo-wide, including ADOPTION.md's deliberately incomplete illustrative list, which
 # would permanently false-positive). Instead this is opt-in: an author wraps the enumeration in
 #     <!-- skills:all -->
 #     - `skill-name`
@@ -1189,8 +1189,13 @@ $sampleChecked = 0
 # documents and differ only in where they look (inside a fence, or in the prose around it). Two copies of
 # this list would drift the moment a fourth document joins -- which is check 16's own subject arriving in
 # its source, so it is one variable shared by both.
+# ADOPTION.md joined in #408, which is this comment's own warning arriving: the page renamed out from
+# under 'QUICKSTART.md' carries every captured sample and measured figure these two checks exist for,
+# and the new short QUICKSTART.md carries almost none. Listing only the old name would have left both
+# checks reporting green over the document that actually holds their subject.
 $consumerDocs = @(
     'QUICKSTART.md',
+    'ADOPTION.md',
     'UNINSTALL.md',
     'README.md'
 )

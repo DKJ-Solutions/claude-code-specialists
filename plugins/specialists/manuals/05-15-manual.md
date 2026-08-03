@@ -80,7 +80,7 @@ and safe hook construction.
   migration. **This "without a restart" path does not extend to a new skill that ships inside an
   already-enabled plugin's updated version** — that only becomes available after a restart, and the
   skill counters `/reload-plugins`/`/reload-skills` print are not evidence either way (see
-  QUICKSTART.md's "Staying up to date" section for the detail). Note: this applies to plugin
+  ADOPTION.md's "Staying up to date" section for the detail). Note: this applies to plugin
   content; changes to `CLAUDE.md` imports and settings still load only on a restart.
 
 ## Sylvester is lazy
