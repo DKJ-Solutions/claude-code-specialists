@@ -168,11 +168,11 @@ try {
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
     Assert-Equal 0 $r.Code 'happy path: exit-code 0'
     Assert-NotMatch '\[ERROR\]' $r.Out 'happy path: no errors'
-    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds', 'Get-ChangelogHeading', 'Get-LiveStage', 'Get-EntryTitlePlaceholder', 'Get-EntryBodyHeading', 'Get-EntryBodyPlaceholder', 'Get-EntryFallbackType')) {
+    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds', 'Get-ChangelogHeading', 'Get-LiveStage', 'Get-EntryTitlePlaceholder', 'Get-EntryBodyHeading', 'Get-EntryBodyPlaceholder', 'Get-EntryFallbackType', 'Get-PrMergeMethod', 'Get-MojibakePaths')) {
         Assert-Match "\[OK\]\s+'$fn' present in" $r.Out "happy path: '$fn' reported OK"
     }
     $okCount = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 12 $okCount 'happy path: exactly twelve [OK] lines (the six mandatory functions + the six optional ones: Get-ChangelogHeading, Get-LiveStage and the four Get-Entry* stub-wording knobs, nothing else)'
+    Assert-Equal 14 $okCount 'happy path: exactly fourteen [OK] lines (the six mandatory functions + the eight optional ones: Get-ChangelogHeading, Get-LiveStage, the four Get-Entry* stub-wording knobs, Get-PrMergeMethod and Get-MojibakePaths, nothing else)'
     # inbound #203: the run names the root it inspected and how it resolved it. Asserted on the clean
     # run too, not only on a drifted one -- the [SCOPE] line is context that must always be emitted, so
     # that the hook has something to surface the moment a finding does appear.
@@ -272,7 +272,7 @@ try {
         Assert-NotMatch $optFn $r.Out "optional Get-Pr*: '$optFn' never mentioned (not in the contract)"
     }
     $okCount6 = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 12 $okCount6 'optional Get-Pr*: still exactly twelve [OK] (the mandatory six + the six declared optionals; the Get-Pr* four excluded)'
+    Assert-Equal 14 $okCount6 'optional Get-Pr*: still exactly fourteen [OK] (the mandatory six + the eight declared optionals; the four UNdeclared Get-Pr* excluded)'
 
     # --- 6c. An optional contract function that is ABSENT -> [INFO] naming the fallback, exit 0 -----
     #     Get-ChangelogHeading (issue #178) is declared Optional: fold-changelog-entry.ps1 falls back
@@ -389,7 +389,7 @@ function Get-RosterIgnoredIds { return @() }
     $expectedContract = @(
         @{ Function = 'Get-BranchInfo';      Lib = 'scripts\lib\branch-info.ps1'; Scripts = @('new-changelog-entry', 'open-pr') },
         @{ Function = 'Test-BranchName';      Lib = 'scripts\lib\branch-info.ps1'; Scripts = @('new-branch') },
-        @{ Function = 'Get-RepoName';         Lib = 'scripts\repo-config.ps1';     Scripts = @('open-pr', 'fold-changelog-entry') },
+        @{ Function = 'Get-RepoName';         Lib = 'scripts\repo-config.ps1';     Scripts = @('open-pr', 'fold-changelog-entry', 'ship-pr', 'verify-resolved-issues') },
         @{ Function = 'Get-LintScript';       Lib = 'scripts\repo-config.ps1';     Scripts = @('open-pr') },
         @{ Function = 'Get-RosterPath';       Lib = 'scripts\repo-config.ps1';     Scripts = @('check-roster-sync') },
         @{ Function = 'Get-RosterIgnoredIds'; Lib = 'scripts\repo-config.ps1';     Scripts = @('check-roster-sync') },
@@ -400,12 +400,18 @@ function Get-RosterIgnoredIds { return @() }
         @{ Function = 'Get-EntryTitlePlaceholder'; Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry') },
         @{ Function = 'Get-EntryBodyHeading';      Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry') },
         @{ Function = 'Get-EntryBodyPlaceholder';  Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry') },
-        @{ Function = 'Get-EntryFallbackType';     Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry') }
+        @{ Function = 'Get-EntryFallbackType';     Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry') },
+        # The two knobs the newly mirrored scripts brought with them (issues #411 and #413). Both belong
+        # in this loop for the same reason the Get-Entry* four do: they are attributed to real registered
+        # shared scripts, so the per-script assertions below apply unchanged -- and those assertions are
+        # exactly what would have caught the mirror being forgotten.
+        @{ Function = 'Get-PrMergeMethod';         Lib = 'scripts\repo-config.ps1'; Scripts = @('ship-pr') },
+        @{ Function = 'Get-MojibakePaths';         Lib = 'scripts\repo-config.ps1'; Scripts = @('fix-mojibake') }
     )
 
     $contractSrc = [System.IO.File]::ReadAllText($Script)
     $totalRecordCount = @([regex]::Matches($contractSrc, "Lib\s*=\s*'[^']+';\s*Function\s*=\s*'[^']+';\s*Scripts\s*=\s*@\(")).Count
-    Assert-Equal 12 $totalRecordCount 'contract: exactly twelve (lib, function) records declared in check-script-contract.ps1 (the eleven below plus the dedicated Get-LiveStage block after this loop)'
+    Assert-Equal 14 $totalRecordCount 'contract: exactly fourteen (lib, function) records declared in check-script-contract.ps1 (the thirteen below plus the dedicated Get-LiveStage block after this loop)'
 
     # Every record must carry a 'Returns' line, so a finding is actionable without any reference to this
     # source repo (Dave, July 28, 2026). Counted against $totalRecordCount rather than listed per record:

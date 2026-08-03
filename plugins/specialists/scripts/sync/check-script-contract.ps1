@@ -25,6 +25,10 @@
                                 repo-config.ps1: Get-ChangelogHeading (OPTIONAL -- see below)
       - check-roster-sync   -> repo-config.ps1: Get-RosterPath, Get-RosterIgnoredIds
       - cut-release skill   -> repo-config.ps1: Get-LiveStage (OPTIONAL -- see below)
+      - ship-pr             -> repo-config.ps1: Get-RepoName
+                               repo-config.ps1: Get-PrMergeMethod (OPTIONAL -- see below)
+      - verify-resolved-issues -> repo-config.ps1: Get-RepoName
+      - fix-mojibake        -> repo-config.ps1: Get-MojibakePaths (OPTIONAL -- see below)
 
     OPTIONAL contract entries are declared with Optional = $true and report [INFO] instead of
     [ERROR] when absent, naming the default that will be used. Get-ChangelogHeading (issue #178) is
@@ -49,11 +53,19 @@
     guards via Get-Command (Get-PrDescriptionPlaceholder, Get-PrApprovalPattern, Get-PrAssignee,
     Get-PrMilestone) -- those are per-repo taste with no wrong-by-default failure mode, so they are
     never declared here.
-    Also out of scope: workshop-only scripts (ship-pr.ps1, scripts/release/cut-release.ps1 -- the
-    284-line, marketplace-specific script that bumps every plugin.json in lockstep) -- they are not
-    mirrored into the plugin and are not part of the consumer contract. The 'cut-release' entry above
-    is a different thing entirely: the shared cut-release SKILL (issue #177), a checklist with no
-    script of its own, that reads Get-LiveStage to decide whether its Block 2 applies.
+    Also out of scope: scripts/release/cut-release.ps1 -- the marketplace-specific script that bumps
+    every plugin.json in lockstep. That one is genuinely workshop-only: lockstep across a marketplace's
+    plugins is meaningless in a consumer. It is not mirrored and is not part of the consumer contract.
+    The 'cut-release' entry above is a different thing entirely: the shared cut-release SKILL (issue
+    #177), a checklist with no script of its own, that reads Get-LiveStage to decide whether its Block 2
+    applies.
+
+    ship-pr.ps1 USED TO BE LISTED HERE and no longer is (issue #411). The stated reason -- "merge policy
+    and the CI check name are repo-specific" -- was half right, and the half that was wrong was load-
+    bearing: the check name never entered the script's logic at all. Merge policy is real and became
+    Get-PrMergeMethod. What the exclusion cost in the meantime was the whole merge + fold sequence being
+    retyped by hand in every consumer, on the one flow classified safety-critical precisely because it
+    merges to main and then commits directly to main.
 
     For each repo-owned lib in the contract:
       - lib file MISSING            -> [ERROR] naming the file and every function/shared-script that
@@ -139,7 +151,7 @@ $script:Contract = @(
        Returns = "an object for a branch name with at least Prefix, Label and ChangelogType, derived from this repo's own branch-prefix table" },
     @{ Lib = 'scripts\lib\branch-info.ps1'; Function = 'Test-BranchName'; Scripts = @('new-branch');
        Returns = 'an object with IsValid plus a Reason when invalid; reject an empty name and the main branch' },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RepoName';    Scripts = @('open-pr', 'fold-changelog-entry');
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RepoName';    Scripts = @('open-pr', 'fold-changelog-entry', 'ship-pr', 'verify-resolved-issues');
        Returns = "this repo as 'owner/name', the form ``gh --repo`` takes" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-LintScript';  Scripts = @('open-pr');
        Returns = 'the repo-root-relative path to the lint script to run before a PR' },
@@ -169,7 +181,13 @@ $script:Contract = @(
        Returns = 'the fallback body used when no -Intent was given -- a directional prompt, not an empty line' },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryFallbackType'; Scripts = @('new-changelog-entry');
        Optional = $true; Default = 'Chore';
-       Returns = "the changelog type an unknown branch prefix falls back to; it must be one of the types this repo's own branch table produces, since the release cut groups entries by it" }
+       Returns = "the changelog type an unknown branch prefix falls back to; it must be one of the types this repo's own branch table produces, since the release cut groups entries by it" },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-PrMergeMethod'; Scripts = @('ship-pr');
+       Optional = $true; Default = 'merge';
+       Returns = "'merge', 'squash' or 'rebase' -- how this repo merges a PR; ship-pr rejects any other value rather than handing it to gh" },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-MojibakePaths'; Scripts = @('fix-mojibake');
+       Optional = $true; Default = 'every *.md in the repo root';
+       Returns = "the absolute paths fix-mojibake examines when called without -Path, given a -RepoRoot parameter; without it the tool falls back to every *.md in the repo root, which silently skips whatever else this repo keeps markdown in" }
 )
 
 # An optional record reports [INFO] (with the fallback the caller uses) where a required one reports

@@ -94,6 +94,31 @@ Assert-Equal 'Chore' (Get-EntryFallbackType) 'Get-EntryFallbackType matches the 
 $knownTypes = @(Get-BranchTypes)
 Assert-True ($knownTypes -contains (Get-EntryFallbackType)) "Get-EntryFallbackType ('$(Get-EntryFallbackType)') is one of the types this repo's branch table produces"
 
+# How ship-pr.ps1 merges (issue #411, Optional in the contract). Constrained to the three values
+# `gh pr merge` accepts: ship-pr validates it and refuses anything else rather than handing an unknown
+# flag to gh at the moment it is about to write to main -- so this assert is the same guard, one layer
+# earlier, where it costs nothing to hit.
+$mergeMethod = Get-PrMergeMethod
+Assert-True (@('merge', 'squash', 'rebase') -contains $mergeMethod) "Get-PrMergeMethod ('$mergeMethod') is one of merge/squash/rebase"
+Assert-Equal 'merge' $mergeMethod 'Get-PrMergeMethod is merge in this workshop (every PR keeps its own commits on main)'
+
+# The file set fix-mojibake.ps1 examines by default (issue #413, Optional in the contract). Asserted
+# against the real repo root rather than a fixture: the point of moving this list out of the tool was
+# that a list can silently stop matching the repo it describes, and only the real tree can show that.
+$repoRootForPaths = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+$mjPaths = @(Get-MojibakePaths -RepoRoot $repoRootForPaths)
+Assert-True ($mjPaths.Count -gt 0) 'Get-MojibakePaths returns a non-empty set'
+Assert-True (($mjPaths | Where-Object { $_ -notmatch '\.md$' }).Count -eq 0) 'Get-MojibakePaths returns only .md files'
+Assert-True (($mjPaths | Where-Object { -not (Test-Path -LiteralPath $_) }).Count -eq 0) 'Get-MojibakePaths returns only paths that exist'
+foreach ($mustHave in @('CHANGELOG.md', 'README.md', 'CLAUDE.md')) {
+    $want = Join-Path $repoRootForPaths $mustHave
+    Assert-True ($mjPaths -contains $want) "Get-MojibakePaths includes the root $mustHave"
+}
+# The two directories that made the old hardcoded list workshop-shaped, and the reason it had to move
+# behind the seam: a consumer has neither, and the tool silently examined almost nothing there.
+Assert-True (($mjPaths | Where-Object { $_ -match '\\plugins\\' }).Count -gt 0) 'Get-MojibakePaths reaches the per-plugin CHANGELOG.md/RELEASE.md files'
+Assert-True (($mjPaths | Where-Object { $_ -match '\\releases\\' }).Count -gt 0) 'Get-MojibakePaths reaches the archived release notes'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red

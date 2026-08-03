@@ -67,6 +67,43 @@ function Invoke-Fix {
     return [pscustomobject]@{ Out = ($out -replace '\s+', ' '); Code = $LASTEXITCODE }
 }
 
+function Invoke-FixWithDefaultPaths {
+    <#
+        Runs the tool with NO -Path, against a throwaway repo root supplied via CLAUDE_PROJECT_DIR --
+        the same dual-context door a consumer running the plugin mirror comes through. That is the only
+        way to exercise the DEFAULT file set (issue #413), which every other scenario in this suite
+        bypasses by naming its file explicitly.
+
+        CLAUDE_PROJECT_DIR is set for the CHILD only and restored afterwards, so a fixture cannot leak
+        into the rest of the suite or into the lint-gate run at the bottom of this file.
+    #>
+    param([string]$Root, [switch]$CheckOnly)
+    $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $Script)
+    if ($CheckOnly) { $a += '-Check' }
+    $prev = $env:CLAUDE_PROJECT_DIR
+    try {
+        $env:CLAUDE_PROJECT_DIR = $Root
+        $out = (& powershell @a 2>&1 | Out-String)
+        return [pscustomobject]@{ Out = ($out -replace '\s+', ' '); Code = $LASTEXITCODE }
+    } finally {
+        if ($null -eq $prev) { Remove-Item Env:\CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue }
+        else { $env:CLAUDE_PROJECT_DIR = $prev }
+    }
+}
+
+function New-DefaultPathsRoot {
+    <# A throwaway repo root holding a damaged file in the ROOT and a damaged file in a SUBDIRECTORY,
+       so the two default-set scenarios can tell which of them a run actually reached. #>
+    param([string]$Label)
+    $root = Join-Path $Fixture "root-$Label"
+    New-Item -ItemType Directory -Path (Join-Path $root 'deep') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $root 'scripts') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $root 'CHANGELOG.md'), "### #1 $ONCE Title $ONCE Fix", $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $root 'feat-some-branch.md'), "### #2 $ONCE Entry $ONCE Feat", $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $root 'deep\buried.md'), "### #3 $ONCE Buried $ONCE Docs", $Utf8NoBom)
+    return $root
+}
+
 function Set-Fixture {
     param([string]$Name, [string]$Text, [switch]$WithBom)
     $p = Join-Path $Fixture $Name
@@ -176,6 +213,46 @@ try {
     $r9 = Invoke-Fix -FilePath $f9 -CheckOnly
     Assert-Equal 0 $r9.Code '-Check exits 0 on a clean file'
     Assert-True ($r9.Out -match 'clean') 'and says so'
+
+    Write-Host 'Default file set without a repo-config: every *.md in the repo root (#413)' -ForegroundColor Cyan
+    #      The fallback has to be a real answer, not a degraded one. The old hardcoded default listed
+    #      four file names plus two workshop directories, so in a consumer it reduced to whichever of
+    #      those happened to exist -- and it never covered an unfolded ENTRY file at all, which is the
+    #      freshest, most non-ASCII-carrying file in any repo that uses this flow.
+    $rootA = New-DefaultPathsRoot -Label 'a'
+    $rA = Invoke-FixWithDefaultPaths -Root $rootA
+    Assert-Equal 0 $rA.Code 'no repo-config: exits 0'
+    Assert-Equal "### #1 $MIDDOT Title $MIDDOT Fix" (Get-FixtureText -Path (Join-Path $rootA 'CHANGELOG.md')) 'no repo-config: the root CHANGELOG.md was repaired'
+    Assert-Equal "### #2 $MIDDOT Entry $MIDDOT Feat" (Get-FixtureText -Path (Join-Path $rootA 'feat-some-branch.md')) 'no repo-config: an unfolded ENTRY file in the root was repaired -- the case the old hardcoded default never covered'
+    Assert-Equal "### #3 $ONCE Buried $ONCE Docs" (Get-FixtureText -Path (Join-Path $rootA 'deep\buried.md')) 'no repo-config: a file OUTSIDE the root was left alone -- the fallback is the root, and it says so rather than guessing'
+
+    Write-Host 'Get-MojibakePaths overrides the fallback entirely (#413)' -ForegroundColor Cyan
+    #      The point of the seam: a repo that keeps markdown somewhere else says so, and the tool walks
+    #      what the repo named instead of what the tool assumed. Deliberately a set that does NOT include
+    #      the root -- so a pass here cannot be explained by the fallback having run anyway.
+    $rootB = New-DefaultPathsRoot -Label 'b'
+    $cfgB = @"
+function Get-MojibakePaths {
+    param([Parameter(Mandatory = `$true)][string]`$RepoRoot)
+    return @((Join-Path `$RepoRoot 'deep\buried.md'))
+}
+"@
+    [System.IO.File]::WriteAllText((Join-Path $rootB 'scripts\repo-config.ps1'), $cfgB, $Utf8NoBom)
+    $rB = Invoke-FixWithDefaultPaths -Root $rootB
+    Assert-Equal 0 $rB.Code 'configured set: exits 0'
+    Assert-Equal "### #3 $MIDDOT Buried $MIDDOT Docs" (Get-FixtureText -Path (Join-Path $rootB 'deep\buried.md')) 'configured set: the file the repo named was repaired'
+    Assert-Equal "### #1 $ONCE Title $ONCE Fix" (Get-FixtureText -Path (Join-Path $rootB 'CHANGELOG.md')) 'configured set: the root fallback did NOT also run -- the repo-owned list replaces it, it does not extend it'
+
+    Write-Host 'A broken repo-config degrades to the fallback rather than stopping (#413)' -ForegroundColor Cyan
+    #      Same discipline as new-changelog-entry (#410): a repair tool that refuses to run because a
+    #      config file has a syntax error helps nobody, least of all the person whose repo is already
+    #      in a state worth repairing.
+    $rootC = New-DefaultPathsRoot -Label 'c'
+    [System.IO.File]::WriteAllText((Join-Path $rootC 'scripts\repo-config.ps1'), "function Get-MojibakePaths { `n", $Utf8NoBom)
+    $rC = Invoke-FixWithDefaultPaths -Root $rootC
+    Assert-Equal 0 $rC.Code 'broken repo-config: still exits 0'
+    Assert-Equal "### #1 $MIDDOT Title $MIDDOT Fix" (Get-FixtureText -Path (Join-Path $rootC 'CHANGELOG.md')) 'broken repo-config: the root fallback ran'
+    Assert-True ($rC.Out -match 'could not be loaded') 'broken repo-config: says so out loud instead of silently examining a different set'
 
     Write-Host 'The lint gate (check 14) reports its category on the real repo' -ForegroundColor Cyan
     #      Asserted on the coverage line rather than on a fixture: the gate consults the tool over the
