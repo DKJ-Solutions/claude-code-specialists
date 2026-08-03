@@ -264,6 +264,55 @@ Assert-Match $fce3 '(?m)^#### #2 ' 'CategoryLevel 3 -> entry demoted to #### (on
 $fceUnknown = Format-CategorizedEntries -Entries @("### #99 $midDot Mystery $midDot Weird $midDot 2026-01-09`n`nBody.") -CategoryLevel 2
 Assert-Match $fceUnknown '(?m)^## Other' 'unknown type falls into the Other catch-all'
 
+Write-Host "issue #417 -- the two halves of Get-ReleaseCategories are repo-owned and probed" -ForegroundColor Cyan
+# THE OVERRIDE IS MERGED, NOT SUBSTITUTED. A repo that renames one category must not have to restate
+# the other four, and 'Other' has to keep a label whatever the repo says -- an entry with an unknown
+# type is exactly the one a reader most needs a heading for.
+function Get-ReleaseCategoryTitles { return @{ Fix = 'Bugs'; Chore = 'Overig' } }
+$catsOverridden = Get-ReleaseCategories
+Assert-Equal 'Bugs' $catsOverridden.Title['Fix'] 'category titles: the repo override wins for the type it names'
+Assert-Equal 'Overig' $catsOverridden.Title['Chore'] 'category titles: and for the second one'
+Assert-Equal 'Features' $catsOverridden.Title['Feat'] 'category titles: a type the override does not mention keeps the default -- merged, not substituted'
+Assert-Equal 'Other' $catsOverridden.Title['Other'] 'category titles: the catch-all keeps a label whatever the repo overrides'
+$fceNl = Format-CategorizedEntries -Entries @($entries[1]) -CategoryLevel 2
+Assert-Match $fceNl '(?m)^## Bugs' 'category titles: the override reaches the rendered heading, not just the map'
+Remove-Item Function:\Get-ReleaseCategoryTitles
+Assert-Equal 'Fixes' (Get-ReleaseCategories).Title['Fix'] 'category titles: with the repo function gone, the English default is back'
+
+Write-Host "issue #417 -- Convert-ChangelogForRelease and the LIVE marker" -ForegroundColor Cyan
+# The marker MOVES: it is stripped wherever it sits and re-applied to the new heading. A marker that
+# accumulated would say two releases are live at once, which is worse than saying none is.
+$clLive = @(
+    '# Changelog', '',
+    '## Pull Requests', '',
+    'Merged PRs land here.', '',
+    '### #7 ' + $midDot + ' An entry ' + $midDot + ' Fix ' + $midDot + ' 2026-02-01', '',
+    'Body.', '',
+    '## Releases', '',
+    'The recorded versions.', '',
+    '### [v1.0.0] - 2026-01-01 ' + $emDash + ' Minor <- **LIVE**', '',
+    'See [releases/development/1.x/1.0.0.md](releases/development/1.x/1.0.0.md) for the full release notes.'
+) -join "`n"
+$outLive = Convert-ChangelogForRelease -Content $clLive -Version '1.1.0' -Date '2026-02-02' -Type 'Minor' `
+    -NotesRelPath 'releases/development/1.x/1.1.0.md' -LiveMarker '<- **LIVE**'
+Assert-Match $outLive '(?m)^### \[v1\.1\.0\] - 2026-02-02 .* Minor <- \*\*LIVE\*\*$' 'LIVE marker: the new release heading carries it'
+Assert-Equal 1 ([regex]::Matches($outLive, [regex]::Escape('<- **LIVE**')).Count) 'LIVE marker: exactly one, so it moved rather than accumulated'
+Assert-Equal $false ([bool]($outLive -match '(?m)^### \[v1\.0\.0\].*LIVE')) 'LIVE marker: the previous release no longer claims to be live'
+# And the default is byte-for-byte what this workshop has always produced -- the knob is inert unless
+# a repo asks for it, which is the whole contract of every optional seam function.
+$outPlain = Convert-ChangelogForRelease -Content $clLive -Version '1.1.0' -Date '2026-02-02' -Type 'Minor' `
+    -NotesRelPath 'releases/development/1.x/1.1.0.md'
+Assert-Equal $false ([bool]($outPlain -match '(?m)^### \[v1\.1\.0\].*LIVE')) 'no LIVE marker: none is written'
+# The invariant is that the marker is NOT stripped -- a repo that does not use the knob must not have
+# an existing marker quietly removed by a release. Asserted on the marker surviving in the carried-over
+# release block, deliberately NOT on the whole heading line: an em-dash in an EXISTING '## Releases'
+# heading is re-emitted on a line of its own, which reproduces against release-lib as it stands on main
+# and is therefore not this change's doing. Recorded rather than worked around silently -- and not
+# repaired here, because it did not reproduce against this repo's real CHANGELOG.md (the probe release
+# came out byte-identical), so the cause is not isolated yet.
+Assert-Match $outPlain ([regex]::Escape('Minor <- **LIVE**')) 'no LIVE marker: an existing one is left alone rather than silently stripped'
+Assert-Equal 1 ([regex]::Matches($outPlain, [regex]::Escape('<- **LIVE**')).Count) 'no LIVE marker: and it is still the only one'
+
 Write-Host "Get-PluginManifestPaths" -ForegroundColor Cyan
 # Pure (does not touch disk), so a fictional root suffices.
 $fakeRoot = 'C:\fake-repo'

@@ -187,7 +187,27 @@ $script:Contract = @(
        Returns = "'merge', 'squash' or 'rebase' -- how this repo merges a PR; ship-pr rejects any other value rather than handing it to gh" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-MojibakePaths'; Scripts = @('fix-mojibake');
        Optional = $true; Default = 'every *.md in the repo root';
-       Returns = "the absolute paths fix-mojibake examines when called without -Path, given a -RepoRoot parameter; without it the tool falls back to every *.md in the repo root, which silently skips whatever else this repo keeps markdown in" }
+       Returns = "the absolute paths fix-mojibake examines when called without -Path, given a -RepoRoot parameter; without it the tool falls back to every *.md in the repo root, which silently skips whatever else this repo keeps markdown in" },
+    # cut-release became shared in #417. Six knobs, all optional, every fallback the behaviour the
+    # script had while it was workshop-only -- declared here for the same reason the entry stubs above
+    # are: none of them crashes when absent, so a consumer would discover the wrong one at release
+    # time, which is the worst moment this repo has. An [INFO] naming the default makes it a thing you
+    # were told. (The highlights tier is phase 2 and deliberately has no entry yet.)
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReservedRootMd'; Scripts = @('cut-release');
+       Optional = $true; Default = "this workshop's own root docs (CHANGELOG, CLAUDE, README, LICENSE, CONTRIBUTING, SECURITY, QUICKSTART, ADOPTION, UNINSTALL)";
+       Returns = 'the root *.md file names that are permanent docs rather than unfolded changelog entries; every other root *.md blocks the cut, so a permanent doc missing from this list refuses a release over a file nobody failed to fold' },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseNotesGrouping'; Scripts = @('cut-release');
+       Optional = $true; Default = 'major';
+       Returns = "'major' for releases/development/<X>.x/ or 'minor' for releases/development/<X.Y>/ -- where the generated notes are foldered, and therefore what the overview row links to" },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseLiveMarker'; Scripts = @('cut-release');
+       Optional = $true; Default = '';
+       Returns = "the suffix marking the currently-live release on the newest '## Releases' heading, moved off the previous one at each cut; '' means this repo has no live stage and neither writes nor strips a marker" },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleasePluginTier'; Scripts = @('cut-release');
+       Optional = $true; Default = 'whether .claude-plugin/marketplace.json exists';
+       Returns = '$true if this repo publishes plugins that the cut must version in lockstep and card (per-plugin CHANGELOG.md + RELEASE.md); $false makes the newest vX.Y.Z tag the version record instead of the manifests' },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseCategoryTitles'; Scripts = @('cut-release');
+       Optional = $true; Default = "the English labels (Feat -> Features, Fix -> Fixes, Docs -> Documentation, Chore -> Maintenance)";
+       Returns = 'a type -> label map merged over those defaults, for a repo whose category headings are in another language; a type with no label falls back to the type name itself, which is the wrong word rather than a missing one' }
 )
 
 # An optional record reports [INFO] (with the fallback the caller uses) where a required one reports

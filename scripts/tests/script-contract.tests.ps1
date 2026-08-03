@@ -168,11 +168,11 @@ try {
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
     Assert-Equal 0 $r.Code 'happy path: exit-code 0'
     Assert-NotMatch '\[ERROR\]' $r.Out 'happy path: no errors'
-    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds', 'Get-ChangelogHeading', 'Get-LiveStage', 'Get-EntryTitlePlaceholder', 'Get-EntryBodyHeading', 'Get-EntryBodyPlaceholder', 'Get-EntryFallbackType', 'Get-PrMergeMethod', 'Get-MojibakePaths')) {
+    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds', 'Get-ChangelogHeading', 'Get-LiveStage', 'Get-EntryTitlePlaceholder', 'Get-EntryBodyHeading', 'Get-EntryBodyPlaceholder', 'Get-EntryFallbackType', 'Get-PrMergeMethod', 'Get-MojibakePaths', 'Get-ReservedRootMd', 'Get-ReleaseNotesGrouping', 'Get-ReleaseLiveMarker', 'Get-ReleasePluginTier', 'Get-ReleaseCategoryTitles')) {
         Assert-Match "\[OK\]\s+'$fn' present in" $r.Out "happy path: '$fn' reported OK"
     }
     $okCount = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 14 $okCount 'happy path: exactly fourteen [OK] lines (the six mandatory functions + the eight optional ones: Get-ChangelogHeading, Get-LiveStage, the four Get-Entry* stub-wording knobs, Get-PrMergeMethod and Get-MojibakePaths, nothing else)'
+    Assert-Equal 19 $okCount 'happy path: exactly nineteen [OK] lines (the six mandatory functions + the thirteen optional ones: Get-ChangelogHeading, Get-LiveStage, the four Get-Entry* stub-wording knobs, Get-PrMergeMethod, Get-MojibakePaths and the five cut-release knobs from #417, nothing else)'
     # inbound #203: the run names the root it inspected and how it resolved it. Asserted on the clean
     # run too, not only on a drifted one -- the [SCOPE] line is context that must always be emitted, so
     # that the hook has something to surface the moment a finding does appear.
@@ -272,7 +272,7 @@ try {
         Assert-NotMatch $optFn $r.Out "optional Get-Pr*: '$optFn' never mentioned (not in the contract)"
     }
     $okCount6 = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 14 $okCount6 'optional Get-Pr*: still exactly fourteen [OK] (the mandatory six + the eight declared optionals; the four UNdeclared Get-Pr* excluded)'
+    Assert-Equal 19 $okCount6 'optional Get-Pr*: still exactly nineteen [OK] (the mandatory six + the thirteen declared optionals; the four UNdeclared Get-Pr* excluded)'
 
     # --- 6c. An optional contract function that is ABSENT -> [INFO] naming the fallback, exit 0 -----
     #     Get-ChangelogHeading (issue #178) is declared Optional: fold-changelog-entry.ps1 falls back
@@ -406,12 +406,22 @@ function Get-RosterIgnoredIds { return @() }
         # shared scripts, so the per-script assertions below apply unchanged -- and those assertions are
         # exactly what would have caught the mirror being forgotten.
         @{ Function = 'Get-PrMergeMethod';         Lib = 'scripts\repo-config.ps1'; Scripts = @('ship-pr') },
-        @{ Function = 'Get-MojibakePaths';         Lib = 'scripts\repo-config.ps1'; Scripts = @('fix-mojibake') }
+        @{ Function = 'Get-MojibakePaths';         Lib = 'scripts\repo-config.ps1'; Scripts = @('fix-mojibake') },
+        # The five cut-release knobs (issue #417, phase 1). Same reasoning again: all attributed to
+        # 'cut-release', now a registered shared script, so the per-script assertions below cover them
+        # -- and those assertions are what would catch the mirror or the seam being forgotten. The
+        # highlights tier is phase 2 and deliberately has no record yet; adding one before the feature
+        # exists would declare a contract nothing honours.
+        @{ Function = 'Get-ReservedRootMd';        Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },
+        @{ Function = 'Get-ReleaseNotesGrouping';  Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },
+        @{ Function = 'Get-ReleaseLiveMarker';     Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },
+        @{ Function = 'Get-ReleasePluginTier';     Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },
+        @{ Function = 'Get-ReleaseCategoryTitles'; Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') }
     )
 
     $contractSrc = [System.IO.File]::ReadAllText($Script)
     $totalRecordCount = @([regex]::Matches($contractSrc, "Lib\s*=\s*'[^']+';\s*Function\s*=\s*'[^']+';\s*Scripts\s*=\s*@\(")).Count
-    Assert-Equal 14 $totalRecordCount 'contract: exactly fourteen (lib, function) records declared in check-script-contract.ps1 (the thirteen below plus the dedicated Get-LiveStage block after this loop)'
+    Assert-Equal 19 $totalRecordCount 'contract: exactly nineteen (lib, function) records declared in check-script-contract.ps1 (the eighteen below plus the dedicated Get-LiveStage block after this loop)'
 
     # Every record must carry a 'Returns' line, so a finding is actionable without any reference to this
     # source repo (Dave, July 28, 2026). Counted against $totalRecordCount rather than listed per record:
