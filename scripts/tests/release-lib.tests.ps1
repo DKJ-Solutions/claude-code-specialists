@@ -571,46 +571,20 @@ $hlLink = Build-HighlightsNotes -Entries @($linkEntry) -Version '1.2.0' -Date '2
 Assert-Match $hlLink '\[the lint\]\(\.\./\.\./\.\./scripts/lint/x\.ps1\)' 'root-relative links get the prefix here too'
 Assert-Match $hlLink '\[the site\]\(https://example\.com\)' 'external links untouched'
 
-Write-Host "Format-InlineMarkdown + ConvertTo-ReleaseHtml (the print-ready page)" -ForegroundColor Cyan
-Assert-Equal '<strong>bold</strong>' (Format-InlineMarkdown '**bold**') 'bold renders as strong'
-Assert-Equal '<code>x</code>' (Format-InlineMarkdown '`x`') 'backticks render as code'
-# Escaping runs FIRST, so entry text containing markup cannot inject a tag into the page. Asserted
-# because the input is contributor-authored prose from a changelog, not a trusted template.
-Assert-Equal '&lt;script&gt;alert(1)&lt;/script&gt;' (Format-InlineMarkdown '<script>alert(1)</script>') 'angle brackets are escaped before any markup pass'
-Assert-Equal '&amp;amp;' (Format-InlineMarkdown '&amp;') 'an existing entity is escaped rather than passed through as markup'
-Assert-Equal '<strong>a&lt;b</strong>' (Format-InlineMarkdown '**a<b**') 'escaping and bold compose without escaping the tags this function emits'
-Assert-Equal '' (Format-InlineMarkdown '') 'an empty line is allowed (AllowEmptyString) rather than throwing'
-
-$html = ConvertTo-ReleaseHtml -Markdown $hl -Version 'v1.2.0'
-Assert-Match $html '^<!doctype html>' 'the page starts with a doctype'
-Assert-Match $html '<html lang="en">' 'lang defaults to en'
-Assert-Match $html '<title>Release notes v1\.2\.0</title>' 'the title names the version'
-Assert-Match $html '<h1>Release notes v1\.2\.0 ' 'the h1 comes from the markdown h1'
-Assert-Match $html '<h2>Features</h2>' 'a category becomes an h2'
-Assert-Match $html '<h3>Documentation</h3>' 'a developer category becomes an h3 (the nesting survives the render)'
-Assert-Match $html '<hr>' 'a horizontal rule renders'
-Assert-Match $html '<p>' 'prose becomes a paragraph'
-Assert-Match $html '</html>\s*$' 'and the page is closed'
-# Self-contained: a stakeholder opens this file on a machine that has never seen this repo, so a
-# reference to any external host would render an unstyled page or leak that it was opened.
-Assert-Equal $false ([bool]($html -match '(?i)<(script|link)\b')) 'no script or link element -- nothing is fetched to render the page'
-Assert-Equal $false ([bool]($html -match '(?i)(https?:)?//[a-z0-9.-]+/[^"]*"\s*(rel|type|href|src)')) 'no external stylesheet or asset reference'
-Assert-Match $html '@media print' 'a print stylesheet is included (the file exists to become a PDF)'
-$htmlNl = ConvertTo-ReleaseHtml -Markdown $hl -Version 'v1.2.0' -Lang 'nl'
-Assert-Match $htmlNl '<html lang="nl">' 'the lang attribute is the consumer answer, not a constant'
-# A paragraph that ends the document (no trailing blank line) must still be flushed -- the classic
-# off-by-one in a line-buffered renderer, and it would silently drop the last sentence.
-$htmlTail = ConvertTo-ReleaseHtml -Markdown "# T`n`nA closing sentence with no trailing newline." -Version 'v1'
-Assert-Match $htmlTail '<p>A closing sentence with no trailing newline\.</p>' 'a final paragraph with no trailing blank line is not dropped'
-$htmlJoin = ConvertTo-ReleaseHtml -Markdown "# T`n`nLine one`nline two`n`nSeparate." -Version 'v1'
-Assert-Match $htmlJoin '<p>Line one line two</p>' 'consecutive lines join into one paragraph'
-Assert-Match $htmlJoin '<p>Separate\.</p>' 'a blank line starts a new paragraph'
-# Documented limitation, asserted so it stays a KNOWN one: link markdown passes through literally.
-# If someone widens the renderer, this assert fails and the change becomes a decision rather than a
-# surprise in a stakeholder's PDF.
-$htmlLink = ConvertTo-ReleaseHtml -Markdown "# T`n`nSee [the docs](https://example.com)." -Version 'v1'
-Assert-Match $htmlLink '\[the docs\]\(https://example\.com\)' 'links are NOT rendered as anchors (documented limitation of the ported renderer)'
-
+Write-Host "the highlights tier produces markdown ONLY (no HTML renderer)" -ForegroundColor Cyan
+# Dave, August 3, 2026: the print-ready .html is not wanted anywhere, so ConvertTo-ReleaseHtml and
+# Format-InlineMarkdown were removed the same day they were ported. ASSERTED ON THEIR ABSENCE rather
+# than simply deleting the old asserts: a partial HTML renderer is exactly the kind of thing that gets
+# helpfully reintroduced, and re-adding it should turn a test red rather than pass unnoticed.
+foreach ($gone in @('ConvertTo-ReleaseHtml', 'Format-InlineMarkdown')) {
+    Assert-Equal $null (Get-Command $gone -ErrorAction SilentlyContinue) "release-lib no longer defines $gone"
+}
+# The document itself must carry no HTML beyond the one comment the marker is built from -- that comment
+# is markdown-legal and is the whole point of the marker, so it is excluded by name rather than by a
+# looser pattern that would also let a stray <div> through.
+$hlNoHtml = Build-HighlightsNotes -Entries $halfEntries -Version '1.2.0' -Date '2026-08-03' -Type 'Minor' -StakeholderTypes @('Feat', 'Fix')
+$tags = @([regex]::Matches($hlNoHtml, '<[a-zA-Z/!][^>]*>') | ForEach-Object { $_.Value } | Where-Object { $_ -notmatch '^<!--' })
+Assert-Equal 0 $tags.Count "the generated document carries no HTML tags (found: $($tags -join ', '))"
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red

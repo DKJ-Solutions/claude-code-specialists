@@ -816,10 +816,18 @@ function Build-ReleaseNotes {
 #
 # ONE DELIBERATE DIFFERENCE FROM THE SOURCE THIS WAS PORTED FROM: there, both halves render their
 # categories at '##', which puts the developer categories at the same level as the marker heading that
-# is supposed to contain them -- so the block reads as ended rather than as nested, and an HTML render
-# shows it that way too. Here the marker sits at '##' and its categories one level under it, which is
-# what Format-CategorizedEntries's -CategoryLevel was already for. The consumer's generated highlights
-# therefore gain a level of nesting they did not have; nothing else about them changes.
+# is supposed to contain them -- so the block reads as ended rather than as nested. Here the marker sits
+# at '##' and its categories one level under it, which is what Format-CategorizedEntries's
+# -CategoryLevel was already for. The consumer's generated highlights therefore gain a level of nesting
+# they did not have; nothing else about them changes.
+#
+# MARKDOWN ONLY -- THE TIER PRODUCES NO HTML, AND THAT IS A DECISION RATHER THAN AN OMISSION (Dave,
+# August 3, 2026, the same day it was ported). The source generated a self-contained, print-ready
+# .html beside the .md, and ConvertTo-ReleaseHtml + Format-InlineMarkdown were ported with it and then
+# removed the same day: it is not wanted anywhere. The renderer was also the weakest part of the port --
+# a partial markdown subset that passed links through as literal '[text](url)' -- so the thing that
+# needed the most explaining is now simply gone. A reader who wants a PDF renders the markdown with a
+# tool built for it. Do not reintroduce an HTML step here without asking.
 
 function Convert-EntryHeadingToTitle {
     <#
@@ -915,93 +923,4 @@ function Build-HighlightsNotes {
         $body = $stake
     }
     return ($header + $body + "`n")
-}
-
-function Format-InlineMarkdown {
-    <#
-        Inline markdown -> HTML for one line: HTML-escapes first, then renders **bold** and `code`.
-        Pure. The escape runs BEFORE the markup so a literal '<' in an entry cannot become a tag,
-        and so the tags this function emits itself are not escaped by their own pass.
-
-        DELIBERATELY NOT A MARKDOWN PARSER. Links, lists, images, emphasis and tables pass through as
-        their literal markdown, exactly as in the source this was ported from. That is a real
-        limitation and it is left in place on purpose: the HTML exists so a stakeholder document can
-        be printed to PDF, and widening the renderer would change what the consumer's existing
-        highlights pages look like -- a visible result, which is a separate decision from moving the
-        tier. Worth revisiting once someone has looked at a rendered page and said what it needs.
-    #>
-    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
-    $t = $Text -replace '&', '&amp;'
-    $t = $t -replace '<', '&lt;'
-    $t = $t -replace '>', '&gt;'
-    $t = $t -replace '\*\*(.+?)\*\*', '<strong>$1</strong>'
-    $t = $t -replace '`([^`]+)`', '<code>$1</code>'
-    return $t
-}
-
-function ConvertTo-ReleaseHtml {
-    <#
-        Renders a highlights markdown document as one self-contained, print-ready HTML page: open it
-        in a browser and Ctrl+P -> save as PDF. Pure string in, string out; no file IO, no external
-        stylesheet or font, so the page prints the same on a machine that has never seen this repo.
-
-        Handles the structure the highlights generator actually emits -- headings (h1-h3), horizontal
-        rules, and paragraphs formed by consecutive non-blank lines -- with inline markup via
-        Format-InlineMarkdown. Anything else degrades to a paragraph of its literal markdown rather
-        than being dropped: a limitation a reader can see and report beats content that silently
-        vanished between the .md and the .pdf.
-
-        $Lang goes into <html lang> and is the consumer's own answer: the document is written for that
-        repo's stakeholders, and a screen reader or a browser's print hyphenation uses it.
-    #>
-    param(
-        [Parameter(Mandatory)][string]$Markdown,
-        [Parameter(Mandatory)][string]$Version,
-        [string]$Lang = 'en'
-    )
-    $lines = $Markdown -split '\r?\n'
-    $body = [System.Text.StringBuilder]::new()
-    $para = [System.Collections.Generic.List[string]]::new()
-
-    # A paragraph ends at a heading, a rule, or a blank line -- so flush the buffer before handling
-    # any of those, and once more after the loop for a document that ends mid-paragraph. A local
-    # scriptblock rather than a nested function: a nested `function` would be published into the
-    # session's function drive on first call and outlive this one, which for a shared library is a
-    # name it never declared it owned.
-    $flush = {
-        if ($para.Count -eq 0) { return }
-        [void]$body.AppendLine("<p>$($para -join ' ')</p>")
-        $para.Clear()
-    }
-
-    foreach ($line in $lines) {
-        $l = $line.TrimEnd()
-        if ($l -match '^#|^---|^$') { & $flush }
-        if ($l -match '^# (.+)$') { [void]$body.AppendLine("<h1>$(Format-InlineMarkdown $Matches[1])</h1>") }
-        elseif ($l -match '^## (.+)$') { [void]$body.AppendLine("<h2>$(Format-InlineMarkdown $Matches[1])</h2>") }
-        elseif ($l -match '^### (.+)$') { [void]$body.AppendLine("<h3>$(Format-InlineMarkdown $Matches[1])</h3>") }
-        elseif ($l -match '^---\s*$') { [void]$body.AppendLine('<hr>') }
-        elseif ($l -ne '') { $para.Add((Format-InlineMarkdown $l)) }
-    }
-    & $flush
-
-    $css = 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;' +
-        'max-width:800px;margin:40px auto;padding:0 24px;color:#1a1a1a;line-height:1.6}' +
-        'h1{font-size:2em;border-bottom:2px solid #e1e4e8;padding-bottom:.4em;margin-bottom:.6em}' +
-        'h2{font-size:1.4em;border-bottom:1px solid #e1e4e8;padding-bottom:.3em;margin-top:2em;color:#24292f}' +
-        'h3{font-size:1.1em;margin-top:1.5em;color:#24292f}' +
-        'strong{font-weight:600}' +
-        'code{background:#f6f8fa;padding:2px 5px;border-radius:4px;font-family:"SFMono-Regular",Consolas,monospace;font-size:.88em}' +
-        'hr{border:none;border-top:1px solid #e1e4e8;margin:1.8em 0}' +
-        'p{margin:.5em 0}' +
-        '@media print{body{margin:20px;max-width:none}}'
-
-    $q = [char]0x22
-    return "<!doctype html>`n<html lang=$q$Lang$q>`n<head>`n" +
-        "<meta charset=${q}UTF-8$q>`n" +
-        "<title>Release notes $Version</title>`n" +
-        "<style>$css</style>`n" +
-        "</head>`n<body>`n" +
-        $body.ToString().Trim() +
-        "`n</body>`n</html>`n"
 }

@@ -172,12 +172,13 @@ The `releases/` directory (modeled on life-hub):
 - **`releases/README.md`** — an overview table of all versions (newest at the top).
 - In `CHANGELOG.md` the `## Releases` block becomes a short **reference** (`### [vX.Y.Z] - date — Type`)
   to the notes file, rather than the full contents inline.
-- **`releases/highlights/<X>.x/<X.Y.Z>.md` + `.html`** — the consumer-facing tier, generated **only for
-  a minor or major** (`Get-ReleaseHighlightsBumps`). Written for the reader who decides whether to
-  *update*, not for the one who reviews the diff: entry metadata (PR number, branch type, date) is
-  stripped, and the `.html` beside it is self-contained and print-ready — open it, Ctrl+P, save as PDF.
+- **`releases/highlights/<X>.x/<X.Y.Z>.md`** — the consumer-facing tier, generated **only for a minor or
+  major** (`Get-ReleaseHighlightsBumps`). Written for the reader who decides whether to *update*, not for
+  the one who reviews the diff: entry metadata (PR number, branch type, date) is stripped.
   **It is a draft and Rendall edits it before it is published.** Turned on August 3, 2026, after this
-  lens had briefly said the opposite.
+  lens had briefly said the opposite. **Markdown only** — the tier generated a print-ready `.html`
+  alongside it for exactly one release (v3.2.0) and no longer does; Dave does not want it anywhere.
+  A PDF, if ever needed, comes from rendering the markdown with a tool built for it.
 - **`releases/internal/<X>.x/<X.Y.Z>.md`** — the third tier, for colleagues and employers: *what the
   work is worth*, at every release including a patch. **Not generated yet in this repo** — the port of
   `new-internal-note.ps1` is its own piece of work. Until it lands, this row describes the intent, not

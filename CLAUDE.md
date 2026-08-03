@@ -221,7 +221,7 @@ The constitution above, concretely implemented here:
      |---|---|---|
      | `releases/development/<X>.x/<X.Y.Z>.md` | developers — the full per-PR record | every release |
      | `releases/internal/<X>.x/<X.Y.Z>.md` | colleagues, employers — what it is worth | every release |
-     | `releases/highlights/<X>.x/<X.Y.Z>.md` + `.html` | consumers — what they notice | minor/major |
+     | `releases/highlights/<X>.x/<X.Y.Z>.md` | consumers — what they notice | minor/major |
 
      The grouping is per **major** (`3.x`) for all three, deliberately differing from the consumer this
      model came from, which folders per minor. `Get-ReleaseNotesGrouping` answers that once.
