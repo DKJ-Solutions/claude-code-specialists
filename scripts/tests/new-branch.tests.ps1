@@ -36,6 +36,32 @@ $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
 $script:pass = 0
 $script:fail = 0
 
+function Get-FlatOutput {
+    <#
+        Captured child output, whitespace collapsed to single spaces, so a phrase assert cannot fail on
+        line breaks that the behaviour under test does not decide.
+
+        A native child's stderr captured with 2>&1 does not arrive as plain text: PowerShell wraps each
+        line in a NativeCommandError, renders it with a 'powershell.exe : ' prefix, and WRAPS the whole
+        record at the HOST WIDTH. The wrap point therefore moves with the width of the window the suite
+        happens to run in and with the length of the fixture's temp path (the user name and $PID are both
+        in it) -- none of which is a property of new-branch.ps1.
+
+        Measured August 3, 2026 at width 176: the record broke MID-WORD into '... Branch name mus' plus
+        't not be 'main'.', so the assert on "must not be 'main'" failed while the script was behaving
+        exactly as specified, and CI -- whose narrower, piped width put the whole phrase on the next line
+        -- stayed green on the same commit. That is a test failing on its own formatting.
+
+        Mid-word is why the newlines are REMOVED rather than collapsed to a space: '\s+' -> ' ' turns that
+        record into 'name mus t not be', which still does not match. Note the two normalizations already
+        in shared-scripts.tests.ps1 differ on exactly this point -- Test-OutputContains (line ~128) removes
+        them and is correct; the inline '\s+' -> ' ' at line ~656 would not survive a mid-word wrap. Follow
+        Test-OutputContains.
+    #>
+    param($Captured)
+    return (($Captured | Out-String) -replace "`r?`n", '')
+}
+
 function Assert-Equal {
     param($Expected, $Actual, [string]$Name)
     if ($Expected -eq $Actual) {
@@ -124,7 +150,7 @@ function Invoke-NewBranch {
         $ErrorActionPreference = 'Continue'
         $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath @callArgs 2>&1
         $code = $LASTEXITCODE
-        return [pscustomobject]@{ Code = $code; Out = ($out | Out-String) }
+        return [pscustomobject]@{ Code = $code; Out = (Get-FlatOutput $out) }
     } finally {
         $ErrorActionPreference = $prevEap
         Set-Location -LiteralPath $prevLoc
@@ -177,7 +203,7 @@ function Invoke-NewBranchWithAdversarialField {
         $cmd = "& '$scriptPath' -Name '$Name' -$Field `$env:$envVarName"
         $out = & powershell -NoProfile -ExecutionPolicy Bypass -Command $cmd 2>&1
         $code = $LASTEXITCODE
-        return [pscustomobject]@{ Code = $code; Out = ($out | Out-String) }
+        return [pscustomobject]@{ Code = $code; Out = (Get-FlatOutput $out) }
     } finally {
         $ErrorActionPreference = $prevEap
         Set-Location -LiteralPath $prevLoc
@@ -215,7 +241,7 @@ function Invoke-NewChangelogEntry {
         $ErrorActionPreference = 'Continue'
         $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath @callArgs 2>&1
         $code = $LASTEXITCODE
-        return [pscustomobject]@{ Code = $code; Out = ($out | Out-String) }
+        return [pscustomobject]@{ Code = $code; Out = (Get-FlatOutput $out) }
     } finally {
         $ErrorActionPreference = $prevEap
         Set-Location -LiteralPath $prevLoc
@@ -225,6 +251,20 @@ function Invoke-NewChangelogEntry {
 }
 
 try {
+    # --- (0) Get-FlatOutput: the property every phrase assert below rests on ---------------------------
+    # Synthetic rather than captured on purpose: the real wrap only appears at particular console widths,
+    # so a test that waited for it would pass on this machine and prove nothing on the next. This pins the
+    # property itself -- a record split MID-WORD still matches the phrase.
+    Write-Host "Get-FlatOutput -- a wrapped record still matches its phrase" -ForegroundColor Cyan
+    $flatProbe = Get-FlatOutput @('powershell.exe : new-branch cannot run: Branch name mus', "t not be 'main'.")
+    Assert-True ($flatProbe -match "must not be 'main'") 'a MID-WORD wrap still matches the phrase'
+    Assert-True ($flatProbe -notmatch "`n") 'no newline survives normalization'
+    # Not covered, and stated rather than tested into passing: a wrap landing exactly ON a space. If the
+    # formatter drops that space, removing the newline glues the words ('already' + 'existed') and a phrase
+    # assert fails again. Whether it drops it has NOT been measured -- the observed break was mid-word. If
+    # that case ever bites, the fix is to strip ALL whitespace from both the text and the pattern before
+    # comparing, not to add a space back here.
+
     # --- (a) Hard rejects: 'main', a name with the token 'final', and empty/whitespace ------------------
     Write-Host "new-branch.ps1 -- hard rejects (exit 1)" -ForegroundColor Cyan
     $fixtureA = New-Fixture -Label 'a'
