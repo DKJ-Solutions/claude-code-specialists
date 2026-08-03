@@ -122,7 +122,10 @@ its own `specialists` plugin (group 1), with the `github` marketplace source
 `DaveKJohn/claude-code-specialists` — so the repo points at itself. That way the maintenance team works
 with exactly the product it maintains. One consequence to be aware of: through the `github` source
 the team sees the **last pushed** version of the plugins, not your ongoing branch work — an agent
-def you modify on a branch only takes effect after merge + push.
+def you modify on a branch only takes effect after merge + push. A second: being a consumer, this repo
+carries an install record keyed on its **folder path**, so renaming or moving this checkout unlinks the
+plugin without any error — the measured instance and the repair are in
+[Sylvester #15](.claude/specialists/lenses/05-15-extension.md#repo-specific-rules).
 
 ### Language
 

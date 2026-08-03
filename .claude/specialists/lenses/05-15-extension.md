@@ -104,6 +104,20 @@ infrastructure.
 - **The lint gate may never become quieter than the risks.** As the repo grows (more plugins, more
   complex manifests), Sylvester extends the checks — with [Tycho #18](04-18-extension.md) building
   tests alongside.
+- **Renaming or moving this checkout unlinks its own plugin install — plan the re-install into the same
+  move.** Because this repo consumes itself, it is a consumer like any other, and the install record is
+  keyed on `projectPath`. Measured August 3, 2026: after the directory was renamed from
+  `davekjohns-workshop` to `claude-code-specialists`, `.claude/settings.json` still enabled
+  `specialists@claude-code-specialists` correctly while the machine's only record named the old folder,
+  so the session loaded no subagent, skill or hook at all. Recognize it by a **deliberate** run of
+  [`check-roster-sync.ps1`](../../../scripts/sync/check-roster-sync.ps1) reporting
+  `[NOT-INSTALLED-HERE]` — the session-start hook cannot report it, because that hook ships in the
+  plugin that did not load. The repair is `claude plugin marketplace update claude-code-specialists`
+  followed by `claude plugin install specialists@claude-code-specialists --scope project` from the new
+  root, after which a leftover record naming the old folder is expected and inert. The mechanism, the
+  other two ways a record goes missing, and why that leftover is not a stray duplicate are in the
+  family's [QUICKSTART](../../../claude-code-plugins/claude-specialists/QUICKSTART.md#staying-up-to-date);
+  don't restate them here.
 - **Always read `$LASTEXITCODE` before you pipe a native command through a cmdlet.** A construct like
   `& git … | Select-Object -First 1` cuts the upstream (git) short as soon as the first item is in;
   if the process has not yet exited cleanly at that point, it ends with a non-zero exit code —

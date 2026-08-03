@@ -501,6 +501,14 @@ own record; it does not freeze it, and it does not guarantee it will still be th
   Once the victim was a real consumer; once it was the workshop repo itself. The `installedAt` stamps are
   the proof — the CLI sets that to *now* on a real install, so a record carrying an older repo's stamp was
   not created where it ended up.
+- **It can be orphaned, by an ordinary directory rename.** The record is keyed on `projectPath` and
+  nothing rewrites that key, so **renaming or moving the checkout leaves the record behind, naming a path
+  that no longer exists** — the repo at its new path has no record and loads nothing. Measured August 3,
+  2026 in the workshop repo itself, whose directory was renamed to match the marketplace's new name: the
+  next session's `enabledPlugins` was still perfectly correct while the only record on the machine named
+  the old folder. Unlike the two above, this one is predictable — if you move a checkout, plan the
+  re-install into the same move — and it is the cause `check-report-lib.ps1` has always named in code
+  without any reader-facing document saying it.
 
 **The second one is the expensive one, because nothing tells you.** No command was run, no file in your
 repo changed, `git status` is clean — and a session that loads no plugin has no hooks to complain,
@@ -529,6 +537,15 @@ wanted one.** Measured in `DaveKJohn/life-hub` on July 31, 2026, CLI `2.1.220` (
 against a path that already carried a record **added a second one beside it** instead of correcting it,
 reporting `✔ Successfully installed … (scope: project)` both times. Two lines for one plugin is not a
 display quirk — it is the stray second record, and the count in that query is the only signal you get.
+
+**Read the paths before you act on that count, though — one repair produces two lines legitimately.**
+After repairing the renamed-directory case above, the expected state *is* two records: one naming the
+directory that no longer exists, one naming the new root. That pair is not #315's stray duplicate — #315's
+two records name the **same** path — and it needs no cleaning: a record whose `projectPath` does not
+resolve cannot be about this repo, so `Get-InstallRecord` skips it rather than counting it, and a
+`check-roster-sync` run immediately after such a repair reports no duplicate and no `[RECORD-SHAPE]`.
+Editing `installed_plugins.json` by hand to remove the dead line buys nothing and risks the file the
+whole administration rests on.
 
 **And there is a third scope this family's documents had not accounted for: `local`.** The CLI does name
 it — re-measured on August 1, 2026, CLI `2.1.220`, and worth stating precisely because an earlier version
