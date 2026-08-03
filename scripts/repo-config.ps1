@@ -264,10 +264,10 @@ function Get-PrMergeMethod {
 #   Bumps             -- WHETHER, and for which bump types. @() switches the tier off entirely.
 #   StakeholderTypes  -- WHICH branch types a non-developer is the audience for. The rest of the
 #                        release lands under the remove-before-publishing marker.
-#   Wording           -- the words on that marker, plus the HTML lang attribute. One function rather
-#                        than three, unlike the four #410 entry stubs: those are chosen
-#                        independently, while these three are one document's language and are always
-#                        set together.
+#   Wording           -- the words on that marker. One function rather than two, unlike the four #410
+#                        entry stubs: those are chosen independently, while these are one document's
+#                        language and are always set together. (It briefly also carried an HTML lang
+#                        attribute; the tier produces no HTML -- see below.)
 #
 # ALL EIGHT ARE OPTIONAL in the script contract, and every fallback is this workshop's CURRENT
 # behaviour -- so a consumer that defines none of them gets exactly what the unshared script did.
@@ -351,10 +351,11 @@ function Get-ReservedRootMd {
 
 # --- The highlights tier: whether, for whom, and in whose words (issue #417, knob 2) --------------
 #
-# The second, stakeholder-facing rendering of a release: releases/highlights/<dir>/<X.Y.Z>.md plus a
-# print-ready .html of it (open -> Ctrl+P -> PDF). Written for NON-DEVELOPERS (Dave, July 13, 2026),
-# so the generated draft puts the stakeholder categories first and everything else under an explicit
-# "remove before publishing" marker for the release manager to cut by hand.
+# The second, stakeholder-facing rendering of a release: releases/highlights/<dir>/<X.Y.Z>.md. Written
+# for NON-DEVELOPERS (Dave, July 13, 2026), so the generated draft puts the stakeholder categories
+# first and everything else under an explicit "remove before publishing" marker for the release manager
+# to cut by hand. MARKDOWN ONLY -- the tier briefly also generated a print-ready .html and no longer
+# does anywhere (Dave, August 3, 2026); whoever wants a PDF renders the markdown with a real tool.
 #
 # ON IN THIS REPO SINCE AUGUST 3, 2026, for minor and major only -- Dave's decision, and it reversed
 # what this file said one commit earlier. The reasoning that had it off was that this repo's release
@@ -404,11 +405,10 @@ function Get-ReleaseHighlightsStakeholderTypes {
     return $script:ReleaseHighlightsStakeholderTypes
 }
 
-# The words on the marker and the HTML lang attribute -- the #410 class one level up. A repo whose
-# stakeholders read Dutch generates a Dutch document, and a hardcoded English heading in it is the
-# wrong word rather than a missing one; lang= is what a screen reader and the browser's print
-# hyphenation act on. Only the keys that differ from release-lib's English defaults need to appear;
-# the map is merged over them rather than replacing them.
+# The words on the marker -- the #410 class one level up. A repo whose stakeholders read Dutch
+# generates a Dutch document, and a hardcoded English heading in it is the wrong word rather than a
+# missing one. Only the keys that differ from release-lib's English defaults need to appear; the map is
+# merged over them rather than replacing them. Two keys now: DevBlockComment and DevBlockHeading.
 #
 # EMPTY HERE for the same reason Get-ReleaseCategoryTitles is: the defaults already say what an
 # English repo means. The tier is ON now, so these ARE read -- an empty map means the English defaults
@@ -416,6 +416,6 @@ function Get-ReleaseHighlightsStakeholderTypes {
 $script:ReleaseHighlightsWording = @{}
 
 function Get-ReleaseHighlightsWording {
-    <# Overrides for the highlights tier's own text: DevBlockComment, DevBlockHeading, HtmlLang. #>
+    <# Overrides for the highlights tier's own text: DevBlockComment, DevBlockHeading. #>
     return $script:ReleaseHighlightsWording
 }

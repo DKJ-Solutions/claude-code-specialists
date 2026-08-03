@@ -62,7 +62,7 @@ go — do not skip a step or reorder them from memory.
 
    **Where `<highlights-file>` comes from.** Where the repo sets `Get-ReleaseHighlightsBumps` in
    `scripts\repo-config.ps1`, `cut-release.ps1` has already generated it at
-   `releases/highlights/<dir>/<X.Y.Z>.md` (plus a print-ready `.html` beside it) — **edit it before
+   `releases/highlights/<dir>/<X.Y.Z>.md` — markdown only — **edit it before
    publishing**: it is written for non-developers and the generated draft still carries a
    developer-only block under an explicit remove-before-publishing marker. Where that knob is **empty**
    there is no highlights file and no such document is wanted; use the development notes as the body and

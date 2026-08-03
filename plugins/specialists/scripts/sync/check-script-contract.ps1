@@ -222,13 +222,13 @@ $script:Contract = @(
        Returns = 'a type -> label map merged over those defaults, for a repo whose category headings are in another language; a type with no label falls back to the type name itself, which is the wrong word rather than a missing one' },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHighlightsBumps'; Scripts = @('cut-release');
        Optional = $true; Default = 'no highlights tier at all';
-       Returns = "the bump types that also get a stakeholder-facing highlights document (releases/highlights/<dir>/<X.Y.Z>.md plus a print-ready .html), e.g. @('minor','major'); @() switches the tier off, which is what the cut did before this knob existed" },
+       Returns = "the bump types that also get a stakeholder-facing highlights document (releases/highlights/<dir>/<X.Y.Z>.md, markdown only), e.g. @('minor','major'); @() switches the tier off, which is what the cut did before this knob existed" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHighlightsStakeholderTypes'; Scripts = @('cut-release');
        Optional = $true; Default = 'no split -- every category is stakeholder-facing';
        Returns = 'the branch types a non-developer reader is the audience for; every OTHER category present lands under the remove-before-publishing marker, so a type left out of this list is reviewed rather than published, and @() writes no marker block at all' },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHighlightsWording'; Scripts = @('cut-release');
-       Optional = $true; Default = "the English marker text plus lang='en'";
-       Returns = "overrides for the highlights document's own text, merged over those defaults: DevBlockComment (the HTML comment above the marker), DevBlockHeading (the marker heading) and HtmlLang (the <html lang> attribute) -- a repo whose stakeholders read another language needs all three, and an unset one is the wrong word rather than a missing one" }
+       Optional = $true; Default = 'the English marker text';
+       Returns = "overrides for the highlights document's own text, merged over those defaults: DevBlockComment (the HTML comment above the marker) and DevBlockHeading (the marker heading) -- a repo whose stakeholders read another language needs both, and an unset one is the wrong word rather than a missing one" }
 )
 
 # An optional record reports [INFO] (with the fallback the caller uses) where a required one reports

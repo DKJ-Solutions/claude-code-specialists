@@ -50,10 +50,10 @@
           it describes rather than where the reader is -- it is written at cut time and cannot know
           which commit a consumer will install from (inbound #384).
       3d. Writes, for a bump type the seam names in Get-ReleaseHighlightsBumps, a second
-          stakeholder-facing rendering of the same release: releases/highlights/<dir>/<X.Y.Z>.md plus
-          a print-ready .html of it. Written for NON-DEVELOPERS, so the categories the seam does not
-          call stakeholder-facing land under an explicit "remove before publishing" marker the
-          release manager cuts by hand. Skipped entirely in this repo (empty seam = tier off).
+          stakeholder-facing rendering of the same release: releases/highlights/<dir>/<X.Y.Z>.md.
+          Written for NON-DEVELOPERS, so the categories the seam does not call stakeholder-facing land
+          under an explicit "remove before publishing" marker the release manager cuts by hand.
+          Markdown only -- no HTML, deliberately (see release-lib.ps1's highlights header).
       4. Commits that directly to main (release: vX.Y.Z) and sets an annotated tag vX.Y.Z.
       5. Pushes main + the tag (unless -NoPush).
 
@@ -165,7 +165,6 @@ $highlightsTypes = @(Get-SeamValue -Name 'Get-ReleaseHighlightsStakeholderTypes'
 $highlightsWording = @{
     DevBlockComment = 'Remove this block before sharing the highlights with non-developers.'
     DevBlockHeading = 'For developers only -- remove before publishing'
-    HtmlLang        = 'en'
 }
 $wordingOverride = Get-SeamValue -Name 'Get-ReleaseHighlightsWording' -Default @{}
 if ($wordingOverride) { foreach ($k in $wordingOverride.Keys) { $highlightsWording[$k] = $wordingOverride[$k] } }
@@ -372,28 +371,26 @@ if ($SummaryFile) {
 $notesContent = Build-ReleaseNotes -Entries $entries -Version $new -Date $today -Type $typeLabel -Title $Title -Summary $summaryText
 $changelogNew = Convert-ChangelogForRelease -Content $changelogRaw -Version $new -Date $today -Type $typeLabel -NotesRelPath $notesRelPath -LiveMarker $liveMarker
 
-# The highlights pair, built here with everything else so a failure leaves no half-written release
+# The highlights document, built here with everything else so a failure leaves no half-written release
 # behind. $cutHighlights is off unless the seam names THIS bump type: the tier exists for the release
 # a stakeholder is told about, and a patch is generally not that release.
 $cutHighlights = $highlightsBumps -contains $bumpType
 $highlightsRelPath = "releases/highlights/$notesDirName/$new.md"
-$highlightsHtmlRelPath = "releases/highlights/$notesDirName/$new.html"
 if ($cutHighlights) {
     $highlightsContent = Build-HighlightsNotes -Entries $entries -Version $new -Date $today `
         -Type $typeLabel -Title $Title -StakeholderTypes $highlightsTypes `
         -DevBlockComment $highlightsWording.DevBlockComment -DevBlockHeading $highlightsWording.DevBlockHeading
-    $highlightsHtml = ConvertTo-ReleaseHtml -Markdown $highlightsContent -Version "v$new" -Lang $highlightsWording.HtmlLang
 }
 
 # --- Write the release-notes file -------------------------------------------------------------
-# EVERY target is checked before ANY of them is written. With the highlights tier on there are three
+# EVERY target is checked before ANY of them is written. With the highlights tier on there are two
 # files, and stopping halfway through would leave a release whose notes exist and whose stakeholder
 # document does not -- discovered by the release manager rather than by this guard.
 # Kept as REPO-RELATIVE paths and joined per check: the message has to name the file the way the repo
 # does, and [System.IO.Path]::GetRelativePath does not exist in the .NET Framework that Windows
 # PowerShell 5.1 runs on -- it would throw here instead of reporting the collision it was written for.
 $plannedFiles = @($notesRelPath)
-if ($cutHighlights) { $plannedFiles += @($highlightsRelPath, $highlightsHtmlRelPath) }
+if ($cutHighlights) { $plannedFiles += @($highlightsRelPath) }
 foreach ($rel in $plannedFiles) {
     if (Test-Path -LiteralPath (Join-Path $repoRoot ($rel -replace '/', '\'))) {
         Write-Error "$rel already exists. Nothing was written."
@@ -479,8 +476,6 @@ if ($cutHighlights) {
     New-Item -ItemType Directory -Force -Path (Join-Path $repoRoot "releases\highlights\$notesDirName") | Out-Null
     Write-Utf8NoBom -Path (Join-Path $repoRoot ($highlightsRelPath -replace '/', '\')) -Content $highlightsContent
     Write-Host "  created: $highlightsRelPath (highlights -- edit before publishing)" -ForegroundColor DarkGray
-    Write-Utf8NoBom -Path (Join-Path $repoRoot ($highlightsHtmlRelPath -replace '/', '\')) -Content $highlightsHtml
-    Write-Host "  created: $highlightsHtmlRelPath (open in a browser -> Ctrl+P -> save as PDF)" -ForegroundColor DarkGray
 }
 
 # --- Bump plugin versions (regex on the version line -- preserves the JSON formatting) -----------

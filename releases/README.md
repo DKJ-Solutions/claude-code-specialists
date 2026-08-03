@@ -28,13 +28,18 @@ keeps `<X>.x`, answered once by `Get-ReleaseNotesGrouping` in
 |---|---|---|---|
 | `development/<X>.x/<X.Y.Z>.md` | developers — the full per-PR record, auto-complete | every release | `cut-release.ps1` |
 | `internal/<X>.x/<X.Y.Z>.md` | colleagues, employers — what the work is worth | every release | *not yet — port pending* |
-| `highlights/<X>.x/<X.Y.Z>.md` + `.html` | consumers — what they actually notice | minor/major only | `cut-release.ps1` |
+| `highlights/<X>.x/<X.Y.Z>.md` | consumers — what they actually notice | minor/major only | `cut-release.ps1` |
 
 **Development is raw and complete**: the changelog entries as they were written, grouped by branch type,
-nothing rewritten. **Highlights is a draft to be edited**: entry metadata is stripped, and the `.html`
-beside it is self-contained and print-ready (open it, Ctrl+P, save as PDF). It is generated only for a
-minor or major, and that needs no separate rule — a minor is cut precisely when a consumer notices
-something, so if a release earned a minor it has a highlights reader.
+nothing rewritten. **Highlights is a draft to be edited**: entry metadata is stripped, and it is
+generated only for a minor or major — which needs no separate rule, since a minor is cut precisely when a
+consumer notices something, so a release that earned a minor has a highlights reader.
+
+> **Markdown only.** For one release (v3.2.0) the tier also generated a print-ready `.html` beside the
+> `.md`. That is gone and is not coming back — Dave's decision, August 3, 2026. A PDF, if ever needed,
+> comes from rendering the markdown with a tool built for it rather than from a partial HTML renderer
+> maintained here. `v3.2.0`'s `.html` was removed from `main`; the `v3.2.0` **tag** still contains it,
+> because a tag is a record of a moment and is not rewritten.
 
 **Before editing a highlights draft, know that the marker is a proposal.** The generator puts `Feat`/`Fix`
 above a "remove before publishing" marker and everything else below it. In the storefront repo this tier
