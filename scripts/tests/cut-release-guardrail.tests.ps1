@@ -65,6 +65,30 @@ Assert-True ($permanentDocs.Count -gt 0) 'found tracked permanent root docs to c
 $uncovered = @($permanentDocs | Where-Object { $allowlist -notcontains $_ })
 Assert-True ($uncovered.Count -eq 0) "every permanent root doc is in `$reservedRootMd (uncovered: $($uncovered -join ', '))"
 
+Write-Host "cut-release.ps1 -- every planned file is checked before the first one is written" -ForegroundColor Cyan
+# WHY THIS IS A TEXT ASSERT AND NOT A BEHAVIOUR ONE: cut-release.ps1 runs its guardrails on load (it
+# refuses to be anywhere but a clean main), so it cannot be dot-sourced and the collision path cannot
+# be exercised in-process -- the same constraint the allowlist check above works around.
+#
+# WHAT IT PROTECTS. With the highlights tier on (#417 phase 2) a cut writes THREE files, and the
+# order is load-bearing: collect every target, check them all, then write. Checking each one just
+# before its own write would leave a release whose developer notes exist and whose stakeholder
+# document does not -- half a release, discovered by the release manager rather than by a guard, on
+# an action that has already committed nothing and cannot be re-run because the first file now exists.
+$planned = [regex]::Match($cutReleaseText, '(?m)^\$plannedFiles\s*=')
+Assert-True $planned.Success 'cut-release.ps1 collects its write targets in $plannedFiles'
+$guardLoop = [regex]::Match($cutReleaseText, '(?ms)foreach \(\$rel in \$plannedFiles\).*?Nothing was written')
+Assert-True $guardLoop.Success 'the collision guard loops over that whole collection and says nothing was written'
+$firstWrite = $cutReleaseText.IndexOf('Write-Utf8NoBom -Path')
+Assert-True ($firstWrite -gt 0) 'found the first content write in cut-release.ps1'
+Assert-True ($guardLoop.Success -and $firstWrite -gt ($guardLoop.Index + $guardLoop.Length)) `
+    'the guard runs BEFORE any file is written, so a collision leaves the tree untouched'
+# And the highlights pair is really in that collection -- a guard over one path would pass the asserts
+# above while protecting nothing new.
+$plannedBlock = [regex]::Match($cutReleaseText, '(?ms)^\$plannedFiles\s*=.*?^foreach \(\$rel in \$plannedFiles\)')
+Assert-True ($plannedBlock.Success -and $plannedBlock.Value -match 'highlightsRelPath' -and $plannedBlock.Value -match 'highlightsHtmlRelPath') `
+    'both highlights targets (the .md and the .html) join the collection when the tier is on'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red

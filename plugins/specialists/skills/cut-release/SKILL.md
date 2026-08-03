@@ -60,6 +60,14 @@ go — do not skip a step or reorder them from memory.
    plain "paste everything into the body" approach returned an HTTP 422 from `gh`. Splitting
    body/attachment is what keeps the command from failing on anything but the smallest release.
 
+   **Where `<highlights-file>` comes from.** Where the repo sets `Get-ReleaseHighlightsBumps` in
+   `scripts\repo-config.ps1`, `cut-release.ps1` has already generated it at
+   `releases/highlights/<dir>/<X.Y.Z>.md` (plus a print-ready `.html` beside it) — **edit it before
+   publishing**: it is written for non-developers and the generated draft still carries a
+   developer-only block under an explicit remove-before-publishing marker. Where that knob is empty
+   (this workshop, life-hub) there is no highlights file and no such document is wanted; use the
+   development notes as the body and drop the attachment line.
+
 3. **Branch cleanup** — the same fixed closing move as the `fold-changelog` skill's:
 
    ```powershell
@@ -77,9 +85,12 @@ A repo that *does* have one (e.g. a repo that pushes a live deploy target as a s
 tagging) fills in `Get-LiveStage` with a short description of that target. Where it is filled in:
 
 1. **Push to the live target** described by `Get-LiveStage`.
-2. **Move the `<- LIVE` marker** in this repo's releases overview from the previous version's row to
-   the new one, so the overview always shows at a glance which recorded version is the one actually
-   live.
+2. **Check the `<- LIVE` marker** in this repo's releases overview, so it shows at a glance which
+   recorded version is the one actually live. Since #417 `cut-release.ps1` **moves this marker itself**
+   where the repo sets `Get-ReleaseLiveMarker` — it strips it from the previous release heading and
+   writes it onto the new one. This step is therefore a verification, not a hand edit; it stays on the
+   checklist because the marker is the one release artefact whose correctness a script cannot confirm
+   (only the person who did the push knows it succeeded).
 
 ## Requirements in the consumer
 
@@ -88,13 +99,23 @@ tagging) fills in `Get-LiveStage` with a short description of that target. Where
   `check-script-contract.ps1` as an **Optional** record (the mechanism introduced for
   `Get-ChangelogHeading`, issue #178): a consumer without the function gets `[INFO]` naming the
   fallback (`''`, i.e. no live stage), never `[ERROR]`.
+- The script's own getters are separate from this skill's and all optional in the same way:
+  `Get-ReservedRootMd`, `Get-ReleaseNotesGrouping`, `Get-ReleaseLiveMarker`, `Get-ReleasePluginTier`,
+  `Get-ReleaseCategoryTitles` and the three highlights knobs (`Get-ReleaseHighlightsBumps`,
+  `Get-ReleaseHighlightsStakeholderTypes`, `Get-ReleaseHighlightsWording`). Define none of them and the
+  cut behaves exactly as it does in the source repo. Run `check-script-contract.ps1` to see which ones
+  this repo answers and which fall back.
 - `git` and a logged-in `gh` CLI for the Minor/Major GitHub Release step.
 
 ## Important
 
-- **No script mirrored, deliberately.** This workshop's own `scripts/release/cut-release.ps1` stays
-  workshop-only — it is not part of the consumer contract (see the "out of scope" note in
-  `check-script-contract.ps1`). What travels here is the procedure, not the script.
+- **The script IS mirrored now** (issue #417, August 3, 2026). This page used to say the opposite —
+  "no script mirrored, deliberately", because the lockstep `plugin.json` bump is meaningless in a
+  consumer. That turned out not to require a fork, only a seam function: a repo with no marketplace
+  manifest skips that half. So `cut-release.ps1` travels with the plugin like the rest of the workflow,
+  and what differs per repo is read from optional getters in the consumer's `scripts\repo-config.ps1`.
+  This page remains the *procedure* around the script — the parts no script performs: the GitHub
+  Release, the live push, the branch cleanup.
 - **Order matters.** Block 1 always runs first; Block 2 only follows it, and only where
   `Get-LiveStage` says there is one to run.
 - **A release itself is cut only at explicit request** (a version bump is never automatic) — that

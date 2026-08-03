@@ -206,11 +206,20 @@ The constitution above, concretely implemented here:
      Since August 3, 2026 it is a **shared** script, mirrored into the plugin like the rest of the
      workflow ([#417](https://github.com/DaveKJohn/claude-code-specialists/issues/417)): everything
      that legitimately differs per repo — which root docs are permanent, how the notes are foldered,
-     the live marker, whether there is a plugin tier at all, the category labels — is read from
-     optional functions in [`scripts/repo-config.ps1`](scripts/repo-config.ps1), each falling back to
+     the live marker, whether there is a plugin tier at all, the category labels, and whether a
+     stakeholder-facing **highlights** document is generated at all — is read from optional functions
+     in [`scripts/repo-config.ps1`](scripts/repo-config.ps1), each falling back to
      what this repo already did. **The exception it runs under did not widen**: same scope, same
      "only on explicit request", and the release artefacts it produces here were verified
-     byte-identical to the unshared script's before the change landed.
+     byte-identical to the unshared script's, both when the script was shared and again when the
+     highlights tier joined it.
+
+     **The highlights tier is off here, and that is a statement about the product rather than a
+     preference.** It is a second rendering of a release written for *non-developers*, and this repo's
+     release audience is developers: a consumer reads `RELEASE.md` and the per-plugin `CHANGELOG.md` to
+     decide whether to update a plugin. So a highlights document generated here would have no reader.
+     The three knobs stay declared with empty answers anyway, because a consuming repo reads
+     `repo-config.ps1` as the model and needs to see both the switch and why it is off.
 - **This repo is `public`.** A deliberate choice, so the remote `github` marketplace source can be
   read without gh auth. Consequence: **nothing confidential** belongs here — no personal
   information, credentials, or secrets. The group 1 agent defs are therefore deliberately

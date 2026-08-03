@@ -119,6 +119,24 @@ foreach ($mustHave in @('CHANGELOG.md', 'README.md', 'CLAUDE.md')) {
 Assert-True (($mjPaths | Where-Object { $_ -match '\\plugins\\' }).Count -gt 0) 'Get-MojibakePaths reaches the per-plugin CHANGELOG.md/RELEASE.md files'
 Assert-True (($mjPaths | Where-Object { $_ -match '\\releases\\' }).Count -gt 0) 'Get-MojibakePaths reaches the archived release notes'
 
+# The highlights tier (#417 phase 2, Optional in the contract). ASSERTED AS OFF ON PURPOSE, which is the
+# opposite of the usual "does the knob work" test -- that lives in release-lib.tests.ps1, where the tier
+# can be exercised. What matters HERE is that this repo answers empty, because the answer is a statement
+# about the product: the release audience is developers, so a stakeholder document would have no reader.
+# If someone switches the tier on, this turns red and the change becomes a decision (Dave's, since the
+# tier produces a visible result) rather than a release that quietly grows two files nobody asked for.
+$hlBumps = @(Get-ReleaseHighlightsBumps)
+Assert-Equal 0 $hlBumps.Count 'Get-ReleaseHighlightsBumps is empty -- no highlights tier in this repo'
+$hlTypes = @(Get-ReleaseHighlightsStakeholderTypes)
+Assert-Equal 0 $hlTypes.Count 'Get-ReleaseHighlightsStakeholderTypes is empty (nothing to split while the tier is off)'
+$hlWording = Get-ReleaseHighlightsWording
+Assert-True ($hlWording -is [hashtable]) 'Get-ReleaseHighlightsWording returns a hashtable (merged over the English defaults)'
+Assert-Equal 0 $hlWording.Keys.Count 'Get-ReleaseHighlightsWording is empty -- an English repo needs no overrides'
+# A bump type that is not one of the three the script understands would silently never match, so the
+# tier would appear configured and generate nothing. Guarded here rather than at release time.
+$badBumps = @($hlBumps | Where-Object { @('major', 'minor', 'patch') -notcontains $_ })
+Assert-Equal 0 $badBumps.Count "Get-ReleaseHighlightsBumps names only major/minor/patch (stray: $($badBumps -join ', '))"
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
