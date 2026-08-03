@@ -45,9 +45,13 @@ layer that used to stand by to hold a second family here has been removed.
 **The nuance, so nobody repairs the wrong thing later: lockstep *within* this product is correct.**
 The four plugins are one system — a shared core plus domain groups — and a consumer running group 1
 alongside group 3 needs matching versions. What was wrong was never the lockstep; it was housing
-unrelated products in a single release train. [`cut-release.ps1`](scripts/release/cut-release.ps1)
-therefore needs no change, and the versioning problem dissolved with the reorganisation instead of
-needing a fix.
+unrelated products in a single release train. The lockstep in
+[`cut-release.ps1`](scripts/release/cut-release.ps1) therefore needs no change, and the versioning
+problem dissolved with the reorganisation instead of needing a fix. (That script *was* changed later
+the same day, for an unrelated reason — it became a shared plugin script under
+[#417](https://github.com/DaveKJohn/claude-code-specialists/issues/417), with what differs per repo
+moved into the seam. The lockstep behaviour is untouched: the release artefacts it produces here are
+byte-identical to what the unshared script produced.)
 
 Decision by Dave, August 3, 2026.
 

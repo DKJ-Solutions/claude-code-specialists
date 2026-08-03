@@ -117,6 +117,33 @@ function Get-SharedScriptPairs {
             Source  = 'scripts\lib\pr-issues-lib.ps1'
             Mirror  = 'plugins\specialists\scripts\lib\pr-issues-lib.ps1'
             LibOnly = $true
+        },
+        @{
+            # Issue #417, phase 1. Two repos ran two independently evolved files of this name, and the
+            # owner's goal is one release workflow rather than two that resemble each other. The audit
+            # that produced the issue named three divergences; reading both files found six, and the
+            # largest -- the whole plugin/marketplace half -- was not among them. All six now sit in the
+            # seam (scripts\repo-config.ps1), each optional, each falling back to what this script did
+            # unshared, so registering it here changes nothing about how the workshop cuts a release.
+            #
+            # The highlights tier the other repo generates is NOT part of this entry: porting it is
+            # phase 2, and it renders stakeholder-facing HTML, which under the safety rules is work that
+            # waits for Dave's own eye rather than merging on the gates.
+            Name   = 'cut-release'
+            Source = 'scripts\release\cut-release.ps1'
+            Mirror = 'plugins\specialists\scripts\release\cut-release.ps1'
+        },
+        @{
+            # Travels with cut-release for the same reason verify-resolved-issues travels with ship-pr:
+            # cut-release dot-sources it as a $PSScriptRoot sibling, so a mirror without it would fail
+            # on the first line that matters. Its one repo-owned dependency, branch-info.ps1, does NOT
+            # travel -- the branch table differs per repo -- so the dot-source of that sibling is
+            # guarded and Get-ReleaseCategories probes for Get-BranchTypes, which cut-release loads
+            # from the consumer's own root before calling in.
+            Name    = 'release-lib'
+            Source  = 'scripts\lib\release-lib.ps1'
+            Mirror  = 'plugins\specialists\scripts\lib\release-lib.ps1'
+            LibOnly = $true
         }
     )
 

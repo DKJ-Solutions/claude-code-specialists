@@ -239,3 +239,103 @@ function Get-PrMergeMethod {
     <# The merge method ship-pr.ps1 uses: 'merge', 'squash' or 'rebase'. #>
     return $script:PrMergeMethod
 }
+
+# --- What cut-release.ps1 does differently per repo (issue #417) -----------------------------------
+#
+# cut-release.ps1 became a SHARED script in #417, after an audit in a second consumer found the two
+# repos running two independently evolved files of the same name. The stated goal is that both repos
+# run exactly the same release workflow, and the inbound issue named three divergences. Reading both
+# files found SIX, and the largest one was not on that list -- so the knobs below are what the
+# measurement produced rather than what the report predicted:
+#
+#   1. where the notes are grouped        Get-ReleaseNotesGrouping    (named in the issue)
+#   2. the highlights tier                -- PHASE 2, deliberately not here yet (see below)
+#   3. the LIVE marker                    Get-ReleaseLiveMarker       (named in the issue)
+#   4. the plugin/marketplace half        Get-ReleasePluginTier       (NOT named -- the largest block)
+#   5. the category labels                Get-ReleaseCategoryTitles   (NOT named)
+#   6. the permanent root docs            Get-ReservedRootMd          (NOT named)
+#
+# Knob 2 is absent on purpose rather than forgotten. The highlights tier is a feature to port, not a
+# switch to flip, and it produces print-ready stakeholder HTML -- work with a visible result, which
+# under this repo's safety rules waits for Dave's own eye. Declaring its config now would put a
+# function here that nothing reads, which is the kind of dead knob this file exists to avoid.
+#
+# ALL SIX ARE OPTIONAL in the script contract, and every fallback is this workshop's CURRENT
+# behaviour -- so a consumer that defines none of them gets exactly what the unshared script did.
+# Same pattern as Get-ChangelogHeading (#178) and the entry-stub wording (#410).
+
+# 'major' -> releases/development/<X>.x/<X.Y.Z>.md   (this workshop)
+# 'minor' -> releases/development/<X.Y>/<X.Y.Z>.md   (a repo that cuts often enough for that to help)
+$script:ReleaseNotesGrouping = 'major'
+
+function Get-ReleaseNotesGrouping {
+    <# How the generated release notes are foldered: 'major' or 'minor'. #>
+    return $script:ReleaseNotesGrouping
+}
+
+# The "this is the version currently live" suffix on the newest '## Releases' row. EMPTY here, and
+# that is not an oversight: a marketplace has no live stage, so there is no such thing as the live
+# version -- consumers install from `main` at a moment of their own choosing. A repo that DOES push
+# to a live target (a theme repo pushing to a live storefront) sets its marker here, and
+# Convert-ChangelogForRelease then MOVES it from the previous row to the new one.
+#
+# Deliberately separate from Get-LiveStage above, which the cut-release SKILL reads to decide whether
+# to print its live-push block. Two questions, one repo: "do you have a live stage" is prose for a
+# human, "what marks the live row" is a string a script writes into a file. A repo can have the first
+# without wanting the second.
+$script:ReleaseLiveMarker = ''
+
+function Get-ReleaseLiveMarker {
+    <# The literal marker appended to the newest release heading, e.g. '<- **LIVE**'. Empty = none. #>
+    return $script:ReleaseLiveMarker
+}
+
+# Whether cut-release runs the plugin/marketplace half: enumerating the manifests from
+# .claude-plugin/marketplace.json, writing each plugin's consumer-facing CHANGELOG.md and RELEASE.md
+# card, and bumping every plugin.json in lockstep. TRUE here -- that half IS this repo's release.
+#
+# THE ONE KNOB WITH A COMPUTED FALLBACK, and the reason is that its answer is a fact rather than a
+# preference: a repo with no .claude-plugin/marketplace.json has no plugins to bump, so a consumer
+# that never heard of this function gets the right behaviour without stating anything. Stated
+# explicitly here anyway, because in THIS repo the answer is load-bearing and a release that
+# silently skipped the lockstep bump would be discovered by a consumer rather than by a gate.
+$script:ReleasePluginTier = $true
+
+function Get-ReleasePluginTier {
+    <# $true if this repo publishes plugins that cut-release must version and card. #>
+    return $script:ReleasePluginTier
+}
+
+# Display labels for the release-notes categories, keyed on the branch TYPES from
+# scripts/lib/branch-info.ps1. Only the ones that differ from release-lib's English defaults
+# (Feat -> Features, Fix -> Fixes, Docs -> Documentation, Chore -> Maintenance, Other -> Other) need
+# to appear; the map is merged over those rather than replacing them.
+#
+# EMPTY HERE, and that is the correct state for an English repo: the defaults already say what this
+# repo means. The knob exists for a non-English consumer, where an unlabelled type degrades to the
+# type name -- the wrong word rather than a missing one. Precisely the #410 case one level up.
+$script:ReleaseCategoryTitles = @{}
+
+function Get-ReleaseCategoryTitles {
+    <# type -> label overrides for the release-notes category headings. Empty = use the defaults. #>
+    return $script:ReleaseCategoryTitles
+}
+
+# The permanent root *.md files that are NOT unfolded changelog entries. cut-release treats every
+# OTHER root *.md as an entry somebody forgot to fold (deliberately catch-all, so an entry with an
+# unknown branch prefix is never missed), and refuses to cut while one exists.
+#
+# THIS LIST HAS GONE STALE THREE TIMES AND EACH TIME IT BLOCKED A RELEASE OVER A DOCUMENT NOBODY HAD
+# FAILED TO FOLD: #165 first, then QUICKSTART.md + UNINSTALL.md in #405 when flattening moved them to
+# the root, then ADOPTION.md in #408. It lived in the script until now, which made it a fourth thing a
+# consumer would have had to fork the script over -- so it moves here, where the answer actually
+# lives. Add a new permanent root doc here, and nowhere else.
+$script:ReservedRootMd = @(
+    'CHANGELOG.md', 'CLAUDE.md', 'README.md', 'LICENSE.md', 'CONTRIBUTING.md', 'SECURITY.md',
+    'QUICKSTART.md', 'ADOPTION.md', 'UNINSTALL.md'
+)
+
+function Get-ReservedRootMd {
+    <# File names in the repo root that are permanent docs rather than unfolded changelog entries. #>
+    return $script:ReservedRootMd
+}

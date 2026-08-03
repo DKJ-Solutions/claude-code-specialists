@@ -203,6 +203,14 @@ The constitution above, concretely implemented here:
      references them from `## Releases`, (re)generates each plugin's consumer-facing `RELEASE.md`
      card, commits that on `main`, and tags `vX.Y.Z`. Deliberately no branch/PR — just like the
      fold. See [Rendall #06](.claude/specialists/lenses/05-06-extension.md#versioning--releases).
+     Since August 3, 2026 it is a **shared** script, mirrored into the plugin like the rest of the
+     workflow ([#417](https://github.com/DaveKJohn/claude-code-specialists/issues/417)): everything
+     that legitimately differs per repo — which root docs are permanent, how the notes are foldered,
+     the live marker, whether there is a plugin tier at all, the category labels — is read from
+     optional functions in [`scripts/repo-config.ps1`](scripts/repo-config.ps1), each falling back to
+     what this repo already did. **The exception it runs under did not widen**: same scope, same
+     "only on explicit request", and the release artefacts it produces here were verified
+     byte-identical to the unshared script's before the change landed.
 - **This repo is `public`.** A deliberate choice, so the remote `github` marketplace source can be
   read without gh auth. Consequence: **nothing confidential** belongs here — no personal
   information, credentials, or secrets. The group 1 agent defs are therefore deliberately
