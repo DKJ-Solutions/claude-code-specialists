@@ -15,6 +15,9 @@
 
     The declared contract (mandatory repo-owned functions per mirrored, consumer-run shared script):
       - new-changelog-entry -> branch-info.ps1: Get-BranchInfo
+                               repo-config.ps1: Get-EntryTitlePlaceholder, Get-EntryBodyHeading,
+                                                Get-EntryBodyPlaceholder, Get-EntryFallbackType
+                                                (all OPTIONAL -- see below)
       - new-branch          -> branch-info.ps1: Test-BranchName
       - open-pr             -> branch-info.ps1: Get-BranchInfo
                                repo-config.ps1: Get-RepoName, Get-LintScript
@@ -32,6 +35,15 @@
     empty string (no separate live stage, Block 2 of the checklist never applies), so a consumer
     without the function is not broken either -- but a repo that DOES have a live stage needs it
     filled in, or the skill would silently never print that block.
+    The four Get-Entry* functions (issue #410) are the third instance and the clearest case for
+    declaring an optional: nothing crashes without them, so the only signal a consumer would ever get
+    is reading English stubs in a repo that is not English -- one branch at a time, indefinitely.
+
+    Note that new-changelog-entry.ps1 treats repo-config.ps1 ITSELF as optional (Test-Path + a
+    try/catch that degrades to a warning), unlike open-pr/fold, which pre-flight on it. That is
+    deliberate: it is the lightest script in the set and every string it reads from there has a working
+    default. The contract records above therefore describe wording that CAN be configured, not a
+    dependency that must exist.
 
     Deliberately OUT of the contract entirely: the optional repo-config functions that open-pr.ps1
     guards via Get-Command (Get-PrDescriptionPlaceholder, Get-PrApprovalPattern, Get-PrAssignee,
@@ -140,7 +152,24 @@ $script:Contract = @(
        Returns = "the literal '## ' heading line a merged entry is folded under" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-LiveStage'; Scripts = @('cut-release skill');
        Optional = $true; Default = '';
-       Returns = "a short description of this repo's separate go-live target, or '' when it has none" }
+       Returns = "a short description of this repo's separate go-live target, or '' when it has none" },
+    # The stub wording new-changelog-entry.ps1 writes (issue #410). Declared here rather than left
+    # undeclared precisely because the failure mode is not a crash: a consumer that never defines these
+    # gets working English stubs in a repo whose changelog is in another language, and discovers it at
+    # entry time, once per branch, forever. An [INFO] naming the default turns that into a thing you
+    # were told rather than a thing you noticed.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryTitlePlaceholder'; Scripts = @('new-changelog-entry');
+       Optional = $true; Default = 'TODO: title';
+       Returns = 'the placeholder title for an entry created without an explicit -Title' },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryBodyHeading'; Scripts = @('new-changelog-entry');
+       Optional = $true; Default = '**To do / where I left off:**';
+       Returns = 'the single bold line written above the entry body' },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryBodyPlaceholder'; Scripts = @('new-changelog-entry');
+       Optional = $true; Default = 'TODO: what still needs to happen on this branch, and where you left off.';
+       Returns = 'the fallback body used when no -Intent was given -- a directional prompt, not an empty line' },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryFallbackType'; Scripts = @('new-changelog-entry');
+       Optional = $true; Default = 'Chore';
+       Returns = "the changelog type an unknown branch prefix falls back to; it must be one of the types this repo's own branch table produces, since the release cut groups entries by it" }
 )
 
 # An optional record reports [INFO] (with the fallback the caller uses) where a required one reports

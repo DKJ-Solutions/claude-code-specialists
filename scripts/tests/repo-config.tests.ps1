@@ -26,6 +26,15 @@ function Assert-Equal {
     }
 }
 
+function Assert-True {
+    param([bool]$Condition, [string]$Name)
+    if ($Condition) {
+        $script:pass++; Write-Host "  [PASS] $Name" -ForegroundColor Green
+    } else {
+        $script:fail++; Write-Host "  [FAIL] $Name" -ForegroundColor Red
+    }
+}
+
 function Assert-Match {
     param([string]$Text, [string]$Pattern, [string]$Name)
     if ($Text -match $Pattern) {
@@ -66,6 +75,24 @@ Assert-Equal '## Pull Requests' $heading "Get-ChangelogHeading is '## Pull Reque
 # so Block 2 of the checklist never applies here; only a repo that has one fills this in.
 $liveStage = Get-LiveStage
 Assert-Equal '' $liveStage "Get-LiveStage defaults to '' in this workshop (no separate live stage)"
+
+# The stub wording new-changelog-entry.ps1 writes (issue #410, all four Optional in the script
+# contract). Asserted against the LITERAL values rather than merely "is non-empty", because these four
+# are the fallbacks the shared script hardcodes as well: if the two ever disagree, a consumer that
+# defines nothing and a consumer that copies this file get different entries, which is exactly the
+# split #410 exists to close. check-script-contract.ps1's Default fields are the third copy and are
+# pinned by script-contract.tests.ps1.
+Assert-Equal 'TODO: title' (Get-EntryTitlePlaceholder) 'Get-EntryTitlePlaceholder matches the shared default'
+Assert-Equal '**To do / where I left off:**' (Get-EntryBodyHeading) 'Get-EntryBodyHeading matches the shared default'
+Assert-Equal 'TODO: what still needs to happen on this branch, and where you left off.' (Get-EntryBodyPlaceholder) 'Get-EntryBodyPlaceholder matches the shared default'
+Assert-Equal 'Chore' (Get-EntryFallbackType) 'Get-EntryFallbackType matches the shared default'
+
+# The fallback type must be a type this repo's own branch table actually produces -- the release cut
+# groups entries by that string, so a typo here silently drops every unknown-prefix entry into a
+# catch-all category at the next release.
+. (Join-Path $PSScriptRoot '..\lib\branch-info.ps1')
+$knownTypes = @(Get-BranchTypes)
+Assert-True ($knownTypes -contains (Get-EntryFallbackType)) "Get-EntryFallbackType ('$(Get-EntryFallbackType)') is one of the types this repo's branch table produces"
 
 Write-Host ""
 if ($script:fail -gt 0) {

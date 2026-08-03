@@ -168,11 +168,11 @@ try {
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
     Assert-Equal 0 $r.Code 'happy path: exit-code 0'
     Assert-NotMatch '\[ERROR\]' $r.Out 'happy path: no errors'
-    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds', 'Get-ChangelogHeading', 'Get-LiveStage')) {
+    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds', 'Get-ChangelogHeading', 'Get-LiveStage', 'Get-EntryTitlePlaceholder', 'Get-EntryBodyHeading', 'Get-EntryBodyPlaceholder', 'Get-EntryFallbackType')) {
         Assert-Match "\[OK\]\s+'$fn' present in" $r.Out "happy path: '$fn' reported OK"
     }
     $okCount = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 8 $okCount 'happy path: exactly eight [OK] lines (the six mandatory functions + the optional Get-ChangelogHeading + the optional Get-LiveStage, nothing else)'
+    Assert-Equal 12 $okCount 'happy path: exactly twelve [OK] lines (the six mandatory functions + the six optional ones: Get-ChangelogHeading, Get-LiveStage and the four Get-Entry* stub-wording knobs, nothing else)'
     # inbound #203: the run names the root it inspected and how it resolved it. Asserted on the clean
     # run too, not only on a drifted one -- the [SCOPE] line is context that must always be emitted, so
     # that the hook has something to surface the moment a finding does appear.
@@ -272,7 +272,7 @@ try {
         Assert-NotMatch $optFn $r.Out "optional Get-Pr*: '$optFn' never mentioned (not in the contract)"
     }
     $okCount6 = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 8 $okCount6 'optional Get-Pr*: still exactly eight [OK] (the mandatory six + Get-ChangelogHeading + Get-LiveStage; the Get-Pr* four excluded)'
+    Assert-Equal 12 $okCount6 'optional Get-Pr*: still exactly twelve [OK] (the mandatory six + the six declared optionals; the Get-Pr* four excluded)'
 
     # --- 6c. An optional contract function that is ABSENT -> [INFO] naming the fallback, exit 0 -----
     #     Get-ChangelogHeading (issue #178) is declared Optional: fold-changelog-entry.ps1 falls back
@@ -305,6 +305,23 @@ try {
     $r2 = Invoke-Ps @('-ConsumerPathOverride', $c2)
     Assert-Equal 0 $r2.Code 'Get-LiveStage present: exit-code 0'
     Assert-Match "\[OK\]\s+'Get-LiveStage' present in" $r2.Out 'Get-LiveStage present: reported OK, not INFO or ERROR'
+
+    # --- 6e. The four stub-wording knobs: absent -> four [INFO]s naming their defaults, exit 0 (#410) --
+    #     Third instance of the 6c/6d pattern, and the one where "not broken" is most misleading: a
+    #     consumer without these gets a perfectly working entry file in the wrong language, every
+    #     branch, indefinitely. Nothing crashes, so the [INFO] is the ONLY signal that exists -- which
+    #     is precisely the argument for declaring them optional rather than leaving them undeclared.
+    #     All four stripped at once, because the failure they guard against is the set being unknown,
+    #     not any single one of them.
+    $c = New-FixtureConsumer -StripFromRepoConfig @('Get-EntryTitlePlaceholder', 'Get-EntryBodyHeading', 'Get-EntryBodyPlaceholder', 'Get-EntryFallbackType')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c)
+    Assert-Equal 0 $r.Code 'stub wording absent: exit-code 0 (every string has a fallback, not a breach)'
+    Assert-NotMatch '\[ERROR\]' $r.Out 'stub wording absent: no error'
+    Assert-Match "\[INFO\].*'Get-EntryTitlePlaceholder' missing from scripts\\repo-config\.ps1.*used by: new-changelog-entry.*optional.*falls back to 'TODO: title'" $r.Out 'stub wording absent: INFO for Get-EntryTitlePlaceholder names caller and default'
+    Assert-Match ("\[INFO\].*'Get-EntryBodyHeading' missing.*falls back to '" + [regex]::Escape('**To do / where I left off:**') + "'") $r.Out 'stub wording absent: INFO for Get-EntryBodyHeading quotes the literal default heading'
+    Assert-Match "\[INFO\].*'Get-EntryFallbackType' missing.*falls back to 'Chore'" $r.Out 'stub wording absent: INFO for Get-EntryFallbackType names the Chore default'
+    $infoCount6e = @([regex]::Matches($r.Out, '\[INFO\]')).Count
+    Assert-Equal 4 $infoCount6e 'stub wording absent: exactly four [INFO] lines -- one per stripped knob, and nothing else downgraded along with them'
 
     # --- 6b. Regression guard: legacy pre-strict-mode top-level code must not false-positive --------
     #     Victor's finding (fixed by Sylvester): the check used to dot-source consumer libs under this
@@ -376,12 +393,19 @@ function Get-RosterIgnoredIds { return @() }
         @{ Function = 'Get-LintScript';       Lib = 'scripts\repo-config.ps1';     Scripts = @('open-pr') },
         @{ Function = 'Get-RosterPath';       Lib = 'scripts\repo-config.ps1';     Scripts = @('check-roster-sync') },
         @{ Function = 'Get-RosterIgnoredIds'; Lib = 'scripts\repo-config.ps1';     Scripts = @('check-roster-sync') },
-        @{ Function = 'Get-ChangelogHeading'; Lib = 'scripts\repo-config.ps1';     Scripts = @('fold-changelog-entry') }
+        @{ Function = 'Get-ChangelogHeading'; Lib = 'scripts\repo-config.ps1';     Scripts = @('fold-changelog-entry') },
+        # The four stub-wording knobs (issue #410). These DO belong in this loop, unlike Get-LiveStage:
+        # they are attributed to 'new-changelog-entry', a genuinely registered shared script, so the
+        # per-script assertions below apply to them unchanged.
+        @{ Function = 'Get-EntryTitlePlaceholder'; Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry') },
+        @{ Function = 'Get-EntryBodyHeading';      Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry') },
+        @{ Function = 'Get-EntryBodyPlaceholder';  Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry') },
+        @{ Function = 'Get-EntryFallbackType';     Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry') }
     )
 
     $contractSrc = [System.IO.File]::ReadAllText($Script)
     $totalRecordCount = @([regex]::Matches($contractSrc, "Lib\s*=\s*'[^']+';\s*Function\s*=\s*'[^']+';\s*Scripts\s*=\s*@\(")).Count
-    Assert-Equal 8 $totalRecordCount 'contract: exactly eight (lib, function) records declared in check-script-contract.ps1 (the seven below plus the dedicated Get-LiveStage block after this loop)'
+    Assert-Equal 12 $totalRecordCount 'contract: exactly twelve (lib, function) records declared in check-script-contract.ps1 (the eleven below plus the dedicated Get-LiveStage block after this loop)'
 
     # Every record must carry a 'Returns' line, so a finding is actionable without any reference to this
     # source repo (Dave, July 28, 2026). Counted against $totalRecordCount rather than listed per record:

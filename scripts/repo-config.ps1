@@ -119,3 +119,47 @@ function Get-LiveStage {
        Empty string means: no separate live stage -- the skill only prints Block 1 (cutting). #>
     return $script:LiveStage
 }
+
+# --- The stub wording new-changelog-entry.ps1 writes into an entry file (issue #410) ---------------
+#
+# The four strings below are the entire visible output of the shared new-changelog-entry.ps1: the title
+# placeholder, the body heading, the fallback body, and the changelog type an unknown branch prefix
+# falls back to. They used to be hardcoded in that script, which is fine for an English repo and wrong
+# for any other -- the FILE it writes is repo-owned, so its wording is too.
+#
+# The concrete case (inbound #410, smartwatchbanden): a Dutch-language repo kept its own copy of
+# new-changelog-entry.ps1 at the same relative path, purely to change these four strings. Two entry
+# points then wrote two formats for the same branch -- the branch flow called the repo copy, the
+# new-branch skill called the shared one -- which is exactly the duplication the skill exists to
+# prevent. Dropping the copy fixed the duplication and cost them Dutch stubs; these functions give the
+# wording back without the copy.
+#
+# All four are OPTIONAL in the script contract: a consumer that defines none of them gets the values
+# below, which are also what the script hardcoded before. Same pattern as Get-ChangelogHeading (#178)
+# and Get-LiveStage (#177). Four separate functions rather than one map-returning function, so the
+# contract check can name the exact default per knob in its [INFO] line.
+$script:EntryTitlePlaceholder = 'TODO: title'
+$script:EntryBodyHeading      = '**To do / where I left off:**'
+$script:EntryBodyPlaceholder  = 'TODO: what still needs to happen on this branch, and where you left off.'
+$script:EntryFallbackType     = 'Chore'
+
+function Get-EntryTitlePlaceholder {
+    <# Placeholder title for an entry created without an explicit -Title. #>
+    return $script:EntryTitlePlaceholder
+}
+
+function Get-EntryBodyHeading {
+    <# The bold line above the entry body. Must be a single line; it is written verbatim. #>
+    return $script:EntryBodyHeading
+}
+
+function Get-EntryBodyPlaceholder {
+    <# Fallback body when no -Intent was given -- a directional prompt, not an empty placeholder. #>
+    return $script:EntryBodyPlaceholder
+}
+
+function Get-EntryFallbackType {
+    <# The changelog type an unknown branch prefix falls back to. Must be one of the types this repo's
+       own branch table produces, since cut-release groups entries by it. #>
+    return $script:EntryFallbackType
+}

@@ -43,6 +43,14 @@ Two optional parameters cover the "start now, continue later (maybe on another d
   (`**To do / where I left off:**` + a prompting TODO) rather than a bare one-line TODO, so a
   forgotten `-Intent` still leaves a "what is next" prompt. Either way it is a scaffold: whoever
   finishes the branch replaces the body with the final description before the PR.
+  The stub wording quoted here is only the **default**. All four strings the entry is built from --
+  the title placeholder, this heading, the fallback body, and the type an unknown prefix falls back
+  to -- are repo-owned and can be set in your own `scripts/repo-config.ps1`
+  (`Get-EntryTitlePlaceholder`, `Get-EntryBodyHeading`, `Get-EntryBodyPlaceholder`,
+  `Get-EntryFallbackType`; issue #410). Define none of them and you get exactly the English text
+  above. That exists so a repo whose changelog is not in English does not have to keep a private
+  copy of the script to change four strings -- which is the duplication this skill exists to
+  prevent.
 - **`-Park`** -- after creating the branch + entry, commits the entry (the intent carrier) and
   pushes the branch to `origin` with `git push -u`. **This opens no PR.** Push is not a PR: parking
   makes the branch reachable from another device, while the PR rule stays intact and separate.
@@ -63,6 +71,11 @@ The script is repo-agnostic, but reads its repo data from the **root** of the co
 - `scripts/lib/branch-info.ps1` (dot-sourced) -- the single source of truth for the branch-prefix
   table (`Get-BranchInfo`/`Test-BranchName`) and the branch-name-to-entry-filename conversion.
 - `git`.
+- `scripts/repo-config.ps1` -- **optional here**, unlike in `open-pr`/`fold-changelog-entry`, which
+  pre-flight on it. If present, its four `Get-Entry*` functions set the stub wording (#410); if it
+  is absent or fails to load, the entry is written with the built-in English defaults and a
+  warning. This is the lightest script in the set, and every string it reads from there has a
+  working fallback.
 
 If `branch-info.ps1` is missing -- typical on a clean consumer -- the script stops before the
 dot-source with a clear pointer instead of a raw error (#86); fill it in first (see the workshop
