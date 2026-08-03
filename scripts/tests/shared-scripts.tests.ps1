@@ -536,7 +536,7 @@ This is the test description text.
 
     # Scenario B: override path -- repo-config defines all four optional #101 functions.
     $rcOverride = @'
-$script:RepoName = 'DaveKJohn/davekjohns-workshop'
+$script:RepoName = 'DaveKJohn/claude-code-specialists'
 function Get-RepoName { return $script:RepoName }
 function Get-RepoBlobUrl { return "https://github.com/$($script:RepoName)/blob/main/" }
 $script:LintScript = 'scripts\lint\check-plugin-integrity.ps1'
@@ -669,7 +669,7 @@ This follows the shape PRs #341-#343 established, see https://github.com/o/r/pul
 ## Releases
 '@
     $rcMinimal = @'
-$script:RepoName = 'DaveKJohn/davekjohns-workshop'
+$script:RepoName = 'DaveKJohn/claude-code-specialists'
 function Get-RepoName { return $script:RepoName }
 '@
     $targetEntryContent = @'

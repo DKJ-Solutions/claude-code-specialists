@@ -24,7 +24,7 @@ that up, plus the governance and safety layer that differs per repo.
 > consumer's main loop from a version bump they did not read, and a second `agent`-setting plugin
 > silently wins on load order. The reasoning is in the
 > [family README](../../../README.md#delivering-the-orchestrator-from-the-plugin--verified-deliberately-not-switched-on)
-> and [issue #215](https://github.com/DaveKJohn/davekjohns-workshop/issues/215). So this skill exists
+> and [issue #215](https://github.com/DaveKJohn/claude-code-specialists/issues/215). So this skill exists
 > because of the `CLAUDE.md` half, which is true on its own.
 
 ## Chicken-and-egg — step 0 is done by the user
@@ -36,7 +36,7 @@ verify — grouped below as `0a` (acts 1 and 2), `0b` (acts 3 and 4) and `0c` (a
 
 > **The count is deliberately the same six as in the
 > [family README](../../../README.md#adoption-the-bootstrap-path)** (inbound
-> [#297](https://github.com/DaveKJohn/davekjohns-workshop/issues/297)). This page said *three acts* while
+> [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297)). This page said *three acts* while
 > that one said *four* and the [QUICKSTART](../../../QUICKSTART.md#connecting-in-three-steps) said *three
 > steps* — the same path, nothing missing anywhere, three different numbers, and the pages link to each
 > other for exactly this step. For a reader following it the first time the count is the only check they
@@ -44,7 +44,7 @@ verify — grouped below as `0a` (acts 1 and 2), `0b` (acts 3 and 4) and `0c` (a
 > refers to; the number now counts the same unit as the README.
 >
 > **It was five until August 1, 2026**, when
-> [#329](https://github.com/DaveKJohn/davekjohns-workshop/issues/329) measured that a session start is
+> [#329](https://github.com/DaveKJohn/claude-code-specialists/issues/329) measured that a session start is
 > what registers the marketplace — making the first restart an act of its own here, in the family README
 > and in the QUICKSTART in the same change. The letters absorbed it (`0a` is now two acts) rather than the
 > count staying at five.
@@ -53,19 +53,19 @@ verify — grouped below as `0a` (acts 1 and 2), `0b` (acts 3 and 4) and `0c` (a
 
 ```jsonc
 "extraKnownMarketplaces": {
-  "davekjohns-workshop": { "source": { "source": "github", "repo": "DaveKJohn/davekjohns-workshop" } }
+  "claude-code-specialists": { "source": { "source": "github", "repo": "DaveKJohn/claude-code-specialists" } }
 },
 "enabledPlugins": {
-  "specialists@davekjohns-workshop": true
-  // plus a domain plugin of choice, e.g. "specialists-shopify@davekjohns-workshop": true
+  "specialists@claude-code-specialists": true
+  // plus a domain plugin of choice, e.g. "specialists-shopify@claude-code-specialists": true
 }
 ```
 
 **Then restart the session once, before `0b`.** Writing `extraKnownMarketplaces` does not register the
 marketplace; a **session start** does. Measured on a virgin profile in three states (inbound
-[#329](https://github.com/DaveKJohn/davekjohns-workshop/issues/329)): without the settings file the
+[#329](https://github.com/DaveKJohn/claude-code-specialists/issues/329)): without the settings file the
 refresh below fails, with the settings file in the same session it still fails, and after one session
-start it succeeds — reporting `Marketplace 'davekjohns-workshop' not found` until then, which reads as a
+start it succeeds — reporting `Marketplace 'claude-code-specialists' not found` until then, which reads as a
 misspelled name rather than a missing act. `claude plugin marketplace add <owner>/<repo> --scope project`
 registers it without a restart if that is preferable; keep the scope flag, because `add` defaults to
 `user`.
@@ -75,25 +75,25 @@ registers it without a restart if that is preferable; keep the scope flag, becau
 not count on the settings keys to produce that entry — they are not the documented route, and what they
 do on their own is now an open question rather than "nothing": on a virgin profile with the marketplace
 registered, a single session start was measured to write a full project-scoped record by itself (inbound
-[#327](https://github.com/DaveKJohn/davekjohns-workshop/issues/327)), in a session that loaded no plugin.
+[#327](https://github.com/DaveKJohn/claude-code-specialists/issues/327)), in a session that loaded no plugin.
 So run, from the root of the consuming repo, one command per plugin listed in `enabledPlugins`:
 
 ```powershell
-claude plugin marketplace update davekjohns-workshop   # first: refresh the cached marketplace
-claude plugin install specialists@davekjohns-workshop --scope project
+claude plugin marketplace update claude-code-specialists   # first: refresh the cached marketplace
+claude plugin install specialists@claude-code-specialists --scope project
 # plus each domain plugin, e.g.:
-claude plugin install specialists-shopify@davekjohns-workshop --scope project
+claude plugin install specialists-shopify@claude-code-specialists --scope project
 ```
 
 **That first line matters if the marketplace is already cached on this machine, and skipping it
-installs an old version with a success message.** Measured in `davekjohns-workshop` on July 30, 2026,
+installs an old version with a success message.** Measured in `claude-code-specialists` on July 30, 2026,
 minutes after `v3.0.2` was tagged and pushed: the cached clone still sat on the pre-release commit, so
 the install produced **3.0.1** and reported `✔ Successfully installed`. Reproduced as a controlled pair
 on July 31 right after `v3.0.5`, same machine and same minute: **without** the refresh a fresh folder got
 `3.0.4` and the clone did not move; **with** it, a second fresh folder got `3.0.5`. Unlike `plugin
 update`, `install` does **not** refresh for itself — so for this command the line is load-bearing rather
 than insurance. And the output cannot tell you: the success line names the **scope and no version at
-all**, which is why step 0c below verifies against the install record. `claude plugin marketplace update davekjohns-workshop` followed by a `plugin
+all**, which is why step 0c below verifies against the install record. `claude plugin marketplace update claude-code-specialists` followed by a `plugin
 update` then moved it `3.0.1 -> 3.0.2` in one step. A refresh mechanism exists (the command reports
 `Refreshing marketplace cache (timeout: 120s)`), so a cache does not stay stale indefinitely; on what
 schedule it refreshes by itself was not established, which is why the explicit line is in the
@@ -109,7 +109,7 @@ carry, it gives each repo **its own install record**, and every other document h
 it.
 
 **It does not, however, promise that the record stays put** (inbound
-[#296](https://github.com/DaveKJohn/davekjohns-workshop/issues/296)). This paragraph used to claim
+[#296](https://github.com/DaveKJohn/claude-code-specialists/issues/296)). This paragraph used to claim
 project scope *"keeps a repo pinned to the version it was tested against"*, and that did not survive
 measurement: on July 31, 2026 both of `life-hub`'s project-scoped records moved `3.0.4 → 3.0.5` in a
 **single** write, `lastUpdated` stamps 70 ms apart, while that repo's session issued no `claude plugin`
@@ -118,7 +118,7 @@ invocations, none in the window of the write). So "pinned" was a property of the
 repo.
 
 **And the consequence is not small, which is what the next round established** (inbound
-[#301](https://github.com/DaveKJohn/davekjohns-workshop/issues/301)). A project-scoped record can also be
+[#301](https://github.com/DaveKJohn/claude-code-specialists/issues/301)). A project-scoped record can also be
 **taken away**: a *session start* in another directory rewrites this file and does so by **adopting an
 existing record**, leaving the repo it belonged to with no install at all. Reproduced twice on July 31,
 2026 (CLI `2.1.220`), with no `claude plugin` command run in either case:
@@ -126,7 +126,7 @@ existing record**, leaving the repo it belonged to with no install at all. Repro
 | | what was taken, and from whom |
 |---|---|
 | 14:32:31.795Z | a throwaway directory gained three records; two carried `installedAt` stamps belonging to **`life-hub`**, whose two `project` records were gone. All three `lastUpdated` identical — one write. |
-| 16:01:48.239Z | same recipe, fresh directory; one record carried **`davekjohns-workshop`'s own** `installedAt`. The workshop — this very repo — had lost its project install to a scratch folder. |
+| 16:01:48.239Z | same recipe, fresh directory; one record carried **`claude-code-specialists`'s own** `installedAt`. The workshop — this very repo — had lost its project install to a scratch folder. |
 
 `installedAt` is what proves adoption rather than creation: the CLI sets it to *now* on a real install,
 so a record bearing an older repo's stamp did not come into being there. Restored with
@@ -141,7 +141,7 @@ record instead of trusting it**, and read it more than once:
 success line names the scope and no version at all — and the query for it is in step 0c below.
 
 Since `v3.0.7` you do not have to remember to: the checks run that same `projectPath` query themselves
-(inbound [#302](https://github.com/DaveKJohn/davekjohns-workshop/issues/302)). `check-roster-sync` emits
+(inbound [#302](https://github.com/DaveKJohn/claude-code-specialists/issues/302)). `check-roster-sync` emits
 a `[NOT-INSTALLED-HERE]` line, and the workshop's `check-connectors` says it about each registered
 consumer — which matters here, because a repo that loads nothing cannot report for itself: the hook that
 would is inside the plugin that is not loading. What was **not** established is the trigger. Two
@@ -166,7 +166,7 @@ directly. **Nothing in this plugin depends on that being fixed**: the checks now
 plugin update` also defaults to user scope, so on a project-scoped install the plain command fails:
 
 ```
-✘ Failed to update plugin "specialists@davekjohns-workshop": Plugin "specialists" is not installed at scope user
+✘ Failed to update plugin "specialists@claude-code-specialists": Plugin "specialists" is not installed at scope user
 ```
 
 That message is literally true and reads as *"this plugin is not installed"* on a machine where it
@@ -175,8 +175,8 @@ user-scope record** beside the project one and makes the plugin appear machine-w
 flag instead, from the consuming repo's root, one command per plugin:
 
 ```powershell
-claude plugin marketplace update davekjohns-workshop
-claude plugin update specialists@davekjohns-workshop --scope project
+claude plugin marketplace update claude-code-specialists
+claude plugin update specialists@claude-code-specialists --scope project
 ```
 
 Both lines — but the reason is stated per command now, because the shared version of it was tested and
@@ -199,7 +199,7 @@ reads exactly like "no hooks because everything is in order". Nothing in the ses
 difference.
 
 **Do not verify with `claude plugin list` alone — it is not repo-scoped, and it will tell you
-everything is fine in a repo that has no install.** Measured in `DaveKJohn/davekjohns-workshop` on
+everything is fine in a repo that has no install.** Measured in `DaveKJohn/claude-code-specialists` on
 July 30, 2026: that repo has `enabledPlugins` set and **no install record of its own** (the only
 `projectPath` in `installed_plugins.json` pointed at a different repo), and the plugin was
 demonstrably not loaded — no `specialists:*` subagents, no skills, no session hooks. That "no record of
@@ -210,7 +210,7 @@ record had **moved**, not never existed — worth knowing, because the two call 
 list nevertheless reported:
 
 ```
-❯ specialists@davekjohns-workshop   Version: 3.0.1   Scope: project   Status: ✔ enabled
+❯ specialists@claude-code-specialists   Version: 3.0.1   Scope: project   Status: ✔ enabled
 ```
 
 The command enumerates install records beyond the current repo, so a green line is no evidence that
@@ -236,17 +236,17 @@ past the `v3.0.8` tag — unreleased `main` — and the payload genuinely differ
 differently on the tag and in the installed cache). `plugin.json` carries `3.0.8` on both commits, so the
 version string cannot express the difference; the sha was the only field that could, and it was printed
 nowhere (inbound
-[#313](https://github.com/DaveKJohn/davekjohns-workshop/issues/313)).
+[#313](https://github.com/DaveKJohn/claude-code-specialists/issues/313)).
 
 **Do not try to resolve the release tag in the cached clone — that comparison is not answerable there**
-(inbound [#322](https://github.com/DaveKJohn/davekjohns-workshop/issues/322)). Earlier editions of this step
+(inbound [#322](https://github.com/DaveKJohn/claude-code-specialists/issues/322)). Earlier editions of this step
 prescribed `git … rev-list -n1 v3.0.8` against
-`~\.claude\plugins\marketplaces\davekjohns-workshop` and offered a binary reading: equal means the release,
+`~\.claude\plugins\marketplaces\claude-code-specialists` and offered a binary reading: equal means the release,
 different means `main`. Three measured facts about that clone break it:
 
 - it is **shallow** (`.git/shallow` present) and its fetch refspec is
   `+refs/heads/main:refs/remotes/origin/main` — main-only. **That does not mean the clone is tag-less**
-  (inbound [#372](https://github.com/DaveKJohn/davekjohns-workshop/issues/372)): the initial `git clone`
+  (inbound [#372](https://github.com/DaveKJohn/claude-code-specialists/issues/372)): the initial `git clone`
   brings along any tag pointing at history it fetched, and both measured clones had them — a fresh one
   carrying `v3.1.1`, an older one carrying 66 tags. An earlier edition of this bullet said *"no tags"*, and
   that was simply wrong;
@@ -286,7 +286,7 @@ comparing a tag object against a commit, which can never match.
 the clone sits on now?
 
 ```powershell
-git -C "$env:USERPROFILE\.claude\plugins\marketplaces\davekjohns-workshop" rev-parse HEAD
+git -C "$env:USERPROFILE\.claude\plugins\marketplaces\claude-code-specialists" rev-parse HEAD
 ```
 
 That works on a shallow clone and does not care which tags it happens to carry — it names no tag at all,
@@ -297,7 +297,7 @@ clone, not about your payload. It is honest about what is knowable here.
 **To identify the release, ask the source rather than the cache** — the tags live there:
 
 ```powershell
-gh api repos/DaveKJohn/davekjohns-workshop/tags --jq '.[] | select(.name=="v3.0.9") | .commit.sha'
+gh api repos/DaveKJohn/claude-code-specialists/tags --jq '.[] | select(.name=="v3.0.9") | .commit.sha'
 ```
 
 That route has no peeling problem to worry about: the API's `.commit.sha` is the commit already, annotated
@@ -313,7 +313,7 @@ what that does *not* mean: it is not evidence that the plugin is not loading. A 
 existing `project` record to a pathless `user` one (see the fourth bullet below), and this query filters on
 `projectPath` — so a plugin can be missing from the output entirely while its skills and subagents are
 plainly present in the session. Measured in `DaveKJohn/life-hub` on August 1, 2026 (inbound
-[#323](https://github.com/DaveKJohn/davekjohns-workshop/issues/323)): the core plugin was absent from its
+[#323](https://github.com/DaveKJohn/claude-code-specialists/issues/323)): the core plugin was absent from its
 own repo's query while 4 skills and 15 subagents were loaded from it. The action is the same either way;
 the reason matters, because "empty" reads as "nothing installed" and here it meant "installed, but no
 longer keyed to this path".
@@ -323,11 +323,11 @@ hypothetical — but the trigger is narrower than it first looks: it is a scope 
 existence of a record.** Both halves are measured, a day apart, CLI `2.1.220`:
 
 - **A record at a *different* scope accumulates.** In `DaveKJohn/life-hub` on July 31, 2026 (inbound
-  [#315](https://github.com/DaveKJohn/davekjohns-workshop/issues/315)) a project-scoped install run against
+  [#315](https://github.com/DaveKJohn/claude-code-specialists/issues/315)) a project-scoped install run against
   a path that already carried a **`local`** record **added a second record beside it** rather than
   correcting it, and both reported `✔ Successfully installed`.
 - **A record at the *same* scope is replaced cleanly.** Reproduced deliberately on August 1, 2026 against
-  `3.0.9` (inbound [#325](https://github.com/DaveKJohn/davekjohns-workshop/issues/325)): a project-scoped
+  `3.0.9` (inbound [#325](https://github.com/DaveKJohn/claude-code-specialists/issues/325)): a project-scoped
   install against a path that already had a **`project`** record left **one** record, with a fresh
   `installedAt` — and the query afterwards printed exactly the one-line-per-plugin green this step defines.
 
@@ -349,7 +349,7 @@ turns up as **no output at all**:
 - **`local`** — **written by a session start, not by you.** Enabling a plugin is enough: a session start
   creates a missing record itself, and flips an existing `project` record to `local`, with no command run
   and nothing announcing it (inbound
-  [#314](https://github.com/DaveKJohn/davekjohns-workshop/issues/314)). It changes what the green above
+  [#314](https://github.com/DaveKJohn/claude-code-specialists/issues/314)). It changes what the green above
   means without changing a single file in your repo. Remove such a record with `claude plugin uninstall
   <plugin>@<marketplace> --scope local` — at `--scope project` the same command refuses with *"Plugin
   … is installed in local scope, not project"*, which is easy to misread as "not installed" — and then
@@ -357,12 +357,12 @@ turns up as **no output at all**:
 - **nothing — the `project` record was demoted to a pathless `user` one.** Also written by a session start,
   and the most confusing of the four because the plugin **vanishes from this query** while it keeps working.
   Measured in `DaveKJohn/life-hub` on August 1, 2026 (inbound
-  [#323](https://github.com/DaveKJohn/davekjohns-workshop/issues/323)): in a single write, an existing
+  [#323](https://github.com/DaveKJohn/claude-code-specialists/issues/323)): in a single write, an existing
   `project` record was rewritten to `scope: user` with its `projectPath` **removed** — the original
   `installedAt` preserved, so it is a rewrite and not a fresh install. The repo then has no record of its
   own, and the fix is the same as for `local`: re-install at project scope from this root. **You do not have
   to spot this by eye.** Since inbound
-  [#323](https://github.com/DaveKJohn/davekjohns-workshop/issues/323) the roster session check reports it as
+  [#323](https://github.com/DaveKJohn/claude-code-specialists/issues/323) the roster session check reports it as
   a `[RECORD-SHAPE]` line with that remedy, so an ordinary session start names it for you.
 
 **Do not expect a second session to repair any of these.** It was the natural assumption — a session start
@@ -396,7 +396,7 @@ is named here rather than left to the count: in a repo that ignores `.claude/*` 
 old path, moving the lenses to the seam drops them out of version control with every gate still green
 and `git status` silent.
 
-> Found while fixing inbound [#297](https://github.com/DaveKJohn/davekjohns-workshop/issues/297), which
+> Found while fixing inbound [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297), which
 > was about the *adoption* path being counted three different ways. This line said *four steps* about a
 > list the README numbers **0 to 4**, and it links to that list — so a reader who counted items 1 to 4
 > would skip step 0 for the very reason it is numbered zero. Same class, higher stakes: the miscount and
@@ -465,7 +465,7 @@ After the script:
    when it finds a **verified workshop checkout on this machine**. A consumer does not have one; the
    workshop's own maintainer does. Measured in round v13 on an unregistered repo — every session of the
    round printed exactly this and nothing further (inbound
-   [#383](https://github.com/DaveKJohn/davekjohns-workshop/issues/383)):
+   [#383](https://github.com/DaveKJohn/claude-code-specialists/issues/383)):
 
    ```text
    connector-sessioncheck: no verified workshop checkout found on this machine -- check skipped.

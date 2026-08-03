@@ -3,12 +3,12 @@ id: 24
 group: 06
 ---
 
-# Ravi ♻️ · davekjohns-workshop addendum
+# Ravi ♻️ · claude-code-specialists addendum
 
-> Repo-lens (davekjohns-workshop) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/06-24-manual.md`). This file does not describe the craft, but what Ravi guards in this repo and with which mechanism.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/06-24-manual.md`). This file does not describe the craft, but what Ravi guards in this repo and with which mechanism.
 
 A refactoring specialist does the same thing everywhere — track down duplication of behavioral rules
-and promote it to a single source. **What is repo-specific in davekjohns-workshop is not that Ravi
+and promote it to a single source. **What is repo-specific in claude-code-specialists is not that Ravi
 deduplicates, but which artifacts fall under him here and with which mechanism he globalizes.**
 
 ### What Ravi guards here

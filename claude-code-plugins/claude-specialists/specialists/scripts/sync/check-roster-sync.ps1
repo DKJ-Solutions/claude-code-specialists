@@ -11,7 +11,7 @@
       (a) Specialists of the ENABLED plugins -- agents AND personas. Enabled plugins are read via
           Get-EnabledPlugins (check-report-lib.ps1) from the SAME settings chain Claude Code honors --
           the user ~/.claude/settings.json, .claude/settings.json and .claude/settings.local.json, per
-          plugin id, local winning (enabledPlugins: a plugin id like 'specialists@davekjohns-workshop'
+          plugin id, local winning (enabledPlugins: a plugin id like 'specialists@claude-code-specialists'
           counts as enabled when its value is $true). Reading only .claude/settings.json is what made
           this check answer "roster in sync" for a repo with no roster at all (inbound #294): the enable
           lived in settings.local.json, so the check saw nothing enabled, the [BOOTSTRAP] branch could

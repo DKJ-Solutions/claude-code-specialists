@@ -21,7 +21,7 @@ meant for is covered in the [family README](README.md).
 
 **Three things have to be true before Step 1's first command, and none of them used to be written down
 anywhere in this family** (inbound
-[#334](https://github.com/DaveKJohn/davekjohns-workshop/issues/334), measured August 1, 2026 on a
+[#334](https://github.com/DaveKJohn/claude-code-specialists/issues/334), measured August 1, 2026 on a
 **virgin Windows user profile**, CLI `2.1.220`). On a machine that has been in use for a while all three
 were satisfied long ago — which is exactly why they stayed invisible until someone adopted this system
 on a new profile.
@@ -53,7 +53,7 @@ symptom worth recognising, not as a step of this procedure.
 **And if you are handing this page to an agent instead of reading it yourself, have it read the file
 rather than a summary of it.** That is a plausible first move for a new consumer — paste the link into
 Claude Code and say *"set this up for me"* — and it was measured (inbound
-[#338](https://github.com/DaveKJohn/davekjohns-workshop/issues/338)): `WebFetch` on the raw URL refused
+[#338](https://github.com/DaveKJohn/claude-code-specialists/issues/338)): `WebFetch` on the raw URL refused
 a verbatim request outright, and on an ordinary summarising question it returned content that did not
 match the file. It described the document as *"8,000+ characters"*, a fraction of its real size, and it
 **invented an enumeration for Step 2** that this page does not contain. Nothing here can fix a fetching
@@ -69,7 +69,7 @@ because the counts on this page are load-bearing.
 > [`specialists-init`](specialists/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
 > both count as its six acts ("step 0" in their numbering). Saying so is the point: those two pages once
 > counted the same procedure as *four* and *three*, and this page's *three steps* made a third number
-> (inbound [#297](https://github.com/DaveKJohn/davekjohns-workshop/issues/297)). Nothing was missing from
+> (inbound [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297)). Nothing was missing from
 > any of them — but if you are cross-reading and the counts differ, the count is exactly what you would
 > use to check whether you skipped something.
 >
@@ -85,7 +85,7 @@ because the counts on this page are load-bearing.
 not be.
 
 > **`.claude` means two different places in this document, and from here on the difference matters**
-> (inbound [#335](https://github.com/DaveKJohn/davekjohns-workshop/issues/335)). `.claude/` in **your
+> (inbound [#335](https://github.com/DaveKJohn/claude-code-specialists/issues/335)). `.claude/` in **your
 > repo** holds your settings, your seam and your lenses; it travels with the repo and it is yours.
 > `~/.claude/` — on Windows `$env:USERPROFILE\.claude` — is the **machine** administration: the
 > marketplace clone, the plugin cache, and the `installed_plugins.json` that the verification query
@@ -100,12 +100,12 @@ repo has that domain). What follows is a **complete, pasteable file** — if you
 ```json
 {
   "extraKnownMarketplaces": {
-    "davekjohns-workshop": {
-      "source": { "source": "github", "repo": "DaveKJohn/davekjohns-workshop" }
+    "claude-code-specialists": {
+      "source": { "source": "github", "repo": "DaveKJohn/claude-code-specialists" }
     }
   },
   "enabledPlugins": {
-    "specialists@davekjohns-workshop": true
+    "specialists@claude-code-specialists": true
   }
 }
 ```
@@ -120,12 +120,12 @@ free.**
 
 **First: restart your Claude Code session once, now.** The marketplace is registered by a **session
 start**, not by writing the key — measured in three states on a virgin profile (inbound
-[#329](https://github.com/DaveKJohn/davekjohns-workshop/issues/329)): without the settings file the
+[#329](https://github.com/DaveKJohn/claude-code-specialists/issues/329)): without the settings file the
 refresh command below fails; **with** the settings file, in the same session, it still fails; after one
 session start in the repo it succeeds. The failure is easy to misread — on CLI `2.1.220` it reads:
 
 ```
-✘ Failed to update marketplace(s): Marketplace 'davekjohns-workshop' not found.
+✘ Failed to update marketplace(s): Marketplace 'claude-code-specialists' not found.
   Available marketplaces: claude-plugins-official
 ```
 
@@ -140,13 +140,13 @@ the running session — measured, the refresh below then succeeded immediately, 
 get right, because this command does not follow the pattern of the others on this page:
 
 ```powershell
-claude plugin marketplace add DaveKJohn/davekjohns-workshop --scope project
+claude plugin marketplace add DaveKJohn/claude-code-specialists --scope project
 ```
 
 It takes a **source** (a URL, path, or GitHub repo) where everything else here uses the marketplace
 *name*, and it defaults to `--scope user`, which would declare the marketplace machine-wide in
 `~/.claude/settings.json` rather than in your repo's — the
-[#279](https://github.com/DaveKJohn/davekjohns-workshop/issues/279) defect, rebuilt in a fourth command.
+[#279](https://github.com/DaveKJohn/claude-code-specialists/issues/279) defect, rebuilt in a fourth command.
 The `--scope project` above comes from the CLI's own `--help` (`user (default), project, or local`, CLI
 `2.1.220`); #329's measurement was taken at the default scope, so treat the flag as documented rather
 than measured and confirm with `claude plugin marketplace list` where it landed. Note also what `add`
@@ -157,8 +157,8 @@ the running session. It makes the marketplace findable and installs nothing.
 of your repo, preceded once by a refresh of that cached clone:
 
 ```powershell
-claude plugin marketplace update davekjohns-workshop                     # 1. refresh the cache first
-claude plugin install specialists@davekjohns-workshop --scope project    # 2. then install, per plugin
+claude plugin marketplace update claude-code-specialists                     # 1. refresh the cache first
+claude plugin install specialists@claude-code-specialists --scope project    # 2. then install, per plugin
 # and line 2 again for each domain group you enabled
 ```
 
@@ -178,7 +178,7 @@ sentence above says this step is for, wrong, without any error. Same flag on the
 [Staying up to date](#staying-up-to-date)).
 
 **Expect that install to rewrite the `settings.json` you just wrote** (inbound
-[#295](https://github.com/DaveKJohn/davekjohns-workshop/issues/295)). This is worth saying out loud
+[#295](https://github.com/DaveKJohn/claude-code-specialists/issues/295)). This is worth saying out loud
 because `.claude/settings.json` is usually a **tracked** file, so the change shows up in `git status`
 and looks like something went wrong. Measured on July 31, 2026 in throwaway repos with
 `core.autocrlf false`: `claude plugin install … --scope project` re-serialises the whole file — key
@@ -189,15 +189,15 @@ second, lasting source of diff.
 
 **Whether that diff is only formatting depends on one thing: was `enabledPlugins` already there?**
 Both halves are measured (inbound
-[#303](https://github.com/DaveKJohn/davekjohns-workshop/issues/303), July 31, 2026):
+[#303](https://github.com/DaveKJohn/claude-code-specialists/issues/303), July 31, 2026):
 
 - **Key already present** — the order above, where act 1 (enable) writes it before act 3 (install) runs.
   Then the content stays **equivalent**: no plugin is switched on that was not on before, and any diff is
   formatting. What you cannot count on is that there will be **no diff at all**. An earlier edition of this
   page said the file stays *byte-identical* and that *"the install writes only when there is something to
-  write"*, on the strength of a single SHA256 comparison in `davekjohns-workshop`. Round v10 falsified the
+  write"*, on the strength of a single SHA256 comparison in `claude-code-specialists`. Round v10 falsified the
   general form (inbound
-  [#336](https://github.com/DaveKJohn/davekjohns-workshop/issues/336)): on a fresh Windows profile, with the
+  [#336](https://github.com/DaveKJohn/claude-code-specialists/issues/336)): on a fresh Windows profile, with the
   key present and written in exactly this order, `claude plugin install … --scope project` **rewrote the
   file anyway** — `enabledPlugins` moved in front of `extraKnownMarketplaces` and the nested `source` object
   was expanded onto separate lines. The likeliest reading is that the workshop's file already happened to
@@ -210,7 +210,7 @@ Both halves are measured (inbound
   different** is now measured rather than inferred.
 
   **On the path this page prescribes, that pair is reproducible — so it is a check you can actually use**
-  (inbound [#385](https://github.com/DaveKJohn/davekjohns-workshop/issues/385)). Round v13 hit both hashes
+  (inbound [#385](https://github.com/DaveKJohn/claude-code-specialists/issues/385)). Round v13 hit both hashes
   exactly, on a second profile: `F694FB44…BF15EFA8` at 224 bytes before, `EB8834F7…AB275E4A` at 246 after,
   and the +22 is the two changes described above, to the byte. That is not luck. Step 1 has you paste the
   printed block into a file that does not exist yet, so the "before" bytes are the block; and the CLI's
@@ -241,7 +241,7 @@ nothing.** It used to say so in bold. Measured on a virgin profile with the mark
 cache present, a **single session start** — no command run, no file changed — wrote a full,
 project-scoped install record with the correct `projectPath`, `version` and `gitCommitSha`,
 indistinguishable from the one the install above produces (inbound
-[#327](https://github.com/DaveKJohn/davekjohns-workshop/issues/327)). The session that writes it still
+[#327](https://github.com/DaveKJohn/claude-code-specialists/issues/327)). The session that writes it still
 loads nothing itself: the record is written *after* the load phase, so only the next session gets the
 plugin. Whether that makes the two commands above redundant has not been tested end to end — so run
 them. They are the route this page can vouch for, and one of them is what puts a version in the record at
@@ -274,13 +274,13 @@ step 2 and the session hooks are simply absent, and that looks exactly like a se
 is fine.
 
 > **The installed record with the inert session — the one state that reads as healthy from every angle**
-> (inbound [#327](https://github.com/DaveKJohn/davekjohns-workshop/issues/327)). Measured on a virgin profile:
+> (inbound [#327](https://github.com/DaveKJohn/claude-code-specialists/issues/327)). Measured on a virgin profile:
 > a **single session start**, with no command run, wrote a full `project`-scoped record with the correct
 > version and sha — and **that same session loaded nothing at all**: no `specialists-*` skills, no subagents,
 > no session-hook output, no routing announcement. The record is written *after* the session's load phase.
 >
 > **And the second measurement was a notch worse than the first** (inbound
-> [#355](https://github.com/DaveKJohn/davekjohns-workshop/issues/355), round v11). Above, the payload at least
+> [#355](https://github.com/DaveKJohn/claude-code-specialists/issues/355), round v11). Above, the payload at least
 > sat in the cache, so the *next* session got the plugin. Measured again on a fresh profile after **three**
 > session starts and still zero `claude plugin` commands, the record read `project 3.1.0` with the right sha
 > — and `installPath` pointed at a directory that **did not exist**. No cache directory, no payload, nothing
@@ -300,7 +300,7 @@ is fine.
 > report it** — the hooks ship in the plugin this session did not load.
 >
 > **And it settles the question this blockquote used to leave open** (inbound
-> [#350](https://github.com/DaveKJohn/davekjohns-workshop/issues/350)): whether a session start makes the two
+> [#350](https://github.com/DaveKJohn/claude-code-specialists/issues/350)): whether a session start makes the two
 > `claude plugin` commands redundant. **It does not.** The experiment this page asked for has been run — the
 > two keys, two restarts, six locations read without a single command — and the answer is that a session
 > start does *half* the job: it registers the marketplace and writes a complete, correct-looking record, but
@@ -318,7 +318,7 @@ review). The details of this path are in the
 as "step 0" (enabling + installing, above) and "step 1" (the skill).
 
 **What it should report, so you can check it rather than trust it** (inbound
-[#337](https://github.com/DaveKJohn/davekjohns-workshop/issues/337)). With only the core `specialists`
+[#337](https://github.com/DaveKJohn/claude-code-specialists/issues/337)). With only the core `specialists`
 plugin enabled, the closing line reads:
 
 ```
@@ -343,7 +343,7 @@ specialists on top of these.
 > The sample above was itself the finding: until August 2, 2026 it showed `0 script-scaffold(s) created,
 > 2 already present` — captured in a repo that already had them, and therefore inverted for exactly the
 > fresh-repo reader this section was written for (inbound
-> [#358](https://github.com/DaveKJohn/davekjohns-workshop/issues/358)). The guidance covered only the
+> [#358](https://github.com/DaveKJohn/claude-code-specialists/issues/358)). The guidance covered only the
 > "lower than this" direction, so the one number that could not match had no explanation.
 
 **And one thing it does that no document mentioned:** every file it writes uses **LF** line endings and
@@ -363,7 +363,7 @@ exploration, her domain.
 ```
 
 **Check for the invariant, not for a fixed string** (inbound
-[#361](https://github.com/DaveKJohn/davekjohns-workshop/issues/361)). A named owner with a stated reason
+[#361](https://github.com/DaveKJohn/claude-code-specialists/issues/361)). A named owner with a stated reason
 is what the persona guarantees and what proves the orchestrator loaded; the exact shape is not fixed.
 Some repos add a house style on top — a fixed header line per turn, emoji and all — but that is a rule
 those repos write into their own `CLAUDE.md`, not something this plugin ships. Until August 2, 2026 this
@@ -382,8 +382,8 @@ different question, answered under [the version is not the code](#staying-up-to-
 clone these commands read tracks `main`, not the tag.
 
 ```powershell
-claude plugin marketplace update davekjohns-workshop          # 1. refresh the marketplace cache
-claude plugin update specialists@davekjohns-workshop --scope project   # 2. then update, per plugin
+claude plugin marketplace update claude-code-specialists          # 1. refresh the marketplace cache
+claude plugin update specialists@claude-code-specialists --scope project   # 2. then update, per plugin
 ```
 
 **Keep line 1 in the procedure — and here is exactly what each command was measured to do, because
@@ -397,7 +397,7 @@ the two differ and an earlier version of this page generalised them.**
   and with the refresh a second fresh folder produced **3.0.5**. So the refresh is what makes the
   difference for this verb — nothing else.
   **And the output cannot warn you, even in principle:** `✔ Successfully installed plugin:
-  specialists@davekjohns-workshop (scope: project)` names the scope and **no version at all**. The
+  specialists@claude-code-specialists (scope: project)` names the scope and **no version at all**. The
   install record is the only place the version appears, which is exactly why the verification step in
   Step 1 queries `installed_plugins.json` instead of reading a success line.
 - **`update` refreshed the cache by itself when measured.** On July 31, 2026 (CLI `2.1.220`), with the
@@ -425,7 +425,7 @@ command belongs in the procedure rather than a hope that it has caught up.
 **The scope flag on the second command is not optional either.** Without it the command defaults to
 user scope and does not act on a project-scoped install. **What it prints depends on your CLI version,
 so treat the wording as version-bound and the flag as the invariant** (inbound
-[#359](https://github.com/DaveKJohn/davekjohns-workshop/issues/359)). On `2.1.220` it names the scope
+[#359](https://github.com/DaveKJohn/claude-code-specialists/issues/359)). On `2.1.220` it names the scope
 and the settings file, and then suggests `claude plugin disable … --scope local` — **which is not the
 step to follow**: that writes a local disable key on top of your project setting and leaves the install
 in place. Earlier releases said *"Plugin `specialists` is not installed at scope user"*, literally true
@@ -438,7 +438,7 @@ plugin; the full history lives in the workshop itself
 folder also carries a `RELEASE.md` card next to its `CHANGELOG.md` — open it in your plugin cache
 after an update to see, at a glance, which release the card describes and what changed in it. It
 does not tell you where *you* are, and since August 2, 2026 it says so rather than claiming
-otherwise (inbound [#384](https://github.com/DaveKJohn/davekjohns-workshop/issues/384)); the section
+otherwise (inbound [#384](https://github.com/DaveKJohn/claude-code-specialists/issues/384)); the section
 directly below is the check for that.
 
 **The version is not the code, and on this marketplace the two routinely disagree.** The cached clone
@@ -448,7 +448,7 @@ whatever version the last release bumped it to. Every commit merged after a rele
 consumers immediately, under the previous release's version number.
 
 Measured twice, from both directions (inbound
-[#313](https://github.com/DaveKJohn/davekjohns-workshop/issues/313), July 31 – August 1, 2026, CLI
+[#313](https://github.com/DaveKJohn/claude-code-specialists/issues/313), July 31 – August 1, 2026, CLI
 `2.1.220`):
 
 - **Without a command.** A consumer moved `3.0.6 → 3.0.8` on its own and landed on `main`, three commits
@@ -470,7 +470,7 @@ what *triggers* the unasked refresh — that a refresh moves you to `main` is se
 itself is not.
 
 **One part of what your session loads is not covered by that sha at all: the persona bodies** (inbound
-[#330](https://github.com/DaveKJohn/davekjohns-workshop/issues/330)). Look at the imports
+[#330](https://github.com/DaveKJohn/claude-code-specialists/issues/330)). Look at the imports
 `specialists-init` writes into `.claude/specialists/SPECIALISTS.md` and you will see they point into
 `~/.claude/plugins/marketplaces/<marketplace>/…`, **the clone** — while your install record's `installPath`,
 `version` and `gitCommitSha` describe a different directory, the version-pinned copy under
@@ -488,8 +488,8 @@ If a persona behaves differently from what the release notes describe, the clone
 `git -C "$env:USERPROFILE\.claude\plugins\marketplaces\<marketplace>" rev-parse HEAD`.
 
 **Read your install record rather than assume it, because it can move — or be taken away — without you
-asking** (inbound [#296](https://github.com/DaveKJohn/davekjohns-workshop/issues/296) and
-[#301](https://github.com/DaveKJohn/davekjohns-workshop/issues/301)). Project scope gives your repo its
+asking** (inbound [#296](https://github.com/DaveKJohn/claude-code-specialists/issues/296) and
+[#301](https://github.com/DaveKJohn/claude-code-specialists/issues/301)). Project scope gives your repo its
 own record; it does not freeze it, and it does not guarantee it will still be there tomorrow.
 
 - **It moves.** Measured July 31, 2026: both project-scoped records of a real consumer went
@@ -510,7 +510,7 @@ Since `v3.0.7` the checks run the `projectPath` query for you and say
 `[NOT-INSTALLED-HERE]` when an enabled plugin has no record for this path; the workshop's connector check
 says it about each registered consumer, which is the vantage point that still works when a consumer has
 gone quiet. **Do not expect that line at a session start, though, and this is measured rather than
-assumed** (inbound [#314](https://github.com/DaveKJohn/davekjohns-workshop/issues/314)): a session start
+assumed** (inbound [#314](https://github.com/DaveKJohn/claude-code-specialists/issues/314)): a session start
 *writes the missing record itself*, so by the time any hook can look the state has healed. Run against
 exactly that fixture — three plugins enabled, one with no record anywhere on the machine — the hook
 printed the line on no branch at all. It is reachable by a **deliberate** run in a repo where a record
@@ -525,7 +525,7 @@ empty, re-install from that root — and note that this is the case where the in
 
 **Check that query again *after* a repair install, because the repair can leave two records where you
 wanted one.** Measured in `DaveKJohn/life-hub` on July 31, 2026, CLI `2.1.220` (inbound
-[#315](https://github.com/DaveKJohn/davekjohns-workshop/issues/315)): re-installing at project scope
+[#315](https://github.com/DaveKJohn/claude-code-specialists/issues/315)): re-installing at project scope
 against a path that already carried a record **added a second one beside it** instead of correcting it,
 reporting `✔ Successfully installed … (scope: project)` both times. Two lines for one plugin is not a
 display quirk — it is the stray second record, and the count in that query is the only signal you get.
@@ -537,7 +537,7 @@ of this sentence claimed the opposite: `install`, `uninstall` and `disable` each
 list was never the gap; **these pages were**, which is why the state was met by a reader with nothing to
 look it up in. It is what a *session start* writes — enabling a plugin is enough for one to create a missing record, and to flip an existing
 `project` record to `local`, with no command run, no file in your repo changed, and nothing reporting it
-(inbound [#314](https://github.com/DaveKJohn/davekjohns-workshop/issues/314)). Two consequences worth
+(inbound [#314](https://github.com/DaveKJohn/claude-code-specialists/issues/314)). Two consequences worth
 holding on to: the "enabled but not installed" state **heals itself**, so a check that looks for it will
 usually find nothing rather than confirm health; and the state you are actually left in is `local`, which
 the rest of this family's documents do not assume anywhere. Remove such a record with `claude plugin

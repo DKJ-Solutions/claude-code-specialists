@@ -37,7 +37,7 @@ $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists\specialists\skills\sync-roster\sync-roster.ps1'
 $Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) 'sync-roster-test-fixture'
 
-$Marketplace = 'davekjohns-workshop'
+$Marketplace = 'claude-code-specialists'
 $PluginName  = 'specialists'
 $PluginId    = "$PluginName@$Marketplace"
 
@@ -259,7 +259,7 @@ try {
     $c2b = New-FixtureConsumer -RosterIds @('06-16') -LensIds @('06-16')
     $rosterBefore2b = Get-B64 (Join-Path $c2b 'CLAUDE.md')
     $stub = New-StubCheck -Name 'stub-bad-plugin' -OutputLines @(
-        "  [ERROR] agent '06-24' (Bad_Name@davekjohns-workshop) has no roster row in CLAUDE.md -- add it to the roster.")
+        "  [ERROR] agent '06-24' (Bad_Name@claude-code-specialists) has no roster row in CLAUDE.md -- add it to the roster.")
     $r = Invoke-Ps @('-ConsumerPathOverride', $c2b, '-CacheRootOverride', $emptyCache, '-CheckScriptOverride', $stub)
     Assert-Equal 0 $r.Code 'guardrail: exit-code 0'
     Assert-Match 'invalid plugin id' $r.Out 'guardrail: malformed plugin id skipped'

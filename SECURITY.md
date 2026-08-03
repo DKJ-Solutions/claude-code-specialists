@@ -1,9 +1,9 @@
 # Security Policy
 
-`davekjohns-workshop` is the public marketplace repo for Dave (DaveKJohn)'s Claude Code plugins
+`claude-code-specialists` is the public marketplace repo for Dave (DaveKJohn)'s Claude Code plugins
 (the Claude Specialists system): plugin/agent definitions, manuals, PowerShell scripts, docs, and
 CI config. It's public **by design**, and by the same design it holds **no secrets, credentials,
-or personal data** — see [`CLAUDE.md`](CLAUDE.md#specific-to-this-repo-davekjohns-workshop).
+or personal data** — see [`CLAUDE.md`](CLAUDE.md#specific-to-this-repo-claude-code-specialists).
 Nothing in here is meant to be confidential in the first place.
 
 ## Reporting a vulnerability

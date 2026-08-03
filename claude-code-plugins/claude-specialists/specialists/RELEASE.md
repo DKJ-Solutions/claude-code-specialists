@@ -5,16 +5,16 @@
 
 Round v12 processed: the teardown papers corrected, and the staleness gate reaches into prose
 
-This card describes v3.1.2, the version your plugin manifest carries. Whether it is the code you are running is a separate question: the documented update path installs from `main`, so a `main` that has moved past the tag reports this same number. [The version is not the code](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/claude-code-plugins/claude-specialists/QUICKSTART.md#staying-up-to-date) in the QUICKSTART is the check.
+This card describes v3.1.2, the version your plugin manifest carries. Whether it is the code you are running is a separate question: the documented update path installs from `main`, so a `main` that has moved past the tag reports this same number. [The version is not the code](https://github.com/DaveKJohn/claude-code-specialists/blob/main/claude-code-plugins/claude-specialists/QUICKSTART.md#staying-up-to-date) in the QUICKSTART is the check.
 
 ## Documentation
 
 ### #378 · Repairing a claim means finding its other sites · Docs · 2026-08-02
 
 The lesson from test round v12, recorded rather than left in a round-up comment. All three of the round's
-core findings ([#372](https://github.com/DaveKJohn/davekjohns-workshop/issues/372),
-[#373](https://github.com/DaveKJohn/davekjohns-workshop/issues/373),
-[#374](https://github.com/DaveKJohn/davekjohns-workshop/issues/374)) turned out to have a **second,
+core findings ([#372](https://github.com/DaveKJohn/claude-code-specialists/issues/372),
+[#373](https://github.com/DaveKJohn/claude-code-specialists/issues/373),
+[#374](https://github.com/DaveKJohn/claude-code-specialists/issues/374)) turned out to have a **second,
 unreported site in the same document** — and in two of the three, the document already stated the truth
 somewhere else and was simply disagreeing with itself.
 
@@ -34,7 +34,7 @@ about which way to repair, sitting unused. Whoever files a finding sees the site
 rest is the writer's job.
 
 Landed in two places along the existing split: the portable rule goes in
-[Tessa #16's manual](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/claude-code-plugins/claude-specialists/specialists/manuals/06-16-manual.md) as a hard
+[Tessa #16's manual](https://github.com/DaveKJohn/claude-code-specialists/blob/main/claude-code-plugins/claude-specialists/specialists/manuals/06-16-manual.md) as a hard
 rule beside *"consistency first"* — those two are neighbours but not the same rule, since consistency-first
 is about not duplicating a rule and this one is about a claim that **is** already duplicated. The concrete
 evidence and the resulting habit (*grep the claim across the page before editing the reported line, and
@@ -46,13 +46,13 @@ general, so this stays a craft rule rather than a lint check. The narrower and g
 — *a measured figure in prose names what it was measured on*, extending check 15 beyond fenced samples to
 byte counts and file sizes — is a separate decision and is not made here.
 
-[PR #378](https://github.com/DaveKJohn/davekjohns-workshop/pull/378)
+[PR #378](https://github.com/DaveKJohn/claude-code-specialists/pull/378)
 
 ---
 
 ### #377 · The cached clone does carry tags, and annotated ones invert the answer · Docs · 2026-08-02
 
-Test round v12's [#372](https://github.com/DaveKJohn/davekjohns-workshop/issues/372), against the #322
+Test round v12's [#372](https://github.com/DaveKJohn/claude-code-specialists/issues/372), against the #322
 block in the `specialists-init` skill. Two things, and the second is the one that matters.
 
 **The "no tags" clause was false, and it survived a round after being reported.** The bullet read the
@@ -82,9 +82,9 @@ The third outcome is now named, with the measured triple, and the instruction is
 a tag locally at all, peel it with `^{}`. The `gh api …/tags` route is noted as immune — its `.commit.sha`
 is the commit already.
 
-[PR #377](https://github.com/DaveKJohn/davekjohns-workshop/pull/377)
+[PR #377](https://github.com/DaveKJohn/claude-code-specialists/pull/377)
 
 ---
 
-Full workshop notes: [releases/development/3.x/3.1.2.md](https://github.com/DaveKJohn/davekjohns-workshop/blob/main/releases/development/3.x/3.1.2.md)
+Full workshop notes: [releases/development/3.x/3.1.2.md](https://github.com/DaveKJohn/claude-code-specialists/blob/main/releases/development/3.x/3.1.2.md)
 Cumulative plugin history: [CHANGELOG.md](CHANGELOG.md)

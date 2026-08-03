@@ -13,7 +13,7 @@ administration.
 
 ## The doctrine: this repo is the source of truth
 
-davekjohns-workshop works like a **Customer Data Platform**: all changes to shared plugin content
+claude-code-specialists works like a **Customer Data Platform**: all changes to shared plugin content
 (agent defs, manuals, persona bodies, skills) **land here first**, and are only then synced out to
 the connected repos — never the other way around (see the safety rules in the repo
 [`CLAUDE.md`](../../../CLAUDE.md)). If an improvement nevertheless originates in a consumer, that
@@ -58,7 +58,7 @@ accepted degree of transparency (security review, July 16, 2026).
   "localCheckout": "../life-hub",
   "plugins": [
     {
-      "id": "specialists@davekjohns-workshop",
+      "id": "specialists@claude-code-specialists",
       "extensions": ["01-01", "05-05"]
     }
   ],

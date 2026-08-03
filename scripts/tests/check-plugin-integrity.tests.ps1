@@ -603,8 +603,8 @@ try {
         'From the root of your repo:'
         ''
         '```powershell'
-        'claude plugin marketplace update davekjohns-workshop'
-        'claude plugin install specialists@davekjohns-workshop --scope project'
+        'claude plugin marketplace update claude-code-specialists'
+        'claude plugin install specialists@claude-code-specialists --scope project'
         '```'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s17Lines -join "`n") + "`n"), $Utf8NoBom)
@@ -619,9 +619,9 @@ try {
     $s18Lines = @(
         '# Contributing'
         ''
-        'Run `claude plugin install specialists@davekjohns-workshop` from the repo root.'
+        'Run `claude plugin install specialists@claude-code-specialists` from the repo root.'
         ''
-        'Refresh first with `claude plugin marketplace update davekjohns-workshop`.'
+        'Refresh first with `claude plugin marketplace update claude-code-specialists`.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s18Lines -join "`n") + "`n"), $Utf8NoBom)
     $rL18 = Invoke-Integrity -FixtureRoot $Fixture
@@ -634,7 +634,7 @@ try {
     $s19Lines = @(
         '# Contributing'
         ''
-        'Run `claude plugin install specialists@davekjohns-workshop --scope project` from the root.'
+        'Run `claude plugin install specialists@claude-code-specialists --scope project` from the root.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s19Lines -join "`n") + "`n"), $Utf8NoBom)
     $rL19 = Invoke-Integrity -FixtureRoot $Fixture
@@ -667,7 +667,7 @@ try {
     $s21Lines = @(
         '# Contributing'
         ''
-        'Removing it is a separate step: `claude plugin uninstall specialists@davekjohns-workshop'
+        'Removing it is a separate step: `claude plugin uninstall specialists@claude-code-specialists'
         '--scope project`, run from the repo root.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s21Lines -join "`n") + "`n"), $Utf8NoBom)
@@ -686,7 +686,7 @@ try {
         'Write-Host "an unrelated example"'
         '```'
         ''
-        'Removing it: `claude plugin uninstall specialists@davekjohns-workshop'
+        'Removing it: `claude plugin uninstall specialists@claude-code-specialists'
         '--scope project`, from the root.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s22Lines -join "`n") + "`n"), $Utf8NoBom)
@@ -699,7 +699,7 @@ try {
     $s23Lines = @(
         '# Contributing'
         ''
-        'Afterwards run `claude plugin uninstall specialists@davekjohns-workshop` to detach.'
+        'Afterwards run `claude plugin uninstall specialists@claude-code-specialists` to detach.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s23Lines -join "`n") + "`n"), $Utf8NoBom)
     $rL23 = Invoke-Integrity -FixtureRoot $Fixture
@@ -716,7 +716,7 @@ try {
     $s24Changelog = @(
         '# Changelog'
         ''
-        'The install back then was `claude plugin install specialists@davekjohns-workshop`, with no'
+        'The install back then was `claude plugin install specialists@claude-code-specialists`, with no'
         'scope flag and no refresh -- which is exactly what that release documented.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CHANGELOG.md'), (($s24Changelog -join "`n") + "`n"), $Utf8NoBom)
@@ -734,9 +734,9 @@ try {
     $s25Lines = @(
         '# Contributing'
         ''
-        'Refresh with `claude plugin marketplace update davekjohns-workshop` first.'
+        'Refresh with `claude plugin marketplace update claude-code-specialists` first.'
         ''
-        'Then `claude plugin install specialists@davekjohns-workshop --scope project ; claude plugin install specialists-ecomm@davekjohns-workshop` for both.'
+        'Then `claude plugin install specialists@claude-code-specialists --scope project ; claude plugin install specialists-ecomm@claude-code-specialists` for both.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s25Lines -join "`n") + "`n"), $Utf8NoBom)
     $rL25 = Invoke-Integrity -FixtureRoot $Fixture
@@ -754,7 +754,7 @@ try {
         '# Contributing'
         ''
         'Remove a record a session start left behind with'
-        '`claude plugin uninstall specialists@davekjohns-workshop --scope local`, then re-install.'
+        '`claude plugin uninstall specialists@claude-code-specialists --scope local`, then re-install.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s26Lines -join "`n") + "`n"), $Utf8NoBom)
     $rL26 = Invoke-Integrity -FixtureRoot $Fixture
@@ -768,9 +768,9 @@ try {
     $s27Lines = @(
         '# Contributing'
         ''
-        'Refresh with `claude plugin marketplace update davekjohns-workshop` first.'
+        'Refresh with `claude plugin marketplace update claude-code-specialists` first.'
         ''
-        'Then run `claude plugin install specialists@davekjohns-workshop --scope local` from the root.'
+        'Then run `claude plugin install specialists@claude-code-specialists --scope local` from the root.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s27Lines -join "`n") + "`n"), $Utf8NoBom)
     $rL27 = Invoke-Integrity -FixtureRoot $Fixture
@@ -844,7 +844,7 @@ try {
         'A record in `installed_plugins.json` looks like this:'
         ''
         '```json'
-        '{ "plugins": { "specialists@davekjohns-workshop": ['
+        '{ "plugins": { "specialists@claude-code-specialists": ['
         '  { "scope": "project", "version": "3.0.8", "projectPath": "C:\\repo" } ] } }'
         '```'
     )
@@ -887,7 +887,7 @@ try {
         'Remove it again:'
         ''
         '```powershell'
-        'claude plugin uninstall specialists@davekjohns-workshop'
+        'claude plugin uninstall specialists@claude-code-specialists'
         '```'
     )
     [System.IO.File]::WriteAllText($s33Path, (($s33 -join "`n") + "`n"), $Utf8NoBom)
@@ -1122,7 +1122,7 @@ try {
     #    the way a captured transcript can.
     [System.IO.File]::WriteAllText($qs, @(
         '# Quickstart', '', 'Run this:', '', ($fence + 'powershell'),
-        'claude plugin install specialists@davekjohns-workshop --scope project', $fence
+        'claude plugin install specialists@claude-code-specialists --scope project', $fence
     ) -join "`n", $Utf8NoBom)
     $s3 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($s3.Out -match '\[expected-output\].*QUICKSTART\.md')) `

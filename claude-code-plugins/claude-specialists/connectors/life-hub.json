@@ -4,7 +4,7 @@
   "localCheckout": "../life-hub",
   "plugins": [
     {
-      "id": "specialists@davekjohns-workshop",
+      "id": "specialists@claude-code-specialists",
       "extensions": [
         "01-01", "02-09", "03-02", "03-07", "04-11", "04-12", "04-13", "04-18",
         "05-05", "05-06", "05-15", "06-16", "06-17", "06-19", "06-23",
@@ -12,7 +12,7 @@
       ]
     },
     {
-      "id": "specialists-lifehub@davekjohns-workshop",
+      "id": "specialists-lifehub@claude-code-specialists",
       "extensions": [
         "02-10", "03-08", "03-14", "04-03", "04-04"
       ]

@@ -5,7 +5,7 @@
     this plugin repo, and flags drift before such a copy is cleaned up.
 .DESCRIPTION
     Topology: life-hub and swb point via a remote `github` marketplace source
-    (`DaveKJohn/davekjohns-workshop`) to this repo -- the Claude Code CLI clones and caches it
+    (`DaveKJohn/claude-code-specialists`) to this repo -- the Claude Code CLI clones and caches it
     itself (see README.md, "Consumption" section). So NO physical copy is needed once a consuming
     repo has been converted to the shared source. During the transition (Phase 3), however, a
     consuming repo can still have its own local copy of an

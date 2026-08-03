@@ -1,13 +1,13 @@
 <#
 .SYNOPSIS
     SessionStart hook of the specialists plugin: checks upon starting a session whether the
-    connectors are still in sync with the workshop source (davekjohns-workshop).
+    connectors are still in sync with the workshop source (claude-code-specialists).
 
 .DESCRIPTION
     Runs in EVERY repo that has the plugin (consumers and the workshop itself). Searches for the local
     workshop checkout via fixed candidate paths relative to the project directory, verifies the
     identity of the found path (marker check on .claude-plugin/marketplace.json with name
-    'davekjohns-workshop' -- Sean guardrail: never run a script purely on a path guess), and
+    'claude-code-specialists' -- Sean guardrail: never run a script purely on a path guess), and
     runs scripts/sync/check-connectors.ps1 there. Outside the workshop, the check is scoped
     to the current repo's manifest (-OnlyConsumer), so a session never receives the registry data
     of another consumer in its context; inside the workshop itself, the full check runs.
@@ -69,7 +69,7 @@ function Test-WorkshopMarker([string]$Path) {
     try {
         $mp = Get-Content -LiteralPath $marker -Raw -Encoding UTF8 | ConvertFrom-Json
         if (-not ($mp.PSObject.Properties.Name -contains 'name')) { return $false }
-        return ($mp.name -eq 'davekjohns-workshop')
+        return ($mp.name -eq 'claude-code-specialists')
     } catch {
         return $false
     }
@@ -85,8 +85,8 @@ try {
         # convention <root>\<owner>\<repo> one level higher.
         $candidates = @(
             $cwd,
-            (Join-Path $cwd '..\davekjohns-workshop'),
-            (Join-Path $cwd '..\..\DaveKJohn\davekjohns-workshop')
+            (Join-Path $cwd '..\claude-code-specialists'),
+            (Join-Path $cwd '..\..\DaveKJohn\claude-code-specialists')
         )
     }
 
