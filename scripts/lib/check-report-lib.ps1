@@ -155,6 +155,34 @@ function Format-SafeToken {
     return $clean
 }
 
+function Format-SafePathToken {
+    <# The path-shaped sibling of Format-SafeToken, for a finding whose SUBJECT is a file path.
+
+       WHY A SECOND FUNCTION RATHER THAN A WIDER CHARSET (inbound #414). Format-SafeToken's allowed set
+       is built for ids -- it strips '~', '\' and ':' among others, which is exactly right for a plugin
+       id and exactly wrong for a path: 'C:\Users\x\.claude\...' comes back as 'CUsersx.claude...' and
+       '~/.claude/...' loses the '~' that says where it starts. A finding that exists to tell a reader
+       WHICH path is missing must not print a path they cannot look up, and Format-SafeToken's own
+       docstring says as much -- "a caller that reports a value because it is suspect should say when
+       the display differs from the raw value". Widening that function instead would have loosened the
+       guard on every id it protects, to serve a case it was not written for.
+
+       What is actually stripped, and why only this much:
+         - CONTROL CHARACTERS, newlines included. This is the real risk the #309 reasoning names: these
+           lines are forwarded into session context by the SessionStart hooks, and a value carrying a
+           newline could forge a line of its own.
+         - SQUARE BRACKETS. The hooks decide what to surface, and how loudly, by matching markers like
+           '[ERROR]' over a check's whole output -- so a path containing one would not merely look odd,
+           it would be COUNTED. A bracket in a real path is vanishingly rare; a bracket that changes a
+           hook's verdict is not something to leave to chance.
+       Everything else is kept, because everything else is what makes a path a path. #>
+    param([AllowEmptyString()][string]$Value = '', [int]$MaxLength = 200)
+    $clean = ($Value -replace '[\p{C}\[\]]', '') -replace '\s+', ' '
+    $clean = $clean.Trim()
+    if ($clean.Length -gt $MaxLength) { $clean = $clean.Substring(0, $MaxLength - 3) + '...' }
+    return $clean
+}
+
 function Format-SuspectToken {
     <# For the case where the value IS the complaint: an invalid plugin id, a malformed marketplace.
 

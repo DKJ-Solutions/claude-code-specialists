@@ -38,8 +38,9 @@ $script:fail = 0
 
 function Get-FlatOutput {
     <#
-        Captured child output, whitespace collapsed to single spaces, so a phrase assert cannot fail on
-        line breaks that the behaviour under test does not decide.
+        Captured child output with ALL whitespace removed, so a phrase assert cannot fail on line breaks
+        that the behaviour under test does not decide. Pair it with Test-Phrase, which strips the expected
+        phrase the same way.
 
         A native child's stderr captured with 2>&1 does not arrive as plain text: PowerShell wraps each
         line in a NativeCommandError, renders it with a 'powershell.exe : ' prefix, and WRAPS the whole
@@ -53,13 +54,77 @@ function Get-FlatOutput {
         -- stayed green on the same commit. That is a test failing on its own formatting.
 
         Mid-word is why the newlines are REMOVED rather than collapsed to a space: '\s+' -> ' ' turns that
-        record into 'name mus t not be', which still does not match. Note the two normalizations already
-        in shared-scripts.tests.ps1 differ on exactly this point -- Test-OutputContains (line ~128) removes
-        them and is correct; the inline '\s+' -> ' ' at line ~656 would not survive a mid-word wrap. Follow
-        Test-OutputContains.
+        record into 'name mus t not be', which still does not match.
+
+        THAT WAS STILL NOT ENOUGH, and the rest was measured on August 3, 2026 at width 198. Two separate
+        things were happening, and only the first was understood:
+
+          1. The CHILD wraps its own Write-Error output at its own width, so its stderr genuinely arrives
+             as two lines, split anywhere -- including ON A SPACE. Removing the newline then GLUES the
+             words ("token" + "'final'" -> "token'final'"), so an assert on "token 'final'" fails for the
+             mirror-image reason the mid-word case failed. No single substitution fixes both, because the
+             wrap point is not recoverable from the wrapped text. Hence: strip ALL whitespace here, and
+             strip it from the expected phrase too -- that is Test-Phrase below.
+
+          2. The PARENT then wrapped each of those stderr lines in its own NativeCommandError and rendered
+             the SECOND record's header, category and FullyQualifiedErrorId BETWEEN the two halves. The
+             captured text read '...the token 'fina' + ~300 characters of error-record decoration + 'l'.'.
+             No whitespace normalization can survive that -- the phrase is not merely reformatted, it has
+             other content inserted into the middle of it. That is why Invoke-CapturedChild below stops
+             using '2>&1' and captures the child's stderr as PLAIN TEXT via a redirect file.
+
+        The two fixes are independent and both are needed: (2) removes the interleaving, (1) survives the
+        child's own wrap that remains afterwards.
     #>
     param($Captured)
-    return (($Captured | Out-String) -replace "`r?`n", '')
+    return (($Captured | Out-String) -replace '\s', '')
+}
+
+function Test-Phrase {
+    <# True when $Text contains $Phrase, comparing both with all whitespace removed -- the matching half of
+       Get-FlatOutput's normalization (see the wrap reasoning there). Use this instead of -match for any
+       assert on captured CHILD output; a regex against flattened text would have to encode the same
+       stripping in every pattern, and the one that forgets is the one that fails at some window width
+       nobody is looking at. #>
+    param([string]$Text, [string]$Phrase)
+    return $Text.Contains(($Phrase -replace '\s', ''))
+}
+
+function Invoke-CapturedChild {
+    <#
+        Runs a powershell child and returns its exit code plus its combined output as PLAIN TEXT.
+
+        Deliberately Start-Process with redirect FILES rather than '& powershell ... 2>&1'. Under 2>&1 the
+        parent turns every stderr line into a NativeCommandError and renders that record -- header,
+        CategoryInfo, FullyQualifiedErrorId -- so with two stderr lines the decoration of the second lands
+        in the MIDDLE of the first's sentence. Measured: an assert on "token 'final'" saw
+        "...the token 'fina<300 characters of error-record>l'." A redirect file receives what the child
+        actually wrote, and nothing else.
+
+        Each argument is quoted individually: Start-Process joins -ArgumentList with plain spaces, so a
+        fixture path containing a space (a user name with one is ordinary) would otherwise arrive as two
+        arguments -- a failure that would look like a bug in the script under test.
+    #>
+    param([string[]]$ChildArgs, [string]$WorkDir)
+    $tag = [Guid]::NewGuid().ToString('N').Substring(0, 8)
+    $outFile = Join-Path ([System.IO.Path]::GetTempPath()) "nb-test-out-$tag.txt"
+    $errFile = Join-Path ([System.IO.Path]::GetTempPath()) "nb-test-err-$tag.txt"
+    try {
+        $quoted = @($ChildArgs | ForEach-Object {
+            if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ }
+        })
+        $proc = Start-Process -FilePath 'powershell' -ArgumentList $quoted -WorkingDirectory $WorkDir `
+            -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+        $text = ''
+        foreach ($f in @($outFile, $errFile)) {
+            if (Test-Path -LiteralPath $f) { $text += [System.IO.File]::ReadAllText($f) }
+        }
+        return [pscustomobject]@{ Code = $proc.ExitCode; Out = (Get-FlatOutput $text) }
+    } finally {
+        foreach ($f in @($outFile, $errFile)) {
+            Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 function Assert-Equal {
@@ -148,9 +213,7 @@ function Invoke-NewBranch {
         Remove-Item Env:\CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue
         Set-Location -LiteralPath $Dir
         $ErrorActionPreference = 'Continue'
-        $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath @callArgs 2>&1
-        $code = $LASTEXITCODE
-        return [pscustomobject]@{ Code = $code; Out = (Get-FlatOutput $out) }
+        return (Invoke-CapturedChild -WorkDir $Dir -ChildArgs (@('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath) + $callArgs))
     } finally {
         $ErrorActionPreference = $prevEap
         Set-Location -LiteralPath $prevLoc
@@ -201,9 +264,7 @@ function Invoke-NewBranchWithAdversarialField {
         # The -Command string itself contains no malicious content -- only the fixed field name and
         # a reference to the env var name (harmless ASCII) -- so that string needs no special escaping.
         $cmd = "& '$scriptPath' -Name '$Name' -$Field `$env:$envVarName"
-        $out = & powershell -NoProfile -ExecutionPolicy Bypass -Command $cmd 2>&1
-        $code = $LASTEXITCODE
-        return [pscustomobject]@{ Code = $code; Out = (Get-FlatOutput $out) }
+        return (Invoke-CapturedChild -WorkDir $Dir -ChildArgs @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $cmd))
     } finally {
         $ErrorActionPreference = $prevEap
         Set-Location -LiteralPath $prevLoc
@@ -239,9 +300,7 @@ function Invoke-NewChangelogEntry {
         else { Remove-Item Env:\CLAUDE_NEWBRANCH_TITLE -ErrorAction SilentlyContinue }
         Set-Location -LiteralPath $Dir
         $ErrorActionPreference = 'Continue'
-        $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath @callArgs 2>&1
-        $code = $LASTEXITCODE
-        return [pscustomobject]@{ Code = $code; Out = (Get-FlatOutput $out) }
+        return (Invoke-CapturedChild -WorkDir $Dir -ChildArgs (@('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath) + $callArgs))
     } finally {
         $ErrorActionPreference = $prevEap
         Set-Location -LiteralPath $prevLoc
@@ -257,13 +316,15 @@ try {
     # property itself -- a record split MID-WORD still matches the phrase.
     Write-Host "Get-FlatOutput -- a wrapped record still matches its phrase" -ForegroundColor Cyan
     $flatProbe = Get-FlatOutput @('powershell.exe : new-branch cannot run: Branch name mus', "t not be 'main'.")
-    Assert-True ($flatProbe -match "must not be 'main'") 'a MID-WORD wrap still matches the phrase'
+    Assert-True (Test-Phrase -Text $flatProbe -Phrase "must not be 'main'") 'a MID-WORD wrap still matches the phrase'
     Assert-True ($flatProbe -notmatch "`n") 'no newline survives normalization'
-    # Not covered, and stated rather than tested into passing: a wrap landing exactly ON a space. If the
-    # formatter drops that space, removing the newline glues the words ('already' + 'existed') and a phrase
-    # assert fails again. Whether it drops it has NOT been measured -- the observed break was mid-word. If
-    # that case ever bites, the fix is to strip ALL whitespace from both the text and the pattern before
-    # comparing, not to add a space back here.
+    # THE AT-SPACE WRAP, which this block used to name as unmeasured and leave uncovered -- with a
+    # prediction attached: "if that case ever bites, the fix is to strip ALL whitespace from both the text
+    # and the pattern before comparing". It bit on August 3, 2026 at width 198, and the prediction was
+    # right. Both directions are pinned here now, so neither can regress into the other's fix.
+    $flatProbeSpace = Get-FlatOutput @('powershell.exe : new-branch cannot run: ... must not contain the token', "'final'.")
+    Assert-True (Test-Phrase -Text $flatProbeSpace -Phrase "token 'final'") 'an AT-SPACE wrap still matches the phrase'
+    Assert-True (Test-Phrase -Text (Get-FlatOutput @('a b')) -Phrase 'a b') 'an unwrapped phrase matches too -- the normalization is not one-directional'
 
     # --- (a) Hard rejects: 'main', a name with the token 'final', and empty/whitespace ------------------
     Write-Host "new-branch.ps1 -- hard rejects (exit 1)" -ForegroundColor Cyan
@@ -271,11 +332,11 @@ try {
 
     $rMain = Invoke-NewBranch -Dir $fixtureA -Name 'main'
     Assert-Equal 1 $rMain.Code "-Name main: exit 1 (hard reject)"
-    Assert-True ($rMain.Out -match "must not be 'main'") "-Name main: pointer names the main rule"
+    Assert-True (Test-Phrase -Text $rMain.Out -Phrase "must not be 'main'") "-Name main: pointer names the main rule"
 
     $rFinal = Invoke-NewBranch -Dir $fixtureA -Name 'feat/final-cut'
     Assert-Equal 1 $rFinal.Code "-Name with token 'final': exit 1 (hard reject)"
-    Assert-True ($rFinal.Out -match "token 'final'") "-Name with token 'final': pointer names the final rule"
+    Assert-True (Test-Phrase -Text $rFinal.Out -Phrase "token 'final'") "-Name with token 'final': pointer names the final rule"
     & git -C $fixtureA rev-parse --verify --quiet 'refs/heads/feat/final-cut' | Out-Null
     Assert-True ($LASTEXITCODE -ne 0) "'feat/final-cut': branch NOT created after hard reject"
 
@@ -310,8 +371,8 @@ try {
     Write-Host "new-branch.ps1 -- idempotent (second run, same name)" -ForegroundColor Cyan
     $r2 = Invoke-NewBranch -Dir $fixtureBC -Name 'feat/my-task' -Title 'Second title (should be ignored)'
     Assert-Equal 0 $r2.Code 'idempotent second run: exit 0'
-    Assert-True ($r2.Out -match 'already existed') 'second run reports the branch already existed (checkout, not -b)'
-    Assert-True ($r2.Out -match 'already exists') 'second run reports the entry file already exists'
+    Assert-True (Test-Phrase -Text $r2.Out -Phrase 'already existed') 'second run reports the branch already existed (checkout, not -b)'
+    Assert-True (Test-Phrase -Text $r2.Out -Phrase 'already exists') 'second run reports the entry file already exists'
     $headBranch2 = (& git -C $fixtureBC rev-parse --abbrev-ref HEAD).Trim()
     Assert-Equal 'feat/my-task' $headBranch2 'HEAD stays on the same branch after the second run'
     $entryText2 = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
@@ -332,7 +393,7 @@ try {
     $fixtureE = New-Fixture -Label 'e'
     $rE = Invoke-NewBranch -Dir $fixtureE -Name 'wip/experiment'
     Assert-Equal 0 $rE.Code 'unknown prefix: new-branch exit 0 (soft warn)'
-    Assert-True ($rE.Out -match 'Unknown branch prefix') 'warning about the unknown prefix in the output'
+    Assert-True (Test-Phrase -Text $rE.Out -Phrase 'Unknown branch prefix') 'warning about the unknown prefix in the output'
     $headBranchE = (& git -C $fixtureE rev-parse --abbrev-ref HEAD).Trim()
     Assert-Equal 'wip/experiment' $headBranchE 'branch still created and checked out despite unknown prefix'
     $entryPathE = Join-Path $fixtureE 'wip-experiment.md'
@@ -432,7 +493,7 @@ try {
 
     $rP = Invoke-NewBranch -Dir $fixtureI -Name 'feat/parked-branch' -Title 'Parked' -Intent 'WIP; continue on the laptop.' -Park
     Assert-Equal 0 $rP.Code '-Park: new-branch exit 0'
-    Assert-True ($rP.Out -match 'parked on origin') '-Park: reports the branch was parked on origin'
+    Assert-True (Test-Phrase -Text $rP.Out -Phrase 'parked on origin') '-Park: reports the branch was parked on origin'
 
     # entry committed: no longer untracked/dirty in the working tree
     $statusI = ((& git -C $fixtureI status --porcelain) -join "`n")
@@ -521,7 +582,7 @@ function Get-EntryFallbackType     { return $script:EntryFallbackType }
     Assert-True (-not ($entryTextK -match [regex]::Escape('**To do / where I left off:**'))) 'configured wording: the built-in English body heading is NOT used'
     Assert-True ($entryTextK -match [regex]::Escape('TODO: wat er nog moet gebeuren op deze branch.')) 'configured wording: the repo fallback body is used'
     Assert-True ($entryTextK -match [regex]::Escape("$([char]0x00B7) Docs $([char]0x00B7)")) "configured wording: unknown prefix falls back to the repo's own type (Docs), not Chore"
-    Assert-True ($rK.Out -match "set to 'Docs'") 'configured wording: the unknown-prefix warning names the configured type'
+    Assert-True (Test-Phrase -Text $rK.Out -Phrase "set to 'Docs'") 'configured wording: the unknown-prefix warning names the configured type'
 
     # --- (l) A broken repo-config.ps1 degrades to a warning, it does not stop the entry (#410) -----
     #     repo-config is OPTIONAL for this script, unlike for open-pr/fold which pre-flight on it. The
@@ -538,7 +599,7 @@ function Get-EntryFallbackType     { return $script:EntryFallbackType }
     Assert-True (Test-Path -LiteralPath $entryPathL) 'broken repo-config: the entry file is still written'
     $entryTextL = [System.IO.File]::ReadAllText($entryPathL, [System.Text.Encoding]::UTF8)
     Assert-True ($entryTextL -match [regex]::Escape('**To do / where I left off:**')) 'broken repo-config: falls back to the built-in wording'
-    Assert-True ($rL.Out -match 'could not be loaded') 'broken repo-config: says so out loud instead of failing silently'
+    Assert-True (Test-Phrase -Text $rL.Out -Phrase 'could not be loaded') 'broken repo-config: says so out loud instead of failing silently'
 } finally {
     foreach ($f in $script:fixtures) {
         if (Test-Path -LiteralPath $f) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }
