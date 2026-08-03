@@ -21,7 +21,11 @@
 
 .PARAMETER Title
     (Optional) title for the changelog entry file, passed through to new-changelog-entry.ps1.
-    Defaults to new-changelog-entry's own default ("TODO: title").
+    Left empty, that script fills in this repo's own title placeholder -- Get-EntryTitlePlaceholder
+    in scripts/repo-config.ps1, falling back to "TODO: title" when the repo does not define one
+    (#410). Deliberately NOT defaulted to that literal here: the placeholder has one owner, and
+    repeating its text in this file would put a second copy of it one plugin update away from
+    disagreeing with the first.
 
 .PARAMETER Intent
     (Optional) the direction of the branch -- what still needs to happen and where you left off.
@@ -45,7 +49,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$Name,
-    [string]$Title = "TODO: title",
+    [string]$Title = "",
     [string]$Intent = "",
     [switch]$Park
 )

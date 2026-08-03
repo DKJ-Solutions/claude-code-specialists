@@ -483,6 +483,62 @@ try {
     $filesAfterJ   = @(Get-ChildItem -LiteralPath $fixtureJ -File | Select-Object -ExpandProperty Name | Sort-Object)
     $expectedFilesJ = @('feat-intent-injection.md', 'README.md', 'X') | Sort-Object
     Assert-True (-not (Compare-Object $expectedFilesJ $filesAfterJ)) 'malicious intent: no extra/stray files created by the payload (no side effects)'
+
+    # --- (k) Repo-configured stub wording really reaches the entry file (#410) ---------------------
+    #     Every fixture above deliberately carries NO repo-config.ps1, so all of them already prove the
+    #     built-in defaults still apply when the file is absent. This scenario proves the other half --
+    #     that a consumer's own wording is actually used -- which is the whole point of the issue: a
+    #     Dutch-language repo previously had to keep a private copy of new-changelog-entry.ps1 at the
+    #     same relative path just to change these four strings, and then got two entry formats for one
+    #     branch depending on which entry point ran.
+    #
+    #     ASCII-only wording on purpose (repo convention for .ps1): Windows PowerShell 5.1 reads a
+    #     BOM-less script as ANSI, so an accented literal in a fixture would be mangled before the code
+    #     under test ever saw it -- and the test would then be measuring the harness.
+    Write-Host "new-branch.ps1 -- repo-configured stub wording (#410)" -ForegroundColor Cyan
+    $fixtureK = New-Fixture -Label 'k'
+    $customConfig = @'
+$script:EntryTitlePlaceholder = 'TODO: titel'
+$script:EntryBodyHeading      = '**Nog te doen / waar ik gebleven ben:**'
+$script:EntryBodyPlaceholder  = 'TODO: wat er nog moet gebeuren op deze branch.'
+$script:EntryFallbackType     = 'Docs'
+function Get-EntryTitlePlaceholder { return $script:EntryTitlePlaceholder }
+function Get-EntryBodyHeading      { return $script:EntryBodyHeading }
+function Get-EntryBodyPlaceholder  { return $script:EntryBodyPlaceholder }
+function Get-EntryFallbackType     { return $script:EntryFallbackType }
+'@
+    [System.IO.File]::WriteAllText((Join-Path $fixtureK 'scripts\repo-config.ps1'), $customConfig, (New-Object System.Text.UTF8Encoding $false))
+
+    # No -Title and no -Intent, and an UNKNOWN prefix -- so all four knobs are exercised at once.
+    $rK = Invoke-NewBranch -Dir $fixtureK -Name 'wip/dutch-stub'
+    Assert-Equal 0 $rK.Code 'configured wording: new-branch exit 0'
+    $entryPathK = Join-Path $fixtureK 'wip-dutch-stub.md'
+    Assert-True (Test-Path -LiteralPath $entryPathK) 'configured wording: entry file created'
+    $entryTextK = [System.IO.File]::ReadAllText($entryPathK, [System.Text.Encoding]::UTF8)
+    Assert-True ($entryTextK -match [regex]::Escape('TODO: titel')) 'configured wording: the repo title placeholder is used'
+    Assert-True (-not ($entryTextK -match [regex]::Escape('TODO: title'))) 'configured wording: the built-in English title placeholder is NOT used'
+    Assert-True ($entryTextK -match [regex]::Escape('**Nog te doen / waar ik gebleven ben:**')) 'configured wording: the repo body heading is used'
+    Assert-True (-not ($entryTextK -match [regex]::Escape('**To do / where I left off:**'))) 'configured wording: the built-in English body heading is NOT used'
+    Assert-True ($entryTextK -match [regex]::Escape('TODO: wat er nog moet gebeuren op deze branch.')) 'configured wording: the repo fallback body is used'
+    Assert-True ($entryTextK -match [regex]::Escape("$([char]0x00B7) Docs $([char]0x00B7)")) "configured wording: unknown prefix falls back to the repo's own type (Docs), not Chore"
+    Assert-True ($rK.Out -match "set to 'Docs'") 'configured wording: the unknown-prefix warning names the configured type'
+
+    # --- (l) A broken repo-config.ps1 degrades to a warning, it does not stop the entry (#410) -----
+    #     repo-config is OPTIONAL for this script, unlike for open-pr/fold which pre-flight on it. The
+    #     lightest script in the set must not become the one with the strictest dependency: every
+    #     string it reads from there has a working fallback, so a syntax error in someone's edit costs
+    #     a warning, not a branch without an entry file.
+    Write-Host "new-branch.ps1 -- a broken repo-config.ps1 does not block the entry (#410)" -ForegroundColor Cyan
+    $fixtureL = New-Fixture -Label 'l'
+    [System.IO.File]::WriteAllText((Join-Path $fixtureL 'scripts\repo-config.ps1'), "function Get-EntryBodyHeading { `n", (New-Object System.Text.UTF8Encoding $false))
+
+    $rL = Invoke-NewBranch -Dir $fixtureL -Name 'feat/broken-config'
+    Assert-Equal 0 $rL.Code 'broken repo-config: new-branch still exits 0'
+    $entryPathL = Join-Path $fixtureL 'feat-broken-config.md'
+    Assert-True (Test-Path -LiteralPath $entryPathL) 'broken repo-config: the entry file is still written'
+    $entryTextL = [System.IO.File]::ReadAllText($entryPathL, [System.Text.Encoding]::UTF8)
+    Assert-True ($entryTextL -match [regex]::Escape('**To do / where I left off:**')) 'broken repo-config: falls back to the built-in wording'
+    Assert-True ($rL.Out -match 'could not be loaded') 'broken repo-config: says so out loud instead of failing silently'
 } finally {
     foreach ($f in $script:fixtures) {
         if (Test-Path -LiteralPath $f) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }
