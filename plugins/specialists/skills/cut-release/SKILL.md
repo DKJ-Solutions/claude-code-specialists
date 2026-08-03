@@ -31,9 +31,11 @@ words: *"not automation, but a checklist that imposes itself."*
 
 ## What the skill does
 
-There is no script to run here, and none is mirrored. Once a release has been cut (the version bump
-is committed), walk through the two blocks below **in order** and print/paste each command as you
-go — do not skip a step or reorder them from memory.
+**Two scripts ARE mirrored now** (this line said the opposite until August 3, 2026): `cut-release.ps1`
+does the cut itself, and `new-internal-note.ps1` lays down the internal summary's skeleton. What this
+page adds is the part no script performs — the GitHub Release, the live push, the branch cleanup, and
+the order. Once a release has been cut, walk through the two blocks below **in order** and print/paste
+each command as you go — do not skip a step or reorder them from memory.
 
 ### Block 1 — cutting (always)
 
@@ -73,7 +75,31 @@ go — do not skip a step or reorder them from memory.
    visible change, while in a tooling repo a `chore/` branch can carry the most consequential change
    there is. Read both halves before cutting.
 
-3. **Branch cleanup** — the same fixed closing move as the `fold-changelog` skill's:
+3. **The internal summary — at EVERY release, patch included.** Where the repo carries
+   `scripts/release/new-internal-note.ps1`, `cut-release.ps1` has printed this invocation at the end of
+   its run:
+
+   ```powershell
+   ./scripts/release/new-internal-note.ps1 -Version X.Y.Z
+   ```
+
+   It writes a **skeleton** to `releases/internal/<dir>/<X.Y.Z>.md`: the metadata copied from the
+   development notes, the entry titles as bullets, and three fixed headings. **The middle one is the
+   tier** — "what it is worth" cannot be generated from a changelog. Think in time, risk and reduced
+   dependence on a developer.
+
+   **This is the tier that covers a patch, and that is why it exists.** Highlights answers *what a
+   consumer notices*; this answers *what the organisation gets out of it*. A release with nothing for a
+   consumer — correctly a patch, so no highlights — can still be the one where a routine change stopped
+   needing a developer. It refuses to overwrite an existing note without `-Force`: this is the one
+   document of the three that cannot be regenerated from anything.
+
+4. **Ship the two hand-written documents via a branch + PR.** The edited highlights draft and the filled-in
+   internal note are both written after the cut, and `cut-release.ps1` has already committed and tagged by
+   then — so neither can ride along on the release commit, and neither is one of the two named
+   direct-on-`main` exceptions. Use the normal `new-branch` → `ship-pr` route.
+
+5. **Branch cleanup** — the same fixed closing move as the `fold-changelog` skill's:
 
    ```powershell
    git fetch --prune

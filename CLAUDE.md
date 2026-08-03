@@ -234,7 +234,7 @@ The constitution above, concretely implemented here:
      | tier | for whom | when |
      |---|---|---|
      | `releases/development/<X>.x/<X.Y.Z>.md` | developers — the full per-PR record | every release |
-     | `releases/internal/<X>.x/<X.Y.Z>.md` | colleagues, employers — what it is worth | every release |
+     | `releases/internal/<X>.x/<X.Y.Z>.md` | colleagues, employers — what it is worth | every release, patch included |
      | `releases/highlights/<X>.x/<X.Y.Z>.md` | consumers — what they notice | minor/major |
 
      The grouping is per **major** (`3.x`) for all three, deliberately differing from the consumer this
@@ -243,6 +243,18 @@ The constitution above, concretely implemented here:
      **A minor is cut when a consumer actually notices something** — otherwise it is a patch. That test
      is what keeps the highlights tier honest: a patch has no highlights reader by construction, which is
      exactly why it is a patch. So the bump type and the tier agree without a second rule.
+
+     **And that same test is why the internal tier exists at every release.** The two are not the same
+     question: highlights is *what a consumer notices*, internal is *what the organisation gets out of
+     it*. They come apart most clearly on a patch — a release with nothing for a consumer can still be
+     the one where a routine change stopped needing a developer.
+
+     **Who writes what.** `cut-release.ps1` generates the development notes and the highlights **draft**,
+     then names the two documents it deliberately did not write. The internal note has its own script
+     ([`new-internal-note.ps1`](scripts/release/new-internal-note.ps1)), which needs the development
+     notes as input and so can only run *after* the cut. Both the highlights edit and the internal note
+     are hand-written and land **via a branch + PR** — the release commit is already tagged by then, and
+     neither is one of the two named direct-on-`main` exceptions.
 
      **One caveat worth knowing before editing a highlights draft: the branch prefix does not predict
      impact in this repo.** The tier puts `Feat`/`Fix` above the "remove before publishing" marker and

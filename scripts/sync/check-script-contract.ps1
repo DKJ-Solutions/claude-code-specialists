@@ -241,7 +241,13 @@ $script:Contract = @(
        Returns = 'the branch types a non-developer reader is the audience for; every OTHER category present lands under the remove-before-publishing marker, so a type left out of this list is reviewed rather than published, and @() writes no marker block at all' },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHighlightsWording'; Scripts = @('cut-release');
        Optional = $true; Default = 'the English marker text';
-       Returns = "overrides for the highlights document's own text, merged over those defaults: DevBlockComment (the HTML comment above the marker) and DevBlockHeading (the marker heading) -- a repo whose stakeholders read another language needs both, and an unset one is the wrong word rather than a missing one" }
+       Returns = "overrides for the highlights document's own text, merged over those defaults: DevBlockComment (the HTML comment above the marker) and DevBlockHeading (the marker heading) -- a repo whose stakeholders read another language needs both, and an unset one is the wrong word rather than a missing one" },
+    # The third tier. Declared for the same reason as the two above: nothing crashes without it, so a
+    # consumer would discover English headings in a document written for its own management -- at the
+    # moment it is being shared, which is the worst one available.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-InternalNoteWording'; Scripts = @('new-internal-note');
+       Optional = $true; Default = 'the English headings and hints';
+       Returns = "overrides for the internal note's own text, merged over the English defaults: Title, AudienceLabel, Audience, SkeletonNote, SectionChanged, SectionValue, HintValue, SectionOpen, HintOpen, NoEntries and Unknown -- the document is read by this repo's own colleagues, so its language is the repo's rather than the script's" }
 )
 
 # An optional record reports [INFO] (with the fallback the caller uses) where a required one reports
