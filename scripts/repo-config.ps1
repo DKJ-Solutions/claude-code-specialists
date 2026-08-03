@@ -249,18 +249,27 @@ function Get-PrMergeMethod {
 # measurement produced rather than what the report predicted:
 #
 #   1. where the notes are grouped        Get-ReleaseNotesGrouping    (named in the issue)
-#   2. the highlights tier                -- PHASE 2, deliberately not here yet (see below)
+#   2. the highlights tier                Get-ReleaseHighlightsBumps  (named in the issue)
+#                                         + Get-ReleaseHighlightsStakeholderTypes
+#                                         + Get-ReleaseHighlightsWording
 #   3. the LIVE marker                    Get-ReleaseLiveMarker       (named in the issue)
 #   4. the plugin/marketplace half        Get-ReleasePluginTier       (NOT named -- the largest block)
 #   5. the category labels                Get-ReleaseCategoryTitles   (NOT named)
 #   6. the permanent root docs            Get-ReservedRootMd          (NOT named)
 #
-# Knob 2 is absent on purpose rather than forgotten. The highlights tier is a feature to port, not a
-# switch to flip, and it produces print-ready stakeholder HTML -- work with a visible result, which
-# under this repo's safety rules waits for Dave's own eye. Declaring its config now would put a
-# function here that nothing reads, which is the kind of dead knob this file exists to avoid.
+# KNOB 2 LANDED IN PHASE 2 and needed three functions rather than one, because "the highlights tier"
+# turned out to be three independent questions and answering them with one config object would have
+# given the script contract a single record whose 'Returns' line could not say anything actionable:
 #
-# ALL SIX ARE OPTIONAL in the script contract, and every fallback is this workshop's CURRENT
+#   Bumps             -- WHETHER, and for which bump types. @() switches the tier off entirely.
+#   StakeholderTypes  -- WHICH branch types a non-developer is the audience for. The rest of the
+#                        release lands under the remove-before-publishing marker.
+#   Wording           -- the words on that marker, plus the HTML lang attribute. One function rather
+#                        than three, unlike the four #410 entry stubs: those are chosen
+#                        independently, while these three are one document's language and are always
+#                        set together.
+#
+# ALL EIGHT ARE OPTIONAL in the script contract, and every fallback is this workshop's CURRENT
 # behaviour -- so a consumer that defines none of them gets exactly what the unshared script did.
 # Same pattern as Get-ChangelogHeading (#178) and the entry-stub wording (#410).
 
@@ -338,4 +347,56 @@ $script:ReservedRootMd = @(
 function Get-ReservedRootMd {
     <# File names in the repo root that are permanent docs rather than unfolded changelog entries. #>
     return $script:ReservedRootMd
+}
+
+# --- The highlights tier: whether, for whom, and in whose words (issue #417, knob 2) --------------
+#
+# The second, stakeholder-facing rendering of a release: releases/highlights/<dir>/<X.Y.Z>.md plus a
+# print-ready .html of it (open -> Ctrl+P -> PDF). Written for NON-DEVELOPERS (Dave, July 13, 2026),
+# so the generated draft puts the stakeholder categories first and everything else under an explicit
+# "remove before publishing" marker for the release manager to cut by hand.
+#
+# OFF IN THIS REPO, and unlike the other knobs that is a statement about the product rather than a
+# preference. This repo's release audience IS developers: a consumer reads RELEASE.md and the
+# per-plugin CHANGELOG to decide whether to update a plugin. There is no non-developer stakeholder for
+# a marketplace of subagent definitions, so a document written for one would have no reader -- and a
+# release manager would have to delete a developer-only block that was in fact the entire release.
+#
+# The three knobs stay declared rather than omitted precisely BECAUSE the answer here is empty: a
+# consumer reading this file as the model needs to see the switch and the reason it is off, which is
+# the same argument that put Get-ReleaseLiveMarker here with an empty string.
+$script:ReleaseHighlightsBumps = @()
+
+function Get-ReleaseHighlightsBumps {
+    <# Bump types that also get a highlights document: e.g. @('minor','major'). Empty = tier off. #>
+    return $script:ReleaseHighlightsBumps
+}
+
+# Which branch types a non-developer reader is the audience for; every other category present lands in
+# the developer-only block. Keyed on the TYPES from scripts/lib/branch-info.ps1, like
+# Get-ReleaseCategoryTitles above -- not on the display labels, which a consumer may have renamed.
+#
+# Empty here because the tier is off, and the value it would have is not obvious enough to guess in
+# advance: in this repo a 'Docs' change often IS the release (the manuals are the product), so the
+# stakeholder/developer split that works for a storefront repo would be actively wrong here.
+$script:ReleaseHighlightsStakeholderTypes = @()
+
+function Get-ReleaseHighlightsStakeholderTypes {
+    <# Branch types whose entries go above the remove-before-publishing marker. Empty = no split. #>
+    return $script:ReleaseHighlightsStakeholderTypes
+}
+
+# The words on the marker and the HTML lang attribute -- the #410 class one level up. A repo whose
+# stakeholders read Dutch generates a Dutch document, and a hardcoded English heading in it is the
+# wrong word rather than a missing one; lang= is what a screen reader and the browser's print
+# hyphenation act on. Only the keys that differ from release-lib's English defaults need to appear;
+# the map is merged over them rather than replacing them.
+#
+# EMPTY HERE for the same reason Get-ReleaseCategoryTitles is: the defaults already say what an
+# English repo means. (And with the tier off, nothing reads it at all.)
+$script:ReleaseHighlightsWording = @{}
+
+function Get-ReleaseHighlightsWording {
+    <# Overrides for the highlights tier's own text: DevBlockComment, DevBlockHeading, HtmlLang. #>
+    return $script:ReleaseHighlightsWording
 }

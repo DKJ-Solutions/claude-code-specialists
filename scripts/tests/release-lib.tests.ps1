@@ -479,6 +479,138 @@ Assert-Match $card2 '\[releases/development/1\.x/1\.5\.0\.md\]\(https://gh\.test
 $cardNoTitle = Build-PluginReleaseCard -PluginName 'specialists' -Version '2.0.0' -Date '2026-07-19' -Type 'Major' -Entries @()
 Assert-Match $cardNoTitle '(?s)\*\*Type:\*\* Major\n\nThis card describes v2\.0\.0' 'without -Title exactly one blank line (no extra) before the describes-line'
 
+# ==================================================================================================
+# THE HIGHLIGHTS TIER (#417 phase 2)
+# ==================================================================================================
+# This repo generates no highlights document (empty seam = tier off), so every assert below runs
+# against the LIB rather than against a release this repo cuts. That is the point: the tier's only
+# consumer is another repo, and a feature no local release exercises is exactly the one that has to be
+# tested here rather than discovered there.
+
+Write-Host "Format-CategorizedEntries -OnlyTypes (the filter the two halves share)" -ForegroundColor Cyan
+$halfEntries = @($entries[0], $entries[1], $docsEntry, $choreEntry, $otherEntry)
+$onlyFeat = Format-CategorizedEntries -Entries $halfEntries -CategoryLevel 2 -OnlyTypes @('Feat', 'Fix')
+Assert-Match $onlyFeat '(?m)^## Features' 'OnlyTypes: a named category is rendered'
+Assert-Match $onlyFeat '(?m)^## Fixes' 'OnlyTypes: and the second named one'
+Assert-Equal $false ([bool]($onlyFeat -match 'Documentation')) 'OnlyTypes: an unnamed category is dropped, not reported'
+Assert-Equal $false ([bool]($onlyFeat -match 'Maintenance')) 'OnlyTypes: and so is the next one'
+Assert-Equal $false ([bool]($onlyFeat -match '(?m)^## Other')) 'OnlyTypes: the catch-all is not exempt from the filter'
+# The complement must be exhaustive: whatever the stakeholder half drops, the developer half shows.
+# If both halves could drop the same entry, an entry would vanish between the changelog and the
+# document generated from it -- silently, since nothing counts the two halves against the input.
+$onlyRest = Format-CategorizedEntries -Entries $halfEntries -CategoryLevel 3 -OnlyTypes @('Docs', 'Chore', 'Other')
+Assert-Match $onlyRest '(?m)^### Documentation' 'OnlyTypes: the complement renders what the first half dropped'
+Assert-Match $onlyRest '(?m)^#### #12 ' 'OnlyTypes: at CategoryLevel 3 its entries sit at ####'
+$allShown = @(1, 2, 10, 11, 12) | Where-Object { ($onlyFeat + $onlyRest) -notmatch "#$_ " }
+Assert-Equal 0 $allShown.Count 'OnlyTypes: every input entry appears in exactly one of the two halves (nothing lost between them)'
+$onlyNone = Format-CategorizedEntries -Entries $halfEntries -CategoryLevel 2 -OnlyTypes @()
+Assert-Match $onlyNone '(?s)## Features.*## Other' 'OnlyTypes: empty means every category -- the unchanged behaviour'
+
+Write-Host "Convert-EntryHeadingToTitle (the metadata a stakeholder does not have a branch for)" -ForegroundColor Cyan
+$hIn = "### #426 $midDot Some title $midDot Feat $midDot 2026-08-03`n`nBody stays.`n`nAnd a second paragraph."
+$hOut = Convert-EntryHeadingToTitle -EntryText $hIn
+Assert-Equal '### Some title' (($hOut -split "`n")[0]) 'heading reduced to the bare title'
+Assert-Match $hOut '(?s)Body stays\..*second paragraph' 'the body is untouched'
+$hMid = Convert-EntryHeadingToTitle -EntryText "### #7 $midDot A title $midDot with a middot $midDot Fix $midDot 2026-01-01`n`nBody."
+Assert-Equal "### A title $midDot with a middot" (($hMid -split "`n")[0]) 'a title containing a middot survives (rejoined, not truncated)'
+$hNoNum = Convert-EntryHeadingToTitle -EntryText "### Titled $midDot Docs $midDot 2026-01-01`n`nBody."
+Assert-Equal '### Titled' (($hNoNum -split "`n")[0]) 'a heading without a #NN field is handled too'
+# The guards matter because this runs over contributor-authored headings. A shape it does not
+# recognise must come through unchanged: a stakeholder reading an odd heading is a cosmetic problem,
+# a stakeholder reading a truncated or empty one is a broken document.
+$hPlain = Convert-EntryHeadingToTitle -EntryText "### Just a heading`n`nBody."
+Assert-Equal '### Just a heading' (($hPlain -split "`n")[0]) 'a heading with no metadata at all is returned unchanged'
+$hTwo = Convert-EntryHeadingToTitle -EntryText "### Only $midDot Two`n`nBody."
+Assert-Equal "### Only $midDot Two" (($hTwo -split "`n")[0]) 'two fields: no (title, type, date) triple to strip, so left alone'
+$hOnlyMeta = Convert-EntryHeadingToTitle -EntryText "### #9 $midDot Fix $midDot 2026-01-01`n`nBody."
+Assert-Equal "### #9 $midDot Fix $midDot 2026-01-01" (($hOnlyMeta -split "`n")[0]) 'a heading that is ONLY metadata keeps it rather than becoming empty'
+$hLevel = Convert-EntryHeadingToTitle -EntryText "#### #5 $midDot Deeper $midDot Feat $midDot 2026-01-01`n`nBody."
+Assert-Equal '#### Deeper' (($hLevel -split "`n")[0]) 'the heading level is preserved, not normalized'
+
+# THE ORDER IS LOAD-BEARING, and this pair is here because the first implementation got it wrong.
+# Format-CategorizedEntries reads the branch type OFF the heading this function strips, so stripping
+# first destroys the very field the grouping needs -- and it does not fail loudly: every entry lands in
+# the 'Other' catch-all, the stakeholder half comes out empty, and the whole release ends up under the
+# "remove before publishing" marker. A generated document that says the entire release is internal is
+# the kind of wrong that gets published. Hence -BareTitles INSIDE the renderer, asserted from both
+# directions so a future refactor that moves the strip back out turns this red.
+$strippedFirst = Convert-EntryHeadingToTitle -EntryText $entries[0]
+$fceStripped = Format-CategorizedEntries -Entries @($strippedFirst) -CategoryLevel 2
+Assert-Match $fceStripped '(?m)^## Other' 'order: a PRE-stripped entry has lost its type and falls into Other (the bug this guards)'
+$fceBare = Format-CategorizedEntries -Entries @($entries[0]) -CategoryLevel 2 -BareTitles
+Assert-Match $fceBare '(?m)^## Features' 'order: -BareTitles strips AFTER the type is read, so the category survives'
+Assert-Match $fceBare '(?m)^### Second feature$' 'order: and the rendered entry heading is the bare title'
+
+Write-Host "Build-HighlightsNotes (stakeholder first, the rest under a marker)" -ForegroundColor Cyan
+$hl = Build-HighlightsNotes -Entries $halfEntries -Version '1.2.0' -Date '2026-08-03' -Type 'Minor' `
+    -Title 'A release for people' -StakeholderTypes @('Feat', 'Fix')
+Assert-Match $hl '(?m)^# Release notes v1\.2\.0 ' 'header names the version'
+Assert-Match $hl '\*\*Date:\*\* 2026-08-03' 'header carries the date'
+Assert-Match $hl 'A release for people' 'the -Title line is included'
+Assert-Match $hl '(?s)## Features.*## Fixes.*For developers only.*### Documentation' 'stakeholder categories come first, the developer block after them'
+Assert-Match $hl '<!-- Remove this block before sharing the highlights with non-developers\. -->' 'the marker carries its HTML comment'
+Assert-Match $hl '(?m)^## For developers only -- remove before publishing$' 'the marker heading sits at ## (containing its categories)'
+Assert-Match $hl '(?m)^### Documentation$' 'a developer category sits one level UNDER the marker, not beside it'
+Assert-Equal $false ([bool]($hl -match "#426 $midDot")) 'entry metadata is stripped in the highlights document'
+# The words are the consumer's, in the consumer's language -- the #410 class. A hardcoded English
+# heading in a Dutch stakeholder document is the wrong word rather than a missing one.
+$hlNl = Build-HighlightsNotes -Entries $halfEntries -Version '1.2.0' -Date '2026-08-03' -Type 'Minor' `
+    -StakeholderTypes @('Feat') -DevBlockComment 'Verwijder dit blok.' -DevBlockHeading 'Alleen voor developers'
+Assert-Match $hlNl '<!-- Verwijder dit blok\. -->' 'the marker comment is overridable'
+Assert-Match $hlNl '(?m)^## Alleen voor developers$' 'the marker heading is overridable'
+Assert-Match $hlNl '(?s)## Fixes' 'a type left OUT of StakeholderTypes lands in the developer half rather than vanishing'
+# No split asked for = no marker at all. A repo can want the second document without wanting the cut.
+$hlAll = Build-HighlightsNotes -Entries $halfEntries -Version '1.2.0' -Date '2026-08-03' -Type 'Minor'
+Assert-Equal $false ([bool]($hlAll -match 'For developers only')) 'no StakeholderTypes: no marker block is written'
+Assert-Match $hlAll '(?s)## Features.*## Documentation.*## Other' 'no StakeholderTypes: every category is rendered at ## instead'
+# All-stakeholder input: the marker must not appear with an empty body under it.
+$hlNoDev = Build-HighlightsNotes -Entries @($entries[0]) -Version '1.2.0' -Date '2026-08-03' -Type 'Minor' -StakeholderTypes @('Feat', 'Fix')
+Assert-Equal $false ([bool]($hlNoDev -match 'For developers only')) 'nothing in the developer half: the marker is omitted, not written empty'
+# Links are rewritten from the highlights file's depth, which equals the developer notes' depth.
+$hlLink = Build-HighlightsNotes -Entries @($linkEntry) -Version '1.2.0' -Date '2026-08-03' -Type 'Minor' -StakeholderTypes @('Fix')
+Assert-Match $hlLink '\[the lint\]\(\.\./\.\./\.\./scripts/lint/x\.ps1\)' 'root-relative links get the prefix here too'
+Assert-Match $hlLink '\[the site\]\(https://example\.com\)' 'external links untouched'
+
+Write-Host "Format-InlineMarkdown + ConvertTo-ReleaseHtml (the print-ready page)" -ForegroundColor Cyan
+Assert-Equal '<strong>bold</strong>' (Format-InlineMarkdown '**bold**') 'bold renders as strong'
+Assert-Equal '<code>x</code>' (Format-InlineMarkdown '`x`') 'backticks render as code'
+# Escaping runs FIRST, so entry text containing markup cannot inject a tag into the page. Asserted
+# because the input is contributor-authored prose from a changelog, not a trusted template.
+Assert-Equal '&lt;script&gt;alert(1)&lt;/script&gt;' (Format-InlineMarkdown '<script>alert(1)</script>') 'angle brackets are escaped before any markup pass'
+Assert-Equal '&amp;amp;' (Format-InlineMarkdown '&amp;') 'an existing entity is escaped rather than passed through as markup'
+Assert-Equal '<strong>a&lt;b</strong>' (Format-InlineMarkdown '**a<b**') 'escaping and bold compose without escaping the tags this function emits'
+Assert-Equal '' (Format-InlineMarkdown '') 'an empty line is allowed (AllowEmptyString) rather than throwing'
+
+$html = ConvertTo-ReleaseHtml -Markdown $hl -Version 'v1.2.0'
+Assert-Match $html '^<!doctype html>' 'the page starts with a doctype'
+Assert-Match $html '<html lang="en">' 'lang defaults to en'
+Assert-Match $html '<title>Release notes v1\.2\.0</title>' 'the title names the version'
+Assert-Match $html '<h1>Release notes v1\.2\.0 ' 'the h1 comes from the markdown h1'
+Assert-Match $html '<h2>Features</h2>' 'a category becomes an h2'
+Assert-Match $html '<h3>Documentation</h3>' 'a developer category becomes an h3 (the nesting survives the render)'
+Assert-Match $html '<hr>' 'a horizontal rule renders'
+Assert-Match $html '<p>' 'prose becomes a paragraph'
+Assert-Match $html '</html>\s*$' 'and the page is closed'
+# Self-contained: a stakeholder opens this file on a machine that has never seen this repo, so a
+# reference to any external host would render an unstyled page or leak that it was opened.
+Assert-Equal $false ([bool]($html -match '(?i)<(script|link)\b')) 'no script or link element -- nothing is fetched to render the page'
+Assert-Equal $false ([bool]($html -match '(?i)(https?:)?//[a-z0-9.-]+/[^"]*"\s*(rel|type|href|src)')) 'no external stylesheet or asset reference'
+Assert-Match $html '@media print' 'a print stylesheet is included (the file exists to become a PDF)'
+$htmlNl = ConvertTo-ReleaseHtml -Markdown $hl -Version 'v1.2.0' -Lang 'nl'
+Assert-Match $htmlNl '<html lang="nl">' 'the lang attribute is the consumer answer, not a constant'
+# A paragraph that ends the document (no trailing blank line) must still be flushed -- the classic
+# off-by-one in a line-buffered renderer, and it would silently drop the last sentence.
+$htmlTail = ConvertTo-ReleaseHtml -Markdown "# T`n`nA closing sentence with no trailing newline." -Version 'v1'
+Assert-Match $htmlTail '<p>A closing sentence with no trailing newline\.</p>' 'a final paragraph with no trailing blank line is not dropped'
+$htmlJoin = ConvertTo-ReleaseHtml -Markdown "# T`n`nLine one`nline two`n`nSeparate." -Version 'v1'
+Assert-Match $htmlJoin '<p>Line one line two</p>' 'consecutive lines join into one paragraph'
+Assert-Match $htmlJoin '<p>Separate\.</p>' 'a blank line starts a new paragraph'
+# Documented limitation, asserted so it stays a KNOWN one: link markdown passes through literally.
+# If someone widens the renderer, this assert fails and the change becomes a decision rather than a
+# surprise in a stakeholder's PDF.
+$htmlLink = ConvertTo-ReleaseHtml -Markdown "# T`n`nSee [the docs](https://example.com)." -Version 'v1'
+Assert-Match $htmlLink '\[the docs\]\(https://example\.com\)' 'links are NOT rendered as anchors (documented limitation of the ported renderer)'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red

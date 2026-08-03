@@ -25,8 +25,10 @@
     this script did before it was shared: Get-ReservedRootMd (which root docs are permanent),
     Get-ReleaseNotesGrouping (notes per major or per minor), Get-ReleaseLiveMarker (the "currently
     live" suffix, none here), Get-ReleasePluginTier (whether steps 3b/3c and the lockstep bump run at
-    all) and Get-ReleaseCategoryTitles (the category labels). The highlights tier that a second
-    consumer generates is deliberately NOT here yet -- that is phase 2 of #417.
+    all), Get-ReleaseCategoryTitles (the category labels) and -- since phase 2 -- the three highlights
+    knobs (Get-ReleaseHighlightsBumps, Get-ReleaseHighlightsStakeholderTypes,
+    Get-ReleaseHighlightsWording), which are all empty in this repo: its release audience is
+    developers, so it generates no stakeholder document. See step 3d.
 
     Steps (all on main):
       1. Guardrails: clean main, no unfolded entry files in the root, lint gate green.
@@ -47,6 +49,11 @@
           Model A (plugin-carried), deliberately without a session-start hook. The card states what
           it describes rather than where the reader is -- it is written at cut time and cannot know
           which commit a consumer will install from (inbound #384).
+      3d. Writes, for a bump type the seam names in Get-ReleaseHighlightsBumps, a second
+          stakeholder-facing rendering of the same release: releases/highlights/<dir>/<X.Y.Z>.md plus
+          a print-ready .html of it. Written for NON-DEVELOPERS, so the categories the seam does not
+          call stakeholder-facing land under an explicit "remove before publishing" marker the
+          release manager cuts by hand. Skipped entirely in this repo (empty seam = tier off).
       4. Commits that directly to main (release: vX.Y.Z) and sets an annotated tag vX.Y.Z.
       5. Pushes main + the tag (unless -NoPush).
 
@@ -148,6 +155,20 @@ $liveMarker    = Get-SeamValue -Name 'Get-ReleaseLiveMarker'    -Default ''
 # version or card. Stated in repo-config here anyway, because in this repo the answer is load-bearing.
 $pluginTier    = Get-SeamValue -Name 'Get-ReleasePluginTier' `
     -Default (Test-Path -LiteralPath (Join-Path $repoRoot '.claude-plugin\marketplace.json'))
+
+# The highlights tier (#417 phase 2). All three default to empty, which is the tier switched OFF --
+# what this script did for its whole life as a workshop-only file, so nothing changes here.
+$highlightsBumps = @(Get-SeamValue -Name 'Get-ReleaseHighlightsBumps' -Default @())
+$highlightsTypes = @(Get-SeamValue -Name 'Get-ReleaseHighlightsStakeholderTypes' -Default @())
+# Merged over release-lib's English defaults rather than replacing them, so a consumer that renames
+# one string does not have to restate the other two (same pattern as Get-ReleaseCategoryTitles).
+$highlightsWording = @{
+    DevBlockComment = 'Remove this block before sharing the highlights with non-developers.'
+    DevBlockHeading = 'For developers only -- remove before publishing'
+    HtmlLang        = 'en'
+}
+$wordingOverride = Get-SeamValue -Name 'Get-ReleaseHighlightsWording' -Default @{}
+if ($wordingOverride) { foreach ($k in $wordingOverride.Keys) { $highlightsWording[$k] = $wordingOverride[$k] } }
 
 # BOM-less UTF8 -- the rest of the repo has no BOM.
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
@@ -351,11 +372,38 @@ if ($SummaryFile) {
 $notesContent = Build-ReleaseNotes -Entries $entries -Version $new -Date $today -Type $typeLabel -Title $Title -Summary $summaryText
 $changelogNew = Convert-ChangelogForRelease -Content $changelogRaw -Version $new -Date $today -Type $typeLabel -NotesRelPath $notesRelPath -LiveMarker $liveMarker
 
+# The highlights pair, built here with everything else so a failure leaves no half-written release
+# behind. $cutHighlights is off unless the seam names THIS bump type: the tier exists for the release
+# a stakeholder is told about, and a patch is generally not that release.
+$cutHighlights = $highlightsBumps -contains $bumpType
+$highlightsRelPath = "releases/highlights/$notesDirName/$new.md"
+$highlightsHtmlRelPath = "releases/highlights/$notesDirName/$new.html"
+if ($cutHighlights) {
+    $highlightsContent = Build-HighlightsNotes -Entries $entries -Version $new -Date $today `
+        -Type $typeLabel -Title $Title -StakeholderTypes $highlightsTypes `
+        -DevBlockComment $highlightsWording.DevBlockComment -DevBlockHeading $highlightsWording.DevBlockHeading
+    $highlightsHtml = ConvertTo-ReleaseHtml -Markdown $highlightsContent -Version "v$new" -Lang $highlightsWording.HtmlLang
+}
+
 # --- Write the release-notes file -------------------------------------------------------------
+# EVERY target is checked before ANY of them is written. With the highlights tier on there are three
+# files, and stopping halfway through would leave a release whose notes exist and whose stakeholder
+# document does not -- discovered by the release manager rather than by this guard.
+# Kept as REPO-RELATIVE paths and joined per check: the message has to name the file the way the repo
+# does, and [System.IO.Path]::GetRelativePath does not exist in the .NET Framework that Windows
+# PowerShell 5.1 runs on -- it would throw here instead of reporting the collision it was written for.
+$plannedFiles = @($notesRelPath)
+if ($cutHighlights) { $plannedFiles += @($highlightsRelPath, $highlightsHtmlRelPath) }
+foreach ($rel in $plannedFiles) {
+    if (Test-Path -LiteralPath (Join-Path $repoRoot ($rel -replace '/', '\'))) {
+        Write-Error "$rel already exists. Nothing was written."
+        exit 1
+    }
+}
+$notesAbs = Join-Path $repoRoot ($notesRelPath -replace '/', '\')
+
 $notesDir = Join-Path $repoRoot ("releases\development\$notesDirName")
 New-Item -ItemType Directory -Force -Path $notesDir | Out-Null
-$notesAbs = Join-Path $repoRoot ($notesRelPath -replace '/', '\')
-if (Test-Path $notesAbs) { Write-Error "$notesRelPath already exists."; exit 1 }
 Write-Utf8NoBom -Path $notesAbs -Content $notesContent
 Write-Host "  created: $notesRelPath ($($entries.Count) entries)" -ForegroundColor DarkGray
 
@@ -422,6 +470,17 @@ foreach ($m in $manifests) {
     $releaseCardPath = Join-Path $pluginDir 'RELEASE.md'
     Write-Utf8NoBom -Path $releaseCardPath -Content $card
     Write-Host "  updated: $pluginName/RELEASE.md" -ForegroundColor DarkGray
+}
+
+# --- 3d. The highlights pair (stakeholder-facing; only for the bump types the seam names) ---------
+# Content and collision were both settled above, so this block is pure IO. It writes NOTHING when the
+# tier is off, which is every release in this repo -- see the seam for why the answer here is empty.
+if ($cutHighlights) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $repoRoot "releases\highlights\$notesDirName") | Out-Null
+    Write-Utf8NoBom -Path (Join-Path $repoRoot ($highlightsRelPath -replace '/', '\')) -Content $highlightsContent
+    Write-Host "  created: $highlightsRelPath (highlights -- edit before publishing)" -ForegroundColor DarkGray
+    Write-Utf8NoBom -Path (Join-Path $repoRoot ($highlightsHtmlRelPath -replace '/', '\')) -Content $highlightsHtml
+    Write-Host "  created: $highlightsHtmlRelPath (open in a browser -> Ctrl+P -> save as PDF)" -ForegroundColor DarkGray
 }
 
 # --- Bump plugin versions (regex on the version line -- preserves the JSON formatting) -----------

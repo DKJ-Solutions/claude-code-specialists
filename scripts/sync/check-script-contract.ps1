@@ -53,12 +53,21 @@
     guards via Get-Command (Get-PrDescriptionPlaceholder, Get-PrApprovalPattern, Get-PrAssignee,
     Get-PrMilestone) -- those are per-repo taste with no wrong-by-default failure mode, so they are
     never declared here.
-    Also out of scope: scripts/release/cut-release.ps1 -- the marketplace-specific script that bumps
-    every plugin.json in lockstep. That one is genuinely workshop-only: lockstep across a marketplace's
-    plugins is meaningless in a consumer. It is not mirrored and is not part of the consumer contract.
-    The 'cut-release' entry above is a different thing entirely: the shared cut-release SKILL (issue
-    #177), a checklist with no script of its own, that reads Get-LiveStage to decide whether its Block 2
-    applies.
+    cut-release.ps1 USED TO BE OUT OF SCOPE HERE, described as "genuinely workshop-only... not mirrored
+    and not part of the consumer contract" because lockstep across a marketplace's plugins is meaningless
+    in a consumer. It became a shared, mirrored script in #417, and the eight cut-release records below
+    are the consumer contract this paragraph said did not exist -- so the paragraph is now the drift it
+    was written to prevent, one file over. Corrected here rather than left standing: a reader who takes it
+    at face value concludes those records are a mistake.
+
+    What was true in it survives, and it is the reason the sharing worked: the lockstep bump IS
+    marketplace-specific. It just did not need the script to be forked -- it needed one seam function
+    (Get-ReleasePluginTier), after which a repo with no marketplace manifest simply skips that half.
+
+    Two 'cut-release' things are named in this file and they are NOT the same, which is worth keeping
+    straight: the shared cut-release SCRIPT (the eight repo-config records below) and the shared
+    cut-release SKILL (issue #177), a checklist that reads Get-LiveStage to decide whether its Block 2
+    applies. The Get-LiveStage record is attributed to 'cut-release skill' for exactly that reason.
 
     ship-pr.ps1 USED TO BE LISTED HERE and no longer is (issue #411). The stated reason -- "merge policy
     and the CI check name are repo-specific" -- was half right, and the half that was wrong was load-
@@ -188,11 +197,14 @@ $script:Contract = @(
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-MojibakePaths'; Scripts = @('fix-mojibake');
        Optional = $true; Default = 'every *.md in the repo root';
        Returns = "the absolute paths fix-mojibake examines when called without -Path, given a -RepoRoot parameter; without it the tool falls back to every *.md in the repo root, which silently skips whatever else this repo keeps markdown in" },
-    # cut-release became shared in #417. Six knobs, all optional, every fallback the behaviour the
+    # cut-release became shared in #417. Eight knobs, all optional, every fallback the behaviour the
     # script had while it was workshop-only -- declared here for the same reason the entry stubs above
     # are: none of them crashes when absent, so a consumer would discover the wrong one at release
     # time, which is the worst moment this repo has. An [INFO] naming the default makes it a thing you
-    # were told. (The highlights tier is phase 2 and deliberately has no entry yet.)
+    # were told. Six landed in phase 1; the last three below are the highlights tier from phase 2,
+    # which is one knob in the issue's numbering and three functions here -- whether, for whom, and in
+    # whose words. Folding them into one config object would have left this contract a single record
+    # whose Returns line could not name an actionable default for any of the three.
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReservedRootMd'; Scripts = @('cut-release');
        Optional = $true; Default = "this workshop's own root docs (CHANGELOG, CLAUDE, README, LICENSE, CONTRIBUTING, SECURITY, QUICKSTART, ADOPTION, UNINSTALL)";
        Returns = 'the root *.md file names that are permanent docs rather than unfolded changelog entries; every other root *.md blocks the cut, so a permanent doc missing from this list refuses a release over a file nobody failed to fold' },
@@ -207,7 +219,16 @@ $script:Contract = @(
        Returns = '$true if this repo publishes plugins that the cut must version in lockstep and card (per-plugin CHANGELOG.md + RELEASE.md); $false makes the newest vX.Y.Z tag the version record instead of the manifests' },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseCategoryTitles'; Scripts = @('cut-release');
        Optional = $true; Default = "the English labels (Feat -> Features, Fix -> Fixes, Docs -> Documentation, Chore -> Maintenance)";
-       Returns = 'a type -> label map merged over those defaults, for a repo whose category headings are in another language; a type with no label falls back to the type name itself, which is the wrong word rather than a missing one' }
+       Returns = 'a type -> label map merged over those defaults, for a repo whose category headings are in another language; a type with no label falls back to the type name itself, which is the wrong word rather than a missing one' },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHighlightsBumps'; Scripts = @('cut-release');
+       Optional = $true; Default = 'no highlights tier at all';
+       Returns = "the bump types that also get a stakeholder-facing highlights document (releases/highlights/<dir>/<X.Y.Z>.md plus a print-ready .html), e.g. @('minor','major'); @() switches the tier off, which is what the cut did before this knob existed" },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHighlightsStakeholderTypes'; Scripts = @('cut-release');
+       Optional = $true; Default = 'no split -- every category is stakeholder-facing';
+       Returns = 'the branch types a non-developer reader is the audience for; every OTHER category present lands under the remove-before-publishing marker, so a type left out of this list is reviewed rather than published, and @() writes no marker block at all' },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHighlightsWording'; Scripts = @('cut-release');
+       Optional = $true; Default = "the English marker text plus lang='en'";
+       Returns = "overrides for the highlights document's own text, merged over those defaults: DevBlockComment (the HTML comment above the marker), DevBlockHeading (the marker heading) and HtmlLang (the <html lang> attribute) -- a repo whose stakeholders read another language needs all three, and an unset one is the wrong word rather than a missing one" }
 )
 
 # An optional record reports [INFO] (with the fallback the caller uses) where a required one reports

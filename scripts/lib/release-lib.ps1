@@ -515,10 +515,27 @@ function Format-CategorizedEntries {
         entry's FIRST line (its title heading) is re-levelled -- a '#'-prefixed line inside a body
         is left alone (^ without multiline = start of the whole block). Output is pure LF; $Entries
         may arrive CRLF (from the root CHANGELOG) and are normalized here.
+
+        $OnlyTypes restricts the output to those categories, in the canonical order; the entries of
+        every other category are dropped rather than reported. Empty (the default) = every category,
+        which is what this function always did. It exists for the highlights tier (#417 phase 2),
+        which renders the SAME entry set twice -- the stakeholder categories in one document section
+        and the remainder in another -- and must classify both halves by the one rule that already
+        reads a type from a heading. Filtering the entries before the call instead would mean a second
+        copy of that parsing, which is how the two halves start disagreeing about what a 'Docs' entry is.
+
+        $BareTitles reduces each entry heading to its title (Convert-EntryHeadingToTitle) -- for the
+        highlights tier, whose reader has no branch and no PR number. IT MUST HAPPEN HERE rather than
+        in the caller, and that is not a style preference: the type this function groups on is read FROM
+        that heading, so a caller that stripped it first would hand over entries whose type is gone and
+        get one undifferentiated 'Other' pile. Measured, not reasoned about -- the first version of the
+        highlights builder did exactly that and every category collapsed into Other.
     #>
     param(
         [Parameter(Mandatory)][string[]]$Entries,
-        [int]$CategoryLevel = 2
+        [int]$CategoryLevel = 2,
+        [string[]]$OnlyTypes = @(),
+        [switch]$BareTitles
     )
     $md = [char]0x00B7
     $cats = Get-ReleaseCategories
@@ -535,11 +552,14 @@ function Format-CategorizedEntries {
             if ($cats.Order -contains $cand) { $t = $cand }
         }
         if (-not $grouped.ContainsKey($t)) { $grouped[$t] = New-Object System.Collections.Generic.List[string] }
-        $grouped[$t].Add(($e.Trim() -replace "`r`n", "`n"))
+        # The type has been read by now, so reducing the heading is safe from here on.
+        $text = if ($BareTitles) { Convert-EntryHeadingToTitle -EntryText $e } else { $e }
+        $grouped[$t].Add(($text.Trim() -replace "`r`n", "`n"))
     }
 
     $sections = @()
     foreach ($cat in $cats.Order) {
+        if ($OnlyTypes.Count -gt 0 -and $OnlyTypes -notcontains $cat) { continue }
         if ($grouped.ContainsKey($cat)) {
             $label = if ($cats.Title.ContainsKey($cat)) { $cats.Title[$cat] } else { $cat }
             $rendered = @($grouped[$cat].ToArray() | ForEach-Object {
@@ -777,4 +797,211 @@ function Build-ReleaseNotes {
     } else { '' }
     $header = "# Release notes v$Version`n`n**Date:** $Date  `n**Type:** $Type`n`n$titleLine$summaryBlock"
     return ($header + $body + "`n")
+}
+
+# ==================================================================================================
+# THE HIGHLIGHTS TIER (#417 phase 2)
+# ==================================================================================================
+#
+# A SECOND, STAKEHOLDER-FACING RENDERING OF THE SAME RELEASE -- not a second changelog. The tier was
+# built in a consumer repo and stayed there while cut-release.ps1 was two files; phase 1 shared the
+# script, this is the half that was still missing. The rule it carries is older than the sharing
+# (Dave, July 13, 2026): HIGHLIGHTS IS WRITTEN FOR NON-DEVELOPERS. So the generated document puts the
+# stakeholder categories first and the remainder under an explicit "remove before publishing" marker.
+#
+# THE TOOL MARKS THE CUT, IT DOES NOT MAKE IT. What a stakeholder should read is an editorial
+# judgement, and a generator that silently dropped the developer half would be making that judgement
+# on the release manager's behalf -- while also hiding the fact that there was anything to decide. So
+# the block is written out, labelled, and left to be deleted by hand.
+#
+# ONE DELIBERATE DIFFERENCE FROM THE SOURCE THIS WAS PORTED FROM: there, both halves render their
+# categories at '##', which puts the developer categories at the same level as the marker heading that
+# is supposed to contain them -- so the block reads as ended rather than as nested, and an HTML render
+# shows it that way too. Here the marker sits at '##' and its categories one level under it, which is
+# what Format-CategorizedEntries's -CategoryLevel was already for. The consumer's generated highlights
+# therefore gain a level of nesting they did not have; nothing else about them changes.
+
+function Convert-EntryHeadingToTitle {
+    <#
+        Reduces a folded entry's heading to its bare title: '### #426 <md> Some title <md> Feat <md>
+        2026-08-03' -> '### Some title'. Pure string in, string out; a heading that does not carry the
+        metadata shape is returned unchanged.
+
+        FOR THE HIGHLIGHTS TIER ONLY, and that is the whole reason it exists as a separate function
+        rather than an option on the renderers. The PR number, the branch type and the merge date are
+        internal administration: precise, useful in the developer notes, and noise in a document whose
+        reader does not have a branch. The developer notes keep them, so this never runs there.
+
+        The trailing two middot fields (type, date) and a leading '#NN' field are dropped; everything
+        between them is the title and is rejoined with the middot, so a title that legitimately
+        contains one survives. Only the FIRST line is touched -- the body may contain anything.
+    #>
+    param([Parameter(Mandatory)][string]$EntryText)
+    $md = [char]0x00B7
+    $lines = $EntryText -split "(`r?`n)", 2
+    $heading = $lines[0]
+    $hm = [regex]::Match($heading, '^(#+)\s+(.*)$')
+    if (-not $hm.Success) { return $EntryText }
+
+    $parts = @($hm.Groups[2].Value -split "\s*$md\s*")
+    # Fewer than three fields means there is no (title, type, date) triple to strip -- leave it alone
+    # rather than guess which of the two remaining fields was the title.
+    if ($parts.Count -lt 3) { return $EntryText }
+    $first = if ($parts[0] -match '^#\d+$') { 1 } else { 0 }
+    $last = $parts.Count - 3
+    if ($last -lt $first) { return $EntryText }
+    $title = (@($parts[$first..$last]) -join " $md ").Trim()
+    if (-not $title) { return $EntryText }
+
+    $rest = if ($lines.Count -gt 1) { ($lines[1] + $lines[2]) } else { '' }
+    return "$($hm.Groups[1].Value) $title$rest"
+}
+
+function Build-HighlightsNotes {
+    <#
+        Builds the highlights document (releases/highlights/<dir>/<X.Y.Z>.md) from the same entry
+        blocks the developer notes are built from. Pure string out, hard LF -- a new standalone file,
+        like Build-ReleaseNotes.
+
+        $StakeholderTypes names the branch types a non-developer reader is the audience for; every
+        OTHER category present lands in the developer-only block below the marker. Empty = every
+        category is stakeholder-facing, so no marker block is written at all (a repo that wants the
+        second document but not the split).
+
+        $DevBlockComment and $DevBlockHeading are the consumer's own words for that marker -- the
+        #410 class: a document written for this repo's stakeholders is written in their language, and
+        a hardcoded English heading in a Dutch release note is the wrong word rather than a missing
+        one.
+
+        The entries arrive with their internal heading metadata intact and keep it until the renderer
+        has read the type off it -- hence -BareTitles on Format-CategorizedEntries rather than a strip
+        pass here; see that function for what stripping too early costs. Links are rewritten first, at
+        the same depth the developer notes use (both documents sit three folders down).
+    #>
+    param(
+        [Parameter(Mandatory)][string[]]$Entries,
+        [Parameter(Mandatory)][string]$Version,
+        [Parameter(Mandatory)][string]$Date,
+        [Parameter(Mandatory)][string]$Type,
+        [string]$Title = '',
+        [string[]]$StakeholderTypes = @(),
+        [string]$DevBlockComment = 'Remove this block before sharing the highlights with non-developers.',
+        [string]$DevBlockHeading = 'For developers only -- remove before publishing',
+        [string]$LinkPrefix = '../../../'
+    )
+    $linked = @($Entries | ForEach-Object { Convert-RootRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
+
+    if ($StakeholderTypes.Count -gt 0) {
+        $stake = Format-CategorizedEntries -Entries $linked -CategoryLevel 2 -OnlyTypes $StakeholderTypes -BareTitles
+        # The developer half is "everything not named", derived rather than configured: a branch type
+        # added later is then stakeholder-facing only if somebody says so, and shows up in the block
+        # that gets reviewed either way. The reverse default would hide it.
+        $cats = Get-ReleaseCategories
+        $devTypes = @($cats.Order | Where-Object { $StakeholderTypes -notcontains $_ })
+        $dev = Format-CategorizedEntries -Entries $linked -CategoryLevel 3 -OnlyTypes $devTypes -BareTitles
+    } else {
+        $stake = Format-CategorizedEntries -Entries $linked -CategoryLevel 2 -BareTitles
+        $dev = ''
+    }
+
+    $rocket = [char]::ConvertFromUtf32(0x1F680)
+    $titleLine = if ($Title) { "$Title`n`n" } else { '' }
+    $header = "# Release notes v$Version $rocket`n`n**Date:** $Date  `n**Type:** $Type`n`n$titleLine"
+
+    if ($dev.Trim()) {
+        $marker = "<!-- $DevBlockComment -->`n## $DevBlockHeading"
+        $body = if ($stake.Trim()) { "$stake`n`n---`n`n$marker`n`n$dev" } else { "$marker`n`n$dev" }
+    } else {
+        $body = $stake
+    }
+    return ($header + $body + "`n")
+}
+
+function Format-InlineMarkdown {
+    <#
+        Inline markdown -> HTML for one line: HTML-escapes first, then renders **bold** and `code`.
+        Pure. The escape runs BEFORE the markup so a literal '<' in an entry cannot become a tag,
+        and so the tags this function emits itself are not escaped by their own pass.
+
+        DELIBERATELY NOT A MARKDOWN PARSER. Links, lists, images, emphasis and tables pass through as
+        their literal markdown, exactly as in the source this was ported from. That is a real
+        limitation and it is left in place on purpose: the HTML exists so a stakeholder document can
+        be printed to PDF, and widening the renderer would change what the consumer's existing
+        highlights pages look like -- a visible result, which is a separate decision from moving the
+        tier. Worth revisiting once someone has looked at a rendered page and said what it needs.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
+    $t = $Text -replace '&', '&amp;'
+    $t = $t -replace '<', '&lt;'
+    $t = $t -replace '>', '&gt;'
+    $t = $t -replace '\*\*(.+?)\*\*', '<strong>$1</strong>'
+    $t = $t -replace '`([^`]+)`', '<code>$1</code>'
+    return $t
+}
+
+function ConvertTo-ReleaseHtml {
+    <#
+        Renders a highlights markdown document as one self-contained, print-ready HTML page: open it
+        in a browser and Ctrl+P -> save as PDF. Pure string in, string out; no file IO, no external
+        stylesheet or font, so the page prints the same on a machine that has never seen this repo.
+
+        Handles the structure the highlights generator actually emits -- headings (h1-h3), horizontal
+        rules, and paragraphs formed by consecutive non-blank lines -- with inline markup via
+        Format-InlineMarkdown. Anything else degrades to a paragraph of its literal markdown rather
+        than being dropped: a limitation a reader can see and report beats content that silently
+        vanished between the .md and the .pdf.
+
+        $Lang goes into <html lang> and is the consumer's own answer: the document is written for that
+        repo's stakeholders, and a screen reader or a browser's print hyphenation uses it.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Markdown,
+        [Parameter(Mandatory)][string]$Version,
+        [string]$Lang = 'en'
+    )
+    $lines = $Markdown -split '\r?\n'
+    $body = [System.Text.StringBuilder]::new()
+    $para = [System.Collections.Generic.List[string]]::new()
+
+    # A paragraph ends at a heading, a rule, or a blank line -- so flush the buffer before handling
+    # any of those, and once more after the loop for a document that ends mid-paragraph. A local
+    # scriptblock rather than a nested function: a nested `function` would be published into the
+    # session's function drive on first call and outlive this one, which for a shared library is a
+    # name it never declared it owned.
+    $flush = {
+        if ($para.Count -eq 0) { return }
+        [void]$body.AppendLine("<p>$($para -join ' ')</p>")
+        $para.Clear()
+    }
+
+    foreach ($line in $lines) {
+        $l = $line.TrimEnd()
+        if ($l -match '^#|^---|^$') { & $flush }
+        if ($l -match '^# (.+)$') { [void]$body.AppendLine("<h1>$(Format-InlineMarkdown $Matches[1])</h1>") }
+        elseif ($l -match '^## (.+)$') { [void]$body.AppendLine("<h2>$(Format-InlineMarkdown $Matches[1])</h2>") }
+        elseif ($l -match '^### (.+)$') { [void]$body.AppendLine("<h3>$(Format-InlineMarkdown $Matches[1])</h3>") }
+        elseif ($l -match '^---\s*$') { [void]$body.AppendLine('<hr>') }
+        elseif ($l -ne '') { $para.Add((Format-InlineMarkdown $l)) }
+    }
+    & $flush
+
+    $css = 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;' +
+        'max-width:800px;margin:40px auto;padding:0 24px;color:#1a1a1a;line-height:1.6}' +
+        'h1{font-size:2em;border-bottom:2px solid #e1e4e8;padding-bottom:.4em;margin-bottom:.6em}' +
+        'h2{font-size:1.4em;border-bottom:1px solid #e1e4e8;padding-bottom:.3em;margin-top:2em;color:#24292f}' +
+        'h3{font-size:1.1em;margin-top:1.5em;color:#24292f}' +
+        'strong{font-weight:600}' +
+        'code{background:#f6f8fa;padding:2px 5px;border-radius:4px;font-family:"SFMono-Regular",Consolas,monospace;font-size:.88em}' +
+        'hr{border:none;border-top:1px solid #e1e4e8;margin:1.8em 0}' +
+        'p{margin:.5em 0}' +
+        '@media print{body{margin:20px;max-width:none}}'
+
+    $q = [char]0x22
+    return "<!doctype html>`n<html lang=$q$Lang$q>`n<head>`n" +
+        "<meta charset=${q}UTF-8$q>`n" +
+        "<title>Release notes $Version</title>`n" +
+        "<style>$css</style>`n" +
+        "</head>`n<body>`n" +
+        $body.ToString().Trim() +
+        "`n</body>`n</html>`n"
 }

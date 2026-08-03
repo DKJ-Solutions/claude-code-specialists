@@ -114,10 +114,12 @@ description while building; ownership of the entry mechanism stays Rendall's.
 A release here is a **recorded moment**: all plugins get the same version number
 (**lockstep, repo-wide**) and the state is tagged as `vX.Y.Z`. `cut-release.ps1` itself publishes
 nothing to GitHub Releases — only a git tag, the full notes in `releases/development/`, and a
-reference to them in `CHANGELOG.md`. For a **Minor or Major** bump, publishing a GitHub Release
-(highlights as the body, the full development notes as an attachment) is a manual closing step
-Rendall walks through afterward, per the `cut-release` skill's checklist — not automated by the
-script; a **Patch** release skips that step (tag only). See
+reference to them in `CHANGELOG.md`. For a **Minor or Major** bump, publishing a GitHub Release is a
+manual closing step Rendall walks through afterward, per the `cut-release` skill's checklist — not
+automated by the script; a **Patch** release skips that step (tag only). **The release body here is the
+development notes.** The skill's checklist describes a highlights file as the body with the notes as an
+attachment, and that is correct in a repo that generates one — this repo does not (see the highlights
+note below), so there is nothing to attach and the notes are the body. See
 [releases/README.md](../../../releases/README.md#cutting-a-release) for the full mechanics. The
 `version` in each
 `.claude-plugin/plugin.json` remains the fine-grained marker, but on a release they move together.
@@ -169,6 +171,14 @@ The `releases/` directory (modeled on life-hub):
 - **`releases/README.md`** — an overview table of all versions (newest at the top).
 - In `CHANGELOG.md` the `## Releases` block becomes a short **reference** (`### [vX.Y.Z] - date — Type`)
   to the notes file, rather than the full contents inline.
+- **No `releases/highlights/`, and that is deliberate** (#417 phase 2, August 3, 2026). The shared
+  `cut-release.ps1` can generate a second, stakeholder-facing rendering of a release — written for
+  *non-developers*, with a print-ready `.html` beside it — but only where the repo names the bump types
+  in `Get-ReleaseHighlightsBumps`. This repo names none, because its release audience **is** developers:
+  a consumer reads `RELEASE.md` and the per-plugin `CHANGELOG.md` to decide whether to update. Rendall
+  therefore never has a highlights draft to edit here, and should not go looking for one. If Dave ever
+  wants stakeholder release notes, the tier is three empty knobs in
+  [`scripts/repo-config.ps1`](../../../scripts/repo-config.ps1) away — not a script change.
 
 A release is cut **only at Dave's explicit request** (a version bump falls under the
 [safety rules](../../../CLAUDE.md#safety-rules)) and deliberately does **not go via a branch + PR**. Like the
