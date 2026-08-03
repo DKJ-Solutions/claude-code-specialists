@@ -108,14 +108,29 @@ destructive actions above happen only on Dave's explicit request.
 > you replace — it doesn't describe that there are specialists and safety rules, but what this repo
 > is, which team works here, and how the constitution is concretely implemented here.*
 
-`claude-code-specialists` is the **workshop repo of Dave (DaveKJohn)**: the marketplace where all of his
-plugins are built and maintained, and the **single source of truth** for all shareable subagent
+`claude-code-specialists` is the **home repo of one product**: the Claude Specialists system, built and
+maintained here by Dave (DaveKJohn), and the **single source of truth** for all shareable subagent
 definitions — every consuming repo (life-hub, smartwatchbanden) points here and enables or disables
-per plugin. The full story (the plugin/family structure and consumption) is in the
-[root `README.md`](README.md); the split manual model, the bootstrap path, and what the specialists
-family does and how its plugins differ are in the
-[family README](claude-code-plugins/claude-specialists/README.md); the drift lint is in the
-[connectors README](claude-code-plugins/claude-specialists/connectors/README.md#maintenance-drift-lint).
+per plugin. The full story — the four plugins and how they differ, the split manual model, the
+bootstrap path, and consumption — is in the [root `README.md`](README.md); the drift lint is in the
+[connectors README](connectors/README.md#maintenance-drift-lint).
+
+**One product, one repository — and therefore one marketplace.** This repo used to be framed as a
+*workshop*: `davekjohns-workshop`, the marketplace where **all** of Dave's plugins would be built, with
+the specialists as the first family among more to come. That framing was retired on August 3, 2026,
+together with the directory layer that was holding a place for the second family. The reason is the
+release train: it is repo-wide, so one `CHANGELOG.md`, one `vX.Y.Z` tag and a lockstep version bump
+cover everything in the repo. A second, unrelated product would be bumped for work it never had, one
+tag would span two products, and one changelog would mix two histories. So the next product gets its
+own repository and its own marketplace instead.
+
+**The nuance, so nobody repairs the wrong thing: lockstep *within* this product is correct** and
+[`cut-release.ps1`](scripts/release/cut-release.ps1) needs no change. The four plugins are one system —
+a shared core plus domain groups — and a consumer running group 1 alongside group 3 needs matching
+versions. What was wrong was never the lockstep, but housing unrelated products in a single release
+train, and that dissolved with the reorganisation rather than needing a fix. Decision by Dave,
+August 3, 2026; the reader-facing statement is in
+[`README.md`](README.md#one-product-one-repository).
 
 **The repo consumes itself.** Via [`.claude/settings.json`](.claude/settings.json) this repo enables
 its own `specialists` plugin (group 1), with the `github` marketplace source
@@ -133,14 +148,15 @@ plugin without any error — the measured instance and the repair are in
 output, and script-generated document content. **The session-reply language is separate and follows
 the user.** That second half applies to every turn regardless of which files it touches, which is why
 it lives here rather than in a path-scoped rule. The system-wide norm (and its three exceptions) is in
-[Tessa #16's portable manual](claude-code-plugins/claude-specialists/specialists/manuals/06-16-manual.md#what-tessa-covers)
+[Tessa #16's portable manual](plugins/specialists/manuals/06-16-manual.md#what-tessa-covers)
 under **"Guarding the language convention,"** so it travels to every consuming repo.
 
 **The per-layer detail — which layers are in scope, and the deliberate exceptions (`VUL-IN`,
 `lint-en-tests`, the legacy markers, the archived release notes) — is in
 [`.claude/rules/language-layers.md`](.claude/rules/language-layers.md).** It is path-scoped to
-`scripts/**`, `.github/**`, `releases/**` and `CHANGELOG.md`, so it loads when you touch one of those
-layers instead of in every session. Two things to know before moving anything else there: a
+`scripts/**`, the plugin-carried `plugins/**/scripts/**` and `plugins/**/hooks/**`, `.github/**`,
+`releases/**` and `CHANGELOG.md`, so it loads when you touch one of those layers instead of in every
+session. Two things to know before moving anything else there: a
 `paths:`-scoped rule is **lost after a `/compact`** until a matching file is read again, and a rule
 *without* `paths:` loads unconditionally and therefore **saves nothing** — the scoping is the saving.
 So only content that is inert until you open a matching file belongs there. Decision by Dave,
@@ -148,9 +164,15 @@ July 20, 2026; sharpened July 21 and July 26, 2026.
 
 ### Structure — where everything lives
 
-The full repo layout (`.claude-plugin/`, `claude-code-plugins/` incl. `connectors/` and
-`agent-shared/`, `scripts/`, `releases/`, `.claude/`, and the root docs + `.github/`) is described
-in [README.md](README.md#repo-layout).
+The full repo layout (`.claude-plugin/`, `plugins/` incl. `agent-shared/`, `connectors/` at the root,
+`scripts/`, `releases/`, `.claude/`, and the root docs + `.github/`) is described in
+[README.md](README.md#repo-layout). Since August 3, 2026 the plugins sit **one** level down in
+`plugins/<plugin>/` instead of two in `claude-code-plugins/claude-specialists/<plugin>/`: that second
+level existed to hold several product families side by side, which the
+[one-product rule](#specific-to-this-repo-claude-code-specialists) above retired. `connectors/` moved
+**to the root** in the same movement, deliberately — it is the consumer register read by
+`scripts/sync/`, not plugin payload, and must not travel along in the plugin cache. `agent-shared/`
+stayed **inside** `plugins/` for the mirror-image reason: it *is* plugin source.
 
 ### claude-code-specialists's safety implementation
 

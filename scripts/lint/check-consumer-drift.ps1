@@ -69,10 +69,10 @@ $PluginRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')
 # (specialists-lifehub, specialists-shopify, specialists-ecomm). We scan all of them, so the drift
 # check also covers a consuming repo's domain specialists.
 $SourceDirs = @(
-    (Join-Path $PluginRoot 'claude-code-plugins\claude-specialists\specialists\agents')
-    (Join-Path $PluginRoot 'claude-code-plugins\claude-specialists\specialists-lifehub\agents')
-    (Join-Path $PluginRoot 'claude-code-plugins\claude-specialists\specialists-shopify\agents')
-    (Join-Path $PluginRoot 'claude-code-plugins\claude-specialists\specialists-ecomm\agents')
+    (Join-Path $PluginRoot 'plugins\specialists\agents')
+    (Join-Path $PluginRoot 'plugins\specialists-lifehub\agents')
+    (Join-Path $PluginRoot 'plugins\specialists-shopify\agents')
+    (Join-Path $PluginRoot 'plugins\specialists-ecomm\agents')
 ) | Where-Object { Test-Path -LiteralPath $_ }
 if ($SourceDirs.Count -eq 0) {
     Write-Host "Cannot find any canonical agent-defs under $PluginRoot -- stopping." -ForegroundColor Red
@@ -207,9 +207,9 @@ Write-Host "Agent-def summary: $missingCount missing, $identicalCount identical 
 
 # --- Persona drift (informational): portable body of the plugin personas vs. the consumer copy ------
 $personaDirs = @(@(
-    (Join-Path $PluginRoot 'claude-code-plugins\claude-specialists\specialists\personas')
-    (Join-Path $PluginRoot 'claude-code-plugins\claude-specialists\specialists-lifehub\personas')
-    (Join-Path $PluginRoot 'claude-code-plugins\claude-specialists\specialists-shopify\personas')
+    (Join-Path $PluginRoot 'plugins\specialists\personas')
+    (Join-Path $PluginRoot 'plugins\specialists-lifehub\personas')
+    (Join-Path $PluginRoot 'plugins\specialists-shopify\personas')
 ) | Where-Object { Test-Path -LiteralPath $_ })
 
 $personaResults = New-Object System.Collections.Generic.List[object]

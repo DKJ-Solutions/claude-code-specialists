@@ -78,12 +78,21 @@ if (-not (Test-Path -LiteralPath $ConsumerRoot -PathType Container)) {
 $ConsumerRoot = (Resolve-Path -LiteralPath $ConsumerRoot).Path
 
 # --- Derive plugin + the ~ path to the plugin install ---------------------------------------------
-# personaDir = <...>/claude-code-plugins/<family>/<plugin>/personas (source/marketplace-clone layout) or
+# personaDir = <...>/plugins/<plugin>/personas (source/marketplace-clone layout) or
 # <...>/<marketplace>/<plugin>/<version>/personas (plugin-cache layout). From that we derive the plugin
 # carrying the personas. The portable body comes from the plugin install; if personaDir falls under user
 # home (~), the standard marketplace cache, we express that path as a ~ path for the @-import in CLAUDE.md.
 #
-# The FAMILY segment is deliberately NOT derived here (issue #179). It used to be, and in the
+# DERIVED FROM THE PARENT, NEVER FROM A NAMED SEGMENT (#405). This used to look up the index of the
+# literal segment 'claude-code-plugins' and take two further segments to skip the family level. That
+# lookup is unusable now the directory is called 'plugins': the segment occurs a SECOND time in every
+# real install path (~/.claude/plugins/marketplaces/<mp>/plugins/<plugin>/personas), IndexOf returns
+# the first, and the derivation would yield the MARKETPLACE name -- the exact defect #179 fixed, back
+# again through a rename. The parent walk below needs no segment name and covers all three layouts:
+# the plugin directory is simply personas' parent, one level further up when a version directory sits
+# in between. personaDir is resolved above, so no '..' segment can reach here.
+#
+# The FAMILY segment is deliberately NOT derived here either (issue #179). It used to be, and in the
 # plugin-cache layout that derivation yields the MARKETPLACE name: a repo installed through
 # 'specialists@claude-code-specialists' got its lenses written to .claude/plugins/claude-code-specialists/,
 # while check-roster-sync.ps1 only ever looked under 'claude-specialists' -- so it reported 16 existing
@@ -91,17 +100,11 @@ $ConsumerRoot = (Resolve-Path -LiteralPath $ConsumerRoot).Path
 # path. The family is a property of the plugin family, not of the marketplace it came from, so it now
 # comes from Get-LensFamily in check-report-lib.ps1: one value, shared by this writer, sync-roster.ps1
 # and the check.
-$segs = ($personaDir -replace '/', '\') -split '\\' | Where-Object { $_ }
-$ccpIdx = [array]::IndexOf([string[]]$segs, 'claude-code-plugins')
-if ($ccpIdx -ge 0 -and ($ccpIdx + 2) -lt $segs.Count) {
-    $personaPlugin = $segs[$ccpIdx + 2]
+$pdParent = Split-Path $personaDir -Parent
+if ((Split-Path $pdParent -Leaf) -match '^\d+\.\d+\.\d+') {
+    $personaPlugin = Split-Path (Split-Path $pdParent -Parent) -Leaf
 } else {
-    $pdParent = Split-Path $personaDir -Parent
-    if ((Split-Path $pdParent -Leaf) -match '^\d+\.\d+\.\d+') {
-        $personaPlugin = Split-Path (Split-Path $pdParent -Parent) -Leaf
-    } else {
-        $personaPlugin = Split-Path $pdParent -Leaf
-    }
+    $personaPlugin = Split-Path $pdParent -Leaf
 }
 # check-report-lib.ps1 travels in the same plugin payload as this skill, so a $PSScriptRoot-relative
 # dot-source resolves from the source repo, the marketplace clone and the plugin cache alike (the same
@@ -937,7 +940,7 @@ Write-Host "  5. Register this repo in the workshop's connector register -- past
 # --- Register proposal (workshop-side) -------------------------------------------------------------
 # Why this block exists: bootstrapping a consumer used to leave NO trace towards the register, and
 # nothing else fills that gap either. The register lives in the workshop
-# (claude-code-plugins/claude-specialists/connectors/<repo>.json) while this script runs in the
+# (connectors/<repo>.json) while this script runs in the
 # consumer, and the register's own doctrine is explicit that it never writes cross-repo -- so this
 # script cannot create the manifest, only hand you one. Without it the workshop is blind to this repo:
 # no plugin-version check, no lens-inventory check, no agent-def drift check. Found 2026-07-28, after a
@@ -979,7 +982,7 @@ $($pluginBlocks -join ",`n")
 "@
     foreach ($line in ($manifest -split "`r?`n")) { Write-Host "  $line" -ForegroundColor Gray }
     Write-Host ""
-    Write-Host "  Save as claude-code-plugins/claude-specialists/connectors/$leaf.json in the WORKSHOP repo," -ForegroundColor Gray
+    Write-Host "  Save as connectors/$leaf.json in the WORKSHOP repo," -ForegroundColor Gray
     Write-Host "  via that repo's normal branch + PR flow. Fill in the two VUL-IN fields first." -ForegroundColor Gray
     Write-Host "  Privacy boundary: the workshop is public -- metadata only, never lens content or absolute paths." -ForegroundColor Gray
 }

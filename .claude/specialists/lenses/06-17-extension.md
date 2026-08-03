@@ -5,7 +5,7 @@ group: 06
 
 # Edith 🔍 · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/06-17-manual.md`). This file does not describe the craft, but what Edith does in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`plugins/specialists/manuals/06-17-manual.md`). This file does not describe the craft, but what Edith does in this repo.
 
 A copy editor does the same thing everywhere — the independent final look before publication:
 language, spelling, consistency, dead links, deviations between what is written and what should be

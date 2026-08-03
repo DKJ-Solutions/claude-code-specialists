@@ -4,7 +4,7 @@
 .DESCRIPTION
     Some bullets under **Boundaries** are word-for-word identical across many agent defs (e.g. the
     inbound rule: 19/19). To maintain them in ONE place instead of in every agent def, they live as
-    the canonical source in claude-code-plugins/claude-specialists/agent-shared/<name>.md and appear
+    the canonical source in plugins/agent-shared/<name>.md and appear
     in an agent def between sentinel comments:
 
         <!-- BEGIN shared:inbound-behaviour -- GENERATED, edit agent-shared/inbound-behaviour.md -->
@@ -22,7 +22,7 @@ Set-StrictMode -Version Latest
 
 function Get-AgentSharedDir {
     param([string]$RepoRoot)
-    return (Join-Path $RepoRoot 'claude-code-plugins\claude-specialists\agent-shared')
+    return (Join-Path $RepoRoot 'plugins\agent-shared')
 }
 
 function Get-SharedBlockText {

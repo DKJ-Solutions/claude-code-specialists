@@ -5,7 +5,7 @@ group: 03
 
 # Rebecca 🔬 · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/03-07-manual.md`). This file does not describe the craft, but what Rebecca researches in this repo and where her findings land.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`plugins/specialists/manuals/03-07-manual.md`). This file does not describe the craft, but what Rebecca researches in this repo and where her findings land.
 
 A research specialist does the same thing everywhere — deep, source-attributed research that enables
 someone else to make a good decision. **What is repo-specific in claude-code-specialists is not that

@@ -5,7 +5,7 @@ group: 06
 
 # Ravi ♻️ · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/06-24-manual.md`). This file does not describe the craft, but what Ravi guards in this repo and with which mechanism.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`plugins/specialists/manuals/06-24-manual.md`). This file does not describe the craft, but what Ravi guards in this repo and with which mechanism.
 
 A refactoring specialist does the same thing everywhere — track down duplication of behavioral rules
 and promote it to a single source. **What is repo-specific in claude-code-specialists is not that Ravi
@@ -13,7 +13,7 @@ deduplicates, but which artifacts fall under him here and with which mechanism h
 
 ### What Ravi guards here
 
-- **The agent defs** in all plugins (`claude-code-plugins/claude-specialists/*/agents/*-agent.md`)
+- **The agent defs** in all plugins (`plugins/*/agents/*-agent.md`)
   and the **persona templates** (`.../specialists/personas/*-persona.md`) — for verbatim-shared bullets
   under **Boundaries** and **Working method**, and for standalone behavior
   directives outside those sections (e.g. the closing language-choice line). This repo is the **source** of
@@ -26,7 +26,7 @@ deduplicates, but which artifacts fall under him here and with which mechanism h
 
 The verbatim-shared blocks run on **build-and-lint** (built July 2026):
 
-- **Source:** `claude-code-plugins/claude-specialists/agent-shared/<name>.md` — one canonical text
+- **Source:** `plugins/agent-shared/<name>.md` — one canonical text
   per block, placed next to the plugin directories so it does not travel with the plugin cache.
 - **Sentinels:** in an agent def the block sits between `<!-- BEGIN/END shared:<name> -->`; the
   content is there verbatim (always loaded), but is filled from the source.
@@ -48,7 +48,7 @@ reaching only the circle of agent defs whose craft the rule actually touches (e.
 Deliberately no per-block agent-def counts here: they drift with every new agent def, which is
 exactly the kind of staleness this lens exists to catch, not repeat. To check the current count or
 circle for a given block, search the sentinel across the plugins — e.g.
-`Get-ChildItem -Recurse -Filter '*-agent.md' claude-code-plugins/claude-specialists | Select-String
+`Get-ChildItem -Recurse -Filter '*-agent.md' plugins | Select-String
 -Pattern 'BEGIN shared:<name>'` lists every agent def currently carrying it;
 `scripts/agents/build-agent-defs.ps1 -Check` complements that by flagging any of those that has
 drifted from its source in `agent-shared/`.

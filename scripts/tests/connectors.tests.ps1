@@ -17,7 +17,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\sync\check-connectors.ps1'
-$Hook     = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists\specialists\hooks\connector-sessioncheck.ps1'
+$Hook     = Join-Path $RepoRoot 'plugins\specialists\hooks\connector-sessioncheck.ps1'
 $Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) 'connectors-test-fixture'
 
 $script:pass = 0
@@ -271,7 +271,7 @@ try {
     Assert-Equal 0 $r.Code 'unregistered consumer: still exit 0 -- not being registered is not a failure of the plugin install'
 
     # --- 6. Real manifests of this repo: the self-manifest always checks ----------------------
-    $selfManifest = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists\connectors\claude-code-specialists.json'
+    $selfManifest = Join-Path $RepoRoot 'connectors\claude-code-specialists.json'
     $r = Invoke-Ps $Script ($base + @('-Manifest', $selfManifest))
     Assert-Equal 0 $r.Code 'self-manifest (workshop consumes itself): exit code 0'
 

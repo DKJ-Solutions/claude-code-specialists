@@ -15,7 +15,7 @@ the team and its playbooks.
 
 The system consists of **four plugins**: the repo-neutral core `specialists` (group 1 — always
 enable it) and three optional domain groups. Which specialists live in which plugin and who they are
-meant for is covered in the [family README](README.md).
+meant for is covered in the [root README](README.md).
 
 ## Before you start
 
@@ -65,8 +65,8 @@ because the counts on this page are load-bearing.
 
 > **Three *steps* here, six *acts* inside Step 1 — a different unit, not a different path.** Step 1
 > below is enable → **restart** → refresh → install → restart → verify, which the
-> [family README](README.md#adoption-the-bootstrap-path) and
-> [`specialists-init`](specialists/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
+> [root README](README.md#adoption-the-bootstrap-path) and
+> [`specialists-init`](plugins/specialists/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
 > both count as its six acts ("step 0" in their numbering). Saying so is the point: those two pages once
 > counted the same procedure as *four* and *three*, and this page's *three steps* made a third number
 > (inbound [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297)). Nothing was missing from
@@ -314,7 +314,7 @@ Chris) + an empty repo-lens scaffold per specialist in **the seam**
 seam (which in turn imports Chris's portable body from the plugin install + his repo lens), and a
 proposal for safety settings (`settings.suggested.jsonc`, for your own
 review). The details of this path are in the
-[family README › Adoption](README.md#adoption-the-bootstrap-path) — which counts the steps there
+[root README › Adoption](README.md#adoption-the-bootstrap-path) — which counts the steps there
 as "step 0" (enabling + installing, above) and "step 1" (the skill).
 
 **What it should report, so you can check it rather than trust it** (inbound
@@ -434,7 +434,7 @@ looked in the wrong scope. Do not answer it by re-running the install either: a 
 a **second, machine-wide record** beside the project one. Each plugin carries its own
 `CHANGELOG.md` that travels with the plugin cache and describes per release what changed for that
 plugin; the full history lives in the workshop itself
-([`CHANGELOG.md`](../../CHANGELOG.md) and [`releases/`](../../releases/README.md)). Each plugin
+([`CHANGELOG.md`](CHANGELOG.md) and [`releases/`](releases/README.md)). Each plugin
 folder also carries a `RELEASE.md` card next to its `CHANGELOG.md` — open it in your plugin cache
 after an update to see, at a glance, which release the card describes and what changed in it. It
 does not tell you where *you* are, and since August 2, 2026 it says so rather than claiming
@@ -595,7 +595,7 @@ what to do about it while you still can.
 
 - **An improvement to the shared core** (an agent def, playbook, persona, or skill): don't
   rework it locally, but report it as an issue on this repo with the label `inbound` — an
-  [issue template](../../.github/ISSUE_TEMPLATE/inbound-improvement.md) is ready for that. The
+  [issue template](.github/ISSUE_TEMPLATE/inbound-improvement.md) is ready for that. The
   workshop processes it through its own chain, and the improvement comes back to all consumers via
   a release.
 - **Repo-specific additions** belong in your own repo lenses in the seam

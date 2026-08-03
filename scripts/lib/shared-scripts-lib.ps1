@@ -40,54 +40,54 @@ function Get-SharedScriptPairs {
         @{
             Name   = 'fold-changelog-entry'
             Source = 'scripts\release\fold-changelog-entry.ps1'
-            Mirror = 'claude-code-plugins\claude-specialists\specialists\scripts\release\fold-changelog-entry.ps1'
+            Mirror = 'plugins\specialists\scripts\release\fold-changelog-entry.ps1'
         },
         @{
             Name   = 'open-pr'
             Source = 'scripts\release\open-pr.ps1'
-            Mirror = 'claude-code-plugins\claude-specialists\specialists\scripts\release\open-pr.ps1'
+            Mirror = 'plugins\specialists\scripts\release\open-pr.ps1'
         },
         @{
             Name   = 'check-roster-sync'
             Source = 'scripts\sync\check-roster-sync.ps1'
-            Mirror = 'claude-code-plugins\claude-specialists\specialists\scripts\sync\check-roster-sync.ps1'
+            Mirror = 'plugins\specialists\scripts\sync\check-roster-sync.ps1'
         },
         @{
             Name   = 'check-script-contract'
             Source = 'scripts\sync\check-script-contract.ps1'
-            Mirror = 'claude-code-plugins\claude-specialists\specialists\scripts\sync\check-script-contract.ps1'
+            Mirror = 'plugins\specialists\scripts\sync\check-script-contract.ps1'
         },
         @{
             Name   = 'new-changelog-entry'
             Source = 'scripts\release\new-changelog-entry.ps1'
-            Mirror = 'claude-code-plugins\claude-specialists\specialists\scripts\release\new-changelog-entry.ps1'
+            Mirror = 'plugins\specialists\scripts\release\new-changelog-entry.ps1'
         },
         @{
             Name   = 'new-branch'
             Source = 'scripts\task\new-branch.ps1'
-            Mirror = 'claude-code-plugins\claude-specialists\specialists\scripts\task\new-branch.ps1'
+            Mirror = 'plugins\specialists\scripts\task\new-branch.ps1'
         },
         @{
             Name   = 'park-branch'
             Source = 'scripts\task\park-branch.ps1'
-            Mirror = 'claude-code-plugins\claude-specialists\specialists\scripts\task\park-branch.ps1'
+            Mirror = 'plugins\specialists\scripts\task\park-branch.ps1'
         },
         @{
             Name    = 'check-report-lib'
             Source  = 'scripts\lib\check-report-lib.ps1'
-            Mirror  = 'claude-code-plugins\claude-specialists\specialists\scripts\lib\check-report-lib.ps1'
+            Mirror  = 'plugins\specialists\scripts\lib\check-report-lib.ps1'
             LibOnly = $true
         },
         @{
             Name    = 'native-capture-lib'
             Source  = 'scripts\lib\native-capture-lib.ps1'
-            Mirror  = 'claude-code-plugins\claude-specialists\specialists\scripts\lib\native-capture-lib.ps1'
+            Mirror  = 'plugins\specialists\scripts\lib\native-capture-lib.ps1'
             LibOnly = $true
         },
         @{
             Name    = 'pr-issues-lib'
             Source  = 'scripts\lib\pr-issues-lib.ps1'
-            Mirror  = 'claude-code-plugins\claude-specialists\specialists\scripts\lib\pr-issues-lib.ps1'
+            Mirror  = 'plugins\specialists\scripts\lib\pr-issues-lib.ps1'
             LibOnly = $true
         }
     )

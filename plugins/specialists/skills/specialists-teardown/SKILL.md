@@ -20,7 +20,7 @@ exempt, and stays as written.
 **This skill is only the repo half of leaving, and the other half is not in this payload.** The machine
 half -- the `claude plugin uninstall`/`marketplace remove` commands, the settings keys to take back out,
 and the order the two halves have to run in -- is in
-[`UNINSTALL.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/claude-code-plugins/claude-specialists/UNINSTALL.md),
+[`UNINSTALL.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/UNINSTALL.md),
 which ships in the marketplace clone rather than in the plugin. The pointer is here because it was
 measured to be missing exactly here: a reader who wanted to leave found this skill without trouble and
 reached the machine half **only by grepping blindly** (inbound
@@ -231,7 +231,7 @@ would have captured it has nothing to capture.
 
 > **Two acts here, out of the five steps (0–4) a full seam migration takes — a different unit, not a
 > different path.** The numbered list lives in
-> [the family README](../../../README.md#the-seam-specified); this page zooms in on step 0, the one that
+> [the claude-code-specialists README](../../../../README.md#the-seam-specified); this page zooms in on step 0, the one that
 > can lose files. Said explicitly because the family now counts this procedure in four places, and
 > inbound [#305](https://github.com/DaveKJohn/claude-code-specialists/issues/305) found this one had been
 > left out of the sweep that aligned the other three.
@@ -320,7 +320,7 @@ distance was measured by hand in `davekokbwj/smartwatchbanden` (July 29, 2026) r
 and it is four different kinds of leftover. Only the second is this skill's own limitation. Note that
 the target is **no *live* reference, not zero references** -- see
 [what is correctly left standing](#and-what-is-correctly-left-standing) at the end of this section, and
-the requirement itself in the [family README](../../../README.md#removal-the-teardown-gap).
+the requirement itself in the [claude-code-specialists README](../../../../README.md#removal-the-teardown-gap).
 
 **1. A runtime dependency no teardown can undo -- the one that actually hurts.** The plugin is the
 single source of truth for the operational scripts (`new-branch.ps1`, `park-branch.ps1`,

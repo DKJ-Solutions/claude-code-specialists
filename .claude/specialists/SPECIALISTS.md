@@ -9,7 +9,7 @@
 The orchestrator (Chris) is always loaded -- portable body from the plugin install and repo lens from
 `lenses/`; he routes on demand to the specialists below.
 
-@~/.claude/plugins/marketplaces/claude-code-specialists/claude-code-plugins/claude-specialists/specialists/personas/01-01-persona.md
+@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/specialists/personas/01-01-persona.md
 
 @lenses/01-01-extension.md
 ## The Claude Specialists — who does what
@@ -24,7 +24,7 @@ with **Chris**, who classifies it and routes it to the right specialist (or a ch
 
 full model (roles, agent def vs. manual, invocation) is in the
 
-[family README](../../claude-code-plugins/claude-specialists/README.md); Chris's own ritual is in his
+[root README](../../README.md); Chris's own ritual is in his
 
 manual.
 
@@ -52,7 +52,7 @@ This automation-first rule is anchored in the character of all specialists via t
 
 mechanism described in
 
-[Shared agent-def blocks](../../claude-code-plugins/claude-specialists/README.md#shared-agent-def-blocks--one-source-for-the-verbatim-boundaries),
+[Shared agent-def blocks](../../README.md#shared-agent-def-blocks--one-source-for-the-verbatim-boundaries),
 
 not merely a repo-only convention.
 
@@ -70,9 +70,9 @@ SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-con
 
 both run in Claude Code and in Cowork, but not in a plain Claude.ai Chat session (there they show up
 
-grayed out). Only the skills stay available in Chat. See the family README's
+grayed out). Only the skills stay available in Chat. See the root README's
 
-[Where this runs](../../claude-code-plugins/claude-specialists/README.md#where-this-runs-chat-cowork-and-claude-code)
+[Where this runs](../../README.md#where-this-runs-chat-cowork-and-claude-code)
 
 section for the sourced detail.
 

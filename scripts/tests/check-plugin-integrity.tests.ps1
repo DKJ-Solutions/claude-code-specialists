@@ -2,7 +2,7 @@
 .SYNOPSIS
     Regression tests for scripts/lint/check-plugin-integrity.ps1:
       - check 4 (dead-link/anchor scan): guards that root CONTRIBUTING.md and
-        claude-code-plugins/claude-specialists/connectors/README.md stay part of the scanned file set.
+        connectors/README.md stay part of the scanned file set.
       - check 10 (marked "all skills" enumerations vs. the canonical skillset): the opt-in
         <!-- skills:all --> ... <!-- /skills:all --> span mechanics, its scope-limiting (no generic
         prose scan), the exact-depth binding of the canonical skillset, fence-masking of literal
@@ -27,7 +27,7 @@
     (no marketplace.json, no plugins, no agent defs) -- checks 1/2/3/3b/3c/6/7 simply find nothing to
     check, and check 8 always reports its 8 shared-script pairs as "missing" against this minimal
     fixture (expected noise, asserted on nowhere below). The fixture additionally carries a small
-    canonical skillset for check 10: claude-code-plugins/claude-specialists/specialists/skills/
+    canonical skillset for check 10: plugins/specialists/skills/
     skill-alpha/SKILL.md and .../skill-beta/SKILL.md (2 real skills), plus a DEPTH DECOY
     skills/skill-alpha/references/SKILL.md (a SKILL.md one level too deep, which must NOT be picked
     up as a 3rd canonical skill). Only check 4's and check 10's per-file findings are asserted on, so
@@ -204,12 +204,12 @@ try {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'scripts\lint') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'scripts\lib') -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $Fixture 'claude-code-plugins\claude-specialists\connectors') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'connectors') -Force | Out-Null
     # check 10 fixture: two canonical skills (skill-alpha, skill-beta) plus a DEPTH DECOY -- a
     # SKILL.md one level deeper (skills/<name>/references/SKILL.md) that must NOT be picked up as a
     # third canonical skill, exercising the exact-depth binding of check 10's canonical-skillset scan.
-    New-Item -ItemType Directory -Path (Join-Path $Fixture 'claude-code-plugins\claude-specialists\specialists\skills\skill-alpha\references') -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $Fixture 'claude-code-plugins\claude-specialists\specialists\skills\skill-beta') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\specialists\skills\skill-alpha\references') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\specialists\skills\skill-beta') -Force | Out-Null
 
     Copy-Item -Path $IntegritySrc -Destination (Join-Path $Fixture 'scripts\lint\check-plugin-integrity.ps1') -Force
     Copy-Item -Path $AgentSharedLibSrc -Destination (Join-Path $Fixture 'scripts\lib\agent-shared-lib.ps1') -Force
@@ -217,42 +217,54 @@ try {
     Copy-Item -Path $CheckReportLibSrc -Destination (Join-Path $Fixture 'scripts\lib\check-report-lib.ps1') -Force
 
     $skillAlphaMd = "---`nname: skill-alpha`ndescription: Fixture skill alpha.`n---`n`n# Skill Alpha`n"
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'claude-code-plugins\claude-specialists\specialists\skills\skill-alpha\SKILL.md'), $skillAlphaMd, $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\specialists\skills\skill-alpha\SKILL.md'), $skillAlphaMd, $Utf8NoBom)
     $skillBetaMd = "---`nname: skill-beta`ndescription: Fixture skill beta.`n---`n`n# Skill Beta`n"
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'claude-code-plugins\claude-specialists\specialists\skills\skill-beta\SKILL.md'), $skillBetaMd, $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\specialists\skills\skill-beta\SKILL.md'), $skillBetaMd, $Utf8NoBom)
     # The depth decoy claims its own name (skill-deep-decoy) in frontmatter -- if check 10 ever
     # regressed to a looser depth match, that name would silently become a 3rd canonical skill.
     $skillDeepDecoyMd = "---`nname: skill-deep-decoy`ndescription: Depth decoy -- must not count as a canonical skill.`n---`n`n# Skill Deep Decoy`n"
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'claude-code-plugins\claude-specialists\specialists\skills\skill-alpha\references\SKILL.md'), $skillDeepDecoyMd, $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\specialists\skills\skill-alpha\references\SKILL.md'), $skillDeepDecoyMd, $Utf8NoBom)
 
     # --- Scenario A: dead links in the two target files + a decoy outside the scan set --------------
     Write-Host "check 4 coverage -- CONTRIBUTING.md + connectors README are IN the scan set" -ForegroundColor Cyan
     $contributingBroken = "# Contributing`n`nSee [nope]($deadLink) for details.`n"
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), $contributingBroken, $Utf8NoBom)
     $connectorsBroken = "# Connectors`n`nSee [nope]($deadLink) for details.`n"
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'claude-code-plugins\claude-specialists\connectors\README.md'), $connectorsBroken, $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'connectors\README.md'), $connectorsBroken, $Utf8NoBom)
     # Decoy: same dead link, but in a file that check 4 does NOT scan -- proves the two hits below
     # are due to CONTRIBUTING.md / the connectors README specifically being in the file list, not
     # some accidental blanket scan of every .md file in the fixture.
+    #
+    # IT MOVED OUT OF THE ROOT IN #405, AND THAT IS THE POINT IT NOW PROVES. This decoy used to sit at
+    # 'NOTES.md' in the fixture root, back when the root docs were a NAMED list and the *.md glob covered
+    # the separate family directory that held QUICKSTART.md, UNINSTALL.md and the family README. Flattening
+    # moved those three documents INTO the root, so the root became the directory where consumer-facing
+    # pages live and inherited the glob (see scenario 33, which requires exactly that). A root decoy would
+    # now be testing that the glob does not work.
+    #
+    # So the decoy moved one directory down instead of being deleted: the property under test -- the scan
+    # is scope-limited rather than a blanket walk of every .md in the tree -- is unchanged and still worth
+    # asserting. Only the boundary moved, from "which root files are named" to "the root, and not below it".
     $decoyBroken = "# Decoy`n`nSee [nope]($deadLink) for details.`n"
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'NOTES.md'), $decoyBroken, $Utf8NoBom)
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'notes') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'notes\NOTES.md'), $decoyBroken, $Utf8NoBom)
 
     $a = Invoke-Integrity -FixtureRoot $Fixture
     Assert-Equal 1 $a.Code 'scenario A: exit 1 (findings present)'
     Assert-True ($a.Out -match [regex]::Escape('.\CONTRIBUTING.md') -and $a.Out -match '\[link\]') 'CONTRIBUTING.md dead link is reported'
-    Assert-True ($a.Out -match [regex]::Escape('.\claude-code-plugins\claude-specialists\connectors\README.md')) 'connectors README dead link is reported'
-    Assert-True (-not ($a.Out -match [regex]::Escape('NOTES.md'))) 'decoy NOTES.md (outside the scan set) is NOT reported -- proves the scan is scope-limited, not accidental'
+    Assert-True ($a.Out -match [regex]::Escape('.\connectors\README.md')) 'connectors README dead link is reported'
+    Assert-True (-not ($a.Out -match [regex]::Escape('NOTES.md'))) 'decoy notes\NOTES.md (outside the scan set) is NOT reported -- proves the scan is scope-limited, not a blanket walk'
 
     # --- Scenario B: fix both dead links -- the two specific findings disappear ----------------------
     Write-Host "check 4 coverage -- fixing the dead links removes exactly those findings" -ForegroundColor Cyan
     $contributingFixed = "# Contributing`n`nNothing to link to here.`n"
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), $contributingFixed, $Utf8NoBom)
     $connectorsFixed = "# Connectors`n`nNothing to link to here.`n"
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'claude-code-plugins\claude-specialists\connectors\README.md'), $connectorsFixed, $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'connectors\README.md'), $connectorsFixed, $Utf8NoBom)
 
     $b = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($b.Out -match [regex]::Escape('.\CONTRIBUTING.md') + '.*dead link')) 'CONTRIBUTING.md dead-link finding is gone once fixed'
-    Assert-True (-not ($b.Out -match [regex]::Escape('.\claude-code-plugins\claude-specialists\connectors\README.md') + '.*dead link')) 'connectors README dead-link finding is gone once fixed'
+    Assert-True (-not ($b.Out -match [regex]::Escape('.\connectors\README.md') + '.*dead link')) 'connectors README dead-link finding is gone once fixed'
 
     # === check 10: marked "all skills" enumerations vs. the canonical skillset ==========================
     # From here on, only CONTRIBUTING.md's content is varied per scenario. The connectors README is
@@ -574,10 +586,14 @@ try {
     Assert-Equal 1 $r16.Code 'scenario 16: exit 1 -- an entry file is scanned, so its findings surface while the PR is open'
     Assert-True ($r16.Out -match [regex]::Escape('.\fix-my-branch.md') -and $r16.Out -match '\[link\]') 'scenario 16: a dead link in an entry body is reported BEFORE the fold, not after'
     Assert-True ($r16.Out -match [regex]::Escape("'<!-- skills:all -->' at line 4 has no matching")) 'scenario 16: the original #234 case -- a marker quoted in entry prose is caught on the PR instead of on main'
-    # The decoy from scenario A is still sitting in the fixture root with the same dead link, and it
-    # opens with an H1. It must STILL be ignored: the new rule keys on the entry format, not on "any
-    # root .md", so a permanent root doc (README, CONTRIBUTING, SECURITY, ...) never joins the set.
-    Assert-True (-not ($r16.Out -match [regex]::Escape('NOTES.md'))) 'scenario 16: an H1 root doc is still NOT read as an entry file -- the scan stayed scope-limited'
+    # The entry-format rule still has to hold, and since #405 it is CHECK 13 that carries it rather than
+    # the dead-link scan. Every root *.md is link-scanned now, so "is this an entry file?" no longer
+    # decides whether a root document is READ -- it decides whether it is judged as a changelog entry
+    # (heading levels) and whether checks 11 and 12 skip it as history in the making. A permanent root
+    # doc must never be counted as one: the fixture root holds CONTRIBUTING.md and CHANGELOG.md beside
+    # the single entry file, so the count is the discriminator, and it would catch the entry rule
+    # degrading into "any root .md" just as the old NOTES.md assertion did.
+    Assert-True ($r16.Out -match '\[entry-heading\].*1 unfolded entry file\(s\)') 'scenario 16: exactly ONE root file is read as an entry -- a permanent root doc is scanned but never judged as one'
 
     # And once the fold has taken it away, it simply drops out of the set again -- no stale reference,
     # no error about a file that no longer exists.
@@ -867,7 +883,7 @@ try {
     Assert-True (-not ($rQ32.Out -match $RecordQueryFindingPattern)) 'scenario 32: prose discussing the file is never an instruction'
     Assert-True ($rQ32.Out -match '\[record-query\] checked 0') 'scenario 32: nothing enforced'
 
-    # --- Scenario 33: a NEW family-level doc is in the scan set without being named ------------------
+    # --- Scenario 33: a NEW consumer-facing doc is in the scan set without being named ---------------
     #     The scan set for checks 11 and 12 (and the dead-link scan) used to be a hardcoded list of two
     #     family docs, 'README.md' and 'QUICKSTART.md'. UNINSTALL.md was then written beside them and no
     #     gate saw it -- a brand-new consumer-facing page printing exactly the class of command these two
@@ -879,8 +895,14 @@ try {
     #     So the assertion is deliberately about a file this suite has never heard of either. Its name is
     #     arbitrary on purpose -- if this scenario ever has to be updated because a real doc got that
     #     name, the enumeration has stopped being an enumeration.
-    Write-Host 'scan set -- a family doc nobody named is still scanned (checks 11 + 12)' -ForegroundColor Cyan
-    $s33Path = Join-Path $Fixture 'claude-code-plugins\claude-specialists\ZZ-NEWLY-WRITTEN-PAGE.md'
+    #
+    #     THE SUBJECT SITS IN THE ROOT SINCE #405, because that is where the class lives now. Flattening
+    #     moved QUICKSTART.md, UNINSTALL.md and the family README into the repo root, so the next
+    #     consumer-facing page will be written there rather than in a family directory -- and a scenario
+    #     testing the old directory would have gone on passing while the real gap reopened one level up.
+    #     The named list this scenario exists to prevent is gone with it: the root carries the *.md glob.
+    Write-Host 'scan set -- a root doc nobody named is still scanned (checks 11 + 12)' -ForegroundColor Cyan
+    $s33Path = Join-Path $Fixture 'ZZ-NEWLY-WRITTEN-PAGE.md'
     $s33 = @(
         '# A page written after the scan set was last touched'
         ''
@@ -1081,7 +1103,7 @@ try {
     # this check can fail badly: missing a real unbound sample, or firing on something that is not one.
     # The false-positive half is not optional politeness -- a gate that cries wolf gets an opt-out
     # pasted over every finding and then reports green while asserting nothing.
-    $qs = Join-Path $Fixture 'claude-code-plugins\claude-specialists\QUICKSTART.md'
+    $qs = Join-Path $Fixture 'QUICKSTART.md'
     # Fence and box drawing from codepoints, never as literals. The first version wrote the fence
     # literally and silently produced an opening fence with the language on the NEXT line, so the
     # "a command block is not examined" case was testing a language-less block and failing for a
@@ -1129,7 +1151,7 @@ try {
         'expected-output: a powershell block is a command to run, not examined'
 
     # 4. A DIAGRAM IS DRAWN, NOT CAPTURED. The check's first real false positive, on the seam diagram in
-    #    the family README.
+    #    the root README.
     [System.IO.File]::WriteAllText($qs, @(
         '# Quickstart', '', 'The shape is:', '', ($fence + 'text'), $tree, $fence
     ) -join "`n", $Utf8NoBom)

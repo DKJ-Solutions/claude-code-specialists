@@ -52,7 +52,7 @@ $ErrorActionPreference = 'Stop'
 # Repo root -- same dual-context resolution the shared scripts use.
 $repoRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
 if (-not $PluginRoot) {
-    $PluginRoot = Join-Path $repoRoot 'claude-code-plugins\claude-specialists\specialists'
+    $PluginRoot = Join-Path $repoRoot 'plugins\specialists'
 }
 $hooks = Join-Path $PluginRoot 'hooks'
 

@@ -8,7 +8,7 @@ manual, and the stable-id system; and (3) **how the specialists here are organiz
 themselves**. It is **not a replacement** for the safety rules or the routing.
 
 > **This repo is an outlier.** claude-code-specialists is Dave's workshop marketplace; the specialists
-> system lives here as the first product family in `claude-code-plugins/claude-specialists/`
+> system lives here as the first product family in `plugins/`
 > (see [`../../README.md`](../../README.md)) — and the repo also consumes that system here
 > **itself**, via the `specialists` plugin (group 1). The team here is therefore small and focused on
 > maintaining this product (agent defs, manuals, docs, tooling), not the broad team of a
@@ -37,7 +37,7 @@ just like inline text.
   - **Persona lens (lens-only)** — for the persona-only specialists (Chris, Derek, Rendall), who run
     in the main conversation instead of as subagents. The main loop loads no plugin subagents, so the
     **portable body** comes straight from the plugin install via an `@` import: Chris always
-    (`@~/.claude/plugins/marketplaces/claude-code-specialists/claude-code-plugins/claude-specialists/specialists/personas/01-01-persona.md`,
+    (`@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/specialists/personas/01-01-persona.md`,
     stated in [`SPECIALISTS.md`](SPECIALISTS.md) rather than in `CLAUDE.md` itself — the seam spends
     two of the four allowed import hops), Derek and Rendall on demand from that same path. The
     extension itself is therefore **lens-only**: only the repo-specific `## Specific to this repo`
@@ -55,8 +55,8 @@ just like inline text.
 
 The general model — persona vs. subagent representations, the manual/agent-def split, the
 portable-craft-vs-repo-lens split, and persona templates as a third artifact — is the plugin
-family's concept and lives in one canonical place: the family README's
-[Manuals — the split model](../../claude-code-plugins/claude-specialists/README.md#manuals--the-split-model).
+family's concept and lives in one canonical place: the root README's
+[Manuals — the split model](../../README.md#manuals--the-split-model).
 This section records only how that plays out **concretely in this repo**.
 
 ### Persona or subagent — one specialist, two representations

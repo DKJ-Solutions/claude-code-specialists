@@ -2,7 +2,7 @@
 .SYNOPSIS
     Regression tests for the script-contract check (scripts/sync/check-script-contract.ps1, issue
     #147) and its SessionStart hook
-    (claude-code-plugins/claude-specialists/specialists/hooks/script-contract-sessioncheck.ps1).
+    (plugins/specialists/hooks/script-contract-sessioncheck.ps1).
 
 .DESCRIPTION
     Dependency-free: no Pester, plain PowerShell. Integration-style -- runs the REAL check script (and
@@ -41,7 +41,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot      = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script        = Join-Path $RepoRoot 'scripts\sync\check-script-contract.ps1'
-$Hook          = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists\specialists\hooks\script-contract-sessioncheck.ps1'
+$Hook          = Join-Path $RepoRoot 'plugins\specialists\hooks\script-contract-sessioncheck.ps1'
 $BranchInfoSrc = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 $RepoConfigSrc = Join-Path $RepoRoot 'scripts\repo-config.ps1'
 $Fixture       = Join-Path ([System.IO.Path]::GetTempPath()) 'script-contract-test-fixture'
@@ -424,7 +424,7 @@ function Get-RosterIgnoredIds { return @() }
     $liveStagePattern = 'Lib\s*=\s*''scripts\\repo-config\.ps1'';\s*Function\s*=\s*''Get-LiveStage'';\s*Scripts\s*=\s*@\(''cut-release skill''\);\s*Optional\s*=\s*\$true;\s*Default\s*=\s*'''''
     Assert-True ([regex]::IsMatch($contractSrc, $liveStagePattern)) "contract: record for 'Get-LiveStage' still declared, attributed to scripts\repo-config.ps1 / 'cut-release skill', Optional with an empty-string Default"
 
-    $cutReleaseSkillPath = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists\specialists\skills\cut-release\SKILL.md'
+    $cutReleaseSkillPath = Join-Path $RepoRoot 'plugins\specialists\skills\cut-release\SKILL.md'
     Assert-True (Test-Path -LiteralPath $cutReleaseSkillPath) 'contract: cut-release SKILL.md exists at the path the Get-LiveStage record is attributed to'
     if (Test-Path -LiteralPath $cutReleaseSkillPath) {
         $skillText = [System.IO.File]::ReadAllText($cutReleaseSkillPath)

@@ -39,7 +39,10 @@ changelog entry — the same workflow as the consuming repos. The steps:
 ## Cutting a release
 
 A release is a **captured moment**: all plugins get the same version number
-(**lockstep, repo-wide**) and the state is tagged as `vX.Y.Z`. A release is cut **only on Dave's
+(**lockstep, repo-wide**) and the state is tagged as `vX.Y.Z`. That works because this repository holds
+**one** product whose four plugins are one system — see
+[One product, one repository](README.md#one-product-one-repository); a second, unrelated product would
+get its own repository and marketplace rather than joining this release train. A release is cut **only on Dave's
 explicit request** and deliberately does **not** go through a branch + PR: like the fold commit, the
 release commit is a permitted direct-on-`main` action (the second exception to "everything via
 branch + PR"). The full mechanics — the `cut-release.ps1` steps, the per-plugin `CHANGELOG.md`s and
