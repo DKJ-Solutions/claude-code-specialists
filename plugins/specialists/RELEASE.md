@@ -5,7 +5,7 @@
 
 Round v12 processed: the teardown papers corrected, and the staleness gate reaches into prose
 
-This card describes v3.1.2, the version your plugin manifest carries. Whether it is the code you are running is a separate question: the documented update path installs from `main`, so a `main` that has moved past the tag reports this same number. [The version is not the code](https://github.com/DaveKJohn/claude-code-specialists/blob/main/claude-code-plugins/claude-specialists/QUICKSTART.md#staying-up-to-date) in the QUICKSTART is the check.
+This card describes v3.1.2, the version your plugin manifest carries. Whether it is the code you are running is a separate question: the documented update path installs from `main`, so a `main` that has moved past the tag reports this same number. [The version is not the code](https://github.com/DaveKJohn/claude-code-specialists/blob/main/QUICKSTART.md#staying-up-to-date) in the QUICKSTART is the check.
 
 ## Documentation
 
@@ -34,7 +34,7 @@ about which way to repair, sitting unused. Whoever files a finding sees the site
 rest is the writer's job.
 
 Landed in two places along the existing split: the portable rule goes in
-[Tessa #16's manual](https://github.com/DaveKJohn/claude-code-specialists/blob/main/claude-code-plugins/claude-specialists/specialists/manuals/06-16-manual.md) as a hard
+[Tessa #16's manual](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/specialists/manuals/06-16-manual.md) as a hard
 rule beside *"consistency first"* — those two are neighbours but not the same rule, since consistency-first
 is about not duplicating a rule and this one is about a claim that **is** already duplicated. The concrete
 evidence and the resulting habit (*grep the claim across the page before editing the reported line, and

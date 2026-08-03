@@ -312,19 +312,26 @@ function Get-TouchedPlugins {
     <#
         Pure: derives the touched plugin names from a list of PR file paths (repo-root-relative,
         as gh pr list --json files supplies -- $Files here are already flat path strings, not the
-        gh objects themselves). Only paths under claude-code-plugins/claude-specialists/<plugin>/
-        count; the connectors folder is workshop administration and does not count (same rule as
-        previously inline in fold-changelog-entry.ps1). -cmatch (Sean's advice): -match is
-        case-insensitive and would silently widen the lowercase character class; plugin folder
-        names are always lowercase slugs. Returns a sorted, deduplicated array of plugin names
+        gh objects themselves). Only paths under plugins/<plugin>/ count. -cmatch (Sean's advice):
+        -match is case-insensitive and would silently widen the lowercase character class; plugin
+        folder names are always lowercase slugs. Returns a sorted, deduplicated array of plugin names
         (empty if nothing touches a plugin). Pulled out to here (#103, Victor #3) so the detection
         is separately testable, instead of inline logic in fold-changelog-entry.ps1.
+
+        THE EXCLUDED SIBLING CHANGED WITH THE LAYOUT (#405). Under the old two-level layout the one
+        non-plugin directory sitting beside the plugins was connectors/, so that was the name excluded
+        here. Flattening moved connectors/ to the repo ROOT -- where it no longer matches this pattern
+        at all -- and moved agent-shared/ IN, beside the plugins. So the exclusion follows the
+        directory rather than the name: agent-shared is plugin SOURCE (its generator writes the shared
+        blocks into plugin agent defs) but is not itself a plugin, and a release must not report it as
+        one. Keeping 'connectors' here instead would have been dead code guarding nothing while the
+        real sibling went uncounted.
     #>
     param([string[]]$Files = @())
     $touched = @()
     foreach ($f in $Files) {
-        if ($f -cmatch '^claude-code-plugins/claude-specialists/([a-z0-9][a-z0-9-]*)/') {
-            if ($Matches[1] -ne 'connectors' -and $touched -notcontains $Matches[1]) { $touched += $Matches[1] }
+        if ($f -cmatch '^plugins/([a-z0-9][a-z0-9-]*)/') {
+            if ($Matches[1] -ne 'agent-shared' -and $touched -notcontains $Matches[1]) { $touched += $Matches[1] }
         }
     }
     return @($touched | Sort-Object)
@@ -547,7 +554,7 @@ function Build-PluginReleaseCard {
     # not on the release. So the card now states what it describes and hands the "where am I" question
     # to the check that can answer it.
     $backtick = [char]0x60
-    $quickstartUrl = $RepoBlobUrl + 'claude-code-plugins/claude-specialists/QUICKSTART.md#staying-up-to-date'
+    $quickstartUrl = $RepoBlobUrl + 'QUICKSTART.md#staying-up-to-date'
     $mainRef = "$backtick" + 'main' + "$backtick"
     $titleLine = if ($Title) { "$Title`n`n" } else { '' }
     $header = "# Release v$Version`n`n" +

@@ -81,7 +81,7 @@ if (-not $Path -or @($Path).Count -eq 0) {
     )
     # Every plugin's own CHANGELOG.md and RELEASE.md: cut-release.ps1 writes entry text into both, so
     # damage in the root changelog propagates there on the next release.
-    $pluginRoot = Join-Path $repoRoot 'claude-code-plugins'
+    $pluginRoot = Join-Path $repoRoot 'plugins'
     if (Test-Path -LiteralPath $pluginRoot) {
         $Path += @(Get-ChildItem -LiteralPath $pluginRoot -Recurse -File -Include 'CHANGELOG.md', 'RELEASE.md' |
             Select-Object -ExpandProperty FullName)

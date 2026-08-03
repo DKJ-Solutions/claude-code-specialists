@@ -17,12 +17,12 @@
          file name <group>-<id>-persona.md matches that frontmatter. Personas (orchestrator +
          main-loop specialists) DELIBERATELY have no agent def -- they run in the main loop, not
          as a subagent -- and are therefore left alone by check 6's agent-def<->manual link.
-      4. dead relative links AND broken anchors in README.md, CHANGELOG.md, CLAUDE.md,
-         CONTRIBUTING.md, every .claude/extensions/*.md, every <plugin>/skills/*/SKILL.md, every
+      4. dead relative links AND broken anchors in every ROOT *.md (README.md, CHANGELOG.md, CLAUDE.md,
+         CONTRIBUTING.md, QUICKSTART.md, UNINSTALL.md, SECURITY.md and any unfolded changelog entry file
+         -- globbed, never named), every .claude/extensions/*.md, every <plugin>/skills/*/SKILL.md, every
          <plugin>/manuals/*-manual.md, every <plugin>/personas/*-persona.md, every releases/**/*.md,
-         every <plugin>/RELEASE.md, claude-code-plugins/claude-specialists/README.md (the family
-         README) and QUICKSTART.md, claude-code-plugins/claude-specialists/connectors/README.md, and
-         every plugin's own claude-code-plugins/claude-specialists/<plugin>/CHANGELOG.md (#103).
+         every <plugin>/RELEASE.md, connectors/README.md, and
+         every plugin's own plugins/<plugin>/CHANGELOG.md (#103).
          Checked: (a) the linked
          file exists, and (b) if the link
          has a #anchor, that anchor exists as a heading in the target file (GitHub slug rules).
@@ -304,36 +304,35 @@ function Test-IsChangelogEntryFile {
 }
 
 $linkFiles = @()
-foreach ($root in 'README.md', 'CHANGELOG.md', 'CLAUDE.md', 'CONTRIBUTING.md') {
-    $p = Join-Path $RepoRoot $root
-    if (Test-Path -LiteralPath $p) { $linkFiles += $p }
-}
+# EVERY ROOT *.md, ENUMERATED AND NOT NAMED, AND THAT IS THE POINT. This used to be a hardcoded list
+# of four root documents PLUS a glob over the family directory that held QUICKSTART.md, UNINSTALL.md and
+# the family README. Both halves were the same class of bug seen twice: the family glob replaced a
+# hardcoded list of two ('README.md', 'QUICKSTART.md') that had gone stale the moment UNINSTALL.md was
+# written beside them and no gate saw it -- not the dead-link scan, not check 11 (printed lifecycle
+# commands), not check 12 (the install-record query), all three of which derive their scan set from
+# $linkFiles. A brand-new consumer-facing page, printing exactly the class of command those two checks
+# exist to police, was invisible on the run that introduced it.
+#
+# #405 moved those three documents INTO the root, which would have left the remaining named list as the
+# only rule over the exact directory the class of defect lives in -- so the root gets the glob the family
+# directory had, for the same reason: a list is only ever correct until the next document is written, and
+# nothing announces the omission. Non-recursive on purpose; every subdirectory is gathered by its own rule
+# below and would otherwise be picked up twice.
+#
+# This also subsumes the root changelog ENTRY files added in #234 (see the note further down on why they
+# belong here) and picks up SECURITY.md, which no rule had ever covered.
+$linkFiles += @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
+    Select-Object -ExpandProperty FullName)
 # The specialists handbook lives next to the lenses (at family level) -- validate its links too.
 $handbook = Join-Path $RepoRoot '.claude\plugins\claude-specialists\README.md'
 if (Test-Path -LiteralPath $handbook) { $linkFiles += $handbook }
-# The family-level docs of the specialists family (claude-code-plugins/claude-specialists/*.md) and
-# every plugin's own CHANGELOG.md (the consumer-facing card that cut-release.ps1 updates) did not yet
+# Every plugin's own CHANGELOG.md (the consumer-facing card that cut-release.ps1 updates) did not yet
 # belong to the scan set -- added (#103).
-#
-# ENUMERATED, NOT NAMED, AND THAT IS THE POINT. This was a hardcoded list of two ('README.md',
-# 'QUICKSTART.md') until UNINSTALL.md was written beside them and no gate saw it: not the dead-link
-# scan, not check 11 (printed lifecycle commands), not check 12 (the install-record query) -- all three
-# derive their scan set from $linkFiles. A brand-new consumer-facing page, printing exactly the class of
-# command those two checks exist to police, was invisible on the run that introduced it.
-#
-# The same gap is what #103 closed by ADDING the two names, which is why naming a third would have been
-# repeating the fix rather than closing the class: the list is only ever correct until the next document
-# is written, and nothing announces the omission. This directory holds the family's consumer-facing
-# pages and nothing else, so its own *.md IS the set -- non-recursive on purpose, since the per-plugin
-# subdirectories are gathered by their own rules below (CHANGELOG.md here, RELEASE.md and SKILL.md
-# further down) and would otherwise be picked up twice.
-$linkFiles += (Get-ChildItem -Path (Join-Path $RepoRoot 'claude-code-plugins\claude-specialists') -Filter '*.md' -File |
-    Select-Object -ExpandProperty FullName)
-# The connectors README (claude-code-plugins/claude-specialists/connectors/) did not yet belong to
+# The connectors README (connectors/) did not yet belong to
 # the scan set either -- added alongside CONTRIBUTING.md (#159 follow-up, spotted by Edith).
-$connectorsReadme = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists\connectors\README.md'
+$connectorsReadme = Join-Path $RepoRoot 'connectors\README.md'
 if (Test-Path -LiteralPath $connectorsReadme) { $linkFiles += $connectorsReadme }
-$linkFiles += (Get-ChildItem -Path (Join-Path $RepoRoot 'claude-code-plugins\claude-specialists') -Recurse -Filter 'CHANGELOG.md' -File |
+$linkFiles += (Get-ChildItem -Path (Join-Path $RepoRoot 'plugins') -Recurse -Filter 'CHANGELOG.md' -File |
     Where-Object { $_.FullName -notmatch '\\connectors\\' } |
     Select-Object -ExpandProperty FullName)
 # The repo lenses live in the seam (.claude/specialists/, the canonical location since #253), on the
@@ -369,24 +368,23 @@ if (Test-Path -LiteralPath $releasesDir) {
 # CHANGELOG.md -- those links need to be validated too.
 $linkFiles += (Get-ChildItem -Path $RepoRoot -Recurse -Filter 'RELEASE.md' -File |
     Select-Object -ExpandProperty FullName)
-# Root changelog ENTRY files (<branch-name>.md), added to close the window in #234. This is the whole
-# fix, and it is small because the gap was structural rather than subtle: an entry file's text lives
-# outside every scanned path while the PR is open, and only enters a scanned file at FOLD time --
-# which happens directly on main, past every PR gate. So the sequence was: CI green on the PR (text in
-# an unscanned file) -> the fold introduces the error on main -> nothing reviews the fold, because it
-# is one of the two sanctioned direct-on-main actions -> the next full gate run is cut-release.ps1,
-# which refuses to release. That is how v2.13.0 was blocked by a changelog sentence.
+# Root changelog ENTRY files (<branch-name>.md) are covered by the root *.md glob at the top of this
+# set, no longer by a rule of their own -- but WHY they must be in it is worth keeping, because the glob
+# does not say it. Added to close the window in #234: the gap was structural rather than subtle, since an
+# entry file's text lives outside every scanned path while the PR is open and only enters a scanned file
+# at FOLD time -- which happens directly on main, past every PR gate. So the sequence was: CI green on the
+# PR (text in an unscanned file) -> the fold introduces the error on main -> nothing reviews the fold,
+# because it is one of the two sanctioned direct-on-main actions -> the next full gate run is
+# cut-release.ps1, which refuses to release. That is how v2.13.0 was blocked by a changelog sentence.
 #
-# Scanning them here means the PR gate sees exactly the text the fold will paste into CHANGELOG.md,
-# so the error surfaces where it can still be reviewed. Their links are validated at ROOT position,
-# which is correct twice over: the entry file sits in the root now, and CHANGELOG.md -- where it is
-# headed -- is in the root too, so a relative link that resolves here resolves there.
+# Scanning them means the PR gate sees exactly the text the fold will paste into CHANGELOG.md, so the
+# error surfaces where it can still be reviewed. Their links are validated at ROOT position, which is
+# correct twice over: the entry file sits in the root, and CHANGELOG.md -- where it is headed -- is in the
+# root too, so a relative link that resolves here resolves there. Checks 11 and 12 exclude them again by
+# name, since an entry file is history in the making (see $lifecycleFiles below).
 #
 # Note this covers check 10 (the skills:all spans) as well, since that check reuses this same set --
 # and check 10 is precisely what #234 tripped over.
-$linkFiles += @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
-    Where-Object { Test-IsChangelogEntryFile -Path $_.FullName } |
-    Select-Object -ExpandProperty FullName)
 
 Write-Coverage -Category 'link-scan' -Checked $linkFiles.Count `
     -Note $(if ($linkFiles.Count -eq 0) { 'the scan set is empty -- no dead link anywhere could be found, which is not the same as there being none' } else { '' })
@@ -448,10 +446,19 @@ foreach ($lf in $linkFiles) {
 # carries -- <plugin>/skills/**/*.ps1 (e.g. specialists-init's bootstrap) and
 # <plugin>/scripts/**/*.ps1 (the shared SSOT home, issue #81). Made unique so a path that hits both
 # filters is not parsed twice.
+#
+# The plugin-scripts half is anchored on the plugins root rather than matched as a path segment (#405).
+# 'plugins' is not a distinctive name: it is also the leaf of .claude/plugins/, so a segment match would
+# widen this check to anything a consumer's plugin layer happens to carry. The old segment name
+# ('claude-code-plugins') was unique enough to get away with it; this one is not.
 $psScripts = @()
+$pluginsRoot = Join-Path $RepoRoot 'plugins'
 $psScripts += (Get-ChildItem -Path (Join-Path $RepoRoot 'scripts') -Recurse -Filter '*.ps1' -File)
 $psScripts += (Get-ChildItem -Path $RepoRoot -Recurse -Filter '*.ps1' -File |
-    Where-Object { $_.FullName -match '\\skills\\' -or $_.FullName -match '\\claude-code-plugins\\.+\\scripts\\' })
+    Where-Object {
+        $_.FullName -match '\\skills\\' -or
+        ($_.FullName.StartsWith($pluginsRoot + '\') -and $_.FullName -match '\\scripts\\')
+    })
 $psScripts = @($psScripts | Sort-Object -Property FullName -Unique)
 $psScripts | ForEach-Object {
     $parseErrors = $null
@@ -608,7 +615,7 @@ Write-Coverage -Category 'release-card' -Checked $pluginManifests.Count `
 # rather than its own file list (single source for "which docs matter").
 #
 # Extraction is CHARACTER-based (offset of the end of the BEGIN match to the start of the END
-# match), not line-based. The real-world enumerations this exists for (e.g. the family README's
+# match), not line-based. The real-world enumerations this exists for (e.g. the root README's
 # "only the skills (...) remain available there" sentence) are inline running prose, not a bullet
 # list on its own lines -- a line-based span could only mark that by putting a sentinel on its own
 # line mid-paragraph, which breaks the paragraph in rendered markdown (an HTML comment is an HTML
@@ -654,7 +661,7 @@ function Get-FenceMaskedText {
     return -join $parts
 }
 
-# Canonical skillset: every claude-code-plugins/claude-specialists/<plugin>/skills/<name>/SKILL.md
+# Canonical skillset: every plugins/<plugin>/skills/<name>/SKILL.md
 # (exact depth -- plugin, then 'skills', then exactly one skill-name folder, then the file -- so a
 # deeper file such as a level-3 progressive-disclosure skills/<name>/references/SKILL.md, should
 # that pattern ever appear, is not mistaken for a top-level skill), across ALL plugin folders (not
@@ -666,7 +673,7 @@ function Get-FenceMaskedText {
 # future skill without that line does not silently drop out of the canonical set (not a new failure
 # mode: the frontmatter's own presence/shape is check 3's domain, not this one's).
 $skillCanonicalList = New-Object System.Collections.Generic.List[string]
-$skillsRoot = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists'
+$skillsRoot = Join-Path $RepoRoot 'plugins'
 if (Test-Path -LiteralPath $skillsRoot) {
     Get-ChildItem -Path $skillsRoot -Recurse -Filter 'SKILL.md' -File |
         Where-Object { $_.FullName -match '\\skills\\[^\\]+\\SKILL\.md$' } | ForEach-Object {
@@ -1151,9 +1158,9 @@ $sampleChecked = 0
 # this list would drift the moment a fourth document joins -- which is check 16's own subject arriving in
 # its source, so it is one variable shared by both.
 $consumerDocs = @(
-    'claude-code-plugins\claude-specialists\QUICKSTART.md',
-    'claude-code-plugins\claude-specialists\UNINSTALL.md',
-    'claude-code-plugins\claude-specialists\README.md'
+    'QUICKSTART.md',
+    'UNINSTALL.md',
+    'README.md'
 )
 # What counts as saying "here is what this is bound to". A version or a year pins the capture in time; the
 # hedges pin it to a condition. Deliberately not 'measured' on its own -- that says the author saw it,

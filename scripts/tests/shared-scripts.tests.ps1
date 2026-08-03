@@ -41,7 +41,7 @@ Assert-True ($pairs.Count -ge 1) 'at least one shared script registered'
 $fold = $pairs | Where-Object { $_.Name -eq 'fold-changelog-entry' }
 Assert-True ($null -ne $fold) 'fold-changelog-entry is in the register'
 Assert-True ($fold.SourceRel -like 'scripts\*') 'source is repo-root-relative under scripts\'
-Assert-True ($fold.MirrorRel -like 'claude-code-plugins\*') 'mirror lives under the plugin'
+Assert-True ($fold.MirrorRel -like 'plugins\*') 'mirror lives under the plugin'
 # Explicit -- the generic loops further down already cover these two implicitly, but a missing
 # pair in the register would then slip through silently instead of giving a targeted failure.
 $newChangelogPair = $pairs | Where-Object { $_.Name -eq 'new-changelog-entry' }

@@ -5,7 +5,7 @@ group: 05
 
 # Sylvester ⚙️ · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/05-15-manual.md`). This file does not describe the craft, but what Sylvester does in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`plugins/specialists/manuals/05-15-manual.md`). This file does not describe the craft, but what Sylvester does in this repo.
 
 A system administrator does the same thing everywhere — manage the harness and the tooling the team
 works in: scripts, config, the safety guards. **What is repo-specific in claude-code-specialists is not
@@ -84,7 +84,7 @@ infrastructure.
   [Rendall #06](05-06-extension.md)'s domain; Sylvester guards the script mechanics underneath.
 - **`scripts/agents/build-agent-defs.ps1` + `scripts/lib/agent-shared-lib.ps1`** — the generator
   that fills the verbatim-shared bullets from
-  `claude-code-plugins/claude-specialists/agent-shared/<name>.md` into all agent defs (between
+  `plugins/agent-shared/<name>.md` into all agent defs (between
   `<!-- BEGIN/END shared:… -->` sentinels). Change a shared block →
   run `build-agent-defs.ps1` → all agent defs updated; `-Check` (and the lint gate, check 7) fails
   on drift. The pure expansion logic lives in the lib, so [Tycho #18](04-18-extension.md) can test
@@ -116,7 +116,7 @@ infrastructure.
   followed by `claude plugin install specialists@claude-code-specialists --scope project` from the new
   root, after which a leftover record naming the old folder is expected and inert. The mechanism, the
   other two ways a record goes missing, and why that leftover is not a stray duplicate are in the
-  family's [QUICKSTART](../../../claude-code-plugins/claude-specialists/QUICKSTART.md#staying-up-to-date);
+  family's [QUICKSTART](../../../QUICKSTART.md#staying-up-to-date);
   don't restate them here.
 - **Always read `$LASTEXITCODE` before you pipe a native command through a cmdlet.** A construct like
   `& git … | Select-Object -First 1` cuts the upstream (git) short as soon as the first item is in;

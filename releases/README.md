@@ -5,7 +5,7 @@ The release history of the davekjohns-workshop marketplace. A release here is no
 lockstep. The full notes live below in `development/<X>.x/<X.Y.Z>.md`, and the `## Releases` block in
 [`CHANGELOG.md`](../CHANGELOG.md) references them. [`scripts/release/cut-release.ps1`](../scripts/release/cut-release.ps1)
 itself publishes nothing to GitHub Releases — that is a separate, manual closing step: for a
-**Minor or Major** bump, the [`cut-release` skill](../claude-code-plugins/claude-specialists/specialists/skills/cut-release/SKILL.md)'s
+**Minor or Major** bump, the [`cut-release` skill](../plugins/specialists/skills/cut-release/SKILL.md)'s
 checklist walks through `gh release create` + `gh release upload` (the highlights as the release
 body, the full development notes as an attachment); a **Patch** release skips that step (tag only).
 Releases are cut only at Dave's explicit request — see [Cutting a release](#cutting-a-release)
@@ -136,7 +136,7 @@ In one motion, on a clean `main`:
 
 **Closing step, after the script, for a Minor/Major bump: publish a GitHub Release.** Not run by
 `cut-release.ps1` and not automated — the release manager walks through the
-[`cut-release` skill](../claude-code-plugins/claude-specialists/specialists/skills/cut-release/SKILL.md)'s
+[`cut-release` skill](../plugins/specialists/skills/cut-release/SKILL.md)'s
 checklist: `gh release create` with the highlights as the release body (`--notes-file`), then
 `gh release upload` with the full development notes file as an attachment. That split is not a
 style choice: `gh`'s release-notes body has a hard 125,000-character limit, which a full notes file

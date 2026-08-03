@@ -6,7 +6,7 @@
 .DESCRIPTION
     The register lives at family level, next to the plugin folders (deliberately NOT inside them,
     so it does not travel along with a consumer's plugin cache): ONE manifest per connected repo
-    (claude-code-plugins/claude-specialists/connectors/<repo>.json), containing the extension
+    (connectors/<repo>.json), containing the extension
     inventory per plugin. Manifests contain only METADATA -- never
     lens content and never absolute machine paths; localCheckout is relative to this repo's root.
 
@@ -79,7 +79,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot   = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$FamilyRoot = Join-Path $RepoRoot 'claude-code-plugins\claude-specialists'
+$PluginsRoot = Join-Path $RepoRoot 'plugins'
 $DriftLint  = Join-Path $RepoRoot 'scripts\lint\check-consumer-drift.ps1'
 
 $script:errors = 0
@@ -90,12 +90,12 @@ $script:infos  = 0
 # register that only exists here), so the lib is dot-sourced unconditionally.
 . (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
 
-# Plugin id (before the '@') -> plugin folder under the family root, only if the name is a
-# simple slug AND the folder actually exists under the family root; otherwise $null.
+# Plugin id (before the '@') -> plugin folder under the plugins root, only if the name is a
+# simple slug AND the folder actually exists under the plugins root; otherwise $null.
 function Get-PluginDir([string]$PluginId) {
     $name = $PluginId.Split('@')[0]
     if (-not (Test-PluginNameSlug -Name $name)) { return $null }
-    $dir = Join-Path $FamilyRoot $name
+    $dir = Join-Path $PluginsRoot $name
     if (-not (Test-Path -LiteralPath $dir)) { return $null }
     return $dir
 }
@@ -117,7 +117,7 @@ function Get-PluginIds([string]$PluginDir) {
 if ($Manifest) {
     $manifestFiles = @(Get-Item -LiteralPath $Manifest)
 } else {
-    $connectorsRoot = Join-Path $FamilyRoot 'connectors'
+    $connectorsRoot = Join-Path $RepoRoot 'connectors'
     $manifestFiles = @()
     if (Test-Path -LiteralPath $connectorsRoot) {
         $manifestFiles = @(Get-ChildItem -LiteralPath $connectorsRoot -Filter '*.json' -File)

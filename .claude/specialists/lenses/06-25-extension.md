@@ -5,7 +5,7 @@ group: 06
 
 # Nolan ⚡ · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`claude-code-plugins/claude-specialists/specialists/manuals/06-25-manual.md`). This file does not describe the craft, but what Nolan measures in this repo and with whom he works.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`plugins/specialists/manuals/06-25-manual.md`). This file does not describe the craft, but what Nolan measures in this repo and with whom he works.
 
 A performance engineer does the same thing everywhere — measure resource cost and trim it without
 losing function. **What is repo-specific in claude-code-specialists is not that Nolan measures, but
@@ -22,7 +22,7 @@ him levers to pull.**
   Nolan checks whether that boundary still holds as the roster grows: does a new persona/subagent
   stay on-demand, or has something crept onto the automatic path that doesn't need to be there?
 - **The size of agent-defs, manuals, and personas** across the plugins
-  (`claude-code-plugins/claude-specialists/*/agents/*-agent.md`, `*/manuals/*-manual.md`,
+  (`plugins/*/agents/*-agent.md`, `*/manuals/*-manual.md`,
   `specialists/personas/*-persona.md`): a manual/agent-def that has grown well past what its craft
   needs is a cost on every load, not a one-time read.
 - **The `agent-shared/` mechanism** (see [Sylvester #15](05-15-extension.md) and

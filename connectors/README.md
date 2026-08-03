@@ -16,14 +16,14 @@ administration.
 claude-code-specialists works like a **Customer Data Platform**: all changes to shared plugin content
 (agent defs, manuals, persona bodies, skills) **land here first**, and are only then synced out to
 the connected repos — never the other way around (see the safety rules in the repo
-[`CLAUDE.md`](../../../CLAUDE.md)). If an improvement nevertheless originates in a consumer, that
+[`CLAUDE.md`](../CLAUDE.md)). If an improvement nevertheless originates in a consumer, that
 is an **inbound signal**: the change is first brought back here and then synced out again.
 
 **The standing inbound route** (agreed with Dave, July 16, 2026): if a session in a consuming repo
 discovers core improvements (something for the shared agent defs, manuals, persona bodies, or
 skills — not lens work), that session does not build it itself, but opens an **issue on this repo**
 with the label **`inbound`** — template:
-[`inbound-improvement`](../../../.github/ISSUE_TEMPLATE/inbound-improvement.md). This way nothing
+[`inbound-improvement`](../.github/ISSUE_TEMPLATE/inbound-improvement.md). This way nothing
 gets lost and every workshop session has a visible backlog; the workshop processes it through the
 normal chain (branch → reviews → PR → release bump on Dave's word), after which the consumer gets
 it back via the plugin update. The only legitimate bridge on the consumer side is a deliberately
@@ -88,11 +88,11 @@ accepted degree of transparency (security review, July 16, 2026).
 
 ## The check
 
-[`scripts/sync/check-connectors.ps1`](../../../scripts/sync/check-connectors.ps1) runs the two-way
+[`scripts/sync/check-connectors.ps1`](../scripts/sync/check-connectors.ps1) runs the two-way
 check across all manifests: plugin still enabled, registered extensions present (outbound),
 unregistered extensions flagged (inbound), the machine version against the source, and per
 consumer the content drift check
-([`check-consumer-drift.ps1`](../../../scripts/lint/check-consumer-drift.ps1)). Run it at the
+([`check-consumer-drift.ps1`](../scripts/lint/check-consumer-drift.ps1)). Run it at the
 start of a workday or session:
 
 ```powershell
@@ -109,7 +109,7 @@ Through the `github` marketplace source, the Claude Code CLI clones and caches t
 every consumer, so no physical copy in the consuming repo is needed and thus no sync step either —
 every consumer literally consumes the same files. Left over from a transition, however, a consuming
 repo may still have an outdated local copy of an agent def that is by now shared here.
-[`scripts/lint/check-consumer-drift.ps1`](../../../scripts/lint/check-consumer-drift.ps1) (invoked
+[`scripts/lint/check-consumer-drift.ps1`](../scripts/lint/check-consumer-drift.ps1) (invoked
 per consumer as part of the `check-connectors.ps1` run above, or standalone) compares such a local
 copy (read-only, changes nothing) with the canonical version here and reports `MISSING` (already
 migrated), `IDENTICAL` (dead copy, safe to remove), or `DRIFTED` (inspect first before removing). The
@@ -159,8 +159,8 @@ structural path difference.
 ## The session check (automatic)
 
 The `specialists` plugin carries a **SessionStart hook**
-([`hooks/hooks.json`](../specialists/hooks/hooks.json) +
-[`connector-sessioncheck.ps1`](../specialists/hooks/connector-sessioncheck.ps1)) that, when a
+([`hooks/hooks.json`](../plugins/specialists/hooks/hooks.json) +
+[`connector-sessioncheck.ps1`](../plugins/specialists/hooks/connector-sessioncheck.ps1)) that, when a
 session starts — in every repo that has the plugin, so also life-hub and smartwatchbanden —
 locates the workshop checkout and runs the connectors check there. Two guardrails from the
 security review: the found path is **verified** first (a marker check on the marketplace name in

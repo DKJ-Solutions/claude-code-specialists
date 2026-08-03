@@ -97,7 +97,7 @@ if ($repo -match 'VUL-IN') {
 # tooling, see scripts\lib\shared-scripts-lib.ps1), unlike this fold script itself. In the
 # workshop root it simply exists; in a consumer repo running the plugin mirror it is missing, and
 # the Plugins line is omitted -- functionally the same as before, since
-# claude-code-plugins/claude-specialists/<plugin>/ paths do not exist there anyway.
+# plugins/<plugin>/ paths do not exist there anyway.
 $releaseLibPath = Join-Path $repoRoot 'scripts\lib\release-lib.ps1'
 $canDetectPlugins = Test-Path -LiteralPath $releaseLibPath
 if ($canDetectPlugins) { . $releaseLibPath }
@@ -214,7 +214,7 @@ foreach ($file in $entryFiles) {
         $entryContent = ([regex]'(?m)^### ').Replace($entryContent, "### #$num $midDot ", 1)
 
         # Deriving touched plugins from the PR files (automation-first): paths under
-        # claude-code-plugins/claude-specialists/<plugin>/ become a 'Plugins:' line, which
+        # plugins/<plugin>/ become a 'Plugins:' line, which
         # cut-release.ps1 later uses to update the per-plugin CHANGELOGs. The detection itself
         # lives in the pure Get-TouchedPlugins (release-lib.ps1, #103) -- only the guard is here;
         # 'files' already came along with the gh pr list call above, so no separate gh roundtrip

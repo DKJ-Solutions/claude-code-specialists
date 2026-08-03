@@ -111,7 +111,14 @@ function Write-Utf8NoBom([string]$Path, [string]$Content) {
 # treats every other root *.md as an unfolded entry (deliberately catch-all, so an entry with an
 # unknown branch prefix is never missed) -- so any permanent root doc added over time must be
 # listed here, or a release would falsely refuse to cut. Add new permanent root docs here.
-$reservedRootMd = @('CHANGELOG.md', 'CLAUDE.md', 'README.md', 'LICENSE.md', 'CONTRIBUTING.md', 'SECURITY.md')
+#
+# QUICKSTART.md and UNINSTALL.md joined in #405, when flattening moved them out of the family
+# directory and into the root. That is the #165 defect class exactly: two permanent root docs
+# arriving without an allowlist entry, which would have blocked the next release with a complaint
+# about "unfolded changelog entry files" naming two documents nobody had failed to fold. It was
+# caught by cut-release-guardrail.tests.ps1 -- the drift guard #165 left behind -- rather than by
+# the release that would have hit it.
+$reservedRootMd = @('CHANGELOG.md', 'CLAUDE.md', 'README.md', 'LICENSE.md', 'CONTRIBUTING.md', 'SECURITY.md', 'QUICKSTART.md', 'UNINSTALL.md')
 
 function Get-PluginManifests {
     # The marketplace definition is the source of truth about what a plugin is: the manifests are

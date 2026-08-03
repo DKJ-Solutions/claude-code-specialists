@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Builds the agent defs: fills every shared-block region (<!-- BEGIN/END shared:NAME -->) with
-    the canonical source from claude-code-plugins/claude-specialists/agent-shared/<name>.md.
+    the canonical source from plugins/agent-shared/<name>.md.
 .DESCRIPTION
     Verbatim-shared bullets under **Boundaries** (e.g. the inbound rule, 19/19) are maintained in
     ONE place (agent-shared/) and filled in here across all agent defs. If you change a shared

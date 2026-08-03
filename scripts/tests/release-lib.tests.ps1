@@ -279,10 +279,11 @@ Assert-Throws { Get-PluginManifestPaths -RepoRoot $fakeRoot -MarketplaceJson 'no
 
 Write-Host "Get-TouchedPlugins" -ForegroundColor Cyan
 $touchedFiles = @(
-    'claude-code-plugins/claude-specialists/specialists/agents/01-01-chris.md',
-    'claude-code-plugins/claude-specialists/specialists/manuals/01-01-manual.md',
-    'claude-code-plugins/claude-specialists/specialists-lifehub/agents/foo.md',
-    'claude-code-plugins/claude-specialists/connectors/some-repo.json',
+    'plugins/specialists/agents/01-01-chris.md',
+    'plugins/specialists/manuals/01-01-manual.md',
+    'plugins/specialists-lifehub/agents/foo.md',
+    'plugins/agent-shared/inbound-behaviour.md',
+    'connectors/some-repo.json',
     'README.md',
     'scripts/lib/release-lib.ps1'
 )
@@ -290,14 +291,19 @@ $touched = @(Get-TouchedPlugins -Files $touchedFiles)
 Assert-Equal 2 $touched.Count 'two touched plugins (deduplicated + sorted)'
 Assert-Equal 'specialists' $touched[0] 'first plugin name alphabetically'
 Assert-Equal 'specialists-lifehub' $touched[1] 'second plugin name alphabetically'
+# The two non-plugin directories, one on each side of the plugins root after the #405 flattening:
+# agent-shared/ sits INSIDE it and has to be excluded by name, connectors/ sits at the ROOT and can no
+# longer match at all. Both are asserted, so neither half can quietly regress into counting as a plugin.
+Assert-Equal $false ([bool]($touched -contains 'agent-shared')) 'agent-shared is plugin source, not a plugin'
 Assert-Equal $false ([bool]($touched -contains 'connectors')) 'connectors folder does not count as a plugin'
+Assert-Equal 0 (@(Get-TouchedPlugins -Files @('connectors/life-hub.json'))).Count 'connectors at the repo root does not match the plugins pattern at all'
 Assert-Equal 0 (@(Get-TouchedPlugins -Files @())).Count 'empty input -> empty set'
 Assert-Equal 0 (@(Get-TouchedPlugins -Files @('README.md', 'scripts/lib/release-lib.ps1'))).Count 'non-plugin paths ignored'
-Assert-Equal 0 (@(Get-TouchedPlugins -Files @('claude-code-plugins/claude-specialists/Specialists/agents/x.md'))).Count 'uppercase plugin slug does not count (-cmatch lowercase rule)'
+Assert-Equal 0 (@(Get-TouchedPlugins -Files @('plugins/Specialists/agents/x.md'))).Count 'uppercase plugin slug does not count (-cmatch lowercase rule)'
 $dedupFiles = @(
-    'claude-code-plugins/claude-specialists/specialists/agents/a.md',
-    'claude-code-plugins/claude-specialists/specialists/agents/b.md',
-    'claude-code-plugins/claude-specialists/specialists/manuals/c.md'
+    'plugins/specialists/agents/a.md',
+    'plugins/specialists/agents/b.md',
+    'plugins/specialists/manuals/c.md'
 )
 $dedupTouched = @(Get-TouchedPlugins -Files $dedupFiles)
 Assert-Equal 1 $dedupTouched.Count 'same plugin across multiple files -> once in the set'
@@ -375,7 +381,7 @@ Assert-Match $card '\*\*Type:\*\* Minor' 'type line'
 Assert-Match $card 'Test-title' 'title included'
 Assert-Match $card 'This card describes v1\.5\.0, the version your plugin manifest carries\.' 'the card states what it describes rather than where the reader is (#384)'
 Assert-Equal $false ([bool]($card -match 'You are on this release')) 'and does not claim the reader is on it -- v13 measured that false in the ordinary case'
-Assert-Match $card '\[The version is not the code\]\(https://gh\.test/blob/main/claude-code-plugins/claude-specialists/QUICKSTART\.md\#staying-up-to-date\)' 'the "where am I" question is handed to the check that can answer it, as an absolute URL (the card is read from a plugin cache)'
+Assert-Match $card '\[The version is not the code\]\(https://gh\.test/blob/main/QUICKSTART\.md\#staying-up-to-date\)' 'the "where am I" question is handed to the check that can answer it, as an absolute URL (the card is read from a plugin cache)'
 Assert-Match $card '(?s)Test-title.*This card describes v1\.5\.0' 'title comes before the describes-line'
 Assert-Match $card '(?m)^## Fixes' 'card groups entries under a category heading (## Fixes), single-release view'
 Assert-Equal $false ([bool]($card -match '(?m)^## v1\.5\.0 ')) 'card carries no redundant inner ## vX.Y.Z heading (the # Release header already states the version)'

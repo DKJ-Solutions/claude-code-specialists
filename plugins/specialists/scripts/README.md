@@ -17,7 +17,7 @@ consumers (life-hub, smartwatchbanden, …) no longer duplicate them per repo. T
 ## Status
 
 This table mirrors the full registry in
-[`scripts/lib/shared-scripts-lib.ps1`](../../../../scripts/lib/shared-scripts-lib.ps1)'s
+[`scripts/lib/shared-scripts-lib.ps1`](../../../scripts/lib/shared-scripts-lib.ps1)'s
 `Get-SharedScriptPairs` -- one row per registered pair, so this is the **complete** shared set, not
 a skill-only subset. Not every pair is reached through a skill, though: `check-roster-sync` /
 `check-script-contract` are read-only checks invoked by a SessionStart hook instead, and

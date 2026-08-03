@@ -1,8 +1,8 @@
 ---
 paths:
   - "scripts/**"
-  - "claude-code-plugins/**/scripts/**"
-  - "claude-code-plugins/**/hooks/**"
+  - "plugins/**/scripts/**"
+  - "plugins/**/hooks/**"
   - ".github/**"
   - "releases/**"
   - "CHANGELOG.md"
@@ -29,7 +29,7 @@ The list below is meant to be exhaustive. If it ever undercounts a layer, that i
 discovery — as an earlier pass did for `.github/workflows/ci.yml` — not a quiet exception to the norm.
 
 - **The script layer is fully in scope.** Every `.ps1` file under `scripts/**` (and the shared
-  mirrors under `claude-code-plugins/claude-specialists/*/scripts/`), the hooks, the tests, and
+  mirrors under `plugins/*/scripts/`), the hooks, the tests, and
   `.github/**` (the workflows, the issue templates, and the PR template) are English throughout —
   comments, docstrings, console output (`Write-Host`/`Write-Error`/`Write-Warning`/`throw` text), and
   workflow/template body text. `ci.yml` was translated on July 26, 2026, closing the gap a
