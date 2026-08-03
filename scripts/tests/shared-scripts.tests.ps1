@@ -125,16 +125,56 @@ try {
     # ('branch-'\n'info.ps1'), which would make a bare -match below fail flakily, purely depending
     # on the (arbitrary) temp-path length. Stripping newlines before the match restores the
     # original continuous text -- no functional change, only deterministic matching.
-    function Test-OutputContains { param([string]$Text, [string]$Pattern) return (($Text -replace "`r?`n", '') -match $Pattern) }
+    #
+    # AND THAT IS ONLY HALF OF IT, measured August 3, 2026 at width 198 (the same finding that repaired
+    # new-branch.tests.ps1's Get-FlatOutput). Under '2>&1' the PARENT turns each of the child's stderr
+    # lines into its own NativeCommandError and renders that record's header, CategoryInfo and
+    # FullyQualifiedErrorId -- so with two stderr lines, ~300 characters of decoration land in the MIDDLE
+    # of the first line's sentence. Stripping newlines cannot repair that: the phrase is not reformatted,
+    # it has other content inserted into it. Invoke-CapturedScript below therefore captures the child's
+    # stderr as PLAIN TEXT via a redirect file, and Test-OutputContains strips ALL whitespace so the
+    # child's own remaining wrap -- mid-word or on a space -- cannot break a match either.
+    function Test-OutputContains {
+        param([string]$Text, [string]$Pattern)
+        return (($Text -replace '\s', '') -match ($Pattern -replace '\s', ''))
+    }
+
+    function Invoke-CapturedScript {
+        <# Runs a shared script as a child and returns its combined output as plain text plus its exit
+           code. Start-Process with redirect files rather than '2>&1' -- see the reasoning above. Each
+           argument is quoted individually, because Start-Process joins -ArgumentList with plain spaces
+           and a temp path containing a space would otherwise arrive as two arguments. #>
+        param([string]$ScriptPath, [string[]]$ScriptArgs = @())
+        $tag = [Guid]::NewGuid().ToString('N').Substring(0, 8)
+        $outFile = Join-Path ([System.IO.Path]::GetTempPath()) "shared-out-$tag.txt"
+        $errFile = Join-Path ([System.IO.Path]::GetTempPath()) "shared-err-$tag.txt"
+        try {
+            $all = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath) + $ScriptArgs
+            $quoted = @($all | ForEach-Object {
+                if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ }
+            })
+            $proc = Start-Process -FilePath 'powershell' -ArgumentList $quoted -NoNewWindow -Wait -PassThru `
+                -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+            $text = ''
+            foreach ($f in @($outFile, $errFile)) {
+                if (Test-Path -LiteralPath $f) { $text += [System.IO.File]::ReadAllText($f) }
+            }
+            return [pscustomobject]@{ Out = $text; Code = $proc.ExitCode }
+        } finally {
+            foreach ($f in @($outFile, $errFile)) { Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue }
+        }
+    }
 
     $foldSrc = ($pairs | Where-Object { $_.Name -eq 'fold-changelog-entry' }).SourcePath
-    $foldOut = (& powershell -NoProfile -ExecutionPolicy Bypass -File $foldSrc 2>&1 | Out-String)
-    $foldCode = $LASTEXITCODE
+    $foldRun = Invoke-CapturedScript -ScriptPath $foldSrc
+    $foldOut = $foldRun.Out
+    $foldCode = $foldRun.Code
     Assert-Equal 1 $foldCode 'fold stops (exit 1) without repo-config'
     Assert-True (Test-OutputContains $foldOut 'repo-config') 'fold names repo-config in the pointer'
     $prSrc = ($pairs | Where-Object { $_.Name -eq 'open-pr' }).SourcePath
-    $prOut = (& powershell -NoProfile -ExecutionPolicy Bypass -File $prSrc -Title 'fix: preflight-test' 2>&1 | Out-String)
-    $prCode = $LASTEXITCODE
+    $prRun = Invoke-CapturedScript -ScriptPath $prSrc -ScriptArgs @('-Title', 'fix: preflight-test')
+    $prOut = $prRun.Out
+    $prCode = $prRun.Code
     Assert-Equal 1 $prCode 'open-pr stops (exit 1) without repo-config/branch-info'
     Assert-True (Test-OutputContains $prOut 'branch-info') 'open-pr names branch-info in the pointer'
 
@@ -142,13 +182,15 @@ try {
     # lighter than fold/open-pr), so no VUL-IN follow-up scenario for these two: their only pre-flight
     # check is the bare existence check on branch-info.ps1 below.
     $nceSrc = ($pairs | Where-Object { $_.Name -eq 'new-changelog-entry' }).SourcePath
-    $nceOut = (& powershell -NoProfile -ExecutionPolicy Bypass -File $nceSrc -Title 'fix: preflight-test' 2>&1 | Out-String)
-    $nceCode = $LASTEXITCODE
+    $nceRun = Invoke-CapturedScript -ScriptPath $nceSrc -ScriptArgs @('-Title', 'fix: preflight-test')
+    $nceOut = $nceRun.Out
+    $nceCode = $nceRun.Code
     Assert-Equal 1 $nceCode 'new-changelog-entry stops (exit 1) without branch-info'
     Assert-True (Test-OutputContains $nceOut 'branch-info') 'new-changelog-entry names branch-info in the pointer'
     $nbSrc = ($pairs | Where-Object { $_.Name -eq 'new-branch' }).SourcePath
-    $nbOut = (& powershell -NoProfile -ExecutionPolicy Bypass -File $nbSrc -Name 'feat/preflight-test' 2>&1 | Out-String)
-    $nbCode = $LASTEXITCODE
+    $nbRun = Invoke-CapturedScript -ScriptPath $nbSrc -ScriptArgs @('-Name', 'feat/preflight-test')
+    $nbOut = $nbRun.Out
+    $nbCode = $nbRun.Code
     Assert-Equal 1 $nbCode 'new-branch stops (exit 1) without branch-info'
     Assert-True (Test-OutputContains $nbOut 'branch-info') 'new-branch names branch-info in the pointer'
 
@@ -175,14 +217,16 @@ function Get-BranchInfo { param([string]$Branch) [pscustomobject]@{ Branch = $Br
     [System.IO.File]::WriteAllText((Join-Path $vfDir 'scripts\repo-config.ps1'), $rcVulin, $Utf8)
     [System.IO.File]::WriteAllText((Join-Path $vfDir 'scripts\lib\branch-info.ps1'), $biVulin, $Utf8)
     $env:CLAUDE_PROJECT_DIR = $vfDir
-    $foldV = (& powershell -NoProfile -ExecutionPolicy Bypass -File $foldSrc 2>&1 | Out-String)
-    $foldVCode = $LASTEXITCODE
+    $foldVRun = Invoke-CapturedScript -ScriptPath $foldSrc
+    $foldV = $foldVRun.Out
+    $foldVCode = $foldVRun.Code
     Assert-Equal 1 $foldVCode 'fold stops (exit 1) on an unfilled VUL-IN scaffold'
-    Assert-True ($foldV -match 'VUL-IN') 'fold names VUL-IN in the pointer'
-    $prV = (& powershell -NoProfile -ExecutionPolicy Bypass -File $prSrc -Title 'fix: vulin-test' 2>&1 | Out-String)
-    $prVCode = $LASTEXITCODE
+    Assert-True (Test-OutputContains $foldV 'VUL-IN') 'fold names VUL-IN in the pointer'
+    $prVRun = Invoke-CapturedScript -ScriptPath $prSrc -ScriptArgs @('-Title', 'fix: vulin-test')
+    $prV = $prVRun.Out
+    $prVCode = $prVRun.Code
     Assert-Equal 1 $prVCode 'open-pr stops (exit 1) on an unfilled VUL-IN scaffold'
-    Assert-True ($prV -match 'VUL-IN') 'open-pr names VUL-IN in the pointer'
+    Assert-True (Test-OutputContains $prV 'VUL-IN') 'open-pr names VUL-IN in the pointer'
 } finally {
     $ErrorActionPreference = $prevEap
     if ($null -eq $prevPd) { Remove-Item Env:\CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue }

@@ -497,8 +497,19 @@ try {
 
     # And the same line must not manufacture an ORPHAN either: before the strip, an import naming an id
     # with no backing specialist would have been collected as a roster token.
+    #
+    # THE IMPORT TARGET IS CREATED ON PURPOSE (inbound #414). Since that check, an import pointing at a
+    # file that does not exist is itself an [ERROR] -- correctly -- and this scenario is not about that.
+    # Leaving the target dangling would make this case exit 1 for a reason it does not test, and a test
+    # that passes for the wrong reason is the one you cannot trust when it eventually fails.
+    #
+    # It is written OUTSIDE any lens directory (notes/, not .claude/specialists/lenses/) so the id '09-99'
+    # still appears only in the import path -- which is precisely the #227 subject. Putting it in a lens
+    # dir would have made it a real lens, and a real lens for an unbacked id IS a legitimate orphan.
     $c = New-FixtureConsumer -RosterIds @('06-16') -LensIds @('06-16') -ExtraRosterLines @(
-        '', '@.claude/plugins/claude-specialists/specialists/09-99-extension.md')
+        '', '@notes/09-99-extension.md')
+    New-Item -ItemType Directory -Path (Join-Path $c 'notes') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $c 'notes\09-99-extension.md'), '# not a lens')
     $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', (New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') }))
     Assert-Equal 0 $r.Code 'import line: exit-code 0 -- nothing is missing'
     Assert-NotMatch "orphan '09-99'" $r.Out 'import line: an @-import does not manufacture an orphan token'
@@ -910,7 +921,7 @@ try {
     Assert-Match 'Summary: 0 error\(s\)' $r.Out 'roster pending: non-counting, like its siblings'
     # The trap the assert above caught on its first run, pinned in its own right: the marker text must not
     # MENTION the error token. The hook counts its signals by matching that literal over the whole output, so
-    # a marker that names it would be counted as an error and push the hook into "roster drift found" -- about
+    # a marker that names it would be counted as an error and push the hook into its blocking branch -- about
     # the one state this marker exists to call fine. Any future marker text is held to the same rule here.
     $pendLine = @($r.Out -split "`n" | Where-Object { $_ -cmatch '\[ROSTER-PENDING\]' })[0]
     Assert-NotMatch '\[ERROR\]' $pendLine 'roster pending: the marker text does not contain the error token the hook counts on'
@@ -1014,7 +1025,7 @@ try {
         'Summary: 1 error(s), 1 info signal(s).')
     $r = Invoke-Hook @('-CheckScriptOverride', $stub)
     Assert-Equal 0 $r.Code 'hook: exit 0 even on drift (never blocks)'
-    Assert-Match 'roster drift found' $r.Out 'hook: drift summary shown'
+    Assert-Match 'blocking finding\(s\)' $r.Out 'hook: drift summary shown'
     Assert-Match "06-24" $r.Out 'hook: the ERROR line is surfaced'
     Assert-NotMatch 'orphan 09-99' $r.Out 'hook: [INFO] stays silent at session start'
     # inbound #203: the one line naming the inspected repo must survive the [ERROR] filter -- this is
@@ -1030,7 +1041,7 @@ try {
         "  [ERROR]  agent '06-24' has no roster row")
     $r = Invoke-Hook @('-CheckScriptOverride', $stub)
     Assert-Equal 0 $r.Code 'hook partial: exit 0 (never blocks)'
-    Assert-Match 'roster drift found' $r.Out 'hook partial: findings still surface'
+    Assert-Match 'blocking finding\(s\)' $r.Out 'hook partial: findings still surface'
     Assert-Match 'may be partial' $r.Out 'hook partial: missing Summary marker flags the list as possibly incomplete'
 
     # H6. A complete-looking report on an UNEXPECTED exit code (not 1) is flagged too -- the exit code
@@ -1047,7 +1058,7 @@ try {
     $r = Invoke-Hook @('-CheckScriptOverride', $stub)
     Assert-Equal 0 $r.Code 'hook: exit 0 when clean'
     Assert-Match 'in sync' $r.Out 'hook: in-sync message'
-    Assert-NotMatch 'roster drift found' $r.Out 'hook: no drift summary when clean'
+    Assert-NotMatch 'blocking finding\(s\)' $r.Out 'hook: no drift summary when clean'
 
     # H4. Stub crashes (non-zero exit, NO [ERROR] line) -> not misreported as "in sync"; a distinct
     #     "could not complete" notice, still exit 0 (finding Victor: a top-level crash in the check
@@ -1144,7 +1155,7 @@ try {
         '  [ORPHANS] 2 roster token(s)/lens file(s) have no backing agent or persona in any enabled plugin.',
         'Summary: 1 error(s), 2 info signal(s).')
     $r = Invoke-Hook @('-CheckScriptOverride', $stub)
-    Assert-Match 'roster drift found' $r.Out 'hook orphans-drift: drift branch fires'
+    Assert-Match 'blocking finding\(s\)' $r.Out 'hook orphans-drift: drift branch fires'
     Assert-Match "persona '01-01'" $r.Out 'hook orphans-drift: the persona ERROR surfaces'
     Assert-Match '\[ORPHANS\] 2 roster token' $r.Out 'hook orphans-drift: the roll-up surfaces alongside the drift'
 
@@ -1181,7 +1192,7 @@ try {
         '  [NOT-INSTALLED-HERE] 1 of 1 enabled plugin(s) have no install record for this path (specialists@claude-code-specialists) -- a session here will not load them.',
         'Summary: 1 error(s), 0 info signal(s).')
     $r = Invoke-Hook @('-CheckScriptOverride', $stub)
-    Assert-Match 'roster drift found' $r.Out 'hook not-installed-drift: the drift branch still fires'
+    Assert-Match 'blocking finding\(s\)' $r.Out 'hook not-installed-drift: the drift branch still fires'
     Assert-Match "agent '06-24'" $r.Out 'hook not-installed-drift: the real finding still surfaces'
     Assert-Match '\[NOT-INSTALLED-HERE\]' $r.Out 'hook not-installed-drift: the marker qualifies that headline'
 
@@ -1231,7 +1242,7 @@ try {
         "  [RECORD-SHAPE] 1 of 1 enabled plugin(s) have an install record for this path that is not the assumed shape (specialists@claude-code-specialists).",
         'Summary: 1 error(s), 0 info signal(s).')
     $r = Invoke-Hook @('-CheckScriptOverride', $stub)
-    Assert-Match 'roster drift found' $r.Out 'hook record-shape-drift: the drift branch still leads'
+    Assert-Match 'blocking finding\(s\)' $r.Out 'hook record-shape-drift: the drift branch still leads'
     Assert-Match "agent '06-24'" $r.Out 'hook record-shape-drift: the real finding still surfaces'
     Assert-Match '\[RECORD-SHAPE\]' $r.Out 'hook record-shape-drift: the marker travels with that headline'
 
@@ -1270,7 +1281,7 @@ try {
         '  [ROSTER-PENDING] this repo was bootstrapped but the roster is still empty: 18 specialist(s) have a lens scaffold and no roster row in .claude/specialists/SPECIALISTS.md.',
         'Summary: 1 error(s), 0 info signal(s).')
     $r = Invoke-Hook @('-CheckScriptOverride', $stub)
-    Assert-Match 'roster drift found' $r.Out 'hook roster-pending-drift: the drift branch leads'
+    Assert-Match 'blocking finding\(s\)' $r.Out 'hook roster-pending-drift: the drift branch leads'
     Assert-Match "agent '06-24'" $r.Out 'hook roster-pending-drift: the real finding surfaces'
     Assert-Match '\[ROSTER-PENDING\]' $r.Out 'hook roster-pending-drift: and the pending line rides along, so 18 deliberate absences are not read as drift'
 
@@ -1409,6 +1420,79 @@ try {
     $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
     Assert-Equal 0 $r.Code 'residual limitation: exit-code 0 (INFO only, never blocking)'
     Assert-Match "\[INFO\].*orphan '12-34'" $r.Out 'residual limitation: two-digit prose range still reads as an orphan token (accepted, documented -- NOT desired behavior)'
+
+    # --- 18. The '@'-imports in the roster file must resolve (inbound #414) ------------------------
+    #     The one file in this system whose absence nothing reported. The roster is repo-local so it
+    #     always loads; the orchestrator's BODY comes from outside it, through a single import, and an
+    #     unresolvable import fails SILENTLY -- session starts, roster renders, persona table intact,
+    #     orchestrator running with none of his rules. Measured for real on 2026-08-03: the marketplace
+    #     rename broke that import in every consumer at once, and the only signal was somebody noticing
+    #     the orchestrator sounded generic.
+    Write-Host "`n== roster-sync.tests: seam @-imports (inbound #414) ==" -ForegroundColor Cyan
+
+    # 18a. Both imports resolve -> [OK] each, no error. The relative one is written the way the
+    #      bootstrap writes it (relative to the ROSTER FILE, not to the repo root), which is the
+    #      resolution rule this check has to get right or it reports the true state as broken.
+    $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') }
+    $c = New-FixtureConsumer -RosterIds @('06-16') -LensIds @('06-16') -ExtraRosterLines @('', '@body.md')
+    [System.IO.File]::WriteAllText((Join-Path $c 'body.md'), "# body")
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 0 $r.Code 'imports resolve: exit-code 0'
+    Assert-Match "\[OK\]\s+import 'body\.md' resolves" $r.Out 'imports resolve: reported OK by name'
+    Assert-NotMatch '\[ERROR\]' $r.Out 'imports resolve: no error'
+
+    # 18b. A dead import -> [ERROR], exit 1. This is the whole point: the roster around it is perfectly
+    #      healthy, so every other line of this run is green and only this one says anything.
+    $c = New-FixtureConsumer -RosterIds @('06-16') -LensIds @('06-16') -ExtraRosterLines @('', '@personas/01-01-persona.md')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 1 $r.Code 'dead import: exit-code 1 -- loud, not soft'
+    Assert-Match "\[ERROR\].*'@'-import 'personas/01-01-persona\.md'" $r.Out 'dead import: the ERROR names the import as written'
+    Assert-Match '\[ERROR\].*does not exist' $r.Out 'dead import: says the target is not there'
+    Assert-Match '\[ERROR\].*SILENTLY' $r.Out 'dead import: says why nothing else would have told you'
+    Assert-Match "\[OK\]\s+'agent '?06-16'? present in roster \+ lens|\[OK\]\s+agent '06-16' present" $r.Out 'dead import: the rest of the roster still reports healthy -- which is exactly what made this invisible'
+
+    # 18c. The displayed path stays a PATH. Format-SafeToken (the id-shaped sanitizer) strips '~', '\'
+    #      and ':', so it would print a home-relative import without its '~' and a Windows target as
+    #      'CUsers...'. A finding whose job is to name the missing path must print one the reader can
+    #      look up, which is why Format-SafePathToken exists.
+    $c = New-FixtureConsumer -RosterIds @('06-16') -LensIds @('06-16') `
+        -ExtraRosterLines @('', '@~/.claude/plugins/marketplaces/nope/personas/01-01-persona.md')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 1 $r.Code 'home-relative dead import: exit-code 1'
+    Assert-Match '\[ERROR\].*~/\.claude/plugins/marketplaces/nope' $r.Out 'home-relative dead import: the tilde survives the display sanitizer'
+    Assert-Match '\[ERROR\].*[A-Za-z]:\\' $r.Out 'home-relative dead import: the RESOLVED target is printed as a real Windows path, drive letter and separators intact'
+
+    # 18d. Not every '@' is an import. The roster's own prose says a specialist can be invoked as
+    #      '@specialists:<name>', and a fenced block may quote an example import -- neither is a line
+    #      the bootstrap wrote, and reporting either would train the reader to ignore this check.
+    $c = New-FixtureConsumer -RosterIds @('06-16') -LensIds @('06-16') -ExtraRosterLines @(
+        '',
+        '@specialists:tessa',
+        'Invoke them directly as `@specialists:<name>`.',
+        '```',
+        '@this/is/an/example.md',
+        '```'
+    )
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
+    Assert-Equal 0 $r.Code 'non-imports: exit-code 0'
+    Assert-NotMatch '\[ERROR\]' $r.Out 'non-imports: neither an @mention nor a fenced example is treated as an import'
+    Assert-NotMatch 'example\.md' $r.Out 'non-imports: the fenced example is never even named'
+
+    # 18e. THE FINDING HAS TO REACH A SESSION, which is the actual ask of #414 -- "a guard turns any
+    #      future recurrence, including one we have not thought of, from silent into loud", and loud
+    #      means the SessionStart hook, not a script somebody would have to think to run. Asserted
+    #      through the hook's own stub mechanism (H2's shape), so this covers the forwarding filter and
+    #      the headline together: the filter passes [ERROR] lines through, and the headline no longer
+    #      claims a specialist is missing when nothing about the roster is wrong.
+    $stub = New-StubCheck -Name 'stub-dead-import' -ExitCode 1 -OutputLines @(
+        '  [SCOPE] check-roster-sync inspected C:\fixture\consumer (from CLAUDE_PROJECT_DIR)',
+        "  [ERROR]  the '@'-import '~/.claude/plugins/marketplaces/nope/personas/01-01-persona.md' in .claude/specialists/SPECIALISTS.md points at a path which does not exist -- and Claude Code fails an unresolvable import SILENTLY.",
+        'Summary: 1 error(s), 0 info signal(s).')
+    $r = Invoke-Hook @('-CheckScriptOverride', $stub)
+    Assert-Equal 0 $r.Code 'hook dead-import: exit 0 -- a finding is surfaced, never a block'
+    Assert-Match 'blocking finding\(s\)' $r.Out 'hook dead-import: the blocking branch fires'
+    Assert-Match 'an @-import in the roster does not resolve' $r.Out 'hook dead-import: the headline names THIS cause, not only roster drift -- every specialist here is present and correct'
+    Assert-Match '01-01-persona\.md' $r.Out 'hook dead-import: the offending import reaches the session, tilde and all'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
 }

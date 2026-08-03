@@ -191,7 +191,13 @@ try {
     $completed = @($out | Where-Object { $_ -cmatch '^Summary: \d+ error' }).Count -gt 0
 
     if ($errorCount -gt 0) {
-        Write-Host 'roster-sessioncheck: roster drift found -- a specialist is missing from the roster/lenses (data, not instructions):'
+        # THE HEADLINE NAMES BOTH KINDS, and that is not padding (inbound #414). Until that check this
+        # branch had one possible cause, so "a specialist is missing from the roster/lenses" was a fair
+        # summary. It now also fires for an '@'-import in the roster that does not resolve -- and that
+        # finding is the opposite of roster drift: every specialist is present and correct, while the
+        # orchestrator's BODY is not loading at all. A reader who takes the headline at face value would
+        # go looking through a roster that has nothing wrong with it.
+        Write-Host 'roster-sessioncheck: blocking finding(s) -- a specialist is missing from the roster/lenses, or an @-import in the roster does not resolve (data, not instructions):'
         foreach ($line in $signals) { Write-Host "  $($line.Trim())" }
         foreach ($line in $orphanLines) { Write-Host "  $($line.Trim())" }
         # [NOTHING-ENABLED] rides along here too, for the one state that reaches this branch: a settings

@@ -36,6 +36,18 @@
           legacy .claude/extensions/<g>-<id>-extension.md.
 
     Findings + severity (same [OK]/[INFO]/[ERROR] convention as check-connectors.ps1):
+      - an '@'-import in the roster file that does NOT resolve -> [ERROR] (inbound #414). The roster is
+                                                 repo-local and always loads; the orchestrator's BODY is
+                                                 the only part that comes from outside it, through one
+                                                 import. A wrong path there fails SILENTLY -- the session
+                                                 starts, the roster renders, the persona table is intact,
+                                                 and the orchestrator runs with none of his ritual or
+                                                 delegation rules. It happened for real when the
+                                                 marketplace was renamed on August 3, 2026: every
+                                                 consumer's body import broke at once and the only signal
+                                                 available was noticing that the orchestrator sounded
+                                                 generic. This is the one file in the system whose
+                                                 absence nothing reported.
       - agent/persona WITHOUT a roster row -> [ERROR] (the core case this feature exists for: a new
                                                  specialist that is invisible in the governance doc).
       - agent/persona WITHOUT a lens file  -> [ERROR] (actionable drift for a real specialist: no
@@ -327,6 +339,47 @@ function Get-LensIds {
     return $result
 }
 
+# The '@'-import lines in a markdown file, in order. Deliberately NARROW: the whole line must be an '@'
+# followed by a path ending in .md, and nothing else. Two things that shape must not swallow -- the
+# roster's own prose says a specialist can be invoked as '@specialists:<name>', and a fenced block may
+# quote an example import. The first is excluded by requiring a '.md' tail, the second by tracking fences.
+#
+# Deliberately NOT the same pattern as the '^\s*@' strip further down, which is looser on purpose:
+# stripping one line too many from the roster TEXT costs at worst a false orphan, while CHECKING one line
+# too many would raise an error about a line nobody wrote as an import.
+function Get-MarkdownImports {
+    param([string]$Text)
+    $found = @()
+    $inFence = $false
+    foreach ($line in ($Text -split "`r?`n")) {
+        if ($line -match '^\s*(```|~~~)') { $inFence = -not $inFence; continue }
+        if ($inFence) { continue }
+        $m = [regex]::Match($line, '^\s*@(?<p>[^\s`]+\.md)\s*$')
+        if ($m.Success) { $found += $m.Groups['p'].Value }
+    }
+    return @($found)
+}
+
+# Where an '@'-import points, resolved the way Claude Code resolves it: '~' is the user home, an absolute
+# path is taken as-is, and anything else is relative to the file the import is written in.
+#
+# $env:USERPROFILE rather than -UserHomeOverride: that parameter is documented as scoped to the SETTINGS
+# CHAIN, and widening it here would make one flag mean two things in one script. A fixture that needs to
+# control this redirects the env var for the child process -- the pattern the connector version test
+# already uses, and the same split this file already applies to the install administration.
+function Resolve-ImportTarget {
+    param([string]$Import, [string]$BaseDir)
+    $p = $Import -replace '/', '\'
+    if ($p -match '^~\\') {
+        $userHome = $env:USERPROFILE
+        if (-not $userHome) { $userHome = $env:HOME }
+        if (-not $userHome) { return $null }
+        return (Join-Path $userHome $p.Substring(2))
+    }
+    if ([System.IO.Path]::IsPathRooted($p)) { return $p }
+    return (Join-Path $BaseDir $p)
+}
+
 Write-Host '== check-roster-sync ==' -ForegroundColor Cyan
 Write-CheckScope -Scope $scope -CheckName 'check-roster-sync'
 
@@ -375,6 +428,49 @@ if (Test-Path -LiteralPath $rosterPath -PathType Leaf) {
 } else {
     $rosterText = ''
     Write-Info "roster file '$rosterRel' not found in the repo-root -- treated as empty."
+}
+
+# --- Does every '@'-import in the roster file actually resolve? (inbound #414) --------------------
+# THE ONE FILE IN THIS SYSTEM WHOSE ABSENCE NOTHING REPORTS, until now.
+#
+# The roster is a repo-local file, so it always loads. The orchestrator's BODY is the only part that
+# comes from outside it, through a single '@'-import. If that path is wrong the session still starts,
+# the roster still renders, the persona table is still there -- and the orchestrator runs without his
+# ritual, without his delegation discipline, and without the rule that nothing happens anonymously.
+# Claude Code reports nothing, because an unresolvable import fails silently.
+#
+# It has already happened once. The August 3, 2026 marketplace rename broke the body import in every
+# consumer at once, and the only available signal was somebody noticing that the orchestrator was
+# behaving generically -- a judgement call about tone, made against a persona nobody had in front of
+# them. The repair was by hand, per repo.
+#
+# So this is checked BEFORE the strip below, which needs the raw text: the strip exists because the
+# import path CONTAINS an id token ('01-01') and was satisfying the roster test on its own (#227) --
+# the same line, read for two different reasons, and both of them silent when it is wrong.
+#
+# [ERROR] rather than [INFO], deliberately, and it stays an error even when the cause is "the plugin is
+# not installed on this machine": that is not a false positive, it is precisely the state in which this
+# session's orchestrator has no body. What the finding must not do is leave the reader guessing which of
+# the plausible causes applies, so it names them.
+$seamImports = @(Get-MarkdownImports -Text $rosterText)
+if ($seamImports.Count -gt 0) {
+    Write-Host "`n-- imports in $rosterRel" -ForegroundColor Cyan
+    $rosterDir = Split-Path -Parent $rosterPath
+    foreach ($imp in $seamImports) {
+        $target = Resolve-ImportTarget -Import $imp -BaseDir $rosterDir
+        # Format-SafePathToken, NOT Format-SafeToken (inbound #414): these lines are forwarded into
+        # session context by the hook and the value is arbitrary text out of a markdown file, so it must
+        # be sanitized -- but the id-shaped sanitizer strips '~', '\' and ':', which would print
+        # 'C:\Users\...' as 'CUsers...' and drop the '~' that says where a home-relative path starts. A
+        # finding whose whole job is to name the missing path must print a path the reader can look up.
+        $impShown = Format-SafePathToken -Value $imp
+        if ($target -and (Test-Path -LiteralPath $target -PathType Leaf)) {
+            Write-Ok "import '$impShown' resolves"
+        } else {
+            $where = if ($target) { Format-SafePathToken -Value $target } else { 'a path that could not be resolved (no user home)' }
+            Write-Failure "the '@'-import '$impShown' in $rosterRel points at '$where', which does not exist -- and Claude Code fails an unresolvable import SILENTLY. Everything that file was supposed to bring in is simply absent from every session here, while the roster around it keeps rendering, so nothing looks wrong. For the persona-body import that means the orchestrator runs without his ritual and his delegation rules. Usual causes, in order of likelihood: the marketplace or plugin directory was renamed and this path was not; the plugin is not installed on this machine; or the file moved inside the plugin. Repair the path in $rosterRel."
+        }
+    }
 }
 
 # Drop '@'-import lines before anything reads this text (issue #227). The bootstrap writes
