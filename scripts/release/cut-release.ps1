@@ -118,7 +118,11 @@ function Write-Utf8NoBom([string]$Path, [string]$Content) {
 # about "unfolded changelog entry files" naming two documents nobody had failed to fold. It was
 # caught by cut-release-guardrail.tests.ps1 -- the drift guard #165 left behind -- rather than by
 # the release that would have hit it.
-$reservedRootMd = @('CHANGELOG.md', 'CLAUDE.md', 'README.md', 'LICENSE.md', 'CONTRIBUTING.md', 'SECURITY.md', 'QUICKSTART.md', 'UNINSTALL.md')
+#
+# ADOPTION.md joined in #408, and it is the same class a third time: renaming QUICKSTART.md to
+# ADOPTION.md and writing a new short QUICKSTART.md beside it adds one permanent root doc, which
+# without this entry the guardrail would report as an unfolded changelog entry and refuse to cut on.
+$reservedRootMd = @('CHANGELOG.md', 'CLAUDE.md', 'README.md', 'LICENSE.md', 'CONTRIBUTING.md', 'SECURITY.md', 'QUICKSTART.md', 'ADOPTION.md', 'UNINSTALL.md')
 
 $script:marketplaceJsonText = $null
 function Get-MarketplaceJsonText {

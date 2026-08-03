@@ -900,7 +900,7 @@ try {
     # --- 11m-11q. [ROSTER-PENDING]: bootstrapped, nothing filled in yet (inbound #333) --------------
     #     MEASURED ON THE DOCUMENTED HAPPY PATH: the session right after a completely successful
     #     specialists-init printed NINETEEN [ERROR] lines, one per specialist. Nothing was broken -- the
-    #     QUICKSTART tells that reader to fill the lenses in at their own pace. The cost is habituation:
+    #     lens-filling is ADOPTION.md's own Step 4, which that reader has not reached. The cost is habituation:
     #     whoever learns to ignore nineteen false errors ignores the twentieth too.
     #
     #     The four boundary cases matter more than the marker itself: the moment ANY of it is filled in the
