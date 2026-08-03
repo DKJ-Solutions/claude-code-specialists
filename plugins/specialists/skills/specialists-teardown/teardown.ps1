@@ -733,7 +733,36 @@ foreach ($r in $auditRoots) {
     $p = Join-Path $root $r.Rel
     if (-not (Test-Path -LiteralPath $p)) { continue }
     if ($r.Recurse) {
-        $auditFiles += @(Get-ChildItem -LiteralPath $p -Recurse -File -Include '*.md', '*.ps1', '*.json', '*.jsonc' -ErrorAction SilentlyContinue)
+        # EVERY FILE, DELIBERATELY -- no extension filter, and the absence of one is the decision (#421).
+        #
+        # This call used to carry `-Include '*.md','*.ps1','*.json','*.jsonc'` beside `-LiteralPath`, and
+        # PowerShell SILENTLY IGNORES -Include when the path is given as -LiteralPath. So the walk has
+        # always read every file under these roots while its own code named four extensions -- the same
+        # defect found in Get-MojibakePaths (#413), reported together with it. Repaired in the other
+        # direction here: the four-name list is gone rather than made to work.
+        #
+        # MEASURED BEFORE DECIDING, because #421 asked two questions the line cannot answer by itself.
+        #   1. Does any documented teardown figure change? No. Across the three repos on hand
+        #      (claude-code-specialists, life-hub, djcylow-react) the ONLY files outside the four
+        #      extensions were two .js files under djcylow-react/scripts, and both scan to zero hits. No
+        #      round's number was measured against something the strict list would have excluded.
+        #   2. Is the superset the better behaviour? Yes, and not by luck. A purpose-built fixture with
+        #      `// Derek opens the PR` in scripts/deploy.js and `Tessa maintains the manuals` in
+        #      .claude/notes.txt yields 4 live references today and would yield 1 with the filter
+        #      working -- so "repairing" it would blind the audit to exactly the class it exists to
+        #      catch. A live reference is live regardless of the extension it sits in: a deploy script,
+        #      a .yml, a .txt note under .claude/ are all things a session loads, a script resolves, or
+        #      a gate depends on.
+        #
+        # It is also the only reading consistent with this section's own bias, stated twice above: a
+        # false positive is cheap and a false negative silent, so the doubt is resolved toward reporting.
+        # An extension allowlist is a false-negative generator by construction.
+        #
+        # The one cost, named rather than left to be discovered: a non-text file under these roots
+        # (an image in .claude/) is read too, and could match the id pattern on decoded bytes. That
+        # costs one [LIVE] line with a file:line the reader dismisses at a glance -- the output prints
+        # the path and what matched, never the matched text, so no binary content can reach the console.
+        $auditFiles += @(Get-ChildItem -LiteralPath $p -Recurse -File -ErrorAction SilentlyContinue)
     } else {
         $auditFiles += @(Get-Item -LiteralPath $p)
     }
