@@ -64,9 +64,14 @@ go — do not skip a step or reorder them from memory.
    `scripts\repo-config.ps1`, `cut-release.ps1` has already generated it at
    `releases/highlights/<dir>/<X.Y.Z>.md` (plus a print-ready `.html` beside it) — **edit it before
    publishing**: it is written for non-developers and the generated draft still carries a
-   developer-only block under an explicit remove-before-publishing marker. Where that knob is empty
-   (this workshop, life-hub) there is no highlights file and no such document is wanted; use the
-   development notes as the body and drop the attachment line.
+   developer-only block under an explicit remove-before-publishing marker. Where that knob is **empty**
+   there is no highlights file and no such document is wanted; use the development notes as the body and
+   drop the attachment line.
+
+   **Read the marker as a proposal, not a verdict.** The split is keyed on branch type, and how well
+   that predicts consumer impact varies per repo: in a storefront repo a `Style` branch *is* a customer-
+   visible change, while in a tooling repo a `chore/` branch can carry the most consequential change
+   there is. Read both halves before cutting.
 
 3. **Branch cleanup** — the same fixed closing move as the `fold-changelog` skill's:
 

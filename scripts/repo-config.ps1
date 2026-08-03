@@ -356,16 +356,26 @@ function Get-ReservedRootMd {
 # so the generated draft puts the stakeholder categories first and everything else under an explicit
 # "remove before publishing" marker for the release manager to cut by hand.
 #
-# OFF IN THIS REPO, and unlike the other knobs that is a statement about the product rather than a
-# preference. This repo's release audience IS developers: a consumer reads RELEASE.md and the
-# per-plugin CHANGELOG to decide whether to update a plugin. There is no non-developer stakeholder for
-# a marketplace of subagent definitions, so a document written for one would have no reader -- and a
-# release manager would have to delete a developer-only block that was in fact the entire release.
+# ON IN THIS REPO SINCE AUGUST 3, 2026, for minor and major only -- Dave's decision, and it reversed
+# what this file said one commit earlier. The reasoning that had it off was that this repo's release
+# audience "is developers", so a stakeholder document would have no reader. That was the wrong unit of
+# analysis: the audience question is not developer-vs-not, it is WHO DECIDES WHETHER TO UPDATE. That
+# reader does not want the full per-PR record, and giving them only the developer notes is the same
+# mismatch a storefront repo has with its management -- one tier serving two audiences badly.
 #
-# The three knobs stay declared rather than omitted precisely BECAUSE the answer here is empty: a
-# consumer reading this file as the model needs to see the switch and the reason it is off, which is
-# the same argument that put Get-ReleaseLiveMarker here with an empty string.
-$script:ReleaseHighlightsBumps = @()
+# So this repo runs the same three tiers as the consumer it was ported from:
+#   releases/development/<X>.x/<X.Y.Z>.md   developers   -- every release, auto-complete, long
+#   releases/internal/<X>.x/<X.Y.Z>.md      colleagues   -- every release, what it is worth
+#   releases/highlights/<X>.x/<X.Y.Z>.md    consumers    -- minor/major only, what they notice
+#
+# PER MAJOR, NOT PER MINOR (Dave, August 3, 2026). The consumer this came from folders its notes per
+# minor; this repo keeps <X>.x for all three tiers, which Get-ReleaseNotesGrouping above already says
+# and every tier reads from that one answer rather than restating it.
+#
+# WHY MINOR/MAJOR AND NOT PATCH: a minor here is cut when a consumer actually notices something. That
+# is the same test the version number itself answers, so the tier and the bump agree by construction --
+# a patch has nothing a consumer would read, which is precisely why it is a patch.
+$script:ReleaseHighlightsBumps = @('minor', 'major')
 
 function Get-ReleaseHighlightsBumps {
     <# Bump types that also get a highlights document: e.g. @('minor','major'). Empty = tier off. #>
@@ -376,10 +386,18 @@ function Get-ReleaseHighlightsBumps {
 # the developer-only block. Keyed on the TYPES from scripts/lib/branch-info.ps1, like
 # Get-ReleaseCategoryTitles above -- not on the display labels, which a consumer may have renamed.
 #
-# Empty here because the tier is off, and the value it would have is not obvious enough to guess in
-# advance: in this repo a 'Docs' change often IS the release (the manuals are the product), so the
-# stakeholder/developer split that works for a storefront repo would be actively wrong here.
-$script:ReleaseHighlightsStakeholderTypes = @()
+# READ THE MARKER AS A PROPOSAL, NOT A VERDICT, and in this repo more so than in the one this was
+# ported from. There, a 'Style' or 'Content' branch IS a storefront change, so the prefix predicts the
+# impact. HERE IT MEASURABLY DOES NOT: held against the 19 entries pending at v3.2.0, the single most
+# consequential change for a consumer -- renaming the marketplace, which breaks every existing install
+# -- arrived on a chore/ branch and therefore lands BELOW the marker, as did "a folder rename silently
+# unlinks plugin installs" on a docs/ one.
+#
+# Feat+Fix is kept anyway, deliberately: the split's value is that both halves are written out and the
+# release manager sees what is a candidate for cutting. A wrong-but-visible proposal costs one edit; the
+# alternative (no split at all) costs the hint entirely. So when editing the draft, expect to promote
+# Docs/Chore items rather than trusting the halves.
+$script:ReleaseHighlightsStakeholderTypes = @('Feat', 'Fix')
 
 function Get-ReleaseHighlightsStakeholderTypes {
     <# Branch types whose entries go above the remove-before-publishing marker. Empty = no split. #>
@@ -393,7 +411,8 @@ function Get-ReleaseHighlightsStakeholderTypes {
 # the map is merged over them rather than replacing them.
 #
 # EMPTY HERE for the same reason Get-ReleaseCategoryTitles is: the defaults already say what an
-# English repo means. (And with the tier off, nothing reads it at all.)
+# English repo means. The tier is ON now, so these ARE read -- an empty map means the English defaults
+# reach the generated document, not that nothing happens.
 $script:ReleaseHighlightsWording = @{}
 
 function Get-ReleaseHighlightsWording {

@@ -206,20 +206,36 @@ The constitution above, concretely implemented here:
      Since August 3, 2026 it is a **shared** script, mirrored into the plugin like the rest of the
      workflow ([#417](https://github.com/DaveKJohn/claude-code-specialists/issues/417)): everything
      that legitimately differs per repo — which root docs are permanent, how the notes are foldered,
-     the live marker, whether there is a plugin tier at all, the category labels, and whether a
-     stakeholder-facing **highlights** document is generated at all — is read from optional functions
-     in [`scripts/repo-config.ps1`](scripts/repo-config.ps1), each falling back to
+     the live marker, whether there is a plugin tier at all, the category labels, and for which bumps a
+     stakeholder-facing **highlights** document is generated, for whom, and in whose words — is read
+     from optional functions in [`scripts/repo-config.ps1`](scripts/repo-config.ps1), each falling back to
      what this repo already did. **The exception it runs under did not widen**: same scope, same
      "only on explicit request", and the release artefacts it produces here were verified
      byte-identical to the unshared script's, both when the script was shared and again when the
      highlights tier joined it.
 
-     **The highlights tier is off here, and that is a statement about the product rather than a
-     preference.** It is a second rendering of a release written for *non-developers*, and this repo's
-     release audience is developers: a consumer reads `RELEASE.md` and the per-plugin `CHANGELOG.md` to
-     decide whether to update a plugin. So a highlights document generated here would have no reader.
-     The three knobs stay declared with empty answers anyway, because a consuming repo reads
-     `repo-config.ps1` as the model and needs to see both the switch and why it is off.
+     **Three release tiers, per major version** (Dave, August 3, 2026). A release is written for three
+     different readers, and one document cannot serve them:
+
+     | tier | for whom | when |
+     |---|---|---|
+     | `releases/development/<X>.x/<X.Y.Z>.md` | developers — the full per-PR record | every release |
+     | `releases/internal/<X>.x/<X.Y.Z>.md` | colleagues, employers — what it is worth | every release |
+     | `releases/highlights/<X>.x/<X.Y.Z>.md` + `.html` | consumers — what they notice | minor/major |
+
+     The grouping is per **major** (`3.x`) for all three, deliberately differing from the consumer this
+     model came from, which folders per minor. `Get-ReleaseNotesGrouping` answers that once.
+
+     **A minor is cut when a consumer actually notices something** — otherwise it is a patch. That test
+     is what keeps the highlights tier honest: a patch has no highlights reader by construction, which is
+     exactly why it is a patch. So the bump type and the tier agree without a second rule.
+
+     **One caveat worth knowing before editing a highlights draft: the branch prefix does not predict
+     impact in this repo.** The tier puts `Feat`/`Fix` above the "remove before publishing" marker and
+     everything else below it, and that split is a *proposal*, not a verdict. Measured against the 19
+     entries pending at v3.2.0, the single most consequential change for a consumer — renaming the
+     marketplace, which breaks every existing install — arrived on a `chore/` branch and therefore landed
+     below the marker. Expect to promote `Docs`/`Chore` items rather than trusting the halves.
 - **This repo is `public`.** A deliberate choice, so the remote `github` marketplace source can be
   read without gh auth. Consequence: **nothing confidential** belongs here — no personal
   information, credentials, or secrets. The group 1 agent defs are therefore deliberately
