@@ -54,7 +54,11 @@
           Written for NON-DEVELOPERS, so the categories the seam does not call stakeholder-facing land
           under an explicit "remove before publishing" marker the release manager cuts by hand.
           Markdown only -- no HTML, deliberately (see release-lib.ps1's highlights header).
-      4. Commits that directly to main (release: vX.Y.Z) and sets an annotated tag vX.Y.Z.
+      4. Commits that directly to main (release: vX.Y.Z) and sets an annotated tag vX.Y.Z, then names
+         the documents it deliberately did NOT write: the highlights draft still needs editing, and the
+         internal summary (the third tier, for colleagues and management, at EVERY release including a
+         patch) has its own script -- new-internal-note.ps1, which needs the notes step 3 just produced.
+         Both are hand-written and both land via a branch + PR, because this commit is already tagged.
       5. Pushes main + the tag (unless -NoPush).
 
 .PARAMETER Version
@@ -487,6 +491,28 @@ foreach ($m in $manifests) {
     Write-Host "  bumped: $pluginName/.claude-plugin/plugin.json -> $new" -ForegroundColor DarkGray
 }
 
+# The follow-up documents this script deliberately does NOT write, printed once at the end whether or
+# not the tag was pushed. Both are hand-written and both need the notes that only exist after this run:
+# the highlights DRAFT (generated above, still carrying its remove-before-publishing block) and the
+# internal note (its own script, because a skeleton committed here would sit inside the release tag).
+#
+# GATED ON THE SCRIPT EXISTING rather than on a config knob: whether a repo has an internal tier is a
+# fact its file tree already answers, so a consumer without that script simply never sees the line. Same
+# reasoning as Get-ReleasePluginTier's computed fallback.
+function Write-FollowUpSteps {
+    $internalScript = 'scripts/release/new-internal-note.ps1'
+    $hasInternal = Test-Path -LiteralPath (Join-Path $repoRoot ($internalScript -replace '/', '\'))
+    if (-not ($cutHighlights -or $hasInternal)) { return }
+    Write-Host ""
+    Write-Host "Still to write by hand (both via a branch + PR -- this commit is already tagged):" -ForegroundColor Cyan
+    if ($cutHighlights) {
+        Write-Host "  - $highlightsRelPath -- edit the draft; it still carries the developer-only block."
+    }
+    if ($hasInternal) {
+        Write-Host "  - the internal summary:  ./$internalScript -Version $new"
+    }
+}
+
 # --- Commit + tag directly on main ---------------------------------------------------------
 # Native git writes chatter to stderr (the LF->CRLF warning from `git add`, `remote:` on push).
 # Under ErrorActionPreference=Stop, PowerShell 5.1 would promote that to a terminating
@@ -511,6 +537,7 @@ if ($NoPush) {
     Write-Host "Release v$new recorded locally on main (commit + tag $tagName), not pushed." -ForegroundColor Green
     Write-Host "Push it yourself when ready:" -ForegroundColor Cyan
     Write-Host "  git push origin main; git push origin $tagName"
+    Write-FollowUpSteps
     exit 0
 }
 
@@ -524,3 +551,4 @@ if ($pushTag.ExitCode -ne 0) { Write-Error "git push of the tag failed."; exit 1
 
 Write-Host ""
 Write-Host "Done: v$new has been cut ($current -> $new, $typeLabel), committed on main and tagged as $tagName. Recorded." -ForegroundColor Green
+Write-FollowUpSteps

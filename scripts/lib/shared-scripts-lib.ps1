@@ -119,6 +119,16 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # The third release tier (August 3, 2026). Its own script rather than part of cut-release, and
+            # the reason changed on the way: the source repo kept it separate because cut-release was
+            # "temporarily diverged" and must not be extended, which #417 settled. What holds instead is
+            # that cut-release COMMITS AND TAGS in one motion, so a skeleton generated there would put an
+            # empty document inside the release tag while the written version landed afterwards anyway.
+            Name   = 'new-internal-note'
+            Source = 'scripts\release\new-internal-note.ps1'
+            Mirror = 'plugins\specialists\scripts\release\new-internal-note.ps1'
+        },
+        @{
             # The changelog entry's scaffold wording, needed by TWO shared scripts that must not be able
             # to disagree about it: new-changelog-entry.ps1 writes it, open-pr.ps1's scaffold gate refuses
             # to ship it. A copy in each would make the gate silently miss whatever the writer changed --

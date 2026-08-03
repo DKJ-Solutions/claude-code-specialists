@@ -179,10 +179,19 @@ The `releases/` directory (modeled on life-hub):
   lens had briefly said the opposite. **Markdown only** — the tier generated a print-ready `.html`
   alongside it for exactly one release (v3.2.0) and no longer does; Dave does not want it anywhere.
   A PDF, if ever needed, comes from rendering the markdown with a tool built for it.
-- **`releases/internal/<X>.x/<X.Y.Z>.md`** — the third tier, for colleagues and employers: *what the
-  work is worth*, at every release including a patch. **Not generated yet in this repo** — the port of
-  `new-internal-note.ps1` is its own piece of work. Until it lands, this row describes the intent, not
-  a file Rendall will find.
+- **`releases/internal/<X>.x/<X.Y.Z>.md`** — the third tier, for colleagues, employers and management:
+  *what the work is worth*, at **every** release including a patch. Written by
+  [`new-internal-note.ps1`](../../../scripts/release/new-internal-note.ps1), which lays down a skeleton —
+  the metadata and the entry titles as bullets, plus three fixed headings — and leaves the rest to
+  Rendall. **The middle heading is the tier**: "what it is worth" cannot be generated from a changelog,
+  and the other two exist to keep it from growing back into the developer notes.
+  - It runs **after** the cut, because the development notes are its input. `cut-release.ps1` prints the
+    invocation at the end rather than doing it, and gates that line on the script existing.
+  - It refuses to overwrite an existing note without `-Force`: this is the one document in the three
+    tiers that cannot be regenerated from anything.
+  - Think in time, risk and reduced dependence on a developer. A release with nothing for a consumer
+    can still be the one where a routine change stopped needing one — that gap **is** why this tier
+    exists, and it is the reason it covers patches while highlights does not.
 - **All three group per major (`3.x`)**, from the single answer in `Get-ReleaseNotesGrouping`. The
   consumer this model came from folders per minor; Dave chose to keep `<X>.x` here.
 
