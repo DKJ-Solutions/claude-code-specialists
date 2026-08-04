@@ -1,0 +1,206 @@
+---
+name: ship-pr
+description: >-
+  Ship a finished branch in one command via the shared, centralized ship-pr script from the plugin
+  (single source of truth, issue #411) -- open the PR, wait for CI, merge, fold the changelog entry,
+  and verify the issues the PR declared it closes. Stops on the first failure and never forces:
+  a failing gate means nothing is pushed, a red CI means nothing is merged. This is the sequence the
+  registry classifies safety-critical, because it merges to the main branch and then commits directly
+  to it under the fold exception. Use this when a branch is finished, committed, and the repo's
+  governance rule allows the PR to be opened.
+disable-model-invocation: true
+---
+
+# ship-pr — the shared PR chain for consumers
+
+This is the **plugin mirror** of `ship-pr.ps1`: the same tested source as in the workshop repo,
+shared here so consumers do not run the five-step chain by hand. Background in
+[issue #411](https://github.com/DaveKJohn/claude-code-specialists/issues/411).
+
+It also documents **`verify-resolved-issues.ps1`**, which is not a separate procedure but this
+script's step 6 — see [Step 6 on its own](#step-6-on-its-own-repairing-bookkeeping-after-the-fact).
+
+## When it may run is governance, not script logic
+
+**The script executes; the repo's own rule decides whether it may.** Under the shared rule a finished
+branch ships by default once the gates are green, and waits for the owner's explicit word only for
+work with a **visible result** (a frontend, styling, rendered output, an artifact — no gate proves
+that something *looks* right) or work that is **irreversible or outward-facing** (a release, a version
+bump, a tag, repo settings, publishing beyond the PR flow).
+
+That distinction matters more here than for `open-pr`, because this script does not stop at the PR: it
+merges and then commits directly to the main branch. Running it is the whole movement, not the first
+step of one.
+
+## What the skill does
+
+Run the shared script from the **root of the consuming repo**, on the branch you want to ship:
+
+```powershell
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/ship-pr.ps1" -Title "feat: short title"
+```
+
+`-Title` is required and is the PR title. Running from the main branch is refused before anything
+happens — this ships a branch.
+
+The six steps, stopping on the first failure:
+
+1. **Open the PR** via `open-pr.ps1` — which runs the resolves gate, the scaffold gate, the repo's own
+   lint gate and all test suites, then pushes and opens. If any of those fails, nothing is pushed and
+   this stops here. See the `open-pr` skill for what those gates check.
+2. **Find the PR number** for the current branch (`gh pr list --head <branch>`).
+3. **Wait for CI.** See [Why step 3 polls before it watches](#why-step-3-polls-before-it-watches).
+4. **Merge** (`gh pr merge`). See [The merge method is repo policy](#the-merge-method-is-repo-policy).
+5. **Check out the main branch, fast-forward, and fold** — handed to `fold-changelog-entry.ps1 -Push`,
+   which folds the entry, commits it and pushes it. See
+   [Why the fold is delegated](#why-the-fold-is-delegated-rather-than-inlined).
+6. **Verify the issues the PR declared it closes are actually closed**, and close any that are not.
+
+## The parameters
+
+| Parameter | What it does |
+|---|---|
+| `-Title` | **Required.** The PR title, e.g. `"feat: group release output by category"`. |
+| `-NoMerge` | Open the PR and stop — no CI wait, no merge, no fold. The same as calling `open-pr` directly, but convenient when scripting. |
+| `-Resolves` | Passed through to `open-pr`: the issues this PR closes, **as a string** (`"331,332"`). Step 6 verifies them. |
+| `-NoResolves` | Passed through to `open-pr`: declare that this PR closes no issue. |
+| `-SkipLint` | Passed through to `open-pr`: skip the lint gate. An escape valve. |
+| `-SkipTests` | Passed through to `open-pr`: skip the test gate. An escape valve. |
+| `-Force` | Passed through to `open-pr`: ship an entry that still carries its scaffold wording. Deliberately separate from the two above — those skip a tool, this overrules a judgement about content. |
+| `-PollSeconds` | Poll interval in seconds for the CI wait. Default 15. |
+
+**`-Resolves` takes a string on purpose, and this is the one parameter where the type is load-bearing.**
+Across `powershell -File` a comma list is cast to a single number via the thousands separator, so an
+`[int[]]` would silently turn `-Resolves 332,340` into issue `332340` — no error, just the wrong issue.
+This script hands the raw string on to `open-pr`, which parses it there, precisely because the hop goes
+through `powershell -File`.
+
+```powershell
+# ships and closes two issues
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/ship-pr.ps1" `
+  -Title "fix: the pre-flight reads commits" -Resolves "331,332"
+
+# open the PR only, e.g. to wait for a review
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/ship-pr.ps1" `
+  -Title "docs: short title" -NoResolves -NoMerge
+```
+
+## Why step 3 polls before it watches
+
+`gh pr checks` prints `no checks reported` **and exits 0** while no check has registered yet — which is
+indistinguishable by exit code from "everything passed". A bare `--watch` right after the push can
+therefore return immediately, and the merge below then runs straight into a `BLOCKED` wall from branch
+protection.
+
+So step 3 first polls the *text* until at least one check is registered (up to 180 seconds), and only
+then watches it. A non-zero exit from the watch means **not merged** — the script stops rather than
+retrying, because branch protection would block it anyway and forcing past a red CI is exactly what
+this chain must not do.
+
+**It deliberately does not name a check.** Step 3 watches whatever checks the PR has and reads the exit
+code. Naming one here would be a claim about the consumer's CI that this script cannot keep — and it
+was the half of the "this is too repo-specific to share" argument that did not survive being read.
+
+## The merge method is repo policy
+
+`gh pr merge` runs with `--merge` by default. A consumer that squashes or rebases declares that in
+`Get-PrMergeMethod` in its own `scripts/repo-config.ps1`; the function is optional, so a repo that
+never thought about it gets `merge`.
+
+The value is **validated before use** — anything other than `merge`, `squash` or `rebase` stops the
+script with a named error. An unrecognized value would otherwise reach `gh` as an unknown flag at the
+one moment this script is about to write to the main branch, which is the worst possible place to
+discover a typo in a config file.
+
+**There is no `--admin`, and that is not an omission.** Bypassing the CI gate is the thing this chain
+exists to make unnecessary.
+
+## Why the fold is delegated rather than inlined
+
+Step 5 hands the fold, its commit **and** its push to `fold-changelog-entry.ps1 -Push`. That delegation
+is the point, not a tidy-up.
+
+This step used to run its own `git add -A` plus `git commit`. `git add -A` stages the **whole tree**, so
+anything else modified or already staged rode along into a commit that lands **directly on the main
+branch** under one of the two named exceptions to "never commit directly". The fold script instead
+commits with an explicit pathspec — the changelog plus the entry files it actually folded, and nothing
+else can enter however messy the tree is.
+
+**An exception is only safe while it stays the size it was granted at.** The workshop's own governance
+doc had stated since August 2, 2026 that the fold commit "names its paths, so nothing else in the tree
+can ride along" — true of the fold script, false of this orchestrator, which is the more commonly used
+route of the two. Repaired here rather than in the doc.
+
+The fast-forward before it is an **explicit** `git fetch --prune` plus `git merge --ff-only origin/main`,
+not a bare `git pull --ff-only`. The bare pull aborted with *"Cannot fast-forward to multiple branches"*
+on a clean main immediately after a merge and prune — and it aborts in the one gap between the merge and
+the fold, which is the state nothing reports: the PR is merged, the entry file is still in the root, and
+every gate stays green until a release trips over it. Git raises that when handed more than one ref;
+naming `origin/main` explicitly hands it exactly one.
+
+## Step 6 on its own: repairing bookkeeping after the fact
+
+Step 6 is **`verify-resolved-issues.ps1`**, mirrored alongside this script because a consumer whose
+`ship-pr` called a file that was not in the mirror would fail at the last step of a sequence that has
+already merged.
+
+**A plain `#332` in a PR body closes nothing** — GitHub only auto-closes on a closing keyword. `open-pr`
+writes those keyword lines; this step checks the **outcome**, and closes what stayed open. A belt on top
+of a brace: if it never fires, the keyword did its job. It **cannot fail the ship** — the merge has
+already happened by then, so a problem here is a warning, not a failure.
+
+It is also usable on its own, which is what it was needed for on August 1, 2026, when eight findings
+repaired by three PRs had stayed open because those bodies carried plain mentions instead of keywords:
+
+```powershell
+# report what a merged PR declared, and close what is still open
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/verify-resolved-issues.ps1" -Pr 343
+
+# report only, change nothing
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/verify-resolved-issues.ps1" -Pr 343 -ReportOnly
+```
+
+| Parameter | What it does |
+|---|---|
+| `-Pr` | **Required.** The (merged) PR number to verify. |
+| `-ReportOnly` | Report the state of each declared issue without closing anything. |
+| `-Repo` | `owner/name`. Defaults to `Get-RepoName` from the consumer's `scripts/repo-config.ps1`. |
+
+Two design decisions worth knowing, because both look like bugs until you know them:
+
+- **It reads the issue numbers back out of the merged PR body** rather than taking them as a parameter,
+  so the verification is against what the PR actually declared. A second tally would be a second thing
+  to drift from the first.
+- **A closing keyword inside backticks is ignored**, because GitHub does not link a reference inside a
+  code span either — so it closes nothing there. That is what makes it possible to write a document
+  explaining this gate without the gate acting on the document.
+
+## Requirements in the consumer
+
+The script is repo-agnostic, but reads its repo data from the **root** of the consumer (dual-context via
+`${CLAUDE_PROJECT_DIR}`):
+
+- `scripts/repo-config.ps1` with `Get-RepoName` (the `gh --repo` target), and optionally
+  `Get-PrMergeMethod`. `Get-RepoName` is hard-required: without it every `gh` call below would target
+  the wrong repo or none at all, so the script stops with a pointer instead of a raw dot-source error.
+- Everything `open-pr` and `fold-changelog` need in turn — `scripts/lib/branch-info.ps1`,
+  `scripts/tests/*.tests.ps1`, `.github/pull_request_template.md`, and a `CHANGELOG.md` carrying the
+  configured heading.
+- `git` and a logged-in `gh` CLI.
+
+The `specialists-init` bootstrap puts `repo-config.ps1` in place as a `VUL-IN` scaffold; fill it in
+before you use this skill.
+
+## Important
+
+- **Known test gap, stated rather than implied.** Like `open-pr`, this orchestrator drives live `git`
+  and `gh` against a real remote and is not covered by an automated suite. The sub-steps it calls are
+  each tested on their own — step 6 was extracted into its own script for exactly that reason, being the
+  one step that mutates state *outside* the repo (it comments and closes). What remains untested here is
+  only the orchestration order.
+- **If it fails between the merge and the fold, do not re-run it blindly.** The PR is already merged at
+  that point; the fold's own output says whether the entry file was removed. Re-running a fold that
+  already deleted the entry is a different problem from the one you had.
+- The source of this script lives in the workshop repo; do not modify it locally in the consumer. A
+  change lands first in the source (`scripts/release/ship-pr.ps1`) and then travels via a release to the
+  plugin mirror — guarded by the shared-scripts drift lint.

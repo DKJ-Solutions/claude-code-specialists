@@ -24,7 +24,16 @@
     issue and silently DROPS the comment (lesson of July 30, 2026), and `gh issue close` has no
     --body-file of its own.
 
-    Deliberately workshop-local (like ship-pr.ps1 and cut-release.ps1): NOT mirrored into the plugin.
+    MIRRORED INTO THE PLUGIN, travelling with ship-pr.ps1 rather than on its own merit: it IS that
+    script's step 6, and a consumer whose ship-pr called a file absent from the mirror would fail at the
+    last step of a sequence that has already merged. Documented by the ship-pr skill, which carries a
+    section for running this step alone.
+
+    This header claimed the opposite until August 4, 2026 -- "deliberately workshop-local, NOT mirrored",
+    citing ship-pr.ps1 and cut-release.ps1 as fellow cases while all three had by then been shared. Noted
+    because no gate can catch that class: the drift lint compares the two copies against each other, and
+    a wrong sentence present in both is not drift.
+
     Pure ASCII (repo convention for .ps1).
 
 .PARAMETER Pr
