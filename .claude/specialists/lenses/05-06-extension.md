@@ -114,13 +114,28 @@ description while building; ownership of the entry mechanism stays Rendall's.
 A release here is a **recorded moment**: all plugins get the same version number
 (**lockstep, repo-wide**) and the state is tagged as `vX.Y.Z`. `cut-release.ps1` itself publishes
 nothing to GitHub Releases — only a git tag, the full notes in `releases/development/`, and a
-reference to them in `CHANGELOG.md`. For a **Minor or Major** bump, publishing a GitHub Release is a
-manual closing step Rendall walks through afterward, per the `cut-release` skill's checklist — not
-automated by the script; a **Patch** release skips that step (tag only). **The body is the edited
-highlights file, the development notes go along as an attachment** — the split the skill's checklist
-describes, and it applies here since the highlights tier was turned on (August 3, 2026). It is not
-merely a style preference: `gh release create`'s body has a hard 125,000-character limit and this repo's
-development notes have exceeded that. See
+reference to them in `CHANGELOG.md`. Publishing a GitHub Release is a manual closing step Rendall walks
+through afterward, per the `cut-release` skill's checklist — not automated by the script.
+
+**Here that happens at *every* release, patch included, and the body is the internal note** (Dave,
+August 4, 2026). The two halves of that decision have separate reasons, so keep them apart:
+
+- **Every release.** Until this date a patch skipped the step entirely (tag only). It no longer does, so
+  the Release page becomes a continuous record rather than one with gaps where the patches were.
+- **The internal note as the body**, with the **highlights and the development notes as attachments** —
+  the three-row table in the skill's step 5. Dave's reasoning: highlights only exist at a minor or major,
+  while the internal note exists at every release, so it is the only tier that can be the body under a
+  no-exceptions rule. It is also the tier written as *what the work is worth*, which is what a public
+  Release page is read as.
+- **The cost, stated rather than discovered.** The internal tier deliberately carries no file names, no
+  commands and no code. On a release that requires the reader to act — `v3.2.0`, where the marketplace
+  rename breaks every existing install *with no error message* — the migration steps are in the attached
+  highlights, not on the page. So when a release needs an action, say that in the body and point at the
+  attachment. This was raised as an objection before the decision and Dave chose the internal note
+  anyway; it is recorded as a known trade-off, not as an open question.
+
+Never inline the development notes regardless: `gh release create`'s body has a hard
+125,000-character limit and this repo's development notes have exceeded that. See
 [releases/README.md](../../../releases/README.md#cutting-a-release) for the full mechanics. The
 `version` in each
 `.claude-plugin/plugin.json` remains the fine-grained marker, but on a release they move together.
@@ -308,6 +323,6 @@ A new recurring release chore? Rendall builds a script for it with the same guar
 In short: the **how** (changelog, SemVer, tags, and — where a release publishes one — a GitHub
 Release) is portable; the **what** (these scripts, the per-branch entry + fold convention, and the
 lockstep repo-wide release via `cut-release.ps1` with git tag + `## Releases` block) belongs to this
-repo. Publishing a GitHub Release here is a manual Minor/Major-only closing step, per the
-`cut-release` skill, that `cut-release.ps1` itself does not automate and that a Patch skips
-entirely.
+repo. Publishing a GitHub Release here is a manual closing step at **every** release, per the
+`cut-release` skill, that `cut-release.ps1` itself does not automate — with the internal note as the
+body and the other tiers attached.

@@ -1,9 +1,9 @@
 ---
 name: cut-release
 description: >-
-  Checklist for the closing steps of cutting a release: the git tag + push, and for a Minor/Major
-  bump a GitHub Release (highlights as the release body, the full development notes as an
-  attachment -- gh's release-notes body has a hard 125,000-character limit), plus branch cleanup.
+  Checklist for the closing steps of cutting a release: the git tag + push, the internal summary and
+  the highlights edit, then a GitHub Release (body = the highest tier the repo has, every other tier
+  as an attachment -- gh's release-notes body has a hard 125,000-character limit), plus branch cleanup.
   Where the repo has a separate "go live" stage (Get-LiveStage in scripts/repo-config.ps1), also the
   push to that live target and moving the "<- LIVE" marker. Prints ready-to-paste command blocks in
   a fixed order -- a checklist that imposes itself, not automation: no script is run or mirrored.
@@ -46,36 +46,7 @@ each command as you go — do not skip a step or reorder them from memory.
    git push origin vX.Y.Z
    ```
 
-2. **Minor or Major bump only — publish a GitHub Release.** A Patch release skips this step
-   entirely (tag only, no GitHub Release):
-
-   ```powershell
-   gh release create vX.Y.Z --title "vX.Y.Z - <short title>" --notes-file <highlights-file>
-   gh release upload vX.Y.Z <full-development-notes-file>
-   ```
-
-   **Highlights as the body, full notes as an attachment — never inline.** The **highlights** (a
-   short summary of what the release contains) become the release **body** via `--notes-file`; the
-   full development notes go along separately as an **attachment** via `gh release upload`. This
-   split is not a style choice: `gh release create`'s notes body has a hard limit of **125,000
-   characters**. At life-hub's v2.1.0, the development notes were **134,419 characters** and the
-   plain "paste everything into the body" approach returned an HTTP 422 from `gh`. Splitting
-   body/attachment is what keeps the command from failing on anything but the smallest release.
-
-   **Where `<highlights-file>` comes from.** Where the repo sets `Get-ReleaseHighlightsBumps` in
-   `scripts\repo-config.ps1`, `cut-release.ps1` has already generated it at
-   `releases/highlights/<dir>/<X.Y.Z>.md` — markdown only — **edit it before
-   publishing**: it is written for non-developers and the generated draft still carries a
-   developer-only block under an explicit remove-before-publishing marker. Where that knob is **empty**
-   there is no highlights file and no such document is wanted; use the development notes as the body and
-   drop the attachment line.
-
-   **Read the marker as a proposal, not a verdict.** The split is keyed on branch type, and how well
-   that predicts consumer impact varies per repo: in a storefront repo a `Style` branch *is* a customer-
-   visible change, while in a tooling repo a `chore/` branch can carry the most consequential change
-   there is. Read both halves before cutting.
-
-3. **The internal summary — at EVERY release, patch included.** Where the repo carries
+2. **The internal summary — at EVERY release, patch included.** Where the repo carries
    `scripts/release/new-internal-note.ps1`, `cut-release.ps1` has printed this invocation at the end of
    its run:
 
@@ -94,12 +65,60 @@ each command as you go — do not skip a step or reorder them from memory.
    needing a developer. It refuses to overwrite an existing note without `-Force`: this is the one
    document of the three that cannot be regenerated from anything.
 
-4. **Ship the two hand-written documents via a branch + PR.** The edited highlights draft and the filled-in
-   internal note are both written after the cut, and `cut-release.ps1` has already committed and tagged by
+3. **Edit the highlights draft — where the repo generates one.** Where the repo sets
+   `Get-ReleaseHighlightsBumps` in `scripts\repo-config.ps1` and this bump is one of them,
+   `cut-release.ps1` has already written `releases/highlights/<dir>/<X.Y.Z>.md` — markdown only. It is a
+   **draft**: it is written for non-developers and still carries a developer-only block under an explicit
+   remove-before-publishing marker.
+
+   **Read the marker as a proposal, not a verdict.** The split is keyed on branch type, and how well
+   that predicts consumer impact varies per repo: in a storefront repo a `Style` branch *is* a customer-
+   visible change, while in a tooling repo a `chore/` branch can carry the most consequential change
+   there is. Read both halves and promote what matters; do not simply delete the bottom one.
+
+   **Budget for a rewrite rather than a trim.** The tier renders the release a *second time*, it does not
+   translate it — the draft is the same prose the development notes carry, regrouped. Turning entries
+   written for someone reviewing a diff into a document for someone deciding whether to update is an
+   authoring job. Measured at this repo's v3.2.0: 1,098 draft lines became 153, and the heaviest item for
+   a consumer sat at line 1,034, below the marker, because it arrived on a `chore/` branch.
+
+4. **Ship the hand-written documents via a branch + PR.** The internal note and the edited highlights
+   draft are both written after the cut, and `cut-release.ps1` has already committed and tagged by
    then — so neither can ride along on the release commit, and neither is one of the two named
    direct-on-`main` exceptions. Use the normal `new-branch` → `ship-pr` route.
 
-5. **Branch cleanup** — the same fixed closing move as the `fold-changelog` skill's:
+5. **Publish the GitHub Release — after step 4, never before it.** The body is one of the documents
+   step 4 just merged, so publishing earlier means publishing a body that does not exist yet. Which bumps
+   get a Release is **repo policy** — see the release manager's repo lens; some repos publish at every
+   release, others at Minor/Major only.
+
+   ```powershell
+   gh release create vX.Y.Z --title "vX.Y.Z - <short title>" --notes-file <body-file>
+   gh release upload vX.Y.Z <full-development-notes-file> [<highlights-file>]
+   ```
+
+   **The body is the highest tier the repo actually has, and every other tier goes along as an
+   attachment.** Take them in this order:
+
+   | the repo has | body | attachments |
+   |---|---|---|
+   | an internal note | `releases/internal/<dir>/<X.Y.Z>.md` | the development notes + the highlights, where one exists |
+   | highlights but no internal note | the edited `releases/highlights/<dir>/<X.Y.Z>.md` | the development notes |
+   | neither | the development notes | — |
+
+   **Never inline the development notes**, whichever row applies: `gh release create`'s notes body has a
+   hard limit of **125,000 characters**. At life-hub's v2.1.0 the development notes were **134,419
+   characters** and the "paste everything into the body" approach returned an HTTP 422 from `gh`. The
+   body/attachment split is what keeps the command from failing on anything but the smallest release.
+
+   **Why the internal note outranks the highlights as the body, where both exist.** It is the only tier
+   written at *every* release, so the page reads the same way whether the release was a patch or a major —
+   and it answers what the work is worth, which is what a Release page is read as. The cost is real and
+   worth naming: the internal tier deliberately carries no file names, no commands and no code, so on a
+   release that requires the reader to *act*, the instruction lives in the attached highlights rather than
+   on the page. Say so in the body when that applies, rather than leaving the reader to find it.
+
+6. **Branch cleanup** — the same fixed closing move as the `fold-changelog` skill's:
 
    ```powershell
    git fetch --prune
@@ -136,7 +155,10 @@ tagging) fills in `Get-LiveStage` with a short description of that target. Where
   `Get-ReleaseHighlightsStakeholderTypes`, `Get-ReleaseHighlightsWording`). Define none of them and the
   cut behaves exactly as it does in the source repo. Run `check-script-contract.ps1` to see which ones
   this repo answers and which fall back.
-- `git` and a logged-in `gh` CLI for the Minor/Major GitHub Release step.
+- `git` and a logged-in `gh` CLI for the GitHub Release step. **Which bumps get a Release is repo
+  policy, not part of this checklist** — it is stated in the release manager's repo lens, because a repo
+  that publishes at every release and one that publishes at Minor/Major only are both coherent, and the
+  choice follows from who reads the page rather than from the mechanics.
 
 ## Important
 
@@ -149,5 +171,10 @@ tagging) fills in `Get-LiveStage` with a short description of that target. Where
   Release, the live push, the branch cleanup.
 - **Order matters.** Block 1 always runs first; Block 2 only follows it, and only where
   `Get-LiveStage` says there is one to run.
+- **And inside Block 1 the GitHub Release moved to last, which is a correction rather than a
+  preference** (August 4, 2026). It used to be step 2, directly after the tag, because its body was the
+  highlights file that `cut-release.ps1` had already generated. Once the body is the internal note — a
+  document step 2 only *starts* and step 4 merges — publishing from step 2 would publish a body that does
+  not exist yet. A checklist meant to impose itself has to be walked in an order that is possible.
 - **A release itself is cut only at explicit request** (a version bump is never automatic) — that
   governance rule is unchanged and sits upstream of this skill, not inside it.

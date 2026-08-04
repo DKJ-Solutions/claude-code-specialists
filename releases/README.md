@@ -4,10 +4,11 @@ The release history of the claude-code-specialists marketplace. A release here i
 **recorded moment**: a git tag that marks the state of the marketplace, with all plugin versions in
 lockstep. The `## Releases` block in [`CHANGELOG.md`](../CHANGELOG.md) references the development notes.
 [`scripts/release/cut-release.ps1`](../scripts/release/cut-release.ps1)
-itself publishes nothing to GitHub Releases — that is a separate, manual closing step: for a
-**Minor or Major** bump, the [`cut-release` skill](../plugins/specialists/skills/cut-release/SKILL.md)'s
-checklist walks through `gh release create` + `gh release upload` (the edited highlights as the release
-body, the full development notes as an attachment); a **Patch** release skips that step (tag only).
+itself publishes nothing to GitHub Releases — that is a separate, manual closing step, taken at
+**every** release including a patch (Dave, August 4, 2026): the
+[`cut-release` skill](../plugins/specialists/skills/cut-release/SKILL.md)'s
+checklist walks through `gh release create` + `gh release upload` with **the internal note as the release
+body and the other tiers attached**.
 Releases are cut only at Dave's explicit request — see [Cutting a release](#cutting-a-release)
 below for the full mechanics. Each release also refreshes, per plugin, the `RELEASE.md` card that
 consumers see (version + short notes, travelling along with the plugin cache via
@@ -185,14 +186,23 @@ In one motion, on a clean `main`:
 4. commits that directly on `main` (`release: vX.Y.Z`) and sets an annotated tag `vX.Y.Z`;
 5. pushes `main` + the tag (unless `-NoPush` for inspection first).
 
-**Closing step, after the script, for a Minor/Major bump: publish a GitHub Release.** Not run by
-`cut-release.ps1` and not automated — the release manager walks through the
-[`cut-release` skill](../plugins/specialists/skills/cut-release/SKILL.md)'s
-checklist: `gh release create` with the highlights as the release body (`--notes-file`), then
-`gh release upload` with the full development notes file as an attachment. That split is not a
-style choice: `gh`'s release-notes body has a hard 125,000-character limit, which a full notes file
-can exceed. A **Patch** release skips this step entirely (tag only, no GitHub Release) — which is
-why, for example, `v2.6.1` and `v2.7.1` have no GitHub Release while `v2.6.0` and `v2.7.0` do.
+**Closing step, after the script and after the two written documents have merged: publish a GitHub
+Release — at every release, patch included.** Not run by `cut-release.ps1` and not automated; the release
+manager walks through the [`cut-release` skill](../plugins/specialists/skills/cut-release/SKILL.md)'s
+checklist: `gh release create` with the **internal note** as the release body (`--notes-file`), then
+`gh release upload` with the full development notes **and the edited highlights, where the bump generated
+one**. Never inline the development notes: `gh`'s release-notes body has a hard 125,000-character limit,
+which a full notes file can exceed.
+
+**It comes last on the checklist for a reason that is easy to get wrong.** The body is a document written
+*after* the cut and merged via a branch + PR, so a Release published straight after the tag would have no
+body to publish. Until August 4, 2026 the step sat directly after the tag, which worked only because the
+body was then the highlights file the script itself had already generated.
+
+**Two consequences of the "every release" half.** Patches now get a Release too — so `v2.6.1` and
+`v2.7.1`, cited here for years as examples of releases deliberately without one, describe the old rule
+and are left standing as history rather than as guidance. And a patch has no highlights by construction,
+so on a patch the attachment list is the development notes alone.
 
 Guardrails: a clean `main`, no unfolded entry files, lint gate green, tag doesn't exist yet. The
 lint gate ([`scripts/lint/check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1),
