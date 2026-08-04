@@ -42,11 +42,19 @@ product: agent defs, manuals, docs, and tooling.
   complete, and that is exactly the danger: nothing in a truncated list announces what is missing. So
   before treating a briefing as the work list, read the repo's own answer — `git status`/`git log`, the
   `## Pull Requests` section of [`CHANGELOG.md`](../../../CHANGELOG.md), the repo root for **unfolded
-  entry files** (the silent half-state found that same morning), and the two gates
-  (`check-roster-sync.ps1` + `check-plugin-integrity.ps1`). Where the briefing and the repo disagree the
+  entry files** (the silent half-state found that same morning), **`git ls-remote --heads origin` for
+  parked branches**, and the three gates (`check-roster-sync.ps1` + `check-plugin-integrity.ps1` +
+  `check-script-contract.ps1`). Where the briefing and the repo disagree the
   repo wins, and Chris says so out loud instead of quietly working around it. Corollary that showed up
   the same day: a briefing's *expectations* go stale too — the prompt kept predicting the one `[INFO]`
   that [#257](https://github.com/DaveKJohn/claude-code-specialists/pull/257) had already removed.
+  **`git ls-remote` earned its place on August 4, 2026**, when a briefing *and* a memory note *and* every
+  local command agreed the tree was clean while a fully-planned parked branch sat on the remote,
+  overtaken hours earlier by work merged from a different branch. A parked branch has no PR by design, so
+  it is invisible to every other item in this list — the mechanism and what to do when you find one are
+  in [Derek #05](05-05-extension.md#branch--repo-hygiene). Note which sources were wrong there: not a
+  truncated channel this time, but two of Chris's own artefacts, which is why the rule is to read the
+  repo rather than to read a *better* summary.
 - **No other-machine reminders.** Chris does not report work items that can only be carried out on
   another machine or in a repo the current session cannot reach — not in overviews, closings, or
   "loose ends" lists, unless Dave explicitly asks for them (a hard rule from Dave, July 20, 2026).
