@@ -282,12 +282,32 @@ Assert-Equal 'Fixes' (Get-ReleaseCategories).Title['Fix'] 'category titles: with
 Write-Host "issue #417 -- Convert-ChangelogForRelease and the LIVE marker" -ForegroundColor Cyan
 # The marker MOVES: it is stripped wherever it sits and re-applied to the new heading. A marker that
 # accumulated would say two releases are live at once, which is worse than saying none is.
-# INTERPOLATED, not concatenated -- and that is load-bearing rather than style. Inside a
-# comma-separated array literal, `'a' + $x + 'b'` is not one element: PowerShell takes the three
-# operands as three ELEMENTS, so this literal used to yield 7 entries instead of 5 and the following
-# -join "`n" put newlines where the concatenation was. Both headings below arrived at Split-Changelog
-# already broken across three lines, with the middot and the em-dash each sitting alone on one.
-# See the comment above the strong assert further down for what that cost.
+# INTERPOLATED, not concatenated -- and that is load-bearing rather than style.
+#
+# THE MECHANISM, because "use interpolation here" is a rule nobody can apply elsewhere: in PowerShell
+# the comma operator binds TIGHTER than '+'. So inside a comma-separated array literal the '+' does not
+# join its two neighbouring strings at all -- it joins the ARRAY on its left to the ARRAY on its right:
+#
+#     @( 'H', '', 'A' + $x + 'B', '', 'T' )   is   ( ('H','','A') + $x + ('B','','T') )
+#
+# which is 7 elements where 5 were written, verified element-for-element against that regrouping. The
+# following -join "`n" then puts newlines exactly where the concatenation was meant to be. Both headings
+# below used to reach Split-Changelog already broken across three lines, with the middot and the em-dash
+# each alone on one, and the function passed that through faithfully.
+#
+# THE SECOND FORM IS QUIETER AND HAS NO LOOSE LINE TO SPOT. When there is no comma to the LEFT, the
+# left operand is a plain string, so string concatenation wins and the array on the right is flattened
+# into it with $OFS (a space) between the parts:
+#
+#     @( 'A' + $x + 'B', 'T' )   ->   ONE element, the string "A<em-dash>B T"
+#
+# That one produces no bare-separator line, so the checks below would not catch it -- it just silently
+# swallows the next element. Assigning the concatenation to a variable first, or interpolating as this
+# fixture now does, gives the elements that were written in both shapes.
+#
+# Searched across every .ps1 in the repo when this was found: no other instance of either shape. The
+# other '+'-built strings are assignments or single expressions, where there is no comma to bind to.
+# See the comment above the strong assert further down for what this one cost.
 $clLive = @(
     '# Changelog', '',
     '## Pull Requests', '',
