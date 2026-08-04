@@ -201,13 +201,29 @@ try {
     Assert-Equal 1 $errCount1 'missing Test-BranchName: exactly one error (Get-BranchInfo unaffected)'
     Assert-Match "\[OK\]\s+'Get-BranchInfo' present in" $r.Out 'missing Test-BranchName: Get-BranchInfo still OK'
 
-    # --- 3. Missing function in repo-config.ps1: Get-RosterPath ------------------------------------
+    # --- 3. Missing Get-RosterPath is an INFO, not an error (inbound #445) --------------------------
+    #     It was the only kind of required entry a consumer could not decline: its sole caller,
+    #     check-roster-sync, runs from a SessionStart hook. And check-roster-sync never actually required
+    #     it -- it defaults the roster to CLAUDE.md and runs to completion -- so the [ERROR] was this
+    #     table declaring a requirement the reading script does not have. Same shape as 6c below.
     $c = New-FixtureConsumer -StripFromRepoConfig @('Get-RosterPath')
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
-    Assert-Equal 1 $r.Code 'missing Get-RosterPath: exit-code 1'
-    Assert-Match "\[ERROR\].*'Get-RosterPath' missing from scripts\\repo-config\.ps1.*required by: check-roster-sync" $r.Out 'missing Get-RosterPath: ERROR names the function, the lib, and check-roster-sync'
+    Assert-Equal 0 $r.Code 'missing Get-RosterPath: exit-code 0 -- an optional entry is not a failure'
+    Assert-Match "\[INFO\].*'Get-RosterPath'.*falls back to 'CLAUDE\.md'" $r.Out 'missing Get-RosterPath: INFO naming the default the reading script actually uses'
     $errCount2 = @([regex]::Matches($r.Out, '\[ERROR\]')).Count
-    Assert-Equal 1 $errCount2 'missing Get-RosterPath: exactly one error'
+    Assert-Equal 0 $errCount2 'missing Get-RosterPath: no error at all'
+    # The same for its sibling, and both at once -- the pair is what a scripts-only consumer strips.
+    $c = New-FixtureConsumer -StripFromRepoConfig @('Get-RosterPath', 'Get-RosterIgnoredIds')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c)
+    Assert-Equal 0 $r.Code 'both roster entries missing: exit-code 0'
+    Assert-Match "\[INFO\].*'Get-RosterIgnoredIds'.*falls back to 'no ignored ids'" $r.Out 'missing Get-RosterIgnoredIds: INFO naming its default'
+    Assert-Equal 0 @([regex]::Matches($r.Out, '\[ERROR\]')).Count 'both roster entries missing: still no error'
+    # And the guard that keeps this from being a blanket downgrade: a genuinely required entry from the
+    # same lib still errors. Without this, "optional" could have been applied to the whole file.
+    $c = New-FixtureConsumer -StripFromRepoConfig @('Get-RepoName')
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c)
+    Assert-Equal 1 $r.Code 'missing Get-RepoName: still exit-code 1 -- the downgrade is scoped to the two roster entries'
+    Assert-Match "\[ERROR\].*'Get-RepoName' missing" $r.Out 'missing Get-RepoName: still an ERROR'
 
     # --- 4. Missing lib file entirely: no scripts/repo-config.ps1 at all ---------------------------
     #     All four repo-config functions are unreachable -> one [ERROR] per function, and the check
@@ -216,11 +232,18 @@ try {
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
     Assert-Equal 1 $r.Code 'missing repo-config.ps1: exit-code 1'
     Assert-Match "\[ERROR\].*'scripts\\repo-config\.ps1' not found" $r.Out 'missing repo-config.ps1: ERROR names the missing file'
-    foreach ($fn in @('Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds')) {
+    foreach ($fn in @('Get-RepoName', 'Get-LintScript')) {
         Assert-Match "\[ERROR\].*'$fn'.*cannot be checked" $r.Out "missing repo-config.ps1: '$fn' reported as unreachable"
     }
+    # The two roster entries became Optional on August 4, 2026 (inbound #445), so an absent lib no longer
+    # errors over them. Asserted in both directions -- present as INFO, absent from the errors -- because
+    # "no error" alone would also pass if the check had stopped examining them altogether.
+    foreach ($fn in @('Get-RosterPath', 'Get-RosterIgnoredIds')) {
+        Assert-NotMatch "\[ERROR\].*'$fn'" $r.Out "missing repo-config.ps1: '$fn' is optional, so not an error"
+        Assert-Match "\[INFO\].*'$fn'" $r.Out "missing repo-config.ps1: '$fn' still reported, as an INFO -- examined, not dropped"
+    }
     $errCount3 = @([regex]::Matches($r.Out, '\[ERROR\]')).Count
-    Assert-Equal 4 $errCount3 'missing repo-config.ps1: exactly four errors (one per MANDATORY repo-config function)'
+    Assert-Equal 2 $errCount3 'missing repo-config.ps1: exactly two errors (one per MANDATORY repo-config function)'
     Assert-Match "\[INFO\].*'Get-ChangelogHeading'.*falls back to '## Pull Requests'" $r.Out 'missing repo-config.ps1: the optional Get-ChangelogHeading is INFO, not ERROR (#178)'
     Assert-Match "\[OK\]\s+'Get-BranchInfo' present in" $r.Out 'missing repo-config.ps1: branch-info.ps1 unaffected, still OK'
 
