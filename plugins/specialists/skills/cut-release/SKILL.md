@@ -134,7 +134,39 @@ each command as you go — do not skip a step or reorder them from memory.
    release that requires the reader to *act*, the instruction lives in the attached highlights rather than
    on the page. Say so in the body when that applies, rather than leaving the reader to find it.
 
-6. **Branch cleanup** — the same fixed closing move as the `fold-changelog` skill's:
+6. **Name the cache refresh in the closing report — pushing the tag is not the end of a release.** A
+   `github` marketplace source is a **cached clone**, and `plugin install` compares against *that*, not
+   against the repo you just tagged. So the safe closing line for a consumer is one idempotent command
+   before they update:
+
+   ```powershell
+   claude plugin marketplace update <marketplace>
+   ```
+
+   **State it as two measurements rather than one rule, because the obvious generalisation was tested and
+   broke.** They are not the same for `install` and `update`:
+
+   | command | refreshes the cached clone? | how it was measured |
+   |---|---|---|
+   | `plugin install` | **no** | a controlled pair, same machine, same minute, two fresh folders: without the refresh the install produced the **previous** release and left the clone where it was; with it, the new one. Confirmed on two separate releases. |
+   | `plugin update` | **yes** | with the clone verifiably still on the pre-release commit and not even containing the new version, a bare update moved to the new version **and advanced the clone during the run**. |
+
+   So the earlier, tidier claim — "skip the refresh and you get the previous version" — holds for
+   `install` and is **false** for `update`. Report the refresh as the *safe first step*, not as a
+   mechanism claim about what breaks without it.
+
+   **Why it has to be said out loud at all: a stale cache is invisible by construction.** It reports
+   success with a plausible version number, and an install's success line names the scope and **no
+   version at all** — so a consumer cannot detect staleness from the output even in principle, only from
+   the install record. This is the one thing a release cannot do for its consumers, which is exactly why
+   the closing report must name it.
+
+   **A practical note for whoever cuts the next release:** the stale window a release opens lasts only
+   until something refreshes it. If a question about cache behaviour is open, the minutes after the tag is
+   pushed are when it can be answered; an hour later the cache has moved on and the answer waits for the
+   next release.
+
+7. **Branch cleanup** — the same fixed closing move as the `fold-changelog` skill's:
 
    ```powershell
    git fetch --prune
@@ -157,6 +189,27 @@ tagging) fills in `Get-LiveStage` with a short description of that target. Where
    writes it onto the new one. This step is therefore a verification, not a hand edit; it stays on the
    checklist because the marker is the one release artefact whose correctness a script cannot confirm
    (only the person who did the push knows it succeeded).
+
+## A milestone release — `-SummaryFile`
+
+An ordinary release's notes are the diff since the last one: `-Title` gives it one sentence and the
+entries carry the detail. A **milestone** is a different claim — the arc across many releases, which fits
+in neither. `-SummaryFile <path>` puts an authored markdown block between the title line and the
+generated entries, closed off with a horizontal rule so a reader can see where the authored part stops
+and the per-PR record begins. Three things to know:
+
+- **The file may live outside the repo, and normally should.** Its canonical home becomes the generated
+  notes file; a second copy kept under `releases/` purely to feed the parameter is duplication.
+- **A missing or empty file is a hard stop.** An empty one would otherwise produce an ordinary release
+  while you believe you cut a milestone.
+- **Links in the summary are left exactly as authored.** Unlike an entry — written in the root changelog
+  and then moved several folders deeper, so its relative links are rewritten — a summary is written *for*
+  the notes file. Rewriting its links would break the ones that were already right.
+
+**And say plainly whether anything breaks.** A `major` bump reads as "breaking" to anyone applying semver
+mechanically, and a milestone may well break nothing — a large change can be backward compatible by
+construction. If nothing breaks, the summary's opening lines have to say so, or a consumer sits on an old
+version waiting for a migration that does not exist.
 
 ## Requirements in the consumer
 
