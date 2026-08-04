@@ -57,9 +57,23 @@ whose PR had been opened in an earlier session therefore had to be merged and fo
 the five-step sequence `ship-pr` exists to remove. Measured on
 [PR #457](https://github.com/DaveKJohn/claude-code-specialists/pull/457).
 
-**Title and body are left alone.** The body may have been edited on github.com since it was opened, and
-overwriting someone's edits with a freshly generated template loses more than a stale title costs — the
-title is at least visible on the PR. Use `gh pr edit` if you want it changed.
+**Title and body are left alone by default.** The body may have been edited on github.com since it was
+opened, and overwriting someone's edits with a freshly generated template loses more than a stale title
+costs — the title is at least visible on the PR. Use `gh pr edit` if you want the title changed.
+
+**`-RefreshBody` rewrites the description from the entry, and only the description.** Pass it when you
+extended the changelog entry after the PR was opened — routine on a branch that keeps growing, and
+otherwise the PR keeps describing an earlier version of the work while the merged changelog gets the new
+one. The "Type of change" boxes, the checklist, the `## Resolved issues` block and anything a reviewer
+added all stay exactly as they are.
+
+It is **opt-in** rather than automatic for the reason above: refreshing on every run would overwrite a
+hand-edited body without being asked. And it is a no-op where there is nothing to do — no open PR, no
+description in the entry, or a body that already matches, in which case nothing is sent to GitHub at all.
+
+The heading it replaces under is the **first `## ` heading of your PR template**, so no extra
+configuration is needed: that is where the description placeholder sits. If your template has no `## `
+heading, the switch warns and changes nothing rather than guessing.
 
 **The one exception appends rather than replaces: a `-Resolves` the existing body does not carry yet.**
 Dropping it would be the whole point of the resolves gate failing from the other side — GitHub closes

@@ -17,10 +17,11 @@
     issue verification) never ran, so the merge and the fold had to be done by hand -- exactly the
     five-step sequence ship-pr exists to remove. Measured August 4, 2026 on PR #457.
 
-    Title and body are deliberately LEFT ALONE when a PR already exists. The body may have been
-    edited on github.com since it was opened, and silently overwriting a reviewer's or the author's
-    edits with a freshly generated template is a worse failure than a stale title: the title is
-    visible on the PR, an overwritten body is gone. Retitle with `gh pr edit` if you want it changed.
+    Title and body are LEFT ALONE by default when a PR already exists. The body may have been edited on
+    github.com since it was opened, and silently overwriting a reviewer's or the author's edits with a
+    freshly generated template is a worse failure than a stale title: the title is visible on the PR, an
+    overwritten body is gone. Retitle with `gh pr edit`; use -RefreshBody to pull the description back
+    from the changelog entry when the entry was rewritten after the PR was opened -- see that parameter.
 
     ONE exception, and it APPENDS rather than replaces: a -Resolves this run declares that the existing
     body does not already carry is added to it. Skipping that would drop the declaration on the floor --
@@ -125,6 +126,20 @@
     Deliberately separate from -SkipLint/-SkipTests: those skip a tool, this overrules a content
     judgement, and conflating them would let a routine "skip the slow suites" also wave prose through.
 
+.PARAMETER RefreshBody
+    On a branch whose PR is ALREADY OPEN, rewrite the description section of that PR's body from the
+    current changelog entry. Only that one section: the "Type of change" boxes, the checklist, the
+    `## Resolved issues` block and anything a reviewer added stay exactly as they are.
+
+    OPT-IN ON PURPOSE, and the default silence is the safer half: a body may have been edited on
+    github.com, and refreshing on every run would overwrite those edits without being asked. So the
+    switch exists for the case that actually happens -- the entry was rewritten after the PR was opened,
+    which is routine on a branch that gets extended -- and it stays off otherwise.
+
+    A no-op where there is nothing to do: no open PR, no entry description, or a body that already says
+    exactly this. In the last case nothing is sent to GitHub at all, so a rerun produces no PR activity.
+    Ignored on a fresh PR, where the body is generated from the template anyway.
+
 .EXAMPLE
     ./scripts/release/open-pr.ps1 -Title "feat: new domain plugin"
 
@@ -139,7 +154,8 @@ param(
     [switch]$SkipTests,
     [string]$Resolves = '',
     [switch]$NoResolves,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$RefreshBody
 )
 $ErrorActionPreference = 'Stop'
 
@@ -177,6 +193,10 @@ $repo = Get-RepoName
 # line above (registered in shared-scripts-lib.ps1 for the mirror + drift lint).
 . (Join-Path $PSScriptRoot '..\lib\pr-issues-lib.ps1')
 
+# The PR-body helpers: Get-EntryDescription (shared by the fresh and the -RefreshBody path, so they read
+# the entry the same way) and Update-PrBodySection. Same payload reasoning as the two libs above.
+. (Join-Path $PSScriptRoot '..\lib\pr-body-lib.ps1')
+
 # Pre-flight (#86): an unfilled scaffold (repo-config still at VUL-IN) would otherwise only fail
 # further down with an unclear gh error. Stop here with a clear pointer.
 if ($repo -match 'VUL-IN' -or (Get-LintScript) -match 'VUL-IN') {
@@ -191,6 +211,13 @@ if ($branch -eq 'main') { Write-Error "You are on main; a PR is created from a b
 # below needs the entry-file path and the label logic further down needs the same object.
 $info = Get-BranchInfo -Branch $branch
 $entryPath = Join-Path $repoRoot ($info.SafeName + '.md')
+
+# The entry's description, read ONCE here because two paths need it: the template auto-fill for a fresh
+# PR, and -RefreshBody for a resumed one. Reading it twice would be two chances to read it differently.
+$entryDescription = ''
+if (Test-Path -LiteralPath $entryPath) {
+    $entryDescription = Get-EntryDescription -EntryText ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8))
+}
 
 # --- Does this branch already have an open PR? ----------------------------------------------------
 # Asked ONCE, here, because two later steps need the answer: the resolves gate (an existing body's
@@ -418,35 +445,89 @@ if ($push.ExitCode -ne 0) { Write-Error "git push failed."; exit 1 }
 # whether to go on to the CI watch and the merge. Returning non-zero here (or letting the duplicate
 # `gh pr create` fail) is what made ship-pr unusable on a resumed branch.
 #
-# Title, body and label are left untouched -- see the note in .DESCRIPTION. The ONE exception is a
-# -Resolves the existing body does not yet carry, and it is not a matter of taste: if this run
-# declares an issue closed and the declaration never reaches the body, GitHub closes nothing at the
-# merge and ship-pr.ps1's step 6 reads the same body back and confirms the same silence. That is the
-# #341-#343 failure precisely, arrived at from the other side -- so the block is APPENDED rather
-# than skipped. Add-ResolvesBlock is idempotent per issue, so an already-declared number is not
-# duplicated and a run with nothing to add writes nothing at all.
+# Title and label are left untouched -- see the note in .DESCRIPTION. TWO things may still edit the body,
+# and both are collected into ONE `gh pr edit` below rather than sent separately, because two calls would
+# be two PR updates (and two notifications) for one run:
+#
+#   1. A -Resolves the existing body does not yet carry. NOT a matter of taste: if this run declares an
+#      issue closed and the declaration never reaches the body, GitHub closes nothing at the merge, and
+#      ship-pr.ps1's step 6 reads the same body back and confirms the same silence. That is the #341-#343
+#      failure arrived at from the other side, so the block is APPENDED rather than skipped.
+#      Add-ResolvesBlock is idempotent per issue, so an already-declared number is not duplicated.
+#   2. -RefreshBody, which rewrites the description section from the entry. OPT-IN, because a body may
+#      have been edited on github.com and refreshing unasked would overwrite that.
+#
+# Both are computed against the SAME starting body and compared to it once at the end, so "nothing to do"
+# means no API call at all rather than a no-op edit.
 if ($existingPr) {
+    $currentBody = [string]$existingPr.body
+    $newBody = $currentBody
+    $edits = @()
+
     if ($resolveIssues.Count -gt 0) {
-        $updatedBody = Add-ResolvesBlock -Body ([string]$existingPr.body) -Issues $resolveIssues
-        if ($updatedBody -ne [string]$existingPr.body) {
-            $editFile = Join-Path ([System.IO.Path]::GetTempPath()) "open-pr-resolves-$PID.md"
-            [System.IO.File]::WriteAllText($editFile, $updatedBody, (New-Object System.Text.UTF8Encoding $false))
-            try {
-                $edit = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'edit', "$($existingPr.number)", '--body-file', $editFile, '--repo', $repo)
-                $edit.Output | ForEach-Object { Write-Host $_ }
-                if ($edit.ExitCode -ne 0) {
-                    Write-Error "PR #$($existingPr.number) is open and the branch was pushed, but appending the closing keyword(s) for $(($resolveIssues | ForEach-Object { "#$_" }) -join ', ') FAILED (exit $($edit.ExitCode)). Do not merge yet: without them in the body GitHub closes nothing. Add the 'Closes #<n>' line(s) by hand, or rerun."
-                    exit 1
-                }
-                Write-Host "Appended the closing keyword(s) for $(($resolveIssues | ForEach-Object { "#$_" }) -join ', ') to PR #$($existingPr.number)." -ForegroundColor Green
-            } finally {
-                Remove-Item -Path $editFile -Force -ErrorAction SilentlyContinue
+        $newBody = Add-ResolvesBlock -Body $newBody -Issues $resolveIssues
+        if ($newBody -ne $currentBody) {
+            $edits += "closing keyword(s) for $(($resolveIssues | ForEach-Object { "#$_" }) -join ', ')"
+        }
+    }
+
+    if ($RefreshBody) {
+        # The heading that carries the description is the FIRST '## ' line of the PR template -- the one
+        # the placeholder sits under, so the template answers this instead of a new repo-config seam a
+        # consumer would have to set. If the template is missing or has no such heading there is nothing
+        # to refresh, and that is a warning rather than a failure: the branch is pushed and the PR is
+        # open, which is the outcome the caller asked for.
+        $descHeading = ''
+        $templateForHeading = Join-Path $repoRoot ".github\pull_request_template.md"
+        if (Test-Path -LiteralPath $templateForHeading) {
+            $descHeading = (Get-Content -LiteralPath $templateForHeading -Encoding UTF8 |
+                Where-Object { $_ -match '^##\s+\S' } | Select-Object -First 1)
+        }
+        if (-not $descHeading) {
+            Write-Warning "-RefreshBody: no '## ' heading found in .github/pull_request_template.md - the description was left as it is."
+        } elseif (-not $entryDescription) {
+            Write-Warning "-RefreshBody: $($info.SafeName).md has no description under its '###' heading - the PR description was left as it is."
+        } else {
+            $refreshed = $false
+            $newBody = Update-PrBodySection -Body $newBody -Heading $descHeading -Content $entryDescription -Changed ([ref]$refreshed)
+            if ($refreshed) {
+                $edits += "the description under '$($descHeading.Trim())'"
+            } else {
+                Write-Host "-RefreshBody: the PR description already matches the entry - nothing sent." -ForegroundColor DarkGray
             }
         }
     }
+
+    if ($newBody -ne $currentBody) {
+        # Guard before writing, from the measured instance on August 4, 2026: a hand-written refresh
+        # published an EMPTY body because a failed string operation passed nothing on. A body edit must
+        # never shrink to nothing, so this refuses rather than sends.
+        if (-not $newBody -or -not $newBody.Trim()) {
+            Write-Error "PR #$($existingPr.number) body assembly produced empty text - nothing was sent. The branch is pushed and the PR is open; the body on GitHub is unchanged."
+            exit 1
+        }
+        $editFile = Join-Path ([System.IO.Path]::GetTempPath()) "open-pr-body-edit-$PID.md"
+        [System.IO.File]::WriteAllText($editFile, $newBody, (New-Object System.Text.UTF8Encoding $false))
+        try {
+            $edit = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'edit', "$($existingPr.number)", '--body-file', $editFile, '--repo', $repo)
+            $edit.Output | ForEach-Object { Write-Host $_ }
+            if ($edit.ExitCode -ne 0) {
+                Write-Error "PR #$($existingPr.number) is open and the branch was pushed, but updating its body FAILED (exit $($edit.ExitCode)): $($edits -join ' + '). If a closing keyword was among the changes, do NOT merge yet - without it in the body GitHub closes nothing. Add it by hand, or rerun."
+                exit 1
+            }
+            Write-Host "Updated PR #$($existingPr.number) body: $($edits -join ' + ')." -ForegroundColor Green
+        } finally {
+            Remove-Item -Path $editFile -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     Write-Host "PR #$($existingPr.number) was already open for '$branch' - the push above updated it." -ForegroundColor Green
     Write-Host "  $($existingPr.url)"
-    Write-Host "Title and body left as they are; retitle with 'gh pr edit' if you want them changed." -ForegroundColor DarkGray
+    if (-not $RefreshBody) {
+        Write-Host "Title and body left as they are; -RefreshBody rewrites the description from the entry, and 'gh pr edit' retitles." -ForegroundColor DarkGray
+    } else {
+        Write-Host "Title left as it is; retitle with 'gh pr edit' if you want it changed." -ForegroundColor DarkGray
+    }
     exit 0
 }
 
@@ -465,17 +546,13 @@ if (-not $Body) {
         # Description from the changelog entry file <SafeName>.md: everything after the compact
         # ###-heading line ("### title - type - date"). This file always exists on the branch.
         # $entryPath was resolved before the gates, alongside $info.
-        $desc = ''
-        if (Test-Path $entryPath) {
-            $entryLines = Get-Content -Path $entryPath -Encoding UTF8
-            $h3Idx = -1
-            for ($i = 0; $i -lt $entryLines.Count; $i++) {
-                if ($entryLines[$i] -match '^###\s') { $h3Idx = $i; break }
-            }
-            if ($h3Idx -ge 0 -and ($h3Idx + 1) -lt $entryLines.Count) {
-                $desc = (($entryLines[($h3Idx + 1)..($entryLines.Count - 1)]) -join "`n").Trim()
-            }
-        }
+        #
+        # Read once, above, by Get-EntryDescription (pr-body-lib) rather than by an inline loop here:
+        # -RefreshBody needs the SAME extraction, and a second copy of the rule is how this repo's
+        # accumulation bugs start. The move also put it under test -- it now refuses to treat a LATER
+        # '###' in the entry's own prose as the heading, which would have cut a description short while
+        # looking perfectly plausible.
+        $desc = $entryDescription
 
         # Tick / fill in what the script deterministically knows:
         #   - the "Type of change" box whose line contains `<prefix>/`;

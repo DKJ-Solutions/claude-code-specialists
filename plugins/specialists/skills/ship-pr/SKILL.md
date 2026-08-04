@@ -86,7 +86,14 @@ The six steps, stopping on the first failure:
 | `-SkipLint` | Passed through to `open-pr`: skip the lint gate. An escape valve. |
 | `-SkipTests` | Passed through to `open-pr`: skip the test gate. An escape valve. |
 | `-Force` | Passed through to `open-pr`: ship an entry that still carries its scaffold wording. Deliberately separate from the two above — those skip a tool, this overrules a judgement about content. |
+| `-RefreshBody` | Passed through to `open-pr`: on a branch whose PR is **already open**, rewrite that PR's description from the current changelog entry. Opt-in, so a body edited on github.com is never overwritten unasked. No effect when the PR is created in this run. |
 | `-PollSeconds` | Poll interval in seconds for the CI wait. Default 15. |
+
+**Reach for `-RefreshBody` on a branch you extended after opening its PR.** Without it the PR keeps
+describing an earlier version of the work while the merged changelog entry carries the new one — and the
+entry is what ends up in the release notes, so the two disagree in the place people go looking. Only the
+description section is touched; see the [`open-pr` skill](../open-pr/SKILL.md#resuming-a-branch-whose-pr-is-already-open)
+for exactly what is preserved.
 
 **`-Resolves` takes a string on purpose, and this is the one parameter where the type is load-bearing.**
 Across `powershell -File` a comma list is cast to a single number via the thousands separator, so an
