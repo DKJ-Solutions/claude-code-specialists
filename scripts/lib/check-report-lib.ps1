@@ -901,15 +901,44 @@ function Get-RecordShape {
 }
 
 function Resolve-PluginDir {
-    <# Resolve the versioned plugin dir for Name+Marketplace under CacheRoot: honors
-       $env:CLAUDE_PLUGIN_ROOT (hook context) only when it points at THIS plugin (its parent dir
-       leaf equals Name), so a multi-plugin setup stays correct; otherwise picks the semantically
-       highest version under <CacheRoot>/<Marketplace>/<Name>/ that has an agents/ dir
-       (bootstrap lesson: a string-sort puts 1.9.0 above 1.10.0 -- [version] fixes that). #>
+    <# Resolve the versioned plugin dir for Name+Marketplace under CacheRoot, in three steps:
+
+         1. $env:CLAUDE_PLUGIN_ROOT (hook context), honored only when it points at THIS plugin (its
+            parent dir leaf equals Name), so a multi-plugin setup stays correct.
+         2. THE INSTALL RECORD for -RepoRoot, when one is given. This is the authority on what a
+            session in that repo actually loads, and it is consulted BEFORE the version scan below.
+         3. The semantically highest version under <CacheRoot>/<Marketplace>/<Name>/ that has an
+            agents/ dir (bootstrap lesson: a string-sort puts 1.9.0 above 1.10.0 -- [version] fixes
+            that). This remains the answer when no -RepoRoot is passed, when the repo has no record,
+            or when the recorded installPath is gone from disk.
+
+       WHY STEP 2 EXISTS (August 4, 2026). Step 3 alone answers "the newest version present on this
+       machine", which is a different question from "the version this repo loads" as soon as the cache
+       holds more than one. Measured here: the cache held 3.1.2, 3.2.0 and 3.3.0, all three with an
+       agents/ dir, while this repo's record pinned 3.2.0 -- so the roster check reported on 3.3.0's
+       agent set. Nothing was visibly wrong, because both versions happened to ship the same 15 agents;
+       the moment two versions differ in roster content, a check reading the wrong one reports "all
+       present" about a specialist the session does not have. A cache holding several versions is the
+       normal state for a machine with more than one consumer, not an edge case.
+
+       The record is matched on <Name>@<Marketplace>, which is the id the administration keys on, and
+       its installPath is used directly rather than being rebuilt from the version -- the record names
+       the directory, so reconstructing it would be a second way of saying the same thing that can
+       disagree with the first. A recorded path that no longer exists, or that has no agents/ dir, falls
+       through to step 3 rather than returning $null: a stale record must not be able to blind a check
+       that would otherwise have found something.
+
+       There is deliberately NO -UserHomeOverride here. Get-InstallRecord documents that flag as pinning
+       the USER LAYER OF THE SETTINGS CHAIN, and states that its callers do not forward theirs to it
+       because the administration is a different file answering a different question. A fixture that
+       wants to control the administration redirects $env:USERPROFILE for the child process, which is
+       what the connector version test already does; adding a passthrough here would offer a second,
+       contradicting way to do it. #>
     param(
         [Parameter(Mandatory = $true)][string]$Name,
         [Parameter(Mandatory = $true)][string]$Marketplace,
-        [Parameter(Mandatory = $true)][string]$CacheRoot
+        [Parameter(Mandatory = $true)][string]$CacheRoot,
+        [string]$RepoRoot = ''
     )
 
     if ($env:CLAUDE_PLUGIN_ROOT) {
@@ -917,6 +946,22 @@ function Resolve-PluginDir {
         if ((Test-Path -LiteralPath $cpr -PathType Container) -and
             ((Split-Path (Split-Path $cpr -Parent) -Leaf) -eq $Name)) {
             return (Resolve-Path -LiteralPath $cpr).Path
+        }
+    }
+
+    if ($RepoRoot) {
+        # Best-effort: this is a refinement of step 3, never a gate in front of it. An unreadable or
+        # absent administration leaves $records empty and the version scan below answers as it always
+        # did -- Get-InstallRecord reports rather than throws, which is what makes that safe.
+        $record = Get-InstallRecord -RepoRoot $RepoRoot
+        $recId = "$Name@$Marketplace"
+        if ($record.RecordsById.ContainsKey($recId)) {
+            foreach ($rec in @($record.RecordsById[$recId])) {
+                if (-not $rec.InstallPath) { continue }
+                if (-not (Test-Path -LiteralPath $rec.InstallPath -PathType Container)) { continue }
+                if (-not (Test-Path -LiteralPath (Join-Path $rec.InstallPath 'agents') -PathType Container)) { continue }
+                return (Resolve-Path -LiteralPath $rec.InstallPath).Path
+            }
         }
     }
 

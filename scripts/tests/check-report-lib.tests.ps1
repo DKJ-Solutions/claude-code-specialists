@@ -510,6 +510,71 @@ try {
     [System.IO.File]::WriteAllText($adminFile, '{ "plugins": { oops')
     $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
     Assert-True ($null -eq (Get-RecordShape -InstallRecord $r -PluginId 'p@m')) 'unparseable administration: no shape finding invented'
+
+    # --- Resolve-PluginDir: the record decides which version, the cache scan is the fallback ----------
+    #     A shared cache holds every version any consumer on the machine pulled, so "highest present" and
+    #     "the one THIS repo loads" are different questions the moment there is a second consumer.
+    #     Measured August 4, 2026: cache at 3.1.2/3.2.0/3.3.0, this repo's record pinned 3.2.0, and the
+    #     roster check reported on 3.3.0's agent set.
+    #
+    #     $env:USERPROFILE is redirected rather than a -UserHomeOverride passed: Get-InstallRecord
+    #     documents that flag as pinning the settings chain, and states its callers do not forward theirs.
+    #     Resolve-PluginDir therefore offers no passthrough, and this is the sanctioned way to point it at
+    #     a throwaway home -- the same route the connector version test uses.
+    Write-Host "Resolve-PluginDir -- install record first, cache scan as fallback" -ForegroundColor Cyan
+    $rpCache = Join-Path $Fixture 'rpcache'
+    $rpRepo  = Join-Path $Fixture 'rprepo'
+    $rpHome  = Join-Path $Fixture 'rphome'
+    New-Item -ItemType Directory -Path $rpRepo -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $rpHome '.claude\plugins') -Force | Out-Null
+    foreach ($v in @('1.9.0', '1.10.0')) {
+        New-Item -ItemType Directory -Path (Join-Path $rpCache "m\specialists\$v\agents") -Force | Out-Null
+    }
+    # A version with NO agents/ dir, to prove the scan's existing filter still applies underneath.
+    New-Item -ItemType Directory -Path (Join-Path $rpCache 'm\specialists\2.0.0') -Force | Out-Null
+    $rpAdmin = Join-Path $rpHome '.claude\plugins\installed_plugins.json'
+    $rpRepoJson = (Resolve-Path -LiteralPath $rpRepo).Path.Replace('\', '\\')
+    $pinnedPath = (Join-Path $rpCache 'm\specialists\1.9.0')
+    $pinnedJson = $pinnedPath.Replace('\', '\\')
+
+    $savedProfile = $env:USERPROFILE
+    try {
+        $env:USERPROFILE = $rpHome
+
+        # 1. No -RepoRoot: unchanged behaviour, and 2.0.0 is skipped for lacking agents/.
+        $d = Resolve-PluginDir -Name 'specialists' -Marketplace 'm' -CacheRoot $rpCache
+        Assert-Equal '1.10.0' (Split-Path $d -Leaf) 'no RepoRoot: the semantically highest version with agents/ (1.10.0 over 1.9.0, 2.0.0 skipped)'
+
+        # 2. A record pinning the OLDER version wins over the higher one in the cache.
+        [System.IO.File]::WriteAllText($rpAdmin, "{ `"plugins`": { `"specialists@m`": [ { `"scope`": `"project`", `"projectPath`": `"$rpRepoJson`", `"installPath`": `"$pinnedJson`", `"version`": `"1.9.0`" } ] } }")
+        $d = Resolve-PluginDir -Name 'specialists' -Marketplace 'm' -CacheRoot $rpCache -RepoRoot $rpRepo
+        Assert-Equal '1.9.0' (Split-Path $d -Leaf) 'record pins 1.9.0: the record wins over the higher version in the cache'
+
+        # 3. A record for ANOTHER repo must not steer this one.
+        $d = Resolve-PluginDir -Name 'specialists' -Marketplace 'm' -CacheRoot $rpCache -RepoRoot $repoB
+        Assert-Equal '1.10.0' (Split-Path $d -Leaf) "another repo's record does not apply -- back to the cache scan"
+
+        # 4. A record whose installPath is GONE falls through rather than blinding the check.
+        $goneJson = (Join-Path $rpCache 'm\specialists\9.9.9').Replace('\', '\\')
+        [System.IO.File]::WriteAllText($rpAdmin, "{ `"plugins`": { `"specialists@m`": [ { `"scope`": `"project`", `"projectPath`": `"$rpRepoJson`", `"installPath`": `"$goneJson`", `"version`": `"9.9.9`" } ] } }")
+        $d = Resolve-PluginDir -Name 'specialists' -Marketplace 'm' -CacheRoot $rpCache -RepoRoot $rpRepo
+        Assert-Equal '1.10.0' (Split-Path $d -Leaf) 'stale record (installPath gone): falls back to the cache scan instead of returning nothing'
+
+        # 5. A recorded path that exists but has no agents/ dir is not a plugin dir either.
+        $noAgentsJson = (Join-Path $rpCache 'm\specialists\2.0.0').Replace('\', '\\')
+        [System.IO.File]::WriteAllText($rpAdmin, "{ `"plugins`": { `"specialists@m`": [ { `"scope`": `"project`", `"projectPath`": `"$rpRepoJson`", `"installPath`": `"$noAgentsJson`", `"version`": `"2.0.0`" } ] } }")
+        $d = Resolve-PluginDir -Name 'specialists' -Marketplace 'm' -CacheRoot $rpCache -RepoRoot $rpRepo
+        Assert-Equal '1.10.0' (Split-Path $d -Leaf) 'recorded path without agents/: falls through, same rule the cache scan applies'
+
+        # 6. An unreadable administration must not break resolution -- Get-InstallRecord reports, and the
+        #    scan still answers. This is what makes step 2 a refinement rather than a gate.
+        [System.IO.File]::WriteAllText($rpAdmin, '{ "plugins": { oops')
+        $d = Resolve-PluginDir -Name 'specialists' -Marketplace 'm' -CacheRoot $rpCache -RepoRoot $rpRepo
+        Assert-Equal '1.10.0' (Split-Path $d -Leaf) 'unreadable administration: the cache scan still answers, no throw'
+    }
+    finally {
+        $env:USERPROFILE = $savedProfile
+    }
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

@@ -761,7 +761,20 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
         continue
     }
 
-    $pluginDir = Resolve-PluginDir -Name $name -Marketplace $marketplace -CacheRoot $cacheRoot
+    # -RepoRoot makes the INSTALL RECORD the first answer to "which version does this repo load?", with
+    # the highest-version cache scan as the fallback it always was. Without it this check reports on the
+    # newest version present on the machine, which stops being the same thing the moment a second
+    # consumer pulls a newer one into the shared cache -- see Resolve-PluginDir for the measured case.
+    # -RepoRoot makes the INSTALL RECORD the first answer to "which version does this repo load?", with
+    # the highest-version cache scan as the fallback it always was. Without it this check reports on the
+    # newest version present on the machine, which stops being the same thing the moment a second
+    # consumer pulls a newer one into the shared cache -- see Resolve-PluginDir for the measured case.
+    #
+    # -UserHomeOverride is deliberately NOT passed through, for the reason Get-InstallRecord states on
+    # its own parameter: that flag pins the USER LAYER OF THE SETTINGS CHAIN, and the administration is a
+    # different file answering a different question. A fixture that wants to control the administration
+    # redirects $env:USERPROFILE for the child process.
+    $pluginDir = Resolve-PluginDir -Name $name -Marketplace $marketplace -CacheRoot $cacheRoot -RepoRoot $repoRoot
     if ($null -eq $pluginDir) {
         Write-Info "plugin '$plugIdShown' is enabled but not found in the cache ($cacheRoot) -- skipped (the install may run on another machine)."
         continue
