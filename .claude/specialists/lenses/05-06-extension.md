@@ -214,6 +214,15 @@ The `releases/` directory (modeled on life-hub):
   - Think in time, risk and reduced dependence on a developer. A release with nothing for a consumer
     can still be the one where a routine change stopped needing one — that gap **is** why this tier
     exists, and it is the reason it covers patches while highlights does not.
+  - **Write the third heading as a snapshot, and note that the heading itself now says so** — it reads
+    *"What was still open at this release"*, past tense, since August 4, 2026. Being the Release body makes
+    this note **published output** that does not move with reality, so a present-tense line in it goes
+    stale in hours rather than months. Measured three times on that one day: a line saying the
+    user-facing notes still needed editing (edited hours later), one pointing at an attachment on a
+    release that had none, and one stating the previous release had no public page — published minutes
+    before it got one. The heading change is the structural half; the other half is Rendall's, and it is
+    to **re-read the previous release's note whenever something it called open closes.** The development
+    notes and the highlights need no such pass: they are written once and left alone.
 - **All three group per major (`3.x`)**, from the single answer in `Get-ReleaseNotesGrouping`. The
   consumer this model came from folders per minor; Dave chose to keep `<X>.x` here.
 

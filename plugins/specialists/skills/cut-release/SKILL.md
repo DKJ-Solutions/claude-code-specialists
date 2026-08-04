@@ -59,6 +59,12 @@ each command as you go — do not skip a step or reorder them from memory.
    tier** — "what it is worth" cannot be generated from a changelog. Think in time, risk and reduced
    dependence on a developer.
 
+   **The third heading is past tense on purpose** — *"What was still open at this release"*. Where this
+   note is the Release body (step 5), it is published output and does not move with reality, so a
+   present-tense line in it goes stale in hours rather than months. Write that section as a snapshot of
+   the release, and expect to re-read the *previous* note whenever something it called open closes. The
+   development notes and the highlights need no such pass: they are written once and left alone.
+
    **This is the tier that covers a patch, and that is why it exists.** Highlights answers *what a
    consumer notices*; this answers *what the organisation gets out of it*. A release with nothing for a
    consumer — correctly a patch, so no highlights — can still be the one where a routine change stopped

@@ -191,10 +191,19 @@ Assert-True (Test-Line -Text $doc -Pattern '# Internal summary v3\.2\.0') 'the t
 Assert-True (Test-Line -Text $doc -Pattern '\*\*Date:\*\* 2026-08-03') 'the date is copied from the developer notes'
 Assert-True (Test-Line -Text $doc -Pattern '\*\*Type:\*\* Minor') 'the type is copied too'
 Assert-True ($doc -match '(?m)^\*\*For whom:\*\* colleagues and management') 'the audience line states who it is for'
-foreach ($h in @('What is different now', 'What it is worth', 'What is still open')) {
+foreach ($h in @('What is different now', 'What it is worth', 'What was still open at this release')) {
     Assert-True (Test-Line -Text $doc -Pattern ('## ' + [regex]::Escape($h))) "the fixed heading '$h' is present"
 }
-Assert-True ($doc -match '(?s)What is different now.*What it is worth.*What is still open') 'the three headings are in order'
+Assert-True ($doc -match '(?s)What is different now.*What it is worth.*What was still open at this release') 'the three headings are in order'
+# The third heading is PAST TENSE and names the release, and that is the fix rather than a wording
+# preference: this document is the published GitHub Release body, so it does not move with reality. A
+# present-tense heading invites lines that go stale in hours -- measured three times on August 4, 2026,
+# once by a line stating the previous release had no public page, published minutes before it got one.
+# Asserted as a negative too, because the old wording is the natural thing to type back in.
+Assert-True ($doc -notmatch '(?m)^## What is still open') 'the open heading is not present tense (it would date the published body)'
+# Not Test-Line: the hint sits mid-line inside the skeleton comment block, so a whole-line match is the
+# wrong tool here even though every heading assert above uses one.
+Assert-True ($doc -match 'SNAPSHOT of this release') 'the skeleton hint tells the writer to write a snapshot, not a claim about the present'
 # The titles carry over WITHOUT the PR number and date -- this document has a reader with no branch.
 Assert-True (Test-Line -Text $doc -Pattern '- \[Feat\] Turn the highlights tier on') 'an entry becomes a [type] bullet with a bare title'
 Assert-True (Test-Line -Text $doc -Pattern '- \[Fix\] The teardown audit walks every file') 'and so does one from another category'
