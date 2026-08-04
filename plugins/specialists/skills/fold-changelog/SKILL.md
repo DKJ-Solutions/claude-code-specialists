@@ -16,6 +16,44 @@ This is the **plugin mirror** of `fold-changelog-entry.ps1`: the same tested sou
 workshop repo, shared here so consumers (life-hub, smartwatchbanden, …) do not duplicate it.
 The background is in [issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81).
 
+## Why the entry file exists at all
+
+**A branch never edits `CHANGELOG.md` directly.** Every branch would be modifying the *same* section of
+the same file, so with more than one branch open at a time that guarantees merge conflicts — on a file
+where a conflict is pure noise, because the two entries never actually disagree. Instead each branch
+writes its **own** entry file, and this skill folds it in after the merge, when the conflict window is
+already closed.
+
+**The filename is the branch name with `/` replaced by `-`** — branch `feat/new-plugin` → file
+`feat-new-plugin.md` in the repo root. **Never add a suffix** such as `-fix` or `-v2`, not even on a
+second attempt on the same branch: the fold looks the entry up by the *exact* branch name, so a suffix
+breaks the match and with it the automatic removal after folding. You are then left with a folded entry
+*and* the file still sitting in the root, which reads exactly like an unfolded branch.
+
+**The entry body carries the description; the fold adds what only exists after the PR.** An entry is
+written as a heading plus prose:
+
+```markdown
+### Short strong title · Branch-type · YYYY-MM-DD
+```
+
+The scaffolder fills in the type and the date from the branch prefix; the fold prepends the **`#NN`** and
+appends the **`PR #NN` link**, both of which require the PR to exist. The separator is a middot.
+
+## The one formatting rule: never use `##` in an entry body
+
+An entry heading is an `###`, and a release cut groups entries under `##` category headings (Features,
+Fixes, and so on). **So an `##` inside a body climbs out of its category and renders as a sibling of
+it** — the release notes then appear to have extra categories that are really one entry's subheadings.
+Use `####`, or bold.
+
+**What makes this worth a rule is *when* it bites.** The entry file looks perfectly fine on its own, and
+fine in the changelog section after folding. The damage only appears once the release cut lifts the body
+into the release notes and any per-plugin changelog — past every gate that could have judged it, in the
+artifact a reader finally sees. Measured on a real release, where a body's two subheadings came out
+looking like two extra release categories. **Inspect the generated notes before pushing a release**;
+that is what the cut's `-NoPush` is for.
+
 ## What the skill does
 
 Run the shared script from the **root of the consuming repo**:
@@ -41,7 +79,36 @@ Keep-a-Changelog repo). The function is optional: without it the script falls ba
 `## Pull Requests`. If the configured heading is not found in `CHANGELOG.md`, the fold stops before
 touching anything and names both the heading it looked for and the function to set (issue #178).
 
-Then commit the result (`CHANGELOG.md` + the removed entry files) directly on main.
+**The script can make that commit itself, and normally should: `-Commit`, or `-Push` to commit and push
+in one step.** Both are **opt-in**, so without either the fold is left in the working tree for you to
+commit by hand — which is how it ran until August 2, 2026, and four hand-typed fold commits in a single
+session is what earned the flags. Committing stays opt-in deliberately: on most repos this commit lands
+directly on the main branch, which is a governance exception the repo grants, not something a script
+should assume.
+
+```powershell
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/fold-changelog-entry.ps1" `
+  -Branch <prefix>/<name> -Push
+```
+
+**The commit names its paths**, so `CHANGELOG.md` and the entry files are the only things that can land
+in it however messy the working tree is. That scope limit is the point rather than tidiness: where this
+commit runs under a "never commit directly to main, except the fold" exception, an unscoped
+`git add -A` would let anything else in the tree ride along under that exception. It is enforced by git
+now instead of by care.
+
+## Two things that go wrong in practice
+
+**Check that you are really on the main branch before folding** (`git branch --show-current`).
+`gh pr merge --delete-branch` promises in its help to clean up the local branch too, and in practice
+turned out to be able to simply leave the local checkout **on the merged branch**. Measured July 16,
+2026: the fold then ran there, and the changes had to be moved over by hand afterwards. Do not trust the
+flag; trust the check.
+
+**Working from more than one machine: always fold with `-Branch`.** Without it the script folds *every*
+entry file present in the root — including one belonging to a merge that another machine is still
+folding, which then lands twice. So `git pull` first, then fold your own branch by name. If your fold
+push is rejected because you are behind origin, that is harmless: pull and retry.
 
 ## Closing step: branch cleanup (#163)
 

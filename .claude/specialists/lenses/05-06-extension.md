@@ -49,30 +49,14 @@ after the merge.
 
 #### Entry format
 
-Every `<branch-name>.md` entry uses this format (the scaffold script fills in everything except the
-description):
-
-```markdown
-### Short strong title · Branch-type · YYYY-MM-DD
-
-Short description of what changed on this branch.
-```
-
-Two things are still missing and are added by `fold-changelog-entry.ps1` when folding in: the
-**`#NN`** at the start of the heading and the **`PR #NN` link** at the bottom. Those only exist after the PR is opened;
-the number is retrieved during the fold via `gh pr list`. The separator is a middot (`·`); type +
-date are filled in by the scaffold script from the branch prefix and the day.
-
-**An entry body must never use `##`.** The entry heading itself is an `###`, and `cut-release.ps1` puts
-`## Features` / `## Fixes` / `## Documentation` / `## Maintenance` above the entries it groups — so an
-`##` inside a body climbs out of its category and renders as a sibling of it. Seen in v2.13.2, where a
-body's `## On the tests` and `## Filed separately` came out looking like two extra release categories
-next to `## Fixes`. Use `####` for a sub-heading, or bold. Worth knowing *when* it bites: the entry file
-looks perfectly fine on its own and in the `## Pull Requests` section, and the damage only appears once
-`cut-release` lifts the body into the notes and the per-plugin CHANGELOG — the same
-[fold/release blind spot as #234](https://github.com/DaveKJohn/claude-code-specialists/issues/234), where
-the artifact a reader finally sees is assembled past every gate that could have judged it. **Inspect the
-generated notes before pushing a release; that is what `-NoPush` is for.**
+**The format, the filename rule (including why a `-v2` suffix breaks the auto-delete), and the `##`-in-a-
+body trap are all in the portable [`fold-changelog` skill](../../../plugins/specialists/skills/fold-changelog/SKILL.md)** —
+they are properties of the shared scripts, so a consumer meets them identically. Local instances worth
+keeping: the `##` trap was seen in **v2.13.2**, where a body's two subheadings came out looking like two
+extra release categories next to `## Fixes`, and it is the same
+[fold/release blind spot as #234](https://github.com/DaveKJohn/claude-code-specialists/issues/234) — the
+artifact a reader finally sees is assembled past every gate that could have judged it. This repo's
+categories are `## Features` / `## Fixes` / `## Documentation` / `## Maintenance`.
 
 **Never merge without an entry file**, not even for small changes. Since the branch-creation
 improvement, that entry file now comes into being **at the moment the branch is created** — no
@@ -88,23 +72,16 @@ description while building; ownership of the entry mechanism stays Rendall's.
 1. **Branch** → the entry file is created *at branch creation* (Derek's `new-branch.ps1`); you fill
    in the description while building. Never touch `CHANGELOG.md`.
 2. **Merge to `main`** ([Derek #05](05-05-extension.md#merging-to-main)) → the entry file travels
-   along. Rendall runs `fold-changelog-entry.ps1 [-Branch <name>] -Push` on `main`: that folds,
-   commits directly (`chore: fold changelog entry <branch> (#NN)`) and pushes, in one step. If you
-   omit `-Branch`, all entry files present are folded in one go. **`-Push` is opt-in and so is its
-   weaker sibling `-Commit`** — without either, the fold is left in the working tree for you to
-   commit by hand, which is how this ran until August 2, 2026 (four hand-typed fold commits in one
-   session is what earned it a flag). The commit names its paths, so `CHANGELOG.md` and the entry
-   files are the only things that can land in it however messy the tree is; that scope limit is what
-   the direct-on-`main` exception was granted for, and it is now enforced by git rather than by care. **Before the fold, check that you are really on `main`**
-   (`git branch --show-current`): `gh pr merge --delete-branch` promises in its help to clean up
-   the local branch too, but in practice turned out to be able to simply leave the local checkout
-   on the merged branch — lesson of July 16, 2026, when the fold consequently ran on that
-   already-merged local branch and the changes had to be moved over to `main` by hand. So do not
-   trust the flag; trust the check. **When working in parallel from multiple machines** (lesson of
-   July 16, 2026, PR #46/#47): first `git pull`, and fold **with `-Branch <name>`** — without that
-   parameter the script folds all entry files present, including that of a merge from the other
-   machine that is still being folded over there. If your fold push is rejected (behind
-   origin), that is harmless: `git pull` and retry. The branch part of this lesson lives with
+   along. Rendall runs `fold-changelog-entry.ps1 -Branch <name> -Push` on `main`: that folds, commits
+   (`chore: fold changelog entry <branch> (#NN)`) and pushes, in one step. **The `-Commit`/`-Push`
+   opt-in, the path-scoped commit, the "check you are really on `main`" guard against
+   `gh pr merge --delete-branch`, and the always-fold-with-`-Branch` rule for working from two machines
+   are all in the portable [`fold-changelog` skill](../../../plugins/specialists/skills/fold-changelog/SKILL.md)** —
+   properties of the shared script, met identically by any consumer. Measured here on July 16, 2026 (the
+   stranded checkout) and PRs #46/#47 (the two-machine collision), and the flags arrived August 2, 2026
+   after four hand-typed fold commits in one session. Repo-specific half: this fold commit runs under
+   **this** repo's direct-on-`main` exception, which is what the path-scoped commit exists to keep honest,
+   and the branch part of the two-machine lesson sits with
    [Derek #05](05-05-extension.md#branch--repo-hygiene).
 3. **More branches merged** → each brings its entry file; each gets folded. `## Pull Requests`
    stacks up.
@@ -149,41 +126,14 @@ only, so consumers (and this repo itself, which consumes itself) only receive me
 a bump. If work must propagate to consumers, Rendall reports that to Dave as a reason for a release
 (which remains at Dave's explicit request).
 
-**The second gate is the consumer's marketplace cache, and it makes a fresh release invisible for a
-while (lesson of July 30, 2026, immediately after `v3.0.2`).** The `github` marketplace source is a
-cached clone, and `plugin install`/`plugin update` compare against *that*, not against this repo. The
-tag and the push had both gone through, and an install in this very repo still produced **3.0.1**
-with a `✔ Successfully installed` line — the cached clone was sitting on the pre-release commit.
-`claude plugin marketplace update claude-code-specialists` then made a single `plugin update` move it
-`3.0.1 -> 3.0.2`. So **pushing the tag is not the end of a release**: the closing report names the
-refresh command a consumer runs before updating.
-
-**Say it as the two measurements, though, not as one rule — the generalisation was tested and broke
-(July 31, 2026, cutting `v3.0.4`).** The measurement above is on **`install`**. Measured immediately
-after that release on the consumer side, with the cached clone verifiably still on the pre-release
-commit and not even containing it, a bare `claude plugin update <plugin>@<marketplace> --scope project`
-moved `3.0.3 -> 3.0.4` **and advanced the clone itself during the run** (CLI `2.1.220`). So `update`
-refreshed for itself, and the earlier claim that skipping the refresh makes an *update* serve the
-previous version does not hold. What Rendall reports at the close of a release is therefore the
-refresh as the **safe first step** — idempotent, one command, and a stale cache is invisible by
-construction because it reports success with a plausible version number — not a mechanism claim about
-what breaks without it.
-
-**And the `install` half is now measured too, by using the very next release for it (`v3.0.5`, July 31,
-2026).** The stale window a release opens lasts only until something refreshes, so it was measured the
-minute it existed rather than left for a round: a controlled pair on the same machine, same minute, two
-fresh folders. **Without** the refresh the install produced `3.0.4` — the previous release — and left the
-cached clone exactly where it was; **with** the refresh it produced `3.0.5`. So `install` does *not*
-refresh and `update` does, the per-command distinction holds, and the `install` half rests on two
-independent measurements now (July 30 and July 31, different releases). Worth knowing for the closing
-report: the install's success line names the **scope and no version at all**, so a consumer cannot detect
-staleness from the output even in principle — only from the install record.
-
-**The practical lesson for cutting a release: the stale window is a measurement opportunity that expires.**
-If a question about cache behaviour is open, the minutes after `cut-release.ps1` pushes the tag are when it
-can be answered; an hour later the cache has moved on and the answer waits for the next release. Nothing
-here is Rendall's to run on a consumer's machine — this is the one thing a release cannot do for its
-consumers, so it must at least be said.
+**The second gate is the consumer's marketplace cache, and the mechanism now lives in the portable
+`cut-release` skill** (step 6) — including the per-command table showing that `install` does *not* refresh
+the cached clone while `update` does, and why a stale cache is invisible by construction. It belongs there
+rather than here: it is CLI behaviour every consumer meets, not something this repo does differently.
+Measured here across `v3.0.2`, `v3.0.4` and `v3.0.5` (July 30–31, 2026) — the `install` half on two
+independent releases, and the `update` half being the measurement that broke the tidier generalisation
+this lens used to state as one rule. Rendall's local obligation is unchanged: **name the refresh command
+in the closing report of every release.**
 
 The `releases/` directory (modeled on life-hub):
 - **`releases/development/<X>.x/<X.Y.Z>.md`** — the full release notes, from the `## Pull Requests`
@@ -287,25 +237,14 @@ must not exist yet. There is deliberately **no release branch and no `release` p
 does not touch the branch workflow. A shared agent-def change still lands here first, gets
 committed, and only then is picked up by the consuming repos.
 
-**A milestone release: `-SummaryFile <path>`.** An ordinary release's notes are the diff since the last
-one — `-Title` gives it one sentence and the entries carry the detail. A **milestone** is a different
-claim: the arc across many releases, which fits in neither. `-SummaryFile` puts an authored markdown
-block between the title line and the generated entries, closed off with a horizontal rule so a reader
-can see where the authored part stops and the per-PR record begins. Three things to know:
-
-- **The file may live outside the repo, and normally should.** Its canonical home becomes the generated
-  notes file; a second copy under `releases/` purely to feed the parameter would be duplication.
-- **A missing or empty file is a hard stop.** An empty one would otherwise produce an ordinary release
-  while you believe you cut a milestone.
-- **Links in the summary are left exactly as authored** — unlike an entry, which was written in the root
-  `CHANGELOG.md` and then moved three folders deeper, a summary is written *for* the notes file. Rewriting
-  its links would break the ones that were already right.
-
-**And say plainly whether anything breaks.** A `major` bump reads as "breaking" to anyone applying semver
-mechanically, and in this repo a milestone may well break nothing (the seam, the largest change in 2.x, is
-backward compatible by construction — every reader accepts the old layouts). If nothing breaks, the
-summary's opening lines have to say so, or a consumer sits on an old version waiting for a migration that
-does not exist.
+**A milestone release: `-SummaryFile <path>`.** The mechanics — that the file normally lives outside the
+repo, that a missing or empty one is a hard stop, that its links are left exactly as authored, and the rule
+to say plainly whether anything breaks — are in the portable
+[`cut-release` skill](../../../plugins/specialists/skills/cut-release/SKILL.md#a-milestone-release---summaryfile).
+The local instance behind that last rule: **the seam, the largest change in 2.x, broke nothing** — it is
+backward compatible by construction, every reader accepts the old layouts — so a `major` bump here can be
+one a consumer needs to do nothing about, and the summary has to say so or they sit on an old version
+waiting for a migration that does not exist.
 
 ### Rendall's toolkit
 
