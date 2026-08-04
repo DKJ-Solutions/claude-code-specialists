@@ -164,9 +164,27 @@ $script:Contract = @(
        Returns = "this repo as 'owner/name', the form ``gh --repo`` takes" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-LintScript';  Scripts = @('open-pr');
        Returns = 'the repo-root-relative path to the lint script to run before a PR' },
+    # OPTIONAL SINCE AUGUST 4, 2026, and the reason is a shape rather than a preference (inbound #445).
+    # Measured across this table that day: 6 of 23 entries were required, and four of those six serve a
+    # script the consumer INVOKES -- Get-BranchInfo, Test-BranchName, Get-RepoName, Get-LintScript. Don't
+    # want the script, don't call it. These two were the only required entries whose sole caller is
+    # check-roster-sync, which runs from a SessionStart hook: nothing in the repo invokes it and nothing
+    # can decline it. So the only demands a consumer could not opt out of were these.
+    #
+    # Making them optional costs nothing, because check-roster-sync never hard-required them: it carries
+    # its own sane defaults (roster 'CLAUDE.md', no ignored ids) and runs to completion without either
+    # function. The [ERROR] pair came from this table alone, declaring a requirement the reading script
+    # does not have. An [INFO] naming the default is the accurate report.
+    #
+    # This does NOT give a consumer a way to say "I have no roster at all" -- that was the larger ask in
+    # #445, and it was deliberately not built: by the time it was measured, the consumer that filed it had
+    # bootstrapped the full system 52 minutes later, so nothing was left to build it against. What is
+    # repaired here is the asymmetry, which stands on its own regardless of who wants which adoption shape.
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RosterPath';  Scripts = @('check-roster-sync');
+       Optional = $true; Default = 'CLAUDE.md';
        Returns = "the repo-root-relative path to the file holding the specialist roster -- '.claude/specialists/SPECIALISTS.md' for a repo set up by specialists-init, since that is where the bootstrap puts the roster slot; something else only if this repo keeps its roster elsewhere. Pointing it at CLAUDE.md when the roster lives in the seam makes the check read a file holding only the @-import and report every specialist as missing (inbound #333)" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RosterIgnoredIds'; Scripts = @('check-roster-sync');
+       Optional = $true; Default = 'no ignored ids';
        Returns = "an array of '<group>-<id>' ids deliberately kept out of the roster -- normally empty, @(), since every enabled specialist belongs in the roster" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ChangelogHeading'; Scripts = @('fold-changelog-entry');
        Optional = $true; Default = '## Pull Requests';
