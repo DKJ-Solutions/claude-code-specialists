@@ -225,7 +225,10 @@ $nl = "`r`n"
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
 
 $skeleton =
-    "# $($w.Title) v$verNum$nl" +
+    # Blank line after the H1, matching what release-lib.ps1 writes for the other two tiers -- three
+    # documents of one release sitting side by side should not differ in shape, or the difference becomes
+    # something a later reader "fixes" in the wrong place. It is also what markdown linters expect.
+    "# $($w.Title) v$verNum$nl$nl" +
     "**Date:** $date$nl" +
     "**Type:** $typeLabel$nl" +
     "**$($w.AudienceLabel):** $($w.Audience)$nl" +
