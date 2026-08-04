@@ -254,7 +254,16 @@ The constitution above, concretely implemented here:
      ([`new-internal-note.ps1`](scripts/release/new-internal-note.ps1)), which needs the development
      notes as input and so can only run *after* the cut. Both the highlights edit and the internal note
      are hand-written and land **via a branch + PR** — the release commit is already tagged by then, and
-     neither is one of the two named direct-on-`main` exceptions.
+     neither is one of the two named direct-on-`main` exceptions. **Confirmed by Dave, August 4, 2026**,
+     over the alternative he was offered: widening the release exception to cover "the release *and*
+     its written notes". He declined it, and the reasoning is the one that already applies elsewhere in
+     this section — an exception is only safe while it stays the size it was granted at, which is what
+     had to be repaired in `ship-pr.ps1` on August 2, 2026. The route also has a measured instance
+     behind it now rather than only an argument:
+     [PR #432](https://github.com/DaveKJohn/claude-code-specialists/pull/432) shipped `v3.2.0`'s internal
+     note this way, gates green and entry folded, with nothing about being post-tag causing friction.
+     Recorded because until that date this was an **assumption** stated as a rule: the question had been
+     put twice without an answer, and the answer-shaped text went into the docs anyway.
 
      **One caveat worth knowing before editing a highlights draft: the branch prefix does not predict
      impact in this repo.** The tier puts `Feat`/`Fix` above the "remove before publishing" marker and

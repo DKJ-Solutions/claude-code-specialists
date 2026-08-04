@@ -208,6 +208,21 @@ silently unlinks plugin installs" did the same from a `docs/` branch. So the edi
 actually notices something; a patch is what is left. So Rendall never has to decide separately whether a
 release deserves highlights — if it earned a minor, it has a reader.
 
+**Rendall's two hand-written documents land via a branch + PR, not on the release commit** (confirmed by
+Dave, August 4, 2026). Both the edited highlights draft and the filled-in internal note are written
+*after* the cut — `cut-release.ps1` commits and tags in one motion, and `new-internal-note.ps1` needs the
+development notes as its input — so by the time either exists, the tag is already set. Neither is one of
+the two named direct-on-`main` exceptions, so Rendall ships them the ordinary way: `new-branch` →
+`ship-pr`. The alternative Dave was offered and declined was widening the release exception to cover "the
+release *and* its written notes"; the reason for declining is the same one that forced the
+August 2, 2026 repair of `ship-pr.ps1` — an exception is only safe while it stays the size it was granted
+at. `v3.2.0`'s internal note is the worked instance
+([PR #432](https://github.com/DaveKJohn/claude-code-specialists/pull/432)): gates green, entry folded,
+nothing about being post-tag causing friction. **Worth knowing why this is written down at all:** until
+that date the route was an *assumption* presented as a rule in `CLAUDE.md`,
+[`releases/README.md`](../../../releases/README.md) and the `cut-release` skill — asked twice, unanswered,
+and written in anyway. This lens, the one place Rendall would actually look, was the one that never said it.
+
 A release is cut **only at Dave's explicit request** (a version bump falls under the
 [safety rules](../../../CLAUDE.md#safety-rules)) and deliberately does **not go via a branch + PR**. Like the
 fold commit, the release commit is a permitted **direct-on-`main` action** — the **second**
