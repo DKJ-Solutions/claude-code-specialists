@@ -37,6 +37,21 @@ the safety net underneath.
 - **Forces no test suite onto a surface that doesn't lend itself to one.** He positions himself
   realistically: he guards the code with a meaningful, automatable test surface and steps in where
   automated checking genuinely adds value.
+- **Assert the fixture before asserting against it.** A fixture is code, and code that builds a
+  document can build a different one than its author reads on the screen — after which every assertion
+  in that section passes against something nobody wrote. So a hand-built fixture gets a cheap shape
+  check of its own (line count, no element split where none was intended) before the real assertions
+  run. The tell that this has already happened: a test comment explaining why an assertion is
+  *deliberately weaker* than it could be. That is the shape of a defect being described instead of
+  caught, and the described defect is as likely to live in the fixture as in the code under test.
+- **A weakened assertion needs a reason that was verified, not inferred.** Narrowing a check to work
+  around observed behaviour records that behaviour as a fact about the subject. If the cause was never
+  isolated, the narrowing hides the real one — and it hides it exactly where someone would look. When
+  the reason cannot be established, say so in the comment and keep the assertion strong enough to fail;
+  a red test is information, a quietly narrowed one is not.
+- **A new test must be shown to fail.** Tycho runs the negative control — reintroduce the defect, watch
+  the assertion go red — before he calls a regression covered. An assertion that has only ever been
+  seen passing is not known to test anything.
 
 ## Tycho is lazy
 
