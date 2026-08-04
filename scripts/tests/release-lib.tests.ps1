@@ -184,6 +184,33 @@ $prosey = @('# Notes', '', '## Overview', '', '### 9.x', '', 'Prose only, no tab
 Assert-Equal '2' (Get-OverviewTargetMajor -ReadmeContent $prosey) 'a section heading with no table under it is not the target -- the last one before the first table is'
 Assert-Equal $null (Get-OverviewTargetMajor -ReadmeContent "# Empty`n`nNo table at all.") 'no table anywhere -> $null, so the guardrail stays silent rather than guessing'
 Assert-Equal $null (Get-OverviewTargetMajor -ReadmeContent "| Version | Date | Type | Title |`n|---|---|---|---|`n") 'a table with no section heading above it -> $null (an ungrouped overview is not this failure mode)'
+
+# BOTH HEADING LEVELS, because the level is a layout choice and pinning one would let a cosmetic edit
+# switch the guardrail off in silence. Measured August 4, 2026: this repo's list moved from '###' (a flat
+# history page) to '####' (nested under a repo-specific section heading) the day the two release pages
+# merged. Under the old '^###' pattern that promotion made this function return $null -- and
+# cut-release.ps1 only refuses when a target was FOUND and differs, so no target means no refusal. The
+# guardrail would have been off while the document still claimed to be protected.
+$lvl3 = "### 2.x`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n"
+$lvl4 = "#### 7.x`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n"
+Assert-Equal '2' (Get-OverviewTargetMajor -ReadmeContent $lvl3) "a '###' major heading is still read (a flat history page)"
+Assert-Equal '7' (Get-OverviewTargetMajor -ReadmeContent $lvl4) "a '####' major heading is read too (nested one deeper under a repo section)"
+Assert-Equal $null (Get-OverviewTargetMajor -ReadmeContent "##### 5.x`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n") 'five hashes is NOT accepted -- the tolerance is two levels, not any level'
+
+# A heading that merely CONTAINS a number must not be mistaken for a major section. The merged page has
+# '### Tier 1 - development' above the list, which is exactly this shape.
+$tiers = "### Tier 1 - development`n`nProse.`n`n#### 3.x`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n"
+Assert-Equal '3' (Get-OverviewTargetMajor -ReadmeContent $tiers) "a 'Tier 1 - development' heading above the list is not read as a major"
+
+# Get-OverviewSectionHeading: the literal heading, so a caller can quote it back at the level in use.
+# cut-release.ps1's new-major refusal prints it AND derives the heading to add from it; hardcoding '###'
+# there told the reader to add a heading the guardrail would not recognise.
+Assert-Equal '### 2.x'  (Get-OverviewSectionHeading -ReadmeContent $lvl3)  'the heading is reported verbatim at three hashes'
+Assert-Equal '#### 7.x' (Get-OverviewSectionHeading -ReadmeContent $lvl4)  'and verbatim at four'
+Assert-Equal '#### 3.x' (Get-OverviewSectionHeading -ReadmeContent $tiers) 'the Tier heading is skipped here as well'
+Assert-Equal $null (Get-OverviewSectionHeading -ReadmeContent "# Empty`n`nNo table.") 'no table -> $null, matching Get-OverviewTargetMajor'
+# The two functions read the SAME match, so they can never disagree about which section is the target.
+Assert-Equal "3" ((Get-OverviewSectionHeading -ReadmeContent $tiers) -replace '^#+\s+' -replace '\.x$') 'the heading and the major agree by construction'
 # The live document, asserted on deliberately: this is the value the next release depends on, so it is
 # pinned rather than left to inspection. It answered '2' until the 3.x section was opened, which is
 # exactly what made a 3.0.0 cut misfile -- and this assertion is what forced that change to be stated

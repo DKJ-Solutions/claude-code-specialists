@@ -29,13 +29,40 @@ that belongs to it rather than to the page: tier 1 the 125,000-character limit t
 and never a body, tier 2 that it is *published output* whose "still open" section goes stale in place, tier 3
 that the marker is a proposal.
 
+**The repo slot got `###` subheadings of its own** — `How to mirror this page`, `Seam values in force here`,
+`Local decisions`, `Measured instances behind the portable rules`, `The release list` — and the major
+sections moved from `###` to `####` beneath the last of them, which is what the hierarchy actually is.
+
+**That cosmetic-looking promotion would have switched the guardrail off in silence, so it came with a
+script change.** `Get-OverviewTargetMajor` matched `^###\s+(\d+)\.x$` — exactly three hashes. At four it
+finds nothing and returns `$null`, and `cut-release.ps1` refuses only when a target was **found** and
+differs, so no target means **no refusal**: the next major would file a `v4.0.0` row under `#### 3.x`
+without a word, in the document whose only job is saying which release is which. **The guardrail would have
+been off while the page still claimed to be protected.** The pattern now accepts `#{3,4}` — deliberately a
+tolerance rather than a move, because the heading level is a function of how deeply the list is nested,
+which is a layout choice each repo owns. Five hashes is still refused, so the tolerance is two levels and
+not "any".
+
+**A second reader of that pattern was needed, and it removed a hardcoded `###` from the error message.**
+`cut-release.ps1`'s new-major refusal printed the target heading *and* the heading to add, both at `###`. On
+a page nesting one deeper, following that advice literally produced a heading the guardrail could not read —
+advice that disables the check it is protecting. The new `Get-OverviewSectionHeading` reports the heading
+verbatim (`#### 3.x`), and the message derives the new one from it. Both functions read **one** shared
+pattern, held in a single `$script:` variable, so the level and the number cannot disagree — a hand-copied
+second regex is how this repo's accumulation bugs start.
+
+**Nine asserts pin all of it**, including the two shapes that must *not* match: `##### 5.x` (five hashes)
+and `### Tier 1 - development`, which is a heading containing a number sitting directly above the list on
+this very page.
+
 **Three structural rules are stated next to the tables they protect, because the restructure could have
 broken a release silently.** `cut-release.ps1` inserts a new row after the **first** release table in the
 document, and the guardrail against a misfiled major reads the **last `### <n>.x` heading** above it. So the
-repo slot stays last, its `###` level may not change, and no table may be introduced above the release
-tables — which is now the one thing to check when adding a section. Verified rather than assumed, against
-the merged file: the guardrail answers `3`, the inserter's first match is the `3.x` header with a new row
-landing above `3.4.0`, and the tiers table thirteen lines from the top is correctly skipped.
+repo slot stays last, the `<n>.x` heading text stays recognisable (its *level* may now change), and no table
+may be introduced above the release tables — which is the one thing to check when adding a section anywhere
+on this page. Verified rather than assumed, against the merged file: the guardrail answers `3`,
+`Get-OverviewSectionHeading` answers `#### 3.x`, the inserter's first match is that section's header with a
+new row landing above `3.4.0`, and the tiers table near the top is correctly skipped.
 
 **The table header is described in prose everywhere and quoted nowhere on the page**, because the inserter
 matches that exact line. An earlier draft did quote it while explaining the mechanism; it could not have

@@ -134,6 +134,8 @@ decisions behind them, the measured instances, and the release list itself.
 
 ## claude-code-specialists (REPLACE WHEN MIRRORING)
 
+### How to mirror this page
+
 > **To an agent mirroring this workflow into another repo:** everything above the horizontal rule is
 > portable and can be copied as-is. This section is not — it holds one repo's local decisions and its own
 > release record, none of which is true of your repo. So keep the **shape** and replace the **content**:
@@ -143,11 +145,15 @@ decisions behind them, the measured instances, and the release list itself.
 > nowhere to put its own history, and the next release will write a row into a document that never declared
 > where rows go.
 
-**The seam values in force here.** All three tiers group **per major** (`3.x`) — the consumer this model
-came from folders per minor. `Get-ReleaseHistoryMode` is `'latest'`, so `CHANGELOG.md`'s heading is
-`## Latest Release` and it holds exactly one block, pointing at this page for the rest; a repo leaving that
-seam at its `all` default uses `## Releases` and lets the blocks accumulate. `Get-ReleaseHistoryPath` is
-left at its default, `releases/README.md` — this page — since the list lives here.
+### Seam values in force here
+
+All three tiers group **per major** (`3.x`) — the consumer this model came from folders per minor.
+`Get-ReleaseHistoryMode` is `'latest'`, so `CHANGELOG.md`'s heading is `## Latest Release` and it holds
+exactly one block, pointing at this page for the rest; a repo leaving that seam at its `all` default uses
+`## Releases` and lets the blocks accumulate. `Get-ReleaseHistoryPath` is left at its default,
+`releases/README.md` — this page — since the list lives here.
+
+### Local decisions
 
 **A GitHub Release is published at every release, patch included** (Dave, August 4, 2026). Two consequences
 of that "every release" half: patches now get one — so `v2.6.1` and `v2.7.1`, cited here for years as
@@ -165,7 +171,7 @@ the development notes alone.
 > here. `v3.2.0`'s `.html` was removed from `main`; the `v3.2.0` **tag** still contains it, because a tag is
 > a record of a moment and is not rewritten.
 
-**The measured instances behind the portable rules above:**
+### Measured instances behind the portable rules
 
 - **The branch prefix does not predict impact here**, which is why the highlights marker is a proposal
   rather than a verdict. Held against v3.2.0's 19 entries, the most consequential change for a consumer —
@@ -179,23 +185,30 @@ the development notes alone.
 - **The closing step used to sit directly after the tag** and was moved to last on August 4, 2026. It had
   worked only because the body was then the highlights file the script itself had already generated.
 
-**The release list — every release ever cut, newest first, grouped by major version.** This is the full
-record: `CHANGELOG.md`'s release block names only the current version and points here for the rest, so
-nothing else in the repo carries this list.
+### The release list
+
+**Every release ever cut, newest first, grouped by major version.** This is the full record:
+`CHANGELOG.md`'s release block names only the current version and points here for the rest, so nothing else
+in the repo carries this list.
 
 New releases are added to the current major's table, the top one. That is why **opening a new major's
 section is a deliberate act, taken before the release is cut**: `cut-release.ps1` inserts the row after the
-first release table it finds, so without a section for the new major a `v3.0.0` row would be filed under
-`### 2.x` with nothing erroring. A guardrail refuses that rather than doing it quietly.
+first release table it finds, so without a section for the new major a `v4.0.0` row would be filed under
+`3.x` with nothing erroring. A guardrail refuses that rather than doing it quietly.
 
 Three things about the structure below are load-bearing rather than stylistic, and all three are why this
-list sits at the **end** of the page: the inserter takes the **first** release table in the whole document,
-so any table above these would silently start receiving the rows; the guardrail reads the **last `### <n>.x`
-heading** before that table, so the heading shape and its `###` level must stay as they are; and the table
-header is deliberately described in prose rather than quoted anywhere on this page, because the inserter
-matches that exact line and a document explaining a pattern should not be one edit away from triggering it.
+list sits at the **end** of the page:
 
-### 3.x
+- **The inserter takes the first release table in the whole document**, so any table introduced above these
+  would silently start receiving the rows. That is the one thing to check when adding a section anywhere on
+  this page.
+- **The guardrail reads the last `<n>.x` heading above that table**, so those headings must stay
+  recognisable. The heading **level** may change — `###` and `####` are both accepted, because how deeply
+  the list is nested is a layout choice the repo owns — but the `<n>.x` text is not decoration.
+- **The table header is described in prose and quoted nowhere on this page**, because the inserter matches
+  that exact line and a document explaining a pattern should not be one edit away from triggering it.
+
+#### 3.x
 
 | Version | Date | Type | Title |
 |---|---|---|---|
@@ -216,7 +229,7 @@ matches that exact line and a document explaining a pattern should not be one ed
 | [3.0.1](development/3.x/3.0.1.md) | 2026-07-30 | Patch | Patch release |
 | [3.0.0](development/3.x/3.0.0.md) | 2026-07-30 | Major | Chapter 2 consolidated (v2.2.0 -> v2.16.0) |
 
-### 2.x
+#### 2.x
 
 | Version | Date | Type | Title |
 |---|---|---|---|
@@ -251,7 +264,7 @@ matches that exact line and a document explaining a pattern should not be one ed
 | [2.0.1](development/2.x/2.0.1.md) | 2026-07-23 | Patch | Releases-overview grouping and the CI retrigger lesson |
 | [2.0.0](development/2.x/2.0.0.md) | 2026-07-23 | Major | Chapter 1 consolidated (v1.0 -> v1.18) |
 
-### 1.x
+#### 1.x
 
 | Version | Date | Type | Title |
 |---|---|---|---|

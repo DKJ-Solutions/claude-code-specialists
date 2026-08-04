@@ -309,16 +309,26 @@ if ((git tag --list $tagName)) { Write-Error "Tag $tagName already exists."; exi
 $newMajor = ($new -split '\.')[0]
 $relReadmePath = Join-Path $repoRoot ($historyRelPath -replace '/', '\')
 if (Test-Path -LiteralPath $relReadmePath) {
-    $targetMajor = Get-OverviewTargetMajor -ReadmeContent (Get-Content -LiteralPath $relReadmePath -Raw -Encoding UTF8)
+    $historyContent = Get-Content -LiteralPath $relReadmePath -Raw -Encoding UTF8
+    $targetMajor = Get-OverviewTargetMajor -ReadmeContent $historyContent
     if ($null -ne $targetMajor -and $targetMajor -ne $newMajor) {
+        # The heading is QUOTED BACK AT THE LEVEL THE DOCUMENT USES, not at a level this script assumes.
+        # It hardcoded '###' until August 4, 2026, which broke the moment the release list was nested one
+        # deeper under a repo-specific section heading: the advice then told you to add a heading whose
+        # level the guardrail would not recognise, so following it exactly would leave the guardrail off.
+        # Get-OverviewSectionHeading reports what was actually matched, from the same pattern.
+        $targetHeading = Get-OverviewSectionHeading -ReadmeContent $historyContent
+        $hashes = ($targetHeading -split '\s+')[0]
+        $newHeading = "$hashes $newMajor.x"
+
         # The message must state what is actually KNOWN, not assume a direction. The mismatch is
         # reachable both ways, and the two ways need different remedies:
         #   newMajor > target -- the usual case: a new major whose section does not exist yet.
         #   newMajor < target -- the section exists but is not on top, because a HIGHER major was opened
-        #     already. Saying "has no '### 2.x' section yet" there would be plainly false, and a
+        #     already. Saying "has no '2.x' section yet" there would be plainly false, and a
         #     guardrail that misdescribes the repo teaches people to bypass it.
         $advice = if ([int]$newMajor -lt [int]$targetMajor) {
-            "'### $newMajor.x' does exist, but '### $targetMajor.x' sits above it, so that is where the row goes.`n" +
+            "'$newHeading' does exist, but '$targetHeading' sits above it, so that is where the row goes.`n" +
             "Releasing an older major after a newer one has been opened needs a decision this script will not make for`n" +
             "you: either move the row by hand after cutting, or reconsider the version."
         } else {
@@ -326,15 +336,15 @@ if (Test-Path -LiteralPath $relReadmePath) {
             # its own. It used to say "directly under '## Overview'", which was stale from the day the
             # overview moved out of releases/README.md into its own history page -- and naming any fixed
             # heading is wrong on principle here, because the history file is repo-owned via
-            # Get-ReleaseHistoryPath and a consumer's may be structured differently. '### <n>.x' is the
-            # one shape this script does depend on, so that is the one it may point at.
-            "Add the section first -- directly ABOVE '### $targetMajor.x', in the same place that heading sits:`n`n" +
-            "### $newMajor.x`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n`n" +
+            # Get-ReleaseHistoryPath and a consumer's may be structured differently. The '<n>.x' heading
+            # is the one shape this script does depend on, so that is the one it may point at.
+            "Add the section first -- directly ABOVE '$targetHeading', at that same heading level:`n`n" +
+            "$newHeading`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n`n" +
             "Then run this again. Opening a new major's section is a deliberate milestone moment, which is why it`n" +
             "is not done for you."
         }
         Write-Error @"
-This release is v$new, but a new row in $historyRelPath would be filed under '### $targetMajor.x'
+This release is v$new, but a new row in $historyRelPath would be filed under '$targetHeading'
 (the first table in the overview). Nothing was written.
 
 $advice
