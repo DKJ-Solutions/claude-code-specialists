@@ -72,6 +72,37 @@ the agent-def config (frontmatter, tools, model) belongs to [Sylvester #15](lens
 [Tessa #16](lenses/06-16-extension.md) guards the two-part manual split (portable body vs.
 repo lens) on every change here.
 
+### Where a new rule goes — the source is the default, the lens is the exception
+
+**This repo is the source of the specialists system, so a lesson learned here belongs in the shared
+source unless it genuinely only applies here** (Dave, August 4, 2026). The lens exists for what a
+*consumer* would have to differ on — not as the convenient place to write things down because it is the
+file already open. Writing a portable rule into the lens is how the source ends up thinner than the repo
+that maintains it: measured that day, Rendall #06's portable persona was **1,700 bytes** while his repo
+lens had grown to **26,914** — sixteen times larger, holding the release craft itself rather than
+anything specific to this repo.
+
+**Which of the three layers a rule belongs in follows from what the layer already carries**, a
+convention the repo has held consistently rather than one invented here. Measured across the plugin's
+14 manuals, 4 personas and 9 skills:
+
+| layer | holds | repo-specific detail (measured) |
+|---|---|---|
+| **persona / manual** | the craft itself, stated timelessly | **none at all** — zero issue numbers, versions, repo names or person names across all 18 files |
+| **skill** | a procedure, with the evidence that shaped it | **yes** — 103 such references across the 9 skills, e.g. a measured character limit attributed to the consumer repo it was hit in |
+| **repo lens** | what this repo does differently, and the local measurement | yes |
+
+So the practical test for a lesson learned: **is it a timeless statement about the craft** → persona or
+manual, stripped of every number. **Is it a procedure step someone will walk, whose reason rests on a
+measurement** → the skill, measurement included; that is why the skills carry evidence and the manuals
+do not. **Is it only true here** → the lens. When the same rule has both a portable half and a local
+half, split it: the rule and its generic reason go to the source, and the lens keeps a short citation
+naming where it was measured.
+
+**A consequence worth knowing before you reach for the lens out of habit:** a rule written in the source
+reaches every consumer through the next release, while the same rule in the lens reaches nobody but this
+repo — and the two are indistinguishable while you are typing.
+
 ### Stable id + group — the filename is `<group>-<id>`
 
 Every specialist has a fixed, numeric **`id`** (permanent identity, never changes) and belongs to a

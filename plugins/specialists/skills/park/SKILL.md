@@ -50,6 +50,37 @@ The script:
 - **No live/deploy action.** The script only touches git (add/commit/push). A consumer whose repo
   drives a live target (e.g. a Shopify theme) is never published by a park.
 
+## Picking a parked branch back up — measure the plan against the main branch first
+
+**A parked branch is invisible to every ordinary check, and that is a consequence of the design rather
+than a defect.** Parking opens **no PR**, so the branch appears in no PR listing, in no issue, and in
+nothing `git status` or `git log` prints on the main branch. On a machine that never checked it out,
+`git branch --list` does not show it either. **`git ls-remote --heads origin` is the only command that
+shows it exists** — so that belongs in whatever start-of-session verification the consumer's
+orchestrator does.
+
+**And a park note knows nothing about what happened after it was written**, which is the trap. Measured
+in the source repo on August 4, 2026: a branch was parked carrying an 81-line hand-off plan and no
+content; the same work was then built on a different branch and merged **1 hour 43 minutes later**,
+closing all three of the issues the plan named. The parked branch stayed on the remote — perfectly
+intact, entirely superseded — and nothing anywhere reported it. It was found the next morning by listing
+remote heads while cleaning up an unrelated merge.
+
+So before executing a line of a parked plan, **measure it against the main branch**, however detailed and
+current the entry file reads. A plan that reads as current is not evidence that it is. The cheap checks
+first:
+
+```powershell
+git log --oneline -- <the files the plan renames or creates>
+```
+
+plus the state of any issues the plan claims to close. In the measured case that was two commands, and it
+turned a day of planned work into a one-line branch deletion.
+
+**Deleting the remote branch afterwards is deliberately a manual act** in the repo this was measured in —
+a parked branch is by definition *not* merged, so its loss is unrecoverable, which is exactly the wrong
+thing to automate. Check your own repo's governance before reaching for `git push origin --delete`.
+
 ## park vs. new-branch -Park
 
 Both put a branch on the remote without a PR, but they cover different moments:
