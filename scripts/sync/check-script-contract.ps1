@@ -244,7 +244,13 @@ $script:Contract = @(
        Returns = "'major' for releases/development/<X>.x/ or 'minor' for releases/development/<X.Y>/ -- where the generated notes are foldered, and therefore what the overview row links to" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseLiveMarker'; Scripts = @('cut-release');
        Optional = $true; Default = '';
-       Returns = "the suffix marking the currently-live release on the newest '## Releases' heading, moved off the previous one at each cut; '' means this repo has no live stage and neither writes nor strips a marker" },
+       Returns = "the suffix marking the currently-live release on the newest release heading, moved off the previous one at each cut; '' means this repo has no live stage and neither writes nor strips a marker" },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHistoryMode'; Scripts = @('cut-release');
+       Optional = $true; Default = 'all';
+       Returns = "'all' to keep a block per release under '## Releases' (the behaviour since the start), or 'latest' to keep only the newest under '## Latest Release' with a pointer to the full list. Only choose 'latest' once every release is listed somewhere else -- that file becomes the sole record" },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHistoryPath'; Scripts = @('cut-release');
+       Optional = $true; Default = 'releases/README.md';
+       Returns = "the repo-root-relative path a 'latest' release section points at for the full list; read only when Get-ReleaseHistoryMode is 'latest'" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleasePluginTier'; Scripts = @('cut-release');
        Optional = $true; Default = 'whether .claude-plugin/marketplace.json exists';
        Returns = '$true if this repo publishes plugins that the cut must version in lockstep and card (per-plugin CHANGELOG.md + RELEASE.md); $false makes the newest vX.Y.Z tag the version record instead of the manifests' },

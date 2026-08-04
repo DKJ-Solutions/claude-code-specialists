@@ -1083,11 +1083,17 @@ if (Test-Path -LiteralPath $clForHeadings) {
     # stray H2 from an entry body IS an H2, so breaking on any '## ' would end the scan at the very defect it
     # is looking for -- and then silently pass everything after it. Measured: the first version broke on any
     # H2 and reported nothing about the two stray ones in #321's entry.
+    # The release heading is matched in BOTH spellings and the scan simply ends at the file when there is
+    # none after Pull Requests -- because since August 4, 2026 that section may sit ABOVE Pull Requests
+    # rather than below it, and a repo whose changelog keeps only the latest release has no second
+    # heading to stop at. Breaking on '## Releases' alone would have made this scan run to the end of the
+    # file for both of those layouts, which is harmless here (there is nothing after Pull Requests to
+    # misjudge) but stops being harmless the moment anything is appended.
     $inPr = $false
     for ($i = 0; $i -lt $clLines.Count; $i++) {
         if ($clLines[$i] -match '^##\s+Pull Requests\s*$') { $inPr = $true; continue }
         if (-not $inPr) { continue }
-        if ($clLines[$i] -match '^##\s+Releases\s*$') { break }
+        if ($clLines[$i] -match '^##\s+(Releases|Latest Release)\s*$') { break }
         if ($clLines[$i] -match '^#{1,2}\s') {
             $lvl = ($clLines[$i] -replace '^(#+).*$', '$1')
             $errors += "[entry-heading] CHANGELOG.md:$($i + 1): a '$lvl ' heading inside the Pull Requests section. It comes from an entry body and climbs out of its release category -- in the generated notes it renders beside '## Fixes' as if it were one (seen in v2.13.2). Demote it to '#### '."

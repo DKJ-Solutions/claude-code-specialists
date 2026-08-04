@@ -21,8 +21,13 @@ rewrite when copying. Managing branches, PRs, and merges up to and including the
 
 ### Changelog
 
-`CHANGELOG.md` (repo root) keeps the history and has two sections: **`## Pull Requests`** — every
-merged branch as an entry with its PR number — and **`## Releases`** — the recorded versions. Each
+`CHANGELOG.md` (repo root) has two sections, and since August 4, 2026 in this order: **`## Latest
+Release`** — the version currently cut, one block, pointing at `releases/README.md` for every earlier
+one — and below it **`## Pull Requests`**, every merged branch as an entry with its PR number. So the top
+of the file is the published state and the rest is what is queued behind it. The release section used to
+sit at the bottom and accumulate a block per release; at 434 of 1,062 lines it was duplicating, more
+poorly, an overview `releases/README.md` already carried in full (`Get-ReleaseHistoryMode = 'latest'`).
+Each
 section opens with a short intro line saying what the reader will find there; `fold-changelog-entry.ps1`
 leaves that line in place (entries go below it). **Branches never edit `CHANGELOG.md` directly** —
 with long-open branches that causes merge conflicts, because every branch would modify the same
@@ -140,8 +145,12 @@ The `releases/` directory (modeled on life-hub):
   entries grouped by branch type (Feat/Fix/Docs/Chore). Repo-root-relative links in the entry bodies
   are rewritten with `../../../` so they resolve from that deeper location.
 - **`releases/README.md`** — an overview table of all versions (newest at the top).
-- In `CHANGELOG.md` the `## Releases` block becomes a short **reference** (`### [vX.Y.Z] - date — Type`)
-  to the notes file, rather than the full contents inline.
+- In `CHANGELOG.md` the `## Latest Release` block becomes a short **reference**
+  (`### [vX.Y.Z] - date — Type`) to the notes file, rather than the full contents inline — and it
+  **replaces** the previous block instead of pushing it down. The cut writes the *development* link,
+  because that is the only one that exists while it runs; `new-internal-note.ps1` repoints it at the
+  internal note the moment that note is created, in the same PR. Linking there at cut time would put a
+  dead relative link inside an immutable tag.
 - **`releases/highlights/<X>.x/<X.Y.Z>.md`** — the consumer-facing tier, generated **only for a minor or
   major** (`Get-ReleaseHighlightsBumps`). Written for the reader who decides whether to *update*, not for
   the one who reviews the diff: entry metadata (PR number, branch type, date) is stripped.
@@ -208,7 +217,7 @@ does everything in one motion:
 a clean `main`:
 1. bumps all plugin versions in lockstep to `X.Y.Z`;
 2. generates `releases/development/<X>.x/<X.Y.Z>.md`, adds a row to `releases/README.md`, and puts a
-   reference in `CHANGELOG.md` under `## Releases` (the Pull Requests section is emptied down to its
+   reference in `CHANGELOG.md` under `## Latest Release` (the Pull Requests section is emptied down to its
    intro);
 3. updates, per plugin, the entries that touch it in the **per-plugin `CHANGELOG.md`**
    (`<plugin>/CHANGELOG.md`) — the consumer-facing history that travels with the plugin cache. The
@@ -261,7 +270,7 @@ waiting for a migration that does not exist.
   before.
 - `scripts/release/cut-release.ps1 (-Version <X.Y.Z> | -Bump <major|minor|patch>) [-Title "…"] [-NoPush] [-SkipLint]`
   — cut a repo-wide release, directly on `main`: lockstep bump + release notes in
-  `releases/development/` + `releases/README.md` row + `## Releases` reference + per-plugin
+  `releases/development/` + `releases/README.md` row + `## Latest Release` reference + per-plugin
   `CHANGELOG.md`s updated + per-plugin `RELEASE.md` cards regenerated + commit + tag `vX.Y.Z` + push.
   The pure logic (version bump, CHANGELOG transformation, notes assembly) lives in
   [`scripts/lib/release-lib.ps1`](../../../scripts/lib/release-lib.ps1), covered by
@@ -271,7 +280,7 @@ A new recurring release chore? Rendall builds a script for it with the same guar
 
 In short: the **how** (changelog, SemVer, tags, and — where a release publishes one — a GitHub
 Release) is portable; the **what** (these scripts, the per-branch entry + fold convention, and the
-lockstep repo-wide release via `cut-release.ps1` with git tag + `## Releases` block) belongs to this
+lockstep repo-wide release via `cut-release.ps1` with git tag + `## Latest Release` block) belongs to this
 repo. Publishing a GitHub Release here is a manual closing step at **every** release, per the
 `cut-release` skill, that `cut-release.ps1` itself does not automate — with the internal note as the
 body and the other tiers attached.

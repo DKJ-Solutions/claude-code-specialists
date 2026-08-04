@@ -155,6 +155,12 @@ function Get-SeamValue {
 
 $notesGrouping = Get-SeamValue -Name 'Get-ReleaseNotesGrouping' -Default 'major'
 $liveMarker    = Get-SeamValue -Name 'Get-ReleaseLiveMarker'    -Default ''
+# Whether the changelog's release section accumulates ('all', the behaviour since the start) or keeps
+# only the newest block behind a pointer ('latest'). Default 'all', so a consumer that never sets it
+# sees no change at all. Its companion names WHERE the full list lives, since that is the one thing a
+# 'latest' section has to be able to point at.
+$historyMode    = Get-SeamValue -Name 'Get-ReleaseHistoryMode'    -Default 'all'
+$historyRelPath = Get-SeamValue -Name 'Get-ReleaseHistoryPath'    -Default 'releases/README.md'
 # The computed fallback is a fact, not a guess: no marketplace manifest means there are no plugins to
 # version or card. Stated in repo-config here anyway, because in this repo the answer is load-bearing.
 $pluginTier    = Get-SeamValue -Name 'Get-ReleasePluginTier' `
@@ -373,7 +379,7 @@ if ($SummaryFile) {
 }
 
 $notesContent = Build-ReleaseNotes -Entries $entries -Version $new -Date $today -Type $typeLabel -Title $Title -Summary $summaryText
-$changelogNew = Convert-ChangelogForRelease -Content $changelogRaw -Version $new -Date $today -Type $typeLabel -NotesRelPath $notesRelPath -LiveMarker $liveMarker
+$changelogNew = Convert-ChangelogForRelease -Content $changelogRaw -Version $new -Date $today -Type $typeLabel -NotesRelPath $notesRelPath -LiveMarker $liveMarker -HistoryMode $historyMode -HistoryRelPath $historyRelPath
 
 # The highlights document, built here with everything else so a failure leaves no half-written release
 # behind. $cutHighlights is off unless the seam names THIS bump type: the tier exists for the release

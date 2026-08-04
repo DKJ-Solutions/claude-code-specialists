@@ -72,6 +72,13 @@ function New-Fixture {
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\release') -Force | Out-Null
     Copy-Item -LiteralPath $ScriptSrc -Destination (Join-Path $dir 'scripts\release\new-internal-note.ps1') -Force
+    # release-lib.ps1 travels along because the script dot-sources it for Set-ReleaseInternalNoteLink
+    # (August 4, 2026), which repoints the changelog's release block at the note this script creates.
+    # Copied rather than made optional in the script: a missing lib must fail loudly, not silently skip
+    # the changelog update and leave the release pointing at the developer notes forever.
+    New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\lib') -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\release-lib.ps1') `
+        -Destination (Join-Path $dir 'scripts\lib\release-lib.ps1') -Force
     if ($null -ne $NotesContent) {
         $notesPath = Join-Path $dir "releases\development\$NotesDir\$Version.md"
         New-Item -ItemType Directory -Path (Split-Path -Parent $notesPath) -Force | Out-Null

@@ -84,6 +84,11 @@ if (-not (Test-Path -LiteralPath $RepoRoot -PathType Container)) {
 }
 $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 
+# Set-ReleaseInternalNoteLink, for repointing the changelog's release block at this note once it exists
+# (see the call near the end). $PSScriptRoot-relative, like every other shared script's dot-source, so
+# the plugin mirror resolves its own copy rather than the consumer's repo root.
+. (Join-Path $PSScriptRoot '..\lib\release-lib.ps1')
+
 # --- Parse the version --------------------------------------------------------------------------
 $verNum = ($Version.Trim() -replace '^[vV]', '')
 if ($verNum -notmatch '^(\d+)\.(\d+)\.(\d+)$') {
@@ -255,9 +260,35 @@ $skeleton =
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $intFile) | Out-Null
 [System.IO.File]::WriteAllText($intFile, $skeleton, $Utf8NoBom)
 
+# --- Point the changelog's release block at this note ---------------------------------------------
+# The cut wrote the DEVELOPER link, because that is the only one that exists while it runs: it commits
+# and tags in one motion, and this note is written afterwards. So the moment the note exists is the
+# moment the link can be corrected -- here, in the same change that adds the file, so the two cannot
+# disagree. Doing it at cut time would have put a dead relative link inside an immutable tag.
+#
+# Best-effort by design: a release that has already succeeded must not be reported as failed over a
+# link. Set-ReleaseInternalNoteLink returns the content untouched when it finds nothing to change, and
+# it is idempotent, so a second run is harmless.
+$changelogFile = Join-Path $RepoRoot 'CHANGELOG.md'
+$changelogTouched = $false
+if (Test-Path -LiteralPath $changelogFile -PathType Leaf) {
+    $clBefore = [System.IO.File]::ReadAllText($changelogFile, [System.Text.Encoding]::UTF8)
+    $clAfter = Set-ReleaseInternalNoteLink -Content $clBefore -Version $verNum `
+        -InternalRelPath $intRel -DevRelPath $devRel
+    if ($clAfter -ne $clBefore) {
+        [System.IO.File]::WriteAllText($changelogFile, $clAfter, $Utf8NoBom)
+        $changelogTouched = $true
+    }
+}
+
 Write-Host ""
 Write-Host "read    :  $devRel  ($($bullets.Count) entry title(s))"
 Write-Host "created :  $intRel  (skeleton -- edit it now)"
+if ($changelogTouched) {
+    Write-Host "updated :  CHANGELOG.md  (the release block now points at this note)"
+} else {
+    Write-Host "skipped :  CHANGELOG.md  (no release block for v$verNum with a notes line to repoint -- nothing changed)"
+}
 Write-Host ""
 Write-Host "Step 1 -- fill in the note (the three headings stay):"
 Write-Host "  code $intRel"
