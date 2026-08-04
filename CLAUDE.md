@@ -278,6 +278,17 @@ The constitution above, concretely implemented here:
   `.claude/specialists/lenses/` lens.
 - **Changes to shared agent defs land here first**, are committed here, and only then picked up by
   the consuming repos — never the other way around.
+- **And because this repo *is* the source, the shared source is the default destination for a lesson
+  learned here — not the lens** (Dave, August 4, 2026). The lens is for what a *consumer* would
+  genuinely have to differ on; it is not the convenient place to write something down because it is the
+  file already open. Writing a portable rule into the lens leaves the source thinner than the repo that
+  maintains it, and nobody downstream ever receives it. Measured that day: Rendall #06's portable persona
+  was **1,700 bytes** while his repo lens had grown to **26,914** — sixteen times larger, holding the
+  release craft itself rather than anything specific to this repo. **Which layer a rule belongs in, and
+  the split when a rule has both a portable and a local half, is in the
+  [Specialists handbook](.claude/specialists/README.md#where-a-new-rule-goes--the-source-is-the-default-the-lens-is-the-exception)**
+  — including the measured convention that personas and manuals carry no repo-specific detail at all
+  while skills carry the evidence behind a procedure.
 
 ### The how (portable) vs. the what (repo-specific)
 

@@ -243,24 +243,14 @@ trusting the exit line — this one printed its success while silently dropping 
   the ones whose loss is unrecoverable, so the permission would carry all of the risk and almost
   none of the benefit. Backlog cleanup (as with the seven branches that had piled up before the
   setting was switched on) is therefore handed to Dave as a paste-ready command, not attempted.
-- **A parked branch can be silently overtaken, and exactly one command shows it exists** (lesson of
-  August 4, 2026). `park-branch.ps1` and `new-branch -Park` push a branch and deliberately open **no
-  PR** — which is the point, but it also means the branch appears in **no** PR listing, in no issue, and
-  in nothing `git status` or `git log` prints on `main`. `git branch --list` does not show it either on
-  a machine that never checked it out. **`git ls-remote --heads origin` is the only place it surfaces**,
-  which is why it now sits in Chris's stand-verification list in
-  [`01-01-extension.md`](01-01-extension.md#the-dave-rules). Measured instance:
-  `docs/split-quickstart-and-adoption` was parked August 3, 2026 at 16:49 carrying an 81-line plan and
-  no content; the same work was then built and merged from another branch at 18:32 the same day
-  (`d151b6e`), closing all three of its inbound issues. The parked branch stayed on the remote,
-  perfectly intact and completely obsolete, and **nothing anywhere said so** — the next session found it
-  by listing remote heads while cleaning up an unrelated merge.
-  **So when you pick up a parked branch, measure its plan against `main` before executing a line of
-  it.** Do not trust the entry file, however detailed: a park note is written at the moment work stops
-  and knows nothing about what happened afterwards, so a plan that reads as current is not evidence that
-  it is. Cheapest check first — `git log --oneline -- <the files the plan renames or creates>` and the
-  state of the issues it claims to close. Here that took two commands and turned a day of work into a
-  paste-ready delete.
+- **A parked branch can be silently overtaken, and exactly one command shows it exists.** The mechanism,
+  the pick-up check and the measurement are in the **portable** `park` skill, which is where a consumer
+  meets this too — a parked branch has no PR by design, so `git ls-remote --heads origin` is the only
+  command that surfaces it, and a park note knows nothing about what happened after it was written.
+  Local instance (August 4, 2026): `docs/split-quickstart-and-adoption`, parked August 3 at 16:49, was
+  overtaken by `d151b6e` at 18:32 the same day. Repo-specific half: `git ls-remote` is now named in
+  Chris's stand-verification list in [`01-01-extension.md`](01-01-extension.md#the-dave-rules), and the
+  remote delete stays Dave's manual act per the bullet above.
 - **Working in parallel from multiple machines** (lesson of July 16, 2026, when PR #46 and #47
   crossed each other): merging different branches in parallel is safe — the lint gate and CI protect
   `main` independently of which machine merges. Two rules keep it that way: **never the same branch

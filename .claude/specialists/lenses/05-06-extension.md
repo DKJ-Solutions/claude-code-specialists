@@ -137,12 +137,10 @@ August 4, 2026). The two halves of that decision have separate reasons, so keep 
 Never inline the development notes regardless: `gh release create`'s body has a hard
 125,000-character limit and this repo's development notes have exceeded that.
 
-**Copy each attachment to a unique filename before uploading — the first published Release under this rule
-walked straight into it.** All three tiers name their file `<X.Y.Z>.md`, an asset's name is its
-**basename**, and `gh`'s `file#label` syntax sets the *label* only, leaving the colliding name in place. At
-`v3.3.0` the development notes uploaded fine and the highlights came back `HTTP 404` on
-`…assets?label=…&name=3.3.0.md`. Upload copies named `vX.Y.Z-development-notes.md` and
-`vX.Y.Z-notes-for-users.md`; a reader who downloads `3.3.0.md` cannot tell which tier they got anyway. See
+**Copy each attachment to a unique filename before uploading** — all three tiers name their file
+`<X.Y.Z>.md` and an asset's name is its basename, so two of them collide. The mechanism (including why
+`gh`'s `file#label` syntax does not solve it) is in the `cut-release` skill's step 5, portable, with the
+failing request that proves it. Measured here at `v3.3.0`. See
 [releases/README.md](../../../releases/README.md#cutting-a-release) for the full mechanics. The
 `version` in each
 `.claude-plugin/plugin.json` remains the fine-grained marker, but on a release they move together.
@@ -214,15 +212,11 @@ The `releases/` directory (modeled on life-hub):
   - Think in time, risk and reduced dependence on a developer. A release with nothing for a consumer
     can still be the one where a routine change stopped needing one — that gap **is** why this tier
     exists, and it is the reason it covers patches while highlights does not.
-  - **Write the third heading as a snapshot, and note that the heading itself now says so** — it reads
-    *"What was still open at this release"*, past tense, since August 4, 2026. Being the Release body makes
-    this note **published output** that does not move with reality, so a present-tense line in it goes
-    stale in hours rather than months. Measured three times on that one day: a line saying the
-    user-facing notes still needed editing (edited hours later), one pointing at an attachment on a
-    release that had none, and one stating the previous release had no public page — published minutes
-    before it got one. The heading change is the structural half; the other half is Rendall's, and it is
-    to **re-read the previous release's note whenever something it called open closes.** The development
-    notes and the highlights need no such pass: they are written once and left alone.
+  - **The third heading is past tense** — *"What was still open at this release"*, since August 4, 2026.
+    The reason and the rule are in the `cut-release` skill and in the script's own skeleton hint, both
+    portable. Local measurement that produced it: three present-tense lines went stale within hours on
+    that one day, the last of them stating that the previous release had no public page — published
+    minutes before it got one.
 - **All three group per major (`3.x`)**, from the single answer in `Get-ReleaseNotesGrouping`. The
   consumer this model came from folders per minor; Dave chose to keep `<X>.x` here.
 
