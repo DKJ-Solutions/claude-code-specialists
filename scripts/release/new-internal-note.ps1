@@ -135,10 +135,14 @@ $w = @{
         'risk and reduced dependence on a developer. For example: "changing an amount took five',
         'edits in code and can now be done by the team itself".'
     ) -join "`n     "
-    SectionOpen    = 'What is still open'
+    SectionOpen    = 'What was still open at this release'
     HintOpen       = @(
         'What was deliberately left, and with whom the next step sits. "Nothing" is also an answer',
-        '-- leave the heading standing with that one line.'
+        '-- leave the heading standing with that one line.',
+        'Write it as a SNAPSHOT of this release, not as a claim about the present. Where this note is',
+        'the published release body it does not move with reality, so a line here goes stale in hours',
+        'rather than months -- measured three times in one day, once by a line stating that the',
+        'previous release had no public page, which its own author then published.'
     ) -join "`n     "
     NoEntries      = '(no entries found -- fill in by hand)'
     Unknown        = '(fill in)'
