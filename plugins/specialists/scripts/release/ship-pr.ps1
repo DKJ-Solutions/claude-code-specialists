@@ -37,7 +37,9 @@
 
          -Title is then unused (an existing PR keeps its title), and -Resolves is still honoured: the
          closing keywords are appended to the existing body, because step 6 below verifies exactly what
-         the merged body declared.
+         the merged body declared. Pass -RefreshBody to also rewrite the PR's description from the
+         changelog entry -- worth it whenever the entry was extended after the PR was opened, which is
+         the normal case on a branch that keeps growing. Both body edits go out as ONE `gh pr edit`.
       2. Look up the PR number for the current branch (gh pr list --head <branch> --base main),
          parsed by Get-ExistingPrRecord. Both details are repairs, measured August 4, 2026: without
          --base a consumer's STACKED PR could be the one merged, and the previous inline parse hit the
@@ -116,6 +118,11 @@
 .PARAMETER NoResolves
     Passed through to open-pr.ps1: declare that this PR closes no issue.
 
+.PARAMETER RefreshBody
+    Passed through to open-pr.ps1: on a branch whose PR is already open, rewrite that PR's description
+    from the current changelog entry. Opt-in, so a body edited on github.com is never overwritten unasked.
+    No effect when the PR is being created in this run.
+
 .EXAMPLE
     ./scripts/release/ship-pr.ps1 -Title "feat: group release output by category"
 
@@ -131,7 +138,8 @@ param(
     [switch]$NoMerge,
     [int]$PollSeconds = 15,
     [string]$Resolves = '',
-    [switch]$NoResolves
+    [switch]$NoResolves,
+    [switch]$RefreshBody
 )
 $ErrorActionPreference = 'Stop'
 
@@ -181,9 +189,10 @@ if ($branch -eq 'main') { Write-Error "You are on main; ship-pr runs from a bran
 
 # --- Step 1: open the PR (open-pr.ps1 runs the lint + test gate, pushes, opens) ------------------
 $openArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'open-pr.ps1'), '-Title', $Title)
-if ($SkipLint)  { $openArgs += '-SkipLint' }
-if ($SkipTests) { $openArgs += '-SkipTests' }
-if ($Force)     { $openArgs += '-Force' }
+if ($SkipLint)    { $openArgs += '-SkipLint' }
+if ($SkipTests)   { $openArgs += '-SkipTests' }
+if ($Force)       { $openArgs += '-Force' }
+if ($RefreshBody) { $openArgs += '-RefreshBody' }
 # Handed over as the raw string. open-pr.ps1 parses it itself precisely BECAUSE this hop goes through
 # `powershell -File`, where an [int[]] parameter would silently collapse '331,332' into 331332.
 if ($Resolves) { $openArgs += @('-Resolves', $Resolves) }

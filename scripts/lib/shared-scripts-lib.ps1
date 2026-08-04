@@ -161,6 +161,15 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # The PR-body helpers open-pr.ps1 dot-sources: Get-EntryDescription (shared by the fresh and
+            # the -RefreshBody path) and Update-PrBodySection. Mirrored for the same reason as the two libs
+            # above -- open-pr is mirrored and would otherwise dot-source a file the consumer does not have.
+            Name    = 'pr-body-lib'
+            Source  = 'scripts\lib\pr-body-lib.ps1'
+            Mirror  = 'plugins\specialists\scripts\lib\pr-body-lib.ps1'
+            LibOnly = $true
+        },
+        @{
             # The third release tier (August 3, 2026). Its own script rather than part of cut-release, and
             # the reason changed on the way: the source repo kept it separate because cut-release was
             # "temporarily diverged" and must not be extended, which #417 settled. What holds instead is
