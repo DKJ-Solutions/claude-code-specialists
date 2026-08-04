@@ -390,11 +390,12 @@ marketplace has (see the "out of scope" note in
 [`scripts/sync/check-script-contract.ps1`](scripts/sync/check-script-contract.ps1)). Its
 **procedure** — the closing steps every release shares once the version bump is committed (tag +
 push, branch cleanup) — was genuinely portable, so it shipped as the `cut-release` **skill**
-instead: a checklist with no script of its own (issue #177). That checklist also covers a
-Minor/Major GitHub Release, with its highlights-as-body/notes-as-attachment split — a manual
-closing step this repo's own Minor/Major releases go through too (see
+instead: a checklist with no script of its own (issue #177). That checklist also covers the GitHub
+Release, whose body is the highest release tier the repo has and whose other tiers go along as
+attachments — a manual closing step this repo takes at every release (see
 [releases/README.md](releases/README.md#cutting-a-release)), just not one `cut-release.ps1`
-itself automates.
+itself automates. *Which* bumps get a Release is repo policy and lives in the release manager's lens,
+not in the portable checklist.
 
 Cowork is positioned for non-code knowledge work; claude-code-specialists is a code/plugin-maintenance
 repo, so Claude Code is the right tool here and the repo stays deliberately Claude-Code-centric.
