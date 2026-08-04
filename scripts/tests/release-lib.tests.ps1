@@ -282,17 +282,28 @@ Assert-Equal 'Fixes' (Get-ReleaseCategories).Title['Fix'] 'category titles: with
 Write-Host "issue #417 -- Convert-ChangelogForRelease and the LIVE marker" -ForegroundColor Cyan
 # The marker MOVES: it is stripped wherever it sits and re-applied to the new heading. A marker that
 # accumulated would say two releases are live at once, which is worse than saying none is.
+# INTERPOLATED, not concatenated -- and that is load-bearing rather than style. Inside a
+# comma-separated array literal, `'a' + $x + 'b'` is not one element: PowerShell takes the three
+# operands as three ELEMENTS, so this literal used to yield 7 entries instead of 5 and the following
+# -join "`n" put newlines where the concatenation was. Both headings below arrived at Split-Changelog
+# already broken across three lines, with the middot and the em-dash each sitting alone on one.
+# See the comment above the strong assert further down for what that cost.
 $clLive = @(
     '# Changelog', '',
     '## Pull Requests', '',
     'Merged PRs land here.', '',
-    '### #7 ' + $midDot + ' An entry ' + $midDot + ' Fix ' + $midDot + ' 2026-02-01', '',
+    "### #7 $midDot An entry $midDot Fix $midDot 2026-02-01", '',
     'Body.', '',
     '## Releases', '',
     'The recorded versions.', '',
-    '### [v1.0.0] - 2026-01-01 ' + $emDash + ' Minor <- **LIVE**', '',
+    "### [v1.0.0] - 2026-01-01 $emDash Minor <- **LIVE**", '',
     'See [releases/development/1.x/1.0.0.md](releases/development/1.x/1.0.0.md) for the full release notes.'
 ) -join "`n"
+# The fixture is asserted before it is used. This whole section was built on a fixture that did not
+# contain what it was written to contain, and nothing said so -- so the shape gets a check of its own.
+$clLiveLines = @($clLive -split "`n")
+Assert-Equal 17 $clLiveLines.Count 'LIVE fixture: 17 lines, i.e. each heading is ONE line rather than split at its separator'
+Assert-Equal 0 @($clLiveLines | Where-Object { $_ -eq $emDash -or $_ -eq $midDot }).Count 'LIVE fixture: no line consists of a bare separator'
 $outLive = Convert-ChangelogForRelease -Content $clLive -Version '1.1.0' -Date '2026-02-02' -Type 'Minor' `
     -NotesRelPath 'releases/development/1.x/1.1.0.md' -LiveMarker '<- **LIVE**'
 Assert-Match $outLive '(?m)^### \[v1\.1\.0\] - 2026-02-02 .* Minor <- \*\*LIVE\*\*$' 'LIVE marker: the new release heading carries it'
@@ -304,14 +315,41 @@ $outPlain = Convert-ChangelogForRelease -Content $clLive -Version '1.1.0' -Date 
     -NotesRelPath 'releases/development/1.x/1.1.0.md'
 Assert-Equal $false ([bool]($outPlain -match '(?m)^### \[v1\.1\.0\].*LIVE')) 'no LIVE marker: none is written'
 # The invariant is that the marker is NOT stripped -- a repo that does not use the knob must not have
-# an existing marker quietly removed by a release. Asserted on the marker surviving in the carried-over
-# release block, deliberately NOT on the whole heading line: an em-dash in an EXISTING '## Releases'
-# heading is re-emitted on a line of its own, which reproduces against release-lib as it stands on main
-# and is therefore not this change's doing. Recorded rather than worked around silently -- and not
-# repaired here, because it did not reproduce against this repo's real CHANGELOG.md (the probe release
-# came out byte-identical), so the cause is not isolated yet.
-Assert-Match $outPlain ([regex]::Escape('Minor <- **LIVE**')) 'no LIVE marker: an existing one is left alone rather than silently stripped'
+# an existing marker quietly removed by a release. Asserted on the WHOLE heading line, anchored.
+#
+# This assert used to stop at the marker substring, "deliberately NOT on the whole heading line",
+# because an em-dash in an existing '## Releases' heading came back on a line of its own -- said to
+# reproduce against release-lib on main, and therefore not that change's doing. The SYMPTOM was real.
+# The CAUSE was this fixture, and release-lib never had anything to do with it.
+#
+# Measured August 4, 2026: the fixture above was built as `'...' + $emDash + '...'` inside a
+# comma-separated array literal, which PowerShell reads as THREE elements rather than one concatenation
+# -- 7 elements where 5 were written -- after which `-join "`n"` turned the seams into newlines. Both
+# headings reached Split-Changelog already broken across three lines. So the function was handed a
+# document whose heading really did have a bare em-dash on line 2, and it passed that through faithfully.
+#
+# That is also why it never reproduced against the repo's real CHANGELOG.md, which was checked three
+# times and taken as evidence that "the cause is not isolated": that file is READ FROM DISK, so it never
+# passes through the construction that caused it. Fed straight through Convert-ChangelogForRelease the
+# real document comes out clean -- the '## Releases' section goes from 73 em-dashes to 74, exactly the
+# one new heading, with all 72 existing headings returned character-for-character and zero lines holding
+# a lone em-dash.
+#
+# The cost of the weakening was real: the test asserted only that the marker survived, not that the
+# heading carrying it came over intact -- and the thing hiding behind that gap was a broken fixture, i.e.
+# every assertion in this section was running against a document nobody had written. The strong form runs
+# now, the fixture is checked before it is used, and the assert below turns the original report into a
+# standing check: if a bare separator line is ever produced for real, it fails here instead of being
+# explained here.
+$strongHeading = '(?m)^### \[v1\.0\.0\] - 2026-01-01 ' + [regex]::Escape($emDash) + ' Minor <- \*\*LIVE\*\*$'
+Assert-Match $outPlain $strongHeading 'no LIVE marker: the carried-over heading comes over intact, em-dash and marker inline'
 Assert-Equal 1 ([regex]::Matches($outPlain, [regex]::Escape('<- **LIVE**')).Count) 'no LIVE marker: and it is still the only one'
+# The reported defect, as a test: no output line may consist of an em-dash on its own. Asserted on both
+# branches, because the report never said which one it was supposed to happen on.
+foreach ($probe in @(@{ N = 'knob off'; V = $outPlain }, @{ N = 'knob on'; V = $outLive })) {
+    $lonely = @(($probe.V -split "`r?`n") | Where-Object { $_.Trim() -eq $emDash })
+    Assert-Equal 0 $lonely.Count "$($probe.N): no line consists of an em-dash alone (the reported defect, as a check)"
+}
 
 Write-Host "Get-PluginManifestPaths" -ForegroundColor Cyan
 # Pure (does not touch disk), so a fictional root suffices.
