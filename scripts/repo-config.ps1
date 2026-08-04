@@ -311,8 +311,13 @@ function Get-ReleaseLiveMarker {
 # THE PRECONDITION IS THE POINT: only set this to 'latest' when the file below really lists every
 # release, because from that moment it is the sole record. Switching a repo whose history lives nowhere
 # else would delete it at the next cut.
+# The path answers ONE question -- "where does this repo keep its release history?" -- and three things
+# read it: the changelog's pointer, the guardrail that checks which major a new row would land in, and
+# the inserter that writes that row. It moved from releases/README.md to its own file on August 4, 2026,
+# so that page describes the PROCESS (what a release is, the three tiers, how one is cut) while this one
+# carries the OUTCOME. One edit here moves all three.
 $script:ReleaseHistoryMode = 'latest'
-$script:ReleaseHistoryPath = 'releases/README.md'
+$script:ReleaseHistoryPath = 'releases/HISTORY.md'
 
 function Get-ReleaseHistoryMode {
     <# 'all' (a block per release) or 'latest' (only the newest, behind a pointer). #>

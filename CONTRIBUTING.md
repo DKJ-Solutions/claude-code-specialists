@@ -36,15 +36,20 @@ changelog entry — the same workflow as the consuming repos. The steps:
    CHANGELOGs — see [Cutting a release](releases/README.md#cutting-a-release)), and removes the entry file;
    commits that directly on `main`.
 
-## Cutting a release
+## Releases — a different cycle, described elsewhere
 
-A release is a **captured moment**: all plugins get the same version number
-(**lockstep, repo-wide**) and the state is tagged as `vX.Y.Z`. That works because this repository holds
-**one** product whose four plugins are one system — see
-[One product, one repository](README.md#one-product-one-repository); a second, unrelated product would
-get its own repository and marketplace rather than joining this release train. A release is cut **only on Dave's
-explicit request** and deliberately does **not** go through a branch + PR: like the fold commit, the
-release commit is a permitted direct-on-`main` action (the second exception to "everything via
-branch + PR"). The full mechanics — the `cut-release.ps1` steps, the per-plugin `CHANGELOG.md`s and
-`RELEASE.md` cards, and the guardrails — are described in
-[`releases/README.md`](releases/README.md#cutting-a-release), not repeated here.
+Everything above is the **contribution cycle**: everyone runs it, on every branch, and it does not wait
+for Dave. Cutting a release is a separate cycle with different rules — only the release manager, only on
+Dave's explicit request, and under a **direct-on-`main` exception that deliberately does not apply to
+ordinary contributions**. Keeping the two apart is the point; do not read the exception below as
+something this page grants.
+
+It is described in full in [`releases/README.md`](releases/README.md#cutting-a-release): what a release
+is, the `cut-release.ps1` steps, the three note tiers, the per-plugin `CHANGELOG.md`s and `RELEASE.md`
+cards, and the guardrails. The list of releases actually cut is
+[`releases/HISTORY.md`](releases/HISTORY.md).
+
+**The one thing worth knowing from here:** a release is repo-wide and in lockstep, which works because
+this repository holds **one** product whose four plugins are one system — see
+[One product, one repository](README.md#one-product-one-repository). A second, unrelated product would
+get its own repository and marketplace rather than joining this release train.

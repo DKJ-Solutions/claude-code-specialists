@@ -300,8 +300,14 @@ if ((git tag --list $tagName)) { Write-Error "Tag $tagName already exists."; exi
 # major bump a 'v3.0.0' row is filed neatly under '### 2.x' and nothing errors. And it has never been
 # hit, because the grouping-by-major arrived in v2.0.1 -- one release after the only major ever cut.
 # Rare plus silent is the worst combination for a manual step, which is why this speaks up instead.
+#
+# The path comes from Get-ReleaseHistoryPath rather than being hardcoded (August 4, 2026). That seam
+# already answers "where does this repo keep its release history?" for the changelog's pointer, and the
+# overview table IS that history -- so one answer serves both. Two hardcoded copies would be two places
+# that have to keep agreeing, and the day they stop, the changelog points at one file while the row
+# lands in another.
 $newMajor = ($new -split '\.')[0]
-$relReadmePath = Join-Path $repoRoot 'releases\README.md'
+$relReadmePath = Join-Path $repoRoot ($historyRelPath -replace '/', '\')
 if (Test-Path -LiteralPath $relReadmePath) {
     $targetMajor = Get-OverviewTargetMajor -ReadmeContent (Get-Content -LiteralPath $relReadmePath -Raw -Encoding UTF8)
     if ($null -ne $targetMajor -and $targetMajor -ne $newMajor) {
@@ -322,7 +328,7 @@ if (Test-Path -LiteralPath $relReadmePath) {
             "is not done for you."
         }
         Write-Error @"
-This release is v$new, but a new row in releases/README.md would be filed under '### $targetMajor.x'
+This release is v$new, but a new row in $historyRelPath would be filed under '### $targetMajor.x'
 (the first table in the overview). Nothing was written.
 
 $advice
@@ -421,7 +427,9 @@ Write-Host "  created: $notesRelPath ($($entries.Count) entries)" -ForegroundCol
 # header; $headerRe.Match returns the FIRST match, so the row always lands in the top (current
 # major) table -- correct for every minor/patch bump. A brand-new major starts a new top section
 # manually first (a deliberate milestone moment), after which its table becomes the insertion target.
-$relReadme = Join-Path $repoRoot 'releases\README.md'
+# Same seam as the guardrail above, so the file this row lands in and the file the changelog points at
+# cannot drift apart.
+$relReadme = Join-Path $repoRoot ($historyRelPath -replace '/', '\')
 $shortTitle = if ($Title) { $Title } else { "$typeLabel release" }
 $newRow = "| [$new](development/$notesDirName/$new.md) | $today | $typeLabel | $shortTitle |"
 if (Test-Path $relReadme) {
@@ -433,9 +441,9 @@ if (Test-Path $relReadme) {
         $at = $hm.Index + $hm.Length
         $rm = $rm.Substring(0, $at) + $newRow + $rmNl + $rm.Substring($at)
         Write-Utf8NoBom -Path $relReadme -Content $rm
-        Write-Host "  updated: releases/README.md" -ForegroundColor DarkGray
+        Write-Host "  updated: $historyRelPath" -ForegroundColor DarkGray
     } else {
-        Write-Warning "Overview table not found in releases/README.md -- add the row manually: $newRow"
+        Write-Warning "Overview table not found in $historyRelPath -- add the row manually: $newRow"
     }
 } else {
     Write-Warning "releases/README.md is missing -- row not added: $newRow"
