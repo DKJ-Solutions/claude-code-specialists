@@ -46,8 +46,7 @@ something this page grants.
 
 It is described in full in [`releases/README.md`](releases/README.md#cutting-a-release): what a release
 is, the `cut-release.ps1` steps, the three note tiers, the per-plugin `CHANGELOG.md`s and `RELEASE.md`
-cards, and the guardrails. The list of releases actually cut is
-[`releases/HISTORY.md`](releases/HISTORY.md).
+cards, and the guardrails. That same page carries the list of releases actually cut, at the end.
 
 **The one thing worth knowing from here:** a release is repo-wide and in lockstep, which works because
 this repository holds **one** product whose four plugins are one system — see

@@ -188,11 +188,14 @@ Assert-Equal $null (Get-OverviewTargetMajor -ReadmeContent "| Version | Date | T
 # pinned rather than left to inspection. It answered '2' until the 3.x section was opened, which is
 # exactly what made a 3.0.0 cut misfile -- and this assertion is what forced that change to be stated
 # instead of quietly landing. Update it, with a reason, whenever a new major section is opened.
-# The path comes from the repo's own Get-ReleaseHistoryPath rather than being written out again here:
-# the overview moved from releases/README.md to releases/HISTORY.md on August 4, 2026, and a hardcoded
-# copy in this test would have gone on asserting against a file that no longer holds the table -- passing
-# by looking at nothing, which is the failure mode this file has caught twice today. Probed in a child
-# scope with StrictMode off, the way every other reader of repo-config does it.
+# The path comes from the repo's own Get-ReleaseHistoryPath rather than being written out again here, and
+# that choice has now paid off TWICE IN OPPOSITE DIRECTIONS on the same day (August 4, 2026): the overview
+# moved out of releases/README.md into its own HISTORY.md, and then back again when the pages were merged.
+# A hardcoded copy would have broken on the first move and broken again on the second -- each time by
+# asserting against a file that no longer holds the table, which passes by looking at nothing. That is the
+# failure mode this file has caught repeatedly, and the reason a test may not restate a value the repo
+# already answers. Probed in a child scope with StrictMode off, the way every other reader of repo-config
+# does it.
 $liveReadme = Join-Path $PSScriptRoot ('..\..\' + ((& {
     Set-StrictMode -Off
     . (Join-Path $PSScriptRoot '..\repo-config.ps1')
