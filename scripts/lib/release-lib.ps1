@@ -257,7 +257,14 @@ function Split-Changelog {
     $secondIdx = [Math]::Max($prIdx, $relIdx)
 
     # Everything above the FIRST of the two headings is the document's own head -- title and intro.
-    $head = if ($firstIdx -gt 0) { $lines[0..($firstIdx - 1)] } else { @() }
+    #
+    # TRAILING BLANKS ARE STRIPPED, and that is a correctness fix rather than tidiness. The head as read
+    # ends with the blank line separating it from the heading; Convert-ChangelogForRelease then adds its
+    # own separator, so each cut left one more blank than the last. Measured over three consecutive cuts:
+    # 2, 3, 4. It renders identically in markdown, which is exactly why it would have gone on growing --
+    # nothing looks wrong until a reader opens the raw file years in.
+    $head = if ($firstIdx -gt 0) { @($lines[0..($firstIdx - 1)]) } else { @() }
+    while ($head.Count -gt 0 -and $head[-1].Trim() -eq '') { $head = @($head[0..($head.Count - 2)]) }
 
     # Each section runs from its own heading to the next heading, or to the end of the file for the
     # second one. Computed from the two indices rather than assuming which is which.
@@ -372,11 +379,27 @@ function Convert-ChangelogForRelease {
     $nl = $s.Nl
 
     $liveSuffix = if ($LiveMarker) { " $LiveMarker" } else { '' }
-    $block = @(
-        "### [v$Version] - $Date $emDash $Type$liveSuffix",
-        '',
-        "See [$NotesRelPath]($NotesRelPath) for the full release notes."
-    )
+    if ($HistoryMode -eq 'latest') {
+        # NO '###' HEADING IN THIS MODE, deliberately: under a section that holds exactly one release by
+        # definition, a per-version heading names what the heading above it already said. The version
+        # moves onto a bold line instead, which reads the same and stops the document from carrying an
+        # empty level of structure.
+        #
+        # Set-ReleaseInternalNoteLink recognises BOTH shapes for this reason -- the heading in 'all'
+        # mode, this line in 'latest' -- so the two functions cannot disagree about where a release
+        # block starts.
+        $block = @(
+            "**v$Version** $emDash $Date $emDash $Type$liveSuffix",
+            '',
+            "See [$NotesRelPath]($NotesRelPath) for the full release notes."
+        )
+    } else {
+        $block = @(
+            "### [v$Version] - $Date $emDash $Type$liveSuffix",
+            '',
+            "See [$NotesRelPath]($NotesRelPath) for the full release notes."
+        )
+    }
 
     if ($HistoryMode -eq 'latest') {
         # Written fresh every cut rather than carried over: in this mode the intro's whole job is to say
@@ -384,8 +407,8 @@ function Convert-ChangelogForRelease {
         # accumulating section's wording. The pointer is the only part a repo varies, so it is the only
         # part interpolated.
         $relIntro = @(
-            "The most recent release. The full list $emDash every version with its date, type and title $emDash",
-            "is in [$HistoryRelPath]($HistoryRelPath)."
+            "The most recent release $emDash every earlier one is listed in",
+            "[$HistoryRelPath]($HistoryRelPath), with its date, type and title."
         )
     } elseif (($s.RelIntroLines -join "`n") -match 'No releases recorded') {
         $relIntro = @(
@@ -471,10 +494,16 @@ function Set-ReleaseInternalNoteLink {
     $nl = if ($usesCRLF) { "`r`n" } else { "`n" }
     $lines = $Content -split "`r?`n"
 
-    # Find the block heading for this version, then the first notes line under it. Anchored on the
-    # version so a changelog still in 'all' mode -- where several blocks sit under one another -- cannot
-    # have an older block rewritten by a call meant for the newest.
-    $headingRx = '^###\s+\[v' + [regex]::Escape($Version) + '\]'
+    # Find the block for this version, then the first notes line under it. Anchored on the version so a
+    # changelog in 'all' mode -- where several blocks sit under one another -- cannot have an older block
+    # rewritten by a call meant for the newest.
+    #
+    # BOTH BLOCK SHAPES are matched: the '### [vX.Y.Z]' heading that 'all' mode writes, and the bold
+    # '**vX.Y.Z**' line that 'latest' mode writes instead (a section holding exactly one release needs no
+    # per-version heading). One function reading both is what keeps this in step with
+    # Convert-ChangelogForRelease rather than needing to be told which mode produced the file.
+    $v = [regex]::Escape($Version)
+    $headingRx = '^(###\s+\[v' + $v + '\]|\*\*v' + $v + '\*\*)'
     $start = -1
     for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match $headingRx) { $start = $i; break } }
     if ($start -lt 0) { return $Content }

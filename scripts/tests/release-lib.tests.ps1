@@ -410,14 +410,48 @@ Assert-Equal 2 ([regex]::Matches($hmAll, '(?m)^### \[v')).Count "history 'all': 
 $hmLatest = Convert-ChangelogForRelease -Content $hmBase @hmArgs -HistoryMode 'latest' -HistoryRelPath 'releases/HISTORY.md'
 Assert-Match $hmLatest '(?m)^## Latest Release$' "history 'latest': the heading becomes '## Latest Release'"
 Assert-Equal $false ([bool]($hmLatest -match '(?m)^## Releases$')) "history 'latest': and the old heading is gone, not both"
-Assert-Equal 1 ([regex]::Matches($hmLatest, '(?m)^### \[v')).Count "history 'latest': exactly one block"
-Assert-Match $hmLatest ([regex]::Escape('### [v1.1.0]')) "history 'latest': and it is the NEW release, not the old one"
-Assert-Equal $false ([bool]($hmLatest -match [regex]::Escape('### [v1.0.0]'))) "history 'latest': the previous block is dropped"
+Assert-Equal 1 ([regex]::Matches($hmLatest, '(?m)^\*\*v')).Count "history 'latest': exactly one block"
+Assert-Match $hmLatest ([regex]::Escape('**v1.1.0**')) "history 'latest': and it is the NEW release, not the old one"
+Assert-Equal $false ([bool]($hmLatest -match [regex]::Escape('v1.0.0'))) "history 'latest': the previous block is dropped"
+# NO per-version heading in this mode: the section holds exactly one release, so a '###' under
+# '## Latest Release' would name what the line above it already said. Asserted rather than left to the
+# block-count above, which would still pass if a heading were emitted ALONGSIDE the bold line.
+Assert-Equal $false ([bool]($hmLatest -match '(?m)^### ')) "history 'latest': no per-version heading -- the section already says there is one release"
 Assert-Match $hmLatest ([regex]::Escape('[releases/HISTORY.md](releases/HISTORY.md)')) "history 'latest': the pointer names the repo's own history file"
 # The pointer is the whole safety argument for dropping blocks, so a 'latest' section without one would
 # be a section that silently deletes history. Asserted separately from the path above: that one checks
 # the value, this one checks that a link is emitted at all.
-Assert-Match $hmLatest '(?m)^is in \[' "history 'latest': the intro really links out rather than only naming a file"
+Assert-Match $hmLatest '(?m)^\[releases/HISTORY\.md\]' "history 'latest': the intro really links out rather than only naming a file"
+
+# BLANK LINES MUST NOT ACCUMULATE. The head as read ends with the blank separating it from the first
+# heading, and the builder adds its own -- so every cut used to leave one more than the last (measured
+# 2, 3, 4 over three cuts). It renders identically in markdown, which is why nothing would ever have
+# looked wrong. Asserted by cutting the OUTPUT again and comparing the gap, not by inspecting one run.
+# Measured above the FIRST of the two section headings, whichever it is -- that is where the head ends
+# and therefore the only place the extra blank can land. Written against '## Latest Release' first, which
+# made the assertion pass with the fix disabled: this fixture is PR-first, so the gap being measured was
+# one the builder never touches. Caught by the negative control, which is the entire reason for running
+# one.
+function Get-BlanksAboveFirstSection([string]$text) {
+    $l = $text -split "`r?`n"
+    $i = -1
+    for ($k = 0; $k -lt $l.Count; $k++) {
+        if ($l[$k] -match '^## (Pull Requests|Latest Release|Releases)$') { $i = $k; break }
+    }
+    if ($i -lt 0) { return -1 }
+    $n = 0; $j = $i - 1
+    while ($j -ge 0 -and $l[$j].Trim() -eq '') { $n++; $j-- }
+    return $n
+}
+$hmCut1 = Convert-ChangelogForRelease -Content $hmBase @hmArgs -HistoryMode 'latest'
+# Re-add a PR entry the way a real cycle does -- INSIDE the Pull Requests section, not appended to the
+# file. This fixture is PR-first, so the release section is last and appending would file the entry
+# under it, which the next cut then refuses with "nothing to release". Injected just above the release
+# heading so it lands where a fold would put it.
+$hmCut1b = ($hmCut1 -replace '(?m)^## Latest Release$', "### #8 $midDot Another $midDot Fix $midDot 2026-03-01`n`nBody.`n`n## Latest Release")
+$hmCut2 = Convert-ChangelogForRelease -Content $hmCut1b -Version '1.2.0' -Date '2026-03-02' -Type 'Minor' -NotesRelPath 'releases/development/1.x/1.2.0.md' -HistoryMode 'latest'
+Assert-Equal 1 (Get-BlanksAboveFirstSection $hmCut1) 'blank lines: one blank between the head and the first section after one cut'
+Assert-Equal 1 (Get-BlanksAboveFirstSection $hmCut2) 'blank lines: still one after a second cut -- they do not accumulate'
 
 # BOTH ORDERS survive a cut, in the order the document already had. The old code threw unless Releases
 # came second; a consumer's layout must not be silently reordered by a release.
@@ -437,7 +471,7 @@ $hmOut = Convert-ChangelogForRelease -Content $hmRelFirst @hmArgs -HistoryMode '
 $relPos = ($hmOut -split "`n") | Select-String -Pattern '^## Latest Release$' | ForEach-Object { $_.LineNumber }
 $prPos  = ($hmOut -split "`n") | Select-String -Pattern '^## Pull Requests$'  | ForEach-Object { $_.LineNumber }
 Assert-Equal $true ($relPos -lt $prPos) 'section order: a releases-first document stays releases-first'
-Assert-Match $hmOut ([regex]::Escape('### [v1.1.0]')) 'section order: releases-first still gets the new block'
+Assert-Match $hmOut ([regex]::Escape('**v1.1.0**')) 'section order: releases-first still gets the new block'
 Assert-Match $hmOut '(?m)^Merged PRs land here\.$' 'section order: releases-first keeps its Pull-Requests intro'
 Assert-Match $hmOut '(?m)^Intro line\.$' "section order: releases-first keeps the document's own head"
 # And the mirror image, from the same call: a PR-first document stays PR-first.
@@ -479,6 +513,16 @@ $intMultiOut = Set-ReleaseInternalNoteLink -Content $intMulti -Version '1.1.0' `
     -InternalRelPath 'releases/internal/1.x/1.1.0.md' -DevRelPath 'releases/development/1.x/1.1.0.md'
 Assert-Match $intMultiOut ([regex]::Escape('[releases/internal/1.x/1.1.0.md]')) 'internal link: the named block is rewritten'
 Assert-Match $intMultiOut ([regex]::Escape('See [releases/development/2.x/2.0.0.md](releases/development/2.x/2.0.0.md) for the full release notes.')) 'internal link: the OTHER block is left exactly as it was'
+
+# THE SHAPE 'latest' MODE ACTUALLY PRODUCES. Asserted against the real generator output rather than a
+# hand-typed block: this pair is the only thing keeping the changelog's release link pointed at the
+# internal note, and if the two functions ever disagree about where a block starts it fails SILENTLY --
+# the cut succeeds, the note is written, and the link simply never moves.
+$intLatest = Convert-ChangelogForRelease -Content $hmBase @hmArgs -HistoryMode 'latest'
+$intLatestOut = Set-ReleaseInternalNoteLink -Content $intLatest -Version '1.1.0' `
+    -InternalRelPath 'releases/internal/1.x/1.1.0.md' -DevRelPath 'releases/development/1.x/1.1.0.md'
+Assert-Match $intLatestOut ([regex]::Escape('[releases/internal/1.x/1.1.0.md](releases/internal/1.x/1.1.0.md)')) "internal link: finds the bold '**vX.Y.Z**' block that 'latest' mode writes, not just the '###' heading"
+Assert-Equal 1 ([regex]::Matches($intLatestOut, '(?m)^See \[')).Count 'internal link: still one notes line in the latest-mode shape'
 
 Write-Host "Get-PluginManifestPaths" -ForegroundColor Cyan
 # Pure (does not touch disk), so a fictional root suffices.
