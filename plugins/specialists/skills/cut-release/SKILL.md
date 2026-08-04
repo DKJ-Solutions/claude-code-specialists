@@ -94,8 +94,18 @@ each command as you go — do not skip a step or reorder them from memory.
 
    ```powershell
    gh release create vX.Y.Z --title "vX.Y.Z - <short title>" --notes-file <body-file>
-   gh release upload vX.Y.Z <full-development-notes-file> [<highlights-file>]
+   # copy each attachment to a UNIQUE filename first -- see the collision note below
+   gh release upload vX.Y.Z <vX.Y.Z-development-notes.md> [<vX.Y.Z-notes-for-users.md>]
    ```
+
+   **Two attachments cannot share a filename, and all three tiers name their file `<X.Y.Z>.md`** — so
+   uploading two of them straight from `releases/` fails. Measured at this repo's `v3.3.0`: the first
+   upload succeeded and the second returned `HTTP 404` on
+   `assets?label=…&name=3.3.0.md`. The asset name is the **basename**, and `gh`'s `file#label` syntax does
+   not help — it sets the *label* and leaves `name` as the basename, which is why the request above still
+   carried the colliding name. **Copy each attachment to a distinct filename and upload the copies**
+   (`vX.Y.Z-development-notes.md`, `vX.Y.Z-notes-for-users.md`). That is worth doing on its own merits: a
+   reader downloading `3.3.0.md` cannot tell which of the three tiers they got.
 
    **The body is the highest tier the repo actually has, and every other tier goes along as an
    attachment.** Take them in this order:
