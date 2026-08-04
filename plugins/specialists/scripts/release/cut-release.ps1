@@ -322,7 +322,13 @@ if (Test-Path -LiteralPath $relReadmePath) {
             "Releasing an older major after a newer one has been opened needs a decision this script will not make for`n" +
             "you: either move the row by hand after cutting, or reconsider the version."
         } else {
-            "Add the section first -- directly under '## Overview', ABOVE '### $targetMajor.x':`n`n" +
+            # Positioned RELATIVE to the heading that was actually found, not under a named heading of
+            # its own. It used to say "directly under '## Overview'", which was stale from the day the
+            # overview moved out of releases/README.md into its own history page -- and naming any fixed
+            # heading is wrong on principle here, because the history file is repo-owned via
+            # Get-ReleaseHistoryPath and a consumer's may be structured differently. '### <n>.x' is the
+            # one shape this script does depend on, so that is the one it may point at.
+            "Add the section first -- directly ABOVE '### $targetMajor.x', in the same place that heading sits:`n`n" +
             "### $newMajor.x`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n`n" +
             "Then run this again. Opening a new major's section is a deliberate milestone moment, which is why it`n" +
             "is not done for you."

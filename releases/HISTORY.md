@@ -1,18 +1,32 @@
-# Release history — claude-code-specialists
+# Releases - history
 
-Every release ever cut, newest first, grouped by major version. This page is the **full record**:
-[`CHANGELOG.md`](../CHANGELOG.md)'s `## Latest Release` block names only the current version and
-points here for the rest, so nothing else in the repo carries this list.
+Every release ever cut, newest first, grouped by major version. This page is the **full record**: the
+release section in [`CHANGELOG.md`](../CHANGELOG.md) names only the current version and points here for
+the rest, so nothing else in the repo carries this list.
 
-What a release *is*, the three note tiers, and how one is cut are in
-[`README.md`](README.md) next to this file — that page describes the process, this one the outcome.
+What a release *is*, the three note tiers, and how one is cut are in [`README.md`](README.md) next to this
+file — that page describes the process, this one the outcome.
 
+New releases are added to the current major's table, the top one. That is why **opening a new major's
+section is a deliberate act, taken before the release is cut**: `cut-release.ps1` inserts the row after the
+first release table it finds, so without a section for the new major a `v3.0.0` row would be filed under
+`### 2.x` with nothing erroring. A guardrail refuses that rather than doing it quietly — see
+[Cutting a release](README.md#cutting-a-release).
 
-Grouped by major version, newest first. New releases are added to the current major's table (the
-top one) — which is why **opening a new major's section is a deliberate act, done before the release is
-cut**: `cut-release.ps1` inserts the new row after the first table header it finds, so without the
-section below a `v3.0.0` row would be filed under `### 2.x` without anything erroring. A guardrail now
-refuses that rather than doing it quietly (see [Cutting a release](README.md#cutting-a-release)).
+*The table header is deliberately described rather than quoted here: the inserter matches that exact line,
+and a document explaining a pattern should not be able to trigger it. The same care is why the closing
+keywords in the PR gate are stripped from code spans before they are read.*
+
+**Everything above travels to any repo; everything below the next heading does not.** The tables are the
+one part of this page that can never be copied — a release history is by definition unique to the repo that
+cut it, so a second repo mirrors the explanation and starts its own list under its own name. Two things to
+keep when you do, both load-bearing rather than stylistic: the repo section stays **last in the file** with
+the current major's table **first inside it** (the inserter takes the first table header in the whole
+document, so any table above these would silently start receiving the rows), and the `### <n>.x` heading
+shape stays as it is (the guardrail reads the last such heading before that first table, and one it cannot
+recognise refuses nothing).
+
+## claude-code-specialists
 
 ### 3.x
 
