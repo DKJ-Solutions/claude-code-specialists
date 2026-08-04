@@ -13,7 +13,7 @@ The most recent release — every earlier one is listed in
 
 **v3.4.0** — 2026-08-04 — Minor
 
-See [releases/development/3.x/3.4.0.md](releases/development/3.x/3.4.0.md) for the full release notes.
+See [releases/internal/3.x/3.4.0.md](releases/internal/3.x/3.4.0.md) for what this release is worth. The full per-PR record is in [releases/development/3.x/3.4.0.md](releases/development/3.x/3.4.0.md).
 
 ## Pull Requests
 
@@ -59,4 +59,3 @@ model is its `v2.11.0`, not the folder.
 [PR #455](https://github.com/DaveKJohn/claude-code-specialists/pull/455)
 
 ---
-
