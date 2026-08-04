@@ -33,6 +33,18 @@ function Get-SharedScriptPairs {
         apply to it. The flag lives HERE, next to the registration, because the test used to keep
         its own hand-written list of lib names: a second literal that a new lib silently fell out of
         (the accumulation shape of #275/#331). Registering a lib now declares its own exception.
+
+        Skill names the plugin skill that DOCUMENTS this script for a consumer, and it is REQUIRED on
+        every non-LibOnly entry -- '' means "no skill documents this", which is a declaration rather
+        than an omission. The lint gate's parameter check (check 18) reads it: a consumer who only has
+        the mirror plus its skill cannot use a parameter the skill never names. Measured August 4,
+        2026: three were missing that way, and -NoPush -- the one inspection step before a release is
+        pushed -- was among them. Same reasoning as LibOnly: declared next to the registration, so a
+        newly shared script cannot fall out of the check silently.
+
+        SkillParamsExempt lists parameters that deliberately do NOT belong in a skill, each with a
+        reason at the registration. Without it the check would be bypassed wholesale the first time it
+        fired on a test-only override, and a gate that gets bypassed guards nothing.
     #>
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
@@ -41,36 +53,50 @@ function Get-SharedScriptPairs {
             Name   = 'fold-changelog-entry'
             Source = 'scripts\release\fold-changelog-entry.ps1'
             Mirror = 'plugins\specialists\scripts\release\fold-changelog-entry.ps1'
+            Skill  = 'fold-changelog'
         },
         @{
             Name   = 'open-pr'
             Source = 'scripts\release\open-pr.ps1'
             Mirror = 'plugins\specialists\scripts\release\open-pr.ps1'
+            Skill  = 'open-pr'
         },
         @{
             Name   = 'check-roster-sync'
             Source = 'scripts\sync\check-roster-sync.ps1'
             Mirror = 'plugins\specialists\scripts\sync\check-roster-sync.ps1'
+            Skill  = 'sync-roster'
+            # All three exist so the test suite can point the check at a fixture instead of the real
+            # machine. A consumer never types them, and documenting them would invite someone to.
+            SkillParamsExempt = @('ConsumerPathOverride', 'CacheRootOverride', 'UserHomeOverride')
         },
         @{
             Name   = 'check-script-contract'
             Source = 'scripts\sync\check-script-contract.ps1'
             Mirror = 'plugins\specialists\scripts\sync\check-script-contract.ps1'
+            # No skill, and none is wanted: this runs from a SessionStart hook and reports. Nobody
+            # invokes it as a procedure, so there is no procedure to write down.
+            Skill  = ''
         },
         @{
             Name   = 'new-changelog-entry'
             Source = 'scripts\release\new-changelog-entry.ps1'
             Mirror = 'plugins\specialists\scripts\release\new-changelog-entry.ps1'
+            # Documented by new-branch's skill rather than one of its own: it is reached as that
+            # script's child step, and a branch is never entry-less.
+            Skill  = 'new-branch'
         },
         @{
             Name   = 'new-branch'
             Source = 'scripts\task\new-branch.ps1'
             Mirror = 'plugins\specialists\scripts\task\new-branch.ps1'
+            Skill  = 'new-branch'
         },
         @{
             Name   = 'park-branch'
             Source = 'scripts\task\park-branch.ps1'
             Mirror = 'plugins\specialists\scripts\task\park-branch.ps1'
+            Skill  = 'park'
         },
         @{
             # Issue #411. Was excluded as "workshop-only" on the reasoning that merge policy and the CI
@@ -82,6 +108,12 @@ function Get-SharedScriptPairs {
             Name   = 'ship-pr'
             Source = 'scripts\release\ship-pr.ps1'
             Mirror = 'plugins\specialists\scripts\release\ship-pr.ps1'
+            # KNOWN GAP, declared rather than hidden (August 4, 2026). This is the mirror a consumer
+            # most needs a procedure for -- it merges to main and then commits directly to main -- and
+            # the cut-release skill already sends the reader to "the normal new-branch -> ship-pr
+            # route", which is a route no page describes. Writing that skill is its own piece of work;
+            # naming the gap here is what keeps check 18 from reporting full coverage over it.
+            Skill  = ''
         },
         @{
             # Travels with ship-pr rather than on its own merit: it IS ship-pr's step 6, and a consumer
@@ -91,6 +123,10 @@ function Get-SharedScriptPairs {
             Name   = 'verify-resolved-issues'
             Source = 'scripts\release\verify-resolved-issues.ps1'
             Mirror = 'plugins\specialists\scripts\release\verify-resolved-issues.ps1'
+            # No skill of its own, and that is right: it IS ship-pr's step 6 and runs from there, so
+            # whatever documents ship-pr documents this. It therefore inherits ship-pr's gap above
+            # rather than having one of its own.
+            Skill  = ''
         },
         @{
             # Issue #413. Three repos had written their own copy of this repair tool, which is the
@@ -99,6 +135,10 @@ function Get-SharedScriptPairs {
             Name   = 'fix-mojibake'
             Source = 'scripts\maintenance\fix-mojibake.ps1'
             Mirror = 'plugins\specialists\scripts\maintenance\fix-mojibake.ps1'
+            # KNOWN GAP, declared (August 4, 2026). Mirrored because three repos had each written their
+            # own copy -- so three people needed it and none of them had a page to read. Its own skill
+            # is pending; the gap is named here so coverage does not read as complete.
+            Skill  = ''
         },
         @{
             Name    = 'check-report-lib'
@@ -127,6 +167,9 @@ function Get-SharedScriptPairs {
             Name   = 'new-internal-note'
             Source = 'scripts\release\new-internal-note.ps1'
             Mirror = 'plugins\specialists\scripts\release\new-internal-note.ps1'
+            # Documented inside the cut-release skill (step 2) rather than separately: it is a step of
+            # cutting a release, and it cannot run before the cut has produced its input.
+            Skill  = 'cut-release'
         },
         @{
             # The changelog entry's scaffold wording, needed by TWO shared scripts that must not be able
@@ -152,6 +195,7 @@ function Get-SharedScriptPairs {
             Name   = 'cut-release'
             Source = 'scripts\release\cut-release.ps1'
             Mirror = 'plugins\specialists\scripts\release\cut-release.ps1'
+            Skill  = 'cut-release'
         },
         @{
             # Travels with cut-release for the same reason verify-resolved-issues travels with ship-pr:
@@ -177,8 +221,29 @@ function Get-SharedScriptPairs {
             # Absent on an entry-point script -- normalized to $false so a caller can test the
             # property without ContainsKey gymnastics under StrictMode.
             LibOnly    = [bool]($p.ContainsKey('LibOnly') -and $p.LibOnly)
+            # Normalized for the same reason. A LibOnly entry carries no Skill at all: it is never
+            # invoked, so there is nothing for a skill to document. $null therefore means "not
+            # applicable", while '' on an entry point means "declared as having none" -- and check 18
+            # tells those two apart rather than treating both as nothing to do.
+            Skill      = if ($p.ContainsKey('Skill')) { [string]$p.Skill } else { $null }
+            SkillParamsExempt = if ($p.ContainsKey('SkillParamsExempt')) { [string[]]$p.SkillParamsExempt } else { @() }
         }
     }
+}
+
+function Get-ScriptParameterNames {
+    <#
+        The parameter names of a script's top-level param() block, via the PowerShell parser rather
+        than a regex. That is not fussiness: a regex over the param block missed a parameter carrying
+        a [Parameter(Mandatory = $true)] attribute when this was first measured, which would have left
+        the gate with a blind spot of exactly the kind it exists to close. Returns @() for a file with
+        no param block (every LibOnly entry) and for a file that cannot be parsed.
+    #>
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return @() }
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($Path, [ref]$null, [ref]$null)
+    if (-not $ast -or -not $ast.ParamBlock) { return @() }
+    return @($ast.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath })
 }
 
 function Get-NormalizedScriptContent {
