@@ -351,8 +351,9 @@ Cowork and in Claude Code — in a plain Claude.ai Chat session they show up gra
 Concretely for claude-code-specialists: the specialists roster (the subagents under Chris) and the three
 SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`)
 function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
-<!-- skills:all -->(`fold-changelog`, `open-pr`, `new-branch`, `park`, `specialists-init`, `specialists-teardown`,
-`sync-roster`, `start-task`, `cut-release`)<!-- /skills:all --> remain available there.
+<!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `specialists-init`,
+`specialists-teardown`, `sync-roster`, `start-task`, `cut-release`)<!-- /skills:all --> remain
+available there.
 
 Skills themselves are Anthropic's general **Agent Skills** mechanism — organized folders of
 instructions/scripts/resources that an agent discovers and loads progressively (name + description
@@ -365,10 +366,10 @@ interchangeable with — a Claude Code subagent.
 
 ## How we use skills — and what we deliberately don't
 
-<!-- skills:all -->Most skills in claude-code-specialists today (`fold-changelog`, `open-pr`, `new-branch`, `park`,
-`specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`) are a thin wrapper around a
-script — procedural **mechanism** (branch, PR, fold, bootstrap, teardown, roster-sync).
-`cut-release`<!-- /skills:all --> is the deliberate exception:
+<!-- skills:all -->Most skills in claude-code-specialists today (`fold-changelog`, `open-pr`, `ship-pr`,
+`new-branch`, `park`, `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`) are a
+thin wrapper around a script — procedural **mechanism** (branch, PR, ship, fold, bootstrap, teardown,
+roster-sync). `cut-release`<!-- /skills:all --> is the deliberate exception:
 a checklist with no script of its own (see below). Either way, the specialists' craft and judgment
 live in the persona/manual context (agent defs), not in skills. That's a deliberate split, but it
 also means we currently use only one half of what Agent Skills can carry.

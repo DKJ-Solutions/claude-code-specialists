@@ -108,12 +108,11 @@ function Get-SharedScriptPairs {
             Name   = 'ship-pr'
             Source = 'scripts\release\ship-pr.ps1'
             Mirror = 'plugins\specialists\scripts\release\ship-pr.ps1'
-            # KNOWN GAP, declared rather than hidden (August 4, 2026). This is the mirror a consumer
-            # most needs a procedure for -- it merges to main and then commits directly to main -- and
-            # the cut-release skill already sends the reader to "the normal new-branch -> ship-pr
-            # route", which is a route no page describes. Writing that skill is its own piece of work;
-            # naming the gap here is what keeps check 18 from reporting full coverage over it.
-            Skill  = ''
+            # The gap declared here on August 4, 2026 is closed: the route the cut-release skill sends
+            # the reader to ("the normal new-branch -> ship-pr route") now has a page. It documents
+            # verify-resolved-issues too, which is why that entry points here rather than at one of
+            # its own.
+            Skill  = 'ship-pr'
         },
         @{
             # Travels with ship-pr rather than on its own merit: it IS ship-pr's step 6, and a consumer
@@ -124,9 +123,10 @@ function Get-SharedScriptPairs {
             Source = 'scripts\release\verify-resolved-issues.ps1'
             Mirror = 'plugins\specialists\scripts\release\verify-resolved-issues.ps1'
             # No skill of its own, and that is right: it IS ship-pr's step 6 and runs from there, so
-            # whatever documents ship-pr documents this. It therefore inherits ship-pr's gap above
-            # rather than having one of its own.
-            Skill  = ''
+            # whatever documents ship-pr documents this. That page now exists and carries a section for
+            # running this step on its own, so the inherited gap is closed with ship-pr's rather than
+            # by giving a step of a sequence a procedure page of its own.
+            Skill  = 'ship-pr'
         },
         @{
             # Issue #413. Three repos had written their own copy of this repair tool, which is the
