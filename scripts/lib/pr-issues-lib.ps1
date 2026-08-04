@@ -218,6 +218,40 @@ function Get-ClosedIssueNumbers {
     return @($numbers | Sort-Object -Unique)
 }
 
+function Get-ExistingPrRecord {
+    <#
+    .SYNOPSIS
+        The first PR record in a `gh pr list --json number,url,body` payload, or $null when there is none.
+
+    .DESCRIPTION
+        open-pr.ps1 asks gh whether the current branch already has an open PR, and the answer decides
+        two things: whether an existing body's closing keywords count as a declaration, and whether
+        `gh pr create` runs at all. Parsing it lives HERE, as a pure function of the JSON text, because
+        the caller drives a live remote and cannot be covered by a suite -- while this can.
+
+        THE PARSE IS THE PART THAT NEEDS A TEST, not the query. Windows PowerShell 5.1 hands a parsed
+        JSON array to the pipeline as a SINGLE object, so `@($text | ConvertFrom-Json)` collects one
+        element that IS the whole Object[]; and indexing the result with [0] returns $null on an empty
+        list rather than failing, which is a wrong answer that looks like a right one. Both shapes have
+        already cost this repo a silent bug (see Get-OpenIssueNumbers's caller). So: assign first, wrap
+        second, and require a `number` before believing a record.
+
+        Returns $null for empty input, an empty list, unparseable JSON, or records without a number --
+        every one of which the caller must treat as "no existing PR", never as an error.
+    #>
+    param([string]$Json)
+
+    if (-not $Json -or -not $Json.Trim()) { return $null }
+
+    try {
+        $parsed = $Json | ConvertFrom-Json
+    } catch {
+        return $null
+    }
+
+    return (@($parsed) | Where-Object { $_ -and $_.number } | Select-Object -First 1)
+}
+
 function New-ResolvesBlock {
     <#
     .SYNOPSIS

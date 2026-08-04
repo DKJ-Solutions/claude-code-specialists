@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Push the current branch and open a Pull Request to main.
+    Push the current branch and open a Pull Request to main -- or update the PR it already has.
 
 .DESCRIPTION
     Pushes the current branch to origin and creates a PR to main via the GitHub CLI. Guardrail:
@@ -8,6 +8,27 @@
     the PR body unless you supply -Body yourself (NOTE: gh pr create --fill fills the body with
     the full commit history since main, not with the template -- so don't use that if you want
     the checklist template).
+
+    RESUMABLE: if the branch ALREADY has an open PR, the gates and the push still run and the
+    `gh pr create` is skipped -- the push is what updates an existing PR, so this exits 0 with the
+    PR number instead of failing. Before this, `gh pr create` was unconditional and returned a
+    non-zero exit code on a duplicate, which made the whole of ship-pr.ps1 unusable on a branch whose
+    PR had been opened in an earlier session: step 1 died and steps 2-6 (CI watch, merge, fold,
+    issue verification) never ran, so the merge and the fold had to be done by hand -- exactly the
+    five-step sequence ship-pr exists to remove. Measured August 4, 2026 on PR #457.
+
+    Title and body are deliberately LEFT ALONE when a PR already exists. The body may have been
+    edited on github.com since it was opened, and silently overwriting a reviewer's or the author's
+    edits with a freshly generated template is a worse failure than a stale title: the title is
+    visible on the PR, an overwritten body is gone. Retitle with `gh pr edit` if you want it changed.
+
+    ONE exception, and it APPENDS rather than replaces: a -Resolves this run declares that the existing
+    body does not already carry is added to it. Skipping that would drop the declaration on the floor --
+    GitHub closes what the body says at merge time, so the issue would stay open and ship-pr.ps1's
+    step 6 would read the same body back and confirm the same silence. That is the #341-#343 failure
+    reached from the other direction, so it is repaired here rather than left to the author. A failed
+    append is a hard stop (exit 1), because the branch is pushed by then and merging it would publish
+    the loss.
 
     Auto-fill (if you do NOT supply -Body): the script fills in the template itself as much as
     possible, so the PR never lands on github.com as an empty form:
@@ -69,7 +90,10 @@
       - neither, while the changelog entry mentions an issue that is currently OPEN -> the gate
         BLOCKS before the lint, the tests, and the push. PR references (`PR #341`, `/pull/341`) are
         not counted, so citing the PR you follow on from does not trip it.
-    A `-Body` you supply that already carries a closing keyword satisfies the gate on its own. If the
+    A `-Body` you supply that already carries a closing keyword satisfies the gate on its own, and so
+    does the body of an ALREADY OPEN PR for this branch -- otherwise resuming such a branch would be
+    blocked for not repeating a decision that is already published on the PR, where GitHub will honour
+    it at the merge regardless of what this run declares. If the
     open/closed state cannot be determined (gh unavailable or failing), the gate WARNS and lets the PR
     through -- wedging the PR flow on a network hiccup would be worse than the slip it guards against.
     The decision table lives in scripts/lib/pr-issues-lib.ps1 and is covered by
@@ -168,6 +192,35 @@ if ($branch -eq 'main') { Write-Error "You are on main; a PR is created from a b
 $info = Get-BranchInfo -Branch $branch
 $entryPath = Join-Path $repoRoot ($info.SafeName + '.md')
 
+# --- Does this branch already have an open PR? ----------------------------------------------------
+# Asked ONCE, here, because two later steps need the answer: the resolves gate (an existing body's
+# closing keywords count as a declaration) and the create step (which is skipped, since the push is
+# what updates an existing PR). Before the gates rather than after, so the gate reads the same facts
+# it decides on.
+#
+# A FAILED QUERY IS NOT AN ANSWER, and it deliberately does not block: treat it as "no existing PR"
+# and let the flow continue. The worst case is the behaviour this script had all along -- a duplicate
+# `gh pr create` refused by gh with its own message -- whereas blocking here would wedge the whole PR
+# flow on a network hiccup. Same reasoning as the resolves gate's undeterminable-state branch.
+#
+# --base main IS LOAD-BEARING, not symmetry with the create below. Without it the query answers "does
+# this branch have an open PR anywhere", and a consumer running stacked PRs (branch -> branch -> main)
+# would get the wrong one: this script would skip creating the PR to main, and ship-pr.ps1 would then
+# find and MERGE the stacked PR into its intermediate base instead. GitHub allows one open PR per
+# (head, base) pair, so with the base pinned there is at most one answer -- which is also why --limit 1
+# cannot hide a second candidate.
+$existingPr = $null
+$prLookup = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--head', $branch, '--base', 'main', '--state', 'open', '--json', 'number,url,body', '--limit', '1', '--repo', $repo) -DiscardStderr
+if ($prLookup.ExitCode -ne 0) {
+    Write-Warning "could not ask gh whether '$branch' already has an open PR (exit $($prLookup.ExitCode)) - continuing as if it has none."
+} else {
+    # The parse itself lives in pr-issues-lib.ps1 (Get-ExistingPrRecord) so the 5.1 array-flattening
+    # pitfall it navigates is covered by pr-issues.tests.ps1 -- this script drives a live remote and
+    # cannot be. It returns $null for anything it cannot read, which is the same "no existing PR" the
+    # failed-query branch above assumes.
+    $existingPr = Get-ExistingPrRecord -Json ($prLookup.Output -join "`n")
+}
+
 # --- Resolves gate --------------------------------------------------------------------------------
 # Runs FIRST, before lint/tests/push: a forgotten closing keyword should not cost the author forty
 # test suites before it is reported, and nothing has left the machine yet at this point.
@@ -223,7 +276,16 @@ if (-not $NoResolves -or $resolveList.Count -gt 0) {
         }
     }
 
-    $decision = Get-ResolvesDecision -Resolves $resolveList -NoResolves:$NoResolves -Body $Body -OpenMentions $openMentions
+    # The body the gate judges: what the caller supplied, PLUS the body of an already open PR for this
+    # branch. Without that second half, resuming such a branch would be blocked for not repeating a
+    # `Closes #<n>` that is already on the PR -- and GitHub honours the body it has at merge time, not
+    # what this run declares, so the gate would be demanding a decision it cannot change. Kept separate
+    # from $Body on purpose: $Body being empty is what triggers the template auto-fill further down, and
+    # folding a fetched body into it would silently suppress that.
+    $gateBody = $Body
+    if ($existingPr) { $gateBody = ($gateBody + "`n" + $existingPr.body) }
+
+    $decision = Get-ResolvesDecision -Resolves $resolveList -NoResolves:$NoResolves -Body $gateBody -OpenMentions $openMentions
     if (-not $decision.Allowed) {
         $list = ($decision.Blocked | ForEach-Object { "#$_" }) -join ', '
         $flag = '-Resolves ' + (($decision.Blocked | ForEach-Object { "$_" }) -join ',')
@@ -350,6 +412,43 @@ if (-not $SkipTests) {
 $push = Invoke-NativeCapture -FilePath 'git' -Arguments @('push', '-u', 'origin', $branch)
 $push.Output | ForEach-Object { Write-Host $_ }
 if ($push.ExitCode -ne 0) { Write-Error "git push failed."; exit 1 }
+
+# --- Already open? Then the push was the update, and there is nothing to create -------------------
+# Exits 0 on purpose: this is a SUCCESSFUL outcome, and ship-pr.ps1 reads that exit code to decide
+# whether to go on to the CI watch and the merge. Returning non-zero here (or letting the duplicate
+# `gh pr create` fail) is what made ship-pr unusable on a resumed branch.
+#
+# Title, body and label are left untouched -- see the note in .DESCRIPTION. The ONE exception is a
+# -Resolves the existing body does not yet carry, and it is not a matter of taste: if this run
+# declares an issue closed and the declaration never reaches the body, GitHub closes nothing at the
+# merge and ship-pr.ps1's step 6 reads the same body back and confirms the same silence. That is the
+# #341-#343 failure precisely, arrived at from the other side -- so the block is APPENDED rather
+# than skipped. Add-ResolvesBlock is idempotent per issue, so an already-declared number is not
+# duplicated and a run with nothing to add writes nothing at all.
+if ($existingPr) {
+    if ($resolveIssues.Count -gt 0) {
+        $updatedBody = Add-ResolvesBlock -Body ([string]$existingPr.body) -Issues $resolveIssues
+        if ($updatedBody -ne [string]$existingPr.body) {
+            $editFile = Join-Path ([System.IO.Path]::GetTempPath()) "open-pr-resolves-$PID.md"
+            [System.IO.File]::WriteAllText($editFile, $updatedBody, (New-Object System.Text.UTF8Encoding $false))
+            try {
+                $edit = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'edit', "$($existingPr.number)", '--body-file', $editFile, '--repo', $repo)
+                $edit.Output | ForEach-Object { Write-Host $_ }
+                if ($edit.ExitCode -ne 0) {
+                    Write-Error "PR #$($existingPr.number) is open and the branch was pushed, but appending the closing keyword(s) for $(($resolveIssues | ForEach-Object { "#$_" }) -join ', ') FAILED (exit $($edit.ExitCode)). Do not merge yet: without them in the body GitHub closes nothing. Add the 'Closes #<n>' line(s) by hand, or rerun."
+                    exit 1
+                }
+                Write-Host "Appended the closing keyword(s) for $(($resolveIssues | ForEach-Object { "#$_" }) -join ', ') to PR #$($existingPr.number)." -ForegroundColor Green
+            } finally {
+                Remove-Item -Path $editFile -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    Write-Host "PR #$($existingPr.number) was already open for '$branch' - the push above updated it." -ForegroundColor Green
+    Write-Host "  $($existingPr.url)"
+    Write-Host "Title and body left as they are; retitle with 'gh pr edit' if you want them changed." -ForegroundColor DarkGray
+    exit 0
+}
 
 if ($info.IsKnown) {
     $label = $info.Label
