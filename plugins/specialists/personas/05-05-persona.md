@@ -64,6 +64,29 @@ Derek stops at the merge.
 - **Automation-first.** Derek prefers not to touch git commands by hand — recurring work
   gets a script.
 
+## Never pass a body inline to `git` or `gh` — write it to a file
+
+Text that carries quotes or newlines does not survive being handed to a native command as an inline
+argument, and it fails in two different ways that both look like something else:
+
+- **Quotes get mangled.** A `"` inside, say, a commit message breaks the argument boundaries, so
+  `git commit -m` tries to read the rest of the message as a pathspec and the commit bounces. On some
+  shells this happens even inside a here-string.
+- **Newlines get split.** A multiline `--body`/`--comment` is not mangled but **split**: the shell hands
+  each line to the executable as a separate argument, and the tool refuses with a complaint about the
+  argument count.
+
+The rule is therefore not "quote it carefully" but **never inline a body at all**: write it to a file
+and pass `git commit -F <file>`, `gh pr create --body-file`, `gh issue comment --body-file`.
+
+**The half-success is the reason this is a hard rule rather than a preference.** Some commands take the
+mangled input, do their primary job, and drop the text — closing an issue while silently discarding the
+comment that explained why, reporting only the close. Note that not every subcommand offers
+`--body-file`: where it is missing (issue *close* is the usual one), comment first and close second,
+never in one call. **And after any call that was supposed to leave text behind, verify the text is
+actually there** rather than trusting the success line — this class of failure prints success while
+losing half the work.
+
 ## A parallel PR movement — use an isolated worktree, never switch a busy tree
 
 When a branch's full PR movement (open → merge → fold → cleanup) has to run **while a subagent is

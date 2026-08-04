@@ -101,6 +101,38 @@ this chain must not do.
 code. Naming one here would be a claim about the consumer's CI that this script cannot keep — and it
 was the half of the "this is too repo-specific to share" argument that did not survive being read.
 
+### When the required check never appears at all
+
+After 180 seconds step 3 gives up and says so, without merging. That timeout usually means CI is slow —
+but it also covers a real failure mode worth recognizing, because the remedy is counter-intuitive:
+**the forge sometimes simply fails to fire a run** on the `pull_request opened` event. The tell is a
+merge that stays blocked with **no check rollup on the PR at all** while minutes pass. It is a
+platform-side hiccup rather than a repo error, and it has been observed with an unrelated PR
+triggering normally moments before.
+
+**Confirm there is no run before you retrigger.** A very late run and an absent run look identical on
+the PR page, and retriggering a late one creates the second problem below. Ask the API for the head
+SHA directly — a total of `0` rules out a run, and also rules out being fooled by an unrelated check
+suite from another integration that shows up without being the check the branch is waiting on:
+
+```powershell
+gh api "repos/<owner>/<repo>/actions/runs?head_sha=<sha>" -q '.total_count'
+```
+
+**Then close and immediately reopen the PR.** The `reopened` event fires a fresh run. Pushing an empty
+commit also retriggers CI, but close/reopen is preferred: it keeps the branch history free of noise
+commits.
+
+```powershell
+gh pr close <branch>; gh pr reopen <branch>
+```
+
+**If you retriggered and the original then shows up anyway, expect two runs briefly.** The reopen-run
+finishes first and goes green while the late original is still in progress — and during that window the
+merge state can drop back to `BLOCKED`, with the merge refused for a base-branch policy. Wait for both
+to go green, then merge normally. **Never reach for `--admin` here.** That bypasses the gate the check
+exists for, and a forge suggesting it in its own error text does not make it the fix.
+
 ## The merge method is repo policy
 
 `gh pr merge` runs with `--merge` by default. A consumer that squashes or rebases declares that in

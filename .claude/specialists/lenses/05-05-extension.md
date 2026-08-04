@@ -122,7 +122,7 @@ right "Type of change" box (from the branch prefix), fills "What does this chang
 description from the changelog entry file (`<branch>.md`), and checks the two always-true
 checklist items ("Changelog entry-bestand aangemaakt" + "Aangevraagd door Dave"). Only pass `-Body`
 if you want to override the auto-fill; do that via `--body-file`, never inline — see
-[the quoting lesson](#the-quoting-lesson-powershell-51-and-double-quotes).
+[the quoting lesson](#the-quoting-lesson-where-it-was-measured).
 
 ### Merging to main
 
@@ -141,76 +141,52 @@ gh pr merge <branch> --merge --delete-branch --subject "merge: <branch> (#<PR-nu
 `git merge --ff-only origin/main` (two statements — see the `&&` note just below), preceded by a
 `git fetch --prune` if you have not already fetched.
 
-**Use `git merge --ff-only origin/main`, not a bare `git pull --ff-only`, for that sync (lesson of
-July 29, 2026, PR #257).** The bare pull failed there with `fatal: Cannot fast-forward to multiple
-branches` on a clean `main` immediately after `gh pr merge --delete-branch` plus a
-`git fetch --prune` that removed two remote refs; the explicit merge ran straight through and
-fast-forwarded correctly. Git emits that error when it is handed **more than one** ref to merge, and
-why the pull got more than one was **not established** — the repo's config is ordinary (a single
-`remote.origin.fetch` refspec, `branch.main.merge` naming one ref, `pull.rebase=false`), and a
-later inspection showed a single `for-merge` line in `FETCH_HEAD`. So this is deliberately not
-recorded as a mechanism note. The rule stands on its own reasoning instead: the explicit form names
-exactly one ref, so it cannot reach that failure mode at all, while the bare pull's behaviour depends
-on whatever `FETCH_HEAD` happens to contain. Prefer the deterministic command for a step that sits in
-the middle of the merge → fold chain, where a stall leaves `main` in a half-finished state.
+**Three CI and sync rules now live in the `ship-pr` skill, which is where a consumer meets them —
+what stays here is where they were measured.** The skill carries the reasoning and the commands; this
+lens carries the local evidence and the two names that are only true here.
 
-**Never chain `gh pr checks --watch` onto a merge in one command (lesson of July 29, 2026).** The
-watch only waits when there is something to wait for: if no run has started yet it returns
-**immediately** with `no checks reported` — a success-looking exit that means "I found nothing", not
-"the gate is green". A merge chained behind it therefore fires while `lint-en-tests` is still
-unevaluated, the `main` ruleset blocks it, and the chain ends with an unmerged PR while every step
-looked like it passed. **Fix:** keep them separate steps, and confirm a run exists for the head SHA
-before watching (the `head_sha` query below) — the same check that distinguishes a missing run from a
-late one. Note also that PowerShell 5.1 has no `&&`, so any such chain here is `;` or
-`if ($?) { ... }`, which happily runs the merge regardless of what the watch concluded.
-
-**If the required check `lint-en-tests` never shows up (lesson of July 23, 2026, PR #152):**
-recognize it by the merge staying blocked with no rollup appearing on the PR at all —
-`mergeStateStatus` sits at `UNKNOWN` and several minutes pass without a workflow run starting.
-GitHub simply failed to fire a run on the `pull_request opened` event (a GitHub-side hiccup, not a
-repo error — a prior PR had triggered normally moments before). **Fix:** close and immediately
-reopen the PR (`gh pr close <branch>` → `gh pr reopen <branch>`); the `reopened` event fires a fresh
-run, which started within seconds in this case and went green. A lighter alternative — pushing an
-empty commit (`git commit --allow-empty`) — also retriggers CI, but close/reopen is preferred since
-it keeps the branch history free of noise commits.
-
-**If the original run seems to never show up, first confirm it isn't just very late (nuance of
-July 23, 2026, PR #155):** before closing/reopening, confirm no run exists at all for the head SHA
-(`gh api repos/<owner>/<repo>/actions/runs?head_sha=<sha> -q '.total_count'`; a `0` rules out a run,
-and also rules out being fooled by an unrelated check suite from another integration (e.g.
-`netlify`) that shows up without being the `lint-en-tests` check) — this avoids retriggering while
-the original run is only delayed. If you already retriggered and the original run then shows up
-anyway, expect two `lint-en-tests` runs briefly: the reopen-run finishes first and goes green, while
-the late original is still `in_progress` — during that window `mergeStateStatus` can drop back to
-`BLOCKED` and `gh pr merge` refuses with a "base branch policy prohibits the merge" error. **Fix:**
-wait for both runs to go green, then merge normally — never reach for `--admin` to bypass this; that
-would defeat the gate the check exists for. (Side note: `main` here is guarded by a **ruleset**, not
-classic branch protection — hence the "base branch policy" wording and `gh`'s `--admin` suggestion,
-which is exactly the bypass to avoid.)
+- **`git merge --ff-only origin/main`, never a bare `git pull --ff-only`.** Measured July 29, 2026 on
+  [PR #257](https://github.com/DaveKJohn/claude-code-specialists/pull/257): the bare pull failed with
+  `fatal: Cannot fast-forward to multiple branches` on a clean `main` right after
+  `gh pr merge --delete-branch` plus a `git fetch --prune` that removed two remote refs. **Why the pull
+  got more than one ref was never established** and is deliberately not recorded as a mechanism note —
+  this repo's config is ordinary (one `remote.origin.fetch` refspec, `branch.main.merge` naming one ref,
+  `pull.rebase=false`) and a later inspection showed a single `for-merge` line in `FETCH_HEAD`. The rule
+  stands on reasoning rather than on that unknown, which is why it survived being made portable.
+- **Never chain `gh pr checks --watch` onto a merge in one command.** Measured July 29, 2026. Two
+  details are local: the check that goes unevaluated is **`lint-en-tests`**, and the thing that blocks
+  the merge is the **`main-ci-gate` ruleset** (see [Tooling & account](#tooling--account)). One more is
+  local to the shell rather than the repo: **PowerShell 5.1 has no `&&`**, so a chain here is `;` or
+  `if ($?) { ... }` — both of which happily run the merge regardless of what the watch concluded.
+- **When the required check never appears, close and reopen the PR — after confirming no run exists.**
+  Measured July 23, 2026 on [PR #152](https://github.com/DaveKJohn/claude-code-specialists/pull/152)
+  (`mergeStateStatus` at `UNKNOWN`, no rollup at all, a prior PR having triggered normally moments
+  before) and sharpened the same day on
+  [PR #155](https://github.com/DaveKJohn/claude-code-specialists/pull/155), which is where the two
+  concurrent runs and the `BLOCKED` window were seen. The unrelated check suite that can fool the
+  head-SHA count was `netlify`. And the reason `gh` phrases its refusal as a *base branch policy* and
+  offers `--admin`: `main` here is guarded by a **ruleset**, not classic branch protection — that
+  suggestion is exactly the bypass to refuse.
 
 Folding the changelog entry on `main` (`fold-changelog-entry.ps1`) is then
 [Rendall #06](05-06-extension.md#changelog)'s work. `main` thus keeps a growing
 `## Pull Requests` section of everything that has been merged.
 
-### The quoting lesson: PowerShell 5.1 and double quotes
+### The quoting lesson: where it was measured
 
-PowerShell 5.1 mangles double quotes in arguments to native commands (`git`, `gh`) — even inside a
-here-string: a `"` in, say, a commit message breaks the argument boundaries, causing `git commit -m`
-to try to read the rest of the message as a pathspec and the commit to bounce (lesson of July 16,
-2026). Working method: keep commit messages and other inline arguments free of `"` (paraphrase, or
-use single quotes), and pass text that genuinely needs them through a file —
-`git commit -F <file>`, `gh … --body-file` — exactly as `open-pr.ps1` already delivers the PR body
-via a temporary file.
+**The rule itself is Derek's craft and now travels with him** — *never pass a body inline to `git` or
+`gh`; write it to a file* — see his portable persona. It is stated there without the numbers, because
+the trap is the shell's, not this repo's. What stays here is the local evidence:
 
-**A multiline body is the same trap one level up, and it fails differently (lesson of July 30, 2026).**
-A `--comment`/`--body` argument holding newlines does not get mangled — it gets **split**: PowerShell
-hands each line to the exe as its own argument, and `gh` answers `accepts 1 arg(s), received 4`. Worse
-is the half-success: `gh issue close 275 --comment "<multiline>"` **closed the issue and dropped the
-comment**, reporting only the close. So the rule is not "quote it carefully" but **never pass a
-multiline body inline** — write it to a file and use `--body-file` (`gh issue comment <n> --body-file`,
-`gh pr create --body-file`; note `gh issue close` has no `--body-file`, so comment first, then close).
-And after any `gh` call that was supposed to leave text behind, verify the text is there rather than
-trusting the exit line — this one printed its success while silently dropping half the work.
+- **Quotes mangled, July 16, 2026.** PowerShell 5.1 broke the argument boundaries on a `"` inside a
+  commit message — even inside a here-string — so `git commit -m` read the rest of the message as a
+  pathspec and the commit bounced.
+- **Newlines split, July 30, 2026.** `gh` answered `accepts 1 arg(s), received 4` on a multiline
+  `--comment`. The half-success that makes this a hard rule was measured the same day:
+  `gh issue close 275 --comment "<multiline>"` **closed the issue and dropped the comment**, reporting
+  only the close.
+- **`open-pr.ps1` already does it right** — it delivers the PR body via a temporary file rather than
+  inline, which is the shape to copy rather than re-derive.
 
 ### Branch & repo hygiene
 
