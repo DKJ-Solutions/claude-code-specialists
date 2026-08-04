@@ -49,10 +49,13 @@ stopped needing a developer. `new-internal-note.ps1` generates only the skeleton
 titles as bullets + three fixed headings); the middle heading, **what it is worth**, cannot be derived
 from a changelog and is the point of the document.
 
-**Both hand-written documents land via a branch + PR.** `cut-release.ps1` commits and tags in one motion,
-so by the time you edit the highlights draft or run `new-internal-note.ps1` (which needs the development
-notes as input), the release commit is already tagged. Neither is one of the two named direct-on-`main`
-exceptions, so they travel the normal reviewed route.
+**Both hand-written documents land via a branch + PR** (confirmed by Dave, August 4, 2026).
+`cut-release.ps1` commits and tags in one motion, so by the time you edit the highlights draft or run
+`new-internal-note.ps1` (which needs the development notes as input), the release commit is already tagged.
+Neither is one of the two named direct-on-`main` exceptions, so they travel the normal reviewed route.
+The alternative — widening the release exception to cover the written notes as well — was offered and
+declined: an exception is only safe while it stays the size it was granted at. `v3.2.0`'s internal note is
+the worked instance ([PR #432](https://github.com/DaveKJohn/claude-code-specialists/pull/432)).
 
 **Before editing a highlights draft, know that the marker is a proposal.** The generator puts `Feat`/`Fix`
 above a "remove before publishing" marker and everything else below it. In the storefront repo this tier
