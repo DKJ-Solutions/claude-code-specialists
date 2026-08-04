@@ -882,8 +882,32 @@ function Build-PluginReleaseCard {
     return ($header + $body + "`n`n" + $footer)
 }
 
+# The two patterns that define where a release row lands, in ONE place because three readers depend on
+# them agreeing: Get-OverviewTargetMajor and Get-OverviewSectionHeading below, and the inserter in
+# cut-release.ps1. A hand-copied second instance of either is how this repo's accumulation bugs start.
+$script:OverviewTableHeaderRe = [regex]"(?m)^\| Version \| Date \| Type \| Title \|\r?\n\|[-| ]+\|\r?\n"
+$script:OverviewMajorHeadingRe = '(?m)^(#{3,4})\s+(\d+)\.x\s*$'
+
+function Get-OverviewSectionHeading {
+    <# The literal major-section heading a new row would land under ('#### 3.x'), or $null when the
+       overview carries no table. Pure string in, string out.
+
+       Exists so a caller can QUOTE that heading back at the reader -- cut-release.ps1's new-major refusal
+       shows the section to add, and it must be shown at the level the document actually uses. Before this,
+       that message hardcoded '###' twice, which was already wrong for a page nesting its list one deeper.
+       Same match as Get-OverviewTargetMajor, from the same shared pattern, so the level and the number
+       can never disagree. #>
+    param([Parameter(Mandatory)][string]$ReadmeContent)
+    $hm = $script:OverviewTableHeaderRe.Match($ReadmeContent)
+    if (-not $hm.Success) { return $null }
+    $sections = [regex]::Matches($ReadmeContent.Substring(0, $hm.Index), $script:OverviewMajorHeadingRe)
+    if ($sections.Count -eq 0) { return $null }
+    $last = $sections[$sections.Count - 1]
+    return ($last.Groups[1].Value + ' ' + $last.Groups[2].Value + '.x')
+}
+
 function Get-OverviewTargetMajor {
-    <# Which '### <n>.x' section of releases/README.md a new row would land in, or $null when the
+    <# Which '<n>.x' section of the release history a new row would land in, or $null when the
        overview carries no table at all. Pure string in, string out.
 
        WHY THIS EXISTS. The row inserter finds the FIRST '| Version | Date | Type | Title |' header and
@@ -897,15 +921,25 @@ function Get-OverviewTargetMajor {
 
        The answer is the LAST section heading before the first table header, not simply the first
        heading in the file: that is precisely the section the inserter will write into, and deriving it
-       any other way would be a second, drifting definition of the same thing. #>
+       any other way would be a second, drifting definition of the same thing.
+
+       BOTH '###' AND '####' ARE ACCEPTED, and that tolerance is the point rather than laxness. The
+       heading level is a function of how deeply the release list is nested in its page, which is a
+       LAYOUT decision the repo owns: a flat page puts the list at '###', while a page that files it
+       under a repo-specific section heading nests it one deeper. This repo moved from the first shape to
+       the second on August 4, 2026. Pinning one level would mean a purely cosmetic edit silently
+       DISABLES the guardrail -- this function would find nothing, return $null, and cut-release.ps1's
+       check is written as "if a target was found and it differs", so no target means no refusal. A
+       guardrail that switches itself off when a heading gains a '#' is worse than none, because the
+       document still reads as though it is protected. #>
     param([Parameter(Mandatory)][string]$ReadmeContent)
-    $headerRe = [regex]"(?m)^\| Version \| Date \| Type \| Title \|\r?\n\|[-| ]+\|\r?\n"
-    $hm = $headerRe.Match($ReadmeContent)
+    $hm = $script:OverviewTableHeaderRe.Match($ReadmeContent)
     if (-not $hm.Success) { return $null }
     $before = $ReadmeContent.Substring(0, $hm.Index)
-    $sections = [regex]::Matches($before, '(?m)^###\s+(\d+)\.x\s*$')
+    $sections = [regex]::Matches($before, $script:OverviewMajorHeadingRe)
     if ($sections.Count -eq 0) { return $null }
-    return $sections[$sections.Count - 1].Groups[1].Value
+    # Group 2, not 1: group 1 is the '#' run (see Get-OverviewSectionHeading, which needs it).
+    return $sections[$sections.Count - 1].Groups[2].Value
 }
 
 function Build-ReleaseNotes {

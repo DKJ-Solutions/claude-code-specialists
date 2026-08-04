@@ -313,11 +313,17 @@ function Get-ReleaseLiveMarker {
 # else would delete it at the next cut.
 # The path answers ONE question -- "where does this repo keep its release history?" -- and three things
 # read it: the changelog's pointer, the guardrail that checks which major a new row would land in, and
-# the inserter that writes that row. It moved from releases/README.md to its own file on August 4, 2026,
-# so that page describes the PROCESS (what a release is, the three tiers, how one is cut) while this one
-# carries the OUTCOME. One edit here moves all three.
+# the inserter that writes that row. One edit here moves all three.
+#
+# It is deliberately left at the DEFAULT, releases/README.md. The list lived in its own HISTORY.md for one
+# day (August 4, 2026), on the reasoning that one page should describe the process and another the outcome.
+# That reasoning was superseded the same day: the pages had since been reorganised portable-half first with
+# everything repo-specific in one named slot, and once that split exists, process-versus-outcome stops
+# earning a file boundary -- the outcome IS repo-specific content, so it is simply the last section of the
+# slot. Merging them also removed four cross-references the two pages needed to introduce each other, and
+# left a consumer with one file to mirror instead of two.
 $script:ReleaseHistoryMode = 'latest'
-$script:ReleaseHistoryPath = 'releases/HISTORY.md'
+$script:ReleaseHistoryPath = 'releases/README.md'
 
 function Get-ReleaseHistoryMode {
     <# 'all' (a block per release) or 'latest' (only the newest, behind a pointer). #>
