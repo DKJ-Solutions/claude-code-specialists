@@ -257,6 +257,66 @@ $unknownUndeclared = Get-ResolvesDecision -Resolves @(332) -OpenMentions $null
 Assert-Set  @()     $unknownUndeclared.Undeclared 'an undeterminable state reports no undeclared issues'
 
 Write-Host ""
+Write-Host "Get-ExistingPrRecord" -ForegroundColor Cyan
+
+# What open-pr.ps1 does with the answer: an existing PR means the gates and the push still run but
+# `gh pr create` is skipped, and the existing body's closing keywords count as a declaration. So a
+# WRONG answer here is not a crash -- it silently opens a duplicate or blocks a resumable branch.
+
+# The empty list is the ordinary "no PR yet" answer and MUST read as $null, not as a record. In 5.1
+# indexing the parsed result with [0] also yields $null here, which is why this is asserted rather
+# than assumed: the two forms agree on this case and disagree on the next one.
+Assert-True ($null -eq (Get-ExistingPrRecord -Json '[]')) 'an empty list means no existing PR'
+
+# One record -- the case that matters, and the one where the 5.1 pitfall bites: with `@(... |
+# ConvertFrom-Json)` the single collected element IS the whole Object[], so .number would be an
+# array member-enumeration rather than the number.
+$one = Get-ExistingPrRecord -Json '[{"number":457,"url":"https://github.com/o/r/pull/457","body":"Closes #123"}]'
+Assert-True ($null -ne $one)                'a single record is found'
+Assert-Equal 457 $one.number                'the number is the record field, not an enumerated array'
+Assert-Equal 'https://github.com/o/r/pull/457' $one.url 'the url comes through'
+Assert-Equal 'Closes #123' $one.body        'the body comes through, so the gate can read it'
+
+# The body of a found record has to satisfy the resolves gate on its own -- otherwise resuming the
+# branch would demand a decision that is already published on the PR and cannot be changed by
+# declaring it again here.
+Assert-True (Test-HasClosingKeyword -Text $one.body) "a found record's body satisfies the resolves gate"
+$fromExisting = Get-ResolvesDecision -Body $one.body -OpenMentions @(123)
+Assert-True $fromExisting.Allowed           'and the gate therefore allows the resumed PR'
+Assert-Set  @(123) $fromExisting.Issues     'crediting the issue the existing body declares'
+
+# --limit 1 is what open-pr passes, but the parser must not depend on gh honouring it.
+$first = Get-ExistingPrRecord -Json '[{"number":10,"body":"a"},{"number":11,"body":"b"}]'
+Assert-Equal 10 $first.number               'the FIRST record wins when gh returns several'
+
+# Every unreadable answer collapses to "no existing PR". That is deliberate and not an oversight: the
+# caller then behaves exactly as it did before this feature existed -- a duplicate `gh pr create` that
+# gh refuses with its own message -- instead of wedging the PR flow on a bad payload.
+Assert-True ($null -eq (Get-ExistingPrRecord -Json 'not json at all')) 'unparseable JSON means no existing PR'
+Assert-True ($null -eq (Get-ExistingPrRecord -Json ''))                'empty input means no existing PR'
+Assert-True ($null -eq (Get-ExistingPrRecord -Json '   '))             'whitespace means no existing PR'
+Assert-True ($null -eq (Get-ExistingPrRecord -Json '[{"url":"https://x/1"}]')) 'a record without a number is not believed'
+
+# THE SHAPE THIS FUNCTION REPLACED, asserted as wrong on purpose. ship-pr.ps1's step 2 used
+#     $prs = @($prList.Output | ConvertFrom-Json); $pr = $prs[0].number
+# and both halves fail in 5.1: the count is 1 even for an empty list, so its `-lt 1` guard was dead
+# code, and $prs[0] is the whole Object[], whose .number member-enumerates to the EMPTY STRING when
+# there is nothing. The script then ran `gh pr merge ''`. These two asserts exist so a future
+# simplification back to that form fails here instead of on main.
+$oldShapeEmpty = @('[]' | ConvertFrom-Json)
+Assert-Equal 1  $oldShapeEmpty.Count      'the replaced @(text | ConvertFrom-Json) shape counts 1 for an empty list'
+Assert-Equal '' "$($oldShapeEmpty[0].number)" 'and yields the empty string as a PR number'
+Assert-True ($null -eq (Get-ExistingPrRecord -Json '[]')) 'Get-ExistingPrRecord answers $null there, so the guard can fire'
+
+# The append path: what open-pr writes back when this run declares an issue the existing body lacks.
+# Idempotent per issue, so a rerun does not stack duplicate blocks -- asserted here because the caller
+# decides whether to call `gh pr edit` by comparing against the original string.
+$appended = Add-ResolvesBlock -Body $one.body -Issues @(123, 456)
+Assert-Set  @(123, 456) (Get-ClosedIssueNumbers -Text $appended) 'the missing issue is appended, the present one kept'
+Assert-Equal $appended (Add-ResolvesBlock -Body $appended -Issues @(123, 456)) 'appending twice changes nothing'
+Assert-Equal $one.body (Add-ResolvesBlock -Body $one.body -Issues @(123)) 'nothing to add leaves the body identical (no pr edit call)'
+
+Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
     exit 1

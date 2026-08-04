@@ -48,7 +48,26 @@ The six steps, stopping on the first failure:
 1. **Open the PR** via `open-pr.ps1` — which runs the resolves gate, the scaffold gate, the repo's own
    lint gate and all test suites, then pushes and opens. If any of those fails, nothing is pushed and
    this stops here. See the `open-pr` skill for what those gates check.
-2. **Find the PR number** for the current branch (`gh pr list --head <branch>`).
+
+   **A branch whose PR is already open is resumed, not refused.** `open-pr.ps1` skips only the
+   `gh pr create` in that case — the gates and the push still run — so this step succeeds and the chain
+   carries on to step 2. Until August 4, 2026 it did not: the create was unconditional, a duplicate
+   returned non-zero, and **steps 2-6 never ran**, so a branch whose PR was opened in an earlier session
+   had to be merged and folded by hand. `-Title` is then unused (an existing PR keeps its title), while
+   `-Resolves` is still honoured — the closing keywords are appended to the existing body, because
+   step 6 verifies exactly what the merged body declared. Measured on
+   [PR #457](https://github.com/DaveKJohn/claude-code-specialists/pull/457).
+2. **Find the PR number** for the current branch (`gh pr list --head <branch> --base main`).
+
+   **`--base main` is load-bearing.** Without it the query asks "does this branch have an open PR
+   *anywhere*", so if you run **stacked PRs** (`branch -> branch -> main`) the answer can be the stacked
+   one — and step 4 would merge it into its intermediate base. GitHub allows one open PR per
+   `(head, base)` pair, so with the base pinned there is at most one answer.
+
+   This step also used to mis-parse gh's answer, repaired August 4, 2026: its "no open PR found" guard
+   could never fire and a missing PR arrived as the empty string, so the script would have run
+   `gh pr merge ''`. Worth knowing if you are on an older version of the plugin — the symptom is a
+   `ship-pr` run that reports no PR number and then fails at the merge with an unhelpful gh error.
 3. **Wait for CI.** See [Why step 3 polls before it watches](#why-step-3-polls-before-it-watches).
 4. **Merge** (`gh pr merge`). See [The merge method is repo policy](#the-merge-method-is-repo-policy).
 5. **Check out the main branch, fast-forward, and fold** — handed to `fold-changelog-entry.ps1 -Push`,

@@ -25,7 +25,24 @@
     Steps, stopping on the first failure (nothing is forced):
       1. open-pr.ps1 -Title <Title> [-SkipLint] [-SkipTests] -- runs the local lint + test gate,
          pushes, and opens the PR. If a gate fails, nothing is pushed and this stops here.
-      2. Look up the PR number for the current branch (gh pr list --head <branch>).
+
+         RESUMES A BRANCH WHOSE PR IS ALREADY OPEN. open-pr.ps1 skips only the `gh pr create` in that
+         case and still runs the gates and the push, so this orchestrator carries straight on to
+         step 2. Until August 4, 2026 it could not: `gh pr create` was unconditional, a duplicate
+         returned non-zero, and step 1's failure meant steps 2-6 never ran -- so a branch whose PR had
+         been opened in an earlier session had to be merged and folded BY HAND, which is the five-step
+         sequence this script exists to remove. Measured on PR #457 and repaired in open-pr.ps1 rather
+         than here: putting the check in the orchestrator would have skipped the gates and the push
+         along with the create, and made `open-pr.ps1` on its own still fail on the same branch.
+
+         -Title is then unused (an existing PR keeps its title), and -Resolves is still honoured: the
+         closing keywords are appended to the existing body, because step 6 below verifies exactly what
+         the merged body declared.
+      2. Look up the PR number for the current branch (gh pr list --head <branch> --base main),
+         parsed by Get-ExistingPrRecord. Both details are repairs, measured August 4, 2026: without
+         --base a consumer's STACKED PR could be the one merged, and the previous inline parse hit the
+         5.1 array-flattening pitfall -- its "no open PR" guard was dead code and a missing PR became
+         the empty string, so the script would have run `gh pr merge ''`. See the comment at step 2.
       3. Wait for the required CI check to finish (gh pr checks <pr> --watch). Branch protection on
          main blocks the merge until it is green; if a check FAILS, this stops WITHOUT merging.
       4. Merge (gh pr merge <pr> --<method>, from Get-PrMergeMethod; 'merge' by default). No --admin:
@@ -60,6 +77,12 @@
     into its own script for exactly that reason: it is the one step here that MUTATES state outside
     this repo (it posts comments and closes issues), so leaving it inline would have meant untestable
     write access. What remains untested here is only the orchestration order.
+
+    That gap is not free, and step 2 is the proof: the bug it carried was in an inline PARSE, not in
+    the orchestration, and it survived because it sat in the one file no suite reads. Moving the parse
+    into pr-issues-lib.ps1 (Get-ExistingPrRecord) is why the same mistake is now a failing assert. The
+    lesson generalises: anything in here that is a pure function of text belongs in a lib, precisely
+    because this file cannot be tested.
 
     Repo root: dual-context (CLAUDE_PROJECT_DIR for a consumer running the plugin mirror, otherwise the
     git root), so the root copy and the mirror stay byte-identical -- guarded by the shared-scripts
@@ -131,6 +154,9 @@ if (-not (Test-Path -LiteralPath $configPath)) {
 # Repo name from the local repo-config (single source), and the shared native-capture helper (#114).
 . $configPath
 . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
+# For Get-ExistingPrRecord in step 2. $PSScriptRoot-relative, not $repoRoot: like native-capture-lib
+# this one is not repo-owned -- it travels with the same plugin/mirror payload as this script.
+. (Join-Path $PSScriptRoot '..\lib\pr-issues-lib.ps1')
 $repo = Get-RepoName
 
 # The merge method is repo POLICY, not script logic (issue #411): this workshop merges, another repo
@@ -172,11 +198,25 @@ if ($NoMerge) {
 }
 
 # --- Step 2: find the PR number for this branch --------------------------------------------------
-$prList = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--head', $branch, '--state', 'open', '--json', 'number', '--limit', '1', '--repo', $repo) -DiscardStderr
+# Parsed by Get-ExistingPrRecord (pr-issues-lib), the same tested function step 1 uses, because THIS
+# STEP WAS IN THE 5.1 PITFALL ITSELF -- measured August 4, 2026 while making step 1 resumable:
+#
+#   $prs = @($prList.Output | ConvertFrom-Json)   # $prs.Count is ALWAYS 1, even for '[]'
+#   $pr  = $prs[0].number                         # $prs[0] is the whole Object[], not a record
+#
+# `@(<text> | ConvertFrom-Json)` collects the parsed array as ONE pipeline element, so the count guard
+# below could never fire -- it was dead code -- and `.number` on that element worked only by member
+# enumeration. With no open PR that yields the EMPTY STRING rather than nothing, and the script then
+# ran `gh pr checks ''` and `gh pr merge ''`. Nothing in the output would have said which PR was being
+# merged, in the one script that writes to main. Now: $null means no PR, and the guard is real.
+#
+# --base main for the reason spelled out in open-pr.ps1's lookup: without it a consumer's stacked PR
+# (branch -> branch) could be the one that gets merged, into its intermediate base.
+$prList = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--head', $branch, '--base', 'main', '--state', 'open', '--json', 'number', '--limit', '1', '--repo', $repo) -DiscardStderr
 if ($prList.ExitCode -ne 0) { Write-Error "Could not list the PR for '$branch' (is gh logged in?)."; exit 1 }
-$prs = @($prList.Output | ConvertFrom-Json)
-if ($prs.Count -lt 1) { Write-Error "No open PR found for '$branch' after open-pr -- stopping."; exit 1 }
-$pr = $prs[0].number
+$prRecord = Get-ExistingPrRecord -Json ($prList.Output -join "`n")
+if ($null -eq $prRecord) { Write-Error "No open PR to main found for '$branch' after open-pr -- stopping."; exit 1 }
+$pr = $prRecord.number
 Write-Host "ship-pr: PR #$pr opened for '$branch'." -ForegroundColor Green
 
 # --- Step 3: wait for the required CI check ------------------------------------------------------

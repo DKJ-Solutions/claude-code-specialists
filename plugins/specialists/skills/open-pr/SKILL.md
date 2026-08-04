@@ -28,17 +28,48 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1" 
 
 The script:
 
-1. Runs the **resolves gate** first, because it needs no network and nothing has left the machine
-   yet. See [The resolves gate](#the-resolves-gate-which-issues-does-this-pr-close) below.
-2. Runs the **scaffold gate**: the branch's changelog entry must no longer carry the wording
+1. Asks `gh` whether this branch **already has an open PR**, once, because two later steps need the
+   answer. See [Resuming a branch whose PR is already open](#resuming-a-branch-whose-pr-is-already-open)
+   below. A failed query is treated as "no existing PR" rather than as a blocker.
+2. Runs the **resolves gate**, before the slow gates and before anything has left the machine. See
+   [The resolves gate](#the-resolves-gate-which-issues-does-this-pr-close) below.
+3. Runs the **scaffold gate**: the branch's changelog entry must no longer carry the wording
    `new-changelog-entry.ps1` scaffolded it with. See
    [The scaffold gate](#the-scaffold-gate-has-the-entry-actually-been-written) below.
-3. Runs the **repo's own lint gate** (via `Get-LintScript` from `repo-config`) and then **all
+4. Runs the **repo's own lint gate** (via `Get-LintScript` from `repo-config`) and then **all
    test suites** (`scripts/tests/*.tests.ps1`) -- exactly like CI. An error blocks: nothing is
    pushed and no PR is opened. `-SkipLint` / `-SkipTests` are the deliberate escape valves.
-4. Pushes the current branch and opens a PR to `main` via `gh`, with a label based on the
+5. Pushes the current branch and opens a PR to `main` via `gh`, with a label based on the
    branch prefix and a pre-filled PR body from `.github/pull_request_template.md` +
-   the changelog entry file.
+   the changelog entry file. If the branch already had an open PR, the push **is** the update and
+   the create is skipped.
+
+## Resuming a branch whose PR is already open
+
+**Running this on a branch that already has an open PR is a normal, supported case** — it runs the
+gates against the new commits, pushes them, and exits 0 with the PR number. Only the `gh pr create` is
+skipped, because a push is what updates an existing PR.
+
+That matters most for [`ship-pr`](../ship-pr/SKILL.md), which calls this script as its step 1. Until
+August 4, 2026 the create was unconditional: a duplicate made `gh` return non-zero, step 1 failed, and
+**steps 2-6 — the CI watch, the merge, the fold, and the issue verification — never ran.** A branch
+whose PR had been opened in an earlier session therefore had to be merged and folded by hand, which is
+the five-step sequence `ship-pr` exists to remove. Measured on
+[PR #457](https://github.com/DaveKJohn/claude-code-specialists/pull/457).
+
+**Title and body are left alone.** The body may have been edited on github.com since it was opened, and
+overwriting someone's edits with a freshly generated template loses more than a stale title costs — the
+title is at least visible on the PR. Use `gh pr edit` if you want it changed.
+
+**The one exception appends rather than replaces: a `-Resolves` the existing body does not carry yet.**
+Dropping it would be the whole point of the resolves gate failing from the other side — GitHub closes
+what the body says *at merge time*, so the issue would stay open, and `ship-pr`'s step 6 reads that
+same body back and would confirm the same silence. The `Closes #<n>` line is appended (idempotent per
+issue, so nothing is duplicated). If that append fails the script **stops with exit 1**: the branch is
+pushed by then, and merging it would publish the loss.
+
+An existing body that already says `Closes #332` also satisfies the resolves gate on its own, so you do
+not have to repeat a decision that is already published on the PR.
 
 ## The scaffold gate: has the entry actually been written?
 
