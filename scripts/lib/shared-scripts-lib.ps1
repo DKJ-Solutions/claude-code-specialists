@@ -135,10 +135,12 @@ function Get-SharedScriptPairs {
             Name   = 'fix-mojibake'
             Source = 'scripts\maintenance\fix-mojibake.ps1'
             Mirror = 'plugins\specialists\scripts\maintenance\fix-mojibake.ps1'
-            # KNOWN GAP, declared (August 4, 2026). Mirrored because three repos had each written their
-            # own copy -- so three people needed it and none of them had a page to read. Its own skill
-            # is pending; the gap is named here so coverage does not read as complete.
-            Skill  = ''
+            # The gap declared here on August 4, 2026 is closed. It was mirrored because three repos had
+            # each written their own copy -- three people needing it and none with a page to read -- and
+            # that same argument is why the page had to follow the mirror rather than wait for someone to
+            # ask for it. With this, check 18 covers every shared entry point except check-script-contract,
+            # whose empty Skill is a statement rather than a gap.
+            Skill  = 'fix-mojibake'
         },
         @{
             Name    = 'check-report-lib'
