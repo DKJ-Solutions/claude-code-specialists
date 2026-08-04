@@ -4,6 +4,261 @@ Consumer-facing history of this plugin: per release, the changes that touched th
 Automatically appended by `cut-release.ps1` of the marketplace repo (claude-code-specialists); the
 full repository history lives there in `CHANGELOG.md` and `releases/`.
 
+## v3.3.0 — 2026-08-04
+
+### Features
+
+#### #431 · The internal tier: a release summary for colleagues and employers · Feat · 2026-08-03
+
+**The third tier, and the one that covers a patch.** `new-internal-note.ps1` is ported from the consumer
+repo as a **shared** script and writes `releases/internal/<X>.x/<X.Y.Z>.md` — for colleagues, employers
+and management, at **every** release including a patch. That last part is the whole reason it exists next
+to highlights: the two answer different questions. Highlights is *what a consumer notices*; internal is
+*what the organisation gets out of it*. They come apart most clearly on a patch — a release with nothing
+for a consumer, correctly a patch and therefore without highlights, can still be the one where a routine
+change stopped needing a developer.
+
+**It generates only half, deliberately.** Version, date, type and the entry titles come from the
+development notes; *"what it is worth"* cannot be derived from a changelog. So the output is a **skeleton**:
+the metadata, the titles as `[type]`-prefixed bullets, and three fixed headings. The headings are fixed on
+purpose — without that boundary this tier grows back into the developer notes it was created to avoid.
+
+**Its own script rather than part of `cut-release`, and the reason changed on the way.** The source repo
+kept it separate because `cut-release.ps1` was marked "temporarily diverged" and must not be extended —
+which #417 settled, so that reason is gone. What holds instead is better: `cut-release` **commits and
+tags in one motion**, so a skeleton generated there would put an empty document inside the release tag
+while the written version landed afterwards anyway. Separate keeps the release commit what it is —
+purely generated artefacts — while the one document that is human-written end to end travels the normal
+reviewed route.
+
+**So both hand-written documents ship via a branch + PR**, and that is now stated in `CLAUDE.md`, Rendall's
+lens, `releases/README.md` and the skill rather than left to be worked out: the edited highlights draft and
+the filled-in internal note are both written *after* the cut, when the release commit is already tagged, and
+neither is one of the two named direct-on-`main` exceptions.
+
+**`cut-release` now names what it did not write.** At the end of a run it prints the highlights draft still
+needing an edit and the `new-internal-note.ps1` invocation — **gated on that script existing**, not on a
+config knob, because whether a repo has an internal tier is a fact its file tree already answers. Same
+reasoning as `Get-ReleasePluginTier`'s computed fallback. Printed on the `-NoPush` path too, where it is
+most useful.
+
+**English script, repo-owned document.** Console output and errors are English like every shared script
+here, but the eleven strings that land *in the file* come from the optional `Get-InternalNoteWording` —
+the #410 class, third time in `repo-config.ps1`. Merged over the English defaults, so a consumer
+translating three headings does not silently lose the fill-in hints. Contract: 22 records → 23.
+
+**Verified against real data, not only fixtures:** run against this repo's own `v3.2.0` notes it read all
+21 entries, copied the date and type, and stripped every PR number and date from the titles. That probe
+skeleton was then removed — the script belongs in this PR, the *written* note for v3.2.0 is content for a
+separate one.
+
+**Tests: a new suite, `internal-note.tests.ps1`, 52 asserts**, weighted toward the refusals rather than the
+happy path — an existing note is the one document of the three that cannot be regenerated from anything, so
+`-Force` being required is asserted by writing text into a note and checking it survives. Also: the folder
+scheme really follows `Get-ReleaseNotesGrouping` (per-minor lands in `3.2/` and *not* in `3.x/`), only H3
+headings count (an H4 inside an entry body does not become a bullet), missing metadata becomes a visible
+`(fill in)` plus a warning rather than a blank line, and every document string is overridable while an
+unmentioned key keeps its default.
+
+**Two PowerShell traps hit while writing that suite, both now comments in it.** `$args` inside a function
+is an *automatic* variable holding the caller's arguments, so assigning to it and splatting passes
+something else entirely — it made a correct refusal look like exit 0. And `[string]$Param = $null` coerces
+to `''`, so a fixture could not tell "no notes file" from "an empty notes file" and wrote an empty one,
+which made the same refusal look broken while the script was right. Both were measured by running the
+script by hand rather than reasoned about.
+
+[PR #431](https://github.com/DaveKJohn/claude-code-specialists/pull/431)
+
+---
+
+#### #430 · Block a PR whose changelog entry still carries its scaffold wording · Feat · 2026-08-03
+
+**A third gate in `open-pr.ps1`, and it was found by the highlights tier rather than by a review.**
+Rendering v3.2.0 for a non-developer audience surfaced that three of its twenty-one entries (#424,
+#425, #426) still carried the scaffold heading `new-branch` had written, with a status appended behind
+it:
+
+```text
+**To do / where I left off:** phase 1 done -- lint gate green, all 23 suites green.
+```
+
+A progress note. Correct on the branch, wrong the moment it is published — and it had already reached
+the release notes *and* the per-plugin `CHANGELOG.md` files that travel to consumers in the plugin
+cache.
+
+**Why a gate rather than a habit.** The window closes at the merge, and it closes **invisibly**: the
+fold moves the entry into `CHANGELOG.md`, the next release moves it on into `releases/` and empties the
+Pull-Requests section. By the time anyone would review it, the place they would look is the one place it
+no longer is. Measured across all 70 archived release notes: one older instance, then three in a single
+day — a rate, not a one-off.
+
+**The wording became a single shared source first, because otherwise the guard could drift.**
+`new-changelog-entry.ps1` hardcoded the three strings; the gate needs the same three. A copy in each
+would let the gate silently miss whatever the writer changed — a drift guard that drifts, which is worse
+than no guard because it reports success. So they moved to
+[`entry-scaffold-lib.ps1`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/scripts/lib/entry-scaffold-lib.ps1), a shared lib both scripts dot-source,
+registered in the mirror. `Get-EntryFallbackType` deliberately stayed behind: a changelog *type* is not
+scaffold prose, so `Chore` is a legitimate final value and can never be evidence of an unedited entry.
+
+**Two deliberate design choices, both measured rather than assumed:**
+
+- **Substring, not whole-line.** The shape that actually shipped kept the heading and appended to it, so
+  a whole-line match would have passed all three real cases.
+- **Fenced code excluded.** This repo's own docs quote that wording while explaining the mechanism —
+  this very entry does, above — and a guard that cannot tell a quote from the real thing gets switched
+  off. An unclosed fence hides the tail, which is the safe direction: a missed finding, never a false
+  accusation against prose somebody did write.
+
+`-Force` is the escape valve, deliberately separate from `-SkipLint`/`-SkipTests`: those skip a tool,
+this overrules a judgement about content, and conflating them would let a routine "skip the slow suites"
+also wave prose through. `ship-pr.ps1` passes it along.
+
+**The contract check learned about indirection.** Three `Get-Entry*` records are now read by two scripts
+through a lib, so neither names them directly. Rather than weaken the "really references this, not a
+stale entry" assertion, records gained a `ViaLib` field and the check now proves **both** halves: the
+script really dot-sources that lib, and the lib really names the function. That is stricter than what it
+replaced — the old text match was satisfiable by a mention in a docstring, which is exactly how this
+would have passed unnoticed.
+
+**A pre-existing flaky test found and fixed on the way, and it is the more interesting find.**
+`shared-scripts.tests.ps1`'s resolves-gate assert failed four runs in a row when the suite's output was
+redirected to a file and passed four runs in a row when it went to the terminal — same commit, with
+`open-pr.ps1` behaving identically both times (verified by stashing my change: it failed against `main`'s
+version too). The cause is the documented one: `Write-Error` wraps at the child's own console width, and
+this scenario normalized whitespace by *collapsing* it, which only survives a wrap landing on a space. A
+mid-word wrap yields `resol` + `ves gate`. #415 fixed exactly this in the branch suites; this scenario
+kept the weaker form. **Green in the setup a human watches, red in the one CI uses** — the worst
+direction for a gate to fail in. Now stripped rather than collapsed, verified on both paths.
+
+**Tests: a new suite, `entry-scaffold.tests.ps1`, 31 asserts.** The one it exists for is the round trip:
+the real `new-changelog-entry.ps1` writes an entry in a throwaway repo and the real matcher is handed its
+output. "The writer and the guard cannot disagree" is a claim about code; that assert measures it. Plus
+the seam probe (an empty override is *ignored* — a blank marker is a substring of everything and would
+refuse every PR in the repo), the exact v3.2.0 shape, and the fence handling in both directions.
+
+[PR #430](https://github.com/DaveKJohn/claude-code-specialists/pull/430)
+
+### Documentation
+
+#### #436 · The internal note becomes the release body, at every release · Docs · 2026-08-04
+
+**Two decisions by Dave, August 4, 2026, with separate reasons — so they are recorded separately.** A
+GitHub Release is now published at **every** release, patch included (until now a patch skipped the step
+entirely, tag only), and its **body is the internal note**, with the highlights and the development notes
+attached. Dave's reasoning for the second: highlights only exist at a minor or major, while the internal
+note exists at every release, so it is the only tier that can be the body under a rule with no exceptions.
+It is also the tier written as *what the work is worth*, which is what a public Release page is read as.
+
+**The objection was raised before the decision and is recorded as a known trade-off, not as an open
+question.** The internal tier deliberately carries no file names, no commands and no code. On `v3.2.0`
+— where the marketplace rename breaks every existing install *with no error message* — that means the
+migration steps sit in the attached highlights rather than on the page a consumer lands on. Dave chose the
+internal note anyway, so the rule now carries its own mitigation: when a release requires action, the body
+says so and points at the attachment. Applied immediately to `v3.2.0`'s note rather than left as advice.
+
+**The step had to move, and that is a correction rather than a preference.** The GitHub Release was step 2
+of the checklist, directly after the tag — which worked only because its body was the highlights file
+`cut-release.ps1` had already generated. The internal note is written *after* the cut and merged via a
+branch + PR, so publishing from step 2 would publish a body that does not exist yet. It is step 5 now,
+after the documents merge. A checklist that exists to impose itself has to be walked in an order that is
+possible.
+
+**The portable/repo split was measured before it was written, and it landed differently than expected.**
+The skill travels to consumers, so "the body is the internal note" may only be unconditional if every
+consumer has one. It does not: `cut-release.ps1` gates the internal tier on **the script existing in the
+repo tree**, not on a config knob (its own comment says why — a repo's file tree already answers that
+question). So the checklist now carries a three-row table — internal note, else highlights, else the
+development notes — and *which bumps get a Release* moved out of the portable page entirely into the
+release manager's repo lens, on the same reasoning that made `Get-PrMergeMethod` repo policy: a repo
+publishing at every release and one publishing at Minor/Major only are both coherent, and the choice
+follows from who reads the page. No new script machinery was needed for either half.
+
+**One consequence worth knowing: the internal note stopped being an archive document.** Being the body
+makes it published output, so a stale line in it now ships. `v3.2.0`'s note listed "the user-facing version
+still needs an editorial pass" under *what is still open* — true when filed, untrue since the highlights
+were edited hours later. Corrected here. The general lesson is the tier's, not this release's: the
+development notes and the highlights are written once and left alone, and the internal note now has to be
+re-read whenever what it calls open has closed.
+
+Also updated: `releases/README.md` (both the summary and the full mechanics, where the two patch examples
+cited for years now describe the old rule and are left standing as history), the root `README.md`, and both
+places in Rendall's lens.
+
+[PR #436](https://github.com/DaveKJohn/claude-code-specialists/pull/436)
+
+---
+
+#### #432 · The internal summary for v3.2.0 · Docs · 2026-08-03
+
+**The first document in the third tier, and it is written rather than generated.** `v3.2.0` was cut before
+`new-internal-note.ps1` existed, so it was the one release the "at every release" rule could not cover.
+This closes that gap: the skeleton was generated from the release's own 21 entries and then filled in.
+
+**Written to the tier's own constraints, which are stricter than they look.** The skeleton states them —
+one page at most, 1-3 lines per subject, no file names, no code, and remove anything that means nothing
+outside the team. Verified rather than assumed: 56 lines, zero file names, zero code fences, zero issue
+numbers, and no skeleton comment blocks left behind. Those constraints are the tier: without them it grows
+back into the developer notes it exists to avoid.
+
+**What the release turned out to be about, once translated out of 21 technical titles.** Two halves. The
+visible one is the rename and reorganisation, which every existing user has to act on once. The quieter and
+more valuable one: work that was maintained three times is now maintained once, and four checks that
+reported success without checking have been repaired — including one whose silence could switch off the
+entire specialist layer without erroring.
+
+**"What it is worth" is the middle heading and the only part no script could produce.** Four items, each in
+terms of what it saves rather than what changed: maintenance paid once instead of three times; less false
+confidence, which is the expensive kind, because nobody looks behind a green result; someone can now start
+without help, after three separate people got stuck in the same place; and one working rule written down
+that had already cost real repairs — verify a report's stated *reason* before building the fix on it.
+
+**The open list names what a release cannot do.** The rename means every existing installation points at a
+name that no longer exists, and nothing errors — it simply stops loading. That is documented rather than
+fixable from this side, and it is stated as such instead of being left out because it is unflattering.
+
+[PR #432](https://github.com/DaveKJohn/claude-code-specialists/pull/432)
+
+### Maintenance
+
+#### #429 · Drop the print-ready HTML from the highlights tier · Chore · 2026-08-03
+
+**Dave, August 3, 2026: the HTML is not wanted anywhere.** So this is a removal from the *shared* code,
+not a knob switched off in this repo — the tier can no longer produce HTML in any consumer, including the
+one it was ported from.
+
+**What is gone.** `ConvertTo-ReleaseHtml` and `Format-InlineMarkdown` in `release-lib.ps1` (88 lines,
+ported and removed the same day), the `.html` write in `cut-release.ps1` step 3d, and the `HtmlLang` key
+from `Get-ReleaseHighlightsWording` — which now carries two keys instead of three. The highlights tier
+keeps doing everything else: the stakeholder/developer split, the metadata stripping, the marker.
+
+**Why the removal is an improvement and not just a subtraction.** That renderer was the weakest part of
+the port and the part needing the most explanation: a partial markdown subset that passed links through
+as literal `[text](https://github.com/DaveKJohn/claude-code-specialists/blob/main/url)`, documented as a known limitation and pinned by a test asserting the limitation
+stayed. A page that silently renders a link as its own source text is worse than no page. Anyone wanting
+a PDF renders the markdown with a tool built for it.
+
+**The generated `v3.2.0.html` is removed from `main`, and the `v3.2.0` tag still contains it.** That is
+deliberate: a tag records a moment and is not rewritten. So `git show v3.2.0` and `main` differ by that
+one file, which is stated in `releases/README.md` rather than left for someone to discover.
+
+**Tests assert the ABSENCE rather than dropping the old asserts** (`release-lib.tests.ps1` 199, down 20;
+`cut-release-guardrail.tests.ps1` 11, up 2). A partial HTML renderer is exactly the kind of thing that
+gets helpfully reintroduced, so re-adding one should turn a test red: the two function names must not
+resolve, the generated document must carry no HTML tag other than the marker comment it is built from,
+and `cut-release.ps1`'s text must contain no `.html` path at all.
+
+**Docs corrected in five places** — `CLAUDE.md`'s tier table, [Rendall
+#06](https://github.com/DaveKJohn/claude-code-specialists/blob/main/.claude/specialists/lenses/05-06-extension.md), `releases/README.md`, the `cut-release` skill, and
+the seam comments in `repo-config.ps1`. Each one said the tier produces a print-ready page.
+
+**One consequence for the consumer, worth naming.** smartwatchbanden has eleven `.html` files under
+`releases/highlights/` from its own unshared script. Those stay — they are that repo's history — but once
+it picks up this plugin version its next cut produces markdown only.
+
+[PR #429](https://github.com/DaveKJohn/claude-code-specialists/pull/429)
+
+---
+
 ## v3.2.0 — 2026-08-03
 
 ### Features
