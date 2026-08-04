@@ -135,7 +135,14 @@ August 4, 2026). The two halves of that decision have separate reasons, so keep 
   anyway; it is recorded as a known trade-off, not as an open question.
 
 Never inline the development notes regardless: `gh release create`'s body has a hard
-125,000-character limit and this repo's development notes have exceeded that. See
+125,000-character limit and this repo's development notes have exceeded that.
+
+**Copy each attachment to a unique filename before uploading — the first published Release under this rule
+walked straight into it.** All three tiers name their file `<X.Y.Z>.md`, an asset's name is its
+**basename**, and `gh`'s `file#label` syntax sets the *label* only, leaving the colliding name in place. At
+`v3.3.0` the development notes uploaded fine and the highlights came back `HTTP 404` on
+`…assets?label=…&name=3.3.0.md`. Upload copies named `vX.Y.Z-development-notes.md` and
+`vX.Y.Z-notes-for-users.md`; a reader who downloads `3.3.0.md` cannot tell which tier they got anyway. See
 [releases/README.md](../../../releases/README.md#cutting-a-release) for the full mechanics. The
 `version` in each
 `.claude-plugin/plugin.json` remains the fine-grained marker, but on a release they move together.

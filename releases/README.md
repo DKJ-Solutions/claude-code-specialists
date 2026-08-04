@@ -195,6 +195,12 @@ checklist: `gh release create` with the **internal note** as the release body (`
 one**. Never inline the development notes: `gh`'s release-notes body has a hard 125,000-character limit,
 which a full notes file can exceed.
 
+**Upload the attachments under unique filenames.** All three tiers call their file `<X.Y.Z>.md` and an
+asset's name is its basename, so uploading two of them straight from `releases/` collides — measured at
+`v3.3.0`, where the second upload returned `HTTP 404` on `…&name=3.3.0.md`. `gh`'s `file#label` syntax does
+not solve it (it sets the label, not the name). Copy them to `vX.Y.Z-development-notes.md` and
+`vX.Y.Z-notes-for-users.md` and upload the copies.
+
 **It comes last on the checklist for a reason that is easy to get wrong.** The body is a document written
 *after* the cut and merged via a branch + PR, so a Release published straight after the tag would have no
 body to publish. Until August 4, 2026 the step sat directly after the tag, which worked only because the
