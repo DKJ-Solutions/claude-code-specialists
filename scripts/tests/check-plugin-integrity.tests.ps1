@@ -1389,6 +1389,58 @@ try {
     $g6 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($g6.Out -match '\[changelog-intro\] \./plugins/specialists/CHANGELOG\.md')) `
         'changelog-intro: renaming the marketplace in the manifest alone makes that same file pass -- the expected text is derived, not hardcoded'
+
+    # --- check 18: a shared script's parameters must appear in the skill that documents it ------------
+    # THE MEASURED DEFECT, August 4, 2026: the fold-changelog skill told consumers to commit the fold BY
+    # HAND for two days after the script gained -Commit/-Push, because that improvement went into this
+    # repo's lens. Looking for siblings found four more, including cut-release's -Bump and -NoPush.
+    #
+    # park-branch is the fixture's subject: one parameter (-Intent), one skill (park), so the scenario
+    # exercises the mapping rather than a script's complexity. Both directions are asserted, because a
+    # positive-only test would pass against a check that examines nothing at all.
+    Write-Host "check 18: shared-script parameters vs. their skill" -ForegroundColor Cyan
+    $parkSrc   = Join-Path $Fixture 'scripts\task\park-branch.ps1'
+    $parkSkill = Join-Path $Fixture 'plugins\specialists\skills\park\SKILL.md'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $parkSrc) -Force | Out-Null
+    New-Item -ItemType Directory -Path (Split-Path -Parent $parkSkill) -Force | Out-Null
+    # A real param block, so the AST reader is what is being exercised -- not a string the test planted.
+    [System.IO.File]::WriteAllText($parkSrc, "param([string]`$Intent)`nWrite-Host 'fixture'`n", $Utf8NoBom)
+
+    # 38. A skill that never names the parameter is reported, naming the script and the parameter.
+    [System.IO.File]::WriteAllText($parkSkill, "# park`n`nParks the current branch. No options described.`n", $Utf8NoBom)
+    $s1 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($s1.Out -match '\[skill-param\].*park-branch\.ps1.*-Intent') `
+        'skill-param: an undocumented parameter is reported, naming both the script and the parameter'
+    Assert-True ($s1.Out -match '\[skill-param\] checked [1-9]') `
+        'skill-param: the coverage count proves a parameter was actually examined, not an empty scan'
+
+    # 39. Documenting it in the skill -- and changing nothing else -- makes the same file pass.
+    [System.IO.File]::WriteAllText($parkSkill, "# park`n`nParks the current branch. Use ``-Intent`` to record where you left off.`n", $Utf8NoBom)
+    $s2 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($s2.Out -match '\[skill-param\].*park-branch\.ps1')) `
+        'skill-param: naming the parameter in the skill alone clears the finding'
+
+    # 40. (THE FIXTURE-QUIET GUARD) a registered script that does not exist in this tree is skipped
+    #     rather than reported as a missing skill. Check 8 already reports the missing source, and
+    #     duplicating that here would have made this check fire on every scenario above it -- which is
+    #     exactly what the first version of it did.
+    Assert-True (-not ($s2.Out -match '\[skill-param\].*cut-release\.ps1')) `
+        'skill-param: a registered script absent from the tree is skipped, not reported (check 8 owns that finding)'
+
+    # 41. The coverage line names what it could NOT cover, rather than reading as complete -- the
+    #     no-silent-caps rule. A registered script declaring Skill = '' must be listed by name.
+    #     check-script-contract is the subject because its '' is a deliberate "no procedure to write
+    #     down" (it runs from a hook), so the fixture only needs it to EXIST to reach the gaps list.
+    #     Note this had to be a script present in the tree: scenario 40's skip fires first otherwise,
+    #     which is why asserting on ship-pr here failed -- the fixture has no ship-pr.ps1.
+    $contractStub = Join-Path $Fixture 'scripts\sync\check-script-contract.ps1'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $contractStub) -Force | Out-Null
+    [System.IO.File]::WriteAllText($contractStub, "Write-Host 'fixture'`n", $Utf8NoBom)
+    $s3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($s3.Out -match '\[skill-param\].*NOT covered.*check-script-contract') `
+        'skill-param: the coverage line names an entry point that declares no skill'
+    Assert-True (-not ($s3.Out -match '\[skill-param\] scripts\\sync\\check-script-contract')) `
+        'skill-param: and declaring no skill is coverage, not an error -- writing a missing skill is separate work'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

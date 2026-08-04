@@ -239,8 +239,15 @@ em-dash inline. That is the third independent observation that it does not occur
 changelog, which strengthens the case that the cause is not where the isolated repro suggests. And the push
 reported `Bypassed rule violations -- required status check "lint-en-tests" is expected`: the release
 commit reaches `main` through a **ruleset bypass on the account**, not through an exception in the ruleset
-itself. The gates did run, locally, before the commit — but they did not run as CI, and that distinction
-was not written down anywhere before now.
+itself. The gates did run, locally, before the commit — but they did not run as CI.
+
+**Correction, made the same day:** this entry originally added that the distinction "was not written down
+anywhere before now". That was wrong, and it is corrected here rather than left standing.
+[Sylvester #15](.claude/specialists/lenses/05-15-extension.md) has documented it since July 15, 2026 —
+the `main-ci-gate` ruleset, its bypass list (Repository admin plus the Write role, "Always allow"), which
+account holds which right, and the standing caveat that the Write bypass is only safe while there are no
+external collaborators. The lesson is the one this repo already has a rule for: check whether the repo
+already answers it before reporting a finding as new.
 
 **For the record, the scaffolded heading this all concerns**, quoted inside a fence so this entry is not
 accused of carrying it — which is exactly the exclusion the gate was built with:

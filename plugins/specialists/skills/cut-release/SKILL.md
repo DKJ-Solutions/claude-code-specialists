@@ -39,11 +39,28 @@ each command as you go — do not skip a step or reorder them from memory.
 
 ### Block 1 — cutting (always)
 
-1. **Tag the release commit and push the tag:**
+1. **Cut the release.** On a clean main branch:
 
    ```powershell
-   git tag -a vX.Y.Z -m "Release vX.Y.Z"
-   git push origin vX.Y.Z
+   ./scripts/release/cut-release.ps1 -Bump <major|minor|patch> -Title "<one sentence>"
+   ```
+
+   Give it **either** `-Bump` **or** `-Version <X.Y.Z>` when you want to name the number yourself.
+   `-SummaryFile` turns it into a milestone (see below). Two escape valves:
+
+   - **`-NoPush` — inspect before publishing, and use it when anything is unusual.** The script otherwise
+     commits, tags **and pushes** in one motion. With `-NoPush` it stops after the commit and tag and
+     prints the two push commands for you, which is the moment to read the generated notes. That is not
+     optional caution: an entry body's stray `##` climbs out of its category, and this is the only step
+     where a human sees the assembled artifact before it is public.
+   - **`-SkipLint`** skips the integrity gate that otherwise runs first. It exists for a genuinely broken
+     gate, not for a hurry — the gate is what stops a release refusing to cut halfway through.
+
+   **So there is normally no tag command to type.** If you did use `-NoPush`, finish with what the script
+   printed:
+
+   ```powershell
+   git push origin main; git push origin vX.Y.Z
    ```
 
 2. **The internal summary — at EVERY release, patch included.** Where the repo carries
@@ -53,6 +70,10 @@ each command as you go — do not skip a step or reorder them from memory.
    ```powershell
    ./scripts/release/new-internal-note.ps1 -Version X.Y.Z
    ```
+
+   `-Force` overwrites an existing note — needed rarely and deliberately, since this is the one tier that
+   cannot be regenerated from anything. `-RepoRoot <path>` points it at another checkout, the same override
+   the fold script carries, for a run from a temporary or detached worktree.
 
    It writes a **skeleton** to `releases/internal/<dir>/<X.Y.Z>.md`: the metadata copied from the
    development notes, the entry titles as bullets, and three fixed headings. **The middle one is the

@@ -41,7 +41,20 @@ infrastructure.
   have been the fourth round in a row to close *instances* of a class that kept coming back. Both checks
   answer the same **mention vs. use** question with a positional discriminator (check 11 the `@`-target,
   check 12 "does the block actually parse the file"), which makes this the third instance of that reasoning
-  in this file. This is the safety guard that
+  in this file. **Check 18 guards the shared source against its own documentation:** every parameter of a
+  mirrored entry point must be named in the skill that documents it, because a consumer has only the mirror
+  and that page — so a parameter the page never names does not exist for them, escape valves included. It
+  is a repair with a measured cause (August 4, 2026): the `fold-changelog` skill told consumers to commit
+  the fold *by hand* for two days after the script gained `-Commit`/`-Push`, since that improvement was
+  written into this repo's lens. Four more surfaced immediately, `-Bump` and `-NoPush` among them — the
+  latter being the only step where a human sees the assembled release before it is public. Two design notes
+  worth keeping: the mapping and the per-parameter exemptions are declared **in the registry beside the
+  registration**, the same reasoning `LibOnly` already carries, so a newly shared script cannot fall out of
+  the check silently; and parameters are read via the **PowerShell parser**, because the regex first used
+  for it missed a `[Parameter(...)]`-attributed parameter and would have given the gate the exact blind
+  spot it exists to close. An entry point declaring *no* skill is reported in the coverage line rather than
+  as an error — `ship-pr`, `fix-mojibake`, `verify-resolved-issues` and `check-script-contract` are in that
+  state today, and the first three are real gaps rather than deliberate ones. This is the safety guard that
   [Derek #05](05-05-extension.md)'s `open-pr.ps1` runs before every push — and that `cut-release.ps1`
   runs before a release.
 - **`.github/workflows/ci.yml`** — the CI gate on GitHub: runs the same lint gate + all test suites

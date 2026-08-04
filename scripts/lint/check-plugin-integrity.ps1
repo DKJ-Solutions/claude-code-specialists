@@ -107,6 +107,15 @@
          four files kept naming the retired marketplace after the rename swept it out of 59 others.
          Compared whitespace-normalized (content, not line wrapping); everything below the first version
          heading is history and deliberately not examined, as in checks 11 and 12.
+     18. shared-script parameters vs. their skill: every parameter of a mirrored entry point must be named
+         in the skill that documents it (the mapping lives in the shared-scripts registry, beside the
+         registration). A consumer has only the mirror and its page, so a parameter the page never names
+         does not exist for them -- including the escape valve they need when something goes wrong. This is
+         a repair: the fold skill told consumers to commit by hand for two days after the script gained
+         -Commit/-Push, and four more were found the same way, -Bump and -NoPush among them. Parameters are
+         read via the PowerShell parser (a regex missed an attributed one). Per-script exemptions are
+         declared in the registry; an entry point declaring no skill at all is reported in the coverage
+         line rather than as an error, since writing a missing skill is separate work.
 
     Exit code: 0 = no errors. 1 = at least one error (usable as a gate in open-pr.ps1).
 .EXAMPLE
@@ -1389,6 +1398,58 @@ if ($mpNameForIntro) {
 }
 Write-Coverage -Category 'changelog-intro' -Checked $introChecked `
     -Note "each per-plugin CHANGELOG's intro header, held against Build-PluginChangelogIntro with the marketplace name read from marketplace.json -- the one part of these files that is NOT history, and the only text cut-release.ps1 writes once and never revisits. Compared whitespace-normalized: content is the subject, line wrapping is not. Everything below the first version heading is deliberately not examined -- that is history, excluded here for the same reason checks 11 and 12 exclude it"
+
+# --- Check 18: a shared script's parameters appear in the skill that documents it -----------------------
+# A consumer has exactly two things: the plugin mirror of a script, and the skill that describes it. So a
+# parameter the skill never names is, for them, a parameter that does not exist -- including the escape
+# valve they need when something goes wrong.
+#
+# THIS IS A REPAIR, NOT A PRECAUTION. Measured August 4, 2026: the fold-changelog skill told every consumer
+# to commit the fold BY HAND for two days after the script gained -Commit/-Push, because that improvement
+# had been written into this repo's lens instead. Looking for siblings found three more -- cut-release's
+# -NoPush and -SkipLint, and new-internal-note's -RepoRoot -- and -NoPush is the one inspection step before
+# a release is pushed, the step that catches the '##-climbs-out-of-its-category' defect. The cause is
+# structural: a parameter is added to a script, its reason goes into a lens or a commit message, and the
+# skill follows nobody.
+#
+# The Skill mapping and the per-parameter exemptions live in the registry
+# (scripts/lib/shared-scripts-lib.ps1), next to the registration, for the reason its own LibOnly comment
+# gives: a second hand-written list is one a newly shared script falls out of silently.
+$skillParamChecked = 0
+$skillDocumented = 0
+$skillGaps = @()
+foreach ($pair in $sharedPairs) {
+    if ($pair.LibOnly) { continue }
+    # A missing SOURCE is check 8's finding, not this one's -- it already says so, and there are no
+    # parameters to read anyway. Skipping keeps this check quiet against a minimal fixture (where none of
+    # the registered scripts exist) instead of reporting every skill as absent.
+    if (-not (Test-Path -LiteralPath $pair.SourcePath)) { continue }
+    # $null = LibOnly/not applicable; '' = an entry point declaring it has no skill. Only the second is
+    # reportable, and it is reported as coverage rather than as an error: writing a missing skill is its
+    # own piece of work, and failing the gate over it would block every unrelated PR until someone did.
+    if ([string]::IsNullOrEmpty($pair.Skill)) { $skillGaps += $pair.Name; continue }
+
+    $skillPath = Join-Path $repoRoot ("plugins\specialists\skills\$($pair.Skill)\SKILL.md")
+    if (-not (Test-Path -LiteralPath $skillPath)) {
+        $errors += "[skill-param] $($pair.SourceRel) names skill '$($pair.Skill)' in the shared-scripts registry, but plugins/specialists/skills/$($pair.Skill)/SKILL.md does not exist. Either the skill was renamed (update the registry) or the mapping is a typo."
+        continue
+    }
+    $skillText = Get-Content -LiteralPath $skillPath -Raw
+    $params = Get-ScriptParameterNames -Path $pair.SourcePath
+    foreach ($p in $params) {
+        if ($pair.SkillParamsExempt -contains $p) { continue }
+        $skillParamChecked++
+        # Matched as '-Name' on a word boundary: that is how a reader would type it, and it avoids
+        # crediting a bare prose mention of the word.
+        if ($skillText -notmatch ('-' + [regex]::Escape($p) + '\b')) {
+            $errors += "[skill-param] $($pair.SourceRel): parameter -$p is documented nowhere in the '$($pair.Skill)' skill, so a consumer who has the mirror plus that page cannot know it exists. Add it, or -- if a consumer genuinely never types it -- register it in SkillParamsExempt with the reason."
+        }
+    }
+    $skillDocumented++
+}
+$gapNote = if ($skillGaps.Count -gt 0) { " NOT covered, because they declare no skill in the registry: $($skillGaps -join ', ')." } else { '' }
+Write-Coverage -Category 'skill-param' -Checked $skillParamChecked `
+    -Note "parameters of the $skillDocumented shared entry point(s) that name a documenting skill, held against that skill's text -- a consumer has only the mirror and its page, so an undocumented parameter does not exist for them. Read via the PowerShell parser, not a regex, which missed an attributed parameter when this was first measured. Exemptions are declared per script in the registry.$gapNote"
 
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {

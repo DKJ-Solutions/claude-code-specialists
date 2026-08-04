@@ -806,6 +806,53 @@ Testing the default (no -RepoRoot) path.
     Remove-Item -Path $foldDefault -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# --- The Skill mapping and Get-ScriptParameterNames (check 18's two inputs) ------------------------------
+# Asserted on the REGISTRY and the PARSER rather than on the gate's output: the gate is exercised by
+# check-plugin-integrity.tests.ps1, while what can rot silently here is an entry point that never declares
+# a Skill at all -- which would drop out of the check without any assert noticing.
+Write-Host ""
+Write-Host "Skill mapping + parameter parsing" -ForegroundColor Cyan
+
+# Every non-lib entry must DECLARE a Skill, even if the declaration is '' ("no skill documents this").
+# $null means the key is absent, and that is the one state that must not exist: it is how a newly shared
+# script would fall out of check 18 unnoticed -- the accumulation shape the LibOnly comment warns about.
+$undeclared = @($pairs | Where-Object { -not $_.LibOnly -and $null -eq $_.Skill } | ForEach-Object { $_.Name })
+Assert-True ($undeclared.Count -eq 0) "every shared entry point declares a Skill (missing: $($undeclared -join ', '))"
+
+# A lib carries no Skill at all -- it is never invoked, so there is nothing to document.
+$libWithSkill = @($pairs | Where-Object { $_.LibOnly -and $null -ne $_.Skill } | ForEach-Object { $_.Name })
+Assert-True ($libWithSkill.Count -eq 0) "a LibOnly entry declares no Skill (unexpected: $($libWithSkill -join ', '))"
+
+# A non-empty Skill must name a skill that exists, or the gate reports a typo forever.
+foreach ($p in @($pairs | Where-Object { -not $_.LibOnly -and -not [string]::IsNullOrEmpty($_.Skill) })) {
+    $skillFile = Join-Path $RepoRoot ("plugins\specialists\skills\$($p.Skill)\SKILL.md")
+    Assert-True (Test-Path -LiteralPath $skillFile) "$($p.Name) names an existing skill ('$($p.Skill)')"
+}
+
+# The parser, not a regex. This is the regression that matters: an attributed parameter
+# ([Parameter(Mandatory = $true)][string]$Version) was missed by the regex this replaced, and -Bump was
+# the parameter it hid -- the one that says what kind of release you are cutting.
+$cutRelease = $pairs | Where-Object { $_.Name -eq 'cut-release' }
+$cutParams = @(Get-ScriptParameterNames -Path $cutRelease.SourcePath)
+foreach ($expected in @('Version', 'Bump', 'NoPush', 'SkipLint')) {
+    Assert-True ($cutParams -contains $expected) "Get-ScriptParameterNames finds -$expected on cut-release (the attributed-parameter case)"
+}
+
+# A dot-sourced lib has no param block, and that must be @() rather than a throw -- the gate walks every
+# registered pair.
+$libPair = $pairs | Where-Object { $_.LibOnly } | Select-Object -First 1
+Assert-Equal 0 (@(Get-ScriptParameterNames -Path $libPair.SourcePath).Count) 'a lib with no param block yields no parameters instead of throwing'
+Assert-Equal 0 (@(Get-ScriptParameterNames -Path (Join-Path $RepoRoot 'does-not-exist.ps1')).Count) 'a missing file yields no parameters instead of throwing'
+
+# An exemption must name a parameter the script actually has, or it is a dead entry that silently excuses
+# nothing -- and reads as if it does.
+foreach ($p in @($pairs | Where-Object { $_.SkillParamsExempt.Count -gt 0 })) {
+    $actual = @(Get-ScriptParameterNames -Path $p.SourcePath)
+    foreach ($ex in $p.SkillParamsExempt) {
+        Assert-True ($actual -contains $ex) "$($p.Name): exempted parameter -$ex actually exists on the script"
+    }
+}
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
