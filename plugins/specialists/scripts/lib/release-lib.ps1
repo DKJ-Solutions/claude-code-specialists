@@ -230,18 +230,40 @@ function Split-Changelog {
     $nl = if ($usesCRLF) { "`r`n" } else { "`n" }
     $lines = $Content -split "`r?`n"
 
+    # BOTH release headings are recognised, and that is a migration guarantee rather than leniency.
+    # A repo that switches Get-ReleaseHistoryMode to 'latest' still has '## Releases' in its changelog
+    # until the next cut rewrites it -- and the throw below is fatal, so a reader that knew only the new
+    # spelling would break every consumer at the one moment it is hardest to debug. Same shape as the
+    # legacy slot heading in check-consumer-drift: recognise both, write one.
     $prIdx = -1; $relIdx = -1
     for ($i = 0; $i -lt $lines.Count; $i++) {
         if ($lines[$i] -match '^##\s+Pull Requests\s*$') { $prIdx = $i }
-        elseif ($lines[$i] -match '^##\s+Releases\s*$') { $relIdx = $i }
+        elseif ($lines[$i] -match '^##\s+(Releases|Latest Release)\s*$') { $relIdx = $i }
     }
     if ($prIdx -lt 0) { throw "Could not find '## Pull Requests' in CHANGELOG.md." }
-    if ($relIdx -lt 0) { throw "Could not find '## Releases' in CHANGELOG.md." }
-    if ($relIdx -le $prIdx) { throw "'## Releases' does not come after '## Pull Requests' -- unexpected structure." }
+    if ($relIdx -lt 0) { throw "Could not find '## Releases' or '## Latest Release' in CHANGELOG.md." }
 
-    $head = $lines[0..$prIdx]
+    # EITHER ORDER IS VALID (August 4, 2026). This used to throw unless the release heading came after
+    # Pull Requests, which was the only layout that existed while that section was an accumulating
+    # archive -- an archive belongs at the bottom. Once it holds a single block the question it answers,
+    # "which version is current?", belongs at the top instead. Both layouts are supported rather than
+    # swapped, because a consumer's changelog keeps whatever order it already has and no cut should
+    # silently reorder someone's document.
+    #
+    # ReleasesFirst travels in the result so the caller can rebuild in the order it found, rather than
+    # re-deriving it from indices it no longer has.
+    $releasesFirst = ($relIdx -lt $prIdx)
+    $firstIdx  = [Math]::Min($prIdx, $relIdx)
+    $secondIdx = [Math]::Max($prIdx, $relIdx)
 
-    $prBody = @($lines[($prIdx + 1)..($relIdx - 1)])
+    # Everything above the FIRST of the two headings is the document's own head -- title and intro.
+    $head = if ($firstIdx -gt 0) { $lines[0..($firstIdx - 1)] } else { @() }
+
+    # Each section runs from its own heading to the next heading, or to the end of the file for the
+    # second one. Computed from the two indices rather than assuming which is which.
+    $prFrom = $prIdx + 1
+    $prTo   = if ($prIdx -eq $firstIdx) { $secondIdx - 1 } else { $lines.Count - 1 }
+    $prBody = if ($prFrom -le $prTo) { @($lines[$prFrom..$prTo]) } else { @() }
     $prFirst = -1
     # Fence-aware here too: a '###' quoted inside a fence in the section intro would otherwise be read
     # as the first entry, putting the intro/entries boundary in the middle of a code block.
@@ -277,10 +299,12 @@ function Split-Changelog {
     }
     if ($null -ne $cur) { $entries += (($cur -join $nl).Trim()) }
 
-    $relBody = @($lines[($relIdx + 1)..($lines.Count - 1)])
+    $relFrom = $relIdx + 1
+    $relTo   = if ($relIdx -eq $firstIdx) { $secondIdx - 1 } else { $lines.Count - 1 }
+    $relBody = if ($relFrom -le $relTo) { @($lines[$relFrom..$relTo]) } else { @() }
     $relFirst = -1
     for ($i = 0; $i -lt $relBody.Count; $i++) { if ($relBody[$i] -match '^###\s') { $relFirst = $i; break } }
-    $relIntroLines = if ($relFirst -ge 0) { @($relBody[0..($relFirst - 1)]) } else { $relBody }
+    $relIntroLines = if ($relFirst -gt 0) { @($relBody[0..($relFirst - 1)]) } elseif ($relFirst -eq 0) { @() } else { $relBody }
     $existingReleases = if ($relFirst -ge 0) { @($relBody[$relFirst..($relBody.Count - 1)]) } else { @() }
 
     return [pscustomobject]@{
@@ -290,6 +314,7 @@ function Split-Changelog {
         Entries          = $entries
         RelIntroLines    = $relIntroLines
         ExistingReleases = $existingReleases
+        ReleasesFirst    = $releasesFirst
     }
 }
 
@@ -312,6 +337,19 @@ function Convert-ChangelogForRelease {
         marker is neither written nor stripped and the output is byte-for-byte what it always was.
         Repo-owned because the answer is a property of the repo: a marketplace has no live stage,
         a theme repo pushing to a live storefront does.
+
+        $HistoryMode (August 4, 2026) decides whether this section accumulates:
+
+          'all'    -- every release keeps a block, under '## Releases'. The behaviour since the start,
+                      and the default, so a consumer that never sets it sees no change.
+          'latest' -- only the newest release keeps a block, under '## Latest Release', followed by a
+                      pointer to wherever the repo keeps its full list ($HistoryRelPath).
+
+        The measured reason for 'latest' being wanted at all: in this workshop the accumulating section
+        had grown to 434 of the changelog's 1,062 lines -- 41% -- across 72 blocks that each said no more
+        than "see the notes". Every one of those 72 versions was ALSO listed in releases/README.md, with a
+        date, a type and a descriptive title: the same coverage, checked in both directions, and richer
+        per row. So the section was not a long list but a poorer copy of a better one.
     #>
     param(
         [Parameter(Mandatory)][string]$Content,
@@ -319,7 +357,9 @@ function Convert-ChangelogForRelease {
         [Parameter(Mandatory)][string]$Date,
         [Parameter(Mandatory)][string]$Type,
         [Parameter(Mandatory)][string]$NotesRelPath,
-        [string]$LiveMarker = ''
+        [string]$LiveMarker = '',
+        [ValidateSet('all', 'latest')][string]$HistoryMode = 'all',
+        [string]$HistoryRelPath = 'releases/README.md'
     )
     $emDash = [char]0x2014
     if ($LiveMarker) {
@@ -338,8 +378,16 @@ function Convert-ChangelogForRelease {
         "See [$NotesRelPath]($NotesRelPath) for the full release notes."
     )
 
-    $relIntroText = ($s.RelIntroLines -join "`n")
-    if ($relIntroText -match 'No releases recorded') {
+    if ($HistoryMode -eq 'latest') {
+        # Written fresh every cut rather than carried over: in this mode the intro's whole job is to say
+        # "this is one release, the rest is over there", and a carried-over intro would still be the
+        # accumulating section's wording. The pointer is the only part a repo varies, so it is the only
+        # part interpolated.
+        $relIntro = @(
+            "The most recent release. The full list $emDash every version with its date, type and title $emDash",
+            "is in [$HistoryRelPath]($HistoryRelPath)."
+        )
+    } elseif (($s.RelIntroLines -join "`n") -match 'No releases recorded') {
         $relIntro = @(
             "The recorded versions of the marketplace $emDash newest at the top. Every release bumps all",
             'plugin versions in lockstep and points to the full notes in `releases/development/`.'
@@ -348,24 +396,102 @@ function Convert-ChangelogForRelease {
         $relIntro = @($s.RelIntroLines | Where-Object { $_ -ne '' })
     }
 
+    # The two sections, each built once, then emitted in the order the document already had. Building
+    # them separately is what makes the order a single decision at the end rather than two divergent
+    # code paths that have to be kept saying the same thing.
+    $prSection = @()
+    $prSection += '## Pull Requests'
+    $prSection += ''
+    $prSection += ($s.PrIntro | Where-Object { $_ -ne '' })
+
+    $relSection = @()
+    $relSection += $(if ($HistoryMode -eq 'latest') { '## Latest Release' } else { '## Releases' })
+    $relSection += ''
+    $relSection += $relIntro
+    $relSection += ''
+    $relSection += $block
+    # In 'latest' mode the previous blocks are dropped rather than pushed down -- that IS the mode. They
+    # are not lost: the repo's history file carries every one of them, which is the precondition for
+    # turning this on at all.
+    if ($HistoryMode -ne 'latest' -and $s.ExistingReleases.Count -gt 0) {
+        $relSection += ''
+        $relSection += '---'
+        $relSection += ''
+        $relSection += $s.ExistingReleases
+    }
+
+    # $s.Head is everything above the first of the two headings, so it no longer carries either of them
+    # -- both are written here, which is what lets the order be chosen rather than inherited.
     $out = @()
     $out += $s.Head
     $out += ''
-    $out += ($s.PrIntro | Where-Object { $_ -ne '' })
-    $out += ''
-    $out += '## Releases'
-    $out += ''
-    $out += $relIntro
-    $out += ''
-    $out += $block
-    if ($s.ExistingReleases.Count -gt 0) {
+    if ($s.ReleasesFirst) {
+        $out += $relSection
         $out += ''
-        $out += '---'
+        $out += $prSection
+    } else {
+        $out += $prSection
         $out += ''
-        $out += $s.ExistingReleases
+        $out += $relSection
     }
 
     return (($out -join $nl).TrimEnd() + $nl)
+}
+
+function Set-ReleaseInternalNoteLink {
+    <#
+        Point the changelog's release block for $Version at the INTERNAL note, keeping the developer
+        notes as a secondary reference. Pure string in/out, and idempotent: run twice and the second
+        call changes nothing.
+
+        WHY THIS IS A SEPARATE STEP RATHER THAN PART OF THE CUT (August 4, 2026). The internal note does
+        not exist when cut-release.ps1 writes the changelog: that script commits AND tags in one motion,
+        while the internal note needs the developer notes as its input and is therefore written
+        afterwards, by hand, landing through a branch + PR. A cut that linked straight to it would put a
+        DEAD RELATIVE LINK inside the release tag -- caught by the lint gate's dead-link scan, and
+        uncorrectable afterwards because the tag is immutable. Generating an empty skeleton at cut time
+        was considered and rejected earlier for the mirror-image reason: that puts an empty document
+        inside the tag instead.
+
+        So the cut writes the developer link, which always exists, and new-internal-note.ps1 calls this
+        the moment the real note is created -- in the same PR that adds it, so the two never disagree.
+
+        Returns the content unchanged (no throw) when the block or its notes line cannot be found: this
+        runs after a successful release, and failing there would make a completed release look broken
+        over a cosmetic line. The caller reports what happened.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Content,
+        [Parameter(Mandatory)][string]$Version,
+        [Parameter(Mandatory)][string]$InternalRelPath,
+        [Parameter(Mandatory)][string]$DevRelPath
+    )
+
+    $usesCRLF = $Content.Contains("`r`n")
+    $nl = if ($usesCRLF) { "`r`n" } else { "`n" }
+    $lines = $Content -split "`r?`n"
+
+    # Find the block heading for this version, then the first notes line under it. Anchored on the
+    # version so a changelog still in 'all' mode -- where several blocks sit under one another -- cannot
+    # have an older block rewritten by a call meant for the newest.
+    $headingRx = '^###\s+\[v' + [regex]::Escape($Version) + '\]'
+    $start = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match $headingRx) { $start = $i; break } }
+    if ($start -lt 0) { return $Content }
+
+    $replacement = "See [$InternalRelPath]($InternalRelPath) for what this release is worth. The full per-PR record is in [$DevRelPath]($DevRelPath)."
+
+    for ($i = $start + 1; $i -lt $lines.Count; $i++) {
+        # Stop at the next block or section rather than running to the end of the file: a notes line
+        # belonging to the NEXT release must not be rewritten with this version's paths.
+        if ($lines[$i] -match '^#{2,3}\s' -or $lines[$i] -match '^---\s*$') { break }
+        if ($lines[$i] -eq $replacement) { return $Content }   # already pointed there
+        if ($lines[$i] -match '^See \[') {
+            $lines[$i] = $replacement
+            return (($lines -join $nl).TrimEnd() + $nl)
+        }
+    }
+    return $Content
 }
 
 function Get-TouchedPlugins {

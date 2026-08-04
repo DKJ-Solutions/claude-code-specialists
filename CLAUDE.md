@@ -214,7 +214,7 @@ The constitution above, concretely implemented here:
      See [Rendall #06](.claude/specialists/lenses/05-06-extension.md#changelog).
   2. The **release commit** (only on explicit request): [`cut-release.ps1`](scripts/release/cut-release.ps1)
      bumps all plugin versions in lockstep, generates the release notes in `releases/development/`,
-     references them from `## Releases`, (re)generates each plugin's consumer-facing `RELEASE.md`
+     references them from `## Latest Release`, (re)generates each plugin's consumer-facing `RELEASE.md`
      card, commits that on `main`, and tags `vX.Y.Z`. Deliberately no branch/PR — just like the
      fold. See [Rendall #06](.claude/specialists/lenses/05-06-extension.md#versioning--releases).
      Since August 3, 2026 it is a **shared** script, mirrored into the plugin like the rest of the

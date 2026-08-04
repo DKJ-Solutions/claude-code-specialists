@@ -91,7 +91,7 @@ infrastructure.
     every pure unit test stayed green**. Only the wiring fixture caught it, which is the general
     lesson: a pure decision table proves the decision, never that it is reached.
 - **`scripts/lib/release-lib.ps1`** — the pure release helpers (version bump, CHANGELOG
-  transformation to a `## Releases` reference, and the assembly of the `releases/development/` notes)
+  transformation to a `## Latest Release` reference, and the assembly of the `releases/development/` notes)
   that [`cut-release.ps1`](../../../scripts/release/cut-release.ps1) dot-sources; deliberately
   pure so [Tycho #18](04-18-extension.md) can test them in isolation. The release *process* is
   [Rendall #06](05-06-extension.md)'s domain; Sylvester guards the script mechanics underneath.

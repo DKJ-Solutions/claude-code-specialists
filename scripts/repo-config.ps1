@@ -299,6 +299,31 @@ function Get-ReleaseLiveMarker {
     return $script:ReleaseLiveMarker
 }
 
+# --- How much release history CHANGELOG.md keeps (Dave, August 4, 2026) ---------------------------
+#
+# 'latest' here, and the reason is a measurement rather than a preference. The accumulating section had
+# grown to 434 of the changelog's 1,062 lines -- 41% -- across 72 blocks that each said no more than
+# "see the notes". Every one of those 72 versions was ALSO in releases/README.md, with a date, a type
+# and a descriptive title: verified in both directions, zero missing either way. So the section was not
+# a long list but a poorer copy of a better one, and the changelog's own subject -- what changed since
+# the last release -- was sitting under it.
+#
+# THE PRECONDITION IS THE POINT: only set this to 'latest' when the file below really lists every
+# release, because from that moment it is the sole record. Switching a repo whose history lives nowhere
+# else would delete it at the next cut.
+$script:ReleaseHistoryMode = 'latest'
+$script:ReleaseHistoryPath = 'releases/README.md'
+
+function Get-ReleaseHistoryMode {
+    <# 'all' (a block per release) or 'latest' (only the newest, behind a pointer). #>
+    return $script:ReleaseHistoryMode
+}
+
+function Get-ReleaseHistoryPath {
+    <# Repo-root-relative path to the full release list a 'latest' section points at. #>
+    return $script:ReleaseHistoryPath
+}
+
 # Whether cut-release runs the plugin/marketplace half: enumerating the manifests from
 # .claude-plugin/marketplace.json, writing each plugin's consumer-facing CHANGELOG.md and RELEASE.md
 # card, and bumping every plugin.json in lockstep. TRUE here -- that half IS this repo's release.

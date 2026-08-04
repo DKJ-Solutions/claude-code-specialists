@@ -2,7 +2,10 @@
 
 The release history of the claude-code-specialists marketplace. A release here is not a deploy but a
 **recorded moment**: a git tag that marks the state of the marketplace, with all plugin versions in
-lockstep. The `## Releases` block in [`CHANGELOG.md`](../CHANGELOG.md) references the development notes.
+lockstep. The `## Latest Release` block in [`CHANGELOG.md`](../CHANGELOG.md) references only the newest
+release and points here for the rest — **this page is the full record** (August 4, 2026; the changelog's
+accumulating section had grown to 41% of that file while duplicating, more poorly, the
+[Overview](#overview) below).
 [`scripts/release/cut-release.ps1`](../scripts/release/cut-release.ps1)
 itself publishes nothing to GitHub Releases — that is a separate, manual closing step, taken at
 **every** release including a patch (Dave, August 4, 2026): the
@@ -175,8 +178,11 @@ In one motion, on a clean `main`:
 1. bumps all `plugin.json` versions in lockstep to `X.Y.Z`;
 2. generates the full release notes in `development/<X>.x/<X.Y.Z>.md` (from the folded
    `## Pull Requests` entries, per branch type), adds a row to this page's [Overview](#overview),
-   and places in `CHANGELOG.md` a reference under `## Releases` (the Pull Requests section is
-   emptied down to its intro);
+   and places in `CHANGELOG.md` a reference under the release heading, emptying the Pull Requests
+   section down to its intro. That heading is `## Latest Release` here, where the new block **replaces**
+   the previous one; in a repo that leaves `Get-ReleaseHistoryMode` at its `all` default it is
+   `## Releases` and the blocks accumulate. Either way the existing section order is kept — a cut never
+   reorders the document;
 3. appends, per plugin, the entries that touched that plugin (selected via the `Plugins:` line that
    the fold derives from the PR's files; as internal bookkeeping, the line itself doesn't travel along)
    to the **per-plugin `CHANGELOG.md`**, and regenerates that plugin's **`RELEASE.md`** card (version,

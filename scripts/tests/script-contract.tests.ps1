@@ -172,7 +172,7 @@ try {
         Assert-Match "\[OK\]\s+'$fn' present in" $r.Out "happy path: '$fn' reported OK"
     }
     $okCount = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 23 $okCount 'happy path: exactly twenty-three [OK] lines (the six mandatory functions + the seventeen optional ones: Get-ChangelogHeading, Get-LiveStage, the four Get-Entry* stub-wording knobs, Get-PrMergeMethod, Get-MojibakePaths, the eight cut-release knobs from #417 and the internal tier''s Get-InternalNoteWording, nothing else)'
+    Assert-Equal 25 $okCount 'happy path: exactly twenty-five [OK] lines (four mandatory functions + twenty-one optional: Get-ChangelogHeading, Get-LiveStage, the two Get-Roster* made optional by #445, the four Get-Entry* stub-wording knobs, Get-PrMergeMethod, Get-MojibakePaths, the eight cut-release knobs from #417, the internal tier''s Get-InternalNoteWording, and the two changelog-history knobs, nothing else)'
     # inbound #203: the run names the root it inspected and how it resolved it. Asserted on the clean
     # run too, not only on a drifted one -- the [SCOPE] line is context that must always be emitted, so
     # that the hook has something to surface the moment a finding does appear.
@@ -295,7 +295,7 @@ try {
         Assert-NotMatch $optFn $r.Out "optional Get-Pr*: '$optFn' never mentioned (not in the contract)"
     }
     $okCount6 = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 23 $okCount6 'optional Get-Pr*: still exactly twenty-three [OK] (the mandatory six + the seventeen declared optionals; the four UNdeclared Get-Pr* excluded)'
+    Assert-Equal 25 $okCount6 'optional Get-Pr*: still exactly twenty-five [OK] (the mandatory four + the twenty-one declared optionals; the four UNdeclared Get-Pr* excluded)'
 
     # --- 6c. An optional contract function that is ABSENT -> [INFO] naming the fallback, exit 0 -----
     #     Get-ChangelogHeading (issue #178) is declared Optional: fold-changelog-entry.ps1 falls back
@@ -457,7 +457,7 @@ function Get-RosterIgnoredIds { return @() }
 
     $contractSrc = [System.IO.File]::ReadAllText($Script)
     $totalRecordCount = @([regex]::Matches($contractSrc, "Lib\s*=\s*'[^']+';\s*Function\s*=\s*'[^']+';\s*Scripts\s*=\s*@\(")).Count
-    Assert-Equal 23 $totalRecordCount 'contract: exactly twenty-three (lib, function) records declared in check-script-contract.ps1 (the twenty-two below plus the dedicated Get-LiveStage block after this loop)'
+    Assert-Equal 25 $totalRecordCount 'contract: exactly twenty-five (lib, function) records declared in check-script-contract.ps1 (the twenty-four below plus the dedicated Get-LiveStage block after this loop)'
 
     # Every record must carry a 'Returns' line, so a finding is actionable without any reference to this
     # source repo (Dave, July 28, 2026). Counted against $totalRecordCount rather than listed per record:

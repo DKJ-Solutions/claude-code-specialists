@@ -371,6 +371,106 @@ foreach ($probe in @(@{ N = 'knob off'; V = $outPlain }, @{ N = 'knob on'; V = $
     Assert-Equal 0 $lonely.Count "$($probe.N): no line consists of an em-dash alone (the reported defect, as a check)"
 }
 
+Write-Host "history mode + section order (August 4, 2026)" -ForegroundColor Cyan
+# One fixture, used for every case below, so a difference in output is a difference in the argument
+# rather than in the input. Built with interpolation for the reason documented at $clLive above.
+$hmBase = @(
+    '# Changelog', '',
+    'Intro line.', '',
+    '## Pull Requests', '',
+    'Merged PRs land here.', '',
+    "### #7 $midDot An entry $midDot Fix $midDot 2026-02-01", '',
+    'Body.', '',
+    '## Releases', '',
+    'The recorded versions.', '',
+    "### [v1.0.0] - 2026-01-01 $emDash Minor", '',
+    'See [releases/development/1.x/1.0.0.md](releases/development/1.x/1.0.0.md) for the full release notes.'
+) -join "`n"
+$hmArgs = @{ Version = '1.1.0'; Date = '2026-02-02'; Type = 'Minor'; NotesRelPath = 'releases/development/1.x/1.1.0.md' }
+
+# 'all' is the default AND is byte-for-byte the old behaviour -- asserted by comparing an explicit
+# 'all' against omitting the parameter entirely. Without this, a later change to the default would
+# silently rewrite every consumer's changelog that never asked for anything.
+$hmAll     = Convert-ChangelogForRelease -Content $hmBase @hmArgs -HistoryMode 'all'
+$hmDefault = Convert-ChangelogForRelease -Content $hmBase @hmArgs
+Assert-Equal $hmAll $hmDefault "history: omitting -HistoryMode is byte-identical to 'all'"
+Assert-Match $hmAll '(?m)^## Releases$' "history 'all': the heading stays '## Releases'"
+Assert-Match $hmAll ([regex]::Escape('### [v1.0.0]')) "history 'all': the previous release is still there"
+Assert-Equal 2 ([regex]::Matches($hmAll, '(?m)^### \[v')).Count "history 'all': two blocks, the new one and the old"
+
+$hmLatest = Convert-ChangelogForRelease -Content $hmBase @hmArgs -HistoryMode 'latest' -HistoryRelPath 'releases/HISTORY.md'
+Assert-Match $hmLatest '(?m)^## Latest Release$' "history 'latest': the heading becomes '## Latest Release'"
+Assert-Equal $false ([bool]($hmLatest -match '(?m)^## Releases$')) "history 'latest': and the old heading is gone, not both"
+Assert-Equal 1 ([regex]::Matches($hmLatest, '(?m)^### \[v')).Count "history 'latest': exactly one block"
+Assert-Match $hmLatest ([regex]::Escape('### [v1.1.0]')) "history 'latest': and it is the NEW release, not the old one"
+Assert-Equal $false ([bool]($hmLatest -match [regex]::Escape('### [v1.0.0]'))) "history 'latest': the previous block is dropped"
+Assert-Match $hmLatest ([regex]::Escape('[releases/HISTORY.md](releases/HISTORY.md)')) "history 'latest': the pointer names the repo's own history file"
+# The pointer is the whole safety argument for dropping blocks, so a 'latest' section without one would
+# be a section that silently deletes history. Asserted separately from the path above: that one checks
+# the value, this one checks that a link is emitted at all.
+Assert-Match $hmLatest '(?m)^is in \[' "history 'latest': the intro really links out rather than only naming a file"
+
+# BOTH ORDERS survive a cut, in the order the document already had. The old code threw unless Releases
+# came second; a consumer's layout must not be silently reordered by a release.
+$hmRelFirst = @(
+    '# Changelog', '',
+    'Intro line.', '',
+    '## Latest Release', '',
+    'The most recent release.', '',
+    "### [v1.0.0] - 2026-01-01 $emDash Minor", '',
+    'See [releases/development/1.x/1.0.0.md](releases/development/1.x/1.0.0.md) for the full release notes.', '',
+    '## Pull Requests', '',
+    'Merged PRs land here.', '',
+    "### #7 $midDot An entry $midDot Fix $midDot 2026-02-01", '',
+    'Body.'
+) -join "`n"
+$hmOut = Convert-ChangelogForRelease -Content $hmRelFirst @hmArgs -HistoryMode 'latest'
+$relPos = ($hmOut -split "`n") | Select-String -Pattern '^## Latest Release$' | ForEach-Object { $_.LineNumber }
+$prPos  = ($hmOut -split "`n") | Select-String -Pattern '^## Pull Requests$'  | ForEach-Object { $_.LineNumber }
+Assert-Equal $true ($relPos -lt $prPos) 'section order: a releases-first document stays releases-first'
+Assert-Match $hmOut ([regex]::Escape('### [v1.1.0]')) 'section order: releases-first still gets the new block'
+Assert-Match $hmOut '(?m)^Merged PRs land here\.$' 'section order: releases-first keeps its Pull-Requests intro'
+Assert-Match $hmOut '(?m)^Intro line\.$' "section order: releases-first keeps the document's own head"
+# And the mirror image, from the same call: a PR-first document stays PR-first.
+$hmOut2 = Convert-ChangelogForRelease -Content $hmBase @hmArgs -HistoryMode 'latest'
+$relPos2 = ($hmOut2 -split "`n") | Select-String -Pattern '^## Latest Release$' | ForEach-Object { $_.LineNumber }
+$prPos2  = ($hmOut2 -split "`n") | Select-String -Pattern '^## Pull Requests$'  | ForEach-Object { $_.LineNumber }
+Assert-Equal $true ($prPos2 -lt $relPos2) 'section order: a PR-first document stays PR-first'
+
+Write-Host "Set-ReleaseInternalNoteLink" -ForegroundColor Cyan
+$intBase = @(
+    '# Changelog', '',
+    '## Latest Release', '',
+    'The most recent release.', '',
+    "### [v1.1.0] - 2026-02-02 $emDash Minor", '',
+    'See [releases/development/1.x/1.1.0.md](releases/development/1.x/1.1.0.md) for the full release notes.'
+) -join "`n"
+$intOut = Set-ReleaseInternalNoteLink -Content $intBase -Version '1.1.0' `
+    -InternalRelPath 'releases/internal/1.x/1.1.0.md' -DevRelPath 'releases/development/1.x/1.1.0.md'
+Assert-Match $intOut ([regex]::Escape('[releases/internal/1.x/1.1.0.md](releases/internal/1.x/1.1.0.md)')) 'internal link: the internal note is now linked'
+Assert-Match $intOut ([regex]::Escape('[releases/development/1.x/1.1.0.md](releases/development/1.x/1.1.0.md)')) 'internal link: the developer notes are kept as the secondary reference'
+Assert-Equal 1 ([regex]::Matches($intOut, '(?m)^See \[')).Count 'internal link: one notes line, replaced rather than appended'
+# Idempotent, because this runs in a PR that may be re-run or rebased.
+Assert-Equal $intOut (Set-ReleaseInternalNoteLink -Content $intOut -Version '1.1.0' `
+    -InternalRelPath 'releases/internal/1.x/1.1.0.md' -DevRelPath 'releases/development/1.x/1.1.0.md') 'internal link: idempotent -- a second call changes nothing'
+# Unknown version: untouched and no throw. This runs AFTER a successful release, so failing here would
+# make a completed release look broken over a cosmetic line.
+Assert-Equal $intBase (Set-ReleaseInternalNoteLink -Content $intBase -Version '9.9.9' `
+    -InternalRelPath 'x.md' -DevRelPath 'y.md') 'internal link: an unknown version leaves the content untouched'
+# And in 'all' mode, where several blocks sit together, only the named version is rewritten.
+$intMulti = @(
+    '## Releases', '',
+    "### [v2.0.0] - 2026-03-01 $emDash Major", '',
+    'See [releases/development/2.x/2.0.0.md](releases/development/2.x/2.0.0.md) for the full release notes.', '',
+    '---', '',
+    "### [v1.1.0] - 2026-02-02 $emDash Minor", '',
+    'See [releases/development/1.x/1.1.0.md](releases/development/1.x/1.1.0.md) for the full release notes.'
+) -join "`n"
+$intMultiOut = Set-ReleaseInternalNoteLink -Content $intMulti -Version '1.1.0' `
+    -InternalRelPath 'releases/internal/1.x/1.1.0.md' -DevRelPath 'releases/development/1.x/1.1.0.md'
+Assert-Match $intMultiOut ([regex]::Escape('[releases/internal/1.x/1.1.0.md]')) 'internal link: the named block is rewritten'
+Assert-Match $intMultiOut ([regex]::Escape('See [releases/development/2.x/2.0.0.md](releases/development/2.x/2.0.0.md) for the full release notes.')) 'internal link: the OTHER block is left exactly as it was'
+
 Write-Host "Get-PluginManifestPaths" -ForegroundColor Cyan
 # Pure (does not touch disk), so a fictional root suffices.
 $fakeRoot = 'C:\fake-repo'
