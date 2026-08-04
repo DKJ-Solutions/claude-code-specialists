@@ -40,10 +40,15 @@ the safety net underneath.
 - **Assert the fixture before asserting against it.** A fixture is code, and code that builds a
   document can build a different one than its author reads on the screen — after which every assertion
   in that section passes against something nobody wrote. So a hand-built fixture gets a cheap shape
-  check of its own (line count, no element split where none was intended) before the real assertions
-  run. The tell that this has already happened: a test comment explaining why an assertion is
-  *deliberately weaker* than it could be. That is the shape of a defect being described instead of
-  caught, and the described defect is as likely to live in the fixture as in the code under test.
+  check of its own (element or line count, nothing split or merged where it was not meant to be) before
+  the real assertions run. **The highest-risk construction is string concatenation inside a list
+  literal**, because operator precedence there is rarely what it looks like: the concatenation operator
+  may bind to the surrounding list rather than to its neighbouring strings, and depending on which side
+  the commas sit that either splits one element into several or silently swallows the next one into a
+  string. Build the value first and put the variable in the list, or interpolate. The tell that this has
+  already gone wrong somewhere: a test comment explaining why an assertion is *deliberately weaker* than
+  it could be. That is the shape of a defect being described instead of caught, and the described defect
+  is as likely to live in the fixture as in the code under test.
 - **A weakened assertion needs a reason that was verified, not inferred.** Narrowing a check to work
   around observed behaviour records that behaviour as a fact about the subject. If the cause was never
   isolated, the narrowing hides the real one — and it hides it exactly where someone would look. When
