@@ -17,11 +17,15 @@
     the wording became a single source the moment the second reader appeared, exactly as CLAUDE.md
     requires for a rule living in two places.
 
-    THE TIER LINE JOINED IT FOR THE SAME REASON, WITH ONE MORE READER (the tier model, August 5,
-    2026). 'Tier: N' is written by new-changelog-entry.ps1, validated by open-pr.ps1 before a PR can
-    ship, and read-then-REMOVED by fold-changelog-entry.ps1, which uses it to pick which of the
-    changelog's three tier sections the entry lands in. Three scripts, one format: a copy in each is
-    how a fold starts filing tier-2 work under repo-internal without anything erroring.
+    THE IMPACT DECLARATION JOINED IT FOR THE SAME REASON, WITH ONE MORE READER (the tier model, August 5,
+    2026). How far a change reaches is written by new-changelog-entry.ps1, validated by open-pr.ps1 before a
+    PR can ship, read by fold-changelog-entry.ps1 to decide where in CHANGELOG.md the entry lands, and read
+    again by the release cut to decide which documents it appears in. Four scripts, one format: a copy in
+    each is how a fold starts filing tier-2 work as repo-internal without anything erroring.
+
+    THE DECLARATION IS NOW A TABLE, AND THE OLDER 'Tier: N' LINE IS STILL RECOGNISED -- this repo's standing
+    "recognise both, write one" rule, because every entry already merged and every entry in a consumer's tree
+    predates the table.
 
     REPO-OWNED, WITH BUILT-IN DEFAULTS (#410). Each string comes from an OPTIONAL function in the
     consumer's scripts/repo-config.ps1 -- Get-EntryTitlePlaceholder, Get-EntryBodyHeading,
@@ -100,8 +104,9 @@ function Get-EntryTextOutsideFences {
 
 # --- The tier line -------------------------------------------------------------------------------
 #
-# 'Tier: N' declares how far an entry reaches, and the changelog is split into one section per tier.
-# The ladder (Dave, August 5, 2026):
+# 'Tier: N' declares how far an entry reaches. It was superseded by the impact table below on the day it
+# shipped and is kept because every entry written before that carries it; it is also the FIRST key the fold
+# orders CHANGELOG.md's flat list on, since August 5, 2026. The ladder (Dave, August 5, 2026):
 #
 #   Tier 0 -- nobody outside this repo's own developers notices. Docs, config, repo-internal work.
 #   Tier 1 -- a colleague working on this project gets something out of it.
@@ -236,11 +241,18 @@ function Remove-EntryTierLine {
     <#
         Removes the 'Tier:' line (and the blank line it leaves behind) from an entry block.
 
-        THE FOLD CONSUMES THE LINE RATHER THAN CARRYING IT (Dave, August 5, 2026). Once the entry sits
-        under '## Tier 2 - Pull Requests', the section states the tier -- and a line inside the entry
-        restating it would be the same fact in two places, which is the drift shape this repo has paid
-        for three times. So the line's whole life is the branch: written when the entry is created,
-        read when it is folded, gone afterwards.
+        ITS CALLER MOVED, AND THAT IS THE WHOLE STORY OF THIS FUNCTION (August 5, 2026). It was written for
+        the FOLD: once an entry sat under '## Tier 2 - Pull Requests', the section stated the tier, so a line
+        inside the entry restating it was the same fact in two places -- the drift shape this repo has paid
+        for three times. The sections are gone, so there is nothing above a folded entry stating its reach,
+        and the fold now KEEPS the line: consuming it would leave the entry declaring nothing, and every
+        downstream reader would take that as tier 0.
+
+        What did not change is that the line must never travel OUTWARD. A self-assigned tier printed at a
+        consumer is the same class of thing as a self-assigned score, and the line now reaches CHANGELOG.md
+        where it never used to -- so this belongs on the same stripping path as Remove-EntryImpactTable, in
+        the renderers that build the highlights, the per-plugin CHANGELOGs and the release cards. That wiring
+        is the release side's to make; this function is unchanged and waiting for it.
 
         Same shape as Remove-EntryPluginsLine in release-lib.ps1, deliberately: both strip one
         bookkeeping line and collapse the double blank it leaves. It lives HERE rather than there
@@ -447,23 +459,35 @@ function Test-EntrySignificanceActive {
     <#
         Does this repo rank its entries at all? $true unless it says otherwise.
 
-        OFF WHERE THERE IS NO TIER SPLIT, which is what keeps this safe to share -- the same reasoning as
-        Test-ReleaseBumpEarned's Active flag. A repo with one entry section has no tier information, so no
-        entry can ever reach tier 1, nothing is required of it, and a document with one section has no
-        cross-category ordering to gain. Rather than imposing a model such a repo never adopted, the whole
-        mechanism reports itself inactive.
+        THE SECTION-COUNT HEURISTIC DIED WITH THE SECTIONS (August 5, 2026), and replacing it was not
+        optional. This used to answer "off where there is no tier split", reading the changelog's section map
+        and treating one section as "this repo never adopted tiers". That test had a real basis while the map
+        existed -- the sections WERE the repo's declaration of which tiers it files. The flat changelog has no
+        map, so Get-ChangelogTierSections now falls back to its built-in single section in EVERY repo, and
+        keeping the old line would have read every repo as not ranking: the scaffold's table, both validators
+        and the cut's significance gate would all have switched themselves off, silently, in the same commit
+        that made the ranking the document's only ordering. Nothing would have errored.
+
+        SO THE DEFAULT IS ON, WITH AN EXPLICIT OPT-OUT, which is also the consistent answer: the entry's
+        section structure became unconditional in the same change, on the grounds that two entry shapes in one
+        system need both paths in every reader forever. A repo that has not adopted the model is not harmed by
+        being on -- its entries are tier 0, and tier 0 is asked for no score (Get-EntryImpactFindings), so
+        every gate stays quiet by itself rather than by a flag.
 
         The seam is Get-EntrySignificanceEnabled in the consumer's scripts/repo-config.ps1, probed with
-        Get-Command like every other optional knob -- for the repo that HAS adopted tiers and does not want
-        the ranking. Returning $false there switches off the scaffold's table, both validators and the cut's
-        gate together, because a half-adopted ranking (required but never read) is worse than neither.
+        Get-Command like every other optional knob. Returning $false there switches off the scaffold's table,
+        both validators and the cut's gate together, because a half-adopted ranking (required but never read)
+        is worse than neither. It does NOT switch off the fold's ORDERING: with the sections gone that
+        ordering is what the three headings used to say, so it is structure rather than a preference.
+
+        Test-ReleaseBumpEarned's own Active flag in release-lib.ps1 keys off the same retired section map and
+        needs the same repair; it is left to the change that reworks the release side, because the answer
+        there is about which release documents exist rather than about scoring.
     #>
-    param($TierSections = $null)
     if (Get-Command Get-EntrySignificanceEnabled -ErrorAction SilentlyContinue) {
         return [bool](Get-EntrySignificanceEnabled)
     }
-    $sections = if ($null -ne $TierSections) { @($TierSections) } else { @(Get-ChangelogTierSections) }
-    return ($sections.Count -gt 1)
+    return $true
 }
 
 function Format-EntryImpactTable {
@@ -760,10 +784,17 @@ function Get-ImpactInsertOffset {
         could scramble a section; an insert can only ever misplace the one entry being folded, which is
         visible in the diff and one edit to repair.
 
-        HIGHEST FIRST, AND A TIE KEEPS THE NEWER ENTRY ON TOP. The section is written newest-first, so equal
-        scores preserve exactly what the fold did before ranking existed. An UNSCORED entry ($Score 0 -- a
-        tier-0 section, an entry from before the table, or a repo with the ranking off) returns the offset
-        the fold has always used: the top of the section. Nothing is ranked that was not asked to be.
+        HIGHEST FIRST, AND A TIE KEEPS THE NEWER ENTRY ON TOP. The list is written newest-first, so equal
+        ranks preserve exactly what the fold did before ranking existed.
+
+        AN UNSCORED ENTRY ($Score 0 -- a tier-0 entry, one from before the table, or a repo with the ranking
+        off) SINKS TO THE BOTTOM OF ITS OWN TIER, and that is a reversal of what this function did when it
+        was written: it had an early return sending any score of 0 to the top of the section. The reason it
+        had to go is symmetry with the entries it ranks against. The loop below reads an entry ALREADY in the
+        changelog that declares no score as 0 and therefore sorts it below everything scored at its tier -- so
+        the early return meant the SAME entry ranked differently depending on which side of the fold it was
+        on, top while it was being inserted and bottom forever after. 0 is the lowest rank, not the absence of
+        one. Nothing is lost by sinking: open-pr reports a missing score and the cut refuses over it by name.
 
         RANKED ON (TIER, SIGNIFICANCE) SINCE THE SECTIONS WENT (Dave, August 5, 2026). While CHANGELOG.md had
         one section per tier, the section answered "how far" and this only had to order within it. There is one
@@ -779,17 +810,18 @@ function Get-ImpactInsertOffset {
         [Parameter(Mandatory)][AllowEmptyString()][string]$SectionText,
         [int]$Score = 0,
         [int]$Tier = 0,
-        [string]$EntryPattern = '(?m)^## ',
-        # DECLARING TIER 0 IS NOT THE SAME AS DECLARING NOTHING, and conflating them was a real bug here: an
-        # early return sent everything with tier 0 and no score to the TOP of the list, so a repo-internal
-        # change led the document. Tier 0 is the lowest RANK and belongs at the bottom; an entry that declares
-        # nothing at all is UNKNOWN, and for those the old pre-ranking behaviour (the top, newest first) is
-        # still the only defined answer. Measured on this function's first run against a mixed list.
-        [switch]$Undeclared
+        [string]$EntryPattern = '(?m)^## '
     )
+    # DECLARING TIER 0 IS NOT THE SAME AS DECLARING NOTHING, and conflating them was a real bug here: an
+    # early return sent everything with tier 0 and no score to the TOP of the list, so a repo-internal change
+    # led the document. There WAS an -Undeclared switch for that second case, returning the top; it is gone,
+    # because in a flat list there is no such thing as an unplaced entry. An entry that declares nothing is
+    # tier 0 -- the documented default and the harmless end -- and the loop below already lands it at the top
+    # of the tier-0 run, which is the newest-first answer without promoting it past work that declared more.
+    # Keeping a switch no caller passes would have preserved the wrong answer for the day somebody reached
+    # for it.
     $entryStarts = @([regex]::Matches($SectionText, $EntryPattern) | ForEach-Object { $_.Index })
     if ($entryStarts.Count -eq 0) { return $SectionText.Length }
-    if ($Undeclared) { return $entryStarts[0] }
 
     for ($i = 0; $i -lt $entryStarts.Count; $i++) {
         $start = $entryStarts[$i]

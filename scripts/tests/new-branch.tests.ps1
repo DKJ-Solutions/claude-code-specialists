@@ -314,6 +314,25 @@ function Invoke-NewChangelogEntry {
     }
 }
 
+function Test-EntryDeclaresType {
+    <#
+        Does the entry state $Type under its own '### Type of change' section?
+
+        THE TYPE LEFT THE HEADING ON AUGUST 5, 2026, and this helper exists because four asserts in this file
+        were reading it out of the heading as a trailing middot field. It was the second-to-last such field,
+        then (once the scaffolded date moved to the fold) a field matched by content against the known branch
+        types -- both of them parses of a heading doing three jobs. As its own section it is STATED rather
+        than inferred, and the heading is reduced to what a reader scans: the title.
+
+        Matched as heading + blank line + the type on its own line, which is exactly what Format-EntryBlock
+        writes. A bare '-match $Type' would pass on the word appearing anywhere in the body, including in the
+        title -- and one of the callers below is the injection test, whose whole subject is that nothing extra
+        ended up in the file.
+    #>
+    param([Parameter(Mandatory = $true)][string]$EntryText, [Parameter(Mandatory = $true)][string]$Type)
+    return ($EntryText -match ('(?m)^### Type of change\r?\n\r?\n' + [regex]::Escape($Type) + '\s*\r?$'))
+}
+
 try {
     # --- (0) Get-FlatOutput: the property every phrase assert below rests on ---------------------------
     # Synthetic rather than captured on purpose: the real wrap only appears at particular console widths,
@@ -368,12 +387,14 @@ try {
     Assert-True (Test-Path -LiteralPath $entryPath) 'entry file created in the repo root with the correct SafeName'
     $entryText1 = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
     Assert-True ($entryText1 -match [regex]::Escape('First title')) 'entry heading contains the given title'
-    # THE HEADING ENDS AT THE TYPE (August 5, 2026). This used to assert '<md> Feat <md>' -- a trailing
-    # middot that only existed because a scaffolded DATE followed it. The date moved to the fold, so the
-    # assert is now the whole line: it proves the type is there AND that nothing follows it, which the
-    # old substring match could not.
+    # THE HEADING IS NOW THE TITLE AND NOTHING ELSE (August 5, 2026), at the entry level rather than one
+    # deeper. It carried a scaffolded date until that morning, then the type until later the same day; both
+    # were fields a parser had to pick apart, and both have their own place now -- the date on the fold's
+    # closing line, the type in its own section. Asserted as the WHOLE line, which is the stronger claim: it
+    # proves nothing was appended, which a prefix match could not.
     $headLine1 = ($entryText1 -split "`r?`n")[0]
-    Assert-Equal "### First title $([char]0x00B7) Feat" $headLine1 'entry heading is title + type, and ends there'
+    Assert-Equal '## First title' $headLine1 'entry heading is the title alone, at the entry level'
+    Assert-True (Test-EntryDeclaresType -EntryText $entryText1 -Type 'Feat') 'and the branch type is stated in its own section instead'
     Assert-True (-not ($headLine1 -match '\d{4}-\d{2}-\d{2}')) 'the scaffold writes NO date -- it would be the branch birth date, not the landing date'
     # (#162) No -Intent given -> the body falls back to the directional block, not a bare TODO.
     Assert-True ($entryText1 -match [regex]::Escape('**To do / where I left off:**')) 'no -Intent: entry body has the directional heading'
@@ -410,7 +431,7 @@ try {
     $entryPathE = Join-Path $fixtureE 'wip-experiment.md'
     Assert-True (Test-Path -LiteralPath $entryPathE) 'entry file still created (fallback type)'
     $entryTextE = [System.IO.File]::ReadAllText($entryPathE, [System.Text.Encoding]::UTF8)
-    Assert-True ((($entryTextE -split "`r?`n")[0]) -match ([regex]::Escape("$([char]0x00B7) Chore") + '$')) 'entry falls back to branch type Chore, at the end of the heading'
+    Assert-True (Test-EntryDeclaresType -EntryText $entryTextE -Type 'Chore') 'entry falls back to branch type Chore, in its own section'
 
     # --- (f) Regression: a malicious -Title (quotes + backslashes) must no longer break the argv
     # boundary to the child process new-changelog-entry.ps1 -- the title goes via
@@ -431,11 +452,12 @@ try {
     $entryPathF = Join-Path $fixtureF 'feat-injection-check.md'
     Assert-True (Test-Path -LiteralPath $entryPathF) 'malicious title: entry file created anyway'
     $entryTextF = [System.IO.File]::ReadAllText($entryPathF, [System.Text.Encoding]::UTF8)
-    # The whole line, not a prefix: with the date gone the heading ends at the type, so an exact compare
-    # is available here and is the stronger assert -- a prefix match would pass even if something had been
-    # appended to the line by a broken argv boundary, which is the very thing this scenario is about.
-    $expectedHeaderF = "### $maliciousTitle $([char]0x00B7) Feat"
+    # The whole line, not a prefix: the heading is now the title alone, so an exact compare is available here
+    # and is the stronger assert -- a prefix match would pass even if something had been appended to the line
+    # by a broken argv boundary, which is the very thing this scenario is about.
+    $expectedHeaderF = "## $maliciousTitle"
     Assert-Equal $expectedHeaderF (($entryTextF -split "`r?`n")[0]) 'malicious title: FULLY and unchanged in the heading line, and nothing appended (no argv splitting)'
+    Assert-True (Test-EntryDeclaresType -EntryText $entryTextF -Type 'Feat') 'malicious title: and the type section is intact rather than absorbing part of the payload'
 
     Assert-True (Test-Path -LiteralPath $sentinelPath) "sentinel file 'X' UNTOUCHED -- no 'Remove-Item' executed via a broken argv"
     $sentinelTextF = [System.IO.File]::ReadAllText($sentinelPath, [System.Text.Encoding]::UTF8)
@@ -595,7 +617,8 @@ function Get-EntryFallbackType     { return $script:EntryFallbackType }
     Assert-True ($entryTextK -match [regex]::Escape('**Nog te doen / waar ik gebleven ben:**')) 'configured wording: the repo body heading is used'
     Assert-True (-not ($entryTextK -match [regex]::Escape('**To do / where I left off:**'))) 'configured wording: the built-in English body heading is NOT used'
     Assert-True ($entryTextK -match [regex]::Escape('TODO: wat er nog moet gebeuren op deze branch.')) 'configured wording: the repo fallback body is used'
-    Assert-True ((($entryTextK -split "`r?`n")[0]) -match ([regex]::Escape("$([char]0x00B7) Docs") + '$')) "configured wording: unknown prefix falls back to the repo's own type (Docs), not Chore"
+    Assert-True (Test-EntryDeclaresType -EntryText $entryTextK -Type 'Docs') "configured wording: unknown prefix falls back to the repo's own type (Docs), not Chore"
+    Assert-True (-not (Test-EntryDeclaresType -EntryText $entryTextK -Type 'Chore')) 'configured wording: and the built-in English fallback type is NOT used'
     Assert-True (Test-Phrase -Text $rK.Out -Phrase "set to 'Docs'") 'configured wording: the unknown-prefix warning names the configured type'
 
     # --- (l) A broken repo-config.ps1 degrades to a warning, it does not stop the entry (#410) -----

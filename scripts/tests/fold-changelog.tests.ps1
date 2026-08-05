@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-    Regression tests for scripts/release/fold-changelog-entry.ps1 -- specifically that fold-all mode
-    only folds genuine changelog entry files and never touches repo-root meta docs.
+    Regression tests for scripts/release/fold-changelog-entry.ps1 -- which files it folds, where in
+    CHANGELOG.md's flat list it puts them, and what it does and does not strip on the way.
 
 .DESCRIPTION
     Dependency-free: no Pester needed, only PowerShell. Integration style -- runs the REAL fold
@@ -10,18 +10,31 @@
 
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/fold-changelog.tests.ps1
 
-    Guards the bug where fold-all mode folded any root *.md that was not in a tiny denylist
-    (CHANGELOG/CLAUDE/README) -- so CONTRIBUTING.md and SECURITY.md got folded and removed. The fix
-    keys off the entry format itself: an entry opens with a '### <title> - <type> - <date>' H3
-    heading; meta docs open with an H1. The tests below pin down: meta docs survive, a genuine entry
-    (including one with a consumer-extended prefix) still folds, an H1 doc with a hyphenated name is
-    NOT folded, and -Branch mode is unaffected.
+    THE FIXTURE CHANGELOG HAS NO SECTION HEADINGS, and that is the change this suite was rewritten for
+    (August 5, 2026). CHANGELOG.md used to carry one '## Tier N - Pull Requests' section per tier, named by
+    a repo-owned seam, and most of this file's fixture machinery existed to model which sections a consumer
+    had declared. The document is a FLAT RANKED LIST now: intro, then one '## ' per change. So the seam, the
+    Keep-a-Changelog variant, the "wrong heading stops cleanly" refusal and the three-section fixture are all
+    gone -- not relaxed, but structurally unreachable, because there is no heading name left to get wrong.
+
+    What replaces them is the assert those tests were standing in for: the entry lands BELOW the intro and
+    at its RANKED position, and the intro is never written over.
+
+    Two guards worth keeping in mind while reading:
+
+      * the original bug this file was written for -- fold-all folding any root *.md that was not in a tiny
+        denylist, so CONTRIBUTING.md and SECURITY.md got folded and removed. The fix keys off the entry
+        format itself, and since this change that means an H2 heading (an H3 for an entry file written
+        before it) against a meta doc's H1.
+      * the pre-pass: a fold-all run writes one entry at a time, so a refusal has to happen before the
+        first write or it leaves a half-state to unpick by hand on main.
 
     The fold script calls `gh pr list` per folded entry for PR-number enrichment; with no matching
     PR that simply returns nothing and the entry folds without a #NN -- so these tests do not depend
-    on a PR existing. File selection (the thing under test) happens regardless of gh.
+    on a PR existing. Everything under test here happens regardless of gh.
 
-    Pure ASCII (repo convention for .ps1).
+    Pure ASCII (repo convention for .ps1). The middot in a pre-format entry heading is built from its
+    codepoint.
 #>
 $ErrorActionPreference = 'Stop'
 
@@ -29,8 +42,9 @@ $RepoRoot         = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')
 $FoldSrc          = Join-Path $RepoRoot 'scripts\release\fold-changelog-entry.ps1'
 $RepoConfigSrc    = Join-Path $RepoRoot 'scripts\repo-config.ps1'
 $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
-# The entry format: the 'Tier: N' line the fold reads to pick a section and then removes, plus the section
-# map itself. A $PSScriptRoot-relative sibling of the fold script, so the fixture has to carry it.
+# The entry format: the heading levels the fold recognises and normalises to, the impact table it reads the
+# rank from, and the ranked insert offset. A $PSScriptRoot-relative sibling of the fold script, so the
+# fixture has to carry it.
 $EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 
 $script:pass = 0
@@ -45,32 +59,42 @@ function Assert-True {
     }
 }
 
+function Assert-Equal {
+    param($Expected, $Actual, [string]$Name)
+    if ($Expected -eq $Actual) {
+        $script:pass++; Write-Host "  [PASS] $Name" -ForegroundColor Green
+    } else {
+        $script:fail++; Write-Host "  [FAIL] $Name`n         expected: '$Expected'`n         got:      '$Actual'" -ForegroundColor Red
+    }
+}
+
 $script:fixtures = @()
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
+
+# The fixture changelog's intro, kept as one variable so the tests can assert it came through untouched
+# rather than re-describing it. Deliberately contains NO '## ' line: in the flat model the intro is
+# everything above the first entry heading, so an intro that carried one would move the boundary.
+$script:FixtureIntro = @(
+    '# Changelog',
+    '',
+    'Everything merged since the last release, furthest reach first. Every release ever cut is listed',
+    'in releases/README.md.',
+    ''
+) -join "`n"
 
 function New-FoldFixture {
     <#
         A throwaway repo root with the real fold script + its repo-owned/sibling dependencies
-        (repo-config.ps1 for Get-RepoName, native-capture-lib.ps1 for the gh call) and a CHANGELOG
-        with the ## Pull Requests / ## Releases skeleton. release-lib.ps1 is deliberately NOT copied,
-        so the optional 'Plugins:' detection is simply skipped.
+        (repo-config.ps1 for Get-RepoName, native-capture-lib.ps1 for the gh call, entry-scaffold-lib.ps1
+        for the entry format) and a CHANGELOG holding only its intro. release-lib.ps1 is deliberately NOT
+        copied, so the optional 'Plugins:' detection is simply skipped.
+
+        repo-config.ps1 is copied VERBATIM now. It used to be rewritten per fixture -- stripping the tier
+        map, adding back the legacy single-heading getter -- because which changelog sections a repo declared
+        was the subject of half these tests. The fold reads no section seam at all any more, so there is
+        nothing left to vary.
     #>
-    param(
-        [Parameter(Mandatory = $true)][string]$Label,
-        # Keep-a-Changelog shape (issue #178): '## [Unreleased]' with released versions as ## sections
-        # below it, and no '## Releases' anywhere. -Heading sets what repo-config reports; omit it to
-        # strip Get-ChangelogHeading entirely and exercise the built-in fallback.
-        [switch]$KeepAChangelog,
-        [string]$Heading,
-        [switch]$OmitHeadingFunction,
-        # THE TIER SPLIT IS OPT-IN PER FIXTURE, and the default is deliberately OFF. Every test in this
-        # file except the tier block at the end is about something orthogonal -- which files are folded,
-        # and which heading the seam names -- and those must keep being asserted in the ONE-SECTION shape,
-        # because that is what a consumer who has not adopted tiers runs. So the default fixture strips
-        # the tier map and exercises the legacy single-heading path, and -TierSections builds the three
-        # sections when the tier behaviour itself is the subject.
-        [switch]$TierSections
-    )
+    param([Parameter(Mandatory = $true)][string]$Label)
     $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("fold-test-$PID-$Label")
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\release') -Force | Out-Null
@@ -78,78 +102,48 @@ function New-FoldFixture {
     Copy-Item -LiteralPath $FoldSrc          -Destination (Join-Path $dir 'scripts\release\fold-changelog-entry.ps1') -Force
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')       -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')       -Force
+    Copy-Item -LiteralPath $RepoConfigSrc    -Destination (Join-Path $dir 'scripts\repo-config.ps1')                  -Force
 
-    $repoConfig = [System.IO.File]::ReadAllText($RepoConfigSrc)
-    if (-not $TierSections) {
-        # Strip the tier map so Get-ChangelogTierSections falls back to the legacy single heading. Done by
-        # removing the FUNCTION, not the backing variable: the probe is Get-Command-based, so a repo that
-        # still has the variable but not the getter is exactly the consumer shape being modelled.
-        $repoConfig = $repoConfig -replace '(?s)function Get-ChangelogTierHeadings \{.*?\r?\n\}', ''
-        # The real repo-config no longer defines the legacy getter (the tier map supersedes it there), so
-        # the fixture adds it back -- these tests are about a consumer that has only that one.
-        if (-not $OmitHeadingFunction) {
-            $headingValue = if ($PSBoundParameters.ContainsKey('Heading')) { $Heading } else { '## Pull Requests' }
-            $repoConfig += "`n`$script:ChangelogHeading = '$headingValue'`nfunction Get-ChangelogHeading { return `$script:ChangelogHeading }`n"
-        }
-    }
-    [System.IO.File]::WriteAllText((Join-Path $dir 'scripts\repo-config.ps1'), $repoConfig, $Utf8NoBom)
-
-    $changelog = if ($KeepAChangelog) {
-        @(
-            '# Changelog',
-            '',
-            'All notable changes to this project.',
-            '',
-            '## [Unreleased]',
-            '',
-            '## [v2.21.0] - 2026-07-24 - Minor',
-            '',
-            '- An older, already released change.',
-            ''
-        ) -join "`n"
-    } elseif ($TierSections) {
-        @(
-            '# Changelog',
-            '',
-            '## Tier 2 - Pull Requests',
-            '',
-            'What a consumer notices.',
-            '',
-            '## Tier 1 - Pull Requests',
-            '',
-            'What the team gets out of it.',
-            '',
-            '## Tier 0 - Pull Requests',
-            '',
-            'Repo-internal only.',
-            '',
-            '## Releases',
-            '',
-            'Released versions.',
-            ''
-        ) -join "`n"
-    } else {
-        @(
-            '# Changelog',
-            '',
-            '## Pull Requests',
-            '',
-            'Everything merged since the last release.',
-            '',
-            '## Releases',
-            '',
-            'Released versions.',
-            ''
-        ) -join "`n"
-    }
-    [System.IO.File]::WriteAllText((Join-Path $dir 'CHANGELOG.md'), $changelog, $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $dir 'CHANGELOG.md'), $script:FixtureIntro, $Utf8NoBom)
     $script:fixtures += $dir
     return $dir
 }
 
 function New-EntryFile {
-    param([string]$Dir, [string]$Name, [string]$Title)
-    $body = "### $Title " + [char]0x00B7 + " Feat " + [char]0x00B7 + " 2026-01-01`n`nDemo entry body.`n"
+    <#
+        An entry file as new-changelog-entry.ps1 writes one since August 5, 2026: an H2 for the change, then
+        the three named H3 sections. -Rows sets the impact table's data rows (the scaffold's own tier-0 row
+        by default), so a test can declare a reach and a significance without hand-building the file.
+    #>
+    param(
+        [string]$Dir, [string]$Name, [string]$Title,
+        [string]$Rows = '| 0 | - | - |',
+        [string]$Type = 'Feat',
+        [string]$ExtraBody = ''
+    )
+    $lines = @("## $Title", '', '### What does this change do?', '', 'Demo entry body.')
+    if ($ExtraBody) { $lines += @('', $ExtraBody) }
+    $lines += @(
+        '', '### Who is this for', '',
+        '| Tier | Significance | Why |', '|---|---|---|', $Rows,
+        '', '### Type of change', '', $Type
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Dir $Name), (($lines -join "`n") + "`n"), $Utf8NoBom)
+}
+
+function New-LegacyEntryFile {
+    <#
+        An entry file in the shape written BEFORE this format: an H3 heading carrying the type (and a
+        scaffolded date) as middot fields, with a 'Tier: N' line under it instead of an impact table.
+
+        NOT A HISTORICAL CURIOSITY. An entry file lives only on a branch, so any branch created before this
+        change still carries one -- this repo had exactly such a branch parked on the remote when the change
+        was written. -NoTierLine leaves the line out, which is the undeclared (= tier 0) case.
+    #>
+    param([string]$Dir, [string]$Name, [string]$Title, [string]$Tier = '0', [switch]$NoTierLine, [string]$ExtraBody = '')
+    $md = [char]0x00B7
+    $tierLine = if ($NoTierLine) { '' } else { "Tier: $Tier`n`n" }
+    $body = "### $Title $md Feat $md 2026-01-01`n`n$tierLine" + "Demo entry body.`n" + $ExtraBody
     [System.IO.File]::WriteAllText((Join-Path $Dir $Name), $body, $Utf8NoBom)
 }
 
@@ -157,6 +151,29 @@ function New-DocFile {
     # An H1 markdown doc (a meta file), NOT an entry.
     param([string]$Dir, [string]$Name, [string]$Heading)
     [System.IO.File]::WriteAllText((Join-Path $Dir $Name), "# $Heading`n`nSome prose.`n", $Utf8NoBom)
+}
+
+function Get-Changelog {
+    param([string]$Dir)
+    return [System.IO.File]::ReadAllText((Join-Path $Dir 'CHANGELOG.md'))
+}
+
+function Get-EntryOrder {
+    <#
+        The entry headings in document order -- which is the ONE thing the fold decides now that there are no
+        sections to file into. Asserted as an ordered list rather than as "the title appears somewhere",
+        because the latter passes on every possible ordering, including the reverse.
+    #>
+    param([string]$Changelog)
+    return @([regex]::Matches($Changelog, '(?m)^## (.+)$') | ForEach-Object { $_.Groups[1].Value.Trim() })
+}
+
+function Get-ChangelogIntro {
+    <# Everything above the first entry heading. The fold must never write into this. #>
+    param([string]$Changelog)
+    $m = ([regex]'(?m)^## ').Match($Changelog)
+    if (-not $m.Success) { return $Changelog }
+    return $Changelog.Substring(0, $m.Index)
 }
 
 function Initialize-FoldGitRepo {
@@ -223,7 +240,7 @@ New-DocFile   -Dir $dir -Name 'CONTRIBUTING.md'     -Heading 'Contributing'
 New-DocFile   -Dir $dir -Name 'SECURITY.md'         -Heading 'Security Policy'
 New-DocFile   -Dir $dir -Name 'CLAUDE.md'           -Heading 'Project guide'
 $r = Invoke-Fold -Dir $dir
-$changelogText = Get-Content -LiteralPath (Join-Path $dir 'CHANGELOG.md') -Raw
+$changelogText = Get-Changelog -Dir $dir
 
 Assert-True ($r.ExitCode -eq 0)                                              'fold-all exits 0'
 Assert-True (-not (Test-Path (Join-Path $dir 'feat-demo-thing.md')))        'the genuine entry file is removed'
@@ -233,16 +250,47 @@ Assert-True (Test-Path (Join-Path $dir 'SECURITY.md'))                      'SEC
 Assert-True (Test-Path (Join-Path $dir 'CLAUDE.md'))                        'CLAUDE.md survives (reserved)'
 Assert-True ($changelogText -notmatch 'Security Policy')                    'meta content did NOT leak into CHANGELOG'
 Assert-True ($changelogText -notmatch '(?m)^# Contributing')               'CONTRIBUTING body did NOT leak into CHANGELOG'
+# THE ENTRY'S OWN SECTIONS CAME THROUGH AT THEIR OWN LEVEL. The fold rewrites the entry's heading; a
+# replace-all rather than a count-1 would have flattened these three into H2s and turned one entry into four.
+Assert-Equal 1 @(Get-EntryOrder -Changelog $changelogText).Count 'the folded entry is exactly ONE entry heading, not four'
+foreach ($section in @('What does this change do?', 'Who is this for', 'Type of change')) {
+    Assert-True ($changelogText -match ('(?m)^### ' + [regex]::Escape($section) + '\s*$')) "the '$section' section kept its own level"
+}
+
+# ---------------------------------------------------------------------------------------------------
+Write-Host "The intro is written below, never over" -ForegroundColor Cyan
+#      There is no configured heading to insert after any more, so the boundary between the intro and the
+#      list is derived structurally -- the first entry heading. Getting that wrong writes an entry into the
+#      middle of the intro, which is why it is asserted rather than assumed.
+Assert-True ((Get-ChangelogIntro -Changelog $changelogText).TrimEnd() -eq $script:FixtureIntro.TrimEnd()) `
+    'the intro is byte-identical after the fold'
+Assert-True ((Get-Changelog -Dir $dir).IndexOf('Demo thing') -gt $script:FixtureIntro.TrimEnd().Length) `
+    'and the entry sits below all of it'
+
+# ---------------------------------------------------------------------------------------------------
+Write-Host "A changelog with nothing pending yet -- the first entry opens the list" -ForegroundColor Cyan
+#      This replaces the retired "could not find the '## Pull Requests' heading -- stopping" refusal. That
+#      path existed because the fold needed a configured heading to exist in the file; it now needs none, so
+#      the case it refused over is the ordinary empty-list case and must simply work.
+$dirE = New-FoldFixture -Label 'emptylist'
+New-EntryFile -Dir $dirE -Name 'feat-first-ever.md' -Title 'The first one'
+$rE = Invoke-Fold -Dir $dirE
+$clE = Get-Changelog -Dir $dirE
+Assert-True ($rE.ExitCode -eq 0)                     'empty list: exits 0 rather than refusing over a missing heading'
+Assert-Equal 'The first one' (@(Get-EntryOrder -Changelog $clE))[0] 'empty list: the entry becomes the list'
+# THE BLANK LINE IS ENSURED, NOT ASSUMED. An intro whose last line had no blank line after it would leave
+# '...releases/README.md.## The first one' -- which markdown renders as one paragraph and no heading at all,
+# so nothing would look broken until a parser went looking for the entry.
+Assert-True ($clE -match "(?m)^\s*$[\r\n]+## The first one") 'empty list: with a blank line between the intro and the heading'
 
 # ---------------------------------------------------------------------------------------------------
 Write-Host "fold-all -- a consumer-extended prefix still folds" -ForegroundColor Cyan
 $dir2 = New-FoldFixture -Label 'extprefix'
 New-EntryFile -Dir $dir2 -Name 'style-tweak-colors.md' -Title 'Tweak colors'
 $r2 = Invoke-Fold -Dir $dir2
-$changelog2 = Get-Content -LiteralPath (Join-Path $dir2 'CHANGELOG.md') -Raw
 Assert-True ($r2.ExitCode -eq 0)                                            'fold-all (ext prefix) exits 0'
 Assert-True (-not (Test-Path (Join-Path $dir2 'style-tweak-colors.md')))    'extended-prefix entry is folded (not prefix-gated)'
-Assert-True ($changelog2 -match 'Tweak colors')                            'extended-prefix entry lands in CHANGELOG'
+Assert-True ((Get-Changelog -Dir $dir2) -match 'Tweak colors')             'extended-prefix entry lands in CHANGELOG'
 
 # ---------------------------------------------------------------------------------------------------
 Write-Host "fold-all -- an H1 doc with a hyphenated name is NOT folded" -ForegroundColor Cyan
@@ -258,50 +306,10 @@ $dir4 = New-FoldFixture -Label 'branchmode'
 New-EntryFile -Dir $dir4 -Name 'fix-explicit-target.md' -Title 'Explicit target'
 New-DocFile   -Dir $dir4 -Name 'CONTRIBUTING.md'        -Heading 'Contributing'
 $r4 = Invoke-Fold -Dir $dir4 -Branch 'fix/explicit-target'
-$changelog4 = Get-Content -LiteralPath (Join-Path $dir4 'CHANGELOG.md') -Raw
 Assert-True ($r4.ExitCode -eq 0)                                            '-Branch mode exits 0'
 Assert-True (-not (Test-Path (Join-Path $dir4 'fix-explicit-target.md')))   '-Branch folds the named entry'
-Assert-True ($changelog4 -match 'Explicit target')                         '-Branch entry lands in CHANGELOG'
+Assert-True ((Get-Changelog -Dir $dir4) -match 'Explicit target')          '-Branch entry lands in CHANGELOG'
 Assert-True (Test-Path (Join-Path $dir4 'CONTRIBUTING.md'))                'CONTRIBUTING.md untouched in -Branch mode'
-
-# ---------------------------------------------------------------------------------------------------
-Write-Host "Keep-a-Changelog -- folds under the configured '## [Unreleased]' heading" -ForegroundColor Cyan
-$dir5 = New-FoldFixture -Label 'keepachangelog' -KeepAChangelog -Heading '## [Unreleased]'
-New-EntryFile -Dir $dir5 -Name 'fix-mix-titels.md' -Title 'Mix titles'
-$r5 = Invoke-Fold -Dir $dir5
-$changelog5 = Get-Content -LiteralPath (Join-Path $dir5 'CHANGELOG.md') -Raw
-Assert-True ($r5.ExitCode -eq 0)                                            'keep-a-changelog: exits 0 (no hard stop on the heading)'
-Assert-True (-not (Test-Path (Join-Path $dir5 'fix-mix-titels.md')))        'keep-a-changelog: the entry file is folded away'
-Assert-True ($changelog5 -match 'Mix titles')                              'keep-a-changelog: the entry lands in CHANGELOG'
-# Placement: inside [Unreleased], above the released version below it -- not appended at the end.
-$posUnreleased = $changelog5.IndexOf('## [Unreleased]')
-$posEntry      = $changelog5.IndexOf('Mix titles')
-$posReleased   = $changelog5.IndexOf('## [v2.21.0]')
-Assert-True ($posUnreleased -lt $posEntry)                                 'keep-a-changelog: the entry sits BELOW the [Unreleased] heading'
-Assert-True ($posEntry -lt $posReleased)                                   'keep-a-changelog: the entry sits ABOVE the released version section'
-
-# ---------------------------------------------------------------------------------------------------
-Write-Host "Keep-a-Changelog -- a wrong/absent heading stops cleanly, naming the config" -ForegroundColor Cyan
-$dir6 = New-FoldFixture -Label 'headingmiss' -KeepAChangelog -Heading '## Pull Requests'
-New-EntryFile -Dir $dir6 -Name 'fix-no-heading.md' -Title 'No heading here'
-$r6 = Invoke-Fold -Dir $dir6
-Assert-True ($r6.ExitCode -eq 1)                                            'heading miss: exits 1'
-Assert-True (Test-Path (Join-Path $dir6 'fix-no-heading.md'))               'heading miss: the entry file is left untouched'
-Assert-True ($r6.Output -match [regex]::Escape('## Pull Requests'))         'heading miss: the message names the heading it looked for'
-Assert-True ($r6.Output -match 'Get-ChangelogHeading')                      'heading miss: the message points at the repo-config function to set'
-
-# ---------------------------------------------------------------------------------------------------
-Write-Host "Backwards compatible -- a repo-config without Get-ChangelogHeading still folds" -ForegroundColor Cyan
-$dir7 = New-FoldFixture -Label 'nofunction' -OmitHeadingFunction
-New-EntryFile -Dir $dir7 -Name 'fix-legacy-config.md' -Title 'Legacy config'
-$r7 = Invoke-Fold -Dir $dir7
-$changelog7 = Get-Content -LiteralPath (Join-Path $dir7 'CHANGELOG.md') -Raw
-Assert-True ($r7.ExitCode -eq 0)                                            'legacy config: exits 0 (falls back to the default heading)'
-Assert-True ($changelog7 -match 'Legacy config')                           'legacy config: the entry lands under ## Pull Requests'
-$posPr    = $changelog7.IndexOf('## Pull Requests')
-$posEnt7  = $changelog7.IndexOf('Legacy config')
-$posRel7  = $changelog7.IndexOf('## Releases')
-Assert-True ($posPr -lt $posEnt7 -and $posEnt7 -lt $posRel7)               'legacy config: placement unchanged (between the two headings)'
 
 # ---------------------------------------------------------------------------------------------------
 Write-Host "Committing is opt-in, and the default is unchanged" -ForegroundColor Cyan
@@ -376,181 +384,153 @@ Assert-True (-not (Test-Path -LiteralPath (Join-Path $dir11 'fix-never-committed
     'untracked entry: and the entry file is still folded away'
 
 # ===================================================================================================
-# THE TIER SPLIT (August 5, 2026): the entry declares a tier, the fold files it and consumes the line
+# THE ORDER OF THE FLAT LIST: tier first, significance second (Dave, August 5, 2026; issue #467)
 # ===================================================================================================
-# These are the only fixtures built with -TierSections. Everything above deliberately runs the
-# one-section shape, because that is what a consumer who has not adopted the model runs -- and both paths
-# have to keep working.
+# This is what the three '## Tier N - Pull Requests' headings used to communicate visually, kept as an
+# ordering rather than as structure. The unit tests in entry-scaffold.tests.ps1 prove the offset function;
+# these prove the FOLD uses it, through the real script, against a real file.
 
-function New-TieredEntryFile {
-    # Like New-EntryFile, but with a 'Tier: N' line where new-changelog-entry.ps1 writes one: directly
-    # under the heading. -NoTierLine leaves it out, which is the undeclared (= tier 0) case.
-    param([string]$Dir, [string]$Name, [string]$Title, [string]$Tier, [switch]$NoTierLine, [string]$ExtraBody = '')
-    $md = [char]0x00B7
-    $tierLine = if ($NoTierLine) { '' } else { "Tier: $Tier`n`n" }
-    $body = "### $Title $md Feat $md 2026-01-01`n`n$tierLine" + "Demo entry body.`n" + $ExtraBody
-    [System.IO.File]::WriteAllText((Join-Path $Dir $Name), $body, $Utf8NoBom)
-}
-
-Write-Host "Each entry lands in the section its tier names" -ForegroundColor Cyan
-$dirT1 = New-FoldFixture -Label 'tier-routing' -TierSections
-New-TieredEntryFile -Dir $dirT1 -Name 'feat-consumer.md'  -Title 'Consumer facing'  -Tier '2'
-New-TieredEntryFile -Dir $dirT1 -Name 'docs-colleague.md' -Title 'For colleagues'   -Tier '1'
-New-TieredEntryFile -Dir $dirT1 -Name 'chore-internal.md' -Title 'Repo internal'    -Tier '0'
-$rT1 = Invoke-Fold -Dir $dirT1
-Assert-True ($rT1.ExitCode -eq 0) 'tier routing: exits 0'
-$clT1 = [System.IO.File]::ReadAllText((Join-Path $dirT1 'CHANGELOG.md'))
-# Asserted per section rather than on the whole file: "the title appears somewhere" would pass even with
-# every entry filed in one section, which is the failure this is for.
-function Get-SectionBody {
-    param([string]$Changelog, [string]$Heading)
-    $lines = $Changelog -split "`r?`n"
-    $from = -1
-    for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -eq $Heading) { $from = $i + 1; break } }
-    if ($from -lt 0) { return '' }
-    $out = @()
-    for ($i = $from; $i -lt $lines.Count; $i++) {
-        if ($lines[$i] -match '^##\s') { break }
-        $out += $lines[$i]
-    }
-    return ($out -join "`n")
-}
-$sec2 = Get-SectionBody -Changelog $clT1 -Heading '## Tier 2 - Pull Requests'
-$sec1 = Get-SectionBody -Changelog $clT1 -Heading '## Tier 1 - Pull Requests'
-$sec0 = Get-SectionBody -Changelog $clT1 -Heading '## Tier 0 - Pull Requests'
-Assert-True ($sec2 -match 'Consumer facing')   'tier routing: the tier-2 entry is under the tier-2 heading'
-Assert-True ($sec2 -notmatch 'For colleagues') 'tier routing: and nothing else is'
-Assert-True ($sec1 -match 'For colleagues')    'tier routing: the tier-1 entry is under the tier-1 heading'
-Assert-True ($sec0 -match 'Repo internal')     'tier routing: the tier-0 entry is under the tier-0 heading'
-Assert-True ($sec0 -notmatch 'Consumer facing') 'tier routing: and the tier-2 entry did not leak down into it'
-# THE LINE IS CONSUMED. Once the section states the tier, an entry restating it would be the same fact in
-# two places -- the drift shape this repo has paid for three times.
-Assert-True ($clT1 -notmatch '(?m)^Tier:')     'the Tier: line is removed once the section states the tier'
-Assert-True ($sec2 -match 'Demo entry body')   'and the body around it survives intact'
-# Each section keeps its own intro: the fold inserts below it, not over it.
-Assert-True ($sec2 -match 'What a consumer notices') 'the section intro is untouched'
-
-Write-Host "An entry with no Tier: line is tier 0, and says so" -ForegroundColor Cyan
-$dirT2 = New-FoldFixture -Label 'tier-default' -TierSections
-New-TieredEntryFile -Dir $dirT2 -Name 'chore-undeclared.md' -Title 'Nothing declared' -NoTierLine
-$rT2 = Invoke-Fold -Dir $dirT2
-Assert-True ($rT2.ExitCode -eq 0) 'undeclared tier: exits 0 -- the default is a valid answer, not an error'
-$clT2 = [System.IO.File]::ReadAllText((Join-Path $dirT2 'CHANGELOG.md'))
-Assert-True ((Get-SectionBody -Changelog $clT2 -Heading '## Tier 0 - Pull Requests') -match 'Nothing declared') `
-    'undeclared tier: the entry is filed as tier 0 -- the harmless end of the scale'
-# Said out loud rather than absorbed: an author who simply forgot has produced work that cannot carry a
-# release on its own, and the moment to learn that is now rather than at the cut.
-Assert-True ($rT2.Output -match 'no Tier: line') 'undeclared tier: the run reports that it defaulted'
-
-Write-Host "A tier the model has no meaning for stops the fold, before anything is written" -ForegroundColor Cyan
-$dirT3 = New-FoldFixture -Label 'tier-bad' -TierSections
-New-TieredEntryFile -Dir $dirT3 -Name 'feat-good.md' -Title 'Perfectly fine' -Tier '2'
-New-TieredEntryFile -Dir $dirT3 -Name 'feat-bad.md'  -Title 'Bad tier'       -Tier '5'
-$before3 = [System.IO.File]::ReadAllText((Join-Path $dirT3 'CHANGELOG.md'))
-$rT3 = Invoke-Fold -Dir $dirT3
-Assert-True ($rT3.ExitCode -eq 1) 'bad tier: exits 1'
-Assert-True ($rT3.Output -match 'tier 5 does not exist') 'bad tier: the reason names the value'
-# THE PRE-PASS IS THE POINT. Folding writes one entry at a time, so a problem found on the second file
-# would leave the first already folded and its source file deleted -- a half-state to unpick by hand on
-# main. So NOTHING may have happened, including to the entry that was fine.
-Assert-True ([System.IO.File]::ReadAllText((Join-Path $dirT3 'CHANGELOG.md')) -eq $before3) `
-    'bad tier: the changelog is byte-identical -- the pre-pass ran before any write'
-Assert-True (Test-Path -LiteralPath (Join-Path $dirT3 'feat-good.md')) `
-    'bad tier: and the VALID entry file still exists, rather than being folded first'
-Assert-True (Test-Path -LiteralPath (Join-Path $dirT3 'feat-bad.md')) 'bad tier: as does the invalid one'
-
-Write-Host "A tier with no section declared is refused by name, not silently neighboured" -ForegroundColor Cyan
-$dirT4 = New-FoldFixture -Label 'tier-nosection' -TierSections
-# Drop tier 2 from the fixture's own map, so an entry declaring it has nowhere to go.
-$cfgT4 = Join-Path $dirT4 'scripts\repo-config.ps1'
-$cfgText = [System.IO.File]::ReadAllText($cfgT4) -replace "(?m)^\s*2 = '## Tier 2 - Pull Requests'\r?\n", ''
-[System.IO.File]::WriteAllText($cfgT4, $cfgText, $Utf8NoBom)
-New-TieredEntryFile -Dir $dirT4 -Name 'feat-orphan.md' -Title 'Nowhere to go' -Tier '2'
-$rT4 = Invoke-Fold -Dir $dirT4
-Assert-True ($rT4.ExitCode -eq 1) 'orphan tier: exits 1'
-Assert-True ($rT4.Output -match 'no changelog section for it') 'orphan tier: the reason says what is missing'
-Assert-True ($rT4.Output -match 'declares tiers: 1, 0') 'orphan tier: and lists the tiers the repo does declare'
-Assert-True (Test-Path -LiteralPath (Join-Path $dirT4 'feat-orphan.md')) 'orphan tier: the entry file is untouched'
-
-Write-Host "A Tier: line QUOTED inside a fence is not the declaration" -ForegroundColor Cyan
-#      An entry documenting the tier model writes the line it is explaining -- this repo's own entry for
-#      this change does. A blind regex would read the quoted value as the declaration AND delete that line
-#      out of the fence while folding, damaging the one entry that explains the mechanism.
-$dirT5 = New-FoldFixture -Label 'tier-fenced' -TierSections
-$fence = "``````text`n" + "Tier: 2`n" + "``````" + "`n"
-New-TieredEntryFile -Dir $dirT5 -Name 'docs-explains.md' -Title 'Explains the format' -Tier '1' -ExtraBody "`nAn example:`n`n$fence"
-$rT5 = Invoke-Fold -Dir $dirT5
-Assert-True ($rT5.ExitCode -eq 0) 'fenced tier: exits 0'
-$clT5 = [System.IO.File]::ReadAllText((Join-Path $dirT5 'CHANGELOG.md'))
-Assert-True ((Get-SectionBody -Changelog $clT5 -Heading '## Tier 1 - Pull Requests') -match 'Explains the format') `
-    'fenced tier: the REAL declaration decided the section, not the quoted one'
-Assert-True ($clT5 -match '(?m)^Tier: 2$') 'fenced tier: and the quoted line survives inside the fence'
-
-# ---------------------------------------------------------------------------------------------------
-# THE IMPACT TABLE, END TO END THROUGH THE REAL SCRIPT (issue #467)
-#
-# The unit tests in entry-scaffold.tests.ps1 prove the offset function. This proves the FOLD uses it: that
-# CHANGELOG.md comes out ordered by significance, that the table survives when scored and is dropped when
-# not, and that a malformed table stops the run before anything is written. The last one matters most --
-# the fold commits directly to main.
-
-function New-ImpactEntryFile {
-    # An entry as new-changelog-entry.ps1 writes it since the impact table: the table where the 'Tier: N'
-    # line used to be, directly under the heading.
-    param([string]$Dir, [string]$Name, [string]$Title, [string]$Rows)
-    $md = [char]0x00B7
-    $table = "| Tier | Significance | Why |`n|---|---|---|`n$Rows`n`n"
-    [System.IO.File]::WriteAllText((Join-Path $Dir $Name), "### $Title $md Feat`n`n$table" + "Demo entry body.`n", $Utf8NoBom)
-}
-
-Write-Host "The fold orders CHANGELOG.md by significance" -ForegroundColor Cyan
-$dirS = New-FoldFixture -Label 'impact-order' -TierSections
+Write-Host "Significance orders entries within a tier" -ForegroundColor Cyan
+$dirS = New-FoldFixture -Label 'impact-order'
 # Folded LOW first, then middling, then HIGH -- so a fold that merely prepends (the pre-ranking behaviour)
 # would leave them in exactly the reverse of the wanted order. Only real ordering can pass this.
-New-ImpactEntryFile -Dir $dirS -Name 'feat-low.md'  -Title 'Least consequential' -Rows '| 1 | 1 | cosmetic |'
+New-EntryFile -Dir $dirS -Name 'feat-low.md'  -Title 'Least consequential' -Rows '| 1 | 1 | cosmetic |'
 $rLow = Invoke-Fold -Dir $dirS -Branch 'feat/low'
-New-ImpactEntryFile -Dir $dirS -Name 'feat-mid.md'  -Title 'Middling'            -Rows '| 1 | 3 | a clear improvement |'
+New-EntryFile -Dir $dirS -Name 'feat-mid.md'  -Title 'Middling'            -Rows '| 1 | 3 | a clear improvement |'
 $rMid = Invoke-Fold -Dir $dirS -Branch 'feat/mid'
-New-ImpactEntryFile -Dir $dirS -Name 'feat-high.md' -Title 'Most consequential'  -Rows '| 1 | 5 | the reader must act |'
+New-EntryFile -Dir $dirS -Name 'feat-high.md' -Title 'Most consequential'  -Rows '| 1 | 5 | the reader must act |'
 $rHigh = Invoke-Fold -Dir $dirS -Branch 'feat/high'
 Assert-True (($rLow.ExitCode -eq 0) -and ($rMid.ExitCode -eq 0) -and ($rHigh.ExitCode -eq 0)) 'impact order: all three folds exit 0'
-$secS = Get-SectionBody -Changelog ([System.IO.File]::ReadAllText((Join-Path $dirS 'CHANGELOG.md'))) -Heading '## Tier 1 - Pull Requests'
-$posHigh = $secS.IndexOf('Most consequential')
-$posMid  = $secS.IndexOf('Middling')
-$posLow  = $secS.IndexOf('Least consequential')
-Assert-True ($posHigh -ge 0 -and $posMid -ge 0 -and $posLow -ge 0) 'impact order: all three entries are in the tier-1 section'
-Assert-True ($posHigh -lt $posMid) 'impact order: significance 5 sits above significance 3'
-Assert-True ($posMid -lt $posLow) 'impact order: and significance 3 above significance 1 -- so the fold ordered, not prepended'
-Assert-True ($secS -match '(?m)^\|\s*1\s*\|\s*5\s*\|') 'impact order: a scored table is CARRIED into the changelog, because the cut empties these sections'
+$orderS = @(Get-EntryOrder -Changelog (Get-Changelog -Dir $dirS))
+Assert-Equal 'Most consequential' $orderS[0] 'impact order: significance 5 leads'
+Assert-Equal 'Middling'           $orderS[1] 'impact order: then 3'
+Assert-Equal 'Least consequential' $orderS[2] 'impact order: then 1 -- so the fold ordered, not prepended'
 
-Write-Host "An unscored table is scaffolding and does not reach the record" -ForegroundColor Cyan
-$dirU = New-FoldFixture -Label 'impact-unscored' -TierSections
-New-ImpactEntryFile -Dir $dirU -Name 'chore-internal.md' -Title 'Repo internal' -Rows '| 0 | - | - |'
+Write-Host "The tier is the FIRST key -- reach beats weight" -ForegroundColor Cyan
+#      The failure this guards is the one measured on the offset function's first run: a repo-internal change
+#      leading the document. A tier-0 entry with the top score must still sink below a tier-1 entry with the
+#      bottom one, or the flat list has lost the distinction the three headings used to make.
+$dirT = New-FoldFixture -Label 'tier-order'
+New-EntryFile -Dir $dirT -Name 'chore-internal.md' -Title 'Repo internal only' -Rows '| 0 | - | - |'
+Invoke-Fold -Dir $dirT -Branch 'chore/internal' | Out-Null
+New-EntryFile -Dir $dirT -Name 'docs-colleague.md' -Title 'For colleagues' -Rows '| 1 | 1 | barely anything |'
+Invoke-Fold -Dir $dirT -Branch 'docs/colleague' | Out-Null
+New-EntryFile -Dir $dirT -Name 'feat-consumer.md' -Title 'Consumer facing' -Rows "| 2 | 2 | small |`n| 1 | 2 | small |"
+$rT = Invoke-Fold -Dir $dirT -Branch 'feat/consumer'
+Assert-True ($rT.ExitCode -eq 0) 'tier order: exits 0'
+$orderT = @(Get-EntryOrder -Changelog (Get-Changelog -Dir $dirT))
+Assert-Equal 'Consumer facing'    $orderT[0] 'tier order: the tier-2 entry leads on a score of 2'
+Assert-Equal 'For colleagues'     $orderT[1] 'tier order: the tier-1 entry follows on a score of 1'
+Assert-Equal 'Repo internal only' $orderT[2] 'tier order: and the tier-0 entry sinks, whatever it scores'
+
+# ===================================================================================================
+# WHAT THE FOLD CARRIES, AND WHAT IT NO LONGER CONSUMES
+# ===================================================================================================
+# A REVERSAL, not a relaxation, and the asserts below are inverted from what they were the day before.
+# While the changelog had one section per tier, the heading above an entry stated its reach -- so the
+# entry's own 'Tier: N' line was the same fact twice, and an unscored table was a question nobody had put.
+# With the sections gone the entry is the only carrier of both.
+
+Write-Host "A scored impact table is carried into the record" -ForegroundColor Cyan
+#      Unchanged behaviour, and the reason is the two-moment property: the cut empties the pending list, so a
+#      score consumed here would not exist when the release documents are built days later, and the ordering
+#      could not be reproduced without re-estimating it.
+$clS = Get-Changelog -Dir $dirS
+Assert-True ($clS -match '(?m)^\|\s*1\s*\|\s*5\s*\|') 'scored table: the row survives the fold'
+Assert-True ($clS -match 'the reader must act')        'scored table: including its Why, which is the lasting half'
+
+Write-Host "An UNSCORED table is carried too, because its section names a question" -ForegroundColor Cyan
+#      This is the inversion. The scaffold row used to be stripped as "a question nobody was asked", which was
+#      right while a heading stated the tier. Now '### Who is this for' is a named section of the entry, and a
+#      heading with its answer cut out is worse than a placeholder: the reader cannot tell "nobody was asked"
+#      from "somebody deleted it". Worse, stripping it would leave the entry declaring no reach at all.
+$dirU = New-FoldFixture -Label 'impact-unscored'
+New-EntryFile -Dir $dirU -Name 'chore-internal.md' -Title 'Repo internal' -Rows '| 0 | - | - |'
 $rU = Invoke-Fold -Dir $dirU
 Assert-True ($rU.ExitCode -eq 0) 'unscored table: exits 0'
-$clU = [System.IO.File]::ReadAllText((Join-Path $dirU 'CHANGELOG.md'))
-Assert-True ((Get-SectionBody -Changelog $clU -Heading '## Tier 0 - Pull Requests') -match 'Repo internal') 'unscored table: the entry is filed under tier 0'
-Assert-True ($clU -notmatch 'Significance') 'unscored table: and the placeholder table is gone -- a question nobody was asked'
+$clU = Get-Changelog -Dir $dirU
+Assert-True ($clU -match 'Repo internal')                        'unscored table: the entry is folded'
+Assert-True ($clU -match '(?m)^\|\s*Tier\s*\|\s*Significance\s*\|') 'unscored table: and its table is still there'
+Assert-True ($clU -match '(?m)^\|\s*0\s*\|\s*-\s*\|\s*-\s*\|')   'unscored table: scaffold row and all, so the reach is still declared'
+
+Write-Host "A pre-format entry keeps its Tier: line and is promoted to an H2" -ForegroundColor Cyan
+#      Both halves matter, and both are inversions of the old behaviour. The line SURVIVES because nothing
+#      above the entry states the tier any more -- consuming it would make the entry read back as tier 0 and
+#      drop silently out of the release documents. And the H3 heading is PROMOTED, because an H3 is not an
+#      entry boundary in a flat list of H2s: it would be absorbed into the block above and inherit its PR link.
+$dirL = New-FoldFixture -Label 'impact-legacy'
+New-EntryFile       -Dir $dirL -Name 'feat-current.md' -Title 'Written in the new format' -Rows '| 1 | 3 | fine |'
+Invoke-Fold -Dir $dirL -Branch 'feat/current' | Out-Null
+New-LegacyEntryFile -Dir $dirL -Name 'feat-old.md' -Title 'Written before the table' -Tier '2'
+$rL = Invoke-Fold -Dir $dirL -Branch 'feat/old'
+Assert-True ($rL.ExitCode -eq 0) 'legacy entry: exits 0'
+$clL = Get-Changelog -Dir $dirL
+Assert-True ($clL -match '(?m)^Tier: 2$') 'legacy entry: its Tier: line is CARRIED, so its reach survives the fold'
+$orderL = @(Get-EntryOrder -Changelog $clL)
+Assert-Equal 2 $orderL.Count 'legacy entry: it is an entry boundary in its own right'
+Assert-True ($orderL[0] -match 'Written before the table') 'legacy entry: and its tier-2 line still ranks it above the tier-1 entry'
+Assert-True ($clL -notmatch '(?m)^### Written before the table') 'legacy entry: nothing is left at the old level'
+Assert-True ($rL.Output -match 'pre-flat entry format') 'legacy entry: and the promotion is reported rather than done silently'
+
+Write-Host "An entry with no declaration at all is tier 0, and says so" -ForegroundColor Cyan
+$dirD = New-FoldFixture -Label 'undeclared'
+New-LegacyEntryFile -Dir $dirD -Name 'chore-undeclared.md' -Title 'Nothing declared' -NoTierLine
+$rD = Invoke-Fold -Dir $dirD
+Assert-True ($rD.ExitCode -eq 0) 'undeclared: exits 0 -- the default is a valid answer, not an error'
+Assert-True ((Get-Changelog -Dir $dirD) -match 'Nothing declared') 'undeclared: the entry is folded as tier 0, the harmless end'
+# Said out loud rather than absorbed: an author who simply forgot has produced work that cannot carry a
+# release on its own, and the moment to learn that is now rather than at the cut.
+Assert-True ($rD.Output -match 'declares no tier') 'undeclared: the run reports that it defaulted'
+
+Write-Host "A missing significance is reported, and folded anyway" -ForegroundColor Cyan
+#      Deliberately not a refusal. Refusing the fold of an ALREADY-MERGED branch produces the silent
+#      half-state this repo has measured -- an unfolded entry file in the repo root the morning after its
+#      merge, with main looking finished. cut-release.ps1 is the refusal point Dave chose instead.
+$dirM = New-FoldFixture -Label 'impact-noscore'
+New-EntryFile -Dir $dirM -Name 'feat-unscored.md' -Title 'Reaches but unweighed' -Rows '| 1 | - | - |'
+$rM = Invoke-Fold -Dir $dirM
+Assert-True ($rM.ExitCode -eq 0) 'missing score: exits 0 -- the fold is not the refusal point'
+Assert-True ($rM.Output -match 'declares no significance for tier 1') 'missing score: but it is said out loud'
+Assert-True ($rM.Output -match 'release cut will refuse') 'missing score: and names where it WILL be refused'
+Assert-True ((Get-Changelog -Dir $dirM) -match 'Reaches but unweighed') 'missing score: the entry landed'
 
 Write-Host "A malformed table stops the run before anything is written" -ForegroundColor Cyan
-$dirB = New-FoldFixture -Label 'impact-malformed' -TierSections
-$clBefore = [System.IO.File]::ReadAllText((Join-Path $dirB 'CHANGELOG.md'))
-New-ImpactEntryFile -Dir $dirB -Name 'feat-bad.md' -Title 'Off the scale' -Rows '| 1 | 9 | too high |'
+$dirB = New-FoldFixture -Label 'impact-malformed'
+$clBefore = Get-Changelog -Dir $dirB
+New-EntryFile -Dir $dirB -Name 'feat-bad.md' -Title 'Off the scale' -Rows '| 1 | 9 | too high |'
 $rB = Invoke-Fold -Dir $dirB
 Assert-True ($rB.ExitCode -ne 0) 'malformed table: refuses'
 Assert-True ($rB.Output -match 'off the scale') 'malformed table: and says which cell'
-Assert-True ([System.IO.File]::ReadAllText((Join-Path $dirB 'CHANGELOG.md')) -eq $clBefore) 'malformed table: CHANGELOG.md is untouched -- this script commits straight to main'
+Assert-True ((Get-Changelog -Dir $dirB) -eq $clBefore) 'malformed table: CHANGELOG.md is untouched -- this script commits straight to main'
 Assert-True (Test-Path (Join-Path $dirB 'feat-bad.md')) 'malformed table: and the entry file still exists, so nothing has to be unpicked'
 
-Write-Host "A pre-table entry still folds -- recognise both, write one" -ForegroundColor Cyan
-$dirL = New-FoldFixture -Label 'impact-legacy' -TierSections
-New-TieredEntryFile -Dir $dirL -Name 'feat-old.md' -Title 'Written before the table' -Tier '2'
-$rL = Invoke-Fold -Dir $dirL
-Assert-True ($rL.ExitCode -eq 0) 'legacy entry: exits 0'
-$clL = [System.IO.File]::ReadAllText((Join-Path $dirL 'CHANGELOG.md'))
-Assert-True ((Get-SectionBody -Changelog $clL -Heading '## Tier 2 - Pull Requests') -match 'Written before the table') `
-    'legacy entry: its old Tier: line still decides the section'
-Assert-True ($clL -notmatch '(?m)^Tier: 2$') 'legacy entry: and that line is still consumed by the fold'
+Write-Host "THE PRE-PASS: one bad entry folds none of the good ones" -ForegroundColor Cyan
+#      Folding writes one entry at a time, so a problem found on the second file would leave the first already
+#      folded and its source file deleted -- a half-state to unpick by hand on main. So NOTHING may have
+#      happened, including to the entry that was fine.
+$dirP = New-FoldFixture -Label 'prepass'
+$clP0 = Get-Changelog -Dir $dirP
+New-EntryFile -Dir $dirP -Name 'feat-good.md' -Title 'Perfectly fine' -Rows '| 1 | 3 | fine |'
+New-EntryFile -Dir $dirP -Name 'feat-worse.md' -Title 'Bad tier'      -Rows '| 5 | 3 | nonexistent tier |'
+$rP = Invoke-Fold -Dir $dirP
+Assert-True ($rP.ExitCode -eq 1) 'pre-pass: exits 1'
+Assert-True ($rP.Output -match 'tier 5') 'pre-pass: the reason names the value'
+Assert-True ((Get-Changelog -Dir $dirP) -eq $clP0) 'pre-pass: the changelog is byte-identical -- it ran before any write'
+Assert-True (Test-Path -LiteralPath (Join-Path $dirP 'feat-good.md')) 'pre-pass: the VALID entry file still exists, rather than being folded first'
+Assert-True (Test-Path -LiteralPath (Join-Path $dirP 'feat-worse.md')) 'pre-pass: as does the invalid one'
+
+Write-Host "A declaration QUOTED inside a fence is not the declaration" -ForegroundColor Cyan
+#      An entry documenting this format writes the thing it is explaining -- this repo's own entries for the
+#      tier model and for this change both do. A blind regex would read the quoted value as the declaration.
+$dirF = New-FoldFixture -Label 'fenced'
+$fence = "``````text`n" + "| Tier | Significance | Why |`n|---|---|---|`n| 2 | 5 | quoted, not declared |`n" + '```' + "`n"
+New-EntryFile -Dir $dirF -Name 'docs-explains.md' -Title 'Explains the format' -Rows '| 1 | 2 | the real one |' -ExtraBody "An example:`n`n$fence"
+$rF = Invoke-Fold -Dir $dirF
+Assert-True ($rF.ExitCode -eq 0) 'fenced: exits 0'
+$clF = Get-Changelog -Dir $dirF
+Assert-True ($clF -match 'the real one')            'fenced: the REAL declaration is the one folded in'
+Assert-True ($clF -match 'quoted, not declared')    'fenced: and the quoted table survives inside its fence'
+Assert-True ($rF.Output -notmatch 'no significance') 'fenced: the real row was read, so nothing is reported missing'
 
 # ---------------------------------------------------------------------------------------------------
 foreach ($f in $script:fixtures) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }
