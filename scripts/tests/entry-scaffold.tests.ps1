@@ -483,6 +483,60 @@ Assert-Equal '<end>'      (Get-InsertLabel -Score 0 -Tier 0) 'insert: an unscore
 $emptySection = "`nIntro.`n`n"
 Assert-Equal $emptySection.Length (Get-ImpactInsertOffset -SectionText $emptySection -Score 4 -Tier 1) 'insert: a list with no entries yet appends at its end'
 
+# --- The insert offset is FENCE-AWARE, like every other reader of this format ----------------------
+# MEASURED ON A REAL FOLD (PR #477), in the document PR #476 had just created. That entry quotes an entry
+# heading inside a ```text fence, as the worked example of the format it introduces -- exactly what an entry
+# documenting this mechanism does, and what this suite's own $fence fixture does one screen up. This
+# function was the one reader that split blocks with a plain regex, and the consequence was not a
+# near-miss:
+#
+#   * the quoted heading was read as an entry boundary, SPLITTING the real entry in two;
+#   * the fragment above the fence holds no impact table -- the table sits further down, under
+#     '### Who is this for' -- so it read as tier 0, score 0;
+#   * the loop meets that tier-0 fragment FIRST, so the tier-1 entry being folded was inserted above it,
+#     at the very top of a list whose next six entries were tier 2.
+#
+# Well-formed markdown throughout, and the console line even reported it -- "placed above 8 existing
+# entries" in a document that had 7. Asserted on the ORDER rather than on the block count, because the
+# order is what the release documents inherit.
+$fencedList = @(
+    '', 'Intro.', '',
+    '## #20 Real, tier 2, and it documents the format', '',
+    'The shape is:', '',
+    '```text',
+    '## #19 A quoted heading',
+    '',
+    '| Tier | Significance | Why |',
+    '|---|---|---|',
+    '| 0 | - | - |',
+    '```', '',
+    '### Who is this for', '',
+    '| Tier | Significance | Why |', '|---|---|---|', '| 2 | 4 | consumers notice |', '',
+    '---', '',
+    '## #18 Real, tier 0', '',
+    '| Tier | Significance | Why |', '|---|---|---|', '| 0 | - | - |', ''
+) -join "`n"
+function Get-FencedInsertLabel {
+    param([int]$Score, [int]$Tier)
+    $off = Get-ImpactInsertOffset -SectionText $fencedList -Score $Score -Tier $Tier
+    if ($off -ge $fencedList.Length) { return '<end>' }
+    return (($fencedList.Substring($off) -split "`r?`n")[0]).Trim()
+}
+# The bug, as the assert that would have caught it: a tier-1 entry must land BELOW the tier-2 entry whose
+# body quotes a heading, not above it. Under the plain-regex split this returned '## #20 ...' -- the top.
+Assert-Equal '## #18 Real, tier 0' (Get-FencedInsertLabel -Score 3 -Tier 1) 'insert/fenced: a quoted entry heading is not a boundary, so the tier-2 entry above it is not split into a tier-0 fragment'
+# And the mirror image from the same fixture: a tier-2 entry scoring higher still leads.
+Assert-Equal '## #20 Real, tier 2, and it documents the format' (Get-FencedInsertLabel -Score 5 -Tier 2) 'insert/fenced: a higher-scoring tier-2 entry still leads'
+# The quoted table must not be read as the entry's declaration either -- it says tier 0 where the real
+# declaration says tier 2, so a fence-blind read gets BOTH the boundary and the tier wrong.
+$blockImpact = Resolve-EntryImpact -EntryText $fencedList.Substring($fencedList.IndexOf('## #20'))
+Assert-Equal 2 $blockImpact.Tier 'insert/fenced: the entry reads as tier 2 from its real table, not tier 0 from the quoted one'
+# CRLF: the offsets are rebuilt from the same split the fence flags come from, so a CRLF document must not
+# be shifted by one byte per line. Asserted by the resulting label rather than the number.
+$crlfList = $fencedList -replace "`n", "`r`n"
+$crlfOff = Get-ImpactInsertOffset -SectionText $crlfList -Score 3 -Tier 1
+Assert-Equal '## #18 Real, tier 0' ((($crlfList.Substring($crlfOff)) -split "`r?`n")[0]).Trim() 'insert/fenced: a CRLF document lands in the same place -- the offsets keep step with the lines'
+
 # --- The rubric -----------------------------------------------------------------------------------
 $rubric = @(Get-EntrySignificanceRubric)
 Assert-Equal 5 $rubric.Count 'rubric: five bands'

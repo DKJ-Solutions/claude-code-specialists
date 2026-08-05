@@ -77,6 +77,41 @@ function Get-EntryScaffoldWording {
     return [pscustomobject]$out
 }
 
+function Get-EntryFencedLineFlags {
+    <#
+        Pure: one $true/$false per input line -- is that line inside a fenced code block? The fence
+        MARKERS count as fenced, i.e. as belonging to the block they delimit.
+
+        ITS OWN FUNCTION BECAUSE TWO READERS HERE NEED THE ANSWER IN TWO SHAPES. Get-EntryTextOutsideFences
+        wants the text with the fenced lines gone, which is enough for a matcher; Get-ImpactInsertOffset
+        needs to know WHICH lines are fenced while keeping every line, because it answers in character
+        offsets into the original text and cannot afford to lose its place. Deriving both from one walk is
+        what stops them disagreeing about where a fence starts -- and a fence reader that disagrees with
+        the reader beside it is how a quoted heading becomes structure.
+
+        Deliberately the same simple rule as before: pair up ``` runs. An unclosed fence leaves the tail
+        flagged, which is the safe direction for every caller -- it can only cause a missed finding, never
+        a false accusation against text somebody did write.
+
+        This duplicates Get-FencedLineFlags in release-lib.ps1, which is the higher lib and already
+        dot-sources this one; the dependency cannot run the other way, because the fold and this file's own
+        suite load this lib standalone. Collapsing the two is a real follow-up and deliberately not done in
+        the same change as the defect repair.
+    #>
+    param([AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines = @())
+    $flags = New-Object System.Collections.Generic.List[bool]
+    $inFence = $false
+    foreach ($line in $Lines) {
+        if ($line -match '^\s*```') {
+            $flags.Add($true)          # the marker belongs to its block
+            $inFence = -not $inFence
+            continue
+        }
+        $flags.Add($inFence)
+    }
+    return @($flags.ToArray())
+}
+
 function Get-EntryTextOutsideFences {
     <#
         Pure: the entry's text with every fenced code block removed, for a caller that wants to match
@@ -93,11 +128,14 @@ function Get-EntryTextOutsideFences {
         finding, never a false accusation against text somebody did write.
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
+    # Read off the shared flags rather than walking the fences again, so this and the ranker cannot end up
+    # disagreeing about where a block starts. Behaviour is unchanged: a marker line is flagged, so it is
+    # dropped exactly as the old 'continue' dropped it.
+    $lines = @($EntryText -split '\r?\n')
+    $fenced = Get-EntryFencedLineFlags -Lines $lines
     $kept = New-Object System.Collections.Generic.List[string]
-    $inFence = $false
-    foreach ($line in ($EntryText -split '\r?\n')) {
-        if ($line -match '^\s*```') { $inFence = -not $inFence; continue }
-        if (-not $inFence) { $kept.Add($line) }
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if (-not $fenced[$i]) { $kept.Add($lines[$i]) }
     }
     return ($kept -join "`n")
 }
@@ -820,7 +858,41 @@ function Get-ImpactInsertOffset {
     # of the tier-0 run, which is the newest-first answer without promoting it past work that declared more.
     # Keeping a switch no caller passes would have preserved the wrong answer for the day somebody reached
     # for it.
-    $entryStarts = @([regex]::Matches($SectionText, $EntryPattern) | ForEach-Object { $_.Index })
+    # FENCE-AWARE, LIKE EVERY OTHER READER OF THIS FORMAT -- and this function was the one that was not.
+    # Measured on the fold of PR #477, in the document PR #476 had just created: that entry quotes
+    # '## #475 <midDot> ...' inside a ```text fence, as the worked example of the format it introduces. A
+    # plain regex over the text reads that quoted heading as an entry boundary, which does two things and
+    # neither errors:
+    #
+    #   * it SPLITS the real entry in two. The fragment above the fence holds no impact table -- the table
+    #     sits further down, under '### Who is this for' -- so it reads as tier 0, score 0;
+    #   * the loop below then meets that tier-0 fragment FIRST, and any entry of tier 1 or higher is
+    #     inserted above it: at the very top of the document. Which is what happened -- a tier-1 entry led
+    #     a list whose next six entries were tier 2.
+    #
+    # Well-formed markdown either way, and the console line even reported it ("placed above 8 existing
+    # entries" in a document that had 7). The fourth-plus instance of one defect class in this file's
+    # history: a matcher satisfied by a MENTION rather than a use. Split-EntryBlocks in release-lib.ps1
+    # already handled it; this ranker did not, because it was written when entries could not contain
+    # headings of their own.
+    #
+    # Done by LINE rather than by character offset, because Get-FencedLineFlags answers per line and the
+    # offsets have to be rebuilt from the same split to stay in step with it. The newline width is added
+    # back per line from the original text, so a CRLF document is not silently shifted by one byte per
+    # line -- the root CHANGELOG is CRLF here.
+    $rxLine = [regex]($EntryPattern -replace '^\(\?m\)', '')
+    $srcLines = @($SectionText -split "`r?`n")
+    $fenced = Get-EntryFencedLineFlags -Lines $srcLines
+    $entryStarts = @()
+    $offset = 0
+    for ($i = 0; $i -lt $srcLines.Count; $i++) {
+        if ((-not $fenced[$i]) -and $rxLine.IsMatch($srcLines[$i])) { $entryStarts += $offset }
+        $offset += $srcLines[$i].Length
+        # The separator this line ended with, taken from the source rather than assumed.
+        if ($offset -lt $SectionText.Length) {
+            if ($SectionText.Substring($offset, 1) -eq "`r") { $offset += 2 } else { $offset += 1 }
+        }
+    }
     if ($entryStarts.Count -eq 0) { return $SectionText.Length }
 
     for ($i = 0; $i -lt $entryStarts.Count; $i++) {
