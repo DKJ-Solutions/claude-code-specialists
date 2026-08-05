@@ -1,35 +1,20 @@
 # Changelog
 
-Where this repo stands: under **Latest Release** the version currently cut, and under the three
-**tier sections** everything merged since it - ordered by how far each change reaches, furthest
-first. Every release ever cut is listed in [`releases/README.md`](releases/README.md); how the
-mechanism works (entry files, tiers, folding) is described in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Everything merged since the last release, furthest reach first: **one `##` per change**, and under it three
+named sections answering what a reader arrives with. Every release ever cut is listed in
+[`releases/README.md`](releases/README.md) — each with its date, type and title, and a link to what that
+release was worth. How the mechanism works (entry files, the impact table, folding) is described in
+[`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-The tier is declared per entry while it is still on its branch and stated by the section once it is
-folded, and it decides what may be released: **a release needs at least one tier-1 entry**, **a minor
-needs a tier-2 one**, and a **major** recaps ten minors. So an empty tier section is normal, and a
-changelog holding nothing but tier 0 is a changelog with no release in it yet.
+Each change declares its own **reach**, and per audience how much it **weighs** there — the impact table
+under *Who is this for*. That is what orders this list: furthest reach first, and within a tier the most
+consequential change first. It also decides what may be released: **a release needs at least one tier-1
+entry**, **a minor needs a tier-2 one**, and a **major** recaps ten minors. So a changelog holding nothing
+but tier 0 is a changelog with no release in it yet.
 
-## Latest Release
+## #475 · A significance score per entry, and the order follows it
 
-The most recent release — every earlier one is listed in
-[releases/README.md](releases/README.md), with its date, type and title.
-
-**v3.5.0** — 2026-08-05 — Minor
-
-See [releases/internal/3.x/3.5.0.md](releases/internal/3.x/3.5.0.md) for what this release is worth. The full per-PR record is in [releases/development/3.x/3.5.0.md](releases/development/3.x/3.5.0.md).
-
-## Tier 2 - Pull Requests
-
-What a consumer of this product notices - newest at the top, one block per pull request.
-At least one entry here is what a minor release requires.
-
-### #475 · A significance score per entry, and the order follows it · Feat
-
-| Tier | Significance | Why |
-|---|---|---|
-| 2 | 4 | a consumer's next entry file looks different and their next cut asks for scores -- noticed the same day, without anything breaking: entries written before this still fold |
-| 1 | 4 | the release documents now order themselves by consequence, so the most consequential change leads instead of sitting third under whichever heading its branch prefix produced |
+### What does this change do?
 
 Closes [#467](https://github.com/DaveKJohn/claude-code-specialists/issues/467).
 
@@ -97,13 +82,26 @@ because it is the first thing anyone reaches for: **RICE and WSJF do not apply h
 *before* it is done, with effort in the denominator — they answer "what do we build next". Everything scored
 here is already merged, so effort is spent and irrelevant.
 
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 4 | a consumer's next entry file looks different and their next cut asks for scores -- noticed the same day, without anything breaking: entries written before this still fold |
+| 1 | 4 | the release documents now order themselves by consequence, so the most consequential change leads instead of sitting third under whichever heading its branch prefix produced |
+
+### Type of change
+
+Feat
+
 Plugins: specialists
 
 [PR #475](https://github.com/DaveKJohn/claude-code-specialists/pull/475) · merged 2026-08-05
 
 ---
 
-### #474 · The lens scaffold's title carries no (VUL-IN) -- only its slot does · Fix
+## #474 · The lens scaffold's title carries no (VUL-IN) -- only its slot does
+
+### What does this change do?
 
 **`specialists-teardown -Apply` would have deleted written repo knowledge, and the dry run pointed at
 the wrong files.** The lens template wrote `(VUL-IN)` into the H1 title *and* the slot heading;
@@ -146,13 +144,26 @@ already proposed.
 carry a marked title (02-09, 03-02, 04-11, 04-12, 04-13, 06-30) and all six are genuinely unfilled, so
 they are classified correctly today. Each is one edit away from the trap.
 
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | - | - |
+| 1 | - | - |
+
+### Type of change
+
+Fix
+
 Plugins: specialists
 
 [PR #474](https://github.com/DaveKJohn/claude-code-specialists/pull/474) · merged 2026-08-05
 
 ---
 
-### #473 · An inbound issue is verified as still standing before it is routed · Docs
+## #473 · An inbound issue is verified as still standing before it is routed
+
+### What does this change do?
 
 **An inbound issue was picked up as open work an hour after it had been repaired.** #469 reported that
 `fold-changelog-entry.ps1` kept the entry-creation date instead of the merge date. It was filed at
@@ -196,13 +207,26 @@ wrong. That guards against repairing the wrong cause; this one guards against re
 already gone. The persona now names both in order: establish the report still stands, *then* verify the
 reason it gives.
 
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | - | - |
+| 1 | - | - |
+
+### Type of change
+
+Docs
+
 Plugins: specialists
 
 [PR #473](https://github.com/DaveKJohn/claude-code-specialists/pull/473) · merged 2026-08-05
 
 ---
 
-### #472 · The merge date is added by the fold, at the bottom, instead of scaffolded into the heading · Feat
+## #472 · The merge date is added by the fold, at the bottom, instead of scaffolded into the heading
+
+### What does this change do?
 
 **This entry's own heading is the specimen: it carries no date.** The scaffolder used to write one, and
 it ran when the *branch* was created — so what it recorded was the branch's birth date, not the landing
@@ -266,13 +290,26 @@ headings alone — you read an entry's last line. That is acceptable because the
 hold what is pending since the last release, a window of days in which the dates sit close together. The
 release notes, where the history actually lives, keep the line per entry.
 
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | - | - |
+| 1 | - | - |
+
+### Type of change
+
+Feat
+
 Plugins: specialists
 
 [PR #472](https://github.com/DaveKJohn/claude-code-specialists/pull/472) · merged 2026-08-05
 
 ---
 
-### #471 · Publishing the GitHub Release is part of a cut that was already asked for · Docs · 2026-08-05
+## #471 · Publishing the GitHub Release is part of a cut that was already asked for
+
+### What does this change do?
 
 **Cutting a release is asked for; the closing steps of that cut are no longer asked for again.** The
 version bump and the tag are the irreversible act and stay behind an explicit request. Once that is
@@ -310,22 +347,26 @@ own place to speak. The core is stated in full here; the deviating consumer reco
 its own lens. Both halves are in Tessa's hard rules now, because she is the one who guards which half a
 sentence belongs in.
 
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | - | - |
+| 1 | - | - |
+
+### Type of change
+
+Docs
+
 Plugins: specialists
 
-[PR #471](https://github.com/DaveKJohn/claude-code-specialists/pull/471)
+[PR #471](https://github.com/DaveKJohn/claude-code-specialists/pull/471) · merged 2026-08-05
 
 ---
 
-## Tier 1 - Pull Requests
+## #470 · The v3.5.0 release documents: the internal note and the edited highlights
 
-What a colleague working on this project gets out of it - newest at the top, one block per
-pull request. At least one entry of this tier or higher is what any release requires.
-
-## Tier 0 - Pull Requests
-
-Repo-internal: docs, config and work nobody outside this repo's own developers notices -
-newest at the top, one block per pull request. No release can be cut from this tier alone.
-### #470 · The v3.5.0 release documents: the internal note and the edited highlights · Docs · 2026-08-05
+### What does this change do?
 
 The two documents `cut-release.ps1` deliberately does not write, for the release cut earlier today. Both
 land here rather than on the release commit because that commit is already tagged, and neither is one of
@@ -351,7 +392,17 @@ the published release body -- measured once by a line stating the previous relea
 which its own author then published. So the open-points section names what sits with whom, and says
 nothing about what has or has not been published as of the hour it was written.
 
-[PR #470](https://github.com/DaveKJohn/claude-code-specialists/pull/470)
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 0 | - | - |
+
+### Type of change
+
+Docs
+
+[PR #470](https://github.com/DaveKJohn/claude-code-specialists/pull/470) · merged 2026-08-05
 
 ---
 

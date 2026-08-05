@@ -15,13 +15,20 @@ with the plugin cache via `claude plugin update`).
 ## The tier model
 
 **One scale, used twice.** A change declares how far it reaches, and that number decides two things: which
-section of `CHANGELOG.md` it is filed under, and which release document it appears in.
+release document it appears in, and — together with its significance score — where in that document it sits.
 
-| tier | who notices | changelog section | release document |
-|---|---|---|---|
-| **2** | consumers of the product | `## Tier 2 - Pull Requests` | `highlights/<dir>/<X.Y.Z>.md` |
-| **1** | colleagues working on this project | `## Tier 1 - Pull Requests` | `internal/<dir>/<X.Y.Z>.md` |
-| **0** | only this repo's own developers | `## Tier 0 - Pull Requests` | `development/<dir>/<X.Y.Z>.md` |
+| tier | who notices | release document |
+|---|---|---|
+| **2** | consumers of the product | `highlights/<dir>/<X.Y.Z>.md` |
+| **1** | colleagues working on this project | `internal/<dir>/<X.Y.Z>.md` |
+| **0** | only this repo's own developers | `development/<dir>/<X.Y.Z>.md` |
+
+**`CHANGELOG.md` has no sections to file into** (Dave, August 5, 2026). It is an intro followed by one `##`
+per change, ranked furthest-reach-first and, within a tier, highest-significance-first — so what the three
+`## Tier N - Pull Requests` sections used to say visually is now the ordering, and each entry states its own
+reach in the impact table it carries. The **fold** is the only moment that order can be decided, because the
+cut empties the list: whatever order it leaves is what these three documents inherit, with nothing
+re-estimated days later.
 
 **The ladder is cumulative, so the documents are not disjoint.** Something a consumer notices is something
 a colleague should hear about too — a tier-2 entry therefore appears in the highlights *and* in the internal
@@ -158,11 +165,12 @@ In one motion, on a clean `main`:
 
 1. bumps all `plugin.json` versions in lockstep to `X.Y.Z`;
 2. generates the full release notes in `development/<dir>/<X.Y.Z>.md` (from the folded entries, grouped by
-   tier and then by branch type within each tier), adds a row to the release list at the end of this page, and places in `CHANGELOG.md`
-   a reference under the release heading, emptying **every tier section** down to its own intro. Which
-   heading that is, and whether the blocks accumulate or the newest **replaces** the previous one, comes
-   from `Get-ReleaseHistoryMode`. Either way the existing section order is kept — a cut never reorders the
-   document, and never adds a tier section the repo has not adopted;
+   tier and, within a tier, a flat list in the ranked order the fold left), adds a row to the release list at
+   the end of this page, and **empties `CHANGELOG.md` down to its intro** — that intro passes through
+   verbatim, so whatever the repo says about itself up there survives every cut. A cut writes no release
+   block: the section that used to hold one had grown to 434 of the changelog's 1,062 lines across 72 blocks
+   each saying no more than "see the notes", while this page already listed all 72 with a date, a type and a
+   title. What replaced it is the intro's own one-line pointer to this page;
 3. appends, per plugin, the entries that touched that plugin (selected via the `Plugins:` line that the fold
    derives from the PR's files; as internal bookkeeping, the line itself doesn't travel along) to the
    **per-plugin `CHANGELOG.md`**, and regenerates that plugin's **`RELEASE.md`** card (version, one-line
@@ -239,17 +247,17 @@ decisions behind them, the measured instances, and the release list itself.
 ### Seam values in force here
 
 All three documents group **per major** (`3.x`) — the consumer this model came from folders per minor.
-`Get-ReleaseHistoryMode` is `'latest'`, so `CHANGELOG.md`'s heading is `## Latest Release` and it holds
-exactly one block, pointing at this page for the rest; a repo leaving that seam at its `all` default uses
-`## Releases` and lets the blocks accumulate. `Get-ReleaseHistoryPath` is left at its default,
-`releases/README.md` — this page — since the list lives here.
+`Get-ReleaseHistoryPath` is left at its default, `releases/README.md` — this page — since the list lives
+here, and since August 5, 2026 that default carries a second job: the **Version cell** of each new row is
+where `new-internal-note.ps1` points the internal note, because removing the changelog's release block left
+that note with no inbound link anywhere else.
 
-**The tier sections** are declared in `Get-ChangelogTierHeadings` as `## Tier 2 - Pull Requests`,
-`## Tier 1 - Pull Requests` and `## Tier 0 - Pull Requests`, in that order — the map's order *is* the
-document's order, so "which tiers exist" and "where do they sit" are one answer. `Get-ChangelogHeading`, the
-legacy single-section seam, is therefore **not stated here**: it is still recognised as a fallback for a repo
-that has not adopted the split, and a value nothing reads is a value that goes stale unnoticed. The script
-contract reports its absence as `[INFO]`, which is the correct report rather than a gap.
+**Six changelog seams retired on August 5, 2026 and are therefore not stated here either.**
+`Get-ChangelogTierHeadings` and the legacy `Get-ChangelogHeading` (#178) named changelog section headings, and
+the document has none; `Get-ReleaseCategoryTitles` labelled the release-notes categories, and the grouping is
+gone with the branch-prefix guess behind it; `Get-ReleaseLiveMarker`, `Get-ReleaseHistoryMode` and
+`Get-ChangelogReleaseWording` (#462) all described the release **block** a cut used to append, and a cut
+writes none. A consumer that still defines one is unaffected — nothing calls them.
 
 **`Get-ReleaseMajorMinMinors` is `10`.** Held against this repo's own history that is roughly right rather
 than arbitrary: the `1.x` line ran to `1.18` and the `2.x` line to `2.16` before each was recapped into a
@@ -261,12 +269,11 @@ every plugin's `RELEASE.md` card exists and that its version matches `plugin.jso
 together via `cut-release.ps1`. That pairing is repo-specific — a repo with no plugin tier has no cards to
 check — which is why the gate is named here and not in the portable half.
 
-**`Get-ChangelogReleaseWording` is deliberately not defined**, for the same reason `Get-ChangelogHeading`
-is not: this repo is English, so the defaults already are its own words and a value nothing reads goes
-stale unnoticed. One thing a non-English consumer should know before leaving it alone — `AllIntro`'s
-default says *"the recorded versions of the marketplace"*, which is simply the wrong noun for a repo that
-is not one. The script contract reports the absence as `[INFO]` and names the default, so it is a thing you
-were told rather than one you meet at release time.
+**What a non-English consumer loses with `Get-ChangelogReleaseWording`, stated rather than glossed over.**
+That seam existed because those four strings were the most visible generated output in `CHANGELOG.md`, and
+inbound #462 asked for them to be repo-owned. The capability is not being taken away — the **output** is
+gone. What replaced it is the intro's own pointer to this page: hand-written prose in a file the repo owns
+outright, so it needs no seam to be in their language. It simply is.
 
 ### Local decisions
 
