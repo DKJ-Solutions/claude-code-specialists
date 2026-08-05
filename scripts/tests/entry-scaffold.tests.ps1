@@ -289,15 +289,25 @@ Assert-True ($crlfOut -notmatch "(?<!`r)`n") 'and no bare LF is introduced along
 $noTier = "### x $md Feat $md 2026-08-05`n`nBody.`n"
 Assert-Equal $noTier (Remove-EntryTierLine -EntryText $noTier) 'an entry with no tier line comes back unchanged'
 
-Write-Host "the wiring (open-pr validates the tier, the fold consumes it)" -ForegroundColor Cyan
+Write-Host "the wiring (open-pr validates the impact, the fold consumes it)" -ForegroundColor Cyan
 # Text asserts for the same reason as the scaffold gate above: open-pr drives a live push and gh.
-Assert-True ($openPrText -match 'Resolve-EntryTier') 'open-pr resolves the entry tier'
-Assert-True ($openPrText -match 'tier gate:') 'and reports under a named gate, so a block is attributable'
+#
+# MATCHED AS A CALL, NOT AS A MENTION. The obvious assert here is `-match 'Resolve-EntryImpact'`, and it
+# would pass on the COMMENT above the call explaining why the legacy reader was dropped -- the "satisfied by
+# a mention rather than a use" failure this repo has measured four times in one day. Requiring the
+# assignment shape means only an actual call can satisfy it.
+Assert-True ($openPrText -match '\$entryTier\s*=\s*Resolve-EntryImpact') 'open-pr resolves the entry impact -- reach and significance in one read'
+# ONE resolve, not two. This was two gates reading two functions, and the legacy one reported tier 0 for a
+# table declaring tier 2 -- the author told the opposite of what they wrote, one line above the reader that
+# got it right. Two readers of one fact is the drift this repo keeps paying for.
+Assert-Equal 1 ([regex]::Matches($openPrText, 'Resolve-EntryImpact -EntryText').Count) 'and does so exactly once, so the two halves cannot disagree'
+Assert-True ($openPrText -notmatch 'Resolve-EntryTier -EntryText') 'and no longer calls the legacy tier reader directly'
+Assert-True ($openPrText -match 'impact gate:') 'and reports under a named gate, so a block is attributable'
 # NOT -Force-able, deliberately: -Force exists for text somebody legitimately wrote, and there is no
-# legitimate 'Tier: 5'. Asserted by reading the refusal block rather than the whole file.
-$tierGateIdx = $openPrText.IndexOf('tier gate:')
+# legitimate '| 2 | 9 | x |'. Asserted by reading the refusal block rather than the whole file.
+$tierGateIdx = $openPrText.IndexOf('impact gate:')
 $tierGateBlock = $openPrText.Substring($tierGateIdx, [Math]::Min(900, $openPrText.Length - $tierGateIdx))
-Assert-True ($tierGateBlock -notmatch '\$Force') 'the tier gate has no -Force escape -- a meaningless tier is never legitimate'
+Assert-True ($tierGateBlock -notmatch '\$Force') 'the impact gate has no -Force escape -- a meaningless value is never legitimate'
 $foldText = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\fold-changelog-entry.ps1'))
 Assert-True ($foldText -match 'entry-scaffold-lib\.ps1') 'the fold dot-sources the shared entry-format lib'
 # Resolve-EntryImpact, not Resolve-EntryTier: since the impact table (issue #467) the fold reads the reach

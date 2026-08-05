@@ -398,68 +398,55 @@ Rewrite the body to say what the change DOES, then run again. Keeping it as-is i
         }
     }
 
-    # Tier gate, on the same read of the same file. The entry declares how far this change reaches
-    # ('Tier: N'), the fold files it under the matching changelog section, and the release cut refuses a
-    # bump the pending tiers have not earned -- so a tier that cannot be honoured has to be caught before
-    # the entry reaches main.
+    # Impact gate, on the same read of the same file. The entry declares how far this change reaches and how
+    # much it weighs there; the fold files it under the matching changelog section and orders it within that
+    # section, and the release cut refuses a bump the pending tiers have not earned. So a declaration that
+    # cannot be honoured has to be caught before the entry reaches main.
     #
-    # ONLY A MALFORMED VALUE IS REFUSED, never a low one. 'Tier: 0' is a legitimate, common and final
-    # answer, exactly like the 'Chore' fallback type -- so it can never be evidence of an unfinished
-    # entry, which is why it is not part of the scaffold gate above. What IS refused is a value the model
-    # has no meaning for ('Tier: 5', 'Tier: two'): that reads back as the default and would file
-    # consumer-facing work as repo-internal, correct-looking and silent. Here it costs one line to fix;
-    # after the merge it is a section-move on main.
+    # ONE RESOLVE FOR BOTH HALVES, and that is a bug this consolidation removes rather than a tidy-up. This
+    # was two blocks: a tier gate reading the legacy Resolve-EntryTier and a significance gate reading the
+    # table. MEASURED on the first real run -- the tier line printed "entry tier: 0 (no Tier: line -- the
+    # default)" for an entry whose table declared tier 2, telling the author the exact opposite of what they
+    # had written, one line above the significance reader that got it right. Two readers of one fact, which
+    # is the drift this repo keeps paying for; now there is one, and it falls back to 'Tier: N' internally.
     #
-    # NOT -Force-able, deliberately, unlike the scaffold gate. -Force exists for text somebody
-    # legitimately wrote; there is no legitimate 'Tier: 5'.
-    $entryTier = Resolve-EntryTier -EntryText $entryText
-    if ($entryTier.Error) {
+    # ONLY A MALFORMED VALUE IS REFUSED, never a low one. Tier 0 and significance 1 are legitimate, common
+    # and final answers -- so neither can ever be evidence of an unfinished entry, which is why this is not
+    # part of the scaffold gate above. What IS refused is a value the model has no meaning for
+    # ('| 5 | 3 | x |', '| 2 | 9 | x |'): it reads back as the default and would file consumer-facing work as
+    # repo-internal, or sink the entry to the bottom of the document it matters most in -- correct-looking
+    # and silent either way. Here it costs one cell to fix; after the merge it is an edit on main.
+    #
+    # MISSING rows and scores are said out loud but NOT refused, which is a split by kind of fault rather
+    # than by convenience. Dave placed that refusal at the cut (August 5, 2026): the score is a judgement
+    # about a finished change, and an author who has not settled it should not be blocked from merging.
+    #
+    # NOT -Force-able, deliberately, unlike the scaffold gate. -Force exists for text somebody legitimately
+    # wrote; there is no legitimate '| 2 | 9 | x |'.
+    $entryTier = Resolve-EntryImpact -EntryText $entryText
+    $malformed = @(@($entryTier.Errors) | Where-Object { $_ })
+    if ($malformed.Count -gt 0) {
         Write-Error @"
-tier gate: $(Split-Path $entryPath -Leaf) does not declare a usable tier - nothing pushed, no PR opened.
-
-  $($entryTier.Error)
-
-The tiers are how far a change reaches, and the release cut reads them:
-  $(Get-EntryTierLabel): 0   only this repo's own developers notice (docs, config, internal work)
-  $(Get-EntryTierLabel): 1   a colleague working on this project gets something out of it
-  $(Get-EntryTierLabel): 2   a consumer of the product notices it
-
-Correct the line and run again.
-"@
-        exit 1
-    }
-    Write-Host "  entry tier: $($entryTier.Tier)$(if (-not $entryTier.Declared) { " (no $(Get-EntryTierLabel): line -- the default; a release cannot be cut from tier-0 work alone)" })" -ForegroundColor DarkGray
-
-    # Significance gate, on the same read of the same file (issue #467). The score orders the release
-    # documents this entry's tier reaches, and cut-release.ps1 refuses a release whose entries have not
-    # declared one.
-    #
-    # THE SPLIT WITH THE CUT IS DELIBERATE, AND IT IS A SPLIT BY KIND OF FAULT rather than by convenience.
-    # A MALFORMED value is refused here: 'Significance: 9' reads back as unscored, which would sort a
-    # change to the bottom of the document it matters most in -- silent, correct-looking, and a one-line
-    # fix now versus an edit on main later. A MISSING value is NOT refused here, because Dave placed that
-    # refusal at the cut (August 5, 2026): the score is a judgement about a finished change, and an author
-    # who has not settled it should not be blocked from merging over it. So this reports it and moves on.
-    #
-    # NOT -Force-able, for the reason the tier gate is not: -Force exists for text somebody legitimately
-    # wrote, and there is no legitimate 'Significance: 9'.
-    if (Test-EntrySignificanceActive) {
-        $impact = Resolve-EntryImpact -EntryText $entryText
-        $malformed = @(@($impact.Errors) | Where-Object { $_ })
-        if ($malformed.Count -gt 0) {
-            Write-Error @"
-impact gate: $(Split-Path $entryPath -Leaf) has an impact table this model cannot read - nothing pushed, no PR opened.
+impact gate: $(Split-Path $entryPath -Leaf) declares an impact this model cannot read - nothing pushed, no PR opened.
 
 $(($malformed | ForEach-Object { "  $_" }) -join "`n")
 
-The rubric:
+The tiers are how far a change reaches, and the release cut reads them:
+  0   only this repo's own developers notice (docs, config, internal work)
+  1   a colleague working on this project gets something out of it
+  2   a consumer of the product notices it
+
+The significance is how much it weighs for that reader, and decides where in the document it sits:
 $((Format-EntrySignificanceRubricLines) -join "`n")
 
-An unreadable cell reads back as unscored, which sinks the entry to the bottom of the document it matters
-most in -- without an error. Correct the table and run again.
+Correct the table and run again.
 "@
-            exit 1
-        }
+        exit 1
+    }
+    Write-Host "  entry tier: $($entryTier.Tier)$(if (-not $entryTier.Declared) { ' (nothing declared -- the default; a release cannot be cut from tier-0 work alone)' })" -ForegroundColor DarkGray
+
+    if (Test-EntrySignificanceActive) {
+        $impact = $entryTier
         # MISSING rows and scores are said out loud, not refused: Dave placed that refusal at the cut
         # (August 5, 2026), because the score is a judgement about a finished change and an author who has
         # not settled it should not be blocked from merging over it.
