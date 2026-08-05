@@ -166,6 +166,32 @@ function Get-LintScript { return `$script:LintScript }
     # And the genuinely unfilled branch-info scaffold must still go, so this did not simply stop removing.
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\lib\branch-info.ps1'))) 'mention vs use: the genuinely unfilled branch-info scaffold is still removed'
 
+    # --- 5b-2. THE BOOTSTRAP->FILL->TEARDOWN SEAM (inbound #451) --------------------------------------
+    #     The previous case hand-writes its filled lens, and that is exactly why it missed this one: it
+    #     wrote a title of its own ('# 06-16 repo lens') instead of the title the BOOTSTRAP writes. The
+    #     bootstrap used to mark the title too -- '# 06-16 <dot> repo lens (VUL-IN)' -- and filling a lens
+    #     replaces only the SLOT heading, so that marker outlived the filling and Test-LooksGenerated,
+    #     which matches '(VUL-IN)' at ANY heading level, read authored repo knowledge as a scaffold.
+    #     Measured in a consumer with 24 lenses: three filled specialist lenses holding 153 lines between
+    #     them printed [remove], and -Apply would have taken them.
+    #
+    #     So this fixture does NOT invent the boilerplate. It takes the lens the real bootstrap produced
+    #     and edits it the way a consumer does -- slot heading replaced, everything above it untouched --
+    #     which is the only version of this test that can catch the template regressing again.
+    New-BootstrappedConsumer | Out-Null
+    $seamLens = Join-Path $Fixture '.claude\specialists\lenses\06-16-extension.md'
+    $asGenerated = [System.IO.File]::ReadAllText($seamLens, [System.Text.Encoding]::UTF8)
+    Assert-True ($asGenerated -match '(?m)^##\sSpecific to this repo \(VUL-IN\)\s*$') 'seam: the freshly bootstrapped lens carries the marker on its SLOT'
+    Assert-True (-not ($asGenerated -match '(?m)^#\s[^\r\n]*\(VUL-IN\)')) 'seam: the freshly bootstrapped lens carries NO marker on its TITLE'
+    # Fill it exactly as a consumer would: the slot heading becomes theirs, the title is never touched.
+    $filledSeamLens = [regex]::Replace($asGenerated, '(?m)^##\sSpecific to this repo \(VUL-IN\)\s*$', '## Specific to this repo (my-repo)')
+    $filledSeamLens = $filledSeamLens.TrimEnd() + "`n`nTessa owns CLAUDE.md and the manuals in this repo, and reviews every doc diff before the PR.`n"
+    [System.IO.File]::WriteAllText($seamLens, $filledSeamLens)
+    $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
+    Assert-Equal 0 $r.Code 'seam: exit-code 0'
+    Assert-True (Test-Path -LiteralPath $seamLens) 'seam: a bootstrap-generated lens that was FILLED IN survives -Apply'
+    Assert-True ([System.IO.File]::ReadAllText($seamLens) -match 'Tessa owns CLAUDE\.md') 'seam: the kept lens still holds the repo knowledge somebody wrote'
+
     # --- 5c. The positive side of each signal still fires -------------------------------------------
     #     Guard against 5b being "fixed" by never removing anything. Each kind keeps its own signal:
     #     a placeholder VALUE for repo-config, an EMPTY prefix table for branch-info, an unfilled slot

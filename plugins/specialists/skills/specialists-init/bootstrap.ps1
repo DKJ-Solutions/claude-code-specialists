@@ -402,13 +402,21 @@ foreach ($pluginName in ($pluginNames | Sort-Object -Unique)) {
         # persona's first name -- so a later rename of the agent-def never drifts this generated
         # header. The name lives in exactly one place, the agent-def's `name:` frontmatter.
         $slug = "$group-$id"
+        # The TITLE deliberately carries no (VUL-IN) -- the same rule, and for the same reason, as the
+        # SPECIALISTS.md scaffold further down: only the SLOT heading may carry the marker, because
+        # filling the lens replaces that heading and nothing ever touches the title. Test-LooksGenerated
+        # keys on '(VUL-IN)' at ANY heading level, so a marked title survives a filled-in lens and makes
+        # the teardown read authored repo knowledge as a disposable scaffold. Inbound #451 measured that
+        # in a consumer with 24 lenses: three filled specialist lenses holding 153 lines between them all
+        # printed [remove], and -Apply would have taken them. Until then this template did exactly what
+        # the comment on the SPECIALISTS.md branch already forbade, for every lens instead of one file.
         $template = @"
 ---
 id: $id
 group: $group
 ---
 
-# $slug $midDot repo lens (VUL-IN)
+# $slug $midDot repo lens
 
 > Repo lens alongside portable domain guide for specialist $slug in ``$pluginName`` plugin.
 > Created by ``specialists-init`` as empty template; agent definition reads it automatically.
@@ -915,6 +923,15 @@ if ($notInstalledIds.Count -gt 0) {
 }
 Write-Host "Next steps (manual -- script intentionally leaves settings.json/hooks untouched):" -ForegroundColor Cyan
 Write-Host "  1. Fill '## Specific to this repo' slot in each $lensRelDisplay/*-extension.md with repo lens (VUL-IN scaffolds can stay empty until specialist has work here)." -ForegroundColor Gray
+# THE MARKER IS LOAD-BEARING, SO SAY SO WHERE THE FILLING IS INSTRUCTED (inbound #451). Replacing the slot
+# heading is what tells specialists-teardown the lens is authored; leaving a '(VUL-IN)' heading anywhere in
+# a lens you HAVE filled makes that script read it as a disposable scaffold. This bootstrap no longer marks
+# the title, but a lens scaffolded by an EARLIER version still carries one -- and that repo cannot be
+# reached from here, so the instruction is the only route to it.
+Write-Host "     Filling a lens means the '(VUL-IN)' goes: replace the slot heading with your own. On a" -ForegroundColor Gray
+Write-Host "     lens scaffolded before this fix, remove it from the '... repo lens (VUL-IN)' TITLE as" -ForegroundColor Gray
+Write-Host "     well -- specialists-teardown keys on that marker at any heading level, so one left on" -ForegroundColor Gray
+Write-Host "     the title makes it list your written lens as removable." -ForegroundColor Gray
 if ($seamMode) {
     Write-Host "  1b. Put this repo's roster, routing table and chains in $($seam.RelDir)/SPECIALISTS.md (the '## The roster (VUL-IN)' slot) -- NOT in CLAUDE.md, which keeps exactly one import line." -ForegroundColor Gray
 }
