@@ -1093,6 +1093,36 @@ function Get-EntrySectionBody {
     return (($kept -join "`n").Trim())
 }
 
+function Get-ReleaseChangeTypes {
+    <#
+        The change types the repo's branch table produces -- 'Feat', 'Fix', 'Docs', 'Chore' here. Read from
+        Get-BranchTypes in the consumer's own scripts/lib/branch-info.ps1 where the caller has dot-sourced
+        it; absent, it falls back to the four canonical types.
+
+        THE FALLBACK IS THE POINT, not a convenience. branch-info.ps1 is repo-owned and deliberately does
+        not travel into the plugin mirror, so 'absent' is the ORDINARY case in a consumer rather than an
+        edge one -- and the readers below need a list to recognise a type field with, not merely to validate
+        against. Measured: while this returned only Get-BranchTypes' answer, new-internal-note.ps1 running
+        in a consumer lost the type off every bullet it took from a historical heading, printing the title
+        alone with no error.
+
+        IT LIVES HERE, IN THE LIB THAT OWNS THE ENTRY FORMAT, because two of its three readers are here --
+        Resolve-EntryType, for the pre-format heading fallback, and the internal note's recogniser through
+        it -- and the dependency can only run downward: the fold and this file's own suite load this lib
+        standalone. It used to sit in release-lib.ps1, whose Convert-EntryHeadingToTitle still calls it by
+        this same name, unchanged, through that file's dot-source of this one.
+
+        NO 'Other' HERE. That was the catch-all CATEGORY LABEL of the retired Get-ReleaseCategories -- a
+        thing this repo printed, never a value a branch table produces -- so a heading field reading 'Other'
+        is a title by construction rather than by a special case.
+
+        Probed with Get-Command rather than taken as a parameter, the same pattern teardown.ps1 uses for
+        Get-RosterIdTokenPattern.
+    #>
+    if (Get-Command Get-BranchTypes -ErrorAction SilentlyContinue) { return @(Get-BranchTypes) }
+    return @('Feat', 'Fix', 'Docs', 'Chore')
+}
+
 function Resolve-EntryType {
     <#
         Pure: the changelog type an entry declares under '### Type of change'. Returns an object with
@@ -1115,6 +1145,16 @@ function Resolve-EntryType {
         older '### Title <midDot> Feat <midDot> 2026-08-03'. Every entry in this repo's history and in every
         consumer's tree carries the type there, and reading them as typeless would file the lot under a
         catch-all. Recognise both, write one.
+
+        RECOGNITION AND VALIDATION USE DIFFERENT LISTS, and conflating them was a measured defect. Both used
+        to read Get-BranchTypes and nothing else, so where that function is absent the known-type list was
+        EMPTY -- which is right for validation (with no table of its own, a repo has nothing to judge a type
+        against) and wrong for recognition (with no list, no heading field can be identified as the type at
+        all). branch-info.ps1 is repo-owned and therefore does NOT travel into the plugin mirror, so the
+        absent case is the ordinary one in a consumer: new-internal-note.ps1 running there lost the type off
+        every bullet it took from a historical heading, silently, printing the title alone. Recognition now
+        uses Get-ReleaseChangeTypes -- which probes the repo's table and falls back to the canonical four --
+        while validation still only fires where the repo's own table is reachable.
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
 
@@ -1125,8 +1165,11 @@ function Resolve-EntryType {
         Error    = $null
     }
 
-    $known = @()
-    if (Get-Command Get-BranchTypes -ErrorAction SilentlyContinue) { $known = @(Get-BranchTypes) }
+    # Two lists, two jobs -- see the header. $repoTypes is empty where the repo has no table of its own, and
+    # only that list may accuse an author of a wrong type; $known always has something to recognise with.
+    $repoTypes = @()
+    if (Get-Command Get-BranchTypes -ErrorAction SilentlyContinue) { $repoTypes = @(Get-BranchTypes) }
+    $known = @(Get-ReleaseChangeTypes)
 
     $section = Get-EntrySectionBody -EntryText $EntryText -Key 'Type'
     if ($section) {
@@ -1135,8 +1178,8 @@ function Resolve-EntryType {
         # The first non-empty line, stripped of the bold/backtick decoration somebody may reasonably add.
         $first = @($section -split '\r?\n' | Where-Object { $_.Trim() })[0]
         $result.Type = ($first -replace '[*`_]', '').Trim()
-        if ($known.Count -gt 0 -and $known -notcontains $result.Type) {
-            $result.Error = "'$($result.Type)' is not a change type this repo produces -- use one of: $($known -join ', ')."
+        if ($repoTypes.Count -gt 0 -and $repoTypes -notcontains $result.Type) {
+            $result.Error = "'$($result.Type)' is not a change type this repo produces -- use one of: $($repoTypes -join ', ')."
         }
         return $result
     }

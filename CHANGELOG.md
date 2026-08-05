@@ -12,7 +12,7 @@ consequential change first. It also decides what may be released: **a release ne
 entry**, **a minor needs a tier-2 one**, and a **major** recaps ten minors. So a changelog holding nothing
 but tier 0 is a changelog with no release in it yet.
 
-## #476 · Every change is an H2 with three named sections, and the tier sections are gone
+## Every change is an H2 with three named sections, and the tier sections are gone
 
 ### What does this change do?
 
@@ -177,7 +177,7 @@ Plugins: specialists
 
 ---
 
-## #475 · A significance score per entry, and the order follows it
+## A significance score per entry, and the order follows it
 
 ### What does this change do?
 
@@ -264,7 +264,7 @@ Plugins: specialists
 
 ---
 
-## #478 · The ranked insert is fence-aware, like every other reader of the entry format
+## The ranked insert is fence-aware, like every other reader of the entry format
 
 ### What does this change do?
 
@@ -328,7 +328,7 @@ Plugins: specialists
 
 ---
 
-## #479 · One fence reader, in the lib that owns the format
+## One fence reader, in the lib that owns the format
 
 ### What does this change do?
 
@@ -398,7 +398,7 @@ Plugins: specialists
 
 ---
 
-## #474 · The lens scaffold's title carries no (VUL-IN) -- only its slot does
+## The lens scaffold's title carries no (VUL-IN) -- only its slot does
 
 ### What does this change do?
 
@@ -460,7 +460,7 @@ Plugins: specialists
 
 ---
 
-## #473 · An inbound issue is verified as still standing before it is routed
+## An inbound issue is verified as still standing before it is routed
 
 ### What does this change do?
 
@@ -523,7 +523,7 @@ Plugins: specialists
 
 ---
 
-## #472 · The merge date is added by the fold, at the bottom, instead of scaffolded into the heading
+## The merge date is added by the fold, at the bottom, instead of scaffolded into the heading
 
 ### What does this change do?
 
@@ -606,7 +606,7 @@ Plugins: specialists
 
 ---
 
-## #471 · Publishing the GitHub Release is part of a cut that was already asked for
+## Publishing the GitHub Release is part of a cut that was already asked for
 
 ### What does this change do?
 
@@ -663,7 +663,7 @@ Plugins: specialists
 
 ---
 
-## #477 · A shared parser's change is probed against a consumer's document, not only this repo's
+## A shared parser's change is probed against a consumer's document, not only this repo's
 
 ### What does this change do?
 
@@ -715,7 +715,7 @@ Plugins: specialists
 
 ---
 
-## #470 · The v3.5.0 release documents: the internal note and the edited highlights
+## The v3.5.0 release documents: the internal note and the edited highlights
 
 ### What does this change do?
 

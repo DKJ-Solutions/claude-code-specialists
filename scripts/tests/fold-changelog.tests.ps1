@@ -250,12 +250,23 @@ Assert-True (Test-Path (Join-Path $dir 'SECURITY.md'))                      'SEC
 Assert-True (Test-Path (Join-Path $dir 'CLAUDE.md'))                        'CLAUDE.md survives (reserved)'
 Assert-True ($changelogText -notmatch 'Security Policy')                    'meta content did NOT leak into CHANGELOG'
 Assert-True ($changelogText -notmatch '(?m)^# Contributing')               'CONTRIBUTING body did NOT leak into CHANGELOG'
-# THE ENTRY'S OWN SECTIONS CAME THROUGH AT THEIR OWN LEVEL. The fold rewrites the entry's heading; a
-# replace-all rather than a count-1 would have flattened these three into H2s and turned one entry into four.
+# THE ENTRY'S OWN SECTIONS CAME THROUGH AT THEIR OWN LEVEL. A replace-all rather than a count-1 would have
+# flattened these three into H2s and turned one entry into four.
 Assert-Equal 1 @(Get-EntryOrder -Changelog $changelogText).Count 'the folded entry is exactly ONE entry heading, not four'
 foreach ($section in @('What does this change do?', 'Who is this for', 'Type of change')) {
     Assert-True ($changelogText -match ('(?m)^### ' + [regex]::Escape($section) + '\s*$')) "the '$section' section kept its own level"
 }
+# THE HEADING IS LEFT EXACTLY AS THE AUTHOR WROTE IT (Dave, August 5, 2026). The fold used to prepend
+# '#NN <midDot> ' to the title; the number is on the closing line now, where the url makes it clickable.
+# Asserted as the WHOLE heading line, anchored: a prefix match would pass with anything prepended.
+Assert-Equal 'Demo thing' @(Get-EntryOrder -Changelog $changelogText)[0] 'the heading is exactly the title -- nothing is prepended to it'
+Assert-True ($changelogText -notmatch ('(?m)^## #\d+ ' + [regex]::Escape([char]0x00B7))) 'no entry heading carries a PR number'
+# And the number is not LOST, which is the whole reason it could leave the heading. This fixture has no PR
+# (the fold's gh call finds nothing by design here), so the assert is on the mechanism rather than a number:
+# the fold writes the number in exactly one place, and that place is the closing line.
+$foldSrcText = [System.IO.File]::ReadAllText($FoldSrc, [System.Text.Encoding]::UTF8)
+Assert-True ($foldSrcText -match 'Format-EntryFoldFooter') 'the closing line is still what carries the PR number and the merge date'
+Assert-True ($foldSrcText -notmatch '\$entryHashes #\$num') 'and the heading prepend is gone from the source, not merely unused'
 
 # ---------------------------------------------------------------------------------------------------
 Write-Host "The intro is written below, never over" -ForegroundColor Cyan

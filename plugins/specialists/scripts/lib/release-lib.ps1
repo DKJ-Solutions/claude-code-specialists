@@ -773,35 +773,20 @@ function Convert-EntryLinksForPluginChangelog {
     return Convert-RootRelativeLinks -EntryText $EntryText -Prefix $RepoBlobUrl
 }
 
-function Get-ReleaseChangeTypes {
-    <#
-        The change types this repo's branch table produces -- 'Feat', 'Fix', 'Docs', 'Chore' here. Read
-        from Get-BranchTypes in the consumer's own scripts/lib/branch-info.ps1, which the caller has
-        dot-sourced; absent (release-lib loaded standalone, e.g. by its own tests) it falls back to the
-        four canonical types.
-
-        WHAT IS LEFT OF Get-ReleaseCategories (August 5, 2026). That function returned an Order AND a
-        Title map, and existed to drive the category GROUPING in the release documents. The grouping is
-        gone -- a release document is a ranked list of changes, and each change states its own type under
-        '### Type of change' -- so the labels ('Features', 'Fixes', 'Documentation', 'Maintenance') and the
-        Get-ReleaseCategoryTitles seam that overrode them are retired with it.
-
-        THE TYPE LIST ITSELF SURVIVES BECAUSE ONE READER STILL NEEDS IT: Convert-EntryHeadingToTitle, which
-        strips administrative fields off a PRE-FORMAT entry heading and can only recognise a type field by
-        comparing it against the types that exist. That is recognition of history, not grouping.
-
-        NO 'Other' HERE, unlike Get-ReleaseCategories, and that is the one behavioural difference. 'Other'
-        was the catch-all CATEGORY LABEL for an entry whose type nothing matched -- a thing this repo
-        printed, never a value a branch table produces. With no categories to file into there is nothing to
-        catch, and the one caller left had to exclude 'Other' by hand precisely because a heading field
-        reading 'Other' is a title rather than a type.
-
-        Probed with Get-Command rather than taken as a parameter, the same pattern teardown.ps1 uses for
-        Get-RosterIdTokenPattern: every real caller has dot-sourced the consumer's branch-info already.
-    #>
-    if (Get-Command Get-BranchTypes -ErrorAction SilentlyContinue) { return @(Get-BranchTypes) }
-    return @('Feat', 'Fix', 'Docs', 'Chore')
-}
+# --- MOVED, NOT DELETED: Get-ReleaseChangeTypes now lives in entry-scaffold-lib.ps1 ----------------
+#
+# Convert-EntryHeadingToTitle below still calls it by exactly that name, and it is in scope because this
+# file dot-sources entry-scaffold-lib unconditionally, at the top.
+#
+# IT MOVED FOR THE SAME REASON THE FENCE READER DID, and the same way: Resolve-EntryType in that lib needs
+# it to RECOGNISE a type field in a pre-format heading, and the dependency can only run downward. Leaving
+# it here meant that function had to make do with Get-BranchTypes alone -- which is repo-owned and
+# therefore absent from the plugin mirror, so in a consumer the known-type list was EMPTY and every bullet
+# new-internal-note.ps1 took from a historical heading silently lost its type.
+#
+# Recognition and validation are different questions and now use different lists: this one (the repo's
+# table, or the canonical four) recognises, while only the repo's own table may accuse an author of a
+# wrong type. See Resolve-EntryType's header.
 
 function Set-EntryHeadingLevel {
     <#
@@ -827,6 +812,21 @@ function Set-EntryHeadingLevel {
         A DELTA OF 0 RETURNS THE BLOCK UNCHANGED apart from the newline normalisation, so a document that
         renders entries at their native level pays nothing.
 
+        THE DELTA IS MEASURED FROM THE BLOCK, NOT ASSUMED, and that is a repair rather than a refinement
+        (August 5, 2026). It used to be '$EntryLevel - Get-EntryHeadingLevel' -- the shift needed by a block
+        that is ALREADY at the canonical level, which every caller here happens to pass, since they read
+        entries straight out of CHANGELOG.md. Handed a block that is already deeper the function therefore
+        computed the wrong delta and, for the exact case of normalising one BACK to canonical, computed
+        zero and silently returned the block untouched. Its own contract above promises "so the entry's own
+        heading sits at $EntryLevel", which is what it now does.
+        Measured on new-internal-note.ps1, which reads entries out of the developer notes (where they sit
+        one level deeper, under the tier headings) and normalises them so the section readers can find
+        anything: every bullet came out without its type, because the block handed to Resolve-EntryType had
+        never been shifted and its sections were still one level below where that reader looks.
+
+        A BLOCK WITH NO HEADING AT ALL is returned normalised and otherwise untouched -- there is nothing to
+        measure from, and inventing a level would be worse than leaving prose alone.
+
         CLAMPED AT H6, which markdown has no level beyond. Reached only by a deeply nested body in a deeply
         nested document; clamping keeps the line a heading rather than turning it into literal '#######'
         text, which is what markdown renders past six.
@@ -836,7 +836,15 @@ function Set-EntryHeadingLevel {
         [Parameter(Mandatory)][int]$EntryLevel
     )
     $lines = @(($EntryText -replace "`r`n", "`n") -split "`n")
-    $delta = $EntryLevel - (Get-EntryHeadingLevel)
+    $fencedForLevel = Get-FencedLineFlags -Lines $lines
+    $ownLevel = 0
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($fencedForLevel[$i]) { continue }
+        $hm = [regex]::Match($lines[$i], '^(#{1,6})\s')
+        if ($hm.Success) { $ownLevel = $hm.Groups[1].Value.Length; break }
+    }
+    if ($ownLevel -eq 0) { return ($lines -join "`n") }
+    $delta = $EntryLevel - $ownLevel
     if ($delta -eq 0) { return ($lines -join "`n") }
 
     $fenced = Get-FencedLineFlags -Lines $lines

@@ -352,6 +352,127 @@ foreach ($cat in 'Features', 'Fixes', 'Documentation', 'Maintenance') {
 Assert-True ($doc -notmatch '#470') 'tiered notes: the PR number is stripped, as before'
 Remove-Item -Recurse -Force -LiteralPath $tiered -ErrorAction SilentlyContinue
 
+Write-Host "The CURRENT note shape: entries recognised by their named sections" -ForegroundColor Cyan
+# THE GAP THAT LET A DEFECT LIVE: every fixture above is the shape the notes had BEFORE the flat changelog,
+# and they all still pass -- which is right, because a note can be regenerated for any release ever cut. But
+# nothing here described what release-lib writes TODAY, so nobody noticed that the recogniser had stopped
+# finding anything at all. It matched '>= 3 middot fields in the heading' with the type as the second-to-last;
+# the format took those fields away one at a time (the date to the closing line, the type into its own
+# section, then the PR number), and at two fields every real entry fell below the threshold.
+#
+# MEASURED AGAINST A NOTE BUILT FROM THE LIVE CHANGELOG, before rewriting it: 46 headings skipped, all ten
+# entries among them, and the ONE heading that still matched was a QUOTED example inside a fenced code block
+# in an entry body -- which became the note's only bullet, with the illustration's own words as its type.
+# That case is the last assert in this block, so it cannot come back.
+$currentNotes = @"
+# Release notes v3.6.0
+
+**Date:** 2026-08-05
+**Type:** Minor
+
+## Tier 2 - consumers
+
+### A consumer-facing feature
+
+#### What does this change do?
+
+Body text.
+
+#### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 4 | consumers notice |
+| 1 | 3 | colleagues too |
+
+#### Type of change
+
+Feat
+
+---
+
+### A consumer-facing fix
+
+#### What does this change do?
+
+Body text, and it quotes the older heading shape while documenting it:
+
+``````text
+#### #469 $midDot An old-shape heading $midDot Fix $midDot 2026-08-05
+``````
+
+#### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 2 | small |
+| 1 | 2 | small |
+
+#### Type of change
+
+Fix
+
+## Tier 1 - colleagues
+
+### Something for colleagues
+
+#### What does this change do?
+
+Body text.
+
+#### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 1 | 3 | useful |
+
+#### Type of change
+
+Docs
+
+## Tier 0 - developers
+
+### Repo-internal housekeeping
+
+#### What does this change do?
+
+Body text.
+
+#### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 0 | - | - |
+
+#### Type of change
+
+Chore
+"@
+$cur = New-Fixture -Label 'current-shape' -NotesContent $currentNotes -Version '3.6.0'
+$rc = Invoke-Script -Dir $cur -Version '3.6.0'
+Assert-Equal 0 $rc.Code 'current shape: exit 0'
+$curDoc = [System.IO.File]::ReadAllText((Join-Path $cur 'releases\internal\3.x\3.6.0.md'))
+# The type comes from the '#### Type of change' SECTION now, not from a heading field.
+Assert-True ($curDoc -match '- \[Feat\] A consumer-facing feature') 'current shape: a tier-2 entry becomes a bullet, its type read from the Type section'
+Assert-True ($curDoc -match '- \[Fix\] A consumer-facing fix')      'current shape: and the second one in that tier'
+Assert-True ($curDoc -match '- \[Docs\] Something for colleagues')  'current shape: the tier-1 entry is carried over'
+Assert-True ($curDoc -notmatch 'Repo-internal housekeeping')        'current shape: the tier-0 entry is not -- the developer notes are its record'
+# The three section headings sit one level under every entry; reading them as entries would put the same
+# four words in the document once per change. Asserted as bullets, since the words appear in prose too.
+foreach ($sec in 'What does this change do\?', 'Who is this for', 'Type of change') {
+    Assert-True ($curDoc -notmatch "(?m)^- (\[[^\]]+\] )?$sec`$") "current shape: the '$sec' section heading is not carried over as a bullet"
+}
+# And the tier headings themselves, which sit one level ABOVE the entries.
+foreach ($tierWord in 'Tier 2 - consumers', 'Tier 1 - colleagues') {
+    Assert-True ($curDoc -notmatch "(?m)^- (\[[^\]]+\] )?$tierWord`$") "current shape: the '$tierWord' heading is not an entry either"
+}
+# THE FABRICATED BULLET, as a standing check. The quoted heading inside the second entry's body is the exact
+# shape the old recogniser matched, and it is the only thing it found in the real document.
+Assert-True ($curDoc -notmatch 'An old-shape heading') 'current shape: a heading quoted inside a fenced block is not read as an entry'
+Assert-True ($curDoc -notmatch '#469') 'current shape: so its number does not reach the document either'
+Assert-Equal 3 (@([regex]::Matches($curDoc, '(?m)^- \[')).Count) 'current shape: exactly three bullets -- the tier-2 pair and the tier-1 one, nothing else'
+Remove-Item -Recurse -Force -LiteralPath $cur -ErrorAction SilentlyContinue
+
 Write-Host "Notes whose every entry is tier 0: an empty list, with the reason" -ForegroundColor Cyan
 # Reachable only through -SkipTierGate (the cut refuses such a release), which is exactly why the message
 # has to distinguish it from "the notes did not parse" -- one is a bypassed judgement, the other a defect.

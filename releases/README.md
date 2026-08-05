@@ -96,9 +96,12 @@ rewritten — literally the whole changelog, generated in full by `cut-release.p
 the per-PR record a developer goes back to, which is why it is never edited down: a summary of it is what
 the other two are for.
 
-**Structured the way `CHANGELOG.md` itself is**: `## Tier <n> - <audience>` first, then the branch-type
-categories inside each tier (`### Features`), then the entries (`#### #NN · …`). Tier 0 is in it, unlike in
-the other two documents — this is the record.
+**Structured the way `CHANGELOG.md` itself is**: `## Tier <n> - <audience>` first, then that tier's entries
+as a flat ranked list (`### <title>`), each keeping its own three sections (`#### What does this change
+do?` and its siblings) and its impact table. There are no branch-type categories in between — the grouping
+came from the branch prefix, which this repo measured does not predict impact — and an entry heading is just
+its title, with the PR number and merge date on the entry's closing line. Tier 0 is in it, unlike in the
+other two documents: this is the record.
 
 Its size is also why it is never the body of a GitHub Release but always an attachment: `gh`'s
 release-notes body has a hard **125,000-character** limit, which a full notes file can exceed.

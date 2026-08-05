@@ -246,8 +246,10 @@ The constitution above, concretely implemented here:
      highlights tier joined it.
 
      **The document is one change per `##` heading, with no section headings at all** (Dave, August 5,
-     2026). `CHANGELOG.md` is an intro followed by a **flat ranked list**: a change *is* the `##`
-     (`## #475 · A significance score per entry`), and under it three `###` sections answer the questions a
+     2026). `CHANGELOG.md` is an intro followed by a **flat ranked list**: a change *is* the `##`, and its
+     heading is **just the title** — `## A significance score per entry, and the order follows it` — with the
+     PR number and the merge date on the entry's closing `[PR #NN](url) · merged <date>` line, where the two
+     facts the merge owns already lived. Under the heading, three `###` sections answer the questions a
      reader arrives with — `What does this change do?`, `Who is this for` (the impact table, which *is* the
      answer rather than prose beside it) and `Type of change`. `Plugins:` and the
      `[PR #NN](url) · merged <date>` line stay plain lines, because a heading around one fact is more
