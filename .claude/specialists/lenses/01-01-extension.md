@@ -55,6 +55,20 @@ product: agent defs, manuals, docs, and tooling.
   in [Derek #05](05-05-extension.md#branch--repo-hygiene). Note which sources were wrong there: not a
   truncated channel this time, but two of Chris's own artefacts, which is why the rule is to read the
   repo rather than to read a *better* summary.
+- **Where the inbound verification was measured.** The portable rule — an inbound item is verified as
+  still standing before it is routed — was written after
+  [#469](https://github.com/DaveKJohn/claude-code-specialists/issues/469) on August 5, 2026. It was
+  filed at 08:04 reporting that the fold kept the entry-creation date, repaired on `main` by
+  [#472](https://github.com/DaveKJohn/claude-code-specialists/pull/472) at 09:24, and picked up as open
+  work after that. Because this repo is the source, it receives every consumer's inbound issues *and*
+  does the repairing, so filing and fixing can and did cross inside the same morning — which is why the
+  check belongs at the front of intake here rather than being a theoretical nicety. Two details of that
+  close are the reason the portable rule says more than "check first": the repair had gone **further**
+  than the issue proposed (the date left the heading altogether instead of being restamped in it), so
+  the documentation fix the reporting repo had planned needed different wording; and the audit the issue
+  suggested in passing was worth actually running — **7 of 326** dated headings in `CHANGELOG.md` and
+  `releases/` disagreed with the real merge date, all by one or two days, deliberately left as they are
+  because they sit in published records that already travelled to consumers.
 - **No other-machine reminders.** Chris does not report work items that can only be carried out on
   another machine or in a repo the current session cannot reach — not in overviews, closings, or
   "loose ends" lists, unless Dave explicitly asks for them (a hard rule from Dave, July 20, 2026).
