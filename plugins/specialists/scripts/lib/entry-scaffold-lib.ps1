@@ -142,6 +142,43 @@ function Format-EntryTierLine {
     return "$($script:EntryTierLabel): $Tier"
 }
 
+function Format-EntryFoldFooter {
+    <#
+        Pure: the closing line the FOLD appends to an entry -- the two facts that do not exist until the
+        merge. '[PR #468](https://...) <middot> merged 2026-08-05'.
+
+        $MergedAt is the PR's own merge timestamp as gh returns it (ISO 8601, UTC). Empty or unparseable
+        -> $FallbackDate is used, which the caller reads off its clock.
+
+        WHY THE PR'S TIMESTAMP AND NOT THE CLOCK (Dave, August 5, 2026). The date used to be scaffolded
+        into the entry's HEADING when the branch was created, making it the branch's birth date rather
+        than the landing date -- wrong by however many days the branch lived, in the one document whose
+        subject is when things landed. Moving it to the fold fixes that; reading it off the PR fixes the
+        remainder, because the fold does not always run seconds after the merge. This repo has measured
+        that gap: unfolded entry files were once found in the repo root the morning after their merge. A
+        clock reading would have dated those a day late, and nothing in the output would have said so.
+
+        WHY A FUNCTION RATHER THAN THREE LINES IN THE FOLD. The fold drives a live remote, so its own
+        suite deliberately does not depend on a PR existing -- which would have left the one path this
+        change adds untested. Same move, same reason as Get-ExistingPrRecord in pr-issues-lib.ps1: the
+        part that is a pure function of an API answer becomes one, so it can be asserted without the API.
+    #>
+    param(
+        [Parameter(Mandatory)][int]$Number,
+        [Parameter(Mandatory)][string]$Url,
+        [string]$MergedAt = '',
+        [Parameter(Mandatory)][string]$FallbackDate
+    )
+    $md = [char]0x00B7
+    $stamp = $FallbackDate
+    if ($MergedAt) {
+        # try/catch rather than a regex pre-check: gh's field is a timestamp or it is absent, and a
+        # malformed one must not turn a completed fold into a failure over a cosmetic line.
+        try { $stamp = ([datetime]$MergedAt).ToLocalTime().ToString('yyyy-MM-dd') } catch { $stamp = $FallbackDate }
+    }
+    return "[PR #$Number]($Url) $md merged $stamp"
+}
+
 function Resolve-EntryTier {
     <#
         Pure: reads the tier an entry declares. Returns an object with

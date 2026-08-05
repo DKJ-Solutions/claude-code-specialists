@@ -759,7 +759,26 @@ Assert-Equal '### Titled' (($hNoNum -split "`n")[0]) 'a heading without a #NN fi
 $hPlain = Convert-EntryHeadingToTitle -EntryText "### Just a heading`n`nBody."
 Assert-Equal '### Just a heading' (($hPlain -split "`n")[0]) 'a heading with no metadata at all is returned unchanged'
 $hTwo = Convert-EntryHeadingToTitle -EntryText "### Only $midDot Two`n`nBody."
-Assert-Equal "### Only $midDot Two" (($hTwo -split "`n")[0]) 'two fields: no (title, type, date) triple to strip, so left alone'
+Assert-Equal "### Only $midDot Two" (($hTwo -split "`n")[0]) 'two fields, neither of them metadata: nothing to strip, so left alone'
+
+# THE DATELESS HEADING (August 5, 2026), which is what every entry folded from now on looks like: the
+# merge date moved out of the heading onto the entry's closing line. Both shapes have to keep working
+# from one code path -- the new one for everything folded from here, the dated one because this repo's
+# whole history carries it and the release notes are regenerated from that history.
+$hNoDate = Convert-EntryHeadingToTitle -EntryText "### #426 $midDot Some title $midDot Feat`n`nBody."
+Assert-Equal '### Some title' (($hNoDate -split "`n")[0]) 'dateless: the type is stripped without a date behind it'
+$hNoDateNoNum = Convert-EntryHeadingToTitle -EntryText "### Titled $midDot Docs`n`nBody."
+Assert-Equal '### Titled' (($hNoDateNoNum -split "`n")[0]) 'dateless: two fields ARE strippable when the second is a real type'
+$hNoDateMid = Convert-EntryHeadingToTitle -EntryText "### #7 $midDot A title $midDot with a middot $midDot Fix`n`nBody."
+Assert-Equal "### A title $midDot with a middot" (($hNoDateMid -split "`n")[0]) 'dateless: a middot in the title still survives'
+# A title that IS a type name, which is the one collision content-matching can have. The LAST matching
+# field is the type, so the title keeps its word.
+$hTypeTitle = Convert-EntryHeadingToTitle -EntryText "### #12 $midDot Fix $midDot Fix`n`nBody."
+Assert-Equal '### Fix' (($hTypeTitle -split "`n")[0]) 'dateless: a title that is itself a type name is not eaten'
+# 'Other' is this repo's printed catch-all label, never a value a branch table produces -- so a field
+# reading 'Other' is a title, not administration.
+$hOther = Convert-EntryHeadingToTitle -EntryText "### Other $midDot Feat`n`nBody."
+Assert-Equal '### Other' (($hOther -split "`n")[0]) "dateless: 'Other' is treated as a title, not as a type to strip"
 $hOnlyMeta = Convert-EntryHeadingToTitle -EntryText "### #9 $midDot Fix $midDot 2026-01-01`n`nBody."
 Assert-Equal "### #9 $midDot Fix $midDot 2026-01-01" (($hOnlyMeta -split "`n")[0]) 'a heading that is ONLY metadata keeps it rather than becoming empty'
 $hLevel = Convert-EntryHeadingToTitle -EntryText "#### #5 $midDot Deeper $midDot Feat $midDot 2026-01-01`n`nBody."
@@ -778,6 +797,27 @@ Assert-Match $fceStripped '(?m)^## Other' 'order: a PRE-stripped entry has lost 
 $fceBare = Format-CategorizedEntries -Entries @($entries[0]) -CategoryLevel 2 -BareTitles
 Assert-Match $fceBare '(?m)^## Features' 'order: -BareTitles strips AFTER the type is read, so the category survives'
 Assert-Match $fceBare '(?m)^### Second feature$' 'order: and the rendered entry heading is the bare title'
+
+# THE TYPE IS FOUND BY CONTENT, NOT BY POSITION (August 5, 2026) -- the assert that would have caught the
+# silent half of moving the merge date out of the heading. The read used to take the second-to-last
+# field, which was only ever the type because a date followed it. With the date gone, that read returns
+# the type name's neighbour and EVERY entry lands in 'Other': no error, no empty output, one meaningless
+# catch-all heading in a document written for consumers. Both shapes are asserted from the same code
+# path, because keeping history parseable is not optional -- the release notes are rebuilt from it.
+$fceDateless = Format-CategorizedEntries -Entries @("### #90 $midDot A dateless feature $midDot Feat`n`nBody.") -CategoryLevel 2
+Assert-Match $fceDateless '(?m)^## Features' 'dateless heading: the type is still found, so the entry is NOT dumped in Other'
+$fceDated = Format-CategorizedEntries -Entries @("### #91 $midDot A dated fix $midDot Fix $midDot 2026-01-01`n`nBody.") -CategoryLevel 2
+Assert-Match $fceDated '(?m)^## Fixes' 'dated heading: history keeps parsing from the same code path'
+$fceBoth = Format-CategorizedEntries -Entries @(
+    "### #90 $midDot A dateless feature $midDot Feat`n`nBody.",
+    "### #91 $midDot A dated fix $midDot Fix $midDot 2026-01-01`n`nBody."
+) -CategoryLevel 2
+Assert-Match $fceBoth '(?m)^## Features' 'mixed release: the dateless entry is categorised'
+Assert-Match $fceBoth '(?m)^## Fixes' 'mixed release: and the dated one, in the same run'
+Assert-Equal 0 ([regex]::Matches($fceBoth, '(?m)^## Other')).Count 'mixed release: nothing fell into the catch-all'
+# The dateless shape must also survive the strip, since the highlights document runs both over the same entry.
+$fceDatelessBare = Format-CategorizedEntries -Entries @("### #90 $midDot A dateless feature $midDot Feat`n`nBody.") -CategoryLevel 2 -BareTitles
+Assert-Match $fceDatelessBare '(?m)^### A dateless feature$' 'dateless heading: -BareTitles leaves the bare title, type read first'
 
 Write-Host "Build-HighlightsNotes (the tier-2 entries, no marker)" -ForegroundColor Cyan
 $hl = Build-HighlightsNotes -Entries $halfEntries -Version '1.2.0' -Date '2026-08-03' -Type 'Minor' `

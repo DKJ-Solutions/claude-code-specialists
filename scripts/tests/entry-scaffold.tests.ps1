@@ -216,6 +216,28 @@ Assert-Equal 2 (Get-EntryTierMax) 'the model has three tiers, 0 to 2'
 Assert-Equal 'Tier: 0' (Format-EntryTierLine) 'the formatter defaults to the harmless tier'
 Assert-Equal 'Tier: 2' (Format-EntryTierLine -Tier 2) 'and writes the tier it is given'
 
+# --- 5b. The fold footer: the two facts that only exist after the merge (August 5, 2026) ----------
+#     Asserted here rather than in fold-changelog.tests.ps1 on purpose. That suite deliberately runs
+#     without a PR -- the fold drives a live remote -- so the with-a-PR path, which is the only path
+#     this line has, could not be reached there. Extracting the pure part is the same move (and the
+#     same reason) as Get-ExistingPrRecord in pr-issues-lib.ps1.
+Write-Host "the fold footer (Format-EntryFoldFooter)" -ForegroundColor Cyan
+$footer = Format-EntryFoldFooter -Number 468 -Url 'https://gh.test/pr/468' -MergedAt '2026-08-05T09:14:00Z' -FallbackDate '2099-01-01'
+Assert-Equal "[PR #468](https://gh.test/pr/468) $md merged 2026-08-05" $footer 'the footer carries the PR link and the merge date on one line'
+Assert-True ($footer -notmatch '2099') 'the PR timestamp wins over the fallback -- the clock is not consulted when gh answered'
+# THE CASE THE WHOLE CHANGE IS ABOUT: a fold that runs the day after the merge must still date the
+# entry by the merge, not by the run. Measured in this repo -- unfolded entries were once found in the
+# root the morning after they landed.
+$footerLate = Format-EntryFoldFooter -Number 12 -Url 'u' -MergedAt '2026-08-05T23:30:00Z' -FallbackDate '2026-08-07'
+Assert-True ($footerLate -match 'merged 2026-08-0[56]$') 'a late fold still dates the entry by the merge, not by the day it was folded'
+# No timestamp: a PR found but not yet merged, which -Branch mode can reach. Then "now" really is the
+# best available answer, so the fallback is used rather than the line being dropped.
+$footerNone = Format-EntryFoldFooter -Number 5 -Url 'u' -FallbackDate '2026-08-05'
+Assert-Equal "[PR #5](u) $md merged 2026-08-05" $footerNone 'no merge timestamp: the caller-supplied date is used'
+# A malformed timestamp must not turn a completed fold into a failure over a cosmetic line.
+$footerBad = Format-EntryFoldFooter -Number 6 -Url 'u' -MergedAt 'not-a-date' -FallbackDate '2026-08-05'
+Assert-Equal "[PR #6](u) $md merged 2026-08-05" $footerBad 'an unparseable timestamp degrades to the fallback instead of throwing'
+
 $entry2 = "### A title $md Feat $md 2026-08-05`n`nTier: 2`n`n**Body heading**`n`nBody text.`n"
 $t2 = Resolve-EntryTier -EntryText $entry2
 Assert-Equal 2 $t2.Tier 'a declared tier is read back'

@@ -49,11 +49,16 @@ section is normal; a changelog holding nothing but tier 0 is a changelog with no
   not even on a second attempt on the same branch: the fold step looks up the entry file by the
   exact branch name, and a suffix breaks that match and with it the auto-delete after folding.
 - **After the merge**: `scripts/release/fold-changelog-entry.ps1` reads the entry file and converts
-  it to the compact CHANGELOG form — a heading `### #NN · title · type · date` (metadata in the
-  heading, middot-separated), the description below it, and as the last line a `PR #NN` link to the PR url —
+  it to the compact CHANGELOG form — a heading `### #NN · title · type` (middot-separated), the
+  description below it, and as the last line `[PR #NN](url) · merged YYYY-MM-DD` —
   and adds that to the tier section the entry's `Tier:` line names, removing that line on the way in. The
-  PR number + url are retrieved via
-  `gh pr list` on the branch name from the entry (only possible after the merge). The fold also
+  PR number, url **and merge timestamp** are retrieved via one
+  `gh pr list` on the branch name from the entry (only possible after the merge).
+  **The date is the fold's and it sits at the bottom** (Dave, August 5, 2026): the scaffolder runs at
+  branch creation, so a date it wrote was the branch's birth date rather than the landing date. The
+  heading now carries what the author knows, the closing line what only the merge knows — and the date
+  comes from the PR's `mergedAt`, not the clock, because a fold does not always run in the same minute as
+  its merge (this repo has found entries still unfolded the next morning). The fold also
   automatically derives a **`Plugins:` line** from the PR's files (paths under
   `plugins/<plugin>/`; the `connectors/` directory does not count) — that
   is how `cut-release.ps1` later knows which entries belong in which per-plugin CHANGELOG. This
