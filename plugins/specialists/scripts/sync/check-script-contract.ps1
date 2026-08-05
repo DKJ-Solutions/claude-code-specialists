@@ -240,6 +240,19 @@ $script:Contract = @(
        ViaLib = 'entry-scaffold-lib';
        Optional = $true; Default = 'TODO: what still needs to happen on this branch, and where you left off.';
        Returns = 'the fallback body used when no -Intent was given -- a directional prompt, not an empty line; open-pr refuses to ship an entry that still carries it' },
+    # The impact table's two knobs (issue #467). Declared for the reason the stub wording above is: neither
+    # failure is a crash. A consumer that has adopted tier sections gets the ranking switched ON by that
+    # fact alone, and would discover it when a cut refuses; a consumer whose readers are not developers gets
+    # a rubric written for developers and would discover that when somebody scores against the wrong test.
+    # An [INFO] naming both defaults turns each into a thing they were told.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntrySignificanceEnabled'; Scripts = @('new-changelog-entry', 'open-pr', 'fold-changelog-entry', 'cut-release');
+       ViaLib = 'entry-scaffold-lib';
+       Optional = $true; Default = 'on wherever Get-ChangelogTierHeadings declares more than one tier section, off otherwise';
+       Returns = "$true to rank changelog entries by significance, $false to switch the whole mechanism off. On, an entry declares an impact table -- one row per tier it reaches, each with a significance from 1 to 5 and a Why -- the fold uses it to order CHANGELOG.md's sections, and the release cut REFUSES a release whose tier-1-or-higher entries have not scored themselves. Off, the entry carries the older single 'Tier: N' line and nothing is ordered or required. A repo with one entry section is off by default, because it has no tier information to rank by" },
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntrySignificanceRubricLevels'; Scripts = @('new-changelog-entry', 'open-pr', 'cut-release');
+       ViaLib = 'entry-scaffold-lib';
+       Optional = $true; Default = "the five built-in bands, 5 = 'the reader must act' down to 1 = 'cosmetic or preventative'";
+       Returns = "a map from significance level to the TEST for that level, e.g. @{ 5 = 'the reader must act -- a breaking change or a required migration' }. Override the bands a repo has to word differently: 'the reader must act' means something else to a marketplace than to a storefront, and a repo whose consumers are not developers needs its own wording. A level left out keeps its built-in text, so one band can be retuned without restating five. The rubric is what makes the number a measurement rather than a mood, and both gates print it when they refuse" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryFallbackType'; Scripts = @('new-changelog-entry');
        Optional = $true; Default = 'Chore';
        Returns = "the changelog type an unknown branch prefix falls back to; it must be one of the types this repo's own branch table produces, since the release cut groups entries by it" },

@@ -300,12 +300,147 @@ $tierGateBlock = $openPrText.Substring($tierGateIdx, [Math]::Min(900, $openPrTex
 Assert-True ($tierGateBlock -notmatch '\$Force') 'the tier gate has no -Force escape -- a meaningless tier is never legitimate'
 $foldText = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\fold-changelog-entry.ps1'))
 Assert-True ($foldText -match 'entry-scaffold-lib\.ps1') 'the fold dot-sources the shared entry-format lib'
-Assert-True ($foldText -match 'Resolve-EntryTier') 'the fold reads the tier'
-Assert-True ($foldText -match 'Remove-EntryTierLine') 'and removes the line once the section states it'
+# Resolve-EntryImpact, not Resolve-EntryTier: since the impact table (issue #467) the fold reads the reach
+# and the significance in ONE pass, and that resolver falls back to the older 'Tier: N' line itself -- so
+# asserting the old name here would demand the fold reach past its own abstraction.
+Assert-True ($foldText -match 'Resolve-EntryImpact') 'the fold reads the reach and the significance in one pass'
+Assert-True ($foldText -match 'Remove-EntryTierLine') 'and removes the legacy tier line once the section states it'
+Assert-True ($foldText -match 'Remove-EntryImpactTable') 'and drops an unscored impact table, which is a question nobody was asked'
+Assert-True ($foldText -match 'Get-ImpactInsertOffset') 'and places the entry by its significance, so CHANGELOG.md stays ordered'
 Assert-True ($foldText -match 'Get-ChangelogTierSections') 'and asks the shared resolver which section that is'
 # The tier must be resolved BEFORE anything is written, or a bad tier leaves a half-folded changelog.
 Assert-True ($foldText.IndexOf('Nothing was folded') -lt $foldText.IndexOf('Write-Utf8NoBom -Path $changelogPath')) `
     'the pre-pass refusal sits before the first changelog write'
+
+# ==================================================================================================
+# THE IMPACT TABLE (issue #467)
+# ==================================================================================================
+#
+# Every assert below is a bug that was actually made while building this, or a failure mode whose whole
+# danger is that it produces well-formed output. Two of them were caught by hand and are here so the next
+# change cannot reintroduce them silently: the OrderedDictionary integer-indexing trap, and the tie
+# direction in the insert offset.
+
+function New-ImpactEntry {
+    param([string]$Title = 'T', [string]$Rows = '', [string]$Body = 'Body.')
+    $md = [char]0x00B7
+    $table = if ($Rows) { "| Tier | Significance | Why |`n|---|---|---|`n$Rows`n`n" } else { '' }
+    return "### $Title $md Feat`n`n$table$Body"
+}
+
+# --- Reading a table ------------------------------------------------------------------------------
+$twoRow = New-ImpactEntry -Rows "| 2 | 5 | consumers must re-add the marketplace |`n| 1 | 4 | the bump stops needing a developer |"
+$imp = Resolve-EntryImpact -EntryText $twoRow
+Assert-True $imp.Table 'impact: a table outside a fence is recognised'
+Assert-Equal 2 $imp.Tier 'and the reach is the HIGHEST row, not the first or the last'
+Assert-True $imp.Declared 'and a table with rows counts as declared'
+Assert-Equal 0 @($imp.Errors).Count 'and a well-formed table reports no errors'
+Assert-Equal 5 (Get-EntryImpactScore -Impact $imp -Tier 2) 'the tier-2 row carries the consumer score'
+Assert-Equal 4 (Get-EntryImpactScore -Impact $imp -Tier 1) 'the tier-1 row carries the organisation score'
+Assert-Equal 0 (Get-EntryImpactScore -Impact $imp -Tier 0) 'a tier with no row scores 0 rather than throwing'
+
+# ROWS IN EITHER ORDER GIVE THE SAME ANSWER. The parser sorts them; nothing may depend on the author
+# having written the highest tier first.
+$reversed = Resolve-EntryImpact -EntryText (New-ImpactEntry -Rows "| 1 | 4 | colleagues |`n| 2 | 5 | consumers |")
+Assert-Equal 2 $reversed.Tier 'impact: row order does not change the reach'
+Assert-Equal 5 (Get-EntryImpactScore -Impact $reversed -Tier 2) 'nor which score belongs to which tier'
+
+# --- The legacy fallback --------------------------------------------------------------------------
+# NOT tolerance -- correctness. Every entry in CHANGELOG.md and in every consumer's tree predates the
+# table, and reading them as tier 0 would silently empty a release.
+$legacy = Resolve-EntryImpact -EntryText "### T`n`nTier: 2`n`nBody."
+Assert-True (-not $legacy.Table) 'impact: an entry with no table is not reported as having one'
+Assert-Equal 2 $legacy.Tier 'and its old Tier: line is still read'
+Assert-True $legacy.Declared 'and still counts as a declared reach'
+Assert-Equal 0 (Get-EntryImpactScore -Impact $legacy -Tier 2) 'but it carries no score, because it never had one'
+Assert-Equal 0 @(Get-EntryImpactFindings -EntryText "### T`n`nTier: 0`n`nBody.").Count 'a pre-table tier-0 entry is not retroactively faulted'
+
+# --- Fence awareness ------------------------------------------------------------------------------
+# The entry documenting this mechanism quotes the table. A parser that cannot tell a quote from a
+# declaration gets disabled by whoever hits it first.
+$fence = "### T`n`n" + '```text' + "`n| Tier | Significance | Why |`n|---|---|---|`n| 2 | 1 | quoted |`n" + '```' + "`n`nTier: 1`n`nBody."
+$fenced = Resolve-EntryImpact -EntryText $fence
+Assert-True (-not $fenced.Table) 'impact: a table inside a fence is a quote, not a declaration'
+Assert-Equal 1 $fenced.Tier 'so the real declaration outside the fence is what is read'
+
+# --- The ladder is enforced as a ladder -----------------------------------------------------------
+$halfClaim = @(Get-EntryImpactFindings -EntryText (New-ImpactEntry -Rows '| 2 | 5 | consumers notice |'))
+Assert-Equal 1 $halfClaim.Count 'impact: a tier-2 entry with no tier-1 row is one finding'
+Assert-True ($halfClaim[0] -match 'reaches tier 2, so it also reaches tier 1') 'and the message names both tiers'
+# $($impact.Tier) vs "$impact.Tier": the second interpolates the OBJECT then appends '.Tier'. It produced
+# 'reaches tier @{Table=True; Rows=System.Object[]...}' -- valid output nobody would write on purpose.
+Assert-True ($halfClaim[0] -notmatch 'System\.Object|@\{') 'and does not interpolate the object instead of its property'
+
+# --- One mistake is reported once -----------------------------------------------------------------
+# A bad cell reads back as unscored, so the completeness checks would pile "tier 2 has no significance"
+# on top of "tier 2's significance 9 is off the scale". Measured: one bad cell produced three findings.
+foreach ($case in @(
+    @{ Row = '| 2 | 9 | x |';    Match = 'off the scale' },
+    @{ Row = '| 2 | high | x |'; Match = 'is not a score' },
+    @{ Row = '| 5 | 3 | x |';    Match = 'does not exist' }
+)) {
+    $found = @(Get-EntryImpactFindings -EntryText (New-ImpactEntry -Rows $case.Row))
+    Assert-Equal 1 $found.Count "impact: '$($case.Row)' produces exactly one finding, not a pile"
+    Assert-True ($found[0] -match $case.Match) "and it is the right one ($($case.Match))"
+}
+$noWhy = @(Get-EntryImpactFindings -EntryText (New-ImpactEntry -Rows '| 1 | 4 | |'))
+Assert-Equal 1 $noWhy.Count 'impact: a score with no Why is one finding'
+Assert-True ($noWhy[0] -match "no 'Why'") 'and it names the missing column'
+$noScore = @(Get-EntryImpactFindings -EntryText (New-ImpactEntry -Rows '| 1 | - | - |'))
+Assert-Equal 1 $noScore.Count 'impact: an empty score cell is one finding'
+
+# --- The scaffold owes nothing --------------------------------------------------------------------
+$scaffoldTable = @(Format-EntryImpactTable)
+Assert-True ($scaffoldTable[0] -match '^\|\s*Tier\s*\|\s*Significance\s*\|\s*Why\s*\|$') 'the scaffold writes the three-column header'
+Assert-Equal 3 $scaffoldTable.Count 'and exactly one data row -- header, separator, tier 0'
+Assert-True ($scaffoldTable[2] -match '^\|\s*0\s*\|\s*-\s*\|\s*-\s*\|$') 'and that row is tier 0 with both cells empty, because any number would be a guess'
+Assert-Equal 0 @(Get-EntryImpactFindings -EntryText (New-ImpactEntry -Rows '| 0 | - | - |')).Count 'a tier-0 entry is never asked for a score'
+
+# --- Stripping ------------------------------------------------------------------------------------
+$stripped = Remove-EntryImpactTable -EntryText $twoRow
+Assert-True ($stripped -notmatch 'Significance') 'strip: the table is gone from an outward-facing rendering'
+Assert-True ($stripped -match 'Body\.') 'and the body survives'
+Assert-True ($stripped -notmatch "`n`n`n") 'and no triple blank line is left behind'
+# A quoted table must survive stripping too, or rendering damages the entry that documents the mechanism.
+Assert-True ((Remove-EntryImpactTable -EntryText $fence) -match 'quoted') 'strip: a fenced table is left alone'
+
+# --- The insert offset ----------------------------------------------------------------------------
+$section = "`nIntro.`n`n### #10 Top`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 5 | big |`n`n---`n`n" +
+           "### #11 Mid`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 3 | ok |`n`n---`n`n"
+function Get-InsertLabel {
+    param([int]$Score)
+    $off = Get-ImpactInsertOffset -SectionText $section -Score $Score -Tier 1
+    if ($off -ge $section.Length) { return '<end>' }
+    return (($section.Substring($off) -split "`r?`n")[0]).Trim()
+}
+Assert-Equal '### #10 Top' (Get-InsertLabel -Score 5) 'insert: a TIE goes above its equal, preserving the newest-first order the section had'
+Assert-Equal '### #10 Top' (Get-InsertLabel -Score 6) 'insert: a higher score leads'
+Assert-Equal '### #11 Mid' (Get-InsertLabel -Score 4) 'insert: a middling score lands between'
+Assert-Equal '<end>'       (Get-InsertLabel -Score 1) 'insert: the lowest score goes last'
+Assert-Equal '### #10 Top' (Get-InsertLabel -Score 0) 'insert: unscored keeps the pre-ranking behaviour -- the top of the section'
+# Compared against the fixture's own length rather than a literal: a hard-coded 8 describes this string,
+# not the behaviour, and breaks the moment somebody edits the fixture's intro.
+$emptySection = "`nIntro.`n`n"
+Assert-Equal $emptySection.Length (Get-ImpactInsertOffset -SectionText $emptySection -Score 4 -Tier 1) 'insert: a section with no entries yet appends at its end'
+
+# --- The rubric -----------------------------------------------------------------------------------
+$rubric = @(Get-EntrySignificanceRubric)
+Assert-Equal 5 $rubric.Count 'rubric: five bands'
+Assert-Equal 5 $rubric[0].Score 'and it reads highest first'
+Assert-Equal 1 $rubric[4].Score 'down to the lowest'
+Assert-True ($rubric[0].Test -match 'must act') 'and the top band is a TEST rather than a feeling'
+# THE ORDEREDDICTIONARY TRAP, walked into on the first run of Get-EntrySignificanceRubric: an
+# [ordered]@{ 5 = '...' } indexer takes a POSITIONAL index for an integer, so $map[5] asked for the sixth
+# element of a five-element map and threw. On a longer map it would not throw -- it would silently return a
+# neighbouring band's text, which is why this is asserted rather than trusted.
+$range = Get-EntrySignificanceRange
+Assert-Equal 1 $range.Min 'rubric: the scale starts at 1'
+Assert-Equal 5 $range.Max 'and ends at 5'
+foreach ($band in $rubric) {
+    Assert-True ($band.Score -ge $range.Min -and $band.Score -le $range.Max) "rubric: band $($band.Score) is inside the declared scale"
+    Assert-True ([bool]$band.Test) "rubric: band $($band.Score) has a test, so a gate printing it says something"
+}
+Assert-Equal 5 @(Format-EntrySignificanceRubricLines).Count 'rubric: one printable line per band'
 
 Write-Host ""
 if ($script:fail -gt 0) {

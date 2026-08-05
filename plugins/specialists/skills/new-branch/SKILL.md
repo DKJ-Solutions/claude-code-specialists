@@ -34,26 +34,66 @@ The script:
    entry come into existence in a single step. If the entry file already exists, that step is a
    no-op (same idempotence).
 
-## The entry carries a tier, scaffolded at 0
+## The entry carries an impact table, scaffolded at tier 0
 
-The entry file gets a `Tier: 0` line under its heading. It says **how far the change reaches**, on one
-scale:
+The entry file gets this under its heading:
+
+```text
+| Tier | Significance | Why |
+|---|---|---|
+| 0 | - | - |
+```
+
+Two questions in one table. **The tier says how far the change reaches**, and therefore which release
+document the entry appears in:
 
 | tier | who notices |
 |---|---|
-| `Tier: 0` | only this repo's own developers -- docs, config, internal work |
-| `Tier: 1` | a colleague working on this project gets something out of it |
-| `Tier: 2` | a consumer of the product notices it |
+| `0` | only this repo's own developers -- docs, config, internal work |
+| `1` | a colleague working on this project gets something out of it |
+| `2` | a consumer of the product notices it |
 
-**Raise it by hand when the work deserves it.** Nothing breaks if you leave it at 0, which is exactly why
-it is worth knowing what it costs: where the repo declares tier sections, the release cut reads them and
-refuses a bump they have not earned -- a release needs at least one tier-1 entry, a minor needs a tier-2
-one. So an entry left at 0 is work that cannot carry a release on its own. `open-pr` prints the tier it
-read, so you learn that before the PR rather than at the cut.
+**The significance says how much it weighs for that reader**, and therefore where in the document it sits --
+the most consequential change leads instead of sitting third under whichever heading its branch prefix
+produced. Score it 1 to 5 against this rubric:
 
-**There is no `-Tier` parameter, deliberately.** Whoever finishes the branch already has to rewrite the
-title and body before the PR (open-pr's scaffold gate refuses the stubs), so the tier is one more edit in a
-file that is being edited anyway.
+| | |
+|---|---|
+| `5` | the reader must act -- a breaking change, a required migration, or a long-standing blocker that is now gone |
+| `4` | materially changes how they work; they notice within a day without being told |
+| `3` | a clear improvement, noticed the moment they touch that part |
+| `2` | small; noticed if somebody points it out |
+| `1` | cosmetic or preventative -- nothing changes for them today |
+
+**Raising the reach is adding a row, and every row needs a score and a `Why`.** The ladder is cumulative: a
+change consumers notice is also a change this project's colleagues get something out of, so a tier-2 entry
+owes a tier-1 row too. Each row is one document's reader answering their own question.
+
+```text
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 5 | consumers must re-add the marketplace under its new name; installs break without it |
+| 1 | 4 | the routine version bump stops needing a developer |
+```
+
+**What it costs to leave it at tier 0.** Nothing breaks, which is exactly why it is worth knowing: where the
+repo declares tier sections, the release cut refuses a bump the entries have not earned -- a release needs at
+least one tier-1 entry, a minor needs a tier-2 one -- and it **also** refuses a release whose tier-1-or-higher
+entries carry no significance, because an unscored entry cannot be placed. So an entry left at 0 is work that
+cannot carry a release on its own. `open-pr` prints what it read and names anything still unsettled, so you
+learn that before the PR rather than at the cut.
+
+**The score cells are empty on purpose.** The tier defaults to 0 because 0 is a harmless final answer; a
+*score* has no harmless value, so any number scaffolded here would be a guess at a ranking. The rubric is
+what makes it a measurement rather than a mood, and the `Why` is what makes the resulting order auditable.
+
+**There is no `-Tier` parameter, deliberately.** Whoever finishes the branch already has to rewrite the title
+and body before the PR (open-pr's scaffold gate refuses the stubs), so the table is one more edit in a file
+that is being edited anyway.
+
+**A repo that has not adopted tier sections gets the older single `Tier: 0` line instead**, and that line is
+still read everywhere -- "recognise both, write one", so entries written before the table keep folding
+correctly.
 
 **Do not derive it from your branch prefix.** The prefix predicts the *category* an entry is grouped under,
 not its impact: a `docs/` branch can carry a tier-2 change and a `feat/` branch a tier-0 one. The source

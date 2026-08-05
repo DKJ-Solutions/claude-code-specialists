@@ -487,6 +487,72 @@ Assert-True ((Get-SectionBody -Changelog $clT5 -Heading '## Tier 1 - Pull Reques
 Assert-True ($clT5 -match '(?m)^Tier: 2$') 'fenced tier: and the quoted line survives inside the fence'
 
 # ---------------------------------------------------------------------------------------------------
+# THE IMPACT TABLE, END TO END THROUGH THE REAL SCRIPT (issue #467)
+#
+# The unit tests in entry-scaffold.tests.ps1 prove the offset function. This proves the FOLD uses it: that
+# CHANGELOG.md comes out ordered by significance, that the table survives when scored and is dropped when
+# not, and that a malformed table stops the run before anything is written. The last one matters most --
+# the fold commits directly to main.
+
+function New-ImpactEntryFile {
+    # An entry as new-changelog-entry.ps1 writes it since the impact table: the table where the 'Tier: N'
+    # line used to be, directly under the heading.
+    param([string]$Dir, [string]$Name, [string]$Title, [string]$Rows)
+    $md = [char]0x00B7
+    $table = "| Tier | Significance | Why |`n|---|---|---|`n$Rows`n`n"
+    [System.IO.File]::WriteAllText((Join-Path $Dir $Name), "### $Title $md Feat`n`n$table" + "Demo entry body.`n", $Utf8NoBom)
+}
+
+Write-Host "The fold orders CHANGELOG.md by significance" -ForegroundColor Cyan
+$dirS = New-FoldFixture -Label 'impact-order' -TierSections
+# Folded LOW first, then middling, then HIGH -- so a fold that merely prepends (the pre-ranking behaviour)
+# would leave them in exactly the reverse of the wanted order. Only real ordering can pass this.
+New-ImpactEntryFile -Dir $dirS -Name 'feat-low.md'  -Title 'Least consequential' -Rows '| 1 | 1 | cosmetic |'
+$rLow = Invoke-Fold -Dir $dirS -Branch 'feat/low'
+New-ImpactEntryFile -Dir $dirS -Name 'feat-mid.md'  -Title 'Middling'            -Rows '| 1 | 3 | a clear improvement |'
+$rMid = Invoke-Fold -Dir $dirS -Branch 'feat/mid'
+New-ImpactEntryFile -Dir $dirS -Name 'feat-high.md' -Title 'Most consequential'  -Rows '| 1 | 5 | the reader must act |'
+$rHigh = Invoke-Fold -Dir $dirS -Branch 'feat/high'
+Assert-True (($rLow.ExitCode -eq 0) -and ($rMid.ExitCode -eq 0) -and ($rHigh.ExitCode -eq 0)) 'impact order: all three folds exit 0'
+$secS = Get-SectionBody -Changelog ([System.IO.File]::ReadAllText((Join-Path $dirS 'CHANGELOG.md'))) -Heading '## Tier 1 - Pull Requests'
+$posHigh = $secS.IndexOf('Most consequential')
+$posMid  = $secS.IndexOf('Middling')
+$posLow  = $secS.IndexOf('Least consequential')
+Assert-True ($posHigh -ge 0 -and $posMid -ge 0 -and $posLow -ge 0) 'impact order: all three entries are in the tier-1 section'
+Assert-True ($posHigh -lt $posMid) 'impact order: significance 5 sits above significance 3'
+Assert-True ($posMid -lt $posLow) 'impact order: and significance 3 above significance 1 -- so the fold ordered, not prepended'
+Assert-True ($secS -match '(?m)^\|\s*1\s*\|\s*5\s*\|') 'impact order: a scored table is CARRIED into the changelog, because the cut empties these sections'
+
+Write-Host "An unscored table is scaffolding and does not reach the record" -ForegroundColor Cyan
+$dirU = New-FoldFixture -Label 'impact-unscored' -TierSections
+New-ImpactEntryFile -Dir $dirU -Name 'chore-internal.md' -Title 'Repo internal' -Rows '| 0 | - | - |'
+$rU = Invoke-Fold -Dir $dirU
+Assert-True ($rU.ExitCode -eq 0) 'unscored table: exits 0'
+$clU = [System.IO.File]::ReadAllText((Join-Path $dirU 'CHANGELOG.md'))
+Assert-True ((Get-SectionBody -Changelog $clU -Heading '## Tier 0 - Pull Requests') -match 'Repo internal') 'unscored table: the entry is filed under tier 0'
+Assert-True ($clU -notmatch 'Significance') 'unscored table: and the placeholder table is gone -- a question nobody was asked'
+
+Write-Host "A malformed table stops the run before anything is written" -ForegroundColor Cyan
+$dirB = New-FoldFixture -Label 'impact-malformed' -TierSections
+$clBefore = [System.IO.File]::ReadAllText((Join-Path $dirB 'CHANGELOG.md'))
+New-ImpactEntryFile -Dir $dirB -Name 'feat-bad.md' -Title 'Off the scale' -Rows '| 1 | 9 | too high |'
+$rB = Invoke-Fold -Dir $dirB
+Assert-True ($rB.ExitCode -ne 0) 'malformed table: refuses'
+Assert-True ($rB.Output -match 'off the scale') 'malformed table: and says which cell'
+Assert-True ([System.IO.File]::ReadAllText((Join-Path $dirB 'CHANGELOG.md')) -eq $clBefore) 'malformed table: CHANGELOG.md is untouched -- this script commits straight to main'
+Assert-True (Test-Path (Join-Path $dirB 'feat-bad.md')) 'malformed table: and the entry file still exists, so nothing has to be unpicked'
+
+Write-Host "A pre-table entry still folds -- recognise both, write one" -ForegroundColor Cyan
+$dirL = New-FoldFixture -Label 'impact-legacy' -TierSections
+New-TieredEntryFile -Dir $dirL -Name 'feat-old.md' -Title 'Written before the table' -Tier '2'
+$rL = Invoke-Fold -Dir $dirL
+Assert-True ($rL.ExitCode -eq 0) 'legacy entry: exits 0'
+$clL = [System.IO.File]::ReadAllText((Join-Path $dirL 'CHANGELOG.md'))
+Assert-True ((Get-SectionBody -Changelog $clL -Heading '## Tier 2 - Pull Requests') -match 'Written before the table') `
+    'legacy entry: its old Tier: line still decides the section'
+Assert-True ($clL -notmatch '(?m)^Tier: 2$') 'legacy entry: and that line is still consumed by the fold'
+
+# ---------------------------------------------------------------------------------------------------
 foreach ($f in $script:fixtures) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }
 
 Write-Host ""

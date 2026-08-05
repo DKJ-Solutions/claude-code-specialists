@@ -429,6 +429,49 @@ Correct the line and run again.
         exit 1
     }
     Write-Host "  entry tier: $($entryTier.Tier)$(if (-not $entryTier.Declared) { " (no $(Get-EntryTierLabel): line -- the default; a release cannot be cut from tier-0 work alone)" })" -ForegroundColor DarkGray
+
+    # Significance gate, on the same read of the same file (issue #467). The score orders the release
+    # documents this entry's tier reaches, and cut-release.ps1 refuses a release whose entries have not
+    # declared one.
+    #
+    # THE SPLIT WITH THE CUT IS DELIBERATE, AND IT IS A SPLIT BY KIND OF FAULT rather than by convenience.
+    # A MALFORMED value is refused here: 'Significance: 9' reads back as unscored, which would sort a
+    # change to the bottom of the document it matters most in -- silent, correct-looking, and a one-line
+    # fix now versus an edit on main later. A MISSING value is NOT refused here, because Dave placed that
+    # refusal at the cut (August 5, 2026): the score is a judgement about a finished change, and an author
+    # who has not settled it should not be blocked from merging over it. So this reports it and moves on.
+    #
+    # NOT -Force-able, for the reason the tier gate is not: -Force exists for text somebody legitimately
+    # wrote, and there is no legitimate 'Significance: 9'.
+    if (Test-EntrySignificanceActive) {
+        $impact = Resolve-EntryImpact -EntryText $entryText
+        $malformed = @(@($impact.Errors) | Where-Object { $_ })
+        if ($malformed.Count -gt 0) {
+            Write-Error @"
+impact gate: $(Split-Path $entryPath -Leaf) has an impact table this model cannot read - nothing pushed, no PR opened.
+
+$(($malformed | ForEach-Object { "  $_" }) -join "`n")
+
+The rubric:
+$((Format-EntrySignificanceRubricLines) -join "`n")
+
+An unreadable cell reads back as unscored, which sinks the entry to the bottom of the document it matters
+most in -- without an error. Correct the table and run again.
+"@
+            exit 1
+        }
+        # MISSING rows and scores are said out loud, not refused: Dave placed that refusal at the cut
+        # (August 5, 2026), because the score is a judgement about a finished change and an author who has
+        # not settled it should not be blocked from merging over it.
+        $impactFindings = @(Get-EntryImpactFindings -EntryText $entryText)
+        if ($impactFindings.Count -gt 0) {
+            Write-Host "  impact: not settled yet -- the release cut will refuse until it is:" -ForegroundColor DarkYellow
+            $impactFindings | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkYellow }
+        } elseif ($impact.Table -and @($impact.Rows | Where-Object { [int]$_.Score -gt 0 }).Count -gt 0) {
+            $shown = @($impact.Rows | Where-Object { [int]$_.Score -gt 0 } | ForEach-Object { "tier $($_.Tier): $($_.Score)" })
+            Write-Host "  significance -- $($shown -join ', ')" -ForegroundColor DarkGray
+        }
+    }
 }
 
 # Lint gate: catch invalid manifests/frontmatter/dead links before they land on main via a PR.

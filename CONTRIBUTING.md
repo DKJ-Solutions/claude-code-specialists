@@ -33,26 +33,61 @@ changelog entry — the same workflow as the consuming repos. The steps:
 5. **Fold:** on `main`, right after the merge,
    [`scripts/release/fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)`-Branch <name>`
    folds the entry file into the **tier section** of [`CHANGELOG.md`](CHANGELOG.md) that the entry's own
-   `Tier:` line names (with `#NN` + PR link), derives a `Plugins:` line from the PR's files along the way
+   impact table names (with `#NN` + PR link), derives a `Plugins:` line from the PR's files along the way
    (for the per-plugin CHANGELOGs — see [Cutting a release](releases/README.md#cutting-a-release)), and
    removes the entry file; commits that directly on `main`.
 
-### One thing to do while writing the entry: set its tier
+### One thing to do while writing the entry: fill in its impact table
 
-Every entry carries a `Tier:` line, scaffolded at `0`. It says **how far the change reaches**, and raising
-it is a one-line edit in a file you are already editing before the PR:
+Every entry carries an impact table, scaffolded at tier 0. Filling it in is an edit in a file you are already
+editing before the PR:
+
+```text
+| Tier | Significance | Why |
+|---|---|---|
+| 0 | - | - |
+```
+
+The **tier** says how far the change reaches, and therefore which release document the entry appears in:
 
 | tier | who notices |
 |---|---|
-| `Tier: 0` | only this repo's own developers — docs, config, repo-internal work |
-| `Tier: 1` | a colleague working on this project gets something out of it |
-| `Tier: 2` | a consumer of the product notices it |
+| `0` | only this repo's own developers — docs, config, repo-internal work |
+| `1` | a colleague working on this project gets something out of it |
+| `2` | a consumer of the product notices it |
 
-**Why it matters even though nothing breaks if you leave it at 0:** the release cut reads these tiers and
-refuses a bump they have not earned — a release needs at least one tier-1 entry, a minor needs a tier-2
-one. So an entry left at 0 is work that cannot carry a release on its own. `open-pr.ps1` prints the tier it
-read, so you find out before the PR rather than at the cut, and it refuses a value the model has no meaning
-for (`Tier: 5`).
+The **significance** says how much it weighs for that reader, and therefore where in the document it sits —
+the most consequential change leads. Score it against this rubric:
+
+| | |
+|---|---|
+| `5` | the reader must act — a breaking change, a required migration, or a long-standing blocker that is now gone |
+| `4` | materially changes how they work; they notice within a day without being told |
+| `3` | a clear improvement, noticed the moment they touch that part |
+| `2` | small; noticed if somebody points it out |
+| `1` | cosmetic or preventative — nothing changes for them today |
+
+**Every tier you claim needs its own row, with a score and a `Why`.** The ladder is cumulative — a change
+consumers notice is also a change colleagues get something out of — so a tier-2 entry owes a tier-1 row:
+
+```text
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 5 | consumers must re-add the marketplace under its new name; installs break without it |
+| 1 | 4 | the routine version bump stops needing a developer |
+```
+
+**Why it matters even though nothing breaks if you leave it at 0:** the release cut refuses a bump the tiers
+have not earned — a release needs at least one tier-1 entry, a minor needs a tier-2 one — and it also refuses
+a release whose tier-1-or-higher entries carry no significance, because an unscored entry cannot be placed.
+So an entry left at 0 is work that cannot carry a release on its own. `open-pr.ps1` prints what it read and
+names anything unsettled, so you find out before the PR rather than at the cut; it refuses a cell the model
+has no meaning for (`| 2 | 9 | … |`) outright.
+
+**The score cells are empty on purpose.** The tier defaults to 0 because 0 is a harmless final answer; a
+*score* has no harmless value, so any number scaffolded for you would be a guess at a ranking. The rubric is
+what makes it a measurement rather than a mood, and the `Why` is what makes the resulting order auditable —
+it says why *this* change is in that band.
 
 **Do not infer it from your branch prefix.** This repo has measured that the prefix does not predict
 impact: the single most consequential change for a consumer in v3.2.0 — renaming the marketplace, which

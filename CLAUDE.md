@@ -249,9 +249,63 @@ The constitution above, concretely implemented here:
 
      **The ladder is cumulative**, so a tier-2 entry is in the highlights *and* in the internal note; the
      development note carries everything, tier 0 included, because it is the record rather than a summary.
-     **The number comes from the author of the entry, on the branch** — `Tier: 0` is scaffolded and raised
-     by hand — and deliberately **not** from the branch prefix, which this repo has measured does not
-     predict impact.
+     **The number comes from the author of the entry, on the branch** — and deliberately **not** from the
+     branch prefix, which this repo has measured does not predict impact.
+
+     **The second axis: significance, and the order follows it** (Dave, August 5, 2026;
+     [#467](https://github.com/DaveKJohn/claude-code-specialists/issues/467)). The tier says how far a change
+     **reaches**, and therefore which document it appears in. A significance score says how much it
+     **weighs** for that document's reader, and therefore **where in it** the entry sits — so the most
+     consequential change leads instead of sitting third under whichever heading its branch prefix produced.
+     Both are declared in one **impact table**, which since #467 **replaces** the `Tier: N` line:
+
+     ```text
+     | Tier | Significance | Why |
+     |---|---|---|
+     | 2 | 5 | consumers must re-add the marketplace under its new name; installs break without it |
+     | 1 | 4 | the routine version bump stops needing a developer |
+     ```
+
+     **The tier is the row, which is what makes the cumulative ladder impossible to claim halfway.** A
+     change consumers notice *is* a change colleagues get something out of, so a tier-2 entry owes a tier-1
+     row too — the rows an entry has are the documents it appears in, and each row is that document's reader
+     answering their own question. The score cells are scaffolded **empty**, unlike the old `Tier: 0`
+     default: 0 was a harmless final answer, while any scaffolded *score* would be a guess at a ranking, and
+     this repo has measured what a guessed ranking costs (the retired highlights marker, below).
+
+     **1 to 5 against a written rubric** (`Get-EntrySignificanceRubric`, overridable per repo), because an
+     unanchored ordinal scale invites false precision — 5 is *the reader must act*, 1 is *nothing changes for
+     them today*. That is what makes the number a measurement rather than a mood, and it is also why the
+     score is comparable **across** releases. Dave reversed his own earlier "no anchors" answer the same day,
+     and the reversal is the reasoning: without anchors there is nothing to drift, but also nothing to check.
+     The **`Why` is required** and is the lasting half — the rubric says which band, the `Why` says why *this*
+     change is in it.
+
+     **Who reads it where.** The fold places the entry at its ranked position in `CHANGELOG.md`, and that is
+     the *only* moment it can: the cut **empties** the tier sections, so whatever order the fold leaves is
+     what the release documents inherit — reproducible across two moments days apart with nothing
+     re-estimated. The **highlights** re-read the tier-2 row (its reader is the consumer); the **internal
+     note** reads the tier-1 row. **Tier 0 is never ranked** — the development note is the record: complete
+     and chronological. The table **survives into the record** because that is the last place each ranking's
+     justification lives, and is **stripped from everything that travels outward** (highlights, per-plugin
+     `CHANGELOG.md`, `RELEASE.md`), because a self-assigned number printed at a consumer is a marketing
+     claim. `cut-release.ps1` refuses a release whose tier-1-or-higher entries have not scored themselves;
+     `-SkipSignificanceGate` overrules it, separate from `-SkipTierGate` because one overrules whether the
+     release should exist and the other how its contents are ordered.
+
+     **`Tier: N` is still read, and always will be** — "recognise both, write one". Every entry already in
+     `CHANGELOG.md` and in every consumer's tree predates the table, and a parser that only knew the new
+     shape would read all of them as tier 0: silent, correct-looking, and wrong in the direction that empties
+     a release.
+
+     **The name was `Happiness` for one afternoon.** Dave rejected it as unprofessional, and he was right
+     about more than the word: *happiness* names an emotion in the reader, which an entry's author is in no
+     position to assert, while the weight of a change for an audience is something they can judge. Worth
+     recording alongside it, because it is the first thing anyone reaches for: **RICE and WSJF do not apply
+     here.** They price work *before* it is done, with effort in the denominator — they answer "what do we
+     build next". Everything scored here is already merged, so effort is spent and irrelevant. Reach ×
+     significance is the decomposition incident practice makes when it derives a priority from impact and
+     urgency rather than asking for one number.
 
      **And a release now has to earn its bump.** `cut-release.ps1` refuses one that the pending entries do
      not justify, before it writes anything:

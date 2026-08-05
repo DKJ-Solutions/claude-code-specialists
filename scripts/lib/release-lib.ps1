@@ -1008,7 +1008,16 @@ function Format-CategorizedEntries {
     param(
         [Parameter(Mandatory)][string[]]$Entries,
         [int]$CategoryLevel = 2,
-        [switch]$BareTitles
+        [switch]$BareTitles,
+        # WHICH TIER'S ROW ORDERS THE OUTPUT (issue #467). 0 -- the default -- means unranked: the
+        # canonical category order and the arrival order within it, byte-identical to before this existed.
+        # A document is ordered by what ITS OWN reader gets out of each change, and the reader is named by
+        # the tier, so this is a tier number rather than an audience word: the internal note ranks on tier
+        # 1, the highlights on tier 2.
+        [int]$RankByTier = 0,
+        # Remove the impact table from the rendered entries. For the documents that travel OUTWARD only;
+        # the record keeps it. See Remove-EntryImpactTable for why the two differ.
+        [switch]$StripSignificance
     )
     $md = [char]0x00B7
     $cats = Get-ReleaseCategories
@@ -1016,7 +1025,9 @@ function Format-CategorizedEntries {
     $entryHashes = '#' * ($CategoryLevel + 1)
 
     $grouped = @{}
+    $index = -1
     foreach ($e in $Entries) {
+        $index++
         $heading = ($e -split "`r?`n")[0]
         $t = 'Other'
         $parts = @(($heading -replace '^#+\s+', '') -split "\s*$md\s*")
@@ -1035,22 +1046,65 @@ function Format-CategorizedEntries {
             $cand = $parts[$p].Trim()
             if ($cats.Order -contains $cand) { $t = $cand; break }
         }
-        if (-not $grouped.ContainsKey($t)) { $grouped[$t] = New-Object System.Collections.Generic.List[string] }
+        if (-not $grouped.ContainsKey($t)) { $grouped[$t] = New-Object System.Collections.Generic.List[pscustomobject] }
+        # THE SCORE IS READ BEFORE ANYTHING IS STRIPPED, for exactly the reason the type is: a later pass
+        # deletes the table it lives in. Reading it here also means -StripSignificance and -RankByTier
+        # compose -- the highlights need both, and doing them in the other order would rank an unscored
+        # pile, which is the same class of bug -BareTitles was measured on in this function.
+        $rank = 0
+        if ($RankByTier -gt 0) {
+            $rank = Get-EntryImpactScore -Impact (Resolve-EntryImpact -EntryText $e) -Tier $RankByTier
+        }
         # The type has been read by now, so reducing the heading is safe from here on.
         $text = if ($BareTitles) { Convert-EntryHeadingToTitle -EntryText $e } else { $e }
-        $grouped[$t].Add(($text.Trim() -replace "`r`n", "`n"))
+        if ($StripSignificance) { $text = Remove-EntryImpactTable -EntryText $text }
+        $grouped[$t].Add([pscustomobject]@{
+            Text  = ($text.Trim() -replace "`r`n", "`n")
+            Rank  = $rank
+            Order = $index
+        })
+    }
+
+    # WHICH CATEGORY COMES FIRST. Unranked: the canonical order from Get-ReleaseCategories, which is what
+    # this always did. Ranked: the category holding the highest-scoring entry leads, so the most
+    # consequential change in the release is genuinely at the top of the document rather than third under
+    # whichever heading its branch prefix produced -- while the reader keeps the grouping. Dave's choice
+    # (August 5, 2026) over sorting only within a category, which preserves the structure but not the
+    # promise, and over dropping the headings, which delivers the promise and costs the grouping.
+    #
+    # THE CANONICAL ORDER IS THE TIE-BREAK, so two categories whose best entry scores the same still come
+    # out in a defined order rather than a hash-table one.
+    $order = @($cats.Order | Where-Object { $grouped.ContainsKey($_) })
+    if ($RankByTier -gt 0) {
+        $ranked = @()
+        $position = -1
+        foreach ($cat in $order) {
+            $position++
+            $best = 0
+            foreach ($item in $grouped[$cat]) { if ($item.Rank -gt $best) { $best = $item.Rank } }
+            $ranked += [pscustomobject]@{ Cat = $cat; Best = $best; Canonical = $position }
+        }
+        $order = @($ranked | Sort-Object -Property @{Expression = 'Best'; Descending = $true}, @{Expression = 'Canonical'; Descending = $false} |
+            ForEach-Object { $_.Cat })
     }
 
     $sections = @()
-    foreach ($cat in $cats.Order) {
-        if ($grouped.ContainsKey($cat)) {
-            $label = if ($cats.Title.ContainsKey($cat)) { $cats.Title[$cat] } else { $cat }
-            $rendered = @($grouped[$cat].ToArray() | ForEach-Object {
-                [regex]::Replace($_, '^#{2,6}\s', "$entryHashes ")
-            })
-            $body = ($rendered -join "`n`n---`n`n")
-            $sections += "$catHashes $label`n`n$body"
+    foreach ($cat in $order) {
+        $label = if ($cats.Title.ContainsKey($cat)) { $cats.Title[$cat] } else { $cat }
+        $items = @($grouped[$cat].ToArray())
+        if ($RankByTier -gt 0) {
+            # SORTED ON (score desc, arrival asc) -- the second key is not decoration. PowerShell's
+            # Sort-Object is NOT a stable sort, so on a five-point scale, where ties are the common case,
+            # sorting on the score alone would let equal-scoring entries come out in a different order
+            # from one run to the next. That would make a regenerated release document differ from the one
+            # already published, with nothing having changed. The arrival index makes the result total.
+            $items = @($items | Sort-Object -Property @{Expression = 'Rank'; Descending = $true}, @{Expression = 'Order'; Descending = $false})
         }
+        $rendered = @($items | ForEach-Object {
+            [regex]::Replace($_.Text, '^#{2,6}\s', "$entryHashes ")
+        })
+        $body = ($rendered -join "`n`n---`n`n")
+        $sections += "$catHashes $label`n`n$body"
     }
     return ($sections -join "`n`n")
 }
@@ -1074,7 +1128,12 @@ function Build-PluginChangelogSection {
         [Parameter(Mandatory)][string]$Date
     )
     $emDash = [char]0x2014
-    $body = Format-CategorizedEntries -Entries $Entries -CategoryLevel 3
+    # -StripSignificance, and NOT ranked (issue #467). This file ships INSIDE the plugin, so it travels to
+    # every consumer's plugin cache -- exactly the outward direction a self-assigned score must not take.
+    # It is not ranked because its entries are a per-PLUGIN selection cutting across all tiers, so there is
+    # no single audience whose score would order it; the release's own documents are where the ordering
+    # question has an answer.
+    $body = Format-CategorizedEntries -Entries $Entries -CategoryLevel 3 -StripSignificance
     return "## v$Version $emDash $Date`n`n$body`n"
 }
 
@@ -1198,7 +1257,10 @@ function Build-PluginReleaseCard {
         })
         # Single-release view: categories at '##' -> entries at '###', exactly like the full notes.
         # (No inner '## vX -- date' line -- the card header above already states the version + date.)
-        $body = (Format-CategorizedEntries -Entries $converted -CategoryLevel 2).Trim()
+        # -StripSignificance for the same reason as the plugin CHANGELOG above: this card ships inside the
+        # plugin and is read by consumers. Unranked for the same reason too -- a per-plugin selection has
+        # no one audience.
+        $body = (Format-CategorizedEntries -Entries $converted -CategoryLevel 2 -StripSignificance).Trim()
     } else {
         $body = "No changes to this plugin in this release $emDash see the full notes."
     }
@@ -1350,7 +1412,19 @@ function Build-ReleaseNotes {
             $linked = @($groupEntries | ForEach-Object { Convert-RootRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
             # Categories one level deeper than in the flat shape, so the nesting stays correct:
             # '## Tier 2 - consumers' -> '### Features' -> '#### <entry>'.
-            $inner = Format-CategorizedEntries -Entries $linked -CategoryLevel 3
+            #
+            # RANKED FROM TIER 1 UP, AND DELIBERATELY NOT AT TIER 0 (issue #467). Tier 0 is the RECORD --
+            # complete and chronological, which is what a record is for -- and its entries are never asked
+            # for a score in the first place. The tiers above it are ordered by what the organisation gets
+            # out of them, the same score CHANGELOG.md's sections are already ordered by, so this
+            # inherits that order rather than forming a second opinion about it.
+            #
+            # THE SCORES ARE NOT STRIPPED HERE, and that is the one place they survive. The cut EMPTIES
+            # the changelog's tier sections, so these notes are the last document holding the reason
+            # behind each ranking; deleting it would leave every order asserted with its justification
+            # thrown away. The documents that travel outward strip it -- see Build-HighlightsNotes.
+            $rankByTier = if ([int]$group.Tier -ge 1) { [int]$group.Tier } else { 0 }
+            $inner = Format-CategorizedEntries -Entries $linked -CategoryLevel 3 -RankByTier $rankByTier
             $sections += ("## " + (Get-ReleaseTierHeading -Tier ([int]$group.Tier)) + "`n`n" + $inner)
         }
         $body = ($sections -join "`n`n")
@@ -1496,8 +1570,23 @@ function Build-HighlightsNotes {
     )
     $real = @($Entries | Where-Object { $_ -and $_.Trim() })
     $linked = @($real | ForEach-Object { Convert-RootRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
+    # ORDERED BY THE CONSUMER SCORE, not the internal one (issue #467). This is the only document whose
+    # reader is the consumer, and 'what does a consumer notice' is a different question from 'what does the
+    # organisation get out of it' -- which is precisely why the two are separate documents and separate
+    # scores. Ordering this one by the internal score would answer its question with a proxy.
+    #
+    # RE-SORTING HERE IS NOT A SECOND ESTIMATE. Both numbers were written once, by the author, on the
+    # branch, and both travel in the entry; this reads the other one rather than forming a new opinion. The
+    # reproducibility the two-moment problem needed is a property of the numbers being stored, not of
+    # there being only one sort.
+    #
+    # AND THE SCORES THEMSELVES ARE STRIPPED, which is the whole reason -StripSignificance exists. A
+    # self-assigned number printed at a consumer is a marketing claim, and this repo has measured what a
+    # published guess costs -- the retired highlights marker is in this file's history for exactly that.
+    # The number does its work by deciding the order and then gets out of the way; the reason stays in the
+    # development notes, where it is auditable by the people who can check it.
     $body = if ($linked.Count -gt 0) {
-        Format-CategorizedEntries -Entries $linked -CategoryLevel 2 -BareTitles
+        Format-CategorizedEntries -Entries $linked -CategoryLevel 2 -BareTitles -RankByTier 2 -StripSignificance
     } else {
         ''
     }
