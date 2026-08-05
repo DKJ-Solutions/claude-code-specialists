@@ -31,10 +31,35 @@ changelog entry — the same workflow as the consuming repos. The steps:
    **irreversible/outward-facing** — stops for his word first.
 5. **Fold:** on `main`, right after the merge,
    [`scripts/release/fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)`-Branch <name>`
-   folds the entry file into the `## Pull Requests` section of [`CHANGELOG.md`](CHANGELOG.md) (with
-   `#NN` + PR link), derives a `Plugins:` line from the PR's files along the way (for the per-plugin
-   CHANGELOGs — see [Cutting a release](releases/README.md#cutting-a-release)), and removes the entry file;
-   commits that directly on `main`.
+   folds the entry file into the **tier section** of [`CHANGELOG.md`](CHANGELOG.md) that the entry's own
+   `Tier:` line names (with `#NN` + PR link), derives a `Plugins:` line from the PR's files along the way
+   (for the per-plugin CHANGELOGs — see [Cutting a release](releases/README.md#cutting-a-release)), and
+   removes the entry file; commits that directly on `main`.
+
+### One thing to do while writing the entry: set its tier
+
+Every entry carries a `Tier:` line, scaffolded at `0`. It says **how far the change reaches**, and raising
+it is a one-line edit in a file you are already editing before the PR:
+
+| tier | who notices |
+|---|---|
+| `Tier: 0` | only this repo's own developers — docs, config, repo-internal work |
+| `Tier: 1` | a colleague working on this project gets something out of it |
+| `Tier: 2` | a consumer of the product notices it |
+
+**Why it matters even though nothing breaks if you leave it at 0:** the release cut reads these tiers and
+refuses a bump they have not earned — a release needs at least one tier-1 entry, a minor needs a tier-2
+one. So an entry left at 0 is work that cannot carry a release on its own. `open-pr.ps1` prints the tier it
+read, so you find out before the PR rather than at the cut, and it refuses a value the model has no meaning
+for (`Tier: 5`).
+
+**Do not infer it from your branch prefix.** This repo has measured that the prefix does not predict
+impact: the single most consequential change for a consumer in v3.2.0 — renaming the marketplace, which
+breaks every existing install — arrived on a `chore/` branch. A `docs/` branch can carry a tier-2 change and
+a `feat/` branch a tier-0 one.
+
+The full model, and what each tier means for the release documents, is in
+[`releases/README.md`](releases/README.md#the-tier-model).
 
 ## Releases — a different cycle, described elsewhere
 
@@ -45,8 +70,9 @@ ordinary contributions**. Keeping the two apart is the point; do not read the ex
 something this page grants.
 
 It is described in full in [`releases/README.md`](releases/README.md#cutting-a-release): what a release
-is, the `cut-release.ps1` steps, the three note tiers, the per-plugin `CHANGELOG.md`s and `RELEASE.md`
-cards, and the guardrails. That same page carries the list of releases actually cut, at the end.
+is, the `cut-release.ps1` steps, [what a bump must earn](releases/README.md#what-a-release-must-earn), the
+three release documents, the per-plugin `CHANGELOG.md`s and `RELEASE.md` cards, and the guardrails. That
+same page carries the list of releases actually cut, at the end.
 
 **The one thing worth knowing from here:** a release is repo-wide and in lockstep, which works because
 this repository holds **one** product whose four plugins are one system — see

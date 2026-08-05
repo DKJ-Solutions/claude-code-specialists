@@ -163,6 +163,22 @@ if (Test-Path -LiteralPath $writtenEntry) {
     $roundTrip = @(Get-EntryScaffoldFindings -EntryText $text -Wording (Get-EntryScaffoldWording))
     Assert-True ($roundTrip.Count -gt 0) 'the matcher sees the writer output as scaffolded -- writer and guard share one source'
     Assert-Equal 3 $roundTrip.Count 'and it finds all three strings the writer wrote'
+    # THE SAME ROUND TRIP FOR THE TIER LINE, and it is the assert that matters most for the tier model: the
+    # writer, the validator (open-pr) and the fold all read this one format, and a real file written by the
+    # real writer is the only thing that proves they agree. 'Tier: 0' is DECLARED, not merely defaulted --
+    # the difference is what lets the fold tell "somebody chose 0" from "somebody forgot".
+    $writtenTier = Resolve-EntryTier -EntryText $text
+    Assert-Equal 0 $writtenTier.Tier 'the writer writes the harmless default tier'
+    Assert-Equal $true $writtenTier.Declared 'and writes it as an explicit declaration, not an omission'
+    Assert-Equal $null $writtenTier.Error 'the written line parses without complaint'
+    # The line sits directly under the heading, where whoever edits the entry will meet it.
+    $entryLines = @(($text -split "`r?`n") | Where-Object { $_.Trim() -ne '' })
+    Assert-True ($entryLines[0] -match '^### ') 'the entry still opens with its heading'
+    Assert-Equal (Format-EntryTierLine -Tier 0) $entryLines[1] 'and the tier line is the first thing under it'
+    # It is NOT scaffold prose: 'Tier: 0' is a legitimate final value, so the gate must never treat it as
+    # evidence of an unedited entry -- exactly the reasoning that keeps Get-EntryFallbackType out too.
+    $tierAsFinding = @($roundTrip | Where-Object { $_.Marker -match 'Tier' })
+    Assert-Equal 0 $tierAsFinding.Count 'the tier line is not one of the scaffold findings -- a low tier is a decision, not a stub'
 }
 Remove-Item -Recurse -Force -LiteralPath $fixture -ErrorAction SilentlyContinue
 
@@ -191,6 +207,83 @@ foreach ($literal in @('TODO: title', '**To do / where I left off:**', 'TODO: wh
     $assignment = "=\s*'" + [regex]::Escape($literal)
     Assert-True ($writerText -notmatch $assignment) "new-changelog-entry assigns no literal '$literal'"
 }
+
+# --- 5. The tier line: the entry's other declared fact -------------------------------------------
+Write-Host "the tier line (Resolve-EntryTier / Remove-EntryTierLine)" -ForegroundColor Cyan
+$md = [char]0x00B7
+Assert-Equal 'Tier' (Get-EntryTierLabel) 'the label is the machine-read key, not translated prose'
+Assert-Equal 2 (Get-EntryTierMax) 'the model has three tiers, 0 to 2'
+Assert-Equal 'Tier: 0' (Format-EntryTierLine) 'the formatter defaults to the harmless tier'
+Assert-Equal 'Tier: 2' (Format-EntryTierLine -Tier 2) 'and writes the tier it is given'
+
+$entry2 = "### A title $md Feat $md 2026-08-05`n`nTier: 2`n`n**Body heading**`n`nBody text.`n"
+$t2 = Resolve-EntryTier -EntryText $entry2
+Assert-Equal 2 $t2.Tier 'a declared tier is read back'
+Assert-Equal $true $t2.Declared 'and reported as declared'
+Assert-Equal '2' $t2.Raw 'with the raw text kept for quoting back'
+Assert-Equal $null $t2.Error 'and no error'
+
+# THE DEFAULT IS THE HARMLESS END, and that is the whole safety argument: forgetting to classify can never
+# promote work into a consumer-facing document, only leave it unreleasable on its own.
+$tNone = Resolve-EntryTier -EntryText "### A title $md Feat $md 2026-08-05`n`nBody only.`n"
+Assert-Equal 0 $tNone.Tier 'no declaration reads as tier 0'
+Assert-Equal $false $tNone.Declared 'and is reported as UNdeclared, so a caller can tell the two apart'
+Assert-Equal $null $tNone.Error 'an absent line is not an error -- it is the documented default'
+
+# A MALFORMED VALUE IS REPORTED, NOT ABSORBED. Silently reading 'Tier: 5' back as 0 would file
+# consumer-facing work as repo-internal: correct-looking output, wrong document, nothing to notice.
+$tHigh = Resolve-EntryTier -EntryText "### x $md Feat $md 2026-08-05`n`nTier: 5`n"
+Assert-Equal 0 $tHigh.Tier 'an out-of-range tier still falls back to the safe end'
+Assert-True ($tHigh.Error -match 'tier 5 does not exist') 'but the error names the value'
+$tWord = Resolve-EntryTier -EntryText "### x $md Feat $md 2026-08-05`n`nTier: two`n"
+Assert-True ($tWord.Error -match 'is not a tier') 'a non-numeric tier is reported too'
+Assert-Equal $true $tWord.Declared 'and still counts as declared -- somebody wrote it, it is just wrong'
+$tNeg = Resolve-EntryTier -EntryText "### x $md Feat $md 2026-08-05`n`nTier: -1`n"
+Assert-True ($null -ne $tNeg.Error) 'a negative tier is rejected rather than read as a number'
+
+# FENCE-AWARENESS, in both directions. The entry documenting this mechanism quotes the line it explains --
+# this repo's own entry for the tier model does -- so a parser that cannot tell a quote from a declaration
+# would read the wrong value AND a blind stripper would delete that line out of the fence while folding.
+$fencedOnly = "### x $md Feat $md 2026-08-05`n`nAn example:`n`n" + '```text' + "`nTier: 2`n" + '```' + "`n"
+$tFenced = Resolve-EntryTier -EntryText $fencedOnly
+Assert-Equal 0 $tFenced.Tier 'a tier line only inside a fence is not a declaration'
+Assert-Equal $false $tFenced.Declared 'and is reported as undeclared'
+Assert-Equal $fencedOnly (Remove-EntryTierLine -EntryText $fencedOnly) 'and the stripper leaves a fenced-only entry byte-identical'
+
+$mixed = "### x $md Feat $md 2026-08-05`n`nTier: 1`n`nBody.`n`n" + '```text' + "`nTier: 2`n" + '```' + "`n"
+Assert-Equal 1 (Resolve-EntryTier -EntryText $mixed).Tier 'the real declaration wins over a quoted one'
+$stripped = Remove-EntryTierLine -EntryText $mixed
+Assert-True ($stripped -notmatch '(?m)^Tier: 1$') 'the real declaration is removed'
+Assert-True ($stripped -match '(?m)^Tier: 2$') 'and the quoted one survives -- exactly what was read is what was removed'
+Assert-True ($stripped -match 'Body\.') 'the body is untouched'
+# No double blank line left behind where the line was.
+Assert-True ($stripped -notmatch "`n`n`n") 'the blank line the removal left behind is collapsed'
+# CRLF in, CRLF out: the caller has already matched the changelog's own style, so this must not rewrite it.
+$crlf = "### x $md Feat $md 2026-08-05`r`n`r`nTier: 1`r`n`r`nBody.`r`n"
+$crlfOut = Remove-EntryTierLine -EntryText $crlf
+Assert-True ($crlfOut -match "`r`n") 'CRLF line endings survive the strip'
+Assert-True ($crlfOut -notmatch "(?<!`r)`n") 'and no bare LF is introduced alongside them'
+# Nothing to remove = nothing changed.
+$noTier = "### x $md Feat $md 2026-08-05`n`nBody.`n"
+Assert-Equal $noTier (Remove-EntryTierLine -EntryText $noTier) 'an entry with no tier line comes back unchanged'
+
+Write-Host "the wiring (open-pr validates the tier, the fold consumes it)" -ForegroundColor Cyan
+# Text asserts for the same reason as the scaffold gate above: open-pr drives a live push and gh.
+Assert-True ($openPrText -match 'Resolve-EntryTier') 'open-pr resolves the entry tier'
+Assert-True ($openPrText -match 'tier gate:') 'and reports under a named gate, so a block is attributable'
+# NOT -Force-able, deliberately: -Force exists for text somebody legitimately wrote, and there is no
+# legitimate 'Tier: 5'. Asserted by reading the refusal block rather than the whole file.
+$tierGateIdx = $openPrText.IndexOf('tier gate:')
+$tierGateBlock = $openPrText.Substring($tierGateIdx, [Math]::Min(900, $openPrText.Length - $tierGateIdx))
+Assert-True ($tierGateBlock -notmatch '\$Force') 'the tier gate has no -Force escape -- a meaningless tier is never legitimate'
+$foldText = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\fold-changelog-entry.ps1'))
+Assert-True ($foldText -match 'entry-scaffold-lib\.ps1') 'the fold dot-sources the shared entry-format lib'
+Assert-True ($foldText -match 'Resolve-EntryTier') 'the fold reads the tier'
+Assert-True ($foldText -match 'Remove-EntryTierLine') 'and removes the line once the section states it'
+Assert-True ($foldText -match 'Get-ChangelogTierSections') 'and asks the shared resolver which section that is'
+# The tier must be resolved BEFORE anything is written, or a bad tier leaves a half-folded changelog.
+Assert-True ($foldText.IndexOf('Nothing was folded') -lt $foldText.IndexOf('Write-Utf8NoBom -Path $changelogPath')) `
+    'the pre-pass refusal sits before the first changelog write'
 
 Write-Host ""
 if ($script:fail -gt 0) {

@@ -3,17 +3,23 @@
     Lays down the skeleton for the internal release summary: releases/internal/<dir>/<X.Y.Z>.md.
 
 .DESCRIPTION
-    The THIRD release tier, for colleagues, employers and management. It exists at EVERY release, patch
-    included, and fills the gap between the other two:
+    THE TIER-1 release document, for colleagues, employers and management. It exists at EVERY release,
+    patch included, and fills the gap between the other two:
 
-      releases/development/<dir>/<X.Y.Z>.md   developers   -- always, auto-complete and long
-      releases/highlights/<dir>/<X.Y.Z>.md    consumers    -- minor/major only, what they notice
-      releases/internal/<dir>/<X.Y.Z>.md      colleagues   -- always, what the work is worth
+      releases/development/<dir>/<X.Y.Z>.md   tier 0   developers   -- always, complete and long
+      releases/internal/<dir>/<X.Y.Z>.md      tier 1   colleagues   -- always, what the work is worth
+      releases/highlights/<dir>/<X.Y.Z>.md    tier 2   consumers    -- minor/major, what they notice
 
     THE DISTINCTION THAT KEEPS THE TIERS WORKABLE: highlights = WHAT THE CONSUMER NOTICES, internal =
     WHAT THE ORGANISATION GETS OUT OF IT. They come apart most clearly on a patch, which is where this
     tier was first needed: a release with nothing for a consumer -- correctly a patch, therefore no
     highlights -- can still be the release where a team stopped needing a developer for a routine change.
+
+    WHICH ENTRIES IT CARRIES OVER: tier 1 AND tier 2, because the ladder is cumulative. Something a
+    consumer notices is something a colleague should hear about too, so a tier-2 entry appears in this
+    document as well as in the highlights. Tier-0 entries do not: they are repo-internal by definition,
+    the developer notes are their record, and copying them here would rebuild the document this tier
+    exists to avoid.
 
     IT GENERATES ONLY HALF, AND THAT IS THE POINT. Version, date, type and the entry titles come from the
     developer notes; "what it is worth" cannot be derived from a changelog. So what you get is a SKELETON
@@ -128,7 +134,8 @@ $w = @{
     Audience       = 'colleagues and management -- what the organisation gets out of this release'
     SkeletonNote   = @(
         'SKELETON. Edit this file and delete these comment blocks afterwards.',
-        'The bullets below come from the developer notes; the [type] marker is a hint about what is',
+        'The bullets below are the tier-1 and tier-2 entries of the developer notes -- tier 0 is',
+        'repo-internal and deliberately absent. The [type] marker is a hint about what is',
         'worth keeping, and belongs gone once you rewrite the line. Keep it to one page at most:',
         '1-3 lines per subject, no file names, no code. Anything that means nothing to someone',
         'outside the team, remove -- this tier is not complete, it is readable.'
@@ -196,36 +203,67 @@ if (-not $typeLabel) {
     $typeLabel = $w.Unknown
 }
 
-# --- Carry over the entry titles ------------------------------------------------------------------
+# --- Carry over the entry titles, TIER 1 AND UP ----------------------------------------------------
 # The headings in the developer notes carry the compact changelog shape:
-#   ### #NN <midDot> title <midDot> type <midDot> date        (the #NN part is optional)
-# Only H3 counts: the H2s are category headings (Features/Fixes/...) and H4s are subdivisions inside an
-# entry. '^###\s' does not match '#### ' because there is no whitespace after the third #.
+#   #NN <midDot> title <midDot> type <midDot> date            (the #NN part is optional)
+#
+# AN ENTRY IS RECOGNISED BY THAT SHAPE, NOT BY ITS HEADING LEVEL, and that is a fix rather than a
+# refinement. The level moved when the notes gained tier sections: entries used to be H3 under H2
+# categories, and are now H4 under H3 categories under H2 tiers. A level-based match would have silently
+# swapped what it collected -- reading the CATEGORY headings ('Features', 'Fixes') as entry titles and
+# putting those four words in a document written for colleagues. The metadata triple is what an entry has
+# and a category heading never does, so that is what is matched.
+#
+# ONLY TIER 1 AND ABOVE REACH THIS DOCUMENT. The ladder is cumulative: tier 2 is what a consumer notices
+# and therefore also something a colleague should hear about, so it belongs here as well as in the
+# highlights. Tier 0 is repo-internal by definition -- it is in the developer notes, which is where the
+# record belongs, and putting it here would rebuild exactly the document this tier exists to avoid.
+#
+# NOTES WITH NO TIER HEADINGS AT ALL take everything, which is the repo-without-a-tier-split case: there
+# is no tier information to filter on, so filtering would empty the document rather than focus it.
 $midDot = [char]0x00B7
 $bullets = New-Object System.Collections.Generic.List[string]
 
-foreach ($h in [regex]::Matches($dev, '(?m)^###\s+(.+?)\s*$')) {
-    $head = $h.Groups[1].Value.Trim()
-    $title = $head
-    $type = ''
+$hasTierHeadings = [regex]::IsMatch($dev, '(?m)^##\s+Tier\s+\d+\b')
+$currentTier = $null
+$skippedTier0 = 0
+
+foreach ($line in ($dev -split "`r?`n")) {
+    $tierMatch = [regex]::Match($line, '^##\s+Tier\s+(\d+)\b')
+    if ($tierMatch.Success) { $currentTier = [int]$tierMatch.Groups[1].Value; continue }
+
+    $hm = [regex]::Match($line, '^#{3,6}\s+(.+?)\s*$')
+    if (-not $hm.Success) { continue }
+    $head = $hm.Groups[1].Value.Trim()
 
     $parts = @($head -split "\s*$midDot\s*")
-    if ($parts.Count -ge 3) {
-        $type = $parts[$parts.Count - 2].Trim()
-        $startIdx = if ($parts[0] -match '^#\d+$') { 1 } else { 0 }
-        $endIdx = $parts.Count - 3
-        # The title itself may contain a middot, so join the range back rather than taking $parts[1].
-        if ($endIdx -ge $startIdx) {
-            $title = (@($parts[$startIdx..$endIdx]) -join " $midDot ").Trim()
-        }
+    # Fewer than three fields is a category heading (or any other heading), not an entry.
+    if ($parts.Count -lt 3) { continue }
+
+    if ($hasTierHeadings -and ($null -eq $currentTier -or $currentTier -lt 1)) {
+        if ($currentTier -eq 0) { $skippedTier0++ }
+        continue
     }
+
+    $type = $parts[$parts.Count - 2].Trim()
+    $startIdx = if ($parts[0] -match '^#\d+$') { 1 } else { 0 }
+    $endIdx = $parts.Count - 3
+    # The title itself may contain a middot, so join the range back rather than taking $parts[1].
+    $title = if ($endIdx -ge $startIdx) { (@($parts[$startIdx..$endIdx]) -join " $midDot ").Trim() } else { $head }
 
     if (-not $title) { continue }
     if ($type) { $bullets.Add("- [$type] $title") } else { $bullets.Add("- $title") }
 }
 
 if ($bullets.Count -eq 0) {
-    Write-Warning "No entry titles found in $devRel -- the skeleton gets an empty list."
+    # Distinguished on purpose: "this release was all repo-internal" is a different situation from "the
+    # notes did not parse", and the second is a defect while the first is a release that legitimately has
+    # little to say to a colleague.
+    if ($skippedTier0 -gt 0) {
+        Write-Warning "Every entry in $devRel is tier 0 ($skippedTier0 of them) -- nothing in this release reaches beyond this repo's own developers, so the list is empty. Write the note from what you know, or reconsider whether those tiers are right."
+    } else {
+        Write-Warning "No entry titles found in $devRel -- the skeleton gets an empty list."
+    }
     $bullets.Add("- $($w.NoEntries)")
 }
 

@@ -21,18 +21,25 @@ rewrite when copying. Managing branches, PRs, and merges up to and including the
 
 ### Changelog
 
-`CHANGELOG.md` (repo root) has two sections, and since August 4, 2026 in this order: **`## Latest
-Release`** — the version currently cut, one block, pointing at `releases/README.md` for every earlier
-one — and below it **`## Pull Requests`**, every merged branch as an entry with its PR number. So the top
-of the file is the published state and the rest is what is queued behind it. The release section used to
-sit at the bottom and accumulate a block per release; at 434 of 1,062 lines it was duplicating, more
-poorly, an overview `releases/README.md` already carried in full (`Get-ReleaseHistoryMode = 'latest'`).
-Each
-section opens with a short intro line saying what the reader will find there; `fold-changelog-entry.ps1`
-leaves that line in place (entries go below it). **Branches never edit `CHANGELOG.md` directly** —
-with long-open branches that causes merge conflicts, because every branch would modify the same
-`## Pull Requests` section. Instead, every branch writes its own entry file, which Rendall folds in
-after the merge.
+`CHANGELOG.md` (repo root) opens with **`## Latest Release`** — the version currently cut, one block,
+pointing at `releases/README.md` for every earlier one — and below it, since August 5, 2026, **three entry
+sections instead of one**: `## Tier 2 - Pull Requests`, `## Tier 1 - Pull Requests` and
+`## Tier 0 - Pull Requests`, in that order. So the top of the file is the published state, and the rest is
+what is queued behind it, ordered by how far each change reaches rather than only by date.
+
+The release section used to sit at the bottom and accumulate a block per release; at 434 of 1,062 lines it
+was duplicating, more poorly, an overview `releases/README.md` already carried in full
+(`Get-ReleaseHistoryMode = 'latest'`). Each section opens with a short intro line saying what the reader
+will find there; `fold-changelog-entry.ps1` leaves that line in place (entries go below it).
+
+**Branches never edit `CHANGELOG.md` directly** — with long-open branches that causes merge conflicts,
+because every branch would modify the same section. Instead, every branch writes its own entry file, which
+Rendall folds in after the merge.
+
+**Which section an entry lands in is the entry's own `Tier:` line**, and the sections themselves come from
+`Get-ChangelogTierHeadings` in [`scripts/repo-config.ps1`](../../../scripts/repo-config.ps1) — the map's
+order is the document's order, so "which tiers exist" and "where do they sit" are one answer. An empty tier
+section is normal; a changelog holding nothing but tier 0 is a changelog with no release in it yet.
 
 #### How it works
 
@@ -44,7 +51,8 @@ after the merge.
 - **After the merge**: `scripts/release/fold-changelog-entry.ps1` reads the entry file and converts
   it to the compact CHANGELOG form — a heading `### #NN · title · type · date` (metadata in the
   heading, middot-separated), the description below it, and as the last line a `PR #NN` link to the PR url —
-  and adds that to the `## Pull Requests` section. The PR number + url are retrieved via
+  and adds that to the tier section the entry's `Tier:` line names, removing that line on the way in. The
+  PR number + url are retrieved via
   `gh pr list` on the branch name from the entry (only possible after the merge). The fold also
   automatically derives a **`Plugins:` line** from the PR's files (paths under
   `plugins/<plugin>/`; the `connectors/` directory does not count) — that
@@ -88,8 +96,8 @@ description while building; ownership of the entry mechanism stays Rendall's.
    **this** repo's direct-on-`main` exception, which is what the path-scoped commit exists to keep honest,
    and the branch part of the two-machine lesson sits with
    [Derek #05](05-05-extension.md#branch--repo-hygiene).
-3. **More branches merged** → each brings its entry file; each gets folded. `## Pull Requests`
-   stacks up.
+3. **More branches merged** → each brings its entry file; each gets folded into the tier section its own
+   `Tier:` line names, and the three sections stack up in parallel.
 
 ### Versioning & releases
 
@@ -141,9 +149,11 @@ this lens used to state as one rule. Rendall's local obligation is unchanged: **
 in the closing report of every release.**
 
 The `releases/` directory (modeled on life-hub):
-- **`releases/development/<X>.x/<X.Y.Z>.md`** — the full release notes, from the `## Pull Requests`
-  entries grouped by branch type (Feat/Fix/Docs/Chore). Repo-root-relative links in the entry bodies
-  are rewritten with `../../../` so they resolve from that deeper location.
+- **`releases/development/<X>.x/<X.Y.Z>.md`** — the full release notes: **every** pending entry, tier 0
+  included, grouped by **tier** and then by branch type within each tier (`## Tier 2 - consumers` →
+  `### Features` → `#### #NN · …`). Literally the whole changelog, which is what makes this the record
+  rather than a summary of one. Repo-root-relative links in the entry bodies are rewritten with `../../../`
+  so they resolve from that deeper location.
 - **`releases/README.md`** — an overview table of all versions (newest at the top).
 - In `CHANGELOG.md` the `## Latest Release` block becomes a short **reference**
   (`### [vX.Y.Z] - date — Type`) to the notes file, rather than the full contents inline — and it
@@ -151,15 +161,17 @@ The `releases/` directory (modeled on life-hub):
   because that is the only one that exists while it runs; `new-internal-note.ps1` repoints it at the
   internal note the moment that note is created, in the same PR. Linking there at cut time would put a
   dead relative link inside an immutable tag.
-- **`releases/highlights/<X>.x/<X.Y.Z>.md`** — the consumer-facing tier, generated **only for a minor or
-  major** (`Get-ReleaseHighlightsBumps`). Written for the reader who decides whether to *update*, not for
-  the one who reviews the diff: entry metadata (PR number, branch type, date) is stripped.
-  **It is a draft and Rendall edits it before it is published.** Turned on August 3, 2026, after this
-  lens had briefly said the opposite. **Markdown only** — the tier generated a print-ready `.html`
-  alongside it for exactly one release (v3.2.0) and no longer does; Dave does not want it anywhere.
-  A PDF, if ever needed, comes from rendering the markdown with a tool built for it.
-- **`releases/internal/<X>.x/<X.Y.Z>.md`** — the third tier, for colleagues, employers and management:
-  *what the work is worth*, at **every** release including a patch. Written by
+- **`releases/highlights/<X>.x/<X.Y.Z>.md`** — the tier-2 document, generated **only for a minor or
+  major** (`Get-ReleaseHighlightsBumps`) and built from **the tier-2 entries**. Written for the reader who
+  decides whether to *update*, not for the one who reviews the diff: entry metadata (PR number, branch
+  type, date) is stripped. **It is a draft and Rendall edits it before it is published** — the selection
+  arrives already made, the prose does not. Turned on August 3, 2026, after this lens had briefly said the
+  opposite. **Markdown only** — the tier generated a print-ready `.html` alongside it for exactly one
+  release (v3.2.0) and no longer does; Dave does not want it anywhere. A PDF, if ever needed, comes from
+  rendering the markdown with a tool built for it.
+- **`releases/internal/<X>.x/<X.Y.Z>.md`** — the tier-1 document, for colleagues, employers and management:
+  *what the work is worth*, at **every** release including a patch. It carries the **tier-1 and tier-2**
+  entries, the ladder being cumulative, and leaves tier 0 to the development notes. Written by
   [`new-internal-note.ps1`](../../../scripts/release/new-internal-note.ps1), which lays down a skeleton —
   the metadata and the entry titles as bullets, plus three fixed headings — and leaves the rest to
   Rendall. **The middle heading is the tier**: "what it is worth" cannot be generated from a changelog,
@@ -179,18 +191,28 @@ The `releases/` directory (modeled on life-hub):
 - **All three group per major (`3.x`)**, from the single answer in `Get-ReleaseNotesGrouping`. The
   consumer this model came from folders per minor; Dave chose to keep `<X>.x` here.
 
-**What Rendall must know before editing a highlights draft: the marker is a proposal, not a verdict.**
-The generated draft puts `Feat`/`Fix` above a "remove before publishing" marker and everything else
-below it. In the repo this tier was ported from that split is reliable, because a `Style` or `Content`
-branch there *is* a storefront change. **Here it measurably is not.** Held against the 19 entries pending
-at v3.2.0, the most consequential change a consumer could face — renaming the marketplace, which breaks
-every existing install — came in on a `chore/` branch and landed *below* the marker; "a folder rename
-silently unlinks plugin installs" did the same from a `docs/` branch. So the editing pass is not
-"delete the bottom half": it is reading both halves and promoting what a consumer would want to know.
+**What Rendall no longer has to do, and the measurement behind it.** Until August 5, 2026 the highlights
+draft put `Feat`/`Fix` above a "remove before publishing" marker and everything else below it, and Rendall's
+editing pass had to read both halves and promote what a consumer would want to know. In the repo this tier
+was ported from that split is reliable, because a `Style` or `Content` branch there *is* a storefront
+change. **Here it measurably was not.** Held against the 19 entries pending at v3.2.0, the most
+consequential change a consumer could face — renaming the marketplace, which breaks every existing install
+— came in on a `chore/` branch and landed *below* the marker; "a folder rename silently unlinks plugin
+installs" did the same from a `docs/` branch.
 
-**And the tier's timing is the same test as the version number's.** A minor is cut when a consumer
-actually notices something; a patch is what is left. So Rendall never has to decide separately whether a
-release deserves highlights — if it earned a minor, it has a reader.
+So the question moved to where it can actually be answered: **the author of the entry declares the tier on
+the branch**, and the draft is the tier-2 entries. The marker and its two seam knobs are retired. Rendall's
+pass is now a rewrite rather than a rewrite *plus* a rescue — and the one thing to watch has changed shape:
+not "did the marker put this in the wrong half", but "did whoever wrote this entry get its tier right".
+A tier that is wrong is now a one-line edit on the branch, or a section move on `main` after the merge.
+
+**And a release now has to earn its bump, so Rendall no longer decides whether a version number is
+justified — the entries do.** `cut-release.ps1` refuses a release with no tier-1 entry, a minor with no
+tier-2 entry, and a major with fewer than 10 minors behind it (`Get-ReleaseMajorMinMinors`), all before it
+writes anything. The rule "a minor is cut when a consumer actually notices something" was already written
+here; it is now enforced, which also means a release that earned a minor always has a highlights reader.
+`-SkipTierGate` overrules it and should be a conversation, not a habit: the refusal names the bump the
+pending work *does* earn, and taking that is nearly always the right move.
 
 **Rendall's two hand-written documents land via a branch + PR, not on the release commit** (confirmed by
 Dave, August 4, 2026). Both the edited highlights draft and the filled-in internal note are written
@@ -217,8 +239,8 @@ does everything in one motion:
 a clean `main`:
 1. bumps all plugin versions in lockstep to `X.Y.Z`;
 2. generates `releases/development/<X>.x/<X.Y.Z>.md`, adds a row to `releases/README.md`, and puts a
-   reference in `CHANGELOG.md` under `## Latest Release` (the Pull Requests section is emptied down to its
-   intro);
+   reference in `CHANGELOG.md` under `## Latest Release` (every tier section is emptied down to its own
+   intro, and none is added or reordered);
 3. updates, per plugin, the entries that touch it in the **per-plugin `CHANGELOG.md`**
    (`<plugin>/CHANGELOG.md`) — the consumer-facing history that travels with the plugin cache. The
    selection runs via the `Plugins:` line, which itself is omitted as internal bookkeeping;
@@ -264,14 +286,17 @@ waiting for a migration that does not exist.
   indirectly, at branch creation, via
   [Derek #05](05-05-extension.md#classifying-naming-and-creating-a-branch)'s `new-branch.ps1` — you
   rarely call it standalone anymore.
-- `scripts/release/fold-changelog-entry.ps1 [-Branch <name>] [-RepoRoot <path>] [-Commit] [-Push]` — fold entry(ies) into
-  `## Pull Requests` on `main` after a merge. `-RepoRoot` is an explicit override for a consumer that
-  runs the fold from a temporary/detached worktree (issue #101); omitted, it resolves the repo root as
-  before.
-- `scripts/release/cut-release.ps1 (-Version <X.Y.Z> | -Bump <major|minor|patch>) [-Title "…"] [-NoPush] [-SkipLint]`
-  — cut a repo-wide release, directly on `main`: lockstep bump + release notes in
-  `releases/development/` + `releases/README.md` row + `## Latest Release` reference + per-plugin
-  `CHANGELOG.md`s updated + per-plugin `RELEASE.md` cards regenerated + commit + tag `vX.Y.Z` + push.
+- `scripts/release/fold-changelog-entry.ps1 [-Branch <name>] [-RepoRoot <path>] [-Commit] [-Push]` — fold
+  entry(ies) into the **tier section their `Tier:` line names** on `main` after a merge, removing that line
+  on the way in. A malformed tier, or one this repo declares no section for, stops the run **before
+  anything is written** — so a fold-all with one bad entry leaves nothing half-done. `-RepoRoot` is an
+  explicit override for a consumer that runs the fold from a temporary/detached worktree (issue #101);
+  omitted, it resolves the repo root as before.
+- `scripts/release/cut-release.ps1 (-Version <X.Y.Z> | -Bump <major|minor|patch>) [-Title "…"] [-NoPush] [-SkipLint] [-SkipTierGate]`
+  — cut a repo-wide release, directly on `main`: the **bump gate** (does the pending work earn this bump?)
+  + lockstep bump + release notes in `releases/development/` + `releases/README.md` row +
+  `## Latest Release` reference + per-plugin `CHANGELOG.md`s updated + per-plugin `RELEASE.md` cards
+  regenerated + commit + tag `vX.Y.Z` + push.
   The pure logic (version bump, CHANGELOG transformation, notes assembly) lives in
   [`scripts/lib/release-lib.ps1`](../../../scripts/lib/release-lib.ps1), covered by
   [`scripts/tests/release-lib.tests.ps1`](../../../scripts/tests/release-lib.tests.ps1).

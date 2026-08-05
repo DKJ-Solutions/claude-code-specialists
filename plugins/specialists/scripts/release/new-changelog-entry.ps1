@@ -10,6 +10,14 @@ scripts/lib/branch-info.ps1 (feat/fix/docs/chore).
 Unknown prefix -> falls back to a repo-configurable type ("Chore" by default) with a warning,
 adjust it yourself in the file.
 
+THE ENTRY ALSO CARRIES A TIER, written at its default of 0: how far this change reaches, on the
+scale 0 = only this repo's own developers notice / 1 = a colleague on the project gets something out
+of it / 2 = a consumer notices. RAISE IT BY HAND when the change deserves it -- the release cut reads
+these tiers and refuses a bump the pending work has not earned, so an entry left at 0 is work that
+cannot be released on its own. The format lives in scripts/lib/entry-scaffold-lib.ps1, shared with
+open-pr.ps1 (which refuses a malformed tier) and fold-changelog-entry.ps1 (which uses it to pick the
+changelog section and then removes the line).
+
 Optional -Intent: the direction of the branch -- what still needs to happen and where you left
 off. Typically given when parking a branch for later (see new-branch.ps1 -Park). If it is given it
 becomes the recorded entry body; if it is left empty the body falls back to a directional block
@@ -159,10 +167,28 @@ if ($Intent -ne "") {
     $body = $stubBody
 }
 
+# The tier line, at its harmless default. It declares how far this change reaches, and the fold reads
+# it to pick which of the changelog's three tier sections the entry lands in -- after which it removes
+# the line, because from then on the section states the tier.
+#
+# WRITTEN AT 0 RATHER THAN GUESSED FROM THE BRANCH PREFIX, which is the whole point of the line
+# existing. This repo has MEASURED that the prefix does not predict impact: held against the 19 entries
+# pending at v3.2.0, the single most consequential change for a consumer -- renaming the marketplace,
+# which breaks every existing install -- arrived on a chore/ branch. A derived tier would encode that
+# same wrong guess as a verdict; a declared one makes it the author's call.
+#
+# DELIBERATELY NO -Tier PARAMETER. Whoever finishes the branch already has to rewrite this file's title
+# and body before the PR (open-pr's scaffold gate refuses the stubs), so raising the tier is one edit in
+# a file that is being edited anyway -- not a manual sequence worth a flag, and one fewer parameter that
+# every consumer's skill page would have to document.
+$tierLine = Format-EntryTierLine
+
 # Compact heading, matching the CHANGELOG format (fold will later add only '#NN <midDot> ' at
 # the front and the '[PR #NN](url)' link at the end -- those only exist after the PR is opened).
 $template = @"
 ### $Title $midDot $branchType $midDot $today
+
+$tierLine
 
 $stubBodyHeading
 

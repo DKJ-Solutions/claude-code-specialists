@@ -4,9 +4,10 @@ description: >-
   Fold a branch's changelog entry files into CHANGELOG.md via the shared, centralized fold script
   from the plugin (single source of truth, issue #81) -- so a consumer does not have to duplicate
   this script locally. Use this on main, immediately after merging a branch, to fold the entry
-  files (<branch-name>.md in the repo root) into the repo's changelog section (## Pull Requests by
-  default, or whatever Get-ChangelogHeading names -- e.g. ## [Unreleased] on Keep-a-Changelog) and
-  then remove them.
+  files (<branch-name>.md in the repo root) into the repo's changelog section -- one section per tier
+  where Get-ChangelogTierHeadings declares them, otherwise the single section Get-ChangelogHeading
+  names (## Pull Requests by default, or e.g. ## [Unreleased] on Keep-a-Changelog) -- and then
+  remove them.
 disable-model-invocation: true
 ---
 
@@ -73,11 +74,35 @@ to land there instead of wherever `CLAUDE_PROJECT_DIR`/git-root would otherwise 
    at the top of that section, below any intro text and above whatever already sits there.
 2. Removes the entry file afterwards.
 
-**Which section** comes from `Get-ChangelogHeading` in the consumer's `scripts/repo-config.ps1` --
-the literal heading line, e.g. `## Pull Requests` (this workshop) or `## [Unreleased]` (a
-Keep-a-Changelog repo). The function is optional: without it the script falls back to
-`## Pull Requests`. If the configured heading is not found in `CHANGELOG.md`, the fold stops before
-touching anything and names both the heading it looked for and the function to set (issue #178).
+**Which section is decided by the entry's TIER**, and the sections themselves come from the consumer's
+`scripts/repo-config.ps1`:
+
+- `Get-ChangelogTierHeadings` -- a map from tier number to the literal heading line, in the order those
+  sections appear in `CHANGELOG.md`. The entry declares its tier with a `Tier: N` line (`0` = only this
+  repo's own developers notice, `1` = a colleague on the project gets something out of it, `2` = a consumer
+  notices); the fold files it under the matching section and then **removes the line**, because from then on
+  the section states the tier.
+- `Get-ChangelogHeading` -- the legacy single heading, e.g. `## Pull Requests` (this workshop's own
+  predecessor) or `## [Unreleased]` (a Keep-a-Changelog repo). Still read where no tier map is declared.
+
+**Both are optional, and a repo needs at most one.** Without either, the script falls back to one
+`## Pull Requests` section, which is what it always did — a repo with one section is simply a repo with one
+tier, so there is no separate behaviour to opt into or out of.
+
+**An entry with no `Tier:` line is tier 0**, the harmless end: forgetting to classify can never promote work
+into a consumer-facing document. The run says so out loud, because such work cannot carry a release on its
+own where the repo's release cut checks tiers.
+
+**Two things stop the fold before it touches anything**, both reported for every entry at once rather than
+one file at a time — a fold-all that failed halfway would leave earlier entries folded and their source
+files deleted:
+
+- a `Tier:` value the model has no meaning for (`Tier: 5`, `Tier: two`);
+- a tier this repo declares no section for — refused by name, with the tiers it *does* declare listed,
+  rather than quietly filed under a neighbour.
+
+If a configured heading is not found in `CHANGELOG.md`, the fold likewise stops before touching anything and
+names both the heading it looked for and the function to set (issue #178).
 
 **The script can make that commit itself, and normally should: `-Commit`, or `-Push` to commit and push
 in one step.** Both are **opt-in**, so without either the fold is left in the working tree for you to
@@ -134,10 +159,11 @@ The script is repo-agnostic, but reads a small block of repo data from the **roo
 (dual-context: it resolves the repo root via `${CLAUDE_PROJECT_DIR}`):
 
 - `scripts/repo-config.ps1` with `Get-RepoName` (for the `gh --repo` calls), and optionally
-  `Get-ChangelogHeading` (the section to fold into; defaults to `## Pull Requests`). This is the
-  only repo-specific file fold needs -- it derives the PR number via `gh pr list` and the
-  entry file name, and thus does not dot-source `branch-info.ps1` (unlike `open-pr`).
-- A `CHANGELOG.md` carrying that heading.
+  `Get-ChangelogTierHeadings` (one section per tier) or the legacy `Get-ChangelogHeading` (a single
+  section; defaults to `## Pull Requests`). This is the only repo-specific file fold needs -- it derives
+  the PR number via `gh pr list` and the entry file name, and thus does not dot-source `branch-info.ps1`
+  (unlike `open-pr`).
+- A `CHANGELOG.md` carrying every heading that seam declares.
 - `git` and a logged-in `gh` CLI.
 
 If `repo-config.ps1` is missing -- typical on a clean consumer -- the script stops before the

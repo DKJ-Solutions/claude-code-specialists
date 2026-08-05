@@ -2,11 +2,21 @@
 Folds one or more changelog entry files (<branch-name>.md in the repo root) into a section of
 CHANGELOG.md, and then removes the entry files.
 
-WHICH section is repo-owned: repo-config.ps1's Get-ChangelogHeading names the literal heading line
-('## Pull Requests' in this workshop, '## [Unreleased]' on a Keep-a-Changelog consumer). It used to
-be hardcoded, which made this script stop outright on any repo naming its section differently
-(issue #178). The function is OPTIONAL -- a consumer without it falls back to '## Pull Requests', so
-every existing consumer keeps working unchanged.
+WHICH section is decided by the entry's TIER, and the sections themselves are repo-owned:
+repo-config.ps1's Get-ChangelogTierHeadings maps tier -> the literal heading line ('## Tier 2 - Pull
+Requests' and its two siblings in this workshop). An entry declares its tier with a 'Tier: N' line;
+this script reads it, files the entry under the matching section, and REMOVES the line -- from then on
+the section states the tier, so the fact lives in exactly one place.
+
+An entry with no 'Tier:' line is tier 0, the harmless end of the scale: forgetting to classify can
+never promote work into a consumer-facing document, it can only leave that work unreleasable on its
+own -- which the cut says out loud.
+
+Both seams are read, newest first (Get-ChangelogTierSections in entry-scaffold-lib.ps1): the legacy
+single-section Get-ChangelogHeading (issue #178) still answers where a repo has not declared tiers, and
+neither function is required -- without both, this falls back to one '## Pull Requests' section, which
+is what it always did. A repo with one section is simply a repo with one tier, so there is no separate
+code path for it.
 
 In fold-all mode (no -Branch) only files that are actually changelog entries are folded: an entry
 opens with the '### <title> <midDot> <type> <midDot> <date>' H3 heading, so repo-root meta docs
@@ -108,6 +118,12 @@ if ($canDetectPlugins) { . $releaseLibPath }
 # workshop root, a consumer's plugin cache, or the plugin mirror tree alike.
 . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
 
+# The entry format: the 'Tier: N' line this script READS to pick a section and then REMOVES, plus the
+# section map itself (Get-ChangelogTierSections). $PSScriptRoot-relative for the same reason as the lib
+# above -- it travels with this script, so the writer (new-changelog-entry.ps1), the validator
+# (open-pr.ps1) and this reader always hold the same version of the format.
+. (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
+
 # BOM-less UTF8 -- Set-Content -Encoding UTF8 always adds a BOM in Windows PowerShell 5.1,
 # and the rest of the repo (CHANGELOG.md etc.) has no BOM.
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
@@ -153,22 +169,57 @@ if ($entryFiles.Count -eq 0) {
 
 $changelogPath = Join-Path $repoRoot "CHANGELOG.md"
 
-# The section heading to fold into: repo-owned and OPTIONAL (issue #178). Get-Command-guarded exactly
-# like open-pr.ps1 does for its optional repo-config functions, so a consumer whose repo-config
-# predates this contract simply gets the workshop default instead of a crash.
+# WHICH SECTION AN ENTRY IS FOLDED INTO -- one per tier, in document order. Both seams are read by
+# Get-ChangelogTierSections (entry-scaffold-lib.ps1): Get-ChangelogTierHeadings where the repo declares
+# tiers, otherwise the legacy single-section Get-ChangelogHeading (issue #178), otherwise the built-in
+# '## Pull Requests'. A repo with one section is simply a repo with one tier, so there is no second code
+# path here -- the loop below looks up a heading by tier either way.
 #
-# The local name is $foldHeading, NOT $changelogHeading: repo-config.ps1 backs Get-ChangelogHeading
-# with $script:ChangelogHeading, and PowerShell variable names are case-insensitive -- at script
-# top-level the local and script scopes are the same, so assigning $changelogHeading here would
-# overwrite the dot-sourced value before the function is ever called, and the configured heading
-# would silently read back as the default. Sibling of the $RepoRoot/$repoRoot collision documented
-# at the top of this file.
-$foldHeading = '## Pull Requests'
-if (Get-Command Get-ChangelogHeading -ErrorAction SilentlyContinue) {
-    $configured = Get-ChangelogHeading
-    if ($configured) { $foldHeading = $configured.Trim() }
+# The local name is $foldSections, NOT $changelogTierHeadings: repo-config.ps1 backs each seam with a
+# $script: variable of that name, and PowerShell variable names are case-insensitive -- at script
+# top-level the local and script scopes are the same, so a same-named local would overwrite the
+# dot-sourced value before the function is ever called, and the configured answer would silently read
+# back as the default. Sibling of the $RepoRoot/$repoRoot collision documented at the top of this file.
+$foldSections = @(Get-ChangelogTierSections)
+
+# --- Pre-pass: every entry's tier is resolved and checked BEFORE anything is folded ---------------
+# A fold-all run writes one entry at a time, so a problem found on the third file would leave the first
+# two already folded and their source files deleted -- a half-state that has to be unpicked by hand on
+# main. Both failures this catches are cheap to see up front and impossible to undo afterwards, so they
+# are checked here rather than in the loop: a malformed 'Tier:' value, and a tier this repo declares no
+# section for.
+#
+# Nothing else moves to a pre-pass. The gh lookup and the heading match stay in the loop where they
+# always were: those depend on state this pass cannot know (the PR, and a changelog that the previous
+# iteration has already rewritten).
+$tierByFile = @{}
+$tierProblems = @()
+foreach ($file in $entryFiles) {
+    $filePath = Join-Path $repoRoot $file
+    if (-not (Test-Path $filePath)) { continue }
+    $raw = Get-Content -Path $filePath -Raw -Encoding UTF8
+    $tier = Resolve-EntryTier -EntryText $raw
+    if ($tier.Error) {
+        $tierProblems += "  $file -- $($tier.Error)"
+        continue
+    }
+    $section = @($foldSections | Where-Object { $_.Tier -eq $tier.Tier })
+    if ($section.Count -eq 0) {
+        $declared = ($foldSections | ForEach-Object { $_.Tier }) -join ', '
+        $tierProblems += "  $file -- declares tier $($tier.Tier), but this repo has no changelog section for it (it declares tiers: $declared). Add the section to Get-ChangelogTierHeadings in scripts\repo-config.ps1, or change the entry's tier."
+        continue
+    }
+    $tierByFile[$file] = [pscustomobject]@{
+        Tier     = $tier.Tier
+        Declared = $tier.Declared
+        Heading  = $section[0].Heading
+    }
 }
-$headingPattern = '(?m)^' + [regex]::Escape($foldHeading) + '\s*?$'
+if ($tierProblems.Count -gt 0) {
+    Write-Host "Nothing was folded -- these entries could not be filed:" -ForegroundColor Red
+    $tierProblems | ForEach-Object { Write-Host $_ -ForegroundColor Red }
+    exit 1
+}
 
 # What this run actually folded -- the source for both the commit message and the committed pathspec.
 $folded = @()
@@ -186,6 +237,20 @@ foreach ($file in $entryFiles) {
     $usesCRLF = $changelogContent.Contains("`r`n")
     $nl = if ($usesCRLF) { "`r`n" } else { "`n" }
     $entryContent = ($entryContent -replace "`r`n", "`n") -replace "`n", $nl
+
+    # The tier decides the section, and the pre-pass has already proved both are usable -- so this is a
+    # lookup, not a decision. The line is then REMOVED: from here on the section states the tier, and
+    # the same fact in two places is the drift this repo has paid for three times.
+    $filed = $tierByFile[$file]
+    $entryContent = (Remove-EntryTierLine -EntryText $entryContent).TrimEnd()
+    $foldHeading = $filed.Heading
+    $headingPattern = '(?m)^' + [regex]::Escape($foldHeading) + '\s*?$'
+    if (-not $filed.Declared) {
+        # Worth saying out loud rather than absorbing. Tier 0 is the documented default and the safe
+        # one, but an author who simply forgot the line has produced work that cannot carry a release on
+        # its own -- and the moment to learn that is now, not when the cut refuses.
+        Write-Host "  ($file has no $(Get-EntryTierLabel): line -- filed as tier 0, which no release can be cut from on its own.)" -ForegroundColor DarkYellow
+    }
 
     # The entry file is already compact ("### <title> <midDot> <type> <midDot> <date>" +
     # description), matching the CHANGELOG format. Fold only adds '#NN <midDot> ' at the front of
@@ -235,7 +300,7 @@ foreach ($file in $entryFiles) {
 
     $headingMatch = [regex]::Match($changelogContent, $headingPattern)
     if (-not $headingMatch.Success) {
-        Write-Host "Could not find the '$foldHeading' heading in CHANGELOG.md - stopping. (The heading comes from Get-ChangelogHeading in scripts\repo-config.ps1; set it to the section this repo folds into.)" -ForegroundColor Red
+        Write-Host "Could not find the '$foldHeading' heading in CHANGELOG.md - stopping. (Section for tier $($filed.Tier); the heading comes from Get-ChangelogTierHeadings -- or the legacy Get-ChangelogHeading -- in scripts\repo-config.ps1. Either add that heading to CHANGELOG.md or correct the seam so the two match.)" -ForegroundColor Red
         exit 1
     }
     $afterHeader = $headingMatch.Index + $headingMatch.Length
@@ -255,7 +320,7 @@ foreach ($file in $entryFiles) {
 
     Write-Utf8NoBom -Path $changelogPath -Content $changelogContent
     Remove-Item -Path $filePath -Force
-    Write-Host "Folded and removed: $file" -ForegroundColor Green
+    Write-Host "Folded and removed: $file (tier $($filed.Tier) -> $foldHeading)" -ForegroundColor Green
     # Captured per iteration rather than read back afterwards. $num in particular survives from one loop
     # pass to the next, so an entry whose PR lookup found nothing would otherwise inherit the previous
     # entry's number -- into a commit message, where a wrong PR reference is worse than none.

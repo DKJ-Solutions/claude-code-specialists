@@ -63,12 +63,53 @@ Assert-Match $roster '\.md$' 'Get-RosterPath points to a .md'
 $ignored = @(Get-RosterIgnoredIds)
 foreach ($id in $ignored) { Assert-Match $id '^\d{2}-\d{2}$' "Get-RosterIgnoredIds: '$id' is a valid <group>-<id>" }
 
-# The CHANGELOG.md section heading fold-changelog-entry.ps1 folds a merged entry into (issue #178,
-# Optional in the script contract -- see check-script-contract.ps1). Must be the literal '##' heading
-# line as it appears in the file; this workshop's own value is '## Pull Requests'.
-$heading = Get-ChangelogHeading
-Assert-Match $heading '^##\s' 'Get-ChangelogHeading returns a literal ## heading line'
-Assert-Equal '## Pull Requests' $heading "Get-ChangelogHeading is '## Pull Requests' in this workshop"
+# THE CHANGELOG'S TIER SECTIONS (the tier model, August 5, 2026) -- which section
+# fold-changelog-entry.ps1 files a merged entry under, one per tier, in the order they appear in the
+# document. Optional in the script contract, like the single Get-ChangelogHeading it replaces (issue
+# #178).
+#
+# ASSERTED AGAINST CHANGELOG.md ITSELF, not just for shape. A heading declared here that the document
+# does not have makes the fold stop dead on the next merged branch, and a heading the document has that
+# is NOT declared here silently stops receiving entries -- so the seam and the file are held against each
+# other in both directions.
+$tierHeadings = Get-ChangelogTierHeadings
+Assert-True ($null -ne $tierHeadings) 'Get-ChangelogTierHeadings returns a map'
+$tierPairs = @()
+foreach ($e in $tierHeadings.GetEnumerator()) { $tierPairs += [pscustomobject]@{ Tier = [int]$e.Key; Heading = [string]$e.Value } }
+Assert-Equal 3 $tierPairs.Count 'three tier sections are declared in this workshop'
+Assert-Equal '2,1,0' (($tierPairs | ForEach-Object { $_.Tier }) -join ',') 'declared highest tier first -- the map order IS the document order'
+foreach ($p in $tierPairs) {
+    Assert-Match $p.Heading '^##\s' "tier $($p.Tier): the heading is a literal ## line"
+    Assert-Equal "## Tier $($p.Tier) - Pull Requests" $p.Heading "tier $($p.Tier): this workshop's heading"
+}
+$changelogPath = Join-Path $PSScriptRoot '..\..\CHANGELOG.md'
+$changelogText = Get-Content -LiteralPath $changelogPath -Raw -Encoding UTF8
+foreach ($p in $tierPairs) {
+    $found = @([regex]::Matches($changelogText, '(?m)^' + [regex]::Escape($p.Heading) + '\s*$')).Count
+    Assert-Equal 1 $found "tier $($p.Tier): its heading appears exactly once in CHANGELOG.md"
+}
+$declaredHeadings = @($tierPairs | ForEach-Object { $_.Heading })
+$prLike = @([regex]::Matches($changelogText, '(?m)^##[^\r\n]*Pull Requests[^\r\n]*$') | ForEach-Object { $_.Value.Trim() })
+foreach ($h in $prLike) {
+    Assert-True ($declaredHeadings -contains $h) "CHANGELOG.md's '$h' is declared in the seam (an undeclared section stops receiving entries silently)"
+}
+
+# The legacy single-section seam is deliberately NOT defined here: the tier map supersedes it, and a value
+# nothing reads is a value that goes stale unnoticed. The fold still recognises it for a consumer that has
+# not migrated, which is why it stays in the script contract as an [INFO] rather than being removed there.
+Assert-Equal $null (Get-Command Get-ChangelogHeading -ErrorAction SilentlyContinue) 'Get-ChangelogHeading is not defined here -- the tier map answers instead'
+
+# How many minors a major must recap. Ten in this workshop, and the number is held against the literal
+# because the shared script hardcodes the same fallback -- the same two-copy risk as the entry stubs
+# below.
+Assert-Equal 10 (Get-ReleaseMajorMinMinors) 'Get-ReleaseMajorMinMinors is 10 in this workshop'
+
+# The two retired highlights knobs. Asserted on ABSENCE: both configured the remove-before-publishing
+# marker that the tier model replaced, and a repo-config still answering them would be handing values to
+# a mechanism that no longer reads them.
+foreach ($gone in 'Get-ReleaseHighlightsStakeholderTypes', 'Get-ReleaseHighlightsWording') {
+    Assert-Equal $null (Get-Command $gone -ErrorAction SilentlyContinue) "$gone is retired, not left returning a value nothing reads"
+}
 
 # The optional "go live" stage description for the cut-release skill's Block 2 (issue #177, Optional
 # in the script contract). Empty by default in this workshop and life-hub -- no separate live stage,
@@ -136,20 +177,15 @@ Assert-True ($hlBumps -notcontains 'patch') 'Get-ReleaseHighlightsBumps excludes
 $badBumps = @($hlBumps | Where-Object { @('major', 'minor', 'patch') -notcontains $_ })
 Assert-Equal 0 $badBumps.Count "Get-ReleaseHighlightsBumps names only major/minor/patch (stray: $($badBumps -join ', '))"
 
-$hlTypes = @(Get-ReleaseHighlightsStakeholderTypes)
-Assert-True ($hlTypes.Count -gt 0) 'Get-ReleaseHighlightsStakeholderTypes names at least one type, so the draft has a stakeholder half'
-# Held against this repo's OWN branch table rather than a literal list: a type named here that branch-info
-# never produces would put an empty category above the marker and silently drop the real ones below it.
-$knownTypes = @(Get-BranchTypes)
-$strayTypes = @($hlTypes | Where-Object { $knownTypes -notcontains $_ })
-Assert-Equal 0 $strayTypes.Count "every stakeholder type is a type this repo's branch table produces (stray: $($strayTypes -join ', '))"
-# And the complement must be non-empty, or the marker block never appears and the knob is doing nothing.
-$devTypes = @($knownTypes | Where-Object { $hlTypes -notcontains $_ })
-Assert-True ($devTypes.Count -gt 0) 'at least one type falls below the marker, so the developer block is really produced'
-
-$hlWording = Get-ReleaseHighlightsWording
-Assert-True ($hlWording -is [hashtable]) 'Get-ReleaseHighlightsWording returns a hashtable (merged over the English defaults)'
-Assert-Equal 0 $hlWording.Keys.Count 'Get-ReleaseHighlightsWording is empty -- an English repo needs no overrides'
+# WHAT USED TO BE ASSERTED HERE, and why it is not. Two more knobs configured the highlights draft: which
+# branch types to promote above a "remove before publishing" marker, and in whose words to label that
+# marker. The asserts held them against this repo's own branch table, because a type named there that
+# branch-info never produces would put an empty category above the marker and drop the real ones below it.
+#
+# Both knobs, the marker and that whole failure mode are gone (August 5, 2026): the highlights document is
+# now the release's TIER-2 entries, declared per entry by their author rather than inferred from a branch
+# prefix -- which this repo had measured does not predict impact. Their absence is asserted at the top of
+# this file, where the tier map is checked, rather than here where the values used to be read.
 
 Write-Host ""
 if ($script:fail -gt 0) {
