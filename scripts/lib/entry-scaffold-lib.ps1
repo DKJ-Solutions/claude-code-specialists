@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
     The changelog entry's own format, in one place: the scaffold strings new-changelog-entry.ps1
-    WRITES and open-pr.ps1 REFUSES TO SHIP, the 'Tier: N' line that declares how far an entry reaches,
-    the significance scores that order the documents that tier reaches, and the changelog sections those
-    tiers are folded into.
+    WRITES and open-pr.ps1 REFUSES TO SHIP, the entry's heading levels and named sections, the impact
+    table declaring how far a change reaches and what it weighs at each reach, and the ranked offset the
+    fold inserts it at.
 
 .DESCRIPTION
     Dot-source it:
@@ -381,7 +381,7 @@ $script:EntrySignificanceMax = 5
 # vibe.
 #
 # AN ARRAY OF PAIRS, NOT A MAP KEYED BY THE SCORE, and that is a bug this shape prevents rather than a
-# style choice -- the very bug Resolve-ChangelogTierSections warns about further down this file, walked
+# style choice -- the very bug the retired Resolve-ChangelogTierSections was measured on, walked
 # into again here on the first run. [ordered]@{ 5 = '...' } is an OrderedDictionary, whose indexer takes
 # BOTH a key and a POSITIONAL INDEX, and the positional overload WINS for an integer. So $rubric[5] asks
 # for the sixth element of a five-element map and throws -- and on a map with more levels than that it
@@ -463,8 +463,8 @@ function Test-EntrySignificanceActive {
         optional. This used to answer "off where there is no tier split", reading the changelog's section map
         and treating one section as "this repo never adopted tiers". That test had a real basis while the map
         existed -- the sections WERE the repo's declaration of which tiers it files. The flat changelog has no
-        map, so Get-ChangelogTierSections now falls back to its built-in single section in EVERY repo, and
-        keeping the old line would have read every repo as not ranking: the scaffold's table, both validators
+        map -- and the resolver that read it is retired further down this file -- so keeping the old line
+        would have read every repo as not ranking: the scaffold's table, both validators
         and the cut's significance gate would all have switched themselves off, silently, in the same commit
         that made the ranking the document's only ordering. Nothing would have errored.
 
@@ -1075,95 +1075,28 @@ function Format-EntryBlock {
     return @($lines.ToArray())
 }
 
-# --- Where a folded entry goes: the changelog's tier sections -------------------------------------
+# --- RETIRED, AUGUST 5, 2026: the changelog's tier sections ---------------------------------------
 #
-# The other half of the tier line. The line says which tier an entry is; this says which SECTION that
-# tier is filed under, and the two live in one file for the reason this lib exists at all: the writer,
-# the validator, the fold and the release cut must not be able to disagree about either.
+# $script:DefaultChangelogHeading, Resolve-ChangelogTierSections and Get-ChangelogTierSections answered
+# one question -- which '## ' heading a merged entry is filed under -- for the three readers that had to
+# agree about it: the fold, release-lib's parser and the release cut. CHANGELOG.md has no section
+# headings any more. An entry IS an H2 and the document is an intro plus a ranked list of them, so the
+# question has no subject: there is no heading to name, and therefore nothing for three readers to
+# disagree about.
 #
-# THE DEFAULT HEADING'S ONLY COPY IS HERE. It used to be stated three times -- fold-changelog-entry.ps1
-# as a local literal, release-lib.ps1 inside a regex, and repo-config.ps1 as the seam's value -- which
-# is the arithmetic this repo keeps paying for: three copies, one of which is edited. All three now read
-# this resolver.
-$script:DefaultChangelogHeading = '## Pull Requests'
-
-function Resolve-ChangelogTierSections {
-    <#
-        Pure: normalises whatever a repo's seam returns into an ordered list of
-
-          Tier     the tier as an int
-          Heading  the literal '## ' heading line that tier's entries are folded under
-
-        in the order the sections appear in the document. $TierHeadings may be an ordered dictionary,
-        a plain hashtable, or $null/empty; empty means "this repo has no tier split", and the result is
-        the single tier-0 section named by $FallbackHeading -- which is exactly the behaviour the fold
-        had before tiers existed, expressed as a one-entry map rather than as a separate code path.
-
-        A LIST OF OBJECTS RATHER THAN THE DICTIONARY ITSELF, and that is a bug this prevents rather
-        than a style choice. [ordered]@{ 2 = '## ...' } is an OrderedDictionary, whose indexer takes
-        BOTH a key and a POSITIONAL INDEX -- and the positional overload wins for an integer, so
-        $map[2] returns the THIRD VALUE rather than the value for key 2. In a map ordered 2, 1, 0 that
-        hands every tier its neighbour's heading, entries get filed under the wrong section, and nothing
-        errors. Measured on the first run of this very function, one screen below the comment warning
-        about it: the enumerator is used here precisely so no caller -- including this one -- can reach
-        for the indexer.
-
-        A plain hashtable has no order of its own, so it is sorted highest tier first -- the order this
-        model reads in, and a defined answer rather than PowerShell's internal bucket order.
-    #>
-    param(
-        $TierHeadings = $null,
-        [string]$FallbackHeading = ''
-    )
-    if (-not $FallbackHeading) { $FallbackHeading = $script:DefaultChangelogHeading }
-
-    $sections = New-Object System.Collections.Generic.List[pscustomobject]
-    if ($TierHeadings) {
-        # GetEnumerator, never the indexer -- see the docstring. DictionaryEntry gives Key and Value
-        # together, so there is no second lookup that could resolve differently.
-        $pairs = @()
-        foreach ($entry in $TierHeadings.GetEnumerator()) {
-            $heading = [string]$entry.Value
-            if (-not $heading) { continue }
-            $pairs += [pscustomobject]@{ Tier = [int]$entry.Key; Heading = $heading.Trim() }
-        }
-        # An unordered hashtable gets a defined order rather than an arbitrary one; an OrderedDictionary
-        # keeps the order it was declared in, because that order IS the repo's answer about the document.
-        if ($TierHeadings -is [hashtable]) { $pairs = @($pairs | Sort-Object Tier -Descending) }
-        foreach ($p in $pairs) { $sections.Add($p) }
-    }
-    if ($sections.Count -eq 0) {
-        $sections.Add([pscustomobject]@{ Tier = 0; Heading = $FallbackHeading })
-    }
-    return @($sections.ToArray())
-}
-
-function Get-ChangelogTierSections {
-    <#
-        This repo's tier sections, read from the seam: Get-ChangelogTierHeadings where the repo defines
-        it, otherwise a single section from the legacy Get-ChangelogHeading, otherwise the built-in
-        default. Returns what Resolve-ChangelogTierSections returns.
-
-        PROBED WITH Get-Command RATHER THAN TAKEN AS A PARAMETER, the same pattern
-        Get-ReleaseCategories uses for Get-BranchTypes: every caller has already dot-sourced the
-        consumer's repo-config for other reasons, and threading two seam values through four call sites
-        that never look at them is how a signature grows without buying anything.
-
-        BOTH SEAMS ARE READ, newest first -- the repo's own "recognise both, write one" rule. A consumer
-        whose repo-config predates the tier model keeps folding into its single section with no change
-        and no warning, because one section IS a valid answer here rather than a legacy special case.
-    #>
-    $map = $null
-    if (Get-Command Get-ChangelogTierHeadings -ErrorAction SilentlyContinue) {
-        $map = Get-ChangelogTierHeadings
-    }
-    $fallback = ''
-    if (Get-Command Get-ChangelogHeading -ErrorAction SilentlyContinue) {
-        $configured = Get-ChangelogHeading
-        if ($configured) { $fallback = ([string]$configured).Trim() }
-    }
-    return Resolve-ChangelogTierSections -TierHeadings $map -FallbackHeading $fallback
-}
+# WHAT REPLACED IT IS NOT A DIFFERENT ANSWER BUT A STRUCTURAL ONE. The fold derives the intro/list
+# boundary from the first entry heading (Get-EntryHeadingLevel), and release-lib's Split-Changelog does
+# the same. Both are exact-level matches, which is safe for the reason Get-EntryHeadingPattern there
+# spells out: '^##' followed by whitespace cannot match an entry's own '### ' sections.
+#
+# THE SEAMS GO WITH THEM: Get-ChangelogTierHeadings and the older single-section Get-ChangelogHeading
+# (issue #178) in the consumer's scripts/repo-config.ps1 are no longer read by anything. A consumer that
+# still defines either is unaffected -- nothing calls them, so they are dead code in that repo's seam,
+# and its next fold and cut behave exactly as this repo's do.
+#
+# Test-EntrySignificanceActive above used to infer "does this repo rank" from the number of sections this
+# returned, and that is the one place the retirement was NOT a pure deletion; see its header for why the
+# default had to become on rather than off.
 
 function Get-EntryScaffoldFindings {
     <#

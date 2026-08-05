@@ -168,16 +168,16 @@ try {
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
     Assert-Equal 0 $r.Code 'happy path: exit-code 0'
     Assert-NotMatch '\[ERROR\]' $r.Out 'happy path: no errors'
-    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds', 'Get-ChangelogTierHeadings', 'Get-LiveStage', 'Get-EntryTitlePlaceholder', 'Get-EntryBodyHeading', 'Get-EntryBodyPlaceholder', 'Get-EntryFallbackType', 'Get-PrMergeMethod', 'Get-MojibakePaths', 'Get-ReservedRootMd', 'Get-ReleaseNotesGrouping', 'Get-ReleaseLiveMarker', 'Get-ReleasePluginTier', 'Get-ReleaseCategoryTitles', 'Get-ReleaseHighlightsBumps', 'Get-ReleaseMajorMinMinors', 'Get-InternalNoteWording')) {
+    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds', 'Get-LiveStage', 'Get-EntryTitlePlaceholder', 'Get-EntryBodyHeading', 'Get-EntryBodyPlaceholder', 'Get-EntryFallbackType', 'Get-PrMergeMethod', 'Get-MojibakePaths', 'Get-ReservedRootMd', 'Get-ReleaseNotesGrouping', 'Get-ReleaseHistoryPath', 'Get-ReleasePluginTier', 'Get-ReleaseHighlightsBumps', 'Get-ReleaseMajorMinMinors', 'Get-InternalNoteWording')) {
         Assert-Match "\[OK\]\s+'$fn' present in" $r.Out "happy path: '$fn' reported OK"
     }
-    # ONE [INFO] ON A HEALTHY REPO, AND IT IS CORRECT RATHER THAN A GAP. Get-ChangelogHeading is the legacy
-    # single-section seam, superseded here by Get-ChangelogTierHeadings -- a repo that declares tiers does
-    # not define it, and the contract still declares it so a consumer who has NOT migrated is told about
-    # it. So the fixture (which is this repo's real repo-config) reports it absent-with-a-fallback.
-    Assert-Match "\[INFO\].*'Get-ChangelogHeading' missing" $r.Out "happy path: the superseded Get-ChangelogHeading reports [INFO], not [OK] or [ERROR]"
+    # FOUR RECORDS RETIRED ON AUGUST 5, 2026, all of them to the flat changelog rather than four separate
+    # decisions: Get-ChangelogTierHeadings and the legacy Get-ChangelogHeading (no sections left to name),
+    # Get-ReleaseLiveMarker and Get-ReleaseHistoryMode (no release block for a marker to sit on or a mode to
+    # select), Get-ReleaseCategoryTitles (no category headings to label) and Get-ChangelogReleaseWording (no
+    # release-block text to override). Each is now asserted on ABSENCE from the register, further down.
     $okCount = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 24 $okCount 'happy path: exactly twenty-four [OK] lines -- the twenty-five declared records minus the one legacy seam this repo deliberately no longer defines (four mandatory functions plus every optional: Get-ChangelogTierHeadings, Get-LiveStage, the two Get-Roster* made optional by #445, the four Get-Entry* stub-wording knobs, Get-PrMergeMethod, Get-MojibakePaths, the cut-release knobs from #417 plus Get-ReleaseMajorMinMinors, the internal tier''s Get-InternalNoteWording, and the two changelog-history knobs, nothing else)'
+    Assert-Equal 20 $okCount 'happy path: exactly twenty [OK] lines -- every declared record this repo defines (four mandatory functions plus every optional: Get-LiveStage, the two Get-Roster* made optional by #445, the four Get-Entry* stub-wording knobs, Get-PrMergeMethod, Get-MojibakePaths, the cut-release knobs from #417 plus Get-ReleaseMajorMinMinors and Get-ReleaseHistoryPath, and the internal tier''s Get-InternalNoteWording, nothing else)'
     # inbound #203: the run names the root it inspected and how it resolved it. Asserted on the clean
     # run too, not only on a drifted one -- the [SCOPE] line is context that must always be emitted, so
     # that the hook has something to surface the moment a finding does appear.
@@ -185,11 +185,14 @@ try {
     Assert-Match ([regex]::Escape($c)) $r.Out 'happy path: the [SCOPE] line names the ACTUAL fixture root, not the session/git root'
     Assert-Match '\[SCOPE\].*-ConsumerPathOverride' $r.Out 'happy path: the [SCOPE] line names HOW the root was resolved (override)'
     # Non-counting, like [OK]/[SKIP]: context must never move the error/info tallies or the exit code. The
-    # two infos counted here are both correct on a healthy repo rather than gaps: the superseded
-    # Get-ChangelogHeading above, and Get-ChangelogReleaseWording (inbound #462), which an ENGLISH repo
+    # infos counted here are correct on a healthy repo rather than gaps -- the seams an ENGLISH repo
     # deliberately leaves undefined because the defaults are already its own words. So this assert still
     # proves the [SCOPE] line added nothing, which is what it is for.
-    Assert-Match 'Summary: 0 error\(s\), 4 info signal\(s\)' $r.Out 'happy path: [SCOPE] is non-counting (0 errors, and only the four deliberately-undefined seams)'
+    #
+    # TWO, DOWN FROM FOUR: the superseded Get-ChangelogHeading and Get-ChangelogReleaseWording were both
+    # among them, and both records retired with the flat changelog. Counted rather than named, deliberately
+    # -- the number is what catches a record quietly gaining or losing an [INFO].
+    Assert-Match 'Summary: 0 error\(s\), 2 info signal\(s\)' $r.Out 'happy path: [SCOPE] is non-counting (0 errors, and only the deliberately-undefined seams)'
 
     # --- 2. Missing function in branch-info.ps1 (the exact #147 incident): Test-BranchName ---------
     #     new-branch crashed at runtime with "The term 'Test-BranchName' is not recognized" because
@@ -253,7 +256,11 @@ try {
     }
     $errCount3 = @([regex]::Matches($r.Out, '\[ERROR\]')).Count
     Assert-Equal 2 $errCount3 'missing repo-config.ps1: exactly two errors (one per MANDATORY repo-config function)'
-    Assert-Match "\[INFO\].*'Get-ChangelogHeading'.*falls back to '## Pull Requests'" $r.Out 'missing repo-config.ps1: the optional Get-ChangelogHeading is INFO, not ERROR (#178)'
+    # An OPTIONAL repo-config seam is an INFO naming its fallback rather than an ERROR, even when the whole
+    # lib is missing. Get-ChangelogHeading (#178) was the subject here until its record retired with the
+    # flat changelog; Get-ReleaseHistoryPath now carries the same property and is the better subject for it
+    # anyway, being the seam a missing answer would silently mis-file a release row against.
+    Assert-Match "\[INFO\].*'Get-ReleaseHistoryPath'.*releases/README\.md" $r.Out 'missing repo-config.ps1: an optional seam is INFO with its fallback named, not ERROR'
     Assert-Match "\[OK\]\s+'Get-BranchInfo' present in" $r.Out 'missing repo-config.ps1: branch-info.ps1 unaffected, still OK'
 
     # --- 4b. ALL libs absent -> one non-counting [BOOTSTRAP] marker, no per-function errors ---------
@@ -304,24 +311,25 @@ try {
         Assert-NotMatch $optFn $r.Out "optional Get-Pr*: '$optFn' never mentioned (not in the contract)"
     }
     $okCount6 = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 24 $okCount6 'optional Get-Pr*: still exactly twenty-four [OK] (the mandatory four + the declared optionals this repo defines; the four UNdeclared Get-Pr* excluded, and the superseded Get-ChangelogHeading reported as [INFO])'
+    Assert-Equal 20 $okCount6 'optional Get-Pr*: still exactly twenty [OK] (the mandatory four + the declared optionals this repo defines; the four UNdeclared Get-Pr* excluded)'
 
     # --- 6c. An optional contract function that is ABSENT -> [INFO] naming the fallback, exit 0 -----
-    #     Get-ChangelogTierHeadings is declared Optional: fold-changelog-entry.ps1 falls back to the legacy
-    #     single heading and then to '## Pull Requests', so a consumer whose repo-config predates the tier
-    #     model is NOT drifted. It must still be mentioned -- silence would leave a consumer to discover at
-    #     fold time that its sections are never found.
+    #     Get-ReleaseHistoryPath is declared Optional: the shared scripts fall back to 'releases/README.md',
+    #     so a consumer that never defined it is NOT drifted. It must still be mentioned -- silence would
+    #     leave a repo that keeps its history elsewhere to discover at release time that the row went into a
+    #     file it does not use.
     #
-    #     THE SUBJECT MOVED FROM Get-ChangelogHeading TO THE TIER MAP, because this repo's real repo-config
-    #     no longer defines the former -- the fixture builder strips a function from that file, so it can
-    #     only strip one that is there. That is not a weaker test: the tier map is now the seam a consumer
-    #     would actually be missing, and the legacy one's [INFO] is asserted on the untouched fixture in
-    #     test 1 instead.
-    $c = New-FixtureConsumer -StripFromRepoConfig @('Get-ChangelogTierHeadings')
+    #     THE SUBJECT HAS MOVED TWICE, and both moves were forced the same way: this fixture STRIPS a
+    #     function from this repo's real repo-config, so it can only strip one that is there. It was
+    #     Get-ChangelogHeading, then Get-ChangelogTierHeadings when the real file stopped defining that, and
+    #     now this -- both of those records retired with the flat changelog. Not a weaker test each time:
+    #     the subject is always a seam a consumer would actually be missing, and it is the two-caller case,
+    #     which is what makes the "used by:" half of the message worth asserting.
+    $c = New-FixtureConsumer -StripFromRepoConfig @('Get-ReleaseHistoryPath')
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
     Assert-Equal 0 $r.Code 'optional absent: exit-code 0 (a fallback exists, so not a breach)'
     Assert-NotMatch '\[ERROR\]' $r.Out 'optional absent: no error'
-    Assert-Match "\[INFO\].*'Get-ChangelogTierHeadings' missing from scripts\\repo-config\.ps1.*used by: fold-changelog-entry, cut-release.*optional.*falls back to 'one section" $r.Out 'optional absent: INFO names the function, both callers and the fallback'
+    Assert-Match "\[INFO\].*'Get-ReleaseHistoryPath' missing from scripts\\repo-config\.ps1.*used by: cut-release, new-internal-note.*optional.*falls back to 'releases/README\.md'" $r.Out 'optional absent: INFO names the function, both callers and the fallback'
 
     # --- 6d. Get-LiveStage: absent -> [INFO] naming the empty-string fallback, exit 0 (issue #177) ----
     #     Mirrors test 6c above (Get-ChangelogHeading, issue #178): Get-LiveStage is Optional in the
@@ -330,8 +338,8 @@ try {
     #     silent: a repo that DOES have a live stage needs to learn the getter is missing, or the skill
     #     would silently never print Block 2. Its Default ('') is falsy, so Write-ContractGap's INFO
     #     message uses the "built-in fallback" phrasing rather than naming a quoted default value --
-    #     asserted explicitly below (distinct from Get-ChangelogHeading's "falls back to '...'" phrasing
-    #     in 6c, which has a non-empty Default).
+    #     asserted explicitly below (distinct from the "falls back to '...'" phrasing in 6c, whose subject
+    #     has a non-empty Default).
     $c = New-FixtureConsumer -StripFromRepoConfig @('Get-LiveStage')
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
     Assert-Equal 0 $r.Code 'Get-LiveStage absent: exit-code 0 (empty-string fallback, not a breach)'
@@ -359,7 +367,7 @@ try {
     Assert-Match ("\[INFO\].*'Get-EntryBodyHeading' missing.*falls back to '" + [regex]::Escape('**To do / where I left off:**') + "'") $r.Out 'stub wording absent: INFO for Get-EntryBodyHeading quotes the literal default heading'
     Assert-Match "\[INFO\].*'Get-EntryFallbackType' missing.*falls back to 'Chore'" $r.Out 'stub wording absent: INFO for Get-EntryFallbackType names the Chore default'
     $infoCount6e = @([regex]::Matches($r.Out, '\[INFO\]')).Count
-    Assert-Equal 8 $infoCount6e 'stub wording absent: exactly eight [INFO] lines -- one per stripped knob, plus the four seams this repo deliberately never defines (the superseded Get-ChangelogHeading, Get-ChangelogReleaseWording, and the two impact-table knobs whose defaults are already this repo''s answers), and nothing else downgraded along with them'
+    Assert-Equal 6 $infoCount6e 'stub wording absent: exactly six [INFO] lines -- one per stripped knob, plus the two impact-table seams this repo deliberately never defines (their defaults are already its answers), and nothing else downgraded along with them. Was eight until the flat changelog retired the superseded Get-ChangelogHeading and Get-ChangelogReleaseWording records'
 
     # --- 6f. NO CONTRACT RECORD MAY SPELL A REPORT MARKER IN ITS OWN TEXT --------------------------
     #     Measured while adding the tier records: a Returns line that mentioned the info marker made the
@@ -454,11 +462,12 @@ function Get-RosterIgnoredIds { return @() }
         @{ Function = 'Get-LintScript';       Lib = 'scripts\repo-config.ps1';     Scripts = @('open-pr', 'cut-release') },
         @{ Function = 'Get-RosterPath';       Lib = 'scripts\repo-config.ps1';     Scripts = @('check-roster-sync') },
         @{ Function = 'Get-RosterIgnoredIds'; Lib = 'scripts\repo-config.ps1';     Scripts = @('check-roster-sync') },
-        # Both changelog-section seams, and both reached through entry-scaffold-lib rather than named
-        # directly -- Get-ChangelogTierSections there reads whichever the repo defines. The tier map is read
-        # by the fold (to file an entry) and by cut-release (to parse the sections and judge the bump).
-        @{ Function = 'Get-ChangelogTierHeadings'; Lib = 'scripts\repo-config.ps1'; Scripts = @('fold-changelog-entry', 'cut-release'); ViaLib = 'entry-scaffold-lib' },
-        @{ Function = 'Get-ChangelogHeading'; Lib = 'scripts\repo-config.ps1';     Scripts = @('fold-changelog-entry'); ViaLib = 'entry-scaffold-lib' },
+        # BOTH CHANGELOG-SECTION SEAMS ARE GONE (August 5, 2026) -- Get-ChangelogTierHeadings and the legacy
+        # single Get-ChangelogHeading (#178). They named which '## ' heading a merged entry was filed under,
+        # and the changelog has no section headings any more: an entry IS an H2, and the fold and release-lib
+        # derive the intro/list boundary from that structurally. Their absence from this list is the point --
+        # if either came back, the count assert below would have to change too, which is the conversation
+        # that should happen.
         # The four stub-wording knobs (issue #410). These DO belong in this loop, unlike Get-LiveStage:
         # they are attributed to 'new-changelog-entry', a genuinely registered shared script, so the
         # per-script assertions below apply to them unchanged.
@@ -486,9 +495,13 @@ function Get-RosterIgnoredIds { return @() }
         # knob nothing reads.
         @{ Function = 'Get-ReservedRootMd';        Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },
         @{ Function = 'Get-ReleaseNotesGrouping';  Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },
-        @{ Function = 'Get-ReleaseLiveMarker';     Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },
         @{ Function = 'Get-ReleasePluginTier';     Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },
-        @{ Function = 'Get-ReleaseCategoryTitles'; Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },
+        # THREE MORE OF THE #417 KNOBS RETIRED WITH THE FLAT CHANGELOG (August 5, 2026), and all three for
+        # one reason rather than three: Get-ReleaseLiveMarker marked the live row of a release section the
+        # changelog no longer has, Get-ReleaseHistoryMode chose whether that section accumulated, and
+        # Get-ReleaseCategoryTitles labelled category headings the release documents no longer have.
+        # Get-ReleaseHistoryPath is the survivor and gained a second caller, below.
+        @{ Function = 'Get-ReleaseHistoryPath';    Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release', 'new-internal-note') },
         @{ Function = 'Get-ReleaseHighlightsBumps';            Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },
         # The two knobs that configured the retired remove-before-publishing marker are gone with it
         # (August 5, 2026): the highlights document is the tier-2 entries now, so there is nothing to
@@ -497,17 +510,17 @@ function Get-RosterIgnoredIds { return @() }
         @{ Function = 'Get-ReleaseMajorMinMinors';              Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },
         # The third tier (August 3, 2026), attributed to its own script rather than to cut-release: the
         # internal note is generated AFTER the cut, because the development notes are its input.
-        @{ Function = 'Get-InternalNoteWording';               Lib = 'scripts\repo-config.ps1'; Scripts = @('new-internal-note') },
-        # The release block written into the repo's OWN CHANGELOG.md (inbound #462), and the only record
-        # here read by TWO release scripts: the cut writes the intro and the notes line, the internal note
-        # rewrites that same line once it exists. One paragraph, one seam -- which is exactly why both are
-        # named. The per-script assertions below therefore run twice for this record.
-        @{ Function = 'Get-ChangelogReleaseWording';            Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release', 'new-internal-note') }
+        @{ Function = 'Get-InternalNoteWording';               Lib = 'scripts\repo-config.ps1'; Scripts = @('new-internal-note') }
+        # Get-ChangelogReleaseWording (inbound #462) USED TO BE THE LAST RECORD HERE, and the only one read
+        # by two release scripts: the cut wrote the release block's intro and notes line, the internal note
+        # rewrote that same line once it existed. There is no release block, so there is no paragraph for
+        # either to write. Get-ReleaseHistoryPath above has inherited both the two-caller shape and the
+        # per-script assertions that shape is what tests.
     )
 
     $contractSrc = [System.IO.File]::ReadAllText($Script)
     $totalRecordCount = @([regex]::Matches($contractSrc, "Lib\s*=\s*'[^']+';\s*Function\s*=\s*'[^']+';\s*Scripts\s*=\s*@\(")).Count
-    Assert-Equal 28 $totalRecordCount 'contract: exactly twenty-eight (lib, function) records declared in check-script-contract.ps1 (the twenty-seven below plus the dedicated Get-LiveStage block after this loop)'
+    Assert-Equal 22 $totalRecordCount 'contract: exactly twenty-two (lib, function) records declared in check-script-contract.ps1 (the twenty-one below plus the dedicated Get-LiveStage block after this loop). Was twenty-eight until the flat changelog retired six: both section seams, the live marker, the history mode, the category labels and the release-block wording'
 
     # Every record must carry a 'Returns' line, so a finding is actionable without any reference to this
     # source repo (Dave, July 28, 2026). Counted against $totalRecordCount rather than listed per record:

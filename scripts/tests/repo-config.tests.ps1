@@ -63,41 +63,29 @@ Assert-Match $roster '\.md$' 'Get-RosterPath points to a .md'
 $ignored = @(Get-RosterIgnoredIds)
 foreach ($id in $ignored) { Assert-Match $id '^\d{2}-\d{2}$' "Get-RosterIgnoredIds: '$id' is a valid <group>-<id>" }
 
-# THE CHANGELOG'S TIER SECTIONS (the tier model, August 5, 2026) -- which section
-# fold-changelog-entry.ps1 files a merged entry under, one per tier, in the order they appear in the
-# document. Optional in the script contract, like the single Get-ChangelogHeading it replaces (issue
-# #178).
+# THE RETIRED CHANGELOG SECTION SEAMS (August 5, 2026), asserted on ABSENCE. Get-ChangelogTierHeadings
+# mapped tier -> the '## ' heading its entries were folded under, and Get-ChangelogHeading (issue #178) was
+# the single-section answer before it. CHANGELOG.md has no section headings any more: an entry IS an H2 and
+# the document is an intro plus a flat ranked list of them, so the fold and release-lib derive the
+# intro/list boundary structurally instead.
 #
-# ASSERTED AGAINST CHANGELOG.md ITSELF, not just for shape. A heading declared here that the document
-# does not have makes the fold stop dead on the next merged branch, and a heading the document has that
-# is NOT declared here silently stops receiving entries -- so the seam and the file are held against each
-# other in both directions.
-$tierHeadings = Get-ChangelogTierHeadings
-Assert-True ($null -ne $tierHeadings) 'Get-ChangelogTierHeadings returns a map'
-$tierPairs = @()
-foreach ($e in $tierHeadings.GetEnumerator()) { $tierPairs += [pscustomobject]@{ Tier = [int]$e.Key; Heading = [string]$e.Value } }
-Assert-Equal 3 $tierPairs.Count 'three tier sections are declared in this workshop'
-Assert-Equal '2,1,0' (($tierPairs | ForEach-Object { $_.Tier }) -join ',') 'declared highest tier first -- the map order IS the document order'
-foreach ($p in $tierPairs) {
-    Assert-Match $p.Heading '^##\s' "tier $($p.Tier): the heading is a literal ## line"
-    Assert-Equal "## Tier $($p.Tier) - Pull Requests" $p.Heading "tier $($p.Tier): this workshop's heading"
-}
-$changelogPath = Join-Path $PSScriptRoot '..\..\CHANGELOG.md'
-$changelogText = Get-Content -LiteralPath $changelogPath -Raw -Encoding UTF8
-foreach ($p in $tierPairs) {
-    $found = @([regex]::Matches($changelogText, '(?m)^' + [regex]::Escape($p.Heading) + '\s*$')).Count
-    Assert-Equal 1 $found "tier $($p.Tier): its heading appears exactly once in CHANGELOG.md"
-}
-$declaredHeadings = @($tierPairs | ForEach-Object { $_.Heading })
-$prLike = @([regex]::Matches($changelogText, '(?m)^##[^\r\n]*Pull Requests[^\r\n]*$') | ForEach-Object { $_.Value.Trim() })
-foreach ($h in $prLike) {
-    Assert-True ($declaredHeadings -contains $h) "CHANGELOG.md's '$h' is declared in the seam (an undeclared section stops receiving entries silently)"
+# ASSERTED RATHER THAN JUST DELETED, because a repo-config still answering these would hand values to a
+# mechanism that no longer reads them -- the write-once-config failure this file already guards for the two
+# retired highlights knobs below.
+foreach ($retired in @('Get-ChangelogTierHeadings', 'Get-ChangelogHeading')) {
+    Assert-Equal $null (Get-Command $retired -ErrorAction SilentlyContinue) "$retired is retired -- the flat changelog has no sections to name"
 }
 
-# The legacy single-section seam is deliberately NOT defined here: the tier map supersedes it, and a value
-# nothing reads is a value that goes stale unnoticed. The fold still recognises it for a consumer that has
-# not migrated, which is why it stays in the script contract as an [INFO] rather than being removed there.
-Assert-Equal $null (Get-Command Get-ChangelogHeading -ErrorAction SilentlyContinue) 'Get-ChangelogHeading is not defined here -- the tier map answers instead'
+# AND THE DOCUMENT ITSELF HAS NONE. The mirror-image assert: a heading left in CHANGELOG.md would be read
+# as an ENTRY by the flat parser (it matches '^## ' exactly as an entry heading does), so it would be
+# rendered into the release notes as a change with no content. Held against the file rather than assumed,
+# because that failure produces well-formed markdown and no error anywhere.
+$changelogPath = Join-Path $PSScriptRoot '..\..\CHANGELOG.md'
+$changelogText = Get-Content -LiteralPath $changelogPath -Raw -Encoding UTF8
+foreach ($gone in @('Pull Requests', 'Latest Release', 'Releases')) {
+    $found = @([regex]::Matches($changelogText, '(?m)^##\s+(Tier \d+ - )?' + [regex]::Escape($gone) + '\s*$')).Count
+    Assert-Equal 0 $found "CHANGELOG.md carries no '## $gone' section any more -- a leftover would parse as an empty entry"
+}
 
 # How many minors a major must recap. Ten in this workshop, and the number is held against the literal
 # because the shared script hardcodes the same fallback -- the same two-copy risk as the entry stubs

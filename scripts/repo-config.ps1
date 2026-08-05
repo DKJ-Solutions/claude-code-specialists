@@ -92,48 +92,24 @@ function Get-RosterIgnoredIds {
     return $script:RosterIgnoredIds
 }
 
-# --- Which CHANGELOG.md section a merged entry is folded into (the tier model, August 5, 2026) -----
+# --- RETIRED, AUGUST 5, 2026: Get-ChangelogTierHeadings ------------------------------------------
 #
-# ONE SECTION PER TIER, newest-facing first. A changelog entry declares how far it reaches with its
-# 'Tier: N' line (scripts/lib/entry-scaffold-lib.ps1), and the fold uses that to pick a section here:
+# This mapped tier -> the literal '## ' heading its entries were folded under, and CHANGELOG.md carried
+# one section per tier: '## Tier 2 - Pull Requests' and its two siblings, in that order, so a reader met
+# the changes that reach furthest first.
 #
-#   Tier 2 -- a consumer of the product notices it
-#   Tier 1 -- a colleague working on this project gets something out of it
-#   Tier 0 -- nobody outside this repo's own developers notices: docs, config, repo-internal work
+# CHANGELOG.md HAS NO SECTION HEADINGS ANY MORE. An entry IS an H2 and the document is an intro followed
+# by a flat list of them, ordered tier-descending then significance-descending -- which keeps exactly what
+# the three headings communicated, as an ordering rather than as structure. So there is no heading for
+# this map to name.
 #
-# THE MAP'S ORDER IS THE DOCUMENT'S ORDER, deliberately, so "which tiers exist" and "in what order do
-# they appear" are one answer rather than two that can disagree. Descending here (Dave, August 5,
-# 2026): a reader opening CHANGELOG.md should meet the changes that reach furthest first, and the
-# repo-internal bulk last.
+# The fold and release-lib derive the intro/list boundary structurally instead (the first entry heading,
+# from Get-EntryHeadingLevel), which is why the resolver that read this seam --
+# Get-ChangelogTierSections in scripts/lib/entry-scaffold-lib.ps1 -- retired with it. The older
+# single-section Get-ChangelogHeading (issue #178) is no longer read either, and was already absent here.
 #
-# THIS REPLACES Get-ChangelogHeading HERE, and the shape is why replacing rather than adding was
-# right: a repo with no tiers is simply a repo with ONE tier, so a single-entry map --
-# [ordered]@{ 0 = '## Pull Requests' } -- is exactly the old behaviour expressed in the new vocabulary.
-# There is no second model to keep working, only a degenerate case of this one. Get-ChangelogHeading
-# stays RECOGNISED by the fold as the legacy answer (the repo's own "recognise both, write one" rule,
-# as with the legacy slot heading and the legacy [ERROR] marker), so a consumer that has not migrated
-# keeps folding exactly as before -- it is simply no longer stated here, because a value nothing reads
-# is a value that goes stale unnoticed.
-#
-# Optional in the contract, like the heading it replaces: a consumer that defines neither function
-# gets '## Pull Requests' as one tier-0 section, which is what the fold has always done.
-$script:ChangelogTierHeadings = [ordered]@{
-    2 = '## Tier 2 - Pull Requests'
-    1 = '## Tier 1 - Pull Requests'
-    0 = '## Tier 0 - Pull Requests'
-}
-
-function Get-ChangelogTierHeadings {
-    <# tier -> the literal '## ' heading line that tier's entries are folded under, in the order the
-       sections appear in CHANGELOG.md. Keys are whole numbers.
-
-       DELIBERATELY NOT REQUIRED TO COVER EVERY TIER THE MODEL HAS. The ceiling (Get-EntryTierMax in
-       entry-scaffold-lib.ps1) is what an entry may DECLARE; this map is what this repo FILES. A repo
-       that keeps only two sections is a legitimate choice, and the fold refuses an entry whose tier
-       has no section here by name rather than guessing a neighbour -- so the two facts are checked
-       where each is known instead of being kept equal by hand. #>
-    return $script:ChangelogTierHeadings
-}
+# Removed rather than left returning a value nothing reads, which is this file's own rule about
+# write-once config. A consumer that still defines either function is unaffected: nothing calls them.
 
 # Whether this repo has a separate "go live" stage after cutting a release -- e.g. a push to a live
 # deploy target, distinct from the tag/GitHub Release. Empty by default: this workshop (like
@@ -280,10 +256,16 @@ function Get-PrMergeMethod {
 #
 #   1. where the notes are grouped        Get-ReleaseNotesGrouping    (named in the issue)
 #   2. the highlights tier                Get-ReleaseHighlightsBumps  (named in the issue)
-#   3. the LIVE marker                    Get-ReleaseLiveMarker       (named in the issue)
+#   3. the LIVE marker                    Get-ReleaseLiveMarker       (named in the issue)   RETIRED Aug 5
 #   4. the plugin/marketplace half        Get-ReleasePluginTier       (NOT named -- the largest block)
-#   5. the category labels                Get-ReleaseCategoryTitles   (NOT named)
+#   5. the category labels                Get-ReleaseCategoryTitles   (NOT named)            RETIRED Aug 5
 #   6. the permanent root docs            Get-ReservedRootMd          (NOT named)
+#
+# TWO OF THE SIX ARE GONE (August 5, 2026), and both for the same reason rather than two: the flat
+# changelog. Knob 3 marked the live row of a release section CHANGELOG.md no longer has; knob 5 labelled
+# category headings the release documents no longer have. Each retirement is written out at the place it
+# used to sit, below. Recorded here too because this list is the record of what the #417 measurement
+# found, and a list that quietly shrinks stops being that.
 #
 # KNOB 2 LANDED IN PHASE 2 AS THREE FUNCTIONS AND IS BACK TO ONE (August 5, 2026). "The highlights
 # tier" was three independent questions -- whether, for whom, and in whose words -- and the second and
@@ -306,38 +288,41 @@ function Get-ReleaseNotesGrouping {
     return $script:ReleaseNotesGrouping
 }
 
-# The "this is the version currently live" suffix on the newest '## Releases' row. EMPTY here, and
-# that is not an oversight: a marketplace has no live stage, so there is no such thing as the live
-# version -- consumers install from `main` at a moment of their own choosing. A repo that DOES push
-# to a live target (a theme repo pushing to a live storefront) sets its marker here, and
-# Convert-ChangelogForRelease then MOVES it from the previous row to the new one.
+# --- RETIRED, AUGUST 5, 2026: Get-ReleaseLiveMarker ------------------------------------------------
 #
-# Deliberately separate from Get-LiveStage above, which the cut-release SKILL reads to decide whether
-# to print its live-push block. Two questions, one repo: "do you have a live stage" is prose for a
-# human, "what marks the live row" is a string a script writes into a file. A repo can have the first
-# without wanting the second.
-$script:ReleaseLiveMarker = ''
+# The "this is the version currently live" suffix Convert-ChangelogForRelease moved from the previous
+# release row onto the new one. There are no release rows in CHANGELOG.md any more -- a cut empties the
+# document down to its intro -- so the marker has nothing to sit on and nothing to be moved from.
+#
+# It was EMPTY here throughout its life, and that was never an oversight: a marketplace has no live stage,
+# so there is no such thing as the live version -- consumers install from `main` at a moment of their own
+# choosing. Get-LiveStage above is a different question and stays: "do you have a live stage" is prose the
+# cut-release skill reads to decide whether to print its live-push block, where this was a string a script
+# wrote into a file. A repo could always have the first without wanting the second, and now only the first
+# exists.
 
-function Get-ReleaseLiveMarker {
-    <# The literal marker appended to the newest release heading, e.g. '<- **LIVE**'. Empty = none. #>
-    return $script:ReleaseLiveMarker
-}
-
-# --- How much release history CHANGELOG.md keeps (Dave, August 4, 2026) ---------------------------
+# --- Where this repo keeps its release history (Dave, August 4, 2026) -----------------------------
 #
-# 'latest' here, and the reason is a measurement rather than a preference. The accumulating section had
-# grown to 434 of the changelog's 1,062 lines -- 41% -- across 72 blocks that each said no more than
-# "see the notes". Every one of those 72 versions was ALSO in releases/README.md, with a date, a type
-# and a descriptive title: verified in both directions, zero missing either way. So the section was not
-# a long list but a poorer copy of a better one, and the changelog's own subject -- what changed since
-# the last release -- was sitting under it.
+# THE MEASUREMENT BEHIND THIS PATH BECOMING LOAD-BEARING. CHANGELOG.md used to carry an accumulating
+# release section that had grown to 434 of the file's 1,062 lines -- 41% -- across 72 blocks that each
+# said no more than "see the notes". Every one of those 72 versions was ALSO in releases/README.md, with a
+# date, a type and a descriptive title: verified in both directions, zero missing either way. So the
+# section was not a long list but a poorer copy of a better one, and the changelog's own subject -- what
+# changed since the last release -- was sitting under it.
 #
-# THE PRECONDITION IS THE POINT: only set this to 'latest' when the file below really lists every
-# release, because from that moment it is the sole record. Switching a repo whose history lives nowhere
-# else would delete it at the next cut.
-# The path answers ONE question -- "where does this repo keep its release history?" -- and three things
-# read it: the changelog's pointer, the guardrail that checks which major a new row would land in, and
-# the inserter that writes that row. One edit here moves all three.
+# Get-ReleaseHistoryMode retired on August 5, 2026, and this is the other half of that same measurement
+# playing out. It chose between 'all' (a block per release) and 'latest' (only the newest, behind a
+# pointer); the flat changelog keeps NEITHER, because a cut now empties the document down to its intro.
+# There is no mode left to select, and the file below is not "where the pointer points" any more but the
+# only list of releases there is.
+#
+# THE PRECONDITION IS THEREFORE ABSOLUTE RATHER THAN A CAUTION: this file must really list every release,
+# because from now on nothing else does. It did before this change too -- that is what made removing the
+# blocks safe rather than lossy.
+#
+# The path answers ONE question and three things read it: the guardrail that checks which major a new row
+# would land in, the inserter that writes that row, and new-internal-note.ps1, which repoints that row's
+# Version cell at the internal note once the note exists. One edit here moves all three.
 #
 # It is deliberately left at the DEFAULT, releases/README.md. The list lived in its own HISTORY.md for one
 # day (August 4, 2026), on the reasoning that one page should describe the process and another the outcome.
@@ -346,16 +331,10 @@ function Get-ReleaseLiveMarker {
 # earning a file boundary -- the outcome IS repo-specific content, so it is simply the last section of the
 # slot. Merging them also removed four cross-references the two pages needed to introduce each other, and
 # left a consumer with one file to mirror instead of two.
-$script:ReleaseHistoryMode = 'latest'
 $script:ReleaseHistoryPath = 'releases/README.md'
 
-function Get-ReleaseHistoryMode {
-    <# 'all' (a block per release) or 'latest' (only the newest, behind a pointer). #>
-    return $script:ReleaseHistoryMode
-}
-
 function Get-ReleaseHistoryPath {
-    <# Repo-root-relative path to the full release list a 'latest' section points at. #>
+    <# Repo-root-relative path to the file that lists every release this repo has cut. #>
     return $script:ReleaseHistoryPath
 }
 
@@ -375,20 +354,25 @@ function Get-ReleasePluginTier {
     return $script:ReleasePluginTier
 }
 
-# Display labels for the release-notes categories, keyed on the branch TYPES from
-# scripts/lib/branch-info.ps1. Only the ones that differ from release-lib's English defaults
-# (Feat -> Features, Fix -> Fixes, Docs -> Documentation, Chore -> Maintenance, Other -> Other) need
-# to appear; the map is merged over those rather than replacing them.
+# --- RETIRED, AUGUST 5, 2026: Get-ReleaseCategoryTitles -------------------------------------------
 #
-# EMPTY HERE, and that is the correct state for an English repo: the defaults already say what this
-# repo means. The knob exists for a non-English consumer, where an unlabelled type degrades to the
-# type name -- the wrong word rather than a missing one. Precisely the #410 case one level up.
-$script:ReleaseCategoryTitles = @{}
-
-function Get-ReleaseCategoryTitles {
-    <# type -> label overrides for the release-notes category headings. Empty = use the defaults. #>
-    return $script:ReleaseCategoryTitles
-}
+# Display labels for the release-notes category headings, keyed on the branch types: Feat -> Features,
+# Fix -> Fixes, Docs -> Documentation, Chore -> Maintenance, plus an 'Other' catch-all. It existed for a
+# non-English consumer, where an unlabelled type degrades to the type NAME -- the wrong word rather than a
+# missing one, precisely the #410 case.
+#
+# THE RELEASE DOCUMENTS HAVE NO CATEGORY HEADINGS ANY MORE. They are ranked lists of changes, exactly as
+# CHANGELOG.md is, and each change states its own type inside it under a '### Type of change' section. So
+# there is no heading for these labels to be the text of.
+#
+# WHY THE GROUPING WENT, since retiring a whole seam deserves the reason: the grouping was derived from the
+# BRANCH PREFIX, which this repo measured does not predict what a change is worth -- the single most
+# consequential change for a consumer at v3.2.0 arrived on a chore/ branch. So the grouping put a
+# document's most important change third, under whichever label its prefix produced, and the significance
+# ranking added in #467 could only reorder the categories rather than escape them.
+#
+# It was EMPTY here throughout, which was the correct state for an English repo. A consumer that still
+# defines it is unaffected: nothing calls it.
 
 # The permanent root *.md files that are NOT unfolded changelog entries. cut-release treats every
 # OTHER root *.md as an entry somebody forgot to fold (deliberately catch-all, so an entry with an

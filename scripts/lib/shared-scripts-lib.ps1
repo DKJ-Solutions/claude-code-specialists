@@ -213,7 +213,7 @@ function Get-SharedScriptPairs {
             # cut-release dot-sources it as a $PSScriptRoot sibling, so a mirror without it would fail
             # on the first line that matters. Its one repo-owned dependency, branch-info.ps1, does NOT
             # travel -- the branch table differs per repo -- so the dot-source of that sibling is
-            # guarded and Get-ReleaseCategories probes for Get-BranchTypes, which cut-release loads
+            # guarded and Get-ReleaseChangeTypes probes for Get-BranchTypes, which cut-release loads
             # from the consumer's own root before calling in.
             Name    = 'release-lib'
             Source  = 'scripts\lib\release-lib.ps1'
