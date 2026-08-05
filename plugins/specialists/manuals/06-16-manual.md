@@ -77,6 +77,20 @@ via a PR.
   answer** — when one place is wrong and another is right, the correct text is evidence about which
   way to repair, and it is free. Whoever files the finding sees the site that bit them; finding the
   rest is the writer's job.
+- **Portable is the default for a way of working; the lens is the exception you have to justify.**
+  Where a decision was *made* says nothing about where it *applies*. A rule about how a specialist
+  works — what they own, what they may do without asking, how they hand over — travels with them and
+  belongs in the portable body or manual, even when it was decided in one repo while working on that
+  repo's own business. Only **repo facts** belong in a lens: this repo's branch name, its lint script,
+  its marketplace, what this particular consumer does differently. The failure mode is quiet, which is
+  why it is a rule: a general rule filed in a lens is not wrong anywhere, it simply never reaches the
+  other repos, and nothing reports its absence.
+  **The corollary matters just as much.** When the portable version would be too broad for some
+  consumer, do **not** soften the portable text to pre-empt that — a vague core is worse for every
+  reader and hides the mechanism that already exists. State the core in full, and let the consumer that
+  deviates record its deviation in its own lens. (Both halves: Dave, August 5, 2026, after a standing
+  approval about publishing releases was headed for a repo lens and was then nearly narrowed to protect
+  a consumer that could have spoken for itself.)
 - **When moving/restructuring: nothing silently drops, everything stays referenced.** If text moves
   from one doc to another, Tessa checks two things explicitly. (a) *No nuance is lost:* whatever can't
   come along when a body is made generic because it's repo-specific moves to the repo-specific
