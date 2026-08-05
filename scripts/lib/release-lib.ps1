@@ -490,6 +490,32 @@ function Split-Changelog {
         throw "No changelog entries in CHANGELOG.md -- nothing to release."
     }
 
+    # A LEFTOVER SECTION HEADING IS NOT AN ENTRY, AND THIS REFUSAL IS WHY (August 5, 2026). Every '## '
+    # below the intro is read as one change now, and a document still carrying the pre-flat shape has
+    # headings at exactly that level. Measured on both of them before this guard existed: a consumer's
+    # '## Pull Requests' parsed as ONE entry swallowing all of their real ones and '## Releases' as a
+    # second, so their whole release history was published outward as a "change" and then deleted from
+    # CHANGELOG.md -- and nothing refused, because blocks like that declare no impact and the bump gate
+    # therefore reads the repo as never having adopted the model and reports itself inactive. Silent,
+    # correct-looking, and it loses data on a repo that never asked for the change; a shared script reaches
+    # a consumer through a plugin update rather than by their choosing.
+    #
+    # Test-EntryDeclaresShape is the discriminator and it is exact rather than a heuristic -- see its header.
+    # Named per offending block, and BEFORE anything is written, so a cut stops with the document intact.
+    $notEntries = @($entries | Where-Object { -not (Test-EntryDeclaresShape -EntryText $_) })
+    if ($notEntries.Count -gt 0) {
+        $names = @($notEntries | ForEach-Object { "'" + (($_ -split "`r?`n")[0]) + "'" })
+        throw ("CHANGELOG.md carries $($notEntries.Count) H$(Get-EntryHeadingLevel) block(s) that declare " +
+            "neither an entry's named sections nor a change type: $($names -join ', '). Every " +
+            "H$(Get-EntryHeadingLevel) below the intro is read as one change, so these would be released as " +
+            "changes -- and the cut empties this file, which would remove them. That is what a pre-flat " +
+            "CHANGELOG.md looks like to this parser: a section heading ('## Pull Requests', " +
+            "'## Tier N - Pull Requests', '## Releases') sits at the level an entry now occupies. Migrate the " +
+            "document first: drop the section headings, promote each entry to H$(Get-EntryHeadingLevel), and " +
+            "give it the three named sections. An entry written before this format is fine as it is -- it " +
+            "declares its type in its heading.")
+    }
+
     return [pscustomobject]@{
         Nl      = $nl
         Head    = $head

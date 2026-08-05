@@ -1098,6 +1098,55 @@ function Format-EntryBlock {
 # returned, and that is the one place the retirement was NOT a pure deletion; see its header for why the
 # default had to become on rather than off.
 
+function Test-EntryDeclaresShape {
+    <#
+        Pure: does this block actually look like an ENTRY? $true when it declares its named sections (any
+        one of the three headings, outside fences) or a change type (the Type section, or the pre-format
+        type field in its heading, via Resolve-EntryType).
+
+        WHY THIS EXISTS, AND IT IS A MEASURED CONSUMER DEFECT RATHER THAN TIDINESS (August 5, 2026). With
+        the changelog flat, every '## ' below the intro is read as one change. A consumer whose CHANGELOG.md
+        still carries the pre-flat shape has section headings at exactly that level -- '## Pull Requests',
+        '## Tier 2 - Pull Requests', '## Releases' -- and the updated shared scripts reach them through a
+        plugin update rather than by their choosing. Measured against both shapes:
+
+          * the single-section consumer: '## Pull Requests' parses as ONE entry swallowing all of their real
+            entries, and '## Releases' as a second one -- so their entire release history is published into
+            the release notes and the per-plugin CHANGELOGs as a "change", and then DELETED from
+            CHANGELOG.md, because the cut keeps only the intro;
+          * the consumer who had adopted the tier sections: three entries named after the three headings.
+
+        AND NOTHING REFUSED. Every one of those blocks declares no impact, so Test-ReleaseBumpEarned reads
+        the repo as never having adopted the model and reports itself INACTIVE -- correctly, by its own
+        rule -- which means the release proceeds. Silent, correct-looking, and it loses data.
+
+        SO THE PARSER REFUSES INSTEAD, and this predicate is the test it refuses on. The discriminator is
+        exact rather than a heuristic: the format has two legitimate shapes and both declare something. A
+        current entry carries the three named sections; a pre-format entry carries its type as a heading
+        field, which is what new-changelog-entry.ps1 wrote for as long as that shape existed. A leftover
+        section heading carries neither, and cannot -- it is a heading with prose under it.
+
+        Deliberately NOT keyed on the '#NN' the fold prepends: the fold cannot reach gh on a manual merge
+        and then writes a legitimate entry with no number, saying so on the console. A gate keying on the
+        number would report the fold's own documented output as a defect.
+
+        FENCE-AWARE through the readers it calls, for the reason every reader here is: an entry documenting
+        this format quotes these headings inside a fence, and the entry for this very change does.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
+
+    $body = Get-EntryTextOutsideFences -EntryText $EntryText
+    $lines = @($body -split '\r?\n')
+    foreach ($heading in (Get-EntrySectionHeadings).Values) {
+        if (-not $heading) { continue }
+        $rx = '^#{' + $script:EntrySectionLevel + '}\s+' + [regex]::Escape([string]$heading) + '\s*$'
+        foreach ($line in $lines) {
+            if ($line -match $rx) { return $true }
+        }
+    }
+    return [bool](Resolve-EntryType -EntryText $EntryText).Declared
+}
+
 function Get-EntryScaffoldFindings {
     <#
         Pure: given an entry file's text, returns the scaffold markers it still contains -- an array of

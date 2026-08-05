@@ -282,6 +282,56 @@ try { Split-Changelog -Content "# Changelog`n`nNothing.`n" } catch { $emptyErr =
 Assert-Match $emptyErr 'nothing to release' 'and the message says what is wrong rather than naming a heading'
 Assert-Match $emptyErr 'H2' 'and states where an entry is expected'
 
+Write-Host "Split-Changelog -- a leftover section heading is refused, not released" -ForegroundColor Cyan
+# THE CONSUMER DEFECT THIS GUARDS, measured on both pre-flat shapes before the guard existed. Every '## '
+# below the intro is read as one change now, and a document still carrying the old shape has headings at
+# exactly that level -- reached through a plugin update rather than by that repo's choosing:
+#
+#   * single-section: '## Pull Requests' parsed as ONE entry swallowing every real entry, and '## Releases'
+#     as a second -- so the whole release history was published outward as a "change" and then DELETED,
+#     because the cut keeps only the intro;
+#   * tier sections: three entries named after the three headings.
+#
+# AND NOTHING REFUSED: blocks like that declare no impact, so the bump gate reads the repo as never having
+# adopted the model and reports itself inactive -- correctly, by its own rule -- and the release proceeds.
+$legacySingle = @(
+    '# Changelog', '', 'Intro of the file.', '',
+    '## Pull Requests', '', 'Merged PRs land here.', '',
+    "### #31 $midDot A consumer feature $midDot Feat $midDot 2026-07-01", '', 'Body 31.', '',
+    '## Releases', '', 'Rel intro.', '', "### [v2.4.0] - 2026-06-01 $emDash Minor", ''
+) -join "`n"
+$legacyErr = ''
+try { Split-Changelog -Content $legacySingle } catch { $legacyErr = $_.Exception.Message }
+Assert-Match $legacyErr 'declare neither' 'a pre-flat single-section document is refused rather than parsed'
+Assert-Match $legacyErr ([regex]::Escape("'## Pull Requests'")) 'and the refusal names the offending block'
+Assert-Match $legacyErr ([regex]::Escape("'## Releases'")) 'including the release history, which the cut would have deleted'
+Assert-Match $legacyErr 'Migrate the document first' 'and says what to do about it'
+$legacyTiers = @(
+    '# Changelog', '', 'Intro.', '',
+    '## Tier 2 - Pull Requests', '', 'What a consumer notices.', '',
+    "### #41 $midDot Something $midDot Feat $midDot 2026-07-01", '', 'Body 41.', '',
+    '## Tier 1 - Pull Requests', '', 'What colleagues get.', ''
+) -join "`n"
+Assert-Throws { Split-Changelog -Content $legacyTiers } 'a document still carrying the tier sections is refused too'
+# BOTH LEGITIMATE SHAPES STILL PASS, which is what makes the discriminator exact rather than a heuristic.
+Assert-Equal 3 (Split-Changelog -Content $sample).Entries.Count 'the current format passes: the three named sections are the declaration'
+$preFormatDoc = New-FlatChangelog -Entries @(
+    "## #99 $midDot An entry from before the format $midDot Fix $midDot 2026-08-01`n`nBody prose, no named sections.")
+Assert-Equal 1 (Split-Changelog -Content $preFormatDoc).Entries.Count 'a pre-format entry passes: it declares its type in its heading'
+# AND IT IS NOT KEYED ON THE '#NN', deliberately: the fold cannot reach gh on a manual merge and then writes
+# a legitimate entry with no number, saying so on the console. A gate keying on the number would report the
+# fold's own documented output as a defect.
+$noPrDoc = New-FlatChangelog -Entries @((New-FlatEntry -Heading 'An entry with no PR number' -Rows @('| 1 | 2 | fine |')))
+Assert-Equal 1 (Split-Changelog -Content $noPrDoc).Entries.Count 'an entry with no PR number passes -- the manual-merge fold'
+# The predicate itself, from both directions.
+Assert-Equal $true  (Test-EntryDeclaresShape -EntryText $e22) 'Test-EntryDeclaresShape: a current entry declares its sections'
+Assert-Equal $true  (Test-EntryDeclaresShape -EntryText "## #99 $midDot A title $midDot Fix`n`nBody.") 'a pre-format entry declares its type in the heading'
+Assert-Equal $false (Test-EntryDeclaresShape -EntryText "## Pull Requests`n`nMerged PRs land here.") 'a section heading with prose under it declares nothing'
+Assert-Equal $false (Test-EntryDeclaresShape -EntryText "## Releases`n`nThe recorded versions.") 'and so does a release-history heading'
+# Fence-aware, so an entry that DOCUMENTS the format is judged by its real declaration rather than by the
+# one it quotes -- and the mirror image: a block whose only sections are quoted is still not an entry.
+Assert-Equal $false (Test-EntryDeclaresShape -EntryText "## Pull Requests`n`nThe shape is:`n`n``````text`n### Type of change`n``````") 'a quoted section heading does not make a section heading into an entry'
+
 Write-Host "Get-PullRequestEntries -- document order IS the fold's ranking" -ForegroundColor Cyan
 $entries = @(Get-PullRequestEntries -Content $sample)
 Assert-Equal 3 $entries.Count 'three entries extracted'
