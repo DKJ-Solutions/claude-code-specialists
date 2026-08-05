@@ -53,16 +53,21 @@ Feat
 ```
 
 The scaffolder fills in the title and the type from the branch prefix. The fold adds what does not exist
-until the merge: it prepends the **`#NN`** to the heading and appends a closing line carrying the
-**`PR #NN` link and the merge date**. The separator is a middot.
+until the merge, and it adds it in **one place**: a closing line carrying the **`PR #NN` link and the merge
+date**. The separator is a middot. **The heading is left exactly as its author wrote it.**
 
 ```markdown
-## #468 · Short strong title
+## Short strong title
 
 …the three sections…
 
 [PR #468](https://github.com/owner/repo/pull/468) · merged 2026-08-05
 ```
+
+**The heading is just the title** (Dave, August 5, 2026). The fold used to prepend `#NN · ` to it as well;
+nothing is lost by dropping that, because the number is still in the entry on the closing line, where the
+url makes it clickable rather than merely printed. What the heading gains is being readable as a sentence —
+it is the one line every reader of the changelog and of all three release documents scans.
 
 **An entry file written before this format still folds.** It carries an `###` heading with the type as a
 middot field and, where the repo had adopted tiers, a `Tier: N` line instead of a table. An entry file

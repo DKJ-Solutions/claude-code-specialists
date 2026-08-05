@@ -49,11 +49,16 @@ with its own heading -- an H2 since this change, an H3 before it -- so repo-root
 (CONTRIBUTING.md, SECURITY.md, ...) that open with an H1 are left untouched. -Branch mode targets exactly
 the named entry and is unaffected.
 
-What the fold adds is exactly what does not exist until the merge: '#NN <midDot> ' at the front of the
-title, and as the last line '[PR #NN](url) <midDot> merged <date>'. The PR number, url and merge timestamp
-are fetched via one `gh pr list` (on -Branch, or in fold-all mode derived from the file name) -- which can
-only happen after opening the PR. If no PR is found (e.g. a manual merge without a PR), none of the three
-is added: the heading stays without #NN and there is no closing line.
+What the fold adds is exactly what does not exist until the merge, and it is now ONE line rather than two
+places: the closing '[PR #NN](url) <midDot> merged <date>'. The heading is left as its author wrote it --
+the fold used to prepend '#NN <midDot> ' to the title as well, and that is gone (Dave, August 5, 2026).
+Nothing is lost by it: the number is still in the entry, on that closing line, where the url makes it
+clickable rather than merely printed. What the heading gains is being readable as a sentence, and it is the
+one line every reader of the changelog and of all three release documents scans.
+
+The number, url and merge timestamp are fetched via one `gh pr list` (on -Branch, or in fold-all mode
+derived from the file name) -- which can only happen after opening the PR. If no PR is found (e.g. a manual
+merge without a PR), no closing line is added and the heading is untouched either way.
 
 AN ENTRY FILE WRITTEN BEFORE THIS FORMAT IS PROMOTED, NOT PASSED THROUGH. Its H3 heading becomes an H2 as
 it lands, because the document it lands in is a flat list of H2s -- and an H3 in that list is not an entry
@@ -358,9 +363,25 @@ foreach ($file in $entryFiles) {
     }
     $entryContent = $promoted
 
-    # Fold only adds '#NN <midDot> ' at the front of the title and the PR link at the end. The PR number
-    # only exists after the merge; we fetch it via the branch -- from -Branch, or in fold-all mode derived
-    # from the file name (<prefix>-<rest>.md -> <prefix>/<rest>).
+    # THE HEADING IS JUST THE TITLE (Dave, August 5, 2026). The fold adds the PR link and the merge date as
+    # the entry's closing line and touches the heading no further -- it used to also prepend '#NN <midDot> '
+    # to the title, and that prepend is gone.
+    #
+    # NOTHING IS LOST, WHICH IS WHY IT COULD GO: the number is still in the entry, on the closing
+    # '[PR #NN](url) <midDot> merged <date>' line, where the url makes it clickable rather than merely
+    # printed. What the heading gains is being readable as a sentence -- it is the one line every reader of
+    # the changelog and of all three release documents scans, and it now says what changed and nothing else.
+    # The two facts the merge owns already had a home together at the end of the block; the number was the
+    # last one still stated twice.
+    #
+    # WHAT HAD TO MOVE WITH IT, because the number was load-bearing in one reader: new-internal-note.ps1
+    # recognised an entry in the development notes by counting middot fields in its heading. That was
+    # already broken by the flat format -- the type and date had left the heading, so every real entry fell
+    # under its threshold and the one heading that still matched was a QUOTED example inside a fenced block,
+    # which it turned into the note's only bullet. It now reads the format's own sections instead.
+    #
+    # The PR number only exists after the merge; we fetch it via the branch -- from -Branch, or in fold-all
+    # mode derived from the file name (<prefix>-<rest>.md -> <prefix>/<rest>).
     $midDot = [char]0x00B7
     $branchForPr = $Branch
     if (-not $branchForPr) {
@@ -382,10 +403,8 @@ foreach ($file in $entryFiles) {
     $prs = if ($ghCode -eq 0 -and $prJson) { @($prJson | ConvertFrom-Json) } else { @() }
     if ($prs.Count -ge 1) {
         $num = $prs[0].number
-        # '#NN <midDot> ' in front of the title, on the heading the promotion above has already put at the
-        # current level -- so this only ever has to know one level. count 1, for the same reason: the entry's
-        # own heading, never a '### ' section heading inside its body.
-        $entryContent = ([regex]('(?m)^' + $entryHashes + ' ')).Replace($entryContent, "$entryHashes #$num $midDot ", 1)
+        # The heading is left exactly as its author wrote it. $entryHashes is still what the promotion above
+        # uses, so a pre-format entry file still arrives at the right level.
 
         # Deriving touched plugins from the PR files (automation-first): paths under
         # plugins/<plugin>/ become a 'Plugins:' line, which
@@ -413,7 +432,8 @@ foreach ($file in $entryFiles) {
     else {
         # No PR: no number, no url -- and no merge date either, deliberately. There is nothing to read a
         # landing date off, and inventing one from the clock would put a fact in the changelog that
-        # nothing backs. An entry folded this way simply carries neither, exactly as it carried no #NN.
+        # nothing backs. An entry folded this way simply carries no closing line; its heading is the same
+        # heading it would have had with one, since the fold no longer writes into the heading at all.
         Write-Host "  No PR found for '$branchForPr' - entry without PR number/url or merge date." -ForegroundColor Yellow
     }
 

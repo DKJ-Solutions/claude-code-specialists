@@ -445,6 +445,21 @@ $deep = Set-EntryHeadingLevel -EntryText $withSub -EntryLevel 3
 Assert-Match $deep '(?m)^##### A sub-heading in the body$' 'an H4 in a body keeps its relative depth'
 # A delta of 0 changes nothing but the newline style.
 Assert-Equal ($e22 -replace "`r`n", "`n") (Set-EntryHeadingLevel -EntryText $e22 -EntryLevel 2) 'a delta of 0 returns the block unchanged'
+# THE DELTA IS MEASURED FROM THE BLOCK, NOT ASSUMED TO BE CANONICAL. It used to be computed as
+# '$EntryLevel - Get-EntryHeadingLevel', which is the shift a block ALREADY at the canonical level needs --
+# true of every caller in this file, since they read entries straight out of CHANGELOG.md, and false for
+# the one caller that reads them back out of a rendered document. Normalising a deeper block to canonical
+# computed a delta of ZERO and returned it untouched, silently: measured on new-internal-note.ps1, where
+# every bullet came out without its type because the sections of the block handed to Resolve-EntryType were
+# still one level below where that reader looks.
+$deeper = Set-EntryHeadingLevel -EntryText $e22 -EntryLevel 3     # canonical -> deeper, as a renderer does
+Assert-Match $deeper '(?m)^### #22 ' 'a canonical block still renders deeper'
+$backAgain = Set-EntryHeadingLevel -EntryText $deeper -EntryLevel 2
+Assert-Match $backAgain '(?m)^## #22 ' 'and a DEEPER block normalises back to canonical -- the case that silently did nothing'
+Assert-Equal 3 (@([regex]::Matches($backAgain, '(?m)^### ')).Count) 'with its three sections coming back with it'
+Assert-Equal ($e22 -replace "`r`n", "`n") $backAgain 'the round trip is lossless, which is what makes the reader downstream able to trust it'
+# A block with no heading at all has nothing to measure from: returned normalised, not guessed at.
+Assert-Equal "Just prose.`n`nMore prose." (Set-EntryHeadingLevel -EntryText "Just prose.`r`n`r`nMore prose." -EntryLevel 4) 'a block with no heading is left alone apart from the newline normalisation'
 Assert-NoMatch (Set-EntryHeadingLevel -EntryText ($e22 -replace "`n", "`r`n") -EntryLevel 2) "`r" 'and normalizes CRLF to LF either way'
 # FENCE-AWARE: an entry documenting the entry format quotes these headings, and shifting a quoted one
 # corrupts the example.

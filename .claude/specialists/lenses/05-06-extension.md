@@ -22,8 +22,9 @@ rewrite when copying. Managing branches, PRs, and merges up to and including the
 ### Changelog
 
 `CHANGELOG.md` (repo root) is an **intro followed by one `##` per change, with no section headings at all**
-(Dave, August 5, 2026). A change *is* the `##` — `## #475 · A significance score per entry` — and under it
-three `###` sections answer what a reader arrives with: `What does this change do?`, `Who is this for` (the
+(Dave, August 5, 2026). A change *is* the `##`, and its heading is **just the title** —
+`## A significance score per entry, and the order follows it`. Under it, three `###` sections answer what a
+reader arrives with: `What does this change do?`, `Who is this for` (the
 impact table) and `Type of change`. Everything above the first `##` is the intro, which is the only part a
 repo writes by hand and the only thing a cut leaves standing.
 
@@ -58,8 +59,10 @@ entries rather than off which section they sit in.
   not even on a second attempt on the same branch: the fold step looks up the entry file by the
   exact branch name, and a suffix breaks that match and with it the auto-delete after folding.
 - **After the merge**: `scripts/release/fold-changelog-entry.ps1` reads the entry file and inserts it at its
-  **ranked position** in the list — the block as written, with `#NN · ` prepended to its `##` heading and
-  `[PR #NN](url) · merged YYYY-MM-DD` appended as its last line. **Nothing is consumed:** the impact table
+  **ranked position** in the list — the block as written, with `[PR #NN](url) · merged YYYY-MM-DD` appended
+  as its last line and the heading **untouched**. (It used to prepend `#NN · ` to the heading too; that went
+  on August 5, 2026 — the number is still in the entry, on that closing line, where the url makes it
+  clickable, and the heading is left readable as a sentence.) **Nothing is consumed:** the impact table
   (or a pre-format entry's `Tier: N` line) travels into `CHANGELOG.md` intact, because with no heading above
   the entry, stripping the declaration would leave every downstream reader taking it as tier 0 — silent,
   correct-looking, and wrong in the direction that empties a release document. The outward-facing renderers
@@ -176,7 +179,7 @@ in the closing report of every release.**
 The `releases/` directory (modeled on life-hub):
 - **`releases/development/<X>.x/<X.Y.Z>.md`** — the full release notes: **every** pending entry, tier 0
   included, grouped by **tier** and, inside a tier, a flat list in ranked order
-  (`## Tier 2 - consumers` → `### #NN · …` → `#### What does this change do?`). Literally the whole
+  (`## Tier 2 - consumers` → `### <title>` → `#### What does this change do?`). Literally the whole
   changelog, which is what makes this the record rather than a summary of one — including each entry's
   impact table, since the cut empties `CHANGELOG.md` and this becomes the last place each ranking's
   justification lives. Repo-root-relative links in the entry bodies are rewritten with `../../../`

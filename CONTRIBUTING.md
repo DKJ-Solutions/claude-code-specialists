@@ -29,9 +29,10 @@ changelog entry — the same workflow as the consuming repos. The steps:
    Feat
    ```
 
-   The heading and the type arrive filled in. **The `#NN` and the merge date are added by the fold** —
-   the PR number does not exist yet, and a date written now would be the branch's birth date rather than
-   its landing date. Valid prefixes (prefix → label → changelog type): `feat/` → enhancement → Feat ·
+   The heading and the type arrive filled in, and **the heading is just the title** — it is the line every
+   reader of the changelog and of all three release documents scans, so it says what changed and nothing
+   else. **The PR number and the merge date are added by the fold**, together on the entry's closing line:
+   neither exists yet, and a date written now would be the branch's birth date rather than its landing date. Valid prefixes (prefix → label → changelog type): `feat/` → enhancement → Feat ·
    `fix/` → bug → Fix · `docs/` → documentation → Docs · `chore/` → documentation → Chore
    (maintenance: scripts, tooling, config). The table is in
    [`scripts/lib/branch-info.ps1`](scripts/lib/branch-info.ps1).
@@ -57,7 +58,7 @@ changelog entry — the same workflow as the consuming repos. The steps:
    folds the entry file into [`CHANGELOG.md`](CHANGELOG.md) — which is **one flat list with no section
    headings at all**, so the fold does not pick a section: it inserts the block at the **position its own
    impact table ranks it at**, furthest reach first and, within a tier, highest significance first. It
-   prepends `#NN`, appends the PR link and the merge date, derives a `Plugins:` line from the PR's files
+   appends the PR link and the merge date as the entry's closing line, derives a `Plugins:` line from the PR's files
    along the way (for the per-plugin CHANGELOGs — see
    [Cutting a release](releases/README.md#cutting-a-release)), and removes the entry file; commits that
    directly on `main`.
