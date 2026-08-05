@@ -55,7 +55,7 @@ each command as you go — do not skip a step or reorder them from memory.
    remains the same file and works as before.
 
    Give it **either** `-Bump` **or** `-Version <X.Y.Z>` when you want to name the number yourself.
-   `-SummaryFile` turns it into a milestone (see below). Three escape valves:
+   `-SummaryFile` turns it into a milestone (see below). Four escape valves:
 
    - **`-NoPush` — inspect before publishing, and use it when anything is unusual.** The script otherwise
      commits, tags **and pushes** in one motion. With `-NoPush` it stops after the commit and tag and
@@ -70,6 +70,24 @@ each command as you go — do not skip a step or reorder them from memory.
      usually means the bump is wrong, not the gate. The script names the bump the work *does* earn; take
      that instead. Deliberately a separate flag from `-SkipLint`, because it overrules a judgement about
      **content** rather than skipping a tool.
+   - **`-SkipSignificanceGate`** cuts even though a pending entry that reaches tier 1 or higher has not said
+     **how much it weighs** there. Every tier an entry reaches is a document with its own reader, so every
+     one owes a row in the entry's impact table — a significance from 1 to 5 against the rubric, plus a
+     `Why`:
+
+     ```text
+     | Tier | Significance | Why |
+     |---|---|---|
+     | 2 | 5 | consumers must re-add the marketplace under its new name |
+     | 1 | 4 | the routine version bump stops needing a developer |
+     ```
+
+     That score is what orders the release documents, so an unscored entry cannot be placed. The gate
+     **refuses** rather than quietly sorting it last, because demoting a forgotten line is worst in the one
+     document whose subject is which change matters most. The fix is an edit in `CHANGELOG.md`, and the
+     refusal names every entry and every missing cell. Separate from both flags above: `-SkipLint` skips a
+     tool, `-SkipTierGate` overrules whether the release should exist, and this overrules how its contents
+     are **ordered**.
 
    **A refusal here has cost nothing.** All the guardrails run before the first file is written, so a
    rejected cut leaves the tree exactly as it was — no notes file, no version bump, no half-cut release to

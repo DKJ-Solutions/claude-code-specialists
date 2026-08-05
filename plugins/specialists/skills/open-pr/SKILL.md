@@ -36,8 +36,8 @@ The script:
 3. Runs the **scaffold gate**: the branch's changelog entry must no longer carry the wording
    `new-changelog-entry.ps1` scaffolded it with. See
    [The scaffold gate](#the-scaffold-gate-has-the-entry-actually-been-written) below. On the same read of
-   the same file it also runs the **tier gate** and prints the tier it read. See
-   [The tier gate](#the-tier-gate-how-far-does-this-change-reach) below.
+   the same file it also runs the **impact gate** and prints the reach and significance it read. See
+   [The impact gate](#the-impact-gate-how-far-does-this-change-reach-and-how-much-does-it-weigh) below.
 4. Runs the **repo's own lint gate** (via `Get-LintScript` from `repo-config`) and then **all
    test suites** (`scripts/tests/*.tests.ps1`) -- exactly like CI. An error blocks: nothing is
    pushed and no PR is opened. `-SkipLint` / `-SkipTests` are the deliberate escape valves.
@@ -111,26 +111,44 @@ the script that writes the scaffold read it from the same shared library, so the
   the wording outside a fence. Deliberately separate from `-SkipLint`/`-SkipTests`: those skip a tool,
   this overrules a judgement about content.
 
-## The tier gate: how far does this change reach?
+## The impact gate: how far does this change reach, and how much does it weigh?
 
-The entry also carries a `Tier: N` line — `0` = only this repo's own developers notice, `1` = a colleague on
-the project gets something out of it, `2` = a consumer notices. The fold files the entry under the changelog
-section that tier names, and where the repo declares tier sections the release cut refuses a bump the
-pending tiers have not earned.
+The entry also carries an **impact table** — one row per tier it reaches, each row scored 1 to 5:
 
-**The tier it read is printed on every run**, including when nothing was declared and the default applied.
-That line is the point: an entry still sitting at tier 0 is work that cannot carry a release on its own, and
-this is the last moment to raise it cheaply — after the merge it is a section move on the main branch.
+```text
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 5 | consumers must re-add the marketplace under its new name |
+| 1 | 4 | the routine version bump stops needing a developer |
+```
 
-**Only a meaningless value is refused, never a low one.** `Tier: 0` is a legitimate, common and final
-answer, which is why this is a separate gate rather than part of the scaffold one: a low tier can never be
-evidence of an unfinished entry. What is refused is `Tier: 5` or `Tier: two` — a value that reads back as the
-default and would file consumer-facing work as repo-internal, correct-looking and silent.
+The **tier** (`0` = only this repo's own developers notice, `1` = a colleague on the project gets something
+out of it, `2` = a consumer notices) decides which changelog section the fold files the entry under, and
+where the repo declares tier sections the release cut refuses a bump the pending tiers have not earned. The
+**significance** decides where *in* that section and its release documents the entry sits, so the most
+consequential change leads.
 
-- **Fenced code is excluded here too**, so an entry that documents the tier format is read by its real
+**What it read is printed on every run**, including when nothing was declared and the default applied. That
+line is the point: an entry still sitting at tier 0 is work that cannot carry a release on its own, and this
+is the last moment to raise it cheaply — after the merge it is a section move on the main branch.
+
+**A malformed table is refused; a missing score is only reported.** That split is by kind of fault, not by
+convenience:
+
+- **Refused** — a cell the model has no meaning for (`| 2 | 9 | … |`, `| 5 | 3 | … |`). It reads back as
+  unscored, which would sink the entry to the bottom of the document it matters most in — correct-looking
+  and silent. Here it is a one-cell fix; after the merge it is an edit on the main branch.
+- **Reported, not refused** — a row or score that is simply missing. The score is a judgement about a
+  finished change, and an author who has not settled it should not be blocked from merging over it. The
+  **release cut** is the refusal point instead, and the message names every entry and every missing cell.
+- **A low score is never refused.** Like `Tier: 0`, a significance of 1 is a legitimate, common and final
+  answer, which is why this is a separate gate rather than part of the scaffold one.
+
+- **Fenced code is excluded here too**, so an entry that documents the impact format is read by its real
   declaration rather than by the one it quotes.
 - **`-Force` does not apply.** It exists for text somebody legitimately wrote; there is no legitimate
-  `Tier: 5`. Correct the line — it is a one-line edit.
+  `| 2 | 9 | … |`. Correct the cell — it is a one-character edit.
+- **`Tier: N` is still read**, so an entry written before the table folds and ships exactly as it did.
 
 ## The resolves gate: which issues does this PR close?
 

@@ -189,7 +189,7 @@ try {
     # Get-ChangelogHeading above, and Get-ChangelogReleaseWording (inbound #462), which an ENGLISH repo
     # deliberately leaves undefined because the defaults are already its own words. So this assert still
     # proves the [SCOPE] line added nothing, which is what it is for.
-    Assert-Match 'Summary: 0 error\(s\), 2 info signal\(s\)' $r.Out 'happy path: [SCOPE] is non-counting (0 errors, and only the two deliberately-undefined seams)'
+    Assert-Match 'Summary: 0 error\(s\), 4 info signal\(s\)' $r.Out 'happy path: [SCOPE] is non-counting (0 errors, and only the four deliberately-undefined seams)'
 
     # --- 2. Missing function in branch-info.ps1 (the exact #147 incident): Test-BranchName ---------
     #     new-branch crashed at runtime with "The term 'Test-BranchName' is not recognized" because
@@ -359,7 +359,7 @@ try {
     Assert-Match ("\[INFO\].*'Get-EntryBodyHeading' missing.*falls back to '" + [regex]::Escape('**To do / where I left off:**') + "'") $r.Out 'stub wording absent: INFO for Get-EntryBodyHeading quotes the literal default heading'
     Assert-Match "\[INFO\].*'Get-EntryFallbackType' missing.*falls back to 'Chore'" $r.Out 'stub wording absent: INFO for Get-EntryFallbackType names the Chore default'
     $infoCount6e = @([regex]::Matches($r.Out, '\[INFO\]')).Count
-    Assert-Equal 6 $infoCount6e 'stub wording absent: exactly six [INFO] lines -- one per stripped knob, plus the two seams this repo deliberately never defines (the superseded Get-ChangelogHeading and Get-ChangelogReleaseWording), and nothing else downgraded along with them'
+    Assert-Equal 8 $infoCount6e 'stub wording absent: exactly eight [INFO] lines -- one per stripped knob, plus the four seams this repo deliberately never defines (the superseded Get-ChangelogHeading, Get-ChangelogReleaseWording, and the two impact-table knobs whose defaults are already this repo''s answers), and nothing else downgraded along with them'
 
     # --- 6f. NO CONTRACT RECORD MAY SPELL A REPORT MARKER IN ITS OWN TEXT --------------------------
     #     Measured while adding the tier records: a Returns line that mentioned the info marker made the
@@ -507,7 +507,7 @@ function Get-RosterIgnoredIds { return @() }
 
     $contractSrc = [System.IO.File]::ReadAllText($Script)
     $totalRecordCount = @([regex]::Matches($contractSrc, "Lib\s*=\s*'[^']+';\s*Function\s*=\s*'[^']+';\s*Scripts\s*=\s*@\(")).Count
-    Assert-Equal 26 $totalRecordCount 'contract: exactly twenty-six (lib, function) records declared in check-script-contract.ps1 (the twenty-five below plus the dedicated Get-LiveStage block after this loop)'
+    Assert-Equal 28 $totalRecordCount 'contract: exactly twenty-eight (lib, function) records declared in check-script-contract.ps1 (the twenty-seven below plus the dedicated Get-LiveStage block after this loop)'
 
     # Every record must carry a 'Returns' line, so a finding is actionable without any reference to this
     # source repo (Dave, July 28, 2026). Counted against $totalRecordCount rather than listed per record:

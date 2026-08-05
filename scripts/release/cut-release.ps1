@@ -100,6 +100,17 @@
 .PARAMETER SkipLint
     Deliberately skip the lint gate (escape valve).
 
+.PARAMETER SkipSignificanceGate
+    Cut even though a pending tier-1-or-higher entry has not declared how much it weighs (issue #467).
+    The score orders the release documents, so without it an entry cannot be placed; the gate refuses
+    rather than sorting it last, because quietly demoting a forgotten line is worst in the one document
+    whose subject is which change matters most.
+
+    SEPARATE FROM -SkipTierGate as well as from -SkipLint, because the three overrule different things:
+    -SkipLint skips a tool, -SkipTierGate overrules whether the release should exist at all, and this
+    overrules how its contents are ordered. One flag for all three would let someone waving through a
+    missing score also wave through an unearned version number.
+
 .PARAMETER SkipTierGate
     Cut a bump the pending changelog tiers have not earned (escape valve).
 
@@ -126,7 +137,8 @@ param(
     [string]$SummaryFile = '',
     [switch]$NoPush,
     [switch]$SkipLint,
-    [switch]$SkipTierGate
+    [switch]$SkipTierGate,
+    [switch]$SkipSignificanceGate
 )
 $ErrorActionPreference = 'Stop'
 
@@ -370,6 +382,64 @@ The tiers are how far a change reaches: 0 = only this repo's own developers noti
 this project gets something out of it, 2 = a consumer notices. An entry's tier is the section it sits in
 under CHANGELOG.md; move it, or correct the bump. -SkipTierGate overrules this, deliberately separate
 from -SkipLint because it overrules a judgement about content rather than skipping a tool.
+"@
+        exit 1
+    }
+}
+
+# --- Guardrail: has every entry that gets ranked said how much it weighs? (issue #467) --------------
+# The significance score orders the release documents, so an entry without one cannot be placed -- and the
+# fallback ("sorts last") would quietly punish a forgotten line in the very document whose subject is
+# which change matters most. This is Dave's chosen refusal point (August 5, 2026): the branch may merge
+# without a score, the release may not be cut without one. By now the branch is long gone, so the fix is
+# one edit in CHANGELOG.md rather than a reopened PR.
+#
+# ONLY TIER 1 AND UP ARE ASKED, because only they reach a ranked document. The tier-0 section is the
+# record: complete and chronological, and never sorted.
+#
+# THE TIER COMES FROM THE SECTION, not from the entry. The fold removed the 'Tier:' line the moment the
+# section took over stating it, so $tierGroups is the only thing that knows -- which is also why this gate
+# could not live in the fold, where one entry is visible at a time and the tier is still a line in a file.
+#
+# SAME OFF-SWITCH AS THE SCAFFOLD AND THE FOLD: Test-EntrySignificanceActive. A repo with no tier split
+# has no ranked document to place anything in, and a repo that declared Get-EntrySignificanceEnabled $false
+# opted out of all three at once -- a score that is demanded but never read is worse than no score.
+if (-not $SkipSignificanceGate -and (Test-EntrySignificanceActive)) {
+    $significanceProblems = @()
+    foreach ($group in $tierGroups) {
+        if ([int]$group.Tier -lt 1) { continue }
+        foreach ($entry in @($group.Entries | Where-Object { $_ -and $_.Trim() })) {
+            $findings = @(Get-EntryImpactFindings -EntryText $entry)
+            if ($findings.Count -eq 0) { continue }
+            # Named by its heading, so the operator can find the entry in a 1,000-line changelog. The
+            # heading is the entry's first line; '### #468 <md> Title <md> Feat' is enough to locate it.
+            $heading = (($entry -split "`r?`n")[0] -replace '^#+\s*', '').Trim()
+            foreach ($finding in $findings) { $significanceProblems += "  $heading`n      $finding" }
+        }
+    }
+    if ($significanceProblems.Count -gt 0) {
+        $rubric = (Format-EntrySignificanceRubricLines) -join "`n"
+        Write-Error @"
+$($significanceProblems.Count) pending entry/entries have not said how much they weigh. Nothing was written.
+
+$($significanceProblems -join "`n")
+
+The rubric:
+$rubric
+
+The score decides where in its release document an entry sits -- highest first -- so the most
+consequential change leads instead of whichever one its category happened to put first. Every tier an
+entry reaches owes a row, because every tier is a document with its own reader:
+
+  | Tier | Significance | Why |
+  |---|---|---|
+  | 2 | 5 | what a consumer gets out of it |
+  | 1 | 4 | what this project's colleagues get out of it |
+
+Add the rows to the entries in CHANGELOG.md and cut again.
+
+-SkipSignificanceGate overrules this, deliberately separate from -SkipLint: this overrules a judgement
+about content, while -SkipLint skips a tool.
 "@
         exit 1
     }

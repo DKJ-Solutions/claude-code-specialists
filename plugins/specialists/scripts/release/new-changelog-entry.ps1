@@ -18,6 +18,22 @@ cannot be released on its own. The format lives in scripts/lib/entry-scaffold-li
 open-pr.ps1 (which refuses a malformed tier) and fold-changelog-entry.ps1 (which uses it to pick the
 changelog section and then removes the line).
 
+THE REACH IS DECLARED AS AN IMPACT TABLE, one row per tier (issue #467), written at tier 0:
+
+  | Tier | Significance | Why |
+  |---|---|---|
+  | 0 | - | - |
+
+ADD A ROW PER TIER THIS CHANGE REACHES, with a significance from 1 to 5 against the RUBRIC (printed
+below the file when this script runs; owned by Get-EntrySignificanceRubric) and a Why saying why this
+particular change sits in that band. The ladder is cumulative, so a tier-2 change owes a tier-1 row as
+well -- the rows an entry has are the documents it appears in, and the score decides where in each one it
+sits. The score cells are written EMPTY, unlike the tier, because any number here would be a guess at a
+ranking; cut-release.ps1 refuses a release whose entries have not answered.
+
+A repo that does not rank (Test-EntrySignificanceActive) gets the older single 'Tier: 0' line instead,
+which is still read everywhere -- "recognise both, write one".
+
 Optional -Intent: the direction of the branch -- what still needs to happen and where you left
 off. Typically given when parking a branch for later (see new-branch.ps1 -Park). If it is given it
 becomes the recorded entry body; if it is left empty the body falls back to a directional block
@@ -166,21 +182,42 @@ if ($Intent -ne "") {
     $body = $stubBody
 }
 
-# The tier line, at its harmless default. It declares how far this change reaches, and the fold reads
-# it to pick which of the changelog's three tier sections the entry lands in -- after which it removes
-# the line, because from then on the section states the tier.
+# THE IMPACT TABLE, at its harmless default: one tier-0 row with no score (issue #467). It declares both
+# facts about reach at once -- how far this change goes, and how much it weighs at each reach it claims --
+# and the fold reads the tier off it to pick which of the changelog's three sections the entry lands in.
 #
-# WRITTEN AT 0 RATHER THAN GUESSED FROM THE BRANCH PREFIX, which is the whole point of the line
+# RAISING THE REACH IS ADDING A ROW, which is the shape's real gain over the 'Tier: N' line it replaced.
+# The ladder is cumulative, so a change consumers notice is also a change colleagues get something out of;
+# as rows that is impossible to claim halfway. You cannot say "reaches consumers" without also saying what
+# it is worth to them AND to the project, because each is a row and each row has a score.
+#
+# WRITTEN AT TIER 0 RATHER THAN GUESSED FROM THE BRANCH PREFIX, which is the whole point of the table
 # existing. This repo has MEASURED that the prefix does not predict impact: held against the 19 entries
-# pending at v3.2.0, the single most consequential change for a consumer -- renaming the marketplace,
-# which breaks every existing install -- arrived on a chore/ branch. A derived tier would encode that
-# same wrong guess as a verdict; a declared one makes it the author's call.
+# pending at v3.2.0, the single most consequential change for a consumer -- renaming the marketplace, which
+# breaks every existing install -- arrived on a chore/ branch. A derived tier would encode that same wrong
+# guess as a verdict; a declared one makes it the author's call.
 #
-# DELIBERATELY NO -Tier PARAMETER. Whoever finishes the branch already has to rewrite this file's title
-# and body before the PR (open-pr's scaffold gate refuses the stubs), so raising the tier is one edit in
-# a file that is being edited anyway -- not a manual sequence worth a flag, and one fewer parameter that
-# every consumer's skill page would have to document.
-$tierLine = Format-EntryTierLine
+# AND THE SCORE CELLS ARE WRITTEN EMPTY, deliberately unlike the tier. Tier 0 is a legitimate final answer,
+# so defaulting to it under-promotes at worst and the cut says so out loud. A significance score has no
+# harmless value: any number written here would be a GUESS at a RANKING, which is exactly the failure the
+# retired highlights marker was measured on. So the cells are questions, and cut-release.ps1 refuses a
+# release whose entries have not answered them.
+#
+# DELIBERATELY NO -Tier PARAMETER. Whoever finishes the branch already has to rewrite this file's title and
+# body before the PR (open-pr's scaffold gate refuses the stubs), so filling in the table is editing a file
+# that is being edited anyway -- not a manual sequence worth a flag, and one fewer parameter that every
+# consumer's skill page would have to document.
+#
+# ONLY WHERE THE REPO RANKS AT ALL. Test-EntrySignificanceActive is off for a repo with no tier split (it
+# has no tier information, so nothing is ever required) and can be switched off explicitly via
+# Get-EntrySignificanceEnabled. Such a repo gets the old single 'Tier: 0' line instead, which is what it
+# already had -- the table is the ranking's carrier, so a repo that does not rank has nothing to carry.
+$impactActive = Test-EntrySignificanceActive
+$impactBlock = if ($impactActive) {
+    (Format-EntryImpactTable) -join "`n"
+} else {
+    Format-EntryTierLine
+}
 
 # Compact heading, matching the CHANGELOG format. The fold adds what only exists after the merge:
 # '#NN <midDot> ' at the front of the title, and the '[PR #NN](url) <midDot> merged <date>' line at the
@@ -195,7 +232,7 @@ $tierLine = Format-EntryTierLine
 $template = @"
 ### $Title $midDot $branchType
 
-$tierLine
+$impactBlock
 
 $stubBodyHeading
 
@@ -204,3 +241,14 @@ $body
 
 [System.IO.File]::WriteAllText($filePath, $template, $Utf8NoBom)
 Write-Host "Created: $fileName" -ForegroundColor Green
+
+# The rubric, printed at the moment the entry comes into existence. The scores themselves are filled in
+# later -- when the tier is raised, by whoever finishes the branch -- so this is not a prompt to act on
+# now; it is the scale being stated where the author is looking, instead of only inside a refusal further
+# down the line. A gate that first mentions the definitions when it blocks you has already let the guess
+# happen.
+if ($impactActive) {
+    $range = Get-EntrySignificanceRange
+    Write-Host "  Impact table written at tier 0. Add a row per tier this change reaches, with a significance ($($range.Min)-$($range.Max)):" -ForegroundColor Cyan
+    Format-EntrySignificanceRubricLines | ForEach-Object { Write-Host $_ -ForegroundColor DarkGray }
+}

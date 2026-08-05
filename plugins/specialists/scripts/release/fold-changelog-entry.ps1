@@ -12,6 +12,28 @@ An entry with no 'Tier:' line is tier 0, the harmless end of the scale: forgetti
 never promote work into a consumer-facing document, it can only leave that work unreleasable on its
 own -- which the cut says out loud.
 
+WHERE IN that section is decided by the entry's SIGNIFICANCE SCORE (issue #467), and this is the only
+moment it can be: the cut EMPTIES the tier sections, and the release documents read what is left in
+document order without sorting it. So the order this script leaves behind is the order the notes and the
+highlights inherit -- which is what makes it reproducible across two moments days apart with nothing
+re-estimated in between. Highest score at the top; an equal score keeps the newer entry above its
+equals, which is exactly what the fold did before ranking existed. INSERT-ONLY, NEVER A RE-SORT,
+deliberately: this commit lands directly on main, so a bug must be able to misplace at most the one
+entry being folded rather than scramble a section it did not write.
+
+Both facts come from the entry's IMPACT TABLE -- one row per tier, the row's second column its
+significance. The highest row is the reach; that row's score is the position. An entry with no table falls
+back to the older 'Tier: N' line and folds unranked, which is correct rather than tolerated: every entry
+written before this format has no score to rank by.
+
+The table is CARRIED INTO the changelog whenever any row is scored, unlike the 'Tier:' line, which is
+always consumed. The cut EMPTIES these sections, so a score consumed here would not exist when the release
+documents are built days later. An UNSCORED table (a tier-0 entry's scaffold row) is stripped, because a
+question nobody was asked does not belong in the record. A missing score is reported and folded anyway:
+refusing the fold of an already-merged branch is the silent half-state this repo has measured, and
+cut-release.ps1 is the refusal point instead. A malformed table DOES stop the run -- it decides which
+section the entry lands in, and getting that wrong is a section-move on main.
+
 Both seams are read, newest first (Get-ChangelogTierSections in entry-scaffold-lib.ps1): the legacy
 single-section Get-ChangelogHeading (issue #178) still answers where a repo has not declared tiers, and
 neither function is required -- without both, this falls back to one '## Pull Requests' section, which
@@ -195,6 +217,11 @@ $changelogPath = Join-Path $repoRoot "CHANGELOG.md"
 # back as the default. Sibling of the $RepoRoot/$repoRoot collision documented at the top of this file.
 $foldSections = @(Get-ChangelogTierSections)
 
+# Does this repo rank its entries at all (issue #467)? Off where there is no tier split, and switchable
+# off via Get-EntrySignificanceEnabled -- see Test-EntrySignificanceActive. Resolved once, from the sections
+# already read above, so the seam is not probed per entry.
+$significanceActive = Test-EntrySignificanceActive -TierSections $foldSections
+
 # --- Pre-pass: every entry's tier is resolved and checked BEFORE anything is folded ---------------
 # A fold-all run writes one entry at a time, so a problem found on the third file would leave the first
 # two already folded and their source files deleted -- a half-state that has to be unpicked by hand on
@@ -211,9 +238,16 @@ foreach ($file in $entryFiles) {
     $filePath = Join-Path $repoRoot $file
     if (-not (Test-Path $filePath)) { continue }
     $raw = Get-Content -Path $filePath -Raw -Encoding UTF8
-    $tier = Resolve-EntryTier -EntryText $raw
-    if ($tier.Error) {
-        $tierProblems += "  $file -- $($tier.Error)"
+    # One read answers both questions: which section (the highest tier a row claims) and where in it (that
+    # row's significance). Resolve-EntryImpact falls back to the older 'Tier: N' line when the entry carries
+    # no table, so an entry written before this format still files correctly.
+    $impact = Resolve-EntryImpact -EntryText $raw
+    $tier = [pscustomobject]@{ Tier = $impact.Tier; Declared = $impact.Declared }
+    $impactErrors = @(@($impact.Errors) | Where-Object { $_ })
+    if ($impactErrors.Count -gt 0) {
+        # A tier that cannot be honoured stops the whole run, exactly as a malformed 'Tier:' line did: it
+        # decides which SECTION the entry goes in, and guessing that wrong is a section-move on main.
+        foreach ($problem in $impactErrors) { $tierProblems += "  $file -- $problem" }
         continue
     }
     $section = @($foldSections | Where-Object { $_.Tier -eq $tier.Tier })
@@ -222,10 +256,33 @@ foreach ($file in $entryFiles) {
         $tierProblems += "  $file -- declares tier $($tier.Tier), but this repo has no changelog section for it (it declares tiers: $declared). Add the section to Get-ChangelogTierHeadings in scripts\repo-config.ps1, or change the entry's tier."
         continue
     }
+    # The significance score that decides WHERE IN the section this entry lands (issue #467). Read here
+    # with the tier, because the position depends on both: only a tier-1-or-higher section is ranked.
+    #
+    # DELIBERATELY NOT A $tierProblems ENTRY, unlike a malformed tier. This pass refuses before anything
+    # is folded, and that is right for the two failures it already catches: both are decidable before the
+    # merge, and open-pr.ps1 refuses over them while the branch is still the only thing affected. A
+    # significance score is different in the one way that matters here -- refusing the FOLD of an
+    # already-merged branch produces the silent half-state this repo has measured (an unfolded entry file
+    # sitting in the repo root the morning after its merge, with main looking finished). So a bad or
+    # missing score is said out loud and the fold proceeds; cut-release.ps1 is the refusal point Dave
+    # chose for it, and by then the branch is long gone and the fix is one edit in CHANGELOG.md.
+    $rankScore = 0
+    $anyScored = $false
+    if ($significanceActive -and $tier.Tier -ge 1) {
+        # The entry is filed under its OWN tier's section, so that tier's row is the one that orders it.
+        $rankScore = Get-EntryImpactScore -Impact $impact -Tier $tier.Tier
+        if ($rankScore -le 0) {
+            Write-Host "  ($file declares no significance for tier $($tier.Tier) -- folded unranked, at the top of its section. The release cut will refuse until it has one.)" -ForegroundColor DarkYellow
+        }
+    }
+    foreach ($row in @($impact.Rows)) { if ([int]$row.Score -gt 0) { $anyScored = $true } }
     $tierByFile[$file] = [pscustomobject]@{
-        Tier     = $tier.Tier
-        Declared = $tier.Declared
-        Heading  = $section[0].Heading
+        Tier      = $tier.Tier
+        Declared  = $tier.Declared
+        Heading   = $section[0].Heading
+        RankScore = $rankScore
+        AnyScored = $anyScored
     }
 }
 if ($tierProblems.Count -gt 0) {
@@ -255,7 +312,20 @@ foreach ($file in $entryFiles) {
     # lookup, not a decision. The line is then REMOVED: from here on the section states the tier, and
     # the same fact in two places is the drift this repo has paid for three times.
     $filed = $tierByFile[$file]
+    # WHAT THE FOLD CONSUMES AND WHAT IT CARRIES (issue #467). The old 'Tier: N' line is always consumed:
+    # once the entry sits under '## Tier 2 - Pull Requests', a line restating that is the same fact twice.
+    # The impact TABLE is carried whenever any row is scored, and that is not an inconsistency -- the cut
+    # EMPTIES these sections, so a score consumed here would not exist when the release documents are built
+    # days later, and the ordering could not be reproduced without re-estimating it. Its Tier column is not
+    # the duplication either: the section says how far the change reached, the column says which audience
+    # each SCORE belongs to.
+    #
+    # AN UNSCORED TABLE IS SCAFFOLDING AND GOES. A tier-0 entry is never asked for a score, so its
+    # '| 0 | - | - |' row is a question nobody put -- carrying it would leave a placeholder in the record.
     $entryContent = (Remove-EntryTierLine -EntryText $entryContent).TrimEnd()
+    if (-not $filed.AnyScored) {
+        $entryContent = (Remove-EntryImpactTable -EntryText $entryContent).TrimEnd()
+    }
     $foldHeading = $filed.Heading
     $headingPattern = '(?m)^' + [regex]::Escape($foldHeading) + '\s*?$'
     if (-not $filed.Declared) {
@@ -337,15 +407,30 @@ foreach ($file in $entryFiles) {
     # below '## [Unreleased]' are the released versions ('## [vX.Y.Z] - ...'), not a Releases block.
     $nextSection = ([regex]'(?m)^## ').Match($changelogContent, $afterHeader)
     $sectionEnd = if ($nextSection.Success) { $nextSection.Index } else { $changelogContent.Length }
-    $firstEntry = ([regex]'(?m)^### ').Match($changelogContent, $afterHeader)
-    $insertPos = if ($firstEntry.Success -and $firstEntry.Index -lt $sectionEnd) { $firstEntry.Index } else { $sectionEnd }
+
+    # WHERE IN the section, decided by the significance score (issue #467). The fold is the only moment at
+    # which CHANGELOG.md's pending list can be ordered, because the cut empties these sections: whatever
+    # order is left here IS the order the release documents inherit, since they read the section in
+    # document order and sort nothing. That is what makes the ordering reproducible across the fold and
+    # the cut without either re-estimating a score.
+    #
+    # A SCORE OF 0 -- a tier-0 section, an unscored entry, a repo with the ranking off -- returns the top
+    # of the section, byte-identical to what this did before ranking existed.
+    #
+    # THE SLICE, AND WHY THE OFFSET IS RELATIVE TO IT: Get-ImpactInsertOffset only ever returns an
+    # entry boundary or the slice's end, so adding $afterHeader back cannot land mid-entry. The insert
+    # itself is unchanged -- '<entry>\n\n---\n\n' is correct before any '### ' and at the section end
+    # alike, because every folded entry is followed by its own separator.
+    $sectionText = $changelogContent.Substring($afterHeader, $sectionEnd - $afterHeader)
+    $insertPos = $afterHeader + (Get-ImpactInsertOffset -SectionText $sectionText -Score $filed.RankScore -Tier $filed.Tier)
 
     $entryBlock = "$entryContent$nl$nl---$nl$nl"
     $changelogContent = $changelogContent.Substring(0, $insertPos) + $entryBlock + $changelogContent.Substring($insertPos)
 
     Write-Utf8NoBom -Path $changelogPath -Content $changelogContent
     Remove-Item -Path $filePath -Force
-    Write-Host "Folded and removed: $file (tier $($filed.Tier) -> $foldHeading)" -ForegroundColor Green
+    $rankNote = if ($filed.RankScore -gt 0) { ", significance $($filed.RankScore)" } else { '' }
+    Write-Host "Folded and removed: $file (tier $($filed.Tier)$rankNote -> $foldHeading)" -ForegroundColor Green
     # Captured per iteration rather than read back afterwards. $num in particular survives from one loop
     # pass to the next, so an entry whose PR lookup found nothing would otherwise inherit the previous
     # entry's number -- into a commit message, where a wrong PR reference is worse than none.
