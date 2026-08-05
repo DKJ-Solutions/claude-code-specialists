@@ -77,39 +77,87 @@ function Get-EntryScaffoldWording {
     return [pscustomobject]$out
 }
 
-function Get-EntryFencedLineFlags {
+function Get-FencedLineFlags {
     <#
-        Pure: one $true/$false per input line -- is that line inside a fenced code block? The fence
-        MARKERS count as fenced, i.e. as belonging to the block they delimit.
+        Returns a bool per input line: is that line inside a fenced code block? The fence MARKER itself is
+        reported as fenced ($true), so a caller that skips fenced lines keeps the markers with their content
+        rather than stripping them and leaving the body inside rendered as prose.
 
-        ITS OWN FUNCTION BECAUSE TWO READERS HERE NEED THE ANSWER IN TWO SHAPES. Get-EntryTextOutsideFences
-        wants the text with the fenced lines gone, which is enough for a matcher; Get-ImpactInsertOffset
-        needs to know WHICH lines are fenced while keeping every line, because it answers in character
-        offsets into the original text and cannot afford to lose its place. Deriving both from one walk is
-        what stops them disagreeing about where a fence starts -- and a fence reader that disagrees with
-        the reader beside it is how a quoted heading becomes structure.
+        THE ONE FENCE READER OF THIS FORMAT, and it lives here because this is the lower lib. Every markdown
+        structure test in the entry format has to ask this question -- '^## ' for an entry boundary, '^---$'
+        for a separator, 'Tier:' for a declaration, the impact table's header row, the three section
+        headings -- and every one of them must NOT fire on text an entry body QUOTES. An entry may
+        legitimately show a broken heading structure, a YAML frontmatter example, or the very format it
+        introduces, and treating that as structure is the defect class this system has now paid for at
+        least five times:
 
-        Deliberately the same simple rule as before: pair up ``` runs. An unclosed fence leaves the tail
-        flagged, which is the safe direction for every caller -- it can only cause a missed finding, never
+          * cutting v2.13.3 produced a third entry from two PRs, split a fence open, and duplicated a
+            category heading in the release notes;
+          * the fold would have deleted a 'Tier: 0' line out of the fence that was explaining it;
+          * a quoted impact table would have disabled the reader that met it first;
+          * and on the fold of PR #478 a quoted entry heading split a real entry in two, so the fragment
+            above its impact table read as tier 0 and a tier-1 entry was inserted at the top of a list
+            whose next six entries were tier 2.
+
+        SO THERE IS ONE ANSWER AND ONE PLACE THAT GIVES IT. Until this change there were two named
+        functions with this job -- this one and Get-FencedLineFlags in release-lib.ps1 -- plus two inline
+        walks in this file. Four walks, and they were NOT equivalent: the release-lib one recognised '~~~'
+        fences and the three here did not, so an entry using tilde fences had its quoted content read as
+        structure by every reader in this file while release-lib's readers handled it correctly. That
+        difference is exactly what "two answers that can drift" means, found by comparing them rather than
+        by anything failing. The union rule wins, so the tilde form is now honoured everywhere.
+
+        Deliberately simple: a line whose first non-space characters are ``` or ~~~ toggles the state.
+        That is CommonMark's own rule for the common cases and needs no parser. Nested fences of the same
+        kind are not a thing in CommonMark, and an unclosed fence leaves the tail flagged as fenced --
+        which is the safe direction for every caller here, since it can only cause a missed finding, never
         a false accusation against text somebody did write.
 
-        This duplicates Get-FencedLineFlags in release-lib.ps1, which is the higher lib and already
-        dot-sources this one; the dependency cannot run the other way, because the fold and this file's own
-        suite load this lib standalone. Collapsing the two is a real follow-up and deliberately not done in
-        the same change as the defect repair.
+        The name is deliberately NOT entry-specific: release-lib's readers scan a whole CHANGELOG rather
+        than one entry, and they call this by exactly this name -- so moving the owner down a layer changed
+        no call site in either lib.
     #>
+    # Not Mandatory, and both Allow* attributes: a changelog section can legitimately be a single empty
+    # line, and a Mandatory [string[]] rejects '' outright (ParameterArgumentValidationError).
     param([AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines = @())
-    $flags = New-Object System.Collections.Generic.List[bool]
+    if ($null -eq $Lines) { return @() }
+    $flags = New-Object 'bool[]' $Lines.Count
     $inFence = $false
-    foreach ($line in $Lines) {
-        if ($line -match '^\s*```') {
-            $flags.Add($true)          # the marker belongs to its block
+    for ($i = 0; $i -lt $Lines.Count; $i++) {
+        if ($Lines[$i] -match '^\s*(```|~~~)') {
+            $flags[$i] = $true          # the marker belongs to the block
             $inFence = -not $inFence
-            continue
+        } else {
+            $flags[$i] = $inFence
         }
-        $flags.Add($inFence)
     }
-    return @($flags.ToArray())
+    return $flags
+}
+
+function Get-EntryLineFlagPairs {
+    <#
+        Private helper: an entry split so that a caller can rewrite it line by line WITHOUT losing the
+        original line endings, with the fence state already resolved. Returns an object with
+
+          Parts   the [regex]::Split result, separators kept (odd indices are the separators)
+          Fenced  one bool per CONTENT line, in order, from Get-FencedLineFlags
+
+        WHY THIS EXISTS: the two removers below (Remove-EntryTierLine, Remove-EntryImpactTable) each used
+        to walk the fences themselves while deciding what to drop. That is where two of this file's four
+        fence walks lived, and it is why neither recognised '~~~'. They need the flags AND the separators,
+        which is an awkward pair to derive twice -- so it is derived once, here, and both read it.
+
+        The separators are preserved rather than normalised because the caller has already matched its
+        document's own style; rewriting them would put CRLF and LF in one entry.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
+    $parts = [regex]::Split($EntryText, '(\r?\n)')
+    $contents = New-Object System.Collections.Generic.List[string]
+    for ($i = 0; $i -lt $parts.Count; $i += 2) { $contents.Add($parts[$i]) }
+    return [pscustomobject]@{
+        Parts  = $parts
+        Fenced = @(Get-FencedLineFlags -Lines @($contents.ToArray()))
+    }
 }
 
 function Get-EntryTextOutsideFences {
@@ -128,11 +176,11 @@ function Get-EntryTextOutsideFences {
         finding, never a false accusation against text somebody did write.
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
-    # Read off the shared flags rather than walking the fences again, so this and the ranker cannot end up
-    # disagreeing about where a block starts. Behaviour is unchanged: a marker line is flagged, so it is
-    # dropped exactly as the old 'continue' dropped it.
+    # Read off the shared flags rather than walking the fences again, so this and every other reader of the
+    # format agree about where a block starts. A marker line is flagged, so it is dropped exactly as the
+    # old inline 'continue' dropped it -- and a '~~~' fence is now recognised too, which it was not.
     $lines = @($EntryText -split '\r?\n')
-    $fenced = Get-EntryFencedLineFlags -Lines $lines
+    $fenced = Get-FencedLineFlags -Lines $lines
     $kept = New-Object System.Collections.Generic.List[string]
     for ($i = 0; $i -lt $lines.Count; $i++) {
         if (-not $fenced[$i]) { $kept.Add($lines[$i]) }
@@ -309,19 +357,22 @@ function Remove-EntryTierLine {
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
     $label = [regex]::Escape($script:EntryTierLabel)
-    # Split KEEPING the separators, so the original CRLF/LF of every line survives the round trip.
-    $parts = [regex]::Split($EntryText, '(\r?\n)')
+    # The fence state comes from the one reader (Get-FencedLineFlags, via the pair helper) rather than from
+    # a walk of its own -- this used to be one of this file's four separate fence walks, and the one that
+    # did not recognise '~~~'. The separators are kept so the original CRLF/LF of every line survives.
+    $pair = Get-EntryLineFlagPairs -EntryText $EntryText
+    $parts = $pair.Parts
     $out = New-Object System.Collections.Generic.List[string]
-    $inFence = $false
     $removed = $false
+    $n = -1
     for ($i = 0; $i -lt $parts.Count; $i++) {
         # Odd indices are the captured separators; only even ones are line content.
         if ($i % 2 -eq 1) { continue }
+        $n++
         $line = $parts[$i]
         $sep = if ($i + 1 -lt $parts.Count) { $parts[$i + 1] } else { '' }
-        if ($line -match '^\s*```') {
-            $inFence = -not $inFence
-        } elseif ((-not $inFence) -and (-not $removed) -and $line -match "^$label`:") {
+        # A fenced line (the markers included) is content, never a declaration.
+        if ((-not $pair.Fenced[$n]) -and (-not $removed) -and $line -match "^$label`:") {
             $removed = $true
             continue
         }
@@ -771,22 +822,26 @@ function Remove-EntryImpactTable {
     $headerPattern = '^\s*\|\s*' + [regex]::Escape($script:EntryImpactHeaders[0]) + '\s*\|\s*' +
         [regex]::Escape($script:EntryImpactHeaders[1]) + '\s*\|'
 
-    # Split KEEPING the separators, so the original CRLF/LF of every kept line survives the round trip.
-    $parts = [regex]::Split($EntryText, '(\r?\n)')
+    # Fence state from the one reader, separators kept -- see Remove-EntryTierLine above for why this is no
+    # longer a walk of its own.
+    $pair = Get-EntryLineFlagPairs -EntryText $EntryText
+    $parts = $pair.Parts
     $out = New-Object System.Collections.Generic.List[string]
-    $inFence = $false
     $inTable = $false
     $done = $false
     $any = $false
+    $n = -1
     for ($i = 0; $i -lt $parts.Count; $i++) {
         if ($i % 2 -eq 1) { continue }
+        $n++
         $line = $parts[$i]
         $sep = if ($i + 1 -lt $parts.Count) { $parts[$i + 1] } else { '' }
 
-        if ($line -match '^\s*```') {
-            $inFence = -not $inFence
+        if ($pair.Fenced[$n]) {
+            # Entering or inside a fence: a table cannot continue across it, so a quoted block cannot be
+            # read as the tail of a real one. Kept for the reason every fenced line is kept.
             $inTable = $false
-        } elseif (-not $inFence -and -not $done) {
+        } elseif (-not $done) {
             if (-not $inTable -and $line -match $headerPattern) {
                 $inTable = $true; $any = $true; continue
             }
@@ -882,7 +937,7 @@ function Get-ImpactInsertOffset {
     # line -- the root CHANGELOG is CRLF here.
     $rxLine = [regex]($EntryPattern -replace '^\(\?m\)', '')
     $srcLines = @($SectionText -split "`r?`n")
-    $fenced = Get-EntryFencedLineFlags -Lines $srcLines
+    $fenced = Get-FencedLineFlags -Lines $srcLines
     $entryStarts = @()
     $offset = 0
     for ($i = 0; $i -lt $srcLines.Count; $i++) {

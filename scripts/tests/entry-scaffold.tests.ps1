@@ -445,6 +445,76 @@ Assert-True ($stripped -notmatch "`n`n`n") 'and no triple blank line is left beh
 # A quoted table must survive stripping too, or rendering damages the entry that documents the mechanism.
 Assert-True ((Remove-EntryImpactTable -EntryText $fence) -match 'quoted') 'strip: a fenced table is left alone'
 
+# --- ONE FENCE READER, AND THE TILDE FORM IT USED NOT TO KNOW -------------------------------------
+# There were FOUR fence walks across the two libs: Get-FencedLineFlags in release-lib, a second named one
+# here, and two inline walks inside the removers below. They were not equivalent -- only release-lib's
+# recognised '~~~' -- so an entry using tilde fences had its quoted content read as STRUCTURE by every
+# reader in this file while release-lib's readers handled it correctly. Found by comparing the four, not by
+# anything failing, which is why the asserts below are new rather than adjusted.
+#
+# One owner now, in this lib, because the dependency can only run this way: the fold and this suite load
+# this lib standalone. Asserted from three angles -- the flags themselves, every reader that depends on
+# them, and the absence of a second definition.
+$tildeFlags = Get-FencedLineFlags -Lines @('prose', '~~~', 'Tier: 2', '~~~', 'after')
+Assert-Equal $true  $tildeFlags[1] 'fences: a ~~~ marker is fenced'
+Assert-Equal $true  $tildeFlags[2] 'fences: and so is the line between the markers -- the form this lib did not know'
+Assert-Equal $true  $tildeFlags[3] 'fences: including the closing marker'
+Assert-Equal $false $tildeFlags[4] 'fences: back outside afterwards'
+$backtickFlags = Get-FencedLineFlags -Lines @('prose', '```', 'Tier: 2', '```', 'after')
+Assert-Equal (($backtickFlags | ForEach-Object { [int]$_ }) -join '') (($tildeFlags | ForEach-Object { [int]$_ }) -join '') 'fences: both forms produce the same flags -- one rule, not two'
+# An unclosed fence keeps the tail flagged: the safe direction, since it can only cause a missed finding.
+Assert-Equal $true (Get-FencedLineFlags -Lines @('text', '~~~', 'Tier: 2'))[2] 'fences: an unclosed ~~~ keeps the tail fenced'
+Assert-Equal 0 (@(Get-FencedLineFlags -Lines @())).Count 'fences: an empty list yields no flags rather than throwing'
+Assert-Equal 1 (@(Get-FencedLineFlags -Lines @(''))).Count 'fences: a single empty line binds (a Mandatory [string[]] would reject it)'
+
+# EVERY READER THAT DEPENDS ON THE FLAGS, on the tilde form. Each of these would previously have read the
+# quoted text as a real declaration -- which is the same defect class four separate times.
+$tildeEntry = "## T`n`n" + '~~~text' + "`n| Tier | Significance | Why |`n|---|---|---|`n| 2 | 1 | quoted |`n" +
+              "Tier: 2`n" + '~~~' + "`n`nTier: 1`n`nBody."
+Assert-True ((Get-EntryTextOutsideFences -EntryText $tildeEntry) -notmatch 'quoted') 'tilde: Get-EntryTextOutsideFences drops a ~~~ block'
+Assert-Equal 1 (Resolve-EntryTier -EntryText $tildeEntry).Tier 'tilde: the tier reader takes the REAL line, not the one quoted in a ~~~ fence'
+$tildeImpact = Resolve-EntryImpact -EntryText $tildeEntry
+Assert-Equal $false $tildeImpact.Table 'tilde: a table quoted in a ~~~ fence is not read as a declaration'
+Assert-Equal 1 $tildeImpact.Tier 'tilde: so the impact falls back to the real Tier line'
+$tildeStripped = Remove-EntryTierLine -EntryText $tildeEntry
+Assert-True ($tildeStripped -match '(?m)^Tier: 2$') 'tilde: Remove-EntryTierLine leaves the QUOTED line inside the fence alone'
+Assert-True ($tildeStripped -notmatch '(?m)^Tier: 1$') 'tilde: and removes the real one'
+Assert-True ((Remove-EntryImpactTable -EntryText $tildeEntry) -match 'quoted') 'tilde: Remove-EntryImpactTable leaves a ~~~-quoted table alone'
+# And the ranker, which is where a fence-blind read cost an ordering (PR #478).
+$tildeList = @(
+    '', 'Intro.', '',
+    '## #20 Tier 2, quoting the format in tilde fences', '',
+    '~~~text', '## #19 A quoted heading', '', '| Tier | Significance | Why |', '|---|---|---|', '| 0 | - | - |', '~~~', '',
+    '### Who is this for', '', '| Tier | Significance | Why |', '|---|---|---|', '| 2 | 4 | consumers notice |', '',
+    '---', '',
+    '## #18 Tier 0', '', '| Tier | Significance | Why |', '|---|---|---|', '| 0 | - | - |', ''
+) -join "`n"
+$tildeOff = Get-ImpactInsertOffset -SectionText $tildeList -Tier 1 -Score 3
+Assert-Equal '## #18 Tier 0' ((($tildeList.Substring($tildeOff)) -split "`r?`n")[0]).Trim() 'tilde: a heading quoted in a ~~~ fence is not an entry boundary either'
+
+# THE SECOND DEFINITION IS GONE. Asserted on absence, like the retired renderers in release-lib's suite:
+# re-adding a per-lib copy is exactly the thing that produced the four-way divergence, and it should turn a
+# test red rather than pass unnoticed. Read from the FILE rather than by Get-Command, because both libs are
+# loaded together in every real caller -- so a duplicate definition would simply be shadowed and invisible.
+$relLibText = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\lib\release-lib.ps1'), [System.Text.Encoding]::UTF8)
+Assert-True ($relLibText -notmatch '(?m)^function Get-FencedLineFlags') 'one owner: release-lib no longer DEFINES a fence reader'
+Assert-True ($relLibText -match 'Get-FencedLineFlags') 'one owner: but it still calls it, by the same name, from the lib it dot-sources'
+$escLibText = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1'), [System.Text.Encoding]::UTF8)
+Assert-Equal 1 (@([regex]::Matches($escLibText, '(?m)^function Get-FencedLineFlags')).Count) 'one owner: and this lib defines it exactly once'
+# NO INLINE WALK LEFT ANYWHERE IN THE OWNER LIB: the two removers used to carry one each, and an inline
+# walk is how the tilde gap survived unnoticed in the first place.
+#
+# BUILT AS A LITERAL AND FALSIFIED, because the first version of this assert was the trap it is guarding
+# against. It was written as an escaped regex ('\^\\\\s\*```...') which matched NOTHING and therefore passed
+# by looking at nothing -- the same class as the fixture that did not contain what it was written to
+# contain, one screen up. Checked against the previous revision before being trusted: the old form appeared
+# 3 times there and the union rule 0, which is what makes the counts below evidence rather than decoration.
+$tick3 = ([string][char]0x60) * 3
+$unionMatcher = "-match '^\s*(" + $tick3      # the one rule, inside Get-FencedLineFlags
+$inlineMatcher = "-match '^\s*" + $tick3 + "'" # the shape the three walks used
+Assert-Equal 1 (@([regex]::Matches($escLibText, [regex]::Escape($unionMatcher))).Count) 'one owner: the fence rule is written exactly once, and it is the union rule'
+Assert-Equal 0 (@([regex]::Matches($escLibText, [regex]::Escape($inlineMatcher))).Count) 'one owner: and no reader tests for a fence inline any more'
+
 # --- The insert offset ----------------------------------------------------------------------------
 # ENTRIES ARE H2 HERE, matching the flat list the fold writes since August 5, 2026 -- and this fixture is
 # where that mattered first: the function's $EntryPattern default moved from '### ' to '## ', so a fixture
