@@ -765,37 +765,284 @@ function Get-ImpactInsertOffset {
         tier-0 section, an entry from before the table, or a repo with the ranking off) returns the offset
         the fold has always used: the top of the section. Nothing is ranked that was not asked to be.
 
-        $Tier names which row to compare against, because a section's entries are ordered by what THAT
-        section's reader gets out of them.
+        RANKED ON (TIER, SIGNIFICANCE) SINCE THE SECTIONS WENT (Dave, August 5, 2026). While CHANGELOG.md had
+        one section per tier, the section answered "how far" and this only had to order within it. There is one
+        flat list now, so the tier is the FIRST key: consumer-facing work leads, repo-internal work sinks, and
+        the significance decides the order inside each tier. That is what the three section headings used to
+        communicate visually, kept as an ordering rather than as structure.
+
+        $EntryPattern is the heading shape an entry starts with -- '(?m)^## ' for the current format. It is a
+        parameter rather than a constant because a document mid-migration still holds pre-format '### '
+        entries, and the caller knows which it is looking at.
     #>
     param(
         [Parameter(Mandatory)][AllowEmptyString()][string]$SectionText,
         [int]$Score = 0,
-        [int]$Tier = 1
+        [int]$Tier = 0,
+        [string]$EntryPattern = '(?m)^## ',
+        # DECLARING TIER 0 IS NOT THE SAME AS DECLARING NOTHING, and conflating them was a real bug here: an
+        # early return sent everything with tier 0 and no score to the TOP of the list, so a repo-internal
+        # change led the document. Tier 0 is the lowest RANK and belongs at the bottom; an entry that declares
+        # nothing at all is UNKNOWN, and for those the old pre-ranking behaviour (the top, newest first) is
+        # still the only defined answer. Measured on this function's first run against a mixed list.
+        [switch]$Undeclared
     )
-    $entryStarts = @([regex]::Matches($SectionText, '(?m)^### ') | ForEach-Object { $_.Index })
+    $entryStarts = @([regex]::Matches($SectionText, $EntryPattern) | ForEach-Object { $_.Index })
     if ($entryStarts.Count -eq 0) { return $SectionText.Length }
-    # Unranked: the top of the section, below whatever intro precedes the first entry. Byte-identical to
-    # the behaviour before this function existed.
-    if ($Score -le 0) { return $entryStarts[0] }
+    if ($Undeclared) { return $entryStarts[0] }
 
     for ($i = 0; $i -lt $entryStarts.Count; $i++) {
         $start = $entryStarts[$i]
         $end = if ($i + 1 -lt $entryStarts.Count) { $entryStarts[$i + 1] } else { $SectionText.Length }
         $block = $SectionText.Substring($start, $end - $start)
-        $existing = Get-EntryImpactScore -Impact (Resolve-EntryImpact -EntryText $block) -Tier $Tier
-        # An unscored entry ALREADY in the changelog -- one written before the table existed -- reads as 0
-        # and therefore sorts below everything scored, the same fail-safe direction as everywhere else here.
-        # It cannot stop a fold: that entry is already merged, and refusing now would block an unrelated
-        # branch over somebody else's line.
+        $impact = Resolve-EntryImpact -EntryText $block
+        $existingTier = [int]$impact.Tier
+        $existingScore = Get-EntryImpactScore -Impact $impact -Tier $existingTier
+
+        # An entry ALREADY in the changelog that declares no score -- one written before the table existed --
+        # reads as 0 and therefore sorts below everything scored at its tier. Same fail-safe direction as
+        # everywhere else here, and it cannot stop a fold: that entry is already merged, and refusing now
+        # would block an unrelated branch over somebody else's line.
         #
-        # '-le', not '-lt': an equal score puts the NEW entry above its equals, which preserves the
-        # newest-first order the section already had. '-lt' would push it below them, silently reversing
-        # that order for every tie -- and ties are the common case on a five-point scale.
-        if ($existing -le $Score) { return $start }
+        # '-le' on the deciding comparison, not '-lt': an equal rank puts the NEW entry above its equals,
+        # which preserves the newest-first order the list already had. '-lt' would push it below them,
+        # silently reversing that order for every tie -- and ties are the common case on a five-point scale.
+        if ($existingTier -lt $Tier) { return $start }
+        if ($existingTier -eq $Tier -and $existingScore -le $Score) { return $start }
     }
     return $SectionText.Length
 }
+# --- The entry's own shape: one H2 per change, with named sections ---------------------------------
+#
+# ONE HEADING PER CHANGE, AND THE DOCUMENT HAS NO OTHERS (Dave, August 5, 2026). CHANGELOG.md used to open
+# with '## Latest Release' and three '## Tier N - Pull Requests' sections, with each change an '### ' inside
+# one of them. All four are gone. A change IS the '## ' heading now -- '## #475 <midDot> A significance score
+# per entry' -- and inside it three named '### ' sections answer the three questions a reader actually
+# arrives with:
+#
+#   ### What does this change do?    the description, which used to be a bare paragraph under the heading
+#   ### Who is this for              the impact table -- the tiers this change reaches, each with a score
+#   ### Type of change               Feat / Fix / Docs / Chore, which used to be a middot field in the heading
+#
+# WHY THE TYPE MOVED OUT OF THE HEADING. It was the second-to-last middot field, then (when the merge date
+# left) a field matched by content against the known branch types. Both were parses of a heading that was
+# doing three jobs at once. As its own section it is stated rather than inferred, and the heading is reduced
+# to what a reader scans: the PR number and the title.
+#
+# WHY 'Who is this for' IS THE TABLE AND NOT PROSE BESIDE IT. The table's Tier rows already answer exactly
+# that question, and answering it twice is the duplication this repo has paid for repeatedly. So the heading
+# names the question and the table is the answer.
+#
+# THE HEADINGS ARE REPO-OWNED, unlike the impact table's column keys. That split follows the one this file
+# already makes: a machine-read KEY stays fixed ('Tier', 'Significance', 'Plugins:'), while text a reader
+# SEES belongs to the repo that owns the document -- the same #410 reasoning that made the entry stubs and
+# the category labels configurable. These are read back by the parser, so a repo that translates them
+# translates both halves at once, which is why they come from one resolver rather than being written twice.
+$script:EntrySectionDefaults = [ordered]@{
+    What = 'What does this change do?'
+    Who  = 'Who is this for'
+    Type = 'Type of change'
+}
+
+# The heading levels, stated once. An entry is an H2 and its sections are H3 -- in the entry FILE and in
+# CHANGELOG.md alike, which is new: the file used to carry H3 entries that the fold pasted in unchanged, and
+# the release renderers re-levelled them per document. One level everywhere means the file a contributor
+# writes looks exactly like the block that lands.
+$script:EntryHeadingLevel  = 2
+$script:EntrySectionLevel  = 3
+
+function Get-EntryHeadingLevel {
+    <# The number of '#' an entry's own heading carries (2). Read by the writer, the fold's file test and
+       the renderers, so no caller counts hashes for itself. #>
+    return $script:EntryHeadingLevel
+}
+
+function Get-EntrySectionLevel {
+    <# The number of '#' an entry's inner sections carry (3). #>
+    return $script:EntrySectionLevel
+}
+
+function Get-EntrySectionHeadings {
+    <#
+        The three section headings as an ordered map, key -> heading TEXT (no leading hashes): What, Who,
+        Type. This repo's answers where repo-config.ps1 overrides them, the English defaults otherwise.
+
+        REPO-OWNED VIA Get-EntrySectionHeadingOverrides, probed with Get-Command like every other prose knob
+        here. The seam's name differs from this function's deliberately: repo-config backs each seam with a
+        function of that name, and a same-named reader would be replaced by the config's version the moment
+        it is dot-sourced -- the collision this file documents on $RepoRoot/$repoRoot, one scope up.
+
+        An override that is present but EMPTY is ignored, the same fail-safe Get-EntryScaffoldWording uses.
+        A blank heading would make the parser look for '### ' with nothing after it, which matches the start
+        of every section in the document -- so the type reader would return the first section's body and the
+        entry would be filed under a type nobody wrote.
+    #>
+    $out = [ordered]@{}
+    foreach ($key in $script:EntrySectionDefaults.Keys) { $out[$key] = $script:EntrySectionDefaults[$key] }
+    if (Get-Command Get-EntrySectionHeadingOverrides -ErrorAction SilentlyContinue) {
+        $override = Get-EntrySectionHeadingOverrides
+        if ($override) {
+            foreach ($entry in $override.GetEnumerator()) {
+                $text = [string]$entry.Value
+                if ($text) { $out[[string]$entry.Key] = $text.Trim() }
+            }
+        }
+    }
+    return $out
+}
+
+function Get-EntrySectionHeading {
+    <# One section's full heading line, e.g. '### Type of change'. One formatter, so the writer and the
+       parser cannot disagree about the level or the spacing. #>
+    param([Parameter(Mandatory)][ValidateSet('What', 'Who', 'Type')][string]$Key)
+    $headings = Get-EntrySectionHeadings
+    return ('#' * $script:EntrySectionLevel) + ' ' + $headings[$Key]
+}
+
+function Get-EntrySectionBody {
+    <#
+        Pure: the text under one of an entry's named sections, trimmed -- '' when the section is absent or
+        empty.
+
+        FENCE-AWARE, and the FIRST occurrence outside a fence wins, for the reason every reader in this file
+        is: an entry documenting this format quotes these headings inside a fence, and the entry for this
+        very change does. A section ends at the next heading of ANY level, so a '#### ' sub-heading inside a
+        body is kept while the next '### ' or '## ' closes it.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$EntryText,
+        [Parameter(Mandatory)][ValidateSet('What', 'Who', 'Type')][string]$Key
+    )
+    $wanted = (Get-EntrySectionHeadings)[$Key]
+    if (-not $wanted) { return '' }
+    $body = Get-EntryTextOutsideFences -EntryText $EntryText
+    $lines = @($body -split '\r?\n')
+    $rx = '^#{' + $script:EntrySectionLevel + '}\s+' + [regex]::Escape($wanted) + '\s*$'
+
+    $from = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match $rx) { $from = $i + 1; break }
+    }
+    if ($from -lt 0) { return '' }
+
+    $kept = @()
+    for ($i = $from; $i -lt $lines.Count; $i++) {
+        # Any heading at this level or above closes the section; a deeper one is content.
+        if ($lines[$i] -match ('^#{1,' + $script:EntrySectionLevel + '}\s')) { break }
+        $kept += $lines[$i]
+    }
+    return (($kept -join "`n").Trim())
+}
+
+function Resolve-EntryType {
+    <#
+        Pure: the changelog type an entry declares under '### Type of change'. Returns an object with
+
+          Type      the type as written, trimmed -- '' when nothing usable is declared.
+          Declared  $true when the section was found with a value.
+          Raw       exactly what the section contained, for quoting back at the author.
+          Error     $null when all is well; otherwise the reason, ready to print.
+
+        VALIDATED AGAINST THE REPO'S OWN BRANCH TYPES where those are reachable (Get-BranchTypes, which the
+        callers dot-source for other reasons). A type the repo does not produce is reported rather than
+        absorbed: the release documents group nothing by it any more, but a typo'd type still reaches the
+        record and the per-plugin changelogs, where nobody looks again.
+
+        THE FIRST LINE IS THE TYPE, and anything after it is ignored rather than refused. 'Feat' with a
+        sentence of justification under it is a reasonable thing to write, and refusing it would make the
+        gate an editor.
+
+        FALLS BACK TO THE HEADING for an entry written before this format -- '### Title <midDot> Feat' or the
+        older '### Title <midDot> Feat <midDot> 2026-08-03'. Every entry in this repo's history and in every
+        consumer's tree carries the type there, and reading them as typeless would file the lot under a
+        catch-all. Recognise both, write one.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
+
+    $result = [pscustomobject]@{
+        Type     = ''
+        Declared = $false
+        Raw      = ''
+        Error    = $null
+    }
+
+    $known = @()
+    if (Get-Command Get-BranchTypes -ErrorAction SilentlyContinue) { $known = @(Get-BranchTypes) }
+
+    $section = Get-EntrySectionBody -EntryText $EntryText -Key 'Type'
+    if ($section) {
+        $result.Raw = $section
+        $result.Declared = $true
+        # The first non-empty line, stripped of the bold/backtick decoration somebody may reasonably add.
+        $first = @($section -split '\r?\n' | Where-Object { $_.Trim() })[0]
+        $result.Type = ($first -replace '[*`_]', '').Trim()
+        if ($known.Count -gt 0 -and $known -notcontains $result.Type) {
+            $result.Error = "'$($result.Type)' is not a change type this repo produces -- use one of: $($known -join ', ')."
+        }
+        return $result
+    }
+
+    # Pre-format fallback: the type as a middot field in the heading.
+    $md = [char]0x00B7
+    $bodyOutside = Get-EntryTextOutsideFences -EntryText $EntryText
+    $headingLine = @($bodyOutside -split '\r?\n' | Where-Object { $_ -match '^#{2,6}\s' })
+    if ($headingLine.Count -gt 0 -and $known.Count -gt 0) {
+        $fields = @(($headingLine[0] -replace '^#+\s+', '') -split "\s*$md\s*")
+        # The LAST matching field wins, which resolves an entry whose title IS a type name
+        # ('## #12 <midDot> Fix <midDot> Fix') -- the same rule the retired heading parser used.
+        for ($i = $fields.Count - 1; $i -ge 0; $i--) {
+            $candidate = $fields[$i].Trim()
+            if ($known -contains $candidate) {
+                $result.Type = $candidate
+                $result.Declared = $true
+                $result.Raw = $candidate
+                return $result
+            }
+        }
+    }
+    return $result
+}
+
+function Format-EntryBlock {
+    <#
+        The whole entry as an array of LINES: the H2 heading, then the three H3 sections in order.
+
+        ONE FORMATTER FOR THE WRITER AND THE MIGRATION, which is why it takes pieces rather than assembling
+        prose. new-changelog-entry.ps1 calls it with a placeholder body and no rows; a migration calls it
+        with real ones. Two assemblers would drift, and the parser reads what this writes.
+
+        $Title carries no type and no date. The fold prepends '#NN <midDot> ' to it after the merge, and
+        appends the PR/merge line at the end of the block -- the two facts that do not exist until then.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Title,
+        [string]$Type = '',
+        [string]$Body = '',
+        $ImpactRows = @()
+    )
+    # Each line appended on its own statement, NOT as @(<expr>, '') -- the comma operator binds looser than
+    # '+', so `@(('#'*2) + ' ' + $Title, '')` concatenates the string with the ARRAY ($Title, '') and joins
+    # it with a space. That produced '## A real title ' with a trailing space and no blank line after it,
+    # which is well-formed markdown and therefore invisible until a parser expecting the blank line fails.
+    # Measured on this function's first run.
+    $heading = ('#' * $script:EntryHeadingLevel) + ' ' + $Title.Trim()
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add($heading)
+    $lines.Add('')
+    $lines.Add((Get-EntrySectionHeading -Key 'What'))
+    $lines.Add('')
+    foreach ($line in ($Body -split '\r?\n')) { $lines.Add($line) }
+    $lines.Add('')
+    $lines.Add((Get-EntrySectionHeading -Key 'Who'))
+    $lines.Add('')
+    foreach ($line in (Format-EntryImpactTable -Rows $ImpactRows)) { $lines.Add($line) }
+    $lines.Add('')
+    $lines.Add((Get-EntrySectionHeading -Key 'Type'))
+    $lines.Add('')
+    $lines.Add($Type)
+    return @($lines.ToArray())
+}
+
 # --- Where a folded entry goes: the changelog's tier sections -------------------------------------
 #
 # The other half of the tier line. The line says which tier an entry is; this says which SECTION that
