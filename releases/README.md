@@ -192,10 +192,15 @@ body to publish.
 Guardrails: a clean `main`, no unfolded entry files, **[the bump earned by the pending
 tiers](#what-a-release-must-earn)** (`-SkipTierGate` overrules), lint gate green, tag doesn't exist yet. All
 of them run **before the first file is written**, deliberately: failing after the notes file exists would
-leave a release half-cut on `main`. The lint gate
-([`scripts/lint/check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1), check 9) also
-guards that every plugin's `RELEASE.md` card is present and its version matches `plugin.json`, since the two
-only ever change together via `cut-release.ps1`.
+leave a release half-cut on `main`.
+
+**The lint gate is *your* repo's, read from `Get-LintScript` — the same seam `open-pr` uses.** This route
+needs its own gate precisely because it does not travel via a PR, so nothing else on it ever meets that
+copy. Until August 5, 2026 the cut resolved the gate by a fixed path to the script the *source* repo
+happens to carry, which meant every consumer release ran with no gate at all and said so in a warning
+(inbound [#464](https://github.com/DaveKJohn/claude-code-specialists/issues/464)). **A gate the seam names
+but the tree does not have is a hard stop**, not a warning: skipping it is `-SkipLint`, and that choice
+belongs in the command rather than in output that scrolls past.
 
 The pure logic (version bump, CHANGELOG transformation, notes construction, and the bump rules in
 `Test-ReleaseBumpEarned`) lives in
@@ -242,6 +247,19 @@ contract reports its absence as `[INFO]`, which is the correct report rather tha
 **`Get-ReleaseMajorMinMinors` is `10`.** Held against this repo's own history that is roughly right rather
 than arbitrary: the `1.x` line ran to `1.18` and the `2.x` line to `2.16` before each was recapped into a
 major.
+
+**`Get-LintScript` is [`scripts/lint/check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1),
+which is what the release route runs here.** Its check 9 is the one written *for* this route: it guards that
+every plugin's `RELEASE.md` card exists and that its version matches `plugin.json`, the two only ever moving
+together via `cut-release.ps1`. That pairing is repo-specific — a repo with no plugin tier has no cards to
+check — which is why the gate is named here and not in the portable half.
+
+**`Get-ChangelogReleaseWording` is deliberately not defined**, for the same reason `Get-ChangelogHeading`
+is not: this repo is English, so the defaults already are its own words and a value nothing reads goes
+stale unnoticed. One thing a non-English consumer should know before leaving it alone — `AllIntro`'s
+default says *"the recorded versions of the marketplace"*, which is simply the wrong noun for a repo that
+is not one. The script contract reports the absence as `[INFO]` and names the default, so it is a thing you
+were told rather than one you meet at release time.
 
 ### Local decisions
 

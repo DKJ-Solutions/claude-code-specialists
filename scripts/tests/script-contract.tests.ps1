@@ -185,9 +185,11 @@ try {
     Assert-Match ([regex]::Escape($c)) $r.Out 'happy path: the [SCOPE] line names the ACTUAL fixture root, not the session/git root'
     Assert-Match '\[SCOPE\].*-ConsumerPathOverride' $r.Out 'happy path: the [SCOPE] line names HOW the root was resolved (override)'
     # Non-counting, like [OK]/[SKIP]: context must never move the error/info tallies or the exit code. The
-    # one info counted here is the superseded Get-ChangelogHeading above -- so this assert still proves the
-    # [SCOPE] line added nothing, which is what it is for.
-    Assert-Match 'Summary: 0 error\(s\), 1 info signal\(s\)' $r.Out 'happy path: [SCOPE] is non-counting (0 errors, and only the one legacy-seam info)'
+    # two infos counted here are both correct on a healthy repo rather than gaps: the superseded
+    # Get-ChangelogHeading above, and Get-ChangelogReleaseWording (inbound #462), which an ENGLISH repo
+    # deliberately leaves undefined because the defaults are already its own words. So this assert still
+    # proves the [SCOPE] line added nothing, which is what it is for.
+    Assert-Match 'Summary: 0 error\(s\), 2 info signal\(s\)' $r.Out 'happy path: [SCOPE] is non-counting (0 errors, and only the two deliberately-undefined seams)'
 
     # --- 2. Missing function in branch-info.ps1 (the exact #147 incident): Test-BranchName ---------
     #     new-branch crashed at runtime with "The term 'Test-BranchName' is not recognized" because
@@ -357,7 +359,7 @@ try {
     Assert-Match ("\[INFO\].*'Get-EntryBodyHeading' missing.*falls back to '" + [regex]::Escape('**To do / where I left off:**') + "'") $r.Out 'stub wording absent: INFO for Get-EntryBodyHeading quotes the literal default heading'
     Assert-Match "\[INFO\].*'Get-EntryFallbackType' missing.*falls back to 'Chore'" $r.Out 'stub wording absent: INFO for Get-EntryFallbackType names the Chore default'
     $infoCount6e = @([regex]::Matches($r.Out, '\[INFO\]')).Count
-    Assert-Equal 5 $infoCount6e 'stub wording absent: exactly five [INFO] lines -- one per stripped knob, plus the superseded Get-ChangelogHeading this repo never defines, and nothing else downgraded along with them'
+    Assert-Equal 6 $infoCount6e 'stub wording absent: exactly six [INFO] lines -- one per stripped knob, plus the two seams this repo deliberately never defines (the superseded Get-ChangelogHeading and Get-ChangelogReleaseWording), and nothing else downgraded along with them'
 
     # --- 6f. NO CONTRACT RECORD MAY SPELL A REPORT MARKER IN ITS OWN TEXT --------------------------
     #     Measured while adding the tier records: a Returns line that mentioned the info marker made the
@@ -444,7 +446,12 @@ function Get-RosterIgnoredIds { return @() }
         @{ Function = 'Get-BranchInfo';      Lib = 'scripts\lib\branch-info.ps1'; Scripts = @('new-changelog-entry', 'open-pr') },
         @{ Function = 'Test-BranchName';      Lib = 'scripts\lib\branch-info.ps1'; Scripts = @('new-branch') },
         @{ Function = 'Get-RepoName';         Lib = 'scripts\repo-config.ps1';     Scripts = @('open-pr', 'fold-changelog-entry', 'ship-pr', 'verify-resolved-issues') },
-        @{ Function = 'Get-LintScript';       Lib = 'scripts\repo-config.ps1';     Scripts = @('open-pr') },
+        # TWO CALLERS SINCE AUGUST 5, 2026 (inbound #464). cut-release resolved its gate by a fixed path
+        # into the source repo, so a consumer's release ran without a lint gate at all -- and the release
+        # route is precisely the one that does NOT pass open-pr's copy of it. Both routes ask this
+        # function now, so the attribution has to say so: a record that named one caller while two call it
+        # is the staleness this loop exists to catch.
+        @{ Function = 'Get-LintScript';       Lib = 'scripts\repo-config.ps1';     Scripts = @('open-pr', 'cut-release') },
         @{ Function = 'Get-RosterPath';       Lib = 'scripts\repo-config.ps1';     Scripts = @('check-roster-sync') },
         @{ Function = 'Get-RosterIgnoredIds'; Lib = 'scripts\repo-config.ps1';     Scripts = @('check-roster-sync') },
         # Both changelog-section seams, and both reached through entry-scaffold-lib rather than named
@@ -490,12 +497,17 @@ function Get-RosterIgnoredIds { return @() }
         @{ Function = 'Get-ReleaseMajorMinMinors';              Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },
         # The third tier (August 3, 2026), attributed to its own script rather than to cut-release: the
         # internal note is generated AFTER the cut, because the development notes are its input.
-        @{ Function = 'Get-InternalNoteWording';               Lib = 'scripts\repo-config.ps1'; Scripts = @('new-internal-note') }
+        @{ Function = 'Get-InternalNoteWording';               Lib = 'scripts\repo-config.ps1'; Scripts = @('new-internal-note') },
+        # The release block written into the repo's OWN CHANGELOG.md (inbound #462), and the only record
+        # here read by TWO release scripts: the cut writes the intro and the notes line, the internal note
+        # rewrites that same line once it exists. One paragraph, one seam -- which is exactly why both are
+        # named. The per-script assertions below therefore run twice for this record.
+        @{ Function = 'Get-ChangelogReleaseWording';            Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release', 'new-internal-note') }
     )
 
     $contractSrc = [System.IO.File]::ReadAllText($Script)
     $totalRecordCount = @([regex]::Matches($contractSrc, "Lib\s*=\s*'[^']+';\s*Function\s*=\s*'[^']+';\s*Scripts\s*=\s*@\(")).Count
-    Assert-Equal 25 $totalRecordCount 'contract: exactly twenty-five (lib, function) records declared in check-script-contract.ps1 (the twenty-four below plus the dedicated Get-LiveStage block after this loop)'
+    Assert-Equal 26 $totalRecordCount 'contract: exactly twenty-six (lib, function) records declared in check-script-contract.ps1 (the twenty-five below plus the dedicated Get-LiveStage block after this loop)'
 
     # Every record must carry a 'Returns' line, so a finding is actionable without any reference to this
     # source repo (Dave, July 28, 2026). Counted against $totalRecordCount rather than listed per record:

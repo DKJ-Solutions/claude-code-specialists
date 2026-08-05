@@ -560,6 +560,65 @@ function Get-PullRequestEntriesByTier {
     return @((Split-Changelog -Content $Content -TierSections $TierSections).TierSections)
 }
 
+# --- The release block's wording in the repo's own CHANGELOG.md (inbound #462) --------------------
+#
+# The four strings a release writes into a file the REPO owns. They were hardcoded English here, which
+# is right for an English repo and wrong for any other -- and the changelog block is the most visible
+# output of the lot, sitting at the top of the file. Exactly the #410 class this repo has now solved
+# three times over: the entry stubs (Get-Entry*), the internal note (Get-InternalNoteWording) and the
+# category labels (Get-ReleaseCategoryTitles) are all repo-owned for this reason. This was the one
+# output left behind, and it was left behind because it lives in a lib rather than in a script.
+#
+# THE DEFAULTS ARE UNCHANGED, deliberately -- the seam's whole contract is that a consumer defining
+# nothing gets exactly what this repo produced before it existed, byte for byte. That includes the word
+# "marketplace" in AllIntro, which is wrong for a consumer that is not one: a repo in that position
+# overrides the key, and the script contract's [INFO] line names the default so it is a thing they were
+# told rather than a thing they discovered at release time.
+#
+# TOKENS RATHER THAN INTERPOLATION, because an override is written in a config file that has none of
+# these values in scope. {history} {notes} {internal} {dev} carry the paths; {emdash} carries the one
+# character this pure-ASCII file cannot hold as a literal.
+$script:ChangelogReleaseWordingDefaults = @{
+    LatestIntro = @(
+        'The most recent release {emdash} every earlier one is listed in',
+        '[{history}]({history}), with its date, type and title.'
+    )
+    AllIntro = @(
+        'The recorded versions of the marketplace {emdash} newest at the top. Every release bumps all',
+        'plugin versions in lockstep and points to the full notes in `releases/development/`.'
+    )
+    NotesLine = @(
+        'See [{notes}]({notes}) for the full release notes.'
+    )
+    InternalNoteLine = @(
+        'See [{internal}]({internal}) for what this release is worth. The full per-PR record is in [{dev}]({dev}).'
+    )
+}
+
+function Get-ChangelogReleaseWordingLines {
+    <#
+        One wording entry as an array of LINES: the repo's override where it has one, the English
+        default otherwise, with every {token} filled in.
+
+        An override may be written as an array of lines or as a single string containing newlines --
+        both normalize to lines here, so a repo is not made to guess which shape the caller wanted.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Key,
+        [hashtable]$Wording = $null,
+        [hashtable]$Tokens = @{}
+    )
+    $lines = $script:ChangelogReleaseWordingDefaults[$Key]
+    if ($Wording -and $Wording.ContainsKey($Key) -and $Wording[$Key]) { $lines = $Wording[$Key] }
+    $lines = @(@($lines) | ForEach-Object { [string]$_ -split "`r?`n" })
+    foreach ($t in $Tokens.Keys) {
+        $needle = '{' + $t + '}'
+        $value  = [string]$Tokens[$t]
+        $lines  = @($lines | ForEach-Object { $_.Replace($needle, $value) })
+    }
+    return $lines
+}
+
 function Convert-ChangelogForRelease {
     <#
         Empties EVERY tier section down to its own intro and puts a short REFERENCE
@@ -600,7 +659,8 @@ function Convert-ChangelogForRelease {
         [string]$LiveMarker = '',
         [ValidateSet('all', 'latest')][string]$HistoryMode = 'all',
         [string]$HistoryRelPath = 'releases/README.md',
-        $TierSections = $null
+        $TierSections = $null,
+        [hashtable]$Wording = $null
     )
     $emDash = [char]0x2014
     if ($LiveMarker) {
@@ -613,6 +673,11 @@ function Convert-ChangelogForRelease {
     $nl = $s.Nl
 
     $liveSuffix = if ($LiveMarker) { " $LiveMarker" } else { '' }
+    # The pointer line under the release heading, from the seam (#462). Built once and used by both
+    # shapes below, because the two differ in their HEADING and never in this line -- writing it twice
+    # is two places for one sentence to be changed in one of them.
+    $notesLines = Get-ChangelogReleaseWordingLines -Key 'NotesLine' -Wording $Wording `
+        -Tokens @{ notes = $NotesRelPath; emdash = $emDash }
     if ($HistoryMode -eq 'latest') {
         # NO '###' HEADING IN THIS MODE, deliberately: under a section that holds exactly one release by
         # definition, a per-version heading names what the heading above it already said. The version
@@ -624,15 +689,13 @@ function Convert-ChangelogForRelease {
         # block starts.
         $block = @(
             "**v$Version** $emDash $Date $emDash $Type$liveSuffix",
-            '',
-            "See [$NotesRelPath]($NotesRelPath) for the full release notes."
-        )
+            ''
+        ) + $notesLines
     } else {
         $block = @(
             "### [v$Version] - $Date $emDash $Type$liveSuffix",
-            '',
-            "See [$NotesRelPath]($NotesRelPath) for the full release notes."
-        )
+            ''
+        ) + $notesLines
     }
 
     if ($HistoryMode -eq 'latest') {
@@ -640,15 +703,11 @@ function Convert-ChangelogForRelease {
         # "this is one release, the rest is over there", and a carried-over intro would still be the
         # accumulating section's wording. The pointer is the only part a repo varies, so it is the only
         # part interpolated.
-        $relIntro = @(
-            "The most recent release $emDash every earlier one is listed in",
-            "[$HistoryRelPath]($HistoryRelPath), with its date, type and title."
-        )
+        $relIntro = Get-ChangelogReleaseWordingLines -Key 'LatestIntro' -Wording $Wording `
+            -Tokens @{ history = $HistoryRelPath; emdash = $emDash }
     } elseif (($s.RelIntroLines -join "`n") -match 'No releases recorded') {
-        $relIntro = @(
-            "The recorded versions of the marketplace $emDash newest at the top. Every release bumps all",
-            'plugin versions in lockstep and points to the full notes in `releases/development/`.'
-        )
+        $relIntro = Get-ChangelogReleaseWordingLines -Key 'AllIntro' -Wording $Wording `
+            -Tokens @{ emdash = $emDash }
     } else {
         $relIntro = @($s.RelIntroLines | Where-Object { $_ -ne '' })
     }
@@ -734,7 +793,8 @@ function Set-ReleaseInternalNoteLink {
         [Parameter(Mandatory)][string]$Content,
         [Parameter(Mandatory)][string]$Version,
         [Parameter(Mandatory)][string]$InternalRelPath,
-        [Parameter(Mandatory)][string]$DevRelPath
+        [Parameter(Mandatory)][string]$DevRelPath,
+        [hashtable]$Wording = $null
     )
 
     $usesCRLF = $Content.Contains("`r`n")
@@ -755,14 +815,26 @@ function Set-ReleaseInternalNoteLink {
     for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match $headingRx) { $start = $i; break } }
     if ($start -lt 0) { return $Content }
 
-    $replacement = "See [$InternalRelPath]($InternalRelPath) for what this release is worth. The full per-PR record is in [$DevRelPath]($DevRelPath)."
+    # From the seam like the three strings Convert-ChangelogForRelease writes (#462) -- this sentence
+    # lands in the same block of the same repo-owned file, so leaving it hardcoded would have made the
+    # block half-configurable, which is the worse of the two states.
+    #
+    # JOINED TO ONE LINE on purpose: this function REPLACES a single line and compares against it for
+    # idempotence, so a multi-line override is flattened rather than quietly breaking both.
+    $replacement = (Get-ChangelogReleaseWordingLines -Key 'InternalNoteLine' -Wording $Wording `
+        -Tokens @{ internal = $InternalRelPath; dev = $DevRelPath; emdash = ([char]0x2014) }) -join ' '
 
     for ($i = $start + 1; $i -lt $lines.Count; $i++) {
         # Stop at the next block or section rather than running to the end of the file: a notes line
         # belonging to the NEXT release must not be rewritten with this version's paths.
         if ($lines[$i] -match '^#{2,3}\s' -or $lines[$i] -match '^---\s*$') { break }
         if ($lines[$i] -eq $replacement) { return $Content }   # already pointed there
-        if ($lines[$i] -match '^See \[') {
+        # THE LINE IS FOUND BY ITS SHAPE, NOT BY ITS WORDS. This used to anchor on '^See [', which is
+        # the English default's opening -- so a repo that overrode NotesLine would have had its link
+        # silently never moved, the exact failure this function's own header warns about. Inside a
+        # release block the notes line is the only line carrying a markdown link, which is true in every
+        # language: the heading above it has none, and the loop stops at the next block.
+        if ($lines[$i] -match '\]\(') {
             $lines[$i] = $replacement
             return (($lines -join $nl).TrimEnd() + $nl)
         }

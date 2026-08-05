@@ -164,8 +164,11 @@ $script:Contract = @(
        Returns = 'an object with IsValid plus a Reason when invalid; reject an empty name and the main branch' },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RepoName';    Scripts = @('open-pr', 'fold-changelog-entry', 'ship-pr', 'verify-resolved-issues');
        Returns = "this repo as 'owner/name', the form ``gh --repo`` takes" },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-LintScript';  Scripts = @('open-pr');
-       Returns = 'the repo-root-relative path to the lint script to run before a PR' },
+    # TWO CALLERS SINCE AUGUST 5, 2026, and the second one is the repair rather than a note (inbound
+    # #464): cut-release resolved the gate by a fixed path into the SOURCE repo, so a consumer's release
+    # ran without one. Both routes now ask this function, which is the point of having it.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-LintScript';  Scripts = @('open-pr', 'cut-release');
+       Returns = 'the repo-root-relative path to the lint script that runs before a PR and before a release cut; a release refuses to cut when the file it names is absent, since a gate that skips itself is not a gate' },
     # OPTIONAL SINCE AUGUST 4, 2026, and the reason is a shape rather than a preference (inbound #445).
     # Measured across this table that day: 6 of 23 entries were required, and four of those six serve a
     # script the consumer INVOKES -- Get-BranchInfo, Test-BranchName, Get-RepoName, Get-LintScript. Don't
@@ -293,6 +296,13 @@ $script:Contract = @(
     # The third tier. Declared for the same reason as the two above: nothing crashes without it, so a
     # consumer would discover English headings in a document written for its own management -- at the
     # moment it is being shared, which is the worst one available.
+    # The release block in the repo's OWN CHANGELOG.md (inbound #462). The fourth knob of this class and
+    # the last output of a release that was still written in the script's language rather than the
+    # repo's -- while the entry stubs, the category labels and the internal note all already were.
+    # BOTH scripts read it, because both write into the same paragraph of the same file.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ChangelogReleaseWording'; Scripts = @('cut-release', 'new-internal-note');
+       Optional = $true; Default = 'the English release-block text';
+       Returns = "overrides for the release block written into CHANGELOG.md, merged over the English defaults, keyed LatestIntro, AllIntro, NotesLine and InternalNoteLine. A value is a line or an array of lines and carries the paths as tokens rather than as interpolation, since a config file has none of them in scope: {history} {notes} {internal} {dev}, plus {emdash} for the em-dash. AllIntro's default says 'the marketplace', which is the wrong word for a consumer that is not one" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-InternalNoteWording'; Scripts = @('new-internal-note');
        Optional = $true; Default = 'the English headings and hints';
        Returns = "overrides for the internal note's own text, merged over the English defaults: Title, AudienceLabel, Audience, SkeletonNote, SectionChanged, SectionValue, HintValue, SectionOpen, HintOpen, NoEntries and Unknown -- the document is read by this repo's own colleagues, so its language is the repo's rather than the script's" }

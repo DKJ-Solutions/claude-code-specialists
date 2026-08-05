@@ -42,8 +42,17 @@ each command as you go — do not skip a step or reorder them from memory.
 1. **Cut the release.** On a clean main branch:
 
    ```powershell
-   ./scripts/release/cut-release.ps1 -Bump <major|minor|patch> -Title "<one sentence>"
+   powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/cut-release.ps1" -Bump <major|minor|patch> -Title "<one sentence>"
    ```
+
+   **Run it from the plugin, not from a repo path.** This page used to print
+   `./scripts/release/cut-release.ps1`, which is a real file in the repo the script is *maintained* in
+   and nothing at all in the repo you are cutting a release for — a consumer runs the mirrored copy and
+   keeps none of its own. So the first command of the checklist failed for exactly the reader this page
+   is written for. The `${CLAUDE_PLUGIN_ROOT}` form is what the other shared skills already use, and it
+   resolves **only inside a plugin-owned component**: typing this by hand in a terminal means spelling
+   out the absolute path to the plugin cache instead. In the source repo itself, `./scripts/release/…`
+   remains the same file and works as before.
 
    Give it **either** `-Bump` **or** `-Version <X.Y.Z>` when you want to name the number yourself.
    `-SummaryFile` turns it into a milestone (see below). Three escape valves:
@@ -73,12 +82,12 @@ each command as you go — do not skip a step or reorder them from memory.
    git push origin main; git push origin vX.Y.Z
    ```
 
-2. **The internal summary — at EVERY release, patch included.** Where the repo carries
-   `scripts/release/new-internal-note.ps1`, `cut-release.ps1` has printed this invocation at the end of
-   its run:
+2. **The internal summary — at EVERY release, patch included.** `cut-release.ps1` has printed this
+   invocation at the end of its run, with the path already resolved for wherever it found the script —
+   paste that rather than retyping it:
 
    ```powershell
-   ./scripts/release/new-internal-note.ps1 -Version X.Y.Z
+   powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/new-internal-note.ps1" -Version X.Y.Z
    ```
 
    `-Force` overwrites an existing note — needed rarely and deliberately, since this is the one tier that
@@ -256,9 +265,19 @@ version waiting for a migration that does not exist.
   fallback (`''`, i.e. no live stage), never `[ERROR]`.
 - The script's own getters are separate from this skill's and all optional in the same way:
   `Get-ReservedRootMd`, `Get-ReleaseNotesGrouping`, `Get-ReleaseLiveMarker`, `Get-ReleasePluginTier`,
-  `Get-ReleaseCategoryTitles`, `Get-ReleaseHighlightsBumps` and `Get-ReleaseMajorMinMinors`. Define none of
-  them and the cut behaves exactly as it does in the source repo. Run `check-script-contract.ps1` to see
-  which ones this repo answers and which fall back.
+  `Get-ReleaseCategoryTitles`, `Get-ReleaseHighlightsBumps`, `Get-ReleaseMajorMinMinors` and
+  `Get-ChangelogReleaseWording`. Define none of them and the cut behaves exactly as it does in the source
+  repo. Run `check-script-contract.ps1` to see which ones this repo answers and which fall back.
+- **`Get-LintScript` is the one that is NOT optional, and the cut now reads it.** The release route does not
+  travel via a PR, so this is the only gate it meets; before August 5, 2026 the cut looked for the *source*
+  repo's lint script by a fixed path and skipped the gate with a warning wherever it did not find one
+  (inbound #464). A named gate that is not on disk is now a hard stop — use `-SkipLint` to cut without one,
+  so the choice is in the command.
+- **`Get-ChangelogReleaseWording` is worth a look in a non-English repo.** It carries the four strings a
+  release writes into your own `CHANGELOG.md`, merged over the English defaults, keyed `LatestIntro`,
+  `AllIntro`, `NotesLine` and `InternalNoteLine`. Values take `{history}`, `{notes}`, `{internal}`, `{dev}`
+  and `{emdash}` as tokens, since a config file has none of those values in scope. `AllIntro`'s default
+  names *"the marketplace"* — the wrong noun for a consumer that is not one.
 - **The tier sections are optional too, and they switch the bump gate on.** `Get-ChangelogTierHeadings`
   declares one changelog section per tier; declare more than one and `cut-release.ps1` starts requiring the
   bump to be earned (see `-SkipTierGate` in step 1). A repo that declares one section — or none, falling
