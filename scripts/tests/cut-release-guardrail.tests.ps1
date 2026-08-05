@@ -93,6 +93,42 @@ Assert-True ($plannedBlock.Success -and $plannedBlock.Value -match 'highlightsRe
 Assert-True ($cutReleaseText -notmatch 'ConvertTo-ReleaseHtml') 'cut-release calls no HTML renderer'
 Assert-True ($cutReleaseText -notmatch "\.html") 'cut-release writes no .html path at all'
 
+Write-Host "cut-release.ps1 -- the bump gate runs before the first write, and only its own flag skips it" -ForegroundColor Cyan
+# The RULES are unit-tested where they live (Test-ReleaseBumpEarned, release-lib.tests.ps1). What can only
+# be checked here is the WIRING, and the same constraint applies as above: this script refuses to be
+# anywhere but a clean main, so it cannot be dot-sourced and the gate cannot be exercised in-process.
+Assert-True ($cutReleaseText -match 'Test-ReleaseBumpEarned') 'cut-release asks whether the bump was earned'
+Assert-True ($cutReleaseText -match '(?m)\[switch\]\$SkipTierGate') 'and declares -SkipTierGate as the escape valve'
+# ITS OWN FLAG, NOT -SkipLint. The two overrule different things -- a tool versus a judgement about content
+# -- and sharing one flag would let somebody skipping a slow lint run also, silently, cut a minor with
+# nothing in it for a consumer.
+$gateBlock = [regex]::Match($cutReleaseText, '(?ms)if \(-not \$SkipTierGate\).*?^\}')
+Assert-True $gateBlock.Success 'the gate is guarded by -SkipTierGate alone'
+Assert-True ($gateBlock.Success -and $gateBlock.Value -notmatch '\$SkipLint') 'and -SkipLint does not reach into it'
+# BEFORE ANY WRITE, for the same reason as the collision guard above: a refusal must leave the tree exactly
+# as it was, with no notes file, no version bump and no half-cut release to unpick on main.
+Assert-True ($gateBlock.Success -and $firstWrite -gt ($gateBlock.Index + $gateBlock.Length)) `
+    'the bump gate runs BEFORE any file is written'
+# It reads the changelog per TIER; the flat accessor would give it entries with no tier to judge.
+Assert-True ($cutReleaseText -match 'Get-PullRequestEntriesByTier') 'it reads the pending entries per tier'
+# The highlights document is the tier-2 selection now, not a category guess -- and the two retired seam
+# knobs must not come back with it.
+Assert-True ($cutReleaseText -match 'tier2Entries') 'the highlights document is built from the tier-2 entries'
+# MATCHED AGAINST CODE ONLY, with comments stripped first. The script explains WHY those knobs were
+# retired, and it names them to do so -- so a plain -notmatch fails on the explanation rather than on a
+# use. That is this repo's own "a matcher satisfied by a mention rather than a use" defect, in reverse:
+# here the mention is the legitimate thing and the use is what must be gone.
+$cutReleaseCode = ($cutReleaseText -replace '(?s)<#.*?#>', '') -split "`r?`n" |
+    Where-Object { $_ -notmatch '^\s*#' } | ForEach-Object { $_ -replace '\s#.*$', '' }
+$cutReleaseCode = $cutReleaseCode -join "`n"
+Assert-True ($cutReleaseCode -match 'Get-PullRequestEntriesByTier') 'the comment-stripped view still contains real code (the strip did not empty it)'
+foreach ($gone in 'Get-ReleaseHighlightsStakeholderTypes', 'Get-ReleaseHighlightsWording', '-StakeholderTypes', '-DevBlockHeading') {
+    Assert-True ($cutReleaseCode -notmatch [regex]::Escape($gone)) "cut-release no longer CALLS '$gone' -- the marker it configured is retired"
+}
+# The threshold behind the major rule is repo-owned rather than hardcoded: a shared script must not pin
+# every consumer to one repo's release cadence.
+Assert-True ($cutReleaseText -match 'Get-ReleaseMajorMinMinors') 'the minors-before-a-major threshold comes from the seam'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red

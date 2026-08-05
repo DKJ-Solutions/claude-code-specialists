@@ -29,6 +29,9 @@ $RepoRoot         = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')
 $FoldSrc          = Join-Path $RepoRoot 'scripts\release\fold-changelog-entry.ps1'
 $RepoConfigSrc    = Join-Path $RepoRoot 'scripts\repo-config.ps1'
 $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
+# The entry format: the 'Tier: N' line the fold reads to pick a section and then removes, plus the section
+# map itself. A $PSScriptRoot-relative sibling of the fold script, so the fixture has to carry it.
+$EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 
 $script:pass = 0
 $script:fail = 0
@@ -59,7 +62,14 @@ function New-FoldFixture {
         # strip Get-ChangelogHeading entirely and exercise the built-in fallback.
         [switch]$KeepAChangelog,
         [string]$Heading,
-        [switch]$OmitHeadingFunction
+        [switch]$OmitHeadingFunction,
+        # THE TIER SPLIT IS OPT-IN PER FIXTURE, and the default is deliberately OFF. Every test in this
+        # file except the tier block at the end is about something orthogonal -- which files are folded,
+        # and which heading the seam names -- and those must keep being asserted in the ONE-SECTION shape,
+        # because that is what a consumer who has not adopted tiers runs. So the default fixture strips
+        # the tier map and exercises the legacy single-heading path, and -TierSections builds the three
+        # sections when the tier behaviour itself is the subject.
+        [switch]$TierSections
     )
     $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("fold-test-$PID-$Label")
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
@@ -67,13 +77,20 @@ function New-FoldFixture {
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\lib')     -Force | Out-Null
     Copy-Item -LiteralPath $FoldSrc          -Destination (Join-Path $dir 'scripts\release\fold-changelog-entry.ps1') -Force
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')       -Force
+    Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')       -Force
 
     $repoConfig = [System.IO.File]::ReadAllText($RepoConfigSrc)
-    if ($OmitHeadingFunction) {
-        # A consumer whose repo-config predates the contract: the whole function is gone.
-        $repoConfig = $repoConfig -replace '(?s)function Get-ChangelogHeading \{.*?\r?\n\}', ''
-    } elseif ($PSBoundParameters.ContainsKey('Heading')) {
-        $repoConfig = $repoConfig -replace "(?m)^\`$script:ChangelogHeading = .*$", "`$script:ChangelogHeading = '$Heading'"
+    if (-not $TierSections) {
+        # Strip the tier map so Get-ChangelogTierSections falls back to the legacy single heading. Done by
+        # removing the FUNCTION, not the backing variable: the probe is Get-Command-based, so a repo that
+        # still has the variable but not the getter is exactly the consumer shape being modelled.
+        $repoConfig = $repoConfig -replace '(?s)function Get-ChangelogTierHeadings \{.*?\r?\n\}', ''
+        # The real repo-config no longer defines the legacy getter (the tier map supersedes it there), so
+        # the fixture adds it back -- these tests are about a consumer that has only that one.
+        if (-not $OmitHeadingFunction) {
+            $headingValue = if ($PSBoundParameters.ContainsKey('Heading')) { $Heading } else { '## Pull Requests' }
+            $repoConfig += "`n`$script:ChangelogHeading = '$headingValue'`nfunction Get-ChangelogHeading { return `$script:ChangelogHeading }`n"
+        }
     }
     [System.IO.File]::WriteAllText((Join-Path $dir 'scripts\repo-config.ps1'), $repoConfig, $Utf8NoBom)
 
@@ -88,6 +105,27 @@ function New-FoldFixture {
             '## [v2.21.0] - 2026-07-24 - Minor',
             '',
             '- An older, already released change.',
+            ''
+        ) -join "`n"
+    } elseif ($TierSections) {
+        @(
+            '# Changelog',
+            '',
+            '## Tier 2 - Pull Requests',
+            '',
+            'What a consumer notices.',
+            '',
+            '## Tier 1 - Pull Requests',
+            '',
+            'What the team gets out of it.',
+            '',
+            '## Tier 0 - Pull Requests',
+            '',
+            'Repo-internal only.',
+            '',
+            '## Releases',
+            '',
+            'Released versions.',
             ''
         ) -join "`n"
     } else {
@@ -336,6 +374,117 @@ $touched11 = @((Invoke-Git -Dir $dir11 -GitArgs @('show', '--name-only', '--pret
 Assert-True ($touched11 -contains 'CHANGELOG.md')                          'untracked entry: the changelog is still committed'
 Assert-True (-not (Test-Path -LiteralPath (Join-Path $dir11 'fix-never-committed.md'))) `
     'untracked entry: and the entry file is still folded away'
+
+# ===================================================================================================
+# THE TIER SPLIT (August 5, 2026): the entry declares a tier, the fold files it and consumes the line
+# ===================================================================================================
+# These are the only fixtures built with -TierSections. Everything above deliberately runs the
+# one-section shape, because that is what a consumer who has not adopted the model runs -- and both paths
+# have to keep working.
+
+function New-TieredEntryFile {
+    # Like New-EntryFile, but with a 'Tier: N' line where new-changelog-entry.ps1 writes one: directly
+    # under the heading. -NoTierLine leaves it out, which is the undeclared (= tier 0) case.
+    param([string]$Dir, [string]$Name, [string]$Title, [string]$Tier, [switch]$NoTierLine, [string]$ExtraBody = '')
+    $md = [char]0x00B7
+    $tierLine = if ($NoTierLine) { '' } else { "Tier: $Tier`n`n" }
+    $body = "### $Title $md Feat $md 2026-01-01`n`n$tierLine" + "Demo entry body.`n" + $ExtraBody
+    [System.IO.File]::WriteAllText((Join-Path $Dir $Name), $body, $Utf8NoBom)
+}
+
+Write-Host "Each entry lands in the section its tier names" -ForegroundColor Cyan
+$dirT1 = New-FoldFixture -Label 'tier-routing' -TierSections
+New-TieredEntryFile -Dir $dirT1 -Name 'feat-consumer.md'  -Title 'Consumer facing'  -Tier '2'
+New-TieredEntryFile -Dir $dirT1 -Name 'docs-colleague.md' -Title 'For colleagues'   -Tier '1'
+New-TieredEntryFile -Dir $dirT1 -Name 'chore-internal.md' -Title 'Repo internal'    -Tier '0'
+$rT1 = Invoke-Fold -Dir $dirT1
+Assert-True ($rT1.ExitCode -eq 0) 'tier routing: exits 0'
+$clT1 = [System.IO.File]::ReadAllText((Join-Path $dirT1 'CHANGELOG.md'))
+# Asserted per section rather than on the whole file: "the title appears somewhere" would pass even with
+# every entry filed in one section, which is the failure this is for.
+function Get-SectionBody {
+    param([string]$Changelog, [string]$Heading)
+    $lines = $Changelog -split "`r?`n"
+    $from = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -eq $Heading) { $from = $i + 1; break } }
+    if ($from -lt 0) { return '' }
+    $out = @()
+    for ($i = $from; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '^##\s') { break }
+        $out += $lines[$i]
+    }
+    return ($out -join "`n")
+}
+$sec2 = Get-SectionBody -Changelog $clT1 -Heading '## Tier 2 - Pull Requests'
+$sec1 = Get-SectionBody -Changelog $clT1 -Heading '## Tier 1 - Pull Requests'
+$sec0 = Get-SectionBody -Changelog $clT1 -Heading '## Tier 0 - Pull Requests'
+Assert-True ($sec2 -match 'Consumer facing')   'tier routing: the tier-2 entry is under the tier-2 heading'
+Assert-True ($sec2 -notmatch 'For colleagues') 'tier routing: and nothing else is'
+Assert-True ($sec1 -match 'For colleagues')    'tier routing: the tier-1 entry is under the tier-1 heading'
+Assert-True ($sec0 -match 'Repo internal')     'tier routing: the tier-0 entry is under the tier-0 heading'
+Assert-True ($sec0 -notmatch 'Consumer facing') 'tier routing: and the tier-2 entry did not leak down into it'
+# THE LINE IS CONSUMED. Once the section states the tier, an entry restating it would be the same fact in
+# two places -- the drift shape this repo has paid for three times.
+Assert-True ($clT1 -notmatch '(?m)^Tier:')     'the Tier: line is removed once the section states the tier'
+Assert-True ($sec2 -match 'Demo entry body')   'and the body around it survives intact'
+# Each section keeps its own intro: the fold inserts below it, not over it.
+Assert-True ($sec2 -match 'What a consumer notices') 'the section intro is untouched'
+
+Write-Host "An entry with no Tier: line is tier 0, and says so" -ForegroundColor Cyan
+$dirT2 = New-FoldFixture -Label 'tier-default' -TierSections
+New-TieredEntryFile -Dir $dirT2 -Name 'chore-undeclared.md' -Title 'Nothing declared' -NoTierLine
+$rT2 = Invoke-Fold -Dir $dirT2
+Assert-True ($rT2.ExitCode -eq 0) 'undeclared tier: exits 0 -- the default is a valid answer, not an error'
+$clT2 = [System.IO.File]::ReadAllText((Join-Path $dirT2 'CHANGELOG.md'))
+Assert-True ((Get-SectionBody -Changelog $clT2 -Heading '## Tier 0 - Pull Requests') -match 'Nothing declared') `
+    'undeclared tier: the entry is filed as tier 0 -- the harmless end of the scale'
+# Said out loud rather than absorbed: an author who simply forgot has produced work that cannot carry a
+# release on its own, and the moment to learn that is now rather than at the cut.
+Assert-True ($rT2.Output -match 'no Tier: line') 'undeclared tier: the run reports that it defaulted'
+
+Write-Host "A tier the model has no meaning for stops the fold, before anything is written" -ForegroundColor Cyan
+$dirT3 = New-FoldFixture -Label 'tier-bad' -TierSections
+New-TieredEntryFile -Dir $dirT3 -Name 'feat-good.md' -Title 'Perfectly fine' -Tier '2'
+New-TieredEntryFile -Dir $dirT3 -Name 'feat-bad.md'  -Title 'Bad tier'       -Tier '5'
+$before3 = [System.IO.File]::ReadAllText((Join-Path $dirT3 'CHANGELOG.md'))
+$rT3 = Invoke-Fold -Dir $dirT3
+Assert-True ($rT3.ExitCode -eq 1) 'bad tier: exits 1'
+Assert-True ($rT3.Output -match 'tier 5 does not exist') 'bad tier: the reason names the value'
+# THE PRE-PASS IS THE POINT. Folding writes one entry at a time, so a problem found on the second file
+# would leave the first already folded and its source file deleted -- a half-state to unpick by hand on
+# main. So NOTHING may have happened, including to the entry that was fine.
+Assert-True ([System.IO.File]::ReadAllText((Join-Path $dirT3 'CHANGELOG.md')) -eq $before3) `
+    'bad tier: the changelog is byte-identical -- the pre-pass ran before any write'
+Assert-True (Test-Path -LiteralPath (Join-Path $dirT3 'feat-good.md')) `
+    'bad tier: and the VALID entry file still exists, rather than being folded first'
+Assert-True (Test-Path -LiteralPath (Join-Path $dirT3 'feat-bad.md')) 'bad tier: as does the invalid one'
+
+Write-Host "A tier with no section declared is refused by name, not silently neighboured" -ForegroundColor Cyan
+$dirT4 = New-FoldFixture -Label 'tier-nosection' -TierSections
+# Drop tier 2 from the fixture's own map, so an entry declaring it has nowhere to go.
+$cfgT4 = Join-Path $dirT4 'scripts\repo-config.ps1'
+$cfgText = [System.IO.File]::ReadAllText($cfgT4) -replace "(?m)^\s*2 = '## Tier 2 - Pull Requests'\r?\n", ''
+[System.IO.File]::WriteAllText($cfgT4, $cfgText, $Utf8NoBom)
+New-TieredEntryFile -Dir $dirT4 -Name 'feat-orphan.md' -Title 'Nowhere to go' -Tier '2'
+$rT4 = Invoke-Fold -Dir $dirT4
+Assert-True ($rT4.ExitCode -eq 1) 'orphan tier: exits 1'
+Assert-True ($rT4.Output -match 'no changelog section for it') 'orphan tier: the reason says what is missing'
+Assert-True ($rT4.Output -match 'declares tiers: 1, 0') 'orphan tier: and lists the tiers the repo does declare'
+Assert-True (Test-Path -LiteralPath (Join-Path $dirT4 'feat-orphan.md')) 'orphan tier: the entry file is untouched'
+
+Write-Host "A Tier: line QUOTED inside a fence is not the declaration" -ForegroundColor Cyan
+#      An entry documenting the tier model writes the line it is explaining -- this repo's own entry for
+#      this change does. A blind regex would read the quoted value as the declaration AND delete that line
+#      out of the fence while folding, damaging the one entry that explains the mechanism.
+$dirT5 = New-FoldFixture -Label 'tier-fenced' -TierSections
+$fence = "``````text`n" + "Tier: 2`n" + "``````" + "`n"
+New-TieredEntryFile -Dir $dirT5 -Name 'docs-explains.md' -Title 'Explains the format' -Tier '1' -ExtraBody "`nAn example:`n`n$fence"
+$rT5 = Invoke-Fold -Dir $dirT5
+Assert-True ($rT5.ExitCode -eq 0) 'fenced tier: exits 0'
+$clT5 = [System.IO.File]::ReadAllText((Join-Path $dirT5 'CHANGELOG.md'))
+Assert-True ((Get-SectionBody -Changelog $clT5 -Heading '## Tier 1 - Pull Requests') -match 'Explains the format') `
+    'fenced tier: the REAL declaration decided the section, not the quoted one'
+Assert-True ($clT5 -match '(?m)^Tier: 2$') 'fenced tier: and the quoted line survives inside the fence'
 
 # ---------------------------------------------------------------------------------------------------
 foreach ($f in $script:fixtures) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }

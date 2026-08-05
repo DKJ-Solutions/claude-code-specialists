@@ -169,8 +169,10 @@ lens carries the local evidence and the two names that are only true here.
   suggestion is exactly the bypass to refuse.
 
 Folding the changelog entry on `main` (`fold-changelog-entry.ps1`) is then
-[Rendall #06](05-06-extension.md#changelog)'s work. `main` thus keeps a growing
-`## Pull Requests` section of everything that has been merged.
+[Rendall #06](05-06-extension.md#changelog)'s work. `main` thus keeps a growing record of everything that
+has been merged — since August 5, 2026 spread over **three tier sections**, chosen by the entry's own
+`Tier:` line rather than by its branch prefix. Derek's part of that is only this: the tier is set while the
+branch is still open, so it belongs in the entry before the PR, not after the merge.
 
 ### The quoting lesson: where it was measured
 

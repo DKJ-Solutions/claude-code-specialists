@@ -9,7 +9,8 @@
         . (Join-Path $PSScriptRoot '..\lib\release-lib.ps1')
 
     Supplies Get-NextVersion, Get-BumpType, Get-LockstepVersion, Get-PluginManifestPaths,
-    Get-PullRequestEntries, Convert-ChangelogForRelease, Build-ReleaseNotes, and for the
+    Get-PullRequestEntries, Get-PullRequestEntriesByTier, Convert-ChangelogForRelease,
+    Build-ReleaseNotes, Get-ReleaseTierHeading, Test-ReleaseBumpEarned, and for the
     per-plugin CHANGELOGs: Get-EntryPlugins, Convert-EntryLinksForPluginChangelog,
     Build-PluginChangelogSection, Build-PluginChangelogIntro and Add-PluginChangelogSection, plus
     Get-MarketplaceName. Also Build-PluginReleaseCard: the
@@ -21,7 +22,14 @@
 
     Model: the release content moves to releases/development/<X>.x/<X.Y.Z>.md; the ## Releases
     block in CHANGELOG.md becomes a short REFERENCE to that file (like life-hub, but without GitHub
-    Releases). The ## Pull Requests section is emptied down to its intro in the process.
+    Releases). Every tier section is emptied down to its intro in the process.
+
+    THE TIER MODEL (August 5, 2026). CHANGELOG.md holds ONE ENTRY SECTION PER TIER -- how far a change
+    reaches, declared per entry on the branch and stated by the section once folded. Three things follow
+    from it here: Split-Changelog parses N sections instead of one, Build-ReleaseNotes groups by tier
+    before it groups by category, and Test-ReleaseBumpEarned answers whether the pending tiers justify
+    the bump somebody is asking for. A repo with no tier split declares a single section and travels
+    every one of those paths as a one-tier case, so there is no second model to maintain.
 
     No Set-StrictMode here: dot-sourcing would change the strict mode of the calling script.
 
@@ -68,6 +76,18 @@
 # assuming it, and states its fallback -- see there.
 $branchInfoSibling = Join-Path $PSScriptRoot 'branch-info.ps1'
 if (Test-Path -LiteralPath $branchInfoSibling) { . $branchInfoSibling }
+
+# The changelog's TIER SECTIONS (the tier model, August 5, 2026): Get-ChangelogTierSections, and with it
+# Resolve-EntryTier for a caller that still needs to read a raw entry. Unlike branch-info above, this
+# sibling is NOT repo-owned -- it travels in the same mirror as this file -- so the dot-source is
+# unconditional in every location it can run from.
+#
+# WHY THE SECTIONS LIVE THERE AND NOT HERE. The fold needs the same answer, and it reaches this lib only
+# where the repo happens to have a copy in its own root (see that script's guarded dot-source), while it
+# always has entry-scaffold-lib. Putting the map here would have meant two definitions of one fact -- the
+# exact thing this repo keeps repairing -- so the map went to the lib both scripts can reach and this one
+# reads it from there.
+. (Join-Path $PSScriptRoot 'entry-scaffold-lib.ps1')
 
 function Get-NextVersion {
     <# Bumps a SemVer X.Y.Z according to $BumpKind (major|minor|patch). #>
@@ -121,6 +141,103 @@ function Get-LockstepVersion {
         throw "Plugin versions are not in lockstep (must be equal for a repo-wide release):`n$detail"
     }
     return $distinct[0]
+}
+
+function Test-ReleaseBumpEarned {
+    <#
+        Pure: does the pending work justify the bump being asked for? Returns an object with
+
+          Earned          $true when the bump may be cut
+          EarnedBump      the bump the pending tiers WARRANT: 'minor', 'patch', or $null when nothing
+                          may be released at all. Never 'major' -- see below.
+          MajorAvailable  $true when this major line has had enough minors for a major to be allowed
+          Reason          why not, ready to print; '' when Earned
+          Counts          tier -> number of pending entries, for the message
+          Active          $false when this repo declares no tier split, so nothing was judged
+
+        EarnedBump DELIBERATELY NEVER SAYS 'major', even when one would be permitted. The pending
+        entries cannot warrant a major -- what earns it is the ten minors behind it, which is a
+        milestone somebody decides to mark rather than a size the work adds up to. Reporting 'major'
+        as the bump this work warrants would nudge a routine tier-1 change into one. So the two facts
+        are reported separately: what the work warrants, and whether a major is available at all.
+
+        THE RULES (Dave, August 5, 2026), and each answers a question the version number was already
+        supposed to answer but nothing enforced:
+
+          any release   at least one entry of tier 1 or higher. A release consisting entirely of
+                        repo-internal work has nobody to announce it to -- and cutting one spends a
+                        version number, a tag and three documents on that.
+          minor         at least one TIER-2 entry. "A minor is cut when a consumer actually notices
+                        something" was already the written rule here; this makes the entries prove it,
+                        which also means the highlights document always has a reader by construction.
+          major         at least $MinMinorsForMajor minors cut in the current major line, on top of the
+                        general minimum. A major is a RECAP of those minors, so what earns it is their
+                        accumulation rather than any single pending change -- which is why a tier-2 entry
+                        is deliberately NOT required here. Read off the minor component of
+                        $CurrentVersion: within major 3 the minors are 3.1 .. 3.10, so the component IS
+                        the count of minors cut in that line.
+
+        OFF WHEN THE REPO HAS NO TIER SPLIT, and that is what keeps this safe to share. A repo with one
+        entry section has no tier information at all, so every entry reads as tier 0 and a gate would
+        refuse every release it ever cuts -- a shared script silently imposing a model the repo never
+        adopted. One declared tier therefore means "not applicable" rather than "nothing qualifies".
+    #>
+    param(
+        [Parameter(Mandatory)][ValidateSet('major', 'minor', 'patch')][string]$BumpType,
+        # Array of objects with Tier and Entries -- what Get-PullRequestEntriesByTier returns.
+        [AllowEmptyCollection()]$TierGroups = @(),
+        [Parameter(Mandatory)][string]$CurrentVersion,
+        [int]$MinMinorsForMajor = 10
+    )
+    $groups = @($TierGroups)
+    $counts = @{}
+    foreach ($g in $groups) { $counts[[int]$g.Tier] = @($g.Entries | Where-Object { $_ -and $_.Trim() }).Count }
+
+    $result = [pscustomobject]@{
+        Earned         = $true
+        EarnedBump     = $BumpType
+        MajorAvailable = $false
+        Reason         = ''
+        Counts         = $counts
+        Active         = ($groups.Count -gt 1)
+    }
+    if (-not $result.Active) { return $result }
+
+    $notable = 0
+    foreach ($tier in $counts.Keys) { if ($tier -ge 1) { $notable += $counts[$tier] } }
+    $consumerFacing = if ($counts.ContainsKey(2)) { $counts[2] } else { 0 }
+
+    if ($CurrentVersion -notmatch '^\d+\.(\d+)\.\d+$') { throw "CurrentVersion '$CurrentVersion' is not X.Y.Z." }
+    $minorsSoFar = [int]$Matches[1]
+
+    # What the pending set warrants, computed once and reported whether or not it matches what was asked
+    # -- so a refusal can name the bump that WOULD work instead of only what will not.
+    $result.MajorAvailable = ($minorsSoFar -ge $MinMinorsForMajor)
+    $result.EarnedBump = if ($notable -eq 0) {
+        $null
+    } elseif ($consumerFacing -gt 0) {
+        'minor'
+    } else {
+        'patch'
+    }
+
+    $tier0 = if ($counts.ContainsKey(0)) { $counts[0] } else { 0 }
+    if ($notable -eq 0) {
+        $result.Earned = $false
+        $result.Reason = "nothing pending reaches beyond this repo: $tier0 entry/entries, all tier 0. A release needs at least one tier-1 entry (something a colleague on this project gets out of it) or a tier-2 one (something a consumer notices)."
+        return $result
+    }
+    if ($BumpType -eq 'minor' -and $consumerFacing -eq 0) {
+        $result.Earned = $false
+        $result.Reason = "a minor is what a consumer notices, and nothing pending is tier 2 ($notable tier-1 entry/entries, $tier0 tier-0). Cut a patch, or raise the tier of the entry that a consumer does notice."
+        return $result
+    }
+    if ($BumpType -eq 'major' -and $minorsSoFar -lt $MinMinorsForMajor) {
+        $result.Earned = $false
+        $result.Reason = "a major recaps the minors before it, and this major line has had $minorsSoFar of them (v$CurrentVersion) -- $MinMinorsForMajor is the threshold. Cut the minor this work earns instead."
+        return $result
+    }
+    return $result
 }
 
 function Get-MarketplaceName {
@@ -218,30 +335,123 @@ function Get-FencedLineFlags {
     return $flags
 }
 
+function Split-EntryBlocks {
+    <#
+        Private helper: turns the lines of one entry section into entry blocks. A new block starts at
+        every '### ' heading; '---' separators between entries are skipped.
+
+        BOTH of those tests must ignore FENCED CODE BLOCKS. An entry body may legitimately quote markdown
+        -- a broken heading structure, a YAML frontmatter example -- and without fence awareness the
+        parser reads that quoted text as structure. Measured while cutting v2.13.3: an entry that quoted
+        a '### #242 ...' line inside a ``` fence produced a THIRD entry from two PRs, split the fence
+        open, and duplicated '## Fixes' in the generated notes. Caught by -NoPush before it shipped.
+        Fourth instance of the same defect class in one day (#227, #235, and the teardown's VUL-IN test):
+        a matcher satisfied by a MENTION rather than a use.
+
+        Pulled out of Split-Changelog when the changelog gained one section per tier: the same splitting
+        now runs once per section, and a copy per section is how the fence handling starts differing
+        between tiers.
+    #>
+    param(
+        [AllowEmptyCollection()][string[]]$Lines = @(),
+        [Parameter(Mandatory)][string]$Nl
+    )
+    $fenced = Get-FencedLineFlags -Lines $Lines
+    $entries = @()
+    $cur = $null
+    for ($i = 0; $i -lt $Lines.Count; $i++) {
+        $ln = $Lines[$i]
+        if ((-not $fenced[$i]) -and $ln -match '^###\s') {
+            if ($null -ne $cur) { $entries += (($cur -join $Nl).Trim()) }
+            $cur = @($ln)
+        } elseif ($null -ne $cur) {
+            if ((-not $fenced[$i]) -and $ln -match '^---\s*$') { continue }
+            $cur += $ln
+        }
+    }
+    if ($null -ne $cur) { $entries += (($cur -join $Nl).Trim()) }
+    return @($entries)
+}
+
 function Split-Changelog {
     <#
-        Private helper: parses CHANGELOG.md into its parts. Returns an object with Nl, Head
-        (through the '## Pull Requests' line), PrIntro, Entries (array of entry blocks), RelIntro
-        and ExistingReleases. Throws if the sections are missing or there are no entries to release.
+        Private helper: parses CHANGELOG.md into its parts. Returns an object with
+
+          Nl                the newline style the document uses
+          Head              everything above the first section heading -- title and intro
+          TierSections      one object per entry section found, IN DOCUMENT ORDER: Tier, Heading,
+                            Intro (lines), Entries (blocks), Index (the heading's line number)
+          Entries           every entry block, all sections concatenated in document order
+          RelIntroLines     the release section's intro
+          ExistingReleases  the release blocks already there
+          ReleaseIndex      the release heading's line number
+          ReleasesFirst     $true when the release section comes before the first entry section
+
+        Throws if the release section is missing, if no entry section is found, or if no section holds
+        an entry to release.
+
+        ONE SECTION PER TIER (the tier model, August 5, 2026). This used to parse exactly two sections
+        -- '## Pull Requests' and the release block -- and the generalisation is deliberately to N entry
+        sections rather than to three: which sections exist is the repo's answer (Get-ChangelogTierSections),
+        a repo with no tier split declares one, and that single-section case is then this same code path
+        rather than a legacy branch beside it.
+
+        WHICH HEADINGS COUNT IS READ FROM THE SEAM, NOT MATCHED BY SHAPE. A heading regex like
+        '^##\s+Tier \d' would have been shorter and would have quietly disagreed with the fold the first
+        time a repo named its sections anything else -- and the fold is what put the entries there.
     #>
-    param([Parameter(Mandatory)][string]$Content)
+    param(
+        [Parameter(Mandatory)][string]$Content,
+        # The tier sections to look for. Omitted, they come from the seam via Get-ChangelogTierSections
+        # -- the same pattern Get-ReleaseCategories uses for Get-BranchTypes, and the same reason: every
+        # real caller has dot-sourced the consumer's repo-config already, while a test wants to state its
+        # own sections without defining seam functions.
+        $TierSections = $null
+    )
 
     $usesCRLF = $Content.Contains("`r`n")
     $nl = if ($usesCRLF) { "`r`n" } else { "`n" }
     $lines = $Content -split "`r?`n"
+
+    if (-not $TierSections) { $TierSections = @(Get-ChangelogTierSections) }
+    $TierSections = @($TierSections)
 
     # BOTH release headings are recognised, and that is a migration guarantee rather than leniency.
     # A repo that switches Get-ReleaseHistoryMode to 'latest' still has '## Releases' in its changelog
     # until the next cut rewrites it -- and the throw below is fatal, so a reader that knew only the new
     # spelling would break every consumer at the one moment it is hardest to debug. Same shape as the
     # legacy slot heading in check-consumer-drift: recognise both, write one.
-    $prIdx = -1; $relIdx = -1
+    $relIdx = -1
     for ($i = 0; $i -lt $lines.Count; $i++) {
-        if ($lines[$i] -match '^##\s+Pull Requests\s*$') { $prIdx = $i }
-        elseif ($lines[$i] -match '^##\s+(Releases|Latest Release)\s*$') { $relIdx = $i }
+        if ($lines[$i] -match '^##\s+(Releases|Latest Release)\s*$') { $relIdx = $i }
     }
-    if ($prIdx -lt 0) { throw "Could not find '## Pull Requests' in CHANGELOG.md." }
     if ($relIdx -lt 0) { throw "Could not find '## Releases' or '## Latest Release' in CHANGELOG.md." }
+
+    # Locate each declared entry section. A section the changelog does not have is recorded as absent
+    # rather than invented: Convert-ChangelogForRelease rebuilds only what was there, so a cut never adds
+    # a heading the repo has not adopted and never reorders the document.
+    $found = @()
+    foreach ($sec in $TierSections) {
+        $pattern = '^' + [regex]::Escape($sec.Heading) + '\s*$'
+        $idx = -1
+        for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match $pattern) { $idx = $i } }
+        if ($idx -ge 0) { $found += [pscustomobject]@{ Tier = [int]$sec.Tier; Heading = $sec.Heading; Index = $idx } }
+    }
+    if ($found.Count -eq 0) {
+        $names = ($TierSections | ForEach-Object { "'$($_.Heading)'" }) -join ', '
+        throw "Could not find any entry section in CHANGELOG.md -- looked for $names (from Get-ChangelogTierHeadings, or the legacy Get-ChangelogHeading, in scripts/repo-config.ps1)."
+    }
+
+    # Every section boundary, sorted: each section runs from its own heading to the next one, or to the
+    # end of the file for the last. Derived from the actual line numbers rather than from an assumption
+    # about which section comes first -- which is what lets the release block sit above the entries or
+    # below them (both layouts are valid; see below).
+    $boundaries = @(@($found | ForEach-Object { $_.Index }) + @($relIdx) | Sort-Object)
+    function Get-SectionEnd {
+        param([int]$HeadingIndex)
+        foreach ($b in $boundaries) { if ($b -gt $HeadingIndex) { return $b - 1 } }
+        return ($lines.Count - 1)
+    }
 
     # EITHER ORDER IS VALID (August 4, 2026). This used to throw unless the release heading came after
     # Pull Requests, which was the only layout that existed while that section was an accumulating
@@ -250,13 +460,12 @@ function Split-Changelog {
     # swapped, because a consumer's changelog keeps whatever order it already has and no cut should
     # silently reorder someone's document.
     #
-    # ReleasesFirst travels in the result so the caller can rebuild in the order it found, rather than
+    # ReleasesFirst travels in the result so a caller can rebuild in the order it found, rather than
     # re-deriving it from indices it no longer has.
-    $releasesFirst = ($relIdx -lt $prIdx)
-    $firstIdx  = [Math]::Min($prIdx, $relIdx)
-    $secondIdx = [Math]::Max($prIdx, $relIdx)
+    $firstIdx = $boundaries[0]
+    $releasesFirst = ($relIdx -eq $firstIdx)
 
-    # Everything above the FIRST of the two headings is the document's own head -- title and intro.
+    # Everything above the FIRST section heading is the document's own head -- title and intro.
     #
     # TRAILING BLANKS ARE STRIPPED, and that is a correctness fix rather than tidiness. The head as read
     # ends with the blank line separating it from the heading; Convert-ChangelogForRelease then adds its
@@ -266,48 +475,42 @@ function Split-Changelog {
     $head = if ($firstIdx -gt 0) { @($lines[0..($firstIdx - 1)]) } else { @() }
     while ($head.Count -gt 0 -and $head[-1].Trim() -eq '') { $head = @($head[0..($head.Count - 2)]) }
 
-    # Each section runs from its own heading to the next heading, or to the end of the file for the
-    # second one. Computed from the two indices rather than assuming which is which.
-    $prFrom = $prIdx + 1
-    $prTo   = if ($prIdx -eq $firstIdx) { $secondIdx - 1 } else { $lines.Count - 1 }
-    $prBody = if ($prFrom -le $prTo) { @($lines[$prFrom..$prTo]) } else { @() }
-    $prFirst = -1
-    # Fence-aware here too: a '###' quoted inside a fence in the section intro would otherwise be read
-    # as the first entry, putting the intro/entries boundary in the middle of a code block.
-    $prFenced = Get-FencedLineFlags -Lines $prBody
-    for ($i = 0; $i -lt $prBody.Count; $i++) { if ((-not $prFenced[$i]) -and $prBody[$i] -match '^###\s') { $prFirst = $i; break } }
-    if ($prFirst -lt 0) { throw "No changelog entries under '## Pull Requests' -- nothing to release." }
+    $tierResult = @()
+    $allEntries = @()
+    foreach ($sec in ($found | Sort-Object Index)) {
+        $from = $sec.Index + 1
+        $to = Get-SectionEnd -HeadingIndex $sec.Index
+        $body = if ($from -le $to) { @($lines[$from..$to]) } else { @() }
 
-    $prIntro = if ($prFirst -gt 0) { @($prBody[0..($prFirst - 1)]) } else { @() }
-    $entryLines = @($prBody[$prFirst..($prBody.Count - 1)])
+        # Fence-aware here too: a '###' quoted inside a fence in the section intro would otherwise be
+        # read as the first entry, putting the intro/entries boundary in the middle of a code block.
+        $bodyFenced = Get-FencedLineFlags -Lines $body
+        $firstEntry = -1
+        for ($i = 0; $i -lt $body.Count; $i++) { if ((-not $bodyFenced[$i]) -and $body[$i] -match '^###\s') { $firstEntry = $i; break } }
 
-    # Split entry lines into blocks: a new block starts at every '### ' heading. '---' separators
-    # between entries are skipped.
-    #
-    # BOTH of those tests must ignore FENCED CODE BLOCKS. An entry body may legitimately quote markdown
-    # -- a broken heading structure, a YAML frontmatter example -- and without fence awareness the
-    # parser reads that quoted text as structure. Measured while cutting v2.13.3: an entry that quoted
-    # a '### #242 ...' line inside a ``` fence produced a THIRD entry from two PRs, split the fence
-    # open, and duplicated '## Fixes' in the generated notes. Caught by -NoPush before it shipped.
-    # Fourth instance of the same defect class in one day (#227, #235, and the teardown's VUL-IN test):
-    # a matcher satisfied by a MENTION rather than a use.
-    $fenced = Get-FencedLineFlags -Lines $entryLines
-    $entries = @()
-    $cur = $null
-    for ($i = 0; $i -lt $entryLines.Count; $i++) {
-        $ln = $entryLines[$i]
-        if ((-not $fenced[$i]) -and $ln -match '^###\s') {
-            if ($null -ne $cur) { $entries += (($cur -join $nl).Trim()) }
-            $cur = @($ln)
-        } elseif ($null -ne $cur) {
-            if ((-not $fenced[$i]) -and $ln -match '^---\s*$') { continue }
-            $cur += $ln
+        $intro = if ($firstEntry -gt 0) { @($body[0..($firstEntry - 1)]) } elseif ($firstEntry -eq 0) { @() } else { $body }
+        $entryLines = if ($firstEntry -ge 0) { @($body[$firstEntry..($body.Count - 1)])  } else { @() }
+        $entries = @(Split-EntryBlocks -Lines $entryLines -Nl $nl)
+
+        $tierResult += [pscustomobject]@{
+            Tier    = $sec.Tier
+            Heading = $sec.Heading
+            Index   = $sec.Index
+            Intro   = @($intro)
+            Entries = $entries
         }
+        $allEntries += $entries
     }
-    if ($null -ne $cur) { $entries += (($cur -join $nl).Trim()) }
+
+    # AN EMPTY TIER SECTION IS NORMAL; ALL OF THEM EMPTY IS NOT. Most releases have nothing pending in at
+    # least one tier -- that is the model working, not a defect -- so the throw is on the total. It stays
+    # fatal because a cut with no entries produces a release note describing nothing.
+    if ($allEntries.Count -eq 0) {
+        throw "No changelog entries in any tier section of CHANGELOG.md -- nothing to release."
+    }
 
     $relFrom = $relIdx + 1
-    $relTo   = if ($relIdx -eq $firstIdx) { $secondIdx - 1 } else { $lines.Count - 1 }
+    $relTo   = Get-SectionEnd -HeadingIndex $relIdx
     $relBody = if ($relFrom -le $relTo) { @($lines[$relFrom..$relTo]) } else { @() }
     $relFirst = -1
     for ($i = 0; $i -lt $relBody.Count; $i++) { if ($relBody[$i] -match '^###\s') { $relFirst = $i; break } }
@@ -317,25 +520,55 @@ function Split-Changelog {
     return [pscustomobject]@{
         Nl               = $nl
         Head             = $head
-        PrIntro          = $prIntro
-        Entries          = $entries
+        TierSections     = $tierResult
+        Entries          = @($allEntries)
         RelIntroLines    = $relIntroLines
         ExistingReleases = $existingReleases
+        ReleaseIndex     = $relIdx
         ReleasesFirst    = $releasesFirst
     }
 }
 
 function Get-PullRequestEntries {
-    <# Returns the entry blocks to be released (### ... + body + PR link) from the Pull-Requests section. #>
-    param([Parameter(Mandatory)][string]$Content)
-    return @((Split-Changelog -Content $Content).Entries)
+    <# Returns the entry blocks to be released (### ... + body + PR link), every tier section
+       concatenated in document order. Use Get-PullRequestEntriesByTier where the tier matters. #>
+    param(
+        [Parameter(Mandatory)][string]$Content,
+        $TierSections = $null
+    )
+    return @((Split-Changelog -Content $Content -TierSections $TierSections).Entries)
+}
+
+function Get-PullRequestEntriesByTier {
+    <#
+        The pending entries PER TIER, in document order: an array of objects with Tier, Heading and
+        Entries. Its own function beside the flat Get-PullRequestEntries because the two callers want
+        genuinely different things and neither should derive the other:
+
+          the flat list  -- the per-plugin CHANGELOGs and the RELEASE.md cards, which select on the
+                            'Plugins:' line and do not care how far a change reaches;
+          per tier       -- the release notes (grouped by tier), the highlights (tier 2 only) and the
+                            cut's bump gate (which tiers are pending at all).
+
+        Deriving the tier from the entries themselves is impossible on purpose: the fold removes the
+        'Tier:' line once the section states the tier, so the section IS the answer.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Content,
+        $TierSections = $null
+    )
+    return @((Split-Changelog -Content $Content -TierSections $TierSections).TierSections)
 }
 
 function Convert-ChangelogForRelease {
     <#
-        Empties the '## Pull Requests' section down to its intro and puts a short REFERENCE
+        Empties EVERY tier section down to its own intro and puts a short REFERENCE
         '### [v<Version>] - <Date> - <Type>' at the top of '## Releases' to the release-notes file
         ($NotesRelPath). Pure string in/out.
+
+        The sections are the ones the repo declares (Get-ChangelogTierSections, overridable via
+        $TierSections for a test), and only the ones the document actually had are written back -- a cut
+        neither invents a heading the repo has not adopted nor changes the order they sit in.
 
         $LiveMarker (optional, #417) is the "this is the version currently live" suffix some repos
         keep on the newest release row. Given, it is STRIPPED from wherever it currently sits and
@@ -366,7 +599,8 @@ function Convert-ChangelogForRelease {
         [Parameter(Mandatory)][string]$NotesRelPath,
         [string]$LiveMarker = '',
         [ValidateSet('all', 'latest')][string]$HistoryMode = 'all',
-        [string]$HistoryRelPath = 'releases/README.md'
+        [string]$HistoryRelPath = 'releases/README.md',
+        $TierSections = $null
     )
     $emDash = [char]0x2014
     if ($LiveMarker) {
@@ -375,7 +609,7 @@ function Convert-ChangelogForRelease {
         # than before would mean re-parsing a list this function only passes through.
         $Content = [regex]::Replace($Content, '[ \t]*' + [regex]::Escape($LiveMarker), '')
     }
-    $s = Split-Changelog -Content $Content
+    $s = Split-Changelog -Content $Content -TierSections $TierSections
     $nl = $s.Nl
 
     $liveSuffix = if ($LiveMarker) { " $LiveMarker" } else { '' }
@@ -419,13 +653,25 @@ function Convert-ChangelogForRelease {
         $relIntro = @($s.RelIntroLines | Where-Object { $_ -ne '' })
     }
 
-    # The two sections, each built once, then emitted in the order the document already had. Building
-    # them separately is what makes the order a single decision at the end rather than two divergent
-    # code paths that have to be kept saying the same thing.
-    $prSection = @()
-    $prSection += '## Pull Requests'
-    $prSection += ''
-    $prSection += ($s.PrIntro | Where-Object { $_ -ne '' })
+    # Each section built once, then emitted in the order the document already had. Building them
+    # separately is what makes the order a single decision at the end rather than divergent code paths
+    # that have to be kept saying the same thing.
+    #
+    # ONE BLOCK PER TIER SECTION, and only for the sections that were actually there: the parser records
+    # which it found, and a heading the repo has not adopted is not conjured up by a release. Each is
+    # emptied down to its own intro, exactly as the single section always was -- the intro is a live
+    # statement about what the section is for, the entries are what the release just consumed.
+    # $sectionLines, NOT $block: $block above holds the release REFERENCE built earlier in this function,
+    # and reusing the name here silently replaced it with the last tier's lines -- the changelog came out
+    # with no '**vX.Y.Z** ... See [notes]' block at all and a tier section duplicated in its place.
+    # Measured on the first run. Same class as the $RepoRoot/$repoRoot collision documented in
+    # fold-changelog-entry.ps1, and just as invisible: the output is well-formed markdown either way.
+    $prSections = @()
+    foreach ($sec in $s.TierSections) {
+        $sectionLines = @($sec.Heading, '')
+        $sectionLines += @($sec.Intro | Where-Object { $_ -ne '' })
+        $prSections += [pscustomobject]@{ Index = $sec.Index; Lines = $sectionLines }
+    }
 
     $relSection = @()
     $relSection += $(if ($HistoryMode -eq 'latest') { '## Latest Release' } else { '## Releases' })
@@ -443,19 +689,20 @@ function Convert-ChangelogForRelease {
         $relSection += $s.ExistingReleases
     }
 
-    # $s.Head is everything above the first of the two headings, so it no longer carries either of them
-    # -- both are written here, which is what lets the order be chosen rather than inherited.
+    # $s.Head is everything above the FIRST section heading, so it carries none of them -- every heading
+    # is written here, which is what lets the order be inherited from the document rather than assumed.
+    #
+    # SORTED ON THE LINE NUMBER EACH SECTION WAS FOUND AT, which generalises the old two-way
+    # ReleasesFirst switch: with one section per tier there is no longer a pair to swap, and the only
+    # answer that cannot silently reorder somebody's changelog is the order the file already had.
+    $ordered = @($prSections + @([pscustomobject]@{ Index = $s.ReleaseIndex; Lines = $relSection }) |
+        Sort-Object Index)
+
     $out = @()
     $out += $s.Head
-    $out += ''
-    if ($s.ReleasesFirst) {
-        $out += $relSection
+    foreach ($sec in $ordered) {
         $out += ''
-        $out += $prSection
-    } else {
-        $out += $prSection
-        $out += ''
-        $out += $relSection
+        $out += $sec.Lines
     }
 
     return (($out -join $nl).TrimEnd() + $nl)
@@ -671,13 +918,13 @@ function Format-CategorizedEntries {
         is left alone (^ without multiline = start of the whole block). Output is pure LF; $Entries
         may arrive CRLF (from the root CHANGELOG) and are normalized here.
 
-        $OnlyTypes restricts the output to those categories, in the canonical order; the entries of
-        every other category are dropped rather than reported. Empty (the default) = every category,
-        which is what this function always did. It exists for the highlights tier (#417 phase 2),
-        which renders the SAME entry set twice -- the stakeholder categories in one document section
-        and the remainder in another -- and must classify both halves by the one rule that already
-        reads a type from a heading. Filtering the entries before the call instead would mean a second
-        copy of that parsing, which is how the two halves start disagreeing about what a 'Docs' entry is.
+        $OnlyTypes IS GONE (August 5, 2026). It restricted the output to named categories, and it
+        existed for exactly one caller: the highlights tier, which rendered the same entry set twice --
+        the "stakeholder" categories in one section and the remainder under a remove-before-publishing
+        marker. The tier model replaced that split with the entries' own tier declaration, so the second
+        rendering, the marker and its two seam knobs all went; this parameter went with them rather than
+        staying as a tested feature with no caller, which this repo has elsewhere called dead code
+        guarding nothing.
 
         $BareTitles reduces each entry heading to its title (Convert-EntryHeadingToTitle) -- for the
         highlights tier, whose reader has no branch and no PR number. IT MUST HAPPEN HERE rather than
@@ -689,7 +936,6 @@ function Format-CategorizedEntries {
     param(
         [Parameter(Mandatory)][string[]]$Entries,
         [int]$CategoryLevel = 2,
-        [string[]]$OnlyTypes = @(),
         [switch]$BareTitles
     )
     $md = [char]0x00B7
@@ -714,7 +960,6 @@ function Format-CategorizedEntries {
 
     $sections = @()
     foreach ($cat in $cats.Order) {
-        if ($OnlyTypes.Count -gt 0 -and $OnlyTypes -notcontains $cat) { continue }
         if ($grouped.ContainsKey($cat)) {
             $label = if ($cats.Title.ContainsKey($cat)) { $cats.Title[$cat] } else { $cat }
             $rendered = @($grouped[$cat].ToArray() | ForEach-Object {
@@ -942,17 +1187,59 @@ function Get-OverviewTargetMajor {
     return $sections[$sections.Count - 1].Groups[2].Value
 }
 
+# The audience each tier is named after in a generated document. ONE MAP, so the release notes and any
+# later reader of a tier number agree about what it means.
+#
+# HARDCODED ENGLISH, deliberately, and not a new seam. This file already writes English prose into the
+# documents it generates -- the per-plugin CHANGELOG intro, the "no changes to this plugin" line, the
+# card's footer labels, the '**Date:**' label -- and none of those is configurable. Adding a knob for
+# these three words while five other strings stay fixed would be arbitrary; translating this file's
+# generated prose is one question with one answer, and the day a consumer needs it, it is that whole
+# question that gets a seam rather than the three words that happened to be added last.
+$script:ReleaseTierAudience = @{
+    2 = 'consumers'
+    1 = 'colleagues'
+    0 = 'developers'
+}
+
+function Get-ReleaseTierHeading {
+    <# The heading text for a tier in a generated release document, e.g. 'Tier 2 - consumers'. A tier
+       with no audience word in the map degrades to 'Tier <n>' rather than to a blank -- an unfamiliar
+       number is readable, a dangling separator is not. #>
+    param([Parameter(Mandatory)][int]$Tier)
+    $audience = $script:ReleaseTierAudience[$Tier]
+    if ($audience) { return "Tier $Tier - $audience" }
+    return "Tier $Tier"
+}
+
 function Build-ReleaseNotes {
     <#
         Builds the full release notes (the releases/development/<X>.x/<X.Y.Z>.md file) from the
-        entry blocks, grouped by branch type. Pure string out -- DELIBERATELY hard LF (see
+        entry blocks. Pure string out -- DELIBERATELY hard LF (see
         Build-PluginChangelogSection above for the same trade-off: this is a NEW, standalone file
         with no existing newline style of its own, unlike the root CHANGELOG.md which detects and
-        keeps its CRLF style via $nl). $Entries come from that CRLF root CHANGELOG -- so here they
+        keeps its CRLF style via $nl). The entries come from that CRLF root CHANGELOG -- so here they
         are explicitly normalized to LF (#103, Victor #5), alongside the link rewriting below.
+
+        TWO SHAPES, ONE FUNCTION (the tier model, August 5, 2026):
+
+          -TierGroups  the changelog's tier sections, each with its own entries. Renders one '## Tier
+                       <n> - <audience>' section per tier IN THE ORDER GIVEN, with the category
+                       grouping one level under it ('### Features' -> '#### <entry>'). This is the
+                       document the tier model produces: complete, raw, and structured the way
+                       CHANGELOG.md itself now is. A tier with no entries is omitted, like an empty
+                       category.
+          -Entries     the flat list, rendered exactly as this function always did ('## Features' ->
+                       '### <entry>'). Kept because a repo with no tier split has one section and
+                       therefore nothing to group by -- a single '## Tier 0' wrapper around the whole
+                       document would be a level of structure that says nothing.
+
+        Give one or the other; -TierGroups wins if both arrive.
     #>
     param(
-        [Parameter(Mandatory)][string[]]$Entries,
+        [AllowEmptyCollection()][string[]]$Entries = @(),
+        # Array of objects with Tier and Entries -- what Get-PullRequestEntriesByTier returns.
+        $TierGroups = $null,
         [Parameter(Mandatory)][string]$Version,
         [Parameter(Mandatory)][string]$Date,
         [Parameter(Mandatory)][string]$Type,
@@ -970,11 +1257,24 @@ function Build-ReleaseNotes {
     # Entries are written with repo-root-relative links; rewrite them so they resolve correctly
     # from the notes file (releases/development/<X>.x/ = 3 folders deep -> '../../../'). External
     # (http/mailto), anchor (#) and absolute (/) links are left alone, as are links that already
-    # start with ../. Format-CategorizedEntries then groups the entries by category
-    # ('## <Category>' -> '### <entry>') and normalizes to LF, so the CRLF of the source CHANGELOG
-    # does not cross the pure-LF output.
-    $linked = @($Entries | ForEach-Object { Convert-RootRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
-    $body = Format-CategorizedEntries -Entries $linked -CategoryLevel 2
+    # start with ../. Format-CategorizedEntries then groups the entries by category and normalizes to
+    # LF, so the CRLF of the source CHANGELOG does not cross the pure-LF output.
+    if ($TierGroups) {
+        $sections = @()
+        foreach ($group in @($TierGroups)) {
+            $groupEntries = @($group.Entries | Where-Object { $_ -and $_.Trim() })
+            if ($groupEntries.Count -eq 0) { continue }
+            $linked = @($groupEntries | ForEach-Object { Convert-RootRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
+            # Categories one level deeper than in the flat shape, so the nesting stays correct:
+            # '## Tier 2 - consumers' -> '### Features' -> '#### <entry>'.
+            $inner = Format-CategorizedEntries -Entries $linked -CategoryLevel 3
+            $sections += ("## " + (Get-ReleaseTierHeading -Tier ([int]$group.Tier)) + "`n`n" + $inner)
+        }
+        $body = ($sections -join "`n`n")
+    } else {
+        $linked = @($Entries | ForEach-Object { Convert-RootRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
+        $body = Format-CategorizedEntries -Entries $linked -CategoryLevel 2
+    }
 
     $titleLine = if ($Title) { "$Title`n`n" } else { '' }
     # Normalized to LF like everything else that enters this file, and separated from the generated
@@ -994,21 +1294,26 @@ function Build-ReleaseNotes {
 #
 # A SECOND, STAKEHOLDER-FACING RENDERING OF THE SAME RELEASE -- not a second changelog. The tier was
 # built in a consumer repo and stayed there while cut-release.ps1 was two files; phase 1 shared the
-# script, this is the half that was still missing. The rule it carries is older than the sharing
-# (Dave, July 13, 2026): HIGHLIGHTS IS WRITTEN FOR NON-DEVELOPERS. So the generated document puts the
-# stakeholder categories first and the remainder under an explicit "remove before publishing" marker.
+# script, phase 2 shared this half. The rule it carries is older than the sharing (Dave, July 13,
+# 2026): HIGHLIGHTS IS WRITTEN FOR NON-DEVELOPERS.
 #
-# THE TOOL MARKS THE CUT, IT DOES NOT MAKE IT. What a stakeholder should read is an editorial
-# judgement, and a generator that silently dropped the developer half would be making that judgement
-# on the release manager's behalf -- while also hiding the fact that there was anything to decide. So
-# the block is written out, labelled, and left to be deleted by hand.
+# THE MARKER IS GONE, AND WITH IT THE GUESS IT EXISTED FOR (August 5, 2026). Until now this document
+# rendered EVERY category, put the branch types a seam called "stakeholder-facing" above a "remove
+# before publishing" marker, and left the release manager to delete the rest. That marker was
+# explicitly a PROPOSAL rather than a verdict, because the branch prefix does not predict impact -- held
+# against the 19 entries pending at v3.2.0, the single most consequential change for a consumer
+# (renaming the marketplace, which breaks every existing install) arrived on a chore/ branch and landed
+# below the marker.
 #
-# ONE DELIBERATE DIFFERENCE FROM THE SOURCE THIS WAS PORTED FROM: there, both halves render their
-# categories at '##', which puts the developer categories at the same level as the marker heading that
-# is supposed to contain them -- so the block reads as ended rather than as nested. Here the marker sits
-# at '##' and its categories one level under it, which is what Format-CategorizedEntries's
-# -CategoryLevel was already for. The consumer's generated highlights therefore gain a level of nesting
-# they did not have; nothing else about them changes.
+# The tier model asks the author of the entry instead, at the moment they know: 'Tier: 2' means a
+# consumer notices. So this document is now simply the tier-2 entries, and the two knobs that
+# configured the marker (Get-ReleaseHighlightsStakeholderTypes, Get-ReleaseHighlightsWording) are
+# retired. That is a smaller document AND a better-founded one: what used to be a hint for the release
+# manager to correct is now a claim the entry's own author made and a reviewer saw on the PR.
+#
+# STILL A DRAFT TO BE EDITED, for the reason that never depended on the marker: entry bodies are
+# written for developers even when the change reaches a consumer, so the selection is right and the
+# prose still needs rewriting. What is gone is the deleting, not the writing.
 #
 # MARKDOWN ONLY -- THE TIER PRODUCES NO HTML, AND THAT IS A DECISION RATHER THAN AN OMISSION (Dave,
 # August 3, 2026, the same day it was ported). The source generated a self-contained, print-ready
@@ -1056,60 +1361,43 @@ function Convert-EntryHeadingToTitle {
 
 function Build-HighlightsNotes {
     <#
-        Builds the highlights document (releases/highlights/<dir>/<X.Y.Z>.md) from the same entry
-        blocks the developer notes are built from. Pure string out, hard LF -- a new standalone file,
-        like Build-ReleaseNotes.
+        Builds the highlights document (releases/highlights/<dir>/<X.Y.Z>.md) from the TIER-2 entries of
+        the release. Pure string out, hard LF -- a new standalone file, like Build-ReleaseNotes.
 
-        $StakeholderTypes names the branch types a non-developer reader is the audience for; every
-        OTHER category present lands in the developer-only block below the marker. Empty = every
-        category is stakeholder-facing, so no marker block is written at all (a repo that wants the
-        second document but not the split).
+        $Entries is the selection, not the whole release: the caller passes the tier-2 section's entries
+        and this renders all of them. The selection lives in the caller because the tier is a property of
+        the changelog SECTION an entry sits in, which only the parser knows -- the fold removed the
+        'Tier:' line the moment the section took over stating it.
 
-        $DevBlockComment and $DevBlockHeading are the consumer's own words for that marker -- the
-        #410 class: a document written for this repo's stakeholders is written in their language, and
-        a hardcoded English heading in a Dutch release note is the wrong word rather than a missing
-        one.
+        AN EMPTY SELECTION RETURNS THE HEADER AND NOTHING ELSE, rather than throwing. cut-release never
+        gets here with nothing (its bump gate refuses a minor with no tier-2 entry), so a throw would
+        only ever fire in a test or a hand call -- and a document that says "this release has no
+        highlights" is a truthful answer to a strange question, while an exception is not.
 
-        The entries arrive with their internal heading metadata intact and keep it until the renderer
-        has read the type off it -- hence -BareTitles on Format-CategorizedEntries rather than a strip
-        pass here; see that function for what stripping too early costs. Links are rewritten first, at
-        the same depth the developer notes use (both documents sit three folders down).
+        The entries keep their heading metadata until the renderer has read the type off it -- hence
+        -BareTitles on Format-CategorizedEntries rather than a strip pass here; see that function for
+        what stripping too early costs. Links are rewritten first, at the same depth the developer notes
+        use (both documents sit three folders down).
     #>
     param(
-        [Parameter(Mandatory)][string[]]$Entries,
+        [AllowEmptyCollection()][string[]]$Entries = @(),
         [Parameter(Mandatory)][string]$Version,
         [Parameter(Mandatory)][string]$Date,
         [Parameter(Mandatory)][string]$Type,
         [string]$Title = '',
-        [string[]]$StakeholderTypes = @(),
-        [string]$DevBlockComment = 'Remove this block before sharing the highlights with non-developers.',
-        [string]$DevBlockHeading = 'For developers only -- remove before publishing',
         [string]$LinkPrefix = '../../../'
     )
-    $linked = @($Entries | ForEach-Object { Convert-RootRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
-
-    if ($StakeholderTypes.Count -gt 0) {
-        $stake = Format-CategorizedEntries -Entries $linked -CategoryLevel 2 -OnlyTypes $StakeholderTypes -BareTitles
-        # The developer half is "everything not named", derived rather than configured: a branch type
-        # added later is then stakeholder-facing only if somebody says so, and shows up in the block
-        # that gets reviewed either way. The reverse default would hide it.
-        $cats = Get-ReleaseCategories
-        $devTypes = @($cats.Order | Where-Object { $StakeholderTypes -notcontains $_ })
-        $dev = Format-CategorizedEntries -Entries $linked -CategoryLevel 3 -OnlyTypes $devTypes -BareTitles
+    $real = @($Entries | Where-Object { $_ -and $_.Trim() })
+    $linked = @($real | ForEach-Object { Convert-RootRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
+    $body = if ($linked.Count -gt 0) {
+        Format-CategorizedEntries -Entries $linked -CategoryLevel 2 -BareTitles
     } else {
-        $stake = Format-CategorizedEntries -Entries $linked -CategoryLevel 2 -BareTitles
-        $dev = ''
+        ''
     }
 
     $rocket = [char]::ConvertFromUtf32(0x1F680)
     $titleLine = if ($Title) { "$Title`n`n" } else { '' }
     $header = "# Release notes v$Version $rocket`n`n**Date:** $Date  `n**Type:** $Type`n`n$titleLine"
 
-    if ($dev.Trim()) {
-        $marker = "<!-- $DevBlockComment -->`n## $DevBlockHeading"
-        $body = if ($stake.Trim()) { "$stake`n`n---`n`n$marker`n`n$dev" } else { "$marker`n`n$dev" }
-    } else {
-        $body = $stake
-    }
     return ($header + $body + "`n")
 }

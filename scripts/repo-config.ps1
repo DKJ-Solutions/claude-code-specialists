@@ -92,17 +92,47 @@ function Get-RosterIgnoredIds {
     return $script:RosterIgnoredIds
 }
 
-# The CHANGELOG.md section heading that fold-changelog-entry.ps1 folds a merged entry into. This
-# workshop keeps merged PRs under '## Pull Requests' (with '## Releases' below it); a consumer on
-# Keep-a-Changelog uses '## [Unreleased]'. The heading used to be hardcoded in the fold script, which
-# made it stop outright on any repo that names its section differently (issue #178). Optional in the
-# contract: a consumer without this function simply gets the default below.
-$script:ChangelogHeading = '## Pull Requests'
+# --- Which CHANGELOG.md section a merged entry is folded into (the tier model, August 5, 2026) -----
+#
+# ONE SECTION PER TIER, newest-facing first. A changelog entry declares how far it reaches with its
+# 'Tier: N' line (scripts/lib/entry-scaffold-lib.ps1), and the fold uses that to pick a section here:
+#
+#   Tier 2 -- a consumer of the product notices it
+#   Tier 1 -- a colleague working on this project gets something out of it
+#   Tier 0 -- nobody outside this repo's own developers notices: docs, config, repo-internal work
+#
+# THE MAP'S ORDER IS THE DOCUMENT'S ORDER, deliberately, so "which tiers exist" and "in what order do
+# they appear" are one answer rather than two that can disagree. Descending here (Dave, August 5,
+# 2026): a reader opening CHANGELOG.md should meet the changes that reach furthest first, and the
+# repo-internal bulk last.
+#
+# THIS REPLACES Get-ChangelogHeading HERE, and the shape is why replacing rather than adding was
+# right: a repo with no tiers is simply a repo with ONE tier, so a single-entry map --
+# [ordered]@{ 0 = '## Pull Requests' } -- is exactly the old behaviour expressed in the new vocabulary.
+# There is no second model to keep working, only a degenerate case of this one. Get-ChangelogHeading
+# stays RECOGNISED by the fold as the legacy answer (the repo's own "recognise both, write one" rule,
+# as with the legacy slot heading and the legacy [ERROR] marker), so a consumer that has not migrated
+# keeps folding exactly as before -- it is simply no longer stated here, because a value nothing reads
+# is a value that goes stale unnoticed.
+#
+# Optional in the contract, like the heading it replaces: a consumer that defines neither function
+# gets '## Pull Requests' as one tier-0 section, which is what the fold has always done.
+$script:ChangelogTierHeadings = [ordered]@{
+    2 = '## Tier 2 - Pull Requests'
+    1 = '## Tier 1 - Pull Requests'
+    0 = '## Tier 0 - Pull Requests'
+}
 
-function Get-ChangelogHeading {
-    <# The CHANGELOG.md section heading a folded entry is inserted under. Must be the literal heading
-       line as it appears in the file (including the leading '##'). #>
-    return $script:ChangelogHeading
+function Get-ChangelogTierHeadings {
+    <# tier -> the literal '## ' heading line that tier's entries are folded under, in the order the
+       sections appear in CHANGELOG.md. Keys are whole numbers.
+
+       DELIBERATELY NOT REQUIRED TO COVER EVERY TIER THE MODEL HAS. The ceiling (Get-EntryTierMax in
+       entry-scaffold-lib.ps1) is what an entry may DECLARE; this map is what this repo FILES. A repo
+       that keeps only two sections is a legitimate choice, and the fold refuses an entry whose tier
+       has no section here by name rather than guessing a neighbour -- so the two facts are checked
+       where each is known instead of being kept equal by hand. #>
+    return $script:ChangelogTierHeadings
 }
 
 # Whether this repo has a separate "go live" stage after cutting a release -- e.g. a push to a live
@@ -250,28 +280,22 @@ function Get-PrMergeMethod {
 #
 #   1. where the notes are grouped        Get-ReleaseNotesGrouping    (named in the issue)
 #   2. the highlights tier                Get-ReleaseHighlightsBumps  (named in the issue)
-#                                         + Get-ReleaseHighlightsStakeholderTypes
-#                                         + Get-ReleaseHighlightsWording
 #   3. the LIVE marker                    Get-ReleaseLiveMarker       (named in the issue)
 #   4. the plugin/marketplace half        Get-ReleasePluginTier       (NOT named -- the largest block)
 #   5. the category labels                Get-ReleaseCategoryTitles   (NOT named)
 #   6. the permanent root docs            Get-ReservedRootMd          (NOT named)
 #
-# KNOB 2 LANDED IN PHASE 2 and needed three functions rather than one, because "the highlights tier"
-# turned out to be three independent questions and answering them with one config object would have
-# given the script contract a single record whose 'Returns' line could not say anything actionable:
+# KNOB 2 LANDED IN PHASE 2 AS THREE FUNCTIONS AND IS BACK TO ONE (August 5, 2026). "The highlights
+# tier" was three independent questions -- whether, for whom, and in whose words -- and the second and
+# third existed only to configure the remove-before-publishing marker. The tier model retired that
+# marker (see the block further down), which retired both knobs with it: what a consumer notices is now
+# declared per entry rather than guessed per branch type. Only 'whether, and for which bump types'
+# survives, because that is the one question the entries cannot answer for the repo.
 #
-#   Bumps             -- WHETHER, and for which bump types. @() switches the tier off entirely.
-#   StakeholderTypes  -- WHICH branch types a non-developer is the audience for. The rest of the
-#                        release lands under the remove-before-publishing marker.
-#   Wording           -- the words on that marker. One function rather than two, unlike the four #410
-#                        entry stubs: those are chosen independently, while these are one document's
-#                        language and are always set together. (It briefly also carried an HTML lang
-#                        attribute; the tier produces no HTML -- see below.)
-#
-# ALL EIGHT ARE OPTIONAL in the script contract, and every fallback is this workshop's CURRENT
+# ALL SIX ARE OPTIONAL in the script contract, and every fallback is this workshop's CURRENT
 # behaviour -- so a consumer that defines none of them gets exactly what the unshared script did.
-# Same pattern as Get-ChangelogHeading (#178) and the entry-stub wording (#410).
+# Same pattern as the changelog section headings (#178, now the tier map) and the entry-stub wording
+# (#410).
 
 # 'major' -> releases/development/<X>.x/<X.Y.Z>.md   (this workshop)
 # 'minor' -> releases/development/<X.Y>/<X.Y.Z>.md   (a repo that cuts often enough for that to help)
@@ -385,13 +409,13 @@ function Get-ReservedRootMd {
     return $script:ReservedRootMd
 }
 
-# --- The highlights tier: whether, for whom, and in whose words (issue #417, knob 2) --------------
+# --- The highlights tier: whether, and for which bumps (issue #417 knob 2; narrowed August 5, 2026) --
 #
 # The second, stakeholder-facing rendering of a release: releases/highlights/<dir>/<X.Y.Z>.md. Written
-# for NON-DEVELOPERS (Dave, July 13, 2026), so the generated draft puts the stakeholder categories
-# first and everything else under an explicit "remove before publishing" marker for the release manager
-# to cut by hand. MARKDOWN ONLY -- the tier briefly also generated a print-ready .html and no longer
-# does anywhere (Dave, August 3, 2026); whoever wants a PDF renders the markdown with a real tool.
+# for NON-DEVELOPERS (Dave, July 13, 2026), and since the tier model it is assembled from the TIER-2
+# ENTRIES rather than from a category guess plus a marker somebody deletes by hand. MARKDOWN ONLY -- the
+# tier briefly also generated a print-ready .html and no longer does anywhere (Dave, August 3, 2026);
+# whoever wants a PDF renders the markdown with a real tool.
 #
 # ON IN THIS REPO SINCE AUGUST 3, 2026, for minor and major only -- Dave's decision, and it reversed
 # what this file said one commit earlier. The reasoning that had it off was that this repo's release
@@ -400,10 +424,16 @@ function Get-ReservedRootMd {
 # reader does not want the full per-PR record, and giving them only the developer notes is the same
 # mismatch a storefront repo has with its management -- one tier serving two audiences badly.
 #
-# So this repo runs the same three tiers as the consumer it was ported from:
-#   releases/development/<X>.x/<X.Y.Z>.md   developers   -- every release, auto-complete, long
-#   releases/internal/<X>.x/<X.Y.Z>.md      colleagues   -- every release, what it is worth
-#   releases/highlights/<X>.x/<X.Y.Z>.md    consumers    -- minor/major only, what they notice
+# So this repo runs three release documents, one per tier of the ladder the entries declare:
+#   releases/development/<X>.x/<X.Y.Z>.md   tier 0   developers   -- every release, complete, raw
+#   releases/internal/<X>.x/<X.Y.Z>.md      tier 1   colleagues   -- every release, what it is worth
+#   releases/highlights/<X>.x/<X.Y.Z>.md    tier 2   consumers    -- minor/major, what they notice
+#
+# THE TIER NUMBER AND THE DOCUMENT ARE THE SAME SCALE, which is the point of the renumbering (Dave,
+# August 5, 2026 -- they were 1/2/3 before, one off from the entries they describe). A tier-1 entry is
+# in the internal note; a tier-2 entry is in the highlights AND, the ladder being cumulative, in the
+# internal note as well. The development note carries everything, tier 0 included, because it is the
+# record.
 #
 # PER MAJOR, NOT PER MINOR (Dave, August 3, 2026). The consumer this came from folders its notes per
 # minor; this repo keeps <X>.x for all three tiers, which Get-ReleaseNotesGrouping above already says
@@ -412,6 +442,11 @@ function Get-ReservedRootMd {
 # WHY MINOR/MAJOR AND NOT PATCH: a minor here is cut when a consumer actually notices something. That
 # is the same test the version number itself answers, so the tier and the bump agree by construction --
 # a patch has nothing a consumer would read, which is precisely why it is a patch.
+#
+# SINCE AUGUST 5, 2026 THAT AGREEMENT IS ENFORCED RATHER THAN HOPED FOR: cut-release refuses a minor
+# unless a tier-2 entry is pending, so "this bump has a highlights reader" is a precondition of the
+# bump instead of a convention about it. This knob therefore no longer decides WHETHER there is
+# anything to write -- the tier does -- only whether this repo wants the document for that bump type.
 $script:ReleaseHighlightsBumps = @('minor', 'major')
 
 function Get-ReleaseHighlightsBumps {
@@ -419,42 +454,46 @@ function Get-ReleaseHighlightsBumps {
     return $script:ReleaseHighlightsBumps
 }
 
-# Which branch types a non-developer reader is the audience for; every other category present lands in
-# the developer-only block. Keyed on the TYPES from scripts/lib/branch-info.ps1, like
-# Get-ReleaseCategoryTitles above -- not on the display labels, which a consumer may have renamed.
+# --- How many minors a major must recap (Dave, August 5, 2026) ------------------------------------
 #
-# READ THE MARKER AS A PROPOSAL, NOT A VERDICT, and in this repo more so than in the one this was
-# ported from. There, a 'Style' or 'Content' branch IS a storefront change, so the prefix predicts the
-# impact. HERE IT MEASURABLY DOES NOT: held against the 19 entries pending at v3.2.0, the single most
-# consequential change for a consumer -- renaming the marketplace, which breaks every existing install
-# -- arrived on a chore/ branch and therefore lands BELOW the marker, as did "a folder rename silently
-# unlinks plugin installs" on a docs/ one.
+# A major here is not "a big release" but a RECAP of the minors before it -- which is what the two majors
+# this repo has cut actually were: v2.0.0 consolidated v1.0 to v1.18, v3.0.0 consolidated v2.2.0 to
+# v2.16.0. Both were written that way after the fact; this states it up front and lets the cut enforce it.
 #
-# Feat+Fix is kept anyway, deliberately: the split's value is that both halves are written out and the
-# release manager sees what is a candidate for cutting. A wrong-but-visible proposal costs one edit; the
-# alternative (no split at all) costs the hint entirely. So when editing the draft, expect to promote
-# Docs/Chore items rather than trusting the halves.
-$script:ReleaseHighlightsStakeholderTypes = @('Feat', 'Fix')
+# TEN, and read off the CURRENT VERSION's minor component rather than counted from the tag list. Within
+# major 3 the minors are 3.1 .. 3.10, so the component IS the number of minors cut in that line -- one
+# number that cannot disagree with itself, where counting tags could (a deleted tag, a minor cut in
+# another line). Held against this repo's own history the threshold is roughly right rather than
+# arbitrary: the 1.x line ran to 1.18 and the 2.x line to 2.16 before each was recapped.
+#
+# Repo-owned because it is release cadence, not language: a repo that cuts minors rarely would be pinned
+# to a major it never reaches, and forking a shared script over one integer is precisely what the seam
+# exists to prevent (#417). Only read where a tier split is declared -- the whole bump gate is off
+# without one.
+$script:ReleaseMajorMinMinors = 10
 
-function Get-ReleaseHighlightsStakeholderTypes {
-    <# Branch types whose entries go above the remove-before-publishing marker. Empty = no split. #>
-    return $script:ReleaseHighlightsStakeholderTypes
+function Get-ReleaseMajorMinMinors {
+    <# The number of minors a major line must have had before a major may be cut. #>
+    return $script:ReleaseMajorMinMinors
 }
 
-# The words on the marker -- the #410 class one level up. A repo whose stakeholders read Dutch
-# generates a Dutch document, and a hardcoded English heading in it is the wrong word rather than a
-# missing one. Only the keys that differ from release-lib's English defaults need to appear; the map is
-# merged over them rather than replacing them. Two keys now: DevBlockComment and DevBlockHeading.
+# --- RETIRED, AUGUST 5, 2026: Get-ReleaseHighlightsStakeholderTypes + Get-ReleaseHighlightsWording ---
 #
-# EMPTY HERE for the same reason Get-ReleaseCategoryTitles is: the defaults already say what an
-# English repo means. The tier is ON now, so these ARE read -- an empty map means the English defaults
-# reach the generated document, not that nothing happens.
-$script:ReleaseHighlightsWording = @{}
-
-function Get-ReleaseHighlightsWording {
-    <# Overrides for the highlights tier's own text: DevBlockComment, DevBlockHeading. #>
-    return $script:ReleaseHighlightsWording
-}
+# Both existed to serve ONE mechanism: the highlights generator wrote out every category, put Feat+Fix
+# above a "remove before publishing" marker and left the release manager to cut the rest by hand. The
+# marker was explicitly a PROPOSAL rather than a verdict, and the reason it could only ever be a
+# proposal is the measurement this repo already had: held against the 19 entries pending at v3.2.0, the
+# single most consequential change for a consumer -- renaming the marketplace, which breaks every
+# existing install -- arrived on a chore/ branch and therefore landed below the marker.
+#
+# The tier model answers that question at the source instead of guessing at the end: the author of the
+# entry says whether a consumer notices, and the generator selects on that. So the marker has nothing
+# left to propose, and the two knobs that configured it -- which types to promote, and in whose words to
+# label the block -- describe machinery that is gone. They are removed rather than left returning values
+# nothing reads, which is this file's own rule about write-once config.
+#
+# A consumer that still defines either function is unaffected: nothing calls them, so they are simply
+# dead code in that repo's seam, and its next fold and cut behave exactly as this repo's do.
 
 # --- The internal tier's own text (the third tier, August 3, 2026) --------------------------------
 #

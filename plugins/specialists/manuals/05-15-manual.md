@@ -83,6 +83,31 @@ and safe hook construction.
   ADOPTION.md's "Staying up to date" section for the detail). Note: this applies to plugin
   content; changes to `CLAUDE.md` imports and settings still load only on a restart.
 
+## Two PowerShell traps that produce well-formed wrong output
+
+Both were measured in this system, not read about, and both share the property that makes them
+expensive: **nothing errors.** The script runs, the output parses, the markdown renders — and it says
+something other than what the author meant. Neither is caught by a linter, so each is worth an assert.
+
+- **`[ordered]@{ 2 = '...' }`'s indexer takes a positional index as well as a key.** For an integer the
+  positional overload wins, so `$map[2]` returns the **third value**, not the value for key `2`. In a
+  map deliberately ordered high-to-low that hands every key its neighbour's value. Measured while
+  building the changelog tier map, on the first run, one screen below the comment warning about it.
+  **Iterate `GetEnumerator()`** and read `Key`/`Value` from the `DictionaryEntry` — then no lookup can
+  resolve differently — or normalise the map once into a list of objects the callers use instead.
+- **A report marker written into prose inflates whatever counts it.** These checks report with `[OK]` /
+  `[INFO]` / `[ERROR]` tokens, and things downstream *count* those tokens: a SessionStart hook decides
+  whether to surface a run by counting `[ERROR]`, and test suites assert on how many `[OK]` lines a
+  clean run prints. A finding whose own message spells one of those tokens is therefore counted twice.
+  Measured: a contract record that spelled the info marker in its explanatory text made five findings
+  count as six and turned three unrelated asserts red. With the error marker it would have raised a
+  blocking session signal for a repo with nothing wrong. **So never write a report marker inside a
+  message, a description or a config value** — describe it ("the info signal") instead of spelling it —
+  and where a set of such strings exists, assert that none of them contains one.
+
+The general shape behind both, worth carrying to the next one: when a mistake cannot announce itself,
+the assert is the announcement. Prefer a test over a comment for anything in this class.
+
 ## Sylvester is lazy
 
 Recurring config work belongs automated — exactly what the **`fewer-permission-prompts` skill** is

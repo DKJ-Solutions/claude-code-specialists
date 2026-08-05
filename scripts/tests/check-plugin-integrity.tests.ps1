@@ -193,6 +193,10 @@ $CheckReportLibSrc = Join-Path $RepoRoot 'scripts\lib\check-report-lib.ps1'
 # REAL script, so a missing dependency is a broken suite rather than one skipped check.
 $ReleaseLibSrc = Join-Path $RepoRoot 'scripts\lib\release-lib.ps1'
 $BranchInfoSrc = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
+# Sixth, since the tier model (August 5, 2026): release-lib dot-sources entry-scaffold-lib.ps1 for the
+# changelog's tier sections. Copied for the same reason as the five above -- this fixture runs the REAL
+# script, so a missing sibling is a broken suite rather than one skipped check.
+$EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 $Fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("check-plugin-integrity-test-$PID")
 
 $script:pass = 0
@@ -243,6 +247,7 @@ try {
     Copy-Item -Path $CheckReportLibSrc -Destination (Join-Path $Fixture 'scripts\lib\check-report-lib.ps1') -Force
     Copy-Item -Path $ReleaseLibSrc -Destination (Join-Path $Fixture 'scripts\lib\release-lib.ps1') -Force
     Copy-Item -Path $BranchInfoSrc -Destination (Join-Path $Fixture 'scripts\lib\branch-info.ps1') -Force
+    Copy-Item -Path $EntryScaffoldSrc -Destination (Join-Path $Fixture 'scripts\lib\entry-scaffold-lib.ps1') -Force
 
     $skillAlphaMd = "---`nname: skill-alpha`ndescription: Fixture skill alpha.`n---`n`n# Skill Alpha`n"
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\specialists\skills\skill-alpha\SKILL.md'), $skillAlphaMd, $Utf8NoBom)

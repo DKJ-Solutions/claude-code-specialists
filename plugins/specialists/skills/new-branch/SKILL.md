@@ -34,6 +34,36 @@ The script:
    entry come into existence in a single step. If the entry file already exists, that step is a
    no-op (same idempotence).
 
+## The entry carries a tier, scaffolded at 0
+
+The entry file gets a `Tier: 0` line under its heading. It says **how far the change reaches**, on one
+scale:
+
+| tier | who notices |
+|---|---|
+| `Tier: 0` | only this repo's own developers -- docs, config, internal work |
+| `Tier: 1` | a colleague working on this project gets something out of it |
+| `Tier: 2` | a consumer of the product notices it |
+
+**Raise it by hand when the work deserves it.** Nothing breaks if you leave it at 0, which is exactly why
+it is worth knowing what it costs: where the repo declares tier sections, the release cut reads them and
+refuses a bump they have not earned -- a release needs at least one tier-1 entry, a minor needs a tier-2
+one. So an entry left at 0 is work that cannot carry a release on its own. `open-pr` prints the tier it
+read, so you learn that before the PR rather than at the cut.
+
+**There is no `-Tier` parameter, deliberately.** Whoever finishes the branch already has to rewrite the
+title and body before the PR (open-pr's scaffold gate refuses the stubs), so the tier is one more edit in a
+file that is being edited anyway.
+
+**Do not derive it from your branch prefix.** The prefix predicts the *category* an entry is grouped under,
+not its impact: a `docs/` branch can carry a tier-2 change and a `feat/` branch a tier-0 one. The source
+repo measured this -- its single most consequential change for a consumer, a rename that broke every
+existing install, arrived on a `chore/` branch.
+
+The tier's word (`Tier`) is a machine-read key and is **not** translated, unlike the four scaffold strings
+below: the writer, the PR gate and the fold all match on the literal, so a translated key would make an
+entry unreadable to your own fold.
+
 ## Recording intent and parking a branch (#162)
 
 Two optional parameters cover the "start now, continue later (maybe on another device)" case:

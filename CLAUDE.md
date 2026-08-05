@@ -220,34 +220,53 @@ The constitution above, concretely implemented here:
      Since August 3, 2026 it is a **shared** script, mirrored into the plugin like the rest of the
      workflow ([#417](https://github.com/DaveKJohn/claude-code-specialists/issues/417)): everything
      that legitimately differs per repo — which root docs are permanent, how the notes are foldered,
-     the live marker, whether there is a plugin tier at all, the category labels, and for which bumps a
-     stakeholder-facing **highlights** document is generated, for whom, and in whose words — is read
-     from optional functions in [`scripts/repo-config.ps1`](scripts/repo-config.ps1), each falling back to
-     what this repo already did. **The exception it runs under did not widen**: same scope, same
+     the live marker, whether there is a plugin tier at all, the category labels, for which bumps a
+     stakeholder-facing **highlights** document is generated, and how many minors a major must recap — is
+     read from optional functions in [`scripts/repo-config.ps1`](scripts/repo-config.ps1), each falling
+     back to what this repo already did. **The exception it runs under did not widen**: same scope, same
      "only on explicit request", and the release artefacts it produces here were verified
      byte-identical to the unshared script's, both when the script was shared and again when the
      highlights tier joined it.
 
-     **Three release tiers, per major version** (Dave, August 3, 2026). A release is written for three
-     different readers, and one document cannot serve them:
+     **The tier model** (Dave, August 5, 2026). Every change declares **how far it reaches**, and that one
+     number decides both which section of `CHANGELOG.md` it is filed under and which release document it
+     appears in:
 
-     | tier | for whom | when |
-     |---|---|---|
-     | `releases/development/<X>.x/<X.Y.Z>.md` | developers — the full per-PR record | every release |
-     | `releases/internal/<X>.x/<X.Y.Z>.md` | colleagues, employers — what it is worth | every release, patch included |
-     | `releases/highlights/<X>.x/<X.Y.Z>.md` | consumers — what they notice | minor/major |
+     | tier | who notices | changelog section | release document | when |
+     |---|---|---|---|---|
+     | **2** | consumers | `## Tier 2 - Pull Requests` | `releases/highlights/<X>.x/<X.Y.Z>.md` | minor/major |
+     | **1** | colleagues on this project | `## Tier 1 - Pull Requests` | `releases/internal/<X>.x/<X.Y.Z>.md` | every release, patch included |
+     | **0** | only this repo's developers | `## Tier 0 - Pull Requests` | `releases/development/<X>.x/<X.Y.Z>.md` | every release |
 
      The grouping is per **major** (`3.x`) for all three, deliberately differing from the consumer this
      model came from, which folders per minor. `Get-ReleaseNotesGrouping` answers that once.
 
-     **A minor is cut when a consumer actually notices something** — otherwise it is a patch. That test
-     is what keeps the highlights tier honest: a patch has no highlights reader by construction, which is
-     exactly why it is a patch. So the bump type and the tier agree without a second rule.
+     **The ladder is cumulative**, so a tier-2 entry is in the highlights *and* in the internal note; the
+     development note carries everything, tier 0 included, because it is the record rather than a summary.
+     **The number comes from the author of the entry, on the branch** — `Tier: 0` is scaffolded and raised
+     by hand — and deliberately **not** from the branch prefix, which this repo has measured does not
+     predict impact.
 
-     **And that same test is why the internal tier exists at every release.** The two are not the same
-     question: highlights is *what a consumer notices*, internal is *what the organisation gets out of
-     it*. They come apart most clearly on a patch — a release with nothing for a consumer can still be
-     the one where a routine change stopped needing a developer.
+     **And a release now has to earn its bump.** `cut-release.ps1` refuses one that the pending entries do
+     not justify, before it writes anything:
+
+     - **any release** needs at least one **tier-1** entry — a release made entirely of repo-internal work
+       has nobody to announce it to, and cutting one spends a version, a tag and three documents on that;
+     - a **minor** needs a **tier-2** entry. "A minor is cut when a consumer actually notices something"
+       was already the written rule; this makes the entries prove it, which also means the highlights
+       document always has a reader by construction;
+     - a **major** needs **10 minors** in the current major line, on top of that minimum. A major is a
+       *recap* — which is what both of this repo's majors already were — so what earns it is the
+       accumulation, not any single pending change. `Get-ReleaseMajorMinMinors` owns the number.
+
+     `-SkipTierGate` overrules it, deliberately separate from `-SkipLint`: that one skips a tool, this one
+     overrules a judgement about content. The gate switches itself off in a repo that declares a single
+     changelog section, so a consumer that has not adopted the model is untouched.
+
+     **And that same ladder is why the internal document exists at every release.** Tier 2 and tier 1 are
+     not the same question: highlights is *what a consumer notices*, internal is *what the organisation
+     gets out of it*. They come apart most clearly on a patch — a release with nothing for a consumer can
+     still be the one where a routine change stopped needing a developer.
 
      **Who writes what.** `cut-release.ps1` generates the development notes and the highlights **draft**,
      then names the two documents it deliberately did not write. The internal note has its own script
@@ -265,12 +284,14 @@ The constitution above, concretely implemented here:
      Recorded because until that date this was an **assumption** stated as a rule: the question had been
      put twice without an answer, and the answer-shaped text went into the docs anyway.
 
-     **One caveat worth knowing before editing a highlights draft: the branch prefix does not predict
-     impact in this repo.** The tier puts `Feat`/`Fix` above the "remove before publishing" marker and
-     everything else below it, and that split is a *proposal*, not a verdict. Measured against the 19
-     entries pending at v3.2.0, the single most consequential change for a consumer — renaming the
-     marketplace, which breaks every existing install — arrived on a `chore/` branch and therefore landed
-     below the marker. Expect to promote `Docs`/`Chore` items rather than trusting the halves.
+     **The measurement the whole tier model rests on: the branch prefix does not predict impact in this
+     repo.** Until August 5, 2026 the highlights document put `Feat`/`Fix` above a "remove before
+     publishing" marker and everything else below it, explicitly as a *proposal* rather than a verdict.
+     Measured against the 19 entries pending at v3.2.0, the single most consequential change for a consumer
+     — renaming the marketplace, which breaks every existing install — arrived on a `chore/` branch and
+     therefore landed below the marker. The tier asks the entry's author instead, so the marker and its two
+     seam knobs are retired; a `docs/` branch carrying a tier-2 change now says so, and the prefix decides
+     nothing but which category heading the entry is grouped under.
 - **This repo is `public`.** A deliberate choice, so the remote `github` marketplace source can be
   read without gh auth. Consequence: **nothing confidential** belongs here — no personal
   information, credentials, or secrets. The group 1 agent defs are therefore deliberately

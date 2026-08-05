@@ -35,7 +35,9 @@ The script:
    [The resolves gate](#the-resolves-gate-which-issues-does-this-pr-close) below.
 3. Runs the **scaffold gate**: the branch's changelog entry must no longer carry the wording
    `new-changelog-entry.ps1` scaffolded it with. See
-   [The scaffold gate](#the-scaffold-gate-has-the-entry-actually-been-written) below.
+   [The scaffold gate](#the-scaffold-gate-has-the-entry-actually-been-written) below. On the same read of
+   the same file it also runs the **tier gate** and prints the tier it read. See
+   [The tier gate](#the-tier-gate-how-far-does-this-change-reach) below.
 4. Runs the **repo's own lint gate** (via `Get-LintScript` from `repo-config`) and then **all
    test suites** (`scripts/tests/*.tests.ps1`) -- exactly like CI. An error blocks: nothing is
    pushed and no PR is opened. `-SkipLint` / `-SkipTests` are the deliberate escape valves.
@@ -108,6 +110,27 @@ the script that writes the scaffold read it from the same shared library, so the
 - **`-Force` ships anyway** (a warning instead of a block), for the rare entry that legitimately quotes
   the wording outside a fence. Deliberately separate from `-SkipLint`/`-SkipTests`: those skip a tool,
   this overrules a judgement about content.
+
+## The tier gate: how far does this change reach?
+
+The entry also carries a `Tier: N` line — `0` = only this repo's own developers notice, `1` = a colleague on
+the project gets something out of it, `2` = a consumer notices. The fold files the entry under the changelog
+section that tier names, and where the repo declares tier sections the release cut refuses a bump the
+pending tiers have not earned.
+
+**The tier it read is printed on every run**, including when nothing was declared and the default applied.
+That line is the point: an entry still sitting at tier 0 is work that cannot carry a release on its own, and
+this is the last moment to raise it cheaply — after the merge it is a section move on the main branch.
+
+**Only a meaningless value is refused, never a low one.** `Tier: 0` is a legitimate, common and final
+answer, which is why this is a separate gate rather than part of the scaffold one: a low tier can never be
+evidence of an unfinished entry. What is refused is `Tier: 5` or `Tier: two` — a value that reads back as the
+default and would file consumer-facing work as repo-internal, correct-looking and silent.
+
+- **Fenced code is excluded here too**, so an entry that documents the tier format is read by its real
+  declaration rather than by the one it quotes.
+- **`-Force` does not apply.** It exists for text somebody legitimately wrote; there is no legitimate
+  `Tier: 5`. Correct the line — it is a one-line edit.
 
 ## The resolves gate: which issues does this PR close?
 

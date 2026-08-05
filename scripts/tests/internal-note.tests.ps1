@@ -79,6 +79,11 @@ function New-Fixture {
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\lib') -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\release-lib.ps1') `
         -Destination (Join-Path $dir 'scripts\lib\release-lib.ps1') -Force
+    # entry-scaffold-lib.ps1 travels along because release-lib dot-sources it for the changelog's tier
+    # sections (August 5, 2026). Copied for the same reason as release-lib itself: a missing sibling must
+    # fail loudly here rather than in someone's release.
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1') `
+        -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1') -Force
     if ($null -ne $NotesContent) {
         $notesPath = Join-Path $dir "releases\development\$NotesDir\$Version.md"
         New-Item -ItemType Directory -Path (Split-Path -Parent $notesPath) -Force | Out-Null
@@ -286,6 +291,103 @@ Assert-True ($doc -notmatch 'What is different now') 'no English heading survive
 Assert-True ($doc -match 'SKELETON') 'an unmentioned key keeps its default -- the map is merged'
 Assert-True ($doc -match 'cannot be generated') 'the value hint survives untranslated rather than disappearing'
 Remove-Item -Recurse -Force -LiteralPath $translated -ErrorAction SilentlyContinue
+
+# ===================================================================================================
+# THE TIER SELECTION (August 5, 2026): tier 1 and 2 are carried over, tier 0 is not
+# ===================================================================================================
+Write-Host "Tiered developer notes: tier 1 and 2 come over, tier 0 stays behind" -ForegroundColor Cyan
+# The developer notes are now nested one level deeper -- '## Tier <n>' -> '### <Category>' ->
+# '#### <entry>' -- so an entry is recognised by its metadata SHAPE rather than by its heading level. A
+# level-based match would have collected the CATEGORY headings instead and put the words 'Features' and
+# 'Fixes' in a document written for colleagues.
+$tieredNotes = @"
+# Release notes v3.2.0
+
+**Date:** 2026-08-03
+**Type:** Minor
+
+## Tier 2 - consumers
+
+### Features
+
+#### #470 $midDot A consumer-facing feature $midDot Feat $midDot 2026-08-05
+
+Body text.
+
+### Fixes
+
+#### #469 $midDot A consumer-facing fix $midDot Fix $midDot 2026-08-05
+
+Body text.
+
+## Tier 1 - colleagues
+
+### Documentation
+
+#### #468 $midDot Something for colleagues $midDot Docs $midDot 2026-08-04
+
+Body text.
+
+## Tier 0 - developers
+
+### Maintenance
+
+#### #467 $midDot Repo-internal housekeeping $midDot Chore $midDot 2026-08-04
+
+Body text.
+"@
+$tiered = New-Fixture -Label 'tiered' -NotesContent $tieredNotes
+$r = Invoke-Script -Dir $tiered
+Assert-Equal 0 $r.Code 'tiered notes: exit 0'
+$doc = [System.IO.File]::ReadAllText((Join-Path $tiered 'releases\internal\3.x\3.2.0.md'))
+Assert-True ($doc -match '- \[Feat\] A consumer-facing feature') 'tiered notes: a tier-2 entry is carried over -- the ladder is cumulative'
+Assert-True ($doc -match '- \[Fix\] A consumer-facing fix')      'tiered notes: and the second one in that tier'
+Assert-True ($doc -match '- \[Docs\] Something for colleagues')  'tiered notes: the tier-1 entry is carried over'
+Assert-True ($doc -notmatch 'Repo-internal housekeeping')        'tiered notes: the tier-0 entry is NOT -- the developer notes are its record'
+# The category headings must not be mistaken for entries. Asserted as bullets specifically: the words do
+# appear in the document's own prose, so a bare -notmatch would be satisfied by the wrong thing.
+foreach ($cat in 'Features', 'Fixes', 'Documentation', 'Maintenance') {
+    Assert-True ($doc -notmatch "(?m)^- (\[[^\]]+\] )?$cat`$") "tiered notes: the '$cat' category heading is not carried over as a bullet"
+}
+Assert-True ($doc -notmatch '#470') 'tiered notes: the PR number is stripped, as before'
+Remove-Item -Recurse -Force -LiteralPath $tiered -ErrorAction SilentlyContinue
+
+Write-Host "Notes whose every entry is tier 0: an empty list, with the reason" -ForegroundColor Cyan
+# Reachable only through -SkipTierGate (the cut refuses such a release), which is exactly why the message
+# has to distinguish it from "the notes did not parse" -- one is a bypassed judgement, the other a defect.
+$allZeroNotes = @"
+# Release notes v3.2.0
+
+**Date:** 2026-08-03
+**Type:** Patch
+
+## Tier 0 - developers
+
+### Maintenance
+
+#### #467 $midDot Only housekeeping $midDot Chore $midDot 2026-08-04
+
+Body text.
+"@
+$allZero = New-Fixture -Label 'allzero' -NotesContent $allZeroNotes
+$r = Invoke-Script -Dir $allZero
+Assert-Equal 0 $r.Code 'all tier 0: exit 0 -- a thin release is not a failure'
+Assert-True ($r.Out -match 'is tier 0') 'all tier 0: the warning says every entry was tier 0'
+Assert-True ($r.Out -notmatch 'No entry titles found') 'all tier 0: and does NOT report it as a parse failure'
+$doc = [System.IO.File]::ReadAllText((Join-Path $allZero 'releases\internal\3.x\3.2.0.md'))
+Assert-True ($doc -match 'no entries found') 'all tier 0: the skeleton carries the fill-in-by-hand placeholder'
+Remove-Item -Recurse -Force -LiteralPath $allZero -ErrorAction SilentlyContinue
+
+Write-Host "Untiered developer notes still carry everything" -ForegroundColor Cyan
+# A repo with no tier split has no tier information to filter on, so filtering would EMPTY the document
+# rather than focus it. The pre-tier fixture at the top of this file is that case; asserted explicitly
+# here so the fallback is a stated guarantee rather than a side effect.
+$flat = New-Fixture -Label 'flat-still-works' -NotesContent "# Release notes v3.2.0`n`n**Date:** 2026-08-03`n**Type:** Patch`n`n## Maintenance`n`n### #1 $midDot An untiered entry $midDot Chore $midDot 2026-08-03`n`nBody.`n"
+$r = Invoke-Script -Dir $flat
+Assert-Equal 0 $r.Code 'untiered notes: exit 0'
+$doc = [System.IO.File]::ReadAllText((Join-Path $flat 'releases\internal\3.x\3.2.0.md'))
+Assert-True ($doc -match '- \[Chore\] An untiered entry') 'untiered notes: every entry is carried over, tier filter or not'
+Remove-Item -Recurse -Force -LiteralPath $flat -ErrorAction SilentlyContinue
 
 Write-Host ""
 if ($script:fail -gt 0) {

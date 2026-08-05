@@ -25,19 +25,26 @@
     this script did before it was shared: Get-ReservedRootMd (which root docs are permanent),
     Get-ReleaseNotesGrouping (notes per major or per minor), Get-ReleaseLiveMarker (the "currently
     live" suffix, none here), Get-ReleasePluginTier (whether steps 3b/3c and the lockstep bump run at
-    all), Get-ReleaseCategoryTitles (the category labels) and -- since phase 2 -- the three highlights
-    knobs (Get-ReleaseHighlightsBumps, Get-ReleaseHighlightsStakeholderTypes,
-    Get-ReleaseHighlightsWording), which are all empty in this repo: its release audience is
-    developers, so it generates no stakeholder document. See step 3d.
+    all), Get-ReleaseCategoryTitles (the category labels), Get-ReleaseHighlightsBumps (which bumps get a
+    stakeholder document; see step 3d) and Get-ReleaseMajorMinMinors (how many minors a major must recap).
+
+    THE TIER MODEL (August 5, 2026). CHANGELOG.md holds one entry section per tier -- how far a change
+    reaches, declared per entry on its branch and stated by the section once folded. Three things here
+    follow from it: the bump gate in step 1, the tier grouping of the notes in step 3, and the highlights
+    document in step 3d being the tier-2 entries rather than a category guess. All three switch
+    themselves off in a repo that declares a single section, so a consumer that has not adopted the model
+    cuts exactly the release it always did.
 
     Steps (all on main):
-      1. Guardrails: clean main, no unfolded entry files in the root, lint gate green.
+      1. Guardrails: clean main, no unfolded entry files in the root, THE BUMP EARNED BY THE PENDING
+         TIERS (any release needs a tier-1 entry, a minor needs a tier-2 one, a major needs enough
+         minors behind it -- Test-ReleaseBumpEarned; -SkipTierGate overrules), lint gate green.
       2. Determines the current version -- the lockstep value from every
          <plugin>/.claude-plugin/plugin.json where this repo publishes plugins, otherwise the newest
          vX.Y.Z tag -- then the new version (-Version or -Bump) and the bump type.
-      3. Generates releases/development/<X>.x/<X.Y.Z>.md from the ## Pull Requests entries
-         (grouped by branch type), adds a row to releases/README.md, puts a reference in
-         CHANGELOG.md under ## Releases and empties the Pull-Requests section, and bumps all
+      3. Generates releases/development/<X>.x/<X.Y.Z>.md from the pending entries, grouped by TIER and
+         then by branch type within each tier, adds a row to releases/README.md, puts a reference in
+         CHANGELOG.md under ## Releases and empties every tier section down to its intro, and bumps all
          plugin.json's.
       3b. Writes, per plugin, the entries with a matching 'Plugins:' line (derived by the fold
           from the PR files) into <plugin>/CHANGELOG.md -- the consumer-facing history that
@@ -51,8 +58,9 @@
           which commit a consumer will install from (inbound #384).
       3d. Writes, for a bump type the seam names in Get-ReleaseHighlightsBumps, a second
           stakeholder-facing rendering of the same release: releases/highlights/<dir>/<X.Y.Z>.md.
-          Written for NON-DEVELOPERS, so the categories the seam does not call stakeholder-facing land
-          under an explicit "remove before publishing" marker the release manager cuts by hand.
+          Written for NON-DEVELOPERS, and it is the TIER-2 ENTRIES -- what a consumer notices was
+          declared by each entry's own author, so there is no "remove before publishing" marker left to
+          cut by hand. Still a draft: the selection is right, the prose is still written for developers.
           Markdown only -- no HTML, deliberately (see release-lib.ps1's highlights header).
       4. Commits that directly to main (release: vX.Y.Z) and sets an annotated tag vX.Y.Z, then names
          the documents it deliberately did NOT write: the highlights draft still needs editing, and the
@@ -92,6 +100,14 @@
 .PARAMETER SkipLint
     Deliberately skip the lint gate (escape valve).
 
+.PARAMETER SkipTierGate
+    Cut a bump the pending changelog tiers have not earned (escape valve).
+
+    DELIBERATELY SEPARATE FROM -SkipLint, and for the same reason the scaffold gate's -Force is separate:
+    this overrules a judgement about CONTENT -- whether the work reaches far enough to deserve this
+    version number -- while -SkipLint skips a tool. Folding them into one flag would let someone skipping
+    a slow lint run also, silently, cut a minor with nothing in it for a consumer.
+
 .EXAMPLE
     ./scripts/release/cut-release.ps1 -Version 1.0.0 -Title "First official release"
 
@@ -109,7 +125,8 @@ param(
     [string]$Title = '',
     [string]$SummaryFile = '',
     [switch]$NoPush,
-    [switch]$SkipLint
+    [switch]$SkipLint,
+    [switch]$SkipTierGate
 )
 $ErrorActionPreference = 'Stop'
 
@@ -139,6 +156,12 @@ if ($absent.Count -gt 0) {
 # Plugin-owned libraries, from $PSScriptRoot: these travel WITH this script, so the sibling is the
 # right one in both locations.
 . (Join-Path $PSScriptRoot '..\lib\release-lib.ps1')
+# The changelog's tier sections (Get-ChangelogTierSections, reading Get-ChangelogTierHeadings from the
+# seam). release-lib dot-sources this lib itself, so this line adds no function that was not already in
+# scope -- it is here for the same reason branch-info is dot-sourced above rather than left to
+# release-lib: a dependency this script's own gate and notes grouping rest on should be visible at the
+# place that rests on it, not inherited from another lib's internals.
+. (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
 # Shared native-capture helper (#114): the #107 EAP=Continue -> capture -> $LASTEXITCODE dance for
 # the git mutations in the final block lives here in one tested place.
 . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
@@ -166,18 +189,19 @@ $historyRelPath = Get-SeamValue -Name 'Get-ReleaseHistoryPath'    -Default 'rele
 $pluginTier    = Get-SeamValue -Name 'Get-ReleasePluginTier' `
     -Default (Test-Path -LiteralPath (Join-Path $repoRoot '.claude-plugin\marketplace.json'))
 
-# The highlights tier (#417 phase 2). All three default to empty, which is the tier switched OFF --
-# what this script did for its whole life as a workshop-only file, so nothing changes here.
+# The highlights tier (#417 phase 2). Empty by default, which is the tier switched OFF -- what this
+# script did for its whole life as a workshop-only file, so nothing changes for a consumer.
+#
+# ONE KNOB NOW, NOT THREE. Get-ReleaseHighlightsStakeholderTypes and Get-ReleaseHighlightsWording are
+# retired (August 5, 2026): both configured the "remove before publishing" marker, and the tier model
+# replaced that marker with the entries' own tier-2 declaration. See release-lib.ps1's highlights header.
 $highlightsBumps = @(Get-SeamValue -Name 'Get-ReleaseHighlightsBumps' -Default @())
-$highlightsTypes = @(Get-SeamValue -Name 'Get-ReleaseHighlightsStakeholderTypes' -Default @())
-# Merged over release-lib's English defaults rather than replacing them, so a consumer that renames
-# one string does not have to restate the other two (same pattern as Get-ReleaseCategoryTitles).
-$highlightsWording = @{
-    DevBlockComment = 'Remove this block before sharing the highlights with non-developers.'
-    DevBlockHeading = 'For developers only -- remove before publishing'
-}
-$wordingOverride = Get-SeamValue -Name 'Get-ReleaseHighlightsWording' -Default @{}
-if ($wordingOverride) { foreach ($k in $wordingOverride.Keys) { $highlightsWording[$k] = $wordingOverride[$k] } }
+
+# How many minors a major line must have had before a major may be cut. A major here is a RECAP of the
+# minors before it, so what earns one is their accumulation -- 10 in this repo. Repo-owned because it is
+# a release-cadence policy: a repo that cuts minors rarely would be pinned to a major it never reaches,
+# and forking a shared script over one integer is exactly what the seam exists to prevent (#417).
+$majorMinMinors = [int](Get-SeamValue -Name 'Get-ReleaseMajorMinMinors' -Default 10)
 
 # BOM-less UTF8 -- the rest of the repo has no BOM.
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
@@ -291,6 +315,61 @@ $typeLabel = @{ major = 'Major'; minor = 'Minor'; patch = 'Patch' }[$bumpType]
 $tagName = "v$new"
 if ((git tag --list $tagName)) { Write-Error "Tag $tagName already exists."; exit 1 }
 
+# --- The changelog, read once -------------------------------------------------------------------
+# READ HERE RATHER THAN FURTHER DOWN, because the tier gate below needs it and a gate that runs after
+# the first write is not a gate. Nothing between this read and the write at the end touches the file, so
+# reading early costs nothing and means the whole run judges ONE snapshot of the changelog.
+$changelogPath = Join-Path $repoRoot 'CHANGELOG.md'
+$changelogRaw = Get-Content -Path $changelogPath -Raw -Encoding UTF8
+$tierGroups = @(Get-PullRequestEntriesByTier -Content $changelogRaw)
+$entries = @($tierGroups | ForEach-Object { $_.Entries } | Where-Object { $_ })
+
+# --- Guardrail: has this bump been earned? (the tier model, August 5, 2026) ------------------------
+# The rules live in Test-ReleaseBumpEarned (release-lib, tested): any release needs a tier-1 entry at
+# minimum, a minor needs a tier-2 one, and a major needs enough minors behind it. The version number was
+# always supposed to mean this; until now nothing checked, so the meaning depended on whoever typed the
+# flag.
+#
+# PLACED WITH THE OTHER GUARDRAILS, BEFORE ANYTHING IS WRITTEN, for the same reason the new-major check
+# is: failing after the notes file exists leaves a release half-cut on main.
+#
+# IT SWITCHES ITSELF OFF in a repo that declares no tier split -- one entry section means there is no
+# tier information to judge, not that nothing qualifies. So a consumer that has not adopted the model is
+# unaffected, without needing a knob to say so.
+if (-not $SkipTierGate) {
+    $earned = Test-ReleaseBumpEarned -BumpType $bumpType -TierGroups $tierGroups `
+        -CurrentVersion $current -MinMinorsForMajor $majorMinMinors
+    if ($earned.Active -and -not $earned.Earned) {
+        $breakdown = ($tierGroups | ForEach-Object {
+            "  tier $($_.Tier): $(@($_.Entries | Where-Object { $_ }).Count) entry/entries"
+        }) -join "`n"
+        $suggestion = if ($earned.EarnedBump) {
+            "What the pending work does earn: -Bump $($earned.EarnedBump)."
+        } else {
+            "Nothing pending earns a release. Raise the tier of an entry that deserves it, or wait for work that does."
+        }
+        Write-Error @"
+This $bumpType has not been earned by the pending changelog entries. Nothing was written.
+
+$($earned.Reason)
+
+Pending, per tier:
+$breakdown
+
+$suggestion
+
+The tiers are how far a change reaches: 0 = only this repo's own developers notice, 1 = a colleague on
+this project gets something out of it, 2 = a consumer notices. An entry's tier is the section it sits in
+under CHANGELOG.md; move it, or correct the bump. -SkipTierGate overrules this, deliberately separate
+from -SkipLint because it overrules a judgement about content rather than skipping a tool.
+"@
+        exit 1
+    }
+    if (-not $earned.Active) {
+        Write-Host "  (no tier split declared in this repo -- the bump gate does not apply.)" -ForegroundColor DarkGray
+    }
+}
+
 # --- Guardrail: a NEW MAJOR needs its own overview section before the row can land ----------------
 # Placed here, with the other guardrails, because it must stop the run BEFORE anything is written: the
 # row insertion happens after the notes file already exists, and failing there would leave a release
@@ -377,9 +456,10 @@ $notesDirName = if ($notesGrouping -eq 'minor') {
 $notesRelPath = "releases/development/$notesDirName/$new.md"
 $today = (Get-Date -Format 'yyyy-MM-dd')
 
-$changelogPath = Join-Path $repoRoot 'CHANGELOG.md'
-$changelogRaw = Get-Content -Path $changelogPath -Raw -Encoding UTF8
-$entries = @(Get-PullRequestEntries -Content $changelogRaw)
+# $changelogPath / $changelogRaw / $tierGroups / $entries were read up with the bump gate, which had to
+# see them before the first write. $entries is the flat list, in document order across the tiers -- the
+# per-plugin loop below selects on the 'Plugins:' line and is deliberately tier-blind: a plugin's
+# consumer-facing CHANGELOG carries everything that touched that plugin.
 
 # -SummaryFile: an authored milestone block, read here rather than passed as a string, because a
 # multi-page summary does not survive a command line. Deliberately NOT required to live in the repo:
@@ -400,18 +480,27 @@ if ($SummaryFile) {
     }
 }
 
-$notesContent = Build-ReleaseNotes -Entries $entries -Version $new -Date $today -Type $typeLabel -Title $Title -Summary $summaryText
+# The development notes are grouped BY TIER, then by category within each tier -- the same shape
+# CHANGELOG.md now has, which is what makes this tier "the whole changelog, raw and complete". A repo
+# with no tier split gets one group and Build-ReleaseNotes renders the flat document it always did.
+$notesContent = Build-ReleaseNotes -TierGroups $tierGroups -Version $new -Date $today -Type $typeLabel -Title $Title -Summary $summaryText
 $changelogNew = Convert-ChangelogForRelease -Content $changelogRaw -Version $new -Date $today -Type $typeLabel -NotesRelPath $notesRelPath -LiveMarker $liveMarker -HistoryMode $historyMode -HistoryRelPath $historyRelPath
 
 # The highlights document, built here with everything else so a failure leaves no half-written release
-# behind. $cutHighlights is off unless the seam names THIS bump type: the tier exists for the release
-# a stakeholder is told about, and a patch is generally not that release.
-$cutHighlights = $highlightsBumps -contains $bumpType
+# behind. It is the TIER-2 entries and nothing else: what a consumer notices was declared by the author
+# of each entry, so there is no marker block left for the release manager to delete (see release-lib's
+# highlights header for the guess this replaced).
+#
+# TWO CONDITIONS, AND THE SECOND IS NOT REDUNDANT. The seam must name this bump type, AND there must be
+# tier-2 work to describe. The bump gate above already guarantees the second for a minor or major, but
+# not for a repo that lists 'patch' in Get-ReleaseHighlightsBumps -- and a highlights document with a
+# header and no content is worse than none, because it looks written.
+$tier2Entries = @($tierGroups | Where-Object { [int]$_.Tier -eq 2 } | ForEach-Object { $_.Entries } | Where-Object { $_ })
+$cutHighlights = ($highlightsBumps -contains $bumpType) -and ($tier2Entries.Count -gt 0)
 $highlightsRelPath = "releases/highlights/$notesDirName/$new.md"
 if ($cutHighlights) {
-    $highlightsContent = Build-HighlightsNotes -Entries $entries -Version $new -Date $today `
-        -Type $typeLabel -Title $Title -StakeholderTypes $highlightsTypes `
-        -DevBlockComment $highlightsWording.DevBlockComment -DevBlockHeading $highlightsWording.DevBlockHeading
+    $highlightsContent = Build-HighlightsNotes -Entries $tier2Entries -Version $new -Date $today `
+        -Type $typeLabel -Title $Title
 }
 
 # --- Write the release-notes file -------------------------------------------------------------
@@ -523,8 +612,9 @@ foreach ($m in $manifests) {
 
 # The follow-up documents this script deliberately does NOT write, printed once at the end whether or
 # not the tag was pushed. Both are hand-written and both need the notes that only exist after this run:
-# the highlights DRAFT (generated above, still carrying its remove-before-publishing block) and the
-# internal note (its own script, because a skeleton committed here would sit inside the release tag).
+# the highlights DRAFT (generated above -- the tier-2 entries, selected but not yet rewritten for their
+# reader) and the internal note (its own script, because a skeleton committed here would sit inside the
+# release tag).
 #
 # GATED ON THE SCRIPT EXISTING rather than on a config knob: whether a repo has an internal tier is a
 # fact its file tree already answers, so a consumer without that script simply never sees the line. Same
@@ -536,7 +626,7 @@ function Write-FollowUpSteps {
     Write-Host ""
     Write-Host "Still to write by hand (both via a branch + PR -- this commit is already tagged):" -ForegroundColor Cyan
     if ($cutHighlights) {
-        Write-Host "  - $highlightsRelPath -- edit the draft; it still carries the developer-only block."
+        Write-Host "  - $highlightsRelPath -- edit the draft; it is the tier-2 entries, still in the words their author wrote for a reviewer."
     }
     if ($hasInternal) {
         Write-Host "  - the internal summary:  ./$internalScript -Version $new"

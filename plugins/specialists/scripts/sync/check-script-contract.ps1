@@ -22,7 +22,9 @@
       - open-pr             -> branch-info.ps1: Get-BranchInfo
                                repo-config.ps1: Get-RepoName, Get-LintScript
       - fold-changelog-entry -> repo-config.ps1: Get-RepoName
-                                repo-config.ps1: Get-ChangelogHeading (OPTIONAL -- see below)
+                                repo-config.ps1: Get-ChangelogTierHeadings, Get-ChangelogHeading
+                                                 (both OPTIONAL, and a repo needs at most one -- see
+                                                 below)
       - check-roster-sync   -> repo-config.ps1: Get-RosterPath, Get-RosterIgnoredIds
       - cut-release skill   -> repo-config.ps1: Get-LiveStage (OPTIONAL -- see below)
       - ship-pr             -> repo-config.ps1: Get-RepoName
@@ -55,7 +57,7 @@
     never declared here.
     cut-release.ps1 USED TO BE OUT OF SCOPE HERE, described as "genuinely workshop-only... not mirrored
     and not part of the consumer contract" because lockstep across a marketplace's plugins is meaningless
-    in a consumer. It became a shared, mirrored script in #417, and the eight cut-release records below
+    in a consumer. It became a shared, mirrored script in #417, and the cut-release records below
     are the consumer contract this paragraph said did not exist -- so the paragraph is now the drift it
     was written to prevent, one file over. Corrected here rather than left standing: a reader who takes it
     at face value concludes those records are a mistake.
@@ -65,7 +67,7 @@
     (Get-ReleasePluginTier), after which a repo with no marketplace manifest simply skips that half.
 
     Two 'cut-release' things are named in this file and they are NOT the same, which is worth keeping
-    straight: the shared cut-release SCRIPT (the eight repo-config records below) and the shared
+    straight: the shared cut-release SCRIPT (its repo-config records below) and the shared
     cut-release SKILL (issue #177), a checklist that reads Get-LiveStage to decide whether its Block 2
     applies. The Get-LiveStage record is attributed to 'cut-release skill' for exactly that reason.
 
@@ -186,9 +188,25 @@ $script:Contract = @(
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RosterIgnoredIds'; Scripts = @('check-roster-sync');
        Optional = $true; Default = 'no ignored ids';
        Returns = "an array of '<group>-<id>' ids deliberately kept out of the roster -- normally empty, @(), since every enabled specialist belongs in the roster" },
+    # THE TIER MODEL'S SECTION MAP (August 5, 2026), and the legacy single heading beside it. Both
+    # optional, and a repo needs at most one: the map where it files entries per tier, the single heading
+    # where it has one section. Neither present means '## Pull Requests' as one tier-0 section, which is
+    # what the fold has always done -- so a consumer that has never heard of tiers is untouched.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ChangelogTierHeadings'; Scripts = @('fold-changelog-entry', 'cut-release');
+       ViaLib = 'entry-scaffold-lib';
+       Optional = $true; Default = 'one section, from Get-ChangelogHeading or else ## Pull Requests';
+       Returns = "an ordered map from tier number to the literal '## ' heading line that tier's entries are folded under, IN THE ORDER those sections appear in CHANGELOG.md -- e.g. [ordered]@{ 2 = '## Tier 2 - Pull Requests'; 1 = '## Tier 1 - Pull Requests'; 0 = '## Tier 0 - Pull Requests' }. The tier says how far a change reaches: 0 = only this repo's own developers notice, 1 = a colleague on the project gets something out of it, 2 = a consumer notices. Declaring more than one tier also turns on the release cut's bump gate, which refuses a minor with no tier-2 entry pending" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ChangelogHeading'; Scripts = @('fold-changelog-entry');
+       ViaLib = 'entry-scaffold-lib';
        Optional = $true; Default = '## Pull Requests';
-       Returns = "the literal '## ' heading line a merged entry is folded under" },
+       # NO REPORT MARKER IN THIS TEXT, and that is a rule for every record here rather than a detail of
+       # this one. A finding's message is scanned for those markers by counters that decide things: the
+       # session hook surfaces a run by counting ERROR markers, and this suite's asserts count OK/INFO
+       # lines. Writing one into a Returns line inflates those counts -- measured on the first draft of
+       # this record, which spelled the info marker out and made five findings count as six. With ERROR
+       # it would have raised a blocking session signal for a repo with nothing wrong. Guarded by an
+       # assert in script-contract.tests.ps1 so the next one fails a test instead of a hook.
+       Returns = "the literal '## ' heading line a merged entry is folded under, for a repo with ONE entry section. Superseded by Get-ChangelogTierHeadings where that is defined -- a repo declaring tiers does not need this function, so it being absent there is the correct state rather than a gap" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-LiveStage'; Scripts = @('cut-release skill');
        Optional = $true; Default = '';
        Returns = "a short description of this repo's separate go-live target, or '' when it has none" },
@@ -228,14 +246,16 @@ $script:Contract = @(
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-MojibakePaths'; Scripts = @('fix-mojibake');
        Optional = $true; Default = 'every *.md in the repo root';
        Returns = "the absolute paths fix-mojibake examines when called without -Path, given a -RepoRoot parameter; without it the tool falls back to every *.md in the repo root, which silently skips whatever else this repo keeps markdown in" },
-    # cut-release became shared in #417. Eight knobs, all optional, every fallback the behaviour the
-    # script had while it was workshop-only -- declared here for the same reason the entry stubs above
-    # are: none of them crashes when absent, so a consumer would discover the wrong one at release
-    # time, which is the worst moment this repo has. An [INFO] naming the default makes it a thing you
-    # were told. Six landed in phase 1; the last three below are the highlights tier from phase 2,
-    # which is one knob in the issue's numbering and three functions here -- whether, for whom, and in
-    # whose words. Folding them into one config object would have left this contract a single record
-    # whose Returns line could not name an actionable default for any of the three.
+    # cut-release became shared in #417. All optional, every fallback the behaviour the script had while
+    # it was workshop-only -- declared here for the same reason the entry stubs above are: none of them
+    # crashes when absent, so a consumer would discover the wrong one at release time, which is the worst
+    # moment this repo has. An [INFO] naming the default makes it a thing you were told.
+    #
+    # Six landed in phase 1. Phase 2 added the highlights tier as three functions -- whether, for whom,
+    # and in whose words -- of which only 'whether' survives: the tier model answered the other two at
+    # the source (see the retirement note below). Get-ReleaseMajorMinMinors joined in the same movement,
+    # because the bump gate it feeds is a hard refusal and a shared script must not pin every consumer to
+    # one repo's release cadence.
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReservedRootMd'; Scripts = @('cut-release');
        Optional = $true; Default = "this workshop's own root docs (CHANGELOG, CLAUDE, README, LICENSE, CONTRIBUTING, SECURITY, QUICKSTART, ADOPTION, UNINSTALL)";
        Returns = 'the root *.md file names that are permanent docs rather than unfolded changelog entries; every other root *.md blocks the cut, so a permanent doc missing from this list refuses a release over a file nobody failed to fold' },
@@ -259,13 +279,17 @@ $script:Contract = @(
        Returns = 'a type -> label map merged over those defaults, for a repo whose category headings are in another language; a type with no label falls back to the type name itself, which is the wrong word rather than a missing one' },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHighlightsBumps'; Scripts = @('cut-release');
        Optional = $true; Default = 'no highlights tier at all';
-       Returns = "the bump types that also get a stakeholder-facing highlights document (releases/highlights/<dir>/<X.Y.Z>.md, markdown only), e.g. @('minor','major'); @() switches the tier off, which is what the cut did before this knob existed" },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHighlightsStakeholderTypes'; Scripts = @('cut-release');
-       Optional = $true; Default = 'no split -- every category is stakeholder-facing';
-       Returns = 'the branch types a non-developer reader is the audience for; every OTHER category present lands under the remove-before-publishing marker, so a type left out of this list is reviewed rather than published, and @() writes no marker block at all' },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHighlightsWording'; Scripts = @('cut-release');
-       Optional = $true; Default = 'the English marker text';
-       Returns = "overrides for the highlights document's own text, merged over those defaults: DevBlockComment (the HTML comment above the marker) and DevBlockHeading (the marker heading) -- a repo whose stakeholders read another language needs both, and an unset one is the wrong word rather than a missing one" },
+       Returns = "the bump types that also get a stakeholder-facing highlights document (releases/highlights/<dir>/<X.Y.Z>.md, markdown only), e.g. @('minor','major'); @() switches the tier off, which is what the cut did before this knob existed. The document is the release's TIER-2 entries, so it is only written when there are some" },
+    # Get-ReleaseHighlightsStakeholderTypes and Get-ReleaseHighlightsWording USED TO BE DECLARED HERE and
+    # are gone (August 5, 2026). Both configured the highlights document's "remove before publishing"
+    # marker: which branch types to promote above it, and in whose words to label it. That marker existed
+    # because the branch prefix does not predict impact, so the generator wrote out both halves and left
+    # the release manager to cut one. The tier model asks the entry's author instead, which removed the
+    # marker and with it everything these two configured. Removed rather than left declared: a contract
+    # record for a knob nothing reads sends a consumer off to write a function that will never be called.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseMajorMinMinors'; Scripts = @('cut-release');
+       Optional = $true; Default = '10';
+       Returns = 'how many minors a major line must have had before a major may be cut -- a major recaps the minors before it, so their accumulation is what earns it. Read off the minor component of the current version (within major 3 the minors are 3.1 .. 3.10, so the component IS the count). A repo that cuts minors rarely sets this lower; it is only read when a tier split is declared, since the whole bump gate is off without one' },
     # The third tier. Declared for the same reason as the two above: nothing crashes without it, so a
     # consumer would discover English headings in a document written for its own management -- at the
     # moment it is being shared, which is the worst one available.

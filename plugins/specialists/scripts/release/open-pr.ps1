@@ -70,6 +70,14 @@
     text has moved out of CHANGELOG.md's Pull Requests section into files nobody re-reads. Fenced code is
     excluded, so an entry documenting this mechanism is not accused of it. Use -Force to ship anyway.
 
+    Tier gate (the tier model, August 5, 2026): the entry's 'Tier: N' line must be a tier the model has
+    -- 0, 1 or 2. A LOW tier is never refused; 'Tier: 0' is a legitimate and common final answer, which
+    is exactly why it is a separate gate rather than part of the scaffold one. What is refused is a value
+    with no meaning ('Tier: 5', 'Tier: two'), because it reads back as the default and would file
+    consumer-facing work as repo-internal without anything erroring. Not -Force-able: -Force exists for
+    text somebody legitimately wrote, and there is no legitimate 'Tier: 5'. The resolved tier is printed
+    either way, so an entry still sitting at the default says so before the PR rather than at the cut.
+
     Lint gate (guardrail for main): before the push, scripts/lint/check-plugin-integrity.ps1 runs.
     If that finds errors (invalid marketplace/plugin manifests, missing agent-def frontmatter,
     dead links), the branch is NOT pushed and NO PR is opened. Use -SkipLint to deliberately skip
@@ -389,6 +397,38 @@ Rewrite the body to say what the change DOES, then run again. Keeping it as-is i
             exit 1
         }
     }
+
+    # Tier gate, on the same read of the same file. The entry declares how far this change reaches
+    # ('Tier: N'), the fold files it under the matching changelog section, and the release cut refuses a
+    # bump the pending tiers have not earned -- so a tier that cannot be honoured has to be caught before
+    # the entry reaches main.
+    #
+    # ONLY A MALFORMED VALUE IS REFUSED, never a low one. 'Tier: 0' is a legitimate, common and final
+    # answer, exactly like the 'Chore' fallback type -- so it can never be evidence of an unfinished
+    # entry, which is why it is not part of the scaffold gate above. What IS refused is a value the model
+    # has no meaning for ('Tier: 5', 'Tier: two'): that reads back as the default and would file
+    # consumer-facing work as repo-internal, correct-looking and silent. Here it costs one line to fix;
+    # after the merge it is a section-move on main.
+    #
+    # NOT -Force-able, deliberately, unlike the scaffold gate. -Force exists for text somebody
+    # legitimately wrote; there is no legitimate 'Tier: 5'.
+    $entryTier = Resolve-EntryTier -EntryText $entryText
+    if ($entryTier.Error) {
+        Write-Error @"
+tier gate: $(Split-Path $entryPath -Leaf) does not declare a usable tier - nothing pushed, no PR opened.
+
+  $($entryTier.Error)
+
+The tiers are how far a change reaches, and the release cut reads them:
+  $(Get-EntryTierLabel): 0   only this repo's own developers notice (docs, config, internal work)
+  $(Get-EntryTierLabel): 1   a colleague working on this project gets something out of it
+  $(Get-EntryTierLabel): 2   a consumer of the product notices it
+
+Correct the line and run again.
+"@
+        exit 1
+    }
+    Write-Host "  entry tier: $($entryTier.Tier)$(if (-not $entryTier.Declared) { " (no $(Get-EntryTierLabel): line -- the default; a release cannot be cut from tier-0 work alone)" })" -ForegroundColor DarkGray
 }
 
 # Lint gate: catch invalid manifests/frontmatter/dead links before they land on main via a PR.

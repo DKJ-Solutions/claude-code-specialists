@@ -721,31 +721,28 @@ $cardNoTitle = Build-PluginReleaseCard -PluginName 'specialists' -Version '2.0.0
 Assert-Match $cardNoTitle '(?s)\*\*Type:\*\* Major\n\nThis card describes v2\.0\.0' 'without -Title exactly one blank line (no extra) before the describes-line'
 
 # ==================================================================================================
-# THE HIGHLIGHTS TIER (#417 phase 2)
+# THE HIGHLIGHTS TIER (#417 phase 2; the tier model, August 5, 2026)
 # ==================================================================================================
-# This repo generates no highlights document (empty seam = tier off), so every assert below runs
-# against the LIB rather than against a release this repo cuts. That is the point: the tier's only
-# consumer is another repo, and a feature no local release exercises is exactly the one that has to be
-# tested here rather than discovered there.
+# The document is now the release's TIER-2 entries and nothing else. The '-OnlyTypes' filter and the
+# "remove before publishing" marker it fed are GONE, together with their two seam knobs -- what a
+# consumer notices is declared by each entry's author rather than guessed from a branch prefix.
+#
+# The asserts that covered the filter and the marker are deliberately not "kept for safety": they
+# described a mechanism that no longer exists, and a suite full of tests for retired behaviour is how a
+# retired mechanism gets helpfully reintroduced. What IS asserted on absence is the removal itself, just
+# below -- the same shape as the HTML-renderer guard at the end of this file.
 
-Write-Host "Format-CategorizedEntries -OnlyTypes (the filter the two halves share)" -ForegroundColor Cyan
+Write-Host "Format-CategorizedEntries -- the retired -OnlyTypes filter" -ForegroundColor Cyan
 $halfEntries = @($entries[0], $entries[1], $docsEntry, $choreEntry, $otherEntry)
-$onlyFeat = Format-CategorizedEntries -Entries $halfEntries -CategoryLevel 2 -OnlyTypes @('Feat', 'Fix')
-Assert-Match $onlyFeat '(?m)^## Features' 'OnlyTypes: a named category is rendered'
-Assert-Match $onlyFeat '(?m)^## Fixes' 'OnlyTypes: and the second named one'
-Assert-Equal $false ([bool]($onlyFeat -match 'Documentation')) 'OnlyTypes: an unnamed category is dropped, not reported'
-Assert-Equal $false ([bool]($onlyFeat -match 'Maintenance')) 'OnlyTypes: and so is the next one'
-Assert-Equal $false ([bool]($onlyFeat -match '(?m)^## Other')) 'OnlyTypes: the catch-all is not exempt from the filter'
-# The complement must be exhaustive: whatever the stakeholder half drops, the developer half shows.
-# If both halves could drop the same entry, an entry would vanish between the changelog and the
-# document generated from it -- silently, since nothing counts the two halves against the input.
-$onlyRest = Format-CategorizedEntries -Entries $halfEntries -CategoryLevel 3 -OnlyTypes @('Docs', 'Chore', 'Other')
-Assert-Match $onlyRest '(?m)^### Documentation' 'OnlyTypes: the complement renders what the first half dropped'
-Assert-Match $onlyRest '(?m)^#### #12 ' 'OnlyTypes: at CategoryLevel 3 its entries sit at ####'
-$allShown = @(1, 2, 10, 11, 12) | Where-Object { ($onlyFeat + $onlyRest) -notmatch "#$_ " }
-Assert-Equal 0 $allShown.Count 'OnlyTypes: every input entry appears in exactly one of the two halves (nothing lost between them)'
-$onlyNone = Format-CategorizedEntries -Entries $halfEntries -CategoryLevel 2 -OnlyTypes @()
-Assert-Match $onlyNone '(?s)## Features.*## Other' 'OnlyTypes: empty means every category -- the unchanged behaviour'
+# ASSERTED ON ABSENCE, like ConvertTo-ReleaseHtml at the end of this file. The parameter had exactly one
+# caller (the highlights split), and re-adding it would mean somebody is rebuilding the guess the tier
+# model replaced -- that should turn a test red rather than pass unnoticed.
+$fceParams = @((Get-Command Format-CategorizedEntries).Parameters.Keys)
+Assert-Equal $false ($fceParams -contains 'OnlyTypes') 'Format-CategorizedEntries no longer takes -OnlyTypes'
+$fceAll = Format-CategorizedEntries -Entries $halfEntries -CategoryLevel 2
+Assert-Match $fceAll '(?s)## Features.*## Fixes.*## Documentation.*## Maintenance.*## Other' 'every category is rendered, in the canonical order'
+$missing = @(1, 2, 10, 11, 12) | Where-Object { $fceAll -notmatch "#$_ " }
+Assert-Equal 0 $missing.Count 'no entry is dropped -- there is no filter left that could drop one'
 
 Write-Host "Convert-EntryHeadingToTitle (the metadata a stakeholder does not have a branch for)" -ForegroundColor Cyan
 $hIn = "### #426 $midDot Some title $midDot Feat $midDot 2026-08-03`n`nBody stays.`n`nAnd a second paragraph."
@@ -771,10 +768,10 @@ Assert-Equal '#### Deeper' (($hLevel -split "`n")[0]) 'the heading level is pres
 # THE ORDER IS LOAD-BEARING, and this pair is here because the first implementation got it wrong.
 # Format-CategorizedEntries reads the branch type OFF the heading this function strips, so stripping
 # first destroys the very field the grouping needs -- and it does not fail loudly: every entry lands in
-# the 'Other' catch-all, the stakeholder half comes out empty, and the whole release ends up under the
-# "remove before publishing" marker. A generated document that says the entire release is internal is
-# the kind of wrong that gets published. Hence -BareTitles INSIDE the renderer, asserted from both
-# directions so a future refactor that moves the strip back out turns this red.
+# the 'Other' catch-all, so a document written for consumers files every change in this release under
+# one meaningless heading. That is the kind of wrong that gets published. Hence -BareTitles INSIDE the
+# renderer, asserted from both directions so a future refactor that moves the strip back out turns
+# this red.
 $strippedFirst = Convert-EntryHeadingToTitle -EntryText $entries[0]
 $fceStripped = Format-CategorizedEntries -Entries @($strippedFirst) -CategoryLevel 2
 Assert-Match $fceStripped '(?m)^## Other' 'order: a PRE-stripped entry has lost its type and falls into Other (the bug this guards)'
@@ -782,33 +779,35 @@ $fceBare = Format-CategorizedEntries -Entries @($entries[0]) -CategoryLevel 2 -B
 Assert-Match $fceBare '(?m)^## Features' 'order: -BareTitles strips AFTER the type is read, so the category survives'
 Assert-Match $fceBare '(?m)^### Second feature$' 'order: and the rendered entry heading is the bare title'
 
-Write-Host "Build-HighlightsNotes (stakeholder first, the rest under a marker)" -ForegroundColor Cyan
+Write-Host "Build-HighlightsNotes (the tier-2 entries, no marker)" -ForegroundColor Cyan
 $hl = Build-HighlightsNotes -Entries $halfEntries -Version '1.2.0' -Date '2026-08-03' -Type 'Minor' `
-    -Title 'A release for people' -StakeholderTypes @('Feat', 'Fix')
+    -Title 'A release for people'
 Assert-Match $hl '(?m)^# Release notes v1\.2\.0 ' 'header names the version'
 Assert-Match $hl '\*\*Date:\*\* 2026-08-03' 'header carries the date'
 Assert-Match $hl 'A release for people' 'the -Title line is included'
-Assert-Match $hl '(?s)## Features.*## Fixes.*For developers only.*### Documentation' 'stakeholder categories come first, the developer block after them'
-Assert-Match $hl '<!-- Remove this block before sharing the highlights with non-developers\. -->' 'the marker carries its HTML comment'
-Assert-Match $hl '(?m)^## For developers only -- remove before publishing$' 'the marker heading sits at ## (containing its categories)'
-Assert-Match $hl '(?m)^### Documentation$' 'a developer category sits one level UNDER the marker, not beside it'
+Assert-Match $hl '(?s)## Features.*## Fixes.*## Documentation' 'every entry given is rendered, grouped by category at ##'
 Assert-Equal $false ([bool]($hl -match "#426 $midDot")) 'entry metadata is stripped in the highlights document'
-# The words are the consumer's, in the consumer's language -- the #410 class. A hardcoded English
-# heading in a Dutch stakeholder document is the wrong word rather than a missing one.
-$hlNl = Build-HighlightsNotes -Entries $halfEntries -Version '1.2.0' -Date '2026-08-03' -Type 'Minor' `
-    -StakeholderTypes @('Feat') -DevBlockComment 'Verwijder dit blok.' -DevBlockHeading 'Alleen voor developers'
-Assert-Match $hlNl '<!-- Verwijder dit blok\. -->' 'the marker comment is overridable'
-Assert-Match $hlNl '(?m)^## Alleen voor developers$' 'the marker heading is overridable'
-Assert-Match $hlNl '(?s)## Fixes' 'a type left OUT of StakeholderTypes lands in the developer half rather than vanishing'
-# No split asked for = no marker at all. A repo can want the second document without wanting the cut.
-$hlAll = Build-HighlightsNotes -Entries $halfEntries -Version '1.2.0' -Date '2026-08-03' -Type 'Minor'
-Assert-Equal $false ([bool]($hlAll -match 'For developers only')) 'no StakeholderTypes: no marker block is written'
-Assert-Match $hlAll '(?s)## Features.*## Documentation.*## Other' 'no StakeholderTypes: every category is rendered at ## instead'
-# All-stakeholder input: the marker must not appear with an empty body under it.
-$hlNoDev = Build-HighlightsNotes -Entries @($entries[0]) -Version '1.2.0' -Date '2026-08-03' -Type 'Minor' -StakeholderTypes @('Feat', 'Fix')
-Assert-Equal $false ([bool]($hlNoDev -match 'For developers only')) 'nothing in the developer half: the marker is omitted, not written empty'
+# THE MARKER AND ITS KNOBS ARE GONE. Asserted on absence for the same reason as -OnlyTypes above: the
+# selection now happens before this function is called, and a marker reappearing here would mean the
+# guess has been rebuilt.
+$hlParams = @((Get-Command Build-HighlightsNotes).Parameters.Keys)
+foreach ($gone in @('StakeholderTypes', 'DevBlockComment', 'DevBlockHeading')) {
+    Assert-Equal $false ($hlParams -contains $gone) "Build-HighlightsNotes no longer takes -$gone"
+}
+Assert-Equal $false ([bool]($hl -match 'For developers only')) 'no remove-before-publishing marker is written'
+# THE CALLER SELECTS, so this function renders exactly what it is handed -- one entry in, one entry out,
+# and no second half derived from anything. That is the whole behavioural change.
+$hlOne = Build-HighlightsNotes -Entries @($entries[0]) -Version '1.2.0' -Date '2026-08-03' -Type 'Minor'
+Assert-Match $hlOne '(?m)^## Features$' 'a single tier-2 entry renders its own category'
+Assert-Equal $false ([bool]($hlOne -match 'Documentation')) 'and nothing that was not handed in'
+# An empty selection must not throw: the cut never gets here with nothing (its bump gate refuses a minor
+# without a tier-2 entry), so the only callers that can are a test and a hand run -- and for those a
+# header with no body is a truthful answer where an exception is not.
+$hlNone = Build-HighlightsNotes -Entries @() -Version '1.2.0' -Date '2026-08-03' -Type 'Minor'
+Assert-Match $hlNone '(?m)^# Release notes v1\.2\.0 ' 'an empty selection still returns the header'
+Assert-Equal $false ([bool]($hlNone -match '(?m)^## ')) 'and no category headings under it'
 # Links are rewritten from the highlights file's depth, which equals the developer notes' depth.
-$hlLink = Build-HighlightsNotes -Entries @($linkEntry) -Version '1.2.0' -Date '2026-08-03' -Type 'Minor' -StakeholderTypes @('Fix')
+$hlLink = Build-HighlightsNotes -Entries @($linkEntry) -Version '1.2.0' -Date '2026-08-03' -Type 'Minor'
 Assert-Match $hlLink '\[the lint\]\(\.\./\.\./\.\./scripts/lint/x\.ps1\)' 'root-relative links get the prefix here too'
 Assert-Match $hlLink '\[the site\]\(https://example\.com\)' 'external links untouched'
 
@@ -820,12 +819,206 @@ Write-Host "the highlights tier produces markdown ONLY (no HTML renderer)" -Fore
 foreach ($gone in @('ConvertTo-ReleaseHtml', 'Format-InlineMarkdown')) {
     Assert-Equal $null (Get-Command $gone -ErrorAction SilentlyContinue) "release-lib no longer defines $gone"
 }
-# The document itself must carry no HTML beyond the one comment the marker is built from -- that comment
-# is markdown-legal and is the whole point of the marker, so it is excluded by name rather than by a
-# looser pattern that would also let a stray <div> through.
-$hlNoHtml = Build-HighlightsNotes -Entries $halfEntries -Version '1.2.0' -Date '2026-08-03' -Type 'Minor' -StakeholderTypes @('Feat', 'Fix')
-$tags = @([regex]::Matches($hlNoHtml, '<[a-zA-Z/!][^>]*>') | ForEach-Object { $_.Value } | Where-Object { $_ -notmatch '^<!--' })
+# The document itself must carry no HTML. The one HTML comment this used to allow was the marker's, and
+# the marker is gone -- so the exclusion for it is gone too and the assert is now simply "no tags at
+# all", which is stricter than what it replaced.
+$hlNoHtml = Build-HighlightsNotes -Entries $halfEntries -Version '1.2.0' -Date '2026-08-03' -Type 'Minor'
+$tags = @([regex]::Matches($hlNoHtml, '<[a-zA-Z/!][^>]*>') | ForEach-Object { $_.Value })
 Assert-Equal 0 $tags.Count "the generated document carries no HTML tags (found: $($tags -join ', '))"
+
+# ==================================================================================================
+# THE TIER MODEL (August 5, 2026)
+# ==================================================================================================
+# CHANGELOG.md holds one entry section per tier. Everything below runs against fixtures with an explicit
+# -TierSections, never against the seam: these asserts are about the PARSING and the RULES, and a suite
+# that read this repo's own repo-config would change meaning the day that repo-config does.
+
+Write-Host "Resolve-ChangelogTierSections" -ForegroundColor Cyan
+$tierMap = [ordered]@{
+    2 = '## Tier 2 - Pull Requests'
+    1 = '## Tier 1 - Pull Requests'
+    0 = '## Tier 0 - Pull Requests'
+}
+$secs = @(Resolve-ChangelogTierSections -TierHeadings $tierMap)
+Assert-Equal 3 $secs.Count 'three declared sections come back'
+# THE BUG THIS EXISTS FOR: an OrderedDictionary's indexer takes a POSITIONAL index as well as a key, so
+# $map[2] returns the THIRD VALUE rather than the value for key 2. In a map ordered 2,1,0 that hands
+# every tier its neighbour's heading and files entries under the wrong section without erroring --
+# measured on the first run of the resolver. Asserted per pair, not on the count.
+Assert-Equal 2 $secs[0].Tier 'document order is the map order: tier 2 first'
+Assert-Equal '## Tier 2 - Pull Requests' $secs[0].Heading 'and tier 2 gets ITS heading, not the third one'
+Assert-Equal 1 $secs[1].Tier 'tier 1 second'
+Assert-Equal '## Tier 1 - Pull Requests' $secs[1].Heading 'with its own heading'
+Assert-Equal 0 $secs[2].Tier 'tier 0 last'
+Assert-Equal '## Tier 0 - Pull Requests' $secs[2].Heading 'with its own heading'
+# An unordered hashtable has no order of its own, so it gets a defined one rather than a bucket order.
+$hashSecs = @(Resolve-ChangelogTierSections -TierHeadings @{ 0 = '## Zero'; 2 = '## Two'; 1 = '## One' })
+Assert-Equal '2,1,0' (($hashSecs | ForEach-Object { $_.Tier }) -join ',') 'a plain hashtable is sorted highest tier first'
+# Empty/absent = one tier-0 section, which is the pre-tier behaviour expressed in the new vocabulary.
+$noneSecs = @(Resolve-ChangelogTierSections)
+Assert-Equal 1 $noneSecs.Count 'no map: exactly one section'
+Assert-Equal 0 $noneSecs[0].Tier 'no map: it is tier 0'
+Assert-Equal '## Pull Requests' $noneSecs[0].Heading 'no map: the built-in default heading'
+Assert-Equal '## [Unreleased]' (@(Resolve-ChangelogTierSections -FallbackHeading '## [Unreleased]')[0].Heading) 'the legacy single heading is honoured as the fallback'
+# A heading declared empty is skipped rather than producing a section that matches nothing.
+$blankSecs = @(Resolve-ChangelogTierSections -TierHeadings ([ordered]@{ 2 = '## Two'; 1 = '' }))
+Assert-Equal 1 $blankSecs.Count 'a tier declared with an empty heading is skipped'
+
+# A changelog with all three sections, the release block FIRST (this repo's layout).
+$tierSample = @(
+    '# Changelog', '', 'Intro line of the file.', '',
+    '## Latest Release', '', 'Rel intro.', '', '**v3.4.0** - 2026-08-04 - Minor', '',
+    'See [releases/development/3.x/3.4.0.md](releases/development/3.x/3.4.0.md) for the full release notes.', '',
+    '## Tier 2 - Pull Requests', '', 'What a consumer notices.', '',
+    "### #22 $midDot Consumer feature $midDot Feat $midDot 2026-08-05", '', 'Body 22.', '', '[PR #22](https://example.test/22)', '',
+    '---', '',
+    "### #21 $midDot Consumer fix $midDot Fix $midDot 2026-08-05", '', 'Body 21.', '', '[PR #21](https://example.test/21)', '',
+    '---', '',
+    '## Tier 1 - Pull Requests', '', 'What the team gets out of it.', '',
+    "### #20 $midDot For colleagues $midDot Docs $midDot 2026-08-04", '', 'Body 20.', '', '[PR #20](https://example.test/20)', '',
+    '---', '',
+    '## Tier 0 - Pull Requests', '', 'Repo-internal only.', '',
+    "### #19 $midDot Housekeeping $midDot Chore $midDot 2026-08-04", '', 'Body 19.', '', '[PR #19](https://example.test/19)', '',
+    '---', ''
+) -join "`n"
+
+Write-Host "Split-Changelog -- one section per tier" -ForegroundColor Cyan
+$ts = Split-Changelog -Content $tierSample -TierSections $secs
+Assert-Equal 4 $ts.Entries.Count 'every entry across the three sections is collected'
+Assert-Equal 3 $ts.TierSections.Count 'three sections were found'
+Assert-Equal 2 $ts.TierSections[0].Tier 'sections come back in DOCUMENT order, tier 2 first'
+Assert-Equal 2 $ts.TierSections[0].Entries.Count 'tier 2 holds its two entries'
+Assert-Match $ts.TierSections[0].Entries[0] '^### #22 ' 'and in the order they sat in'
+Assert-Equal 1 $ts.TierSections[1].Entries.Count 'tier 1 holds one'
+Assert-Match $ts.TierSections[2].Entries[0] '^### #19 ' 'tier 0 holds the last one'
+Assert-Equal 'Repo-internal only.' (($ts.TierSections[2].Intro | Where-Object { $_ -ne '' }) -join ' ') 'each section keeps its OWN intro'
+Assert-Equal $true $ts.ReleasesFirst 'the release block sitting above the entries is recognised'
+Assert-Equal 'Intro line of the file.' $ts.Head[-1] 'the head stops above the FIRST section heading, whichever that is'
+# A section the document does not have is absent, not invented -- and an empty one is normal.
+$twoOnly = @(
+    '# Changelog', '', '## Tier 2 - Pull Requests', '',
+    "### #30 $midDot Only entry $midDot Feat $midDot 2026-08-05", '', 'Body.', '',
+    '## Releases', '', 'Rel intro.', ''
+) -join "`n"
+$tsTwo = Split-Changelog -Content $twoOnly -TierSections $secs
+Assert-Equal 1 $tsTwo.TierSections.Count 'only the sections actually present are reported'
+Assert-Equal $false $tsTwo.ReleasesFirst 'and a release block below the entries is recognised too'
+# All sections empty is fatal; SOME empty is not.
+Assert-Throws {
+    Split-Changelog -TierSections $secs -Content (@(
+        '# Changelog', '', '## Tier 2 - Pull Requests', '', 'Intro.', '',
+        '## Tier 0 - Pull Requests', '', 'Intro.', '', '## Releases', '', 'Rel.', ''
+    ) -join "`n")
+} 'every tier section empty -- nothing to release, so it throws'
+Assert-Throws {
+    Split-Changelog -TierSections $secs -Content "# Changelog`n`n## Something Else`n`n### #1 $midDot x $midDot Feat $midDot 2026-01-01`n`n## Releases`n`nRel.`n"
+} 'no declared section present at all -- throws naming what it looked for'
+# The pre-tier fixtures in this file are the one-section case, and they must keep working untouched:
+# a repo with no tier split travels the same code path as a one-entry map.
+$legacy = Split-Changelog -Content $sample
+Assert-Equal 1 $legacy.TierSections.Count 'no seam defined: the fallback gives exactly one section'
+Assert-Equal 2 $legacy.Entries.Count 'and the old fixture still yields its two entries'
+
+Write-Host "Get-PullRequestEntriesByTier" -ForegroundColor Cyan
+$byTier = @(Get-PullRequestEntriesByTier -Content $tierSample -TierSections $secs)
+Assert-Equal 3 $byTier.Count 'one group per section found'
+Assert-Equal 2 $byTier[0].Tier 'the group carries its tier'
+Assert-Equal '## Tier 2 - Pull Requests' $byTier[0].Heading 'and its heading'
+Assert-Equal 4 (@(Get-PullRequestEntries -Content $tierSample -TierSections $secs).Count) 'the flat accessor still returns every entry'
+
+Write-Host "Convert-ChangelogForRelease -- every tier section emptied, order kept" -ForegroundColor Cyan
+$tierConv = Convert-ChangelogForRelease -Content $tierSample -Version '3.5.0' -Date '2026-08-05' -Type 'Minor' `
+    -NotesRelPath 'releases/development/3.x/3.5.0.md' -HistoryMode 'latest' -TierSections $secs
+Assert-Match $tierConv '(?m)^\*\*v3\.5\.0\*\*' 'the new release block is written'
+Assert-Match $tierConv 'See \[releases/development/3\.x/3\.5\.0\.md\]' 'pointing at the notes file'
+Assert-Match $tierConv '(?s)## Latest Release.*## Tier 2 - Pull Requests.*## Tier 1 - Pull Requests.*## Tier 0 - Pull Requests' 'the document order is preserved, release block first'
+foreach ($pr in 19, 20, 21, 22) {
+    Assert-Equal $false ([bool]($tierConv -match "#$pr $midDot")) "entry #$pr is cleared out of the changelog"
+}
+Assert-Match $tierConv 'What a consumer notices\.' 'tier 2 keeps its intro'
+Assert-Match $tierConv 'Repo-internal only\.' 'tier 0 keeps its intro'
+# THE BUG THIS GUARDS: the tier loop first reused the variable holding the release reference, so the
+# '**vX.Y.Z** ... See [notes]' block silently vanished and a tier section appeared twice in its place.
+# Well-formed markdown either way, which is why it needs an assert rather than an eye.
+Assert-Equal 1 (@([regex]::Matches($tierConv, '(?m)^## Tier 0 - Pull Requests')).Count) 'each tier section appears exactly once'
+
+Write-Host "Build-ReleaseNotes -TierGroups (tier, then category, then entry)" -ForegroundColor Cyan
+$tierNotes = Build-ReleaseNotes -TierGroups $ts.TierSections -Version '3.5.0' -Date '2026-08-05' -Type 'Minor' -Title 'A title'
+Assert-Match $tierNotes '(?m)^# Release notes v3\.5\.0$' 'header names the version'
+Assert-Match $tierNotes '(?m)^## Tier 2 - consumers$' 'the tier heading names its audience'
+Assert-Match $tierNotes '(?m)^## Tier 1 - colleagues$' 'and so does tier 1'
+Assert-Match $tierNotes '(?m)^## Tier 0 - developers$' 'and tier 0'
+Assert-Match $tierNotes '(?s)## Tier 2 - consumers.*### Features.*#### #22 ' 'nesting: tier at ##, category at ###, entry at ####'
+Assert-Match $tierNotes '(?s)## Tier 2 - consumers.*### Fixes.*#### #21 ' 'a second category inside the same tier'
+Assert-Match $tierNotes '(?s)## Tier 2.*## Tier 1.*## Tier 0' 'the tiers keep the order they were given'
+# THE DEVELOPMENT NOTES ARE THE COMPLETE RECORD: tier 0 belongs in them, unlike in the other two tiers.
+Assert-Match $tierNotes '#### #19 ' 'tier-0 entries ARE in the developer notes -- this tier is the record'
+# An empty tier is omitted rather than printed as a heading with nothing under it.
+$sparse = @([pscustomobject]@{ Tier = 2; Entries = @($entries[0]) }, [pscustomobject]@{ Tier = 1; Entries = @() })
+$sparseNotes = Build-ReleaseNotes -TierGroups $sparse -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
+Assert-Match $sparseNotes '(?m)^## Tier 2 - consumers$' 'a tier with entries is rendered'
+Assert-Equal $false ([bool]($sparseNotes -match 'Tier 1')) 'a tier with no entries is omitted, not written empty'
+# Links are rewritten from the notes file's depth in the tier shape too.
+$tierLinkNotes = Build-ReleaseNotes -TierGroups @([pscustomobject]@{ Tier = 1; Entries = @($linkEntry) }) -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
+Assert-Match $tierLinkNotes '\[the lint\]\(\.\./\.\./\.\./scripts/lint/x\.ps1\)' 'root-relative links get the prefix inside a tier group'
+# And the flat shape still produces the pre-tier document, for a repo with one section.
+$flatNotes = Build-ReleaseNotes -Entries $ts.Entries -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
+Assert-Match $flatNotes '(?m)^## Features$' 'flat: categories sit at ## as they always did'
+Assert-Match $flatNotes '(?m)^### #22 ' 'flat: entries sit at ###'
+Assert-Equal $false ([bool]($flatNotes -match 'Tier ')) 'flat: no tier heading is invented'
+
+Write-Host "Get-ReleaseTierHeading" -ForegroundColor Cyan
+Assert-Equal 'Tier 2 - consumers'  (Get-ReleaseTierHeading -Tier 2) 'tier 2 is for consumers'
+Assert-Equal 'Tier 1 - colleagues' (Get-ReleaseTierHeading -Tier 1) 'tier 1 is for colleagues'
+Assert-Equal 'Tier 0 - developers' (Get-ReleaseTierHeading -Tier 0) 'tier 0 is for developers'
+Assert-Equal 'Tier 7' (Get-ReleaseTierHeading -Tier 7) 'an unknown tier degrades to its number, not to a dangling separator'
+
+Write-Host "Test-ReleaseBumpEarned -- the bump has to be earned" -ForegroundColor Cyan
+function New-TierGroup { param([int]$Tier, [int]$Count)
+    [pscustomobject]@{ Tier = $Tier; Entries = @(1..[Math]::Max($Count, 0) | Where-Object { $Count -gt 0 } | ForEach-Object { "### #$_ x" }) }
+}
+$g210 = @((New-TierGroup 2 1), (New-TierGroup 1 1), (New-TierGroup 0 3))
+$g10  = @((New-TierGroup 2 0), (New-TierGroup 1 2), (New-TierGroup 0 1))
+$g0   = @((New-TierGroup 2 0), (New-TierGroup 1 0), (New-TierGroup 0 4))
+# A tier-2 entry pending: patch and minor are both allowed (a minor is not compulsory).
+Assert-Equal $true (Test-ReleaseBumpEarned -BumpType patch -TierGroups $g210 -CurrentVersion '3.4.0').Earned 'tier 2 pending: a patch is allowed'
+Assert-Equal $true (Test-ReleaseBumpEarned -BumpType minor -TierGroups $g210 -CurrentVersion '3.4.0').Earned 'tier 2 pending: a minor is earned'
+Assert-Equal 'minor' (Test-ReleaseBumpEarned -BumpType patch -TierGroups $g210 -CurrentVersion '3.4.0').EarnedBump 'tier 2 pending: the work warrants a minor'
+# Only tier 1: a patch, and a minor is refused by name.
+Assert-Equal $true (Test-ReleaseBumpEarned -BumpType patch -TierGroups $g10 -CurrentVersion '3.4.0').Earned 'tier 1 only: a patch is earned'
+$minorRefused = Test-ReleaseBumpEarned -BumpType minor -TierGroups $g10 -CurrentVersion '3.4.0'
+Assert-Equal $false $minorRefused.Earned 'tier 1 only: a minor is refused'
+Assert-Equal 'patch' $minorRefused.EarnedBump 'and the refusal names the bump that would work'
+Assert-Match $minorRefused.Reason 'nothing pending is tier 2' 'the reason says what is missing'
+# Nothing but tier 0: no release at all.
+$noneEarned = Test-ReleaseBumpEarned -BumpType patch -TierGroups $g0 -CurrentVersion '3.4.0'
+Assert-Equal $false $noneEarned.Earned 'tier 0 only: not even a patch'
+Assert-Equal $null $noneEarned.EarnedBump 'and nothing is suggested, because nothing qualifies'
+Assert-Match $noneEarned.Reason 'nothing pending reaches beyond this repo' 'the reason says why'
+# The major rule: ten minors in this major line, read off the version's minor component.
+$majorEarly = Test-ReleaseBumpEarned -BumpType major -TierGroups $g210 -CurrentVersion '3.4.0'
+Assert-Equal $false $majorEarly.Earned 'major at 3.4.0: four minors is not ten'
+Assert-Equal $false $majorEarly.MajorAvailable 'and a major is reported unavailable'
+Assert-Match $majorEarly.Reason 'had 4 of them' 'the reason counts the minors so far'
+$majorReady = Test-ReleaseBumpEarned -BumpType major -TierGroups $g210 -CurrentVersion '3.10.0'
+Assert-Equal $true $majorReady.Earned 'major at 3.10.0: ten minors, so it is allowed'
+Assert-Equal $true $majorReady.MajorAvailable 'and reported available'
+Assert-Equal 'minor' $majorReady.EarnedBump 'EarnedBump never says major -- ten minors is a milestone, not a size the work adds up to'
+# A major still needs the general minimum: ten minors do not license a release made of nothing.
+Assert-Equal $false (Test-ReleaseBumpEarned -BumpType major -TierGroups $g0 -CurrentVersion '3.10.0').Earned 'major at 3.10.0 with only tier 0: still refused'
+# Tier 1 only, ten minors: a major is permitted (its justification is the minors, not a pending tier 2).
+Assert-Equal $true (Test-ReleaseBumpEarned -BumpType major -TierGroups $g10 -CurrentVersion '3.10.0').Earned 'major needs no pending tier-2 entry -- the minors behind it are what earn it'
+# The threshold is repo-owned.
+Assert-Equal $true (Test-ReleaseBumpEarned -BumpType major -TierGroups $g210 -CurrentVersion '3.4.0' -MinMinorsForMajor 4).Earned 'the minors threshold is configurable'
+# AND THE WHOLE GATE IS OFF WITHOUT A TIER SPLIT. This is what keeps the shared script safe for a
+# consumer that never adopted the model: one section means there is no tier information to judge, not
+# that nothing qualifies -- the opposite reading would refuse every release they ever cut.
+$single = @((New-TierGroup 0 3))
+$off = Test-ReleaseBumpEarned -BumpType minor -TierGroups $single -CurrentVersion '3.4.0'
+Assert-Equal $false $off.Active 'one declared section: the gate reports itself inactive'
+Assert-Equal $true $off.Earned 'and does not refuse'
+Assert-Throws { Test-ReleaseBumpEarned -BumpType patch -TierGroups $g210 -CurrentVersion 'x.y.z' } 'a malformed current version throws rather than guessing the minor count'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red

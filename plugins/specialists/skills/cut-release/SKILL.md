@@ -46,7 +46,7 @@ each command as you go — do not skip a step or reorder them from memory.
    ```
 
    Give it **either** `-Bump` **or** `-Version <X.Y.Z>` when you want to name the number yourself.
-   `-SummaryFile` turns it into a milestone (see below). Two escape valves:
+   `-SummaryFile` turns it into a milestone (see below). Three escape valves:
 
    - **`-NoPush` — inspect before publishing, and use it when anything is unusual.** The script otherwise
      commits, tags **and pushes** in one motion. With `-NoPush` it stops after the commit and tag and
@@ -55,6 +55,16 @@ each command as you go — do not skip a step or reorder them from memory.
      where a human sees the assembled artifact before it is public.
    - **`-SkipLint`** skips the integrity gate that otherwise runs first. It exists for a genuinely broken
      gate, not for a hurry — the gate is what stops a release refusing to cut halfway through.
+   - **`-SkipTierGate`** cuts a bump the pending changelog entries have not earned. **Expect not to need
+     it.** Where the repo declares tier sections, the cut requires at least one **tier-1** entry for any
+     release, a **tier-2** entry for a minor, and enough minors behind the line for a major — so a refusal
+     usually means the bump is wrong, not the gate. The script names the bump the work *does* earn; take
+     that instead. Deliberately a separate flag from `-SkipLint`, because it overrules a judgement about
+     **content** rather than skipping a tool.
+
+   **A refusal here has cost nothing.** All the guardrails run before the first file is written, so a
+   rejected cut leaves the tree exactly as it was — no notes file, no version bump, no half-cut release to
+   unpick on main.
 
    **So there is normally no tag command to type.** If you did use `-NoPush`, finish with what the script
    printed:
@@ -94,20 +104,25 @@ each command as you go — do not skip a step or reorder them from memory.
 
 3. **Edit the highlights draft — where the repo generates one.** Where the repo sets
    `Get-ReleaseHighlightsBumps` in `scripts\repo-config.ps1` and this bump is one of them,
-   `cut-release.ps1` has already written `releases/highlights/<dir>/<X.Y.Z>.md` — markdown only. It is a
-   **draft**: it is written for non-developers and still carries a developer-only block under an explicit
-   remove-before-publishing marker.
+   `cut-release.ps1` has already written `releases/highlights/<dir>/<X.Y.Z>.md` — markdown only. It is the
+   release's **tier-2 entries**: the ones whose author declared that a consumer notices them.
 
-   **Read the marker as a proposal, not a verdict.** The split is keyed on branch type, and how well
-   that predicts consumer impact varies per repo: in a storefront repo a `Style` branch *is* a customer-
-   visible change, while in a tooling repo a `chore/` branch can carry the most consequential change
-   there is. Read both halves and promote what matters; do not simply delete the bottom one.
+   **Nothing to delete, and that is the change.** This document used to carry a developer-only block under
+   a "remove before publishing" marker, because the generator had to guess from branch types which entries
+   a consumer cares about — a guess that fails in both directions (in a storefront repo a `Style` branch
+   *is* customer-visible; in a tooling repo a `chore/` branch can carry the most consequential change
+   there is). The tier asks the entry's author instead, so the selection arrives already made. Retired
+   August 5, 2026, along with the two seam knobs that configured it.
 
-   **Budget for a rewrite rather than a trim.** The tier renders the release a *second time*, it does not
-   translate it — the draft is the same prose the development notes carry, regrouped. Turning entries
-   written for someone reviewing a diff into a document for someone deciding whether to update is an
-   authoring job. Measured at this repo's v3.2.0: 1,098 draft lines became 153, and the heaviest item for
-   a consumer sat at line 1,034, below the marker, because it arrived on a `chore/` branch.
+   **It is still a draft, for the reason that never depended on the marker:** the prose is the entry
+   bodies, written for whoever reviews the diff.
+
+   **Budget for a rewrite rather than a trim.** This document renders the release a *second time*, it does
+   not translate it. Turning entries written for someone reviewing a diff into a document for someone
+   deciding whether to update is an authoring job. Measured at this repo's v3.2.0, while the draft still
+   held every category: 1,098 draft lines became 153, and the heaviest item for a consumer sat at line
+   1,034, below the marker, because it arrived on a `chore/` branch. The tier selection removes the second
+   half of that problem; the rewrite is still yours.
 
 4. **Ship the hand-written documents via a branch + PR.** The internal note and the edited highlights
    draft are both written after the cut, and `cut-release.ps1` has already committed and tagged by
@@ -235,16 +250,20 @@ version waiting for a migration that does not exist.
 ## Requirements in the consumer
 
 - `scripts\repo-config.ps1` with, optionally, `Get-LiveStage` — same shape as the existing
-  `Get-LintScript`/`Get-ChangelogHeading` getters. Absent or empty: only Block 1 applies. Declared in
+  `Get-LintScript`/`Get-ChangelogTierHeadings` getters. Absent or empty: only Block 1 applies. Declared in
   `check-script-contract.ps1` as an **Optional** record (the mechanism introduced for
   `Get-ChangelogHeading`, issue #178): a consumer without the function gets `[INFO]` naming the
   fallback (`''`, i.e. no live stage), never `[ERROR]`.
 - The script's own getters are separate from this skill's and all optional in the same way:
   `Get-ReservedRootMd`, `Get-ReleaseNotesGrouping`, `Get-ReleaseLiveMarker`, `Get-ReleasePluginTier`,
-  `Get-ReleaseCategoryTitles` and the three highlights knobs (`Get-ReleaseHighlightsBumps`,
-  `Get-ReleaseHighlightsStakeholderTypes`, `Get-ReleaseHighlightsWording`). Define none of them and the
-  cut behaves exactly as it does in the source repo. Run `check-script-contract.ps1` to see which ones
-  this repo answers and which fall back.
+  `Get-ReleaseCategoryTitles`, `Get-ReleaseHighlightsBumps` and `Get-ReleaseMajorMinMinors`. Define none of
+  them and the cut behaves exactly as it does in the source repo. Run `check-script-contract.ps1` to see
+  which ones this repo answers and which fall back.
+- **The tier sections are optional too, and they switch the bump gate on.** `Get-ChangelogTierHeadings`
+  declares one changelog section per tier; declare more than one and `cut-release.ps1` starts requiring the
+  bump to be earned (see `-SkipTierGate` in step 1). A repo that declares one section — or none, falling
+  back to the legacy `Get-ChangelogHeading` or to `## Pull Requests` — has no tier information to judge, so
+  the gate reports itself inactive and the cut behaves exactly as it always did.
 - `git` and a logged-in `gh` CLI for the GitHub Release step. **Which bumps get a Release is repo
   policy, not part of this checklist** — it is stated in the release manager's repo lens, because a repo
   that publishes at every release and one that publishes at Minor/Major only are both coherent, and the
