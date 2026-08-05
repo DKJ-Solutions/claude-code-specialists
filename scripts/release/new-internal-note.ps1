@@ -311,8 +311,13 @@ $changelogFile = Join-Path $RepoRoot 'CHANGELOG.md'
 $changelogTouched = $false
 if (Test-Path -LiteralPath $changelogFile -PathType Leaf) {
     $clBefore = [System.IO.File]::ReadAllText($changelogFile, [System.Text.Encoding]::UTF8)
+    # The sentence this writes lands in the same release block cut-release wrote, so it reads the SAME
+    # seam that block's other lines come from (#462) -- one repo, one voice in one file. Two knobs for
+    # four sentences in one paragraph would be a way for half of it to end up in another language.
+    $clWording = Get-SeamValue -Name 'Get-ChangelogReleaseWording' -Default @{}
+    if ($null -eq $clWording) { $clWording = @{} }
     $clAfter = Set-ReleaseInternalNoteLink -Content $clBefore -Version $verNum `
-        -InternalRelPath $intRel -DevRelPath $devRel
+        -InternalRelPath $intRel -DevRelPath $devRel -Wording $clWording
     if ($clAfter -ne $clBefore) {
         [System.IO.File]::WriteAllText($changelogFile, $clAfter, $Utf8NoBom)
         $changelogTouched = $true

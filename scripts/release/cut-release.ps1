@@ -203,6 +203,14 @@ $highlightsBumps = @(Get-SeamValue -Name 'Get-ReleaseHighlightsBumps' -Default @
 # and forking a shared script over one integer is exactly what the seam exists to prevent (#417).
 $majorMinMinors = [int](Get-SeamValue -Name 'Get-ReleaseMajorMinMinors' -Default 10)
 
+# The wording of the release block this cut writes into the repo's OWN CHANGELOG.md (inbound #462).
+# Empty by default, which is the English text release-lib already carried -- the fourth knob of the
+# #410 class, after the entry stubs, the category labels and the internal note. The changelog block was
+# the one output of a release still written in the script's language rather than the repo's, and it is
+# the most visible of them: it sits at the top of the file.
+$changelogWording = Get-SeamValue -Name 'Get-ChangelogReleaseWording' -Default @{}
+if ($null -eq $changelogWording) { $changelogWording = @{} }
+
 # BOM-less UTF8 -- the rest of the repo has no BOM.
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
 function Write-Utf8NoBom([string]$Path, [string]$Content) {
@@ -433,15 +441,33 @@ $advice
 }
 
 # --- Lint gate ----------------------------------------------------------------------------------
+# The release route's OWN gate, and it needs one precisely because this route does not travel via a
+# PR: nothing else here ever meets open-pr's copy of it.
+#
+# RESOLVED THROUGH THE SEAM, not by a fixed path (inbound #464). Until August 5, 2026 this read
+# `Join-Path $PSScriptRoot '..\lint\check-plugin-integrity.ps1'` -- the SOURCE repo's own lint script,
+# by a path that only exists in the source repo. From a consumer's plugin cache that file is not
+# there, so every consumer release ran with no gate at all and said so in a warning nobody had to act
+# on. Get-LintScript is the same seam open-pr already reads for exactly this question, so the two
+# routes now run the same repo's gate instead of one of them running this repo's.
+#
+# The measured cost of not having it, in the repo that reported this: two dead links reached its main
+# through the release route and would have blocked every subsequent PR. That repo ran a lint here for
+# that reason, and adopting the shared script silently took it away again.
+#
+# A MISSING SCRIPT IS A HARD STOP rather than a warning, which is the second half of the repair. A
+# gate that switches itself off on a condition the operator did not choose is not a gate; -SkipLint is
+# how you choose it, and choosing it is recorded in the command instead of in output that scrolls past.
 if (-not $SkipLint) {
-    $lintPath = Join-Path $PSScriptRoot '..\lint\check-plugin-integrity.ps1'
-    if (Test-Path $lintPath) {
-        Write-Host "check-plugin-integrity: integrity check for the release..." -ForegroundColor Cyan
-        & powershell -NoProfile -ExecutionPolicy Bypass -File $lintPath
-        if ($LASTEXITCODE -ne 0) { Write-Error "check-plugin-integrity found errors -- release aborted. Fix them, or run with -SkipLint."; exit 1 }
-    } else {
-        Write-Warning "check-plugin-integrity.ps1 not found -- lint gate skipped."
+    $lintRel  = Get-SeamValue -Name 'Get-LintScript' -Default 'scripts\lint\check-plugin-integrity.ps1'
+    $lintPath = Join-Path $repoRoot $lintRel
+    if (-not (Test-Path -LiteralPath $lintPath)) {
+        Write-Error "the lint gate '$lintRel' does not exist in the repo root ($repoRoot) -- release aborted. Point Get-LintScript in scripts\repo-config.ps1 at this repo's lint script, or run with -SkipLint to cut without a gate."
+        exit 1
     }
+    Write-Host "lint gate: integrity check for the release ($lintRel)..." -ForegroundColor Cyan
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $lintPath
+    if ($LASTEXITCODE -ne 0) { Write-Error "the lint gate found errors -- release aborted. Fix them, or run with -SkipLint."; exit 1 }
 }
 
 # --- Build content (before the write actions, so a parse error leaves nothing behind) --------
@@ -484,7 +510,7 @@ if ($SummaryFile) {
 # CHANGELOG.md now has, which is what makes this tier "the whole changelog, raw and complete". A repo
 # with no tier split gets one group and Build-ReleaseNotes renders the flat document it always did.
 $notesContent = Build-ReleaseNotes -TierGroups $tierGroups -Version $new -Date $today -Type $typeLabel -Title $Title -Summary $summaryText
-$changelogNew = Convert-ChangelogForRelease -Content $changelogRaw -Version $new -Date $today -Type $typeLabel -NotesRelPath $notesRelPath -LiveMarker $liveMarker -HistoryMode $historyMode -HistoryRelPath $historyRelPath
+$changelogNew = Convert-ChangelogForRelease -Content $changelogRaw -Version $new -Date $today -Type $typeLabel -NotesRelPath $notesRelPath -LiveMarker $liveMarker -HistoryMode $historyMode -HistoryRelPath $historyRelPath -Wording $changelogWording
 
 # The highlights document, built here with everything else so a failure leaves no half-written release
 # behind. It is the TIER-2 entries and nothing else: what a consumer notices was declared by the author
@@ -617,11 +643,30 @@ foreach ($m in $manifests) {
 # release tag).
 #
 # GATED ON THE SCRIPT EXISTING rather than on a config knob: whether a repo has an internal tier is a
-# fact its file tree already answers, so a consumer without that script simply never sees the line. Same
+# fact its file tree already answers, so a repo without that script simply never sees the line. Same
 # reasoning as Get-ReleasePluginTier's computed fallback.
+#
+# WHICH FILE TREE, THOUGH -- that is what inbound #461 caught. The probe looked only in the CONSUMER's
+# repo root, where a consumer has no copy, that being the entire point of the mirror. So the reasoning
+# above held in the source and inverted everywhere else: the tree answered "no internal tier" for a repo
+# that has one, and the line about the one tier written at EVERY release, patch included, was the one
+# line a consumer never got. It is also the tier nothing else reminds you about.
+#
+# So the repo's own copy is tried first and the sibling that travels with THIS script second. The fact
+# is still read off a file tree; it is now read off the tree that can answer it -- a repo running this
+# script has the note's script beside it, because they are mirrored together.
+#
+# AND THE PRINTED PATH IS THE RESOLVED ONE (inbound #460's class, one file over): './scripts/release/...'
+# is a command in the source repo and a dead path in a consumer. A checklist that prints something
+# unrunnable is worse than one that prints something long.
 function Write-FollowUpSteps {
     $internalScript = 'scripts/release/new-internal-note.ps1'
-    $hasInternal = Test-Path -LiteralPath (Join-Path $repoRoot ($internalScript -replace '/', '\'))
+    $internalOwn    = Join-Path $repoRoot ($internalScript -replace '/', '\')
+    $internalMirror = Join-Path $PSScriptRoot 'new-internal-note.ps1'
+
+    $hasOwn      = Test-Path -LiteralPath $internalOwn
+    $hasInternal = $hasOwn -or (Test-Path -LiteralPath $internalMirror)
+
     if (-not ($cutHighlights -or $hasInternal)) { return }
     Write-Host ""
     Write-Host "Still to write by hand (both via a branch + PR -- this commit is already tagged):" -ForegroundColor Cyan
@@ -629,7 +674,12 @@ function Write-FollowUpSteps {
         Write-Host "  - $highlightsRelPath -- edit the draft; it is the tier-2 entries, still in the words their author wrote for a reviewer."
     }
     if ($hasInternal) {
-        Write-Host "  - the internal summary:  ./$internalScript -Version $new"
+        $internalCmd = if ($hasOwn) {
+            "./$internalScript -Version $new"
+        } else {
+            "powershell -NoProfile -File `"$((Resolve-Path -LiteralPath $internalMirror).Path)`" -Version $new"
+        }
+        Write-Host "  - the internal summary:  $internalCmd"
     }
 }
 
