@@ -19,16 +19,29 @@ is what it always did. A repo with one section is simply a repo with one tier, s
 code path for it.
 
 In fold-all mode (no -Branch) only files that are actually changelog entries are folded: an entry
-opens with the '### <title> <midDot> <type> <midDot> <date>' H3 heading, so repo-root meta docs
+opens with the '### <title> <midDot> <type>' H3 heading, so repo-root meta docs
 (CONTRIBUTING.md, SECURITY.md, ...) that open with an H1 are left untouched. -Branch mode targets
 exactly the named entry and is unaffected.
 
-The entry file is already compact (heading `### title - type - date` with middot separation,
-followed by the description) -- matching the CHANGELOG format. When folding, fold only adds
-'#NN - ' at the front of the title and, as the last line, the link `[PR #NN](url)`. The PR number +
-url are fetched via `gh pr list` (on -Branch, or in fold-all mode derived from the file name) --
-that can only happen after opening the PR. If no PR is found (e.g. a manual merge without a PR),
-no number/url is added and the heading stays without #NN.
+The entry file is already compact (heading `### title - type` with middot separation, followed by the
+description) -- matching the CHANGELOG format. What the fold adds is exactly what does not exist until
+the merge: '#NN - ' at the front of the title, and as the last line
+`[PR #NN](url) - merged <date>`. The PR number, url and merge timestamp are fetched via one
+`gh pr list` (on -Branch, or in fold-all mode derived from the file name) -- which can only happen
+after opening the PR. If no PR is found (e.g. a manual merge without a PR), none of the three is
+added: the heading stays without #NN and there is no closing line.
+
+THE DATE MOVED HERE FROM THE SCAFFOLD ON AUGUST 5, 2026 (Dave), and both halves of that were
+deliberate. It is the FOLD's to write, because new-changelog-entry.ps1 runs when the branch is created
+and could only ever record the branch's birth date -- wrong by however many days the branch lived, in
+the one document whose subject is when things landed. And it goes at the BOTTOM, because the heading
+carries what the author knows (title, type) while this line carries what only the merge knows.
+
+Nothing here parses that date back out, and neither does anything downstream: release-lib reads the
+TYPE off the heading by matching the known branch types rather than by counting fields from the end,
+so a heading with or without a trailing date is read the same way. That was a required part of this
+change -- the old parse took the second-to-last field, which would have silently made every entry's
+type 'Other' the moment the date left.
 
 Usage:
   .\scripts\release\fold-changelog-entry.ps1 -Branch feat/new-plugin
@@ -269,7 +282,9 @@ foreach ($file in $entryFiles) {
     # --json (Victor #4, #103) -- gh pr list supplies that field just as well as gh pr view, so the
     # second gh call (previously gh pr view --json files) has been dropped: one PR lookup suffices
     # for both the number/url and the touched files.
-    $prList = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--head', $branchForPr, '--state', 'all', '--json', 'number,url,files', '--limit', '1', '--repo', $repo) -DiscardStderr
+    # 'mergedAt' joined the field list on August 5, 2026 for the merge date below -- at no cost, since
+    # this call already happens and gh returns whatever fields are asked for in one roundtrip.
+    $prList = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--head', $branchForPr, '--state', 'all', '--json', 'number,url,files,mergedAt', '--limit', '1', '--repo', $repo) -DiscardStderr
     $ghCode = $prList.ExitCode
     $prJson = $prList.Output
     if ($ghCode -ne 0) { Write-Host "  (gh pr list returned exit code $ghCode -- PR-number enrichment skipped; run gh manually for the reason.)" -ForegroundColor DarkYellow }
@@ -292,10 +307,20 @@ foreach ($file in $entryFiles) {
             }
         }
 
-        $entryContent = $entryContent.TrimEnd() + "$nl$nl[PR #$num]($($prs[0].url))"
+        # THE CLOSING LINE CARRIES BOTH FACTS THE MERGE OWNS: which PR this was, and when it landed
+        # (Dave, August 5, 2026). Built by Format-EntryFoldFooter in entry-scaffold-lib.ps1 -- the lib
+        # that owns the entry FORMAT, so the one place that writes this line is the one place a test can
+        # read it. Its header carries the reasoning for reading mergedAt rather than the clock; the clock
+        # is passed in as the fallback because a pure function may not have one of its own.
+        $entryContent = $entryContent.TrimEnd() + "$nl$nl" + (Format-EntryFoldFooter `
+            -Number $num -Url $prs[0].url -MergedAt ([string]$prs[0].mergedAt) `
+            -FallbackDate (Get-Date -Format 'yyyy-MM-dd'))
     }
     else {
-        Write-Host "  No PR found for '$branchForPr' - entry without PR number/url." -ForegroundColor Yellow
+        # No PR: no number, no url -- and no merge date either, deliberately. There is nothing to read a
+        # landing date off, and inventing one from the clock would put a fact in the changelog that
+        # nothing backs. An entry folded this way simply carries neither, exactly as it carried no #NN.
+        Write-Host "  No PR found for '$branchForPr' - entry without PR number/url or merge date." -ForegroundColor Yellow
     }
 
     $headingMatch = [regex]::Match($changelogContent, $headingPattern)

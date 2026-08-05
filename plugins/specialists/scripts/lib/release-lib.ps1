@@ -1020,9 +1020,20 @@ function Format-CategorizedEntries {
         $heading = ($e -split "`r?`n")[0]
         $t = 'Other'
         $parts = @(($heading -replace '^#+\s+', '') -split "\s*$md\s*")
-        if ($parts.Count -ge 2) {
-            $cand = $parts[$parts.Count - 2].Trim()
-            if ($cats.Order -contains $cand) { $t = $cand }
+        # THE TYPE IS FOUND BY WHAT IT IS, NOT BY WHERE IT SITS (August 5, 2026). This read
+        # `$parts[$parts.Count - 2]` -- the second-to-last field -- which was only ever correct because a
+        # trailing date happened to follow the type. When the merge date moved out of the heading to the
+        # entry's closing line, that positional read would have made EVERY entry's type 'Other': no
+        # error, no empty output, just one giant catch-all category in the release notes. Matching the
+        # field against the known types instead is right for a heading with a trailing date and one
+        # without, so the two shapes need no mode flag and history keeps parsing.
+        #
+        # The LAST matching field wins, which resolves the one collision this can have: an entry whose
+        # title is itself exactly a type name ('### #12 <md> Fix <md> Fix'). Fields are middot-separated,
+        # so an ordinary title containing the word cannot match -- only a field equal to it.
+        for ($p = $parts.Count - 1; $p -ge 0; $p--) {
+            $cand = $parts[$p].Trim()
+            if ($cats.Order -contains $cand) { $t = $cand; break }
         }
         if (-not $grouped.ContainsKey($t)) { $grouped[$t] = New-Object System.Collections.Generic.List[string] }
         # The type has been read by now, so reducing the heading is safe from here on.
@@ -1406,9 +1417,16 @@ function Convert-EntryHeadingToTitle {
         internal administration: precise, useful in the developer notes, and noise in a document whose
         reader does not have a branch. The developer notes keep them, so this never runs there.
 
-        The trailing two middot fields (type, date) and a leading '#NN' field are dropped; everything
-        between them is the title and is rejoined with the middot, so a title that legitimately
-        contains one survives. Only the FIRST line is touched -- the body may contain anything.
+        A leading '#NN' field and the trailing administrative fields are dropped; everything between
+        them is the title and is rejoined with the middot, so a title that legitimately contains one
+        survives. Only the FIRST line is touched -- the body may contain anything.
+
+        WHICH TRAILING FIELDS, DECIDED BY CONTENT RATHER THAN BY COUNT (August 5, 2026). This used to
+        drop exactly two -- the (type, date) pair the scaffold always wrote. Since the merge date moved
+        out of the heading onto the entry's closing line, a heading has ONE trailing administrative
+        field, while every entry already in this repo's history has two. Dropping a fixed number would
+        have to pick which era to be right about; recognising a field by its shape -- a known branch
+        type, or an ISO date -- is right for both, which is also why nothing had to be migrated.
     #>
     param([Parameter(Mandatory)][string]$EntryText)
     $md = [char]0x00B7
@@ -1418,12 +1436,29 @@ function Convert-EntryHeadingToTitle {
     if (-not $hm.Success) { return $EntryText }
 
     $parts = @($hm.Groups[2].Value -split "\s*$md\s*")
-    # Fewer than three fields means there is no (title, type, date) triple to strip -- leave it alone
-    # rather than guess which of the two remaining fields was the title.
-    if ($parts.Count -lt 3) { return $EntryText }
+    $types = (Get-ReleaseCategories).Order
     $first = if ($parts[0] -match '^#\d+$') { 1 } else { 0 }
-    $last = $parts.Count - 3
-    if ($last -lt $first) { return $EntryText }
+
+    # THE TAIL HAS A GRAMMAR, so it is matched rather than walked: at most one date, and before it at
+    # most one type. Anything else is title. A greedy "keep eating administrative-looking fields" loop
+    # was written first and this file's own suite caught it -- on '### #12 <md> Fix <md> Fix', an entry
+    # whose title IS a type name, it ate both and returned the heading unchanged. Two types in a row
+    # cannot both be the type; the grammar says so and the loop could not.
+    #
+    # 'Other' is excluded from the type test deliberately: it is the catch-all label this repo PRINTS,
+    # never a value a branch table produces, so a field reading 'Other' is a title.
+    $isMeta = {
+        param($f, $kind)
+        if ($kind -eq 'date') { return $f -match '^\d{4}-\d{2}-\d{2}$' }
+        return ($f -ne 'Other') -and ($types -contains $f)
+    }
+    $last = $parts.Count - 1
+    if ($last -ge $first -and (& $isMeta $parts[$last].Trim() 'date')) { $last-- }
+    if ($last -ge $first -and (& $isMeta $parts[$last].Trim() 'type')) { $last-- }
+
+    # Nothing was administration, or nothing but -- either way there is no (title + metadata) shape here,
+    # so leave the heading exactly as it was rather than guess.
+    if ($last -eq ($parts.Count - 1) -or $last -lt $first) { return $EntryText }
     $title = (@($parts[$first..$last]) -join " $md ").Trim()
     if (-not $title) { return $EntryText }
 

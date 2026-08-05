@@ -35,11 +35,27 @@ breaks the match and with it the automatic removal after folding. You are then l
 written as a heading plus prose:
 
 ```markdown
-### Short strong title · Branch-type · YYYY-MM-DD
+### Short strong title · Branch-type
 ```
 
-The scaffolder fills in the type and the date from the branch prefix; the fold prepends the **`#NN`** and
-appends the **`PR #NN` link**, both of which require the PR to exist. The separator is a middot.
+The scaffolder fills in the type from the branch prefix. The fold adds what does not exist until the
+merge: it prepends the **`#NN`** and appends a closing line carrying the **`PR #NN` link and the merge
+date**. The separator is a middot.
+
+```markdown
+### #468 · Short strong title · Branch-type
+
+…the description…
+
+[PR #468](https://github.com/owner/repo/pull/468) · merged 2026-08-05
+```
+
+**The date is the fold's, and it sits at the bottom** (Dave, August 5, 2026). The scaffolder runs when
+the *branch* is created, so any date it wrote was the branch's birth date — a branch opened on Monday and
+merged on Thursday was filed as Monday's work, in the one document whose subject is when things landed.
+So the heading now carries what the author knows (title, type) and the closing line carries what only
+the merge knows. The date comes from the PR's own merge timestamp rather than from the clock, because a
+fold does not always run in the same minute as its merge.
 
 ## The one formatting rule: never use `##` in an entry body
 

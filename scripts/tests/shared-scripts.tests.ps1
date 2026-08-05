@@ -464,7 +464,16 @@ Assert-True (-not ($foldText -match "gh pr list.*2>\`$null")) 'fold no longer re
 # roundtrip has been dropped. Regression guard: the --json list carries 'files' along (now as an
 # argument-array element), and a real 'gh pr view' call (as opposed to an explanatory code comment
 # naming the old approach) has not returned.
-Assert-True ($foldText -match "'--json', 'number,url,files'") 'fold already requests files in the gh pr list call'
+# 'mergedAt' joined the list on August 5, 2026, when the merge date moved out of the scaffolded heading
+# onto the entry's closing line. Asserted per FIELD rather than as one literal string, so adding a fifth
+# field later does not fail this for no reason -- while dropping either of these two still does, and both
+# matter: without 'files' the Plugins line disappears, without 'mergedAt' the date silently falls back to
+# the clock, which is the exact inaccuracy the change removed.
+$foldJson = [regex]::Match($foldText, "'--json',\s*'([^']+)'")
+Assert-True $foldJson.Success 'fold passes a --json field list to gh pr list'
+$foldFields = @($foldJson.Groups[1].Value -split ',')
+Assert-True ($foldFields -contains 'files') 'fold requests files in the gh pr list call (the Plugins line)'
+Assert-True ($foldFields -contains 'mergedAt') 'fold requests mergedAt in the same call (the merge date, from the PR rather than the clock)'
 Assert-True (-not ($foldText -match '(?m)^\s*\$\w+\s*=\s*gh pr view')) 'fold no longer runs a separate gh pr view call (merged, #103)'
 
 Write-Host "open-pr + fold-changelog-entry: repo-config-driven overrides (#101)" -ForegroundColor Cyan

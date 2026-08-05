@@ -153,7 +153,6 @@ if (Test-Path $filePath) {
     exit 0
 }
 
-$today = Get-Date -Format "yyyy-MM-dd"
 $midDot = [char]0x00B7
 
 # Body: an explicit -Intent (typically when parking the branch for later / another device) becomes
@@ -183,10 +182,18 @@ if ($Intent -ne "") {
 # every consumer's skill page would have to document.
 $tierLine = Format-EntryTierLine
 
-# Compact heading, matching the CHANGELOG format (fold will later add only '#NN <midDot> ' at
-# the front and the '[PR #NN](url)' link at the end -- those only exist after the PR is opened).
+# Compact heading, matching the CHANGELOG format. The fold adds what only exists after the merge:
+# '#NN <midDot> ' at the front of the title, and the '[PR #NN](url) <midDot> merged <date>' line at the
+# end.
+#
+# NO DATE HERE, DELIBERATELY (Dave, August 5, 2026). This script runs when the BRANCH is created, so any
+# date it writes is the branch's birth date -- and the changelog records what LANDED when. A branch
+# opened on Monday and merged on Thursday used to be filed as Monday's work, silently, in the one
+# document whose whole job is to say when things happened. The date is now the fold's to add, from the
+# PR's own merge timestamp, and it goes at the BOTTOM: the heading carries what the author knows (title,
+# type) and the closing line carries what only the merge knows (PR number, merge date).
 $template = @"
-### $Title $midDot $branchType $midDot $today
+### $Title $midDot $branchType
 
 $tierLine
 

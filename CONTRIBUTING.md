@@ -6,7 +6,8 @@ changelog entry — the same workflow as the consuming repos. The steps:
 1. **Branch — its changelog entry comes along in the same move:**
    [`scripts/task/new-branch.ps1`](scripts/task/new-branch.ps1)`-Name <prefix>/<short-name> -Title "…"`
    creates (or idempotently resumes) the `<prefix>/<short-name>` branch and, as a child step,
-   scaffolds `<branch-name>.md` in the repo root (heading + date + type already filled in) via
+   scaffolds `<branch-name>.md` in the repo root (heading + type already filled in; the **merge date is
+   added by the fold**, at the bottom, because a date written now would be the branch's birth date) via
    [`scripts/release/new-changelog-entry.ps1`](scripts/release/new-changelog-entry.ps1) — a branch is
    never entry-less. Valid prefixes (prefix → label → changelog type): `feat/` → enhancement → Feat ·
    `fix/` → bug → Fix · `docs/` → documentation → Docs · `chore/` → documentation → Chore
