@@ -69,6 +69,26 @@ and safe hook construction.
 - **Deterministic guardrail hooks belong in `settings.json`, not in a plugin.** A hook that enforces
   a hard rule at execution time must always be active — independent of plugin trust or which plugins
   are enabled. Plugins carry subagents/skills; the safety hooks stay deliberately in the repo config.
+- **When a shared script changes what it RECOGNISES, probe it against a consumer's document — not only
+  against this repo's.** A shared script reaches a consumer through a plugin update rather than by their
+  choosing, so a parser that has learned a new shape meets their *old* one first. The source repo is the
+  worst possible place to notice that, because it is the one repo that has already migrated: its own
+  files are the new shape by the time the change is finished, and every test written alongside the change
+  uses the new shape too. So the check is a deliberate one — build the input a consumer actually has, run
+  the changed reader over it, and look at what comes out.
+  **The failure mode to expect is silence, not an error.** A parser handed a shape it was not written
+  for does not usually throw; it produces a confident, well-formed, wrong answer, and the gates that
+  might have caught it are often reading the same wrong answer. Measured here: a changelog parser that
+  had learned to read one change per `##` heading read a consumer's section headings as changes, so
+  their entire release history was published outward as a "change" and then deleted from the file —
+  while the guard that should have refused reported itself *inactive*, correctly by its own rule,
+  because those blocks declared nothing for it to judge. Found by probing a synthetic consumer, not by
+  a failing suite.
+  **The repair is a refusal, and it needs an exact discriminator to be safe to ship.** "Looks wrong"
+  is not enough for a gate that will fire in repos you cannot see: name the shapes that are legitimate,
+  check that each declares something the old shape cannot, and refuse the rest *before* writing
+  anything — naming the offending part and the migration. A refusal that can fire on a legitimate
+  document is worse than the defect, because it arrives in someone else's repo.
 - **Plugin/subagent changes don't load by themselves mid-session — reload deliberately, both ways.**
   A newly registered or enabled plugin doesn't appear on its own in the running session, and the
   reverse holds too: if you remove a local agent-def mid-session (as in a migration to a plugin),
