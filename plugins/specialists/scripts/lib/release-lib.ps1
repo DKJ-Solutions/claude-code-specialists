@@ -340,42 +340,23 @@ function Get-PluginManifestPaths {
     }
 }
 
-function Get-FencedLineFlags {
-    <#
-        Returns a bool per input line: is that line inside a fenced code block?
-
-        Exists because markdown structure tests -- '^### ' for an entry heading, '^---$' for a
-        separator -- must not fire on text an entry body QUOTES. An entry may legitimately show a
-        broken heading structure or a YAML frontmatter example, and treating that as structure is how
-        cutting v2.13.3 produced a third entry from two PRs, split a fence open, and duplicated a
-        category heading in the release notes.
-
-        The fence line ITSELF is reported as fenced ($true), so a caller that skips fenced lines keeps
-        the fence markers with the content rather than stripping them and leaving the body inside
-        rendered as prose.
-
-        Deliberately simple: a line whose first non-space characters are ``` or ~~~ toggles the state.
-        That is CommonMark's own rule for the common cases and needs no parser. Nested fences of the
-        same kind are not a thing in CommonMark, and an unclosed fence leaves the tail flagged as
-        fenced -- which is the safe direction, since it stops the parser inventing structure out of
-        code.
-    #>
-    # Not Mandatory, and both Allow* attributes: a changelog section can legitimately be a single
-    # empty line, and a Mandatory [string[]] rejects '' outright (ParameterArgumentValidationError).
-    param([AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines = @())
-    if ($null -eq $Lines) { return @() }
-    $flags = New-Object 'bool[]' $Lines.Count
-    $inFence = $false
-    for ($i = 0; $i -lt $Lines.Count; $i++) {
-        if ($Lines[$i] -match '^\s*(```|~~~)') {
-            $flags[$i] = $true          # the marker belongs to the block
-            $inFence = -not $inFence
-        } else {
-            $flags[$i] = $inFence
-        }
-    }
-    return $flags
-}
+# --- MOVED, NOT DELETED: Get-FencedLineFlags now lives in entry-scaffold-lib.ps1 -------------------
+#
+# The three readers below (Split-EntryBlocks, Split-Changelog, Set-EntryHeadingLevel) still call it by
+# exactly that name, and it is in scope here because this file dot-sources entry-scaffold-lib
+# unconditionally, at the top.
+#
+# WHY IT MOVED DOWN A LAYER RATHER THAN THE OTHER ONE MOVING UP. There were four fence walks in the two
+# libs -- this named function, a second named one in entry-scaffold-lib, and two inline walks inside its
+# removers -- and they were not equivalent: only this one recognised '~~~' fences. So an entry using tilde
+# fences had its quoted content read as STRUCTURE by every reader in that file while the readers here
+# handled it correctly. One question, one answer, and it has to sit in the lib that owns the entry format,
+# because the dependency can only run this way: the fold and entry-scaffold-lib's own suite load that lib
+# standalone, while nothing loads this one without it.
+#
+# The name deliberately did not gain an 'Entry' prefix on the way down: the readers here scan a whole
+# CHANGELOG rather than one entry, so a name claiming otherwise would be wrong at three call sites -- and
+# keeping it meant the move changed no call site in either lib.
 
 function Get-EntryHeadingPattern {
     <#

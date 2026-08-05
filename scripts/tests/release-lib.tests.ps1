@@ -200,7 +200,19 @@ Assert-Equal $false ('### What does this change do?' -match $rx) 'an H3 section 
 Assert-Equal $false ('# Changelog' -match $rx) 'the document title does not match either'
 Assert-Equal 2 (Get-EntryHeadingLevel) 'the level is 2, read from the format rather than counted here'
 
-Write-Host "Get-FencedLineFlags" -ForegroundColor Cyan
+Write-Host "Get-FencedLineFlags -- one owner, reached from here through the lib below" -ForegroundColor Cyan
+# THE FUNCTION MOVED DOWN A LAYER and this whole block is the proof that the move is invisible from here:
+# every assert below is the one that ran when release-lib defined it itself, unchanged. It is in scope
+# because this file dot-sources entry-scaffold-lib unconditionally -- so a broken import fails loudly here
+# rather than at a release.
+#
+# WHY IT MOVED: there were four fence walks across the two libs and they were not equivalent -- only this
+# lib's recognised '~~~', so an entry with tilde fences had its quoted content read as STRUCTURE by every
+# reader in entry-scaffold-lib while the readers here handled it correctly. The tilde behaviour and the
+# absence of a second definition are asserted in that lib's own suite, where the owner now lives.
+Assert-Equal $null (Get-Command Get-FencedLineFlags -CommandType Function -ErrorAction SilentlyContinue |
+    Where-Object { $_.ScriptBlock.File -and $_.ScriptBlock.File.EndsWith('release-lib.ps1') }) 'the fence reader is no longer defined by release-lib itself'
+Assert-Equal $true ($null -ne (Get-Command Get-FencedLineFlags -ErrorAction SilentlyContinue)) 'but dot-sourcing release-lib still brings it into scope, so no call site changed'
 $fenceLines = @('## real', 'text', '```', '## QUOTED', '---', '```', '---', '## real2')
 $fenceFlags = Get-FencedLineFlags -Lines $fenceLines
 Assert-Equal $false $fenceFlags[0] 'flags: a heading outside a fence is not fenced'
