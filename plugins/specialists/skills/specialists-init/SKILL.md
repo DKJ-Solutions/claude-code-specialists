@@ -449,6 +449,22 @@ After the script:
    routing (Chris), the branch/PR conventions (Derek), the release mechanics (Rendall). The portable
    body lives in the plugin install (not in the lens) and is loaded along via the `@`-import — the
    marketplace's drift lint guards the lenses against the canonical source.
+
+   **Replacing that heading is not cosmetic — it is the signal `specialists-teardown` reads.** That
+   script decides what to remove by looking for `(VUL-IN)` in a heading, at **any** level, so a lens
+   still carrying one anywhere is classified as an untouched scaffold no matter how much you wrote
+   underneath it. Filling the slot heading is therefore what makes your lens safe from a later
+   teardown.
+
+   **If this repo was bootstrapped before August 2026, check the lens TITLES too.** Older versions of
+   this script wrote the marker into the title as well — `# <group>-<id> · repo lens (VUL-IN)` — and
+   filling a lens never touches its title, so the marker survived and the teardown read authored repo
+   knowledge as disposable. Measured in a consumer with 24 lenses: three filled specialist lenses
+   holding 153 lines between them were all listed for removal, and `-Apply` would have taken them. The
+   dry run is the default, so nothing was lost — but the dry run is exactly what you read before
+   deciding to apply, and it named the wrong files. Current versions mark the slot only; a one-time
+   sweep for `^#.*\(VUL-IN\)` over your lenses closes it for an older repo
+   ([#451](https://github.com/DaveKJohn/claude-code-specialists/issues/451)).
 2. **Adopt the settings.** Copy what fits from `.claude/settings.suggested.jsonc` into
    `settings.json` (or `settings.local.json`), adapt the hooks stub to real repo scripts (or leave
    them out), and then remove the proposal file.

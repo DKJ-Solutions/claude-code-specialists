@@ -94,9 +94,20 @@ try {
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture $PpLegacy))) 'fresh repo: nothing written to the pre-seam plugin path'
     $lensText = [System.IO.File]::ReadAllText((Join-Path $Fixture "$Pp\06-16-extension.md"), [System.Text.Encoding]::UTF8)
     Assert-True ($lensText -match 'VUL-IN') 'lens scaffold carries the VUL-IN marker'
+    # Still asserted, and now the load-bearing half: after the title lost its marker (inbound #451) the
+    # SLOT is the only thing left carrying one, so this line is what proves an unfilled scaffold is still
+    # RECOGNISABLE as unfilled. Drop it and the fix could silently become "no marker anywhere", which
+    # makes the teardown keep every empty lens forever -- the opposite defect, same root.
+    Assert-True ($lensText -match '(?m)^##\sSpecific to this repo \(VUL-IN\)\s*$') 'lens scaffold marks the SLOT heading -- the signal the teardown keys on'
     # Rename-proof (issue #145): the agent-lens header carries the stable g-id slug, not the persona
     # name -- so a later rename of the agent-def never drifts this generated header.
-    Assert-True ($lensText -match '(?m)^# 06-16 .* repo lens \(VUL-IN\)') 'lens scaffold header is the nameless g-id form (issue #145)'
+    Assert-True ($lensText -match '(?m)^# 06-16 .* repo lens\s*$') 'lens scaffold header is the nameless g-id form (issue #145)'
+    # THE MIRROR OF THE SPECIALISTS.md ASSERTION BELOW (inbound #451), and the reason it exists: filling a
+    # lens replaces the SLOT heading and never touches the title, while Test-LooksGenerated matches
+    # '(VUL-IN)' at any heading level. A marked title therefore outlives the filling and makes
+    # specialists-teardown list authored repo knowledge as removable. Measured in a consumer with 24
+    # lenses: three filled ones holding 153 lines all printed [remove].
+    Assert-True (-not ($lensText -match '(?m)^#\s[^\r\n]*\(VUL-IN\)')) 'lens TITLE carries NO VUL-IN -- only the slot does'
     Assert-True (-not ($lensText -match 'Victor')) 'lens scaffold does NOT bake the persona name (Victor) in (issue #145)'
     $claudeMd = Join-Path $Fixture 'CLAUDE.md'
     Assert-True (Test-Path -LiteralPath $claudeMd) 'CLAUDE.md scaffold created'
