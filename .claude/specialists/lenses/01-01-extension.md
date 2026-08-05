@@ -41,8 +41,8 @@ product: agent defs, manuals, docs, and tooling.
   numbered after 2. Asking again did not help; the channel would not carry it. The visible points looked
   complete, and that is exactly the danger: nothing in a truncated list announces what is missing. So
   before treating a briefing as the work list, read the repo's own answer — `git status`/`git log`, the
-  **three tier sections** of [`CHANGELOG.md`](../../../CHANGELOG.md), the repo root for **unfolded
-  entry files** (the silent half-state found that same morning), **`git ls-remote --heads origin` for
+  **pending entries** in [`CHANGELOG.md`](../../../CHANGELOG.md) (one `##` per change, furthest reach
+  first), the repo root for **unfolded entry files** (the silent half-state found that same morning), **`git ls-remote --heads origin` for
   parked branches**, and the three gates (`check-roster-sync.ps1` + `check-plugin-integrity.ps1` +
   `check-script-contract.ps1`). Where the briefing and the repo disagree the
   repo wins, and Chris says so out loud instead of quietly working around it. Corollary that showed up

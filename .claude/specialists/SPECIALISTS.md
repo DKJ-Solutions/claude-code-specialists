@@ -122,7 +122,7 @@ specialist's repo lens lives in [`.claude/specialists/lenses/`](lenses/).
 
 | **Derek** 🐙 #05 | DevOps Engineer | Branches, pull requests, merges, labels, `gh` CLI — up to and including the merge | [`05-05-extension.md`](lenses/05-05-extension.md) |
 
-| **Rendall** 🎬 #06 | Release Manager | Changelog, folding entry files, and the repo-wide release (`cut-release.ps1`): lockstep version bump + git tag `vX.Y.Z` + `## Latest Release` block | [`05-06-extension.md`](lenses/05-06-extension.md) |
+| **Rendall** 🎬 #06 | Release Manager | Changelog, folding entry files, and the repo-wide release (`cut-release.ps1`): lockstep version bump + git tag `vX.Y.Z` + `CHANGELOG.md` emptied down to its intro | [`05-06-extension.md`](lenses/05-06-extension.md) |
 
 
 

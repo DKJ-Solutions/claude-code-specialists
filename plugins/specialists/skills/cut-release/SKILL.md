@@ -60,13 +60,13 @@ each command as you go — do not skip a step or reorder them from memory.
    - **`-NoPush` — inspect before publishing, and use it when anything is unusual.** The script otherwise
      commits, tags **and pushes** in one motion. With `-NoPush` it stops after the commit and tag and
      prints the two push commands for you, which is the moment to read the generated notes. That is not
-     optional caution: an entry body's stray `##` climbs out of its category, and this is the only step
+     optional caution: an entry body's stray `##` is read as a change of its own, and this is the only step
      where a human sees the assembled artifact before it is public.
    - **`-SkipLint`** skips the integrity gate that otherwise runs first. It exists for a genuinely broken
      gate, not for a hurry — the gate is what stops a release refusing to cut halfway through.
    - **`-SkipTierGate`** cuts a bump the pending changelog entries have not earned. **Expect not to need
-     it.** Where the repo declares tier sections, the cut requires at least one **tier-1** entry for any
-     release, a **tier-2** entry for a minor, and enough minors behind the line for a major — so a refusal
+     it.** Where the pending entries declare their impact, the cut requires at least one **tier-1** entry for
+     any release, a **tier-2** entry for a minor, and enough minors behind the line for a major — so a refusal
      usually means the bump is wrong, not the gate. The script names the bump the work *does* earn; take
      that instead. Deliberately a separate flag from `-SkipLint`, because it overrules a judgement about
      **content** rather than skipping a tool.
@@ -252,12 +252,13 @@ A repo that *does* have one (e.g. a repo that pushes a live deploy target as a s
 tagging) fills in `Get-LiveStage` with a short description of that target. Where it is filled in:
 
 1. **Push to the live target** described by `Get-LiveStage`.
-2. **Check the `<- LIVE` marker** in this repo's releases overview, so it shows at a glance which
-   recorded version is the one actually live. Since #417 `cut-release.ps1` **moves this marker itself**
-   where the repo sets `Get-ReleaseLiveMarker` — it strips it from the previous release heading and
-   writes it onto the new one. This step is therefore a verification, not a hand edit; it stays on the
-   checklist because the marker is the one release artefact whose correctness a script cannot confirm
-   (only the person who did the push knows it succeeded).
+2. **Mark which recorded version is the one actually live**, wherever this repo records that, so its
+   releases overview shows it at a glance. `cut-release.ps1` briefly did this itself, via a
+   `Get-ReleaseLiveMarker` seam that moved a marker from the previous release heading onto the new one; that
+   seam **retired on August 5, 2026** together with the `CHANGELOG.md` release block it wrote into — a cut
+   now empties the changelog and writes no release heading for a marker to sit on. So this is a hand step
+   again, which is where it started: the marker is the one release artefact whose correctness a script cannot
+   confirm, because only the person who did the push knows it succeeded.
 
 ## A milestone release — `-SummaryFile`
 
@@ -282,31 +283,39 @@ version waiting for a migration that does not exist.
 
 ## Requirements in the consumer
 
-- `scripts\repo-config.ps1` with, optionally, `Get-LiveStage` — same shape as the existing
-  `Get-LintScript`/`Get-ChangelogTierHeadings` getters. Absent or empty: only Block 1 applies. Declared in
+- `scripts\repo-config.ps1` with, optionally, `Get-LiveStage` — same shape as the existing `Get-LintScript`
+  getter. Absent or empty: only Block 1 applies. Declared in
   `check-script-contract.ps1` as an **Optional** record (the mechanism introduced for
   `Get-ChangelogHeading`, issue #178): a consumer without the function gets `[INFO]` naming the
   fallback (`''`, i.e. no live stage), never `[ERROR]`.
 - The script's own getters are separate from this skill's and all optional in the same way:
-  `Get-ReservedRootMd`, `Get-ReleaseNotesGrouping`, `Get-ReleaseLiveMarker`, `Get-ReleasePluginTier`,
-  `Get-ReleaseCategoryTitles`, `Get-ReleaseHighlightsBumps`, `Get-ReleaseMajorMinMinors` and
-  `Get-ChangelogReleaseWording`. Define none of them and the cut behaves exactly as it does in the source
-  repo. Run `check-script-contract.ps1` to see which ones this repo answers and which fall back.
+  `Get-ReservedRootMd`, `Get-ReleaseNotesGrouping`, `Get-ReleaseHistoryPath`, `Get-ReleasePluginTier`,
+  `Get-ReleaseHighlightsBumps` and `Get-ReleaseMajorMinMinors`. Define none of them and the cut behaves
+  exactly as it does in the source repo. Run `check-script-contract.ps1` to see which ones this repo answers
+  and which fall back.
+- **Six seams retired on August 5, 2026, and a consumer that still defines one is unaffected** — nothing
+  calls them, so they are simply dead code in that repo's config. `Get-ChangelogTierHeadings` and the legacy
+  `Get-ChangelogHeading` (#178) configured changelog section headings, and the document has none;
+  `Get-ReleaseCategoryTitles` labelled the release-notes categories, and the grouping is gone;
+  `Get-ReleaseLiveMarker`, `Get-ReleaseHistoryMode` and `Get-ChangelogReleaseWording` (#462) all described
+  the release **block** a cut used to append to `CHANGELOG.md`, and a cut writes none. The capability behind
+  that last one is not being taken away from the non-English repo that asked for it: what replaced the
+  generated block is the changelog intro's own one-line pointer to the release history — hand-written prose
+  in a file the repo owns outright, so it needs no seam to be in their language.
 - **`Get-LintScript` is the one that is NOT optional, and the cut now reads it.** The release route does not
   travel via a PR, so this is the only gate it meets; before August 5, 2026 the cut looked for the *source*
   repo's lint script by a fixed path and skipped the gate with a warning wherever it did not find one
   (inbound #464). A named gate that is not on disk is now a hard stop — use `-SkipLint` to cut without one,
   so the choice is in the command.
-- **`Get-ChangelogReleaseWording` is worth a look in a non-English repo.** It carries the four strings a
-  release writes into your own `CHANGELOG.md`, merged over the English defaults, keyed `LatestIntro`,
-  `AllIntro`, `NotesLine` and `InternalNoteLine`. Values take `{history}`, `{notes}`, `{internal}`, `{dev}`
-  and `{emdash}` as tokens, since a config file has none of those values in scope. `AllIntro`'s default
-  names *"the marketplace"* — the wrong noun for a consumer that is not one.
-- **The tier sections are optional too, and they switch the bump gate on.** `Get-ChangelogTierHeadings`
-  declares one changelog section per tier; declare more than one and `cut-release.ps1` starts requiring the
-  bump to be earned (see `-SkipTierGate` in step 1). A repo that declares one section — or none, falling
-  back to the legacy `Get-ChangelogHeading` or to `## Pull Requests` — has no tier information to judge, so
-  the gate reports itself inactive and the cut behaves exactly as it always did.
+- **What switches the bump gate on is the entries, not a setting.** `cut-release.ps1` starts requiring the
+  bump to be earned (see `-SkipTierGate` in step 1) as soon as **any** pending entry has declared its impact
+  — an impact table, or the older `Tier: N` line. A repo whose entries declare nothing has no tier
+  information to judge, so the gate reports itself inactive and the cut behaves exactly as it always did.
+  That test used to be "does this repo declare more than one changelog section", which stopped working the
+  day the sections went: a flat document gives an adopting repo and an unadopted one one group each, so the
+  old test would have read every repo as unadopted and switched the gate off in silence. Counting
+  declarations keeps *"declared tier 0"* distinct from *"declared nothing"*, which is the whole difference
+  between a release with nobody to announce it to and a repo that never chose the model.
 - `git` and a logged-in `gh` CLI for the GitHub Release step. **Which bumps get a Release is repo
   policy, not part of this checklist** — it is stated in the release manager's repo lens, because a repo
   that publishes at every release and one that publishes at Minor/Major only are both coherent, and the

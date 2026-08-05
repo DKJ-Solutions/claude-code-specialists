@@ -964,48 +964,113 @@ try {
     Assert-True (-not ($r33c.Out -match [regex]::Escape('ZZ-NEWLY-WRITTEN-PAGE.md'))) 'scenario 33: the fixture is left as it was found'
 
     # --- Scenario 34: check 13, entry heading levels (this repo's own defect, four times in one day) ---
-    #     An entry body used '### Tested' as a sub-heading. The entry's own heading is an H3, so after the
-    #     fold CHANGELOG.md carried four headings with no PR number -- and release-lib.ps1 splits entries on
-    #     EVERY unfenced '### ' line, so cut-release.ps1 would have shipped four "entries" with no number,
-    #     no type and no Plugins line. Rendall's lens warned about the '##' form of this and the warning did
-    #     not stop it, which is the whole argument for a gate: the rule is exactly checkable.
-    Write-Host 'check 13 -- a second H3 in an entry body is an error, at both moments' -ForegroundColor Cyan
-    $s34Entry = Join-Path $Fixture 'fix-a-branch-name.md'
-    $s34Good = @(
-        '### A fixture entry ' + [char]0x00B7 + ' Fix ' + [char]0x00B7 + ' 2026-08-01'
+    #     An entry body used a sub-heading at the entry's own level, so the two became siblings: after the
+    #     fold CHANGELOG.md carried headings with no PR number, and the release renderer split an entry on
+    #     every one of them, shipping "entries" with no number, no type and no Plugins line. Rendall's lens
+    #     warned about it and the warning did not stop it, which is the whole argument for a gate: the rule
+    #     is exactly checkable.
+    #
+    #     REWRITTEN FOR THE FLAT CHANGELOG (August 5, 2026). An entry is an H2 with three named H3 sections,
+    #     so the forbidden levels moved up by one AND a second, new rule joined them: a heading AT the
+    #     section level that is not one of the declared sections. Both halves are asserted here, and so is
+    #     the case that must stay silent -- the three real section headings, which the pre-flat version of
+    #     this check would have reported as three defects each.
+    $s34Md = [char]0x00B7
+    $s34Sections = @(
+        '### What does this change do?'
         ''
         'A body with a correctly demoted sub-heading.'
         ''
         '#### Tested'
         ''
         'All green.'
+        ''
+        '### Who is this for'
+        ''
+        '| Tier | Significance | Why |'
+        '|---|---|---|'
+        '| 0 | - | - |'
+        ''
+        '### Type of change'
+        ''
+        'Fix'
     )
+    Write-Host 'check 13 -- an entry is an H2 with three named H3 sections, and a body heading may be neither' -ForegroundColor Cyan
+    $s34Entry = Join-Path $Fixture 'fix-a-branch-name.md'
+    $s34Good = @('## A fixture entry') + @('') + $s34Sections
     [System.IO.File]::WriteAllText($s34Entry, (($s34Good -join "`n") + "`n"), $Utf8NoBom)
     $r34a = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True (-not ($r34a.Out -match 'entry-heading.*fix-a-branch-name')) 'scenario 34: a "####" sub-heading is accepted'
+    # THE ASSERT THAT MATTERS MOST HERE, because the whole entry format would trip a level-only rule: the
+    # three declared section headings sit at the section level BY DESIGN and must be silent, while the
+    # '####' sub-heading inside one of them is the ordinary accepted case.
+    Assert-True (-not ($r34a.Out -match 'entry-heading.*fix-a-branch-name')) 'scenario 34: the three declared H3 sections plus a "####" sub-heading are accepted'
     Assert-True ($r34a.Out -match '\[entry-heading\] checked') 'scenario 34: and the entry file WAS examined -- the pass is not an empty scan'
+    Assert-True ($r34a.Out -match '\[entry-heading\].*1 unfolded entry file\(s\)') 'scenario 34: an H2 entry file is RECOGNISED as one -- the detector was H3-only until August 5, 2026, so this check silently judged nothing'
 
-    # The defect itself.
-    $s34Bad = @($s34Good) -replace '^#### Tested$', '### Tested'
+    # Defect one: a heading at the entry's own level inside the body. This is the old '### Tested' defect,
+    # one level up, and now the worse one -- it becomes a separate entry rather than a stray sub-heading.
+    $s34Bad = @($s34Good) -replace '^#### Tested$', '## Tested'
     [System.IO.File]::WriteAllText($s34Entry, (($s34Bad -join "`n") + "`n"), $Utf8NoBom)
     $r34b = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True ($r34b.Out -match 'entry-heading.*fix-a-branch-name\.md:5') 'scenario 34: a second H3 is reported, with its line number'
+    Assert-True ($r34b.Out -match 'entry-heading.*fix-a-branch-name\.md:7') 'scenario 34: an H2 in an entry body is reported, with its line number'
     Assert-True ($r34b.Out -match 'SEPARATE entry') 'scenario 34: and the message says WHY, by naming the consequence at fold time'
+    Assert-True ($r34b.Out -match 'undeclared tier 0') 'scenario 34: including what the phantom entry declares -- nothing'
+
+    # Defect two, new with the format: a heading at the SECTION level that is not a declared section. The
+    # dangerous version of this is a MISSPELLED section heading, which costs the entry its declaration
+    # silently -- so the fixture uses exactly that rather than an obviously unrelated word.
+    $s34Typo = @($s34Good) -replace '^### Who is this for$', '### Who is this For'
+    [System.IO.File]::WriteAllText($s34Entry, (($s34Typo -join "`n") + "`n"), $Utf8NoBom)
+    $r34c = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34c.Out -match 'entry-heading.*fix-a-branch-name\.md:11') 'scenario 34: a misspelled section heading is reported, with its line'
+    Assert-True ($r34c.Out -match 'not one of them') 'scenario 34: and the message lists the sections that ARE declared'
+    Assert-True ($r34c.Out -match 'loses that declaration') 'scenario 34: naming the silent cost rather than only the rule'
 
     # Fence-aware: an entry that QUOTES a heading is discussing structure, not creating it -- the
-    # mention-versus-use question this file answers in four other checks.
+    # mention-versus-use question this file answers in four other checks, and one this repo's own entry
+    # files do (the entry for this very change quotes the format).
     $s34Fenced = @(
-        '### A fixture entry ' + [char]0x00B7 + ' Fix ' + [char]0x00B7 + ' 2026-08-01'
+        '## A fixture entry'
+        ''
+        '### What does this change do?'
         ''
         'The wrong form looks like this:'
         ''
         '```markdown'
-        '### Tested'
+        '## Tested'
+        '### Who is this For'
         '```'
+        ''
+        '### Who is this for'
+        ''
+        '| Tier | Significance | Why |'
+        '|---|---|---|'
+        '| 0 | - | - |'
+        ''
+        '### Type of change'
+        ''
+        'Fix'
     )
     [System.IO.File]::WriteAllText($s34Entry, (($s34Fenced -join "`n") + "`n"), $Utf8NoBom)
-    $r34c = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True (-not ($r34c.Out -match 'entry-heading.*fix-a-branch-name')) 'scenario 34: a fenced heading example is not a finding -- it is a mention, not a use'
+    $r34d = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r34d.Out -match 'entry-heading.*fix-a-branch-name')) 'scenario 34: both fenced examples are mentions, not uses -- neither level is reported'
+
+    # A PRE-FORMAT entry file, which is not history: an entry file lives only on a branch, so a branch
+    # created before the format changed still carries an H3 heading, and this repo had one parked on the
+    # remote the day the format landed. It must still be RECOGNISED (line 1 is skipped whatever its level,
+    # because the fold promotes it) while its body is judged by the same rules.
+    $s34Legacy = @(
+        '### An older entry ' + $s34Md + ' Fix ' + $s34Md + ' 2026-08-01'
+        ''
+        'Body prose.'
+        ''
+        '## Not allowed here either'
+    )
+    [System.IO.File]::WriteAllText($s34Entry, (($s34Legacy -join "`n") + "`n"), $Utf8NoBom)
+    $r34e = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34e.Out -match '\[entry-heading\].*1 unfolded entry file\(s\)') 'scenario 34: a pre-format H3 entry file is still recognised as an entry file'
+    Assert-True ($r34e.Out -match 'entry-heading.*fix-a-branch-name\.md:5') 'scenario 34: and its body is judged by the same rules'
+    Assert-True (-not ($r34e.Out -match 'fix-a-branch-name\.md:1')) 'scenario 34: while its own H3 heading on line 1 is NOT reported -- that is the entry, and the fold promotes it'
     Remove-Item -LiteralPath $s34Entry -Force
 
     # The CHANGELOG half, which is what cut-release actually parses -- and the half that catches damage
@@ -1014,84 +1079,110 @@ try {
     $s34ClGood = @(
         '# Changelog'
         ''
-        '## Pull Requests'
+        'Everything merged since the last release, furthest reach first.'
         ''
-        '### #123 ' + [char]0x00B7 + ' A real entry ' + [char]0x00B7 + ' Fix ' + [char]0x00B7 + ' 2026-08-01'
+        '## #123 ' + $s34Md + ' A real entry'
         ''
-        '#### Tested'
-        ''
-        '## Releases'
-        ''
-    )
+    ) + $s34Sections + @('')
     [System.IO.File]::WriteAllText($s34Cl, (($s34ClGood -join "`n") + "`n"), $Utf8NoBom)
-    $r34d = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True (-not ($r34d.Out -match 'entry-heading. CHANGELOG')) 'scenario 34: a well-formed Pull Requests section is silent'
+    $r34f = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r34f.Out -match 'entry-heading. CHANGELOG')) 'scenario 34: a well-formed flat changelog is silent'
 
-    $s34ClBad = @($s34ClGood) -replace '^#### Tested$', '### Tested'
-    [System.IO.File]::WriteAllText($s34Cl, (($s34ClBad -join "`n") + "`n"), $Utf8NoBom)
-    $r34e = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True ($r34e.Out -match 'entry-heading. CHANGELOG\.md:7') 'scenario 34: a numberless H3 in Pull Requests is reported, with its line'
-    Assert-True ($r34e.Out -match 'cut-release') 'scenario 34: and the message names what would break'
+    # A body sub-heading written at the entry's own level, in the middle of a formatted entry. It SPLITS the
+    # entry: the three sections land across two blocks, so the phantom's first section is whichever one
+    # followed it -- never the first. That is the rule, and it is structural rather than a guess about intent.
+    $s34ClStray = @($s34ClGood) -replace '^#### Tested$', '## Tested'
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClStray -join "`n") + "`n"), $Utf8NoBom)
+    $r34g = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34g.Out -match 'entry-heading. CHANGELOG\.md:11') 'scenario 34: a body heading at the entry level is reported, with its line'
+    Assert-True ($r34g.Out -match 'has been SPLIT') 'scenario 34: and the message names what happened to the entry rather than only the rule'
+    Assert-True ($r34g.Out -match "first named section is 'Who is this for'") 'scenario 34: quoting the section it starts at, which is the evidence'
 
-    # The H2 case, which is the one Rendall's lens actually documented (v2.13.2) and which the first version
-    # of this check MISSED: it gated H3 only, and the next release cut put two H2s from an older entry body
-    # into the generated notes as siblings of '## Fixes'. A gate that covers the instance you just met and
-    # not the one the docs warned about is half a gate.
-    $s34ClH2 = @(
+    # THE FALSE POSITIVE THIS AVOIDS, and it is the reason the rule is not simply "an H2 needs a #NN": the
+    # fold cannot reach gh on a manual merge, and then it writes a legitimate entry with no number and no PR
+    # footer, saying so on the console. Keying on the number would report the fold's own documented output as
+    # a defect.
+    $s34ClNoPr = @($s34ClGood) -replace ('^## #123 ' + [regex]::Escape($s34Md) + ' A real entry$'), '## A real entry with no PR number'
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClNoPr -join "`n") + "`n"), $Utf8NoBom)
+    $r34h = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r34h.Out -match 'entry-heading. CHANGELOG')) 'scenario 34: an entry with no PR number but with its sections is accepted -- the manual-merge fold'
+
+    # A PRE-FORMAT entry, which is the second legitimate shape: no sections at all, the type carried as a
+    # heading field. Every entry this repo folded before August 5, 2026 looks like this, and so does anything
+    # folded from a branch that predates the format -- so reporting it would fire on real history.
+    $s34ClLegacy = @(
         '# Changelog'
         ''
-        '## Pull Requests'
+        'Intro.'
         ''
-        '### #123 ' + [char]0x00B7 + ' A real entry ' + [char]0x00B7 + ' Fix ' + [char]0x00B7 + ' 2026-08-01'
+        '## #99 ' + $s34Md + ' An entry from before the format ' + $s34Md + ' Fix ' + $s34Md + ' 2026-08-01'
         ''
-        '## A sub-heading that climbs out of its category'
+        'Body prose, no named sections.'
+        ''
+        '#### A properly demoted sub-heading'
+        ''
+        'More prose.'
+        ''
+    )
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClLegacy -join "`n") + "`n"), $Utf8NoBom)
+    $r34k = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r34k.Out -match 'entry-heading. CHANGELOG')) 'scenario 34: a pre-format entry declaring its type in the heading is accepted -- no sections required of it'
+
+    # THE PLACEMENT NEITHER RULE CATCHES ALONE, and the reason the check has two: a stray heading directly
+    # BELOW the entry heading keeps all three sections in its own block, so the first rule sees a well-formed
+    # entry. What gives it away is the entry ABOVE it, now sectionless -- and a current-format heading carries
+    # no type field, so the type rule reports that one. The error lands on the real entry rather than on the
+    # stray, which is why the message names both possibilities instead of asserting which it found.
+    $s34ClAbsorbed = @(
+        '# Changelog'
+        ''
+        'Intro.'
+        ''
+        '## #123 ' + $s34Md + ' A real entry'
+        ''
+        '## A sub-heading that swallowed the entry'
+        ''
+    ) + $s34Sections + @('')
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClAbsorbed -join "`n") + "`n"), $Utf8NoBom)
+    $r34l = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34l.Out -match 'entry-heading. CHANGELOG\.md:5') 'scenario 34: a stray heading directly below an entry heading is caught via the entry it emptied'
+    Assert-True ($r34l.Out -match 'declares neither its named sections nor a change type') 'scenario 34: and the message states exactly what is missing'
+    Assert-True ($r34l.Out -match 'absorbed by such a heading directly below it') 'scenario 34: naming the second possibility, since the error lands on the victim rather than the cause'
+
+    # An H1 below the intro, and a stray section-level heading, in one document -- so the assert on the
+    # second one also proves the scan did not stop at the first. The pre-flat check keyed its boundary on a
+    # heading NAME and had to reason carefully about not ending the scan at the very defect it looked for;
+    # the boundary is structural now, so the scan simply runs to the end of the file.
+    $s34ClMixed = @(
+        '# Changelog'
+        ''
+        'Intro.'
+        ''
+        '## #123 ' + $s34Md + ' A real entry'
+        ''
+        '### What does this change do?'
+        ''
+        '# A body heading that climbs above every entry'
         ''
         '### Tested'
         ''
-        '## Releases'
+        '### Type of change'
+        ''
+        'Fix'
         ''
     )
-    [System.IO.File]::WriteAllText($s34Cl, (($s34ClH2 -join "`n") + "`n"), $Utf8NoBom)
-    $r34g = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True ($r34g.Out -match 'entry-heading. CHANGELOG\.md:7') 'scenario 34: an H2 inside Pull Requests is reported too, with its line'
-    Assert-True ($r34g.Out -match 'climbs out of its release category') 'scenario 34: and the message names the consequence in the notes'
-    # THE TRAP THIS GUARDS, tested on the property rather than on the error total (the fixture has its own
-    # expected noise, so a count assert would be brittle): the section scan must end at '## Releases'
-    # specifically, NOT at the next H2. Otherwise a stray H2 ends the scan at the very defect it is looking
-    # for and everything after it passes silently. The numberless H3 on line 9 sits AFTER the stray H2, so it
-    # can only be reported if the scan kept going. Measured: the first version broke on any H2 and reported
-    # neither of them.
-    Assert-True ($r34g.Out -match 'entry-heading. CHANGELOG\.md:9') 'scenario 34: and a defect AFTER the stray H2 is still reported -- the scan did not stop at it'
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClMixed -join "`n") + "`n"), $Utf8NoBom)
+    $r34i = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34i.Out -match 'entry-heading. CHANGELOG\.md:9') 'scenario 34: an H1 below the intro is reported'
+    Assert-True ($r34i.Out -match 'climbs above every entry') 'scenario 34: and the message names the consequence in the document'
+    Assert-True ($r34i.Out -match 'entry-heading. CHANGELOG\.md:11') 'scenario 34: and the stray section heading AFTER it is still reported -- the scan did not stop'
 
-    # An entry FILE with an H2 in its body: caught at the moment the author can still fix it.
-    $s34EntryH2 = @(
-        '### A fixture entry ' + [char]0x00B7 + ' Fix ' + [char]0x00B7 + ' 2026-08-01'
-        ''
-        '## Not allowed here'
-    )
-    [System.IO.File]::WriteAllText($s34Entry, (($s34EntryH2 -join "`n") + "`n"), $Utf8NoBom)
-    $r34h = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True ($r34h.Out -match 'entry-heading.*fix-a-branch-name\.md:3') 'scenario 34: an H2 in an entry body is reported on the PR'
-    Assert-True ($r34h.Out -match "a '## ' heading") 'scenario 34: and the message names the level it found'
-    Remove-Item -LiteralPath $s34Entry -Force
-
-    # Scoped to the Pull Requests section: the Releases section legitimately holds '### vX.Y.Z' headings,
-    # and reporting those would make the check fire on every repo that has ever released.
-    $s34ClRel = @(
-        '# Changelog'
-        ''
-        '## Pull Requests'
-        ''
-        '### #123 ' + [char]0x00B7 + ' A real entry ' + [char]0x00B7 + ' Fix ' + [char]0x00B7 + ' 2026-08-01'
-        ''
-        '## Releases'
-        ''
-        '### v1.2.3 ' + [char]0x00B7 + ' 2026-07-01'
-        ''
-    )
-    [System.IO.File]::WriteAllText($s34Cl, (($s34ClRel -join "`n") + "`n"), $Utf8NoBom)
-    $r34f = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True (-not ($r34f.Out -match 'entry-heading. CHANGELOG')) 'scenario 34: a version heading under ## Releases is NOT a finding -- the check stops at the section boundary'
+    # A changelog with no entry at all is the normal state between a release and the next merge: not judged
+    # and not an error. Stated as an assert because "reports nothing" and "found nothing to report" look
+    # identical from the outside, and the coverage line is what distinguishes them.
+    [System.IO.File]::WriteAllText($s34Cl, "# Changelog`n`nNothing merged since the last release.`n", $Utf8NoBom)
+    $r34j = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r34j.Out -match 'entry-heading. CHANGELOG')) 'scenario 34: an entry-less changelog is not an error -- that is the state right after a release'
     Remove-Item -LiteralPath $s34Cl -Force
 
     # Leaves the fixture with a history-only mention again, which the coverage block below relies on.

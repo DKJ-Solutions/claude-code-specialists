@@ -208,36 +208,32 @@ if ($Intent -ne "") {
 # that is being edited anyway -- not a manual sequence worth a flag, and one fewer parameter that every
 # consumer's skill page would have to document.
 #
-# ONLY WHERE THE REPO RANKS AT ALL. Test-EntrySignificanceActive is off for a repo with no tier split (it
-# has no tier information, so nothing is ever required) and can be switched off explicitly via
-# Get-EntrySignificanceEnabled. Such a repo gets the old single 'Tier: 0' line instead, which is what it
-# already had -- the table is the ranking's carrier, so a repo that does not rank has nothing to carry.
+# THE SECTION SHAPE IS THE SHAPE, ALWAYS -- the ranking's on/off switch does not change it. An earlier
+# draft wrote the table only where Test-EntrySignificanceActive said the repo ranks, and the old 'Tier: 0'
+# line otherwise. That produced TWO entry shapes in one system, so every reader downstream would have needed
+# both paths forever. The table at tier 0 is harmless in a repo that never scores it -- nothing asks, nothing
+# refuses -- so the switch now governs only the GATES, which is the thing a repo was ever opting out of.
 $impactActive = Test-EntrySignificanceActive
-$impactBlock = if ($impactActive) {
-    (Format-EntryImpactTable) -join "`n"
-} else {
-    Format-EntryTierLine
-}
 
-# Compact heading, matching the CHANGELOG format. The fold adds what only exists after the merge:
-# '#NN <midDot> ' at the front of the title, and the '[PR #NN](url) <midDot> merged <date>' line at the
-# end.
+# ONE H2 PER CHANGE, WITH THREE NAMED SECTIONS (Dave, August 5, 2026). The heading carries only what a reader
+# scans -- the title, and after the merge the PR number. Everything else is stated under its own '### ':
+# what the change does, who it is for (the impact table), and its type.
+#
+# THE TYPE IS NO LONGER A MIDDOT FIELD IN THE HEADING. It used to be parsed back out of there -- first by
+# position, then by matching against the known types -- because the heading was doing three jobs at once. As
+# its own section it is stated rather than inferred.
 #
 # NO DATE HERE, DELIBERATELY (Dave, August 5, 2026). This script runs when the BRANCH is created, so any
-# date it writes is the branch's birth date -- and the changelog records what LANDED when. A branch
-# opened on Monday and merged on Thursday used to be filed as Monday's work, silently, in the one
-# document whose whole job is to say when things happened. The date is now the fold's to add, from the
-# PR's own merge timestamp, and it goes at the BOTTOM: the heading carries what the author knows (title,
-# type) and the closing line carries what only the merge knows (PR number, merge date).
-$template = @"
-### $Title $midDot $branchType
-
-$impactBlock
-
-$stubBodyHeading
-
-$body
-"@
+# date it writes is the branch's birth date -- and the changelog records what LANDED when. A branch opened on
+# Monday and merged on Thursday used to be filed as Monday's work, silently, in the one document whose whole
+# job is to say when things happened. The date is the fold's to add, from the PR's own merge timestamp, and
+# it goes at the BOTTOM with the PR number: the two facts that do not exist until the merge.
+#
+# THE STUB BODY STILL GOES INSIDE the 'what does this change do?' section rather than replacing it, so
+# open-pr's scaffold gate keeps working unchanged: it refuses an entry still carrying this wording, and it
+# looks for the wording, not for where it sits.
+$entryLines = Format-EntryBlock -Title $Title -Type $branchType -Body ($stubBodyHeading + "`n`n" + $body)
+$template = ($entryLines -join "`n") + "`n"
 
 [System.IO.File]::WriteAllText($filePath, $template, $Utf8NoBom)
 Write-Host "Created: $fileName" -ForegroundColor Green

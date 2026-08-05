@@ -82,10 +82,15 @@
          so history is excluded identically. Matching is case-insensitive, since PowerShell property
          access is and a working query must not be reported as broken.
 
-     13. entry-heading levels: a heading inside a changelog entry body at or above the entry's own H3
-         becomes a SEPARATE entry when the fold pastes it into CHANGELOG.md, and an H1/H2 climbs out of
-         its release category in the generated notes (seen in v2.13.2). Judged in every unfolded root
-         entry file and in CHANGELOG.md's '## Pull Requests' section.
+     13. entry-heading levels: an entry is an H2 with three named H3 sections, and a body heading may be
+         neither. At or above the entry's own level it becomes a SEPARATE entry the moment the fold pastes
+         it into CHANGELOG.md -- one declaring no impact, so filed as an undeclared tier 0 -- or, at H1,
+         climbs above every entry in the document (seen in v2.13.2). At the SECTION level it truncates the
+         section it lands in, and if it is a misspelling of a real section heading the entry silently loses
+         that declaration and the tier/significance gates read nothing. Every level comes from
+         entry-scaffold-lib.ps1 rather than being written out here. Judged in every unfolded root entry
+         file (line 1 skipped, so a pre-format H3 entry still passes) and in CHANGELOG.md below its intro,
+         where the intro/entries boundary is derived structurally exactly as Split-Changelog derives it.
      14. encoding: scripts/maintenance/fix-mojibake.ps1 -Check is run as the gate. WHICH files it walks
          is repo-owned since issue #413 -- Get-MojibakePaths in scripts/repo-config.ps1 names them, here
          every *.md in the root, every *.md under plugins/, and every note under releases/. A UTF-8
@@ -330,16 +335,28 @@ function Get-HeadingSlugs {
 }
 
 function Test-IsChangelogEntryFile {
-    # A changelog entry file (new-changelog-entry.ps1) opens with the compact entry heading
-    # '### <title> <midDot> <type> <midDot> <date>' -- an H3. Permanent root docs (README, CHANGELOG,
-    # CONTRIBUTING, SECURITY, ...) open with an H1. Same structural signature fold-changelog-entry.ps1
-    # keys off, deliberately restated rather than imported: dot-sourcing that script would RUN it, and
-    # a lint gate must not invoke a release action to answer a question. The shared thing is the entry
-    # FORMAT, owned by new-changelog-entry.ps1; both readers derive from it.
+    # A changelog entry file (new-changelog-entry.ps1) opens with its own heading; permanent root docs
+    # (README, CHANGELOG, CONTRIBUTING, SECURITY, ...) open with an H1. Same structural signature
+    # fold-changelog-entry.ps1 keys off, and BOTH levels are accepted for the same reason it accepts
+    # them: an entry file lives only on a branch, so a branch created before August 5, 2026 still
+    # carries the older H3 shape, and the fold promotes it as it lands.
+    #
+    # THE LEVEL IS READ FROM THE FORMAT LIB, NOT RESTATED, and that repair is the point. This function
+    # used to hardcode '^###\s' with a comment explaining that restating it was deliberate, because
+    # importing meant dot-sourcing the fold script -- which would RUN a release action to answer a
+    # lint question. That reasoning was sound and its conclusion went stale the moment the entry format
+    # moved into entry-scaffold-lib.ps1, a pure lib this file already loads through release-lib.ps1.
+    # Measured August 5, 2026: entries had been H2 since the format changed and this copy still looked
+    # for H3, so the gate recognised NO entry file at all -- check 13 below silently judged nothing and
+    # reported clean, and check 11 stopped excluding entry files from its scan set. Exactly the
+    # duplicated-fact failure the rest of this file exists to prevent, in the helper that answers
+    # "what is an entry".
     param([Parameter(Mandatory = $true)][string]$Path)
+    $entryLevel = Get-EntryHeadingLevel
+    $rx = '^#{' + $entryLevel + ',' + ($entryLevel + 1) + '}\s'
     foreach ($line in [System.IO.File]::ReadAllLines($Path, [System.Text.Encoding]::UTF8)) {
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
-        return ($line -match '^###\s')
+        return ($line -match $rx)
     }
     return $false
 }
@@ -1029,34 +1046,54 @@ $irSkipNote = "$irMentions fenced block(s) naming the file without parsing it sk
 Write-Coverage -Category 'record-query' -Checked $irChecked `
     -Note $(if ($irChecked -eq 0) { "no printed query reads installed_plugins.json anywhere in the scan set -- nothing to enforce, which is not the same as the docs being right ($irSkipNote)" } else { "$irSkipNote; history excluded as in check 11" })
 
-# --- 13. entry heading levels: a sub-heading inside an entry body cannot be an entry itself --------------
-# THE DEFECT, and it is this repo's own, four times in one day. An entry body used '### Tested' as a
-# sub-heading. The entry heading is ITSELF an H3, so those became siblings: after the fold, CHANGELOG.md's
-# '## Pull Requests' section carried four headings with no PR number. That is not cosmetic --
-# release-lib.ps1's Read-Changelog splits entries on EVERY unfenced '^###\s' line, so cut-release.ps1 would
-# have emitted four extra "entries" with no number, no type and no Plugins line, and grouped them under
-# whatever category came last.
+# --- 13. entry heading levels: a body heading cannot become an entry, nor a section of one ---------------
+# THE DEFECT, and it is this repo's own, four times in one day. An entry body used a sub-heading at the
+# entry's own level, so the two became siblings: after the fold, CHANGELOG.md carried headings with no PR
+# number, and the release renderer split an entry on every one of them -- emitting extra "entries" with no
+# number, no type and no Plugins line. Rendall's lens already warned about it (seen in v2.13.2, where a
+# body heading rendered as a release category). The warning did not stop it, which is the argument for a
+# gate rather than a sharper sentence: the rule is exactly checkable, so nobody should have to remember it.
 #
-# Rendall's lens already warned about the '##' version of this (seen in v2.13.2, where a body's
-# '## On the tests' rendered as a release category). The warning did not stop it, which is the argument for
-# a gate rather than a sharper sentence: the rule is exactly checkable, so nobody should have to remember it.
+# EVERY LEVEL IS READ FROM THE FORMAT LIB (entry-scaffold-lib.ps1, via release-lib.ps1), because the levels
+# moved on August 5, 2026 and a hardcoded copy would have gone stale exactly the way this file's own
+# Test-IsChangelogEntryFile did. An entry heading is an H2; its three named sections are H3.
 #
-# BOTH LEVELS, H2 AND H3, and the H2 half is the one the lens actually warned about. The first version of
-# this check gated H3 only -- and the very next release cut showed two H2 headings from an older entry body
-# sitting in the generated notes as siblings of '## Fixes' and '## Documentation', which is v2.13.2's defect
-# verbatim. A gate that covers the instance you just met and not the one the documentation warned about is
-# half a gate. An entry body may use '####' or bold; nothing above that.
+# WHAT IS NOW WRONG, AND WHY EACH HALF IS A REAL DEFECT RATHER THAN A STYLE RULE:
+#   - a heading AT OR ABOVE the entry's own level in a body. An H2 becomes a SEPARATE ENTRY -- Split-Changelog
+#     splits on exactly that level -- and the phantom carries no impact table, so it reads as an undeclared
+#     tier 0 and gets its own block in the record. An H1 climbs above every entry in the document.
+#   - a SECTION-LEVEL heading that is not one of the entry's declared sections. This half is new with the
+#     format, and it is not cosmetic: Get-EntrySectionBody ends a section at the next heading of that level
+#     or above, so a stray H3 truncates whichever section it lands in -- and a MISTYPED section heading
+#     ('Who is this For') is the same shape, silently costing the entry the very declaration the tier and
+#     significance gates read. Use '#### ' or bold for a sub-heading; fix the spelling for a section.
 #
 # TWO PLACES, because they catch it at two different moments:
-#   - the root ENTRY FILES, which is where the author can still fix it on the PR. An entry file holds
-#     exactly ONE heading at H3 or above: its own, on the first line.
-#   - CHANGELOG.md's '## Pull Requests' section, which is what cut-release actually parses. This half also
-#     catches damage that arrived through the fold -- the one write that happens directly on main, past
-#     every PR gate (the #234 lesson, one section over).
-# Fence-aware in both, via the same Get-FenceMaskedText the other checks use: an entry that QUOTES a '###'
-# line inside a code fence is discussing structure, not creating it -- the mention-versus-use question this
-# file has now answered four times.
+#   - the root ENTRY FILES, which is where the author can still fix it on the PR. Line 1 is the entry's own
+#     heading and is skipped whatever its level -- a pre-format H3 entry file is legitimate, and the fold
+#     promotes it as it lands.
+#   - CHANGELOG.md below its intro, which is what cut-release actually parses. This half also catches damage
+#     that arrived through the fold -- the one write that happens directly on main, past every PR gate (the
+#     #234 lesson).
+# Fence-aware in both, via the same Get-FenceMaskedText the other checks use: an entry that QUOTES a heading
+# inside a code fence is discussing structure, not creating it -- the mention-versus-use question this file
+# has now answered four times, and this repo's own changelog and entry files do exactly that.
 $ehChecked = 0
+$ehEntryLevel   = Get-EntryHeadingLevel
+$ehSectionLevel = Get-EntrySectionLevel
+$ehSectionNames = @((Get-EntrySectionHeadings).Values)
+# At or above the entry's own level: '#' .. '##' while an entry is an H2.
+$ehTooHighRx = '^#{1,' + $ehEntryLevel + '}\s'
+$ehSectionRx = '^#{' + $ehSectionLevel + '}\s+(.+?)\s*$'
+
+function Test-IsDeclaredSectionHeading([string]$Line) {
+    # $true when the line is a section heading whose text is one this repo declares. The comparison is
+    # exact, deliberately: 'Who is this For' differing only in case is the mistyped-heading case this
+    # exists to catch, and the parser it protects matches exactly too.
+    $m = [regex]::Match($Line, $ehSectionRx)
+    if (-not $m.Success) { return $false }
+    return ($ehSectionNames -ccontains $m.Groups[1].Value)
+}
 
 $entryFilesForHeadings = @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
     Where-Object { Test-IsChangelogEntryFile -Path $_.FullName })
@@ -1066,39 +1103,92 @@ foreach ($ef in $entryFilesForHeadings) {
     $masked = Get-FenceMaskedText -Text ([System.IO.File]::ReadAllText($ef.FullName, [System.Text.Encoding]::UTF8))
     $ehLines = $masked -split "`r?`n"
     for ($i = 1; $i -lt $ehLines.Count; $i++) {
-        # '#', '##' or '###' -- anything at or above the entry's own level. '####' and deeper are fine.
-        if ($ehLines[$i] -match '^#{1,3}\s') {
-            $lvl = ($ehLines[$i] -replace '^(#+).*$', '$1')
-            $errors += "[entry-heading] ${rel}:$($i + 1): a '$lvl ' heading in an entry body, at or above the entry's own level. The entry heading is an H3, so an H3 becomes a SEPARATE entry when the fold pastes it into CHANGELOG.md -- and an H1/H2 climbs out of its release category and renders beside '## Fixes' in the generated notes (seen in v2.13.2). Use '#### ' or bold instead."
+        $line = $ehLines[$i]
+        if ($line -match $ehTooHighRx) {
+            $lvl = ($line -replace '^(#+).*$', '$1')
+            $errors += "[entry-heading] ${rel}:$($i + 1): a '$lvl ' heading in an entry body, at or above the entry's own level. An entry heading is an H$ehEntryLevel, so an H$ehEntryLevel here becomes a SEPARATE entry the moment the fold pastes this file into CHANGELOG.md -- one that declares no impact and therefore reads as an undeclared tier 0 -- and an H1 climbs above every entry in the document. Use '$('#' * ($ehSectionLevel + 1)) ' or bold instead."
+        } elseif (($line -match $ehSectionRx) -and -not (Test-IsDeclaredSectionHeading $line)) {
+            $errors += "[entry-heading] ${rel}:$($i + 1): '$($Matches[1])' is at the level of the entry's named sections but is not one of them ($($ehSectionNames -join ', ')). A section ends at the next heading of this level or above, so this truncates whichever section it sits in -- and if it is a misspelling of a real section heading, the entry silently loses that declaration and the tier/significance gates read nothing. Use '$('#' * ($ehSectionLevel + 1)) ' for a sub-heading, or correct the spelling."
         }
     }
 }
 
 $clForHeadings = Join-Path $RepoRoot 'CHANGELOG.md'
 if (Test-Path -LiteralPath $clForHeadings) {
-    $ehChecked++
     $clMasked = Get-FenceMaskedText -Text ([System.IO.File]::ReadAllText($clForHeadings, [System.Text.Encoding]::UTF8))
     $clLines = $clMasked -split "`r?`n"
-    # The section ends at '## Releases' specifically, NOT at the next H2. That distinction is the point: a
-    # stray H2 from an entry body IS an H2, so breaking on any '## ' would end the scan at the very defect it
-    # is looking for -- and then silently pass everything after it. Measured: the first version broke on any
-    # H2 and reported nothing about the two stray ones in #321's entry.
-    # The release heading is matched in BOTH spellings and the scan simply ends at the file when there is
-    # none after Pull Requests -- because since August 4, 2026 that section may sit ABOVE Pull Requests
-    # rather than below it, and a repo whose changelog keeps only the latest release has no second
-    # heading to stop at. Breaking on '## Releases' alone would have made this scan run to the end of the
-    # file for both of those layouts, which is harmless here (there is nothing after Pull Requests to
-    # misjudge) but stops being harmless the moment anything is appended.
-    $inPr = $false
+    # THE BOUNDARY IS STRUCTURAL NOW, not a heading name. It used to be '## Pull Requests' to '## Releases',
+    # matched in both spellings and in either order; the flat document has no section headings at all, so the
+    # intro simply ends at the first entry heading -- the same rule Split-Changelog derives it by, which is
+    # what keeps the gate and the parser looking at one document.
+    #
+    # A changelog with no entry at all is not judged and not an error: that is the normal state of the file
+    # between a release and the next merge, and check 13's subject is the entries.
+    $clFirstEntry = -1
     for ($i = 0; $i -lt $clLines.Count; $i++) {
-        if ($clLines[$i] -match '^##\s+Pull Requests\s*$') { $inPr = $true; continue }
-        if (-not $inPr) { continue }
-        if ($clLines[$i] -match '^##\s+(Releases|Latest Release)\s*$') { break }
-        if ($clLines[$i] -match '^#{1,2}\s') {
-            $lvl = ($clLines[$i] -replace '^(#+).*$', '$1')
-            $errors += "[entry-heading] CHANGELOG.md:$($i + 1): a '$lvl ' heading inside the Pull Requests section. It comes from an entry body and climbs out of its release category -- in the generated notes it renders beside '## Fixes' as if it were one (seen in v2.13.2). Demote it to '#### '."
-        } elseif ($clLines[$i] -match '^###\s' -and $clLines[$i] -notmatch '^###\s+#\d+\s') {
-            $errors += "[entry-heading] CHANGELOG.md:$($i + 1): a '### ' heading in the Pull Requests section without a PR number. cut-release.ps1 splits entries on every '### ' line, so this is read as an entry it cannot categorise -- it is almost certainly a sub-heading from an entry body that should be '#### '."
+        if ($clLines[$i] -match ('^#{' + $ehEntryLevel + '}\s')) { $clFirstEntry = $i; break }
+    }
+    if ($clFirstEntry -ge 0) {
+        $ehChecked++
+        $clRealLines = (([System.IO.File]::ReadAllText($clForHeadings, [System.Text.Encoding]::UTF8)) -split "`r?`n")
+        $ehWhatHeading = (Get-EntrySectionHeadings)['What']
+
+        # WHAT DISTINGUISHES AN ENTRY FROM A BODY HEADING, since markdown gives no marker for it. Every H2
+        # here is read as one change, so a stray body heading becomes a phantom entry: no impact table, so an
+        # undeclared tier 0, with its own block in the record. The rule is structural rather than a guess, and
+        # it is TWO rules because there are two legitimate entry shapes:
+        #
+        #   - an entry with sections: its FIRST declared section must be the first one ('$ehWhatHeading').
+        #     A stray heading dropped inside a formatted entry splits the three sections across two blocks,
+        #     so the phantom's first section is whichever one followed it -- never the first.
+        #   - an entry with NO sections: only a pre-format entry, which carries its type as a heading field
+        #     instead. Resolve-EntryType answers that, reading the section where there is one and the heading
+        #     where there is not -- the same reader the release documents use, so the gate cannot disagree
+        #     with them about what an entry declares.
+        #
+        # THAT PAIR IS WHAT MAKES IT COMPLETE, and neither half is complete alone. A stray heading placed
+        # between the entry heading and its first section keeps all three sections in ITS block and passes the
+        # first rule -- but it leaves the real entry above it with none, and a current-format heading carries
+        # no type field, so the second rule reports that one. The error lands on the entry rather than on the
+        # stray, which is why the message names both possibilities instead of asserting which it found.
+        #
+        # NOT KEYED ON THE '#NN' THE FOLD PREPENDS, deliberately, though it would be the obvious test: the
+        # fold cannot reach gh on a manual merge and then writes a legitimate entry with no number and no PR
+        # footer, stating so on the console. A gate keying on the number would report the fold's own
+        # documented output as a defect.
+        $clStarts = @()
+        for ($i = $clFirstEntry; $i -lt $clLines.Count; $i++) {
+            if ($clLines[$i] -match ('^#{' + $ehEntryLevel + '}\s')) { $clStarts += $i }
+        }
+        for ($b = 0; $b -lt $clStarts.Count; $b++) {
+            $from = $clStarts[$b]
+            $to = if ($b + 1 -lt $clStarts.Count) { $clStarts[$b + 1] - 1 } else { $clLines.Count - 1 }
+            $firstDeclared = $null
+            for ($i = $from + 1; $i -le $to; $i++) {
+                if (Test-IsDeclaredSectionHeading $clLines[$i]) {
+                    $firstDeclared = ([regex]::Match($clLines[$i], $ehSectionRx)).Groups[1].Value
+                    break
+                }
+            }
+            if ($null -ne $firstDeclared) {
+                if ($firstDeclared -cne $ehWhatHeading) {
+                    $errors += "[entry-heading] CHANGELOG.md:$($from + 1): this H$ehEntryLevel's first named section is '$firstDeclared' rather than '$ehWhatHeading'. Every H$ehEntryLevel here is read as one change, so an entry whose sections do not start at the beginning is one that has been SPLIT -- almost certainly by a body sub-heading written at the entry's own level, which the release documents then file as a separate change declaring no impact. Demote that sub-heading to '$('#' * ($ehSectionLevel + 1)) '."
+                }
+            } else {
+                $blockText = (@($clRealLines[$from..([Math]::Min($to, $clRealLines.Count - 1))]) -join "`n")
+                if (-not (Resolve-EntryType -EntryText $blockText).Declared) {
+                    $errors += "[entry-heading] CHANGELOG.md:$($from + 1): this H$ehEntryLevel declares neither its named sections nor a change type. Every H$ehEntryLevel here is read as one change, and this one tells the release documents nothing -- it is either a body sub-heading written at the entry's own level (demote it to '$('#' * ($ehSectionLevel + 1)) ') or a real entry whose sections were absorbed by such a heading directly below it."
+                }
+            }
+        }
+
+        for ($i = $clFirstEntry; $i -lt $clLines.Count; $i++) {
+            $line = $clLines[$i]
+            if ($line -match '^#\s') {
+                $errors += "[entry-heading] CHANGELOG.md:$($i + 1): an H1 below the intro. It comes from an entry body and climbs above every entry in the document -- and in the generated release notes it renders above the tier heading it belongs under. Demote it to '$('#' * ($ehSectionLevel + 1)) '."
+            } elseif (($line -match $ehSectionRx) -and -not (Test-IsDeclaredSectionHeading $line)) {
+                $errors += "[entry-heading] CHANGELOG.md:$($i + 1): '$($Matches[1])' sits at the level of an entry's named sections but is not one of them ($($ehSectionNames -join ', ')). A section ends at the next heading of this level or above, so this truncates the section it sits in -- and a misspelled section heading costs that entry its declaration silently. Demote it to '$('#' * ($ehSectionLevel + 1)) ', or correct the spelling."
+            }
         }
     }
 }

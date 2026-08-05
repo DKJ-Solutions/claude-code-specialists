@@ -123,20 +123,21 @@ The entry also carries an **impact table** — one row per tier it reaches, each
 ```
 
 The **tier** (`0` = only this repo's own developers notice, `1` = a colleague on the project gets something
-out of it, `2` = a consumer notices) decides which changelog section the fold files the entry under, and
-where the repo declares tier sections the release cut refuses a bump the pending tiers have not earned. The
-**significance** decides where *in* that section and its release documents the entry sits, so the most
-consequential change leads.
+out of it, `2` = a consumer notices) decides which release documents the entry appears in, and where the
+repo's entries declare their impact at all the release cut refuses a bump the pending tiers have not earned.
+The **significance** decides where *in* the list the entry sits — `CHANGELOG.md` is one flat ranked list, and
+the release documents inherit the order the fold leaves — so the most consequential change leads.
 
 **What it read is printed on every run**, including when nothing was declared and the default applied. That
 line is the point: an entry still sitting at tier 0 is work that cannot carry a release on its own, and this
-is the last moment to raise it cheaply — after the merge it is a section move on the main branch.
+is the last moment to raise it cheaply — the fold ranks the entry as it lands, and after that a correction is
+a re-insert on the main branch.
 
 **A malformed table is refused; a missing score is only reported.** That split is by kind of fault, not by
 convenience:
 
 - **Refused** — a cell the model has no meaning for (`| 2 | 9 | … |`, `| 5 | 3 | … |`). It reads back as
-  unscored, which would sink the entry to the bottom of the document it matters most in — correct-looking
+  unscored, which would sink the entry to the bottom of the list it matters most in — correct-looking
   and silent. Here it is a one-cell fix; after the merge it is an edit on the main branch.
 - **Reported, not refused** — a row or score that is simply missing. The score is a judgement about a
   finished change, and an author who has not settled it should not be blocked from merging over it. The

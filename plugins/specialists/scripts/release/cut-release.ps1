@@ -161,18 +161,18 @@ if ($absent.Count -gt 0) {
 # $repoRoot, not $PSScriptRoot: from the plugin mirror $PSScriptRoot points into the plugin cache,
 # while repo-config and branch-info always live in the consumer's repo root. branch-info is dot-sourced
 # HERE rather than left to release-lib, because release-lib travels into the mirror and its sibling
-# branch-info does not -- Get-ReleaseCategories probes for Get-BranchTypes and finds what we load here.
+# branch-info does not -- Get-ReleaseChangeTypes probes for Get-BranchTypes and finds what we load here.
 . (Join-Path $repoRoot 'scripts\lib\branch-info.ps1')
 . (Join-Path $repoRoot 'scripts\repo-config.ps1')
 
 # Plugin-owned libraries, from $PSScriptRoot: these travel WITH this script, so the sibling is the
 # right one in both locations.
 . (Join-Path $PSScriptRoot '..\lib\release-lib.ps1')
-# The changelog's tier sections (Get-ChangelogTierSections, reading Get-ChangelogTierHeadings from the
-# seam). release-lib dot-sources this lib itself, so this line adds no function that was not already in
-# scope -- it is here for the same reason branch-info is dot-sourced above rather than left to
-# release-lib: a dependency this script's own gate and notes grouping rest on should be visible at the
-# place that rests on it, not inherited from another lib's internals.
+# The entry format (Test-EntrySignificanceActive for the significance gate, Get-EntryImpactFindings for
+# what it reports). release-lib dot-sources this lib itself, so this line adds no function that was not
+# already in scope -- it is here for the same reason branch-info is dot-sourced above rather than left to
+# release-lib: a dependency this script's own gates rest on should be visible at the place that rests on
+# it, not inherited from another lib's internals.
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
 # Shared native-capture helper (#114): the #107 EAP=Continue -> capture -> $LASTEXITCODE dance for
 # the git mutations in the final block lives here in one tested place.
@@ -189,12 +189,12 @@ function Get-SeamValue {
 }
 
 $notesGrouping = Get-SeamValue -Name 'Get-ReleaseNotesGrouping' -Default 'major'
-$liveMarker    = Get-SeamValue -Name 'Get-ReleaseLiveMarker'    -Default ''
-# Whether the changelog's release section accumulates ('all', the behaviour since the start) or keeps
-# only the newest block behind a pointer ('latest'). Default 'all', so a consumer that never sets it
-# sees no change at all. Its companion names WHERE the full list lives, since that is the one thing a
-# 'latest' section has to be able to point at.
-$historyMode    = Get-SeamValue -Name 'Get-ReleaseHistoryMode'    -Default 'all'
+# WHERE THE FULL RELEASE LIST LIVES -- the one survivor of the three changelog-release seams (August 5,
+# 2026). Get-ReleaseLiveMarker and Get-ReleaseHistoryMode described the release BLOCK in CHANGELOG.md: the
+# "currently live" suffix on its newest row, and whether that section accumulated or kept only the newest
+# behind a pointer. A cut writes no such block any more -- it empties the changelog down to its intro -- so
+# both knobs describe machinery that is gone and are retired. This one stays because the row inserter below
+# still writes into that file, which is now the only list of releases there is.
 $historyRelPath = Get-SeamValue -Name 'Get-ReleaseHistoryPath'    -Default 'releases/README.md'
 # The computed fallback is a fact, not a guess: no marketplace manifest means there are no plugins to
 # version or card. Stated in repo-config here anyway, because in this repo the answer is load-bearing.
@@ -215,13 +215,12 @@ $highlightsBumps = @(Get-SeamValue -Name 'Get-ReleaseHighlightsBumps' -Default @
 # and forking a shared script over one integer is exactly what the seam exists to prevent (#417).
 $majorMinMinors = [int](Get-SeamValue -Name 'Get-ReleaseMajorMinMinors' -Default 10)
 
-# The wording of the release block this cut writes into the repo's OWN CHANGELOG.md (inbound #462).
-# Empty by default, which is the English text release-lib already carried -- the fourth knob of the
-# #410 class, after the entry stubs, the category labels and the internal note. The changelog block was
-# the one output of a release still written in the script's language rather than the repo's, and it is
-# the most visible of them: it sits at the top of the file.
-$changelogWording = Get-SeamValue -Name 'Get-ChangelogReleaseWording' -Default @{}
-if ($null -eq $changelogWording) { $changelogWording = @{} }
+# RETIRED WITH THE RELEASE BLOCK (August 5, 2026): Get-ChangelogReleaseWording (inbound #462) configured
+# the four strings a cut wrote into CHANGELOG.md -- the release section's intro, the notes pointer, and the
+# sentence repointing it at the internal note. The cut writes none of them now. What replaced that block is
+# the changelog intro's own one-line pointer to the release history: hand-written prose in a file the repo
+# owns, which needs no seam to be in the repo's language because it simply is. See release-lib.ps1's
+# retirement note for what the consumer who asked for #462 does and does not lose.
 
 # BOM-less UTF8 -- the rest of the repo has no BOM.
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
@@ -353,9 +352,12 @@ $entries = @($tierGroups | ForEach-Object { $_.Entries } | Where-Object { $_ })
 # PLACED WITH THE OTHER GUARDRAILS, BEFORE ANYTHING IS WRITTEN, for the same reason the new-major check
 # is: failing after the notes file exists leaves a release half-cut on main.
 #
-# IT SWITCHES ITSELF OFF in a repo that declares no tier split -- one entry section means there is no
-# tier information to judge, not that nothing qualifies. So a consumer that has not adopted the model is
-# unaffected, without needing a knob to say so.
+# IT SWITCHES ITSELF OFF where no pending entry declared its impact at all -- which means the repo has not
+# adopted the model, not that nothing qualifies. That test used to be "does the repo declare more than one
+# changelog section", and it had to change with the sections: a flat changelog gives an unadopted repo and
+# an adopting one exactly one group each, so the old signal would have read every repo as unadopted and
+# switched this gate off silently. See Test-ReleaseBumpEarned for why 'declared tier 0' and 'declared
+# nothing' must not be confused.
 if (-not $SkipTierGate) {
     $earned = Test-ReleaseBumpEarned -BumpType $bumpType -TierGroups $tierGroups `
         -CurrentVersion $current -MinMinorsForMajor $majorMinMinors
@@ -379,9 +381,10 @@ $breakdown
 $suggestion
 
 The tiers are how far a change reaches: 0 = only this repo's own developers notice, 1 = a colleague on
-this project gets something out of it, 2 = a consumer notices. An entry's tier is the section it sits in
-under CHANGELOG.md; move it, or correct the bump. -SkipTierGate overrules this, deliberately separate
-from -SkipLint because it overrules a judgement about content rather than skipping a tool.
+this project gets something out of it, 2 = a consumer notices. An entry's tier is the highest row of its
+own impact table in CHANGELOG.md; raise it, or correct the bump. -SkipTierGate overrules this,
+deliberately separate from -SkipLint because it overrules a judgement about content rather than skipping
+a tool.
 "@
         exit 1
     }
@@ -394,16 +397,20 @@ from -SkipLint because it overrules a judgement about content rather than skippi
 # without a score, the release may not be cut without one. By now the branch is long gone, so the fix is
 # one edit in CHANGELOG.md rather than a reopened PR.
 #
-# ONLY TIER 1 AND UP ARE ASKED, because only they reach a ranked document. The tier-0 section is the
-# record: complete and chronological, and never sorted.
+# ONLY TIER 1 AND UP ARE ASKED, because only they reach a ranked document. Tier 0 is the record: complete
+# and chronological, and never sorted.
 #
-# THE TIER COMES FROM THE SECTION, not from the entry. The fold removed the 'Tier:' line the moment the
-# section took over stating it, so $tierGroups is the only thing that knows -- which is also why this gate
-# could not live in the fold, where one entry is visible at a time and the tier is still a line in a file.
+# THE TIER COMES FROM THE ENTRY, which is the reversal in this change. It used to come from the changelog
+# SECTION, because the fold consumed the 'Tier:' line the moment the section took over stating it -- so
+# $tierGroups was the only thing that knew, and this gate could not have lived in the fold. With the
+# sections gone the entry carries its own declaration into the changelog, and $tierGroups is simply where
+# that declaration has already been read once.
 #
-# SAME OFF-SWITCH AS THE SCAFFOLD AND THE FOLD: Test-EntrySignificanceActive. A repo with no tier split
-# has no ranked document to place anything in, and a repo that declared Get-EntrySignificanceEnabled $false
-# opted out of all three at once -- a score that is demanded but never read is worse than no score.
+# SAME OFF-SWITCH AS THE SCAFFOLD AND THE FOLD: Test-EntrySignificanceActive, which now defaults ON with
+# Get-EntrySignificanceEnabled as the opt-out. A repo that sets it $false opted out of all three at once --
+# a score that is demanded but never read is worse than no score. Note this is a DIFFERENT off-switch from
+# the bump gate's above: that one asks whether the repo declares tiers at all, this one whether it wants
+# them ranked, and a repo can want the first without the second.
 if (-not $SkipSignificanceGate -and (Test-EntrySignificanceActive)) {
     $significanceProblems = @()
     foreach ($group in $tierGroups) {
@@ -428,8 +435,8 @@ The rubric:
 $rubric
 
 The score decides where in its release document an entry sits -- highest first -- so the most
-consequential change leads instead of whichever one its category happened to put first. Every tier an
-entry reaches owes a row, because every tier is a document with its own reader:
+consequential change leads. Every tier an entry reaches owes a row, because every tier is a document with
+its own reader:
 
   | Tier | Significance | Why |
   |---|---|---|
@@ -444,7 +451,7 @@ about content, while -SkipLint skips a tool.
         exit 1
     }
     if (-not $earned.Active) {
-        Write-Host "  (no tier split declared in this repo -- the bump gate does not apply.)" -ForegroundColor DarkGray
+        Write-Host "  (no pending entry declares its impact -- this repo has not adopted the tier model, so the bump gate does not apply.)" -ForegroundColor DarkGray
     }
 }
 
@@ -576,11 +583,16 @@ if ($SummaryFile) {
     }
 }
 
-# The development notes are grouped BY TIER, then by category within each tier -- the same shape
-# CHANGELOG.md now has, which is what makes this tier "the whole changelog, raw and complete". A repo
-# with no tier split gets one group and Build-ReleaseNotes renders the flat document it always did.
+# The development notes are grouped BY TIER, each tier a flat ranked list of entries -- the same shape
+# CHANGELOG.md has, which is what makes this tier "the whole changelog, raw and complete". A repo whose
+# entries declare no tier gets one group and Build-ReleaseNotes renders the flat document it always did.
 $notesContent = Build-ReleaseNotes -TierGroups $tierGroups -Version $new -Date $today -Type $typeLabel -Title $Title -Summary $summaryText
-$changelogNew = Convert-ChangelogForRelease -Content $changelogRaw -Version $new -Date $today -Type $typeLabel -NotesRelPath $notesRelPath -LiveMarker $liveMarker -HistoryMode $historyMode -HistoryRelPath $historyRelPath -Wording $changelogWording
+# THE CHANGELOG IS EMPTIED, AND NOTHING IS WRITTEN BACK INTO IT (August 5, 2026). This call used to hand
+# over the version, the date, the type, the notes path and three seam values to rebuild a release block and
+# one section per tier. There is no block and there are no sections: the intro stays as the repo wrote it,
+# the entries this release just consumed are removed, and the only thing left saying where releases live is
+# the pointer in that intro -- which is why this now takes the content and nothing else.
+$changelogNew = Convert-ChangelogForRelease -Content $changelogRaw
 
 # The highlights document, built here with everything else so a failure leaves no half-written release
 # behind. It is the TIER-2 entries and nothing else: what a consumer notices was declared by the author

@@ -90,7 +90,7 @@ if (-not (Test-Path -LiteralPath $RepoRoot -PathType Container)) {
 }
 $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 
-# Set-ReleaseInternalNoteLink, for repointing the changelog's release block at this note once it exists
+# Set-ReleaseInternalNoteLink, for repointing the release history's row at this note once it exists
 # (see the call near the end). $PSScriptRoot-relative, like every other shared script's dot-source, so
 # the plugin mirror resolves its own copy rather than the consumer's repo root.
 . (Join-Path $PSScriptRoot '..\lib\release-lib.ps1')
@@ -298,39 +298,51 @@ $skeleton =
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $intFile) | Out-Null
 [System.IO.File]::WriteAllText($intFile, $skeleton, $Utf8NoBom)
 
-# --- Point the changelog's release block at this note ---------------------------------------------
+# --- Point the release history's row at this note --------------------------------------------------
 # The cut wrote the DEVELOPER link, because that is the only one that exists while it runs: it commits
 # and tags in one motion, and this note is written afterwards. So the moment the note exists is the
 # moment the link can be corrected -- here, in the same change that adds the file, so the two cannot
 # disagree. Doing it at cut time would have put a dead relative link inside an immutable tag.
 #
+# THE TARGET FILE MOVED, NOT THE MECHANISM (Dave, August 5, 2026). This used to rewrite the notes line
+# inside CHANGELOG.md's release block, and that block is gone: a cut now empties the changelog down to its
+# intro. Left pointed at the changelog this step would not have ERRORED either -- the function returns its
+# input unchanged when it finds nothing -- it would simply have gone quiet, and the internal note would
+# have had no inbound link anywhere. So it repoints the Version cell of the release history's row, which
+# is the one place that still lists releases.
+#
 # Best-effort by design: a release that has already succeeded must not be reported as failed over a
 # link. Set-ReleaseInternalNoteLink returns the content untouched when it finds nothing to change, and
 # it is idempotent, so a second run is harmless.
-$changelogFile = Join-Path $RepoRoot 'CHANGELOG.md'
-$changelogTouched = $false
-if (Test-Path -LiteralPath $changelogFile -PathType Leaf) {
-    $clBefore = [System.IO.File]::ReadAllText($changelogFile, [System.Text.Encoding]::UTF8)
-    # The sentence this writes lands in the same release block cut-release wrote, so it reads the SAME
-    # seam that block's other lines come from (#462) -- one repo, one voice in one file. Two knobs for
-    # four sentences in one paragraph would be a way for half of it to end up in another language.
-    $clWording = Get-SeamValue -Name 'Get-ChangelogReleaseWording' -Default @{}
-    if ($null -eq $clWording) { $clWording = @{} }
-    $clAfter = Set-ReleaseInternalNoteLink -Content $clBefore -Version $verNum `
-        -InternalRelPath $intRel -DevRelPath $devRel -Wording $clWording
-    if ($clAfter -ne $clBefore) {
-        [System.IO.File]::WriteAllText($changelogFile, $clAfter, $Utf8NoBom)
-        $changelogTouched = $true
+#
+# THE PATHS ARE RELATIVE TO THE HISTORY FILE'S OWN FOLDER, not to the repo root, because that is how its
+# rows are written ('development/3.x/3.6.0.md'). $intRel/$devRel are repo-root-relative, so the
+# 'releases/' prefix comes off here -- derived from the seam's own path rather than hardcoded, so a repo
+# that keeps its history somewhere else is not silently mis-linked.
+$historyRelPath = Get-SeamValue -Name 'Get-ReleaseHistoryPath' -Default 'releases/README.md'
+$historyFile = Join-Path $RepoRoot ($historyRelPath -replace '/', '\')
+$historyDirPrefix = (Split-Path -Parent ($historyRelPath -replace '\\', '/')) -replace '\\', '/'
+if ($historyDirPrefix) { $historyDirPrefix = $historyDirPrefix.TrimEnd('/') + '/' }
+$historyTouched = $false
+if (Test-Path -LiteralPath $historyFile -PathType Leaf) {
+    $hBefore = [System.IO.File]::ReadAllText($historyFile, [System.Text.Encoding]::UTF8)
+    $intForRow = if ($historyDirPrefix -and $intRel.StartsWith($historyDirPrefix)) { $intRel.Substring($historyDirPrefix.Length) } else { $intRel }
+    $devForRow = if ($historyDirPrefix -and $devRel.StartsWith($historyDirPrefix)) { $devRel.Substring($historyDirPrefix.Length) } else { $devRel }
+    $hAfter = Set-ReleaseInternalNoteLink -Content $hBefore -Version $verNum `
+        -InternalRelPath $intForRow -DevRelPath $devForRow
+    if ($hAfter -ne $hBefore) {
+        [System.IO.File]::WriteAllText($historyFile, $hAfter, $Utf8NoBom)
+        $historyTouched = $true
     }
 }
 
 Write-Host ""
 Write-Host "read    :  $devRel  ($($bullets.Count) entry title(s))"
 Write-Host "created :  $intRel  (skeleton -- edit it now)"
-if ($changelogTouched) {
-    Write-Host "updated :  CHANGELOG.md  (the release block now points at this note)"
+if ($historyTouched) {
+    Write-Host "updated :  $historyRelPath  (the row for v$verNum now points at this note)"
 } else {
-    Write-Host "skipped :  CHANGELOG.md  (no release block for v$verNum with a notes line to repoint -- nothing changed)"
+    Write-Host "skipped :  $historyRelPath  (no row for v$verNum to repoint, or it already points here -- nothing changed)"
 }
 Write-Host ""
 Write-Host "Step 1 -- fill in the note (the three headings stay):"
