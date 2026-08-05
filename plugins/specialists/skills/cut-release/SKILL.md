@@ -143,6 +143,12 @@ each command as you go — do not skip a step or reorder them from memory.
    get a Release is **repo policy** — see the release manager's repo lens; some repos publish at every
    release, others at Minor/Major only.
 
+   **Do not stop to ask permission here.** Cutting the release is what was asked for, and this is the last
+   step of that same procedure — a second approval at the end of a checklist the requester started is a
+   rubber stamp (Dave, August 5, 2026). Steps 1 to 5 therefore run in one motion. The approval that
+   remains is **Block 2 below**, where a repo has a live stage: publishing a document that describes a
+   version and pushing to a target customers see are different acts.
+
    ```powershell
    gh release create vX.Y.Z --title "vX.Y.Z - <short title>" --notes-file <body-file>
    # copy each attachment to a UNIQUE filename first -- see the collision note below

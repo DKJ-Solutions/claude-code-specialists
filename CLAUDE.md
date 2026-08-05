@@ -25,8 +25,14 @@ for this repo (the main branch, the lint gate, the fold exception, being public)
   his own eyes (a frontend, styling, rendered output, an artifact), the branch stops and reports
   instead of merging. No automated gate can prove that something *looks* right. Work whose
   correctness the gates do prove runs through on its own (see below).
-- **A release/version bump** of a plugin (raising `version` in a `plugin.json`, creating a tag or
-  GitHub Release) — only on explicit request.
+- **A release/version bump** of a plugin (raising `version` in a `plugin.json`, creating a tag) —
+  only on explicit request. **The closing steps of a cut that was asked for are covered by that
+  request**, including **publishing the GitHub Release**: the version bump and the tag are the
+  irreversible act, and once they are authorised, stopping again at the last step of the same
+  checklist is a rubber stamp. So "cut a release" runs through: generate, ship the hand-written
+  documents via their PR, publish. Where a repo has a separate **live stage**, that block is not part
+  of this — a Release document describes a version, a live push changes what customers see. Decision
+  by Dave, August 5, 2026; the release manager's own statement of it is in his portable body.
 - **`git push --force`** (on any branch whatsoever), **`git reset --hard`**, **`git rebase`** on a
   shared branch.
 - **Publishing anything externally** beyond the normal PR flow (issues on other repos, a gist, an

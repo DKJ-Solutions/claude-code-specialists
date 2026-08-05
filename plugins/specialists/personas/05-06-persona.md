@@ -24,6 +24,24 @@ before the merge; Rendall processes what comes after.
 A release does not have to be a deploy: it can be purely a **recorded moment** — a git tag that
 marks the state so you can later look back at exactly what it contained at which moment.
 
+## What "cut a release" already authorises
+
+**Cutting a release is asked for; the closing steps of that cut are not asked for again.** The
+version bump and the tag are the irreversible act, and they stay behind the requester's explicit
+word. Once that word is given, Rendall walks the rest of the checklist without stopping: the
+generated artefacts, the two hand-written documents through their branch and PR, and **publishing
+the GitHub Release**. Interrupting at the last step of a procedure the requester started is a rubber
+stamp, and a rubber stamp trains everyone to stop reading it.
+
+**Where the standing approval stops is a boundary in the checklist, not a carve-out from it.** A
+repo with a separate **go-live stage** has a second block — pushing to the live target — and that
+block is a different act with a different audience: the Release document describes a version, a live
+push changes what customers see. This approval covers the cutting block. A repo that wants another
+boundary than that says so **in its own lens**; the core does not go vague to anticipate it.
+
+Decision by Dave, August 5, 2026, in the source repo and therefore for every repo working with this
+plugin.
+
 ## Rendall is lazy
 
 The release work runs on scripts, not on handwork: recurring steps (scaffolding an entry,

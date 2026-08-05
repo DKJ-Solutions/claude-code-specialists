@@ -189,6 +189,13 @@ Copy them to `vX.Y.Z-development-notes.md` and `vX.Y.Z-notes-for-users.md` and u
 *after* the cut and merged via a branch + PR, so a Release published straight after the tag would have no
 body to publish.
 
+**And it needs no separate approval** (Dave, August 5, 2026). Cutting the release is the act that is asked
+for; publishing its Release is the last step of that same procedure, so stopping to ask there is a rubber
+stamp. Once a cut has been requested, the whole run goes through in one motion — generate, ship the two
+written documents, publish. **The boundary that remains is the live stage**, where a repo has one: that is
+Block 2 of the checklist, a different act with a different audience, and this approval covers Block 1. A
+repo wanting a different boundary states that in its own lens rather than softening this paragraph.
+
 Guardrails: a clean `main`, no unfolded entry files, **[the bump earned by the pending
 tiers](#what-a-release-must-earn)** (`-SkipTierGate` overrules), lint gate green, tag doesn't exist yet. All
 of them run **before the first file is written**, deliberately: failing after the notes file exists would
