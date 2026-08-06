@@ -77,9 +77,9 @@ owes a tier-1 row too. Each row is one document's reader answering their own que
 ```
 
 **What it costs to leave it at tier 0.** Nothing breaks, which is exactly why it is worth knowing: where the
-repo declares tier sections, the release cut refuses a bump the entries have not earned -- a release needs at
-least one tier-1 entry, a minor needs a tier-2 one -- and it **also** refuses a release whose tier-1-or-higher
-entries carry no significance, because an unscored entry cannot be placed. So an entry left at 0 is work that
+repo's entries declare their impact at all, the release cut refuses a bump the entries have not earned -- a
+release needs at least one tier-1 entry, a minor needs a tier-2 one -- and it **also** refuses a release whose
+tier-1-or-higher entries carry no significance, because an unscored entry cannot be placed. So an entry left at 0 is work that
 cannot carry a release on its own. `open-pr` prints what it read and names anything still unsettled, so you
 learn that before the PR rather than at the cut.
 
@@ -91,12 +91,13 @@ what makes it a measurement rather than a mood, and the `Why` is what makes the 
 and body before the PR (open-pr's scaffold gate refuses the stubs), so the table is one more edit in a file
 that is being edited anyway.
 
-**A repo that has not adopted tier sections gets the older single `Tier: 0` line instead**, and that line is
-still read everywhere -- "recognise both, write one", so entries written before the table keep folding
-correctly.
+**A repo that switches the mechanism off (`Get-EntrySignificanceEnabled`) gets the older single `Tier: 0`
+line instead**, and that line is still read everywhere -- "recognise both, write one", so entries written
+before the table keep folding correctly.
 
-**Do not derive it from your branch prefix.** The prefix predicts the *category* an entry is grouped under,
-not its impact: a `docs/` branch can carry a tier-2 change and a `feat/` branch a tier-0 one. The source
+**Do not derive it from your branch prefix.** The prefix decides the entry's *type*, which the entry states
+under its own heading -- it predicts nothing about impact: a `docs/` branch can carry a tier-2 change and a
+`feat/` branch a tier-0 one. The source
 repo measured this -- its single most consequential change for a consumer, a rename that broke every
 existing install, arrived on a `chore/` branch.
 

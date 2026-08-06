@@ -6,10 +6,33 @@ changelog entry — the same workflow as the consuming repos. The steps:
 1. **Branch — its changelog entry comes along in the same move:**
    [`scripts/task/new-branch.ps1`](scripts/task/new-branch.ps1)`-Name <prefix>/<short-name> -Title "…"`
    creates (or idempotently resumes) the `<prefix>/<short-name>` branch and, as a child step,
-   scaffolds `<branch-name>.md` in the repo root (heading + type already filled in; the **merge date is
-   added by the fold**, at the bottom, because a date written now would be the branch's birth date) via
+   scaffolds `<branch-name>.md` in the repo root via
    [`scripts/release/new-changelog-entry.ps1`](scripts/release/new-changelog-entry.ps1) — a branch is
-   never entry-less. Valid prefixes (prefix → label → changelog type): `feat/` → enhancement → Feat ·
+   never entry-less. **The entry is one `##` heading with three `###` sections under it**, and that is
+   exactly the block that lands in the changelog:
+
+   ```text
+   ## <the title you gave -Title>
+
+   ### What does this change do?
+
+   … the description you write …
+
+   ### Who is this for
+
+   | Tier | Significance | Why |
+   |---|---|---|
+   | 0 | - | - |
+
+   ### Type of change
+
+   Feat
+   ```
+
+   The heading and the type arrive filled in, and **the heading is just the title** — it is the line every
+   reader of the changelog and of all three release documents scans, so it says what changed and nothing
+   else. **The PR number and the merge date are added by the fold**, together on the entry's closing line:
+   neither exists yet, and a date written now would be the branch's birth date rather than its landing date. Valid prefixes (prefix → label → changelog type): `feat/` → enhancement → Feat ·
    `fix/` → bug → Fix · `docs/` → documentation → Docs · `chore/` → documentation → Chore
    (maintenance: scripts, tooling, config). The table is in
    [`scripts/lib/branch-info.ps1`](scripts/lib/branch-info.ps1).
@@ -32,10 +55,17 @@ changelog entry — the same workflow as the consuming repos. The steps:
    **irreversible/outward-facing** — stops for his word first.
 5. **Fold:** on `main`, right after the merge,
    [`scripts/release/fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)`-Branch <name>`
-   folds the entry file into the **tier section** of [`CHANGELOG.md`](CHANGELOG.md) that the entry's own
-   impact table names (with `#NN` + PR link), derives a `Plugins:` line from the PR's files along the way
-   (for the per-plugin CHANGELOGs — see [Cutting a release](releases/README.md#cutting-a-release)), and
-   removes the entry file; commits that directly on `main`.
+   folds the entry file into [`CHANGELOG.md`](CHANGELOG.md) — which is **one flat list with no section
+   headings at all**, so the fold does not pick a section: it inserts the block at the **position its own
+   impact table ranks it at**, furthest reach first and, within a tier, highest significance first. It
+   appends the PR link and the merge date as the entry's closing line, derives a `Plugins:` line from the PR's files
+   along the way (for the per-plugin CHANGELOGs — see
+   [Cutting a release](releases/README.md#cutting-a-release)), and removes the entry file; commits that
+   directly on `main`.
+
+   **The fold is the only moment that order can be decided**, which is why the table has to be right
+   before the merge: the cut empties the list, so whatever order the fold leaves is what the release
+   documents inherit. Nothing is re-sorted afterwards.
 
 ### One thing to do while writing the entry: fill in its impact table
 
@@ -56,8 +86,9 @@ The **tier** says how far the change reaches, and therefore which release docume
 | `1` | a colleague working on this project gets something out of it |
 | `2` | a consumer of the product notices it |
 
-The **significance** says how much it weighs for that reader, and therefore where in the document it sits —
-the most consequential change leads. Score it against this rubric:
+The **significance** says how much it weighs for that reader, and therefore **where in the list** the entry
+sits — first in `CHANGELOG.md` at the fold, and then in the release document that inherits that order. The
+most consequential change leads. Score it against this rubric:
 
 | | |
 |---|---|

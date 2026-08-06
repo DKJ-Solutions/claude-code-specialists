@@ -1,35 +1,283 @@
 # Changelog
 
-Where this repo stands: under **Latest Release** the version currently cut, and under the three
-**tier sections** everything merged since it - ordered by how far each change reaches, furthest
-first. Every release ever cut is listed in [`releases/README.md`](releases/README.md); how the
-mechanism works (entry files, tiers, folding) is described in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Everything merged since the last release, furthest reach first: **one `##` per change**, and under it three
+named sections answering what a reader arrives with. Every release ever cut is listed in
+[`releases/README.md`](releases/README.md) — each with its date, type and title, and a link to what that
+release was worth. How the mechanism works (entry files, the impact table, folding) is described in
+[`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-The tier is declared per entry while it is still on its branch and stated by the section once it is
-folded, and it decides what may be released: **a release needs at least one tier-1 entry**, **a minor
-needs a tier-2 one**, and a **major** recaps ten minors. So an empty tier section is normal, and a
-changelog holding nothing but tier 0 is a changelog with no release in it yet.
+Each change declares its own **reach**, and per audience how much it **weighs** there — the impact table
+under *Who is this for*. That is what orders this list: furthest reach first, and within a tier the most
+consequential change first. It also decides what may be released: **a release needs at least one tier-1
+entry**, **a minor needs a tier-2 one**, and a **major** recaps ten minors. So a changelog holding nothing
+but tier 0 is a changelog with no release in it yet.
 
-## Latest Release
+## Every change is an H2 with three named sections, and the tier sections are gone
 
-The most recent release — every earlier one is listed in
-[releases/README.md](releases/README.md), with its date, type and title.
+### What does this change do?
 
-**v3.5.0** — 2026-08-05 — Minor
+`CHANGELOG.md` drops every `##` section heading. `## Latest Release` and the three
+`## Tier N - Pull Requests` sections are gone; a change **is** the `##` heading now, and inside it three
+`###` sections answer the questions a reader arrives with:
 
-See [releases/internal/3.x/3.5.0.md](releases/internal/3.x/3.5.0.md) for what this release is worth. The full per-PR record is in [releases/development/3.x/3.5.0.md](releases/development/3.x/3.5.0.md).
+```text
+## #475 · A significance score per entry, and the order follows it
 
-## Tier 2 - Pull Requests
+### What does this change do?
 
-What a consumer of this product notices - newest at the top, one block per pull request.
-At least one entry here is what a minor release requires.
+…the description…
 
-### #475 · A significance score per entry, and the order follows it · Feat
+### Who is this for
 
 | Tier | Significance | Why |
 |---|---|---|
-| 2 | 4 | a consumer's next entry file looks different and their next cut asks for scores -- noticed the same day, without anything breaking: entries written before this still fold |
-| 1 | 4 | the release documents now order themselves by consequence, so the most consequential change leads instead of sitting third under whichever heading its branch prefix produced |
+| 2 | 4 | … |
+| 1 | 4 | … |
+
+### Type of change
+
+Feat
+
+Plugins: specialists
+
+[PR #475](https://github.com/DaveKJohn/claude-code-specialists/pull/475) · merged 2026-08-05
+```
+
+`Plugins:` and the PR line stay **plain lines**: a heading around one fact is more structure than content,
+and `Plugins:` is machine-read by the cut. Dave, August 5, 2026.
+
+**The three tier sections lasted one day, and removing them takes nothing away.** They said exactly one
+thing — how far each change reaches — and since [#467](https://github.com/DaveKJohn/claude-code-specialists/issues/467)
+the entries say that themselves, in a table that also carries what the change is *worth*. So what the
+headings did visually is kept as the **ordering**: furthest reach first, and within a tier the highest
+significance first. The fold is the only moment that order can be decided, because the cut empties the
+list — whatever order the fold leaves is what the release documents inherit, with nothing re-estimated
+days later.
+
+**The release block goes entirely**, and the reason is measured rather than aesthetic. It had grown to
+**434 of the changelog's 1,062 lines** across 72 blocks that each said no more than "see the notes", while
+[`releases/README.md`](releases/README.md) already listed every one of those 72 versions with a date, a
+type and a descriptive title — the same coverage, verified in both directions, and richer per row. The
+intro now carries a one-line pointer to that page, and a cut writes nothing at all: it empties the document
+down to its intro, which passes through verbatim, so whatever a repo says about itself up there survives
+every cut in whatever language it wrote it.
+
+**The release documents follow the same flat shape, and that deletion is the point.** The category grouping
+is gone, with `Format-CategorizedEntries`, the category labels and the `Get-ReleaseCategoryTitles` seam. It
+grouped on the **branch prefix**, which this repo has measured does not predict impact — at v3.2.0 the
+single most consequential change for a consumer arrived on a `chore/` branch — so a document's most
+important change was filed third under whichever label its prefix produced, and #467's ranking could only
+reorder the categories, not escape them. Each change states its own type inside itself now.
+
+Six seams retire: `Get-ChangelogTierHeadings` and the legacy `Get-ChangelogHeading` (#178) named section
+headings the document no longer has; `Get-ReleaseCategoryTitles` labelled the categories;
+`Get-ReleaseLiveMarker`, `Get-ReleaseHistoryMode` and `Get-ChangelogReleaseWording` (#462) all described the
+release block. A consumer that still defines one is unaffected — nothing calls them. **What #462's
+non-English consumer loses is stated rather than glossed over:** the capability is not withdrawn, the
+*output* is gone, and what replaced it is hand-written prose in a file they own outright.
+
+#### The two defects this found, both silent and neither reported by a test
+
+**A consumer's release history would have been published as a "change" and then deleted.** Found by probing
+a synthetic consumer while scoring this entry, not by a failing suite. Every `##` below the intro is read as
+one change now, and a document still carrying the pre-flat shape has headings at exactly that level —
+reached through a plugin update rather than by that repo's choosing. Measured: `## Pull Requests` parsed as
+ONE entry swallowing every real entry and `## Releases` as a second, so the whole release history went
+outward into the notes and the per-plugin CHANGELOGs and was then removed from `CHANGELOG.md`, because the
+cut keeps only the intro. **And nothing refused** — blocks like that declare no impact, so the bump gate
+read the repo as never having adopted the model and reported itself inactive, correctly by its own rule.
+`Split-Changelog` now refuses before returning anything, naming each block and the migration. The
+discriminator is exact rather than a heuristic: the format has two legitimate shapes and both declare
+something — the three named sections, or a pre-format entry's type in its heading — while a section heading
+carries neither and cannot. Deliberately not keyed on the `#NN` the fold prepends, because the fold writes a
+legitimate numberless entry when `gh` is unreachable.
+
+**The lint gate had stopped recognising entry files at all.** `Test-IsChangelogEntryFile` in
+`check-plugin-integrity.ps1` still looked for `^###\s`, with a comment explaining that restating the level
+rather than importing it was deliberate — importing meant dot-sourcing the fold script, which would run a
+release action to answer a lint question. Sound reasoning whose conclusion went stale the moment the entry
+format moved into `entry-scaffold-lib.ps1`, a pure lib that file already loads. So since the format landed,
+check 13 silently judged nothing and reported clean, and check 11 stopped excluding entry files from its
+scan set.
+
+#### Five reversals the plan did not carry, all for one reason
+
+The section heading was the thing that used to state an entry's reach.
+
+- **The `Tier: N` line is KEPT, not consumed.** With no heading above the entry, stripping it leaves the
+  entry declaring nothing, and every downstream reader takes that as tier 0 — silent, correct-looking, and
+  wrong in the direction that empties a release document. `Remove-EntryTierLine`'s caller moved to the
+  outward renderers instead, beside `Remove-EntryImpactTable`: the line now reaches `CHANGELOG.md`, which
+  puts a self-assigned tier on the path to a consumer's plugin cache unless it is dropped there.
+- **A pre-format `###` entry file is PROMOTED to `##` as it folds**, outside the PR block. An `###` in a
+  flat list of `##`s is not an entry boundary, so it would be absorbed into the block above and inherit that
+  block's PR link. Doing it inside the PR block — where the `#NN` prepend lives — would have skipped it
+  silently for a manual merge or an unreachable `gh`. Not hypothetical: a branch parked on the remote
+  carried exactly such a file.
+- **`Test-EntrySignificanceActive` had to be repaired in the same commit, and this was a landmine.** It
+  answered "off where there is no tier split" by counting the changelog's sections. With no sections that
+  read returns one section in *every* repo, so the scaffold's table, both validators and the cut's
+  significance gate would all have switched themselves **off**, without erroring, in the same commit that
+  made the ranking the document's only ordering. It defaults **on** now, with `Get-EntrySignificanceEnabled`
+  as the opt-out. `Test-ReleaseBumpEarned`'s `Active` flag had the same defect and now keys on whether any
+  pending entry **declared** its impact — a measurement rather than a flag, and one that keeps "declared
+  tier 0" distinct from "declared nothing".
+- **An unscored entry sinks to the BOTTOM of its tier**, not the top. The plan and two comments said the
+  top; the code was right. The loop reads an entry already in the changelog with no score as 0 and sorts it
+  below everything scored at its tier, so a top-insert would rank the same entry differently on either side
+  of the fold.
+- **`Get-ImpactInsertOffset`'s `-Undeclared` switch is gone.** In a flat list there is no unplaced entry:
+  declaring nothing is tier 0, which the loop already lands correctly.
+
+Two refusals disappeared, both structurally rather than by relaxation: **"could not find the heading"**
+(there is no heading name left to mismatch) and **"this repo declares no section for tier N"** (a tier the
+repo does not use is a position, not an error).
+
+#### And the parser recognises both shapes while the writer only writes one
+
+These are *shared* scripts, so a consumer who adopted the tier sections would otherwise get a plugin update
+whose scripts cannot read their own changelog. The **declaration** is read in both shapes (table or
+`Tier: N`) and a pre-format heading's type is still recognised, because every entry in this repo's history
+and in every consumer's tree predates the table and the release notes are regenerated from that history.
+The **structure** is deliberately read in the new shape only: an entry's own `###` sections and a pre-format
+`###` entry heading are indistinguishable, so a parser accepting both would read every entry as four. That
+is what the new refusal exists to say out loud instead of guessing.
+
+#### What was measured, not assumed
+
+- All **26 suites** and all four gates green. `release-lib.tests.ps1` was **rewritten rather than patched**
+  (353 asserts): every fixture in it was the old document shape, and the machinery varying which sections a
+  repo declared tested a seam that is gone. Patching would have left a suite whose fixtures nothing writes,
+  passing by looking at a document that cannot occur. Its `New-FlatEntry` helper has its own shape asserted
+  before the suite uses it — this file has already paid once for a fixture that did not contain what it was
+  written to contain.
+- This repo's own `CHANGELOG.md` is migrated: **6 entries, not the ~25 this branch's own note predicted** —
+  v3.5.0 had already been cut, which is why the repo is read rather than the note. Structural only, with
+  significance cells left **empty**, because filling them in would be exactly the guessed ranking #467
+  removed. Verified with the real parsers: 6 entries read back, the scored one leads, the unscored sink below
+  it in arrival order, and the bump gate reports itself active.
+- Two things that looked like leaks in the outward documents were a **fence-blind probe**: the only
+  survivors sit inside code fences, in the entries that document the format itself, while every real
+  declaration is stripped.
+
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 5 | a consumer whose `CHANGELOG.md` still has section headings must migrate it: measured, their release history would otherwise be published as a change and then deleted, with nothing refusing. The cut now refuses instead and names the migration, so the action is required but the failure is loud |
+| 1 | 4 | every entry this team writes changes shape, and the changelog stops being three sections to scan -- noticed the same day, without being told |
+
+### Type of change
+
+Feat
+
+Plugins: specialists
+
+[PR #476](https://github.com/DaveKJohn/claude-code-specialists/pull/476) · merged 2026-08-05
+
+---
+
+## An entry heading is just the title -- the PR number lives on the closing line
+
+### What does this change do?
+
+**This entry's own heading is the specimen: it carries no `#NN`.** The fold used to prepend `#NN · ` to the
+title; it no longer writes into the heading at all. Dave, August 5, 2026.
+
+**Nothing is lost, which is why it could go.** The number is still in the entry, on the closing
+`[PR #NN](url) · merged <date>` line, where the url makes it clickable rather than merely printed. The two
+facts the merge owns already had a home together at the end of the block — the number was the last one still
+stated twice. What the heading gains is being readable as a sentence, and it is the one line every reader of
+`CHANGELOG.md` and of all three release documents scans.
+
+The ten entries already folded are migrated in the same change, by a script that skips fenced illustrations
+so the entry documenting the older shape keeps its example intact.
+
+#### The number was load-bearing in one reader, and that reader was already broken
+
+**`new-internal-note.ps1` recognised an entry by counting middot fields in its heading** — `≥ 3`, with the
+type taken from the second-to-last. The flat format had already taken those fields away one at a time (the
+merge date to the closing line, then the type into its own section), so at two fields **every real entry
+fell below the threshold**. Removing the number would have made it one field, but the damage predates this
+change.
+
+**Measured against a note generated from the live changelog, before rewriting anything: 46 headings skipped,
+all ten entries among them — and the one heading that still matched the old shape was a QUOTED example
+inside a fenced code block in an entry body,** which became the note's only bullet, with the illustration's
+own words as its type. A document written for colleagues, listing one line that describes nothing. No error,
+plausible output, and a warning that said the opposite of what had happened.
+
+**So the recogniser is structural now:** a heading is an entry when the headings **one level below it**,
+inside its own block, include one of the format's named sections. That is level-independent by construction,
+which matters because the level genuinely differs per document — entries sit at H3 under the tier headings
+and at H2 in the untiered shape — and it cannot confuse a heading with its container, since one level below
+a tier heading are entry headings and one level below the H1 are tier headings. The type comes from
+`Resolve-EntryType`, the title from `Convert-EntryHeadingToTitle`, and the walk is fence-aware — which is
+what stops a quoted example from ever becoming a bullet again.
+
+**The pre-format shape is still recognised**, by the metadata triple, because this script takes a *version*
+and reads that release's notes off disk: it can be run against any release ever cut, and every note written
+before the named sections existed has entries without them. Two independent guards keep the fabricated
+bullet from coming back — the fence awareness, and a requirement that the type field be a type the branch
+table actually produces (the illustration's second-to-last field was a *title*, so it fails that test even
+without the fence).
+
+#### Two latent defects the work surfaced, both silent
+
+**`Set-EntryHeadingLevel` computed its shift as `$EntryLevel - <canonical>`** — the shift a block *already*
+at the canonical level needs, which is true of every caller that reads entries straight out of
+`CHANGELOG.md`, and false for the one that reads them back out of a rendered document. Normalising a deeper
+block **to** canonical therefore computed a delta of zero and returned it untouched. Its own docstring
+promises "so the entry's own heading sits at `$EntryLevel`", which is what it now does: the delta is
+measured from the block. The visible symptom was every internal-note bullet losing its type, because the
+block handed to the type reader had never been shifted and its sections were still one level below where
+that reader looks.
+
+**`Resolve-EntryType` conflated recognition with validation.** Both used `Get-BranchTypes` and nothing else,
+so where that function is absent the known-type list was **empty** — right for validation (a repo with no
+table of its own has nothing to judge a type against) and wrong for recognition (with no list, no heading
+field can be identified as the type at all). `branch-info.ps1` is repo-owned and deliberately does not
+travel into the plugin mirror, so **the absent case is the ordinary one in a consumer**: every bullet taken
+from a historical heading lost its type there, silently. Recognition now uses `Get-ReleaseChangeTypes`,
+which probes the repo's table and falls back to the canonical four; validation still only fires where the
+repo's own table is reachable.
+
+`Get-ReleaseChangeTypes` moved down into `entry-scaffold-lib.ps1` for that, the same way and for the same
+reason the fence reader did one PR earlier: two of its readers live there and the dependency can only run
+downward. It kept its name, so no call site changed.
+
+#### What was measured, not assumed
+
+- All **26 suites** and all four gates green.
+- **The internal-note suite had no fixture in the current format** — every one of its scenarios was the
+  pre-flat shape, and they all passed, which is exactly why nobody noticed the recogniser had stopped
+  finding anything. One was added, built to match what the real renderer writes, and it asserts the
+  fabricated bullet cannot return.
+- The `Set-EntryHeadingLevel` repair is asserted as a **lossless round trip** (canonical → deeper →
+  canonical), because the read-back direction is the one that silently did nothing.
+- The migration was verified with the real parsers: 10 entries, ranking unchanged, every type still read,
+  and **11 closing lines still carrying a PR link** — the ten entries plus the fenced illustration.
+
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 4 | a consumer's next internal note stops silently losing its bullets, and where it found any it stopped losing their type -- both were broken before this and neither reported anything; their changelog headings also get shorter, which they see the first time they fold |
+| 1 | 3 | the one line everybody scans in four documents now says what changed and nothing else -- a clear improvement, noticed the moment you open the changelog |
+
+### Type of change
+
+Feat
+
+Plugins: specialists
+
+[PR #480](https://github.com/DaveKJohn/claude-code-specialists/pull/480) · merged 2026-08-06
+
+---
+
+## A significance score per entry, and the order follows it
+
+### What does this change do?
 
 Closes [#467](https://github.com/DaveKJohn/claude-code-specialists/issues/467).
 
@@ -97,13 +345,160 @@ because it is the first thing anyone reaches for: **RICE and WSJF do not apply h
 *before* it is done, with effort in the denominator — they answer "what do we build next". Everything scored
 here is already merged, so effort is spent and irrelevant.
 
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 4 | a consumer's next entry file looks different and their next cut asks for scores -- noticed the same day, without anything breaking: entries written before this still fold |
+| 1 | 4 | the release documents now order themselves by consequence, so the most consequential change leads instead of sitting third under whichever heading its branch prefix produced |
+
+### Type of change
+
+Feat
+
 Plugins: specialists
 
 [PR #475](https://github.com/DaveKJohn/claude-code-specialists/pull/475) · merged 2026-08-05
 
 ---
 
-### #474 · The lens scaffold's title carries no (VUL-IN) -- only its slot does · Fix
+## The ranked insert is fence-aware, like every other reader of the entry format
+
+### What does this change do?
+
+**A tier-1 entry led a list whose next six entries were tier 2.** `Get-ImpactInsertOffset` — the function
+that decides where the fold places an entry, and therefore the order every release document inherits — split
+the changelog into blocks with a plain regex. It was the one reader of this format that was not fence-aware.
+
+**Measured on the fold of [#477](https://github.com/DaveKJohn/claude-code-specialists/pull/477), in the
+document [#476](https://github.com/DaveKJohn/claude-code-specialists/pull/476) had created hours earlier.**
+That entry quotes an entry heading inside a fence, as the worked example of the format it introduces —
+exactly what an entry documenting a mechanism does. Three consequences, none of which errored:
+
+- the quoted heading was read as an entry boundary, **splitting the real entry in two**;
+- the fragment above the fence holds no impact table — the table sits further down, under
+  `### Who is this for` — so it read as **tier 0, score 0**;
+- the loop meets that tier-0 fragment **first**, so any entry of tier 1 or higher is inserted above it: at
+  the very top of the document.
+
+The ranker also read the *quoted* table as the entry's declaration, so a fence-blind read got both the
+boundary and the tier wrong from one cause.
+
+**The console line reported it and the number was the tell:** *"placed above 8 existing entries"* in a
+document that had 7. Worth recording, because taking that line at face value was the available mistake — the
+order was verified against the parser afterwards, which is what turned a plausible message into a defect.
+
+**This is the fourth-plus instance of one class in this format's short history: a matcher satisfied by a
+MENTION rather than a use.** `Split-EntryBlocks`, `Resolve-EntryImpact`, `Resolve-EntryTier`,
+`Get-EntrySectionBody` and `Set-EntryHeadingLevel` were all made fence-aware for exactly this reason. This
+one was missed because it was written when an entry could not contain headings of its own — the flat format
+made that false the same day, and nothing re-derived which readers the change had newly exposed.
+
+**Fixed by walking lines rather than characters**, since fence state is a per-line fact: the offsets are
+rebuilt from the same split the flags come from, taking each line's separator from the source so a CRLF
+document is not shifted by a byte per line — the root `CHANGELOG.md` is CRLF here.
+
+**And the fence walk now has one owner in this lib.** `Get-EntryFencedLineFlags` is new, and
+`Get-EntryTextOutsideFences` reads it instead of walking fences itself — two readers of one fact rather than
+two answers that can drift, which is how a quoted heading becomes structure. `release-lib.ps1` has its own
+`Get-FencedLineFlags` with the same semantics; **collapsing those two is a real follow-up and deliberately
+not done here**, in the same change as a defect repair. The dependency can only run one way: the fold and
+this lib's own suite load it standalone, so it cannot reach up into `release-lib`.
+
+**The entry #477 had already been misplaced on `main` is repositioned in this branch**, by the fixed
+function rather than by hand — so the placement is the code's answer, and correcting it exercises the repair.
+It now sits between the tier-2 block and the tier-0 one, which is where its own table says it belongs.
+
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 3 | a consumer whose entries quote the format -- the likeliest kind of entry to do so, since it documents a mechanism -- gets the ordering their impact tables actually declare rather than one determined by where a fence sits; noticed the moment they look at the folded list |
+| 1 | 4 | the ordering this team just built is the only thing deciding what leads a release document, and it was silently wrong for any entry quoting an entry heading -- which the entry introducing the format did |
+
+### Type of change
+
+Fix
+
+Plugins: specialists
+
+[PR #478](https://github.com/DaveKJohn/claude-code-specialists/pull/478) · merged 2026-08-05
+
+---
+
+## One fence reader, in the lib that owns the format
+
+### What does this change do?
+
+**There were four fence walks across the two libs, and they were not equivalent** — which is the finding,
+not the tidy-up. `Get-FencedLineFlags` in `release-lib.ps1`, a second named function in
+`entry-scaffold-lib.ps1`, and an inline walk inside each of that lib's two removers
+(`Remove-EntryTierLine`, `Remove-EntryImpactTable`). Three of the four matched only backtick fences; **only
+release-lib's recognised `~~~`.**
+
+So an entry using tilde fences had its quoted content read as **structure** by every reader in
+`entry-scaffold-lib` — the tier line, the impact table, the section headings, the ranked insert — while
+release-lib's readers handled the same entry correctly. Nobody had hit it, because this repo writes
+backtick fences; it was found by comparing the four walks rather than by anything failing. That is precisely
+what "two answers that can drift" costs, and this one had already drifted before anyone looked.
+
+**One owner now, and it had to be the lower lib.** The dependency can only run one way: the fold and
+`entry-scaffold-lib`'s own suite load that lib standalone, while nothing loads `release-lib` without it. So
+the canonical `Get-FencedLineFlags` moved down, keeping the union rule — the tilde form is honoured
+everywhere now, which is strictly the safe direction: it can only stop a quotation being read as structure,
+never the reverse.
+
+**The name deliberately did not gain an `Entry` prefix on the way down.** Release-lib's three readers scan a
+whole `CHANGELOG.md` rather than one entry, so a name claiming otherwise would be wrong at those call sites
+— and keeping it meant the move changed **no call site in either lib**.
+
+**The two inline walks went too**, via a small private helper that returns the split-with-separators and the
+resolved flags together. Those two needed both facts, which is an awkward pair to derive twice — and
+deriving it twice is exactly how the tilde gap survived unnoticed inside them.
+
+#### Two asserts that had to be falsified before they could be trusted
+
+**The first version of "no inline walk left" passed by looking at nothing.** It was written as an escaped
+regex and matched nothing at all — the same class as the fixture that did not contain what it was written to
+contain, which this suite has already paid for once. Rebuilt as a literal count and **checked against the
+previous revision**: the old shape appears **3 times** there and the union rule **0**, which is what makes
+the counts evidence rather than decoration.
+
+**The second — "release-lib no longer defines it" — was falsified in both directions**, by building a
+throwaway pair of libs and reading `ScriptBlock.File`: `False` where the upper lib only dot-sources, `True`
+the moment it defines a copy of its own. So re-adding a per-lib copy turns a test red instead of being
+silently shadowed and invisible, which is what a duplicate definition would otherwise be — both libs are
+loaded together in every real caller.
+
+#### What is deliberately still outside this change
+
+Measured while scoping it, and stated rather than left for somebody to rediscover: **six more fence walks
+exist in the script layer**, none of them a per-line-flag reader and none of them reachable from this owner
+without a new dependency. `pr-body-lib.ps1` and `check-roster-sync.ps1` strip fences out of a text; the lint
+gate has `Get-FenceMaskedText` (which masks rather than flags, to preserve character offsets) plus three
+single-purpose walks of its own. Each would need its own dependency decision, and none shares the defect
+this change repairs — the entry format's readers now agree with each other, which is what mattered.
+
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 2 | a consumer whose entries use `~~~` fences stops having quoted text read as a real declaration -- a latent gap rather than one anyone had hit, so small, and noticed only if somebody points it out |
+| 1 | 3 | the entry format's readers can no longer disagree about where a fence starts, which is the cause behind four separate defects in this format's first days -- a clear improvement, noticed the moment somebody touches that lib |
+
+### Type of change
+
+Fix
+
+Plugins: specialists
+
+[PR #479](https://github.com/DaveKJohn/claude-code-specialists/pull/479) · merged 2026-08-05
+
+---
+
+## The lens scaffold's title carries no (VUL-IN) -- only its slot does
+
+### What does this change do?
 
 **`specialists-teardown -Apply` would have deleted written repo knowledge, and the dry run pointed at
 the wrong files.** The lens template wrote `(VUL-IN)` into the H1 title *and* the slot heading;
@@ -146,13 +541,26 @@ already proposed.
 carry a marked title (02-09, 03-02, 04-11, 04-12, 04-13, 06-30) and all six are genuinely unfilled, so
 they are classified correctly today. Each is one edit away from the trap.
 
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | - | - |
+| 1 | - | - |
+
+### Type of change
+
+Fix
+
 Plugins: specialists
 
 [PR #474](https://github.com/DaveKJohn/claude-code-specialists/pull/474) · merged 2026-08-05
 
 ---
 
-### #473 · An inbound issue is verified as still standing before it is routed · Docs
+## An inbound issue is verified as still standing before it is routed
+
+### What does this change do?
 
 **An inbound issue was picked up as open work an hour after it had been repaired.** #469 reported that
 `fold-changelog-entry.ps1` kept the entry-creation date instead of the merge date. It was filed at
@@ -196,13 +604,26 @@ wrong. That guards against repairing the wrong cause; this one guards against re
 already gone. The persona now names both in order: establish the report still stands, *then* verify the
 reason it gives.
 
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | - | - |
+| 1 | - | - |
+
+### Type of change
+
+Docs
+
 Plugins: specialists
 
 [PR #473](https://github.com/DaveKJohn/claude-code-specialists/pull/473) · merged 2026-08-05
 
 ---
 
-### #472 · The merge date is added by the fold, at the bottom, instead of scaffolded into the heading · Feat
+## The merge date is added by the fold, at the bottom, instead of scaffolded into the heading
+
+### What does this change do?
 
 **This entry's own heading is the specimen: it carries no date.** The scaffolder used to write one, and
 it ran when the *branch* was created — so what it recorded was the branch's birth date, not the landing
@@ -266,13 +687,26 @@ headings alone — you read an entry's last line. That is acceptable because the
 hold what is pending since the last release, a window of days in which the dates sit close together. The
 release notes, where the history actually lives, keep the line per entry.
 
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | - | - |
+| 1 | - | - |
+
+### Type of change
+
+Feat
+
 Plugins: specialists
 
 [PR #472](https://github.com/DaveKJohn/claude-code-specialists/pull/472) · merged 2026-08-05
 
 ---
 
-### #471 · Publishing the GitHub Release is part of a cut that was already asked for · Docs · 2026-08-05
+## Publishing the GitHub Release is part of a cut that was already asked for
+
+### What does this change do?
 
 **Cutting a release is asked for; the closing steps of that cut are no longer asked for again.** The
 version bump and the tag are the irreversible act and stay behind an explicit request. Once that is
@@ -310,22 +744,78 @@ own place to speak. The core is stated in full here; the deviating consumer reco
 its own lens. Both halves are in Tessa's hard rules now, because she is the one who guards which half a
 sentence belongs in.
 
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | - | - |
+| 1 | - | - |
+
+### Type of change
+
+Docs
+
 Plugins: specialists
 
-[PR #471](https://github.com/DaveKJohn/claude-code-specialists/pull/471)
+[PR #471](https://github.com/DaveKJohn/claude-code-specialists/pull/471) · merged 2026-08-05
 
 ---
 
-## Tier 1 - Pull Requests
+## A shared parser's change is probed against a consumer's document, not only this repo's
 
-What a colleague working on this project gets out of it - newest at the top, one block per
-pull request. At least one entry of this tier or higher is what any release requires.
+### What does this change do?
 
-## Tier 0 - Pull Requests
+One hard rule added to [Sylvester #15's portable manual](plugins/specialists/manuals/05-15-manual.md):
+**when a shared script changes what it recognises, probe it against a consumer's document.** A shared
+script reaches a consumer through a plugin update rather than by their choosing, so a parser that has
+learned a new shape meets their *old* one first — and the source repo is the worst possible place to
+notice that, because it is the one repo that has already migrated. Its own files are the new shape by the
+time the change is finished, and every test written alongside the change uses the new shape too.
 
-Repo-internal: docs, config and work nobody outside this repo's own developers notices -
-newest at the top, one block per pull request. No release can be cut from this tier alone.
-### #470 · The v3.5.0 release documents: the internal note and the edited highlights · Docs · 2026-08-05
+**The rule names the failure mode, which is silence rather than an error.** A parser handed a shape it was
+not written for produces a confident, well-formed, wrong answer, and the gates that might have caught it
+are often reading that same answer.
+
+**The measured instance is [#476](https://github.com/DaveKJohn/claude-code-specialists/pull/476),** where
+`CHANGELOG.md` became one flat list of `##` entries. Probed against a consumer still on the pre-flat shape,
+their `## Pull Requests` heading parsed as ONE entry swallowing every real entry and `## Releases` as a
+second — so their whole release history would have been published into the release notes and the
+per-plugin CHANGELOGs as a "change", and then deleted from `CHANGELOG.md`, because the cut keeps only the
+intro. **And nothing refused:** blocks like that declare no impact, so the bump gate read the repo as never
+having adopted the tier model and reported itself *inactive* — correct by its own rule, and the reason the
+release would have proceeded. Found by building a synthetic consumer while scoring that branch's own entry,
+not by a failing suite. The guard that now refuses it shipped in the same PR.
+
+**And it states what makes the repair safe**, which is the half easiest to get wrong: a refusal that will
+fire in repos you cannot see needs an *exact* discriminator, not "looks wrong". Name the shapes that are
+legitimate, check that each declares something the old shape cannot, refuse the rest before writing
+anything, and name both the offending part and the migration. A refusal that can fire on a legitimate
+document is worse than the defect, because it arrives in someone else's repo.
+
+**It goes to the portable manual rather than to this repo's lens**, per the August 4, 2026 rule: the source
+is the default destination and the lens is the exception that needs a reason. Nothing about this rule is
+specific to this repo — any repo maintaining scripts that travel to consumers meets it — and a portable
+rule filed in a lens is not wrong anywhere, it simply never arrives.
+
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 1 | 3 | a colleague changing a shared script now has the check written down instead of rediscovering it the way this one was rediscovered -- noticed the moment they touch that part |
+
+### Type of change
+
+Docs
+
+Plugins: specialists
+
+[PR #477](https://github.com/DaveKJohn/claude-code-specialists/pull/477) · merged 2026-08-05
+
+---
+
+## The v3.5.0 release documents: the internal note and the edited highlights
+
+### What does this change do?
 
 The two documents `cut-release.ps1` deliberately does not write, for the release cut earlier today. Both
 land here rather than on the release commit because that commit is already tagged, and neither is one of
@@ -351,7 +841,17 @@ the published release body -- measured once by a line stating the previous relea
 which its own author then published. So the open-points section names what sits with whom, and says
 nothing about what has or has not been published as of the hour it was written.
 
-[PR #470](https://github.com/DaveKJohn/claude-code-specialists/pull/470)
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 0 | - | - |
+
+### Type of change
+
+Docs
+
+[PR #470](https://github.com/DaveKJohn/claude-code-specialists/pull/470) · merged 2026-08-05
 
 ---
 

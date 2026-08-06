@@ -90,7 +90,7 @@ if (-not (Test-Path -LiteralPath $RepoRoot -PathType Container)) {
 }
 $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 
-# Set-ReleaseInternalNoteLink, for repointing the changelog's release block at this note once it exists
+# Set-ReleaseInternalNoteLink, for repointing the release history's row at this note once it exists
 # (see the call near the end). $PSScriptRoot-relative, like every other shared script's dot-source, so
 # the plugin mirror resolves its own copy rather than the consumer's repo root.
 . (Join-Path $PSScriptRoot '..\lib\release-lib.ps1')
@@ -204,15 +204,37 @@ if (-not $typeLabel) {
 }
 
 # --- Carry over the entry titles, TIER 1 AND UP ----------------------------------------------------
-# The headings in the developer notes carry the compact changelog shape:
-#   #NN <midDot> title <midDot> type <midDot> date            (the #NN part is optional)
+# AN ENTRY IS RECOGNISED BY ITS STRUCTURE -- the named sections it contains -- and its type is read from
+# the section that states it. That is the second rewrite of this recogniser, and the first one is the
+# reason the rule is now structural rather than lexical.
 #
-# AN ENTRY IS RECOGNISED BY THAT SHAPE, NOT BY ITS HEADING LEVEL, and that is a fix rather than a
-# refinement. The level moved when the notes gained tier sections: entries used to be H3 under H2
-# categories, and are now H4 under H3 categories under H2 tiers. A level-based match would have silently
-# swapped what it collected -- reading the CATEGORY headings ('Features', 'Fixes') as entry titles and
-# putting those four words in a document written for colleagues. The metadata triple is what an entry has
-# and a category heading never does, so that is what is matched.
+# IT USED TO MATCH THE HEADING'S METADATA FIELDS: '#NN <midDot> title <midDot> type <midDot> date', with
+# "three or more middot fields" as the test for "this is an entry" and the second-to-last field as the
+# type. That was correct while a heading carried metadata, and the format took it apart in two steps --
+# the merge date moved to the closing line, then the type moved into its own section, and finally the PR
+# number followed the date. Each step removed a field, and at two fields every real entry fell below the
+# threshold.
+#
+# MEASURED BEFORE REWRITING IT, against a note generated from the live changelog: 46 headings skipped, all
+# ten entries among them, and the ONE heading that still matched the old shape was a QUOTED example inside
+# a fenced code block in an entry body -- which became the note's only bullet, with the illustration's own
+# words as its type. A document written for colleagues, listing one line that describes nothing. It failed
+# in the direction this repo keeps paying for: no error, plausible output, and a warning that said the
+# opposite of what had happened.
+#
+# SO THE TEST IS: a heading is an ENTRY heading when the headings ONE LEVEL BELOW it, inside its own block,
+# include one of the format's named sections. That is level-independent by construction, which matters
+# because the level genuinely differs per document -- entries sit at H3 under the tier headings here, and
+# at H2 in the untiered shape. It also cannot confuse a heading with its container: one level below a tier
+# heading are the entry headings, and one level below the H1 are the tier headings. Neither is a section.
+#
+# THE TYPE COMES FROM Resolve-EntryType, on the block re-levelled back to canonical depth with
+# Set-EntryHeadingLevel. Both already exist and both already handle the pre-format shape (the type as a
+# heading field), so history keeps parsing through the same path rather than through a second branch here.
+# The title goes through Convert-EntryHeadingToTitle for the same reason: a historical heading still
+# carries '#NN' and a type and a date, and this document's reader wants none of them.
+#
+# FENCE-AWARE, which the old walk was not -- and that is exactly how a quoted example became a bullet.
 #
 # ONLY TIER 1 AND ABOVE REACH THIS DOCUMENT. The ladder is cumulative: tier 2 is what a consumer notices
 # and therefore also something a colleague should hear about, so it belongs here as well as in the
@@ -221,35 +243,83 @@ if (-not $typeLabel) {
 #
 # NOTES WITH NO TIER HEADINGS AT ALL take everything, which is the repo-without-a-tier-split case: there
 # is no tier information to filter on, so filtering would empty the document rather than focus it.
-$midDot = [char]0x00B7
 $bullets = New-Object System.Collections.Generic.List[string]
 
 $hasTierHeadings = [regex]::IsMatch($dev, '(?m)^##\s+Tier\s+\d+\b')
-$currentTier = $null
 $skippedTier0 = 0
 
-foreach ($line in ($dev -split "`r?`n")) {
-    $tierMatch = [regex]::Match($line, '^##\s+Tier\s+(\d+)\b')
+$devLines = @($dev -split "`r?`n")
+$devFenced = Get-FencedLineFlags -Lines $devLines
+$sectionNames = @((Get-EntrySectionHeadings).Values)
+
+# Every heading outside a fence, with its level -- one pass, so the scans below agree about what a heading is.
+$heads = @()
+for ($i = 0; $i -lt $devLines.Count; $i++) {
+    if ($devFenced[$i]) { continue }
+    $m = [regex]::Match($devLines[$i], '^(#{1,6})\s+(.+?)\s*$')
+    if ($m.Success) {
+        $heads += [pscustomobject]@{
+            Index = $i
+            Level = $m.Groups[1].Value.Length
+            Text  = $m.Groups[2].Value.Trim()
+        }
+    }
+}
+
+$currentTier = $null
+for ($h = 0; $h -lt $heads.Count; $h++) {
+    $head = $heads[$h]
+
+    $tierMatch = [regex]::Match($devLines[$head.Index], '^##\s+Tier\s+(\d+)\b')
     if ($tierMatch.Success) { $currentTier = [int]$tierMatch.Groups[1].Value; continue }
 
-    $hm = [regex]::Match($line, '^#{3,6}\s+(.+?)\s*$')
-    if (-not $hm.Success) { continue }
-    $head = $hm.Groups[1].Value.Trim()
+    # The block: everything up to the next heading at this level or shallower.
+    $blockEnd = $devLines.Count - 1
+    for ($k = $h + 1; $k -lt $heads.Count; $k++) {
+        if ($heads[$k].Level -le $head.Level) { $blockEnd = $heads[$k].Index - 1; break }
+    }
+    # Is one of the headings directly under it a named section? That is what makes it an entry.
+    $isEntry = $false
+    for ($k = $h + 1; $k -lt $heads.Count; $k++) {
+        if ($heads[$k].Index -gt $blockEnd) { break }
+        if ($heads[$k].Level -eq ($head.Level + 1) -and ($sectionNames -ccontains $heads[$k].Text)) { $isEntry = $true; break }
+    }
 
-    $parts = @($head -split "\s*$midDot\s*")
-    # Fewer than three fields is a category heading (or any other heading), not an entry.
-    if ($parts.Count -lt 3) { continue }
+    # RECOGNISE BOTH, WRITE ONE -- the rule this format has already applied to the tier declaration and to
+    # the entry heading, and it applies here for a reason that is easy to miss: this script takes a VERSION
+    # and reads that release's development notes off disk, so it can be run against any release ever cut.
+    # Every note written before the named sections existed has entries with no sections at all, and the
+    # structural test above cannot see them -- so a note regenerated for an older release would come back
+    # empty. The pre-format shape is therefore still recognised, by the metadata triple its headings carry.
+    #
+    # TWO GUARDS, EACH ENOUGH ON ITS OWN, because this is the shape that produced the fabricated bullet:
+    # the walk is fence-aware now (a quoted illustration is not a heading at all), AND the type field must
+    # be a type this repo's branch table actually produces. The illustration that got through read
+    # '#NNN <midDot> Short strong title <midDot> Feat' -- three fields, but the second-to-last is a title,
+    # so a known-type check rejects it even without the fence.
+    if (-not $isEntry) {
+        $parts = @($head.Text -split "\s*$([char]0x00B7)\s*")
+        if ($parts.Count -ge 3) {
+            $candidate = $parts[$parts.Count - 2].Trim()
+            if ((Get-ReleaseChangeTypes) -ccontains $candidate) { $isEntry = $true }
+        }
+    }
+    if (-not $isEntry) { continue }
 
     if ($hasTierHeadings -and ($null -eq $currentTier -or $currentTier -lt 1)) {
         if ($currentTier -eq 0) { $skippedTier0++ }
         continue
     }
 
-    $type = $parts[$parts.Count - 2].Trim()
-    $startIdx = if ($parts[0] -match '^#\d+$') { 1 } else { 0 }
-    $endIdx = $parts.Count - 3
-    # The title itself may contain a middot, so join the range back rather than taking $parts[1].
-    $title = if ($endIdx -ge $startIdx) { (@($parts[$startIdx..$endIdx]) -join " $midDot ").Trim() } else { $head }
+    $block = (@($devLines[$head.Index..$blockEnd]) -join "`n")
+    # Re-levelled to the format's own depth so the section readers find what they look for, whatever depth
+    # this document renders at.
+    $canonical = Set-EntryHeadingLevel -EntryText $block -EntryLevel (Get-EntryHeadingLevel)
+    $type = (Resolve-EntryType -EntryText $canonical).Type
+    # The whole heading LINE goes in, hashes included, and the hashes come off after: that function matches
+    # '^(#+)\s+' and returns its input untouched without them -- so passing the bare text would silently stop
+    # stripping the metadata a historical heading still carries, which is the one case it exists for.
+    $title = (((Convert-EntryHeadingToTitle -EntryText $devLines[$head.Index]) -split "`r?`n")[0] -replace '^#+\s+', '').Trim()
 
     if (-not $title) { continue }
     if ($type) { $bullets.Add("- [$type] $title") } else { $bullets.Add("- $title") }
@@ -298,39 +368,51 @@ $skeleton =
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $intFile) | Out-Null
 [System.IO.File]::WriteAllText($intFile, $skeleton, $Utf8NoBom)
 
-# --- Point the changelog's release block at this note ---------------------------------------------
+# --- Point the release history's row at this note --------------------------------------------------
 # The cut wrote the DEVELOPER link, because that is the only one that exists while it runs: it commits
 # and tags in one motion, and this note is written afterwards. So the moment the note exists is the
 # moment the link can be corrected -- here, in the same change that adds the file, so the two cannot
 # disagree. Doing it at cut time would have put a dead relative link inside an immutable tag.
 #
+# THE TARGET FILE MOVED, NOT THE MECHANISM (Dave, August 5, 2026). This used to rewrite the notes line
+# inside CHANGELOG.md's release block, and that block is gone: a cut now empties the changelog down to its
+# intro. Left pointed at the changelog this step would not have ERRORED either -- the function returns its
+# input unchanged when it finds nothing -- it would simply have gone quiet, and the internal note would
+# have had no inbound link anywhere. So it repoints the Version cell of the release history's row, which
+# is the one place that still lists releases.
+#
 # Best-effort by design: a release that has already succeeded must not be reported as failed over a
 # link. Set-ReleaseInternalNoteLink returns the content untouched when it finds nothing to change, and
 # it is idempotent, so a second run is harmless.
-$changelogFile = Join-Path $RepoRoot 'CHANGELOG.md'
-$changelogTouched = $false
-if (Test-Path -LiteralPath $changelogFile -PathType Leaf) {
-    $clBefore = [System.IO.File]::ReadAllText($changelogFile, [System.Text.Encoding]::UTF8)
-    # The sentence this writes lands in the same release block cut-release wrote, so it reads the SAME
-    # seam that block's other lines come from (#462) -- one repo, one voice in one file. Two knobs for
-    # four sentences in one paragraph would be a way for half of it to end up in another language.
-    $clWording = Get-SeamValue -Name 'Get-ChangelogReleaseWording' -Default @{}
-    if ($null -eq $clWording) { $clWording = @{} }
-    $clAfter = Set-ReleaseInternalNoteLink -Content $clBefore -Version $verNum `
-        -InternalRelPath $intRel -DevRelPath $devRel -Wording $clWording
-    if ($clAfter -ne $clBefore) {
-        [System.IO.File]::WriteAllText($changelogFile, $clAfter, $Utf8NoBom)
-        $changelogTouched = $true
+#
+# THE PATHS ARE RELATIVE TO THE HISTORY FILE'S OWN FOLDER, not to the repo root, because that is how its
+# rows are written ('development/3.x/3.6.0.md'). $intRel/$devRel are repo-root-relative, so the
+# 'releases/' prefix comes off here -- derived from the seam's own path rather than hardcoded, so a repo
+# that keeps its history somewhere else is not silently mis-linked.
+$historyRelPath = Get-SeamValue -Name 'Get-ReleaseHistoryPath' -Default 'releases/README.md'
+$historyFile = Join-Path $RepoRoot ($historyRelPath -replace '/', '\')
+$historyDirPrefix = (Split-Path -Parent ($historyRelPath -replace '\\', '/')) -replace '\\', '/'
+if ($historyDirPrefix) { $historyDirPrefix = $historyDirPrefix.TrimEnd('/') + '/' }
+$historyTouched = $false
+if (Test-Path -LiteralPath $historyFile -PathType Leaf) {
+    $hBefore = [System.IO.File]::ReadAllText($historyFile, [System.Text.Encoding]::UTF8)
+    $intForRow = if ($historyDirPrefix -and $intRel.StartsWith($historyDirPrefix)) { $intRel.Substring($historyDirPrefix.Length) } else { $intRel }
+    $devForRow = if ($historyDirPrefix -and $devRel.StartsWith($historyDirPrefix)) { $devRel.Substring($historyDirPrefix.Length) } else { $devRel }
+    $hAfter = Set-ReleaseInternalNoteLink -Content $hBefore -Version $verNum `
+        -InternalRelPath $intForRow -DevRelPath $devForRow
+    if ($hAfter -ne $hBefore) {
+        [System.IO.File]::WriteAllText($historyFile, $hAfter, $Utf8NoBom)
+        $historyTouched = $true
     }
 }
 
 Write-Host ""
 Write-Host "read    :  $devRel  ($($bullets.Count) entry title(s))"
 Write-Host "created :  $intRel  (skeleton -- edit it now)"
-if ($changelogTouched) {
-    Write-Host "updated :  CHANGELOG.md  (the release block now points at this note)"
+if ($historyTouched) {
+    Write-Host "updated :  $historyRelPath  (the row for v$verNum now points at this note)"
 } else {
-    Write-Host "skipped :  CHANGELOG.md  (no release block for v$verNum with a notes line to repoint -- nothing changed)"
+    Write-Host "skipped :  $historyRelPath  (no row for v$verNum to repoint, or it already points here -- nothing changed)"
 }
 Write-Host ""
 Write-Host "Step 1 -- fill in the note (the three headings stay):"

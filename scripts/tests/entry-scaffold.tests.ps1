@@ -163,22 +163,43 @@ if (Test-Path -LiteralPath $writtenEntry) {
     $roundTrip = @(Get-EntryScaffoldFindings -EntryText $text -Wording (Get-EntryScaffoldWording))
     Assert-True ($roundTrip.Count -gt 0) 'the matcher sees the writer output as scaffolded -- writer and guard share one source'
     Assert-Equal 3 $roundTrip.Count 'and it finds all three strings the writer wrote'
-    # THE SAME ROUND TRIP FOR THE TIER LINE, and it is the assert that matters most for the tier model: the
-    # writer, the validator (open-pr) and the fold all read this one format, and a real file written by the
-    # real writer is the only thing that proves they agree. 'Tier: 0' is DECLARED, not merely defaulted --
-    # the difference is what lets the fold tell "somebody chose 0" from "somebody forgot".
-    $writtenTier = Resolve-EntryTier -EntryText $text
-    Assert-Equal 0 $writtenTier.Tier 'the writer writes the harmless default tier'
-    Assert-Equal $true $writtenTier.Declared 'and writes it as an explicit declaration, not an omission'
-    Assert-Equal $null $writtenTier.Error 'the written line parses without complaint'
-    # The line sits directly under the heading, where whoever edits the entry will meet it.
+    # THE SAME ROUND TRIP FOR THE IMPACT DECLARATION, and it is the assert that matters most for the tier
+    # model: the writer, the validator (open-pr), the fold and the cut all read this one format, and a real
+    # file written by the real writer is the only thing that proves they agree. Tier 0 is DECLARED, not merely
+    # defaulted -- the difference is what lets the fold tell "somebody chose 0" from "somebody forgot".
+    $writtenImpact = Resolve-EntryImpact -EntryText $text
+    Assert-Equal $true $writtenImpact.Table 'the writer writes an impact table, not the superseded Tier: line'
+    Assert-Equal 0 $writtenImpact.Tier 'and the row it writes is the harmless default tier'
+    Assert-Equal $true $writtenImpact.Declared 'declared, not omitted -- so the fold can tell a choice from a forgetting'
+    Assert-Equal 0 @($writtenImpact.Errors).Count 'the written table parses without complaint'
+    Assert-Equal 0 ([int]$writtenImpact.Rows[0].Score) 'with NO score, because any scaffolded number would be a guess at a ranking'
+    # A tier-0 entry owes nothing, so the writer's own output must pass the gates it will meet.
+    Assert-Equal 0 @(Get-EntryImpactFindings -EntryText $text).Count 'and a freshly scaffolded entry has no impact findings against it'
+
+    # THE SHAPE OF THE FILE: one H2 for the change, three H3 sections inside it. Asserted on a file the real
+    # writer produced rather than on Format-EntryBlock, because the two agreeing is the actual claim.
     $entryLines = @(($text -split "`r?`n") | Where-Object { $_.Trim() -ne '' })
-    Assert-True ($entryLines[0] -match '^### ') 'the entry still opens with its heading'
-    Assert-Equal (Format-EntryTierLine -Tier 0) $entryLines[1] 'and the tier line is the first thing under it'
-    # It is NOT scaffold prose: 'Tier: 0' is a legitimate final value, so the gate must never treat it as
-    # evidence of an unedited entry -- exactly the reasoning that keeps Get-EntryFallbackType out too.
+    Assert-True ($entryLines[0] -match ('^#{' + (Get-EntryHeadingLevel) + '} ')) 'the entry opens with its own heading, at the entry level'
+    Assert-True ($entryLines[0] -notmatch '^#{4}') 'and not one level deeper'
+    foreach ($key in @('What', 'Who', 'Type')) {
+        Assert-True ($text -match ('(?m)^' + [regex]::Escape((Get-EntrySectionHeading -Key $key)) + '\s*$')) `
+            "the '$key' section heading is written verbatim as the parser expects it"
+    }
+    # ORDER, not just presence: the parser finds a section wherever it is, but a reader meets them in the
+    # order they are written, and the three answer the questions in the order somebody arrives with them.
+    $posWhat = $text.IndexOf((Get-EntrySectionHeading -Key 'What'))
+    $posWho  = $text.IndexOf((Get-EntrySectionHeading -Key 'Who'))
+    $posType = $text.IndexOf((Get-EntrySectionHeading -Key 'Type'))
+    Assert-True ($posWhat -lt $posWho -and $posWho -lt $posType) 'and the three sections are written in reading order'
+    # The type is STATED in its own section now rather than parsed out of the heading as a middot field.
+    $writtenType = Resolve-EntryType -EntryText $text
+    Assert-Equal $true $writtenType.Declared 'the type is declared in its own section'
+    Assert-Equal $null $writtenType.Error 'and is a type this repo actually produces'
+    Assert-True ($entryLines[0] -notmatch [regex]::Escape($writtenType.Type)) 'and it is no longer a field in the heading'
+    # The table is NOT scaffold prose: a tier-0 row is a legitimate final answer, so the gate must never
+    # treat it as evidence of an unedited entry -- the reasoning that keeps Get-EntryFallbackType out too.
     $tierAsFinding = @($roundTrip | Where-Object { $_.Marker -match 'Tier' })
-    Assert-Equal 0 $tierAsFinding.Count 'the tier line is not one of the scaffold findings -- a low tier is a decision, not a stub'
+    Assert-Equal 0 $tierAsFinding.Count 'the impact table is not one of the scaffold findings -- a low tier is a decision, not a stub'
 }
 Remove-Item -Recurse -Force -LiteralPath $fixture -ErrorAction SilentlyContinue
 
@@ -314,10 +335,20 @@ Assert-True ($foldText -match 'entry-scaffold-lib\.ps1') 'the fold dot-sources t
 # and the significance in ONE pass, and that resolver falls back to the older 'Tier: N' line itself -- so
 # asserting the old name here would demand the fold reach past its own abstraction.
 Assert-True ($foldText -match 'Resolve-EntryImpact') 'the fold reads the reach and the significance in one pass'
-Assert-True ($foldText -match 'Remove-EntryTierLine') 'and removes the legacy tier line once the section states it'
-Assert-True ($foldText -match 'Remove-EntryImpactTable') 'and drops an unscored impact table, which is a question nobody was asked'
-Assert-True ($foldText -match 'Get-ImpactInsertOffset') 'and places the entry by its significance, so CHANGELOG.md stays ordered'
-Assert-True ($foldText -match 'Get-ChangelogTierSections') 'and asks the shared resolver which section that is'
+Assert-True ($foldText -match 'Get-ImpactInsertOffset') 'and places the entry by that rank, so CHANGELOG.md stays ordered'
+# THE FOLD STRIPS NOTHING FROM THE ENTRY ANY MORE, and this is asserted as an ABSENCE because it is a
+# reversal rather than a gap. While the changelog had one section per tier, the heading above an entry stated
+# its reach -- so the entry's own 'Tier: N' line was the same fact twice, and an unscored table was a question
+# nobody had put. With the sections gone the entry is the only carrier of both, and either strip would be
+# silent: the entry would read back as tier 0 and drop out of the release documents, or '### Who is this for'
+# would carry a heading with its answer cut out. Matched on the CALL shape, not the bare name, so the comments
+# explaining the reversal cannot satisfy the assert -- the "satisfied by a mention rather than a use" failure
+# this repo has measured four times in one day.
+Assert-True ($foldText -notmatch 'Remove-EntryTierLine -EntryText') 'the fold no longer consumes the legacy tier line -- nothing above the entry states it now'
+Assert-True ($foldText -notmatch 'Remove-EntryImpactTable -EntryText') 'and no longer drops an unscored table, which would leave a named section unanswered'
+# And it no longer asks any seam WHICH section: the list is flat, so the boundary is structural.
+Assert-True ($foldText -notmatch 'Get-ChangelogTierSections') 'and reads no section map -- there are no sections left to file into'
+Assert-True ($foldText -match 'Get-EntryHeadingLevel') 'the fold takes the entry heading level from the lib rather than counting hashes itself'
 # The tier must be resolved BEFORE anything is written, or a bad tier leaves a half-folded changelog.
 Assert-True ($foldText.IndexOf('Nothing was folded') -lt $foldText.IndexOf('Write-Utf8NoBom -Path $changelogPath')) `
     'the pre-pass refusal sits before the first changelog write'
@@ -414,24 +445,167 @@ Assert-True ($stripped -notmatch "`n`n`n") 'and no triple blank line is left beh
 # A quoted table must survive stripping too, or rendering damages the entry that documents the mechanism.
 Assert-True ((Remove-EntryImpactTable -EntryText $fence) -match 'quoted') 'strip: a fenced table is left alone'
 
+# --- ONE FENCE READER, AND THE TILDE FORM IT USED NOT TO KNOW -------------------------------------
+# There were FOUR fence walks across the two libs: Get-FencedLineFlags in release-lib, a second named one
+# here, and two inline walks inside the removers below. They were not equivalent -- only release-lib's
+# recognised '~~~' -- so an entry using tilde fences had its quoted content read as STRUCTURE by every
+# reader in this file while release-lib's readers handled it correctly. Found by comparing the four, not by
+# anything failing, which is why the asserts below are new rather than adjusted.
+#
+# One owner now, in this lib, because the dependency can only run this way: the fold and this suite load
+# this lib standalone. Asserted from three angles -- the flags themselves, every reader that depends on
+# them, and the absence of a second definition.
+$tildeFlags = Get-FencedLineFlags -Lines @('prose', '~~~', 'Tier: 2', '~~~', 'after')
+Assert-Equal $true  $tildeFlags[1] 'fences: a ~~~ marker is fenced'
+Assert-Equal $true  $tildeFlags[2] 'fences: and so is the line between the markers -- the form this lib did not know'
+Assert-Equal $true  $tildeFlags[3] 'fences: including the closing marker'
+Assert-Equal $false $tildeFlags[4] 'fences: back outside afterwards'
+$backtickFlags = Get-FencedLineFlags -Lines @('prose', '```', 'Tier: 2', '```', 'after')
+Assert-Equal (($backtickFlags | ForEach-Object { [int]$_ }) -join '') (($tildeFlags | ForEach-Object { [int]$_ }) -join '') 'fences: both forms produce the same flags -- one rule, not two'
+# An unclosed fence keeps the tail flagged: the safe direction, since it can only cause a missed finding.
+Assert-Equal $true (Get-FencedLineFlags -Lines @('text', '~~~', 'Tier: 2'))[2] 'fences: an unclosed ~~~ keeps the tail fenced'
+Assert-Equal 0 (@(Get-FencedLineFlags -Lines @())).Count 'fences: an empty list yields no flags rather than throwing'
+Assert-Equal 1 (@(Get-FencedLineFlags -Lines @(''))).Count 'fences: a single empty line binds (a Mandatory [string[]] would reject it)'
+
+# EVERY READER THAT DEPENDS ON THE FLAGS, on the tilde form. Each of these would previously have read the
+# quoted text as a real declaration -- which is the same defect class four separate times.
+$tildeEntry = "## T`n`n" + '~~~text' + "`n| Tier | Significance | Why |`n|---|---|---|`n| 2 | 1 | quoted |`n" +
+              "Tier: 2`n" + '~~~' + "`n`nTier: 1`n`nBody."
+Assert-True ((Get-EntryTextOutsideFences -EntryText $tildeEntry) -notmatch 'quoted') 'tilde: Get-EntryTextOutsideFences drops a ~~~ block'
+Assert-Equal 1 (Resolve-EntryTier -EntryText $tildeEntry).Tier 'tilde: the tier reader takes the REAL line, not the one quoted in a ~~~ fence'
+$tildeImpact = Resolve-EntryImpact -EntryText $tildeEntry
+Assert-Equal $false $tildeImpact.Table 'tilde: a table quoted in a ~~~ fence is not read as a declaration'
+Assert-Equal 1 $tildeImpact.Tier 'tilde: so the impact falls back to the real Tier line'
+$tildeStripped = Remove-EntryTierLine -EntryText $tildeEntry
+Assert-True ($tildeStripped -match '(?m)^Tier: 2$') 'tilde: Remove-EntryTierLine leaves the QUOTED line inside the fence alone'
+Assert-True ($tildeStripped -notmatch '(?m)^Tier: 1$') 'tilde: and removes the real one'
+Assert-True ((Remove-EntryImpactTable -EntryText $tildeEntry) -match 'quoted') 'tilde: Remove-EntryImpactTable leaves a ~~~-quoted table alone'
+# And the ranker, which is where a fence-blind read cost an ordering (PR #478).
+$tildeList = @(
+    '', 'Intro.', '',
+    '## #20 Tier 2, quoting the format in tilde fences', '',
+    '~~~text', '## #19 A quoted heading', '', '| Tier | Significance | Why |', '|---|---|---|', '| 0 | - | - |', '~~~', '',
+    '### Who is this for', '', '| Tier | Significance | Why |', '|---|---|---|', '| 2 | 4 | consumers notice |', '',
+    '---', '',
+    '## #18 Tier 0', '', '| Tier | Significance | Why |', '|---|---|---|', '| 0 | - | - |', ''
+) -join "`n"
+$tildeOff = Get-ImpactInsertOffset -SectionText $tildeList -Tier 1 -Score 3
+Assert-Equal '## #18 Tier 0' ((($tildeList.Substring($tildeOff)) -split "`r?`n")[0]).Trim() 'tilde: a heading quoted in a ~~~ fence is not an entry boundary either'
+
+# THE SECOND DEFINITION IS GONE. Asserted on absence, like the retired renderers in release-lib's suite:
+# re-adding a per-lib copy is exactly the thing that produced the four-way divergence, and it should turn a
+# test red rather than pass unnoticed. Read from the FILE rather than by Get-Command, because both libs are
+# loaded together in every real caller -- so a duplicate definition would simply be shadowed and invisible.
+$relLibText = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\lib\release-lib.ps1'), [System.Text.Encoding]::UTF8)
+Assert-True ($relLibText -notmatch '(?m)^function Get-FencedLineFlags') 'one owner: release-lib no longer DEFINES a fence reader'
+Assert-True ($relLibText -match 'Get-FencedLineFlags') 'one owner: but it still calls it, by the same name, from the lib it dot-sources'
+$escLibText = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1'), [System.Text.Encoding]::UTF8)
+Assert-Equal 1 (@([regex]::Matches($escLibText, '(?m)^function Get-FencedLineFlags')).Count) 'one owner: and this lib defines it exactly once'
+# NO INLINE WALK LEFT ANYWHERE IN THE OWNER LIB: the two removers used to carry one each, and an inline
+# walk is how the tilde gap survived unnoticed in the first place.
+#
+# BUILT AS A LITERAL AND FALSIFIED, because the first version of this assert was the trap it is guarding
+# against. It was written as an escaped regex ('\^\\\\s\*```...') which matched NOTHING and therefore passed
+# by looking at nothing -- the same class as the fixture that did not contain what it was written to
+# contain, one screen up. Checked against the previous revision before being trusted: the old form appeared
+# 3 times there and the union rule 0, which is what makes the counts below evidence rather than decoration.
+$tick3 = ([string][char]0x60) * 3
+$unionMatcher = "-match '^\s*(" + $tick3      # the one rule, inside Get-FencedLineFlags
+$inlineMatcher = "-match '^\s*" + $tick3 + "'" # the shape the three walks used
+Assert-Equal 1 (@([regex]::Matches($escLibText, [regex]::Escape($unionMatcher))).Count) 'one owner: the fence rule is written exactly once, and it is the union rule'
+Assert-Equal 0 (@([regex]::Matches($escLibText, [regex]::Escape($inlineMatcher))).Count) 'one owner: and no reader tests for a fence inline any more'
+
 # --- The insert offset ----------------------------------------------------------------------------
-$section = "`nIntro.`n`n### #10 Top`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 5 | big |`n`n---`n`n" +
-           "### #11 Mid`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 3 | ok |`n`n---`n`n"
+# ENTRIES ARE H2 HERE, matching the flat list the fold writes since August 5, 2026 -- and this fixture is
+# where that mattered first: the function's $EntryPattern default moved from '### ' to '## ', so a fixture
+# left at H3 stopped having any entry boundaries at all and every offset silently became "the end". Four
+# asserts went red at once, which is the loud version of a failure that in the real document would have been
+# one entry quietly appended at the bottom.
+$section = "`nIntro.`n`n## #10 Top`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 5 | big |`n`n---`n`n" +
+           "## #11 Mid`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 3 | ok |`n`n---`n`n"
 function Get-InsertLabel {
-    param([int]$Score)
-    $off = Get-ImpactInsertOffset -SectionText $section -Score $Score -Tier 1
+    param([int]$Score, [int]$Tier = 1)
+    $off = Get-ImpactInsertOffset -SectionText $section -Score $Score -Tier $Tier
     if ($off -ge $section.Length) { return '<end>' }
     return (($section.Substring($off) -split "`r?`n")[0]).Trim()
 }
-Assert-Equal '### #10 Top' (Get-InsertLabel -Score 5) 'insert: a TIE goes above its equal, preserving the newest-first order the section had'
-Assert-Equal '### #10 Top' (Get-InsertLabel -Score 6) 'insert: a higher score leads'
-Assert-Equal '### #11 Mid' (Get-InsertLabel -Score 4) 'insert: a middling score lands between'
-Assert-Equal '<end>'       (Get-InsertLabel -Score 1) 'insert: the lowest score goes last'
-Assert-Equal '### #10 Top' (Get-InsertLabel -Score 0) 'insert: unscored keeps the pre-ranking behaviour -- the top of the section'
+Assert-Equal '## #10 Top' (Get-InsertLabel -Score 5) 'insert: a TIE goes above its equal, preserving the newest-first order the list had'
+Assert-Equal '## #10 Top' (Get-InsertLabel -Score 6) 'insert: a higher score leads'
+Assert-Equal '## #11 Mid' (Get-InsertLabel -Score 4) 'insert: a middling score lands between'
+Assert-Equal '<end>'      (Get-InsertLabel -Score 1) 'insert: the lowest score goes last'
+# UNSCORED SINKS TO THE BOTTOM OF ITS TIER, not to the top of it, and the reason is symmetry with the
+# entries it is being ranked against: this function already reads an entry ALREADY in the changelog that
+# declares no score as 0 and sorts it below everything scored at its tier, so a new one has to land in the
+# same place or the same entry would rank differently depending on which side of the fold it was on. It is
+# not buried either -- open-pr reports the missing score and the cut refuses over it by name.
+Assert-Equal '<end>' (Get-InsertLabel -Score 0) 'insert: an unscored entry sinks within its tier -- 0 is the lowest rank, not the absence of one'
+# THE TIER IS THE FIRST KEY, which is what replaced the three section headings. Asserted in both directions,
+# because getting this backwards is the bug that was measured on this function's first run: a repo-internal
+# change leading the document.
+Assert-Equal '## #10 Top' (Get-InsertLabel -Score 1 -Tier 2) 'insert: a further-reaching tier leads even on the LOWEST score'
+Assert-Equal '<end>'      (Get-InsertLabel -Score 5 -Tier 0) 'insert: and tier 0 sinks below tier 1 even on the highest'
+# A DECLARED TIER 0 IS NOT "DECLARED NOTHING". Both are tier 0 with no score here, and both belong at the
+# bottom -- the -Undeclared switch that used to send the second case to the TOP of the list is gone, because
+# in a flat list there is no such thing as an unplaced entry.
+Assert-Equal '<end>'      (Get-InsertLabel -Score 0 -Tier 0) 'insert: an unscored tier-0 entry sinks too, rather than leading the document'
 # Compared against the fixture's own length rather than a literal: a hard-coded 8 describes this string,
 # not the behaviour, and breaks the moment somebody edits the fixture's intro.
 $emptySection = "`nIntro.`n`n"
-Assert-Equal $emptySection.Length (Get-ImpactInsertOffset -SectionText $emptySection -Score 4 -Tier 1) 'insert: a section with no entries yet appends at its end'
+Assert-Equal $emptySection.Length (Get-ImpactInsertOffset -SectionText $emptySection -Score 4 -Tier 1) 'insert: a list with no entries yet appends at its end'
+
+# --- The insert offset is FENCE-AWARE, like every other reader of this format ----------------------
+# MEASURED ON A REAL FOLD (PR #477), in the document PR #476 had just created. That entry quotes an entry
+# heading inside a ```text fence, as the worked example of the format it introduces -- exactly what an entry
+# documenting this mechanism does, and what this suite's own $fence fixture does one screen up. This
+# function was the one reader that split blocks with a plain regex, and the consequence was not a
+# near-miss:
+#
+#   * the quoted heading was read as an entry boundary, SPLITTING the real entry in two;
+#   * the fragment above the fence holds no impact table -- the table sits further down, under
+#     '### Who is this for' -- so it read as tier 0, score 0;
+#   * the loop meets that tier-0 fragment FIRST, so the tier-1 entry being folded was inserted above it,
+#     at the very top of a list whose next six entries were tier 2.
+#
+# Well-formed markdown throughout, and the console line even reported it -- "placed above 8 existing
+# entries" in a document that had 7. Asserted on the ORDER rather than on the block count, because the
+# order is what the release documents inherit.
+$fencedList = @(
+    '', 'Intro.', '',
+    '## #20 Real, tier 2, and it documents the format', '',
+    'The shape is:', '',
+    '```text',
+    '## #19 A quoted heading',
+    '',
+    '| Tier | Significance | Why |',
+    '|---|---|---|',
+    '| 0 | - | - |',
+    '```', '',
+    '### Who is this for', '',
+    '| Tier | Significance | Why |', '|---|---|---|', '| 2 | 4 | consumers notice |', '',
+    '---', '',
+    '## #18 Real, tier 0', '',
+    '| Tier | Significance | Why |', '|---|---|---|', '| 0 | - | - |', ''
+) -join "`n"
+function Get-FencedInsertLabel {
+    param([int]$Score, [int]$Tier)
+    $off = Get-ImpactInsertOffset -SectionText $fencedList -Score $Score -Tier $Tier
+    if ($off -ge $fencedList.Length) { return '<end>' }
+    return (($fencedList.Substring($off) -split "`r?`n")[0]).Trim()
+}
+# The bug, as the assert that would have caught it: a tier-1 entry must land BELOW the tier-2 entry whose
+# body quotes a heading, not above it. Under the plain-regex split this returned '## #20 ...' -- the top.
+Assert-Equal '## #18 Real, tier 0' (Get-FencedInsertLabel -Score 3 -Tier 1) 'insert/fenced: a quoted entry heading is not a boundary, so the tier-2 entry above it is not split into a tier-0 fragment'
+# And the mirror image from the same fixture: a tier-2 entry scoring higher still leads.
+Assert-Equal '## #20 Real, tier 2, and it documents the format' (Get-FencedInsertLabel -Score 5 -Tier 2) 'insert/fenced: a higher-scoring tier-2 entry still leads'
+# The quoted table must not be read as the entry's declaration either -- it says tier 0 where the real
+# declaration says tier 2, so a fence-blind read gets BOTH the boundary and the tier wrong.
+$blockImpact = Resolve-EntryImpact -EntryText $fencedList.Substring($fencedList.IndexOf('## #20'))
+Assert-Equal 2 $blockImpact.Tier 'insert/fenced: the entry reads as tier 2 from its real table, not tier 0 from the quoted one'
+# CRLF: the offsets are rebuilt from the same split the fence flags come from, so a CRLF document must not
+# be shifted by one byte per line. Asserted by the resulting label rather than the number.
+$crlfList = $fencedList -replace "`n", "`r`n"
+$crlfOff = Get-ImpactInsertOffset -SectionText $crlfList -Score 3 -Tier 1
+Assert-Equal '## #18 Real, tier 0' ((($crlfList.Substring($crlfOff)) -split "`r?`n")[0]).Trim() 'insert/fenced: a CRLF document lands in the same place -- the offsets keep step with the lines'
 
 # --- The rubric -----------------------------------------------------------------------------------
 $rubric = @(Get-EntrySignificanceRubric)
@@ -451,6 +625,27 @@ foreach ($band in $rubric) {
     Assert-True ([bool]$band.Test) "rubric: band $($band.Score) has a test, so a gate printing it says something"
 }
 Assert-Equal 5 @(Format-EntrySignificanceRubricLines).Count 'rubric: one printable line per band'
+
+# --- Whether the repo ranks at all ----------------------------------------------------------------
+Write-Host "Test-EntrySignificanceActive (the off-switch, and its default)" -ForegroundColor Cyan
+# ON BY DEFAULT SINCE THE SECTIONS WENT, and this assert is the guard on the landmine that change laid.
+# The old answer read the changelog's section map and treated one section as "this repo never adopted
+# tiers". The flat changelog has no map, so that read now returns a single built-in section in EVERY repo --
+# which would have switched the scaffold's table, both validators and the cut's gate off everywhere, in the
+# same commit that made the ranking the document's only ordering, without erroring.
+Assert-Equal $true (Test-EntrySignificanceActive) 'no seam defined: ranking is ON, because there is no longer a section count to infer it from'
+# THE OPT-OUT IS THE SEAM AND NOTHING ELSE, in both directions -- a knob that only turns one way is how a
+# consumer ends up unable to decline a model it never adopted.
+function Get-EntrySignificanceEnabled { return $false }
+Assert-Equal $false (Test-EntrySignificanceActive) 'the repo seam can switch it off'
+Remove-Item Function:\Get-EntrySignificanceEnabled
+function Get-EntrySignificanceEnabled { return $true }
+Assert-Equal $true (Test-EntrySignificanceActive) 'and back on'
+Remove-Item Function:\Get-EntrySignificanceEnabled
+# The retired parameter: a caller still passing the old section list must FAIL LOUDLY rather than have it
+# silently ignored, because the value it used to pass is exactly the one that now means the opposite.
+$sigCmd = Get-Command Test-EntrySignificanceActive
+Assert-True (-not $sigCmd.Parameters.ContainsKey('TierSections')) 'and it takes no section list any more -- the retired argument cannot be passed unnoticed'
 
 Write-Host ""
 if ($script:fail -gt 0) {

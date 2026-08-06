@@ -21,25 +21,35 @@ rewrite when copying. Managing branches, PRs, and merges up to and including the
 
 ### Changelog
 
-`CHANGELOG.md` (repo root) opens with **`## Latest Release`** — the version currently cut, one block,
-pointing at `releases/README.md` for every earlier one — and below it, since August 5, 2026, **three entry
-sections instead of one**: `## Tier 2 - Pull Requests`, `## Tier 1 - Pull Requests` and
-`## Tier 0 - Pull Requests`, in that order. So the top of the file is the published state, and the rest is
-what is queued behind it, ordered by how far each change reaches rather than only by date.
+`CHANGELOG.md` (repo root) is an **intro followed by one `##` per change, with no section headings at all**
+(Dave, August 5, 2026). A change *is* the `##`, and its heading is **just the title** —
+`## A significance score per entry, and the order follows it`. Under it, three `###` sections answer what a
+reader arrives with: `What does this change do?`, `Who is this for` (the
+impact table) and `Type of change`. Everything above the first `##` is the intro, which is the only part a
+repo writes by hand and the only thing a cut leaves standing.
 
-The release section used to sit at the bottom and accumulate a block per release; at 434 of 1,062 lines it
-was duplicating, more poorly, an overview `releases/README.md` already carried in full
-(`Get-ReleaseHistoryMode = 'latest'`). Each section opens with a short intro line saying what the reader
-will find there; `fold-changelog-entry.ps1` leaves that line in place (entries go below it).
+**Two sections went in the same movement, and each for a measured reason.**
+
+- **`## Latest Release`.** It used to accumulate a block per release and had reached **434 of 1,062 lines**
+  across 72 blocks that each said no more than "see the notes", while
+  [`releases/README.md`](../../../releases/README.md) already listed all 72 with a date, a type and a
+  descriptive title — the same coverage, verified in both directions, and richer per row. `'latest'` mode cut
+  it to one block; this removes the last one. The intro's one-line pointer to that page is what answers
+  "which version is current" now, and being hand-written prose it cannot go stale at a cut that no longer
+  touches it.
+- **The three `## Tier N - Pull Requests` sections**, which had lasted a day. They communicated exactly one
+  thing — how far each change reaches — and the entries now say that themselves, in a table that also carries
+  what the change is worth. What the headings did visually is kept as the **ordering**: furthest reach first,
+  highest significance first within a tier.
 
 **Branches never edit `CHANGELOG.md` directly** — with long-open branches that causes merge conflicts,
-because every branch would modify the same section. Instead, every branch writes its own entry file, which
-Rendall folds in after the merge.
+because every branch would modify the same region of the same file. Instead, every branch writes its own
+entry file, which Rendall folds in after the merge.
 
-**Which section an entry lands in is the entry's own `Tier:` line**, and the sections themselves come from
-`Get-ChangelogTierHeadings` in [`scripts/repo-config.ps1`](../../../scripts/repo-config.ps1) — the map's
-order is the document's order, so "which tiers exist" and "where do they sit" are one answer. An empty tier
-section is normal; a changelog holding nothing but tier 0 is a changelog with no release in it yet.
+**Where an entry lands is decided by its own impact table, and by nothing else** — no heading to choose, no
+seam to configure (`Get-ChangelogTierHeadings` and the legacy `Get-ChangelogHeading` are retired). A
+changelog holding nothing but tier 0 is a changelog with no release in it yet, and that now reads off the
+entries rather than off which section they sit in.
 
 #### How it works
 
@@ -48,10 +58,17 @@ section is normal; a changelog holding nothing but tier 0 is a changelog with no
   file `feat-new-plugin.md`). **Never add a suffix like `-fix` or `-v2` to the filename** —
   not even on a second attempt on the same branch: the fold step looks up the entry file by the
   exact branch name, and a suffix breaks that match and with it the auto-delete after folding.
-- **After the merge**: `scripts/release/fold-changelog-entry.ps1` reads the entry file and converts
-  it to the compact CHANGELOG form — a heading `### #NN · title · type` (middot-separated), the
-  description below it, and as the last line `[PR #NN](url) · merged YYYY-MM-DD` —
-  and adds that to the tier section the entry's `Tier:` line names, removing that line on the way in. The
+- **After the merge**: `scripts/release/fold-changelog-entry.ps1` reads the entry file and inserts it at its
+  **ranked position** in the list — the block as written, with `[PR #NN](url) · merged YYYY-MM-DD` appended
+  as its last line and the heading **untouched**. (It used to prepend `#NN · ` to the heading too; that went
+  on August 5, 2026 — the number is still in the entry, on that closing line, where the url makes it
+  clickable, and the heading is left readable as a sentence.) **Nothing is consumed:** the impact table
+  (or a pre-format entry's `Tier: N` line) travels into `CHANGELOG.md` intact, because with no heading above
+  the entry, stripping the declaration would leave every downstream reader taking it as tier 0 — silent,
+  correct-looking, and wrong in the direction that empties a release document. The outward-facing renderers
+  strip both themselves, at the moment they render. A **pre-format `###` entry file is promoted to `##`** as
+  it lands, because an `###` in a flat list of `##`s is not an entry boundary and would be absorbed into the
+  entry above it, inheriting that entry's PR link. The
   PR number, url **and merge timestamp** are retrieved via one
   `gh pr list` on the branch name from the entry (only possible after the merge).
   **The date is the fold's and it sits at the bottom** (Dave, August 5, 2026): the scaffolder runs at
@@ -73,8 +90,14 @@ they are properties of the shared scripts, so a consumer meets them identically.
 keeping: the `##` trap was seen in **v2.13.2**, where a body's two subheadings came out looking like two
 extra release categories next to `## Fixes`, and it is the same
 [fold/release blind spot as #234](https://github.com/DaveKJohn/claude-code-specialists/issues/234) — the
-artifact a reader finally sees is assembled past every gate that could have judged it. This repo's
-categories are `## Features` / `## Fixes` / `## Documentation` / `## Maintenance`.
+artifact a reader finally sees is assembled past every gate that could have judged it. **The trap got worse
+and gained a sibling on August 5, 2026**: a body `##` is now read as a *separate change* rather than as a
+stray category, and a body `###` collides with the entry's own named sections — where a *misspelled* section
+heading costs the entry its declaration in silence. Both halves are now gated by
+`check-plugin-integrity.ps1`'s check 13, in the entry file and in `CHANGELOG.md`, so neither depends on
+anyone remembering this paragraph. **This repo has no release categories any more**: the grouping came from
+the branch prefix, which it measured does not predict impact, and each change states its own type inside
+itself.
 
 **Never merge without an entry file**, not even for small changes. Since the branch-creation
 improvement, that entry file now comes into being **at the moment the branch is created** — no
@@ -101,8 +124,8 @@ description while building; ownership of the entry mechanism stays Rendall's.
    **this** repo's direct-on-`main` exception, which is what the path-scoped commit exists to keep honest,
    and the branch part of the two-machine lesson sits with
    [Derek #05](05-05-extension.md#branch--repo-hygiene).
-3. **More branches merged** → each brings its entry file; each gets folded into the tier section its own
-   `Tier:` line names, and the three sections stack up in parallel.
+3. **More branches merged** → each brings its entry file; each gets inserted at the position its own impact
+   table ranks it at, so the list stays ordered furthest-reach-first as it grows.
 
 ### Versioning & releases
 
@@ -155,17 +178,20 @@ in the closing report of every release.**
 
 The `releases/` directory (modeled on life-hub):
 - **`releases/development/<X>.x/<X.Y.Z>.md`** — the full release notes: **every** pending entry, tier 0
-  included, grouped by **tier** and then by branch type within each tier (`## Tier 2 - consumers` →
-  `### Features` → `#### #NN · …`). Literally the whole changelog, which is what makes this the record
-  rather than a summary of one. Repo-root-relative links in the entry bodies are rewritten with `../../../`
+  included, grouped by **tier** and, inside a tier, a flat list in ranked order
+  (`## Tier 2 - consumers` → `### <title>` → `#### What does this change do?`). Literally the whole
+  changelog, which is what makes this the record rather than a summary of one — including each entry's
+  impact table, since the cut empties `CHANGELOG.md` and this becomes the last place each ranking's
+  justification lives. Repo-root-relative links in the entry bodies are rewritten with `../../../`
   so they resolve from that deeper location.
 - **`releases/README.md`** — an overview table of all versions (newest at the top).
-- In `CHANGELOG.md` the `## Latest Release` block becomes a short **reference**
-  (`### [vX.Y.Z] - date — Type`) to the notes file, rather than the full contents inline — and it
-  **replaces** the previous block instead of pushing it down. The cut writes the *development* link,
-  because that is the only one that exists while it runs; `new-internal-note.ps1` repoints it at the
-  internal note the moment that note is created, in the same PR. Linking there at cut time would put a
-  dead relative link inside an immutable tag.
+- In `CHANGELOG.md` the cut writes **nothing at all** — it empties the document down to its intro. The
+  internal note's only inbound link is therefore the **Version cell of the `releases/README.md` row**,
+  written by `new-internal-note.ps1`. That the cut cannot write it is unchanged and is the reason the step is
+  separate: the note does not exist while the cut runs, and linking to it then would put a dead relative link
+  inside an immutable tag. The cell was chosen over a fourth column because the table's shape is matched by
+  one regex that three readers share — including the row inserter and the new-major guardrail — and only new
+  rows are touched, so the existing 72 keep pointing where they always did.
 - **`releases/highlights/<X>.x/<X.Y.Z>.md`** — the tier-2 document, generated **only for a minor or
   major** (`Get-ReleaseHighlightsBumps`) and built from **the tier-2 entries**. Written for the reader who
   decides whether to *update*, not for the one who reviews the diff: entry metadata (PR number, branch
@@ -243,9 +269,9 @@ does everything in one motion:
 `cut-release.ps1 (-Version <X.Y.Z> | -Bump <major|minor|patch>) [-Title "…"] [-SummaryFile <path>]` on
 a clean `main`:
 1. bumps all plugin versions in lockstep to `X.Y.Z`;
-2. generates `releases/development/<X>.x/<X.Y.Z>.md`, adds a row to `releases/README.md`, and puts a
-   reference in `CHANGELOG.md` under `## Latest Release` (every tier section is emptied down to its own
-   intro, and none is added or reordered);
+2. generates `releases/development/<X>.x/<X.Y.Z>.md`, adds a row to `releases/README.md`, and **empties
+   `CHANGELOG.md` down to its intro** — the intro passes through verbatim, so whatever the repo says about
+   itself up there survives every cut, in whatever language it wrote it;
 3. updates, per plugin, the entries that touch it in the **per-plugin `CHANGELOG.md`**
    (`<plugin>/CHANGELOG.md`) — the consumer-facing history that travels with the plugin cache. The
    selection runs via the `Plugins:` line, which itself is omitted as internal bookkeeping;
@@ -292,16 +318,16 @@ waiting for a migration that does not exist.
   [Derek #05](05-05-extension.md#classifying-naming-and-creating-a-branch)'s `new-branch.ps1` — you
   rarely call it standalone anymore.
 - `scripts/release/fold-changelog-entry.ps1 [-Branch <name>] [-RepoRoot <path>] [-Commit] [-Push]` — fold
-  entry(ies) into the **tier section their `Tier:` line names** on `main` after a merge, removing that line
-  on the way in. A malformed tier, or one this repo declares no section for, stops the run **before
-  anything is written** — so a fold-all with one bad entry leaves nothing half-done. `-RepoRoot` is an
+  entry(ies) into `CHANGELOG.md` on `main` after a merge, each at the **position its own impact table ranks
+  it at** and with its declaration left intact. A malformed tier or an off-scale significance stops the run
+  **before anything is written** — so a fold-all with one bad entry leaves nothing half-done. `-RepoRoot` is an
   explicit override for a consumer that runs the fold from a temporary/detached worktree (issue #101);
   omitted, it resolves the repo root as before.
 - `scripts/release/cut-release.ps1 (-Version <X.Y.Z> | -Bump <major|minor|patch>) [-Title "…"] [-NoPush] [-SkipLint] [-SkipTierGate]`
   — cut a repo-wide release, directly on `main`: the **bump gate** (does the pending work earn this bump?)
   + lockstep bump + release notes in `releases/development/` + `releases/README.md` row +
-  `## Latest Release` reference + per-plugin `CHANGELOG.md`s updated + per-plugin `RELEASE.md` cards
-  regenerated + commit + tag `vX.Y.Z` + push.
+  `CHANGELOG.md` emptied down to its intro + per-plugin `CHANGELOG.md`s updated + per-plugin `RELEASE.md`
+  cards regenerated + commit + tag `vX.Y.Z` + push.
   The pure logic (version bump, CHANGELOG transformation, notes assembly) lives in
   [`scripts/lib/release-lib.ps1`](../../../scripts/lib/release-lib.ps1), covered by
   [`scripts/tests/release-lib.tests.ps1`](../../../scripts/tests/release-lib.tests.ps1).
@@ -310,7 +336,7 @@ A new recurring release chore? Rendall builds a script for it with the same guar
 
 In short: the **how** (changelog, SemVer, tags, and — where a release publishes one — a GitHub
 Release) is portable; the **what** (these scripts, the per-branch entry + fold convention, and the
-lockstep repo-wide release via `cut-release.ps1` with git tag + `## Latest Release` block) belongs to this
-repo. Publishing a GitHub Release here is a manual closing step at **every** release, per the
+lockstep repo-wide release via `cut-release.ps1` with a git tag, and a `CHANGELOG.md` emptied down to its
+intro) belongs to this repo. Publishing a GitHub Release here is a manual closing step at **every** release, per the
 `cut-release` skill, that `cut-release.ps1` itself does not automate — with the internal note as the
 body and the other tiers attached.

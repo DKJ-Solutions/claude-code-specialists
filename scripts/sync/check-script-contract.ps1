@@ -22,7 +22,7 @@
       - open-pr             -> branch-info.ps1: Get-BranchInfo
                                repo-config.ps1: Get-RepoName, Get-LintScript
       - fold-changelog-entry -> repo-config.ps1: Get-RepoName
-                                repo-config.ps1: Get-ChangelogTierHeadings, Get-ChangelogHeading
+                                repo-config.ps1: Get-ReleaseHistoryPath, Get-ReservedRootMd
                                                  (both OPTIONAL, and a repo needs at most one -- see
                                                  below)
       - check-roster-sync   -> repo-config.ps1: Get-RosterPath, Get-RosterIgnoredIds
@@ -191,25 +191,20 @@ $script:Contract = @(
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RosterIgnoredIds'; Scripts = @('check-roster-sync');
        Optional = $true; Default = 'no ignored ids';
        Returns = "an array of '<group>-<id>' ids deliberately kept out of the roster -- normally empty, @(), since every enabled specialist belongs in the roster" },
-    # THE TIER MODEL'S SECTION MAP (August 5, 2026), and the legacy single heading beside it. Both
-    # optional, and a repo needs at most one: the map where it files entries per tier, the single heading
-    # where it has one section. Neither present means '## Pull Requests' as one tier-0 section, which is
-    # what the fold has always done -- so a consumer that has never heard of tiers is untouched.
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ChangelogTierHeadings'; Scripts = @('fold-changelog-entry', 'cut-release');
-       ViaLib = 'entry-scaffold-lib';
-       Optional = $true; Default = 'one section, from Get-ChangelogHeading or else ## Pull Requests';
-       Returns = "an ordered map from tier number to the literal '## ' heading line that tier's entries are folded under, IN THE ORDER those sections appear in CHANGELOG.md -- e.g. [ordered]@{ 2 = '## Tier 2 - Pull Requests'; 1 = '## Tier 1 - Pull Requests'; 0 = '## Tier 0 - Pull Requests' }. The tier says how far a change reaches: 0 = only this repo's own developers notice, 1 = a colleague on the project gets something out of it, 2 = a consumer notices. Declaring more than one tier also turns on the release cut's bump gate, which refuses a minor with no tier-2 entry pending" },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ChangelogHeading'; Scripts = @('fold-changelog-entry');
-       ViaLib = 'entry-scaffold-lib';
-       Optional = $true; Default = '## Pull Requests';
-       # NO REPORT MARKER IN THIS TEXT, and that is a rule for every record here rather than a detail of
-       # this one. A finding's message is scanned for those markers by counters that decide things: the
-       # session hook surfaces a run by counting ERROR markers, and this suite's asserts count OK/INFO
-       # lines. Writing one into a Returns line inflates those counts -- measured on the first draft of
-       # this record, which spelled the info marker out and made five findings count as six. With ERROR
-       # it would have raised a blocking session signal for a repo with nothing wrong. Guarded by an
-       # assert in script-contract.tests.ps1 so the next one fails a test instead of a hook.
-       Returns = "the literal '## ' heading line a merged entry is folded under, for a repo with ONE entry section. Superseded by Get-ChangelogTierHeadings where that is defined -- a repo declaring tiers does not need this function, so it being absent there is the correct state rather than a gap" },
+    # RETIRED, AUGUST 5, 2026: Get-ChangelogTierHeadings and the legacy single Get-ChangelogHeading (#178).
+    # Both answered which '## ' heading a merged entry is filed under, and CHANGELOG.md has no section
+    # headings any more -- an entry IS an H2 and the document is an intro plus a flat ranked list of them.
+    # The fold and release-lib derive the intro/list boundary structurally now (the first entry heading),
+    # so nothing reads either function.
+    #
+    # NO REPORT MARKER IN A Returns TEXT, and that is a rule for every record here rather than a detail of
+    # one. A finding's message is scanned for those markers by counters that decide things: the session
+    # hook surfaces a run by counting ERROR markers, and this suite's asserts count OK/INFO lines. Writing
+    # one into a Returns line inflates those counts -- measured on the first draft of the record that used
+    # to sit here, which spelled the info marker out and made five findings count as six. With ERROR it
+    # would have raised a blocking session signal for a repo with nothing wrong. Guarded by an assert in
+    # script-contract.tests.ps1 so the next one fails a test instead of a hook. Kept here rather than
+    # deleted with the records, because the rule outlived them.
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-LiveStage'; Scripts = @('cut-release skill');
        Optional = $true; Default = '';
        Returns = "a short description of this repo's separate go-live target, or '' when it has none" },
@@ -247,8 +242,8 @@ $script:Contract = @(
     # An [INFO] naming both defaults turns each into a thing they were told.
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntrySignificanceEnabled'; Scripts = @('new-changelog-entry', 'open-pr', 'fold-changelog-entry', 'cut-release');
        ViaLib = 'entry-scaffold-lib';
-       Optional = $true; Default = 'on wherever Get-ChangelogTierHeadings declares more than one tier section, off otherwise';
-       Returns = "$true to rank changelog entries by significance, $false to switch the whole mechanism off. On, an entry declares an impact table -- one row per tier it reaches, each with a significance from 1 to 5 and a Why -- the fold uses it to order CHANGELOG.md's sections, and the release cut REFUSES a release whose tier-1-or-higher entries have not scored themselves. Off, the entry carries the older single 'Tier: N' line and nothing is ordered or required. A repo with one entry section is off by default, because it has no tier information to rank by" },
+       Optional = $true; Default = 'on';
+       Returns = "$true to rank changelog entries by significance, $false to switch the whole mechanism off. On, an entry declares an impact table -- one row per tier it reaches, each with a significance from 1 to 5 and a Why -- and the release cut REFUSES a release whose tier-1-or-higher entries have not scored themselves. Off, nothing is required and no gate speaks. It does NOT switch off the fold's ordering of CHANGELOG.md, which is structural: the tier decides where an entry lands, which is what the retired tier sections used to say visually. On by default since the sections went -- the old default inferred adoption from how many changelog sections a repo declared, and a flat changelog gives every repo the same answer to that" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntrySignificanceRubricLevels'; Scripts = @('new-changelog-entry', 'open-pr', 'cut-release');
        ViaLib = 'entry-scaffold-lib';
        Optional = $true; Default = "the five built-in bands, 5 = 'the reader must act' down to 1 = 'cosmetic or preventative'";
@@ -278,21 +273,26 @@ $script:Contract = @(
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseNotesGrouping'; Scripts = @('cut-release');
        Optional = $true; Default = 'major';
        Returns = "'major' for releases/development/<X>.x/ or 'minor' for releases/development/<X.Y>/ -- where the generated notes are foldered, and therefore what the overview row links to" },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseLiveMarker'; Scripts = @('cut-release');
-       Optional = $true; Default = '';
-       Returns = "the suffix marking the currently-live release on the newest release heading, moved off the previous one at each cut; '' means this repo has no live stage and neither writes nor strips a marker" },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHistoryMode'; Scripts = @('cut-release');
-       Optional = $true; Default = 'all';
-       Returns = "'all' to keep a block per release under '## Releases' (the behaviour since the start), or 'latest' to keep only the newest under '## Latest Release' with a pointer to the full list. Only choose 'latest' once every release is listed somewhere else -- that file becomes the sole record" },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHistoryPath'; Scripts = @('cut-release');
+    # RETIRED, AUGUST 5, 2026: Get-ReleaseLiveMarker and Get-ReleaseHistoryMode. The first marked the
+    # currently-live release on the newest release heading; the second chose whether that section
+    # accumulated a block per release or kept only the newest behind a pointer. A cut writes no release
+    # block into CHANGELOG.md at all now -- it empties the document down to its intro -- so both describe
+    # machinery that is gone. Removed rather than left declared, for the reason the highlights knobs below
+    # were: a contract record for a knob nothing reads sends a consumer off to write a function that will
+    # never be called.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHistoryPath'; Scripts = @('cut-release', 'new-internal-note');
        Optional = $true; Default = 'releases/README.md';
-       Returns = "the repo-root-relative path a 'latest' release section points at for the full list; read only when Get-ReleaseHistoryMode is 'latest'" },
+       Returns = "the repo-root-relative path to the file that lists every release this repo has cut. Since the changelog stopped carrying release blocks it is the ONLY such list, so it must genuinely be complete. Three things read it: the guardrail refusing a new major whose section does not exist yet, the inserter that writes the row, and new-internal-note.ps1, which repoints that row's Version cell at the internal note once the note exists" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleasePluginTier'; Scripts = @('cut-release');
        Optional = $true; Default = 'whether .claude-plugin/marketplace.json exists';
        Returns = '$true if this repo publishes plugins that the cut must version in lockstep and card (per-plugin CHANGELOG.md + RELEASE.md); $false makes the newest vX.Y.Z tag the version record instead of the manifests' },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseCategoryTitles'; Scripts = @('cut-release');
-       Optional = $true; Default = "the English labels (Feat -> Features, Fix -> Fixes, Docs -> Documentation, Chore -> Maintenance)";
-       Returns = 'a type -> label map merged over those defaults, for a repo whose category headings are in another language; a type with no label falls back to the type name itself, which is the wrong word rather than a missing one' },
+    # RETIRED, AUGUST 5, 2026: Get-ReleaseCategoryTitles. Display labels for the release-notes category
+    # headings (Feat -> Features, Fix -> Fixes, ...), for a repo whose headings are in another language. The
+    # release documents have no category headings any more -- they are ranked lists of changes, and each
+    # change states its own type inside it under a '### Type of change' section. The grouping went because
+    # it was derived from the BRANCH PREFIX, which this repo measured does not predict what a change is
+    # worth: the most consequential change for a consumer at v3.2.0 arrived on a chore/ branch and was
+    # therefore filed third, under whichever label its prefix produced.
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHighlightsBumps'; Scripts = @('cut-release');
        Optional = $true; Default = 'no highlights tier at all';
        Returns = "the bump types that also get a stakeholder-facing highlights document (releases/highlights/<dir>/<X.Y.Z>.md, markdown only), e.g. @('minor','major'); @() switches the tier off, which is what the cut did before this knob existed. The document is the release's TIER-2 entries, so it is only written when there are some" },
@@ -309,13 +309,15 @@ $script:Contract = @(
     # The third tier. Declared for the same reason as the two above: nothing crashes without it, so a
     # consumer would discover English headings in a document written for its own management -- at the
     # moment it is being shared, which is the worst one available.
-    # The release block in the repo's OWN CHANGELOG.md (inbound #462). The fourth knob of this class and
-    # the last output of a release that was still written in the script's language rather than the
-    # repo's -- while the entry stubs, the category labels and the internal note all already were.
-    # BOTH scripts read it, because both write into the same paragraph of the same file.
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ChangelogReleaseWording'; Scripts = @('cut-release', 'new-internal-note');
-       Optional = $true; Default = 'the English release-block text';
-       Returns = "overrides for the release block written into CHANGELOG.md, merged over the English defaults, keyed LatestIntro, AllIntro, NotesLine and InternalNoteLine. A value is a line or an array of lines and carries the paths as tokens rather than as interpolation, since a config file has none of them in scope: {history} {notes} {internal} {dev}, plus {emdash} for the em-dash. AllIntro's default says 'the marketplace', which is the wrong word for a consumer that is not one" },
+    # RETIRED, AUGUST 5, 2026: Get-ChangelogReleaseWording (inbound #462). Four strings a release wrote into
+    # CHANGELOG.md -- the release section's two intros, the notes pointer, and the sentence repointing that
+    # pointer at the internal note. All four described the release BLOCK, and a cut writes none of it now.
+    #
+    # WHAT THE CONSUMER WHO ASKED FOR #462 LOSES, stated rather than glossed: nothing, because the OUTPUT is
+    # what went rather than the capability. That inbound issue came from a non-English repo and made these
+    # strings repo-owned because they were the most visible generated text in the file. What replaced the
+    # block is the changelog intro's own one-line pointer to the release history -- hand-written prose in a
+    # file the repo owns outright, which is in the repo's language by construction and needs no seam.
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-InternalNoteWording'; Scripts = @('new-internal-note');
        Optional = $true; Default = 'the English headings and hints';
        Returns = "overrides for the internal note's own text, merged over the English defaults: Title, AudienceLabel, Audience, SkeletonNote, SectionChanged, SectionValue, HintValue, SectionOpen, HintOpen, NoEntries and Unknown -- the document is read by this repo's own colleagues, so its language is the repo's rather than the script's" }

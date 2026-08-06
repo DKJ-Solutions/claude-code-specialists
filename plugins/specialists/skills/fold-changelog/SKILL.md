@@ -4,10 +4,9 @@ description: >-
   Fold a branch's changelog entry files into CHANGELOG.md via the shared, centralized fold script
   from the plugin (single source of truth, issue #81) -- so a consumer does not have to duplicate
   this script locally. Use this on main, immediately after merging a branch, to fold the entry
-  files (<branch-name>.md in the repo root) into the repo's changelog section -- one section per tier
-  where Get-ChangelogTierHeadings declares them, otherwise the single section Get-ChangelogHeading
-  names (## Pull Requests by default, or e.g. ## [Unreleased] on Keep-a-Changelog) -- and then
-  remove them.
+  files (<branch-name>.md in the repo root) into CHANGELOG.md -- a flat ranked list with no section
+  headings, where each entry lands at the position its own impact table ranks it at (furthest reach
+  first, highest significance first within a tier) -- and then remove them.
 disable-model-invocation: true
 ---
 
@@ -31,24 +30,51 @@ second attempt on the same branch: the fold looks the entry up by the *exact* br
 breaks the match and with it the automatic removal after folding. You are then left with a folded entry
 *and* the file still sitting in the root, which reads exactly like an unfolded branch.
 
-**The entry body carries the description; the fold adds what only exists after the PR.** An entry is
-written as a heading plus prose:
+**The entry body carries the description; the fold adds what only exists after the PR.** An entry is one
+`##` heading with three named `###` sections under it — the same block in the entry file and in
+`CHANGELOG.md`, so what a contributor writes is exactly what lands:
 
 ```markdown
-### Short strong title · Branch-type
-```
+## Short strong title
 
-The scaffolder fills in the type from the branch prefix. The fold adds what does not exist until the
-merge: it prepends the **`#NN`** and appends a closing line carrying the **`PR #NN` link and the merge
-date**. The separator is a middot.
-
-```markdown
-### #468 · Short strong title · Branch-type
+### What does this change do?
 
 …the description…
 
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 0 | - | - |
+
+### Type of change
+
+Feat
+```
+
+The scaffolder fills in the title and the type from the branch prefix. The fold adds what does not exist
+until the merge, and it adds it in **one place**: a closing line carrying the **`PR #NN` link and the merge
+date**. The separator is a middot. **The heading is left exactly as its author wrote it.**
+
+```markdown
+## Short strong title
+
+…the three sections…
+
 [PR #468](https://github.com/owner/repo/pull/468) · merged 2026-08-05
 ```
+
+**The heading is just the title** (Dave, August 5, 2026). The fold used to prepend `#NN · ` to it as well;
+nothing is lost by dropping that, because the number is still in the entry on the closing line, where the
+url makes it clickable rather than merely printed. What the heading gains is being readable as a sentence —
+it is the one line every reader of the changelog and of all three release documents scans.
+
+**An entry file written before this format still folds.** It carries an `###` heading with the type as a
+middot field and, where the repo had adopted tiers, a `Tier: N` line instead of a table. An entry file
+lives only on a branch, so that shape is not distant history — any branch opened before the format
+changed still has one. The fold **promotes the heading to `##`** as it lands, and says so on the console:
+an `###` in a flat list of `##`s is not an entry boundary to any reader of it, so it would otherwise be
+absorbed into the entry above and inherit that entry's PR link.
 
 **The date is the fold's, and it sits at the bottom** (Dave, August 5, 2026). The scaffolder runs when
 the *branch* is created, so any date it wrote was the branch's birth date — a branch opened on Monday and
@@ -57,19 +83,25 @@ So the heading now carries what the author knows (title, type) and the closing l
 the merge knows. The date comes from the PR's own merge timestamp rather than from the clock, because a
 fold does not always run in the same minute as its merge.
 
-## The one formatting rule: never use `##` in an entry body
+## The one formatting rule: a body sub-heading is `####`, never `##` or `###`
 
-An entry heading is an `###`, and a release cut groups entries under `##` category headings (Features,
-Fixes, and so on). **So an `##` inside a body climbs out of its category and renders as a sibling of
-it** — the release notes then appear to have extra categories that are really one entry's subheadings.
-Use `####`, or bold.
+**`##` makes it a separate change.** Every `##` in `CHANGELOG.md` is read as one entry, so a body
+sub-heading at that level becomes a phantom entry — one that declares no impact, therefore reads as an
+undeclared tier 0, and gets its own block in the release record.
+
+**`###` makes it a fourth section, and can cost the entry a declaration.** The three named sections sit at
+that level, and a section ends at the next heading of that level or above — so a stray `###` truncates
+whichever section it lands in. The dangerous version is a *misspelled* section heading (`Who is this For`):
+the parser looks for the exact text, so the entry silently loses the declaration the tier and significance
+gates read.
+
+Use `####`, or bold. The lint gate checks both halves in the entry file and in `CHANGELOG.md`.
 
 **What makes this worth a rule is *when* it bites.** The entry file looks perfectly fine on its own, and
-fine in the changelog section after folding. The damage only appears once the release cut lifts the body
-into the release notes and any per-plugin changelog — past every gate that could have judged it, in the
-artifact a reader finally sees. Measured on a real release, where a body's two subheadings came out
-looking like two extra release categories. **Inspect the generated notes before pushing a release**;
-that is what the cut's `-NoPush` is for.
+fine in the changelog after folding. The damage only appears once the release cut lifts the body into the
+release notes and any per-plugin changelog — in the artifact a reader finally sees. Measured on a real
+release, where a body's two subheadings came out looking like two extra release categories.
+**Inspect the generated notes before pushing a release**; that is what the cut's `-NoPush` is for.
 
 ## What the skill does
 
@@ -85,40 +117,39 @@ temporary/detached worktree (e.g. a `ship-pr.ps1` that checks out main elsewhere
 to land there instead of wherever `CLAUDE_PROJECT_DIR`/git-root would otherwise resolve to (issue
 #101); omitted, behavior is unchanged. The script:
 
-1. Folds each entry file (`<branch-name-with-hyphens>.md`) into this repo's changelog section of
-   `CHANGELOG.md`, with the PR number + link included (retrieved via `gh pr list`). The entry lands
-   at the top of that section, below any intro text and above whatever already sits there.
+1. Folds each entry file (`<branch-name-with-hyphens>.md`) into `CHANGELOG.md`, with the PR number + link
+   included (retrieved via `gh pr list`).
 2. Removes the entry file afterwards.
 
-**Which section is decided by the entry's TIER**, and the sections themselves come from the consumer's
-`scripts/repo-config.ps1`:
+**Where it lands is decided by the entry's own impact table**, not by a heading and not by a seam.
+`CHANGELOG.md` is an intro followed by a flat list of `##` entries, and the fold inserts the block at its
+ranked position: **furthest reach first**, and within a tier **highest significance first**. Everything
+above the first `##` is the intro and is never written into; a document with no entries yet simply gets the
+first one.
 
-- `Get-ChangelogTierHeadings` -- a map from tier number to the literal heading line, in the order those
-  sections appear in `CHANGELOG.md`. The entry declares its tier with a `Tier: N` line (`0` = only this
-  repo's own developers notice, `1` = a colleague on the project gets something out of it, `2` = a consumer
-  notices); the fold files it under the matching section and then **removes the line**, because from then on
-  the section states the tier.
-- `Get-ChangelogHeading` -- the legacy single heading, e.g. `## Pull Requests` (this workshop's own
-  predecessor) or `## [Unreleased]` (a Keep-a-Changelog repo). Still read where no tier map is declared.
+**Nothing is consumed.** The `Tier: N` line of a pre-format entry, and the impact table of a current one,
+both travel into `CHANGELOG.md` intact. That is a change from when the document had one section per tier: the
+*section heading* stated the reach then, so the fold stripped the line. With no heading above the entry,
+stripping it would leave the entry declaring nothing — and every downstream reader would take it as tier 0,
+which is silent, correct-looking, and wrong in the direction that empties a release document. The documents
+that travel outward strip both declarations themselves, at the moment they render.
 
-**Both are optional, and a repo needs at most one.** Without either, the script falls back to one
-`## Pull Requests` section, which is what it always did — a repo with one section is simply a repo with one
-tier, so there is no separate behaviour to opt into or out of.
+**An entry that declares nothing is tier 0**, the harmless end: forgetting to classify can never promote
+work into a consumer-facing document. The run says so out loud, because such work cannot carry a release on
+its own where the repo's release cut checks tiers. **An entry that declares a reach but no significance is
+also reported and still folds** — it sinks to the bottom of its tier, which is exactly where a reader of an
+unranked entry would put it, and the same place it would rank from if it were scored last.
 
-**An entry with no `Tier:` line is tier 0**, the harmless end: forgetting to classify can never promote work
-into a consumer-facing document. The run says so out loud, because such work cannot carry a release on its
-own where the repo's release cut checks tiers.
+**What stops the fold before it touches anything**, reported for every entry at once rather than one file at
+a time — a fold-all that failed halfway would leave earlier entries folded and their source files deleted:
 
-**Two things stop the fold before it touches anything**, both reported for every entry at once rather than
-one file at a time — a fold-all that failed halfway would leave earlier entries folded and their source
-files deleted:
+- a tier the model has no meaning for (`Tier: 5`, `Tier: two`, or an impact row `| 5 | 3 | … |`);
+- a significance cell off the scale (`| 2 | 9 | … |`).
 
-- a `Tier:` value the model has no meaning for (`Tier: 5`, `Tier: two`);
-- a tier this repo declares no section for — refused by name, with the tiers it *does* declare listed,
-  rather than quietly filed under a neighbour.
-
-If a configured heading is not found in `CHANGELOG.md`, the fold likewise stops before touching anything and
-names both the heading it looked for and the function to set (issue #178).
+**Two refusals disappeared with the sections, and both are structural rather than relaxed:** "could not find
+the heading — stopping" (issue #178) has no heading name left to mismatch, and "this repo declares no section
+for tier N" has no mapping left to miss — a tier the repo does not use is now a position in the list rather
+than an error.
 
 **The script can make that commit itself, and normally should: `-Commit`, or `-Push` to commit and push
 in one step.** Both are **opt-in**, so without either the fold is left in the working tree for you to
@@ -174,12 +205,14 @@ closing step -- not something to remember per repo or per time:
 The script is repo-agnostic, but reads a small block of repo data from the **root** of the consumer
 (dual-context: it resolves the repo root via `${CLAUDE_PROJECT_DIR}`):
 
-- `scripts/repo-config.ps1` with `Get-RepoName` (for the `gh --repo` calls), and optionally
-  `Get-ChangelogTierHeadings` (one section per tier) or the legacy `Get-ChangelogHeading` (a single
-  section; defaults to `## Pull Requests`). This is the only repo-specific file fold needs -- it derives
-  the PR number via `gh pr list` and the entry file name, and thus does not dot-source `branch-info.ps1`
-  (unlike `open-pr`).
-- A `CHANGELOG.md` carrying every heading that seam declares.
+- `scripts/repo-config.ps1` with `Get-RepoName` (for the `gh --repo` calls). This is the only
+  repo-specific file fold needs -- it derives the PR number via `gh pr list` and the entry file name, and
+  thus does not dot-source `branch-info.ps1` (unlike `open-pr`). **No changelog-structure seam is read any
+  more**: `Get-ChangelogTierHeadings` and the legacy `Get-ChangelogHeading` are retired, because a flat
+  document has no section headings to configure. A consumer that still defines either is unaffected --
+  nothing calls them.
+- A `CHANGELOG.md`. Its intro may be anything the repo likes; the fold only needs to find where the intro
+  ends, which is the first `##` heading.
 - `git` and a logged-in `gh` CLI.
 
 If `repo-config.ps1` is missing -- typical on a clean consumer -- the script stops before the

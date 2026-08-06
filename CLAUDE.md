@@ -220,32 +220,63 @@ The constitution above, concretely implemented here:
      See [Rendall #06](.claude/specialists/lenses/05-06-extension.md#changelog).
   2. The **release commit** (only on explicit request): [`cut-release.ps1`](scripts/release/cut-release.ps1)
      bumps all plugin versions in lockstep, generates the release notes in `releases/development/`,
-     references them from `## Latest Release`, (re)generates each plugin's consumer-facing `RELEASE.md`
+     **empties `CHANGELOG.md` down to its intro**, (re)generates each plugin's consumer-facing `RELEASE.md`
      card, commits that on `main`, and tags `vX.Y.Z`. Deliberately no branch/PR — just like the
      fold. See [Rendall #06](.claude/specialists/lenses/05-06-extension.md#versioning--releases).
      Since August 3, 2026 it is a **shared** script, mirrored into the plugin like the rest of the
      workflow ([#417](https://github.com/DaveKJohn/claude-code-specialists/issues/417)): everything
      that legitimately differs per repo — which root docs are permanent, how the notes are foldered,
-     the live marker, whether there is a plugin tier at all, the category labels, for which bumps a
+     whether there is a plugin tier at all, for which bumps a
      stakeholder-facing **highlights** document is generated, and how many minors a major must recap — is
      read from optional functions in [`scripts/repo-config.ps1`](scripts/repo-config.ps1), each falling
-     back to what this repo already did. **The exception it runs under did not widen**: same scope, same
+     back to what this repo already did.
+
+     **A cut writes no release block, and that is deliberate** (Dave, August 5, 2026). It used to append a
+     `## Latest Release` block naming the version, the date, the type and a pointer to the notes. Measured
+     before removing it: that accumulating section had grown to **434 of the changelog's 1,062 lines**
+     across 72 blocks that each said no more than "see the notes", while
+     [`releases/README.md`](releases/README.md) already listed every one of those 72 versions with a date,
+     a type and a descriptive title — the same coverage, verified in both directions, and richer per row.
+     So the intro carries a one-line pointer to that page and the cut leaves the document at its intro.
+     One consequence worth knowing: the internal note's only inbound link is now the **Version cell** of
+     that page's history row, written by `new-internal-note.ps1` rather than by the cut — see
+     `Set-ReleaseInternalNoteLink` for why it cannot be the cut's job. **The exception it runs under did not widen**: same scope, same
      "only on explicit request", and the release artefacts it produces here were verified
      byte-identical to the unshared script's, both when the script was shared and again when the
      highlights tier joined it.
 
-     **The tier model** (Dave, August 5, 2026). Every change declares **how far it reaches**, and that one
-     number decides both which section of `CHANGELOG.md` it is filed under and which release document it
-     appears in:
+     **The document is one change per `##` heading, with no section headings at all** (Dave, August 5,
+     2026). `CHANGELOG.md` is an intro followed by a **flat ranked list**: a change *is* the `##`, and its
+     heading is **just the title** — `## A significance score per entry, and the order follows it` — with the
+     PR number and the merge date on the entry's closing `[PR #NN](url) · merged <date>` line, where the two
+     facts the merge owns already lived. Under the heading, three `###` sections answer the questions a
+     reader arrives with — `What does this change do?`, `Who is this for` (the impact table, which *is* the
+     answer rather than prose beside it) and `Type of change`. `Plugins:` and the
+     `[PR #NN](url) · merged <date>` line stay plain lines, because a heading around one fact is more
+     structure than content. The three `## Tier N - Pull Requests` sections it replaced said exactly one
+     thing — how far each change reaches — and the entries now say that themselves, in a table that also
+     carries what the change is worth. **What the sections communicated visually is kept as the ordering**:
+     furthest reach first, and within a tier the highest significance first.
 
-     | tier | who notices | changelog section | release document | when |
-     |---|---|---|---|---|
-     | **2** | consumers | `## Tier 2 - Pull Requests` | `releases/highlights/<X>.x/<X.Y.Z>.md` | minor/major |
-     | **1** | colleagues on this project | `## Tier 1 - Pull Requests` | `releases/internal/<X>.x/<X.Y.Z>.md` | every release, patch included |
-     | **0** | only this repo's developers | `## Tier 0 - Pull Requests` | `releases/development/<X>.x/<X.Y.Z>.md` | every release |
+     **The tier model** (Dave, August 5, 2026). Every change declares **how far it reaches**, and that one
+     number decides which release document it appears in:
+
+     | tier | who notices | release document | when |
+     |---|---|---|---|
+     | **2** | consumers | `releases/highlights/<X>.x/<X.Y.Z>.md` | minor/major |
+     | **1** | colleagues on this project | `releases/internal/<X>.x/<X.Y.Z>.md` | every release, patch included |
+     | **0** | only this repo's developers | `releases/development/<X>.x/<X.Y.Z>.md` | every release |
 
      The grouping is per **major** (`3.x`) for all three, deliberately differing from the consumer this
      model came from, which folders per minor. `Get-ReleaseNotesGrouping` answers that once.
+
+     **The release documents follow the same flat shape**, and that deletion is part of the decision rather
+     than a tidy-up alongside it: the category grouping (`## Features`, `## Fixes`, …) is gone, together with
+     `Format-CategorizedEntries`, the category labels and the `Get-ReleaseCategoryTitles` seam. It grouped on
+     the **branch prefix**, which this repo has measured does not predict impact, so a document's most
+     consequential change was filed third under whichever label its prefix produced — and the ranking could
+     only reorder the categories, not escape them. Each change states its own type inside itself now, so
+     nothing is lost by not grouping on it.
 
      **The ladder is cumulative**, so a tier-2 entry is in the highlights *and* in the internal note; the
      development note carries everything, tier 0 included, because it is the record rather than a summary.
@@ -282,9 +313,10 @@ The constitution above, concretely implemented here:
      change is in it.
 
      **Who reads it where.** The fold places the entry at its ranked position in `CHANGELOG.md`, and that is
-     the *only* moment it can: the cut **empties** the tier sections, so whatever order the fold leaves is
+     the *only* moment it can: the cut **empties the list**, so whatever order the fold leaves is
      what the release documents inherit — reproducible across two moments days apart with nothing
-     re-estimated. The **highlights** re-read the tier-2 row (its reader is the consumer); the **internal
+     re-estimated. Insert-only, never a re-sort: the fold commit lands directly on `main`, so a bug there
+     must be able to misplace at most the one entry being folded rather than scramble a list it did not write. The **highlights** re-read the tier-2 row (its reader is the consumer); the **internal
      note** reads the tier-1 row. **Tier 0 is never ranked** — the development note is the record: complete
      and chronological. The table **survives into the record** because that is the last place each ranking's
      justification lives, and is **stripped from everything that travels outward** (highlights, per-plugin
@@ -320,8 +352,15 @@ The constitution above, concretely implemented here:
        accumulation, not any single pending change. `Get-ReleaseMajorMinMinors` owns the number.
 
      `-SkipTierGate` overrules it, deliberately separate from `-SkipLint`: that one skips a tool, this one
-     overrules a judgement about content. The gate switches itself off in a repo that declares a single
-     changelog section, so a consumer that has not adopted the model is untouched.
+     overrules a judgement about content. **The gate switches itself off where no pending entry declared its
+     impact at all**, so a consumer that has not adopted the model is untouched. That test used to be "does
+     this repo declare more than one changelog section", which had a real basis while the sections existed
+     and became a landmine the moment they went: a flat document gives an unadopted repo and an adopting one
+     one group each, so the old line would have read every repo as not adopting and switched the gate off in
+     silence, in the same change that made the tier the model's primary fact. Nothing would have errored.
+     Counting **declarations** is a measurement rather than a flag, and it keeps "declared tier 0" distinct
+     from "declared nothing" — which is the whole difference between a release that has nobody to announce
+     itself to and a repo that never chose the model.
 
      **And that same ladder is why the internal document exists at every release.** Tier 2 and tier 1 are
      not the same question: highlights is *what a consumer notices*, internal is *what the organisation

@@ -170,9 +170,10 @@ lens carries the local evidence and the two names that are only true here.
 
 Folding the changelog entry on `main` (`fold-changelog-entry.ps1`) is then
 [Rendall #06](05-06-extension.md#changelog)'s work. `main` thus keeps a growing record of everything that
-has been merged — since August 5, 2026 spread over **three tier sections**, chosen by the entry's own
-`Tier:` line rather than by its branch prefix. Derek's part of that is only this: the tier is set while the
-branch is still open, so it belongs in the entry before the PR, not after the merge.
+has been merged — since August 5, 2026 as **one flat list, ranked** by each entry's own impact table rather
+than grouped by its branch prefix. Derek's part of that is only this: the tier and the significance are set
+while the branch is still open, so they belong in the entry before the PR — the fold is the only moment the
+order can be decided, and after that a correction is a re-insert on `main`.
 
 ### The quoting lesson: where it was measured
 
