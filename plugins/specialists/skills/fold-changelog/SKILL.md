@@ -1,12 +1,13 @@
 ---
 name: fold-changelog
 description: >-
-  Fold a branch's changelog entry files into CHANGELOG.md via the shared, centralized fold script
-  from the plugin (single source of truth, issue #81) -- so a consumer does not have to duplicate
-  this script locally. Use this on main, immediately after merging a branch, to fold the entry
-  files (<branch-name>.md in the repo root) into CHANGELOG.md -- a flat ranked list with no section
-  headings, where each entry lands at the position its own impact table ranks it at (furthest reach
-  first, highest significance first within a tier) -- and then remove them.
+  Fold a branch's changelog entry into CHANGELOG.md via the shared, centralized fold script from the
+  plugin (single source of truth, issue #81) -- so a consumer does not have to duplicate this script
+  locally. Use this on main, immediately after merging a branch, to fold the entry
+  (branch/branch-changelog.md, or a pre-split <branch-name>.md in the repo root) into CHANGELOG.md --
+  a flat ranked list with no section headings, where each entry lands at the position its own impact
+  table ranks it at (furthest reach first, highest significance first within a tier) -- and then
+  clear it: the branch/ pair is reset to its empty state, a root entry file is removed.
 disable-model-invocation: true
 ---
 
@@ -24,11 +25,22 @@ where a conflict is pure noise, because the two entries never actually disagree.
 writes its **own** entry file, and this skill folds it in after the merge, when the conflict window is
 already closed.
 
-**The filename is the branch name with `/` replaced by `-`** — branch `feat/new-plugin` → file
-`feat-new-plugin.md` in the repo root. **Never add a suffix** such as `-fix` or `-v2`, not even on a
-second attempt on the same branch: the fold looks the entry up by the *exact* branch name, so a suffix
-breaks the match and with it the automatic removal after folding. You are then left with a folded entry
-*and* the file still sitting in the root, which reads exactly like an unfolded branch.
+**The entry is `branch/branch-changelog.md`** — a fixed path, the same on every branch. Git tracks it
+per branch, so branches in flight cannot collide on it. Its companion `branch/branch-progress.md` is the
+step list; it is never folded, and it is what the fold reads the branch name back off in order to find
+the PR.
+
+**Both are cleared by the fold, and neither is deleted.** They are rewritten to their empty **reset
+state** — the state that lives on the trunk, opening with an H1 and carrying a warning not to write there
+until a branch exists. That H1 is load-bearing: it is what stops the trunk's own empty file being folded
+as if it were a change, and it is why folding twice is impossible rather than merely unlikely.
+
+**A pre-split entry still folds.** Before August 6, 2026 the entry was a `<branch-name>.md` in the repo
+root — branch `feat/new-plugin` → `feat-new-plugin.md` — and any branch created before that date still
+carries one. The fold finds both forms and **deletes** the root one, since it is named after a branch that
+is now merged. If you are on such a branch: **never add a suffix** like `-fix` or `-v2`, not even on a
+second attempt. Without `-Branch` the fold recovers the branch from the file name, so a suffix breaks the
+PR lookup.
 
 **The entry body carries the description; the fold adds what only exists after the PR.** An entry is one
 `##` heading with three named `###` sections under it — the same block in the entry file and in
@@ -111,15 +123,18 @@ Run the shared script from the **root of the consuming repo**:
 powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/fold-changelog-entry.ps1" -Branch <prefix>/<name>
 ```
 
-Without `-Branch` it folds all entry files present in the root. An optional `-RepoRoot <path>`
+Without `-Branch` it folds everything it finds: `branch/branch-changelog.md` if it holds an entry, plus
+any pre-split entry file in the root. An optional `-RepoRoot <path>`
 overrides which repo root the script writes to — for a consumer that runs the fold from a
 temporary/detached worktree (e.g. a `ship-pr.ps1` that checks out main elsewhere) and wants the fold
 to land there instead of wherever `CLAUDE_PROJECT_DIR`/git-root would otherwise resolve to (issue
 #101); omitted, behavior is unchanged. The script:
 
-1. Folds each entry file (`<branch-name-with-hyphens>.md`) into `CHANGELOG.md`, with the PR number + link
-   included (retrieved via `gh pr list`).
-2. Removes the entry file afterwards.
+1. Folds each entry into `CHANGELOG.md`, with the PR number + link included (retrieved via
+   `gh pr list` — keyed on `-Branch`, or on the name in `branch-progress.md`, or for a pre-split entry
+   on its file name).
+2. Clears it afterwards: **`branch/branch-changelog.md` and `branch/branch-progress.md` are reset** to
+   their empty state, a pre-split root entry file is **removed**.
 
 **Where it lands is decided by the entry's own impact table**, not by a heading and not by a seam.
 `CHANGELOG.md` is an intro followed by a flat list of `##` entries, and the fold inserts the block at its
@@ -163,8 +178,8 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/fold-changelo
   -Branch <prefix>/<name> -Push
 ```
 
-**The commit names its paths**, so `CHANGELOG.md` and the entry files are the only things that can land
-in it however messy the working tree is. That scope limit is the point rather than tidiness: where this
+**The commit names its paths**, so `CHANGELOG.md`, the entries it folded and the step list it reset are
+the only things that can land in it however messy the working tree is. That scope limit is the point rather than tidiness: where this
 commit runs under a "never commit directly to main, except the fold" exception, an unscoped
 `git add -A` would let anything else in the tree ride along under that exception. It is enforced by git
 now instead of by care.
@@ -177,10 +192,10 @@ turned out to be able to simply leave the local checkout **on the merged branch*
 2026: the fold then ran there, and the changes had to be moved over by hand afterwards. Do not trust the
 flag; trust the check.
 
-**Working from more than one machine: always fold with `-Branch`.** Without it the script folds *every*
-entry file present in the root — including one belonging to a merge that another machine is still
-folding, which then lands twice. So `git pull` first, then fold your own branch by name. If your fold
-push is rejected because you are behind origin, that is harmless: pull and retry.
+**Working from more than one machine: always fold with `-Branch`.** Without it the script folds
+*everything* it finds — including a pre-split entry file belonging to a merge that another machine is
+still folding, which then lands twice. So `git pull` first, then fold your own branch by name. If your
+fold push is rejected because you are behind origin, that is harmless: pull and retry.
 
 ## Closing step: branch cleanup (#163)
 
@@ -223,7 +238,8 @@ this skill.
 ## Important
 
 - **Run this on main, after the merge** (after the PR has been merged) — then the PR number exists.
-- The script only touches `CHANGELOG.md` + the entry files; nothing else.
+- The script only touches `CHANGELOG.md`, the entries it folds and `branch/branch-progress.md`; nothing
+  else.
 - The source of this script lives in the workshop repo; do not modify it locally in the consumer. A
   change lands first in the source (`scripts/release/fold-changelog-entry.ps1`) and then travels via
   a release to the plugin mirror — guarded by the shared-scripts drift lint.

@@ -3,13 +3,26 @@
 Changes to this repo go through a branch + Pull Request to `main`, with a folded
 changelog entry — the same workflow as the consuming repos. The steps:
 
-1. **Branch — its changelog entry comes along in the same move:**
+1. **Branch — its two files in `branch/` come along in the same move:**
    [`scripts/task/new-branch.ps1`](scripts/task/new-branch.ps1)`-Name <prefix>/<short-name> -Title "…"`
    creates (or idempotently resumes) the `<prefix>/<short-name>` branch and, as a child step,
-   scaffolds `<branch-name>.md` in the repo root via
+   writes both files via
    [`scripts/release/new-changelog-entry.ps1`](scripts/release/new-changelog-entry.ps1) — a branch is
-   never entry-less. **The entry is one `##` heading with three `###` sections under it**, and that is
-   exactly the block that lands in the changelog:
+   never entry-less:
+
+   | file | subject | lifetime |
+   |---|---|---|
+   | `branch/branch-changelog.md` | what the change **does** — the entry that folds into `CHANGELOG.md` | folded at the merge, then reset |
+   | `branch/branch-progress.md` | what still **must happen** — the branch's name, its step list, where you left off | reset at the merge; never folded |
+
+   **Fixed names, not one per branch.** Git already tracks these per branch, so branches in flight
+   cannot collide on them. On `main` both sit in an empty **reset state** carrying a warning not to
+   write there until a branch exists — that state opens with an `#`, which is exactly what stops the
+   fold mistaking it for an entry.
+
+   **`branch-changelog.md` holds the entry block and nothing around it**, so it pastes into the
+   changelog in one go. **The entry is one `##` heading with three `###` sections under it**, and that is
+   exactly the block that lands there:
 
    ```text
    ## <the title you gave -Title>
@@ -36,8 +49,8 @@ changelog entry — the same workflow as the consuming repos. The steps:
    `fix/` → bug → Fix · `docs/` → documentation → Docs · `chore/` → documentation → Chore
    (maintenance: scripts, tooling, config). The table is in
    [`scripts/lib/branch-info.ps1`](scripts/lib/branch-info.ps1).
-2. **Work + commit** on the branch: write the entry file's description, then commit it along with
-   the rest of the work.
+2. **Work + commit** on the branch: keep the step list current as you go, write the entry's
+   description, then commit both along with the rest of the work.
 3. **Open the PR:** [`scripts/release/open-pr.ps1`](scripts/release/open-pr.ps1)`-Title "…"` first runs
    the **lint gate** [`scripts/lint/check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1)
    (valid manifests, agent-def frontmatter, no dead links, and the flags on every printed
@@ -55,13 +68,14 @@ changelog entry — the same workflow as the consuming repos. The steps:
    **irreversible/outward-facing** — stops for his word first.
 5. **Fold:** on `main`, right after the merge,
    [`scripts/release/fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)`-Branch <name>`
-   folds the entry file into [`CHANGELOG.md`](CHANGELOG.md) — which is **one flat list with no section
+   folds the entry into [`CHANGELOG.md`](CHANGELOG.md) — which is **one flat list with no section
    headings at all**, so the fold does not pick a section: it inserts the block at the **position its own
    impact table ranks it at**, furthest reach first and, within a tier, highest significance first. It
    appends the PR link and the merge date as the entry's closing line, derives a `Plugins:` line from the PR's files
    along the way (for the per-plugin CHANGELOGs — see
-   [Cutting a release](releases/README.md#cutting-a-release)), and removes the entry file; commits that
-   directly on `main`.
+   [Cutting a release](releases/README.md#cutting-a-release)), and **resets both `branch/` files** to
+   their empty state — so the trunk is ready for the next branch and the merged branch's ticked-off steps
+   do not greet whoever opens it. Commits that directly on `main`, naming exactly those three paths.
 
    **The fold is the only moment that order can be decided**, which is why the table has to be right
    before the merge: the cut empties the list, so whatever order the fold leaves is what the release

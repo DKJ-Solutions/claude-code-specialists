@@ -9,7 +9,7 @@
 - [ ] `chore/` · maintenance: scripts, workflow, tooling, config · _documentation_
 
 ## Checklist
-- [ ] Changelog entry file created (`<branch-name>.md` in the repo root)
+- [ ] Changelog entry written (`branch/branch-changelog.md`)
 - [ ] `check-plugin-integrity.ps1` green (manifests, agent-def frontmatter, links)
 - [ ] Shared agent defs change here only (this repo is the single source of truth)
 

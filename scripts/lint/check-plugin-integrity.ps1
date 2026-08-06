@@ -405,6 +405,16 @@ if (Test-Path -LiteralPath $pluginsRootDir) {
     $linkFiles += @(Get-ChildItem -Path $pluginsRootDir -Filter '*.md' -File |
         Select-Object -ExpandProperty FullName)
 }
+# AND THE THIRD, ARRIVING THE SAME WAY: branch/ -- the entry and the step list. They used to be root *.md
+# and were therefore covered by the root glob; the branch/ split moved them one level down. Same omission
+# as the plugins/ one above and worth stating separately rather than merging the two comments, because
+# these two documents went dark in the same week for two unrelated reasons -- which is the actual lesson
+# about this scan set: a file leaves it by MOVING, and nothing reports that it has.
+$branchDirForLinks = Join-Path $RepoRoot ((Get-BranchFilePaths).Directory)
+if (Test-Path -LiteralPath $branchDirForLinks) {
+    $linkFiles += @(Get-ChildItem -Path $branchDirForLinks -Filter '*.md' -File |
+        Select-Object -ExpandProperty FullName)
+}
 # The specialists handbook lives next to the lenses (at family level) -- validate its links too.
 $handbook = Join-Path $RepoRoot '.claude\plugins\claude-specialists\README.md'
 if (Test-Path -LiteralPath $handbook) { $linkFiles += $handbook }
@@ -949,6 +959,10 @@ $lifecycleFiles = @($linkFiles | Where-Object {
     if ($rel -match '^releases\\') { return $false }
     # A root <branch-name>.md entry file is history in the making; same reasoning as CHANGELOG.md.
     if (($rel -notmatch '\\') -and (Test-IsChangelogEntryFile -Path $_)) { return $false }
+    # branch/ is the same subject at its new address. Both files: the entry is history in the making, and
+    # the step list is a scratch pad that never travels anywhere -- neither is a document a consumer reads
+    # a lifecycle command off, which is what this check judges.
+    if ($rel -match ('^' + [regex]::Escape((Get-BranchFilePaths).Directory) + '\\')) { return $false }
     return $true
 })
 
@@ -1143,8 +1157,17 @@ function Test-IsDeclaredSectionHeading([string]$Line) {
     return ($ehSectionNames -ccontains $m.Groups[1].Value)
 }
 
+# THE ENTRY IS IN branch/ SINCE THE SPLIT (August 6, 2026), so scanning only the root would leave this
+# check with nothing to judge on every branch -- and it would still report [OK], because "no unfolded entry
+# file" is a legitimate state between merges. A check that goes quiet for the right-looking reason is worse
+# than one that errors. Both locations are walked, for the same "recognise both" reason the fold walks both.
 $entryFilesForHeadings = @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
     Where-Object { Test-IsChangelogEntryFile -Path $_.FullName })
+$branchDirForHeadings = Join-Path $RepoRoot ((Get-BranchFilePaths).Directory)
+if (Test-Path -LiteralPath $branchDirForHeadings) {
+    $entryFilesForHeadings += @(Get-ChildItem -Path $branchDirForHeadings -Filter '*.md' -File |
+        Where-Object { Test-IsChangelogEntryFile -Path $_.FullName })
+}
 foreach ($ef in $entryFilesForHeadings) {
     $ehChecked++
     $rel = $ef.FullName.Substring($RepoRoot.Length).TrimStart('\', '/')
@@ -1242,7 +1265,7 @@ if (Test-Path -LiteralPath $clForHeadings) {
 }
 
 Write-Coverage -Category 'entry-heading' -Checked $ehChecked `
-    -Note $(if ($entryFilesForHeadings.Count -eq 0) { 'no unfolded entry file in the root, so only CHANGELOG.md was judged -- normal between merges' } else { "$($entryFilesForHeadings.Count) unfolded entry file(s) plus CHANGELOG.md" })
+    -Note $(if ($entryFilesForHeadings.Count -eq 0) { 'no unfolded entry in branch/ or the root, so only CHANGELOG.md was judged -- normal between merges' } else { "$($entryFilesForHeadings.Count) unfolded entry file(s) plus CHANGELOG.md" })
 
 # --- 14. mojibake: a double-encoded character is a silent content change -----------------------------------
 # MEASURED HERE, August 1, 2026, and it nearly shipped. Demoting four headings in CHANGELOG.md with
@@ -1310,7 +1333,7 @@ Write-Coverage -Category 'mojibake' -Checked $mjFiles `
     } elseif ($mjFiles -eq 0) {
         'the repair tool ran but did not state how many files it examined, so this count is not evidence of scope'
     } else {
-        'the set this repo names in Get-MojibakePaths (scripts/repo-config.ps1): every *.md in the root -- the changelog, the root docs and any unfolded entry file -- plus every *.md under plugins/ and every note under releases/. Peeled by the inverse round trip rather than matched against a table of known sequences'
+        'the set this repo names in Get-MojibakePaths (scripts/repo-config.ps1): every *.md in the root (the changelog and the root docs), every *.md in branch/ (the entry whose text is pasted into CHANGELOG.md, and the step list), plus every *.md under plugins/ and every note under releases/. Peeled by the inverse round trip rather than matched against a table of known sequences'
     })
 
 # --- 15. unbound output samples: an expectation that cannot hold everywhere -------------------------------

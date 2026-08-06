@@ -476,7 +476,9 @@ function Get-RosterIgnoredIds { return @() }
         # below therefore now checks BOTH scripts really reference each one -- which is what would catch the
         # gate being removed while the contract still promised it.
         @{ Function = 'Get-EntryTitlePlaceholder'; Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry', 'open-pr'); ViaLib = 'entry-scaffold-lib' },
-        @{ Function = 'Get-EntryBodyHeading';      Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry', 'open-pr'); ViaLib = 'entry-scaffold-lib' },
+        # open-pr ONLY since the branch/ split: new-changelog-entry stopped writing the to-do heading when
+        # the step list moved to branch-progress.md, so the gate is the last reader of this knob.
+        @{ Function = 'Get-EntryBodyHeading';      Lib = 'scripts\repo-config.ps1'; Scripts = @('open-pr'); ViaLib = 'entry-scaffold-lib' },
         @{ Function = 'Get-EntryBodyPlaceholder';  Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry', 'open-pr'); ViaLib = 'entry-scaffold-lib' },
         # The fourth stays single-reader on purpose: a changelog TYPE is not scaffold prose, so 'Chore' is a
         # legitimate final value and can never be evidence of an unedited entry.

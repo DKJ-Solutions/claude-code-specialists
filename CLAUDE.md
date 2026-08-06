@@ -211,12 +211,24 @@ The constitution above, concretely implemented here:
   ([`entry-scaffold-lib.ps1`](scripts/lib/entry-scaffold-lib.ps1)) read by both the script that writes
   it and the gate that refuses it — a copy in each would make the gate silently miss whatever the
   writer changed.
+
+  **Two of those three strings are now recognised without being written** (August 6, 2026). The
+  `branch/` split moved the step list into its own file, so the entry is no longer scaffolded with a
+  to-do heading over a to-do placeholder — its placeholder asks what the change *does*. The gate keeps
+  refusing the retired wording, and that is not politeness towards history: every branch in flight,
+  here and in every consumer, carries an entry with those strings right now, and consumers receive the
+  new scripts through a plugin update rather than by choosing to. A gate that forgot them would wave
+  exactly those entries through. **Recognise both, write one** — the same rule the `Tier: N` line gets.
 - **Two deliberate exceptions to "never directly on `main`":**
   1. The **fold commit** after a merge: [`fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)
-     folds the entry file into `CHANGELOG.md` and removes it, and with `-Commit`/`-Push` makes that
-     commit itself — scope limited to `CHANGELOG.md` + the entry file, and since August 2, 2026
+     folds the entry into `CHANGELOG.md` and clears it, and with `-Commit`/`-Push` makes that
+     commit itself — scope limited to `CHANGELOG.md` + the entry + `branch/branch-progress.md`, which
+     the same run resets, and since August 2, 2026
      enforced rather than merely intended: the commit names its paths, so nothing else in the tree
-     can ride along. Committing stays opt-in, because it is this exception being used.
+     can ride along. **The scope grew by one path on August 6, 2026 and the exception did not widen
+     with it**: the step list is reset by this run, so leaving it out would produce a commit that
+     resets half the pair — the entry empty on `main` while the step list still shows the merged
+     branch's ticked boxes. Committing stays opt-in, because it is this exception being used.
      See [Rendall #06](.claude/specialists/lenses/05-06-extension.md#changelog).
   2. The **release commit** (only on explicit request): [`cut-release.ps1`](scripts/release/cut-release.ps1)
      bumps all plugin versions in lockstep, generates the release notes in `releases/development/`,

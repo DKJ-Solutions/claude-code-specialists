@@ -289,6 +289,25 @@ if ($strayEntries.Count -gt 0) {
     exit 1
 }
 
+# THE SAME GUARD FOR branch/ (Dave, August 6, 2026). Since the split the entry arrives at a FIXED path, so
+# the catch-all above cannot see it: that one is "every root *.md that is not a permanent doc", and this
+# file is neither in the root nor stray -- it is a permanent part of the repo whose CONTENT decides whether
+# work is pending. The test is therefore the content, not the file's existence, and it is the same
+# structural test the fold uses to decide the file holds an entry at all.
+#
+# WHY IT MATTERS MORE HERE THAN THE ROOT VERSION DID. A cut EMPTIES CHANGELOG.md; an entry still sitting
+# unfolded at this moment does not land in the release documents and is then orphaned on a trunk whose
+# pending list has just been cleared. The root form announced itself by being a file nobody expected. The
+# branch/ form looks exactly like the reset state at a glance, which is precisely why it needs a gate
+# rather than a reader's attention.
+$cutBranchFiles = Get-BranchFilePaths
+$cutBranchChangelog = Join-Path $repoRoot $cutBranchFiles.Changelog
+if ((Test-Path -LiteralPath $cutBranchChangelog) -and
+    (Test-BranchChangelogIsFilled -Text ([System.IO.File]::ReadAllText($cutBranchChangelog)))) {
+    Write-Error "$($cutBranchFiles.Changelog) still holds an unfolded entry. Fold it first (fold-changelog-entry.ps1); a cut empties CHANGELOG.md, so an entry left here would miss this release and be orphaned afterwards."
+    exit 1
+}
+
 # --- Determine version + bump type ------------------------------------------------------------
 # WHERE THE CURRENT VERSION COMES FROM depends on the plugin tier, and the two sources are not
 # interchangeable (#417). With plugins, the manifests ARE the record and Get-LockstepVersion also

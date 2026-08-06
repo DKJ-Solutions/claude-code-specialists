@@ -1,11 +1,11 @@
 ---
 name: new-branch
 description: >-
-  Create (or idempotently resume) a git branch AND its changelog entry file in one move, via the
-  shared, centralized new-branch script from the plugin (single source of truth, issue #81) -- so a
-  consumer does not have to duplicate this script locally. Use this whenever a new piece of work
-  starts: a branch is never entry-less -- creating it brings its changelog entry to life in the
-  same step, instead of a separate later scaffolding step.
+  Create (or idempotently resume) a git branch AND its two files in branch/ -- the changelog entry
+  and the step list -- in one move, via the shared, centralized new-branch script from the plugin
+  (single source of truth, issue #81), so a consumer does not have to duplicate this script locally.
+  Use this whenever a new piece of work starts: a branch is never entry-less -- creating it brings
+  both files to life in the same step, instead of a separate later scaffolding step.
 ---
 
 # new-branch -- the shared branch+entry creator for consumers
@@ -29,10 +29,32 @@ The script:
    `final`; soft-warns (but proceeds) on an unknown prefix.
 2. Creates the branch (`git checkout -b`), or checks it out if it already exists -- **idempotent**:
    running it again on the same branch simply resumes it instead of failing.
-3. Immediately creates that branch's changelog entry file by calling the shared
-   `new-changelog-entry.ps1` as a child step (own script, own mirror) -- so the branch and its
-   entry come into existence in a single step. If the entry file already exists, that step is a
-   no-op (same idempotence).
+3. Immediately writes that branch's **two files in `branch/`** by calling the shared
+   `new-changelog-entry.ps1` as a child step (own script, own mirror) -- so the branch and its files
+   come into existence in a single step. Idempotent **per file**: a file that already belongs to this
+   branch is left exactly as it is.
+
+## The two files, and why there are two
+
+```text
+branch/
+  branch-changelog.md   what the change DOES  -- nothing but the entry, so it pastes into CHANGELOG.md
+  branch-progress.md    what still MUST HAPPEN -- the branch's name, its step list, where you left off
+```
+
+**Fixed names, not one per branch.** Git already tracks these per branch, so two branches in flight
+cannot collide on them and the repo root stops filling up with other people's work. On the trunk both
+sit in an empty **reset state**, with a warning saying not to write there until a branch exists; the
+fold puts them back in that state after the merge.
+
+**Why the split earns its keep.** One file used to do both jobs — it was scaffolded with a
+`**To do / where I left off:**` heading *and* folded verbatim into `CHANGELOG.md`, so "replace this
+whole block before the PR" had to be a written instruction. Two files make it obvious. The entry now
+prompts for what the change does, and nothing else.
+
+**`branch-changelog.md` holds the entry block and nothing around it** — no title, no branch line. That
+is what makes it pasteable in one go; the branch name lives in `branch-progress.md`, which has room for
+it, and the fold reads it back from there to find the PR.
 
 ## The entry carries an impact table, scaffolded at tier 0
 
@@ -109,14 +131,17 @@ entry unreadable to your own fold.
 
 Two optional parameters cover the "start now, continue later (maybe on another device)" case:
 
-- **`-Intent "<what is next / where I left off>"`** -- fills the changelog entry body with that
-  text instead of a placeholder. If you omit it, the body falls back to a directional block
-  (`**To do / where I left off:**` + a prompting TODO) rather than a bare one-line TODO, so a
-  forgotten `-Intent` still leaves a "what is next" prompt. Either way it is a scaffold: whoever
-  finishes the branch replaces the body with the final description before the PR.
-  The stub wording quoted here is only the **default**. All four strings the entry is built from --
-  the title placeholder, this heading, the fallback body, and the type an unknown prefix falls back
-  to -- are repo-owned and can be set in your own `scripts/repo-config.ps1`
+- **`-Intent "<what is next / where I left off>"`** -- recorded in **`branch-progress.md`**, under
+  its "where I left off" section. Omit it and that section carries a prompting placeholder instead,
+  so a forgotten `-Intent` still leaves the question standing.
+  **It deliberately does not touch the entry.** An intent is a status, and the entry's text folds
+  verbatim into `CHANGELOG.md` -- this repo measured three released entries that shipped a progress
+  note that way. The entry always scaffolds with its own placeholder, and the PR gate keeps refusing
+  it until somebody writes what the change does.
+  The stub wording quoted here is only the **default**. The strings the entry is built from --
+  the title placeholder, the body placeholder, the retired to-do heading (still refused by `open-pr`
+  wherever it survives), and the type an unknown prefix falls back to -- are repo-owned and can be
+  set in your own `scripts/repo-config.ps1`
   (`Get-EntryTitlePlaceholder`, `Get-EntryBodyHeading`, `Get-EntryBodyPlaceholder`,
   `Get-EntryFallbackType`; issue #410). Define none of them and you get exactly the English text
   above. That exists so a repo whose changelog is not in English does not have to keep a private
@@ -140,7 +165,7 @@ The script is repo-agnostic, but reads its repo data from the **root** of the co
 (dual-context via `${CLAUDE_PROJECT_DIR}`):
 
 - `scripts/lib/branch-info.ps1` (dot-sourced) -- the single source of truth for the branch-prefix
-  table (`Get-BranchInfo`/`Test-BranchName`) and the branch-name-to-entry-filename conversion.
+  table (`Get-BranchInfo`/`Test-BranchName`).
 - `git`.
 - `scripts/repo-config.ps1` -- **optional here**, unlike in `open-pr`/`fold-changelog-entry`, which
   pre-flight on it. If present, its four `Get-Entry*` functions set the stub wording (#410); if it
@@ -155,11 +180,15 @@ repo as a model, or use the `VUL-IN` scaffold the `specialists-init` bootstrap p
 ## Important
 
 - **No push, no PR by default.** Without `-Park` the script only runs `git checkout`/`checkout -b`
-  locally and writes the entry file; nothing leaves the machine. With `-Park` it also commits the
-  entry and pushes the branch to `origin` -- but still **opens no PR**. Opening a PR remains a
-  separate, explicit step (the `open-pr` skill).
-- **Idempotent repetition.** Running the script again on a branch that already exists, or for an
-  entry file that is already there, does not fail or overwrite -- it simply resumes/no-ops.
+  locally and writes the two branch files; nothing leaves the machine. With `-Park` it also commits
+  **both** of them and pushes the branch to `origin` -- but still **opens no PR**. Both, because the
+  step list is the half that says what was still in flight, and that is what parking hands over.
+  Opening a PR remains a separate, explicit step (the `open-pr` skill).
+- **Idempotent repetition, per file.** Running the script again on a branch that already exists does
+  not fail or overwrite -- it resumes. The two branch files are judged **separately**, and on what
+  each one says it belongs to rather than on whether it exists (both exist on the trunk by design):
+  an entry that has been written stays written, and a step list you have been ticking off is never
+  clobbered by a rerun.
 - The source of this script lives in the workshop repo; do not modify it locally in the consumer. A
   change lands first in the source (`scripts/task/new-branch.ps1`) and then travels via a release to
   the plugin mirror -- guarded by the shared-scripts drift lint.
