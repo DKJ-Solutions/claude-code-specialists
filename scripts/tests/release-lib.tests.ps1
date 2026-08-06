@@ -120,7 +120,7 @@ function New-FlatEntry {
     if ($TierLine) { $lines += @($TierLine, '') }
     $lines += $Body
     if ($ExtraBody) { $lines += @('', $ExtraBody) }
-    $lines += @('', (Get-EntrySectionHeading -Key 'Who'), '')
+    $lines += @('', (Get-EntrySectionHeading -Key 'Significance'), '')
     if ($Rows.Count -gt 0 -and $Rows[0]) {
         $lines += @('| Tier | Significance | Why |', '|---|---|---|')
         $lines += $Rows
@@ -539,7 +539,11 @@ Assert-NoMatch $stripped '(?m)^\| 2 \| 5 \|' 'and its rows with it'
 # -NoPush: 17 empty sections per release card, 17 per per-plugin CHANGELOG, 16 in the highlights draft.
 # It had never been seen in a real document -- v3.5.0 was cut hours BEFORE #476 landed, so v3.6.0 would
 # have been the first release to ship it.
-Assert-NoMatch $stripped '(?m)^### Who is this for$' 'the section heading goes with the table it introduced, or the question is left unanswered'
+#
+# READ FROM THE LIB, NOT WRITTEN OUT, since the heading was renamed to 'Significance' hours after this
+# assert was fixed. A literal here would have gone on passing against a heading nothing writes any more --
+# a green assert measuring nothing, which is the failure mode this whole section exists to catch.
+Assert-NoMatch $stripped ('(?m)^' + [regex]::Escape((Get-EntrySectionHeading -Key 'Significance')) + '$') 'the section heading goes with the declaration it introduced, or the question is left unanswered'
 Assert-Match $stripped '(?m)^### Type of change$' 'and the sections that still have content keep their headings'
 # BOTH DECLARATIONS, and the second is new here: while the changelog had tier sections the fold consumed
 # the 'Tier: N' line, so it could never reach a rendered document. The fold now carries it, which puts a

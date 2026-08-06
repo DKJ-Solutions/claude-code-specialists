@@ -23,16 +23,35 @@ whole thing at once, or paste it back after cutting it about:
 
 <what the change does, for whoever reads CHANGELOG.md later>
 
-### Who is this for
+### Significance
 
-| Tier | Significance | Why |
-|---|---|---|
-| 0 | - | - |
+#### Tier 0
+
+<why it matters to this repo's own developers>
+
+Score: <1-5>
+
+Is this change also relevant to colleagues and employers? Then continue to Tier 1.
+If not, stop here and move on to the next section.
 
 ### Type of change
 
 Feat
 ```
+
+**Work down the tiers, and stop where the answer is no.** Tier 0 can always be filled in — every change
+matters to the people who maintain this repo, if only a little. Each section ends by asking whether there
+is a next one:
+
+| section | who notices | add it when |
+|---|---|---|
+| `#### Tier 0` | this repo's own developers | always |
+| `#### Tier 1` | colleagues and employers | the change gives the project something, not just the code |
+| `#### Tier 2` | the people who consume this product | a consumer would notice |
+
+Each section carries **why it matters at that reach**, then **`Score: N`** — 1 to 5 against the rubric
+`new-branch` prints when it writes the file. The tier decides which release documents the entry appears
+in; the score decides where in each of them it sits.
 
 **Four things about this shape, each of which someone has got wrong before:**
 
@@ -42,14 +61,15 @@ Feat
   a date written now would be the branch's birth date rather than its landing date.
 - **Nothing may use `##` or `###` inside the body.** A `##` becomes a *separate change* the moment the
   fold pastes this into `CHANGELOG.md` — one that declares no impact, so it reads as tier 0 — and a
-  `###` collides with the three named sections above, truncating whichever one it lands in. Use `####`
-  or bold. The lint gate checks this.
+  `###` collides with the three named sections, truncating whichever one it lands in. Use `####` or
+  bold. The lint gate checks this. Inside `### Significance` the `####` level is structural, so there it
+  is `Tier 0`, `Tier 1` or `Tier 2` and nothing else.
 - **The three `###` sections are exact.** They are what the parsers look for; a misspelling means the
   entry silently loses that declaration and the gates read nothing.
-- **The impact table is scaffolded at tier 0 with the scores empty**, and that is a question rather than
-  a default. Add a row per tier the change reaches, each with a score from 1 to 5 and a `Why` — the
-  bands are printed by `new-branch` when it writes the file, and the full model is in
-  [`CONTRIBUTING.md`](../CONTRIBUTING.md).
+- **The score is scaffolded empty**, and that is a question rather than a default. Tier 0 is a harmless
+  final answer about *reach*, but any number written into `Score:` for you would be a guess at a
+  ranking — and this repo has measured what a guessed ranking costs. The release cut refuses a release
+  whose tier-1-or-higher entries have not answered.
 
 A worked example, as it looks just before the PR:
 
@@ -61,17 +81,34 @@ A worked example, as it looks just before the PR:
 Agent defs, `agent-shared/`, `.github/` and `.claude/rules/` matched no rule in the scan set — 40 files,
 and a real dead link had been sitting in one of them, seen by nothing.
 
-### Who is this for
+### Significance
 
-| Tier | Significance | Why |
-|---|---|---|
-| 1 | 3 | a dead link in the largest body of prose this repo ships is now caught before it merges |
-| 0 | 2 | four more rules in the scan set; no change to how anyone works |
+#### Tier 0
+
+Four more rules in the scan set; nothing changes in how anyone works.
+
+Score: 2
+
+Is this change also relevant to colleagues and employers? Then continue to Tier 1.
+If not, stop here and move on to the next section.
+
+#### Tier 1
+
+A dead link in the largest body of prose this repo ships is now caught before it merges.
+
+Score: 3
+
+Is this change also relevant to the people who consume this product? Then continue to Tier 2.
+If not, stop here and move on to the next section.
 
 ### Type of change
 
 Fix
 ```
+
+That entry stops at tier 1: nobody outside this repo notices a lint rule, so there is no `#### Tier 2`
+and its absence *is* the answer. That is why this replaced a table — a missing row read as an omission,
+a missing section reads as a decision.
 
 ## Why two files and not one
 
@@ -144,8 +181,8 @@ can never be folded as if it were a change, and folding twice is impossible rath
    `-Force` for this gate**; the dropped mark already is the way past a step that should not be done.
 4. **A step still carrying the scaffold's own placeholder is refused, ticked or not.** Ticking the
    scaffolded first step without replacing it reports a plan as finished that was never written.
-5. **Fill in the entry's impact table before the PR.** How far the change reaches and what it weighs
-   there decides which release documents it appears in and where in them it sits — see
+5. **Fill in the Significance sections before the PR.** How far the change reaches decides which release
+   documents the entry appears in; what it weighs there decides where in each of them it sits — see
    [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 6. **Never edit `CHANGELOG.md` from a branch.** Every branch would be editing the same region of the
    same file; that is the merge conflict this directory exists to avoid.

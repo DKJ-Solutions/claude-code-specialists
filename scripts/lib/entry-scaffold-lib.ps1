@@ -482,6 +482,122 @@ $script:EntryImpactEmptyCell = '-'
 $script:EntrySignificanceMin = 1
 $script:EntrySignificanceMax = 5
 
+# --- THE SHAPE THAT REPLACED THE TABLE (Dave, August 6, 2026) -------------------------------------
+#
+# One '#### Tier N' sub-section per reach the change claims, each carrying why it matters at that reach
+# and then its score. The table is gone because it forced a rectangle onto something that is not always
+# rectangular: not every change HAS a tier 1 or a tier 2, and a missing row reads as an omission while a
+# missing section reads as an answer.
+#
+# THE KEYS STAY FIXED while the prose around them is repo-owned, exactly as the table's column headers
+# were. 'Tier' in the sub-heading and 'Score:' on its own line are what four scripts parse; the routing
+# question underneath is editorial and comes from Get-EntrySignificanceWording.
+#
+# 'Score:' ECHOES THE RETIRED 'Tier: N' LINE ON PURPOSE -- same shape, same position, one fact per line.
+# A reader who knows one knows the other, and a parser for either is the same three characters of regex.
+$script:EntryTierSubLevel   = 4
+$script:EntryTierSubPrefix  = 'Tier'
+$script:EntryScoreLabel     = 'Score:'
+
+$script:EntrySignificanceWordingDefaults = [ordered]@{
+    # One sentence per tier, printed under that tier's score, sending the author to the next one. Written
+    # as a QUESTION with both answers spelled out, because the failure it prevents is silence: an author
+    # who simply stops after tier 0 has not decided that colleagues get nothing out of the change, they
+    # have not been asked. Tier 2 has no successor, so it carries none.
+    Route0 = 'Is this change also relevant to colleagues and employers? Then continue to Tier 1. If not, stop here and move on to the next section.'
+    Route1 = 'Is this change also relevant to the people who consume this product? Then continue to Tier 2. If not, stop here and move on to the next section.'
+    WhyPlaceholder = 'TODO: why this change matters at this reach.'
+}
+
+function Get-EntrySignificanceWording {
+    <#
+        The editorial half of the Significance section -- the routing questions and the why-placeholder --
+        with this repo's answers where scripts/repo-config.ps1 supplies them.
+
+        One getter returning a map rather than three, for the reason Get-BranchFileWording gives: these are
+        document prose read by a human, not markers a gate matches string-for-string, and a repo that
+        translates one translates all of them.
+    #>
+    $out = [ordered]@{}
+    foreach ($key in $script:EntrySignificanceWordingDefaults.Keys) {
+        $out[$key] = $script:EntrySignificanceWordingDefaults[$key]
+    }
+    if (Get-Command Get-EntrySignificanceWordingOverrides -ErrorAction SilentlyContinue) {
+        $override = Get-EntrySignificanceWordingOverrides
+        if ($override) {
+            foreach ($key in @($out.Keys)) {
+                $v = $null
+                if ($override -is [System.Collections.IDictionary]) {
+                    if (-not $override.Contains($key)) { continue }
+                    $v = $override[$key]
+                } elseif ($override.PSObject.Properties[$key]) {
+                    $v = $override.PSObject.Properties[$key].Value
+                } else { continue }
+                if ($v) { $out[$key] = $v }
+            }
+        }
+    }
+    return [pscustomobject]$out
+}
+
+function Format-EntrySignificanceSections {
+    <#
+        The Significance section's body as an array of LINES: one '#### Tier N' block per row, LOWEST tier
+        first, each with its why, its 'Score: N' line and -- for tier 0 and 1 -- the question routing the
+        author to the next tier.
+
+        LOWEST FIRST, which is the opposite of the table it replaces. The table listed the furthest reach
+        at the top because that is what decided the entry's position in the changelog. These sections are
+        walked by a person filling them in, and that walk starts at tier 0: it is the one every change can
+        answer, and each answer decides whether there is a next one. Ordering the document against the
+        order it is written in would put the routing questions in reverse.
+
+        Called with no rows it renders the SCAFFOLD: tier 0 alone, its why a placeholder and its score
+        EMPTY. Tier 0 is the honest default claim -- reaches nobody outside this repo -- while a scaffolded
+        SCORE would be a guess at a ranking, which is the failure the retired highlights marker was
+        measured on.
+
+        One formatter for the writer and any migration, so the parser below can never meet a shape nothing
+        here produced.
+    #>
+    param($Rows = @())
+    $w      = Get-EntrySignificanceWording
+    $hashes = '#' * $script:EntryTierSubLevel
+    $routes = @{ 0 = $w.Route0; 1 = $w.Route1 }
+
+    $ordered = @(@($Rows) | Sort-Object -Property @{Expression = { [int]$_.Tier }; Descending = $false})
+    if ($ordered.Count -eq 0) {
+        $ordered = @([pscustomobject]@{ Tier = 0; Score = 0; Why = '' })
+    }
+
+    $lines = New-Object System.Collections.Generic.List[string]
+    for ($i = 0; $i -lt $ordered.Count; $i++) {
+        $row  = $ordered[$i]
+        $tier = [int]$row.Tier
+        if ($i -gt 0) { $lines.Add('') }
+        $lines.Add("$hashes $($script:EntryTierSubPrefix) $tier")
+        $lines.Add('')
+        $why = if ($row.PSObject.Properties['Why'] -and $row.Why) { [string]$row.Why } else { $w.WhyPlaceholder }
+        foreach ($line in ($why -split '\r?\n')) { $lines.Add($line) }
+        $lines.Add('')
+        # An unscored row writes the label with nothing after it -- a question left standing rather than a
+        # number nobody chose. Get-EntryImpactFindings is what refuses it before the PR.
+        $score = if ($row.PSObject.Properties['Score'] -and [int]$row.Score -gt 0) { ' ' + [string][int]$row.Score } else { '' }
+        $lines.Add($script:EntryScoreLabel + $score)
+        # EVERY tier 0 and tier 1 section closes with it, including one that already has its successor
+        # below it (Dave: "het kopje sluit altijd af met"). An earlier draft wrote it only under the last
+        # section, on the grounds that a tier whose successor exists has already been answered. That is
+        # true of the author and false of the reader: the entry is walked again at the fold, at the cut and
+        # in the record, and a question that disappears once answered leaves the next reader unable to see
+        # that it WAS asked. Tier 2 has no successor and therefore carries none.
+        if ($routes.ContainsKey($tier)) {
+            $lines.Add('')
+            $lines.Add($routes[$tier])
+        }
+    }
+    return @($lines.ToArray())
+}
+
 # THE RUBRIC -- the definition of each level, and the reason the number is a measurement. Every band is
 # written as a TEST rather than a feeling ("must act", "noticed within a day"), so two people scoring the
 # same change land on the same band and a reviewer can disagree with a specific claim instead of with a
@@ -626,6 +742,118 @@ function Format-EntryImpactTable {
     return $lines
 }
 
+function Read-EntryTierSections {
+    <#
+        Private: the '#### Tier N' sub-sections in an already-defenced, already-split entry. Returns an
+        object with Rows (the same shape the table produces -- Tier, Score, Why, Raw, Error) and Errors.
+        Both empty means the entry carries no sections at all, which is what sends Resolve-EntryImpact on
+        to the older shapes.
+
+        AN OBJECT RATHER THAN A [ref] PARAMETER, and that is a bug fix rather than taste. The first version
+        took `[ref]$result.Errors` -- a reference to a property of a pscustomobject -- and assigning through
+        it silently wrote to a copy: every malformed section parsed, reported nothing, and the entry fell
+        through to the legacy reader as an undeclared tier 0. Exactly the class of failure this parser
+        exists to prevent, in the parser itself. Caught by the three malformed-input tests on their first
+        run; a [ref] over a plain variable would have worked, but returning the pair cannot go wrong at all.
+
+        Reporting the faults rather than absorbing them keeps the symmetry with the table: the gates above
+        were written against ITS failures, and a shape that reported its own differently would slip past
+        every one of them.
+
+        WHAT COUNTS AS A FAULT, and each of these is a way to be silently wrong rather than merely untidy:
+
+          * a heading that is not a whole number ('#### Tier two', '#### Tier 1a') -- it would otherwise be
+            no section at all, so the reach it states would vanish;
+          * a score outside the rubric's range, or one that is not a number;
+          * the same tier declared twice, which leaves two different answers to one question.
+
+        A MISSING SCORE IS NOT A FAULT HERE. It is a row with Score 0, exactly as an empty table cell was,
+        and Get-EntryImpactFindings is what decides whether that blocks -- one place, so the fold can go
+        ahead and say so out loud while the release cut refuses.
+    #>
+    param(
+        # BOTH Allow* attributes, like Get-FencedLineFlags: the array is a document split on newlines, so
+        # most of it is blank lines, and a [string[]] without AllowEmptyString rejects the whole call on
+        # the first one (ParameterArgumentValidationErrorEmptyStringNotAllowed). Measured on the first run.
+        [AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines = @()
+    )
+    $hashes  = '#' * $script:EntryTierSubLevel
+    $headRx  = '^\s*' + $hashes + '\s+' + [regex]::Escape($script:EntryTierSubPrefix) + '\s+(\S+)\s*$'
+    $scoreRx = '^\s*' + [regex]::Escape($script:EntryScoreLabel) + '\s*(\S*)\s*$'
+    $range   = Get-EntrySignificanceRange
+
+    $rows = New-Object System.Collections.Generic.List[pscustomobject]
+    $errs = @()
+    $seen = @{}
+
+    $i = 0
+    while ($i -lt $Lines.Count) {
+        if ($Lines[$i] -notmatch $headRx) { $i++; continue }
+        $raw      = $Lines[$i].Trim()
+        $tierCell = $Matches[1]
+        $i++
+
+        # The section runs to the next heading of ANY level -- the next tier, the next '###' section, or the
+        # next entry. Anything deeper than this level would be a sub-heading of this section and is kept.
+        $whyLines = New-Object System.Collections.Generic.List[string]
+        $scoreCell = $null
+        while ($i -lt $Lines.Count) {
+            $line = $Lines[$i]
+            if ($line -match ('^\s*#{1,' + $script:EntryTierSubLevel + '}\s')) { break }
+            if ($null -eq $scoreCell -and $line -match $scoreRx) { $scoreCell = $Matches[1] }
+            elseif ($null -eq $scoreCell) { $whyLines.Add($line) }
+            $i++
+        }
+
+        if ($tierCell -notmatch '^\d+$') {
+            $errs += "significance section '$raw' does not name a tier -- write a whole number from 0 to $(Get-EntryTierMax)."
+            continue
+        }
+        $tier = [int]$tierCell
+        if ($tier -gt (Get-EntryTierMax)) {
+            $errs += "significance section '$raw' names tier $tier, which this model has no meaning for -- the highest is $(Get-EntryTierMax)."
+            continue
+        }
+        if ($seen.ContainsKey($tier)) {
+            $errs += "significance section '$raw' declares tier $tier a second time -- one section per tier, or two answers stand for one question."
+            continue
+        }
+        $seen[$tier] = $true
+
+        $score = 0
+        if ($scoreCell -and $scoreCell -ne $script:EntryImpactEmptyCell) {
+            if ($scoreCell -notmatch '^\d+$') {
+                $errs += "'$($script:EntryScoreLabel) $scoreCell' under tier $tier is not a number -- write $($range.Min) to $($range.Max)."
+            } elseif ([int]$scoreCell -lt $range.Min -or [int]$scoreCell -gt $range.Max) {
+                $errs += "'$($script:EntryScoreLabel) $scoreCell' under tier $tier is outside the rubric -- write $($range.Min) to $($range.Max)."
+            } else {
+                $score = [int]$scoreCell
+            }
+        }
+
+        # The routing question is this format's own prose, not the author's answer, so it must not become
+        # the Why -- it would otherwise be published as the reason the change matters.
+        $w = Get-EntrySignificanceWording
+        $routes = @($w.Route0, $w.Route1) | Where-Object { $_ }
+        $why = (@($whyLines | Where-Object {
+            $t = $_.Trim()
+            if (-not $t) { return $false }
+            foreach ($r in $routes) { if ($t -eq ([string]$r).Trim()) { return $false } }
+            return $true
+        }) -join "`n").Trim()
+
+        $rows.Add([pscustomobject]@{
+            Tier  = $tier
+            Score = $score
+            Why   = $why
+            Raw   = $raw
+            Error = $null
+        })
+    }
+
+    return [pscustomobject]@{ Rows = @($rows.ToArray()); Errors = @($errs) }
+}
+
 function Resolve-EntryImpact {
     <#
         Pure: reads an entry's impact declaration. Returns an object with
@@ -639,10 +867,12 @@ function Resolve-EntryImpact {
           Declared  $true when the reach was actually stated (a table with rows, or a 'Tier:' line).
           Errors    every row-level complaint, ready to print; empty when the table parses.
 
-        FALLS BACK TO 'Tier: N', and that fallback is not legacy tolerance -- it is correctness for the
-        entries that already exist. Every entry in CHANGELOG.md and in every consumer's tree predates this
-        table, and reading them as tier 0 would silently empty a release. So no table means: read the old
-        line, report no scores, and let the gates decide whether scores were required.
+        THREE SHAPES ARE READ, ONE IS WRITTEN. In order: the '#### Tier N' sub-sections (current), the
+        impact table (August 5-6, 2026), and the 'Tier: N' line (before that). That is not legacy
+        tolerance, it is correctness for the entries that already exist -- CHANGELOG.md holds all three
+        right now, every consumer's tree holds at least one, and they reach each new parser through a
+        plugin update rather than by choosing to. A parser that knew only the newest shape would read all
+        the others as tier 0: silent, correct-looking, and wrong in the direction that empties a release.
 
         FENCE-AWARE, AND THE FIRST TABLE OUTSIDE A FENCE WINS. An entry documenting this mechanism quotes
         the table inside a fence -- the entry for this very change does, and so does this file -- and a
@@ -664,6 +894,26 @@ function Resolve-EntryImpact {
 
     $body = Get-EntryTextOutsideFences -EntryText $EntryText
     $lines = @($body -split '\r?\n')
+
+    # SHAPE 1, the current one: '#### Tier N' sub-sections. Tried first, so an entry that carries both --
+    # a migration, or an entry documenting the change from one to the other outside a fence -- is read as
+    # what it IS rather than as what it describes.
+    $sections = Read-EntryTierSections -Lines $lines
+    # ERRORS COUNT AS "this entry used the section shape" just as rows do. An entry whose every section is
+    # malformed has zero rows, and falling through on that would send it to the legacy reader, which finds
+    # nothing and returns an undeclared tier 0 -- the complaints discarded, the defect invisible.
+    if (@($sections.Rows).Count -gt 0 -or @($sections.Errors).Count -gt 0) {
+        $result.Table = $true
+        $result.Rows = @($sections.Rows)
+        $result.Errors = @($sections.Errors)
+        $declared = @($sections.Rows | Where-Object { $null -eq $_.Error })
+        if ($declared.Count -gt 0) {
+            $result.Declared = $true
+            $result.Tier = (@($declared | ForEach-Object { [int]$_.Tier }) | Measure-Object -Maximum).Maximum
+        }
+        return $result
+    }
+
     $headerPattern = '^\s*\|\s*' + [regex]::Escape($script:EntryImpactHeaders[0]) + '\s*\|\s*' +
         [regex]::Escape($script:EntryImpactHeaders[1]) + '\s*\|'
 
@@ -673,7 +923,7 @@ function Resolve-EntryImpact {
     }
 
     if ($start -lt 0) {
-        # No table: the pre-table shape. Read what those entries do carry.
+        # Neither shape: the pre-table one. Read what those entries do carry.
         $legacy = Resolve-EntryTier -EntryText $EntryText
         $result.Tier = $legacy.Tier
         $result.Declared = $legacy.Declared
@@ -916,9 +1166,20 @@ function Remove-EmptyImpactSection {
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
 
-    $heading = (Get-EntrySectionHeadings)['Who']
-    if ([string]::IsNullOrWhiteSpace($heading)) { return $EntryText }
-    $headingRx = '^#{' + (Get-EntrySectionLevel) + '}\s+' + [regex]::Escape($heading) + '\s*$'
+    # THE CURRENT HEADING AND EVERY RETIRED ONE. The key was 'Who' until the section became 'Significance'
+    # hours after this function was written, and an [ordered] lookup on a key that no longer exists returns
+    # $null rather than throwing -- so the guard below took the early exit and this function silently did
+    # nothing, restoring the empty-section defect it had just been written to fix. Caught by its own tests;
+    # it would otherwise have reached a consumer's plugin cache exactly as the original did.
+    #
+    # The retired names matter for the same reason they matter to the lint: an entry written under the old
+    # heading still carries a table, and stripping that table has to take the old heading with it or the
+    # hole simply moves to the older entries.
+    $headings = @((Get-EntrySectionHeadings)['Significance']) + @(Get-EntryRetiredSectionHeadings) |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    if (@($headings).Count -eq 0) { return $EntryText }
+    $headingRx = '^#{' + (Get-EntrySectionLevel) + '}\s+(?:' +
+        ((@($headings) | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')\s*$'
 
     $pair = Get-EntryLineFlagPairs -EntryText $EntryText
     $parts = $pair.Parts
@@ -947,6 +1208,78 @@ function Remove-EmptyImpactSection {
         $kept.Add($parts[$i] + $sep)
     }
     return ($kept -join '')
+}
+
+function Remove-EntryTierSections {
+    <#
+        Removes the '#### Tier N' sub-sections -- heading, why, score and routing question -- from an entry
+        block, leaving the '### Significance' heading above them standing.
+
+        THE HEADING GOES TOO WHEN NOTHING IS LEFT UNDER IT, via the same Remove-EmptyImpactSection the
+        table remover calls. That behaviour was measured on the shape this one replaces: leaving the heading
+        standing shipped a named question with no answer under it into 17 sections per release card, 17 per
+        per-plugin CHANGELOG and 16 in the highlights draft, in exactly the documents that travel to a
+        consumer. The sub-sections inherit the finding because they inherit the position -- they ARE the
+        section's content, so removing them empties it in precisely the same way.
+
+        EVERY section is removed, not just the first -- unlike the table remover, which stops after one. A
+        table appeared once by construction; tiers come in threes, and stopping at the first would publish
+        the other two at a consumer, which is the exact thing this stripping exists to prevent.
+
+        Fence-aware through the shared reader, for the reason every reader here is: an entry documenting
+        this format quotes these headings, and this repo's own README does.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
+
+    $hashes = '#' * $script:EntryTierSubLevel
+    $headRx = '^\s*' + $hashes + '\s+' + [regex]::Escape($script:EntryTierSubPrefix) + '\s+\S+\s*$'
+
+    $pair = Get-EntryLineFlagPairs -EntryText $EntryText
+    $parts = $pair.Parts
+    $out = New-Object System.Collections.Generic.List[string]
+    $inSection = $false
+    $any = $false
+    $n = -1
+    for ($i = 0; $i -lt $parts.Count; $i++) {
+        if ($i % 2 -eq 1) { continue }
+        $n++
+        $line = $parts[$i]
+        $sep = if ($i + 1 -lt $parts.Count) { $parts[$i + 1] } else { '' }
+
+        if ($pair.Fenced[$n]) {
+            # A fence cannot sit inside a section being dropped without its opening marker having been
+            # dropped too, so reaching one means the section ended at a heading we already honoured.
+            $inSection = $false
+        } else {
+            if ($line -match $headRx) { $inSection = $true; $any = $true; continue }
+            if ($inSection) {
+                # Any heading at this level or shallower closes the section -- the next tier, the next
+                # '###', or the next entry. It is kept; only the sub-sections themselves go.
+                if ($line -match ('^\s*#{1,' + $script:EntryTierSubLevel + '}\s')) { $inSection = $false }
+                else { continue }
+            }
+        }
+        $out.Add($line + $sep)
+    }
+    $t = ($out -join '')
+    if (-not $any) { return $t }
+    $t = [regex]::Replace($t, '(\r?\n)\1\1+', '$1$1')
+    return (Remove-EmptyImpactSection -EntryText $t)
+}
+
+function Remove-EntrySignificanceDeclaration {
+    <#
+        Strips whatever shape this entry declared its significance in -- the '#### Tier N' sub-sections, the
+        impact table, or both if a migrating entry carries both.
+
+        ONE ENTRY POINT FOR THE OUTWARD-FACING RENDERERS, which is the whole reason it exists. Those
+        renderers ask one question -- "take the self-assigned numbers out before a consumer sees them" --
+        and they must not have to know which of three shapes this particular entry used. release-lib calls
+        this; the two removers underneath it stay separate because each is independently testable and the
+        table one is still the only thing that understands a table.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
+    return (Remove-EntryImpactTable -EntryText (Remove-EntryTierSections -EntryText $EntryText))
 }
 
 function Get-ImpactInsertOffset {
@@ -1078,9 +1411,15 @@ function Get-ImpactInsertOffset {
 # doing three jobs at once. As its own section it is stated rather than inferred, and the heading is reduced
 # to what a reader scans: the PR number and the title.
 #
-# WHY 'Who is this for' IS THE TABLE AND NOT PROSE BESIDE IT. The table's Tier rows already answer exactly
-# that question, and answering it twice is the duplication this repo has paid for repeatedly. So the heading
-# names the question and the table is the answer.
+# 'Significance', AND IT IS SUB-SECTIONS RATHER THAN A TABLE (Dave, August 6, 2026). It was
+# 'Who is this for' holding an impact table, one row per tier. The table went because it forced a shape onto
+# something that is not always rectangular: NOT EVERY CHANGE HAS A TIER 1 OR A TIER 2, and a table makes the
+# absence of a row look like an omission rather than an answer. As '#### Tier N' sub-sections, a change that
+# reaches nobody outside this repo simply has one section -- which is a complete statement, not a gap.
+#
+# The heading also stopped naming an audience, because the section no longer answers "who": each sub-section
+# names its own audience by its number, and what the section as a whole carries is how much the change WEIGHS
+# for each of them.
 #
 # THE HEADINGS ARE REPO-OWNED, unlike the impact table's column keys. That split follows the one this file
 # already makes: a machine-read KEY stays fixed ('Tier', 'Significance', 'Plugins:'), while text a reader
@@ -1088,9 +1427,29 @@ function Get-ImpactInsertOffset {
 # the category labels configurable. These are read back by the parser, so a repo that translates them
 # translates both halves at once, which is why they come from one resolver rather than being written twice.
 $script:EntrySectionDefaults = [ordered]@{
-    What = 'What does this change do?'
-    Who  = 'Who is this for'
-    Type = 'Type of change'
+    What         = 'What does this change do?'
+    Significance = 'Significance'
+    Type         = 'Type of change'
+}
+
+# RECOGNISED, NEVER WRITTEN -- the section headings this format has retired. Measured the moment
+# 'Who is this for' became 'Significance': all 24 entries pending in CHANGELOG.md carry the old name, and
+# the lint's section check reported every one of them as a MISSPELLED heading, which is its most alarming
+# finding ("costs that entry its declaration silently"). Twenty-four false accusations is how a check gets
+# switched off. Every consumer's changelog and every branch in flight is in the same position, and they
+# reach the renamed heading through a plugin update rather than by choosing to.
+#
+# Deliberately not repo-configurable: these are historical strings, so there is nothing to choose about
+# them, and a repo that translated the heading translated the CURRENT one -- their old name lives in their
+# own documents, which is why a name-matcher accepts the seam's value AND these.
+$script:EntryRetiredSectionHeadings = @(
+    'Who is this for'
+)
+
+function Get-EntryRetiredSectionHeadings {
+    <# Section headings that were once written and are still recognised. A name-matcher accepts these
+       alongside Get-EntrySectionHeadings' values; a WRITER must never use them. #>
+    return @($script:EntryRetiredSectionHeadings)
 }
 
 # The heading levels, stated once. An entry is an H2 and its sections are H3 -- in the entry FILE and in
@@ -1143,7 +1502,7 @@ function Get-EntrySectionHeadings {
 function Get-EntrySectionHeading {
     <# One section's full heading line, e.g. '### Type of change'. One formatter, so the writer and the
        parser cannot disagree about the level or the spacing. #>
-    param([Parameter(Mandatory)][ValidateSet('What', 'Who', 'Type')][string]$Key)
+    param([Parameter(Mandatory)][ValidateSet('What', 'Significance', 'Type')][string]$Key)
     $headings = Get-EntrySectionHeadings
     return ('#' * $script:EntrySectionLevel) + ' ' + $headings[$Key]
 }
@@ -1160,7 +1519,7 @@ function Get-EntrySectionBody {
     #>
     param(
         [Parameter(Mandatory)][AllowEmptyString()][string]$EntryText,
-        [Parameter(Mandatory)][ValidateSet('What', 'Who', 'Type')][string]$Key
+        [Parameter(Mandatory)][ValidateSet('What', 'Significance', 'Type')][string]$Key
     )
     $wanted = (Get-EntrySectionHeadings)[$Key]
     if (-not $wanted) { return '' }
@@ -1325,9 +1684,9 @@ function Format-EntryBlock {
     $lines.Add('')
     foreach ($line in ($Body -split '\r?\n')) { $lines.Add($line) }
     $lines.Add('')
-    $lines.Add((Get-EntrySectionHeading -Key 'Who'))
+    $lines.Add((Get-EntrySectionHeading -Key 'Significance'))
     $lines.Add('')
-    foreach ($line in (Format-EntryImpactTable -Rows $ImpactRows)) { $lines.Add($line) }
+    foreach ($line in (Format-EntrySignificanceSections -Rows $ImpactRows)) { $lines.Add($line) }
     $lines.Add('')
     $lines.Add((Get-EntrySectionHeading -Key 'Type'))
     $lines.Add('')

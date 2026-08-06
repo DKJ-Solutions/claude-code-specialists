@@ -1157,7 +1157,11 @@ Write-Coverage -Category 'record-query' -Checked $irChecked `
 $ehChecked = 0
 $ehEntryLevel   = Get-EntryHeadingLevel
 $ehSectionLevel = Get-EntrySectionLevel
-$ehSectionNames = @((Get-EntrySectionHeadings).Values)
+# The current names PLUS the retired ones. Without the second half this check reports every entry
+# written before a heading was renamed as a MISSPELLED section -- its most alarming finding, and its
+# least true. Measured when 'Who is this for' became 'Significance': 24 pending entries in this repo's
+# own CHANGELOG.md, all accused at once, which is how a check gets switched off rather than heeded.
+$ehSectionNames = @((Get-EntrySectionHeadings).Values) + @(Get-EntryRetiredSectionHeadings)
 # At or above the entry's own level: '#' .. '##' while an entry is an H2.
 $ehTooHighRx = '^#{1,' + $ehEntryLevel + '}\s'
 $ehSectionRx = '^#{' + $ehSectionLevel + '}\s+(.+?)\s*$'

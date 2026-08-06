@@ -24,8 +24,9 @@ rewrite when copying. Managing branches, PRs, and merges up to and including the
 `CHANGELOG.md` (repo root) is an **intro followed by one `##` per change, with no section headings at all**
 (Dave, August 5, 2026). A change *is* the `##`, and its heading is **just the title** —
 `## A significance score per entry, and the order follows it`. Under it, three `###` sections answer what a
-reader arrives with: `What does this change do?`, `Who is this for` (the
-impact table) and `Type of change`. Everything above the first `##` is the intro, which is the only part a
+reader arrives with: `What does this change do?`, `Significance` (one `#### Tier N`
+sub-section per reach the change claims — August 6, 2026, replacing the impact table, because not every
+change has a tier 1 or a tier 2 and a missing row read as an omission) and `Type of change`. Everything above the first `##` is the intro, which is the only part a
 repo writes by hand and the only thing a cut leaves standing.
 
 **Two sections went in the same movement, and each for a measured reason.**
