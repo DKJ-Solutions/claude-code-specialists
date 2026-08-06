@@ -469,11 +469,48 @@ Assert-Equal 0 @(Get-EntryImpactFindings -EntryText (New-ImpactEntry -Rows '| 0 
 
 # --- Stripping ------------------------------------------------------------------------------------
 $stripped = Remove-EntryImpactTable -EntryText $twoRow
-Assert-True ($stripped -notmatch 'Significance') 'strip: the table is gone from an outward-facing rendering'
+Assert-True ($stripped -notmatch '\| Tier \| Significance \| Why \|') 'strip: the table is gone from an outward-facing rendering'
 Assert-True ($stripped -match 'Body\.') 'and the body survives'
 Assert-True ($stripped -notmatch "`n`n`n") 'and no triple blank line is left behind'
 # A quoted table must survive stripping too, or rendering damages the entry that documents the mechanism.
 Assert-True ((Remove-EntryImpactTable -EntryText $fence) -match 'quoted') 'strip: a fenced table is left alone'
+
+# --- THE SECTION HEADING GOES WITH THE TABLE ------------------------------------------------------
+# The fixture above puts the table bare under the entry heading, which is the pre-#467 shape and the reason
+# this went unnoticed: in a REAL entry the table sits under its own '### Who is this for'. Stripping the
+# table and keeping that heading left a named question with no answer under it, in every entry of every
+# document that travels outward -- 17 per release card at v3.6.0, caught by -NoPush and not by these tests.
+$sect = Get-EntrySectionHeadings
+$h    = '#' * (Get-EntrySectionLevel)
+function New-SectionedEntry {
+    param([string]$SignificanceBody = "| Tier | Significance | Why |`n|---|---|---|`n| 2 | 4 | consumers |")
+    return "## A title`n`n$h $($sect['What'])`n`nBody paragraph.`n`n$h $($sect['Significance'])`n`n$SignificanceBody`n`n$h $($sect['Type'])`n`nFix`n"
+}
+$sectioned = Remove-EntryImpactTable -EntryText (New-SectionedEntry)
+Assert-True ($sectioned -notmatch [regex]::Escape($sect['Significance'])) 'strip: the section heading goes with the table it introduced'
+Assert-True ($sectioned -match [regex]::Escape($sect['Type'])) 'and the section after it survives'
+Assert-True ($sectioned -match [regex]::Escape($sect['What'])) 'and so does the one before it'
+Assert-True ($sectioned -match 'Body paragraph\.') 'and the description is untouched'
+Assert-True ($sectioned -match "Body paragraph\.`r?`n`r?`n$h ") 'and exactly one blank line separates the paragraph from the next heading'
+Assert-True ($sectioned -notmatch "`n`n`n") 'and no triple blank line is left behind'
+
+# THE HEADING ONLY GOES WHEN THE SECTION IS ACTUALLY EMPTY. The convention is that the table is the whole
+# answer, but a strip that deletes a heading on the strength of a convention deletes somebody's prose the
+# first time they write some -- so the emptiness is checked rather than assumed.
+$withProse = Remove-EntryImpactTable -EntryText (New-SectionedEntry -SignificanceBody "| Tier | Significance | Why |`n|---|---|---|`n| 2 | 4 | consumers |`n`nAnd a sentence the author added.")
+# Matched on the table's HEADER ROW, not on the word 'Significance': that word is now the section heading
+# too, so a bare word match reports the heading as a surviving table and passes for the wrong reason.
+Assert-True ($withProse -notmatch '\| Tier \| Significance \| Why \|') 'strip: the table still goes when the section holds prose as well'
+Assert-True ($withProse -match [regex]::Escape($sect['Significance'])) 'but the heading stays, because the section is not empty'
+Assert-True ($withProse -match 'And a sentence the author added\.') 'and the prose is untouched'
+
+# An entry that QUOTES the section heading inside a fence keeps the quoted copy: the entries documenting
+# this format do exactly that, and this is the fifth matcher in this lib that has to tell a use from a
+# mention.
+$quotedHeading = "## A title`n`n$h $($sect['What'])`n`nIt looks like this:`n`n``````text`n$h $($sect['Significance'])`n``````\n`n$h $($sect['Significance'])`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 3 | colleagues |`n`n$h $($sect['Type'])`n`nDocs`n"
+$quotedOut = Remove-EntryImpactTable -EntryText $quotedHeading
+Assert-Equal 1 ([regex]::Matches($quotedOut, [regex]::Escape($sect['Significance'])).Count) 'strip: the fenced copy of the heading survives while the real one goes'
+Assert-True ($quotedOut -notmatch '\| Tier \| Significance \| Why \|') 'and the real table is still removed'
 
 # --- ONE FENCE READER, AND THE TILDE FORM IT USED NOT TO KNOW -------------------------------------
 # There were FOUR fence walks across the two libs: Get-FencedLineFlags in release-lib, a second named one
@@ -735,7 +772,12 @@ $sigBlock = (Format-EntryBlock -Title 'T' -Type 'Feat' -Body 'body text' -Impact
 $sigStripped = Remove-EntrySignificanceDeclaration -EntryText $sigBlock
 Assert-True (-not ($sigStripped -match '#### Tier')) 'stripped: every tier section is gone, not just the first'
 Assert-True (-not ($sigStripped -match '(?m)^Score:')) 'stripped: and the scores with them -- a self-assigned number at a consumer is a marketing claim'
-Assert-True ($sigStripped -match [regex]::Escape((Get-EntrySectionHeading -Key 'Significance'))) 'stripped: the section heading stays, because the renderers lay out around it'
+# THE HEADING GOES WITH THEM, and this assert is inherited rather than invented: leaving it standing was
+# measured on the table this shape replaced, shipping a named question with nothing under it into 17
+# sections per release card. The sub-sections ARE the section's content, so removing them empties it the
+# same way.
+Assert-True (-not ($sigStripped -match [regex]::Escape((Get-EntrySectionHeading -Key 'Significance')))) 'stripped: the section heading goes with them, or a consumer reads a question with no answer'
+Assert-True ($sigStripped -match [regex]::Escape((Get-EntrySectionHeading -Key 'Type'))) 'stripped: and a section that still has content keeps its heading'
 Assert-True ($sigStripped -match 'body text') 'stripped: the entry itself is untouched'
 # One call, three shapes: a migrating entry carrying both must come out clean.
 $mixed = $sigBlock + "`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 2 | leftover |`n"

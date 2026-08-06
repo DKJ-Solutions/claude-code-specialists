@@ -4,6 +4,1140 @@ Consumer-facing history of this plugin: per release, the changes that touched th
 Automatically appended by `cut-release.ps1` of the marketplace repo (claude-code-specialists); the
 full repository history lives there in `CHANGELOG.md` and `releases/`.
 
+## v3.6.0 — 2026-08-06
+
+### Every change is an H2 with three named sections, and the tier sections are gone
+
+#### What does this change do?
+
+`CHANGELOG.md` drops every `##` section heading. `## Latest Release` and the three
+`## Tier N - Pull Requests` sections are gone; a change **is** the `##` heading now, and inside it three
+`###` sections answer the questions a reader arrives with:
+
+```text
+## #475 · A significance score per entry, and the order follows it
+
+### What does this change do?
+
+…the description…
+
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 4 | … |
+| 1 | 4 | … |
+
+### Type of change
+
+Feat
+
+[PR #475](https://github.com/DaveKJohn/claude-code-specialists/pull/475) · merged 2026-08-05
+```
+
+`Plugins:` and the PR line stay **plain lines**: a heading around one fact is more structure than content,
+and `Plugins:` is machine-read by the cut. Dave, August 5, 2026.
+
+**The three tier sections lasted one day, and removing them takes nothing away.** They said exactly one
+thing — how far each change reaches — and since [#467](https://github.com/DaveKJohn/claude-code-specialists/issues/467)
+the entries say that themselves, in a table that also carries what the change is *worth*. So what the
+headings did visually is kept as the **ordering**: furthest reach first, and within a tier the highest
+significance first. The fold is the only moment that order can be decided, because the cut empties the
+list — whatever order the fold leaves is what the release documents inherit, with nothing re-estimated
+days later.
+
+**The release block goes entirely**, and the reason is measured rather than aesthetic. It had grown to
+**434 of the changelog's 1,062 lines** across 72 blocks that each said no more than "see the notes", while
+[`releases/README.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/releases/README.md) already listed every one of those 72 versions with a date, a
+type and a descriptive title — the same coverage, verified in both directions, and richer per row. The
+intro now carries a one-line pointer to that page, and a cut writes nothing at all: it empties the document
+down to its intro, which passes through verbatim, so whatever a repo says about itself up there survives
+every cut in whatever language it wrote it.
+
+**The release documents follow the same flat shape, and that deletion is the point.** The category grouping
+is gone, with `Format-CategorizedEntries`, the category labels and the `Get-ReleaseCategoryTitles` seam. It
+grouped on the **branch prefix**, which this repo has measured does not predict impact — at v3.2.0 the
+single most consequential change for a consumer arrived on a `chore/` branch — so a document's most
+important change was filed third under whichever label its prefix produced, and #467's ranking could only
+reorder the categories, not escape them. Each change states its own type inside itself now.
+
+Six seams retire: `Get-ChangelogTierHeadings` and the legacy `Get-ChangelogHeading` (#178) named section
+headings the document no longer has; `Get-ReleaseCategoryTitles` labelled the categories;
+`Get-ReleaseLiveMarker`, `Get-ReleaseHistoryMode` and `Get-ChangelogReleaseWording` (#462) all described the
+release block. A consumer that still defines one is unaffected — nothing calls them. **What #462's
+non-English consumer loses is stated rather than glossed over:** the capability is not withdrawn, the
+*output* is gone, and what replaced it is hand-written prose in a file they own outright.
+
+##### The two defects this found, both silent and neither reported by a test
+
+**A consumer's release history would have been published as a "change" and then deleted.** Found by probing
+a synthetic consumer while scoring this entry, not by a failing suite. Every `##` below the intro is read as
+one change now, and a document still carrying the pre-flat shape has headings at exactly that level —
+reached through a plugin update rather than by that repo's choosing. Measured: `## Pull Requests` parsed as
+ONE entry swallowing every real entry and `## Releases` as a second, so the whole release history went
+outward into the notes and the per-plugin CHANGELOGs and was then removed from `CHANGELOG.md`, because the
+cut keeps only the intro. **And nothing refused** — blocks like that declare no impact, so the bump gate
+read the repo as never having adopted the model and reported itself inactive, correctly by its own rule.
+`Split-Changelog` now refuses before returning anything, naming each block and the migration. The
+discriminator is exact rather than a heuristic: the format has two legitimate shapes and both declare
+something — the three named sections, or a pre-format entry's type in its heading — while a section heading
+carries neither and cannot. Deliberately not keyed on the `#NN` the fold prepends, because the fold writes a
+legitimate numberless entry when `gh` is unreachable.
+
+**The lint gate had stopped recognising entry files at all.** `Test-IsChangelogEntryFile` in
+`check-plugin-integrity.ps1` still looked for `^###\s`, with a comment explaining that restating the level
+rather than importing it was deliberate — importing meant dot-sourcing the fold script, which would run a
+release action to answer a lint question. Sound reasoning whose conclusion went stale the moment the entry
+format moved into `entry-scaffold-lib.ps1`, a pure lib that file already loads. So since the format landed,
+check 13 silently judged nothing and reported clean, and check 11 stopped excluding entry files from its
+scan set.
+
+##### Five reversals the plan did not carry, all for one reason
+
+The section heading was the thing that used to state an entry's reach.
+
+- **The `Tier: N` line is KEPT, not consumed.** With no heading above the entry, stripping it leaves the
+  entry declaring nothing, and every downstream reader takes that as tier 0 — silent, correct-looking, and
+  wrong in the direction that empties a release document. `Remove-EntryTierLine`'s caller moved to the
+  outward renderers instead, beside `Remove-EntryImpactTable`: the line now reaches `CHANGELOG.md`, which
+  puts a self-assigned tier on the path to a consumer's plugin cache unless it is dropped there.
+- **A pre-format `###` entry file is PROMOTED to `##` as it folds**, outside the PR block. An `###` in a
+  flat list of `##`s is not an entry boundary, so it would be absorbed into the block above and inherit that
+  block's PR link. Doing it inside the PR block — where the `#NN` prepend lives — would have skipped it
+  silently for a manual merge or an unreachable `gh`. Not hypothetical: a branch parked on the remote
+  carried exactly such a file.
+- **`Test-EntrySignificanceActive` had to be repaired in the same commit, and this was a landmine.** It
+  answered "off where there is no tier split" by counting the changelog's sections. With no sections that
+  read returns one section in *every* repo, so the scaffold's table, both validators and the cut's
+  significance gate would all have switched themselves **off**, without erroring, in the same commit that
+  made the ranking the document's only ordering. It defaults **on** now, with `Get-EntrySignificanceEnabled`
+  as the opt-out. `Test-ReleaseBumpEarned`'s `Active` flag had the same defect and now keys on whether any
+  pending entry **declared** its impact — a measurement rather than a flag, and one that keeps "declared
+  tier 0" distinct from "declared nothing".
+- **An unscored entry sinks to the BOTTOM of its tier**, not the top. The plan and two comments said the
+  top; the code was right. The loop reads an entry already in the changelog with no score as 0 and sorts it
+  below everything scored at its tier, so a top-insert would rank the same entry differently on either side
+  of the fold.
+- **`Get-ImpactInsertOffset`'s `-Undeclared` switch is gone.** In a flat list there is no unplaced entry:
+  declaring nothing is tier 0, which the loop already lands correctly.
+
+Two refusals disappeared, both structurally rather than by relaxation: **"could not find the heading"**
+(there is no heading name left to mismatch) and **"this repo declares no section for tier N"** (a tier the
+repo does not use is a position, not an error).
+
+##### And the parser recognises both shapes while the writer only writes one
+
+These are *shared* scripts, so a consumer who adopted the tier sections would otherwise get a plugin update
+whose scripts cannot read their own changelog. The **declaration** is read in both shapes (table or
+`Tier: N`) and a pre-format heading's type is still recognised, because every entry in this repo's history
+and in every consumer's tree predates the table and the release notes are regenerated from that history.
+The **structure** is deliberately read in the new shape only: an entry's own `###` sections and a pre-format
+`###` entry heading are indistinguishable, so a parser accepting both would read every entry as four. That
+is what the new refusal exists to say out loud instead of guessing.
+
+##### What was measured, not assumed
+
+- All **26 suites** and all four gates green. `release-lib.tests.ps1` was **rewritten rather than patched**
+  (353 asserts): every fixture in it was the old document shape, and the machinery varying which sections a
+  repo declared tested a seam that is gone. Patching would have left a suite whose fixtures nothing writes,
+  passing by looking at a document that cannot occur. Its `New-FlatEntry` helper has its own shape asserted
+  before the suite uses it — this file has already paid once for a fixture that did not contain what it was
+  written to contain.
+- This repo's own `CHANGELOG.md` is migrated: **6 entries, not the ~25 this branch's own note predicted** —
+  v3.5.0 had already been cut, which is why the repo is read rather than the note. Structural only, with
+  significance cells left **empty**, because filling them in would be exactly the guessed ranking #467
+  removed. Verified with the real parsers: 6 entries read back, the scored one leads, the unscored sink below
+  it in arrival order, and the bump gate reports itself active.
+- Two things that looked like leaks in the outward documents were a **fence-blind probe**: the only
+  survivors sit inside code fences, in the entries that document the format itself, while every real
+  declaration is stripped.
+
+#### Type of change
+
+Feat
+
+[PR #476](https://github.com/DaveKJohn/claude-code-specialists/pull/476) · merged 2026-08-05
+
+---
+
+### The lens scaffold's title carries no (VUL-IN) -- only its slot does
+
+#### What does this change do?
+
+**`specialists-teardown -Apply` would have deleted written repo knowledge, and the dry run pointed at
+the wrong files.** The lens template wrote `(VUL-IN)` into the H1 title *and* the slot heading;
+filling a lens replaces only the slot; and `Test-LooksGenerated` matches `(VUL-IN)` at **any** heading
+level. So the title outlived the filling and a lens somebody had written kept classifying as a
+disposable scaffold — permanently, and more so the longer that repo worked with it. Inbound
+[#451](https://github.com/DaveKJohn/claude-code-specialists/issues/451) measured it in a consumer with
+24 lenses: three filled specialist lenses holding 153 lines between them all printed `[remove]`.
+
+**The fix is the rule this same script already followed 320 lines further down**, for `SPECIALISTS.md`,
+where the code comment spells out the reasoning it was breaking here — *"A (VUL-IN) title would survive
+a filled-in roster and make the teardown delete somebody's work."* The lens template did exactly what
+that comment forbids, for every lens instead of one file. The marker now sits on the slot alone, which
+is also the only thing an unfilled scaffold needs: the slot heading is still there, so an untouched
+lens is still recognised and still removed.
+
+**The dangerous direction was the one that had no test, and the reason is worth keeping.** A filled
+lens was already covered — but that fixture *hand-wrote* its lens, and gave it a title of its own
+(`# 06-16 repo lens`) rather than the title the bootstrap produces. Inventing the boilerplate is what
+made it blind: the only shape that reproduces this defect is the real generated file edited the way a
+consumer edits it. The new test therefore runs the actual bootstrap, replaces only the slot heading,
+and asserts the file survives `-Apply`. Verified by falsification rather than by passing: with the
+marker put back, that assertion fails and the lens is deleted.
+
+**And it is not retroactive, so the instructions carry the other half.** A repo bootstrapped before
+this release keeps a marked title on every lens it fills from here on, and that repo cannot be reached
+from this one. The bootstrap's closing hints and the `specialists-init` skill page now say that filling
+a lens means the marker goes — and that on an older repo it has to come off the **title** too, with the
+one-time sweep to find them. Of the two pairings #451 offered, this is the instructions one; the
+alternative it also suggested — a check reporting "content beyond the boilerplate but still a
+`(VUL-IN)` heading" — is deliberately **not** built here, because the obvious implementation
+misclassifies an *untouched* `SPECIALISTS.md` as authored: that scaffold legitimately contains real
+import lines, so "anything beyond headings and comments" is not boilerplate there. Doing it properly
+means moving the scaffold wording into a shared source both scripts read, which is the
+`Get-ClaudeMdScaffold` pattern and a larger change than this defect needs. The front-matter `filled:`
+key stays with [#237](https://github.com/DaveKJohn/claude-code-specialists/issues/237), where it was
+already proposed.
+
+**In this repo the risk is latent rather than live**, which is why it went unnoticed here: six lenses
+carry a marked title (02-09, 03-02, 04-11, 04-12, 04-13, 06-30) and all six are genuinely unfilled, so
+they are classified correctly today. Each is one edit away from the trap.
+
+#### Type of change
+
+Fix
+
+[PR #474](https://github.com/DaveKJohn/claude-code-specialists/pull/474) · merged 2026-08-05
+
+---
+
+### An entry heading is just the title -- the PR number lives on the closing line
+
+#### What does this change do?
+
+**This entry's own heading is the specimen: it carries no `#NN`.** The fold used to prepend `#NN · ` to the
+title; it no longer writes into the heading at all. Dave, August 5, 2026.
+
+**Nothing is lost, which is why it could go.** The number is still in the entry, on the closing
+`[PR #NN](https://github.com/DaveKJohn/claude-code-specialists/blob/main/url) · merged <date>` line, where the url makes it clickable rather than merely printed. The two
+facts the merge owns already had a home together at the end of the block — the number was the last one still
+stated twice. What the heading gains is being readable as a sentence, and it is the one line every reader of
+`CHANGELOG.md` and of all three release documents scans.
+
+The ten entries already folded are migrated in the same change, by a script that skips fenced illustrations
+so the entry documenting the older shape keeps its example intact.
+
+##### The number was load-bearing in one reader, and that reader was already broken
+
+**`new-internal-note.ps1` recognised an entry by counting middot fields in its heading** — `≥ 3`, with the
+type taken from the second-to-last. The flat format had already taken those fields away one at a time (the
+merge date to the closing line, then the type into its own section), so at two fields **every real entry
+fell below the threshold**. Removing the number would have made it one field, but the damage predates this
+change.
+
+**Measured against a note generated from the live changelog, before rewriting anything: 46 headings skipped,
+all ten entries among them — and the one heading that still matched the old shape was a QUOTED example
+inside a fenced code block in an entry body,** which became the note's only bullet, with the illustration's
+own words as its type. A document written for colleagues, listing one line that describes nothing. No error,
+plausible output, and a warning that said the opposite of what had happened.
+
+**So the recogniser is structural now:** a heading is an entry when the headings **one level below it**,
+inside its own block, include one of the format's named sections. That is level-independent by construction,
+which matters because the level genuinely differs per document — entries sit at H3 under the tier headings
+and at H2 in the untiered shape — and it cannot confuse a heading with its container, since one level below
+a tier heading are entry headings and one level below the H1 are tier headings. The type comes from
+`Resolve-EntryType`, the title from `Convert-EntryHeadingToTitle`, and the walk is fence-aware — which is
+what stops a quoted example from ever becoming a bullet again.
+
+**The pre-format shape is still recognised**, by the metadata triple, because this script takes a *version*
+and reads that release's notes off disk: it can be run against any release ever cut, and every note written
+before the named sections existed has entries without them. Two independent guards keep the fabricated
+bullet from coming back — the fence awareness, and a requirement that the type field be a type the branch
+table actually produces (the illustration's second-to-last field was a *title*, so it fails that test even
+without the fence).
+
+##### Two latent defects the work surfaced, both silent
+
+**`Set-EntryHeadingLevel` computed its shift as `$EntryLevel - <canonical>`** — the shift a block *already*
+at the canonical level needs, which is true of every caller that reads entries straight out of
+`CHANGELOG.md`, and false for the one that reads them back out of a rendered document. Normalising a deeper
+block **to** canonical therefore computed a delta of zero and returned it untouched. Its own docstring
+promises "so the entry's own heading sits at `$EntryLevel`", which is what it now does: the delta is
+measured from the block. The visible symptom was every internal-note bullet losing its type, because the
+block handed to the type reader had never been shifted and its sections were still one level below where
+that reader looks.
+
+**`Resolve-EntryType` conflated recognition with validation.** Both used `Get-BranchTypes` and nothing else,
+so where that function is absent the known-type list was **empty** — right for validation (a repo with no
+table of its own has nothing to judge a type against) and wrong for recognition (with no list, no heading
+field can be identified as the type at all). `branch-info.ps1` is repo-owned and deliberately does not
+travel into the plugin mirror, so **the absent case is the ordinary one in a consumer**: every bullet taken
+from a historical heading lost its type there, silently. Recognition now uses `Get-ReleaseChangeTypes`,
+which probes the repo's table and falls back to the canonical four; validation still only fires where the
+repo's own table is reachable.
+
+`Get-ReleaseChangeTypes` moved down into `entry-scaffold-lib.ps1` for that, the same way and for the same
+reason the fence reader did one PR earlier: two of its readers live there and the dependency can only run
+downward. It kept its name, so no call site changed.
+
+##### What was measured, not assumed
+
+- All **26 suites** and all four gates green.
+- **The internal-note suite had no fixture in the current format** — every one of its scenarios was the
+  pre-flat shape, and they all passed, which is exactly why nobody noticed the recogniser had stopped
+  finding anything. One was added, built to match what the real renderer writes, and it asserts the
+  fabricated bullet cannot return.
+- The `Set-EntryHeadingLevel` repair is asserted as a **lossless round trip** (canonical → deeper →
+  canonical), because the read-back direction is the one that silently did nothing.
+- The migration was verified with the real parsers: 10 entries, ranking unchanged, every type still read,
+  and **11 closing lines still carrying a PR link** — the ten entries plus the fenced illustration.
+
+#### Type of change
+
+Feat
+
+[PR #480](https://github.com/DaveKJohn/claude-code-specialists/pull/480) · merged 2026-08-06
+
+---
+
+### A significance score per entry, and the order follows it
+
+#### What does this change do?
+
+Closes [#467](https://github.com/DaveKJohn/claude-code-specialists/issues/467).
+
+The tier model answers how far a change **reaches**, and therefore which document an entry appears in.
+This adds the second axis: how much it **weighs** for that document's reader, and therefore **where in
+it** the entry sits. Both are now declared in one **impact table**, which replaces the `Tier: N` line:
+
+```text
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 5 | consumers must re-add the marketplace under its new name; installs break without it |
+| 1 | 4 | the routine version bump stops needing a developer |
+```
+
+**The tier is the row, and that is what the shape buys.** The ladder is cumulative, so a change consumers
+notice is also a change colleagues get something out of — as rows that is impossible to claim halfway. The
+rows an entry has *are* the documents it appears in, and each row is that document's reader answering their
+own question. The score cells are scaffolded **empty**, deliberately unlike the old `Tier: 0` default: 0
+was a harmless final answer, while any scaffolded score would be a guess at a **ranking** — the exact
+failure the retired highlights marker was measured on.
+
+**1 to 5 against a written rubric** (`Get-EntrySignificanceRubric`, overridable per repo), in the shape
+severity levels and ITIL impact levels use: 5 is *the reader must act*, 1 is *nothing changes for them
+today*. That is what makes the number a measurement rather than a mood, and it is why the score is
+comparable across releases. The **`Why` is required** and is the lasting half — the rubric says which band,
+the `Why` says why *this* change is in it.
+
+**The fold is the only moment `CHANGELOG.md` can be ordered**, because the cut empties the tier sections:
+whatever order the fold leaves behind is what the release documents inherit, since they read the section in
+document order and sort nothing. That makes the ordering reproducible across two moments days apart with
+nothing re-estimated. Insert-only, never a re-sort — this commit lands directly on `main`, so a bug must be
+able to misplace at most the one entry being folded rather than scramble a section it did not write.
+
+**Where each score is read.** The highlights re-read the **tier-2** row (their reader is the consumer); the
+internal note reads the **tier-1** row. **Tier 0 is never ranked** — the development note is the record:
+complete and chronological. The table **survives into the record**, which is the last place each ranking's
+justification lives, and is **stripped from everything that travels outward** (highlights, per-plugin
+`CHANGELOG.md`, `RELEASE.md`), because a self-assigned number printed at a consumer is a marketing claim.
+
+`cut-release.ps1` refuses a release whose tier-1-or-higher entries have not scored themselves, with
+`-SkipSignificanceGate` as the escape valve — separate from `-SkipTierGate`, because one overrules whether
+the release should exist and the other how its contents are ordered. `open-pr.ps1` refuses a *malformed*
+table while the branch is still the only thing affected, but only **reports** a missing score: that is a
+judgement about a finished change, and an author who has not settled it should not be blocked from merging.
+
+**`Tier: N` is still read, and always will be** — "recognise both, write one". Every entry already in
+`CHANGELOG.md` and in every consumer's tree predates the table, and a parser that only knew the new shape
+would read all of them as tier 0: silent, correct-looking, and wrong in the direction that empties a
+release. The whole mechanism switches itself **off** where a repo declares no tier split, and can be
+switched off explicitly via `Get-EntrySignificanceEnabled`.
+
+**Two bugs worth recording, both caught while building this and both now asserted.** An
+`[ordered]@{ 5 = '...' }` indexer takes a **positional** index for an integer, so `$rubric[5]` asked for the
+sixth element of a five-element map — the exact trap `Resolve-ChangelogTierSections` already warns about in
+the same file, walked into one screen below the warning; on a longer map it would have silently returned a
+neighbouring band's text instead of throwing. And `Sort-Object` is **not stable** in PowerShell 5.1, so
+ordering on the score alone would let equal-scoring entries come out differently from one run to the next —
+a regenerated release document differing from the published one with nothing having changed. The arrival
+index is now the tie-break.
+
+**The name was `Happiness` for one afternoon.** Dave rejected it as unprofessional, and he was right about
+more than the word: *happiness* names an emotion in the reader, which an entry's author is in no position to
+assert, while the weight of a change for an audience is something they can judge. Recorded alongside it
+because it is the first thing anyone reaches for: **RICE and WSJF do not apply here.** They price work
+*before* it is done, with effort in the denominator — they answer "what do we build next". Everything scored
+here is already merged, so effort is spent and irrelevant.
+
+#### Type of change
+
+Feat
+
+[PR #475](https://github.com/DaveKJohn/claude-code-specialists/pull/475) · merged 2026-08-05
+
+---
+
+### The merge date is added by the fold, at the bottom, instead of scaffolded into the heading
+
+#### What does this change do?
+
+**This entry's own heading is the specimen: it carries no date.** The scaffolder used to write one, and
+it ran when the *branch* was created — so what it recorded was the branch's birth date, not the landing
+date. A branch opened on Monday and merged on Thursday was filed as Monday's work, silently, in the one
+document whose whole subject is when things happened. Dave, August 5, 2026.
+
+**The date is now the fold's, and it goes at the bottom** — his second call, and the better one. The
+heading was mixing two kinds of fact: the author knows the title and the type, while the PR number and
+the merge date do not exist until the merge. That second kind already had a home at the end of the entry,
+on the `[PR #NN](https://github.com/DaveKJohn/claude-code-specialists/blob/main/url)` line. So the two facts the fold owns now sit together:
+
+```text
+### #NNN · Short strong title · Feat
+
+…the description…
+
+[PR #NNN](https://github.com/DaveKJohn/claude-code-specialists/pull/NNN) · merged 2026-08-05
+```
+
+**It reads the PR's own `mergedAt`, not the clock**, and that distinction is not theoretical here. The
+fold usually runs seconds after the merge, but this repo has measured it not doing so: unfolded entry
+files were once found sitting in the repo root the morning *after* their merge — the silent half-state
+that put `git status` into Chris's stand-verification rule. A clock reading would have dated those a day
+late with nothing in the output to say so. `mergedAt` costs nothing: the fold already makes exactly one
+`gh pr list` call, and gh returns whatever fields are asked for in one roundtrip.
+
+**The dangerous half of this change was not the date at all.** `Format-CategorizedEntries` read each
+entry's branch type as the **second-to-last** middot field of its heading — correct only because a date
+happened to follow the type. Removing the date would have made that read return the type's neighbour, and
+every entry in every release document would have landed in the `Other` catch-all: no error, no empty
+output, one meaningless heading where the categories used to be. Found by reading the code before
+touching it, not by a failing test. Both heading parses are now **content-based** rather than positional
+— the type is recognised by matching the known branch types, the date by its shape — so the same code
+path reads a dated heading and a dateless one. That is also why nothing had to be migrated: this repo's
+entire history keeps parsing.
+
+**`Convert-EntryHeadingToTitle` needed the same treatment and taught the sharper lesson.** The first
+implementation walked in from the end eating anything that looked administrative, and a newly written
+assert caught it on `### #12 · Fix · Fix` — an entry whose title *is* a type name. It ate both fields and
+gave up. The tail has a grammar (at most one date, and before it at most one type), so it is matched
+rather than walked; two types in a row cannot both be the type, which the grammar states and a greedy
+loop cannot. `Other` is deliberately not treated as a type: it is the catch-all label this repo prints,
+never a value a branch table produces.
+
+**The closing line became `Format-EntryFoldFooter` in the entry-format lib, and the reason is testability
+rather than tidiness.** The fold drives a live remote, so its own suite deliberately runs without a PR —
+which would have left the only path this line has untested. Extracting the pure part is the same move,
+for the same reason, as `Get-ExistingPrRecord` in `pr-issues-lib.ps1`. Its five asserts cover the normal
+case, the PR timestamp beating the fallback, a fold that runs a day late, a PR with no timestamp yet, and
+an unparseable one degrading instead of throwing — because a completed fold must not read as failed over
+a cosmetic line.
+
+**Four asserts in the branch suite got stricter rather than looser.** They pinned `· Feat ·` — a trailing
+middot that only existed because a date followed. They now compare the whole heading line, which proves
+both that the type is there and that nothing follows it; the malicious-title scenario in particular gains
+from that, since a prefix match would have passed even if a broken argv boundary had appended something.
+Plus one new assert stating the point outright: the scaffold writes no date.
+
+**One cost, stated rather than smoothed over.** `CHANGELOG.md` can no longer be scanned for dates from the
+headings alone — you read an entry's last line. That is acceptable because the tier sections only ever
+hold what is pending since the last release, a window of days in which the dates sit close together. The
+release notes, where the history actually lives, keep the line per entry.
+
+#### Type of change
+
+Feat
+
+[PR #472](https://github.com/DaveKJohn/claude-code-specialists/pull/472) · merged 2026-08-05
+
+---
+
+### The impact-table strip takes the heading that introduced it
+
+#### What does this change do?
+
+**Stripping the impact table left its section heading standing, so every outward-facing entry carried a
+named question with nothing under it.** `Remove-EntryImpactTable` removed the rows and collapsed the blank
+line, which was the whole job under the pre-#467 format: the declaration was then a bare `Tier: N` line
+with nothing above it. Since the entry gained three named sections the table lives under
+`### Who is this for`, and the entry format is explicit that the table **is** the answer rather than prose
+beside it — so removing the table and keeping the heading produces a hole, not structure.
+
+**Measured while cutting v3.6.0 with `-NoPush`, which is the only step where a human sees the assembled
+artifact**: 17 empty sections in `plugins/specialists/RELEASE.md`, 17 in its per-plugin `CHANGELOG.md`, 16
+in the highlights draft, 2 in each smaller plugin's card. The development notes were correct throughout —
+they keep the table, so they keep its heading — which is why nothing upstream of the cut noticed. Those
+are exactly the documents that travel to consumers in the plugin cache.
+
+**A test asserted the broken behaviour, and how it got there is the more useful half of this.**
+`release-lib.tests.ps1` held *"the section heading stays -- an outward document keeps its structure"*. It
+arrived in [#476](https://github.com/DaveKJohn/claude-code-specialists/pull/476), the same PR that
+introduced the named sections, and no document anywhere states that rule — the rationale existed only in
+the assert message, written to describe what the code happened to do. This repo has met that shape before:
+`Get-RosterIgnoredIds` was likewise introduced by the commit that built the check it kept quiet, and
+justified in code as a decision nobody had made. **The consequence had also never been observed**, because
+`v3.5.0` was cut hours *before* #476 landed; `v3.6.0` would have been the first release to ship it.
+
+**The heading only goes when the section is genuinely empty, and that check is the point rather than
+caution.** The convention says the table is the whole answer, but a strip that deletes a heading on the
+strength of a convention deletes a reader's prose the first time somebody writes some. So the lines between
+the heading and the next one must all be blank, the heading text comes from `Get-EntrySectionHeadings`
+rather than a literal — a repo that translates its section headings gets this behaviour translated with
+them — and both halves are fence-aware, so an entry quoting the heading (the entries documenting this
+format do) keeps the quoted copy while the real one goes.
+
+**Verified by falsification, not by passing.** With the new call disabled, two of the added asserts fail
+and the rest still pass; restored, all 215 asserts in that suite and all 374 in `release-lib`'s pass. The
+shared mirror under `plugins/specialists/scripts/lib/` was updated in the same commit.
+
+#### Type of change
+
+Fix
+
+[PR #494](https://github.com/DaveKJohn/claude-code-specialists/pull/494) · merged 2026-08-06
+
+---
+
+### A branch does not open a PR while a step is still open
+
+#### What does this change do?
+
+The step list becomes a gate. `open-pr.ps1` refuses to push and `ship-pr.ps1` refuses to merge while
+`branch/branch-progress.md` has anything unresolved in it. This is the second half of the requirement
+that produced the `branch/` split -- *"pas als alle punten zijn afgevinkt kan de branch met een PR
+gemergd worden"* -- with the first half being the two files themselves.
+
+**Three marks, and the third is what makes the gate honest:**
+
+```text
+- [ ] not done yet          -> blocks the PR and the merge
+- [x] done
+- [~] dropped -- <why it turned out not to be needed>
+```
+
+A plan legitimately grows items that stop making sense. A gate offering only *tick it* teaches people to
+tick boxes for work they did not do, and then reports success -- which is worse than no gate, because it
+comes with a citation. `- [~]` keeps the line and the reason on the page, which is the half worth
+reading later, and it is precisely what lets this gate be **un-`-Force`-able**: there is no legitimate
+case left for overruling it, so a second escape valve would only ever be used to skip the first. That is
+the same reasoning the impact gate runs on, and the opposite of the scaffold gate's, which does have a
+`-Force` because an entry can legitimately quote the wording it refuses.
+
+**A step still carrying the scaffold's own placeholder is refused, ticked or not.** Ticking the
+scaffolded first step without replacing it reports a plan as finished that was never written -- the same
+shape measured on three of v3.2.0's entries one file over, where the author kept the stub and appended a
+status behind it.
+
+**It fires in both scripts, deliberately.** The requirement is about the *merge*; `open-pr` has a
+`-Force`, and a PR can also be opened by hand on github.com or opened days ago and resumed. Checking
+only at the push would leave all three routes able to land an unfinished plan. `ship-pr` re-reads the
+working copy rather than trusting step 1, because it may have changed since.
+
+**A branch with no step list at all is not refused.** A branch created by hand rather than by
+`new-branch` carries the trunk's empty reset state, which holds no steps -- the one-commit typo fix.
+Refusing that would make the mechanism ceremony rather than a tool. What is not tolerated is a
+scaffolded list left as scaffolded: that branch did run `new-branch` and then ignored what it wrote.
+
+**And the directory gets a README.** `branch/README.md` states what the two files are for, why their
+names are fixed, why the reset state opens with an `#`, how links in each are resolved, and the six
+rules -- including this gate. It is the page to send someone to instead of explaining the folder.
+
+#### Type of change
+
+Feat
+
+[PR #490](https://github.com/DaveKJohn/claude-code-specialists/pull/490) · merged 2026-08-06
+
+---
+
+### A branch carries two files in branch/: the changelog entry and the step list
+
+#### What does this change do?
+
+A branch's working files move out of the repo root and into a `branch/` directory, and there are **two**
+of them because they answer two different questions for two different readers:
+
+```text
+branch/
+  branch-changelog.md   what the change DOES     -- for whoever reads CHANGELOG.md later
+  branch-progress.md    what still MUST HAPPEN   -- for whoever is working on the branch
+```
+
+**The split is the point.** One file used to do both jobs: `new-changelog-entry.ps1` scaffolded the entry
+with a bold heading that asked, in so many words, what was still to do and where you left off -- and
+`open-pr.ps1`'s scaffold gate refused to ship while that heading survived. So the entry was today's to-do list *and* tomorrow's changelog
+prose, which is why "replace this whole block before the PR" had to be a written instruction rather than
+something the format made obvious. Two files make it obvious: the entry now prompts for what the change
+does, and nothing else.
+
+**Fixed names rather than one per branch**, which looks like it should collide the moment two branches
+exist and cannot: git already tracks these files per branch, so each branch carries its own version of the
+same path and a checkout swaps them. The per-branch filename was solving a problem version control had
+already solved, and it cost a repo root that filled up with other people's in-flight work.
+
+**`branch-changelog.md` holds the entry block and nothing around it** -- no title, no branch line, no
+warning. That is what makes it pasteable into `CHANGELOG.md` in one go; anything wrapped around it would be
+a manual strip step for whoever pastes it. The branch name therefore lives in `branch-progress.md`, which
+has room for it -- and the fold reads it back from there to find the PR, since the file name no longer
+carries it.
+
+**On the trunk both sit in an empty reset state**, with a warning under the branch line saying not to write
+there until a branch exists. That state opens with an `#`, and that is load-bearing rather than cosmetic:
+the entry test only accepts the entry heading levels, so the trunk's own empty file can never be folded as
+if it were a change, and folding twice is impossible rather than merely unlikely.
+
+**The fold resets instead of deleting**, which is the one real asymmetry the split introduces. A pre-split
+root entry is named after its branch, so once folded it has no reason to exist and is still deleted.
+`branch/branch-changelog.md` is a path the next branch will use, so it -- and `branch-progress.md`, whose
+ticked-off steps would otherwise greet the next branch as somebody else's work -- is rewritten to its empty
+state and named in the same fold commit.
+
+**Everything reads both forms.** Every branch created before this change, here and in every consuming repo,
+carries a root `<branch-name>.md`; consumers receive these scripts through a plugin update rather than by
+choosing to. So the fold discovers both and disposes of each correctly, `open-pr` prefers the new path and
+falls back to the old one, and `cut-release` refuses on either. The same rule covers the two scaffold
+strings the entry no longer carries: the gate keeps refusing them, because a gate that forgot them would
+wave exactly those in-flight entries through into `CHANGELOG.md` without erroring.
+
+Two smaller corrections fell out of the move and are worth naming, because both fail silently:
+
+- **`-Intent` now lands in the step list, not the entry.** It is a status, and the entry's text folds
+  verbatim into `CHANGELOG.md` -- which is the shape v3.2.0 measured shipping three times over.
+- **The PR template's changelog checkbox is ticked on the file *holding* an entry**, not on the file
+  existing. Since the entry now exists on the trunk too, the old test would have ticked the box for a
+  branch that wrote nothing -- the one direction a self-ticking checklist must never fail in.
+
+#### Type of change
+
+Feat
+
+[PR #484](https://github.com/DaveKJohn/claude-code-specialists/pull/484) · merged 2026-08-06
+
+---
+
+### INSTALL.md drops the history it was keeping a third copy of
+
+#### What does this change do?
+
+`plugins/INSTALL.md` had grown a habit of explaining its own past to someone trying to install
+something: *"It was five acts until August 1, 2026"*, *"And it was three steps until August 3"*,
+*"Until August 3, 2026 this was not a step"*, and a two-paragraph account of the `QUICKSTART` →
+`ADOPTION` → `INSTALL` renames. Interesting, and worth nothing at all to a reader running commands.
+
+**They were a third copy, which is why the repair is a deletion rather than a move.** Each one
+describes a change that already has a changelog entry and a release document — verified per issue
+before cutting anything: `#327` appears in 4 of them, `#329` in 2, `#408` in 2, `#335` in 1. A
+separate background page would have been a fourth copy, ageing independently, with nobody able to say
+which one was current. The adoption half now carries one sentence pointing at
+[`releases/README.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/releases/README.md), which indexes every version with the changes behind it.
+
+**The blockquotes that stayed are the ones that change what the reader does**, and the split was made
+on that test rather than on shape: that `.claude` means two different directories in this document,
+that an install record can read as perfectly healthy while the session is inert, and which of the
+three machine states you are in. Two borderline blocks were rewritten instead of cut, because a
+historical frame was wrapped around an operational fact — that a session start does *not* make the two
+`claude plugin` commands redundant, and that Step 4's half hour is authoring rather than installing.
+Cutting those wholesale would have taken the fact with the frame.
+
+**The reading-time block is shorter and remeasured.** ~9,300 words (~47 min) against
+`specialists-init`'s ~5,600 (~28 min), so ~75 minutes for a first-time adopter — down from ~77, and
+the number moved *because* of this change, which is exactly the trap: the `measured-figure` check
+holds a figure to naming what binds it, never to being right. `README.md` quotes the same figure and
+was corrected with it.
+
+#### Type of change
+
+Docs
+
+[PR #485](https://github.com/DaveKJohn/claude-code-specialists/pull/485) · merged 2026-08-06
+
+---
+
+### The three consumer-facing documents become plugins/INSTALL.md and plugins/UNINSTALL.md
+
+#### What does this change do?
+
+The repo root goes from eight markdown files to five. `UNINSTALL.md` moved to `plugins/` unchanged;
+`ADOPTION.md` and `QUICKSTART.md` moved there too and were then **merged into one `INSTALL.md`**, with
+the short commands-only page as its first half and the full adoption manual as its second. Everything
+that pointed at any of the three moved with them, in both directions: the `README.md` entry table and
+its eight other pointers, `connectors/README.md`, Sylvester #15's lens, `specialists-init/SKILL.md`,
+and the pages' own outbound links, which now sit a level deeper and reach the root through `../`.
+
+**Two halves in one file needed more than a rename.** Three headings existed twice after the merge, so
+`#staying-up-to-date` — the anchor every external link uses — had become ambiguous and resolved to the
+two-command summary instead of the measured section. The short half's headings were renamed rather than
+the long half's, because every inbound link means the long one. The self-referencing prose went with
+it: the quickstart half no longer tells the reader to open a page that is now the text below it, and
+the note explaining the #408 rename now explains why the split was undone as well. It was not reversed
+— what #408 asked for was that a reader can tell a one-hour manual from a command list before
+committing to it, and two named halves do that while removing the failure mode a split invites, where
+one page is updated and the other quietly disagrees.
+
+**The absolute URLs moved too, and those are the half a consumer feels.** `release-lib.ps1` bakes
+`…/blob/main/…#staying-up-to-date` into every generated `RELEASE.md` card, and that card ships in the
+plugin cache. The generator, all four committed cards, `specialists-teardown/SKILL.md` and
+`UNINSTALL.md`'s own "on GitHub" pointer now name `plugins/INSTALL.md`. Cards already delivered for
+v3.5.0 and earlier keep the old URL and will 404 — that cost is real, it cannot be recalled, and it is
+named here rather than left to be discovered.
+
+**Seven links in published release documents were rewritten**, in `releases/development/2.x/2.7.1.md`,
+`3.0.3`, `3.0.6`, `3.1.0` and `releases/highlights/3.x/3.2.0.md`, `3.3.0.md`. That is deliberately
+unlike the seven wrong dates left standing on August 5, 2026: a date is a claim about what was true
+then and stays true unedited, while a relative link is a pointer to where a file is *now* and is simply
+wrong once the file moves. Repairing it changes no statement the document makes.
+
+**And the move exposed a gate that had gone quiet, which is the part worth keeping.** The dead-link scan
+gathers every root `*.md` by glob — a rule written precisely because a named list goes stale — but reaches
+into `plugins/` only for `CHANGELOG.md`, `SKILL.md`, manuals and personas. A document sitting directly in
+`plugins/` matched no rule at all, so all three went dark the moment they landed there: their own outbound
+links unvalidated, and the run still reporting clean. `plugins/` now gets the same non-recursive glob the
+root has. The same staleness hit `$consumerDocs`, the root-relative list checks 15 and 16 read, which
+`Test-Path`-skips a missing entry in silence. Both are repaired, and the coverage line is the proof:
+link-scan 159 → 162, lifecycle 11 → 18, record-query 1 → 5, expected-output 1 → 5, measured-figure 0 → 11.
+Five checks were examining less than they reported, and nothing said so.
+
+**Also corrected because the merge invalidated it:** the reading-time figure in `INSTALL.md`, remeasured
+at ~9,800 words (~49 min) against `specialists-init`'s ~5,600 (~28 min), and the same figure where
+`README.md` quotes it. The `measured-figure` check passed it either way — it holds a figure to naming
+what binds it, not to being right — which is exactly why a merge has to remeasure by hand.
+
+**The skip is a finding now, not a `continue`.** Both readers of `$consumerDocs` opened their file with
+`if (-not (Test-Path)) { continue }`, so a stale entry cost coverage and said nothing — which is precisely
+how the drop above went unnoticed. A named document that is not there is now `[consumer-doc]`, validated
+once before the two loops so one cause does not read as two findings.
+
+**And that check found something older and worse.** Adding it produced
+`the collection is of a fixed size` and a run that died mid-scan. The cause was not the new check:
+`Add-Error` appends to a `List[string]`, and sixteen other places did `$errors += "..."`, which on a
+`List` does not append — it rebuilds the whole thing as a fixed-size `Object[]` and rebinds `$errors` to
+it. **Every** `Add-Error` after the first `+=` would have thrown. It never fired because the ordering hid
+it: all existing `Add-Error` callers sit above the first `+=`, so the array only came into being after
+the last one. The first check added below that line hit it immediately. All sixteen now go through
+`Add-Error`, and scenario 43 in the test suite is the canary — check 19 sits below every former `+=`
+site, so if the style returns, that scenario stops reporting a finding and starts reporting an exception.
+
+Worth stating plainly, because it is the uncomfortable half: this defect was reachable by any future
+check written at the bottom of that file, and the gate that guards this repo would have died rather than
+reported. It was found by accident, while adding two lines for something else.
+
+#### Type of change
+
+Docs
+
+[PR #482](https://github.com/DaveKJohn/claude-code-specialists/pull/482) · merged 2026-08-06
+
+---
+
+### The ranked insert is fence-aware, like every other reader of the entry format
+
+#### What does this change do?
+
+**A tier-1 entry led a list whose next six entries were tier 2.** `Get-ImpactInsertOffset` — the function
+that decides where the fold places an entry, and therefore the order every release document inherits — split
+the changelog into blocks with a plain regex. It was the one reader of this format that was not fence-aware.
+
+**Measured on the fold of [#477](https://github.com/DaveKJohn/claude-code-specialists/pull/477), in the
+document [#476](https://github.com/DaveKJohn/claude-code-specialists/pull/476) had created hours earlier.**
+That entry quotes an entry heading inside a fence, as the worked example of the format it introduces —
+exactly what an entry documenting a mechanism does. Three consequences, none of which errored:
+
+- the quoted heading was read as an entry boundary, **splitting the real entry in two**;
+- the fragment above the fence holds no impact table — the table sits further down, under
+  `### Who is this for` — so it read as **tier 0, score 0**;
+- the loop meets that tier-0 fragment **first**, so any entry of tier 1 or higher is inserted above it: at
+  the very top of the document.
+
+The ranker also read the *quoted* table as the entry's declaration, so a fence-blind read got both the
+boundary and the tier wrong from one cause.
+
+**The console line reported it and the number was the tell:** *"placed above 8 existing entries"* in a
+document that had 7. Worth recording, because taking that line at face value was the available mistake — the
+order was verified against the parser afterwards, which is what turned a plausible message into a defect.
+
+**This is the fourth-plus instance of one class in this format's short history: a matcher satisfied by a
+MENTION rather than a use.** `Split-EntryBlocks`, `Resolve-EntryImpact`, `Resolve-EntryTier`,
+`Get-EntrySectionBody` and `Set-EntryHeadingLevel` were all made fence-aware for exactly this reason. This
+one was missed because it was written when an entry could not contain headings of its own — the flat format
+made that false the same day, and nothing re-derived which readers the change had newly exposed.
+
+**Fixed by walking lines rather than characters**, since fence state is a per-line fact: the offsets are
+rebuilt from the same split the flags come from, taking each line's separator from the source so a CRLF
+document is not shifted by a byte per line — the root `CHANGELOG.md` is CRLF here.
+
+**And the fence walk now has one owner in this lib.** `Get-EntryFencedLineFlags` is new, and
+`Get-EntryTextOutsideFences` reads it instead of walking fences itself — two readers of one fact rather than
+two answers that can drift, which is how a quoted heading becomes structure. `release-lib.ps1` has its own
+`Get-FencedLineFlags` with the same semantics; **collapsing those two is a real follow-up and deliberately
+not done here**, in the same change as a defect repair. The dependency can only run one way: the fold and
+this lib's own suite load it standalone, so it cannot reach up into `release-lib`.
+
+**The entry #477 had already been misplaced on `main` is repositioned in this branch**, by the fixed
+function rather than by hand — so the placement is the code's answer, and correcting it exercises the repair.
+It now sits between the tier-2 block and the tier-0 one, which is where its own table says it belongs.
+
+#### Type of change
+
+Fix
+
+[PR #478](https://github.com/DaveKJohn/claude-code-specialists/pull/478) · merged 2026-08-05
+
+---
+
+### An inbound issue is verified as still standing before it is routed
+
+#### What does this change do?
+
+**An inbound issue was picked up as open work an hour after it had been repaired.** #469 reported that
+`fold-changelog-entry.ps1` kept the entry-creation date instead of the merge date. It was filed at
+08:04; #472 repaired it on `main` at 09:24; it was still labelled open when the next session reached
+for it. Nothing was built twice — the check that caught it was reading the code before starting — but
+nothing in the intake required that reading either, and the outcome would have been a second repair
+competing with the first on a defect nobody had.
+
+**So the check is now the front of intake, in Chris's portable persona.** A filed report is a snapshot
+of the moment somebody wrote it, and the gap between filing and pickup is exactly the window in which
+the defect may already have gone — sometimes closed by the very work that was underway while the report
+was being written. His first act on an inbound item is therefore to read the code, doc or output it
+describes and establish that what it reports is still true, before classifying anything.
+
+**This repo is where that gap is widest, which is why the rule is portable rather than local.** A
+consumer *files* inbound issues; the source both receives them and does the repairing, so filing and
+fixing can cross inside a single morning — and they did. But the rule is a timeless statement about
+intake, not something only true here, so it goes to the source and the lens keeps just the citation
+of where it was measured. The layer test in the
+[Specialists handbook](https://github.com/DaveKJohn/claude-code-specialists/blob/main/.claude/specialists/README.md#where-a-new-rule-goes--the-source-is-the-default-the-lens-is-the-exception)
+is what decided that, and it is the reason the persona text carries no issue numbers or dates at all.
+
+**Closing an already-repaired item is stated as the assignment, with the evidence attached** — because
+two things about #469's close showed that "check first, then close" is not enough on its own:
+
+- **The repair had gone further than the report proposed.** #469 offered three options and preferred
+  restamping the date at fold time; what shipped removed the date from the heading altogether and let
+  the fold add it at the bottom. A silent close would have left the reporting repo applying the
+  documentation fix it had planned — which was now the wrong wording, since the author no longer writes
+  a date at all.
+- **The audit the report suggested in passing was worth running.** #469 noted that anyone auditing an
+  existing `CHANGELOG.md` could compare each heading's date against `gh pr view --json mergedAt`. Run
+  here across `CHANGELOG.md` and `releases/`: **7 of 326** dated headings disagree, all by one or two
+  days. They are deliberately left alone — they sit in published records that already travelled to
+  consumers in the plugin cache, and moving a date by a day rewrites shipped history for no reader's
+  benefit. Both entries still pending in `CHANGELOG.md` were correct.
+
+**And the companion rule it does not replace.** This repo already required that a finding's *reason* be
+verified before it is repaired, after an inbound report whose symptom was real and whose explanation was
+wrong. That guards against repairing the wrong cause; this one guards against repairing a cause that is
+already gone. The persona now names both in order: establish the report still stands, *then* verify the
+reason it gives.
+
+#### Type of change
+
+Docs
+
+[PR #473](https://github.com/DaveKJohn/claude-code-specialists/pull/473) · merged 2026-08-05
+
+---
+
+### Publishing the GitHub Release is part of a cut that was already asked for
+
+#### What does this change do?
+
+**Cutting a release is asked for; the closing steps of that cut are no longer asked for again.** The
+version bump and the tag are the irreversible act and stay behind an explicit request. Once that is
+given, the run goes through in one motion — generate the artefacts, ship the two hand-written documents
+via their branch and PR, **publish the GitHub Release**. Stopping at the last step of a checklist the
+requester started is a rubber stamp, and a rubber stamp trains everyone to stop reading it. The same
+reasoning that made the PR merge a default rather than a checkpoint (July 27, 2026), applied one step
+further along. Decision by Dave, August 5, 2026.
+
+**The boundary that remains is Block 2 of the checklist, and it is a boundary rather than a carve-out.**
+Where a repo sets `Get-LiveStage` it has a second stage — pushing to the live target — and that is a
+different act with a different audience: a Release document describes a version, a live push changes
+what customers see. This approval covers Block 1. A repo wanting another boundary states that in its
+own lens.
+
+**Four places said this and they had to stop disagreeing.** The constitution named "creating a tag or
+GitHub Release" in one breath under *only on explicit request*, which would have outranked everything
+else written elsewhere — the safety rules take precedence over any convenience, so leaving that line
+standing would have made the new default unusable in exactly the sessions that read the rules
+carefully. It now separates the tag from the publication. Rendall's **portable body** carries the
+statement in his own terms, the release page's **portable half** carries it where the closing step is
+described, and the **cut-release skill** carries it at step 5, which is where somebody actually reads
+it mid-procedure.
+
+**And the reason all four are portable is itself now a written rule, in Tessa's manual.** The first
+draft of this change was headed for Rendall's *repo lens*, because that is where the decision was made.
+Dave's correction: where a decision is made says nothing about where it applies, and what he wants in
+this repo he wants in the others he runs the plugin in. The failure mode is quiet — a general rule
+filed in a lens is not wrong anywhere, it simply never arrives, and nothing reports its absence.
+
+**The corollary was the second correction, and it is the sharper one.** Knowing the rule was portable,
+the next instinct was to *narrow* its wording so it could not surprise a consumer with a live deploy
+stage. That is the wrong repair: it weakens the core for every reader to pre-empt one repo that has its
+own place to speak. The core is stated in full here; the deviating consumer records the deviation in
+its own lens. Both halves are in Tessa's hard rules now, because she is the one who guards which half a
+sentence belongs in.
+
+#### Type of change
+
+Docs
+
+[PR #471](https://github.com/DaveKJohn/claude-code-specialists/pull/471) · merged 2026-08-05
+
+---
+
+### A skipped plugin says why it was skipped, not that it is missing
+
+#### What does this change do?
+
+`check-roster-sync.ps1` told two different situations apart that it used to report as one. When it cannot
+resolve a plugin's cache dir it now says either *not on this machine* or *here, but it ships no `agents/`
+directory* — and only the first is the install problem the old wording described.
+
+**`Resolve-PluginDir` cannot distinguish them, and that is correct of it.** It requires an `agents/` dir at
+every return path, because a roster check has nothing to read without one. So it answers `$null` both for a
+plugin that is absent and for one sitting in the cache with skills, hooks or MCP servers and no agents —
+two different facts about the machine, reported as the absent one.
+
+**Measured on `figma@claude-plugins-official`.** It sits in the cache at 2.2.90, its `installPath` is in the
+administration and resolves, and the session start reported it as *"enabled but not found in the cache
+— skipped (the install may run on another machine)"*. Every part of the behaviour was right: a plugin of
+skills and MCP servers is nothing for a roster check to check. Only the stated reason was false, which is
+the failure shape this repo keeps paying for — a reader acting on that line goes looking for a broken
+install, on a machine where nothing is broken.
+
+**The discriminator is `Get-CachedPluginDirs`, and it lives next to `Resolve-PluginDir` rather than in the
+caller.** `<CacheRoot>/<Marketplace>/<Name>/<version>` is that function's own layout knowledge, and a second
+construction of it in the script asking the question could disagree with the one answering it.
+`Resolve-PluginDir`'s version scan now reads from the same helper, so the enumeration and the discriminator
+cannot drift apart. Its `[version]` sort travels along unchanged — a string sort puts 1.9.0 above 1.10.0.
+
+**The test pins the false reason being gone, not just a truer one being present.** Verified in both
+directions: with the discriminator removed, the three asserts that name the real reason, the version found,
+and the absence of the old wording all fail. The fourth — exit code 0 — passes either way and is labelled
+an invariant, because a skills-only plugin was never an error.
+
+#### Type of change
+
+Fix
+
+[PR #491](https://github.com/DaveKJohn/claude-code-specialists/pull/491) · merged 2026-08-06
+
+---
+
+### The fold guards the trailing newline before it inserts
+
+#### What does this change do?
+
+`fold-changelog-entry.ps1` normalises `CHANGELOG.md`'s tail — exactly one blank line at the end, whatever it
+ended with — before it measures anything in the document. One line, and it replaces the `TrimEnd()` that used
+to sit in the *nothing-pending* branch only.
+
+**The defect it closes loses a merged entry, silently.** `Get-ImpactInsertOffset` returns the slice's
+**length** for the lowest-ranked entry — the common case, since tier 0 sinks to the bottom of the list — so
+the insert lands at the very end of the content. On a document ending in `---` with nothing after it, that
+produces `---## <title>` on one line. `^## ` stops matching, so `Split-Changelog` never sees the entry, the
+cut leaves it out of every release document, and the entry **file** has already been deleted by then. The
+markdown stays well-formed, the fold reports success, and one merged change is gone.
+
+**The condition turned up in a working tree, and the record holds no trace of it — which is the point.** The
+branch behind [PR #486](https://github.com/DaveKJohn/claude-code-specialists/pull/486) was handed over with
+`CHANGELOG.md`'s final newline stripped by an editor, and it was repaired in the pre-commit diff review. So
+the commit, the PR and the fold that followed all ran on a well-formed document: `git log` shows nothing,
+no gate ever met it, and there is no PR review comment to point at. That is the honest shape of this — the
+**condition** is ordinary editing and has happened once, the **loss** is what the guard prevents, and what
+proves the loss follows from the condition is the test below rather than an incident.
+
+Behind it, the two insertion paths had drifted apart: the one that runs when nothing is pending ensured the
+line break and explained at length why it had to, while the one that runs on every other fold assumed it.
+
+**The regression test asserts the defect shape rather than the repair.** It seeds a tier-1 entry so the new
+tier-0 one sinks past it to the end of the list — two equal-ranked entries would exercise the
+insert-*before*-a-heading path and never reach the end at all — strips the trailing newline, and then counts
+entry headings. Verified in both directions: with the guard removed the appended entry is invisible to
+`^## ` and three of the assertions fail. The other two are **labelled as invariants**, because they pass
+either way — the fold succeeds on both sides of the bug, so an exit code cannot see it, and an assertion
+that cannot fail must not be read as coverage. A second case holds the normalisation to being one, capping
+an accumulated run of blank lines rather than pushing it up the document, which is the same accumulation
+`Split-Changelog` already strips from the head.
+
+The plugin mirror is regenerated, so consumers get the guard with the next release.
+
+#### Type of change
+
+Fix
+
+[PR #488](https://github.com/DaveKJohn/claude-code-specialists/pull/488) · merged 2026-08-06
+
+---
+
+### The dead-link scan reaches the payload layers it never read
+
+#### What does this change do?
+
+`check-plugin-integrity.ps1` builds its scan set from named categories — every root `*.md`, the handbook,
+`connectors/README.md`, every `plugins/**/CHANGELOG.md`, the lenses, `SKILL.md`, manuals, personas,
+`RELEASE.md`, `releases/**`, and since yesterday `plugins/*.md`. Four kinds of markdown matched **none** of
+them and had therefore never been link-checked:
+
+| layer | files |
+|---|---|
+| `plugins/*/agents/*.md` | 26 |
+| `plugins/agent-shared/*.md` | 11 |
+| `.github/**/*.md` | 2 |
+| `.claude/rules/*.md` | 1 |
+
+The agent defs are the glaring omission: they are the largest single body of prose this repo ships, they
+are payload a consumer executes against, and manuals and personas each already had a rule. The scan set
+went from 163 files to 202 and surfaced exactly the one dead link the manual pass had found —
+`plugins/specialists-lifehub/agents/02-10-agent.md` pointing at `../../CLAUDE.md`, which is
+`plugins/CLAUDE.md` and has never existed. The other 38 files are clean, which is worth stating: the gap
+was in coverage, not in a backlog of rot.
+
+**Six assertions bind the four layers separately**, plus the existing out-of-scope decoy and a
+remove-and-recheck pass. One combined assertion would have passed with three of the four rules missing.
+
+##### The correction that changed half this branch
+
+[#481](https://github.com/DaveKJohn/claude-code-specialists/issues/481) also proposed rewriting eight
+payload links that leave their plugin, on the reasoning that no `../` from a plugin reaches the consumer's
+tree. **That premise is wrong, and checking it before acting is the only reason this branch did not ship
+churn.** There are two install locations:
+
+- `~/.claude/plugins/marketplaces/claude-code-specialists/` — a **full repo clone** (root docs,
+  `plugins/`, `scripts/`, `releases/`), and the location the seam `@`-import already targets;
+- `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/` — **payload only**.
+
+In the clone a repo-following relative link resolves exactly as it does here. So
+`skills/specialists-init/SKILL.md` → `../../../../README.md` and the seven like it mean *the source repo*
+and reach it. They were left untouched.
+
+**The two `CLAUDE.md` links were still wrong — for the opposite reason to the one reported.**
+`../../../CLAUDE.md` from `plugins/specialists-shopify/agents/` does resolve in the clone; it reaches the
+**source** `CLAUDE.md`, while the sentence around it means the safety rules of the repo the agent is
+working in. A link that resolves to the wrong document is worse than one that 404s, because nothing
+reports it. Both now read "the repo's safety rules" with no link at all — the location-independent form
+every persona and manual already uses, and the one inbound #64 introduced for personas. This is the
+repo's own rule about verifying a report's *reason* before repairing its *symptom*, applied to a report
+this repo wrote itself.
+
+Also corrected: `plugins/*/RELEASE.md` was listed in #481 as uncovered. It was already in the scan set.
+
+#### Type of change
+
+Fix
+
+[PR #483](https://github.com/DaveKJohn/claude-code-specialists/pull/483) · merged 2026-08-06
+
+---
+
+### One fence reader, in the lib that owns the format
+
+#### What does this change do?
+
+**There were four fence walks across the two libs, and they were not equivalent** — which is the finding,
+not the tidy-up. `Get-FencedLineFlags` in `release-lib.ps1`, a second named function in
+`entry-scaffold-lib.ps1`, and an inline walk inside each of that lib's two removers
+(`Remove-EntryTierLine`, `Remove-EntryImpactTable`). Three of the four matched only backtick fences; **only
+release-lib's recognised `~~~`.**
+
+So an entry using tilde fences had its quoted content read as **structure** by every reader in
+`entry-scaffold-lib` — the tier line, the impact table, the section headings, the ranked insert — while
+release-lib's readers handled the same entry correctly. Nobody had hit it, because this repo writes
+backtick fences; it was found by comparing the four walks rather than by anything failing. That is precisely
+what "two answers that can drift" costs, and this one had already drifted before anyone looked.
+
+**One owner now, and it had to be the lower lib.** The dependency can only run one way: the fold and
+`entry-scaffold-lib`'s own suite load that lib standalone, while nothing loads `release-lib` without it. So
+the canonical `Get-FencedLineFlags` moved down, keeping the union rule — the tilde form is honoured
+everywhere now, which is strictly the safe direction: it can only stop a quotation being read as structure,
+never the reverse.
+
+**The name deliberately did not gain an `Entry` prefix on the way down.** Release-lib's three readers scan a
+whole `CHANGELOG.md` rather than one entry, so a name claiming otherwise would be wrong at those call sites
+— and keeping it meant the move changed **no call site in either lib**.
+
+**The two inline walks went too**, via a small private helper that returns the split-with-separators and the
+resolved flags together. Those two needed both facts, which is an awkward pair to derive twice — and
+deriving it twice is exactly how the tilde gap survived unnoticed inside them.
+
+##### Two asserts that had to be falsified before they could be trusted
+
+**The first version of "no inline walk left" passed by looking at nothing.** It was written as an escaped
+regex and matched nothing at all — the same class as the fixture that did not contain what it was written to
+contain, which this suite has already paid for once. Rebuilt as a literal count and **checked against the
+previous revision**: the old shape appears **3 times** there and the union rule **0**, which is what makes
+the counts evidence rather than decoration.
+
+**The second — "release-lib no longer defines it" — was falsified in both directions**, by building a
+throwaway pair of libs and reading `ScriptBlock.File`: `False` where the upper lib only dot-sources, `True`
+the moment it defines a copy of its own. So re-adding a per-lib copy turns a test red instead of being
+silently shadowed and invisible, which is what a duplicate definition would otherwise be — both libs are
+loaded together in every real caller.
+
+##### What is deliberately still outside this change
+
+Measured while scoping it, and stated rather than left for somebody to rediscover: **six more fence walks
+exist in the script layer**, none of them a per-line-flag reader and none of them reachable from this owner
+without a new dependency. `pr-body-lib.ps1` and `check-roster-sync.ps1` strip fences out of a text; the lint
+gate has `Get-FenceMaskedText` (which masks rather than flags, to preserve character offsets) plus three
+single-purpose walks of its own. Each would need its own dependency decision, and none shares the defect
+this change repairs — the entry format's readers now agree with each other, which is what mattered.
+
+#### Type of change
+
+Fix
+
+[PR #479](https://github.com/DaveKJohn/claude-code-specialists/pull/479) · merged 2026-08-05
+
+---
+
+### A shared parser's change is probed against a consumer's document, not only this repo's
+
+#### What does this change do?
+
+One hard rule added to [Sylvester #15's portable manual](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/specialists/manuals/05-15-manual.md):
+**when a shared script changes what it recognises, probe it against a consumer's document.** A shared
+script reaches a consumer through a plugin update rather than by their choosing, so a parser that has
+learned a new shape meets their *old* one first — and the source repo is the worst possible place to
+notice that, because it is the one repo that has already migrated. Its own files are the new shape by the
+time the change is finished, and every test written alongside the change uses the new shape too.
+
+**The rule names the failure mode, which is silence rather than an error.** A parser handed a shape it was
+not written for produces a confident, well-formed, wrong answer, and the gates that might have caught it
+are often reading that same answer.
+
+**The measured instance is [#476](https://github.com/DaveKJohn/claude-code-specialists/pull/476),** where
+`CHANGELOG.md` became one flat list of `##` entries. Probed against a consumer still on the pre-flat shape,
+their `## Pull Requests` heading parsed as ONE entry swallowing every real entry and `## Releases` as a
+second — so their whole release history would have been published into the release notes and the
+per-plugin CHANGELOGs as a "change", and then deleted from `CHANGELOG.md`, because the cut keeps only the
+intro. **And nothing refused:** blocks like that declare no impact, so the bump gate read the repo as never
+having adopted the tier model and reported itself *inactive* — correct by its own rule, and the reason the
+release would have proceeded. Found by building a synthetic consumer while scoring that branch's own entry,
+not by a failing suite. The guard that now refuses it shipped in the same PR.
+
+**And it states what makes the repair safe**, which is the half easiest to get wrong: a refusal that will
+fire in repos you cannot see needs an *exact* discriminator, not "looks wrong". Name the shapes that are
+legitimate, check that each declares something the old shape cannot, refuse the rest before writing
+anything, and name both the offending part and the migration. A refusal that can fire on a legitimate
+document is worse than the defect, because it arrives in someone else's repo.
+
+**It goes to the portable manual rather than to this repo's lens**, per the August 4, 2026 rule: the source
+is the default destination and the lens is the exception that needs a reason. Nothing about this rule is
+specific to this repo — any repo maintaining scripts that travel to consumers meets it — and a portable
+rule filed in a lens is not wrong anywhere, it simply never arrives.
+
+#### Type of change
+
+Docs
+
+[PR #477](https://github.com/DaveKJohn/claude-code-specialists/pull/477) · merged 2026-08-05
+
+---
+
 ## v3.5.0 — 2026-08-05
 
 ### Features
