@@ -113,7 +113,7 @@ Assert-Equal '' $liveStage "Get-LiveStage defaults to '' in this workshop (no se
 # pinned by script-contract.tests.ps1.
 Assert-Equal 'TODO: title' (Get-EntryTitlePlaceholder) 'Get-EntryTitlePlaceholder matches the shared default'
 Assert-Equal '**To do / where I left off:**' (Get-EntryBodyHeading) 'Get-EntryBodyHeading matches the shared default'
-Assert-Equal 'TODO: what still needs to happen on this branch, and where you left off.' (Get-EntryBodyPlaceholder) 'Get-EntryBodyPlaceholder matches the shared default'
+Assert-Equal 'TODO: what this change does, for whoever reads CHANGELOG.md later.' (Get-EntryBodyPlaceholder) 'Get-EntryBodyPlaceholder matches the shared default'
 Assert-Equal 'Chore' (Get-EntryFallbackType) 'Get-EntryFallbackType matches the shared default'
 
 # The fallback type must be a type this repo's own branch table actually produces -- the release cut

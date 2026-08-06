@@ -36,10 +36,11 @@
       1. The correct "Type of change" box is ticked based on the branch prefix (the same source
          as the label -- the `<prefix>/` rule in the template).
       2. "What does this change do?" is filled with the description from the changelog entry file
-         (<SafeName>.md in the repo root), which always exists on the branch. So you never have to
-         type anything twice.
-      3. The two checklist items that are always true at that point are ticked: "Changelog entry
-         file created" (exists, since it was just read) and "Requested by Dave" (the script only
+         (branch/branch-changelog.md, or the pre-split <SafeName>.md in the repo root), which always
+         exists on the branch. So you never have to type anything twice.
+      3. The two checklist items that are true at that point are ticked: "Changelog entry written"
+         (the entry file actually holds an entry -- not merely that it exists, since the branch/
+         split it exists on the trunk too) and "Requested by Dave" (the script only
          runs at Dave's request). The remaining checklist items stay empty -- those are human
          judgement checks the script cannot honestly verify.
       If you do supply -Body, it is used literally (override).
@@ -218,7 +219,27 @@ if ($branch -eq 'main') { Write-Error "You are on main; a PR is created from a b
 # Resolved BEFORE the gates (it is a pure function of the branch name), because the resolves gate
 # below needs the entry-file path and the label logic further down needs the same object.
 $info = Get-BranchInfo -Branch $branch
-$entryPath = Join-Path $repoRoot ($info.SafeName + '.md')
+
+# Dot-sourced HERE rather than inside the scaffold gate below, because resolving the entry's path now
+# needs the lib too. One load, at the first point anything requires it.
+. (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
+
+# THE ENTRY LIVES IN branch/ SINCE THE SPLIT (Dave, August 6, 2026), with the root <SafeName>.md still
+# accepted as the fallback. Both exist in the wild simultaneously: a branch created before the split
+# carries the root form, and consumers receive these scripts through a plugin update rather than by
+# choosing to. Preferring the new path and falling back to the old one is what lets a branch cut over
+# mid-flight without this gate suddenly finding no entry -- which would not merely warn, it would let a
+# scaffolded entry through, since a gate with nothing to read reports nothing.
+$branchFiles = Get-BranchFilePaths
+$entryPath = Join-Path $repoRoot $branchFiles.Changelog
+if (-not (Test-Path -LiteralPath $entryPath)) {
+    $entryPath = Join-Path $repoRoot ($info.SafeName + '.md')
+} elseif (-not (Test-BranchChangelogIsFilled -Text ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)))) {
+    # Present but still in its reset state: this branch never ran the scaffolder, so if a root entry
+    # exists it is the real one. The reset file is not an entry and must not be read as an empty one.
+    $legacyPath = Join-Path $repoRoot ($info.SafeName + '.md')
+    if (Test-Path -LiteralPath $legacyPath) { $entryPath = $legacyPath }
+}
 
 # The entry's description, read ONCE here because two paths need it: the template auto-fill for a fresh
 # PR, and -RefreshBody for a resumed one. Reading it twice would be two chances to read it differently.
@@ -374,11 +395,12 @@ Both are honest answers; the gate only refuses to guess.
 # no gh and no subprocess, and refusing it is a content decision rather than a tooling one. -Force is
 # the escape valve, for the rare entry that legitimately quotes the wording outside a fence.
 if (Test-Path -LiteralPath $entryPath) {
-    . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
     $entryText = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
     $scaffoldFindings = @(Get-EntryScaffoldFindings -EntryText $entryText -Wording (Get-EntryScaffoldWording))
     if ($scaffoldFindings.Count -gt 0) {
-        $entryRel = Split-Path $entryPath -Leaf
+        # Repo-relative, not the bare leaf. Every branch's entry is now called branch-changelog.md, so a
+        # leaf-only name in the refusal tells the reader nothing about which file to open.
+        $entryRel = $entryPath.Substring($repoRoot.Length).TrimStart('\', '/')
         $detail = ($scaffoldFindings | ForEach-Object { "  - $($_.Label): '$($_.Marker)'" }) -join "`n"
         if ($Force) {
             Write-Warning "scaffold gate: $entryRel still carries scaffold wording, but -Force was given:`n$detail"
@@ -556,7 +578,9 @@ if ($existingPr) {
         if (-not $descHeading) {
             Write-Warning "-RefreshBody: no '## ' heading found in .github/pull_request_template.md - the description was left as it is."
         } elseif (-not $entryDescription) {
-            Write-Warning "-RefreshBody: $($info.SafeName).md has no description under its '###' heading - the PR description was left as it is."
+            # The resolved path, not a name rebuilt from the branch: which of the two forms was actually
+            # read is the first thing the reader needs in order to open the right file.
+            Write-Warning "-RefreshBody: $($entryPath.Substring($repoRoot.Length).TrimStart('\', '/')) has no description under its '###' heading - the PR description was left as it is."
         } else {
             $refreshed = $false
             $newBody = Update-PrBodySection -Body $newBody -Heading $descHeading -Content $entryDescription -Changed ([ref]$refreshed)
@@ -627,13 +651,19 @@ if (-not $Body) {
         # Tick / fill in what the script deterministically knows:
         #   - the "Type of change" box whose line contains `<prefix>/`;
         #   - the placeholder under "What does this change do?" -> the description;
-        #   - "Changelog entry file created": true as soon as <SafeName>.md exists (just read);
+        #   - "Changelog entry written": true once the entry file actually holds an entry (just read);
         #   - "Requested by Dave": always true -- this script only runs at Dave's request.
         # The remaining checklist items stay empty on purpose: human judgement checks.
         # Each of the three string matches is BILINGUAL: it accepts both the legacy Dutch template
         # strings AND the new English ones, so a consumer whose PR template is still Dutch keeps working.
         $prefixPattern = '^- \[ \] `' + [regex]::Escape($info.Prefix) + '/`'
-        $entryExists = Test-Path $entryPath
+        # NOT Test-Path any more, and that is a correctness fix rather than a rename. Since the split the
+        # entry lives at a fixed path that EXISTS ON THE TRUNK in its reset state, so "the file is there"
+        # stopped being evidence of anything -- it would tick the box on a branch that never wrote an
+        # entry, which is the one direction a self-ticking checklist must never fail in. The test is
+        # whether the file actually holds an entry, which is the same structural test the fold uses.
+        $entryExists = (Test-Path -LiteralPath $entryPath) -and
+            (Test-BranchChangelogIsFilled -Text ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)))
 
         # #101: the description placeholder(s) and the approval-checklist pattern are overridable
         # via optional repo-config functions, so a consumer with its own PR template text does not
@@ -658,7 +688,12 @@ if (-not $Body) {
                 $line -replace '^- \[ \]', '- [x]'
             } elseif ($desc -and ($descPlaceholders -contains $line)) {
                 $desc
-            } elseif ($entryExists -and $line -match '^- \[ \] Changelog entry(-bestand aangemaakt| file created)') {
+            # 'written' joined the alternation with the branch/ split, which renamed the item: the file is
+            # no longer *created* by the branch (it exists on the trunk in its reset state), it is written
+            # into. All three spellings are accepted for the reason the two Dutch/English ones already are
+            # -- a consumer's PR template is their file, and this script must not silently stop ticking an
+            # item because the template it ships with moved on.
+            } elseif ($entryExists -and $line -match '^- \[ \] Changelog entry(-bestand aangemaakt| file created| written)') {
                 $line -replace '^- \[ \]', '- [x]'
             } elseif ($line -match $approvalPattern) {
                 $line -replace '^- \[ \]', '- [x]'

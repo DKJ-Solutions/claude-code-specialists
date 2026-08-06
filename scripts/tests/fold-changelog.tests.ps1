@@ -46,6 +46,10 @@ $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
 # rank from, and the ranked insert offset. A $PSScriptRoot-relative sibling of the fold script, so the
 # fixture has to carry it.
 $EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
+# Dot-sourced into the RUNNER as well, not only copied into each fixture: the branch/ cases build their
+# fixture files with the real formatters and assert with the real predicates, so a change to the format
+# breaks the script and its test together instead of leaving the test asserting a shape nothing writes.
+. $EntryScaffoldSrc
 
 $script:pass = 0
 $script:fail = 0
@@ -542,6 +546,69 @@ $clF = Get-Changelog -Dir $dirF
 Assert-True ($clF -match 'the real one')            'fenced: the REAL declaration is the one folded in'
 Assert-True ($clF -match 'quoted, not declared')    'fenced: and the quoted table survives inside its fence'
 Assert-True ($rF.Output -notmatch 'no significance') 'fenced: the real row was read, so nothing is reported missing'
+
+Write-Host "The branch/ pair: folded from the new path, RESET rather than deleted" -ForegroundColor Cyan
+#      The split (Dave, August 6, 2026). Two things have to hold that did not exist before: the entry is
+#      found at a fixed path instead of one named after the branch, and clearing it means rewriting it to
+#      its empty state -- deleting it would leave the trunk missing a file the next branch expects.
+$dirBF = New-FoldFixture -Label 'branchfiles'
+$bfPaths = Get-BranchFilePaths
+New-Item -ItemType Directory -Path (Join-Path $dirBF $bfPaths.Directory) -Force | Out-Null
+New-EntryFile -Dir $dirBF -Name $bfPaths.Changelog -Title 'Written in the branch folder' -Rows '| 1 | 4 | the split |'
+[System.IO.File]::WriteAllText((Join-Path $dirBF $bfPaths.Progress),
+    ((Format-BranchProgressScaffold -Branch 'feat/branch-folder') -join "`n") + "`n", $Utf8NoBom)
+
+$rBF = Invoke-Fold -Dir $dirBF
+Assert-True ($rBF.ExitCode -eq 0) 'branch files: exits 0'
+Assert-True ((Get-Changelog -Dir $dirBF) -match 'Written in the branch folder') 'branch files: the entry landed in CHANGELOG.md'
+
+$bfChangelogPath = Join-Path $dirBF $bfPaths.Changelog
+$bfProgressPath  = Join-Path $dirBF $bfPaths.Progress
+Assert-True (Test-Path -LiteralPath $bfChangelogPath) 'branch files: the entry file still EXISTS -- it is a fixed path the next branch will use'
+$bfChangelogAfter = [System.IO.File]::ReadAllText($bfChangelogPath)
+Assert-True (-not (Test-BranchChangelogIsFilled -Text $bfChangelogAfter)) 'branch files: and it is back in its empty state'
+Assert-True (-not ($bfChangelogAfter -match 'Written in the branch folder')) 'branch files: with the folded entry gone from it, not merely appended to'
+
+$bfProgressAfter = [System.IO.File]::ReadAllText($bfProgressPath)
+Assert-True (-not ($bfProgressAfter -match '(?m)^- \[ \] ')) 'branch files: the step list is reset too -- a merged branch does not hand its ticked boxes to the next one'
+Assert-Equal 'main' (Get-BranchFileDeclaredBranch -Text $bfProgressAfter) 'branch files: and the reset names the trunk again'
+Assert-True ($rBF.Output -match 'reset') 'branch files: the run says it reset rather than removed, so the reader does not go looking for a deleted file'
+
+Write-Host "A RESET branch-changelog.md is not an entry, and is not folded" -ForegroundColor Cyan
+#      The reset state opens with an H1, exactly as CONTRIBUTING.md does. This is what makes a double fold
+#      impossible and what stops the trunk's own empty file being pasted into CHANGELOG.md as a change.
+$dirBR = New-FoldFixture -Label 'branchreset'
+New-Item -ItemType Directory -Path (Join-Path $dirBR $bfPaths.Directory) -Force | Out-Null
+[System.IO.File]::WriteAllText((Join-Path $dirBR $bfPaths.Changelog),
+    ((Format-BranchChangelogReset) -join "`n") + "`n", $Utf8NoBom)
+[System.IO.File]::WriteAllText((Join-Path $dirBR $bfPaths.Progress),
+    ((Format-BranchProgressReset) -join "`n") + "`n", $Utf8NoBom)
+$clBR0 = Get-Changelog -Dir $dirBR
+$rBR = Invoke-Fold -Dir $dirBR
+Assert-True ($rBR.ExitCode -eq 0) 'reset pair: exits 0 -- nothing to fold is not an error'
+Assert-True ($rBR.Output -match 'No entry files found') 'reset pair: and it says there was nothing to fold'
+Assert-True ((Get-Changelog -Dir $dirBR) -eq $clBR0) 'reset pair: CHANGELOG.md is byte-identical'
+
+Write-Host "The fold commit names both branch files" -ForegroundColor Cyan
+#      The entry is modified rather than deleted now, and the step list rides along because this run
+#      rewrote it. Leaving either out produces a commit that resets half the pair.
+$dirBC = New-FoldFixture -Label 'branchcommit'
+New-Item -ItemType Directory -Path (Join-Path $dirBC $bfPaths.Directory) -Force | Out-Null
+New-EntryFile -Dir $dirBC -Name $bfPaths.Changelog -Title 'Committed from the branch folder' -Rows '| 1 | 2 | commit scope |'
+[System.IO.File]::WriteAllText((Join-Path $dirBC $bfPaths.Progress),
+    ((Format-BranchProgressScaffold -Branch 'feat/commit-scope') -join "`n") + "`n", $Utf8NoBom)
+Initialize-FoldGitRepo -Dir $dirBC
+# An unrelated staged file, to prove the enforced scope did not widen along with the path change.
+[System.IO.File]::WriteAllText((Join-Path $dirBC 'stray.txt'), "unrelated`n", $Utf8NoBom)
+Invoke-Git -Dir $dirBC -GitArgs @('add', 'stray.txt') | Out-Null
+
+$rBC = Invoke-Fold -Dir $dirBC -ExtraArgs @('-Commit')
+Assert-True ($rBC.ExitCode -eq 0) 'fold commit: exits 0'
+$bcFiles = @(Invoke-Git -Dir $dirBC -GitArgs @('diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'))
+Assert-True ($bcFiles -contains 'CHANGELOG.md')        'fold commit: CHANGELOG.md is in it'
+Assert-True ($bcFiles -contains $bfPaths.Changelog)    'fold commit: the reset entry file is in it'
+Assert-True ($bcFiles -contains $bfPaths.Progress)     'fold commit: and the reset step list, so the pair lands together'
+Assert-True (-not ($bcFiles -contains 'stray.txt'))    'fold commit: the unrelated staged file is NOT swept in -- the pathspec scope is unchanged'
 
 # ---------------------------------------------------------------------------------------------------
 foreach ($f in $script:fixtures) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }

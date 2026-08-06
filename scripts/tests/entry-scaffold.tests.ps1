@@ -59,14 +59,14 @@ Write-Host "Get-EntryScaffoldWording (the seam probe)" -ForegroundColor Cyan
 $bare = Get-EntryScaffoldWording
 Assert-Equal 'TODO: title' $bare.Title 'no getters: the default placeholder title'
 Assert-Equal '**To do / where I left off:**' $bare.BodyHeading 'no getters: the default body heading'
-Assert-Equal 'TODO: what still needs to happen on this branch, and where you left off.' $bare.BodyPlaceholder 'no getters: the default fallback body'
+Assert-Equal 'TODO: what this change does, for whoever reads CHANGELOG.md later.' $bare.BodyPlaceholder 'no getters: the default fallback body'
 
 function Get-EntryTitlePlaceholder { return 'TE DOEN: titel' }
 function Get-EntryBodyHeading { return '**Nog te doen:**' }
 $overridden = Get-EntryScaffoldWording
 Assert-Equal 'TE DOEN: titel' $overridden.Title 'override: the repo answer wins for the title'
 Assert-Equal '**Nog te doen:**' $overridden.BodyHeading 'override: and for the body heading'
-Assert-Equal 'TODO: what still needs to happen on this branch, and where you left off.' $overridden.BodyPlaceholder 'override: an unmentioned string keeps its default -- probed per key, not all-or-nothing'
+Assert-Equal 'TODO: what this change does, for whoever reads CHANGELOG.md later.' $overridden.BodyPlaceholder 'override: an unmentioned string keeps its default -- probed per key, not all-or-nothing'
 Remove-Item Function:\Get-EntryTitlePlaceholder, Function:\Get-EntryBodyHeading
 
 # An EMPTY override is ignored, and this is the load-bearing one. A blank marker is a substring of every
@@ -85,13 +85,25 @@ $wording = Get-EntryScaffoldWording
 $written = "### A real title $midDot Feat $midDot 2026-08-03`n`nThis entry says what the change does.`n"
 Assert-Equal 0 (@(Get-EntryScaffoldFindings -EntryText $written -Wording $wording)).Count 'a written entry produces no findings'
 
-$untouched = "### TODO: title $midDot Chore $midDot 2026-08-03`n`n**To do / where I left off:**`n`nTODO: what still needs to happen on this branch, and where you left off.`n"
-$allThree = @(Get-EntryScaffoldFindings -EntryText $untouched -Wording $wording)
-Assert-Equal 3 $allThree.Count 'a completely untouched scaffold produces all three findings'
-Assert-True (@($allThree | ForEach-Object { $_.Label }) -contains 'the placeholder title') 'the placeholder title is named'
-Assert-True (@($allThree | ForEach-Object { $_.Label }) -contains 'the scaffold body heading') 'the body heading is named'
-Assert-True (@($allThree | ForEach-Object { $_.Label }) -contains 'the fallback body') 'the fallback body is named'
-Assert-True ($allThree[0].Marker -is [string] -and $allThree[0].Marker.Length -gt 0) 'each finding carries the literal marker it matched, for the error message'
+# The CURRENT untouched scaffold: since the branch/ split the writer no longer puts a to-do heading above
+# the body, so an unedited entry carries exactly two markers.
+$untouched = "## TODO: title`n`n### What does this change do?`n`nTODO: what this change does, for whoever reads CHANGELOG.md later.`n"
+$bothMarkers = @(Get-EntryScaffoldFindings -EntryText $untouched -Wording $wording)
+Assert-Equal 2 $bothMarkers.Count 'a completely untouched scaffold produces a finding per marker it carries'
+Assert-True (@($bothMarkers | ForEach-Object { $_.Label }) -contains 'the placeholder title') 'the placeholder title is named'
+Assert-True (@($bothMarkers | ForEach-Object { $_.Label }) -contains 'the fallback body') 'the fallback body is named'
+Assert-True ($bothMarkers[0].Marker -is [string] -and $bothMarkers[0].Marker.Length -gt 0) 'each finding carries the literal marker it matched, for the error message'
+
+# THE PRE-SPLIT SCAFFOLD IS STILL REFUSED, and this is the assert that matters most about the change that
+# retired it. Every consumer with a branch in flight has an entry in exactly this shape, and they receive
+# the new scripts through a plugin update rather than by choosing to. A gate that only knew the current
+# wording would wave all of them through into CHANGELOG.md without erroring -- so both are recognised, and
+# only one is written.
+$legacyUntouched = "### TODO: title $midDot Chore $midDot 2026-08-03`n`n**To do / where I left off:**`n`nTODO: what still needs to happen on this branch, and where you left off.`n"
+$legacyFindings = @(Get-EntryScaffoldFindings -EntryText $legacyUntouched -Wording $wording)
+Assert-Equal 3 $legacyFindings.Count 'the pre-split scaffold still produces all three of its findings'
+Assert-True (@($legacyFindings | ForEach-Object { $_.Label }) -contains 'the scaffold body heading') 'the retired body heading is still named'
+Assert-True (@($legacyFindings | ForEach-Object { $_.Label }) -contains 'a retired scaffold placeholder') 'and the retired placeholder is named as retired, so the message says which era it came from'
 
 # THE SHAPE THAT ACTUALLY SHIPPED (v3.2.0, entries #424/#425/#426): the author kept the heading and
 # appended a status behind it. A whole-line match would have passed all three, which is why the matcher
@@ -156,13 +168,31 @@ try {
     $ErrorActionPreference = $prevEap
 }
 
-$writtenEntry = Join-Path $fixture 'feat-round-trip.md'
+# branch/branch-changelog.md, not feat-round-trip.md in the root: since the branch/ split the writer uses
+# fixed paths, and the path it uses comes from the same lib the readers use.
+$writtenEntry = Join-Path $fixture ((Get-BranchFilePaths).Changelog)
 Assert-True (Test-Path -LiteralPath $writtenEntry) 'the writer produced an entry file in the fixture'
+
+# THE SECOND FILE, which is the half of the split the entry itself can no longer be asked about: the step
+# list exists, names the branch it was created on, and is a separate document rather than a section of the
+# entry. Asserted on the real writer's output for the same reason the entry is.
+$writtenProgress = Join-Path $fixture ((Get-BranchFilePaths).Progress)
+Assert-True (Test-Path -LiteralPath $writtenProgress) 'the writer produced the step list beside it'
+if (Test-Path -LiteralPath $writtenProgress) {
+    $progressText = [System.IO.File]::ReadAllText($writtenProgress, [System.Text.Encoding]::UTF8)
+    Assert-Equal 'feat/round-trip' (Get-BranchFileDeclaredBranch -Text $progressText) 'the step list names the branch it belongs to -- the fold reads this back to find the PR'
+    Assert-True ($progressText -match '(?m)^- \[ \] ') 'and it opens its list with an unticked item'
+    Assert-Equal 0 @(Get-EntryScaffoldFindings -EntryText $progressText -Wording (Get-EntryScaffoldWording)).Count 'the step list carries no entry-scaffold markers -- it is not an entry and must not be judged as one'
+}
+
 if (Test-Path -LiteralPath $writtenEntry) {
     $text = [System.IO.File]::ReadAllText($writtenEntry, [System.Text.Encoding]::UTF8)
     $roundTrip = @(Get-EntryScaffoldFindings -EntryText $text -Wording (Get-EntryScaffoldWording))
     Assert-True ($roundTrip.Count -gt 0) 'the matcher sees the writer output as scaffolded -- writer and guard share one source'
-    Assert-Equal 3 $roundTrip.Count 'and it finds all three strings the writer wrote'
+    Assert-Equal 2 $roundTrip.Count 'and it finds both strings the writer wrote (the to-do heading is no longer one of them)'
+    # THE ENTRY NO LONGER ASKS FOR A TO-DO LIST, which is the whole point of the split: the file whose text
+    # folds verbatim into CHANGELOG.md must prompt for what the change DOES.
+    Assert-True (-not ($text -match 'To do / where I left off')) 'the entry carries no to-do heading -- that job moved to the step list'
     # THE SAME ROUND TRIP FOR THE IMPACT DECLARATION, and it is the assert that matters most for the tier
     # model: the writer, the validator (open-pr), the fold and the cut all read this one format, and a real
     # file written by the real writer is the only thing that proves they agree. Tier 0 is DECLARED, not merely

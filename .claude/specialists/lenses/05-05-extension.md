@@ -58,9 +58,10 @@ Creating the branch and creating its changelog entry file are no longer two sepa
 **a branch is never entry-less.** `new-branch.ps1` checks out the branch (idempotently — running it
 again on an existing branch simply resumes it) and then immediately calls the shared
 `new-changelog-entry.ps1` ([Rendall #06](05-06-extension.md#changelog)) as a child step to scaffold
-`<branch-name>.md`. Mechanism ownership of the entry file stays with Rendall; Derek's `new-branch` is
-what triggers it at the moment the branch is born. The assigned specialist then fills in the
-description while building. As soon as that work is finished and committed, the PR follows in
+the branch's two files in `branch/` — `branch-changelog.md` (the entry) and `branch-progress.md` (the
+step list, which also names the branch). Mechanism ownership of both stays with Rendall; Derek's
+`new-branch` is what triggers it at the moment the branch is born. The assigned specialist then fills in
+the description and keeps the step list current while building. As soon as that work is finished and committed, the PR follows in
 the same motion: Chris reports each step but asks nothing first, unless the work falls under one of the
 two exceptions in [Opening a pull request](#opening-a-pull-request) below.
 
@@ -119,8 +120,10 @@ started.
 
 **The PR body fills itself in** via `open-pr.ps1` — simply leave out `-Body`. The script ticks the
 right "Type of change" box (from the branch prefix), fills "What does this change do?" with the
-description from the changelog entry file (`<branch>.md`), and checks the two always-true
-checklist items ("Changelog entry-bestand aangemaakt" + "Aangevraagd door Dave"). Only pass `-Body`
+description from the changelog entry (`branch/branch-changelog.md`), and ticks the two checklist items
+it can honestly verify ("Changelog entry written" + "Requested by Dave"). The first is judged on the file
+actually **holding** an entry, not on its existing — since the split it exists on `main` too, in its
+reset state, so a self-ticking box keyed on existence would tick for a branch that wrote nothing. Only pass `-Body`
 if you want to override the auto-fill; do that via `--body-file`, never inline — see
 [the quoting lesson](#the-quoting-lesson-where-it-was-measured).
 
@@ -250,12 +253,12 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
 Derek prefers not to touch the git commands by hand. His toolbox:
 
 - `scripts/task/new-branch.ps1 -Name <branch-name> [-Title "…"] [-Intent "…"] [-Park]` — create (or
-  idempotently resume) the branch and, in the same move, scaffold its changelog entry file by
+  idempotently resume) the branch and, in the same move, write its two files in `branch/` by
   calling the shared `new-changelog-entry.ps1` as a child step. `-Intent` records where you left
-  off / what is next in the entry body (empty → a directional fallback block instead of a bare
-  TODO); `-Park` commits that entry and pushes the branch to `origin` for later / another device —
-  **still no PR** (#162). Without `-Park`: no push, no PR — just the branch + the entry file on
-  disk. See [Step 3 above](#classifying-naming-and-creating-a-branch).
+  off / what is next in **`branch-progress.md`** — deliberately not in the entry, whose text folds
+  verbatim into `CHANGELOG.md`; `-Park` commits **both** files and pushes the branch to `origin` for
+  later / another device — **still no PR** (#162). Without `-Park`: no push, no PR — just the branch +
+  the two files on disk. See [Step 3 above](#classifying-naming-and-creating-a-branch).
 - `scripts/task/park-branch.ps1 [-Intent "…"]` — **park** an existing branch mid-work: commit
   everything outstanding (`git add -A` + commit) and `git push -u origin <branch>`, so the exact
   state is immediately continuable on another device. Refuses on `main`, opens **no PR**, and does

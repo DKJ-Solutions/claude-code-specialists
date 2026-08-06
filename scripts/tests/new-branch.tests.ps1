@@ -36,6 +36,10 @@ $EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 # PowerShell's mandatory-param binding catches an empty -Name via the CLI with a generic error, so
 # the exact Reason text can only be tested directly.
 . $BranchInfoSrc
+# The asserts read the branch files' paths and their branch line from the lib rather than from literals,
+# so a path change breaks the writer and the test together instead of leaving the test asserting a stale
+# location that still passes.
+. $EntryScaffoldSrc
 
 $script:pass = 0
 $script:fail = 0
@@ -383,8 +387,13 @@ try {
     Assert-Equal 0 $r1.Code 'valid name: new-branch exit 0'
     $headBranch1 = (& git -C $fixtureBC rev-parse --abbrev-ref HEAD).Trim()
     Assert-Equal 'feat/my-task' $headBranch1 'HEAD is on the new branch'
-    $entryPath = Join-Path $fixtureBC 'feat-my-task.md'
-    Assert-True (Test-Path -LiteralPath $entryPath) 'entry file created in the repo root with the correct SafeName'
+    # branch/branch-changelog.md, from the lib rather than written out here: the test must fail if the
+    # writer and the readers stop agreeing about the path, not merely if this literal goes stale.
+    $entryPath    = Join-Path $fixtureBC ((Get-BranchFilePaths).Changelog)
+    $progressPath = Join-Path $fixtureBC ((Get-BranchFilePaths).Progress)
+    Assert-True (Test-Path -LiteralPath $entryPath) 'entry file created at the fixed branch/ path'
+    Assert-True (Test-Path -LiteralPath $progressPath) 'and the step list beside it -- a branch gets both files or neither'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fixtureBC 'feat-my-task.md'))) 'nothing is written to the repo root any more'
     $entryText1 = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
     Assert-True ($entryText1 -match [regex]::Escape('First title')) 'entry heading contains the given title'
     # THE HEADING IS NOW THE TITLE AND NOTHING ELSE (August 5, 2026), at the entry level rather than one
@@ -396,21 +405,35 @@ try {
     Assert-Equal '## First title' $headLine1 'entry heading is the title alone, at the entry level'
     Assert-True (Test-EntryDeclaresType -EntryText $entryText1 -Type 'Feat') 'and the branch type is stated in its own section instead'
     Assert-True (-not ($headLine1 -match '\d{4}-\d{2}-\d{2}')) 'the scaffold writes NO date -- it would be the branch birth date, not the landing date'
-    # (#162) No -Intent given -> the body falls back to the directional block, not a bare TODO.
-    Assert-True ($entryText1 -match [regex]::Escape('**To do / where I left off:**')) 'no -Intent: entry body has the directional heading'
-    Assert-True ($entryText1 -match 'what still needs to happen on this branch') 'no -Intent: directional fallback TODO, not the old bare description line'
+    # THE ENTRY NO LONGER CARRIES A TO-DO LIST. That job moved to branch-progress.md with the split, and
+    # this pair of asserts is what holds the two files to their separate jobs: the file that folds into
+    # CHANGELOG.md prompts for what the change DOES, and nothing else.
+    Assert-True (-not ($entryText1 -match [regex]::Escape('**To do / where I left off:**'))) 'the entry has no to-do heading -- that lives in the step list now'
+    Assert-True ($entryText1 -match 'what this change does') 'the entry body prompts for the description, not for a plan'
+
+    $progressText1 = [System.IO.File]::ReadAllText($progressPath, [System.Text.Encoding]::UTF8)
+    Assert-Equal 'feat/my-task' (Get-BranchFileDeclaredBranch -Text $progressText1) 'the step list names the branch it was created on'
+    Assert-True ($progressText1 -match '(?m)^- \[ \] ') 'and carries an unticked first step'
+    Assert-True (-not ($progressText1 -match '(?m)^## Steps\s*$\s*_\(')) 'it is the scaffolded shape, not the reset placeholder'
 
     Write-Host "new-branch.ps1 -- idempotent (second run, same name)" -ForegroundColor Cyan
     $r2 = Invoke-NewBranch -Dir $fixtureBC -Name 'feat/my-task' -Title 'Second title (should be ignored)'
     Assert-Equal 0 $r2.Code 'idempotent second run: exit 0'
     Assert-True (Test-Phrase -Text $r2.Out -Phrase 'already existed') 'second run reports the branch already existed (checkout, not -b)'
-    Assert-True (Test-Phrase -Text $r2.Out -Phrase 'already exists') 'second run reports the entry file already exists'
+    Assert-True (Test-Phrase -Text $r2.Out -Phrase 'already written') 'second run reports the branch files were already written'
     $headBranch2 = (& git -C $fixtureBC rev-parse --abbrev-ref HEAD).Trim()
     Assert-Equal 'feat/my-task' $headBranch2 'HEAD stays on the same branch after the second run'
     $entryText2 = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
     Assert-Equal $entryText1 $entryText2 'entry content unchanged -- no overwrite, second title ignored'
-    $entryFiles = @(Get-ChildItem -LiteralPath $fixtureBC -Filter '*.md' -File | Where-Object { $_.Name -ne 'README.md' })
-    Assert-Equal 1 $entryFiles.Count 'no duplicate entry -- exactly one entry file in the repo root'
+    # THE ONE THAT WOULD HURT MOST: a rerun must not wipe a step list somebody has been ticking off. The
+    # branch files are a fixed path, so "does it exist" can no longer be the idempotency test -- this proves
+    # the replacement (what the file says it belongs to) actually holds.
+    $progressText2 = [System.IO.File]::ReadAllText($progressPath, [System.Text.Encoding]::UTF8)
+    Assert-Equal $progressText1 $progressText2 'step list unchanged -- a rerun does not clobber work in progress'
+    $rootMd = @(Get-ChildItem -LiteralPath $fixtureBC -Filter '*.md' -File | Where-Object { $_.Name -ne 'README.md' })
+    Assert-Equal 0 $rootMd.Count 'the repo root stays clean -- no entry file lands there at all'
+    $branchDirFiles = @(Get-ChildItem -LiteralPath (Join-Path $fixtureBC 'branch') -Filter '*.md' -File)
+    Assert-Equal 2 $branchDirFiles.Count 'exactly the two branch files, no duplicate per branch'
 
     Write-Host "new-branch.ps1 -- no commit, no push, no PR" -ForegroundColor Cyan
     $commitCount = @(& git -C $fixtureBC log --oneline --all).Count
@@ -418,7 +441,7 @@ try {
     $remotes = @(& git -C $fixtureBC remote)
     Assert-Equal 0 $remotes.Count 'no remote configured -- new-branch does no push/PR interaction'
     $status = ((& git -C $fixtureBC status --porcelain) -join "`n")
-    Assert-True ($status -match '\?\? feat-my-task\.md') 'entry file is untracked -- no git add/commit performed'
+    Assert-True ($status -match '\?\? branch/') 'the branch files are untracked -- no git add/commit performed'
 
     # --- (e) Soft warn on unknown prefix: branch + entry still created, fallback type, exit 0 -------
     Write-Host "new-branch.ps1 -- unknown prefix: soft warn, no hard reject" -ForegroundColor Cyan
@@ -428,7 +451,7 @@ try {
     Assert-True (Test-Phrase -Text $rE.Out -Phrase 'Unknown branch prefix') 'warning about the unknown prefix in the output'
     $headBranchE = (& git -C $fixtureE rev-parse --abbrev-ref HEAD).Trim()
     Assert-Equal 'wip/experiment' $headBranchE 'branch still created and checked out despite unknown prefix'
-    $entryPathE = Join-Path $fixtureE 'wip-experiment.md'
+    $entryPathE = Join-Path $fixtureE ((Get-BranchFilePaths).Changelog)
     Assert-True (Test-Path -LiteralPath $entryPathE) 'entry file still created (fallback type)'
     $entryTextE = [System.IO.File]::ReadAllText($entryPathE, [System.Text.Encoding]::UTF8)
     Assert-True (Test-EntryDeclaresType -EntryText $entryTextE -Type 'Chore') 'entry falls back to branch type Chore, in its own section'
@@ -449,7 +472,7 @@ try {
     $rF = Invoke-NewBranchWithAdversarialField -Dir $fixtureF -Name 'feat/injection-check' -Field Title -Value $maliciousTitle
     Assert-Equal 0 $rF.Code 'malicious title: new-branch exit 0'
 
-    $entryPathF = Join-Path $fixtureF 'feat-injection-check.md'
+    $entryPathF = Join-Path $fixtureF ((Get-BranchFilePaths).Changelog)
     Assert-True (Test-Path -LiteralPath $entryPathF) 'malicious title: entry file created anyway'
     $entryTextF = [System.IO.File]::ReadAllText($entryPathF, [System.Text.Encoding]::UTF8)
     # The whole line, not a prefix: the heading is now the title alone, so an exact compare is available here
@@ -463,8 +486,9 @@ try {
     $sentinelTextF = [System.IO.File]::ReadAllText($sentinelPath, [System.Text.Encoding]::UTF8)
     Assert-True ($sentinelTextF -match 'sentinel') "sentinel file 'X' content unchanged"
 
+    # -File only, so the branch/ directory itself is not counted; the entry no longer lands in the root.
     $filesAfterF   = @(Get-ChildItem -LiteralPath $fixtureF -File | Select-Object -ExpandProperty Name | Sort-Object)
-    $expectedFiles = @('feat-injection-check.md', 'README.md', 'X') | Sort-Object
+    $expectedFiles = @('README.md', 'X') | Sort-Object
     Assert-True (-not (Compare-Object $expectedFiles $filesAfterF)) 'no extra/stray files created by the payload (no side effects)'
 
     $commitCountF = @(& git -C $fixtureF log --oneline --all).Count
@@ -485,25 +509,33 @@ try {
 
     $rG = Invoke-NewChangelogEntry -Dir $fixtureG -Title 'Explicit title' -EnvTitle 'Env title (should be ignored)'
     Assert-Equal 0 $rG.Code 'explicit -Title + set env var: exit 0'
-    $entryPathG = Join-Path $fixtureG 'feat-env-precedence.md'
+    $entryPathG = Join-Path $fixtureG ((Get-BranchFilePaths).Changelog)
     Assert-True (Test-Path -LiteralPath $entryPathG) 'entry file created'
     $entryTextG = [System.IO.File]::ReadAllText($entryPathG, [System.Text.Encoding]::UTF8)
     Assert-True ($entryTextG -match [regex]::Escape('Explicit title')) 'explicit -Title wins -- appears in the heading line'
     Assert-True (-not ($entryTextG -match [regex]::Escape('Env title'))) 'env-var title NOT used while -Title was given explicitly'
     Assert-True ($null -eq $env:CLAUDE_NEWBRANCH_TITLE) 'test process itself leaves no leaking CLAUDE_NEWBRANCH_TITLE behind after this scenario'
 
-    # --- (h) -Intent given: recorded as the entry body under the directional heading (#162) --------
-    Write-Host "new-branch.ps1 -- -Intent recorded as the entry body" -ForegroundColor Cyan
+    # --- (h) -Intent given: recorded in the STEP LIST, not the entry (#162, revised August 6, 2026) --
+    # The intent is a status -- "where I left off" -- and since the branch/ split that is exactly what
+    # branch-progress.md is for. It used to become the entry BODY, which put a progress note in the file
+    # whose text folds verbatim into CHANGELOG.md; that is the shape v3.2.0 measured shipping three times.
+    # So the pair of asserts below is deliberately mirrored: present in the step list, absent from the entry.
+    Write-Host "new-branch.ps1 -- -Intent recorded in the step list, not the entry" -ForegroundColor Cyan
     $fixtureH = New-Fixture -Label 'h'
     $intentText = 'Skeleton + routing done; next: wire the API client.'
     $rH = Invoke-NewBranch -Dir $fixtureH -Name 'feat/park-intent' -Title 'Parked work' -Intent $intentText
     Assert-Equal 0 $rH.Code '-Intent: new-branch exit 0'
-    $entryPathH = Join-Path $fixtureH 'feat-park-intent.md'
+    $entryPathH = Join-Path $fixtureH ((Get-BranchFilePaths).Changelog)
     Assert-True (Test-Path -LiteralPath $entryPathH) '-Intent: entry file created'
     $entryTextH = [System.IO.File]::ReadAllText($entryPathH, [System.Text.Encoding]::UTF8)
-    Assert-True ($entryTextH -match [regex]::Escape($intentText)) '-Intent: the intent text is the recorded entry body'
-    Assert-True ($entryTextH -match [regex]::Escape('**To do / where I left off:**')) '-Intent: still under the directional heading'
-    Assert-True (-not ($entryTextH -match 'what still needs to happen on this branch')) '-Intent: fallback TODO replaced by the intent'
+    Assert-True (-not ($entryTextH -match [regex]::Escape($intentText))) '-Intent: the intent does NOT land in the entry -- that text would fold into CHANGELOG.md verbatim'
+    Assert-True ($entryTextH -match 'what this change does') '-Intent: the entry keeps its own placeholder, so the gate still refuses it until written'
+
+    $progressPathH = Join-Path $fixtureH ((Get-BranchFilePaths).Progress)
+    $progressTextH = [System.IO.File]::ReadAllText($progressPathH, [System.Text.Encoding]::UTF8)
+    Assert-True ($progressTextH -match [regex]::Escape($intentText)) '-Intent: the intent is recorded in the step list instead'
+    Assert-True (-not ($progressTextH -match 'what has been done so far')) '-Intent: and it replaces that section placeholder rather than sitting beside it'
 
     # --- (i) -Park: commit the entry + push to origin, NO PR, entry-scoped ------------------------
     Write-Host "new-branch.ps1 -- -Park commits the entry and pushes to origin (no PR)" -ForegroundColor Cyan
@@ -537,7 +569,8 @@ try {
     $commitCountI = @(& git -C $fixtureI log --oneline).Count
     Assert-Equal 2 $commitCountI '-Park: exactly one park commit on top of the initial fixture commit'
 
-    # entry-scoped: the park commit contains ONLY the changelog entry, not the unrelated staged file
+    # branch-file-scoped: the park commit contains BOTH branch files and nothing else. Both, because the
+    # step list is the half that says what was still in flight, and parking exists to hand that over.
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
@@ -545,7 +578,8 @@ try {
     } finally {
         $ErrorActionPreference = $prevEap
     }
-    Assert-True ($parkCommitFiles -contains 'feat-parked-branch.md') '-Park: park commit contains the changelog entry'
+    Assert-True ($parkCommitFiles -contains (Get-BranchFilePaths).Changelog) '-Park: park commit contains the changelog entry'
+    Assert-True ($parkCommitFiles -contains (Get-BranchFilePaths).Progress) '-Park: and the step list -- parking the description without the plan defeats the flag'
     Assert-True (-not ($parkCommitFiles -contains 'stray.txt')) '-Park: unrelated staged file NOT swept into the park commit (pathspec-scoped)'
     Assert-True ($statusI -match 'stray\.txt') '-Park: unrelated file still left staged for the caller''s own commit'
 
@@ -572,13 +606,17 @@ try {
     $rJ = Invoke-NewBranchWithAdversarialField -Dir $fixtureJ -Name 'feat/intent-injection' -Field Intent -Value $maliciousIntent
     Assert-Equal 0 $rJ.Code 'malicious intent: new-branch exit 0'
 
-    $entryPathJ = Join-Path $fixtureJ 'feat-intent-injection.md'
+    $entryPathJ = Join-Path $fixtureJ ((Get-BranchFilePaths).Changelog)
     Assert-True (Test-Path -LiteralPath $entryPathJ) 'malicious intent: entry file created anyway'
-    $entryTextJ = [System.IO.File]::ReadAllText($entryPathJ, [System.Text.Encoding]::UTF8)
-    Assert-True ($entryTextJ.Contains($maliciousIntent)) 'malicious intent: FULLY and unchanged in the entry body (no argv splitting)'
+    # ASSERTED ON THE STEP LIST, because that is where an intent lands now. The boundary under test is
+    # unchanged -- free text crossing a native process boundary via an env var rather than argv -- only the
+    # file it ends up in moved, and asserting on the old one would have quietly stopped testing anything.
+    $progressPathJ = Join-Path $fixtureJ ((Get-BranchFilePaths).Progress)
+    $progressTextJ = [System.IO.File]::ReadAllText($progressPathJ, [System.Text.Encoding]::UTF8)
+    Assert-True ($progressTextJ.Contains($maliciousIntent)) 'malicious intent: FULLY and unchanged in the step list (no argv splitting)'
     Assert-True (Test-Path -LiteralPath $sentinelPathJ) "sentinel file 'X' UNTOUCHED -- no 'Remove-Item' executed via a broken argv"
     $filesAfterJ   = @(Get-ChildItem -LiteralPath $fixtureJ -File | Select-Object -ExpandProperty Name | Sort-Object)
-    $expectedFilesJ = @('feat-intent-injection.md', 'README.md', 'X') | Sort-Object
+    $expectedFilesJ = @('README.md', 'X') | Sort-Object
     Assert-True (-not (Compare-Object $expectedFilesJ $filesAfterJ)) 'malicious intent: no extra/stray files created by the payload (no side effects)'
 
     # --- (k) Repo-configured stub wording really reaches the entry file (#410) ---------------------
@@ -609,12 +647,15 @@ function Get-EntryFallbackType     { return $script:EntryFallbackType }
     # No -Title and no -Intent, and an UNKNOWN prefix -- so all four knobs are exercised at once.
     $rK = Invoke-NewBranch -Dir $fixtureK -Name 'wip/dutch-stub'
     Assert-Equal 0 $rK.Code 'configured wording: new-branch exit 0'
-    $entryPathK = Join-Path $fixtureK 'wip-dutch-stub.md'
+    $entryPathK = Join-Path $fixtureK ((Get-BranchFilePaths).Changelog)
     Assert-True (Test-Path -LiteralPath $entryPathK) 'configured wording: entry file created'
     $entryTextK = [System.IO.File]::ReadAllText($entryPathK, [System.Text.Encoding]::UTF8)
     Assert-True ($entryTextK -match [regex]::Escape('TODO: titel')) 'configured wording: the repo title placeholder is used'
     Assert-True (-not ($entryTextK -match [regex]::Escape('TODO: title'))) 'configured wording: the built-in English title placeholder is NOT used'
-    Assert-True ($entryTextK -match [regex]::Escape('**Nog te doen / waar ik gebleven ben:**')) 'configured wording: the repo body heading is used'
+    # The body heading is no longer WRITTEN by anything -- neither the repo's nor the built-in one. It
+    # survives only as a marker open-pr refuses (entry-scaffold.tests.ps1 covers that), so the assert here
+    # is that the entry is free of both.
+    Assert-True (-not ($entryTextK -match [regex]::Escape('**Nog te doen / waar ik gebleven ben:**'))) 'configured wording: the repo body heading is not written into the entry either'
     Assert-True (-not ($entryTextK -match [regex]::Escape('**To do / where I left off:**'))) 'configured wording: the built-in English body heading is NOT used'
     Assert-True ($entryTextK -match [regex]::Escape('TODO: wat er nog moet gebeuren op deze branch.')) 'configured wording: the repo fallback body is used'
     Assert-True (Test-EntryDeclaresType -EntryText $entryTextK -Type 'Docs') "configured wording: unknown prefix falls back to the repo's own type (Docs), not Chore"
@@ -632,10 +673,11 @@ function Get-EntryFallbackType     { return $script:EntryFallbackType }
 
     $rL = Invoke-NewBranch -Dir $fixtureL -Name 'feat/broken-config'
     Assert-Equal 0 $rL.Code 'broken repo-config: new-branch still exits 0'
-    $entryPathL = Join-Path $fixtureL 'feat-broken-config.md'
+    $entryPathL = Join-Path $fixtureL ((Get-BranchFilePaths).Changelog)
     Assert-True (Test-Path -LiteralPath $entryPathL) 'broken repo-config: the entry file is still written'
     $entryTextL = [System.IO.File]::ReadAllText($entryPathL, [System.Text.Encoding]::UTF8)
-    Assert-True ($entryTextL -match [regex]::Escape('**To do / where I left off:**')) 'broken repo-config: falls back to the built-in wording'
+    Assert-True ($entryTextL -match [regex]::Escape('TODO: what this change does')) 'broken repo-config: falls back to the built-in wording'
+    Assert-True ($entryTextL -match [regex]::Escape('TODO: title')) 'broken repo-config: and to the built-in title placeholder'
     Assert-True (Test-Phrase -Text $rL.Out -Phrase 'could not be loaded') 'broken repo-config: says so out loud instead of failing silently'
 } finally {
     foreach ($f in $script:fixtures) {

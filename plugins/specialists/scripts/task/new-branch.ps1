@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-    Creates (or idempotently reuses) a branch and immediately creates its changelog entry file.
+    Creates (or idempotently reuses) a branch and immediately creates its two files in branch/:
+    the changelog entry and the step list.
 
 .DESCRIPTION
     Core improvement: branch creation and changelog-entry creation used to be two separate manual
@@ -34,8 +35,10 @@
     back to a directional block instead of a bare TODO.
 
 .PARAMETER Park
-    (Optional switch) after creating the branch + entry, commit the changelog entry (the intent
-    carrier) and push the branch to origin with `git push -u` -- NO PR. Push is not a PR: parking a
+    (Optional switch) after creating the branch + its files, commit BOTH branch files (the entry and
+    the step list that carries the intent) and push the branch to origin with `git push -u` -- NO PR.
+    Both, because the step list is the half that says what was still in flight, and parking exists
+    precisely to hand that over. Push is not a PR: parking a
     branch on the remote makes it reachable from another device without opening a PR, so the PR rule
     stays intact and separate. Default (no -Park): unchanged behaviour -- purely local, nothing is
     committed or pushed.
@@ -152,7 +155,8 @@ try {
 }
 
 # -Park (opt-in): make the freshly created branch reachable from another device by committing its
-# changelog entry (the intent carrier) and pushing it -- NO PR. Only when the entry step succeeded;
+# branch files (the entry plus the step list carrying the intent) and pushing them -- NO PR. Only when
+# the entry step succeeded;
 # on a non-zero entry code we do not park, and fall through to the exit below. Push != PR: the PR
 # rule stays intact and separate (see the .PARAMETER Park note). git writes progress to stderr,
 # which under EAP=Stop would die as a terminating NativeCommandError before the exit-code check
@@ -160,25 +164,31 @@ try {
 # (EAP=Continue -> run -> record $LASTEXITCODE), the same helper open-pr.ps1 uses for its push.
 if ($Park -and $entryCode -eq 0) {
     . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
+    . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
 
-    # The entry file for this branch (branch-info is already dot-sourced above): <SafeName>.md.
-    $parkInfo  = Get-BranchInfo -Branch $Name
-    $parkEntry = Join-Path $repoRoot ($parkInfo.SafeName + '.md')
+    # BOTH branch files, since the branch/ split (Dave, August 6, 2026). Parking exists to make work
+    # reachable from another device, and the step list is the half that says what was still in flight --
+    # parking the entry alone would push the description and leave the plan behind, which is the opposite
+    # of what -Park is for. They are named explicitly rather than swept up, so the commit stays exactly as
+    # narrow as it was: this pushes to a branch, but the pathspec discipline is the same everywhere.
+    $parkFiles = Get-BranchFilePaths
+    $parkPaths = @($parkFiles.Changelog, $parkFiles.Progress) |
+        Where-Object { Test-Path -LiteralPath (Join-Path $repoRoot $_) }
 
-    if (Test-Path -LiteralPath $parkEntry) {
-        $addRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'add', '--', $parkEntry)
+    if ($parkPaths.Count -gt 0) {
+        $addRes = Invoke-NativeCapture -FilePath 'git' -Arguments (@('-C', $repoRoot, 'add', '--') + $parkPaths)
         $addRes.Output | ForEach-Object { Write-Host $_ }
-        if ($addRes.ExitCode -ne 0) { Write-Error "park: staging the changelog entry failed."; exit 1 }
+        if ($addRes.ExitCode -ne 0) { Write-Error "park: staging the branch files failed."; exit 1 }
     }
 
-    # Everything below is scoped to the entry pathspec (`-- $parkEntry`), so a park commits ONLY the
-    # changelog entry: any content the caller already staged for their own next commit is left
-    # exactly as it was (staged, uncommitted), not swept into the park commit.
+    # Everything below is scoped to the branch-file pathspec (`-- $parkPaths`), so a park commits ONLY
+    # those two files: any content the caller already staged for their own next commit is left exactly as
+    # it was (staged, uncommitted), not swept into the park commit.
     #
-    # Commit only if the entry path actually has staged changes: a re-park of an already-committed
-    # entry stages nothing (`git diff --cached --quiet -- <path>` -> exit 0), and we then just push
-    # the existing commit rather than failing on an empty commit.
-    $diffRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'diff', '--cached', '--quiet', '--', $parkEntry)
+    # Commit only if those paths actually have staged changes: a re-park of already-committed branch files
+    # stages nothing (`git diff --cached --quiet -- <paths>` -> exit 0), and we then just push the existing
+    # commit rather than failing on an empty commit.
+    $diffRes = Invoke-NativeCapture -FilePath 'git' -Arguments (@('-C', $repoRoot, 'diff', '--cached', '--quiet', '--') + $parkPaths)
     if ($diffRes.ExitCode -ne 0) {
         # The commit message goes via `git commit -F <file>`, not `-m "...$Name..."`: a branch name
         # may legally carry a `"` (git check-ref-format allows it, and Test-BranchName does not
@@ -188,14 +198,14 @@ if ($Park -and $entryCode -eq 0) {
         $msgFile = Join-Path ([System.IO.Path]::GetTempPath()) "new-branch-park-msg-$PID.txt"
         [System.IO.File]::WriteAllText($msgFile, "park: $Name (work parked for later)", (New-Object System.Text.UTF8Encoding $false))
         try {
-            $commitRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'commit', '-F', $msgFile, '--', $parkEntry)
+            $commitRes = Invoke-NativeCapture -FilePath 'git' -Arguments (@('-C', $repoRoot, 'commit', '-F', $msgFile, '--') + $parkPaths)
             $commitRes.Output | ForEach-Object { Write-Host $_ }
-            if ($commitRes.ExitCode -ne 0) { Write-Error "park: committing the changelog entry failed."; exit 1 }
+            if ($commitRes.ExitCode -ne 0) { Write-Error "park: committing the branch files failed."; exit 1 }
         } finally {
             Remove-Item -Path $msgFile -Force -ErrorAction SilentlyContinue
         }
     } else {
-        Write-Host "park: nothing new to commit (entry already committed) -- pushing as-is." -ForegroundColor Yellow
+        Write-Host "park: nothing new to commit (branch files already committed) -- pushing as-is." -ForegroundColor Yellow
     }
 
     $pushRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'push', '-u', 'origin', $Name)
@@ -205,7 +215,7 @@ if ($Park -and $entryCode -eq 0) {
 } elseif ($Park) {
     # -Park was requested but the entry step did not succeed -- do not commit/push, and say why
     # rather than falling through silently.
-    Write-Warning "park: skipped -- the changelog entry step exited $entryCode, so nothing was committed or pushed."
+    Write-Warning "park: skipped -- the branch-file step exited $entryCode, so nothing was committed or pushed."
 }
 
 exit $entryCode

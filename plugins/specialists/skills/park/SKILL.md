@@ -37,9 +37,9 @@ The script:
 1. **Guardrail:** refuses on `main` -- parking is a feature-branch action (everything on `main`
    goes via a PR).
 2. Commits **all** outstanding work on the current branch (`git add -A` + commit), so nothing is
-   left behind locally -- the changelog entry file and any other WIP travel along. If nothing is
-   staged (the branch was already committed locally but never pushed), it skips the commit and just
-   pushes.
+   left behind locally -- both `branch/` files (the entry and the step list) and any other WIP travel
+   along. If nothing is staged (the branch was already committed locally but never pushed), it skips
+   the commit and just pushes.
 3. Pushes the branch to `origin` with `git push -u` (sets upstream tracking).
 
 ## What parking is NOT
@@ -67,7 +67,7 @@ intact, entirely superseded — and nothing anywhere reported it. It was found t
 remote heads while cleaning up an unrelated merge.
 
 So before executing a line of a parked plan, **measure it against the main branch**, however detailed and
-current the entry file reads. A plan that reads as current is not evidence that it is. The cheap checks
+current `branch/branch-progress.md` reads. A plan that reads as current is not evidence that it is. The cheap checks
 first:
 
 ```powershell

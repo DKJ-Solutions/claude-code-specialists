@@ -39,11 +39,29 @@
 
 # The English fallbacks, and the ONLY copy of them. new-changelog-entry.ps1 held these literals until
 # the gate needed the same list; it now reads them from here.
+#
+# TWO OF THESE ARE NO LONGER WRITTEN, ONLY RECOGNISED (Dave, August 6, 2026). Until the branch/ split the
+# entry file was also the branch's to-do list, so new-changelog-entry.ps1 scaffolded it with a
+# '**To do / where I left off:**' heading over a matching placeholder. branch-progress.md holds that job
+# now, and an entry that still asked for a to-do list would re-create the exact confusion the split
+# removes. So the writer stops writing them and the GATE KEEPS REFUSING THEM -- "recognise both, write
+# one", the same rule the tier line gets. This is not politeness towards history: every consumer with a
+# branch in flight has an entry carrying these strings right now, and they reach the new scripts through
+# a plugin update rather than by choosing to. A gate that forgot them would wave those entries through
+# into CHANGELOG.md, silently, which is the one failure mode a guard must not have.
 $script:EntryScaffoldDefaults = [ordered]@{
     Title         = 'TODO: title'
     BodyHeading   = '**To do / where I left off:**'
-    BodyPlaceholder = 'TODO: what still needs to happen on this branch, and where you left off.'
+    BodyPlaceholder = 'TODO: what this change does, for whoever reads CHANGELOG.md later.'
 }
+
+# Recognised by the gate, never written by anything, and deliberately NOT repo-configurable: it is a
+# historical string, so there is nothing for a consumer to choose about it. Kept separate from the map
+# above rather than folded into BodyPlaceholder because that one IS seamed -- a repo that overrode the
+# placeholder would otherwise lose the legacy marker along with the default it replaced.
+$script:EntryScaffoldLegacyMarkers = @(
+    'TODO: what still needs to happen on this branch, and where you left off.'
+)
 
 function Get-EntryScaffoldWording {
     <#
@@ -1339,16 +1357,336 @@ function Get-EntryScaffoldFindings {
     )
     $body = Get-EntryTextOutsideFences -EntryText $EntryText
 
-    $findings = @()
-    foreach ($p in @(
+    $checks = @(
         @{ Label = 'the placeholder title';   Marker = $Wording.Title },
         @{ Label = 'the scaffold body heading'; Marker = $Wording.BodyHeading },
         @{ Label = 'the fallback body';       Marker = $Wording.BodyPlaceholder }
-    )) {
+    )
+    # The strings the scaffolder used to write, still refused. See $script:EntryScaffoldLegacyMarkers.
+    foreach ($legacy in $script:EntryScaffoldLegacyMarkers) {
+        $checks += @{ Label = 'a retired scaffold placeholder'; Marker = $legacy }
+    }
+
+    $findings = @()
+    foreach ($p in $checks) {
         if (-not $p.Marker) { continue }
         if ($body.Contains($p.Marker)) {
             $findings += [pscustomobject]@{ Label = $p.Label; Marker = $p.Marker }
         }
     }
     return $findings
+}
+
+# --- THE branch/ DIRECTORY: two files per branch, both with a reset state -------------------------
+#
+# Dave, August 6, 2026. A branch's working files live in ONE known directory instead of a file named
+# after the branch in the repo root, and there are TWO of them because they answer two different
+# questions for two different readers:
+#
+#   branch/branch-changelog.md   what the change DOES     -- for whoever reads CHANGELOG.md later
+#   branch/branch-progress.md    what still MUST HAPPEN   -- for whoever is working on the branch
+#
+# THE SPLIT IS THE POINT. The root entry file did both jobs: new-changelog-entry.ps1 scaffolded it with
+# a body heading that literally read '**To do / where I left off:**', and open-pr's scaffold gate
+# refused to ship while that heading survived. So one file was today's to-do list AND tomorrow's
+# changelog prose, which is why "replace this whole block before the PR" had to be a written
+# instruction rather than something the format made obvious. Two files make it obvious.
+#
+# WHY FIXED NAMES RATHER THAN ONE PER BRANCH, which looks like it should collide the moment two
+# branches exist. It cannot: git already tracks these files per branch, so each branch carries its own
+# version of the same path and a checkout swaps them. The per-branch filename was solving a problem
+# version control had already solved, and it cost a repo root that filled up with other people's work.
+#
+# THE RESET STATE IS WHAT LIVES ON THE TRUNK, and it is load-bearing rather than cosmetic. Both reset
+# files open with an H1, so Test-IsChangelogEntryFile in the fold ignores them exactly as it ignores
+# CONTRIBUTING.md -- while a FILLED branch-changelog.md opens with the entry's own H2 and is folded.
+# One structural test, no new flag, and the trunk state cannot be mistaken for an unfolded entry.
+#
+# AND THE FILLED CHANGELOG FILE IS NOTHING BUT THE ENTRY BLOCK -- no header, no branch line, no
+# warning. That is deliberate and it is Dave's requirement restated: the file must be copy-pasteable
+# into CHANGELOG.md in one go. Anything wrapped around the entry would have to be stripped by whoever
+# pastes it, which is the manual step the format exists to remove. The branch name therefore lives in
+# branch-progress.md, the file that has room for it.
+
+$script:BranchFileDefaults = [ordered]@{
+    ChangelogTitle = 'Branch changelog'
+    ProgressTitle  = 'Branch progress'
+    BranchLabel    = 'Branch'
+    StepsHeading   = 'Steps'
+    NotesHeading   = 'Where I left off'
+    FirstStep      = 'TODO: the first step of this branch'
+    NotesPlaceholder = 'TODO: what has been done so far, and what you were in the middle of.'
+    ChangelogReset = @(
+        'This file carries the changelog entry of the branch you are on -- the finished description that',
+        'folds into `CHANGELOG.md` at the merge. It is written when a branch is created and returns to this',
+        'state once the entry has been folded, so what you see here is the empty state, not a lost entry.'
+    )
+    ProgressReset  = @(
+        'This file carries the step list of the branch you are on. It is written when a branch is created',
+        'and returns to this state after the merge.'
+    )
+    TrunkWarning   = @(
+        'Do not work in this file yet -- create a branch first.',
+        'Anything written here on the trunk belongs to no branch, will not be folded, and is in the way',
+        'of the next person who does create one.'
+    )
+    ScaffoldNote   = 'filled in when a branch is created'
+}
+
+function Get-BranchTrunkName {
+    <#
+        The trunk this repo merges into, 'main' unless the consumer says otherwise via an OPTIONAL
+        Get-TrunkBranchName in scripts/repo-config.ps1.
+
+        It is here rather than inline because THREE things need the same answer and one of them writes
+        it into a document: new-changelog-entry.ps1 refuses to scaffold on the trunk, the reset template
+        below names the trunk in its warning, and the fold writes that template back. A literal 'main'
+        in each is the shape where a consumer on 'master' gets a correct refusal and a document that
+        tells them the wrong branch name.
+    #>
+    if (Get-Command Get-TrunkBranchName -ErrorAction SilentlyContinue) {
+        $v = Get-TrunkBranchName
+        if ($v) { return [string]$v }
+    }
+    return 'main'
+}
+
+function Get-BranchFilePaths {
+    <#
+        The two branch files' repo-relative paths and the directory holding them, as ONE object.
+
+        FORWARD SLASHES, deliberately: these strings are handed to git (pathspecs, ls-files comparison)
+        as often as to Join-Path, and Join-Path on Windows accepts '/' while git's own output never uses
+        '\'. The one place that needs the backslash form converts at the boundary, which is where the
+        fold already does it for the legacy root entries.
+
+        Not repo-configurable, and that is the same call CHANGELOG.md's own name gets: this is the
+        FORMAT the shared scripts read, not prose about it. A consumer renaming the directory would be
+        renaming the interface between four scripts, which is what a fork is for. The WORDING inside the
+        files is configurable -- see Get-BranchFileWording -- because that is language, and language is
+        the thing #410 established a repo owns.
+    #>
+    return [pscustomobject]@{
+        Directory = 'branch'
+        Changelog = 'branch/branch-changelog.md'
+        Progress  = 'branch/branch-progress.md'
+    }
+}
+
+function Get-BranchFileWording {
+    <#
+        The prose inside the two branch files -- this repo's answers where repo-config.ps1 gives them,
+        the English defaults otherwise.
+
+        ONE GETTER RETURNING A MAP, unlike Get-EntryScaffoldWording's three separate ones, and the
+        difference is deliberate rather than inconsistency. Those three are each read by a GATE that
+        must match the writer string-for-string, so each is its own contract with its own name. These
+        nine are document prose read by nobody but the reader of the file; a repo translating one
+        translates all of them, and nine seam functions to translate a template would be nine entries in
+        the script contract for one act.
+
+        A key present but EMPTY is ignored, the same fail-safe Get-EntryScaffoldWording uses: an empty
+        heading would produce a document with a blank line where its title should be, and nothing would
+        report it.
+    #>
+    $out = [ordered]@{}
+    foreach ($key in $script:BranchFileDefaults.Keys) { $out[$key] = $script:BranchFileDefaults[$key] }
+    if (Get-Command Get-BranchFileWordingOverrides -ErrorAction SilentlyContinue) {
+        $overrides = Get-BranchFileWordingOverrides
+        if ($overrides) {
+            foreach ($key in @($out.Keys)) {
+                # Two containers to support, because a seam is hand-written: a hashtable is what a
+                # consumer reaches for, an ordered dictionary is what copying the block above produces.
+                $v = $null
+                if ($overrides -is [System.Collections.IDictionary]) {
+                    if (-not $overrides.Contains($key)) { continue }
+                    $v = $overrides[$key]
+                } elseif ($overrides.PSObject.Properties[$key]) {
+                    # A pscustomobject cannot be indexed by string in PS 5.1 -- $o['Key'] returns $null
+                    # silently, which would read as "override absent" for every key a consumer set.
+                    $v = $overrides.PSObject.Properties[$key].Value
+                } else { continue }
+                if ($v) { $out[$key] = $v }
+            }
+        }
+    }
+    return [pscustomobject]$out
+}
+
+function Format-BranchFileHeader {
+    <#
+        Private: the H1, the branch line and -- on the trunk only -- the warning under it. Both files
+        open with exactly this, which is what makes them one recognisable pair rather than two documents
+        that happen to live in a directory.
+
+        THE WARNING IS KEYED ON THE BRANCH BEING THE TRUNK, not on the file being in its reset state,
+        and those come apart in the case worth catching: someone runs `git checkout -b` by hand instead
+        of new-branch, so the files are still reset while HEAD is on a real branch. Keying on the trunk
+        keeps the warning off that person's screen -- they are allowed to work here -- while the empty
+        step list still says the scaffold never ran.
+
+        Returns a string ARRAY rather than the List it builds, and the callers append its lines to their
+        own list. Returning the List itself does not work: PowerShell unrolls a returned collection, so
+        `$lines = Format-BranchFileHeader ...` hands the caller an object[] -- fixed-size -- and every
+        subsequent .Add() throws. Measured on this function's first run.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Title,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Branch,
+        [Parameter(Mandatory)][pscustomobject]$Wording
+    )
+    $trunk = Get-BranchTrunkName
+    $shown = if ($Branch) { $Branch } else { $trunk }
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add('# ' + $Title)
+    $lines.Add('')
+    $lines.Add('**' + $Wording.BranchLabel + ':** `' + $shown + '`')
+    if ($shown -eq $trunk) {
+        $lines.Add('')
+        $lines.Add('> **You are on `' + $trunk + '`.** ' + $Wording.TrunkWarning[0])
+        foreach ($line in @($Wording.TrunkWarning | Select-Object -Skip 1)) { $lines.Add('> ' + $line) }
+    }
+    return @($lines.ToArray())
+}
+
+function New-BranchFileLines {
+    <#
+        Private: a fresh line list already carrying the shared header. Every branch file starts this way,
+        and having the three formatters call ONE helper is what keeps them from drifting apart on the
+        blank line after the header -- the kind of difference that is invisible until a diff shows two
+        files disagreeing about their own shape.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Title,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Branch,
+        [Parameter(Mandatory)][pscustomobject]$Wording
+    )
+    $lines = New-Object System.Collections.Generic.List[string]
+    foreach ($line in (Format-BranchFileHeader -Title $Title -Branch $Branch -Wording $Wording)) {
+        $lines.Add($line)
+    }
+    # `,$lines`, not `$lines`: PowerShell unrolls a returned collection, so a bare return would hand the
+    # caller a fixed-size object[] and its next .Add() would throw. The leading comma wraps the List in a
+    # one-element array, and it is that outer array PowerShell unrolls -- leaving the List intact.
+    return ,$lines
+}
+
+function Format-BranchChangelogReset {
+    <#
+        branch/branch-changelog.md in its empty state -- what lives on the trunk, and what the fold
+        writes back once the entry has landed in CHANGELOG.md.
+
+        Opens with an H1 so the fold's own entry test skips it. That is the whole back-pressure: a reset
+        file cannot be folded twice, and a release cannot mistake it for work somebody forgot to fold.
+    #>
+    param([string]$Branch = '')
+    $w = Get-BranchFileWording
+    $lines = New-BranchFileLines -Title $w.ChangelogTitle -Branch $Branch -Wording $w
+    $lines.Add('')
+    foreach ($line in @($w.ChangelogReset)) { $lines.Add($line) }
+    return @($lines.ToArray())
+}
+
+function Format-BranchProgressReset {
+    <#
+        branch/branch-progress.md in its empty state. Same shape as the changelog reset, plus the empty
+        step list -- so the file a reader opens on the trunk already shows them what it will look like
+        once it is theirs.
+    #>
+    param([string]$Branch = '')
+    $w = Get-BranchFileWording
+    $lines = New-BranchFileLines -Title $w.ProgressTitle -Branch $Branch -Wording $w
+    $lines.Add('')
+    foreach ($line in @($w.ProgressReset)) { $lines.Add($line) }
+    $lines.Add('')
+    $lines.Add('## ' + $w.StepsHeading)
+    $lines.Add('')
+    $lines.Add('_(' + $w.ScaffoldNote + ')_')
+    return @($lines.ToArray())
+}
+
+function Format-BranchProgressScaffold {
+    <#
+        branch/branch-progress.md as it is written when a branch is created: the branch's own name, an
+        open first step, and a place to record where you left off.
+
+        THE STEP LIST IS A CHECKBOX LIST because that is the form the requirement was given in -- work
+        is ticked off, and the list is done when nothing is open. Whether a PR is REFUSED while an item
+        is still open is a separate decision that has not been taken; nothing here gates anything yet, so
+        the format is ready for that gate without presuming it.
+
+        -Intent, when given, becomes the "where I left off" note rather than the first step: parking a
+        branch records what HAS happened, and a step list scaffolded with someone's status text as its
+        only entry would read as an instruction to do it again.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Branch,
+        [string]$Intent = ''
+    )
+    $w = Get-BranchFileWording
+    $lines = New-BranchFileLines -Title $w.ProgressTitle -Branch $Branch -Wording $w
+    # H2 as a literal, NOT ('#' * $script:EntryHeadingLevel). Both happen to be 2 today, and reusing the
+    # entry's level would silently move this file's sections the day the changelog's entry level changes
+    # -- a coupling between two formats that have nothing to do with each other. This file's own shape is
+    # H1 title, H2 sections, and it owns that.
+    $lines.Add('')
+    $lines.Add('## ' + $w.StepsHeading)
+    $lines.Add('')
+    $lines.Add('- [ ] ' + $w.FirstStep)
+    $lines.Add('')
+    $lines.Add('## ' + $w.NotesHeading)
+    $lines.Add('')
+    if ($Intent) {
+        foreach ($line in ($Intent -split '\r?\n')) { $lines.Add($line) }
+    } else {
+        $lines.Add($w.NotesPlaceholder)
+    }
+    return @($lines.ToArray())
+}
+
+function Get-BranchFileDeclaredBranch {
+    <#
+        Pure: the branch a branch file says it belongs to -- the name in its '**Branch:** `x`' line -- or
+        '' when the file has no such line.
+
+        THIS IS THE IDEMPOTENCY TEST, and it is why the branch line is in the document rather than only in
+        the scaffolder's head. new-changelog-entry.ps1 may be run twice on the same branch (it is, by
+        new-branch, which is itself idempotent), and the second run must not overwrite a step list somebody
+        has been ticking off. Comparing the declared branch against HEAD answers that exactly: the trunk
+        name means the file is still in its reset state and is ours to write, any other name means it is
+        already someone's working file.
+
+        The label is read from the wording rather than hardcoded, so a repo that translated it can still be
+        recognised -- a predicate that only knows the English label would read every file in a translated
+        repo as unscaffolded and overwrite it.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
+    $label = (Get-BranchFileWording).BranchLabel
+    $rx = '^\*\*' + [regex]::Escape([string]$label) + ':\*\*\s*`([^`]+)`\s*$'
+    foreach ($line in ($Text -split '\r?\n')) {
+        if ($line -match $rx) { return $Matches[1] }
+    }
+    return ''
+}
+
+function Test-BranchChangelogIsFilled {
+    <#
+        Pure: does branch/branch-changelog.md hold an actual entry, or is it still (back) in its reset
+        state? True means there is an entry here -- the file opens with the entry heading level.
+
+        THE SAME STRUCTURAL TEST THE FOLD USES, and on purpose: the fold decides "is this an entry" by
+        the first non-blank line's heading level, so a second predicate answering the same question a
+        different way is how a release cut and a fold start disagreeing about whether work is pending.
+        Both levels are accepted for the reason Test-IsChangelogEntryFile accepts both -- an entry
+        written before the flat format is still an entry.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
+    $entryLevel  = Get-EntryHeadingLevel
+    $legacyLevel = $entryLevel + 1
+    $rx = '^#{' + $entryLevel + ',' + $legacyLevel + '}\s'
+    foreach ($line in ($Text -split '\r?\n')) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        return ($line -match $rx)
+    }
+    return $false
 }

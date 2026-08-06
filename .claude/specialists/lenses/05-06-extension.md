@@ -53,12 +53,22 @@ entries rather than off which section they sit in.
 
 #### How it works
 
-- **`<branch-name-with-hyphens>.md`** (repo root) — created on the branch; contains that branch's
-  single entry. Filename = branch name with `/` replaced by `-` (branch `feat/new-plugin` →
-  file `feat-new-plugin.md`). **Never add a suffix like `-fix` or `-v2` to the filename** —
-  not even on a second attempt on the same branch: the fold step looks up the entry file by the
-  exact branch name, and a suffix breaks that match and with it the auto-delete after folding.
-- **After the merge**: `scripts/release/fold-changelog-entry.ps1` reads the entry file and inserts it at its
+- **`branch/branch-changelog.md`** — written when the branch is created; contains that branch's single
+  entry and **nothing around it**, so it pastes into `CHANGELOG.md` in one go. A **fixed** path, the same
+  on every branch: git already tracks it per branch, so two branches in flight cannot collide on it, and
+  the repo root stops filling up with other people's work.
+- **`branch/branch-progress.md`** — its companion: the branch's name, its step list, and where you left
+  off. Never folded. The branch line is what the fold reads back to find the PR, since the file name no
+  longer carries it.
+- **Both live on `main` in an empty reset state**, opening with an `#` and carrying a warning not to write
+  there until a branch exists. That `#` is load-bearing: the entry test only accepts the entry heading
+  levels, so the trunk's own empty file can never be folded as if it were a change.
+- **A pre-split root entry still folds.** Before August 6, 2026 the entry was a `<branch-name>.md` in the
+  root — branch `feat/new-plugin` → `feat-new-plugin.md` — and the fold recognises both forms, deleting
+  the root one and resetting the `branch/` pair. On such a branch: **never add a suffix like `-fix` or
+  `-v2`** — without `-Branch` the fold recovers the branch from that file name, and a suffix breaks the
+  PR lookup.
+- **After the merge**: `scripts/release/fold-changelog-entry.ps1` reads the entry and inserts it at its
   **ranked position** in the list — the block as written, with `[PR #NN](url) · merged YYYY-MM-DD` appended
   as its last line and the heading **untouched**. (It used to prepend `#NN · ` to the heading too; that went
   on August 5, 2026 — the number is still in the entry, on that closing line, where the url makes it
@@ -99,20 +109,21 @@ anyone remembering this paragraph. **This repo has no release categories any mor
 the branch prefix, which it measured does not predict impact, and each change states its own type inside
 itself.
 
-**Never merge without an entry file**, not even for small changes. Since the branch-creation
-improvement, that entry file now comes into being **at the moment the branch is created** — no
+**Never merge without an entry**, not even for small changes. Since the branch-creation
+improvement, the entry comes into being **at the moment the branch is created** — no
 separate later scaffolding step: [Derek #05](05-05-extension.md#classifying-naming-and-creating-a-branch)'s
 `new-branch.ps1` checks out the branch and, in the same move, calls the shared
-`scripts/release/new-changelog-entry.ps1 -Title "…"` (fills in the filename, date, and branch type
-from the prefix automatically) as a child step. A branch is never entry-less. Whoever builds on the
+`scripts/release/new-changelog-entry.ps1 -Title "…"` (which writes both `branch/` files, filling in the
+title, the branch name and the type from the prefix automatically) as a child step. A branch is never
+entry-less. Whoever builds on the
 branch (often [Tessa #16](06-16-extension.md) or [Sylvester #15](05-15-extension.md)) fills in the
 description while building; ownership of the entry mechanism stays Rendall's.
 
 #### Lifecycle
 
-1. **Branch** → the entry file is created *at branch creation* (Derek's `new-branch.ps1`); you fill
-   in the description while building. Never touch `CHANGELOG.md`.
-2. **Merge to `main`** ([Derek #05](05-05-extension.md#merging-to-main)) → the entry file travels
+1. **Branch** → both `branch/` files are written *at branch creation* (Derek's `new-branch.ps1`); you
+   fill in the description and keep the step list current while building. Never touch `CHANGELOG.md`.
+2. **Merge to `main`** ([Derek #05](05-05-extension.md#merging-to-main)) → the entry travels
    along. Rendall runs `fold-changelog-entry.ps1 -Branch <name> -Push` on `main`: that folds, commits
    (`chore: fold changelog entry <branch> (#NN)`) and pushes, in one step. **The `-Commit`/`-Push`
    opt-in, the path-scoped commit, the "check you are really on `main`" guard against
@@ -124,7 +135,9 @@ description while building; ownership of the entry mechanism stays Rendall's.
    **this** repo's direct-on-`main` exception, which is what the path-scoped commit exists to keep honest,
    and the branch part of the two-machine lesson sits with
    [Derek #05](05-05-extension.md#branch--repo-hygiene).
-3. **More branches merged** → each brings its entry file; each gets inserted at the position its own impact
+   The fold also **resets both `branch/` files** to their empty state and names them in the same commit,
+   so the trunk is ready for the next branch instead of showing the merged one's ticked-off steps.
+3. **More branches merged** → each brings its entry; each gets inserted at the position its own impact
    table ranks it at, so the list stays ordered furthest-reach-first as it grows.
 
 ### Versioning & releases
@@ -294,8 +307,9 @@ a clean `main`:
 5. commits that directly on `main` (`release: vX.Y.Z`) and sets an annotated tag `vX.Y.Z`;
 6. pushes `main` + the tag (unless `-NoPush` for prior inspection).
 
-Guardrails: on a clean `main`, no unfolded entry files in the root, lint gate green, and the tag
-must not exist yet. There is deliberately **no release branch and no `release` prefix** — the release
+Guardrails: on a clean `main`, no unfolded entry — neither a pre-split file in the root nor a filled
+`branch/branch-changelog.md`, which is its own check because a filled one looks like the reset state at a
+glance — lint gate green, and the tag must not exist yet. There is deliberately **no release branch and no `release` prefix** — the release
 does not touch the branch workflow. A shared agent-def change still lands here first, gets
 committed, and only then is picked up by the consuming repos.
 
@@ -310,9 +324,11 @@ waiting for a migration that does not exist.
 
 ### Rendall's toolkit
 
-- `scripts/release/new-changelog-entry.ps1 [-Title <string>] [-Intent <string>]` — scaffold the
-  entry file on the branch. `-Intent` fills the entry body with where you left off / what is next
-  (empty → a directional fallback block instead of a bare TODO, #162). Shared/mirrored to the plugin
+- `scripts/release/new-changelog-entry.ps1 [-Title <string>] [-Intent <string>]` — write the branch's
+  two files in `branch/`. `-Intent` records where you left off / what is next in
+  **`branch-progress.md`**, not in the entry (#162): an intent is a status, and the entry's text folds
+  verbatim into `CHANGELOG.md`. Idempotent per file, judged on what each file says it belongs to rather
+  than on its existing — both exist on `main` by design. Shared/mirrored to the plugin
   ([issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81)); normally reached
   indirectly, at branch creation, via
   [Derek #05](05-05-extension.md#classifying-naming-and-creating-a-branch)'s `new-branch.ps1` — you

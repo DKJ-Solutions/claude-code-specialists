@@ -1,6 +1,17 @@
 <#
-Folds one or more changelog entry files (<branch-name>.md in the repo root) into CHANGELOG.md's flat
-list of changes, and then removes the entry files.
+Folds one or more changelog entry files into CHANGELOG.md's flat list of changes, and then clears them.
+
+WHERE THE ENTRY COMES FROM, AND WHY THAT IS TWO PLACES (Dave, August 6, 2026). A branch now carries its
+working files in branch/: branch-changelog.md (the entry) and branch-progress.md (the step list). Entries
+written before that split are a <branch-name>.md in the repo ROOT, and every consumer with a branch in
+flight has one right now -- they receive these scripts through a plugin update rather than by choosing to.
+Both forms are discovered, in both modes: "recognise both, write one".
+
+AND THE TWO ARE CLEARED DIFFERENTLY, which is the one real asymmetry. A root entry is named after its
+branch, so once folded it is deleted. branch/branch-changelog.md is a FIXED path the next branch will use,
+so it is REWRITTEN to its empty state -- together with branch-progress.md, whose ticked-off steps would
+otherwise greet the next branch as somebody else's work. The reset opens with an H1, which is also what
+makes it impossible to fold twice.
 
 THERE ARE NO SECTIONS ANY MORE (Dave, August 5, 2026). CHANGELOG.md used to carry one
 '## Tier N - Pull Requests' section per tier, and the fold's first job was to pick one from a repo-owned
@@ -212,17 +223,54 @@ function Test-IsChangelogEntryFile {
     return $false
 }
 
+# THE ENTRY NOW ARRIVES IN branch/, AND THE ROOT FORM IS STILL FOLDED (Dave, August 6, 2026). Since the
+# branch/ split, new-changelog-entry.ps1 writes branch/branch-changelog.md; every branch created before
+# that -- here and in every consumer, who get these scripts through a plugin update rather than by
+# choosing to -- carries a root <branch-name>.md instead. Recognising only the new path would leave those
+# entries sitting unfolded in the root, which is precisely the silent half-state this repo keeps
+# rediscovering. So both are discovered, in both modes: "recognise both, write one".
+$branchFiles = Get-BranchFilePaths
+$branchChangelogPath = Join-Path $repoRoot $branchFiles.Changelog
+$branchChangelogFilled = (Test-Path -LiteralPath $branchChangelogPath) -and
+    (Test-BranchChangelogIsFilled -Text ([System.IO.File]::ReadAllText($branchChangelogPath)))
+
+# WHICH BRANCH THE branch/ ENTRY BELONGS TO, read from branch-progress.md's own '**Branch:**' line.
+#
+# This is the one thing the fixed filename genuinely costs, and the reason the branch line is in the
+# document rather than only in the scaffolder's head. In fold-all mode the branch is what the PR lookup
+# keys on, and it used to be recovered from the entry's file NAME (feat-x.md -> feat/x). A fixed name
+# carries no branch, so 'branch-changelog' would have been read as the branch 'branch/changelog', found
+# no PR, and folded the entry with neither number nor merge date -- silently, since a missing PR is a
+# legitimate outcome the script already prints and moves past.
+#
+# READ BEFORE THE LOOP, WHICH IS ALSO BEFORE THE RESET at the end of the run: on main after the merge the
+# progress file still names the branch that was just merged, which is exactly the fact needed here.
+$branchFileOwner = ''
+if ($branchChangelogFilled) {
+    $progressFile = Join-Path $repoRoot $branchFiles.Progress
+    if (Test-Path -LiteralPath $progressFile) {
+        $declared = Get-BranchFileDeclaredBranch -Text ([System.IO.File]::ReadAllText($progressFile))
+        if ($declared -and $declared -ne (Get-BranchTrunkName)) { $branchFileOwner = $declared }
+    }
+}
+
 if ($Branch) {
-    # Explicit target: the caller named the branch, so trust it and fold exactly that entry file.
-    $entryFiles = @(($Branch -replace '/', '-') + ".md")
+    # Explicit target: the caller named the branch, so trust it. The legacy root file is named after that
+    # branch; the branch/ file is not named after anything, so it qualifies on being filled.
+    $entryFiles = @()
+    if ($branchChangelogFilled) { $entryFiles += $branchFiles.Changelog }
+    $legacyName = ($Branch -replace '/', '-') + ".md"
+    if (Test-Path -LiteralPath (Join-Path $repoRoot $legacyName)) { $entryFiles += $legacyName }
 }
 else {
     # Fold-all: never fold a file that is not an actual changelog entry (structural gate above).
     $reserved = @("CHANGELOG.md", "CLAUDE.md", "README.md")
-    $entryFiles = Get-ChildItem -Path $repoRoot -Filter "*.md" -File |
+    $entryFiles = @()
+    if ($branchChangelogFilled) { $entryFiles += $branchFiles.Changelog }
+    $entryFiles += @(Get-ChildItem -Path $repoRoot -Filter "*.md" -File |
         Where-Object { $reserved -notcontains $_.Name } |
         Where-Object { Test-IsChangelogEntryFile -Path $_.FullName } |
-        Select-Object -ExpandProperty Name
+        Select-Object -ExpandProperty Name)
 }
 
 if ($entryFiles.Count -eq 0) {
@@ -385,8 +433,17 @@ foreach ($file in $entryFiles) {
     $midDot = [char]0x00B7
     $branchForPr = $Branch
     if (-not $branchForPr) {
-        $base = [System.IO.Path]::GetFileNameWithoutExtension($file)
-        $branchForPr = $base -replace '^([^-]+)-', '$1/'
+        if ($file -eq $branchFiles.Changelog) {
+            # From branch-progress.md's branch line -- see $branchFileOwner above for why the file name
+            # cannot answer this any more.
+            $branchForPr = $branchFileOwner
+            if (-not $branchForPr) {
+                Write-Host "  $($branchFiles.Progress) names no branch, so there is nothing to look a PR up by. Pass -Branch to get the number and merge date." -ForegroundColor Yellow
+            }
+        } else {
+            $base = [System.IO.Path]::GetFileNameWithoutExtension($file)
+            $branchForPr = $base -replace '^([^-]+)-', '$1/'
+        }
     }
     # gh can write messages to stderr; Invoke-NativeCapture runs it under EAP=Continue so that
     # cannot become a terminating error before the graceful exit-code handling below (#107).
@@ -396,11 +453,20 @@ foreach ($file in $entryFiles) {
     # for both the number/url and the touched files.
     # 'mergedAt' joined the field list on August 5, 2026 for the merge date below -- at no cost, since
     # this call already happens and gh returns whatever fields are asked for in one roundtrip.
-    $prList = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--head', $branchForPr, '--state', 'all', '--json', 'number,url,files,mergedAt', '--limit', '1', '--repo', $repo) -DiscardStderr
-    $ghCode = $prList.ExitCode
-    $prJson = $prList.Output
-    if ($ghCode -ne 0) { Write-Host "  (gh pr list returned exit code $ghCode -- PR-number enrichment skipped; run gh manually for the reason.)" -ForegroundColor DarkYellow }
-    $prs = if ($ghCode -eq 0 -and $prJson) { @($prJson | ConvertFrom-Json) } else { @() }
+    #
+    # SKIPPED ENTIRELY WITHOUT A BRANCH NAME. 'gh pr list --head ""' is not a no-op -- it drops the head
+    # filter and returns the repo's most recent PR, whichever branch that came from -- so an entry whose
+    # branch could not be determined would be stamped with a stranger's PR number, url and merge date. A
+    # wrong reference in the changelog is worse than none, and none is a state this script already handles.
+    if ($branchForPr) {
+        $prList = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--head', $branchForPr, '--state', 'all', '--json', 'number,url,files,mergedAt', '--limit', '1', '--repo', $repo) -DiscardStderr
+        $ghCode = $prList.ExitCode
+        $prJson = $prList.Output
+        if ($ghCode -ne 0) { Write-Host "  (gh pr list returned exit code $ghCode -- PR-number enrichment skipped; run gh manually for the reason.)" -ForegroundColor DarkYellow }
+        $prs = if ($ghCode -eq 0 -and $prJson) { @($prJson | ConvertFrom-Json) } else { @() }
+    } else {
+        $prs = @()
+    }
     if ($prs.Count -ge 1) {
         $num = $prs[0].number
         # The heading is left exactly as its author wrote it. $entryHashes is still what the promotion above
@@ -473,24 +539,54 @@ foreach ($file in $entryFiles) {
     $changelogContent = $changelogContent.Substring(0, $insertPos) + $entryBlock + $changelogContent.Substring($insertPos)
 
     Write-Utf8NoBom -Path $changelogPath -Content $changelogContent
-    Remove-Item -Path $filePath -Force
+
+    # DISPOSAL DIFFERS BY WHERE THE ENTRY LIVED, and that is the one real asymmetry the split introduces.
+    # A legacy root entry is named after its branch, so once folded it has no reason to exist and is
+    # deleted, exactly as before. branch/branch-changelog.md is a FIXED path that every future branch will
+    # use, so deleting it would leave the trunk missing a file the next `git checkout -b` expects -- and
+    # would quietly turn the reset state into "somebody has to recreate this". It is rewritten to its empty
+    # state instead, which is also what makes it impossible to fold twice: the reset opens with an H1, and
+    # the entry test only accepts the entry heading levels.
+    $isBranchFile = ($file -eq $branchFiles.Changelog)
+    if ($isBranchFile) {
+        Write-Utf8NoBom -Path $filePath -Content (((Format-BranchChangelogReset) -join $nl) + $nl)
+    } else {
+        Remove-Item -Path $filePath -Force
+    }
     $rankNote = if ($filed.RankScore -gt 0) { ", significance $($filed.RankScore)" } else { ', unranked' }
     # WHERE it landed, not just that it landed. With the sections gone there is no heading name to report,
     # and "folded" alone would say nothing about the one thing this script decides -- so the position in the
     # list is printed instead, which is also what makes a misplacement visible without opening the file.
     $aheadOf = @([regex]::Matches($changelogContent.Substring($insertPos + $entryBlock.Length), '(?m)^' + $entryHashes + ' ')).Count
-    Write-Host "Folded and removed: $file (tier $($filed.Tier)$rankNote -- placed above $aheadOf existing $(if ($aheadOf -eq 1) { 'entry' } else { 'entries' }))" -ForegroundColor Green
+    $disposal = if ($isBranchFile) { 'reset' } else { 'removed' }
+    Write-Host "Folded and ${disposal}: $file (tier $($filed.Tier)$rankNote -- placed above $aheadOf existing $(if ($aheadOf -eq 1) { 'entry' } else { 'entries' }))" -ForegroundColor Green
     # Captured per iteration rather than read back afterwards. $num in particular survives from one loop
     # pass to the next, so an entry whose PR lookup found nothing would otherwise inherit the previous
     # entry's number -- into a commit message, where a wrong PR reference is worse than none.
     $folded += [pscustomobject]@{
         File   = $file
-        Branch = $branchForPr
+        # The file name as the fallback, so a fold whose branch could not be determined still produces a
+        # commit subject that names something. Without it the message would read 'chore: fold changelog
+        # entry ' -- a commit on main that says nothing about what it folded.
+        Branch = $(if ($branchForPr) { $branchForPr } else { $file })
         Pr     = $(if ($prs.Count -ge 1) { $prs[0].number } else { $null })
     }
 }
 
 Write-Host "CHANGELOG.md updated." -ForegroundColor Green
+
+# THE STEP LIST IS RESET WITH THE ENTRY, and only with it. branch-progress.md is never folded -- nothing
+# in it belongs in a changelog -- but it is the same branch's file, and leaving a merged branch's ticked-off
+# steps on the trunk would greet the next branch with somebody else's work. The reset is keyed on the entry
+# actually having been folded rather than on the file existing, so a fold-all run that only found legacy
+# root entries leaves it alone: that run belongs to a branch that never had a step list.
+$resetPaths = @()
+if (@($folded | ForEach-Object { $_.File }) -contains $branchFiles.Changelog) {
+    $progressPath = Join-Path $repoRoot $branchFiles.Progress
+    Write-Utf8NoBom -Path $progressPath -Content (((Format-BranchProgressReset) -join $nl) + $nl)
+    $resetPaths += $branchFiles.Progress
+    Write-Host "Reset to its empty state: $($branchFiles.Progress)" -ForegroundColor Green
+}
 
 # --- The fold commit ------------------------------------------------------------------------------
 # WHY THIS IS IN THE SCRIPT AT ALL. The fold has always ended with a hand-typed commit, and on
@@ -527,16 +623,25 @@ if ($Commit) {
     # worst possible moment for an avoidable error. Read from the index rather than from disk, because by
     # now the file is gone from disk and still in the index, which is exactly the state that needs
     # recording.
+    # THE PROGRESS FILE RIDES ALONG, because this run rewrote it. It is not an entry and was not folded,
+    # but leaving it out would produce a commit that resets half the pair -- the changelog file empty on
+    # main and the step list still showing the merged branch's ticked boxes. Named explicitly rather than
+    # swept up, so the enforced scope stays exactly as small as it was: CHANGELOG.md, the entries, and the
+    # one file the fold itself reset.
     $entryPaths = @($folded | ForEach-Object { $_.File })
-    $lsFiles = Invoke-NativeCapture -FilePath 'git' -Arguments (@('ls-files', '--') + $entryPaths)
+    $writtenPaths = @($entryPaths) + @($resetPaths | Where-Object { $entryPaths -notcontains $_ })
+    $lsFiles = Invoke-NativeCapture -FilePath 'git' -Arguments (@('ls-files', '--') + $writtenPaths)
     # git reports its own paths with forward slashes; the entry names are plain file names in the repo
     # root, so normalising both sides costs nothing and removes the one way this could silently drop a
     # deletion from the commit.
     $tracked = @($lsFiles.Output | Where-Object { $_ } | ForEach-Object { ($_ -replace '/', '\').Trim() })
-    $paths = @('CHANGELOG.md') + @($entryPaths | Where-Object { $tracked -contains ($_ -replace '/', '\') })
-    $untracked = @($entryPaths | Where-Object { $tracked -notcontains ($_ -replace '/', '\') })
+    $paths = @('CHANGELOG.md') + @($writtenPaths | Where-Object { $tracked -contains ($_ -replace '/', '\') })
+    $untracked = @($writtenPaths | Where-Object { $tracked -notcontains ($_ -replace '/', '\') })
     if ($untracked.Count -gt 0) {
-        Write-Host "  (not in the commit, because git never tracked them: $($untracked -join ', ') -- they were folded and deleted all the same.)" -ForegroundColor DarkYellow
+        # Deliberately not "deleted": since the split, an untracked path here may have been reset rather
+        # than removed, and a message that names the wrong disposal sends the reader looking for a file
+        # that is still on disk.
+        Write-Host "  (not in the commit, because git never tracked them: $($untracked -join ', ') -- the fold handled them on disk all the same.)" -ForegroundColor DarkYellow
     }
     $commitRun = Invoke-NativeCapture -FilePath 'git' -Arguments (@('commit', '-m', $message, '--') + $paths)
     if ($commitRun.ExitCode -ne 0) {

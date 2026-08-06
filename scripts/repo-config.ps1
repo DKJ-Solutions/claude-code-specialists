@@ -144,9 +144,15 @@ function Get-LiveStage {
 # below, which are also what the script hardcoded before. Same pattern as Get-ChangelogHeading (#178)
 # and Get-LiveStage (#177). Four separate functions rather than one map-returning function, so the
 # contract check can name the exact default per knob in its [INFO] line.
+#
+# TWO OF THEM ARE NOW GATE-ONLY (August 6, 2026). Since the branch/ split, new-changelog-entry.ps1 writes
+# neither the body heading nor the old to-do placeholder -- branch-progress.md carries the step list, and
+# the entry's placeholder asks what the change DOES. The body heading stays defined here because it is
+# still a marker open-pr refuses, so a consumer who translated it keeps a gate that recognises their
+# wording rather than only the English one. See $script:EntryScaffoldDefaults in entry-scaffold-lib.ps1.
 $script:EntryTitlePlaceholder = 'TODO: title'
 $script:EntryBodyHeading      = '**To do / where I left off:**'
-$script:EntryBodyPlaceholder  = 'TODO: what still needs to happen on this branch, and where you left off.'
+$script:EntryBodyPlaceholder  = 'TODO: what this change does, for whoever reads CHANGELOG.md later.'
 $script:EntryFallbackType     = 'Chore'
 
 function Get-EntryTitlePlaceholder {
@@ -193,9 +199,19 @@ function Get-MojibakePaths {
     <# Absolute paths of the files fix-mojibake.ps1 examines when called without -Path. #>
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
-    # Every markdown file in the repo root: CHANGELOG.md, the root docs, and any unfolded entry file.
+    # Every markdown file in the repo root: CHANGELOG.md and the root docs.
     $paths = @(Get-ChildItem -LiteralPath $RepoRoot -Filter '*.md' -File |
         Select-Object -ExpandProperty FullName)
+
+    # branch/ -- the branch's entry and step list. They were covered by the root glob above until the split
+    # moved them (August 6, 2026), and the entry is the single highest-value file in this set: its text is
+    # pasted verbatim into CHANGELOG.md and from there into the per-plugin CHANGELOGs that travel to
+    # consumers, so a mis-decode caught anywhere later has already been copied three times.
+    $branchDir = Join-Path $RepoRoot 'branch'
+    if (Test-Path -LiteralPath $branchDir) {
+        $paths += @(Get-ChildItem -LiteralPath $branchDir -Filter '*.md' -File |
+            Select-Object -ExpandProperty FullName)
+    }
 
     # Every markdown file under plugins/: the per-plugin CHANGELOG.md and RELEASE.md that cut-release.ps1
     # writes entry text into, and the manuals, agent defs and personas beside them -- all prose, all

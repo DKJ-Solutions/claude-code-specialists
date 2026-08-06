@@ -1,6 +1,20 @@
 <#
-Creates the changelog entry file for the current branch in the repo root:
-<branch-name-with-hyphens>.md, with branch name, date, and branch type already filled in.
+Writes the current branch's two working files in branch/ (Dave, August 6, 2026):
+
+  branch/branch-changelog.md   what the change DOES -- nothing but the entry block, so it pastes
+                               into CHANGELOG.md in one go. This is what the fold folds.
+  branch/branch-progress.md    what still MUST HAPPEN -- the branch's name, its step list, and
+                               where you left off. Never folded; reset after the merge.
+
+IT REPLACES THE ROOT ENTRY FILE (<branch-name-with-hyphens>.md). Fixed paths rather than one named
+after the branch: git already tracks these per branch, so two branches cannot collide on them, and
+the repo root stops filling up with other people's in-flight work. The reasoning, and why the reset
+state is what lives on the trunk, is in scripts/lib/entry-scaffold-lib.ps1.
+
+BOTH FILES ARE WRITTEN INDEPENDENTLY and the script is idempotent per file: a rerun leaves a
+changelog file that already holds an entry alone, and leaves a step list somebody has been ticking
+off alone, judged by what each file says it belongs to rather than by whether it exists (both exist
+on the trunk by design).
 
 Usage:
   .\scripts\release\new-changelog-entry.ps1 -Title "Short title of the change"
@@ -35,10 +49,10 @@ A repo that does not rank (Test-EntrySignificanceActive) gets the older single '
 which is still read everywhere -- "recognise both, write one".
 
 Optional -Intent: the direction of the branch -- what still needs to happen and where you left
-off. Typically given when parking a branch for later (see new-branch.ps1 -Park). If it is given it
-becomes the recorded entry body; if it is left empty the body falls back to a directional block
-instead of a bare one-line TODO, so a forgotten -Intent still leaves a "what is next / where was
-I" prompt rather than an empty placeholder (#162).
+off. Typically given when parking a branch for later (see new-branch.ps1 -Park). It lands in
+branch-progress.md under "where I left off", NOT in the entry: it is a status, and the entry file's
+text folds verbatim into CHANGELOG.md. Left empty, that section carries its own placeholder, so a
+forgotten -Intent still leaves a "where was I" prompt rather than a blank (#162).
 
 THE STUB WORDING IS REPO-OWNED (#410). The four strings this script writes -- the title
 placeholder, the body heading, the fallback body and the unknown-prefix type -- come from four
@@ -136,7 +150,6 @@ if (Test-Path -LiteralPath $configPath) {
 # Probed AFTER the dot-source above, so this repo's own answers win where it gives them.
 $scaffold         = Get-EntryScaffoldWording
 $stubTitle        = $scaffold.Title
-$stubBodyHeading  = $scaffold.BodyHeading
 $stubBody         = $scaffold.BodyPlaceholder
 
 # The caller named no title (see the param comment): use this repo's placeholder.
@@ -146,9 +159,10 @@ if ($Title -eq "") { $Title = $stubTitle }
 # and the rest of the repo has no BOM.
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
 
+$trunk = Get-BranchTrunkName
 $branch = (git rev-parse --abbrev-ref HEAD).Trim()
-if ($branch -eq "main") {
-    Write-Host "You are on main - create a branch first." -ForegroundColor Red
+if ($branch -eq $trunk) {
+    Write-Host "You are on $trunk - create a branch first." -ForegroundColor Red
     exit 1
 }
 
@@ -161,26 +175,41 @@ if (-not $branchType) {
     Write-Host "Unknown branch prefix '$($info.Prefix)' - 'Branch type' set to '$stubFallbackType', adjust this by hand if needed." -ForegroundColor Yellow
 }
 
-$fileName = $info.SafeName + ".md"
-$filePath = Join-Path $repoRoot $fileName
+# THE BRANCH FILES LIVE IN branch/, NOT IN THE REPO ROOT UNDER THE BRANCH'S NAME (Dave, August 6, 2026).
+# Two fixed paths, and git's own per-branch tracking is what keeps two branches from colliding on them --
+# see the block in entry-scaffold-lib.ps1 for why that beats a filename per branch.
+$branchFiles    = Get-BranchFilePaths
+$branchDirPath  = Join-Path $repoRoot $branchFiles.Directory
+$changelogPath  = Join-Path $repoRoot $branchFiles.Changelog
+$progressPath   = Join-Path $repoRoot $branchFiles.Progress
 
-if (Test-Path $filePath) {
-    Write-Host "Entry file '$fileName' already exists - nothing done." -ForegroundColor Yellow
+if (-not (Test-Path -LiteralPath $branchDirPath)) {
+    $null = New-Item -ItemType Directory -Path $branchDirPath -Force
+}
+
+# IDEMPOTENCY IS PER FILE, not one check for both, because the two can legitimately be out of step: a
+# rerun on a branch whose entry has been written must still not clobber the step list, and vice versa.
+# The test is what the file SAYS it belongs to rather than whether it exists -- both files exist on the
+# trunk by design, so Test-Path would report every fresh branch as already scaffolded.
+$changelogExisting = if (Test-Path -LiteralPath $changelogPath) { [System.IO.File]::ReadAllText($changelogPath) } else { '' }
+$progressExisting  = if (Test-Path -LiteralPath $progressPath)  { [System.IO.File]::ReadAllText($progressPath)  } else { '' }
+
+$changelogTaken = (Test-BranchChangelogIsFilled -Text $changelogExisting)
+$progressOwner  = Get-BranchFileDeclaredBranch -Text $progressExisting
+$progressTaken  = ($progressOwner -and $progressOwner -ne $trunk)
+
+if ($changelogTaken -and $progressTaken) {
+    Write-Host "Branch files already written for '$branch' - nothing done." -ForegroundColor Yellow
     exit 0
 }
 
-$midDot = [char]0x00B7
-
-# Body: an explicit -Intent (typically when parking the branch for later / another device) becomes
-# the recorded body; otherwise it falls back to a directional block instead of a bare one-line
-# TODO, so a forgotten -Intent still prompts for "what is next / where was I" (#162). Either way
-# this is a scaffold: whoever finishes the branch replaces the body with the final description
-# before the PR (open-pr and fold-changelog-entry read exactly this text).
-if ($Intent -ne "") {
-    $body = $Intent
-} else {
-    $body = $stubBody
-}
+# -Intent NO LONGER LANDS IN THE ENTRY (Dave, August 6, 2026). It is "where you left off" -- a status,
+# typically written when parking a branch (#162) -- and with the two files split, status is exactly what
+# branch-progress.md is for. It used to become the entry BODY, which put a progress note in the file whose
+# text folds verbatim into CHANGELOG.md, and that is the defect the v3.2.0 measurement found three times
+# over. So the entry always scaffolds with the placeholder body, and the gate keeps refusing it until
+# somebody writes what the change does.
+$body = $stubBody
 
 # THE IMPACT TABLE, at its harmless default: one tier-0 row with no score (issue #467). It declares both
 # facts about reach at once -- how far this change goes, and how much it weighs at each reach it claims --
@@ -232,11 +261,33 @@ $impactActive = Test-EntrySignificanceActive
 # THE STUB BODY STILL GOES INSIDE the 'what does this change do?' section rather than replacing it, so
 # open-pr's scaffold gate keeps working unchanged: it refuses an entry still carrying this wording, and it
 # looks for the wording, not for where it sits.
-$entryLines = Format-EntryBlock -Title $Title -Type $branchType -Body ($stubBodyHeading + "`n`n" + $body)
+#
+# THE '**To do / where I left off:**' HEADING IS NO LONGER WRITTEN ABOVE IT (August 6, 2026). That heading
+# was the entry admitting it was doing two jobs; branch-progress.md has the second one now, and the
+# placeholder underneath asks what the change DOES rather than what is left to do. The gate still refuses
+# the old wording wherever it survives -- see $script:EntryScaffoldLegacyMarkers.
+#
+# AND THE FILE HOLDS NOTHING BUT THIS BLOCK -- no title, no branch line, no warning around it. That is the
+# requirement restated: branch-changelog.md must be pasteable into CHANGELOG.md in one go, so anything
+# wrapped around the entry would be a manual strip step for whoever pastes it. The branch name lives in
+# branch-progress.md, which has room for it.
+$entryLines = Format-EntryBlock -Title $Title -Type $branchType -Body $body
 $template = ($entryLines -join "`n") + "`n"
 
-[System.IO.File]::WriteAllText($filePath, $template, $Utf8NoBom)
-Write-Host "Created: $fileName" -ForegroundColor Green
+if ($changelogTaken) {
+    Write-Host "Kept: $($branchFiles.Changelog) (already holds an entry)" -ForegroundColor Yellow
+} else {
+    [System.IO.File]::WriteAllText($changelogPath, $template, $Utf8NoBom)
+    Write-Host "Created: $($branchFiles.Changelog)" -ForegroundColor Green
+}
+
+if ($progressTaken) {
+    Write-Host "Kept: $($branchFiles.Progress) (already scaffolded for '$progressOwner')" -ForegroundColor Yellow
+} else {
+    $progressText = ((Format-BranchProgressScaffold -Branch $branch -Intent $Intent) -join "`n") + "`n"
+    [System.IO.File]::WriteAllText($progressPath, $progressText, $Utf8NoBom)
+    Write-Host "Created: $($branchFiles.Progress)" -ForegroundColor Green
+}
 
 # The rubric, printed at the moment the entry comes into existence. The scores themselves are filled in
 # later -- when the tier is raised, by whoever finishes the branch -- so this is not a prompt to act on

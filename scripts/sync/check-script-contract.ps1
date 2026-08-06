@@ -227,14 +227,14 @@ $script:Contract = @(
        ViaLib = 'entry-scaffold-lib';
        Optional = $true; Default = 'TODO: title';
        Returns = 'the placeholder title for an entry created without an explicit -Title; open-pr refuses to ship an entry that still carries it' },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryBodyHeading'; Scripts = @('new-changelog-entry', 'open-pr');
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryBodyHeading'; Scripts = @('open-pr');
        ViaLib = 'entry-scaffold-lib';
        Optional = $true; Default = '**To do / where I left off:**';
-       Returns = 'the single bold line written above the entry body; open-pr refuses to ship an entry that still carries it' },
+       Returns = 'the to-do line the entry USED to be scaffolded with; no longer written since the branch/ split, still refused by open-pr wherever it survives' },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryBodyPlaceholder'; Scripts = @('new-changelog-entry', 'open-pr');
        ViaLib = 'entry-scaffold-lib';
-       Optional = $true; Default = 'TODO: what still needs to happen on this branch, and where you left off.';
-       Returns = 'the fallback body used when no -Intent was given -- a directional prompt, not an empty line; open-pr refuses to ship an entry that still carries it' },
+       Optional = $true; Default = 'TODO: what this change does, for whoever reads CHANGELOG.md later.';
+       Returns = 'the placeholder body an entry is scaffolded with -- a prompt for what the change does, since the step list moved to branch/branch-progress.md; open-pr refuses to ship an entry that still carries it' },
     # The impact table's two knobs (issue #467). Declared for the reason the stub wording above is: neither
     # failure is a crash. A consumer that has adopted tier sections gets the ranking switched ON by that
     # fact alone, and would discover it when a cut refuses; a consumer whose readers are not developers gets

@@ -584,7 +584,10 @@ This is the test description text.
     Assert-True ($bodyA -match 'This is the test description text\.') 'default path: description filled in from the changelog entry'
     Assert-True ($bodyA -notmatch '<!-- Short description of what changes and why') 'default path: description placeholder was replaced'
     Assert-True ($bodyA -match '- \[x\] `feat/`') 'default path: type-of-change box ticked'
-    Assert-True ($bodyA -match '- \[x\] Changelog entry file created') 'default path: changelog-entry checklist item ticked'
+    # This fixture deliberately carries a PRE-SPLIT root entry file and no branch/ directory, so scenario A
+    # doubles as the end-to-end proof that a branch created before August 6, 2026 still reads, ticks and
+    # auto-fills exactly as it did -- which is the case every consumer with a branch in flight is in.
+    Assert-True ($bodyA -match '- \[x\] Changelog entry written') 'default path: changelog-entry checklist item ticked'
     Assert-True ($bodyA -match '- \[x\] Requested by Dave') 'default path: approval checklist item ticked (default pattern)'
 
     # Scenario B: override path -- repo-config defines all four optional #101 functions.
