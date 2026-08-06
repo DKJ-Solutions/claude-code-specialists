@@ -328,13 +328,25 @@ function Test-EntryDeclaresType {
         types -- both of them parses of a heading doing three jobs. As its own section it is STATED rather
         than inferred, and the heading is reduced to what a reader scans: the title.
 
-        Matched as heading + blank line + the type on its own line, which is exactly what Format-EntryBlock
-        writes. A bare '-match $Type' would pass on the word appearing anywhere in the body, including in the
-        title -- and one of the callers below is the injection test, whose whole subject is that nothing extra
-        ended up in the file.
+        THE SECTION IS 'Branch type' AND HOLDS THE PREFIX SINCE THE DOSSIER FORM (August 6, 2026), so this
+        asks Get-EntrySectionAnswer rather than matching the raw text: the section now opens with a guidance
+        comment, and a heading+blank+value pattern would be looking at the hint. The comparison is
+        case-insensitive because the FILE carries 'feat' while the callers name the canonical 'Feat' -- which
+        is exactly the pair Resolve-EntryType reconciles.
+
+        A bare '-match $Type' would pass on the word appearing anywhere in the body, including in the
+        description -- and one of the callers below is the injection test, whose whole subject is that
+        nothing extra ended up in the file. Reading the one section keeps that assert as sharp as it was.
     #>
     param([Parameter(Mandatory = $true)][string]$EntryText, [Parameter(Mandatory = $true)][string]$Type)
-    return ($EntryText -match ('(?m)^### Type of change\r?\n\r?\n' + [regex]::Escape($Type) + '\s*\r?$'))
+    $answer = Get-EntrySectionAnswer -EntryText $EntryText -Key 'Type'
+    return ($answer -and ($answer.Trim().ToLowerInvariant() -eq $Type.ToLowerInvariant()))
+}
+
+function Get-EntryDescription {
+    <# The 'Branch description' section's answer -- where the title given to new-branch now lands. #>
+    param([Parameter(Mandatory = $true)][string]$EntryText)
+    return (Get-EntrySectionAnswer -EntryText $EntryText -Key 'Description')
 }
 
 try {
@@ -402,14 +414,22 @@ try {
     # closing line, the type in its own section. Asserted as the WHOLE line, which is the stronger claim: it
     # proves nothing was appended, which a prefix match could not.
     $headLine1 = ($entryText1 -split "`r?`n")[0]
-    Assert-Equal '## First title' $headLine1 'entry heading is the title alone, at the entry level'
-    Assert-True (Test-EntryDeclaresType -EntryText $entryText1 -Type 'Feat') 'and the branch type is stated in its own section instead'
+    Assert-Equal '## `feat/my-task` changelog' $headLine1 'entry heading names the branch, whole and at the entry level'
+    Assert-Equal 'First title' (Get-EntryDescription -EntryText $entryText1) 'and the title given to new-branch is the branch description'
+    Assert-True (Test-EntryDeclaresType -EntryText $entryText1 -Type 'Feat') 'and the branch type is stated in its own section'
     Assert-True (-not ($headLine1 -match '\d{4}-\d{2}-\d{2}')) 'the scaffold writes NO date -- it would be the branch birth date, not the landing date'
+    Assert-True ((Get-EntrySectionAnswer -EntryText $entryText1 -Key 'Id') -match '^\d{8}-\d{6}$') 'the branch ID is stamped at creation'
     # THE ENTRY NO LONGER CARRIES A TO-DO LIST. That job moved to branch-progress.md with the split, and
     # this pair of asserts is what holds the two files to their separate jobs: the file that folds into
     # CHANGELOG.md prompts for what the change DOES, and nothing else.
     Assert-True (-not ($entryText1 -match [regex]::Escape('**To do / where I left off:**'))) 'the entry has no to-do heading -- that lives in the step list now'
-    Assert-True ($entryText1 -match 'what this change does') 'the entry body prompts for the description, not for a plan'
+    # THE PROMPT IS A GUIDANCE COMMENT OVER AN EMPTY SECTION, not a visible placeholder -- so what proves the
+    # entry is unfinished is that the gate still refuses it, which is the property that actually matters.
+    Assert-Equal '' (Get-EntrySectionAnswer -EntryText $entryText1 -Key 'What') 'the body section is left empty for the author'
+    $whatHeading1 = Get-EntrySectionHeading -Key 'What'
+    $gate1 = @(Get-EntryScaffoldFindings -EntryText $entryText1 -Wording (Get-EntryScaffoldWording))
+    Assert-True (@($gate1 | Where-Object { $_.Marker -eq $whatHeading1 }).Count -gt 0) `
+        'and the gate names it, so an unwritten entry cannot reach a PR'
 
     $progressText1 = [System.IO.File]::ReadAllText($progressPath, [System.Text.Encoding]::UTF8)
     Assert-Equal 'feat/my-task' (Get-BranchFileDeclaredBranch -Text $progressText1) 'the step list names the branch it was created on'
@@ -475,11 +495,14 @@ try {
     $entryPathF = Join-Path $fixtureF ((Get-BranchFilePaths).Changelog)
     Assert-True (Test-Path -LiteralPath $entryPathF) 'malicious title: entry file created anyway'
     $entryTextF = [System.IO.File]::ReadAllText($entryPathF, [System.Text.Encoding]::UTF8)
-    # The whole line, not a prefix: the heading is now the title alone, so an exact compare is available here
-    # and is the stronger assert -- a prefix match would pass even if something had been appended to the line
-    # by a broken argv boundary, which is the very thing this scenario is about.
-    $expectedHeaderF = "## $maliciousTitle"
-    Assert-Equal $expectedHeaderF (($entryTextF -split "`r?`n")[0]) 'malicious title: FULLY and unchanged in the heading line, and nothing appended (no argv splitting)'
+    # THE PAYLOAD LANDS IN 'Branch description' SINCE THE DOSSIER FORM -- the title given to new-branch is a
+    # section now, not the heading. The assert follows it there and keeps its shape: an EXACT compare of the
+    # whole section answer, which proves nothing was appended or lost at a broken argv boundary. A prefix
+    # match would pass on exactly the damage this scenario is about.
+    Assert-Equal $maliciousTitle (Get-EntryDescription -EntryText $entryTextF) 'malicious title: FULLY and unchanged in its section, and nothing appended (no argv splitting)'
+    # ...and the heading is untouched by it, which is new ground the split opened: a payload that escaped its
+    # section would show up here first.
+    Assert-Equal '## `feat/injection-check` changelog' (($entryTextF -split "`r?`n")[0]) 'malicious title: and the heading still names the branch, nothing more'
     Assert-True (Test-EntryDeclaresType -EntryText $entryTextF -Type 'Feat') 'malicious title: and the type section is intact rather than absorbing part of the payload'
 
     Assert-True (Test-Path -LiteralPath $sentinelPath) "sentinel file 'X' UNTOUCHED -- no 'Remove-Item' executed via a broken argv"
@@ -512,7 +535,7 @@ try {
     $entryPathG = Join-Path $fixtureG ((Get-BranchFilePaths).Changelog)
     Assert-True (Test-Path -LiteralPath $entryPathG) 'entry file created'
     $entryTextG = [System.IO.File]::ReadAllText($entryPathG, [System.Text.Encoding]::UTF8)
-    Assert-True ($entryTextG -match [regex]::Escape('Explicit title')) 'explicit -Title wins -- appears in the heading line'
+    Assert-Equal 'Explicit title' (Get-EntryDescription -EntryText $entryTextG) 'explicit -Title wins -- it is the branch description'
     Assert-True (-not ($entryTextG -match [regex]::Escape('Env title'))) 'env-var title NOT used while -Title was given explicitly'
     Assert-True ($null -eq $env:CLAUDE_NEWBRANCH_TITLE) 'test process itself leaves no leaking CLAUDE_NEWBRANCH_TITLE behind after this scenario'
 
@@ -530,7 +553,8 @@ try {
     Assert-True (Test-Path -LiteralPath $entryPathH) '-Intent: entry file created'
     $entryTextH = [System.IO.File]::ReadAllText($entryPathH, [System.Text.Encoding]::UTF8)
     Assert-True (-not ($entryTextH -match [regex]::Escape($intentText))) '-Intent: the intent does NOT land in the entry -- that text would fold into CHANGELOG.md verbatim'
-    Assert-True ($entryTextH -match 'what this change does') '-Intent: the entry keeps its own placeholder, so the gate still refuses it until written'
+    Assert-Equal '' (Get-EntrySectionAnswer -EntryText $entryTextH -Key 'What') '-Intent: the entry body is left empty rather than taking the status'
+    Assert-True (@(Get-EntryScaffoldFindings -EntryText $entryTextH -Wording (Get-EntryScaffoldWording)).Count -gt 0) '-Intent: so the gate still refuses the entry until somebody writes what the change does'
 
     $progressPathH = Join-Path $fixtureH ((Get-BranchFilePaths).Progress)
     $progressTextH = [System.IO.File]::ReadAllText($progressPathH, [System.Text.Encoding]::UTF8)
@@ -650,17 +674,22 @@ function Get-EntryFallbackType     { return $script:EntryFallbackType }
     $entryPathK = Join-Path $fixtureK ((Get-BranchFilePaths).Changelog)
     Assert-True (Test-Path -LiteralPath $entryPathK) 'configured wording: entry file created'
     $entryTextK = [System.IO.File]::ReadAllText($entryPathK, [System.Text.Encoding]::UTF8)
-    Assert-True ($entryTextK -match [regex]::Escape('TODO: titel')) 'configured wording: the repo title placeholder is used'
-    Assert-True (-not ($entryTextK -match [regex]::Escape('TODO: title'))) 'configured wording: the built-in English title placeholder is NOT used'
-    # The body heading is no longer WRITTEN by anything -- neither the repo's nor the built-in one. It
-    # survives only as a marker open-pr refuses (entry-scaffold.tests.ps1 covers that), so the assert here
-    # is that the entry is free of both.
-    Assert-True (-not ($entryTextK -match [regex]::Escape('**Nog te doen / waar ik gebleven ben:**'))) 'configured wording: the repo body heading is not written into the entry either'
-    Assert-True (-not ($entryTextK -match [regex]::Escape('**To do / where I left off:**'))) 'configured wording: the built-in English body heading is NOT used'
-    Assert-True ($entryTextK -match [regex]::Escape('TODO: wat er nog moet gebeuren op deze branch.')) 'configured wording: the repo fallback body is used'
+    # NONE OF THE THREE PROSE STRINGS IS WRITTEN ANY MORE -- neither the repo's nor the built-in one. The
+    # dossier form scaffolds every field as a heading with a guidance comment over an empty space, so there
+    # is no placeholder to configure into the file; the three seams survive as markers open-pr REFUSES,
+    # which entry-scaffold.tests.ps1 covers directly. So what this scenario asserts is that the entry is
+    # free of all six strings, and that the one knob still governing content -- the fallback TYPE -- works.
+    foreach ($absent in @('TODO: titel', 'TODO: title',
+                          '**Nog te doen / waar ik gebleven ben:**', '**To do / where I left off:**',
+                          'TODO: wat er nog moet gebeuren op deze branch.',
+                          'TODO: what this change does, for whoever reads CHANGELOG.md later.')) {
+        Assert-True (-not ($entryTextK -match [regex]::Escape($absent))) "configured wording: '$absent' is not written into the entry"
+    }
     Assert-True (Test-EntryDeclaresType -EntryText $entryTextK -Type 'Docs') "configured wording: unknown prefix falls back to the repo's own type (Docs), not Chore"
     Assert-True (-not (Test-EntryDeclaresType -EntryText $entryTextK -Type 'Chore')) 'configured wording: and the built-in English fallback type is NOT used'
-    Assert-True (Test-Phrase -Text $rK.Out -Phrase "set to 'Docs'") 'configured wording: the unknown-prefix warning names the configured type'
+    # LOWERCASE IN THE FILE AND IN THE WARNING, because the section holds the branch PREFIX now and its own
+    # hint asks for one. Resolve-EntryType canonicalises, so the entry still reads back as 'Docs'.
+    Assert-True (Test-Phrase -Text $rK.Out -Phrase "set to 'docs'") 'configured wording: the unknown-prefix warning names the configured type'
 
     # --- (l) A broken repo-config.ps1 degrades to a warning, it does not stop the entry (#410) -----
     #     repo-config is OPTIONAL for this script, unlike for open-pr/fold which pre-flight on it. The
@@ -676,8 +705,12 @@ function Get-EntryFallbackType     { return $script:EntryFallbackType }
     $entryPathL = Join-Path $fixtureL ((Get-BranchFilePaths).Changelog)
     Assert-True (Test-Path -LiteralPath $entryPathL) 'broken repo-config: the entry file is still written'
     $entryTextL = [System.IO.File]::ReadAllText($entryPathL, [System.Text.Encoding]::UTF8)
-    Assert-True ($entryTextL -match [regex]::Escape('TODO: what this change does')) 'broken repo-config: falls back to the built-in wording'
-    Assert-True ($entryTextL -match [regex]::Escape('TODO: title')) 'broken repo-config: and to the built-in title placeholder'
+    # The subject here is that the entry is WRITTEN at all despite the broken config -- the placeholders it
+    # used to be checked by are no longer written by anything (see scenario k). So the assert moved to the
+    # structure: the built-in section headings are there, which is what proves the built-in defaults were
+    # used rather than nothing.
+    Assert-True ($entryTextL -match ('(?m)^' + [regex]::Escape((Get-EntrySectionHeading -Key 'What')) + '$')) 'broken repo-config: falls back to the built-in section wording'
+    Assert-True (Test-EntryDeclaresType -EntryText $entryTextL -Type 'Feat') 'broken repo-config: and the branch type is still stated'
     Assert-True (Test-Phrase -Text $rL.Out -Phrase 'could not be loaded') 'broken repo-config: says so out loud instead of failing silently'
 } finally {
     foreach ($f in $script:fixtures) {

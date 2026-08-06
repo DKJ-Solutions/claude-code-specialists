@@ -147,13 +147,19 @@ if (Test-Path -LiteralPath $configPath) {
     }
 }
 
-# Probed AFTER the dot-source above, so this repo's own answers win where it gives them.
-$scaffold         = Get-EntryScaffoldWording
-$stubTitle        = $scaffold.Title
-$stubBody         = $scaffold.BodyPlaceholder
-
-# The caller named no title (see the param comment): use this repo's placeholder.
-if ($Title -eq "") { $Title = $stubTitle }
+# THE PLACEHOLDER STRINGS ARE NO LONGER WRITTEN, ONLY REFUSED (Dave, August 6, 2026). The dossier form
+# gives every field a guidance COMMENT above it and leaves the field itself empty, so there is no stub
+# title and no stub body to put anywhere. Get-EntryScaffoldWording still exists and open-pr still reads it,
+# because every branch in flight carries an entry written by the older scaffolder -- see the header of
+# $script:EntryScaffoldDefaults. What replaced the strings as this repo's guard is a measurement: the gate
+# reports a section that is still EMPTY once the comments are stripped, which catches the untouched entry
+# AND the one whose placeholder was deleted instead of answered.
+#
+# -Title, WHERE THE CALLER GIVES ONE, IS THE BRANCH DESCRIPTION. That is where the heading's old job went:
+# the H2 names the branch now, and the human-readable name of the change is a section. Left empty, the
+# section is left empty -- and the gate refuses the PR until somebody writes it, which is strictly better
+# than a placeholder that can be ticked past.
+$description = $Title
 
 # BOM-less UTF8 -- Set-Content -Encoding UTF8 always adds a BOM in Windows PowerShell 5.1,
 # and the rest of the repo has no BOM.
@@ -168,12 +174,25 @@ if ($branch -eq $trunk) {
 
 . $branchInfoPath
 
+# THE 'Branch type' SECTION HOLDS THE PREFIX, LOWERCASE, which is what its own hint asks for ("options for
+# type are: feat, fix or docs") and what the branch name already says. It used to hold the canonical type
+# ('Feat'); Resolve-EntryType canonicalises case-insensitively, so both read back as the one type the
+# release documents know -- which is what keeps the hundreds of entries already carrying 'Feat' readable.
 $info = Get-BranchInfo -Branch $branch
-$branchType = $info.Type
+$branchType = if ($info.IsKnown) { $info.Prefix } else { '' }
 if (-not $branchType) {
-    $branchType = $stubFallbackType
-    Write-Host "Unknown branch prefix '$($info.Prefix)' - 'Branch type' set to '$stubFallbackType', adjust this by hand if needed." -ForegroundColor Yellow
+    $branchType = $stubFallbackType.ToLowerInvariant()
+    Write-Host "Unknown branch prefix '$($info.Prefix)' - 'Branch type' set to '$branchType', adjust this by hand if needed." -ForegroundColor Yellow
 }
+
+# THE BRANCH ID, STAMPED AT CREATION, and written into BOTH files so the pair can be recognised as one
+# even out of context -- a parked branch picked up on another machine, or two branch files pasted into a
+# report. A timestamp is what Dave's own hint asks for, and it is the one identifier available here that
+# needs no state and cannot collide with another branch created on another machine.
+#
+# THE SECOND IS PART OF IT deliberately. Two branches created in the same minute is not a hypothetical in a
+# repo whose whole workflow is "notice it once, script it the second time".
+$branchId = (Get-Date).ToString('yyyyMMdd-HHmmss')
 
 # THE BRANCH FILES LIVE IN branch/, NOT IN THE REPO ROOT UNDER THE BRANCH'S NAME (Dave, August 6, 2026).
 # Two fixed paths, and git's own per-branch tracking is what keeps two branches from colliding on them --
@@ -207,9 +226,9 @@ if ($changelogTaken -and $progressTaken) {
 # typically written when parking a branch (#162) -- and with the two files split, status is exactly what
 # branch-progress.md is for. It used to become the entry BODY, which put a progress note in the file whose
 # text folds verbatim into CHANGELOG.md, and that is the defect the v3.2.0 measurement found three times
-# over. So the entry always scaffolds with the placeholder body, and the gate keeps refusing it until
-# somebody writes what the change does.
-$body = $stubBody
+# over. So the entry scaffolds with an empty body, and the gate keeps refusing it until somebody writes
+# what the change does.
+$body = ''
 
 # THE IMPACT TABLE, at its harmless default: one tier-0 row with no score (issue #467). It declares both
 # facts about reach at once -- how far this change goes, and how much it weighs at each reach it claims --
@@ -267,11 +286,13 @@ $impactActive = Test-EntrySignificanceActive
 # placeholder underneath asks what the change DOES rather than what is left to do. The gate still refuses
 # the old wording wherever it survives -- see $script:EntryScaffoldLegacyMarkers.
 #
-# AND THE FILE HOLDS NOTHING BUT THIS BLOCK -- no title, no branch line, no warning around it. That is the
-# requirement restated: branch-changelog.md must be pasteable into CHANGELOG.md in one go, so anything
-# wrapped around the entry would be a manual strip step for whoever pastes it. The branch name lives in
-# branch-progress.md, which has room for it.
-$entryLines = Format-EntryBlock -Title $Title -Type $branchType -Body $body
+# AND THE FILE HOLDS NOTHING BUT THIS BLOCK -- no preamble, no warning around it. That is the requirement
+# restated: branch-changelog.md must be pasteable into CHANGELOG.md in one go, so anything wrapped around
+# the entry would be a manual strip step for whoever pastes it. Since the dossier form the block itself
+# opens with the branch, which is what lands in CHANGELOG.md -- Dave's own call, made before this was
+# built; see $script:EntrySectionDefaults for the alternative he was offered and declined.
+$entryLines = Format-EntryBlock -Branch $branch -Description $description -Id $branchId `
+    -Type $branchType -Body $body
 $template = ($entryLines -join "`n") + "`n"
 
 if ($changelogTaken) {
@@ -284,7 +305,10 @@ if ($changelogTaken) {
 if ($progressTaken) {
     Write-Host "Kept: $($branchFiles.Progress) (already scaffolded for '$progressOwner')" -ForegroundColor Yellow
 } else {
-    $progressText = ((Format-BranchProgressScaffold -Branch $branch -Intent $Intent) -join "`n") + "`n"
+    # THE SAME ID AS THE ENTRY. Two stamps taken a few lines apart would differ by a second often enough to
+    # matter, and the whole point of the field is that the pair carries one identifier.
+    $progressText = ((Format-BranchProgressScaffold -Branch $branch -Intent $Intent -Id $branchId `
+        -Description $description) -join "`n") + "`n"
     [System.IO.File]::WriteAllText($progressPath, $progressText, $Utf8NoBom)
     Write-Host "Created: $($branchFiles.Progress)" -ForegroundColor Green
 }

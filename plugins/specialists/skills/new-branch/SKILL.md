@@ -52,9 +52,28 @@ fold puts them back in that state after the merge.
 whole block before the PR" had to be a written instruction. Two files make it obvious. The entry now
 prompts for what the change does, and nothing else.
 
-**`branch-changelog.md` holds the entry block and nothing around it** — no title, no branch line. That
-is what makes it pasteable in one go; the branch name lives in `branch-progress.md`, which has room for
-it, and the fold reads it back from there to find the PR.
+**`branch-changelog.md` holds the entry block and nothing around it** — no preamble, no warning. That is
+what makes it pasteable in one go. Its heading names the **branch** (`` ## `feat/x` changelog ``), which is
+also how the fold finds the PR, and the human-readable name of the change is its first section.
+
+**Every field is a heading with a guidance comment under it**, and you write underneath. The comments are
+stripped by the fold, so leaving them standing costs the changelog nothing and there is nothing to tidy
+before the PR. Six sections, three of them filled in for you:
+
+```text
+## `<your branch>` changelog
+
+### Branch description     <- the title you gave -Title
+### Branch ID              <- a timestamp, stamped at creation
+### Branch type            <- the branch prefix
+### What does the change on this branch bring to main?
+### Significance
+### Pull Request           <- filled in by the fold, from the merge
+```
+
+**An empty field is refused.** There is no visible `TODO:` anywhere, so `open-pr` measures instead of
+matching: it names the description, the body and any tier whose reason is still blank. That catches an
+untouched entry *and* one whose prompt was deleted rather than answered.
 
 **The step list is enforced, not decorative.** `open-pr` refuses to push and `ship-pr` refuses to merge
 while anything is still `- [ ]`. Resolve each step as `- [x]` done or `- [~]` dropped, with the reason
@@ -62,17 +81,20 @@ kept on the line — that third mark exists so nobody is ever pushed into tickin
 not do. There is no `-Force`. Full convention and reasoning: the `open-pr` skill, and the source repo's
 [`branch/README.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/branch/README.md).
 
-## The entry carries an impact table, scaffolded at tier 0
+## The entry declares its Significance, scaffolded at tier 0
 
-The entry file gets this under its heading:
+Under `### Significance` the entry gets one `#### Tier N` sub-section per reach it claims, starting with
+tier 0 alone:
 
 ```text
-| Tier | Significance | Why |
-|---|---|---|
-| 0 | - | - |
+#### Tier 0
+
+<!-- why the change matters AT THIS REACH specifically -->
+
+**Score:**
 ```
 
-Two questions in one table. **The tier says how far the change reaches**, and therefore which release
+Two questions in one section. **The tier says how far the change reaches**, and therefore which release
 document the entry appears in:
 
 | tier | who notices |
@@ -93,16 +115,28 @@ produced. Score it 1 to 5 against this rubric:
 | `2` | small; noticed if somebody points it out |
 | `1` | cosmetic or preventative -- nothing changes for them today |
 
-**Raising the reach is adding a row, and every row needs a score and a `Why`.** The ladder is cumulative: a
-change consumers notice is also a change this project's colleagues get something out of, so a tier-2 entry
-owes a tier-1 row too. Each row is one document's reader answering their own question.
+**Raising the reach is adding a section, and every section needs a reason and a score.** The ladder is
+cumulative: a change consumers notice is also a change this project's colleagues get something out of, so a
+tier-2 entry owes a tier-1 section too. Each is one document's reader answering their own question.
+Tier 1 and Tier 2 arrive **commented out**, each behind its own `<!-- UNCOMMENT … -->` line — delete the
+first to bring Tier 1 in, and Tier 2 stays commented until you delete its own.
 
 ```text
-| Tier | Significance | Why |
-|---|---|---|
-| 2 | 5 | consumers must re-add the marketplace under its new name; installs break without it |
-| 1 | 4 | the routine version bump stops needing a developer |
+#### Tier 1
+
+The routine version bump stops needing a developer.
+
+**Score:** 4
+
+#### Tier 2
+
+Consumers must re-add the marketplace under its new name; installs break without it.
+
+**Score:** 5
 ```
+
+**`**Score:**` and the plain `Score:` are both read**, and only the bold form is written — the standing
+"recognise both, write one" rule, because every entry written before this carries the plain one.
 
 **What it costs to leave it at tier 0.** Nothing breaks, which is exactly why it is worth knowing: where the
 repo's entries declare their impact at all, the release cut refuses a bump the entries have not earned -- a
@@ -111,17 +145,18 @@ tier-1-or-higher entries carry no significance, because an unscored entry cannot
 cannot carry a release on its own. `open-pr` prints what it read and names anything still unsettled, so you
 learn that before the PR rather than at the cut.
 
-**The score cells are empty on purpose.** The tier defaults to 0 because 0 is a harmless final answer; a
-*score* has no harmless value, so any number scaffolded here would be a guess at a ranking. The rubric is
-what makes it a measurement rather than a mood, and the `Why` is what makes the resulting order auditable.
+**The score is scaffolded empty on purpose.** The tier defaults to 0 because 0 is a harmless final answer;
+a *score* has no harmless value, so any number scaffolded here would be a guess at a ranking. The rubric is
+what makes it a measurement rather than a mood, and the reason above it is what makes the resulting order
+auditable.
 
-**There is no `-Tier` parameter, deliberately.** Whoever finishes the branch already has to rewrite the title
-and body before the PR (open-pr's scaffold gate refuses the stubs), so the table is one more edit in a file
-that is being edited anyway.
+**There is no `-Tier` parameter, deliberately.** Whoever finishes the branch already has to answer the
+description and the body before the PR (open-pr's gate refuses an empty one), so the Significance sections
+are one more edit in a file that is being edited anyway.
 
-**A repo that switches the mechanism off (`Get-EntrySignificanceEnabled`) gets the older single `Tier: 0`
-line instead**, and that line is still read everywhere -- "recognise both, write one", so entries written
-before the table keep folding correctly.
+**Older shapes keep working.** The impact table this replaced and the single `Tier: 0` line before it are
+both still read everywhere -- "recognise both, write one" -- so entries written on either side of the change
+keep folding correctly.
 
 **Do not derive it from your branch prefix.** The prefix decides the entry's *type*, which the entry states
 under its own heading -- it predicts nothing about impact: a `docs/` branch can carry a tier-2 change and a
@@ -138,21 +173,23 @@ entry unreadable to your own fold.
 Two optional parameters cover the "start now, continue later (maybe on another device)" case:
 
 - **`-Intent "<what is next / where I left off>"`** -- recorded in **`branch-progress.md`**, under
-  its "where I left off" section. Omit it and that section carries a prompting placeholder instead,
-  so a forgotten `-Intent` still leaves the question standing.
+  its "where I left off" section. Omit it and that section carries its guidance comment alone, so the
+  question is still standing when you come back.
   **It deliberately does not touch the entry.** An intent is a status, and the entry's text folds
   verbatim into `CHANGELOG.md` -- this repo measured three released entries that shipped a progress
-  note that way. The entry always scaffolds with its own placeholder, and the PR gate keeps refusing
-  it until somebody writes what the change does.
-  The stub wording quoted here is only the **default**. The strings the entry is built from --
-  the title placeholder, the body placeholder, the retired to-do heading (still refused by `open-pr`
-  wherever it survives), and the type an unknown prefix falls back to -- are repo-owned and can be
-  set in your own `scripts/repo-config.ps1`
-  (`Get-EntryTitlePlaceholder`, `Get-EntryBodyHeading`, `Get-EntryBodyPlaceholder`,
-  `Get-EntryFallbackType`; issue #410). Define none of them and you get exactly the English text
-  above. That exists so a repo whose changelog is not in English does not have to keep a private
-  copy of the script to change four strings -- which is the duplication this skill exists to
-  prevent.
+  note that way. The entry's body is left empty, and the PR gate keeps refusing it until somebody
+  writes what the change does.
+  **The prose in these files is repo-owned.** The guidance comments, the section headings, the routing
+  questions and the rubric can all be set from your own `scripts/repo-config.ps1`
+  (`Get-EntryGuidanceOverrides`, `Get-EntrySectionHeadingOverrides`,
+  `Get-EntrySignificanceWordingOverrides`, `Get-EntrySignificanceRubricLevels`,
+  `Get-BranchFileWordingOverrides`), along with the type an unknown prefix falls back to
+  (`Get-EntryFallbackType`; issue #410). Define none of them and you get exactly the English text above.
+  That exists so a repo whose changelog is not in English does not have to keep a private copy of the
+  script -- which is the duplication this skill exists to prevent. The three retired placeholder strings
+  (`Get-EntryTitlePlaceholder`, `Get-EntryBodyHeading`, `Get-EntryBodyPlaceholder`) are **no longer
+  written by anything**; they survive only as wording `open-pr` still refuses wherever an older entry
+  carries it.
 - **`-Park`** -- after creating the branch + entry, commits the entry (the intent carrier) and
   pushes the branch to `origin` with `git push -u`. **This opens no PR.** Push is not a PR: parking
   makes the branch reachable from another device, while the PR rule stays intact and separate.

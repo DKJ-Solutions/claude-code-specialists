@@ -270,17 +270,34 @@ The constitution above, concretely implemented here:
      highlights tier joined it.
 
      **The document is one change per `##` heading, with no section headings at all** (Dave, August 5,
-     2026). `CHANGELOG.md` is an intro followed by a **flat ranked list**: a change *is* the `##`, and its
-     heading is **just the title** — `## A significance score per entry, and the order follows it` — with the
-     PR number and the merge date on the entry's closing `[PR #NN](url) · merged <date>` line, where the two
-     facts the merge owns already lived. Under the heading, three `###` sections answer the questions a
-     reader arrives with — `What does this change do?`, `Significance` (one `#### Tier N` sub-section per
-     reach the change claims) and `Type of change`. `Plugins:` and the
-     `[PR #NN](url) · merged <date>` line stay plain lines, because a heading around one fact is more
-     structure than content. The three `## Tier N - Pull Requests` sections it replaced said exactly one
-     thing — how far each change reaches — and the entries now say that themselves, in a table that also
-     carries what the change is worth. **What the sections communicated visually is kept as the ordering**:
-     furthest reach first, and within a tier the highest significance first.
+     2026). `CHANGELOG.md` is an intro followed by a **flat ranked list**: a change *is* the `##`. The three
+     `## Tier N - Pull Requests` sections it replaced said exactly one thing — how far each change reaches —
+     and the entries now say that themselves, in a form that also carries what the change is worth.
+     **What the sections communicated visually is kept as the ordering**: furthest reach first, and within a
+     tier the highest significance first.
+
+     **And since August 6, 2026 the entry is the branch's own dossier, folded in as it stands.** The heading
+     names the **branch** — `` ## `feat/x` changelog `` — and six `###` sections answer, in order:
+     `Branch description` (the human-readable name of the change, which the heading used to carry),
+     `Branch ID` (a timestamp stamped at creation), `Branch type` (the prefix, lowercase),
+     `What does the change on this branch bring to main?`, `Significance` (one `#### Tier N` sub-section per
+     reach the change claims, each closing with `**Score:**`) and `Pull Request`, which the **fold** fills
+     from the merge itself. `Plugins:` stays a plain line, because a heading around one fact is more
+     structure than content.
+
+     **Dave chose that `CHANGELOG.md` receives this shape verbatim**, asked and answered before any of it was
+     built. The alternative he was offered — a fold that reads the dossier and derives a slimmer entry from
+     it — was declined, and the reason is one this repo has already paid for three times: a fold that rewrote
+     the entry would put a **second definition of the entry format** inside the fold, free to drift from the
+     one the scaffolder writes. One shape, written once, read everywhere.
+
+     **The form writes no visible placeholder at all.** Every field is a heading with an HTML guidance
+     comment above the space where the answer goes; the fold strips those comments, so leaving one standing
+     is not a defect and there is nothing to tidy before the PR. What replaced the `TODO:` strings as the
+     gate is a **measurement**: `open-pr` refuses an entry whose description, body or any tier's reason is
+     still empty once the comments are stripped — strictly more than the strings caught, since it also
+     catches a placeholder that was deleted rather than answered. The retired strings are still refused, for
+     the standing reason: every branch in flight, here and in every consumer, carries one right now.
 
      **The tier model** (Dave, August 5, 2026). Every change declares **how far it reaches**, and that one
      number decides which release document it appears in:
@@ -320,11 +337,19 @@ The constitution above, concretely implemented here:
 
      The routine version bump stops needing a developer.
 
-     Score: 4
+     **Score:** 4
 
-     Is this change also relevant to colleagues and employers? Then continue to Tier 1.
-     If not, stop here and move on to the next section.
+     <!--
+          Is this change also relevant to colleagues and employers? Then continue to Tier 1.
+          If not, stop here and move on to the next section.
+     -->
      ```
+
+     **The score label is bold and the routing question is a comment** (Dave, August 6, 2026). `Score:` sat
+     as bare prose in a section that is otherwise all prose, so it did not read as the field it is. The
+     question moved into a comment for the reason all the form text did: it is asked of the author, not of
+     the reader of the record. Both are **read in either form** — plain `Score:` and the pre-comment
+     question alike — because `CHANGELOG.md` and every consumer's tree are full of entries carrying them.
 
      **SUB-SECTIONS RATHER THAN A TABLE** (Dave, August 6, 2026), which replaced the impact table that had
      itself replaced the `Tier: N` line the day before. The table forced a rectangle onto something that is

@@ -135,6 +135,13 @@ function New-FlatEntry {
     return (($lines -join "`n").Trim())
 }
 
+# THE SECTION NAMES COME FROM THE LIB, NOT FROM LITERALS IN THE ASSERTS. The fixture builder above already
+# writes them that way; the asserts did not, so renaming two sections for the dossier form turned eight
+# structural assertions ("the entry's sections sit one level under the entry") into failures about spelling.
+# What those asserts are actually about is the LEVEL and the NESTING, and neither depends on the wording.
+$WhatRx = [regex]::Escape((Get-EntrySectionHeadings)['What'])
+$TypeRx = [regex]::Escape((Get-EntrySectionHeadings)['Type'])
+
 function New-FlatChangelog {
     <# An intro plus the given entry blocks, '---'-separated, as the fold leaves the document. #>
     param([string[]]$Entries, [string]$Intro = '')
@@ -438,7 +445,7 @@ Write-Host "Set-EntryHeadingLevel -- the whole block shifts, not the first line"
 $shifted = Set-EntryHeadingLevel -EntryText $e22 -EntryLevel 3
 Assert-Match $shifted '^### #22 ' 'the entry heading lands at the requested level'
 Assert-Equal 3 (@([regex]::Matches($shifted, '(?m)^#### ')).Count) 'and its three sections moved with it, to one level below'
-Assert-NoMatch $shifted '(?m)^### What does this change do\?' 'no section is left at the entry level'
+Assert-NoMatch $shifted ('(?m)^### ' + $WhatRx) 'no section is left at the entry level'
 # SHIFTED BY A DELTA, so structure inside the entry survives whatever it is.
 $withSub = New-FlatEntry -Heading "#50 $midDot Nested" -ExtraBody "#### A sub-heading in the body"
 $deep = Set-EntryHeadingLevel -EntryText $withSub -EntryLevel 3
@@ -544,7 +551,7 @@ Assert-NoMatch $stripped '(?m)^\| 2 \| 5 \|' 'and its rows with it'
 # assert was fixed. A literal here would have gone on passing against a heading nothing writes any more --
 # a green assert measuring nothing, which is the failure mode this whole section exists to catch.
 Assert-NoMatch $stripped ('(?m)^' + [regex]::Escape((Get-EntrySectionHeading -Key 'Significance')) + '$') 'the section heading goes with the declaration it introduced, or the question is left unanswered'
-Assert-Match $stripped '(?m)^### Type of change$' 'and the sections that still have content keep their headings'
+Assert-Match $stripped ('(?m)^### ' + $TypeRx + '$') 'and the sections that still have content keep their headings'
 # BOTH DECLARATIONS, and the second is new here: while the changelog had tier sections the fold consumed
 # the 'Tier: N' line, so it could never reach a rendered document. The fold now carries it, which puts a
 # self-assigned tier on the path to a consumer's plugin cache unless it is dropped here.
@@ -580,7 +587,7 @@ Assert-Match $notes 'A title' 'title included'
 Assert-Match $notes '(?m)^## Tier 2 - consumers$' 'the tier heading names its audience'
 Assert-Match $notes '(?m)^## Tier 1 - colleagues$' 'and so does tier 1'
 Assert-Match $notes '(?m)^## Tier 0 - developers$' 'and tier 0'
-Assert-Match $notes '(?s)## Tier 2 - consumers.*### #22 .*#### What does this change do\?' 'nesting: tier at ##, entry at ###, its sections at ####'
+Assert-Match $notes ('(?s)## Tier 2 - consumers.*### #22 .*#### ' + $WhatRx) 'nesting: tier at ##, entry at ###, its sections at ####'
 Assert-Match $notes '(?s)## Tier 2.*## Tier 1.*## Tier 0' 'the tiers keep the order they were given'
 # THE DEVELOPMENT NOTES ARE THE COMPLETE RECORD: tier 0 belongs in them, unlike in the other two
 # documents, and so do the declarations -- the cut EMPTIES the changelog, so this is the last place each
@@ -592,7 +599,7 @@ Assert-Match $notes 'consumers must re-add the marketplace' "and so does each ro
 foreach ($label in 'Features', 'Fixes', 'Maintenance') {
     Assert-NoMatch $notes "(?m)^#+ $label$" "no '$label' category heading"
 }
-Assert-Match $notes '(?m)^#### Type of change$' 'the type is stated inside the entry instead'
+Assert-Match $notes ('(?m)^#### ' + $TypeRx + '$') 'the type is stated inside the entry instead'
 # An empty tier is omitted rather than printed as a heading with nothing under it.
 $sparse = @([pscustomobject]@{ Tier = 2; Entries = @($e22) }, [pscustomobject]@{ Tier = 1; Entries = @() })
 $sparseNotes = Build-ReleaseNotes -TierGroups $sparse -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
@@ -614,7 +621,7 @@ Write-Host "Build-ReleaseNotes -Entries (the flat shape, for a repo that declare
 # A single '## Tier 0' wrapper around the whole document would be a level of structure that says nothing.
 $flatNotes = Build-ReleaseNotes -Entries $entries -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
 Assert-Match $flatNotes '(?m)^## #22 ' 'flat: entries sit at ##'
-Assert-Match $flatNotes '(?m)^### What does this change do\?$' 'flat: their sections at ###'
+Assert-Match $flatNotes ('(?m)^### ' + $WhatRx + '$') 'flat: their sections at ###'
 Assert-NoMatch $flatNotes 'Tier \d - ' 'flat: no tier heading is invented'
 # -TierGroups wins when both arrive, which is what the doc promises.
 $bothArgs = Build-ReleaseNotes -Entries @($e21) -TierGroups $sparse -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
@@ -661,7 +668,7 @@ Write-Host "Convert-EntryHeadingToTitle (the metadata a stakeholder does not hav
 # dropped, which is a different question from whether anything had -- so the highlights document, whose
 # whole reason for calling this is that its reader has no PR numbers, kept every one of them.
 Assert-Equal '## Consumer feature' ((Convert-EntryHeadingToTitle -EntryText $e22) -split "`n")[0] 'the leading #NN is dropped even with no trailing field -- the current shape'
-Assert-Match (Convert-EntryHeadingToTitle -EntryText $e22) '(?m)^### What does this change do\?$' 'and the body is untouched'
+Assert-Match (Convert-EntryHeadingToTitle -EntryText $e22) ('(?m)^### ' + $WhatRx + '$') 'and the body is untouched'
 $hIn = "### #426 $midDot Some title $midDot Feat $midDot 2026-08-03`n`nBody stays.`n`nAnd a second paragraph."
 $hOut = Convert-EntryHeadingToTitle -EntryText $hIn
 Assert-Equal '### Some title' (($hOut -split "`n")[0]) 'the fully-dated historical shape reduces to the bare title'
@@ -891,8 +898,8 @@ Write-Host "Build-PluginChangelogSection + Add-PluginChangelogSection" -Foregrou
 $section = Build-PluginChangelogSection -Entries @($entryWithPlugins) -Version '1.5.0' -Date '2026-07-17'
 Assert-Match $section '^## v1\.5\.0 ' 'section heading with version'
 Assert-Match $section '(?m)^### #4 ' 'the entry sits one level under the version heading'
-Assert-Match $section '(?m)^#### What does this change do\?$' "and the entry's own sections one level under that"
-Assert-Match $section '(?s)## v1\.5\.0 .*### #4 .*#### Type of change' 'nesting: ## version -> ### entry -> #### section'
+Assert-Match $section ('(?m)^#### ' + $WhatRx + '$') "and the entry's own sections one level under that"
+Assert-Match $section ('(?s)## v1\.5\.0 .*### #4 .*#### ' + $TypeRx) 'nesting: ## version -> ### entry -> #### section'
 # NO CATEGORY HEADINGS. This file ships to consumers; it is a list of changes, each stating its own type.
 foreach ($label in 'Features', 'Fixes', 'Documentation', 'Maintenance') {
     Assert-NoMatch $section "(?m)^#+ $label$" "the plugin CHANGELOG has no '$label' category heading"
@@ -955,7 +962,7 @@ Assert-Match $card '\[The version is not the code\]\(https://gh\.test/blob/main/
 Assert-Match $card '(?s)Test-title.*This card describes v1\.5\.0' 'title comes before the describes-line'
 # Single-release view: entries at '##', exactly like the full flat notes, and no category heading.
 Assert-Match $card '(?m)^## #9 .* Something' 'entry sits at ## in the single-release view'
-Assert-Match $card '(?m)^### What does this change do\?$' "and its sections at ###"
+Assert-Match $card ('(?m)^### ' + $WhatRx + '$') "and its sections at ###"
 Assert-NoMatch $card '(?m)^## v1\.5\.0 ' 'card carries no redundant inner ## vX.Y.Z heading (the # Release header already states the version)'
 Assert-NoMatch $card '(?m)^#+ (Features|Fixes|Documentation|Maintenance)$' 'no category heading on the card either'
 Assert-NoMatch $card '\| Tier \| Significance \| Why \|' 'the impact table does not travel onto the card -- it ships inside the plugin'

@@ -1,48 +1,87 @@
-## branch/templates/ holds a blank copy of each branch file, held to the scaffolder by the lint gate
+## `feat/branch-file-form` changelog
 
-### What does this change do?
+### Branch description
+<!-- Short description of branch-->
 
-`branch/templates/` carries a blank `branch_template_changelog.md` and `branch_template_progress.md` --
-something to look at, or paste from when a file has been cut about.
+The branch files take the form Dave designed
 
-**They are generated, not maintained, and that is the whole design.** A template sitting beside a
-scaffolder that writes the same shape is two sources of one format, which is the drift this repo has paid
-for repeatedly -- the scaffold wording, the fence readers, the tier sections. It is not a theoretical
-risk here: **the entry format changed three times on the day these templates were added**, so a
-hand-written copy would have been stale before it was committed.
+### Branch ID
+<!--unique ID for branch like a timestamp of the moment this branch is created-->
 
-So their content comes from the same formatters `new-changelog-entry.ps1` calls, through one function
-(`Get-BranchTemplates`), and a new lint check holds the files on disk to it. Editing a template by hand
-is an error the gate names; changing the format makes the templates follow. That is what lets them exist
-as a convenience without becoming a second definition of anything.
+20260807-000213
 
-**The check is asserted in both directions**, because a check that only ever passes cannot be told from
-one that reads nothing: correct content is silent, a hand-edit is reported with the direction of the
-drift, and a deleted template is reported rather than quietly skipped.
+### Branch type
+<!-- options for type are: feat, fix or docs-->
 
-Two scans that walked `branch/` non-recursively now recurse into it -- the dead-link scan and the
-mojibake scan. Both matter more for a template than for an ordinary file: whatever is wrong in one is
-copied forward into every branch that pastes it, instead of staying in the one place it was written.
+feat
+
+### What does the change on this branch bring to main?
+<!--
+     What the change DOES, for someone reading CHANGELOG.md months from now --
+     not a report of what you did on the branch. Name what is different afterwards,
+     and where a decision was measured rather than assumed, say what was measured.
+-->
+
+The two files a branch works in now carry the form Dave designed, and `branch/templates/` holds it as the
+spec rather than as a copy: the generator reproduces both files **byte for byte**, so they were never
+edited to match the code. The entry became the branch's own dossier -- the heading names the branch, and
+six sections carry the description, a creation timestamp, the type, what the change brings to `main`, the
+Significance sub-sections and a `Pull Request` section the fold fills from the merge.
+
+Every field is now a heading with a guidance comment above an empty space, which retired the last visible
+`TODO:`. So the scaffold gate stopped matching prose and started **measuring**: it refuses an entry whose
+description, body or any tier's reason is empty once the comments are stripped -- strictly more than the
+strings caught, because it also catches a placeholder deleted rather than answered. Every older shape is
+still read: the retired section headings, the plain `Score:`, the one-line routing questions and the
+`Tier: N` line.
+
+Three defects surfaced while wiring it, each found by a check rather than by a report. The fold never
+called the comment stripper written for it, so every guidance block would have folded into `CHANGELOG.md`
+verbatim. The step gate read the three example marks out of its own guidance comment, reporting four open
+steps on a fresh branch -- three of which no one could resolve, since they return with the next scaffold.
+And `Resolve-EntryType` took the first line of its section, which is now the hint, so every new entry
+declared its type to be `<!-- options for type are: feat, fix or docs-->`.
 
 ### Significance
 
 #### Tier 0
 
-Two more files in the repo, and one more lint check -- which is the only reason the two files are
-allowed to exist.
+<!--
+     Why the change matters AT THIS REACH specifically. A reason that would read the
+     same under every tier is a sign the tier is wrong. Then Score: 1-5 against the
+     rubric new-branch printed when it wrote this file.
+-->
 
-Score: 2
+Filling either branch file is now a form with the guidance beside each box, and the three defects above
+would each have reached `main` silently.
 
-Is this change also relevant to colleagues and employers? Then continue to Tier 1.
-If not, stop here and move on to the next section.
+**Score:** 4
+
+<!--
+     Is this change also relevant to colleagues and employers? Then continue to Tier 1.
+     If not, stop here and move on to the next section.
+-->
 
 #### Tier 1
 
-The entry format now has somewhere to be *looked at* rather than only inferred from a scaffolded file or
-read out of a formatter, without anyone having to keep that copy true by hand.
+Every branch in this project starts from these two files, so the shape is the first thing anyone working
+here meets -- and the gates that read it decide what a release can be cut from.
 
-Score: 2
+**Score:** 3
 
-### Type of change
+<!--
+     Is this change also relevant to the people who consume this product? Then
+     continue to Tier 2. If not, stop here and move on to the next section.
+-->
 
-Feat
+#### Tier 2
+
+The scaffolder and the gates are plugin-carried, so a consumer's next `new-branch` writes this form
+whether or not they went looking for it. Nothing they already have breaks -- every older shape is still
+read, deliberately -- but the file they open on their next branch looks different.
+
+**Score:** 4
+
+### Pull Request
+<!-- link to the PR in github when branch is merged to main en de datum waarop dit gebeurde-->
+

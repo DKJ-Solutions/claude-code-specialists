@@ -72,14 +72,21 @@ each command as you go — do not skip a step or reorder them from memory.
      **content** rather than skipping a tool.
    - **`-SkipSignificanceGate`** cuts even though a pending entry that reaches tier 1 or higher has not said
      **how much it weighs** there. Every tier an entry reaches is a document with its own reader, so every
-     one owes a row in the entry's impact table — a significance from 1 to 5 against the rubric, plus a
-     `Why`:
+     one owes a `#### Tier N` sub-section under the entry's `### Significance` — a reason it matters at
+     that reach, plus a significance from 1 to 5 against the rubric:
 
      ```text
-     | Tier | Significance | Why |
-     |---|---|---|
-     | 2 | 5 | consumers must re-add the marketplace under its new name |
-     | 1 | 4 | the routine version bump stops needing a developer |
+     #### Tier 1
+
+     The routine version bump stops needing a developer.
+
+     **Score:** 4
+
+     #### Tier 2
+
+     Consumers must re-add the marketplace under its new name.
+
+     **Score:** 5
      ```
 
      That score is what orders the release documents, so an unscored entry cannot be placed. The gate

@@ -1347,6 +1347,30 @@ function Convert-EntryHeadingToTitle {
     $hm = [regex]::Match($heading, '^(#+)\s+(.*)$')
     if (-not $hm.Success) { return $EntryText }
 
+    # THE DOSSIER HEADING NAMES THE BRANCH, AND THIS DOCUMENT'S READER HAS NO BRANCH. Since August 6, 2026
+    # an entry opens with '## `feat/x` changelog' and its human-readable name lives in 'Branch description'
+    # -- so for the highlights the title IS that section. Without this the tier-2 document, the one written
+    # for consumers, would list its changes as "`feat/x` changelog": no middot and no '#NN' in that heading,
+    # so the field-dropping below leaves it exactly as it found it.
+    #
+    # SAME RULE AS THE REST OF THIS FUNCTION, applied to a new shape rather than a new rule -- the PR number,
+    # the type and the date are dropped here for being internal administration, and a branch name is the
+    # purest example of it. The developer notes and CHANGELOG.md keep the heading, as they keep the others.
+    $branchHeading = [regex]::Match($hm.Groups[2].Value, '^`([^`]+)`\s+\S+$')
+    if ($branchHeading.Success) {
+        $described = Get-EntrySectionAnswer -EntryText $EntryText -Key 'Description'
+        # No description, no rewrite: an entry that never filled it in keeps the branch heading, which is
+        # ugly and TRUE. Inventing a title from the branch name would publish a slug as a change name.
+        if ($described) {
+            $title = @($described -split '\r?\n' | Where-Object { $_.Trim() })[0].Trim()
+            if ($title) {
+                $rest = if ($lines.Count -gt 1) { ($lines[1] + $lines[2]) } else { '' }
+                return $hm.Groups[1].Value + ' ' + $title + $rest
+            }
+        }
+        return $EntryText
+    }
+
     $parts = @($hm.Groups[2].Value -split "\s*$md\s*")
     $types = Get-ReleaseChangeTypes
     $first = if ($parts[0] -match '^#\d+$') { 1 } else { 0 }

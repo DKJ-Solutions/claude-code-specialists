@@ -5,8 +5,8 @@ description: >-
   plugin (single source of truth, issue #81) -- so a consumer does not have to duplicate this script
   locally. Use this on main, immediately after merging a branch, to fold the entry
   (branch/branch-changelog.md, or a pre-split <branch-name>.md in the repo root) into CHANGELOG.md --
-  a flat ranked list with no section headings, where each entry lands at the position its own impact
-  table ranks it at (furthest reach first, highest significance first within a tier) -- and then
+  a flat ranked list with no section headings, where each entry lands at the position its own
+  Significance sections rank it at (furthest reach first, highest significance first within a tier) -- and then
   clear it: the branch/ pair is reset to its empty state, a root entry file is removed.
 disable-model-invocation: true
 ---
@@ -43,13 +43,26 @@ second attempt. Without `-Branch` the fold recovers the branch from the file nam
 PR lookup.
 
 **The entry body carries the description; the fold adds what only exists after the PR.** An entry is one
-`##` heading with three named `###` sections under it — the same block in the entry file and in
-`CHANGELOG.md`, so what a contributor writes is exactly what lands:
+`##` heading naming the branch, with six named `###` sections under it — the same block in the entry file
+and in `CHANGELOG.md`, so what a contributor writes is exactly what lands. The fold **strips the guidance
+comments** on the way and writes the PR line into `### Pull Request`:
 
 ```markdown
-## Short strong title
+## `feat/short-name` changelog
 
-### What does this change do?
+### Branch description
+
+Short strong title
+
+### Branch ID
+
+20260806-114230
+
+### Branch type
+
+feat
+
+### What does the change on this branch bring to main?
 
 …the description…
 
@@ -59,39 +72,34 @@ PR lookup.
 
 …why it matters at this reach…
 
-Score: 2
+**Score:** 2
 
-Is this change also relevant to colleagues and employers? Then continue to Tier 1.
-If not, stop here and move on to the next section.
+### Pull Request
 
-### Type of change
-
-Feat
+[PR #123](https://github.com/…/pull/123) · merged 2026-08-06
 ```
 
 One `#### Tier N` sub-section per reach the change claims, lowest first, each ending by asking whether
 there is a next one. **Not every change has a tier 1 or a tier 2** — that is why these are sections rather
 than the table they replaced, where a missing row read as an omission.
 
-The scaffolder fills in the title and the type from the branch prefix. The fold adds what does not exist
-until the merge, and it adds it in **one place**: a closing line carrying the **`PR #NN` link and the merge
-date**. The separator is a middot. **The heading is left exactly as its author wrote it.**
+The scaffolder fills in the heading, the branch ID and the type. The fold adds what does not exist until
+the merge, and it adds it in **one place**: the **`PR #NN` link and the merge date**, under the entry's own
+`### Pull Request` heading. The separator is a middot. **The heading is left exactly as its author wrote
+it**, and so is everything else — the fold rewrites nothing but the comments it strips.
 
-```markdown
-## Short strong title
+**The heading names the branch** (Dave, August 6, 2026), and the human-readable name of the change is the
+first section under it. The fold used to prepend `#NN · ` to a title heading; nothing is lost by that being
+gone, because the number is in the entry's Pull Request section, where the url makes it clickable rather
+than merely printed.
 
-…the three sections…
-
-[PR #468](https://github.com/owner/repo/pull/468) · merged 2026-08-05
-```
-
-**The heading is just the title** (Dave, August 5, 2026). The fold used to prepend `#NN · ` to it as well;
-nothing is lost by dropping that, because the number is still in the entry on the closing line, where the
-url makes it clickable rather than merely printed. What the heading gains is being readable as a sentence —
-it is the one line every reader of the changelog and of all three release documents scans.
+**The highlights document is the exception, and only for the heading.** Its reader is a consumer, who has no
+branch — so there the heading is replaced by the entry's `Branch description`, exactly as the PR number and
+the merge date are dropped there for being internal administration. `CHANGELOG.md` and the developer notes
+keep the branch heading.
 
 **An entry file written before this format still folds.** It carries an `###` heading with the type as a
-middot field and, where the repo had adopted tiers, a `Tier: N` line instead of a table. An entry file
+middot field and, where the repo had adopted tiers, an impact table or a `Tier: N` line. An entry file
 lives only on a branch, so that shape is not distant history — any branch opened before the format
 changed still has one. The fold **promotes the heading to `##`** as it lands, and says so on the console:
 an `###` in a flat list of `##`s is not an entry boundary to any reader of it, so it would otherwise be
@@ -110,9 +118,9 @@ fold does not always run in the same minute as its merge.
 sub-heading at that level becomes a phantom entry — one that declares no impact, therefore reads as an
 undeclared tier 0, and gets its own block in the release record.
 
-**`###` makes it a fourth section, and can cost the entry a declaration.** The three named sections sit at
+**`###` makes it a seventh section, and can cost the entry a declaration.** The named sections sit at
 that level, and a section ends at the next heading of that level or above — so a stray `###` truncates
-whichever section it lands in. The dangerous version is a *misspelled* section heading (`Who is this For`):
+whichever section it lands in. The dangerous version is a *misspelled* section heading (`Branch Type`):
 the parser looks for the exact text, so the entry silently loses the declaration the tier and significance
 gates read.
 
@@ -145,13 +153,13 @@ to land there instead of wherever `CLAUDE_PROJECT_DIR`/git-root would otherwise 
 2. Clears it afterwards: **`branch/branch-changelog.md` and `branch/branch-progress.md` are reset** to
    their empty state, a pre-split root entry file is **removed**.
 
-**Where it lands is decided by the entry's own impact table**, not by a heading and not by a seam.
+**Where it lands is decided by the entry's own Significance section**, not by a heading and not by a seam.
 `CHANGELOG.md` is an intro followed by a flat list of `##` entries, and the fold inserts the block at its
 ranked position: **furthest reach first**, and within a tier **highest significance first**. Everything
 above the first `##` is the intro and is never written into; a document with no entries yet simply gets the
 first one.
 
-**Nothing is consumed.** The `Tier: N` line of a pre-format entry, and the impact table of a current one,
+**Nothing is consumed.** The `Tier: N` line of a pre-format entry, and the Significance sections of a current one,
 both travel into `CHANGELOG.md` intact. That is a change from when the document had one section per tier: the
 *section heading* stated the reach then, so the fold stripped the line. With no heading above the entry,
 stripping it would leave the entry declaring nothing — and every downstream reader would take it as tier 0,
