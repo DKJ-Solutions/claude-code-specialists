@@ -1,18 +1,14 @@
 # Branch progress
 
-**Branch:** `chore/score-the-unscored-entries`
+**Branch:** `main`
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ## Steps
 
-- [x] Establish that the significance gate refuses the v3.6.0 cut, and that it writes nothing when it does
-- [x] Read the four unscored entries and score them against `Get-EntrySignificanceRubric`
-- [x] Assert the parse-and-reassemble round trip is byte-identical before editing `CHANGELOG.md`
-- [x] Write the eight score rows and stable-sort the entries into ranked order
-- [x] Verify 21 entries in / 21 out, exactly four changed, no mojibake
-- [x] Fill in this branch's own changelog entry and step list
-
-## Where I left off
-
-Done. `CHANGELOG.md` holds 21 entries, all tier-1-and-higher ones scored, ranked furthest-reach-first
-and highest-significance-first within a tier. Ready for the gates and the PR; the v3.6.0 cut follows
-after the fold.
+_(filled in when a branch is created)_
