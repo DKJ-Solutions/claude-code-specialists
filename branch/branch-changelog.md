@@ -21,10 +21,9 @@ session towards `plugins/` and this branch towards `branch/`, each closing a rea
 nothing about. Taking either side whole would have re-opened the other's gap in silence -- clean merge,
 green gate, one class of file no longer scanned. Two sides editing the same list usually both belong.
 
-The lesson lands in [Derek #05](.claude/specialists/lenses/05-05-extension.md#branch--repo-hygiene),
-beside the two collisions it completes, rather than in a fourth place -- and deliberately not in
-Chris's stand-verification list, which answers *what is the state* at the start of a session, not
-*is it still the state* at the moment of a push.
+The lesson lands in Derek #05's branch hygiene, beside the two collisions it completes, rather than in
+a fourth place -- and deliberately not in Chris's stand-verification list, which answers *what is the
+state* at the start of a session, not *is it still the state* at the moment of a push.
 
 ### Who is this for
 
