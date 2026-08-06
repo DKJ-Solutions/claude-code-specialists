@@ -332,6 +332,35 @@ try {
     Assert-True (-not ($b3.Out -match [regex]::Escape('09-99-agent.md'))) `
         'payload scan: removing the agent def clears its finding -- the report tracked the file, not the fixture'
 
+    # --- Scenario B4: the entry's links resolve from the REPO ROOT, not from branch/ ----------------
+    # The entry file's text is pasted verbatim into CHANGELOG.md at the root, so its links have to work
+    # there. Until the branch/ split it sat in the root and that held by construction; moving it one level
+    # down turned every root-relative link in an entry into a dead one, measured on the first entry written
+    # after the move. Both halves are asserted, because a fix that simply stopped scanning branch/ would
+    # satisfy the first and lose the check entirely.
+    Write-Host "check 4 coverage -- an entry's links are judged where the text LANDS" -ForegroundColor Cyan
+    $entryDirFx = Join-Path $Fixture 'branch'
+    New-Item -ItemType Directory -Path $entryDirFx -Force | Out-Null
+    $entryFx    = Join-Path $entryDirFx 'branch-changelog.md'
+    $progressFx = Join-Path $entryDirFx 'branch-progress.md'
+    # 'connectors/README.md' exists in this fixture and is root-relative -- exactly the shape an entry
+    # writes, and exactly what resolving from branch/ would call dead.
+    [System.IO.File]::WriteAllText($entryFx,
+        "## Fixture entry`n`nSee [the connectors README](connectors/README.md) and [nope]($deadLink).`n", $Utf8NoBom)
+    # The step list never travels, so it keeps the ordinary nested convention: '../' to reach the root.
+    [System.IO.File]::WriteAllText($progressFx,
+        "# Branch progress`n`n**Branch:** ``feat/fixture```n`n## Steps`n`n- [ ] see [the connectors README](../connectors/README.md)`n", $Utf8NoBom)
+
+    $b4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($b4.Out -match 'dead link ''connectors/README\.md''')) `
+        'entry links: a root-relative link in the entry is NOT dead -- it is judged from the repo root, where the fold puts the text'
+    Assert-True ($b4.Out -match [regex]::Escape('.\branch\branch-changelog.md') -and $b4.Out -match [regex]::Escape($deadLink)) `
+        'entry links: a genuinely dead link in the entry IS still reported -- the rebase is not a way out of the check'
+    Assert-True (-not ($b4.Out -match [regex]::Escape('.\branch\branch-progress.md'))) `
+        'entry links: the step list keeps the ordinary nested convention -- it never travels, so ../ is correct there'
+
+    Remove-Item -LiteralPath $entryFx, $progressFx -Force
+
     # === check 10: marked "all skills" enumerations vs. the canonical skillset ==========================
     # From here on, only CONTRIBUTING.md's content is varied per scenario. The connectors README is
     # left exactly as fixed by Scenario B above (marker-free), so it never contributes a
