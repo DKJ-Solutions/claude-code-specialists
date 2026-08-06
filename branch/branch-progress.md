@@ -1,14 +1,16 @@
 # Branch progress
 
-**Branch:** `main`
-
-> **You are on `main`.** Do not work in this file yet -- create a branch first.
-> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
-> of the next person who does create one.
-
-This file carries the step list of the branch you are on. It is written when a branch is created
-and returns to this state after the merge.
+**Branch:** `docs/v3-6-0-release-documents`
 
 ## Steps
 
-_(filled in when a branch is created)_
+- [x] Generate the internal note skeleton from the v3.6.0 development notes
+- [x] Write the internal note: what is different, what it is worth, what was left open at this release
+- [x] Rewrite the highlights draft for the consumer, with the three action items promoted to the top
+- [x] Check every measured figure quoted in the highlights against its source entry
+- [~] No separate migration guide written -- the three action items fit in the highlights, and a fourth document would be one more place for them to drift
+
+## Where I left off
+
+Done. Both documents written. After the merge and the fold, the GitHub Release is published with the
+internal note as its body and the other two tiers attached under unique filenames.
