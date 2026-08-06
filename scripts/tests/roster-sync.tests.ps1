@@ -478,6 +478,27 @@ try {
     Assert-Equal 0 $r.Code 'not in cache: exit-code 0'
     Assert-Match 'not found in the cache' $r.Out 'not in cache: INFO'
 
+    # --- 5c. Cached but SHIPS NO AGENTS -> a different INFO, naming the real reason -----------------
+    #     Resolve-PluginDir requires an agents/ dir at every return path -- correct, since a roster check
+    #     has nothing to read without one -- so it answers $null both for "not on this machine" and for
+    #     "right here, ships no agents". This line used to report the FIRST for the second. Measured on
+    #     figma@claude-plugins-official: in the cache at 2.2.90, installPath present in the
+    #     administration, reported as "not found in the cache". Behaviour right, stated reason false.
+    #
+    #     The fixture is the shape a skills/MCP-only plugin has: a version dir with no agents/ and no
+    #     personas/ inside it. Built by hand rather than via New-FixtureCache, whose whole job is to put
+    #     agents or personas there.
+    $noAgentsCache = Join-Path $Fixture 'no-agents-cache'
+    if (Test-Path -LiteralPath $noAgentsCache) { Remove-Item -Recurse -Force -LiteralPath $noAgentsCache }
+    New-Item -ItemType Directory -Path (Join-Path $noAgentsCache "$Marketplace\$PluginName\2.2.90\skills") -Force | Out-Null
+    $c = New-FixtureConsumer -RosterIds @() -Enabled $true
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $noAgentsCache)
+    Assert-Equal 0 $r.Code 'no agents dir: exit-code 0 -- a skills-only plugin is not a fault'
+    Assert-Match 'ships no agents/ directory' $r.Out 'no agents dir: the INFO names the real reason'
+    Assert-Match '2\.2\.90' $r.Out 'no agents dir: and the version it found, which is the proof it looked'
+    # The load-bearing half: the FALSE reason must be gone, not merely joined by a truer one.
+    Assert-NotMatch 'not found in the cache' $r.Out 'no agents dir: and does NOT claim the plugin is missing'
+
     # --- 5f. An '@'-import must NOT count as a roster row (issue #227) -----------------------------
     #     The bootstrap writes '@.claude/plugins/<family>/<plugin>/06-16-extension.md' into CLAUDE.md,
     #     and that path CONTAINS the token '06-16' -- so Test-InRoster was satisfied by the import

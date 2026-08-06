@@ -965,17 +965,49 @@ function Resolve-PluginDir {
         }
     }
 
-    $nameDir = Join-Path (Join-Path $CacheRoot $Marketplace) $Name
-    if (-not (Test-Path -LiteralPath $nameDir -PathType Container)) { return $null }
-    $versions = Get-ChildItem -LiteralPath $nameDir -Directory |
-        Where-Object { $_.Name -match '^\d+\.\d+\.\d+$' } |
-        Sort-Object { [version]$_.Name } -Descending
-    foreach ($v in $versions) {
-        if (Test-Path -LiteralPath (Join-Path $v.FullName 'agents') -PathType Container) {
-            return (Resolve-Path -LiteralPath $v.FullName).Path
+    foreach ($v in (Get-CachedPluginDirs -Name $Name -Marketplace $Marketplace -CacheRoot $CacheRoot)) {
+        if (Test-Path -LiteralPath (Join-Path $v 'agents') -PathType Container) {
+            return (Resolve-Path -LiteralPath $v).Path
         }
     }
     return $null
+}
+
+function Get-CachedPluginDirs {
+    <# Every version dir present on disk for Name+Marketplace under CacheRoot, newest first, WITHOUT
+       asking whether any of them ships an agents/ dir. Returns @() when the plugin has no cached dir
+       at all.
+
+       IT EXISTS TO SEPARATE TWO ANSWERS Resolve-PluginDir CANNOT (August 6, 2026). That function
+       requires agents/ at every return path -- correctly, because a roster check has nothing to read
+       without one -- so it answers $null both for "this plugin is not on this machine" and for "it is
+       right here and ships no agents". Those are different facts about the machine, and a caller that
+       reports the first when the second is true states something false: measured on
+       figma@claude-plugins-official, sitting in the cache at 2.2.90 with its installPath present in the
+       administration, reported by check-roster-sync as "enabled but not found in the cache". Everything
+       about the BEHAVIOUR was right -- a plugin of skills and MCP servers is nothing for a roster check
+       to check -- and only the stated reason was wrong, which is the failure shape this repo keeps
+       paying for: a message a reader cannot act on because it describes a different problem.
+
+       THE PATH SHAPE HAS ONE OWNER, which is why this is here rather than in the caller.
+       <CacheRoot>/<Marketplace>/<Name>/<version> is Resolve-PluginDir's own layout knowledge, and a
+       second construction of it in the script that asks the question could disagree with the one that
+       answers it. Resolve-PluginDir's version scan now reads from this function, so the enumeration
+       and the discriminator cannot drift apart.
+
+       The [version] sort is load-bearing and predates this extraction: a string sort puts 1.9.0 above
+       1.10.0 (bootstrap lesson). #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Marketplace,
+        [Parameter(Mandatory = $true)][string]$CacheRoot
+    )
+    $nameDir = Join-Path (Join-Path $CacheRoot $Marketplace) $Name
+    if (-not (Test-Path -LiteralPath $nameDir -PathType Container)) { return @() }
+    return @(Get-ChildItem -LiteralPath $nameDir -Directory |
+        Where-Object { $_.Name -match '^\d+\.\d+\.\d+$' } |
+        Sort-Object { [version]$_.Name } -Descending |
+        ForEach-Object { $_.FullName })
 }
 
 function Get-DisplayName {
