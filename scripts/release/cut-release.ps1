@@ -237,10 +237,13 @@ function Write-Utf8NoBom([string]$Path, [string]$Content) {
 # time blocking a release over a document nobody had failed to fold (#165, then QUICKSTART.md +
 # UNINSTALL.md in #405, then ADOPTION.md in #408) -- and once this script is shared, which root docs
 # a repo has is by definition not something the script can know. The fallback below is the workshop's
-# own list, so a consumer that defines nothing still gets the behaviour this script always had.
+# own list, so a consumer that defines nothing still gets the behaviour this script always had -- and
+# it tracks that list rather than a snapshot of it: the install and uninstall pages left the root for
+# plugins/, so they left here too. A fallback that kept naming them would not have blocked anything,
+# but it would have described a root the workshop no longer has, which is how this list went stale the
+# first three times.
 $reservedRootMd = @(Get-SeamValue -Name 'Get-ReservedRootMd' -Default @(
-    'CHANGELOG.md', 'CLAUDE.md', 'README.md', 'LICENSE.md', 'CONTRIBUTING.md', 'SECURITY.md',
-    'QUICKSTART.md', 'ADOPTION.md', 'UNINSTALL.md'))
+    'CHANGELOG.md', 'CLAUDE.md', 'README.md', 'LICENSE.md', 'CONTRIBUTING.md', 'SECURITY.md'))
 
 $script:marketplaceJsonText = $null
 function Get-MarketplaceJsonText {

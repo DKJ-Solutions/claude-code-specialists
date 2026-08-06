@@ -129,7 +129,7 @@ infrastructure.
   followed by `claude plugin install specialists@claude-code-specialists --scope project` from the new
   root, after which a leftover record naming the old folder is expected and inert. The mechanism, the
   other two ways a record goes missing, and why that leftover is not a stray duplicate are in the
-  family's [ADOPTION.md](../../../ADOPTION.md#staying-up-to-date);
+  family's [INSTALL.md](../../../plugins/INSTALL.md#staying-up-to-date);
   don't restate them here.
 - **Always read `$LASTEXITCODE` before you pipe a native command through a cmdlet.** A construct like
   `& git … | Select-Object -First 1` cuts the upstream (git) short as soon as the first item is in;
