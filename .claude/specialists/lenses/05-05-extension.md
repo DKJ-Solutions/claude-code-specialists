@@ -239,6 +239,21 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   on two machines** (push/pull races), and **a fresh `git pull` before every new branch and before
   every fold**. The fold collision point itself is [Rendall #06](05-06-extension.md#lifecycle)'s
   part of this lesson.
+- **`main` moves under a long branch, and the green gate you ran proves nothing about the merged
+  result.** The bullet above is about the *fold* and about two machines; this is the same collision
+  arriving one step earlier, at the *branch*, and it bites hardest on the work that takes longest —
+  precisely the work whose author is least likely to look up. **Measured August 6, 2026**: during a
+  single branch's build, **six** PRs (#481–#486) merged from a concurrent session. The branch had to
+  take `main` in **twice**, the second time after its own suites had already gone green once.
+  So: `git fetch` + merge `main` **immediately before pushing**, then re-run the lint and test gates
+  on the merged tree, not on the base you started from. `open-pr.ps1` runs both gates, but it runs
+  them on whatever your working copy holds — a stale base included.
+  **And the conflict shape is worth recognising, because the wrong resolution looks tidy.** The one
+  real conflict that day was in the dead-link scan set: both sides had widened it, the other session
+  towards `plugins/` and this branch towards `branch/`, each closing a genuine gap the other knew
+  nothing about. Taking either side whole would have re-opened the other's gap silently, with a clean
+  merge and a green gate to say so. **Two sides editing the same list usually both belong** — read what
+  each was for before choosing, and keep both unless they actually contradict.
 
 ### Tooling & account
 
