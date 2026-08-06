@@ -372,6 +372,35 @@ foreach ($file in $entryFiles) {
     $nl = if ($usesCRLF) { "`r`n" } else { "`n" }
     $entryContent = ($entryContent -replace "`r`n", "`n") -replace "`n", $nl
 
+    # THE DOCUMENT'S TAIL IS NORMALISED BEFORE ANYTHING IS MEASURED IN IT: it ends with exactly one blank
+    # line, whatever it ended with before. BOTH insertion paths below need that, and only one of them used
+    # to ensure it -- the one that runs when nothing is pending, which is the rarer of the two.
+    #
+    # WHAT IT PREVENTS. Get-ImpactInsertOffset returns the slice's LENGTH for the lowest-ranked entry -- the
+    # COMMON case, since tier 0 sinks to the bottom of the list -- so the insert lands at the very end of the
+    # content. On a document ending in '---' with nothing after it, that produces '---## <title>' on ONE line.
+    # That is not a heading any more: '^## ' does not match it, so Split-Changelog does not see the entry, the
+    # cut leaves it out of every release document, and the entry FILE has already been deleted by then. The
+    # markdown stays well-formed, nothing errors, and one merged change is gone -- the failure shape this repo
+    # keeps paying for.
+    #
+    # FOUND IN A WORKING TREE RATHER THAN IN THE HISTORY, and that is why nothing had caught it. The branch
+    # behind PR #486 was handed over with CHANGELOG.md's final newline stripped by an editor, and it was
+    # repaired in the pre-commit diff review -- so the commit, the PR and the fold that followed all ran on a
+    # well-formed document. Which is exactly why 'git log' holds no trace of the condition and no gate ever
+    # met it: the CONDITION is ordinary editing, the LOSS is what this line prevents, and the demonstration
+    # that the loss follows from the condition is the regression test, not an incident.
+    #
+    # Idempotent, so the happy path is byte-identical: a document already ending in '---' plus one blank line
+    # comes back unchanged. It also caps the trailing blanks a hand-edit can leave behind, which is the same
+    # accumulation Split-Changelog strips from the head.
+    #
+    # THE TRADEOFF, SO IT IS A CHOICE RATHER THAN AN OVERSIGHT: TrimEnd() takes all trailing whitespace, not
+    # only line breaks, so a markdown HARD BREAK (two spaces) on the document's very last line loses those two
+    # spaces. Unreachable on a machine-written tail, which always ends in '---', and it can only be a
+    # hand-typed intro's closing line -- where a hard break before end-of-file has nothing to break onto.
+    $changelogContent = $changelogContent.TrimEnd() + $nl + $nl
+
     # The pre-pass has already proved the entry's impact is usable, so this is a lookup rather than a
     # decision. NOTHING IS STRIPPED FROM THE ENTRY HERE, and that reverses what this block used to do.
     # While CHANGELOG.md had tier sections, the HEADING above an entry stated its reach, so the entry's own
@@ -515,10 +544,11 @@ foreach ($file in $entryFiles) {
         $listStart = $listMatch.Index
     }
     else {
-        # Nothing pending yet: the whole file is intro, so this entry opens the list. The blank line is
-        # ENSURED rather than assumed -- an intro whose last line has no blank line after it would otherwise
-        # get the heading glued to it, which markdown renders as one paragraph and no heading at all.
-        $changelogContent = $changelogContent.TrimEnd() + $nl + $nl
+        # Nothing pending yet: the whole file is intro, so this entry opens the list. The blank line the
+        # heading needs is already there -- an intro whose last line has none would get the heading glued to
+        # it, which markdown renders as one paragraph and no heading at all. That used to be ensured HERE,
+        # for this path only; the tail normalisation above now does it for both, which is the whole point of
+        # having moved it.
         $listStart = $changelogContent.Length
     }
 
@@ -531,7 +561,8 @@ foreach ($file in $entryFiles) {
     # THE SLICE, AND WHY THE OFFSET IS RELATIVE TO IT: Get-ImpactInsertOffset only ever returns an entry
     # boundary or the slice's end, so adding $listStart back cannot land mid-entry. The insert itself is
     # unchanged -- '<entry>\n\n---\n\n' is correct before any entry heading and at the list's end alike,
-    # because every folded entry is followed by its own separator.
+    # because every folded entry is followed by its own separator AND the tail normalisation above has
+    # guaranteed the content ends on a line break. Landing at the end is where that guarantee is load-bearing.
     $listText = $changelogContent.Substring($listStart)
     $insertPos = $listStart + (Get-ImpactInsertOffset -SectionText $listText -Score $filed.RankScore -Tier $filed.Tier)
 
