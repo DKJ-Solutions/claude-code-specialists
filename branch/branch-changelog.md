@@ -31,9 +31,18 @@ asserted byte-identical over all 21 entries first, and afterwards a re-parse con
 21 out with exactly four whose text differs. Tier 1 and tier 0 are untouched; tier 0 is never ranked.
 
 **One hazard worth recording for the next person who scripts an edit to this file.** Windows PowerShell's
-`Get-Content -Raw` misreads the document's UTF-8 middots as `Â·`, so a read-modify-write through it would
-have committed mojibake across all 88 KB while every diff line looked plausible. The edit reads and
-writes through `UTF8Encoding($false)` explicitly, and the result was scanned for `Â`/`â€` before commit.
+`Get-Content -Raw` reads the document's UTF-8 middots as their Latin-1 byte pair, so a read-modify-write
+through it would have committed double-encoded text across all 88 KB while every diff line still looked
+plausible. The edit reads and writes through `UTF8Encoding($false)` explicitly, and the result was run
+past the lint gate's mojibake scan before the commit.
+
+**That scan then flagged this very entry, which is worth keeping.** The first draft of the paragraph
+above printed the double-encoded sequences literally, as an illustration of what to look for — and check
+16 has no exemption for a mention, unlike checks 11, 12 and 13, which each skip fenced or illustrative
+text for exactly this reason. So the paragraph names the sequences instead of reproducing them. The
+gate is right to be blunt here — in an entry heading the middot *is* the field delimiter — but this is
+the fifth instance in this repo of a matcher that cannot tell a use from a mention, and the first where
+the matcher is the one being written about.
 
 ### Who is this for
 
