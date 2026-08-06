@@ -211,14 +211,14 @@ if (Test-Path -LiteralPath $writtenEntry) {
     $entryLines = @(($text -split "`r?`n") | Where-Object { $_.Trim() -ne '' })
     Assert-True ($entryLines[0] -match ('^#{' + (Get-EntryHeadingLevel) + '} ')) 'the entry opens with its own heading, at the entry level'
     Assert-True ($entryLines[0] -notmatch '^#{4}') 'and not one level deeper'
-    foreach ($key in @('What', 'Who', 'Type')) {
+    foreach ($key in @('What', 'Significance', 'Type')) {
         Assert-True ($text -match ('(?m)^' + [regex]::Escape((Get-EntrySectionHeading -Key $key)) + '\s*$')) `
             "the '$key' section heading is written verbatim as the parser expects it"
     }
     # ORDER, not just presence: the parser finds a section wherever it is, but a reader meets them in the
     # order they are written, and the three answer the questions in the order somebody arrives with them.
     $posWhat = $text.IndexOf((Get-EntrySectionHeading -Key 'What'))
-    $posWho  = $text.IndexOf((Get-EntrySectionHeading -Key 'Who'))
+    $posWho  = $text.IndexOf((Get-EntrySectionHeading -Key 'Significance'))
     $posType = $text.IndexOf((Get-EntrySectionHeading -Key 'Type'))
     Assert-True ($posWhat -lt $posWho -and $posWho -lt $posType) 'and the three sections are written in reading order'
     # The type is STATED in its own section now rather than parsed out of the heading as a middot field.
@@ -676,6 +676,76 @@ Remove-Item Function:\Get-EntrySignificanceEnabled
 # silently ignored, because the value it used to pass is exactly the one that now means the opposite.
 $sigCmd = Get-Command Test-EntrySignificanceActive
 Assert-True (-not $sigCmd.Parameters.ContainsKey('TierSections')) 'and it takes no section list any more -- the retired argument cannot be passed unnoticed'
+
+Write-Host "The Significance sections (the shape that replaced the impact table)" -ForegroundColor Cyan
+$sigRows = @(
+    [pscustomobject]@{ Tier = 2; Score = 5; Why = 'installs break until the marketplace is re-added' },
+    [pscustomobject]@{ Tier = 0; Score = 2; Why = 'the lint gate follows the entry' },
+    [pscustomobject]@{ Tier = 1; Score = 4; Why = 'the bump stops needing a developer' }
+)
+$sigText = (Format-EntrySignificanceSections -Rows $sigRows) -join "`n"
+# LOWEST FIRST, which is the opposite of the table. These sections are walked by a person filling them in,
+# and that walk starts at tier 0 -- each answer decides whether there is a next one.
+Assert-True ($sigText.IndexOf('#### Tier 0') -lt $sigText.IndexOf('#### Tier 1')) 'sections: tier 0 comes first, because that is the order they are filled in'
+Assert-True ($sigText.IndexOf('#### Tier 1') -lt $sigText.IndexOf('#### Tier 2')) 'sections: and tier 1 before tier 2'
+Assert-True ($sigText -match '(?m)^Score: 5$') 'sections: the score is its own line, echoing the retired Tier: line'
+# The routing question is under EVERY tier 0 and 1, including one whose successor is already there. An
+# author who has answered does not need it; a reader at the fold, the cut or in the record needs to see
+# that it WAS asked.
+Assert-Equal 1 (@([regex]::Matches($sigText, [regex]::Escape((Get-EntrySignificanceWording).Route0))).Count) 'sections: tier 0 carries its routing question even when tier 1 follows'
+Assert-Equal 1 (@([regex]::Matches($sigText, [regex]::Escape((Get-EntrySignificanceWording).Route1))).Count) 'sections: and tier 1 carries its own'
+Assert-True (-not ($sigText -match 'continue to Tier 3')) 'sections: tier 2 carries none -- there is no successor to route to'
+
+# The scaffold: tier 0 alone, why placeholdered, score EMPTY. A scaffolded score would be a guess at a
+# ranking, which is the failure the retired highlights marker was measured on.
+$sigScaffold = (Format-EntrySignificanceSections) -join "`n"
+Assert-True ($sigScaffold -match '(?m)^#### Tier 0$') 'scaffold: tier 0 is the only section'
+Assert-True (-not ($sigScaffold -match '(?m)^#### Tier [12]$')) 'scaffold: no tier 1 or 2 -- not every change has one, which is why the table went'
+Assert-True ($sigScaffold -match '(?m)^Score:\s*$') 'scaffold: the score is a question left standing, not a number nobody chose'
+
+Write-Host "Resolve-EntryImpact reads three shapes and writes one" -ForegroundColor Cyan
+$sigRound = Resolve-EntryImpact -EntryText ((Format-EntryBlock -Title 'T' -Type 'Feat' -Body 'b' -ImpactRows $sigRows) -join "`n")
+Assert-Equal 2 $sigRound.Tier 'sections round trip: the reach is the highest section'
+Assert-Equal $true $sigRound.Declared 'sections round trip: declared'
+Assert-Equal 0 @($sigRound.Errors).Count 'sections round trip: no complaints'
+Assert-Equal 3 @($sigRound.Rows).Count 'sections round trip: one row per section'
+Assert-Equal 4 ([int](@($sigRound.Rows | Where-Object { $_.Tier -eq 1 })[0].Score)) 'sections round trip: the score comes back'
+Assert-True ((@($sigRound.Rows | Where-Object { $_.Tier -eq 1 })[0].Why) -match 'stops needing a developer') 'sections round trip: and the why with it'
+# THE ROUTING QUESTION IS THE FORMAT'S PROSE, NOT THE AUTHOR'S ANSWER. Reading it as the Why would publish
+# a form instruction as the reason a change matters.
+Assert-True (-not ((@($sigRound.Rows | Where-Object { $_.Tier -eq 0 })[0].Why) -match 'continue to Tier')) 'sections round trip: the routing question is not mistaken for the why'
+
+# Shape 2 and 3, still read. Every entry in CHANGELOG.md and in every consumer's tree is one of these.
+$tableEntry = "## X`n`n### Who is this for`n`n| Tier | Significance | Why |`n|---|---|---|`n| 2 | 4 | consumers |`n"
+Assert-Equal 2 (Resolve-EntryImpact -EntryText $tableEntry).Tier 'the impact table is still read'
+Assert-Equal 1 (Resolve-EntryImpact -EntryText "### X`n`nTier: 1`n`nbody`n").Tier 'and the pre-table Tier: line'
+# ...and the heading those entries carry is not reported as a misspelling by anything that matches names.
+Assert-True ((Get-EntryRetiredSectionHeadings) -contains 'Who is this for') "the retired section heading is recognised, so 24 existing entries are not accused of a typo"
+
+Write-Host "A malformed section is reported rather than absorbed" -ForegroundColor Cyan
+$badTier = "### Significance`n`n#### Tier two`n`nwhy`n`nScore: 3`n"
+Assert-True (@((Resolve-EntryImpact -EntryText $badTier).Errors).Count -gt 0) 'a non-numeric tier is an error, not a section that silently vanishes'
+$badScore = "### Significance`n`n#### Tier 0`n`nwhy`n`nScore: 9`n"
+Assert-True (@((Resolve-EntryImpact -EntryText $badScore).Errors -match 'outside the rubric').Count -gt 0) 'a score outside the rubric is named as such'
+$dupTier = "### Significance`n`n#### Tier 0`n`na`n`nScore: 1`n`n#### Tier 0`n`nb`n`nScore: 2`n"
+Assert-True (@((Resolve-EntryImpact -EntryText $dupTier).Errors -match 'a second time').Count -gt 0) 'the same tier twice is two answers to one question'
+
+Write-Host "Stripping the declaration for the documents that travel outward" -ForegroundColor Cyan
+$sigBlock = (Format-EntryBlock -Title 'T' -Type 'Feat' -Body 'body text' -ImpactRows $sigRows) -join "`n"
+$sigStripped = Remove-EntrySignificanceDeclaration -EntryText $sigBlock
+Assert-True (-not ($sigStripped -match '#### Tier')) 'stripped: every tier section is gone, not just the first'
+Assert-True (-not ($sigStripped -match '(?m)^Score:')) 'stripped: and the scores with them -- a self-assigned number at a consumer is a marketing claim'
+Assert-True ($sigStripped -match [regex]::Escape((Get-EntrySectionHeading -Key 'Significance'))) 'stripped: the section heading stays, because the renderers lay out around it'
+Assert-True ($sigStripped -match 'body text') 'stripped: the entry itself is untouched'
+# One call, three shapes: a migrating entry carrying both must come out clean.
+$mixed = $sigBlock + "`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 2 | leftover |`n"
+Assert-True (-not ((Remove-EntrySignificanceDeclaration -EntryText $mixed) -match '\| Tier \| Significance \|')) 'stripped: an entry carrying both shapes loses both'
+
+# Fence-aware, like every reader here: this repo's own README quotes the whole shape.
+$fencedSig = "### Significance`n`n" + '```text' + "`n#### Tier 2`n`nquoted`n`nScore: 5`n" + '```' + "`n`n#### Tier 0`n`nreal`n`nScore: 1`n"
+$fencedRes = Resolve-EntryImpact -EntryText $fencedSig
+Assert-Equal 0 $fencedRes.Tier 'fenced: a tier section QUOTED inside a fence is not a declaration'
+Assert-Equal 1 @($fencedRes.Rows).Count 'fenced: only the real section is read'
 
 Write-Host "Get-BranchProgressFindings (the step-list gate's matcher)" -ForegroundColor Cyan
 $marks = Get-BranchProgressMarks

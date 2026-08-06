@@ -1047,11 +1047,13 @@ try {
         ''
         'All green.'
         ''
-        '### Who is this for'
+        '### Significance'
         ''
-        '| Tier | Significance | Why |'
-        '|---|---|---|'
-        '| 0 | - | - |'
+        '#### Tier 0'
+        ''
+        'Only this repo notices.'
+        ''
+        'Score: 2'
         ''
         '### Type of change'
         ''
@@ -1081,7 +1083,7 @@ try {
     # Defect two, new with the format: a heading at the SECTION level that is not a declared section. The
     # dangerous version of this is a MISSPELLED section heading, which costs the entry its declaration
     # silently -- so the fixture uses exactly that rather than an obviously unrelated word.
-    $s34Typo = @($s34Good) -replace '^### Who is this for$', '### Who is this For'
+    $s34Typo = @($s34Good) -replace '^### Significance$', '### Significanse'
     [System.IO.File]::WriteAllText($s34Entry, (($s34Typo -join "`n") + "`n"), $Utf8NoBom)
     $r34c = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True ($r34c.Out -match 'entry-heading.*fix-a-branch-name\.md:11') 'scenario 34: a misspelled section heading is reported, with its line'
@@ -1100,14 +1102,16 @@ try {
         ''
         '```markdown'
         '## Tested'
-        '### Who is this For'
+        '### Significanse'
         '```'
         ''
-        '### Who is this for'
+        '### Significance'
         ''
-        '| Tier | Significance | Why |'
-        '|---|---|---|'
-        '| 0 | - | - |'
+        '#### Tier 0'
+        ''
+        'Only this repo notices.'
+        ''
+        'Score: 2'
         ''
         '### Type of change'
         ''
@@ -1158,7 +1162,7 @@ try {
     $r34g = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True ($r34g.Out -match 'entry-heading. CHANGELOG\.md:11') 'scenario 34: a body heading at the entry level is reported, with its line'
     Assert-True ($r34g.Out -match 'has been SPLIT') 'scenario 34: and the message names what happened to the entry rather than only the rule'
-    Assert-True ($r34g.Out -match "first named section is 'Who is this for'") 'scenario 34: quoting the section it starts at, which is the evidence'
+    Assert-True ($r34g.Out -match "first named section is 'Significance'") 'scenario 34: quoting the section it starts at, which is the evidence'
 
     # THE FALSE POSITIVE THIS AVOIDS, and it is the reason the rule is not simply "an H2 needs a #NN": the
     # fold cannot reach gh on a manual merge, and then it writes a legitimate entry with no number and no PR

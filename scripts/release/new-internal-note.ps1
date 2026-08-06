@@ -250,7 +250,9 @@ $skippedTier0 = 0
 
 $devLines = @($dev -split "`r?`n")
 $devFenced = Get-FencedLineFlags -Lines $devLines
-$sectionNames = @((Get-EntrySectionHeadings).Values)
+# Current names plus retired ones: this reads the DEVELOPMENT NOTES, which are the archive, so most of
+# what it walks was written under an older set of headings. See Get-EntryRetiredSectionHeadings.
+$sectionNames = @((Get-EntrySectionHeadings).Values) + @(Get-EntryRetiredSectionHeadings)
 
 # Every heading outside a fence, with its level -- one pass, so the scans below agree about what a heading is.
 $heads = @()

@@ -274,8 +274,8 @@ The constitution above, concretely implemented here:
      heading is **just the title** — `## A significance score per entry, and the order follows it` — with the
      PR number and the merge date on the entry's closing `[PR #NN](url) · merged <date>` line, where the two
      facts the merge owns already lived. Under the heading, three `###` sections answer the questions a
-     reader arrives with — `What does this change do?`, `Who is this for` (the impact table, which *is* the
-     answer rather than prose beside it) and `Type of change`. `Plugins:` and the
+     reader arrives with — `What does this change do?`, `Significance` (one `#### Tier N` sub-section per
+     reach the change claims) and `Type of change`. `Plugins:` and the
      `[PR #NN](url) · merged <date>` line stay plain lines, because a heading around one fact is more
      structure than content. The three `## Tier N - Pull Requests` sections it replaced said exactly one
      thing — how far each change reaches — and the entries now say that themselves, in a table that also
@@ -312,21 +312,44 @@ The constitution above, concretely implemented here:
      **reaches**, and therefore which document it appears in. A significance score says how much it
      **weighs** for that document's reader, and therefore **where in it** the entry sits — so the most
      consequential change leads instead of sitting third under whichever heading its branch prefix produced.
-     Both are declared in one **impact table**, which since #467 **replaces** the `Tier: N` line:
+     Both are declared under **`### Significance`**, one `#### Tier N` sub-section per reach the change
+     claims, each carrying why it matters there and then its score:
 
      ```text
-     | Tier | Significance | Why |
-     |---|---|---|
-     | 2 | 5 | consumers must re-add the marketplace under its new name; installs break without it |
-     | 1 | 4 | the routine version bump stops needing a developer |
+     #### Tier 0
+
+     The routine version bump stops needing a developer.
+
+     Score: 4
+
+     Is this change also relevant to colleagues and employers? Then continue to Tier 1.
+     If not, stop here and move on to the next section.
      ```
 
-     **The tier is the row, which is what makes the cumulative ladder impossible to claim halfway.** A
-     change consumers notice *is* a change colleagues get something out of, so a tier-2 entry owes a tier-1
-     row too — the rows an entry has are the documents it appears in, and each row is that document's reader
-     answering their own question. The score cells are scaffolded **empty**, unlike the old `Tier: 0`
-     default: 0 was a harmless final answer, while any scaffolded *score* would be a guess at a ranking, and
-     this repo has measured what a guessed ranking costs (the retired highlights marker, below).
+     **SUB-SECTIONS RATHER THAN A TABLE** (Dave, August 6, 2026), which replaced the impact table that had
+     itself replaced the `Tier: N` line the day before. The table forced a rectangle onto something that is
+     not always rectangular: **not every change has a tier 1 or a tier 2**, and a missing row reads as an
+     omission while a missing section reads as a decision. The heading also stopped naming an audience —
+     it was `Who is this for` — because each sub-section names its own by its number, and what the section
+     carries is how much the change *weighs* for each of them.
+
+     **Each section closes by asking whether there is a next one**, and that question is written even where
+     the next tier is already there. An author who has answered does not need it; a reader at the fold, at
+     the cut and in the record does — a question that disappears once answered leaves them unable to see
+     that it was asked. Tier 2 has no successor and carries none.
+
+     **The ladder stays cumulative and is still impossible to claim halfway.** A change consumers notice
+     *is* a change colleagues get something out of, so a tier-2 entry owes a tier-1 section — the sections
+     an entry has are the documents it appears in, and each is that document's reader answering their own
+     question. The score is scaffolded **empty**, unlike the tier: 0 is a harmless final answer about
+     reach, while any scaffolded *score* would be a guess at a ranking, and this repo has measured what a
+     guessed ranking costs (the retired highlights marker, below).
+
+     **Three shapes are read and one is written.** The sub-sections, the table, and the older `Tier: N`
+     line — because `CHANGELOG.md` holds all three right now and every consumer's tree holds at least one.
+     The retired section heading is recognised too (`Get-EntryRetiredSectionHeadings`): without that, the
+     lint reported all 24 pending entries as *misspelled* headings the moment the name changed, which is
+     how a check gets switched off rather than heeded.
 
      **1 to 5 against a written rubric** (`Get-EntrySignificanceRubric`, overridable per repo), because an
      unanchored ordinal scale invites false precision — 5 is *the reader must act*, 1 is *nothing changes for

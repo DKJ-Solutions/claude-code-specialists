@@ -120,7 +120,7 @@ function New-FlatEntry {
     if ($TierLine) { $lines += @($TierLine, '') }
     $lines += $Body
     if ($ExtraBody) { $lines += @('', $ExtraBody) }
-    $lines += @('', (Get-EntrySectionHeading -Key 'Who'), '')
+    $lines += @('', (Get-EntrySectionHeading -Key 'Significance'), '')
     if ($Rows.Count -gt 0 -and $Rows[0]) {
         $lines += @('| Tier | Significance | Why |', '|---|---|---|')
         $lines += $Rows
@@ -530,7 +530,7 @@ Assert-NoMatch $bare "#22 $midDot" 'and drops the PR number a stakeholder has no
 $stripped = Format-RankedEntries -Entries @($e22) -EntryLevel 2 -StripSignificance
 Assert-NoMatch $stripped '\| Tier \| Significance \| Why \|' '-StripSignificance removes the impact table'
 Assert-NoMatch $stripped '(?m)^\| 2 \| 5 \|' 'and its rows with it'
-Assert-Match $stripped '(?m)^### Who is this for$' 'the section heading stays -- an outward document keeps its structure'
+Assert-Match $stripped ('(?m)^' + [regex]::Escape((Get-EntrySectionHeading -Key 'Significance')) + '$') 'the section heading stays -- an outward document keeps its structure'
 # BOTH DECLARATIONS, and the second is new here: while the changelog had tier sections the fold consumed
 # the 'Tier: N' line, so it could never reach a rendered document. The fold now carries it, which puts a
 # self-assigned tier on the path to a consumer's plugin cache unless it is dropped here.

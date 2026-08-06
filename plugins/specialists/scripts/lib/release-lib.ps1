@@ -917,7 +917,7 @@ function Format-RankedEntries {
             # consumed the 'Tier: N' line, so it could never reach a rendered document; the fold now carries
             # it, which puts a self-assigned tier on the path to a consumer's plugin cache unless it is
             # dropped here -- the same class of thing as a self-assigned score.
-            $text = Remove-EntryImpactTable -EntryText $text
+            $text = Remove-EntrySignificanceDeclaration -EntryText $text
             $text = Remove-EntryTierLine -EntryText $text
         }
         $items += [pscustomobject]@{

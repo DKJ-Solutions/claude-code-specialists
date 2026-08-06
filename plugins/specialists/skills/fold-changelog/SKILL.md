@@ -53,16 +53,25 @@ PR lookup.
 
 …the description…
 
-### Who is this for
+### Significance
 
-| Tier | Significance | Why |
-|---|---|---|
-| 0 | - | - |
+#### Tier 0
+
+…why it matters at this reach…
+
+Score: 2
+
+Is this change also relevant to colleagues and employers? Then continue to Tier 1.
+If not, stop here and move on to the next section.
 
 ### Type of change
 
 Feat
 ```
+
+One `#### Tier N` sub-section per reach the change claims, lowest first, each ending by asking whether
+there is a next one. **Not every change has a tier 1 or a tier 2** — that is why these are sections rather
+than the table they replaced, where a missing row read as an omission.
 
 The scaffolder fills in the title and the type from the branch prefix. The fold adds what does not exist
 until the merge, and it adds it in **one place**: a closing line carrying the **`PR #NN` link and the merge

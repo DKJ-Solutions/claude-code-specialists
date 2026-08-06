@@ -32,11 +32,16 @@ changelog entry — the same workflow as the consuming repos. The steps:
 
    … the description you write …
 
-   ### Who is this for
+   ### Significance
 
-   | Tier | Significance | Why |
-   |---|---|---|
-   | 0 | - | - |
+   #### Tier 0
+
+   … why it matters to this repo's own developers …
+
+   Score: <1-5>
+
+   Is this change also relevant to colleagues and employers? Then continue to Tier 1.
+   If not, stop here and move on to the next section.
 
    ### Type of change
 
@@ -74,27 +79,37 @@ changelog entry — the same workflow as the consuming repos. The steps:
    [`scripts/release/fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)`-Branch <name>`
    folds the entry into [`CHANGELOG.md`](CHANGELOG.md) — which is **one flat list with no section
    headings at all**, so the fold does not pick a section: it inserts the block at the **position its own
-   impact table ranks it at**, furthest reach first and, within a tier, highest significance first. It
+   Significance sections rank it at**, furthest reach first and, within a tier, highest significance first. It
    appends the PR link and the merge date as the entry's closing line, derives a `Plugins:` line from the PR's files
    along the way (for the per-plugin CHANGELOGs — see
    [Cutting a release](releases/README.md#cutting-a-release)), and **resets both `branch/` files** to
    their empty state — so the trunk is ready for the next branch and the merged branch's ticked-off steps
    do not greet whoever opens it. Commits that directly on `main`, naming exactly those three paths.
 
-   **The fold is the only moment that order can be decided**, which is why the table has to be right
-   before the merge: the cut empties the list, so whatever order the fold leaves is what the release
+   **The fold is the only moment that order can be decided**, which is why the Significance sections have
+   to be right before the merge: the cut empties the list, so whatever order the fold leaves is what the release
    documents inherit. Nothing is re-sorted afterwards.
 
-### One thing to do while writing the entry: fill in its impact table
+### One thing to do while writing the entry: fill in its Significance sections
 
-Every entry carries an impact table, scaffolded at tier 0. Filling it in is an edit in a file you are already
-editing before the PR:
+Every entry carries a `### Significance` section with one `#### Tier N` sub-section per reach it claims,
+scaffolded with tier 0 alone. Filling it in is an edit in a file you are already editing before the PR:
 
 ```text
-| Tier | Significance | Why |
-|---|---|---|
-| 0 | - | - |
+#### Tier 0
+
+… why it matters at this reach …
+
+Score: <1-5>
+
+Is this change also relevant to colleagues and employers? Then continue to Tier 1.
+If not, stop here and move on to the next section.
 ```
+
+**Work down the tiers and stop where the answer is no.** Tier 0 can always be answered; each section ends
+by asking whether there is a next one. **Not every change has a tier 1 or a tier 2, and that is the point
+of sections rather than a table** — a missing row read as an omission, a missing section reads as a
+decision.
 
 The **tier** says how far the change reaches, and therefore which release document the entry appears in:
 
@@ -116,14 +131,25 @@ most consequential change leads. Score it against this rubric:
 | `2` | small; noticed if somebody points it out |
 | `1` | cosmetic or preventative — nothing changes for them today |
 
-**Every tier you claim needs its own row, with a score and a `Why`.** The ladder is cumulative — a change
-consumers notice is also a change colleagues get something out of — so a tier-2 entry owes a tier-1 row:
+**Every tier you claim needs its own section, with a why and a score.** The ladder is cumulative — a change
+consumers notice is also a change colleagues get something out of — so a tier-2 entry owes a tier-1 section,
+and the routing questions walk you there:
 
 ```text
-| Tier | Significance | Why |
-|---|---|---|
-| 2 | 5 | consumers must re-add the marketplace under its new name; installs break without it |
-| 1 | 4 | the routine version bump stops needing a developer |
+#### Tier 1
+
+The routine version bump stops needing a developer.
+
+Score: 4
+
+Is this change also relevant to the people who consume this product? Then continue to Tier 2.
+If not, stop here and move on to the next section.
+
+#### Tier 2
+
+Consumers must re-add the marketplace under its new name; installs break without it.
+
+Score: 5
 ```
 
 **Why it matters even though nothing breaks if you leave it at 0:** the release cut refuses a bump the tiers
