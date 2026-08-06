@@ -45,7 +45,8 @@ happens — this ships a branch.
 
 The six steps, stopping on the first failure:
 
-1. **Open the PR** via `open-pr.ps1` — which runs the resolves gate, the scaffold gate, the repo's own
+1. **Open the PR** via `open-pr.ps1` — which runs the resolves gate, the scaffold gate, the impact gate,
+   the step-list gate, the repo's own
    lint gate and all test suites, then pushes and opens. If any of those fails, nothing is pushed and
    this stops here. See the `open-pr` skill for what those gates check.
 
@@ -69,7 +70,14 @@ The six steps, stopping on the first failure:
    `gh pr merge ''`. Worth knowing if you are on an older version of the plugin — the symptom is a
    `ship-pr` run that reports no PR number and then fails at the merge with an unhelpful gh error.
 3. **Wait for CI.** See [Why step 3 polls before it watches](#why-step-3-polls-before-it-watches).
-4. **Merge** (`gh pr merge`). See [The merge method is repo policy](#the-merge-method-is-repo-policy).
+4. **Merge** (`gh pr merge`), but first the **step-list gate again**: `branch/branch-progress.md` must
+   have nothing unresolved left in it, or the merge does not happen. Not belt-and-braces — the rule is
+   about the *merge*, and step 1's copy of it lives in `open-pr.ps1`, which has a `-Force`. A PR opened
+   through that valve, by hand on github.com, or days ago and resumed here would otherwise land with an
+   unfinished plan. Checked against the working copy at this moment rather than trusted from step 1, and
+   there is no `-Force` for it: `- [~] dropped -- <why>` is the way past a step that should not be done.
+   The three marks are in the `open-pr` skill and in the source repo's `branch/README.md`.
+   See [The merge method is repo policy](#the-merge-method-is-repo-policy).
 5. **Check out the main branch, fast-forward, and fold** — handed to `fold-changelog-entry.ps1 -Push`,
    which folds the entry, commits it and pushes it. See
    [Why the fold is delegated](#why-the-fold-is-delegated-rather-than-inlined).

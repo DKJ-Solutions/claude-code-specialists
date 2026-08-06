@@ -56,6 +56,12 @@ prompts for what the change does, and nothing else.
 is what makes it pasteable in one go; the branch name lives in `branch-progress.md`, which has room for
 it, and the fold reads it back from there to find the PR.
 
+**The step list is enforced, not decorative.** `open-pr` refuses to push and `ship-pr` refuses to merge
+while anything is still `- [ ]`. Resolve each step as `- [x]` done or `- [~]` dropped, with the reason
+kept on the line — that third mark exists so nobody is ever pushed into ticking a box for work they did
+not do. There is no `-Force`. Full convention and reasoning: the `open-pr` skill, and the source repo's
+[`branch/README.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/branch/README.md).
+
 ## The entry carries an impact table, scaffolded at tier 0
 
 The entry file gets this under its heading:

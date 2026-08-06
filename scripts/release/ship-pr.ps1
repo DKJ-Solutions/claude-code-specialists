@@ -165,6 +165,9 @@ if (-not (Test-Path -LiteralPath $configPath)) {
 # For Get-ExistingPrRecord in step 2. $PSScriptRoot-relative, not $repoRoot: like native-capture-lib
 # this one is not repo-owned -- it travels with the same plugin/mirror payload as this script.
 . (Join-Path $PSScriptRoot '..\lib\pr-issues-lib.ps1')
+# For the step-list gate before the merge in step 4 (Get-BranchFilePaths / Get-BranchProgressFindings).
+# Same plugin-payload sibling, same reasoning as the two above.
+. (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
 $repo = Get-RepoName
 
 # The merge method is repo POLICY, not script logic (issue #411): this workshop merges, another repo
@@ -260,6 +263,35 @@ if ($checks.ExitCode -ne 0) {
 Write-Host "ship-pr: CI green." -ForegroundColor Green
 
 # --- Step 4: merge (no --admin: never bypass the CI gate) ----------------------------------------
+#
+# THE STEP-LIST GATE FIRES AGAIN HERE, and that is not belt-and-braces. Dave's requirement is about the
+# MERGE -- "pas als alle punten zijn afgevinkt kan de branch met een PR gemergd worden" -- while step 1's
+# copy of it runs in open-pr.ps1, which has a -Force. A PR opened through that escape valve, or opened by
+# hand on github.com, or opened days ago and resumed by this script, would otherwise land with an
+# unfinished plan: exactly what the requirement asks to be impossible. Checked here rather than passed
+# down from step 1, because the working copy may have changed since.
+#
+# Read from the branch's own checkout, which is where HEAD still is at this point -- step 5 is what moves
+# to main. An absent list is no finding, the same tolerance open-pr.ps1 applies and for the same reason.
+$shipProgressRel  = (Get-BranchFilePaths).Progress
+$shipProgressPath = Join-Path $repoRoot $shipProgressRel
+if (Test-Path -LiteralPath $shipProgressPath) {
+    $shipSteps = @(Get-BranchProgressFindings -Text ([System.IO.File]::ReadAllText($shipProgressPath, [System.Text.Encoding]::UTF8)))
+    if ($shipSteps.Count -gt 0) {
+        $shipMarks  = Get-BranchProgressMarks
+        $shipDetail = ($shipSteps | ForEach-Object { "  - $($_.Label): $($_.Line)" }) -join "`n"
+        Write-Error @"
+step-list gate: $shipProgressRel still has unresolved steps - PR #$pr is NOT merged.
+
+$shipDetail
+
+Resolve each step ($($shipMarks.Done.Trim()) done, $($shipMarks.Dropped.Trim()) dropped with a reason), commit, and re-run. CI has already
+passed, so a re-run picks up from here. There is no -Force for this gate.
+"@
+        exit 1
+    }
+}
+
 $merge = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'merge', "$pr", "--$mergeMethod", '--repo', $repo)
 $merge.Output | ForEach-Object { Write-Host $_ }
 if ($merge.ExitCode -ne 0) { Write-Error "Merge of PR #$pr failed."; exit 1 }

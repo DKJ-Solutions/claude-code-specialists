@@ -677,6 +677,50 @@ Remove-Item Function:\Get-EntrySignificanceEnabled
 $sigCmd = Get-Command Test-EntrySignificanceActive
 Assert-True (-not $sigCmd.Parameters.ContainsKey('TierSections')) 'and it takes no section list any more -- the retired argument cannot be passed unnoticed'
 
+Write-Host "Get-BranchProgressFindings (the step-list gate's matcher)" -ForegroundColor Cyan
+$marks = Get-BranchProgressMarks
+Assert-Equal '- [ ] ' $marks.Open    'the open mark is the ordinary unchecked task box'
+Assert-Equal '- [x] ' $marks.Done    'the done mark is the ordinary checked one'
+Assert-Equal '- [~] ' $marks.Dropped 'and the dropped mark is a third form, not a second meaning for one of the two'
+
+$allResolved = "# Branch progress`n`n## Steps`n`n- [x] built it`n- [~] wire the second reader -- dropped: one reader turned out to be enough`n"
+Assert-Equal 0 @(Get-BranchProgressFindings -Text $allResolved).Count 'a list of ticked and dropped steps is finished'
+
+$oneOpen = "# Branch progress`n`n## Steps`n`n- [x] built it`n- [ ] write the tests`n"
+$openFindings = @(Get-BranchProgressFindings -Text $oneOpen)
+Assert-Equal 1 $openFindings.Count 'one open step is one finding'
+Assert-Equal 'still open' $openFindings[0].Label 'and it is reported as open'
+Assert-True ($openFindings[0].Line -match 'write the tests') 'the finding carries the step text, so the message says WHICH step'
+
+# THE DROPPED MARK IS THE WHOLE REASON THE GATE IS SAFE TO MAKE UNFORCEABLE. Without it the only way past
+# a step that turned out not to be needed is to tick it, which is a gate teaching people to report work
+# they did not do.
+$dropped = "## Steps`n`n- [~] the second reader -- dropped: one turned out to be enough`n"
+Assert-Equal 0 @(Get-BranchProgressFindings -Text $dropped).Count 'a dropped step does not block'
+
+# A TICKED SCAFFOLD IS STILL A FINDING, which is the v3.2.0 shape one level up: the author keeps what the
+# scaffolder wrote and marks it done. That reports a plan as finished that was never written.
+$tickedStub = "## Steps`n`n- [x] " + (Get-BranchFileWording).FirstStep + "`n"
+$stubFindings = @(Get-BranchProgressFindings -Text $tickedStub)
+Assert-Equal 1 $stubFindings.Count 'a TICKED scaffold placeholder is still a finding'
+Assert-Equal 'still the scaffolded step' $stubFindings[0].Label 'and it is named as the scaffold rather than as an open step'
+
+# ...and an UNticked one is reported once, not twice -- it is open, which is the more actionable of the
+# two labels and the one that tells the author what to do.
+$freshScaffold = ((Format-BranchProgressScaffold -Branch 'feat/fresh') -join "`n")
+$freshFindings = @(Get-BranchProgressFindings -Text $freshScaffold)
+Assert-Equal 1 $freshFindings.Count 'a freshly scaffolded list produces exactly one finding, not one per rule'
+Assert-Equal 'still open' $freshFindings[0].Label 'and the open label wins, because that is the actionable one'
+
+# The reset state carries NO steps, so a branch made by hand rather than by new-branch is not refused --
+# the one-commit typo fix. Deliberate tolerance, asserted so it cannot be tightened by accident.
+Assert-Equal 0 @(Get-BranchProgressFindings -Text ((Format-BranchProgressReset) -join "`n")).Count 'the reset state has nothing to resolve -- an absent plan is not a refusal'
+
+# Fence-aware, like every reader of this format: this repo's own branch/README.md quotes all three marks
+# while teaching them, and a step list may legitimately do the same.
+$quoted = "## Steps`n`n- [x] documented the marks`n`n" + '```text' + "`n- [ ] not done yet`n" + '```' + "`n"
+Assert-Equal 0 @(Get-BranchProgressFindings -Text $quoted).Count 'an open step QUOTED inside a fence is not an open step'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
