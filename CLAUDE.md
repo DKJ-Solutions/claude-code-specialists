@@ -219,6 +219,18 @@ The constitution above, concretely implemented here:
   here and in every consumer, carries an entry with those strings right now, and consumers receive the
   new scripts through a plugin update rather than by choosing to. A gate that forgot them would wave
   exactly those entries through. **Recognise both, write one** — the same rule the `Tier: N` line gets.
+- **A fourth gate, on the branch's own plan: the step-list gate** (Dave, August 6, 2026). A branch
+  reaches a PR when its own plan is finished, so `open-pr.ps1` refuses to push and `ship-pr.ps1` refuses
+  to merge while `branch/branch-progress.md` has an unresolved step. **Both**, deliberately: the
+  requirement Dave gave is about the *merge*, and `open-pr` has a `-Force` — a PR opened through that
+  valve, or by hand on github.com, would otherwise land with an unfinished plan.
+  **Three marks, not two.** `- [x]` is done, `- [~]` is dropped with the reason kept on the line, and a
+  step still carrying the scaffold's placeholder is refused whether or not it is ticked. The third mark
+  is what makes the gate safe to leave **un-`-Force`-able**: without it the only way past a step that
+  turned out not to be needed is to tick it, which teaches people to report work they did not do — a
+  gate that then says success is worse than no gate. **A branch with no step list at all is not
+  refused**: that is the one-commit typo fix, and refusing it would make the mechanism ceremony. The
+  full convention lives in [`branch/README.md`](branch/README.md).
 - **Two deliberate exceptions to "never directly on `main`":**
   1. The **fold commit** after a merge: [`fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)
      folds the entry into `CHANGELOG.md` and clears it, and with `-Commit`/`-Push` makes that

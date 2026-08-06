@@ -38,6 +38,8 @@ The script:
    [The scaffold gate](#the-scaffold-gate-has-the-entry-actually-been-written) below. On the same read of
    the same file it also runs the **impact gate** and prints the reach and significance it read. See
    [The impact gate](#the-impact-gate-how-far-does-this-change-reach-and-how-much-does-it-weigh) below.
+   Then the **step-list gate**: the branch's own plan must be finished. See
+   [The step-list gate](#the-step-list-gate-is-the-branchs-own-plan-finished) below.
 4. Runs the **repo's own lint gate** (via `Get-LintScript` from `repo-config`) and then **all
    test suites** (`scripts/tests/*.tests.ps1`) -- exactly like CI. An error blocks: nothing is
    pushed and no PR is opened. `-SkipLint` / `-SkipTests` are the deliberate escape valves.
@@ -110,6 +112,38 @@ the script that writes the scaffold read it from the same shared library, so the
 - **`-Force` ships anyway** (a warning instead of a block), for the rare entry that legitimately quotes
   the wording outside a fence. Deliberately separate from `-SkipLint`/`-SkipTests`: those skip a tool,
   this overrules a judgement about content.
+
+## The step-list gate: is the branch's own plan finished?
+
+A branch carries two files. The entry says what the change does; `branch/branch-progress.md` says what
+still has to happen. **A branch reaches a PR when its own plan is finished**, so this gate refuses to
+push while any step is unresolved. Three marks:
+
+```text
+- [ ] not done yet          -> blocks the PR
+- [x] done
+- [~] dropped -- <why it turned out not to be needed>
+```
+
+**The third mark is the reason the gate is safe to make unforceable.** A plan legitimately grows items
+that stop making sense. A gate offering only "tick it" teaches people to tick boxes for work they did
+not do — and then reports success, which is worse than no gate at all. A dropped step keeps its line and
+its reason on the page, which is the half worth reading later.
+
+- **A step still carrying the scaffold's placeholder is refused, ticked or not.** Ticking the
+  scaffolded first step without replacing it reports a plan as finished that was never written — the
+  same shape the scaffold gate above was measured on, one file over.
+- **No step list at all is not a finding.** A branch created by hand rather than by `new-branch` has the
+  trunk's empty reset state, which holds no steps. That is the one-commit typo fix; refusing it would
+  make the mechanism ceremony rather than a tool.
+- **Fenced code is excluded**, so a step list that quotes the convention is not accused of following it.
+- **There is no `-Force`**, deliberately, unlike the scaffold gate. `-Force` exists for text somebody
+  legitimately wrote and wants to keep; here `- [~]` already is the sanctioned way past a step that
+  should not be done, and a second escape valve would only ever be used to skip the first.
+
+`ship-pr` runs this check **again** before the merge. Not belt-and-braces: the requirement is about the
+merge, and a PR opened through `-Force`, by hand on github.com, or days ago and resumed would otherwise
+land with an unfinished plan.
 
 ## The impact gate: how far does this change reach, and how much does it weigh?
 

@@ -420,6 +420,49 @@ Rewrite the body to say what the change DOES, then run again. Keeping it as-is i
         }
     }
 
+    # Step-list gate (Dave, August 5-6, 2026): "pas als alle punten zijn afgevinkt kan de branch met een PR
+    # gemergd worden". The branch's step list must have nothing unresolved left in it.
+    #
+    # WHAT COUNTS AS RESOLVED IS TWO MARKS, NOT ONE. '- [x] ' is done; '- [~] ' is deliberately dropped,
+    # with the reason kept on the line. The second exists because a plan legitimately grows items that stop
+    # making sense, and a gate offering only "tick it" teaches people to tick boxes for work they did not do
+    # -- which is worse than no gate, because it then reports success. A step still carrying the scaffold's
+    # own placeholder is refused whether or not it is ticked, for the same reason the entry's scaffold gate
+    # refuses its stubs: a ticked stub reports a plan as finished that was never written.
+    #
+    # DELIBERATELY NOT -Force-ABLE, unlike the scaffold gate above and like the impact gate below. -Force
+    # exists for text somebody legitimately wrote and wants to keep; there is no such case here, because
+    # '- [~] ' already IS the sanctioned way past a step that should not be done. Adding a second escape
+    # valve would only ever be used to skip the first.
+    #
+    # ABSENT LIST = NO FINDING, deliberately. A branch made by hand (`git checkout -b`) rather than by
+    # new-branch has its step list still in the trunk's reset state, which contains no steps at all. That
+    # is the one-commit typo fix, and refusing it would make the mechanism ceremony rather than a tool.
+    # What is NOT tolerated is the scaffolded list left as scaffolded -- that branch did run new-branch and
+    # then ignored what it wrote.
+    $progressPath = Join-Path $repoRoot (Get-BranchFilePaths).Progress
+    if (Test-Path -LiteralPath $progressPath) {
+        $progressRel = (Get-BranchFilePaths).Progress
+        $stepFindings = @(Get-BranchProgressFindings -Text ([System.IO.File]::ReadAllText($progressPath, [System.Text.Encoding]::UTF8)))
+        if ($stepFindings.Count -gt 0) {
+            $marks = Get-BranchProgressMarks
+            $stepDetail = ($stepFindings | ForEach-Object { "  - $($_.Label): $($_.Line)" }) -join "`n"
+            Write-Error @"
+step-list gate: $progressRel still has unresolved steps - nothing pushed, no PR opened.
+
+$stepDetail
+
+A branch reaches a PR when its own plan is finished. Resolve each step:
+  $($marks.Done)done
+  $($marks.Dropped)dropped, and why it turned out not to be needed
+
+A dropped step keeps its line and its reason, which is the half worth reading later. There is no -Force
+for this gate - '$($marks.Dropped.Trim())' is the way past a step that should not be done.
+"@
+            exit 1
+        }
+    }
+
     # Impact gate, on the same read of the same file. The entry declares how far this change reaches and how
     # much it weighs there; the fold files it under the matching changelog section and orders it within that
     # section, and the release cut refuses a bump the pending tiers have not earned. So a declaration that

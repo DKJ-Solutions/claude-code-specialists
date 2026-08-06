@@ -1611,9 +1611,10 @@ function Format-BranchProgressScaffold {
         open first step, and a place to record where you left off.
 
         THE STEP LIST IS A CHECKBOX LIST because that is the form the requirement was given in -- work
-        is ticked off, and the list is done when nothing is open. Whether a PR is REFUSED while an item
-        is still open is a separate decision that has not been taken; nothing here gates anything yet, so
-        the format is ready for that gate without presuming it.
+        is ticked off, and the list is done when nothing is open. Since August 6, 2026 that IS a gate:
+        open-pr.ps1 and ship-pr.ps1 refuse while a step is unresolved (Get-BranchProgressFindings), so
+        the placeholder written here is deliberately one open step -- you cannot reach a PR without
+        having stated your own.
 
         -Intent, when given, becomes the "where I left off" note rather than the first step: parking a
         branch records what HAS happened, and a step list scaffolded with someone's status text as its
@@ -1632,7 +1633,7 @@ function Format-BranchProgressScaffold {
     $lines.Add('')
     $lines.Add('## ' + $w.StepsHeading)
     $lines.Add('')
-    $lines.Add('- [ ] ' + $w.FirstStep)
+    $lines.Add((Get-BranchProgressMarks).Open + $w.FirstStep)
     $lines.Add('')
     $lines.Add('## ' + $w.NotesHeading)
     $lines.Add('')
@@ -1667,6 +1668,62 @@ function Get-BranchFileDeclaredBranch {
         if ($line -match $rx) { return $Matches[1] }
     }
     return ''
+}
+
+$script:BranchProgressMarks = [ordered]@{
+    Open    = '- [ ] '
+    Done    = '- [x] '
+    Dropped = '- [~] '
+}
+
+function Get-BranchProgressMarks {
+    <# The three step marks, as one object: Open, Done, Dropped. One owner, because the writer of the
+       scaffold, the gate that refuses an open step and the README that teaches the convention all have
+       to mean the same three strings. #>
+    return [pscustomobject]$script:BranchProgressMarks
+}
+
+function Get-BranchProgressFindings {
+    <#
+        Pure: the reasons this step list is not finished, as an array of objects with Label and Line.
+        Empty means every step has been resolved -- ticked or deliberately dropped.
+
+        TWO KINDS OF FINDING, and the second is what stops the gate from being a formality:
+
+          * an OPEN step ('- [ ] ') -- work that was written down and has not been resolved;
+          * a step still carrying the SCAFFOLD's placeholder text, ticked or not. Ticking the
+            scaffolded first step without replacing it is the exact shape the entry's own scaffold gate
+            was measured on at v3.2.0 (author keeps the stub, appends a status), and here it would be
+            worse: it reports a plan as finished that was never written.
+
+        '- [~] ' IS THE SANCTIONED WAY PAST A STEP THAT TURNED OUT NOT TO BE NEEDED, and it exists
+        because the alternative is worse than no gate. A plan legitimately grows items that stop making
+        sense; with only two marks available the gate teaches people to tick boxes for work they did not
+        do, and then it reports success. A dropped step keeps its line and its reason on the page, which
+        is the half that is actually worth reading later.
+
+        FENCE-AWARE, like every reader of this format: a step list may quote the convention it follows --
+        this repo's own README does -- and a guard that cannot tell a quote from a real step gets
+        switched off by the first person it accuses wrongly.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
+
+    $marks = Get-BranchProgressMarks
+    $body = Get-EntryTextOutsideFences -EntryText $Text
+    $placeholder = (Get-BranchFileWording).FirstStep
+
+    $findings = @()
+    foreach ($line in ($body -split '\r?\n')) {
+        $trimmed = $line.TrimStart()
+        if ($trimmed.StartsWith($marks.Open)) {
+            $findings += [pscustomobject]@{ Label = 'still open'; Line = $trimmed }
+        } elseif ($placeholder -and $trimmed.Contains($placeholder)) {
+            # Reached only for a ticked or dropped line, since an open one is already reported above --
+            # so this says "resolved, but it still says what the scaffold wrote", which is the lie.
+            $findings += [pscustomobject]@{ Label = 'still the scaffolded step'; Line = $trimmed }
+        }
+    }
+    return $findings
 }
 
 function Test-BranchChangelogIsFilled {

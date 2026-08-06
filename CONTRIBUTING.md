@@ -18,7 +18,8 @@ changelog entry — the same workflow as the consuming repos. The steps:
    **Fixed names, not one per branch.** Git already tracks these per branch, so branches in flight
    cannot collide on them. On `main` both sit in an empty **reset state** carrying a warning not to
    write there until a branch exists — that state opens with an `#`, which is exactly what stops the
-   fold mistaking it for an entry.
+   fold mistaking it for an entry. The full convention, including the three step marks, is in
+   [`branch/README.md`](branch/README.md).
 
    **`branch-changelog.md` holds the entry block and nothing around it**, so it pastes into the
    changelog in one go. **The entry is one `##` heading with three `###` sections under it**, and that is
@@ -50,7 +51,10 @@ changelog entry — the same workflow as the consuming repos. The steps:
    (maintenance: scripts, tooling, config). The table is in
    [`scripts/lib/branch-info.ps1`](scripts/lib/branch-info.ps1).
 2. **Work + commit** on the branch: keep the step list current as you go, write the entry's
-   description, then commit both along with the rest of the work.
+   description, then commit both along with the rest of the work. **Every step must be resolved before
+   the PR** — `- [x]` done, or `- [~]` dropped with the reason on the line. Steps 3 and 4 both refuse
+   while anything is still `- [ ]`, and there is no `-Force` for it: the dropped mark already is the way
+   past a step that should not be done.
 3. **Open the PR:** [`scripts/release/open-pr.ps1`](scripts/release/open-pr.ps1)`-Title "…"` first runs
    the **lint gate** [`scripts/lint/check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1)
    (valid manifests, agent-def frontmatter, no dead links, and the flags on every printed
