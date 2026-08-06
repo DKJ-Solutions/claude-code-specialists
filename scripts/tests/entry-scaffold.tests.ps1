@@ -475,6 +475,41 @@ Assert-True ($stripped -notmatch "`n`n`n") 'and no triple blank line is left beh
 # A quoted table must survive stripping too, or rendering damages the entry that documents the mechanism.
 Assert-True ((Remove-EntryImpactTable -EntryText $fence) -match 'quoted') 'strip: a fenced table is left alone'
 
+# --- THE SECTION HEADING GOES WITH THE TABLE ------------------------------------------------------
+# The fixture above puts the table bare under the entry heading, which is the pre-#467 shape and the reason
+# this went unnoticed: in a REAL entry the table sits under its own '### Who is this for'. Stripping the
+# table and keeping that heading left a named question with no answer under it, in every entry of every
+# document that travels outward -- 17 per release card at v3.6.0, caught by -NoPush and not by these tests.
+$sect = Get-EntrySectionHeadings
+$h    = '#' * (Get-EntrySectionLevel)
+function New-SectionedEntry {
+    param([string]$WhoBody = "| Tier | Significance | Why |`n|---|---|---|`n| 2 | 4 | consumers |")
+    return "## A title`n`n$h $($sect['What'])`n`nBody paragraph.`n`n$h $($sect['Who'])`n`n$WhoBody`n`n$h $($sect['Type'])`n`nFix`n"
+}
+$sectioned = Remove-EntryImpactTable -EntryText (New-SectionedEntry)
+Assert-True ($sectioned -notmatch [regex]::Escape($sect['Who'])) 'strip: the section heading goes with the table it introduced'
+Assert-True ($sectioned -match [regex]::Escape($sect['Type'])) 'and the section after it survives'
+Assert-True ($sectioned -match [regex]::Escape($sect['What'])) 'and so does the one before it'
+Assert-True ($sectioned -match 'Body paragraph\.') 'and the description is untouched'
+Assert-True ($sectioned -match "Body paragraph\.`r?`n`r?`n$h ") 'and exactly one blank line separates the paragraph from the next heading'
+Assert-True ($sectioned -notmatch "`n`n`n") 'and no triple blank line is left behind'
+
+# THE HEADING ONLY GOES WHEN THE SECTION IS ACTUALLY EMPTY. The convention is that the table is the whole
+# answer, but a strip that deletes a heading on the strength of a convention deletes somebody's prose the
+# first time they write some -- so the emptiness is checked rather than assumed.
+$withProse = Remove-EntryImpactTable -EntryText (New-SectionedEntry -WhoBody "| Tier | Significance | Why |`n|---|---|---|`n| 2 | 4 | consumers |`n`nAnd a sentence the author added.")
+Assert-True ($withProse -notmatch 'Significance') 'strip: the table still goes when the section holds prose as well'
+Assert-True ($withProse -match [regex]::Escape($sect['Who'])) 'but the heading stays, because the section is not empty'
+Assert-True ($withProse -match 'And a sentence the author added\.') 'and the prose is untouched'
+
+# An entry that QUOTES the section heading inside a fence keeps the quoted copy: the entries documenting
+# this format do exactly that, and this is the fifth matcher in this lib that has to tell a use from a
+# mention.
+$quotedHeading = "## A title`n`n$h $($sect['What'])`n`nIt looks like this:`n`n``````text`n$h $($sect['Who'])`n``````\n`n$h $($sect['Who'])`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 3 | colleagues |`n`n$h $($sect['Type'])`n`nDocs`n"
+$quotedOut = Remove-EntryImpactTable -EntryText $quotedHeading
+Assert-Equal 1 ([regex]::Matches($quotedOut, [regex]::Escape($sect['Who'])).Count) 'strip: the fenced copy of the heading survives while the real one goes'
+Assert-True ($quotedOut -notmatch 'Significance') 'and the real table is still removed'
+
 # --- ONE FENCE READER, AND THE TILDE FORM IT USED NOT TO KNOW -------------------------------------
 # There were FOUR fence walks across the two libs: Get-FencedLineFlags in release-lib, a second named one
 # here, and two inline walks inside the removers below. They were not equivalent -- only release-lib's
