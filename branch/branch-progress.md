@@ -1,11 +1,14 @@
 # Branch progress
 
-**Branch:** `fix/skipped-plugin-says-why-it-was-skipped`
+**Branch:** `main`
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ## Steps
 
-- [ ] TODO: the first step of this branch
-
-## Where I left off
-
-TODO: what has been done so far, and what you were in the middle of.
+_(filled in when a branch is created)_
