@@ -12,6 +12,8 @@ consequential change first. It also decides what may be released: **a release ne
 entry**, **a minor needs a tier-2 one**, and a **major** recaps ten minors. So a changelog holding nothing
 but tier 0 is a changelog with no release in it yet.
 
+---
+
 ## Every change is an H2 with three named sections, and the tier sections are gone
 
 ### What does this change do?
