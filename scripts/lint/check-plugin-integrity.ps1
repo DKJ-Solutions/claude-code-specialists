@@ -518,8 +518,22 @@ foreach ($lf in $linkFiles) {
     # Persona templates are destined for .claude/extensions/ of a consuming repo; their relative
     # links need to resolve THERE, not at the source location in the plugin. So validate them as if
     # the file were already at that destination (this repo mirrors the consumer layout).
+    #
+    # THE CHANGELOG ENTRY IS THE SECOND CASE OF THE SAME RULE (August 6, 2026). Its text is pasted
+    # verbatim into CHANGELOG.md at the repo root, so its links have to resolve THERE -- and until the
+    # branch/ split they did by construction, because the entry file itself sat in the root. Moving it one
+    # level down turned every root-relative link in an entry into a dead one: measured on the first entry
+    # written after the move, with five more of the same shape already pending in CHANGELOG.md. Validating
+    # it where the file sits would force authors to write '../' links that break the moment they land.
+    #
+    # THE STEP LIST IS DELIBERATELY NOT INCLUDED, though it sits in the same directory. It never travels:
+    # it is read where it lies and reset in place, so 'where the file sits' IS its destination, and the
+    # ordinary '../' convention every other nested document here follows is the correct one for it.
+    $entryRelForLinks = ((Get-BranchFilePaths).Changelog -replace '/', '\')
     if ($lf -match '\\personas\\.*-persona\.md$') {
         $dir = Join-Path $RepoRoot '.claude\extensions'
+    } elseif ($lf.EndsWith('\' + $entryRelForLinks)) {
+        $dir = $RepoRoot
     } else {
         $dir = Split-Path -Parent $lf
     }
