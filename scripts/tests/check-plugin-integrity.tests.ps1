@@ -1227,7 +1227,13 @@ try {
     # this check can fail badly: missing a real unbound sample, or firing on something that is not one.
     # The false-positive half is not optional politeness -- a gate that cries wolf gets an opt-out
     # pasted over every finding and then reports green while asserting nothing.
-    $qs = Join-Path $Fixture 'QUICKSTART.md'
+    # IN plugins/, NOT THE ROOT, because that is where the three consumer-facing documents now live and
+    # $consumerDocs is read as a path rather than a bare name. The check Test-Path-skips an entry it
+    # cannot find, in silence -- so a fixture writing to the old location would leave every assertion
+    # below passing over a document the check never opened.
+    $qsDir = Join-Path $Fixture 'plugins'
+    if (-not (Test-Path -LiteralPath $qsDir)) { New-Item -ItemType Directory -Path $qsDir -Force | Out-Null }
+    $qs = Join-Path $qsDir 'INSTALL.md'
     # Fence and box drawing from codepoints, never as literals. The first version wrote the fence
     # literally and silently produced an opening fence with the language on the NEXT line, so the
     # "a command block is not examined" case was testing a language-less block and failing for a
@@ -1248,7 +1254,7 @@ try {
         'Done: 4 created, 0 already present.', $fence, '', 'Compare it against yours.'
     ) -join "`n", $Utf8NoBom)
     $s1 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True ($s1.Out -match '\[expected-output\].*QUICKSTART\.md') `
+    Assert-True ($s1.Out -match '\[expected-output\].*INSTALL\.md') `
         'expected-output: an output sample with no stated binding is reported'
     Assert-True ($s1.Out -match 'expected-output. checked [1-9]') `
         'expected-output: and the coverage line counts samples examined, not check runs'
@@ -1260,7 +1266,7 @@ try {
             'Done: 4 created, 0 already present.', $fence, '', $binding
         ) -join "`n", $Utf8NoBom)
         $s2 = Invoke-Integrity -FixtureRoot $Fixture
-        Assert-True (-not ($s2.Out -match '\[expected-output\].*QUICKSTART\.md')) `
+        Assert-True (-not ($s2.Out -match '\[expected-output\].*INSTALL\.md')) `
             "expected-output: a sample bound by '$binding' passes"
     }
 
@@ -1271,7 +1277,7 @@ try {
         'claude plugin install specialists@claude-code-specialists --scope project', $fence
     ) -join "`n", $Utf8NoBom)
     $s3 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True (-not ($s3.Out -match '\[expected-output\].*QUICKSTART\.md')) `
+    Assert-True (-not ($s3.Out -match '\[expected-output\].*INSTALL\.md')) `
         'expected-output: a powershell block is a command to run, not examined'
 
     # 4. A DIAGRAM IS DRAWN, NOT CAPTURED. The check's first real false positive, on the seam diagram in
@@ -1280,7 +1286,7 @@ try {
         '# Quickstart', '', 'The shape is:', '', ($fence + 'text'), $tree, $fence
     ) -join "`n", $Utf8NoBom)
     $s4 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True (-not ($s4.Out -match '\[expected-output\].*QUICKSTART\.md')) `
+    Assert-True (-not ($s4.Out -match '\[expected-output\].*INSTALL\.md')) `
         'expected-output: a box-drawing diagram is not a captured sample'
 
     # 5. THE OPT-OUT HAS TO NAME A REASON. A bare marker must not silence the check, or the escape hatch
@@ -1289,14 +1295,14 @@ try {
         '# Quickstart', '', 'Reads:', '', $fence, 'Done: 4 created.', $fence, '', '<!-- unbound-sample: -->'
     ) -join "`n", $Utf8NoBom)
     $s5 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True ($s5.Out -match '\[expected-output\].*QUICKSTART\.md') `
+    Assert-True ($s5.Out -match '\[expected-output\].*INSTALL\.md') `
         'expected-output: an opt-out marker with no reason does not silence the check'
     [System.IO.File]::WriteAllText($qs, @(
         '# Quickstart', '', 'Reads:', '', $fence, 'Done: 4 created.', $fence, '',
         '<!-- unbound-sample: invented for the test fixture, bound to nothing real -->'
     ) -join "`n", $Utf8NoBom)
     $s6 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True (-not ($s6.Out -match '\[expected-output\].*QUICKSTART\.md')) `
+    Assert-True (-not ($s6.Out -match '\[expected-output\].*INSTALL\.md')) `
         'expected-output: an opt-out that names a reason does silence it'
 
     # --- check 16: a measured figure in prose names what it was measured on -------------------------
@@ -1311,7 +1317,7 @@ try {
         '# Quickstart', '', 'After the teardown the file is 288 bytes and holds nothing of ours.'
     ) -join "`n", $Utf8NoBom)
     $f1 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True ($f1.Out -match '\[measured-figure\].*QUICKSTART\.md') `
+    Assert-True ($f1.Out -match '\[measured-figure\].*INSTALL\.md') `
         'measured-figure: a byte count in prose with no stated binding is reported'
     Assert-True ($f1.Out -match 'measured-figure. checked [1-9]') `
         'measured-figure: and the coverage line counts figures examined, not check runs'
@@ -1326,7 +1332,7 @@ try {
             '# Quickstart', '', "After the teardown the file is 288 bytes. $binding"
         ) -join "`n", $Utf8NoBom)
         $f2 = Invoke-Integrity -FixtureRoot $Fixture
-        Assert-True (-not ($f2.Out -match '\[measured-figure\].*QUICKSTART\.md')) `
+        Assert-True (-not ($f2.Out -match '\[measured-figure\].*INSTALL\.md')) `
             "measured-figure: a figure bound by '$binding' passes"
     }
 
@@ -1339,7 +1345,7 @@ try {
         '| file | size |', '|---|---|', '| settings.json | 288 bytes |'
     ) -join "`n", $Utf8NoBom)
     $f3 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True (-not ($f3.Out -match '\[measured-figure\].*QUICKSTART\.md')) `
+    Assert-True (-not ($f3.Out -match '\[measured-figure\].*INSTALL\.md')) `
         'measured-figure: a binding in the paragraph ABOVE a table binds its rows'
     [System.IO.File]::WriteAllText($qs, @(
         '# Quickstart', '', 'The sizes:', '',
@@ -1347,7 +1353,7 @@ try {
         'The right-hand column is round v12.'
     ) -join "`n", $Utf8NoBom)
     $f4 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True (-not ($f4.Out -match '\[measured-figure\].*QUICKSTART\.md')) `
+    Assert-True (-not ($f4.Out -match '\[measured-figure\].*INSTALL\.md')) `
         'measured-figure: a binding in the paragraph BELOW a table binds its rows too'
 
     # 4. AND IT STOPS THERE. A binding two blocks away does NOT count -- otherwise the gate is satisfied
@@ -1357,7 +1363,7 @@ try {
         'An unrelated paragraph sits in between.', '', 'The file is 288 bytes.'
     ) -join "`n", $Utf8NoBom)
     $f5 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True ($f5.Out -match '\[measured-figure\].*QUICKSTART\.md') `
+    Assert-True ($f5.Out -match '\[measured-figure\].*INSTALL\.md') `
         'measured-figure: a binding two blocks away is out of reach -- the window is bounded'
 
     # 5. A FENCED FIGURE BELONGS TO CHECK 15. Counting it here would report one sample as two findings,
@@ -1376,7 +1382,7 @@ try {
         '# Quickstart', '', 'The clone is deleted (measured: 288 bytes, gone).'
     ) -join "`n", $Utf8NoBom)
     $f7 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True ($f7.Out -match '\[measured-figure\].*QUICKSTART\.md') `
+    Assert-True ($f7.Out -match '\[measured-figure\].*INSTALL\.md') `
         'measured-figure: the word ''measured'' alone does not bind a figure'
 
     # 7. NOT EVERY 'byte' IS A FIGURE. 'byte-identical' is a word, and a check that flagged it would be
@@ -1393,14 +1399,14 @@ try {
         '# Quickstart', '', 'The file is 288 bytes.', '', '<!-- unbound-figure: -->'
     ) -join "`n", $Utf8NoBom)
     $f9 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True ($f9.Out -match '\[measured-figure\].*QUICKSTART\.md') `
+    Assert-True ($f9.Out -match '\[measured-figure\].*INSTALL\.md') `
         'measured-figure: an opt-out marker with no reason does not silence the check'
     [System.IO.File]::WriteAllText($qs, @(
         '# Quickstart', '', 'The file is 288 bytes.', '',
         '<!-- unbound-figure: invented for the test fixture, bound to nothing real -->'
     ) -join "`n", $Utf8NoBom)
     $f10 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True (-not ($f10.Out -match '\[measured-figure\].*QUICKSTART\.md')) `
+    Assert-True (-not ($f10.Out -match '\[measured-figure\].*INSTALL\.md')) `
         'measured-figure: an opt-out that names a reason does silence it'
 
     # --- check 17: the per-plugin CHANGELOG intro still matches its generator ------------------------
@@ -1537,6 +1543,29 @@ try {
         'skill-param: the coverage line names an entry point that declares no skill'
     Assert-True (-not ($s3.Out -match '\[skill-param\] scripts\\sync\\check-script-contract')) `
         'skill-param: and declaring no skill is coverage, not an error -- writing a missing skill is separate work'
+
+    # --- check 19: a named consumer-facing document that is not there ------------------------------
+    # 42. THE SILENT-COVERAGE CASE. Checks 15 and 16 open each $consumerDocs entry with a Test-Path
+    #     'continue', so a stale entry costs coverage and says nothing. Measured August 6, 2026, moving
+    #     those documents into plugins/: expected-output went 5 -> 1 and measured-figure 11 -> 0 in one
+    #     commit, no error anywhere, and it surfaced only because somebody read the coverage line.
+    #     The fixture never creates plugins/UNINSTALL.md, so the entry is genuinely absent here.
+    $s4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($s4.Out -match '\[consumer-doc\].*UNINSTALL\.md') `
+        'consumer-doc: a named document that does not exist is reported instead of skipped in silence'
+    Assert-True ($s4.Out -match '\[consumer-doc\].*(update the list|drop the entry)') `
+        'consumer-doc: and the finding names both repairs, since the list and the tree can each be the wrong one'
+
+    # 43. AND THE REASON THIS ASSERT EXISTS AT ALL, which is not check 19's subject. Adding a finding
+    #     used to depend on WHERE in the file you added it: sixteen bare '$errors += ...' lines rebuilt
+    #     the List[string] as a fixed-size array, so the first Add-Error below the last of them threw
+    #     "the collection is of a fixed size" and killed the run mid-scan. Check 19 sits below all of
+    #     them and is therefore the canary: if the '+=' style ever comes back, this scenario stops
+    #     reporting a finding and starts reporting an exception.
+    Assert-True (-not ($s4.Out -match 'fixed size|vaste grootte')) `
+        'consumer-doc: the run completes -- a finding raised after the last check does not hit a fixed-size collection'
+    Assert-True ($s4.Out -match 'Summary: \d+ error') `
+        'consumer-doc: and the summary is still reached, so the scan ended normally rather than dying mid-file'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

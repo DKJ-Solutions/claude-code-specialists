@@ -689,7 +689,7 @@ $unbootstrapped = ($enabledIds.Count -gt 0) -and (-not $anyLensFile) -and (-not 
 # MEASURED ON THE DOCUMENTED HAPPY PATH. On a virgin profile, immediately after a completely successful
 # specialists-init plus restart -- every count correct -- the next session start printed NINETEEN [ERROR]
 # lines, one per specialist, saying each has no roster row. Nothing was broken; filling the lenses is a
-# step of its own in ADOPTION.md (Step 4) that the reader has legitimately not reached yet, and [ERROR]
+# step of its own in INSTALL.md (Step 4) that the reader has legitimately not reached yet, and [ERROR]
 # is the heaviest level these checks have. (That page said "at your own pace" when this was measured;
 # #408 promoted it to a numbered step, which sharpens the point rather than changing it -- a step you
 # have not reached is not an error either.)

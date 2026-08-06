@@ -1,6 +1,6 @@
 # Uninstall — how to disconnect your repo
 
-The counterpart to [ADOPTION.md](ADOPTION.md), and written for the same reader: someone who did
+The counterpart to [INSTALL.md](INSTALL.md), and written for the same reader: someone who did
 **not** build this system and now wants it out again. Adoption is reversible by design — a consumer must
 be able to install *and* uninstall at any moment (Dave's requirement, July 29, 2026) — and this page is
 the procedure for the second half.
@@ -34,7 +34,7 @@ After that the document exists **nowhere on this machine**, so a reader who is i
 day, or just wants to re-read a step has nothing left to read (inbound
 [#328](https://github.com/DaveKJohn/claude-code-specialists/issues/328)). Keep this page open or save it to
 disk; the durable copy is
-[on GitHub](https://github.com/DaveKJohn/claude-code-specialists/blob/main/UNINSTALL.md).
+[on GitHub](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/UNINSTALL.md).
 That is the paragraph above applied to the manual instead of the tool: this page made the argument for
 `specialists-teardown` and then missed it for itself. It missed it a second time for its own audit tool —
 [Step 1](#step-1--take-the-plugin-out-of-your-repo) now says so. Both only surfaced when someone walked
@@ -79,7 +79,7 @@ lens tree is not ignored.
 The filter on command 1 is load-bearing rather than tidiness: on Windows a `.gitignore` with CRLF line
 endings and a blank line makes git report a hit with an **empty pattern field** for any path ending in a
 slash, which reads exactly like a real ignore rule. The full measurement is in the
-[skill](plugins/specialists/skills/specialists-teardown/SKILL.md#pre-flight-is-your-lens-tree-actually-under-version-control).
+[skill](specialists/skills/specialists-teardown/SKILL.md#pre-flight-is-your-lens-tree-actually-under-version-control).
 And note where the undo really begins: at the **commit**, not at the bootstrap. If command 2 comes back
 empty because the lenses were never committed, commit them first — a wrongly removed file is only one
 `git checkout` away once git has a copy. **Commit more than the lens tree, though.** This paragraph used to
@@ -119,7 +119,7 @@ per plugin each saying `project` is the state the rest of this document assumes.
 `SPECIALISTS.md` imports** — those point into `~\.claude\plugins\marketplaces\<marketplace>\`, the git clone,
 which is a *different directory* carrying the sources in a different layout. Both exist on a machine that has
 run this family, which is exactly why picking the wrong one is easy; the adoption page's
-[Staying up to date](ADOPTION.md#staying-up-to-date) section explains why there are two.
+[Staying up to date](INSTALL.md#staying-up-to-date) section explains why there are two.
 
 ```powershell
 # Preview -- nothing is removed
@@ -361,7 +361,7 @@ Exactly the mirror image of what Step 2 says about `"enabledPlugins": {}`, and t
 a diff there is the command working, not a fault. Remove the empty key by hand if you want the file back to
 where it started.
 
-**On the path ADOPTION.md prescribes, none of that happens — and that is the expected result, not an
+**On the path INSTALL.md prescribes, none of that happens — and that is the expected result, not an
 anomaly** (inbound [#374](https://github.com/DaveKJohn/claude-code-specialists/issues/374)). Two independent
 reasons: the adoption page's pasteable block puts `extraKnownMarketplaces` in **your repo's**
 `.claude/settings.json`, and its `marketplace add` alternative is given as `--scope project` for exactly
@@ -511,6 +511,6 @@ delete nothing.
 ## Reporting something wrong with this page
 
 The same route as everything else: an issue on this repo with the label `inbound`, using the
-[issue template](.github/ISSUE_TEMPLATE/inbound-improvement.md). A step that did not work as printed
+[issue template](../.github/ISSUE_TEMPLATE/inbound-improvement.md). A step that did not work as printed
 is worth reporting even if you found the way around it — that is the class of defect this family keeps
 finding in its own documents.

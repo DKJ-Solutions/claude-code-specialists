@@ -1,21 +1,149 @@
-# Adoption — how to connect your repo
+# Install
+
+## Quickstart — the commands, and nothing else
+
+**This half is the short one.** Two settings keys, four commands, one verification query, two
+restarts. Every caveat, every measurement and every failure mode behind them lives in
+**[Adoption](#adoption--how-to-connect-your-repo)**, the second half of this page — the full manual,
+which this half is the summary of.
+
+> **Read the adoption half instead if any of this is true**: this is a machine that has adopted the
+> family before (a leftover user-scope marketplace makes half of Step 1 silently unnecessary —
+> [which of the three machine states are you in?](#which-of-the-three-machine-states-are-you-in));
+> it is a fresh Windows profile ([before you start](#before-you-start) — the execution
+> policy alone will stop you); or **you are an agent executing this for someone**
+> ([where it has to stop](#if-an-agent-is-doing-this-for-you--where-it-has-to-stop) —
+> two of these acts are ones you structurally cannot perform).
+
+### Step 1 — enable and install
+
+**1. Write your repo's own `.claude/settings.json`** (create `.claude/` beside your `README.md` if it
+is not there). A complete, pasteable file; if you already have one, merge these two keys into it.
+Strict JSON — no comments, no trailing commas. Add a line per domain group you want.
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "claude-code-specialists": {
+      "source": { "source": "github", "repo": "DaveKJohn/claude-code-specialists" }
+    }
+  },
+  "enabledPlugins": {
+    "specialists@claude-code-specialists": true
+  }
+}
+```
+
+**2. Restart your Claude Code session.** A session start is what registers the marketplace; without
+it, the next command fails with `Marketplace … not found`.
+
+**3–4. Refresh, then install — from your repo's root, one install per plugin you enabled.**
+
+```powershell
+claude plugin marketplace update claude-code-specialists                     # never skip: install does not refresh
+claude plugin marketplace list                                               # came the entry from YOUR repo's settings?
+claude plugin install specialists@claude-code-specialists --scope project    # once per plugin
+```
+
+`--scope project` is not optional — without it the install goes machine-wide and writes no
+`projectPath`, with no error.
+
+**5. Restart your Claude Code session again.**
+
+**6. Verify — from your repo's root.** The install output names no version at all, so this query is
+the only place your version is written down.
+
+```powershell
+$root = (Get-Location).Path
+(Get-Content "$env:USERPROFILE\.claude\plugins\installed_plugins.json" -Raw | ConvertFrom-Json).plugins.PSObject.Properties |
+  ForEach-Object { $n = $_.Name; $_.Value | Where-Object { $_.projectPath -eq $root } |
+    ForEach-Object {
+      $payload = if ($_.installPath -and (Test-Path -LiteralPath $_.installPath)) { 'payload present' } else { 'PAYLOAD MISSING' }
+      "$n -> $($_.scope) $($_.version) $($_.gitCommitSha) [$payload]" } }
+```
+
+**One** `project` line per plugin, ending in `payload present`. The count is part of the check.
+Anything else — empty output, two lines for one plugin, `local`, `PAYLOAD MISSING` — is covered in
+[Connecting in four steps](#connecting-in-four-steps), in the adoption half below.
+
+### Step 2 — run the bootstrap skill
+
+In the new session, invoke `specialists-init`. It places the persona lenses, an empty lens scaffold
+per specialist, two script scaffolds, one `@`-import in your `CLAUDE.md` and a settings proposal —
+purely additively, in seconds. Check its closing `Done:` line against
+[what it should report](#connecting-in-four-steps).
+
+### Step 3 — restart and verify
+
+Restart once more and check that Chris takes the floor: the turn **names the specialist the work
+belongs to, and why**, before doing it. Look for that invariant, not for a fixed string.
+
+### Step 4 — write the roster and fill the lenses
+
+**This is the big one, and it is not optional.** Steps 1–3 give you a team that knows its craft and
+nothing about your repo; the lenses in `.claude/specialists/lenses/` are where you say what each
+specialist serves *here*, and an unfilled lens does nothing. Budget writing time, not typing time —
+[Step 4 in the adoption half](#connecting-in-four-steps) states the cost and the two things that
+reliably surface while you do it.
+
+### Staying up to date — the two commands
+
+Two commands, from your repo's root, one pair per plugin:
+
+```powershell
+claude plugin marketplace update claude-code-specialists
+claude plugin update specialists@claude-code-specialists --scope project
+```
+
+Same scope flag, same reason. **The version number is not the code** — the clone these commands read
+tracks `main`, not the tag, so your `gitCommitSha` is the truth about your session and your `version`
+only tells you which release notes to read. A new *skill* needs a session restart before it appears;
+a new *specialist* needs a roster and lens catch-up (`sync-roster`). Your install record can also
+move, be adopted by another directory, or be orphaned by renaming your checkout, all without you
+asking. All of that, measured:
+[Staying up to date in the adoption half](#staying-up-to-date).
+
+### Getting out again — the short answer
+
+Adoption is reversible by design: **[UNINSTALL.md](UNINSTALL.md)**. Two removals, out of your repo
+and off your machine, in that order — the teardown skill ships inside the plugin you would be
+uninstalling.
+
+### Reporting back
+
+An improvement to the shared core (an agent def, playbook, persona, or skill) is not reworked
+locally: file it as an issue on this repo with the label `inbound` — there is an
+[issue template](../.github/ISSUE_TEMPLATE/inbound-improvement.md). Repo-specific additions belong in
+your own lenses, which do not travel with the plugin.
+
+---
+
+## Adoption — how to connect your repo
 
 This page is for those who did **not** build the Claude Specialists system: a colleague with a repo
 of their own who wants to work with the specialists team. Everything below is the common thread —
 the deeper explanation sits behind the links and is deliberately not repeated here.
 
-> **This page was called `QUICKSTART.md` until August 3, 2026, and the name was the defect** (inbound
+> **This half was called `QUICKSTART.md` until August 3, 2026, and the name was the defect** (inbound
 > [#408](https://github.com/DaveKJohn/claude-code-specialists/issues/408)). It is a thorough,
 > measurement-backed adoption manual and it never tried to be anything else; "quickstart" set an
 > expectation it cannot meet, and a consumer who had just spent half an hour on it reported the
-> mismatch as *"the name QUICKSTART is very misleading"*. The old name still exists as a genuinely
-> short page — **[QUICKSTART.md](QUICKSTART.md)**, the commands and nothing else, linking back here
-> for every caveat. Take that one if you only want to type; take this one if you want to know why.
+> mismatch as *"the name QUICKSTART is very misleading"*. The repair was to split the two: the name
+> went to a genuinely short page, and this one became `ADOPTION.md`.
+>
+> **Since then the split has been undone the other way round, and the reasoning survives it.** The two
+> pages are the two halves of this one file: the [Quickstart](#quickstart--the-commands-and-nothing-else)
+> above is the commands and nothing else, this half is every caveat behind them. What #408 actually
+> asked for was that a reader can tell the two apart before committing an hour — one page with two
+> named halves does that, and it also removes the failure mode a split invites, where one page is
+> updated and the other quietly disagrees. Read the top if you only want to type; read on if you want
+> to know why.
 >
 > **Budget well over an hour of reading before the last command is done, and know where it goes.**
-> Measured August 3, 2026: this page is ~8,900 words (~44 min at 200 wpm) and
-> [`specialists-init`'s `SKILL.md`](plugins/specialists/skills/specialists-init/SKILL.md) another
-> ~5,400 (~27 min); the two are what a first-time adopter is told to read, so call it **~70 minutes**.
+> Measured August 6, 2026, after the two pages became one: this file is ~9,800 words (~49 min at
+> 200 wpm) and [`specialists-init`'s `SKILL.md`](specialists/skills/specialists-init/SKILL.md)
+> another ~5,600 (~28 min); the two are what a first-time adopter is told to read, so call it
+> **~77 minutes**. The quickstart half is ~600 of those words — the rest is this half.
 > Both pages grow, so read those as the order of magnitude, not a promise. The one number this page
 > never used to state is the one a reader would plan with, on a page meticulous about every other
 > count. And the *typing* is not where the time goes either: the bootstrap script places the whole
@@ -24,7 +152,7 @@ the deeper explanation sits behind the links and is deliberately not repeated he
 > phrasing invited the misattribution above: the reader blamed the installer for the cost of the
 > authoring. Step 4 is a numbered step now, with its cost stated.
 
-## What you get
+### What you get
 
 Instead of one generic Claude, you work with a **team of specialized Claudes under one Chief of
 Staff (Chris)**: every assignment is classified and delivered to the specialist with the right
@@ -35,9 +163,9 @@ the team and its playbooks.
 
 The system consists of **four plugins**: the repo-neutral core `specialists` (group 1 — always
 enable it) and three optional domain groups. Which specialists live in which plugin and who they are
-meant for is covered in the [root README](README.md).
+meant for is covered in the [root README](../README.md).
 
-## Before you start
+### Before you start
 
 **Three things have to be true before Step 1's first command, and none of them used to be written down
 anywhere in this family** (inbound
@@ -63,7 +191,7 @@ on a new profile.
    Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
    ```
 
-### Which of the three machine states are you in?
+#### Which of the three machine states are you in?
 
 **The two above are a *virgin profile* and a machine where all three were satisfied long ago. There
 is a third, and it is the most likely one for anyone reading this page a second time** (inbound
@@ -122,7 +250,7 @@ tool; two things do work. Save the raw file to disk and have the agent read it f
 the marketplace clone once you have one — and check any count it quotes against the document itself,
 because the counts on this page are load-bearing.
 
-### If an agent is doing this for you — where it has to stop
+#### If an agent is doing this for you — where it has to stop
 
 **The paragraph above is about *reading* the page. This one is about *executing* it, and the two have
 different answers: the procedure below contains acts an agent structurally cannot perform** (inbound
@@ -163,12 +291,12 @@ session, invoke `specialists-init`"*. For a delegated adoption there is no share
 "you" is at that line — the natural one is that whoever executed Step 1 continues, and that reading
 is impossible to satisfy.
 
-## Connecting in four steps
+### Connecting in four steps
 
 > **Four *steps* here, six *acts* inside Step 1 — a different unit, not a different path.** Step 1
 > below is enable → **restart** → refresh → install → restart → verify, which the
-> [root README](README.md#adoption-the-bootstrap-path) and
-> [`specialists-init`](plugins/specialists/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
+> [root README](../README.md#adoption-the-bootstrap-path) and
+> [`specialists-init`](specialists/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
 > both count as its six acts ("step 0" in their numbering). Saying so is the point: those two pages once
 > counted the same procedure as *four* and *three*, and this page's step count made a third number
 > (inbound [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297)). Nothing was missing from
@@ -438,7 +566,7 @@ Chris) + an empty repo-lens scaffold per specialist in **the seam**
 seam (which in turn imports Chris's portable body from the plugin install + his repo lens), and a
 proposal for safety settings (`settings.suggested.jsonc`, for your own
 review). The details of this path are in the
-[root README › Adoption](README.md#adoption-the-bootstrap-path) — which counts the steps there
+[root README › Adoption](../README.md#adoption-the-bootstrap-path) — which counts the steps there
 as "step 0" (enabling + installing, above) and "step 1" (the skill).
 
 **What it should report, so you can check it rather than trust it** (inbound
@@ -527,7 +655,7 @@ done — with an empty lens they simply answer out of their portable playbook.
 > and the `@`-import in **seconds**. The page's own framing produced the misattribution, which makes
 > it a documentation defect rather than a user error.
 
-## Staying up to date
+### Staying up to date
 
 Updates are *announced* via **releases** — the version bump, the notes, the `RELEASE.md` card — and
 getting one takes **two** commands, from your repo's root. What actually lands in your cache is a
@@ -587,7 +715,7 @@ looked in the wrong scope. Do not answer it by re-running the install either: a 
 a **second, machine-wide record** beside the project one. Each plugin carries its own
 `CHANGELOG.md` that travels with the plugin cache and describes per release what changed for that
 plugin; the full history lives in the workshop itself
-([`CHANGELOG.md`](CHANGELOG.md) and [`releases/`](releases/README.md)). Each plugin
+([`CHANGELOG.md`](../CHANGELOG.md) and [`releases/`](../releases/README.md)). Each plugin
 folder also carries a `RELEASE.md` card next to its `CHANGELOG.md` — open it in your plugin cache
 after an update to see, at a glance, which release the card describes and what changed in it. It
 does not tell you where *you* are, and since August 2, 2026 it says so rather than claiming
@@ -735,7 +863,7 @@ it excludes any skill with `disable-model-invocation: true`. Several of `special
 unchanged count, or even `0 skills`, proves nothing about whether a new skill has actually landed.
 The only reliable check is the slash list itself.
 
-## Getting out again
+### Getting out again
 
 Adoption is reversible by design, and the procedure has its own page: **[UNINSTALL.md](UNINSTALL.md)** —
 the mirror of this one. Two things from it are worth knowing *before* you adopt rather than after. The
@@ -744,11 +872,11 @@ because the teardown skill ships inside the plugin you would be uninstalling. An
 shared workflow scripts, that dependency is not something a teardown can undo for you — the page says
 what to do about it while you still can.
 
-## Reporting back or improving something
+### Reporting back or improving something
 
 - **An improvement to the shared core** (an agent def, playbook, persona, or skill): don't
   rework it locally, but report it as an issue on this repo with the label `inbound` — an
-  [issue template](.github/ISSUE_TEMPLATE/inbound-improvement.md) is ready for that. The
+  [issue template](../.github/ISSUE_TEMPLATE/inbound-improvement.md) is ready for that. The
   workshop processes it through its own chain, and the improvement comes back to all consumers via
   a release.
 - **Repo-specific additions** belong in your own repo lenses in the seam
