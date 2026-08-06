@@ -18,7 +18,7 @@
          main-loop specialists) DELIBERATELY have no agent def -- they run in the main loop, not
          as a subagent -- and are therefore left alone by check 6's agent-def<->manual link.
       4. dead relative links AND broken anchors in every ROOT *.md (README.md, CHANGELOG.md, CLAUDE.md,
-         CONTRIBUTING.md, QUICKSTART.md, ADOPTION.md, UNINSTALL.md, SECURITY.md and any unfolded changelog entry file
+         CONTRIBUTING.md, SECURITY.md, plugins/INSTALL.md, plugins/UNINSTALL.md and any unfolded changelog entry file
          -- globbed, never named), every .claude/extensions/*.md, every <plugin>/skills/*/SKILL.md, every
          <plugin>/manuals/*-manual.md, every <plugin>/personas/*-persona.md, every releases/**/*.md,
          every <plugin>/RELEASE.md, connectors/README.md, and
@@ -133,6 +133,13 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $errors = New-Object System.Collections.Generic.List[string]
 
+# EVERY FINDING GOES THROUGH HERE, and that is load-bearing rather than tidy. Until August 6, 2026 the
+# checks below were split between this function and sixteen bare '$errors += "..."' lines. On a List[T],
+# '+=' does not append -- it rebuilds the whole thing as a fixed-size Object[] and rebinds $errors to it,
+# after which EVERY later Add-Error throws "the collection is of a fixed size" and the run dies mid-scan.
+# It never fired because the ordering hid it: all Add-Error callers happened to sit above the first '+=',
+# so the array only ever came into being after the last one. The first check added below that line found
+# it immediately. Adding a finding must not depend on where in the file you add it.
 function Add-Error([string]$Msg) { $script:errors.Add($Msg) }
 
 # Write-Coverage: the shared, non-counting [COVERAGE] line (issue #221), so every category below states
@@ -381,9 +388,28 @@ $linkFiles = @()
 # belong here) and picks up SECURITY.md, which no rule had ever covered.
 $linkFiles += @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
     Select-Object -ExpandProperty FullName)
-# branch/ -- the entry and the step list. They used to be root *.md and were therefore covered by the glob
-# above; the split moved them one level down, and a link-scan set that quietly stopped covering the file
-# every branch writes is exactly the omission the glob above exists to prevent.
+# AND THE SAME GLOB OVER plugins/, FOR THE SAME REASON, because that is where those three documents now
+# live. ADOPTION.md, QUICKSTART.md and UNINSTALL.md moved out of the root, and the rules below reach into
+# plugins/ only for CHANGELOG.md, SKILL.md, manuals and personas -- so a document sitting directly in
+# plugins/ matched NO rule and left the scan set without a word. Measured on the move: all three went dark
+# at once, every one of their own outbound links unvalidated, while the run still reported clean. That is
+# the omission this file's root glob exists to prevent, arriving through the other side. Non-recursive on
+# purpose, exactly as above: every subdirectory is gathered by its own rule below.
+#
+# GUARDED BY Test-Path, unlike the root glob, because $RepoRoot always exists and plugins/ does not: a
+# consumer has no plugins/ at all, and neither does a lint fixture that never creates one. Without the
+# guard Get-ChildItem raises ItemNotFound there -- which is how the first version of this line broke the
+# test suite in a place that had nothing to do with links.
+$pluginsRootDir = Join-Path $RepoRoot 'plugins'
+if (Test-Path -LiteralPath $pluginsRootDir) {
+    $linkFiles += @(Get-ChildItem -Path $pluginsRootDir -Filter '*.md' -File |
+        Select-Object -ExpandProperty FullName)
+}
+# AND THE THIRD, ARRIVING THE SAME WAY: branch/ -- the entry and the step list. They used to be root *.md
+# and were therefore covered by the root glob; the branch/ split moved them one level down. Same omission
+# as the plugins/ one above and worth stating separately rather than merging the two comments, because
+# these two documents went dark in the same week for two unrelated reasons -- which is the actual lesson
+# about this scan set: a file leaves it by MOVING, and nothing reports that it has.
 $branchDirForLinks = Join-Path $RepoRoot ((Get-BranchFilePaths).Directory)
 if (Test-Path -LiteralPath $branchDirForLinks) {
     $linkFiles += @(Get-ChildItem -Path $branchDirForLinks -Filter '*.md' -File |
@@ -426,6 +452,30 @@ $linkFiles += (Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-manual.md' -Fil
     Where-Object { $_.FullName -match '\\manuals\\' } | Select-Object -ExpandProperty FullName)
 $linkFiles += (Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-persona.md' -File |
     Where-Object { $_.FullName -match '\\personas\\' } | Select-Object -ExpandProperty FullName)
+# THE AGENT DEFS, THE SHARED BLOCKS, AND THE TWO CONFIG-ADJACENT DOC LAYERS (#481). Every category above
+# names a shape of file, and four kinds of markdown matched none of them: */agents/*.md (26 files),
+# plugins/agent-shared/*.md (11), .github/**/*.md (2) and .claude/rules/*.md (1). Agent defs are the
+# glaring one -- they are the largest single body of prose this repo ships, they are payload, and their
+# links had never been read by anything. Measured on the day this was added: one genuinely dead link had
+# been sitting in an agent def, plus the location-dependent CLAUDE.md links repaired alongside it.
+#
+# Manuals and personas already have a rule each, so this is the same family finally covered in full. Each
+# directory is guarded, for the reason the plugins/ glob is: a consumer has some of these and not others.
+foreach ($payloadSpec in @(
+    @{ Dir = 'plugins';        Recurse = $true;  Filter = '*.md'; Match = '\\agents\\' },
+    @{ Dir = 'plugins\agent-shared'; Recurse = $false; Filter = '*.md'; Match = $null },
+    @{ Dir = '.github';        Recurse = $true;  Filter = '*.md'; Match = $null },
+    @{ Dir = '.claude\rules';  Recurse = $false; Filter = '*.md'; Match = $null })) {
+    $payloadDir = Join-Path $RepoRoot $payloadSpec.Dir
+    if (-not (Test-Path -LiteralPath $payloadDir)) { continue }
+    $found = if ($payloadSpec.Recurse) {
+        Get-ChildItem -Path $payloadDir -Recurse -Filter $payloadSpec.Filter -File
+    } else {
+        Get-ChildItem -Path $payloadDir -Filter $payloadSpec.Filter -File
+    }
+    if ($payloadSpec.Match) { $found = @($found | Where-Object { $_.FullName -match $payloadSpec.Match }) }
+    $linkFiles += @($found | Select-Object -ExpandProperty FullName)
+}
 $releasesDir = Join-Path $RepoRoot 'releases'
 if (Test-Path -LiteralPath $releasesDir) {
     $linkFiles += (Get-ChildItem -Path $releasesDir -Recurse -Filter '*.md' -File | Select-Object -ExpandProperty FullName)
@@ -670,7 +720,7 @@ Write-Coverage -Category 'release-card' -Checked $pluginManifests.Count `
 # --- 10. marked "all skills" enumerations vs. the canonical skillset -----------------------------------
 # A prose bullet list that claims to enumerate "all skills" is a maintenance trap: it silently
 # drifts as skills are added/removed, and a generic prose scan over-detects (tested and rejected --
-# 147 hits repo-wide, including ADOPTION.md's deliberately incomplete illustrative list, which
+# 147 hits repo-wide, including INSTALL.md's deliberately incomplete illustrative list, which
 # would permanently false-positive). Instead this is opt-in: an author wraps the enumeration in
 #     <!-- skills:all -->
 #     - `skill-name`
@@ -1127,9 +1177,9 @@ foreach ($ef in $entryFilesForHeadings) {
         $line = $ehLines[$i]
         if ($line -match $ehTooHighRx) {
             $lvl = ($line -replace '^(#+).*$', '$1')
-            $errors += "[entry-heading] ${rel}:$($i + 1): a '$lvl ' heading in an entry body, at or above the entry's own level. An entry heading is an H$ehEntryLevel, so an H$ehEntryLevel here becomes a SEPARATE entry the moment the fold pastes this file into CHANGELOG.md -- one that declares no impact and therefore reads as an undeclared tier 0 -- and an H1 climbs above every entry in the document. Use '$('#' * ($ehSectionLevel + 1)) ' or bold instead."
+            Add-Error "[entry-heading] ${rel}:$($i + 1): a '$lvl ' heading in an entry body, at or above the entry's own level. An entry heading is an H$ehEntryLevel, so an H$ehEntryLevel here becomes a SEPARATE entry the moment the fold pastes this file into CHANGELOG.md -- one that declares no impact and therefore reads as an undeclared tier 0 -- and an H1 climbs above every entry in the document. Use '$('#' * ($ehSectionLevel + 1)) ' or bold instead."
         } elseif (($line -match $ehSectionRx) -and -not (Test-IsDeclaredSectionHeading $line)) {
-            $errors += "[entry-heading] ${rel}:$($i + 1): '$($Matches[1])' is at the level of the entry's named sections but is not one of them ($($ehSectionNames -join ', ')). A section ends at the next heading of this level or above, so this truncates whichever section it sits in -- and if it is a misspelling of a real section heading, the entry silently loses that declaration and the tier/significance gates read nothing. Use '$('#' * ($ehSectionLevel + 1)) ' for a sub-heading, or correct the spelling."
+            Add-Error "[entry-heading] ${rel}:$($i + 1): '$($Matches[1])' is at the level of the entry's named sections but is not one of them ($($ehSectionNames -join ', ')). A section ends at the next heading of this level or above, so this truncates whichever section it sits in -- and if it is a misspelling of a real section heading, the entry silently loses that declaration and the tier/significance gates read nothing. Use '$('#' * ($ehSectionLevel + 1)) ' for a sub-heading, or correct the spelling."
         }
     }
 }
@@ -1193,12 +1243,12 @@ if (Test-Path -LiteralPath $clForHeadings) {
             }
             if ($null -ne $firstDeclared) {
                 if ($firstDeclared -cne $ehWhatHeading) {
-                    $errors += "[entry-heading] CHANGELOG.md:$($from + 1): this H$ehEntryLevel's first named section is '$firstDeclared' rather than '$ehWhatHeading'. Every H$ehEntryLevel here is read as one change, so an entry whose sections do not start at the beginning is one that has been SPLIT -- almost certainly by a body sub-heading written at the entry's own level, which the release documents then file as a separate change declaring no impact. Demote that sub-heading to '$('#' * ($ehSectionLevel + 1)) '."
+                    Add-Error "[entry-heading] CHANGELOG.md:$($from + 1): this H$ehEntryLevel's first named section is '$firstDeclared' rather than '$ehWhatHeading'. Every H$ehEntryLevel here is read as one change, so an entry whose sections do not start at the beginning is one that has been SPLIT -- almost certainly by a body sub-heading written at the entry's own level, which the release documents then file as a separate change declaring no impact. Demote that sub-heading to '$('#' * ($ehSectionLevel + 1)) '."
                 }
             } else {
                 $blockText = (@($clRealLines[$from..([Math]::Min($to, $clRealLines.Count - 1))]) -join "`n")
                 if (-not (Resolve-EntryType -EntryText $blockText).Declared) {
-                    $errors += "[entry-heading] CHANGELOG.md:$($from + 1): this H$ehEntryLevel declares neither its named sections nor a change type. Every H$ehEntryLevel here is read as one change, and this one tells the release documents nothing -- it is either a body sub-heading written at the entry's own level (demote it to '$('#' * ($ehSectionLevel + 1)) ') or a real entry whose sections were absorbed by such a heading directly below it."
+                    Add-Error "[entry-heading] CHANGELOG.md:$($from + 1): this H$ehEntryLevel declares neither its named sections nor a change type. Every H$ehEntryLevel here is read as one change, and this one tells the release documents nothing -- it is either a body sub-heading written at the entry's own level (demote it to '$('#' * ($ehSectionLevel + 1)) ') or a real entry whose sections were absorbed by such a heading directly below it."
                 }
             }
         }
@@ -1206,9 +1256,9 @@ if (Test-Path -LiteralPath $clForHeadings) {
         for ($i = $clFirstEntry; $i -lt $clLines.Count; $i++) {
             $line = $clLines[$i]
             if ($line -match '^#\s') {
-                $errors += "[entry-heading] CHANGELOG.md:$($i + 1): an H1 below the intro. It comes from an entry body and climbs above every entry in the document -- and in the generated release notes it renders above the tier heading it belongs under. Demote it to '$('#' * ($ehSectionLevel + 1)) '."
+                Add-Error "[entry-heading] CHANGELOG.md:$($i + 1): an H1 below the intro. It comes from an entry body and climbs above every entry in the document -- and in the generated release notes it renders above the tier heading it belongs under. Demote it to '$('#' * ($ehSectionLevel + 1)) '."
             } elseif (($line -match $ehSectionRx) -and -not (Test-IsDeclaredSectionHeading $line)) {
-                $errors += "[entry-heading] CHANGELOG.md:$($i + 1): '$($Matches[1])' sits at the level of an entry's named sections but is not one of them ($($ehSectionNames -join ', ')). A section ends at the next heading of this level or above, so this truncates the section it sits in -- and a misspelled section heading costs that entry its declaration silently. Demote it to '$('#' * ($ehSectionLevel + 1)) ', or correct the spelling."
+                Add-Error "[entry-heading] CHANGELOG.md:$($i + 1): '$($Matches[1])' sits at the level of an entry's named sections but is not one of them ($($ehSectionNames -join ', ')). A section ends at the next heading of this level or above, so this truncates the section it sits in -- and a misspelled section heading costs that entry its declaration silently. Demote it to '$('#' * ($ehSectionLevel + 1)) ', or correct the spelling."
             }
         }
     }
@@ -1258,14 +1308,14 @@ if (Test-Path -LiteralPath $mjScript) {
     $mjChecked = 1
     if ($mjCode -ne 0) {
         foreach ($line in @($mjOut | Where-Object { $_ -match '\[mojibake\]' })) {
-            $errors += ("[mojibake] " + ($line -replace '^\s*\[mojibake\]\s*', '') + " -- a UTF-8 character was read as ANSI and written back, so the file's text changed without any error. In an entry heading the separator IS the field delimiter, so cut-release.ps1 stops being able to read the entry type. Repair with scripts/maintenance/fix-mojibake.ps1; avoid it by never reading a non-ASCII file with bare Get-Content.")
+            Add-Error ("[mojibake] " + ($line -replace '^\s*\[mojibake\]\s*', '') + " -- a UTF-8 character was read as ANSI and written back, so the file's text changed without any error. In an entry heading the separator IS the field delimiter, so cut-release.ps1 stops being able to read the entry type. Repair with scripts/maintenance/fix-mojibake.ps1; avoid it by never reading a non-ASCII file with bare Get-Content.")
         }
         if (@($mjOut | Where-Object { $_ -match '\[mojibake\]' }).Count -eq 0) {
-            $errors += "[mojibake] scripts/maintenance/fix-mojibake.ps1 -Check exited $mjCode without naming a file -- the mojibake gate could not complete, so nothing is asserted about encoding."
+            Add-Error "[mojibake] scripts/maintenance/fix-mojibake.ps1 -Check exited $mjCode without naming a file -- the mojibake gate could not complete, so nothing is asserted about encoding."
         }
     }
 } else {
-    $errors += "[mojibake] scripts/maintenance/fix-mojibake.ps1 is missing -- the encoding gate cannot run."
+    Add-Error "[mojibake] scripts/maintenance/fix-mojibake.ps1 is missing -- the encoding gate cannot run."
 }
 
 # THE COUNT IS FILES, NOT TOOL RUNS. It used to report 'checked 1' -- true of the invocation and useless
@@ -1317,12 +1367,16 @@ $sampleChecked = 0
 # its source, so it is one variable shared by both.
 # ADOPTION.md joined in #408, which is this comment's own warning arriving: the page renamed out from
 # under 'QUICKSTART.md' carries every captured sample and measured figure these two checks exist for,
-# and the new short QUICKSTART.md carries almost none. Listing only the old name would have left both
+# and the new short QUICKSTART.md carried almost none. Listing only the old name would have left both
 # checks reporting green over the document that actually holds their subject.
+#
+# THE TWO ARE ONE FILE AGAIN -- plugins/INSTALL.md, the short page as its first half -- so the set is
+# three entries, not four. Note what the merge did to the failure mode this comment describes: while
+# they were separate, naming the wrong one silently halved the coverage. Now there is one page and no
+# wrong one to name, which is worth more than the entry it saved.
 $consumerDocs = @(
-    'QUICKSTART.md',
-    'ADOPTION.md',
-    'UNINSTALL.md',
+    'plugins\INSTALL.md',
+    'plugins\UNINSTALL.md',
     'README.md'
 )
 # What counts as saying "here is what this is bound to". A version or a year pins the capture in time; the
@@ -1333,6 +1387,20 @@ $bindingMarker = '(\d+\.\d+\.\d+)|(\b(19|20)\d{2}\b)|version-bound|varies|may di
 # '<!-- unbound-sample: -->' satisfies '\S' on the comment terminator itself, and the escape hatch
 # becomes a way to switch the check off rather than a way to record an exception.
 $sampleOptOut  = '<!--\s*unbound-sample:\s*(?!-->)\S'
+# A NAMED DOCUMENT THAT IS NOT THERE IS A FINDING, NOT A SKIP -- and this is the repair for how the
+# defect above stayed invisible rather than for the defect itself. Both loops below open their file with
+# a 'Test-Path ... { continue }', so a stale entry in the list costs coverage and says nothing: checks 15
+# and 16 simply examine less and still report green. Measured on the move into plugins/: expected-output
+# went 5 -> 1 and measured-figure 11 -> 0 in one commit, with no error anywhere, and it surfaced only
+# because somebody happened to read the coverage line.
+#
+# Validated ONCE here rather than inside each loop, so a missing document is reported once instead of
+# per reader -- two findings for one cause read as two causes.
+foreach ($rel in $consumerDocs) {
+    if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot $rel))) {
+        Add-Error "[consumer-doc] '$rel' is named in the consumer-facing set but does not exist -- checks 15 and 16 skip it in silence, so their coverage is lower than it looks. Either the document moved (update the list) or it is gone (drop the entry)."
+    }
+}
 foreach ($rel in $consumerDocs) {
     $full = Join-Path $RepoRoot $rel
     if (-not (Test-Path -LiteralPath $full)) { continue }
@@ -1374,7 +1442,7 @@ foreach ($rel in $consumerDocs) {
         $context = $before + "`n" + $after
         if ($context -match $sampleOptOut) { continue }
         if ($context -notmatch $bindingMarker) {
-            $errors += "[expected-output] ${rel}:$($open2 + 1) -- a fenced block with no language is a sample the reader compares against, and nothing near it says what the capture is bound to (a CLI version, a date, a platform, a repo state, or a hedge such as 'varies' / 'illustrative'). Four of test round v11's nine findings were exactly this. Name the binding, or mark the block deliberate with '<!-- unbound-sample: <reason> -->'."
+            Add-Error "[expected-output] ${rel}:$($open2 + 1) -- a fenced block with no language is a sample the reader compares against, and nothing near it says what the capture is bound to (a CLI version, a date, a platform, a repo state, or a hedge such as 'varies' / 'illustrative'). Four of test round v11's nine findings were exactly this. Name the binding, or mark the block deliberate with '<!-- unbound-sample: <reason> -->'."
         }
     }
 }
@@ -1442,7 +1510,7 @@ foreach ($rel in $consumerDocs) {
         $context = ($lines[$from..$to] -join "`n")
         if ($context -match $figureOptOut) { continue }
         if ($context -notmatch $figureBinding) {
-            $errors += "[measured-figure] ${rel}:$($i + 1) -- a byte count or file size in prose is a measurement of somebody's machine, and nothing in the surrounding paragraphs says whose (a date, a test round, a CLI version, a named profile state, or a hedge such as 'varies' / 'approximately'). Round v12 filed exactly this as #374: a reader whose own number differs cannot tell whether they mis-installed or the page went stale. Name the binding, or mark it deliberate with '<!-- unbound-figure: <reason> -->'."
+            Add-Error "[measured-figure] ${rel}:$($i + 1) -- a byte count or file size in prose is a measurement of somebody's machine, and nothing in the surrounding paragraphs says whose (a date, a test round, a CLI version, a named profile state, or a hedge such as 'varies' / 'approximately'). Round v12 filed exactly this as #374: a reader whose own number differs cannot tell whether they mis-installed or the page went stale. Name the binding, or mark it deliberate with '<!-- unbound-figure: <reason> -->'."
         }
     }
 }
@@ -1483,7 +1551,7 @@ if (Test-Path -LiteralPath $mpForIntro) {
     try {
         $mpNameForIntro = Get-MarketplaceName -MarketplaceJson ([System.IO.File]::ReadAllText($mpForIntro, [System.Text.Encoding]::UTF8))
     } catch {
-        $errors += "[changelog-intro] .claude-plugin/marketplace.json has no readable 'name', so the expected intro cannot be derived: $($_.Exception.Message)"
+        Add-Error "[changelog-intro] .claude-plugin/marketplace.json has no readable 'name', so the expected intro cannot be derived: $($_.Exception.Message)"
     }
 }
 if ($mpNameForIntro) {
@@ -1502,14 +1570,14 @@ if ($mpNameForIntro) {
         if (-not $vMatch.Success) {
             # No release section yet: nothing has been appended, so there is no intro/history split to
             # judge. Stated rather than silently skipped.
-            $errors += "[changelog-intro] ${rel}: no '## vX.Y.Z' heading, so the intro's end cannot be located -- either the file was never written by cut-release.ps1 or its version headings were edited by hand."
+            Add-Error "[changelog-intro] ${rel}: no '## vX.Y.Z' heading, so the intro's end cannot be located -- either the file was never written by cut-release.ps1 or its version headings were edited by hand."
             continue
         }
         $introChecked++
         $actual = Get-NormalizedIntroText $raw.Substring(0, $vMatch.Index)
         $expected = Get-NormalizedIntroText (Build-PluginChangelogIntro -PluginName $plName -MarketplaceName $mpNameForIntro)
         if ($actual -ne $expected) {
-            $errors += "[changelog-intro] ${rel}: the intro above the first '## vX.Y.Z' heading no longer matches what Build-PluginChangelogIntro (scripts/lib/release-lib.ps1) generates. cut-release.ps1 writes this header ONLY for a CHANGELOG that does not exist yet, so it is never refreshed and drifts unseen -- which is how all four files kept naming the retired marketplace after the rename. Bring the file's intro in line with the template (whitespace and line wrapping are ignored); do not edit the template to match a stale file. Expected: $expected"
+            Add-Error "[changelog-intro] ${rel}: the intro above the first '## vX.Y.Z' heading no longer matches what Build-PluginChangelogIntro (scripts/lib/release-lib.ps1) generates. cut-release.ps1 writes this header ONLY for a CHANGELOG that does not exist yet, so it is never refreshed and drifts unseen -- which is how all four files kept naming the retired marketplace after the rename. Bring the file's intro in line with the template (whitespace and line wrapping are ignored); do not edit the template to match a stale file. Expected: $expected"
         }
     }
 }
@@ -1548,7 +1616,7 @@ foreach ($pair in $sharedPairs) {
 
     $skillPath = Join-Path $repoRoot ("plugins\specialists\skills\$($pair.Skill)\SKILL.md")
     if (-not (Test-Path -LiteralPath $skillPath)) {
-        $errors += "[skill-param] $($pair.SourceRel) names skill '$($pair.Skill)' in the shared-scripts registry, but plugins/specialists/skills/$($pair.Skill)/SKILL.md does not exist. Either the skill was renamed (update the registry) or the mapping is a typo."
+        Add-Error "[skill-param] $($pair.SourceRel) names skill '$($pair.Skill)' in the shared-scripts registry, but plugins/specialists/skills/$($pair.Skill)/SKILL.md does not exist. Either the skill was renamed (update the registry) or the mapping is a typo."
         continue
     }
     $skillText = Get-Content -LiteralPath $skillPath -Raw
@@ -1559,7 +1627,7 @@ foreach ($pair in $sharedPairs) {
         # Matched as '-Name' on a word boundary: that is how a reader would type it, and it avoids
         # crediting a bare prose mention of the word.
         if ($skillText -notmatch ('-' + [regex]::Escape($p) + '\b')) {
-            $errors += "[skill-param] $($pair.SourceRel): parameter -$p is documented nowhere in the '$($pair.Skill)' skill, so a consumer who has the mirror plus that page cannot know it exists. Add it, or -- if a consumer genuinely never types it -- register it in SkillParamsExempt with the reason."
+            Add-Error "[skill-param] $($pair.SourceRel): parameter -$p is documented nowhere in the '$($pair.Skill)' skill, so a consumer who has the mirror plus that page cannot know it exists. Add it, or -- if a consumer genuinely never types it -- register it in SkillParamsExempt with the reason."
         }
     }
     $skillDocumented++

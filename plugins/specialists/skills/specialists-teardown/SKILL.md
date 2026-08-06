@@ -20,7 +20,7 @@ exempt, and stays as written.
 **This skill is only the repo half of leaving, and the other half is not in this payload.** The machine
 half -- the `claude plugin uninstall`/`marketplace remove` commands, the settings keys to take back out,
 and the order the two halves have to run in -- is in
-[`UNINSTALL.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/UNINSTALL.md),
+[`UNINSTALL.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/UNINSTALL.md),
 which ships in the marketplace clone rather than in the plugin. The pointer is here because it was
 measured to be missing exactly here: a reader who wanted to leave found this skill without trouble and
 reached the machine half **only by grepping blindly** (inbound

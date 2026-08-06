@@ -399,9 +399,13 @@ function Get-ReleasePluginTier {
 # the root, then ADOPTION.md in #408. It lived in the script until now, which made it a fourth thing a
 # consumer would have had to fork the script over -- so it moves here, where the answer actually
 # lives. Add a new permanent root doc here, and nowhere else.
+# AND THE THREE IT BLOCKED OVER ARE OFF IT AGAIN, because they left the root for plugins/. Keeping them
+# would not have blocked anything -- an allowlist entry for a file that is not there is inert -- but it
+# would have made the list describe a root that no longer exists, and it would have SILENCED the one
+# signal worth having: a QUICKSTART.md reappearing in the root now means somebody moved it back by
+# accident, and cut-release should say so rather than wave it through.
 $script:ReservedRootMd = @(
-    'CHANGELOG.md', 'CLAUDE.md', 'README.md', 'LICENSE.md', 'CONTRIBUTING.md', 'SECURITY.md',
-    'QUICKSTART.md', 'ADOPTION.md', 'UNINSTALL.md'
+    'CHANGELOG.md', 'CLAUDE.md', 'README.md', 'LICENSE.md', 'CONTRIBUTING.md', 'SECURITY.md'
 )
 
 function Get-ReservedRootMd {

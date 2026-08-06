@@ -937,7 +937,7 @@ Assert-Match $card '\*\*Type:\*\* Minor' 'type line'
 Assert-Match $card 'Test-title' 'title included'
 Assert-Match $card 'This card describes v1\.5\.0, the version your plugin manifest carries\.' 'the card states what it describes rather than where the reader is (#384)'
 Assert-NoMatch $card 'You are on this release' 'and does not claim the reader is on it -- v13 measured that false in the ordinary case'
-Assert-Match $card '\[The version is not the code\]\(https://gh\.test/blob/main/ADOPTION\.md\#staying-up-to-date\)' 'the "where am I" question is handed to the check that can answer it, as an absolute URL (the card is read from a plugin cache); ADOPTION.md since the page was renamed (#408)'
+Assert-Match $card '\[The version is not the code\]\(https://gh\.test/blob/main/plugins/INSTALL\.md\#staying-up-to-date\)' 'the "where am I" question is handed to the check that can answer it, as an absolute URL (the card is read from a plugin cache); plugins/INSTALL.md since the page was renamed (#408) and then moved out of the root'
 Assert-Match $card '(?s)Test-title.*This card describes v1\.5\.0' 'title comes before the describes-line'
 # Single-release view: entries at '##', exactly like the full flat notes, and no category heading.
 Assert-Match $card '(?m)^## #9 .* Something' 'entry sits at ## in the single-release view'

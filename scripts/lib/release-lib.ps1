@@ -1063,13 +1063,17 @@ function Build-PluginReleaseCard {
     # not on the release. So the card now states what it describes and hands the "where am I" question
     # to the check that can answer it.
     #
-    # ADOPTION.md, not QUICKSTART.md: the page was renamed on August 3, 2026 (inbound #408) and the
-    # detailed "Staying up to date" section went with it. QUICKSTART.md still exists and still carries
-    # that anchor, deliberately -- the archived release notes and the older per-plugin CHANGELOGs link
-    # to it and are not rewritten -- but a card generated from here points at the page that holds the
-    # measurement.
+    # plugins/INSTALL.md, and the path has moved twice. The page was QUICKSTART.md, renamed ADOPTION.md
+    # on August 3, 2026 (inbound #408) when a short commands-only page took the old name; both then left
+    # the root for plugins/, and were merged back into one INSTALL.md with the short page as its first
+    # half. The '#staying-up-to-date' anchor survived all three moves and belongs to the LONG half --
+    # the short half's own section was renamed to keep that anchor unambiguous, because a duplicate
+    # heading would have silently sent this card to the two-command summary instead of the measurement.
+    #
+    # The archived release notes and the older per-plugin CHANGELOGs still name the old pages, and are
+    # deliberately not rewritten -- but a card generated from here points at where the page IS.
     $backtick = [char]0x60
-    $adoptionUrl = $RepoBlobUrl + 'ADOPTION.md#staying-up-to-date'
+    $adoptionUrl = $RepoBlobUrl + 'plugins/INSTALL.md#staying-up-to-date'
     $mainRef = "$backtick" + 'main' + "$backtick"
     $titleLine = if ($Title) { "$Title`n`n" } else { '' }
     $header = "# Release v$Version`n`n" +
@@ -1077,7 +1081,7 @@ function Build-PluginReleaseCard {
         "${titleLine}This card describes v$Version, the version your plugin manifest carries. Whether it is " +
         "the code you are running is a separate question: the documented update path installs from $mainRef, " +
         "so a $mainRef that has moved past the tag reports this same number. " +
-        "[The version is not the code]($adoptionUrl) in ADOPTION.md is the check.`n`n"
+        "[The version is not the code]($adoptionUrl) in INSTALL.md is the check.`n`n"
 
     $emDash = [char]0x2014
     $realEntries = @($Entries | Where-Object { $_ -and $_.Trim() })
