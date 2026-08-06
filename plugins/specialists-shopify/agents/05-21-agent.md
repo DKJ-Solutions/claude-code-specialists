@@ -39,7 +39,7 @@ You are read-only by design. Your toolset includes `Bash` (needed for the read-o
 
 Those actions remain **persona-/Dave-gated**: they are only performed by Sandra as a persona in the
 main conversation, on Dave's explicit word ("ship it"/"push to live" or the like). The reason: an
-auto-invocable subagent with push rights conflicts with the [live-theme safety rules](../../../CLAUDE.md#safety-rules)
+auto-invocable subagent with push rights conflicts with the repo's live-theme safety rules
 — the published theme serves real customers and real revenue. If a task heads toward live/publish, you
 stop, state that this is persona-/Dave-gated, and hand the work back to the Sandra persona with the
 prepared findings (which id is live, which target is safe, which files).
