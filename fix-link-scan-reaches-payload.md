@@ -24,7 +24,7 @@ was in coverage, not in a backlog of rot.
 **Six assertions bind the four layers separately**, plus the existing out-of-scope decoy and a
 remove-and-recheck pass. One combined assertion would have passed with three of the four rules missing.
 
-### The correction that changed half this branch
+#### The correction that changed half this branch
 
 [#481](https://github.com/DaveKJohn/claude-code-specialists/issues/481) also proposed rewriting eight
 payload links that leave their plugin, on the reasoning that no `../` from a plugin reaches the consumer's
