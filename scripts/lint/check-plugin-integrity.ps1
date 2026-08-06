@@ -442,6 +442,30 @@ $linkFiles += (Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-manual.md' -Fil
     Where-Object { $_.FullName -match '\\manuals\\' } | Select-Object -ExpandProperty FullName)
 $linkFiles += (Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-persona.md' -File |
     Where-Object { $_.FullName -match '\\personas\\' } | Select-Object -ExpandProperty FullName)
+# THE AGENT DEFS, THE SHARED BLOCKS, AND THE TWO CONFIG-ADJACENT DOC LAYERS (#481). Every category above
+# names a shape of file, and four kinds of markdown matched none of them: */agents/*.md (26 files),
+# plugins/agent-shared/*.md (11), .github/**/*.md (2) and .claude/rules/*.md (1). Agent defs are the
+# glaring one -- they are the largest single body of prose this repo ships, they are payload, and their
+# links had never been read by anything. Measured on the day this was added: one genuinely dead link had
+# been sitting in an agent def, plus the location-dependent CLAUDE.md links repaired alongside it.
+#
+# Manuals and personas already have a rule each, so this is the same family finally covered in full. Each
+# directory is guarded, for the reason the plugins/ glob is: a consumer has some of these and not others.
+foreach ($payloadSpec in @(
+    @{ Dir = 'plugins';        Recurse = $true;  Filter = '*.md'; Match = '\\agents\\' },
+    @{ Dir = 'plugins\agent-shared'; Recurse = $false; Filter = '*.md'; Match = $null },
+    @{ Dir = '.github';        Recurse = $true;  Filter = '*.md'; Match = $null },
+    @{ Dir = '.claude\rules';  Recurse = $false; Filter = '*.md'; Match = $null })) {
+    $payloadDir = Join-Path $RepoRoot $payloadSpec.Dir
+    if (-not (Test-Path -LiteralPath $payloadDir)) { continue }
+    $found = if ($payloadSpec.Recurse) {
+        Get-ChildItem -Path $payloadDir -Recurse -Filter $payloadSpec.Filter -File
+    } else {
+        Get-ChildItem -Path $payloadDir -Filter $payloadSpec.Filter -File
+    }
+    if ($payloadSpec.Match) { $found = @($found | Where-Object { $_.FullName -match $payloadSpec.Match }) }
+    $linkFiles += @($found | Select-Object -ExpandProperty FullName)
+}
 $releasesDir = Join-Path $RepoRoot 'releases'
 if (Test-Path -LiteralPath $releasesDir) {
     $linkFiles += (Get-ChildItem -Path $releasesDir -Recurse -Filter '*.md' -File | Select-Object -ExpandProperty FullName)

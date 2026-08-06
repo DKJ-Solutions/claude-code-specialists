@@ -299,6 +299,39 @@ try {
     Assert-True (-not ($b.Out -match [regex]::Escape('.\CONTRIBUTING.md') + '.*dead link')) 'CONTRIBUTING.md dead-link finding is gone once fixed'
     Assert-True (-not ($b.Out -match [regex]::Escape('.\connectors\README.md') + '.*dead link')) 'connectors README dead-link finding is gone once fixed'
 
+    # --- Scenario B2: the four payload layers added in #481 are IN the scan set ---------------------
+    # Agent defs, agent-shared, .github and .claude/rules matched no category until August 6, 2026 --
+    # 40 files, the largest of them the agent defs, which are the biggest body of prose this repo ships.
+    # A real dead link had been sitting in one of them, seen by nothing. Each layer gets its own broken
+    # link here rather than one shared assertion, because they are four separate rules and a single
+    # combined check would pass while three of them were absent.
+    Write-Host "check 4 coverage -- the payload layers (#481) are IN the scan set" -ForegroundColor Cyan
+    $payloadTargets = @(
+        @{ Rel = 'plugins\specialists\agents\09-99-agent.md';   Label = 'an agent def' },
+        @{ Rel = 'plugins\agent-shared\fixture-block.md';        Label = 'a shared agent-def block' },
+        @{ Rel = '.github\pull_request_template.md';             Label = 'a .github template' },
+        @{ Rel = '.claude\rules\fixture-rule.md';                Label = 'a path-scoped rule' }
+    )
+    foreach ($pt in $payloadTargets) {
+        $ptFull = Join-Path $Fixture $pt.Rel
+        New-Item -ItemType Directory -Path (Split-Path -Parent $ptFull) -Force | Out-Null
+        [System.IO.File]::WriteAllText($ptFull, "# Fixture`n`nSee [nope]($deadLink) for details.`n", $Utf8NoBom)
+    }
+    $b2 = Invoke-Integrity -FixtureRoot $Fixture
+    foreach ($pt in $payloadTargets) {
+        Assert-True ($b2.Out -match [regex]::Escape('.\' + $pt.Rel)) `
+            ("payload scan: a dead link in $($pt.Label) is reported -- " + $pt.Rel)
+    }
+    Assert-True (-not ($b2.Out -match [regex]::Escape('NOTES.md'))) `
+        'payload scan: the out-of-scope decoy is STILL not reported -- the four new rules are scoped, not a blanket walk'
+
+    # And removing them again clears exactly those findings, so the assertions above are bound to the
+    # files rather than to some other error the fixture happens to produce.
+    foreach ($pt in $payloadTargets) { Remove-Item -LiteralPath (Join-Path $Fixture $pt.Rel) -Force }
+    $b3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($b3.Out -match [regex]::Escape('09-99-agent.md'))) `
+        'payload scan: removing the agent def clears its finding -- the report tracked the file, not the fixture'
+
     # === check 10: marked "all skills" enumerations vs. the canonical skillset ==========================
     # From here on, only CONTRIBUTING.md's content is varied per scenario. The connectors README is
     # left exactly as fixed by Scenario B above (marker-free), so it never contributes a
