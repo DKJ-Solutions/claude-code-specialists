@@ -12,8 +12,8 @@ branch/
 ```
 
 **The split is the point.** One file used to do both jobs: `new-changelog-entry.ps1` scaffolded the entry
-with a body heading that literally read `**To do / where I left off:**`, and `open-pr.ps1`'s scaffold gate
-refused to ship while that heading survived. So the entry was today's to-do list *and* tomorrow's changelog
+with a bold heading that asked, in so many words, what was still to do and where you left off -- and
+`open-pr.ps1`'s scaffold gate refused to ship while that heading survived. So the entry was today's to-do list *and* tomorrow's changelog
 prose, which is why "replace this whole block before the PR" had to be a written instruction rather than
 something the format made obvious. Two files make it obvious: the entry now prompts for what the change
 does, and nothing else.
