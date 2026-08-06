@@ -530,7 +530,17 @@ Assert-NoMatch $bare "#22 $midDot" 'and drops the PR number a stakeholder has no
 $stripped = Format-RankedEntries -Entries @($e22) -EntryLevel 2 -StripSignificance
 Assert-NoMatch $stripped '\| Tier \| Significance \| Why \|' '-StripSignificance removes the impact table'
 Assert-NoMatch $stripped '(?m)^\| 2 \| 5 \|' 'and its rows with it'
-Assert-Match $stripped '(?m)^### Who is this for$' 'the section heading stays -- an outward document keeps its structure'
+# THIS ASSERT USED TO SAY THE OPPOSITE, and the reversal is the finding rather than a preference
+# (August 6, 2026). It read "the section heading stays -- an outward document keeps its structure", and it
+# arrived in #476, the same PR that introduced the three named sections -- pinning what the code did, with
+# the rationale stated only in the assert message and in no document anywhere. What it actually produces is
+# a heading naming a question with nothing under it, because the entry format is explicit that the table IS
+# the answer rather than prose beside it. That is a hole, not structure. Measured while cutting v3.6.0 with
+# -NoPush: 17 empty sections per release card, 17 per per-plugin CHANGELOG, 16 in the highlights draft.
+# It had never been seen in a real document -- v3.5.0 was cut hours BEFORE #476 landed, so v3.6.0 would
+# have been the first release to ship it.
+Assert-NoMatch $stripped '(?m)^### Who is this for$' 'the section heading goes with the table it introduced, or the question is left unanswered'
+Assert-Match $stripped '(?m)^### Type of change$' 'and the sections that still have content keep their headings'
 # BOTH DECLARATIONS, and the second is new here: while the changelog had tier sections the fold consumed
 # the 'Tier: N' line, so it could never reach a rendered document. The fold now carries it, which puts a
 # self-assigned tier on the path to a consumer's plugin cache unless it is dropped here.

@@ -832,6 +832,23 @@ function Remove-EntryImpactTable {
         that arrived immediately: the entry documenting this mechanism quotes the table inside a fence, and a
         blind matcher would delete it out of the fence while rendering.
 
+        THE SECTION HEADING GOES WITH THE TABLE, and forgetting that shipped an empty section into every
+        outward-facing entry (August 6, 2026). Under the pre-#467 format the declaration was a bare 'Tier: N'
+        line with nothing above it, so removing the line was the whole job. The impact table lives under its
+        own '### Who is this for' heading, and that heading exists to introduce the table -- the entry format
+        is explicit that the table IS the answer rather than prose beside it, so a stripped table leaves a
+        question with no answer under it. Measured while cutting v3.6.0 with -NoPush: 17 empty sections in
+        each release card, 17 in the per-plugin CHANGELOG and 16 in the highlights draft, in exactly the
+        documents that travel to consumers in the plugin cache. The record was correct throughout, which is
+        why nothing upstream noticed -- the development notes keep the table, so they keep the heading too.
+
+        THE HEADING ONLY GOES WHEN THE SECTION IS ACTUALLY EMPTY, checked rather than assumed. The convention
+        says that section holds the table and nothing else, but a strip that deletes a heading on the
+        strength of a convention would delete a reader's prose the first time somebody wrote some. So the
+        lines between the heading and the next one must all be blank, and the heading text comes from
+        Get-EntrySectionHeadings rather than a literal -- a repo that translates its section headings
+        translates this behaviour with them.
+
         The line endings of everything kept are preserved rather than normalised -- the caller has already
         matched its document's style.
     #>
@@ -874,7 +891,62 @@ function Remove-EntryImpactTable {
     }
     $t = ($out -join '')
     if (-not $any) { return $t }
-    return [regex]::Replace($t, '(\r?\n)\1\1+', '$1$1')
+    $t = [regex]::Replace($t, '(\r?\n)\1\1+', '$1$1')
+    return (Remove-EmptyImpactSection -EntryText $t)
+}
+
+function Remove-EmptyImpactSection {
+    <#
+        Removes the impact table's section heading once the table under it is gone, leaving the blank line
+        that separated it from the paragraph above -- so '...text / blank / ### Who is this for / blank /
+        ### Type of change' becomes '...text / blank / ### Type of change'.
+
+        Only called by Remove-EntryImpactTable, and only when that function actually removed something. It is
+        its own function for the reason the removers above are: the "what counts as this section" question
+        has one answer, and a caller that re-derived it could disagree with the writer.
+
+        A SECTION HOLDING ANYTHING BUT BLANK LINES IS LEFT ALONE, including the heading. That is the whole
+        safety of this: the strip is entitled to remove what it put there, not to decide that somebody
+        else's prose under the same heading was surplus.
+
+        Fence-aware on both halves, for the same reason every reader in this file is: an entry that quotes
+        the section heading inside a fence -- the entries documenting this format do -- must not have the
+        quoted copy taken out of the fence, and a heading inside a fence must not be read as the boundary
+        that ends the section either.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
+
+    $heading = (Get-EntrySectionHeadings)['Who']
+    if ([string]::IsNullOrWhiteSpace($heading)) { return $EntryText }
+    $headingRx = '^#{' + (Get-EntrySectionLevel) + '}\s+' + [regex]::Escape($heading) + '\s*$'
+
+    $pair = Get-EntryLineFlagPairs -EntryText $EntryText
+    $parts = $pair.Parts
+    $lineAt = @()
+    for ($i = 0; $i -lt $parts.Count; $i += 2) { $lineAt += $i }
+
+    $start = -1
+    for ($n = 0; $n -lt $lineAt.Count; $n++) {
+        if ((-not $pair.Fenced[$n]) -and $parts[$lineAt[$n]] -match $headingRx) { $start = $n; break }
+    }
+    if ($start -lt 0) { return $EntryText }
+
+    # Walk to the next heading of any level; anything non-blank on the way means the section has content.
+    $end = $lineAt.Count
+    for ($n = $start + 1; $n -lt $lineAt.Count; $n++) {
+        $line = $parts[$lineAt[$n]]
+        if ((-not $pair.Fenced[$n]) -and $line -match '^#{1,6}\s') { $end = $n; break }
+        if ($line.Trim() -ne '') { return $EntryText }
+    }
+
+    $kept = New-Object System.Collections.Generic.List[string]
+    for ($n = 0; $n -lt $lineAt.Count; $n++) {
+        if ($n -ge $start -and $n -lt $end) { continue }
+        $i = $lineAt[$n]
+        $sep = if ($i + 1 -lt $parts.Count) { $parts[$i + 1] } else { '' }
+        $kept.Add($parts[$i] + $sep)
+    }
+    return ($kept -join '')
 }
 
 function Get-ImpactInsertOffset {
