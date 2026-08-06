@@ -12,7 +12,7 @@ describes a change that already has a changelog entry and a release document —
 before cutting anything: `#327` appears in 4 of them, `#329` in 2, `#408` in 2, `#335` in 1. A
 separate background page would have been a fourth copy, ageing independently, with nobody able to say
 which one was current. The adoption half now carries one sentence pointing at
-[`releases/README.md`](../releases/README.md), which indexes every version with the changes behind it.
+[`releases/README.md`](releases/README.md), which indexes every version with the changes behind it.
 
 **The blockquotes that stayed are the ones that change what the reader does**, and the split was made
 on that test rather than on shape: that `.claude` means two different directories in this document,
