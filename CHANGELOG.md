@@ -179,6 +179,68 @@ Plugins: specialists
 
 ---
 
+## The lens scaffold's title carries no (VUL-IN) -- only its slot does
+
+### What does this change do?
+
+**`specialists-teardown -Apply` would have deleted written repo knowledge, and the dry run pointed at
+the wrong files.** The lens template wrote `(VUL-IN)` into the H1 title *and* the slot heading;
+filling a lens replaces only the slot; and `Test-LooksGenerated` matches `(VUL-IN)` at **any** heading
+level. So the title outlived the filling and a lens somebody had written kept classifying as a
+disposable scaffold — permanently, and more so the longer that repo worked with it. Inbound
+[#451](https://github.com/DaveKJohn/claude-code-specialists/issues/451) measured it in a consumer with
+24 lenses: three filled specialist lenses holding 153 lines between them all printed `[remove]`.
+
+**The fix is the rule this same script already followed 320 lines further down**, for `SPECIALISTS.md`,
+where the code comment spells out the reasoning it was breaking here — *"A (VUL-IN) title would survive
+a filled-in roster and make the teardown delete somebody's work."* The lens template did exactly what
+that comment forbids, for every lens instead of one file. The marker now sits on the slot alone, which
+is also the only thing an unfilled scaffold needs: the slot heading is still there, so an untouched
+lens is still recognised and still removed.
+
+**The dangerous direction was the one that had no test, and the reason is worth keeping.** A filled
+lens was already covered — but that fixture *hand-wrote* its lens, and gave it a title of its own
+(`# 06-16 repo lens`) rather than the title the bootstrap produces. Inventing the boilerplate is what
+made it blind: the only shape that reproduces this defect is the real generated file edited the way a
+consumer edits it. The new test therefore runs the actual bootstrap, replaces only the slot heading,
+and asserts the file survives `-Apply`. Verified by falsification rather than by passing: with the
+marker put back, that assertion fails and the lens is deleted.
+
+**And it is not retroactive, so the instructions carry the other half.** A repo bootstrapped before
+this release keeps a marked title on every lens it fills from here on, and that repo cannot be reached
+from this one. The bootstrap's closing hints and the `specialists-init` skill page now say that filling
+a lens means the marker goes — and that on an older repo it has to come off the **title** too, with the
+one-time sweep to find them. Of the two pairings #451 offered, this is the instructions one; the
+alternative it also suggested — a check reporting "content beyond the boilerplate but still a
+`(VUL-IN)` heading" — is deliberately **not** built here, because the obvious implementation
+misclassifies an *untouched* `SPECIALISTS.md` as authored: that scaffold legitimately contains real
+import lines, so "anything beyond headings and comments" is not boilerplate there. Doing it properly
+means moving the scaffold wording into a shared source both scripts read, which is the
+`Get-ClaudeMdScaffold` pattern and a larger change than this defect needs. The front-matter `filled:`
+key stays with [#237](https://github.com/DaveKJohn/claude-code-specialists/issues/237), where it was
+already proposed.
+
+**In this repo the risk is latent rather than live**, which is why it went unnoticed here: six lenses
+carry a marked title (02-09, 03-02, 04-11, 04-12, 04-13, 06-30) and all six are genuinely unfilled, so
+they are classified correctly today. Each is one edit away from the trap.
+
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 5 | a repo bootstrapped before this release must strip the marker from every lens title it has filled, or `specialists-teardown -Apply` deletes that written work; measured in a consumer where three filled lenses holding 153 lines all classified as disposable scaffold |
+| 1 | 2 | latent here rather than live: all six lenses carrying a marked title are genuinely unfilled, so nothing changes today -- each was one edit away from the trap |
+
+### Type of change
+
+Fix
+
+Plugins: specialists
+
+[PR #474](https://github.com/DaveKJohn/claude-code-specialists/pull/474) · merged 2026-08-05
+
+---
+
 ## An entry heading is just the title -- the PR number lives on the closing line
 
 ### What does this change do?
@@ -361,6 +423,89 @@ Feat
 Plugins: specialists
 
 [PR #475](https://github.com/DaveKJohn/claude-code-specialists/pull/475) · merged 2026-08-05
+
+---
+
+## The merge date is added by the fold, at the bottom, instead of scaffolded into the heading
+
+### What does this change do?
+
+**This entry's own heading is the specimen: it carries no date.** The scaffolder used to write one, and
+it ran when the *branch* was created — so what it recorded was the branch's birth date, not the landing
+date. A branch opened on Monday and merged on Thursday was filed as Monday's work, silently, in the one
+document whose whole subject is when things happened. Dave, August 5, 2026.
+
+**The date is now the fold's, and it goes at the bottom** — his second call, and the better one. The
+heading was mixing two kinds of fact: the author knows the title and the type, while the PR number and
+the merge date do not exist until the merge. That second kind already had a home at the end of the entry,
+on the `[PR #NN](url)` line. So the two facts the fold owns now sit together:
+
+```text
+### #NNN · Short strong title · Feat
+
+…the description…
+
+[PR #NNN](https://github.com/DaveKJohn/claude-code-specialists/pull/NNN) · merged 2026-08-05
+```
+
+**It reads the PR's own `mergedAt`, not the clock**, and that distinction is not theoretical here. The
+fold usually runs seconds after the merge, but this repo has measured it not doing so: unfolded entry
+files were once found sitting in the repo root the morning *after* their merge — the silent half-state
+that put `git status` into Chris's stand-verification rule. A clock reading would have dated those a day
+late with nothing in the output to say so. `mergedAt` costs nothing: the fold already makes exactly one
+`gh pr list` call, and gh returns whatever fields are asked for in one roundtrip.
+
+**The dangerous half of this change was not the date at all.** `Format-CategorizedEntries` read each
+entry's branch type as the **second-to-last** middot field of its heading — correct only because a date
+happened to follow the type. Removing the date would have made that read return the type's neighbour, and
+every entry in every release document would have landed in the `Other` catch-all: no error, no empty
+output, one meaningless heading where the categories used to be. Found by reading the code before
+touching it, not by a failing test. Both heading parses are now **content-based** rather than positional
+— the type is recognised by matching the known branch types, the date by its shape — so the same code
+path reads a dated heading and a dateless one. That is also why nothing had to be migrated: this repo's
+entire history keeps parsing.
+
+**`Convert-EntryHeadingToTitle` needed the same treatment and taught the sharper lesson.** The first
+implementation walked in from the end eating anything that looked administrative, and a newly written
+assert caught it on `### #12 · Fix · Fix` — an entry whose title *is* a type name. It ate both fields and
+gave up. The tail has a grammar (at most one date, and before it at most one type), so it is matched
+rather than walked; two types in a row cannot both be the type, which the grammar states and a greedy
+loop cannot. `Other` is deliberately not treated as a type: it is the catch-all label this repo prints,
+never a value a branch table produces.
+
+**The closing line became `Format-EntryFoldFooter` in the entry-format lib, and the reason is testability
+rather than tidiness.** The fold drives a live remote, so its own suite deliberately runs without a PR —
+which would have left the only path this line has untested. Extracting the pure part is the same move,
+for the same reason, as `Get-ExistingPrRecord` in `pr-issues-lib.ps1`. Its five asserts cover the normal
+case, the PR timestamp beating the fallback, a fold that runs a day late, a PR with no timestamp yet, and
+an unparseable one degrading instead of throwing — because a completed fold must not read as failed over
+a cosmetic line.
+
+**Four asserts in the branch suite got stricter rather than looser.** They pinned `· Feat ·` — a trailing
+middot that only existed because a date followed. They now compare the whole heading line, which proves
+both that the type is there and that nothing follows it; the malicious-title scenario in particular gains
+from that, since a prefix match would have passed even if a broken argv boundary had appended something.
+Plus one new assert stating the point outright: the scaffold writes no date.
+
+**One cost, stated rather than smoothed over.** `CHANGELOG.md` can no longer be scanned for dates from the
+headings alone — you read an entry's last line. That is acceptable because the tier sections only ever
+hold what is pending since the last release, a window of days in which the dates sit close together. The
+release notes, where the history actually lives, keep the line per entry.
+
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 4 | every consumer's entry headings lose their date, and their changelog starts recording when a change landed instead of when its branch was opened -- noticed the first time they fold |
+| 1 | 4 | the one document whose whole subject is when things happened was silently dating work early, on every branch that ran longer than a day |
+
+### Type of change
+
+Feat
+
+Plugins: specialists
+
+[PR #472](https://github.com/DaveKJohn/claude-code-specialists/pull/472) · merged 2026-08-05
 
 ---
 
@@ -698,6 +843,126 @@ Plugins: specialists
 
 ---
 
+## An inbound issue is verified as still standing before it is routed
+
+### What does this change do?
+
+**An inbound issue was picked up as open work an hour after it had been repaired.** #469 reported that
+`fold-changelog-entry.ps1` kept the entry-creation date instead of the merge date. It was filed at
+08:04; #472 repaired it on `main` at 09:24; it was still labelled open when the next session reached
+for it. Nothing was built twice — the check that caught it was reading the code before starting — but
+nothing in the intake required that reading either, and the outcome would have been a second repair
+competing with the first on a defect nobody had.
+
+**So the check is now the front of intake, in Chris's portable persona.** A filed report is a snapshot
+of the moment somebody wrote it, and the gap between filing and pickup is exactly the window in which
+the defect may already have gone — sometimes closed by the very work that was underway while the report
+was being written. His first act on an inbound item is therefore to read the code, doc or output it
+describes and establish that what it reports is still true, before classifying anything.
+
+**This repo is where that gap is widest, which is why the rule is portable rather than local.** A
+consumer *files* inbound issues; the source both receives them and does the repairing, so filing and
+fixing can cross inside a single morning — and they did. But the rule is a timeless statement about
+intake, not something only true here, so it goes to the source and the lens keeps just the citation
+of where it was measured. The layer test in the
+[Specialists handbook](.claude/specialists/README.md#where-a-new-rule-goes--the-source-is-the-default-the-lens-is-the-exception)
+is what decided that, and it is the reason the persona text carries no issue numbers or dates at all.
+
+**Closing an already-repaired item is stated as the assignment, with the evidence attached** — because
+two things about #469's close showed that "check first, then close" is not enough on its own:
+
+- **The repair had gone further than the report proposed.** #469 offered three options and preferred
+  restamping the date at fold time; what shipped removed the date from the heading altogether and let
+  the fold add it at the bottom. A silent close would have left the reporting repo applying the
+  documentation fix it had planned — which was now the wrong wording, since the author no longer writes
+  a date at all.
+- **The audit the report suggested in passing was worth running.** #469 noted that anyone auditing an
+  existing `CHANGELOG.md` could compare each heading's date against `gh pr view --json mergedAt`. Run
+  here across `CHANGELOG.md` and `releases/`: **7 of 326** dated headings disagree, all by one or two
+  days. They are deliberately left alone — they sit in published records that already travelled to
+  consumers in the plugin cache, and moving a date by a day rewrites shipped history for no reader's
+  benefit. Both entries still pending in `CHANGELOG.md` were correct.
+
+**And the companion rule it does not replace.** This repo already required that a finding's *reason* be
+verified before it is repaired, after an inbound report whose symptom was real and whose explanation was
+wrong. That guards against repairing the wrong cause; this one guards against repairing a cause that is
+already gone. The persona now names both in order: establish the report still stands, *then* verify the
+reason it gives.
+
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 3 | their Chief of Staff now establishes that an inbound report is still true before he routes it, instead of taking the filing at face value -- noticed the moment they hand him one |
+| 1 | 4 | this repo both receives the inbound issues and does the repairing, so filing and fixing cross inside a single morning; intake changes shape for the team that meets that gap most |
+
+### Type of change
+
+Docs
+
+Plugins: specialists
+
+[PR #473](https://github.com/DaveKJohn/claude-code-specialists/pull/473) · merged 2026-08-05
+
+---
+
+## Publishing the GitHub Release is part of a cut that was already asked for
+
+### What does this change do?
+
+**Cutting a release is asked for; the closing steps of that cut are no longer asked for again.** The
+version bump and the tag are the irreversible act and stay behind an explicit request. Once that is
+given, the run goes through in one motion — generate the artefacts, ship the two hand-written documents
+via their branch and PR, **publish the GitHub Release**. Stopping at the last step of a checklist the
+requester started is a rubber stamp, and a rubber stamp trains everyone to stop reading it. The same
+reasoning that made the PR merge a default rather than a checkpoint (July 27, 2026), applied one step
+further along. Decision by Dave, August 5, 2026.
+
+**The boundary that remains is Block 2 of the checklist, and it is a boundary rather than a carve-out.**
+Where a repo sets `Get-LiveStage` it has a second stage — pushing to the live target — and that is a
+different act with a different audience: a Release document describes a version, a live push changes
+what customers see. This approval covers Block 1. A repo wanting another boundary states that in its
+own lens.
+
+**Four places said this and they had to stop disagreeing.** The constitution named "creating a tag or
+GitHub Release" in one breath under *only on explicit request*, which would have outranked everything
+else written elsewhere — the safety rules take precedence over any convenience, so leaving that line
+standing would have made the new default unusable in exactly the sessions that read the rules
+carefully. It now separates the tag from the publication. Rendall's **portable body** carries the
+statement in his own terms, the release page's **portable half** carries it where the closing step is
+described, and the **cut-release skill** carries it at step 5, which is where somebody actually reads
+it mid-procedure.
+
+**And the reason all four are portable is itself now a written rule, in Tessa's manual.** The first
+draft of this change was headed for Rendall's *repo lens*, because that is where the decision was made.
+Dave's correction: where a decision is made says nothing about where it applies, and what he wants in
+this repo he wants in the others he runs the plugin in. The failure mode is quiet — a general rule
+filed in a lens is not wrong anywhere, it simply never arrives, and nothing reports its absence.
+
+**The corollary was the second correction, and it is the sharper one.** Knowing the rule was portable,
+the next instinct was to *narrow* its wording so it could not surprise a consumer with a live deploy
+stage. That is the wrong repair: it weakens the core for every reader to pre-empt one repo that has its
+own place to speak. The core is stated in full here; the deviating consumer records the deviation in
+its own lens. Both halves are in Tessa's hard rules now, because she is the one who guards which half a
+sentence belongs in.
+
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 3 | their release run stops asking a second time at the last step of a checklist they already started -- noticed the moment they cut one |
+| 1 | 3 | one rubber stamp fewer in the procedure this team walks at every release, with the tag itself still behind an explicit request |
+
+### Type of change
+
+Docs
+
+Plugins: specialists
+
+[PR #471](https://github.com/DaveKJohn/claude-code-specialists/pull/471) · merged 2026-08-05
+
+---
+
 ## A skipped plugin says why it was skipped, not that it is missing
 
 ### What does this change do?
@@ -939,271 +1204,6 @@ Fix
 Plugins: specialists
 
 [PR #479](https://github.com/DaveKJohn/claude-code-specialists/pull/479) · merged 2026-08-05
-
----
-
-## The lens scaffold's title carries no (VUL-IN) -- only its slot does
-
-### What does this change do?
-
-**`specialists-teardown -Apply` would have deleted written repo knowledge, and the dry run pointed at
-the wrong files.** The lens template wrote `(VUL-IN)` into the H1 title *and* the slot heading;
-filling a lens replaces only the slot; and `Test-LooksGenerated` matches `(VUL-IN)` at **any** heading
-level. So the title outlived the filling and a lens somebody had written kept classifying as a
-disposable scaffold — permanently, and more so the longer that repo worked with it. Inbound
-[#451](https://github.com/DaveKJohn/claude-code-specialists/issues/451) measured it in a consumer with
-24 lenses: three filled specialist lenses holding 153 lines between them all printed `[remove]`.
-
-**The fix is the rule this same script already followed 320 lines further down**, for `SPECIALISTS.md`,
-where the code comment spells out the reasoning it was breaking here — *"A (VUL-IN) title would survive
-a filled-in roster and make the teardown delete somebody's work."* The lens template did exactly what
-that comment forbids, for every lens instead of one file. The marker now sits on the slot alone, which
-is also the only thing an unfilled scaffold needs: the slot heading is still there, so an untouched
-lens is still recognised and still removed.
-
-**The dangerous direction was the one that had no test, and the reason is worth keeping.** A filled
-lens was already covered — but that fixture *hand-wrote* its lens, and gave it a title of its own
-(`# 06-16 repo lens`) rather than the title the bootstrap produces. Inventing the boilerplate is what
-made it blind: the only shape that reproduces this defect is the real generated file edited the way a
-consumer edits it. The new test therefore runs the actual bootstrap, replaces only the slot heading,
-and asserts the file survives `-Apply`. Verified by falsification rather than by passing: with the
-marker put back, that assertion fails and the lens is deleted.
-
-**And it is not retroactive, so the instructions carry the other half.** A repo bootstrapped before
-this release keeps a marked title on every lens it fills from here on, and that repo cannot be reached
-from this one. The bootstrap's closing hints and the `specialists-init` skill page now say that filling
-a lens means the marker goes — and that on an older repo it has to come off the **title** too, with the
-one-time sweep to find them. Of the two pairings #451 offered, this is the instructions one; the
-alternative it also suggested — a check reporting "content beyond the boilerplate but still a
-`(VUL-IN)` heading" — is deliberately **not** built here, because the obvious implementation
-misclassifies an *untouched* `SPECIALISTS.md` as authored: that scaffold legitimately contains real
-import lines, so "anything beyond headings and comments" is not boilerplate there. Doing it properly
-means moving the scaffold wording into a shared source both scripts read, which is the
-`Get-ClaudeMdScaffold` pattern and a larger change than this defect needs. The front-matter `filled:`
-key stays with [#237](https://github.com/DaveKJohn/claude-code-specialists/issues/237), where it was
-already proposed.
-
-**In this repo the risk is latent rather than live**, which is why it went unnoticed here: six lenses
-carry a marked title (02-09, 03-02, 04-11, 04-12, 04-13, 06-30) and all six are genuinely unfilled, so
-they are classified correctly today. Each is one edit away from the trap.
-
-### Who is this for
-
-| Tier | Significance | Why |
-|---|---|---|
-| 2 | - | - |
-| 1 | - | - |
-
-### Type of change
-
-Fix
-
-Plugins: specialists
-
-[PR #474](https://github.com/DaveKJohn/claude-code-specialists/pull/474) · merged 2026-08-05
-
----
-
-## An inbound issue is verified as still standing before it is routed
-
-### What does this change do?
-
-**An inbound issue was picked up as open work an hour after it had been repaired.** #469 reported that
-`fold-changelog-entry.ps1` kept the entry-creation date instead of the merge date. It was filed at
-08:04; #472 repaired it on `main` at 09:24; it was still labelled open when the next session reached
-for it. Nothing was built twice — the check that caught it was reading the code before starting — but
-nothing in the intake required that reading either, and the outcome would have been a second repair
-competing with the first on a defect nobody had.
-
-**So the check is now the front of intake, in Chris's portable persona.** A filed report is a snapshot
-of the moment somebody wrote it, and the gap between filing and pickup is exactly the window in which
-the defect may already have gone — sometimes closed by the very work that was underway while the report
-was being written. His first act on an inbound item is therefore to read the code, doc or output it
-describes and establish that what it reports is still true, before classifying anything.
-
-**This repo is where that gap is widest, which is why the rule is portable rather than local.** A
-consumer *files* inbound issues; the source both receives them and does the repairing, so filing and
-fixing can cross inside a single morning — and they did. But the rule is a timeless statement about
-intake, not something only true here, so it goes to the source and the lens keeps just the citation
-of where it was measured. The layer test in the
-[Specialists handbook](.claude/specialists/README.md#where-a-new-rule-goes--the-source-is-the-default-the-lens-is-the-exception)
-is what decided that, and it is the reason the persona text carries no issue numbers or dates at all.
-
-**Closing an already-repaired item is stated as the assignment, with the evidence attached** — because
-two things about #469's close showed that "check first, then close" is not enough on its own:
-
-- **The repair had gone further than the report proposed.** #469 offered three options and preferred
-  restamping the date at fold time; what shipped removed the date from the heading altogether and let
-  the fold add it at the bottom. A silent close would have left the reporting repo applying the
-  documentation fix it had planned — which was now the wrong wording, since the author no longer writes
-  a date at all.
-- **The audit the report suggested in passing was worth running.** #469 noted that anyone auditing an
-  existing `CHANGELOG.md` could compare each heading's date against `gh pr view --json mergedAt`. Run
-  here across `CHANGELOG.md` and `releases/`: **7 of 326** dated headings disagree, all by one or two
-  days. They are deliberately left alone — they sit in published records that already travelled to
-  consumers in the plugin cache, and moving a date by a day rewrites shipped history for no reader's
-  benefit. Both entries still pending in `CHANGELOG.md` were correct.
-
-**And the companion rule it does not replace.** This repo already required that a finding's *reason* be
-verified before it is repaired, after an inbound report whose symptom was real and whose explanation was
-wrong. That guards against repairing the wrong cause; this one guards against repairing a cause that is
-already gone. The persona now names both in order: establish the report still stands, *then* verify the
-reason it gives.
-
-### Who is this for
-
-| Tier | Significance | Why |
-|---|---|---|
-| 2 | - | - |
-| 1 | - | - |
-
-### Type of change
-
-Docs
-
-Plugins: specialists
-
-[PR #473](https://github.com/DaveKJohn/claude-code-specialists/pull/473) · merged 2026-08-05
-
----
-
-## The merge date is added by the fold, at the bottom, instead of scaffolded into the heading
-
-### What does this change do?
-
-**This entry's own heading is the specimen: it carries no date.** The scaffolder used to write one, and
-it ran when the *branch* was created — so what it recorded was the branch's birth date, not the landing
-date. A branch opened on Monday and merged on Thursday was filed as Monday's work, silently, in the one
-document whose whole subject is when things happened. Dave, August 5, 2026.
-
-**The date is now the fold's, and it goes at the bottom** — his second call, and the better one. The
-heading was mixing two kinds of fact: the author knows the title and the type, while the PR number and
-the merge date do not exist until the merge. That second kind already had a home at the end of the entry,
-on the `[PR #NN](url)` line. So the two facts the fold owns now sit together:
-
-```text
-### #NNN · Short strong title · Feat
-
-…the description…
-
-[PR #NNN](https://github.com/DaveKJohn/claude-code-specialists/pull/NNN) · merged 2026-08-05
-```
-
-**It reads the PR's own `mergedAt`, not the clock**, and that distinction is not theoretical here. The
-fold usually runs seconds after the merge, but this repo has measured it not doing so: unfolded entry
-files were once found sitting in the repo root the morning *after* their merge — the silent half-state
-that put `git status` into Chris's stand-verification rule. A clock reading would have dated those a day
-late with nothing in the output to say so. `mergedAt` costs nothing: the fold already makes exactly one
-`gh pr list` call, and gh returns whatever fields are asked for in one roundtrip.
-
-**The dangerous half of this change was not the date at all.** `Format-CategorizedEntries` read each
-entry's branch type as the **second-to-last** middot field of its heading — correct only because a date
-happened to follow the type. Removing the date would have made that read return the type's neighbour, and
-every entry in every release document would have landed in the `Other` catch-all: no error, no empty
-output, one meaningless heading where the categories used to be. Found by reading the code before
-touching it, not by a failing test. Both heading parses are now **content-based** rather than positional
-— the type is recognised by matching the known branch types, the date by its shape — so the same code
-path reads a dated heading and a dateless one. That is also why nothing had to be migrated: this repo's
-entire history keeps parsing.
-
-**`Convert-EntryHeadingToTitle` needed the same treatment and taught the sharper lesson.** The first
-implementation walked in from the end eating anything that looked administrative, and a newly written
-assert caught it on `### #12 · Fix · Fix` — an entry whose title *is* a type name. It ate both fields and
-gave up. The tail has a grammar (at most one date, and before it at most one type), so it is matched
-rather than walked; two types in a row cannot both be the type, which the grammar states and a greedy
-loop cannot. `Other` is deliberately not treated as a type: it is the catch-all label this repo prints,
-never a value a branch table produces.
-
-**The closing line became `Format-EntryFoldFooter` in the entry-format lib, and the reason is testability
-rather than tidiness.** The fold drives a live remote, so its own suite deliberately runs without a PR —
-which would have left the only path this line has untested. Extracting the pure part is the same move,
-for the same reason, as `Get-ExistingPrRecord` in `pr-issues-lib.ps1`. Its five asserts cover the normal
-case, the PR timestamp beating the fallback, a fold that runs a day late, a PR with no timestamp yet, and
-an unparseable one degrading instead of throwing — because a completed fold must not read as failed over
-a cosmetic line.
-
-**Four asserts in the branch suite got stricter rather than looser.** They pinned `· Feat ·` — a trailing
-middot that only existed because a date followed. They now compare the whole heading line, which proves
-both that the type is there and that nothing follows it; the malicious-title scenario in particular gains
-from that, since a prefix match would have passed even if a broken argv boundary had appended something.
-Plus one new assert stating the point outright: the scaffold writes no date.
-
-**One cost, stated rather than smoothed over.** `CHANGELOG.md` can no longer be scanned for dates from the
-headings alone — you read an entry's last line. That is acceptable because the tier sections only ever
-hold what is pending since the last release, a window of days in which the dates sit close together. The
-release notes, where the history actually lives, keep the line per entry.
-
-### Who is this for
-
-| Tier | Significance | Why |
-|---|---|---|
-| 2 | - | - |
-| 1 | - | - |
-
-### Type of change
-
-Feat
-
-Plugins: specialists
-
-[PR #472](https://github.com/DaveKJohn/claude-code-specialists/pull/472) · merged 2026-08-05
-
----
-
-## Publishing the GitHub Release is part of a cut that was already asked for
-
-### What does this change do?
-
-**Cutting a release is asked for; the closing steps of that cut are no longer asked for again.** The
-version bump and the tag are the irreversible act and stay behind an explicit request. Once that is
-given, the run goes through in one motion — generate the artefacts, ship the two hand-written documents
-via their branch and PR, **publish the GitHub Release**. Stopping at the last step of a checklist the
-requester started is a rubber stamp, and a rubber stamp trains everyone to stop reading it. The same
-reasoning that made the PR merge a default rather than a checkpoint (July 27, 2026), applied one step
-further along. Decision by Dave, August 5, 2026.
-
-**The boundary that remains is Block 2 of the checklist, and it is a boundary rather than a carve-out.**
-Where a repo sets `Get-LiveStage` it has a second stage — pushing to the live target — and that is a
-different act with a different audience: a Release document describes a version, a live push changes
-what customers see. This approval covers Block 1. A repo wanting another boundary states that in its
-own lens.
-
-**Four places said this and they had to stop disagreeing.** The constitution named "creating a tag or
-GitHub Release" in one breath under *only on explicit request*, which would have outranked everything
-else written elsewhere — the safety rules take precedence over any convenience, so leaving that line
-standing would have made the new default unusable in exactly the sessions that read the rules
-carefully. It now separates the tag from the publication. Rendall's **portable body** carries the
-statement in his own terms, the release page's **portable half** carries it where the closing step is
-described, and the **cut-release skill** carries it at step 5, which is where somebody actually reads
-it mid-procedure.
-
-**And the reason all four are portable is itself now a written rule, in Tessa's manual.** The first
-draft of this change was headed for Rendall's *repo lens*, because that is where the decision was made.
-Dave's correction: where a decision is made says nothing about where it applies, and what he wants in
-this repo he wants in the others he runs the plugin in. The failure mode is quiet — a general rule
-filed in a lens is not wrong anywhere, it simply never arrives, and nothing reports its absence.
-
-**The corollary was the second correction, and it is the sharper one.** Knowing the rule was portable,
-the next instinct was to *narrow* its wording so it could not surprise a consumer with a live deploy
-stage. That is the wrong repair: it weakens the core for every reader to pre-empt one repo that has its
-own place to speak. The core is stated in full here; the deviating consumer records the deviation in
-its own lens. Both halves are in Tessa's hard rules now, because she is the one who guards which half a
-sentence belongs in.
-
-### Who is this for
-
-| Tier | Significance | Why |
-|---|---|---|
-| 2 | - | - |
-| 1 | - | - |
-
-### Type of change
-
-Docs
-
-Plugins: specialists
-
-[PR #471](https://github.com/DaveKJohn/claude-code-specialists/pull/471) · merged 2026-08-05
 
 ---
 
