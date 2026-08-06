@@ -197,6 +197,10 @@ $BranchInfoSrc = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 # changelog's tier sections. Copied for the same reason as the five above -- this fixture runs the REAL
 # script, so a missing sibling is a broken suite rather than one skipped check.
 $EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
+# Dot-sourced into the RUNNER as well as copied into the fixture: check 13b's scenarios build their
+# template files from Get-BranchTemplates, so the test and the check read the same definition. A fixture
+# written out by hand here would be the very second source of the format that check exists to prevent.
+. $EntryScaffoldSrc
 $Fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("check-plugin-integrity-test-$PID")
 
 $script:pass = 0
@@ -1059,6 +1063,31 @@ try {
         ''
         'Fix'
     )
+    # --- check 13b: the branch/ templates are held to the scaffolder ------------------------------
+    # The whole reason the templates are allowed to exist: they are generated from the formatters, and
+    # this check is what stops them becoming a second definition of the entry format. Asserted in both
+    # directions -- correct content is silent, a hand-edit is caught -- because a check that only ever
+    # passes is indistinguishable from one that reads nothing.
+    Write-Host 'check 13b -- branch/templates are held to what the scaffolder writes' -ForegroundColor Cyan
+    foreach ($tpl in (Get-BranchTemplates)) {
+        $tplPath = Join-Path $Fixture ($tpl.Path -replace '/', '\')
+        New-Item -ItemType Directory -Path (Split-Path -Parent $tplPath) -Force | Out-Null
+        [System.IO.File]::WriteAllText($tplPath, $tpl.Content, $Utf8NoBom)
+    }
+    $r13bGood = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r13bGood.Out -match '\[branch-template\].*no longer matches')) 'check 13b: generated templates are silent'
+    Assert-True ($r13bGood.Out -match '\[branch-template\] checked 2') 'check 13b: and both were actually examined -- the pass is not an empty scan'
+
+    $tpl1 = Join-Path $Fixture ((Get-BranchTemplates)[0].Path -replace '/', '\')
+    [System.IO.File]::WriteAllText($tpl1, ((Get-BranchTemplates)[0].Content + "`nSomebody edited this by hand.`n"), $Utf8NoBom)
+    $r13bDrift = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-Equal 1 $r13bDrift.Code 'check 13b: a hand-edited template is an error'
+    Assert-True ($r13bDrift.Out -match 'no longer matches what the scaffolder writes') 'check 13b: and the message says which way the drift runs'
+    Remove-Item -LiteralPath $tpl1 -Force
+    $r13bGone = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r13bGone.Out -match '\[branch-template\].*is missing') 'check 13b: a deleted template is reported rather than silently passing'
+    [System.IO.File]::WriteAllText($tpl1, (Get-BranchTemplates)[0].Content, $Utf8NoBom)
+
     Write-Host 'check 13 -- an entry is an H2 with three named H3 sections, and a body heading may be neither' -ForegroundColor Cyan
     $s34Entry = Join-Path $Fixture 'fix-a-branch-name.md'
     $s34Good = @('## A fixture entry') + @('') + $s34Sections

@@ -10,6 +10,18 @@ Everything a branch needs to carry lives here, split into two files with one job
 Both are written by [`scripts/task/new-branch.ps1`](../scripts/task/new-branch.ps1) at the moment the
 branch is created. You do not create them by hand, and you do not delete them.
 
+A blank copy of each also sits in [`templates/`](templates/), to look at or paste from:
+
+| template | for |
+|---|---|
+| [`branch_template_changelog.md`](templates/branch_template_changelog.md) | `branch-changelog.md` |
+| [`branch_template_progress.md`](templates/branch_template_progress.md) | `branch-progress.md` |
+
+**They are generated, not maintained.** A template beside a scaffolder that writes the same shape is two
+sources of one format, which is the drift this repo keeps paying for — so their content comes from the
+same formatters `new-branch` calls (`Get-BranchTemplates`), and the lint gate holds the files on disk to
+it. Editing one by hand is an error the gate reports; change the format and the templates follow.
+
 ## The entry template
 
 `new-branch` already writes this shape into `branch-changelog.md`, so on a fresh branch you are filling

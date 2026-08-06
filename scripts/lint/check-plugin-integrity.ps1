@@ -410,9 +410,12 @@ if (Test-Path -LiteralPath $pluginsRootDir) {
 # as the plugins/ one above and worth stating separately rather than merging the two comments, because
 # these two documents went dark in the same week for two unrelated reasons -- which is the actual lesson
 # about this scan set: a file leaves it by MOVING, and nothing reports that it has.
+#
+# RECURSIVE here, unlike the two globs above, because branch/ has a subdirectory: templates/. Those files
+# are prose somebody pastes from, so a dead link in one is copied forward into every branch that uses it.
 $branchDirForLinks = Join-Path $RepoRoot ((Get-BranchFilePaths).Directory)
 if (Test-Path -LiteralPath $branchDirForLinks) {
-    $linkFiles += @(Get-ChildItem -Path $branchDirForLinks -Filter '*.md' -File |
+    $linkFiles += @(Get-ChildItem -Path $branchDirForLinks -Recurse -Filter '*.md' -File |
         Select-Object -ExpandProperty FullName)
 }
 # The specialists handbook lives next to the lenses (at family level) -- validate its links too.
@@ -1284,6 +1287,34 @@ if (Test-Path -LiteralPath $clForHeadings) {
 
 Write-Coverage -Category 'entry-heading' -Checked $ehChecked `
     -Note $(if ($entryFilesForHeadings.Count -eq 0) { 'no unfolded entry in branch/ or the root, so only CHANGELOG.md was judged -- normal between merges' } else { "$($entryFilesForHeadings.Count) unfolded entry file(s) plus CHANGELOG.md" })
+
+# --- 13b. the branch/ templates still match what the scaffolder writes -------------------------------------
+# A template beside a scaffolder that writes the same shape is TWO SOURCES OF ONE FORMAT. This repo has paid
+# for that shape repeatedly -- the scaffold wording, the fence readers, the tier sections -- and the entry
+# format changed THREE TIMES on the day these templates were added, so a hand-maintained copy would have gone
+# stale before it was committed.
+#
+# The templates are therefore generated from the same formatters new-changelog-entry.ps1 calls, and this holds
+# the files on disk to Get-BranchTemplates. Compared with line endings normalised: whether the working copy
+# checked out CRLF is not a property of the format.
+$btChecked = 0
+$btMissing = 0
+foreach ($tpl in (Get-BranchTemplates)) {
+    $btChecked++
+    $tplPath = Join-Path $RepoRoot ($tpl.Path -replace '/', '\')
+    if (-not (Test-Path -LiteralPath $tplPath)) {
+        $btMissing++
+        Add-Error "[branch-template] $($tpl.Path) is missing. It is generated from the same formatters the scaffolder uses -- see Get-BranchTemplates in scripts/lib/entry-scaffold-lib.ps1."
+        continue
+    }
+    $onDisk   = ([System.IO.File]::ReadAllText($tplPath, [System.Text.Encoding]::UTF8)) -replace "`r`n", "`n"
+    $expected = $tpl.Content -replace "`r`n", "`n"
+    if ($onDisk -ne $expected) {
+        Add-Error "[branch-template] $($tpl.Path) no longer matches what the scaffolder writes. It is a copy-paste convenience, not a second definition of the format -- regenerate it from Get-BranchTemplates rather than editing it by hand."
+    }
+}
+Write-Coverage -Category 'branch-template' -Checked $btChecked `
+    -Note $(if ($btMissing -gt 0) { "$btMissing missing" } else { 'held against the formatters the scaffolder calls, so the template cannot drift from the file a branch actually gets' })
 
 # --- 14. mojibake: a double-encoded character is a silent content change -----------------------------------
 # MEASURED HERE, August 1, 2026, and it nearly shipped. Demoting four headings in CHANGELOG.md with

@@ -2076,6 +2076,41 @@ function Format-BranchProgressScaffold {
     return @($lines.ToArray())
 }
 
+$script:BranchTemplateDir         = 'branch/templates'
+$script:BranchTemplateBranchToken = '<prefix>/<short-name>'
+
+function Get-BranchTemplates {
+    <#
+        The copy-paste templates under branch/template/, as objects with Path (repo-relative) and Content
+        (exactly what that file must contain).
+
+        WHY THEY ARE GENERATED RATHER THAN WRITTEN, and why a lint check reads this same function. A
+        template beside a scaffolder that writes the same shape is TWO SOURCES OF ONE FORMAT, which is the
+        drift this repo keeps paying for -- the entry-scaffold wording, the fence readers, the tier
+        sections. The entry format changed three times in one day while these templates were being added;
+        a hand-written copy would have been wrong before it was committed.
+
+        So the content comes from the same formatters the scaffolder calls, and check-plugin-integrity.ps1
+        holds the files on disk to it. The templates are then genuinely a convenience -- something to look
+        at and paste from -- without being a second definition of anything.
+
+        THE PROGRESS TEMPLATE NAMES A PLACEHOLDER BRANCH rather than a real one, because it belongs to no
+        branch. That token is stated here so the generator and the checker cannot disagree about it.
+    #>
+    $nl = "`n"
+    $w  = Get-EntryScaffoldWording
+    return @(
+        [pscustomobject]@{
+            Path    = "$($script:BranchTemplateDir)/branch_template_changelog.md"
+            Content = ((Format-EntryBlock -Title $w.Title -Type 'Feat' -Body $w.BodyPlaceholder) -join $nl) + $nl
+        },
+        [pscustomobject]@{
+            Path    = "$($script:BranchTemplateDir)/branch_template_progress.md"
+            Content = ((Format-BranchProgressScaffold -Branch $script:BranchTemplateBranchToken) -join $nl) + $nl
+        }
+    )
+}
+
 function Get-BranchFileDeclaredBranch {
     <#
         Pure: the branch a branch file says it belongs to -- the name in its '**Branch:** `x`' line -- or
