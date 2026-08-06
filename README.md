@@ -15,7 +15,7 @@ its own copies, and enables or disables **per plugin** which groups it needs.
 | I want to… | Go to |
 |---|---|
 | **connect my own repo — just the commands** | **[INSTALL.md, the quickstart half](plugins/INSTALL.md#quickstart--the-commands-and-nothing-else)** — four steps, the commands and nothing else, linking down for every caveat. |
-| **connect my own repo — and know why** | **[INSTALL.md, the adoption half](plugins/INSTALL.md#adoption--how-to-connect-your-repo)** — the full, measurement-backed adoption manual for someone who did not build this, ~49 min (August 6, 2026). Read its *Before you start* section first if the machine is new or has adopted this family before. |
+| **connect my own repo — and know why** | **[INSTALL.md, the adoption half](plugins/INSTALL.md#adoption--how-to-connect-your-repo)** — the full, measurement-backed adoption manual for someone who did not build this, ~47 min (August 6, 2026). Read its *Before you start* section first if the machine is new or has adopted this family before. |
 | **disconnect it again** | [UNINSTALL.md](plugins/UNINSTALL.md) — the install page's mirror: the repo teardown and the machine-side removal, in the order they have to happen. |
 | know **which plugin does what** | [The four plugins](#the-four-plugins--whats-the-difference) |
 | know **how a specialist is built** | [Manuals — the split model](#manuals--the-split-model) |

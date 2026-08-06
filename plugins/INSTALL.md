@@ -124,33 +124,17 @@ This page is for those who did **not** build the Claude Specialists system: a co
 of their own who wants to work with the specialists team. Everything below is the common thread —
 the deeper explanation sits behind the links and is deliberately not repeated here.
 
-> **This half was called `QUICKSTART.md` until August 3, 2026, and the name was the defect** (inbound
-> [#408](https://github.com/DaveKJohn/claude-code-specialists/issues/408)). It is a thorough,
-> measurement-backed adoption manual and it never tried to be anything else; "quickstart" set an
-> expectation it cannot meet, and a consumer who had just spent half an hour on it reported the
-> mismatch as *"the name QUICKSTART is very misleading"*. The repair was to split the two: the name
-> went to a genuinely short page, and this one became `ADOPTION.md`.
->
-> **Since then the split has been undone the other way round, and the reasoning survives it.** The two
-> pages are the two halves of this one file: the [Quickstart](#quickstart--the-commands-and-nothing-else)
-> above is the commands and nothing else, this half is every caveat behind them. What #408 actually
-> asked for was that a reader can tell the two apart before committing an hour — one page with two
-> named halves does that, and it also removes the failure mode a split invites, where one page is
-> updated and the other quietly disagrees. Read the top if you only want to type; read on if you want
-> to know why.
->
-> **Budget well over an hour of reading before the last command is done, and know where it goes.**
-> Measured August 6, 2026, after the two pages became one: this file is ~9,800 words (~49 min at
-> 200 wpm) and [`specialists-init`'s `SKILL.md`](specialists/skills/specialists-init/SKILL.md)
-> another ~5,600 (~28 min); the two are what a first-time adopter is told to read, so call it
-> **~77 minutes**. The quickstart half is ~600 of those words — the rest is this half.
-> Both pages grow, so read those as the order of magnitude, not a promise. The one number this page
-> never used to state is the one a reader would plan with, on a page meticulous about every other
-> count. And the *typing* is not where the time goes either: the bootstrap script places the whole
-> seam in seconds. It goes into **Step 4** — writing your roster and filling your lenses — which this
-> page used to disclose in a trailing subordinate clause reading *"then, at your own pace"*. That
-> phrasing invited the misattribution above: the reader blamed the installer for the cost of the
-> authoring. Step 4 is a numbered step now, with its cost stated.
+**Why the procedure is what it is** — which step was added when, and what was measured to justify it —
+is not on this page. It lives in the release record: [`releases/README.md`](../releases/README.md)
+indexes every version with the changes behind it. This page tells you what to do; that one tells you
+why it changed.
+
+> **Budget well over an hour, and know where it goes.** Measured August 6, 2026: this file is ~9,300
+> words (~47 min at 200 wpm) and
+> [`specialists-init`'s `SKILL.md`](specialists/skills/specialists-init/SKILL.md) another ~5,600
+> (~28 min) — call it **~75 minutes** for a first-time adopter. Both pages grow, so treat
+> that as an order of magnitude. The time is not in the typing: the bootstrap places the whole seam in
+> seconds. It is in **Step 4**, writing your roster and filling your lenses.
 
 ### What you get
 
@@ -302,19 +286,6 @@ is impossible to satisfy.
 > (inbound [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297)). Nothing was missing from
 > any of them — but if you are cross-reading and the counts differ, the count is exactly what you would
 > use to check whether you skipped something.
->
-> **It was five acts until August 1, 2026, and the sixth act is the first restart.** #329 measured that a
-> session start is what registers the marketplace — so the act was always there, unwritten, and a reader
-> who skipped it could not run act 3 at all. The number moved on all three pages in the same change rather
-> than the restart being folded into "enable", because being folded into another act is precisely what
-> kept it invisible.
->
-> **And it was three *steps* until August 3, 2026.** Step 4 — writing the roster and filling the lenses —
-> was always part of the procedure, disclosed as *"then, at your own pace"* in a trailing clause of Step 3,
-> after the page had already framed itself as complete (inbound
-> [#408](https://github.com/DaveKJohn/claude-code-specialists/issues/408)). Same lesson as the act above,
-> one level up: an unnumbered step reads as optional polish, and this one is where the system starts being
-> useful at all. The number moved here, in the README and in the `specialists-init` skill in one change.
 
 **Step 1 — enable *and* install the plugins.** The first half is one file: **your repo's own**
 `.claude/settings.json`. `.claude/` is a directory in the root of your repository, beside your
@@ -551,13 +522,10 @@ is fine.
 > appears at a session start: not only has the state already been written away, there is **no hook running to
 > report it** — the hooks ship in the plugin this session did not load.
 >
-> **And it settles the question this blockquote used to leave open** (inbound
-> [#350](https://github.com/DaveKJohn/claude-code-specialists/issues/350)): whether a session start makes the two
-> `claude plugin` commands redundant. **It does not.** The experiment this page asked for has been run — the
-> two keys, two restarts, six locations read without a single command — and the answer is that a session
-> start does *half* the job: it registers the marketplace and writes a complete, correct-looking record, but
-> never fetches the payload. `marketplace update` + `install` are the pair that does. So the commands stay,
-> and now for a measured reason rather than caution.
+> **And a session start does not make the two `claude plugin` commands redundant.** Measured: two keys, two
+> restarts, six locations read without running a single command. A session start does *half* the job — it
+> registers the marketplace and writes a complete, correct-looking record — but never fetches the payload.
+> `marketplace update` + `install` are the pair that does.
 
 **Step 2 — run the bootstrap skill.** In the new session, invoke `specialists-init`. It sets up —
 purely additively, without overwriting anything — the **lens-only** persona lenses (including
@@ -647,13 +615,9 @@ before you write anything, because every gate stays green while your lenses are 
 The worker specialists can be invoked directly as `@specialists:<name>` from the moment Step 3 is
 done — with an empty lens they simply answer out of their portable playbook.
 
-> **Until August 3, 2026 this was not a step.** It read *"then, at your own pace, fill in the repo
-> lenses"* — a trailing clause at the end of Step 3, on a page that had already announced three
-> steps. "At your own pace" reads as optional polish. The measured consequence was an owner
-> attributing the half hour of *authoring* to the *installer*, and saying so:
-> `specialists-init` itself places the seam, 25 lens files, the roster scaffold, the settings proposal
-> and the `@`-import in **seconds**. The page's own framing produced the misattribution, which makes
-> it a documentation defect rather than a user error.
+> **Do not attribute this half hour to the installer.** `specialists-init` places the seam, 25 lens
+> files, the roster scaffold, the settings proposal and the `@`-import in **seconds**. The time here is
+> yours, spent writing — which is why it is a numbered step rather than a closing remark.
 
 ### Staying up to date
 
