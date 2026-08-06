@@ -765,10 +765,6 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
     # the highest-version cache scan as the fallback it always was. Without it this check reports on the
     # newest version present on the machine, which stops being the same thing the moment a second
     # consumer pulls a newer one into the shared cache -- see Resolve-PluginDir for the measured case.
-    # -RepoRoot makes the INSTALL RECORD the first answer to "which version does this repo load?", with
-    # the highest-version cache scan as the fallback it always was. Without it this check reports on the
-    # newest version present on the machine, which stops being the same thing the moment a second
-    # consumer pulls a newer one into the shared cache -- see Resolve-PluginDir for the measured case.
     #
     # -UserHomeOverride is deliberately NOT passed through, for the reason Get-InstallRecord states on
     # its own parameter: that flag pins the USER LAYER OF THE SETTINGS CHAIN, and the administration is a
@@ -776,7 +772,19 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
     # redirects $env:USERPROFILE for the child process.
     $pluginDir = Resolve-PluginDir -Name $name -Marketplace $marketplace -CacheRoot $cacheRoot -RepoRoot $repoRoot
     if ($null -eq $pluginDir) {
-        Write-Info "plugin '$plugIdShown' is enabled but not found in the cache ($cacheRoot) -- skipped (the install may run on another machine)."
+        # TWO REASONS, TOLD APART, because Resolve-PluginDir answers $null for both and they are different
+        # facts about this machine (August 6, 2026). It requires an agents/ dir at every return path, so a
+        # plugin that is cached and simply ships no agents came back indistinguishable from one that is not
+        # installed here -- and this line reported the second. Measured on figma@claude-plugins-official:
+        # present in the cache at 2.2.90, its installPath in the administration, and reported as "not found
+        # in the cache". The skip was right, the reason was false, and a reader acting on it would have gone
+        # looking for a broken install. See Get-CachedPluginDirs.
+        $cachedDirs = @(Get-CachedPluginDirs -Name $name -Marketplace $marketplace -CacheRoot $cacheRoot)
+        if ($cachedDirs.Count -gt 0) {
+            Write-Info "plugin '$plugIdShown' is enabled and present in the cache ($(Split-Path $cachedDirs[0] -Leaf)), but ships no agents/ directory -- there is no roster for this check to read, skipped. A plugin of skills, hooks or MCP servers only is the ordinary case for this, not a fault."
+        } else {
+            Write-Info "plugin '$plugIdShown' is enabled but not found in the cache ($cacheRoot) -- skipped (the install may run on another machine)."
+        }
         continue
     }
 
