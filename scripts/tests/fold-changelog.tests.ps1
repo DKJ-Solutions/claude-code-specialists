@@ -544,6 +544,66 @@ Assert-True ($clF -match 'quoted, not declared')    'fenced: and the quoted tabl
 Assert-True ($rF.Output -notmatch 'no significance') 'fenced: the real row was read, so nothing is reported missing'
 
 # ---------------------------------------------------------------------------------------------------
+Write-Host "A changelog with no trailing newline does not swallow the entry appended to its end" -ForegroundColor Cyan
+#      Get-ImpactInsertOffset returns the slice's LENGTH for the lowest-ranked entry -- the common case, since
+#      tier 0 sinks to the bottom -- so the insert lands at the very end of the content. Ending on '---' with
+#      nothing after it, that produces '---## <title>' on ONE line: '^## ' stops matching, so the cut never
+#      sees the entry, and the entry FILE is deleted by then. Nothing errors and the markdown stays
+#      well-formed, which is exactly why only a test catches it.
+#
+#      THE CONDITION IS NOT HYPOTHETICAL AND THE LOSS IS NOT RECORDED, which is why this test exists in this
+#      shape. The branch behind PR #486 was handed over with the final newline stripped by an editor and
+#      repaired before its commit, so no commit, PR or fold ever carried it -- the condition is ordinary
+#      editing, and everything below is what proves the loss follows from it.
+#
+#      The seeded entry is tier 1 ON PURPOSE. An equal rank puts the new entry ABOVE its equals, so two tier-0
+#      entries would exercise the insert-before-a-heading path and never reach the end of the list at all.
+$dirN = New-FoldFixture -Label 'tail-noeol'
+New-EntryFile -Dir $dirN -Name 'feat-ranked-above.md' -Title 'Ranks above the newcomer' -Rows '| 1 | 3 | a clear improvement |'
+Invoke-Fold -Dir $dirN -Branch 'feat/ranked-above' | Out-Null
+# The editor's damage, reproduced exactly: every trailing line break gone, so the file ends on '---'.
+$clNpath = Join-Path $dirN 'CHANGELOG.md'
+[System.IO.File]::WriteAllText($clNpath, ([System.IO.File]::ReadAllText($clNpath)).TrimEnd(), $Utf8NoBom)
+Assert-True (-not ([System.IO.File]::ReadAllText($clNpath)).EndsWith("`n")) 'tail no-eol: the fixture really has no trailing newline'
+New-EntryFile -Dir $dirN -Name 'chore-sinks-to-bottom.md' -Title 'Sinks to the bottom' -Rows '| 0 | - | - |'
+$rN = Invoke-Fold -Dir $dirN -Branch 'chore/sinks-to-bottom'
+$clN = Get-Changelog -Dir $dirN
+# WHICH ASSERTS PIN THE GUARD AND WHICH DO NOT, written down because the defect is SILENT and the difference
+# is therefore invisible. Verified by removing the guard: the three marked below fail, and these two pass
+# either way -- the fold succeeds whichever side of the bug it is on, so an exit code cannot see it.
+Assert-True ($rN.ExitCode -eq 0) 'tail no-eol: exits 0 (an invariant -- the defect never threw)'
+# THE THREE THAT PIN IT.
+$orderN = @(Get-EntryOrder -Changelog $clN)
+Assert-Equal 2 $orderN.Count 'tail no-eol: the appended entry is still an entry heading, not glued onto the separator'
+Assert-Equal 'Sinks to the bottom' $orderN[1] 'tail no-eol: and it sits at the bottom, below the higher-ranked one'
+# The defect shape itself, asserted directly: a heading welded to the separator above it.
+Assert-True ($clN -notmatch '---##') 'tail no-eol: no separator carries a heading on its own line'
+# THE SECOND INVARIANT: the appended entry block ends in a separator plus a blank line by construction, so
+# this passes with the guard removed too. It is here to pin the NEXT fold's precondition rather than this one.
+Assert-True ($clN.EndsWith("`n")) 'tail no-eol: and the document is left ending on a line break (an invariant)'
+
+Write-Host "The tail is normalised rather than merely repaired -- accumulated blanks are capped" -ForegroundColor Cyan
+#      Same one line does both jobs. Split-Changelog already strips this accumulation from the HEAD, for the
+#      reason that applies here too: it renders identically, so nothing looks wrong until somebody opens the
+#      raw file years in.
+$dirNB = New-FoldFixture -Label 'tail-blanks'
+New-EntryFile -Dir $dirNB -Name 'feat-first.md' -Title 'The seeded one' -Rows '| 1 | 3 | a clear improvement |'
+Invoke-Fold -Dir $dirNB -Branch 'feat/first' | Out-Null
+$clNBpath = Join-Path $dirNB 'CHANGELOG.md'
+[System.IO.File]::WriteAllText($clNBpath, (([System.IO.File]::ReadAllText($clNBpath)).TrimEnd() + "`n`n`n`n`n"), $Utf8NoBom)
+New-EntryFile -Dir $dirNB -Name 'chore-second.md' -Title 'The appended one' -Rows '| 0 | - | - |'
+$rNB = Invoke-Fold -Dir $dirNB -Branch 'chore/second'
+# Both invariants, as in the block above: neither can see this behaviour, and they are labelled so that the
+# one assert that CAN is not read as three.
+Assert-True ($rNB.ExitCode -eq 0) 'tail blanks: exits 0 (an invariant)'
+$clNB = (Get-Changelog -Dir $dirNB) -replace "`r`n", "`n"
+Assert-Equal 2 @(Get-EntryOrder -Changelog $clNB).Count 'tail blanks: both entries are headings (an invariant)'
+# Asserted as "nowhere in the document", not as "not at the end". The appended entry block ends in
+# '---' + blank line by construction, so an end-of-file assertion passes whether the guard ran or not --
+# the four blanks end up in the MIDDLE, above the entry that was appended after them.
+Assert-True ($clNB -notmatch "`n`n`n") 'tail blanks: the run of blank lines is capped, not merely pushed up the document'
+
+# ---------------------------------------------------------------------------------------------------
 foreach ($f in $script:fixtures) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }
 
 Write-Host ""
