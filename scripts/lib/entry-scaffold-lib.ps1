@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    The changelog entry's own format, in one place: the scaffold strings new-changelog-entry.ps1
+    The changelog entry's own format, in one place: the scaffold strings new-branch.ps1
     WRITES and open-pr.ps1 REFUSES TO SHIP, the entry's heading levels and named sections, the impact
     table declaring how far a change reaches and what it weighs at each reach, and the ranked offset the
     fold inserts it at.
@@ -18,7 +18,7 @@
     requires for a rule living in two places.
 
     THE IMPACT DECLARATION JOINED IT FOR THE SAME REASON, WITH ONE MORE READER (the tier model, August 5,
-    2026). How far a change reaches is written by new-changelog-entry.ps1, validated by open-pr.ps1 before a
+    2026). How far a change reaches is written by new-branch.ps1, validated by open-pr.ps1 before a
     PR can ship, read by fold-changelog-entry.ps1 to decide where in CHANGELOG.md the entry lands, and read
     again by the release cut to decide which documents it appears in. Four scripts, one format: a copy in
     each is how a fold starts filing tier-2 work as repo-internal without anything erroring.
@@ -30,18 +30,18 @@
     REPO-OWNED, WITH BUILT-IN DEFAULTS (#410). Each string comes from an OPTIONAL function in the
     consumer's scripts/repo-config.ps1 -- Get-EntryTitlePlaceholder, Get-EntryBodyHeading,
     Get-EntryBodyPlaceholder -- probed with Get-Command and falling back to the English value
-    new-changelog-entry.ps1 used to hardcode. A consumer that defines none of them is unaffected.
+    new-branch.ps1 used to hardcode. A consumer that defines none of them is unaffected.
     (Get-EntryFallbackType is deliberately NOT here: it is a changelog TYPE, not scaffold prose --
     'Chore' is a legitimate final value, so it can never be evidence of an unedited entry.)
 
     Pure ASCII (repo convention for .ps1).
 #>
 
-# The English fallbacks, and the ONLY copy of them. new-changelog-entry.ps1 held these literals until
+# The English fallbacks, and the ONLY copy of them. new-branch.ps1 held these literals until
 # the gate needed the same list; it now reads them from here.
 #
 # TWO OF THESE ARE NO LONGER WRITTEN, ONLY RECOGNISED (Dave, August 6, 2026). Until the branch/ split the
-# entry file was also the branch's to-do list, so new-changelog-entry.ps1 scaffolded it with a
+# entry file was also the branch's to-do list, so new-branch.ps1 scaffolded it with a
 # '**To do / where I left off:**' heading over a matching placeholder. branch-progress.md holds that job
 # now, and an entry that still asked for a to-do list would re-create the exact confusion the split
 # removes. So the writer stops writing them and the GATE KEEPS REFUSING THEM -- "recognise both, write
@@ -2162,7 +2162,7 @@ function Format-EntryBlock {
         built. See $script:EntrySectionDefaults for the reasoning.
 
         ONE FORMATTER FOR THE WRITER AND THE MIGRATION, which is why it takes pieces rather than assembling
-        prose. new-changelog-entry.ps1 calls it with empty fields and no rows; a migration calls it with real
+        prose. new-branch.ps1 calls it with empty fields and no rows; a migration calls it with real
         ones. Two assemblers would drift, and the parser reads what this writes.
 
         $TitleSuffix is for the copy under branch/templates/, which marks itself '(template)' so it cannot be
@@ -2260,7 +2260,7 @@ function Test-EntryDeclaresShape {
         SO THE PARSER REFUSES INSTEAD, and this predicate is the test it refuses on. The discriminator is
         exact rather than a heuristic: the format has two legitimate shapes and both declare something. A
         current entry carries the three named sections; a pre-format entry carries its type as a heading
-        field, which is what new-changelog-entry.ps1 wrote for as long as that shape existed. A leftover
+        field, which is what new-branch.ps1 wrote for as long as that shape existed. A leftover
         section heading carries neither, and cannot -- it is a heading with prose under it.
 
         Deliberately NOT keyed on the '#NN' the fold prepends: the fold cannot reach gh on a manual merge
@@ -2410,7 +2410,7 @@ function Get-EntryScaffoldFindings {
 #   branch/branch-changelog.md   what the change DOES     -- for whoever reads CHANGELOG.md later
 #   branch/branch-progress.md    what still MUST HAPPEN   -- for whoever is working on the branch
 #
-# THE SPLIT IS THE POINT. The root entry file did both jobs: new-changelog-entry.ps1 scaffolded it with
+# THE SPLIT IS THE POINT. The root entry file did both jobs: new-branch.ps1 scaffolded it with
 # a body heading that literally read '**To do / where I left off:**', and open-pr's scaffold gate
 # refused to ship while that heading survived. So one file was today's to-do list AND tomorrow's
 # changelog prose, which is why "replace this whole block before the PR" had to be a written
@@ -2489,7 +2489,7 @@ function Get-BranchTrunkName {
         Get-TrunkBranchName in scripts/repo-config.ps1.
 
         It is here rather than inline because THREE things need the same answer and one of them writes
-        it into a document: new-changelog-entry.ps1 refuses to scaffold on the trunk, the reset template
+        it into a document: new-branch.ps1 refuses to scaffold on the trunk, the reset template
         below names the trunk in its warning, and the fold writes that template back. A literal 'main'
         in each is the shape where a consumer on 'master' gets a correct refusal and a document that
         tells them the wrong branch name.
@@ -2837,7 +2837,7 @@ function Get-BranchFileDeclaredBranch {
         '' when the file has no such line.
 
         THIS IS THE IDEMPOTENCY TEST, and it is why the branch line is in the document rather than only in
-        the scaffolder's head. new-changelog-entry.ps1 may be run twice on the same branch (it is, by
+        the scaffolder's head. new-branch.ps1 may be run twice on the same branch (it is, by
         new-branch, which is itself idempotent), and the second run must not overwrite a step list somebody
         has been ticking off. Comparing the declared branch against HEAD answers that exactly: the trunk
         name means the file is still in its reset state and is ours to write, any other name means it is

@@ -114,7 +114,7 @@ itself.
 improvement, the entry comes into being **at the moment the branch is created** — no
 separate later scaffolding step: [Derek #05](05-05-extension.md#classifying-naming-and-creating-a-branch)'s
 `new-branch.ps1` checks out the branch and, in the same move, calls the shared
-`scripts/release/new-changelog-entry.ps1 -Title "…"` (which writes both `branch/` files, filling in the
+`scripts/task/new-branch.ps1 -Title "…"` (which writes both `branch/` files, filling in the
 title, the branch name and the type from the prefix automatically) as a child step. A branch is never
 entry-less. Whoever builds on the
 branch (often [Tessa #16](06-16-extension.md) or [Sylvester #15](05-15-extension.md)) fills in the
@@ -325,7 +325,7 @@ waiting for a migration that does not exist.
 
 ### Rendall's toolkit
 
-- `scripts/release/new-changelog-entry.ps1 [-Title <string>] [-Intent <string>]` — write the branch's
+- `scripts/task/new-branch.ps1 [-Title <string>] [-Intent <string>]` — write the branch's
   two files in `branch/`. `-Intent` records where you left off / what is next in
   **`branch-progress.md`**, not in the entry (#162): an intent is a status, and the entry's text folds
   verbatim into `CHANGELOG.md`. Idempotent per file, judged on what each file says it belongs to rather

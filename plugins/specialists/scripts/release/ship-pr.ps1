@@ -47,8 +47,9 @@
          the empty string, so the script would have run `gh pr merge ''`. See the comment at step 2.
       3. Wait for the required CI check to finish (gh pr checks <pr> --watch). Branch protection on
          main blocks the merge until it is green; if a check FAILS, this stops WITHOUT merging.
-      4. Merge (gh pr merge <pr> --<method>, from Get-PrMergeMethod; 'merge' by default). No --admin:
-         the CI gate is never bypassed.
+      4. Merge (gh pr merge <pr> --<method>, from Get-PrMergeMethod; 'merge' by default), with the
+         merge commit's subject set to 'merge: PR #NN <branch>' so every line in the graph starts with
+         a type. No --admin: the CI gate is never bypassed.
       5. Check out main, fast-forward, and hand the fold to fold-changelog-entry.ps1 -Push, which folds
          the entry AND makes the commit itself -- naming CHANGELOG.md and the entry file as the
          commit's pathspec.
@@ -150,7 +151,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
 Set-Location $repoRoot
 
-# Pre-flight (#86): this script hard-requires the consumer's repo-config (unlike new-changelog-entry,
+# Pre-flight (#86): this script hard-requires the consumer's repo-config (unlike new-branch,
 # which treats it as optional) -- Get-RepoName has no sane default, and without it every gh call below
 # would target the wrong repo or none at all. Stop with a pointer instead of a raw dot-source error.
 $configPath = Join-Path $repoRoot 'scripts\repo-config.ps1'
@@ -292,7 +293,21 @@ passed, so a re-run picks up from here. There is no -Force for this gate.
     }
 }
 
-$merge = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'merge', "$pr", "--$mergeMethod", '--repo', $repo)
+# THE MERGE COMMIT GETS A TYPED SUBJECT (Dave, August 7, 2026). GitHub's default is
+# "Merge pull request #504 from Owner/feat/x", which is the one line in the graph that does not start with
+# a type. Everything else does -- feat:, fix:, docs:, chore:, release: -- so scanning the history means
+# reading one shape for every commit except the merges, which are half of them.
+#
+# 'merge: PR #NN <branch>' matches the fold's own subject one commit later
+# ("chore: fold changelog entry <branch> (#NN)"), so a merge and its fold read as a pair.
+#
+# SAFE TO CHANGE, CHECKED RATHER THAN ASSUMED: nothing in this repo parses the merge subject -- not a
+# script, not a gate, not a document. The PR number stays in the line for anyone who greps for it.
+#
+# -t is the short form of --subject and applies to the merge-commit method only; a repo configured for
+# squash or rebase (Get-PrMergeMethod) has no merge commit for it to name, and gh ignores it there.
+$mergeSubject = "merge: PR #$pr $branch"
+$merge = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'merge', "$pr", "--$mergeMethod", '--subject', $mergeSubject, '--repo', $repo)
 $merge.Output | ForEach-Object { Write-Host $_ }
 if ($merge.ExitCode -ne 0) { Write-Error "Merge of PR #$pr failed."; exit 1 }
 Write-Host "ship-pr: PR #$pr merged (--$mergeMethod)." -ForegroundColor Green

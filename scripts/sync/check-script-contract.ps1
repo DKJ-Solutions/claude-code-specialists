@@ -14,7 +14,7 @@
     equivalent guard for the repo-owned SCRIPT CONTRACT. This mirrors that architecture exactly.
 
     The declared contract (mandatory repo-owned functions per mirrored, consumer-run shared script):
-      - new-changelog-entry -> branch-info.ps1: Get-BranchInfo
+      - new-branch -> branch-info.ps1: Get-BranchInfo
                                repo-config.ps1: Get-EntryTitlePlaceholder, Get-EntryBodyHeading,
                                                 Get-EntryBodyPlaceholder, Get-EntryFallbackType
                                                 (all OPTIONAL -- see below)
@@ -45,7 +45,7 @@
     declaring an optional: nothing crashes without them, so the only signal a consumer would ever get
     is reading English stubs in a repo that is not English -- one branch at a time, indefinitely.
 
-    Note that new-changelog-entry.ps1 treats repo-config.ps1 ITSELF as optional (Test-Path + a
+    Note that new-branch.ps1 treats repo-config.ps1 ITSELF as optional (Test-Path + a
     try/catch that degrades to a warning), unlike open-pr/fold, which pre-flight on it. That is
     deliberate: it is the lightest script in the set and every string it reads from there has a working
     default. The contract records above therefore describe wording that CAN be configured, not a
@@ -102,7 +102,7 @@
     StrictMode note: this script itself runs under Set-StrictMode -Version Latest, but each
     consumer lib (branch-info.ps1 / repo-config.ps1) is dot-sourced and probed in a child scope with
     StrictMode explicitly OFF. The real runtime callers this check models (open-pr.ps1,
-    new-branch.ps1, new-changelog-entry.ps1, fold-changelog-entry.ps1) never call Set-StrictMode, and
+    new-branch.ps1, fold-changelog-entry.ps1) never call Set-StrictMode, and
     both consumer libs are deliberately written on that no-strict-mode assumption (harmless loose
     top-level code is expected there). Do NOT "helpfully" move the dot-source into strict scope --
     that produces false [ERROR]s for legacy-but-working consumer libs that never crash at real
@@ -158,7 +158,7 @@ $repoRoot = $scope.Path
 # that source repo, and no reason to know it exists. With 'Returns' in the finding, the reader can write
 # the function from the report alone.
 $script:Contract = @(
-    @{ Lib = 'scripts\lib\branch-info.ps1'; Function = 'Get-BranchInfo';  Scripts = @('new-changelog-entry', 'open-pr');
+    @{ Lib = 'scripts\lib\branch-info.ps1'; Function = 'Get-BranchInfo';  Scripts = @('new-branch', 'open-pr');
        Returns = "an object for a branch name with at least Prefix, Label and ChangelogType, derived from this repo's own branch-prefix table" },
     @{ Lib = 'scripts\lib\branch-info.ps1'; Function = 'Test-BranchName'; Scripts = @('new-branch');
        Returns = 'an object with IsValid plus a Reason when invalid; reject an empty name and the main branch' },
@@ -208,7 +208,7 @@ $script:Contract = @(
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-LiveStage'; Scripts = @('cut-release skill');
        Optional = $true; Default = '';
        Returns = "a short description of this repo's separate go-live target, or '' when it has none" },
-    # The stub wording new-changelog-entry.ps1 writes (issue #410). Declared here rather than left
+    # The stub wording open-pr.ps1 REFUSES (issue #410) -- nothing writes it any more. Declared here rather than left
     # undeclared precisely because the failure mode is not a crash: a consumer that never defines these
     # gets working English stubs in a repo whose changelog is in another language, and discovers it at
     # entry time, once per branch, forever. An [INFO] naming the default turns that into a thing you
@@ -216,14 +216,14 @@ $script:Contract = @(
     # THREE OF THE FOUR ARE NOW READ BY TWO SCRIPTS, and the second one is why the attribution matters:
     # open-pr.ps1's scaffold gate REFUSES a PR whose entry still carries this wording, reading it through
     # the shared entry-scaffold-lib.ps1 exactly as the writer does. A consumer that configures the wording
-    # but is told only about new-changelog-entry would not know the gate follows its answer too -- and a
+    # but is told only about the writer would not know the gate follows its answer too -- and a
     # finding here has to be self-contained (Dave, July 28, 2026).
     # ViaLib names the shared library through which these scripts reach the function, because NEITHER of
     # them names it directly any more -- both call Get-EntryScaffoldWording. Declared rather than left
     # implicit so the completeness guard can still prove the reference is real: it checks that each script
     # dot-sources that lib AND that the lib names the function, which is a stricter test than the direct
     # text match it replaces (that one was satisfiable by a mere mention in a docstring).
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryTitlePlaceholder'; Scripts = @('new-changelog-entry', 'open-pr');
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryTitlePlaceholder'; Scripts = @('open-pr');
        ViaLib = 'entry-scaffold-lib';
        Optional = $true; Default = 'TODO: title';
        Returns = 'the placeholder title for an entry created without an explicit -Title; open-pr refuses to ship an entry that still carries it' },
@@ -231,7 +231,7 @@ $script:Contract = @(
        ViaLib = 'entry-scaffold-lib';
        Optional = $true; Default = '**To do / where I left off:**';
        Returns = 'the to-do line the entry USED to be scaffolded with; no longer written since the branch/ split, still refused by open-pr wherever it survives' },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryBodyPlaceholder'; Scripts = @('new-changelog-entry', 'open-pr');
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryBodyPlaceholder'; Scripts = @('open-pr');
        ViaLib = 'entry-scaffold-lib';
        Optional = $true; Default = 'TODO: what this change does, for whoever reads CHANGELOG.md later.';
        Returns = 'the placeholder body an entry is scaffolded with -- a prompt for what the change does, since the step list moved to branch/branch-progress.md; open-pr refuses to ship an entry that still carries it' },
@@ -240,15 +240,15 @@ $script:Contract = @(
     # fact alone, and would discover it when a cut refuses; a consumer whose readers are not developers gets
     # a rubric written for developers and would discover that when somebody scores against the wrong test.
     # An [INFO] naming both defaults turns each into a thing they were told.
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntrySignificanceEnabled'; Scripts = @('new-changelog-entry', 'open-pr', 'fold-changelog-entry', 'cut-release');
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntrySignificanceEnabled'; Scripts = @('new-branch', 'open-pr', 'fold-changelog-entry', 'cut-release');
        ViaLib = 'entry-scaffold-lib';
        Optional = $true; Default = 'on';
        Returns = "$true to rank changelog entries by significance, $false to switch the whole mechanism off. On, an entry declares an impact table -- one row per tier it reaches, each with a significance from 1 to 5 and a Why -- and the release cut REFUSES a release whose tier-1-or-higher entries have not scored themselves. Off, nothing is required and no gate speaks. It does NOT switch off the fold's ordering of CHANGELOG.md, which is structural: the tier decides where an entry lands, which is what the retired tier sections used to say visually. On by default since the sections went -- the old default inferred adoption from how many changelog sections a repo declared, and a flat changelog gives every repo the same answer to that" },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntrySignificanceRubricLevels'; Scripts = @('new-changelog-entry', 'open-pr', 'cut-release');
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntrySignificanceRubricLevels'; Scripts = @('new-branch', 'open-pr', 'cut-release');
        ViaLib = 'entry-scaffold-lib';
        Optional = $true; Default = "the five built-in bands, 5 = 'the reader must act' down to 1 = 'cosmetic or preventative'";
        Returns = "a map from significance level to the TEST for that level, e.g. @{ 5 = 'the reader must act -- a breaking change or a required migration' }. Override the bands a repo has to word differently: 'the reader must act' means something else to a marketplace than to a storefront, and a repo whose consumers are not developers needs its own wording. A level left out keeps its built-in text, so one band can be retuned without restating five. The rubric is what makes the number a measurement rather than a mood, and both gates print it when they refuse" },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryFallbackType'; Scripts = @('new-changelog-entry');
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-EntryFallbackType'; Scripts = @('new-branch');
        Optional = $true; Default = 'Chore';
        Returns = "the changelog type an unknown branch prefix falls back to; it must be one of the types this repo's own branch table produces, since the release cut groups entries by it" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-PrMergeMethod'; Scripts = @('ship-pr');
@@ -398,7 +398,7 @@ foreach ($libRel in $contractLibs) {
     }
 
     # Dot-source + probe the consumer lib in a CHILD scope with StrictMode explicitly OFF -- the real
-    # runtime callers this check models (open-pr.ps1, new-branch.ps1, new-changelog-entry.ps1,
+    # runtime callers this check models (open-pr.ps1, new-branch.ps1,
     # fold-changelog-entry.ps1) never call Set-StrictMode, and branch-info.ps1/repo-config.ps1 are
     # written on that no-strict-mode assumption (harmless loose top-level code is expected). Probing
     # inside the same block keeps the dot-sourced functions visible to Get-Command while nothing

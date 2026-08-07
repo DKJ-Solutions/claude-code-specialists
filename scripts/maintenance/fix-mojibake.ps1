@@ -85,7 +85,7 @@ $repoRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git
 
 if (-not $Path -or @($Path).Count -eq 0) {
     # The repo-owned set (issue #413). repo-config.ps1 is OPTIONAL here, exactly as it is for
-    # new-changelog-entry.ps1 (#410): a repair tool that refuses to run because a config file is missing
+    # new-branch.ps1 (#410): a repair tool that refuses to run because a config file is missing
     # helps nobody, and the fallback below is a real answer rather than a degraded one.
     #
     # Dot-sourced and probed in a CHILD scope with StrictMode explicitly OFF -- this script runs under

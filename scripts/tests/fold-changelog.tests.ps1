@@ -115,7 +115,7 @@ function New-FoldFixture {
 
 function New-EntryFile {
     <#
-        An entry file as new-changelog-entry.ps1 writes one since August 5, 2026: an H2 for the change, then
+        An entry file as new-branch.ps1 writes one since August 5, 2026: an H2 for the change, then
         the three named H3 sections. -Rows sets the impact table's data rows (the scaffold's own tier-0 row
         by default), so a test can declare a reach and a significance without hand-building the file.
     #>

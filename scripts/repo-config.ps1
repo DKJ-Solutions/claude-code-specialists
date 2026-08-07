@@ -126,15 +126,15 @@ function Get-LiveStage {
     return $script:LiveStage
 }
 
-# --- The stub wording new-changelog-entry.ps1 writes into an entry file (issue #410) ---------------
+# --- The stub wording new-branch.ps1 writes into an entry file (issue #410) ---------------
 #
-# The four strings below are the entire visible output of the shared new-changelog-entry.ps1: the title
+# The four strings below are the entire visible output of the shared new-branch.ps1: the title
 # placeholder, the body heading, the fallback body, and the changelog type an unknown branch prefix
 # falls back to. They used to be hardcoded in that script, which is fine for an English repo and wrong
 # for any other -- the FILE it writes is repo-owned, so its wording is too.
 #
 # The concrete case (inbound #410, smartwatchbanden): a Dutch-language repo kept its own copy of
-# new-changelog-entry.ps1 at the same relative path, purely to change these four strings. Two entry
+# new-branch.ps1 at the same relative path, purely to change these four strings. Two entry
 # points then wrote two formats for the same branch -- the branch flow called the repo copy, the
 # new-branch skill called the shared one -- which is exactly the duplication the skill exists to
 # prevent. Dropping the copy fixed the duplication and cost them Dutch stubs; these functions give the
@@ -145,7 +145,7 @@ function Get-LiveStage {
 # and Get-LiveStage (#177). Four separate functions rather than one map-returning function, so the
 # contract check can name the exact default per knob in its [INFO] line.
 #
-# TWO OF THEM ARE NOW GATE-ONLY (August 6, 2026). Since the branch/ split, new-changelog-entry.ps1 writes
+# TWO OF THEM ARE NOW GATE-ONLY (August 6, 2026). Since the branch/ split, new-branch.ps1 writes
 # neither the body heading nor the old to-do placeholder -- branch-progress.md carries the step list, and
 # the entry's placeholder asks what the change DOES. The body heading stays defined here because it is
 # still a marker open-pr refuses, so a consumer who translated it keeps a gate that recognises their

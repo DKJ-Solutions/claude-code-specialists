@@ -34,7 +34,7 @@ The script:
 2. Runs the **resolves gate**, before the slow gates and before anything has left the machine. See
    [The resolves gate](#the-resolves-gate-which-issues-does-this-pr-close) below.
 3. Runs the **scaffold gate**: the branch's changelog entry must no longer carry the wording
-   `new-changelog-entry.ps1` scaffolded it with. See
+   `new-branch.ps1` scaffolded it with. See
    [The scaffold gate](#the-scaffold-gate-has-the-entry-actually-been-written) below. On the same read of
    the same file it also runs the **impact gate** and prints the reach and significance it read. See
    [The impact gate](#the-impact-gate-how-far-does-this-change-reach-and-how-much-does-it-weigh) below.

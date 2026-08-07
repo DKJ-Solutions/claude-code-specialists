@@ -30,7 +30,7 @@ The script:
 2. Creates the branch (`git checkout -b`), or checks it out if it already exists -- **idempotent**:
    running it again on the same branch simply resumes it instead of failing.
 3. Immediately writes that branch's **two files in `branch/`** by calling the shared
-   `new-changelog-entry.ps1` as a child step (own script, own mirror) -- so the branch and its files
+   `new-branch.ps1` as a child step (own script, own mirror) -- so the branch and its files
    come into existence in a single step. Idempotent **per file**: a file that already belongs to this
    branch is left exactly as it is.
 

@@ -29,8 +29,7 @@ link is not an oversight.
 |---|---|---|
 | `release/fold-changelog-entry.ps1` | **Shared** (mirror active) | [`fold-changelog`](../skills/fold-changelog/SKILL.md) |
 | `release/open-pr.ps1` | **Shared** (mirror active; lint gate via `Get-LintScript` in `repo-config`) | [`open-pr`](../skills/open-pr/SKILL.md) |
-| `release/new-changelog-entry.ps1` | **Shared** (mirror active; normally reached indirectly via `new-branch`, not called standalone) | [`new-branch`](../skills/new-branch/SKILL.md) |
-| `task/new-branch.ps1` | **Shared** (mirror active; creates the branch and calls `new-changelog-entry.ps1` as a child step in the same move -- a branch is never entry-less) | [`new-branch`](../skills/new-branch/SKILL.md) |
+| `task/new-branch.ps1` | **Shared** (mirror active; creates the branch AND writes both `branch/` files plus the reference templates, in one move -- a branch is never entry-less) | [`new-branch`](../skills/new-branch/SKILL.md) |
 | `task/park-branch.ps1` | **Shared** (mirror active; commits all outstanding work + `git push -u` -- no PR, no live action; self-contained, no repo-owned config) | [`park`](../skills/park/SKILL.md) |
 | `sync/check-roster-sync.ps1` | **Shared** (mirror active; read-only roster/lens drift check) | none -- invoked by the `roster-sessioncheck` SessionStart hook |
 | `sync/check-script-contract.ps1` | **Shared** (mirror active; read-only script-contract drift check) | none -- invoked by the `script-contract-sessioncheck` SessionStart hook |

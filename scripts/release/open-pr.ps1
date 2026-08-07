@@ -63,7 +63,7 @@
     (= needs further classification).
 
     Scaffold gate (measured at v3.2.0): the branch's changelog entry must no longer carry the wording
-    new-changelog-entry.ps1 scaffolded it with -- the placeholder title, the "to do / where I left off"
+    new-branch.ps1 scaffolded it with -- the placeholder title, the "to do / where I left off"
     heading or the fallback body (whatever this repo configured them to be; entry-scaffold-lib.ps1 is the
     single source, shared with the script that writes them). Three of v3.2.0's twenty-one entries kept
     that heading with a status appended, and it reached the release notes and the per-plugin CHANGELOGs

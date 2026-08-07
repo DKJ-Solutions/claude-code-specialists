@@ -342,7 +342,7 @@ function Get-HeadingSlugs {
 }
 
 function Test-IsChangelogEntryFile {
-    # A changelog entry file (new-changelog-entry.ps1) opens with its own heading; permanent root docs
+    # A changelog entry file (new-branch.ps1) opens with its own heading; permanent root docs
     # (README, CHANGELOG, CONTRIBUTING, SECURITY, ...) open with an H1. Same structural signature
     # fold-changelog-entry.ps1 keys off, and BOTH levels are accepted for the same reason it accepts
     # them: an entry file lives only on a branch, so a branch created before August 5, 2026 still
@@ -1323,7 +1323,7 @@ Write-Coverage -Category 'entry-heading' -Checked $ehChecked `
 # format changed THREE TIMES on the day these templates were added, so a hand-maintained copy would have gone
 # stale before it was committed.
 #
-# The templates are therefore generated from the same formatters new-changelog-entry.ps1 calls, and this holds
+# The templates are therefore generated from the same formatters new-branch.ps1 calls, and this holds
 # the files on disk to Get-BranchTemplates. Compared with line endings normalised: whether the working copy
 # checked out CRLF is not a property of the format.
 $btChecked = 0

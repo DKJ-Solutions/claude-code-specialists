@@ -44,8 +44,8 @@ Assert-True ($fold.SourceRel -like 'scripts\*') 'source is repo-root-relative un
 Assert-True ($fold.MirrorRel -like 'plugins\*') 'mirror lives under the plugin'
 # Explicit -- the generic loops further down already cover these two implicitly, but a missing
 # pair in the register would then slip through silently instead of giving a targeted failure.
-$newChangelogPair = $pairs | Where-Object { $_.Name -eq 'new-changelog-entry' }
-Assert-True ($null -ne $newChangelogPair) 'new-changelog-entry is in the register'
+$newChangelogPair = $pairs | Where-Object { $_.Name -eq 'new-branch' }
+Assert-True ($null -ne $newChangelogPair) 'new-branch is in the register'
 $newBranchPair = $pairs | Where-Object { $_.Name -eq 'new-branch' }
 Assert-True ($null -ne $newBranchPair) 'new-branch is in the register'
 
@@ -178,15 +178,16 @@ try {
     Assert-Equal 1 $prCode 'open-pr stops (exit 1) without repo-config/branch-info'
     Assert-True (Test-OutputContains $prOut 'branch-info') 'open-pr names branch-info in the pointer'
 
-    # new-changelog-entry and new-branch rely ONLY on branch-info.ps1 (no repo-config, no gh --
-    # lighter than fold/open-pr), so no VUL-IN follow-up scenario for these two: their only pre-flight
-    # check is the bare existence check on branch-info.ps1 below.
-    $nceSrc = ($pairs | Where-Object { $_.Name -eq 'new-changelog-entry' }).SourcePath
-    $nceRun = Invoke-CapturedScript -ScriptPath $nceSrc -ScriptArgs @('-Title', 'fix: preflight-test')
+    # new-branch relies ONLY on branch-info.ps1 (no gh, and repo-config is optional to it -- lighter than
+    # fold/open-pr), so no VUL-IN follow-up scenario for it: its only pre-flight check is the bare
+    # existence check on branch-info.ps1 below. This used to name two scripts; they merged on
+    # August 7, 2026.
+    $nceSrc = ($pairs | Where-Object { $_.Name -eq 'new-branch' }).SourcePath
+    $nceRun = Invoke-CapturedScript -ScriptPath $nceSrc -ScriptArgs @('-Name', 'fix/preflight-test')
     $nceOut = $nceRun.Out
     $nceCode = $nceRun.Code
-    Assert-Equal 1 $nceCode 'new-changelog-entry stops (exit 1) without branch-info'
-    Assert-True (Test-OutputContains $nceOut 'branch-info') 'new-changelog-entry names branch-info in the pointer'
+    Assert-Equal 1 $nceCode 'new-branch stops (exit 1) without branch-info'
+    Assert-True (Test-OutputContains $nceOut 'branch-info') 'new-branch names branch-info in the pointer'
     $nbSrc = ($pairs | Where-Object { $_.Name -eq 'new-branch' }).SourcePath
     $nbRun = Invoke-CapturedScript -ScriptPath $nbSrc -ScriptArgs @('-Name', 'feat/preflight-test')
     $nbOut = $nbRun.Out

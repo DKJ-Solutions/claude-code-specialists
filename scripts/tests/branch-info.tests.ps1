@@ -40,7 +40,7 @@ function Assert-True {
 Write-Host "Get-BranchPrefix" -ForegroundColor Cyan
 Assert-Equal 'feat'  (Get-BranchPrefix -Branch 'feat/new-plugin') "slash prefix 'feat/...' -> feat"
 Assert-Equal 'fix'   (Get-BranchPrefix -Branch 'fix/broken-frontmatter') "slash prefix 'fix/...' -> fix"
-Assert-Equal 'chore' (Get-BranchPrefix -Branch 'chore-loose-name') "hyphen prefix without slash -> chore"
+Assert-Equal 'wip'   (Get-BranchPrefix -Branch 'wip-loose-name') "hyphen prefix without slash -> wip"
 
 Write-Host "Get-BranchInfo" -ForegroundColor Cyan
 $feat = Get-BranchInfo -Branch 'feat/new-plugin'
@@ -69,7 +69,14 @@ $tableTypes = @($script:BranchPrefixTable.Values | ForEach-Object { $_.Type } | 
 foreach ($t in $tableTypes) {
     Assert-True ($types -contains $t) "table type '$t' is in Get-BranchTypes"
 }
-foreach ($t in $types) {
+# 'Chore' IS THE ONE CANONICAL TYPE WITH NO PREFIX, SINCE AUGUST 7, 2026, and that is asserted rather than
+# excused. Chore work goes directly on the trunk, so no branch produces it -- but every entry already
+# written under it must still validate, so it stays in Get-BranchTypes. Pinning the exception by name is
+# what makes it a decision: a table that quietly re-adds a chore row fails here, and so does dropping
+# 'Chore' from the canonical list and breaking the entries that carry it.
+Assert-True (-not ($tableTypes -contains 'Chore')) "'Chore' has NO prefix -- chore work goes directly on the trunk"
+Assert-True ($types -contains 'Chore') "...but it is still a canonical type, because existing entries declare it"
+foreach ($t in ($types | Where-Object { $_ -ne 'Chore' })) {
     Assert-True ($tableTypes -contains $t) "canonical type '$t' has a prefix in the table"
 }
 
@@ -89,6 +96,17 @@ Assert-Equal $false $finalCheck.IsValid "name with token 'final' -> IsValid fals
 # refused, and what to do instead. A whole-string compare would go red on every rewording of the
 # explanation, which is the half most likely to be improved -- and it would say nothing about the part
 # that actually has to be there.
+# 'chore/' IS REFUSED (Dave, August 7, 2026): chore work goes directly on the trunk, so a chore BRANCH is
+# a contradiction. Anchored to the PREFIX, unlike 'final' -- a branch may legitimately be about chores, and
+# refusing that would be the over-broad match this repo already accepts for one token and no more.
+$choreCheck = Test-BranchName -Branch 'chore/tidy-the-scripts'
+Assert-Equal $false $choreCheck.IsValid "prefix 'chore/' -> IsValid false"
+Assert-True ($choreCheck.Reason -match 'not a branch prefix') "chore -> the Reason says what was refused"
+Assert-True ($choreCheck.Reason -match 'feat/, fix/ or docs/') "chore -> and names the three that are left"
+Assert-Equal $true (Test-BranchName -Branch 'docs/explain-the-chore-commits').IsValid "a branch ABOUT chores is fine -- only the prefix position makes the claim"
+# ...and 'Chore' survives as a TYPE, because every entry already written under it still has to validate.
+Assert-True ((Get-BranchTypes) -contains 'Chore') "'Chore' is still a recognised changelog type -- existing entries carry it"
+
 Assert-True ($finalCheck.Reason -match "must not contain the token 'final'") "token 'final' -> the Reason says what was refused"
 Assert-True ($finalCheck.Reason -match '-v2') "token 'final' -> and names the remedy, so the next guess is not 'finished'"
 

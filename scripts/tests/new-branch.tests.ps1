@@ -1,7 +1,12 @@
 <#
 .SYNOPSIS
-    Regression tests for scripts/task/new-branch.ps1 (branch creation + changelog entry in a single,
-    idempotent call) and, indirectly, its sibling scripts/release/new-changelog-entry.ps1.
+    Regression tests for scripts/task/new-branch.ps1 -- branch creation plus the two files the branch
+    works in, in a single idempotent call.
+
+    ONE SCRIPT SINCE AUGUST 7, 2026. The file writing used to live in a sibling,
+    scripts/release/new-changelog-entry.ps1, invoked as a child process. These tests were the safety
+    net for that merge: they run the real script end to end, so a behaviour that survived the splice
+    is a behaviour these asserts saw.
 
 .DESCRIPTION
     Dependency-free: no Pester needed, only PowerShell. Integration style -- runs the REAL scripts
@@ -10,9 +15,9 @@
 
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/new-branch.tests.ps1
 
-    new-branch.ps1 itself calls 'exit' (and in turn starts new-changelog-entry.ps1 as a child
-    process) -- that is why it is run here as a CHILD PROCESS (powershell -File), otherwise 'exit'
-    would abort this test runner itself. The git mutation commands in new-branch/new-changelog-entry
+    new-branch.ps1 itself calls 'exit' -- that is why it is run here as a CHILD PROCESS
+    (powershell -File), otherwise 'exit' would abort this test runner itself. The git mutation
+    commands in new-branch
     already run under ErrorActionPreference=Continue themselves (the #107 pitfall, see
     shared-scripts.tests.ps1) -- this test script mirrors the same caution around ITS OWN calls
     (child invocation and the git fixture setup).
@@ -23,14 +28,13 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot         = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $NewBranchSrc     = Join-Path $RepoRoot 'scripts\task\new-branch.ps1'
-$NewChangelogSrc  = Join-Path $RepoRoot 'scripts\release\new-changelog-entry.ps1'
 $BranchInfoSrc    = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 # new-branch -Park dot-sources this sibling shared lib for its git push (the #107 stderr guard),
 # so the fixture must carry it too.
 $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
-# new-changelog-entry.ps1 dot-sources this for the scaffold wording -- the single source it shares with
-# open-pr.ps1's scaffold gate. Without it in the fixture, every entry-writing case here dies on a raw
-# path-not-found instead of testing anything.
+# new-branch.ps1 dot-sources this for the entry format -- the single source it shares with open-pr.ps1's
+# scaffold gate. Without it in the fixture, every entry-writing case here dies on a raw path-not-found
+# instead of testing anything.
 $EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 # Direct Test-BranchName calls (separate from the CLI) for the empty/whitespace-only case --
 # PowerShell's mandatory-param binding catches an empty -Name via the CLI with a generic error, so
@@ -157,9 +161,9 @@ $script:fixtures = @()
 
 function New-Fixture {
     <#
-        A fresh throwaway git repo with the three touched scripts copied into it (new-branch.ps1,
-        new-changelog-entry.ps1, branch-info.ps1 -- the real ones from the repo, so the prefix table
-        is correct), plus an initial commit on a base branch 'main'. The scripts under test will run
+        A fresh throwaway git repo with the touched scripts copied into it (new-branch.ps1 and the libs
+        it dot-sources -- the real ones from the repo, so the prefix table is correct), plus an initial
+        commit on a base branch 'main'. The scripts under test will run
         FROM THIS FIXTURE (not from the real repo), so git mutations (checkout/checkout -b) never
         touch the own working copy.
     #>
@@ -170,7 +174,6 @@ function New-Fixture {
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\release') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\lib')    -Force | Out-Null
     Copy-Item -LiteralPath $NewBranchSrc     -Destination (Join-Path $dir 'scripts\task\new-branch.ps1')             -Force
-    Copy-Item -LiteralPath $NewChangelogSrc  -Destination (Join-Path $dir 'scripts\release\new-changelog-entry.ps1') -Force
     Copy-Item -LiteralPath $BranchInfoSrc    -Destination (Join-Path $dir 'scripts\lib\branch-info.ps1')             -Force
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')      -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')      -Force
@@ -280,41 +283,6 @@ function Invoke-NewBranchWithAdversarialField {
         if ($null -eq $prevPd) { Remove-Item Env:\CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue }
         else { $env:CLAUDE_PROJECT_DIR = $prevPd }
         [Environment]::SetEnvironmentVariable($envVarName, $prevEnvValue)
-    }
-}
-
-function Invoke-NewChangelogEntry {
-    <#
-        Runs the fixture copy of new-changelog-entry.ps1 DIRECTLY (i.e. separate from new-branch.ps1)
-        as a child process, with the fixture folder as cwd. Optionally $env:CLAUDE_NEWBRANCH_TITLE is
-        set beforehand in THIS test process -- the child process inherits that env var automatically,
-        exactly as new-branch.ps1 also does internally. Always cleans up the env var again
-        (restores the previous value), even on an error, so this test process itself does not leave
-        behind a leaking CLAUDE_NEWBRANCH_TITLE.
-    #>
-    param(
-        [Parameter(Mandatory = $true)][string]$Dir,
-        [string]$Title,
-        [string]$EnvTitle
-    )
-    $scriptPath = Join-Path $Dir 'scripts\release\new-changelog-entry.ps1'
-    $callArgs = @()
-    if ($PSBoundParameters.ContainsKey('Title')) { $callArgs += @('-Title', $Title) }
-
-    $prevEnvTitle = $env:CLAUDE_NEWBRANCH_TITLE
-    $prevEap = $ErrorActionPreference
-    $prevLoc = (Get-Location).Path
-    try {
-        if ($PSBoundParameters.ContainsKey('EnvTitle')) { $env:CLAUDE_NEWBRANCH_TITLE = $EnvTitle }
-        else { Remove-Item Env:\CLAUDE_NEWBRANCH_TITLE -ErrorAction SilentlyContinue }
-        Set-Location -LiteralPath $Dir
-        $ErrorActionPreference = 'Continue'
-        return (Invoke-CapturedChild -WorkDir $Dir -ChildArgs (@('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath) + $callArgs))
-    } finally {
-        $ErrorActionPreference = $prevEap
-        Set-Location -LiteralPath $prevLoc
-        if ($null -eq $prevEnvTitle) { Remove-Item Env:\CLAUDE_NEWBRANCH_TITLE -ErrorAction SilentlyContinue }
-        else { $env:CLAUDE_NEWBRANCH_TITLE = $prevEnvTitle }
     }
 }
 
@@ -517,27 +485,15 @@ try {
     $commitCountF = @(& git -C $fixtureF log --oneline --all).Count
     Assert-Equal 1 $commitCountF 'malicious title: no new commit added -- only the initial fixture commit'
 
-    # --- (g) Regression: an explicit -Title wins over a set $env:CLAUDE_NEWBRANCH_TITLE -- the env
-    # var is only a fallback as long as -Title is at its own default. Tested on
-    # new-changelog-entry.ps1 itself (directly), where that precedence logic lives. -------------------
-    Write-Host "new-changelog-entry.ps1 -- an explicit -Title wins over a set env-var fallback" -ForegroundColor Cyan
-    $fixtureG = New-Fixture -Label 'g'
-    $prevEap = $ErrorActionPreference
-    try {
-        $ErrorActionPreference = 'Continue'
-        & git -C $fixtureG checkout -q -b 'feat/env-precedence' 2>$null | Out-Null
-    } finally {
-        $ErrorActionPreference = $prevEap
-    }
-
-    $rG = Invoke-NewChangelogEntry -Dir $fixtureG -Title 'Explicit title' -EnvTitle 'Env title (should be ignored)'
-    Assert-Equal 0 $rG.Code 'explicit -Title + set env var: exit 0'
-    $entryPathG = Join-Path $fixtureG ((Get-BranchFilePaths).Changelog)
-    Assert-True (Test-Path -LiteralPath $entryPathG) 'entry file created'
-    $entryTextG = [System.IO.File]::ReadAllText($entryPathG, [System.Text.Encoding]::UTF8)
-    Assert-Equal 'Explicit title' (Get-EntryDescription -EntryText $entryTextG) 'explicit -Title wins -- it is the branch description'
-    Assert-True (-not ($entryTextG -match [regex]::Escape('Env title'))) 'env-var title NOT used while -Title was given explicitly'
-    Assert-True ($null -eq $env:CLAUDE_NEWBRANCH_TITLE) 'test process itself leaves no leaking CLAUDE_NEWBRANCH_TITLE behind after this scenario'
+    # --- (g) RETIRED, AUGUST 7, 2026. It tested that an explicit -Title beat a set
+    # $env:CLAUDE_NEWBRANCH_TITLE, invoking new-changelog-entry.ps1 directly because the precedence lived
+    # there. Both the env var and that script are gone: the handoff existed ONLY to carry -Title across a
+    # process boundary without argv requoting, and merging the two scripts removed the boundary. -Title is
+    # an ordinary parameter again, so there is no precedence left to get wrong.
+    #
+    # The half of this scenario worth keeping did not need the env var at all -- that an explicit -Title
+    # lands in the branch description -- and scenario (f) below already asserts it on a payload far nastier
+    # than 'Explicit title'. Deleted rather than rewritten into a duplicate.
 
     # --- (h) -Intent given: recorded in the STEP LIST, not the entry (#162, revised August 6, 2026) --
     # The intent is a status -- "where I left off" -- and since the branch/ split that is exactly what
