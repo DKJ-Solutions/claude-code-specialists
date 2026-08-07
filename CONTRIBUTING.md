@@ -29,22 +29,18 @@ changelog entry — the same workflow as the consuming repos. The steps:
    ## `<your branch>` changelog
 
    ### Branch description
-   <!-- Short description of branch-->
 
    … the title you gave -Title …
 
    ### Branch ID
-   <!--unique ID for branch like a timestamp of the moment this branch is created-->
 
    20260806-114230
 
    ### Branch type
-   <!-- options for type are: feat, fix or docs-->
 
    feat
 
    ### What does the change on this branch bring to main?
-   <!-- what the change DOES, for whoever reads CHANGELOG.md later -->
 
    … the description you write …
 
@@ -56,14 +52,26 @@ changelog entry — the same workflow as the consuming repos. The steps:
 
    **Score:** <1-5>
 
+   #### Tier 1
+
+   … why it matters to colleagues, or why it does not …
+
+   **Score:** <1-5, or N/A>
+
+   #### Tier 2
+
+   … why it matters to customers and users, or why it does not …
+
+   **Score:** <1-5, or N/A>
+
    ### Pull Request
-   <!-- filled in by the fold, from the merge itself -->
    ```
 
-   **The heading, the ID and the type arrive filled in**, and every field carries a guidance comment above
-   the space where your answer goes. Those comments are **stripped by the fold**, so leaving them standing
-   costs the changelog nothing — and an empty field is refused at step 3, which is what replaced the old
-   `TODO:` placeholders. **The PR number and the merge date are added by the fold** into `### Pull Request`:
+   **The heading, the ID and the type arrive filled in**, and the file is otherwise **bare** — headings and
+   the space under them. The guidance for each field lives in
+   [`branch/templates/`](branch/templates/), which is what those copies are for. An empty field is refused
+   at step 3, which is what replaced the old `TODO:` placeholders.
+   **The PR number and the merge date are added by the fold** into `### Pull Request`:
    neither exists yet, and a date written now would be the branch's birth date rather than its landing date. Valid prefixes (prefix → label → changelog type): `feat/` → enhancement → Feat ·
    `fix/` → bug → Fix · `docs/` → documentation → Docs · `chore/` → documentation → Chore
    (maintenance: scripts, tooling, config). The table is in
@@ -105,8 +113,8 @@ changelog entry — the same workflow as the consuming repos. The steps:
 
 ### One thing to do while writing the entry: fill in its Significance sections
 
-Every entry carries a `### Significance` section with one `#### Tier N` sub-section per reach it claims,
-scaffolded with tier 0 alone. Filling it in is an edit in a file you are already editing before the PR:
+Every entry carries a `### Significance` section with a `#### Tier N` sub-section for each of the three
+reaches. Filling them in is an edit in a file you are already editing before the PR:
 
 ```text
 #### Tier 0
@@ -114,17 +122,13 @@ scaffolded with tier 0 alone. Filling it in is an edit in a file you are already
 … why it matters at this reach …
 
 **Score:** <1-5>
-
-<!--
-     Is this change also relevant to colleagues and employers? Then continue to Tier 1.
-     If not, stop here and move on to the next section.
--->
 ```
 
-**Work down the tiers and stop where the answer is no.** Tier 0 can always be answered; each section ends
-by asking whether there is a next one. **Not every change has a tier 1 or a tier 2, and that is the point
-of sections rather than a table** — a missing row read as an omission, a missing section reads as a
-decision.
+**All three tiers are in the file, and each one is answered.** Tier 0 can always be scored. For the two
+above it the answer may well be *"this reaches nobody here"* — write `N/A` in the score and say in one line
+why. **That is an answer, not a gap:** a blank means both "reaches nobody" and "nobody has got to this yet",
+and the gate has to be able to tell those apart. The reach is the **highest tier with a number**, so an
+`N/A` costs nothing but a sentence.
 
 The **tier** says how far the change reaches, and therefore which release document the entry appears in:
 
@@ -146,9 +150,9 @@ most consequential change leads. Score it against this rubric:
 | `2` | small; noticed if somebody points it out |
 | `1` | cosmetic or preventative — nothing changes for them today |
 
-**Every tier you claim needs its own section, with a why and a score.** The ladder is cumulative — a change
-consumers notice is also a change colleagues get something out of — so a tier-2 entry owes a tier-1 section,
-and the routing questions walk you there:
+**Every tier needs a why, including the ones you answer `N/A`.** The ladder is cumulative — a change
+consumers notice is also a change colleagues get something out of — so a scored tier 2 obliges a scored
+tier 1:
 
 ```text
 #### Tier 1
@@ -157,11 +161,6 @@ The routine version bump stops needing a developer.
 
 **Score:** 4
 
-<!--
-     Is this change also relevant to the people who consume this product? Then
-     continue to Tier 2. If not, stop here and move on to the next section.
--->
-
 #### Tier 2
 
 Consumers must re-add the marketplace under its new name; installs break without it.
@@ -169,9 +168,9 @@ Consumers must re-add the marketplace under its new name; installs break without
 **Score:** 5
 ```
 
-**Tier 1 and Tier 2 arrive commented out**, each behind its own `<!-- UNCOMMENT … -->` line. Delete the
-first to bring Tier 1 in; Tier 2 has a marker of its own, so it stays commented until you delete that one
-too. The tiers come out one at a time, in order, with nothing else to edit.
+**The ladder cannot be skipped.** `N/A` at tier 1 with a score at tier 2 says a change consumers notice
+gives this project's colleagues nothing, and `open-pr.ps1` refuses that by name rather than asking you for
+a number.
 
 **Why it matters even though nothing breaks if you leave it at 0:** the release cut refuses a bump the tiers
 have not earned — a release needs at least one tier-1 entry, a minor needs a tier-2 one — and it also refuses

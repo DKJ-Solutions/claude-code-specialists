@@ -1,14 +1,5 @@
 ## `<prefix>/<short-name>` progress (template)
 
-### Branch description
-<!-- Short description of branch-->
-
-### Branch ID
-<!--unique ID for branch like a timestamp of the moment this branch is created-->
-
-### Branch type
-<!-- options for type are: feat, fix or docs-->
-
 ### Steps
 
 <!--

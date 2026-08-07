@@ -30,33 +30,37 @@
 
 <!--
      Is this change also relevant to colleagues and employers? Then continue to Tier 1.
-     If not, stop here and move on to the next section.
+     If not, say so there in one line and put N/A in its Score.
 -->
-
-<!-- UNCOMMENT Tier 1 if colleagues and employers get something out of this change.
 
 #### Tier 1
 
+<!--
      Why the change matters AT THIS REACH specifically. A reason that would read the
      same under every tier is a sign the tier is wrong. Then Score: 1-5 against the
      rubric new-branch printed when it wrote this file.
 
+     If it has no significance at this reach at all, then explain shortly why and insert N/A in Score.
+-->
+
 **Score:**
 
-     Is this change also relevant to the people who consume this product? Then
-     continue to Tier 2. If not, stop here and move on to the next section.
-
-<!-- UNCOMMENT Tier 2 as well if a consumer of the product notices it.
+<!--
+     Is this change also relevant to customers and users? Then continue to Tier 2.
+     If not, say so there in one line and put N/A in its Score.
+-->
 
 #### Tier 2
 
+<!--
      Why the change matters AT THIS REACH specifically. A reason that would read the
      same under every tier is a sign the tier is wrong. Then Score: 1-5 against the
      rubric new-branch printed when it wrote this file.
 
-**Score:**
-
+     If it has no significance at this reach at all, then explain shortly why and insert N/A in Score.
 -->
+
+**Score:**
 
 ### Pull Request
 <!-- link to the PR in github when branch is merged to main and the date this happened-->
