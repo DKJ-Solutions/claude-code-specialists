@@ -119,7 +119,7 @@ to stop asking for the title twice rather than to add a third check on the secon
 **Reach for `open-pr` on its own only when you are stopping at the PR** — work waiting under one of the
 two exceptions, or a branch you want reviewed before it lands. **When the work is going all the way
 through, run [`ship-pr`](#merging-to-main) instead**: its first step *is* this script, so running both
-puts the lint and all 26 suites through a second time for no added coverage.
+puts the lint and every suite through a second time for no added coverage.
 
 **Name the issues the PR closes — the gate now insists.** A PR that repairs an issue passes
 `-Resolves "331,332"`; a PR that repairs none passes `-NoResolves`. Leave both off while the changelog
@@ -175,9 +175,15 @@ It runs `open-pr` (gate → push → PR), waits for the required CI check, merge
 folds the entry. One command, one gate run.
 
 **Do NOT run `open-pr` first and then `ship-pr`** — measured August 7, 2026 and it cost about 91 minutes
-in a single day. `ship-pr`'s step 1 *is* `open-pr`, so running both puts the lint and all 26 suites
-through twice: roughly 13 minutes each, on top of the ~11 that CI spends on the same commit. This section
-used to show a bare `gh pr merge` and never named `ship-pr`, which is what led into that route.
+in a single day. `ship-pr`'s step 1 *is* `open-pr`, so running both puts the lint and every suite through
+a second time for no added coverage, on top of what CI spends on the same commit. This section used to show
+a bare `gh pr merge` and never named `ship-pr`, which is what led into that route.
+
+**That waste is now a fraction of what it was, and the advice is unchanged.** Later the same day the gate
+started running its suites in parallel ([#512](https://github.com/DaveKJohn/claude-code-specialists/issues/512)),
+taking it from **510s sequential to 128–263s** over six runs on the same machine in the same session — so a
+duplicate run costs two to four minutes rather than thirteen. Worth knowing for a second reason: a gate
+that is cheap is a gate nobody has an excuse to `-SkipTests`.
 
 The by-hand route below is the **fallback**, for when `ship-pr` cannot finish — a CI check that never
 reports, or a PR opened from the GitHub UI. The order is fixed either way: **first the PR open, then

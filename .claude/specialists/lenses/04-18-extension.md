@@ -31,7 +31,9 @@ logic in `release-lib.ps1` (version bump, CHANGELOG transformation, release-note
   `cut-release-guardrail.tests.ps1`, `park-branch.tests.ps1`), the connectors + roster machinery
   (`connectors.tests.ps1`, `roster-sync.tests.ps1`, `sync-roster.tests.ps1`), the shared-scripts
   mirror + contract (`shared-scripts.tests.ps1`, `script-contract.tests.ps1`), the bootstrap drift
-  check (`bootstrap-drift.tests.ps1`), and the repo-config helper (`repo-config.tests.ps1`). Tycho
+  check (`bootstrap-drift.tests.ps1`), the repo-config helper (`repo-config.tests.ps1`), and the test
+  gate itself (`test-suite-gate.tests.ps1` — the runner all three callers share, which had only
+  wiring-level coverage until it became a parallel scheduler on August 7, 2026). Tycho
   does not need to re-derive that list from memory: `Get-ChildItem scripts/tests/*.tests.ps1` gives
   the current count and membership directly, which is deliberately how this file avoids hardcoding a
   number that would drift with every new suite.
