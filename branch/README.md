@@ -240,8 +240,15 @@ readers, the scaffold wording and the tier sections. One shape, written once, re
 ## Working from more than one machine
 
 Park a branch with [`scripts/task/park-branch.ps1`](../scripts/task/park-branch.ps1), or create it with
-`new-branch.ps1 -Park`: both commit **both** files and push, with no PR. The step list is the half that
-says what was still in flight, so parking the entry without it defeats the point.
+`new-branch.ps1 -Park`: both push with no PR, and both take **both** files rather than the entry alone —
+the step list is the half that says what was still in flight, so parking the description without the plan
+defeats the point.
+
+**They differ in what else comes along, and the commit now says so** (#507): `-Park` commits *only* those
+two files, leaving anything you had staged for your own next commit exactly where it was, while
+`park-branch` commits *everything* outstanding. The subjects read `park: <branch> (the branch files only)`
+and `park: <branch> (all outstanding work)`. They were the same sentence until August 7, 2026, which meant
+that afterwards nothing told you which half of your work had reached origin.
 
 Before picking a parked branch back up, measure its plan against `main`. A plan that reads as current is
 not evidence that it is — see the `park` skill for what to check and why.

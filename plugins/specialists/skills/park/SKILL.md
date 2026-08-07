@@ -85,10 +85,23 @@ thing to automate. Check your own repo's governance before reaching for `git pus
 
 Both put a branch on the remote without a PR, but they cover different moments:
 
-- **`new-branch -Park`** parks a branch **at creation** and commits **only the changelog entry**
+- **`new-branch -Park`** parks a branch **at creation** and commits **only the branch files**
   (leaving other staged work untouched) -- start-and-park in one move.
 - **`park` (this skill)** parks an **existing** branch **at any point mid-work** and commits
   **everything** outstanding -- back up a branch you are already working on.
+
+**The commit says which of the two you got**, since
+[#507](https://github.com/DaveKJohn/claude-code-specialists/issues/507): `park: <branch> (all outstanding
+work)` against `park: <branch> (the branch files only)`. Until August 7, 2026 both wrote the *same*
+subject -- `park: <branch> (work parked for later)` -- so afterwards nothing told you which half of your
+work was safely on origin, which is the one question a park exists to answer. Both now run the same
+implementation (`Invoke-GitPark` in `park-lib.ps1`), and the scope picks the pathspec **and** the words
+from one decision, so a park cannot commit one thing and announce another.
+
+**Neither was deleted, and the measurement is why.** The proposal on the table was to drop `-Park` as
+"parking a branch with nothing in it yet". Across the whole history there are **three** park commits --
+**two** of them from `-Park`, one from this script. The two entry points are two *moments*, and both are
+used; what was wrong was only that the record could not tell them apart.
 
 ## Requirements in the consumer
 

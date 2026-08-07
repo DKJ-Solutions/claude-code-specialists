@@ -21,10 +21,18 @@
       - It performs NO live/deploy action of any kind: it only touches git (add/commit/push). A
         consumer whose repo drives a live target (e.g. a Shopify theme) is never published by a park.
 
-    Relation to `new-branch -Park`: that flag parks a branch AT CREATION and commits ONLY the
-    changelog entry (leaving other staged work untouched). This script parks an EXISTING branch at
+    Relation to `new-branch -Park`: that flag parks a branch AT CREATION and commits ONLY the branch
+    files (leaving other staged work untouched). This script parks an EXISTING branch at
     any point mid-work and commits EVERYTHING outstanding. Use new-branch -Park to start-and-park in
     one move; use park-branch to back up a branch you are already working on.
+
+    BOTH RUN THE SAME IMPLEMENTATION SINCE #507 (August 7, 2026) -- Invoke-GitPark in park-lib.ps1 --
+    and the commit message now names the scope, so `park: <branch> (all outstanding work)` and
+    `park: <branch> (the branch files only)` are told apart in the log. They used to be the same
+    sentence, which meant that afterwards nothing said which half of your work was safely on origin.
+    That was the finding; the two entry points themselves are NOT a defect and neither was deleted --
+    they are two moments, and the measured usage backs both (of three park commits in the whole
+    history, two came from -Park).
 
     Self-contained: depends only on git and the shared native-capture helper that travels with it --
     no repo-owned config (no branch-info, no repo-config), so it needs no consumer-side scaffold.
@@ -69,6 +77,10 @@ $repoRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git
 # cache, or the plugin mirror tree alike.
 . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
 
+# The shared park implementation, same payload reasoning as the lib above: it travels with this script
+# and with new-branch.ps1, the only two callers there are.
+. (Join-Path $PSScriptRoot '..\lib\park-lib.ps1')
+
 # Current branch from HEAD. Via Invoke-NativeCapture so a detached/edge git state cannot turn a
 # stderr line into a terminating error before the exit code is judged.
 $branchRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-parse', '--abbrev-ref', 'HEAD')
@@ -85,42 +97,11 @@ if ($branch -eq 'main') {
     exit 1
 }
 
-# Stage everything outstanding: the whole point of a park is that nothing is left behind locally.
-$addRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'add', '-A')
-$addRes.Output | ForEach-Object { Write-Host $_ }
-if ($addRes.ExitCode -ne 0) { Write-Error "park: staging outstanding work failed."; exit 1 }
-
-# Commit only if something is actually staged. `git diff --cached --quiet` exits 0 when there is
-# nothing staged (clean or already-committed) and 1 when there are staged changes -- so a branch
-# that was already committed locally but never pushed skips the commit and is simply pushed as-is
-# (the real-world scenario this script exists for, issue #175).
-$diffRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'diff', '--cached', '--quiet')
-if ($diffRes.ExitCode -ne 0) {
-    # Message via `git commit -F <file>`, not `-m "...$branch..."`: a branch name may legally carry a
-    # `"` (git check-ref-format allows it), which embedded in an -m argument would break native argv
-    # reconstruction (the quoting lesson). A message file sidesteps argv entirely. An optional -Intent
-    # is appended as a second paragraph, so "where I left off" lands in the commit itself. Cleaned up
-    # in finally, whether or not git succeeds.
-    $msg = "park: $branch (work parked for later)"
-    if ($Intent.Trim()) { $msg = "$msg`n`n$($Intent.Trim())" }
-    $msgFile = Join-Path ([System.IO.Path]::GetTempPath()) "park-branch-msg-$PID.txt"
-    [System.IO.File]::WriteAllText($msgFile, $msg, (New-Object System.Text.UTF8Encoding $false))
-    try {
-        $commitRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'commit', '-F', $msgFile)
-        $commitRes.Output | ForEach-Object { Write-Host $_ }
-        if ($commitRes.ExitCode -ne 0) { Write-Error "park: committing outstanding work failed."; exit 1 }
-    } finally {
-        Remove-Item -Path $msgFile -Force -ErrorAction SilentlyContinue
-    }
-} else {
-    Write-Host "park: nothing new to commit -- pushing the existing commits as-is." -ForegroundColor Yellow
-}
-
-# Push + set upstream tracking, so the branch is reachable (and continuable) from another device.
-# No PR: push != PR (the PR rule stays intact and separate).
-$pushRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'push', '-u', 'origin', $branch)
-$pushRes.Output | ForEach-Object { Write-Host $_ }
-if ($pushRes.ExitCode -ne 0) { Write-Error "park: git push failed (is 'origin' configured and reachable?)."; exit 1 }
-
-Write-Host "Branch '$branch' parked on origin (pushed, no PR)." -ForegroundColor Green
+# THE STAGE-COMMIT-PUSH ITSELF LIVES IN park-lib.ps1 (issue #507, August 7, 2026), because
+# new-branch.ps1 -Park had its own copy of these same four steps -- and the two had drifted in the way
+# that matters least to a script and most to a person: they wrote the IDENTICAL commit message while
+# committing different things. 'Everything' is this script's scope and always was; the scope now also
+# chooses the words, so the log says which half of the work is on origin.
+$ok = Invoke-GitPark -RepoRoot $repoRoot -Branch $branch -Scope 'Everything' -Intent $Intent
+if (-not $ok) { exit 1 }
 exit 0

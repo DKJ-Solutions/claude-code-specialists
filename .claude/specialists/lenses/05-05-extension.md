@@ -334,8 +334,12 @@ Derek prefers not to touch the git commands by hand. His toolbox:
   **no live/deploy action** — git only. Already committed locally but not pushed? It skips the
   commit and just pushes. Self-contained (no repo-owned config). `-Intent` records where you left
   off in the park commit message. Runs via the `park` skill (#175). **`park` vs `new-branch -Park`:**
-  `-Park` parks *at creation* and commits *only the changelog entry*; `park-branch` parks an
-  *existing* branch and commits *everything* — start-and-park versus back-up-mid-work.
+  `-Park` parks *at creation* and commits *only the two branch files*; `park-branch` parks an
+  *existing* branch and commits *everything* — start-and-park versus back-up-mid-work. **The commit
+  subject says which** since August 7, 2026 (#507): `(all outstanding work)` against `(the branch files
+  only)`. Both used to write the same sentence while committing different things, so the log could not
+  answer the one question a park is asked later — which half of my work is on origin? One implementation
+  now (`Invoke-GitPark`), with the scope choosing the pathspec and the words together.
 - `scripts/release/open-pr.ps1 [-Body "…"] [-SkipLint] [-SkipTests]` — push the branch +
   open the PR, with the right label from the prefix. Without `-Body` **the script fills in the
   template itself**. **Lint gate:** before the push, `scripts/lint/check-plugin-integrity.ps1`

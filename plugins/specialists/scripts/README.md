@@ -35,6 +35,7 @@ link is not an oversight.
 | `sync/check-script-contract.ps1` | **Shared** (mirror active; read-only script-contract drift check) | none -- invoked by the `script-contract-sessioncheck` SessionStart hook |
 | `lib/check-report-lib.ps1` | **Shared** (mirror active; dot-sourced `[OK]`/`[INFO]`/`[ERROR]` report helper lib, no standalone entry point) | none -- consumed by the sync/check scripts |
 | `lib/native-capture-lib.ps1` | **Shared** (mirror active; dot-sourced `Invoke-NativeCapture` helper lib -- the stderr-safe native-command wrapper -- no standalone entry point) | none -- consumed by every native-command call site (release/task scripts) |
+| `lib/park-lib.ps1` | **Shared** (mirror active; dot-sourced `Invoke-GitPark` -- the one stage/commit/push behind both parking entry points, with the scope choosing the pathspec and the commit words together; no standalone entry point) | none -- consumed by `task/park-branch.ps1` and `task/new-branch.ps1 -Park` |
 
 ## How the mirror works
 
