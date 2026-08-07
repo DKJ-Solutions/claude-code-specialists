@@ -134,7 +134,7 @@ produced. Score it 1 to 5 against this rubric:
 | `4` | materially changes how they work; they notice within a day without being told |
 | `3` | a clear improvement, noticed the moment they touch that part |
 | `2` | small; noticed if somebody points it out |
-| `1` | cosmetic or preventative -- nothing changes for them today |
+| `1` | cosmetic, or prevents a failure that has not happened yet -- then name the failure, because that is the only part a later reader can use |
 
 **All three tiers are in the file, and each one is answered.** Where the change reaches nobody, write
 `N/A` in the score and say in one line why -- that is an answer rather than a gap, and it is what lets a

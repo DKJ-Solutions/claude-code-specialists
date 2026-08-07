@@ -912,7 +912,24 @@ $script:EntrySignificanceRubricDefaults = @(
     [pscustomobject]@{ Score = 4; Test = 'materially changes how they work; they notice within a day without being told' }
     [pscustomobject]@{ Score = 3; Test = 'a clear improvement, noticed the moment they touch that part' }
     [pscustomobject]@{ Score = 2; Test = 'small; noticed if somebody points it out' }
-    [pscustomobject]@{ Score = 1; Test = 'cosmetic or preventative -- nothing changes for them today' }
+    # BAND 1 ASKS WHAT IS PREVENTED (Dave, #509, August 7, 2026). It read 'cosmetic or preventative --
+    # nothing changes for them today', and the second half invited the sentence the rubric exists to
+    # prevent: PR #503's entry scored its tier 0 with "Nothing changes here" -- technically inside the band,
+    # and worth nothing to a reader a year later. A preventative change is the one case where the value is
+    # ENTIRELY in what did not happen, so that is the one thing the band has to ask for. The other four
+    # bands describe something the reader can observe; this one describes an absence, and an absence has to
+    # be named or it is indistinguishable from having nothing to say.
+    #
+    # THE OBVIOUS ALTERNATIVE WAS REJECTED, and it is worth knowing why before anyone builds it. Dave asked
+    # whether tier 0 scoring below tier 1 should be refused at all -- if nothing changes for this repo's own
+    # developers, how can it change for anyone further out? The general claim does not hold, and PR #503 is
+    # the counterexample: the defect existed ONLY outside this repo (consumers had no branch/templates/;
+    # this repo always did), so it was worth 4 to a consumer and almost nothing here. The tiers are not
+    # nested audiences -- a consumer is not a colleague of this project. That gate would have refused a
+    # correct entry. The instinct behind it IS already encoded, correctly, one level down: tier 0 is the one
+    # tier that cannot be N/A, because every change reaches this repo's own developers at least a little.
+    # The floor is a score of 1, not nothing -- and band 1 now asks what that 1 buys.
+    [pscustomobject]@{ Score = 1; Test = 'cosmetic, or prevents a failure that has not happened yet -- then name the failure, because that is the only part a later reader can use' }
 )
 
 function Get-EntrySignificanceRange {

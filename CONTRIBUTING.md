@@ -149,7 +149,7 @@ most consequential change leads. Score it against this rubric:
 | `4` | materially changes how they work; they notice within a day without being told |
 | `3` | a clear improvement, noticed the moment they touch that part |
 | `2` | small; noticed if somebody points it out |
-| `1` | cosmetic or preventative — nothing changes for them today |
+| `1` | cosmetic, or prevents a failure that has not happened yet — then name the failure, because that is the only part a later reader can use |
 
 **Every tier needs a why, including the ones you answer `N/A`.** The ladder is cumulative — a change
 consumers notice is also a change colleagues get something out of — so a scored tier 2 obliges a scored
