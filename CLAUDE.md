@@ -202,6 +202,19 @@ The constitution above, concretely implemented here:
   (`scripts/tests/*.tests.ps1`), exactly as CI
   does. `open-pr.ps1` runs both gates first; on an error or a failing suite nothing is pushed and
   no PR is opened (`-SkipLint`/`-SkipTests` are the escape valves). See [Sylvester #15](.claude/specialists/lenses/05-15-extension.md).
+
+  **The entry format is described in about ten hand-maintained places, and the answer is a check rather
+  than a clear-out** (Dave, August 7, 2026;
+  [#508](https://github.com/DaveKJohn/claude-code-specialists/issues/508)). Two of those descriptions were
+  measured stale during a sweep that was looking for exactly that, one of them consumer-facing. The
+  alternative — deleting the shape from every document and pointing at
+  [`branch/templates/`](branch/templates/) — was weighed and declined: the prose costs every reader on
+  every read, while a check costs nothing per read. **What is checked is the section COUNT, not the
+  section names**, and that was settled by measuring four candidate rules against the tree rather than by
+  argument. A name-matching rule accuses **six** correct documents, because `What does this change do?`
+  and `Type of change` are retired entry sections *and* live headings of the PR template — so it would
+  have been born red behind an exemption list, the shape this repo was already bitten by. The count is a
+  fact the scaffolder owns, both recorded drifts stated it, and holding it needs no exemptions at all.
 - **A third gate, on the changelog entry itself: the scaffold gate** (August 3, 2026). `open-pr.ps1`
   refuses to push a branch whose entry still carries the wording `new-branch.ps1` scaffolded
   it with — the placeholder title, the "to do / where I left off" heading, or the fallback body.

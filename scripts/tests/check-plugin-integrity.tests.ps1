@@ -1661,6 +1661,51 @@ try {
         'consumer-doc: the run completes -- a finding raised after the last check does not hit a fixed-size collection'
     Assert-True ($s4.Out -match 'Summary: \d+ error') `
         'consumer-doc: and the summary is still reached, so the scan ended normally rather than dying mid-file'
+
+    # --- check 20: a claimed section COUNT is held to the scaffolder's ------------------------------
+    # ISSUE #508. The entry format lives in ~10 hand-maintained descriptions against two that cannot
+    # drift, and two of those descriptions were measured stale. Both said the same checkable thing --
+    # "three named `###` sections" -- while the scaffolder had moved to six.
+    #
+    # THE COUNT AND NOT THE NAMES, and the fixture below is why that matters more than it sounds: a
+    # name-matching rule was measured against the real tree first and accused SIX correct documents,
+    # because 'What does this change do?' and 'Type of change' are retired entry sections AND live
+    # headings of .github/pull_request_template.md. Both directions are asserted, since a
+    # positive-only test would pass against a check that examines nothing.
+    Write-Host "check 20: a claimed section count vs. the scaffolder" -ForegroundColor Cyan
+    $shapeDoc = Join-Path $Fixture 'branch\README.md'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $shapeDoc) -Force | Out-Null
+
+    # 44. A wrong count is reported, naming the file, the claim and the truth.
+    [System.IO.File]::WriteAllText($shapeDoc, "# branch`n`nAn entry is one ``##`` heading with three named ``###`` sections under it.`n", $Utf8NoBom)
+    $e1 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($e1.Out -match '\[entry-shape\].*README\.md.*says an entry has 3') `
+        'entry-shape: a stale section count is reported, naming the document and the number it claims'
+    Assert-True ($e1.Out -match '\[entry-shape\] checked [1-9]') `
+        'entry-shape: the coverage count proves a claim was actually examined, not an empty scan'
+
+    # 45. The RIGHT count -- and nothing else changed -- makes the same file pass. Written from
+    #     Get-EntrySectionHeadings rather than the literal 'six', so this asserts the check is DERIVED:
+    #     if the format gains a section, the fixture follows and the assert still means something.
+    $shapeCount = @((Get-EntrySectionHeadings).Keys).Count
+    [System.IO.File]::WriteAllText($shapeDoc, "# branch`n`nAn entry is one ``##`` heading with $shapeCount named ``###`` sections under it.`n", $Utf8NoBom)
+    $e2 = Invoke-Integrity -FixtureRoot $Fixture
+    # MATCHED ON THE FINDING'S OWN WORDS, not on the file name, and that is a repair rather than a style
+    # choice: '\[entry-shape\].*README\.md' also matches the COVERAGE line, which names branch/README.md
+    # while explaining what it does not exclude. Both negative asserts here failed on their first run for
+    # that reason, against a check that was behaving correctly -- a fixture reproduction showed 'checked 1'
+    # and no finding. An assert that can match the check's own prose is testing the note, not the rule.
+    Assert-True (-not ($e2.Out -match 'says an entry has')) `
+        'entry-shape: the correct count clears the finding, and the expected number comes from the scaffolder'
+
+    # 46. THE HAYSTACK IS NARROW ON PURPOSE. Without the level marker the pattern matches ordinary prose
+    #     about anything -- "one section apart", "two sections went in the same movement" -- which
+    #     measured 18 disagreements of which 17 were noise. A count with no '###' beside it is not a
+    #     claim about the entry's shape and must stay silent.
+    [System.IO.File]::WriteAllText($shapeDoc, "# branch`n`nThe clean-machine claim appeared twice, one section apart, and three sections went with it.`n", $Utf8NoBom)
+    $e3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($e3.Out -match 'says an entry has')) `
+        'entry-shape: a count with no level marker is prose about something else, not a claim about the shape'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

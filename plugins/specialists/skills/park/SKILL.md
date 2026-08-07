@@ -98,6 +98,14 @@ work was safely on origin, which is the one question a park exists to answer. Bo
 implementation (`Invoke-GitPark` in `park-lib.ps1`), and the scope picks the pathspec **and** the words
 from one decision, so a park cannot commit one thing and announce another.
 
+**The name stays `park`, decided rather than defaulted** (Dave, August 7, 2026). A rename to `origin-save`
+was proposed alongside the fix, on the grounds that it states the goal — *make sure everything local is
+safely on origin* — instead of a metaphor. It was declined once the commit message told the two scopes
+apart: the confusion the rename was meant to cure was **which half got saved**, and that is what was
+actually wrong. A rename would have cost a consumer-visible transition — the script path, this skill's
+name, and every document naming either — for a clarity the fix already delivers. Recorded here so it is a
+settled question rather than one that returns.
+
 **Neither was deleted, and the measurement is why.** The proposal on the table was to drop `-Park` as
 "parking a branch with nothing in it yet". Across the whole history there are **three** park commits --
 **two** of them from `-Park`, one from this script. The two entry points are two *moments*, and both are

@@ -22,12 +22,20 @@ rewrite when copying. Managing branches, PRs, and merges up to and including the
 ### Changelog
 
 `CHANGELOG.md` (repo root) is an **intro followed by one `##` per change, with no section headings at all**
-(Dave, August 5, 2026). A change *is* the `##`, and its heading is **just the title** —
-`## A significance score per entry, and the order follows it`. Under it, three `###` sections answer what a
-reader arrives with: `What does this change do?`, `Significance` (one `#### Tier N`
-sub-section per reach the change claims — August 6, 2026, replacing the impact table, because not every
-change has a tier 1 or a tier 2 and a missing row read as an omission) and `Type of change`. Everything above the first `##` is the intro, which is the only part a
-repo writes by hand and the only thing a cut leaves standing.
+(Dave, August 5, 2026). A change *is* the `##`, and since August 6, 2026 its heading names the **branch** —
+`` ## `feat/x` changelog `` — with six `###` sections under it: the branch's title, its ID, its type, what
+the change brings to `main`, `Significance` (one `#### Tier N` sub-section per reach the change claims,
+replacing the impact table because not every change has a tier 1 or a tier 2 and a missing row read as an
+omission) and `Pull Request`, which the fold fills from the merge. Everything above the first `##` is the
+intro, which is the only part a repo writes by hand and the only thing a cut leaves standing.
+
+**This paragraph is why check 19 exists.** It described the pre-dossier shape — "just the title", three
+sections, and two names that had been retired — for a day after the format moved, and it is one of the two
+documents [#508](https://github.com/DaveKJohn/claude-code-specialists/issues/508) measured as stale. The
+count is now held by the lint against `Get-EntrySectionHeadings`, so this cannot silently drift again; the
+NAMES are not, and deliberately, for the reason that check's own comment records. **The shape itself is
+written once**, in `branch/templates/branch_template_changelog.md`, which is generated — read it there
+rather than trusting any prose, this paragraph included.
 
 **Two sections went in the same movement, and each for a measured reason.**
 
