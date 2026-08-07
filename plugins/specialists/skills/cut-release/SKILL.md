@@ -65,10 +65,20 @@ each command as you go — do not skip a step or reorder them from memory.
    - **`-SkipLint`** skips the integrity gate that otherwise runs first. It exists for a genuinely broken
      gate, not for a hurry — the gate is what stops a release refusing to cut halfway through.
    - **`-SkipTierGate`** cuts a bump the pending changelog entries have not earned. **Expect not to need
-     it.** Where the pending entries declare their impact, the cut requires at least one **tier-1** entry for
-     any release, a **tier-2** entry for a minor, and enough minors behind the line for a major — so a refusal
-     usually means the bump is wrong, not the gate. The script names the bump the work *does* earn; take
-     that instead. Deliberately a separate flag from `-SkipLint`, because it overrules a judgement about
+     it.** Where the pending entries declare their impact, **the bump follows the highest tier pending**:
+
+     | highest tier pending | bump | documents written |
+     |---|---|---|
+     | `0` | patch | the development notes |
+     | `1` | minor | + the internal note |
+     | `2` | minor | + the highlights, for consumers |
+
+     A major additionally needs enough minors behind the line. So a refusal usually means the bump is
+     wrong, not the gate — the script names the bump the work *does* earn; take that instead.
+
+     **The documents follow the TIER, not the bump**, which is why a tier-1-only minor writes no
+     highlights: the version moves for everyone, but nobody outside is handed a document about work they
+     cannot see. Deliberately a separate flag from `-SkipLint`, because it overrules a judgement about
      **content** rather than skipping a tool.
    - **`-SkipSignificanceGate`** cuts even though a pending entry that reaches tier 1 or higher has not said
      **how much it weighs** there. Every tier an entry reaches is a document with its own reader, so every
@@ -322,7 +332,7 @@ version waiting for a migration that does not exist.
   day the sections went: a flat document gives an adopting repo and an unadopted one one group each, so the
   old test would have read every repo as unadopted and switched the gate off in silence. Counting
   declarations keeps *"declared tier 0"* distinct from *"declared nothing"*, which is the whole difference
-  between a release with nobody to announce it to and a repo that never chose the model.
+  between a release that announces nothing on purpose — a patch — and a repo that never chose the model.
 - `git` and a logged-in `gh` CLI for the GitHub Release step. **Which bumps get a Release is repo
   policy, not part of this checklist** — it is stated in the release manager's repo lens, because a repo
   that publishes at every release and one that publishes at Minor/Major only are both coherent, and the

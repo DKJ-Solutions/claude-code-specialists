@@ -621,10 +621,16 @@ $changelogNew = Convert-ChangelogForRelease -Content $changelogRaw
 # of each entry, so there is no marker block left for the release manager to delete (see release-lib's
 # highlights header for the guess this replaced).
 #
-# TWO CONDITIONS, AND THE SECOND IS NOT REDUNDANT. The seam must name this bump type, AND there must be
-# tier-2 work to describe. The bump gate above already guarantees the second for a minor or major, but
-# not for a repo that lists 'patch' in Get-ReleaseHighlightsBumps -- and a highlights document with a
-# header and no content is worse than none, because it looks written.
+# TWO CONDITIONS, AND THE SECOND IS THE LOAD-BEARING ONE. The seam must name this bump type, AND there
+# must be tier-2 work to describe. A highlights document with a header and no content is worse than none,
+# because it looks written.
+#
+# THE SECOND CONDITION USED TO BE BELT-AND-BRACES AND IS NOW THE WHOLE MECHANISM (August 7, 2026). It was
+# written when a minor REQUIRED a tier-2 entry, so the bump gate already guaranteed it and this only
+# covered a repo that listed 'patch' in the seam. Tier 1 earns a minor now, so a minor with nothing for a
+# consumer is an ordinary outcome here -- and this line is what stops it handing that consumer a document
+# about work they cannot see. The audience of each note follows the TIER; only the version number follows
+# the bump.
 $tier2Entries = @($tierGroups | Where-Object { [int]$_.Tier -eq 2 } | ForEach-Object { $_.Entries } | Where-Object { $_ })
 $cutHighlights = ($highlightsBumps -contains $bumpType) -and ($tier2Entries.Count -gt 0)
 $highlightsRelPath = "releases/highlights/$notesDirName/$new.md"

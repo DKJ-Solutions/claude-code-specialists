@@ -1063,21 +1063,31 @@ function New-TierGroup {
 $g210 = @((New-TierGroup 2 1), (New-TierGroup 1 1), (New-TierGroup 0 3))
 $g10  = @((New-TierGroup 2 0), (New-TierGroup 1 2), (New-TierGroup 0 1))
 $g0   = @((New-TierGroup 2 0), (New-TierGroup 1 0), (New-TierGroup 0 4))
+# THE BUMP FOLLOWS THE HIGHEST TIER PENDING (Dave, August 7, 2026): tier 0 only -> patch; tier 1 or
+# higher -> minor. Both rows below changed on that day, and both loosened by one step -- a tier-0-only
+# release used to be refused outright, and a minor used to demand a tier-2 entry.
+#
 # A tier-2 entry pending: patch and minor are both allowed (a minor is not compulsory).
 Assert-Equal $true (Test-ReleaseBumpEarned -BumpType patch -TierGroups $g210 -CurrentVersion '3.4.0').Earned 'tier 2 pending: a patch is allowed'
 Assert-Equal $true (Test-ReleaseBumpEarned -BumpType minor -TierGroups $g210 -CurrentVersion '3.4.0').Earned 'tier 2 pending: a minor is earned'
 Assert-Equal 'minor' (Test-ReleaseBumpEarned -BumpType patch -TierGroups $g210 -CurrentVersion '3.4.0').EarnedBump 'tier 2 pending: the work warrants a minor'
-# Only tier 1: a patch, and a minor is refused by name.
-Assert-Equal $true (Test-ReleaseBumpEarned -BumpType patch -TierGroups $g10 -CurrentVersion '3.4.0').Earned 'tier 1 only: a patch is earned'
-$minorRefused = Test-ReleaseBumpEarned -BumpType minor -TierGroups $g10 -CurrentVersion '3.4.0'
-Assert-Equal $false $minorRefused.Earned 'tier 1 only: a minor is refused'
-Assert-Equal 'patch' $minorRefused.EarnedBump 'and the refusal names the bump that would work'
-Assert-Match $minorRefused.Reason 'nothing pending is tier 2' 'the reason says what is missing'
-# Nothing but tier 0: no release at all.
-$noneEarned = Test-ReleaseBumpEarned -BumpType patch -TierGroups $g0 -CurrentVersion '3.4.0'
-Assert-Equal $false $noneEarned.Earned 'tier 0 only: not even a patch'
-Assert-Equal $null $noneEarned.EarnedBump 'and nothing is suggested, because nothing qualifies'
-Assert-Match $noneEarned.Reason 'nothing pending reaches beyond this repo' 'the reason says why'
+# Only tier 1: a MINOR is earned now, where this used to be a patch with the minor refused. The version
+# here speaks to all stakeholders, colleagues included -- and the DOCUMENTS still follow the tier, so such
+# a release writes the internal note and no highlights (asserted on cut-release's own condition).
+Assert-Equal $true (Test-ReleaseBumpEarned -BumpType patch -TierGroups $g10 -CurrentVersion '3.4.0').Earned 'tier 1 only: a patch is still allowed'
+$minorTier1 = Test-ReleaseBumpEarned -BumpType minor -TierGroups $g10 -CurrentVersion '3.4.0'
+Assert-Equal $true $minorTier1.Earned 'tier 1 only: a minor is EARNED -- something beyond this repo got value'
+Assert-Equal 'minor' $minorTier1.EarnedBump 'and the work warrants exactly that'
+Assert-Equal '' $minorTier1.Reason 'so there is nothing to refuse'
+# Nothing but tier 0: a PATCH, where this used to be refused outright. Publishing to no audience is what
+# a patch is for; the minor is what gets refused, by name.
+$tier0Only = Test-ReleaseBumpEarned -BumpType patch -TierGroups $g0 -CurrentVersion '3.4.0'
+Assert-Equal $true $tier0Only.Earned 'tier 0 only: a patch is earned -- a release with nothing to announce is a patch'
+Assert-Equal 'patch' $tier0Only.EarnedBump 'and that is what the work warrants'
+$tier0Minor = Test-ReleaseBumpEarned -BumpType minor -TierGroups $g0 -CurrentVersion '3.4.0'
+Assert-Equal $false $tier0Minor.Earned 'tier 0 only: a minor is refused'
+Assert-Equal 'patch' $tier0Minor.EarnedBump 'and the refusal names the bump that would work'
+Assert-Match $tier0Minor.Reason 'everything pending is tier 0' 'the reason says what is missing'
 # The major rule: ten minors in this major line, read off the version's minor component.
 $majorEarly = Test-ReleaseBumpEarned -BumpType major -TierGroups $g210 -CurrentVersion '3.4.0'
 Assert-Equal $false $majorEarly.Earned 'major at 3.4.0: four minors is not ten'
@@ -1104,7 +1114,8 @@ Write-Host "Test-ReleaseBumpEarned -- Active keys on Declared, not on a section 
 $declaredZeroOnly = @((New-TierGroup 0 3 3))
 $onT0 = Test-ReleaseBumpEarned -BumpType patch -TierGroups $declaredZeroOnly -CurrentVersion '3.4.0'
 Assert-Equal $true $onT0.Active 'one group, but its entries DECLARED tier 0: the gate is active'
-Assert-Equal $false $onT0.Earned 'and refuses -- an all-tier-0 release has nobody to announce it to'
+Assert-Equal $true $onT0.Earned 'and allows the PATCH it warrants -- a release with nothing to announce is what a patch is'
+Assert-Equal $false (Test-ReleaseBumpEarned -BumpType minor -TierGroups $declaredZeroOnly -CurrentVersion '3.4.0').Earned 'while still refusing the minor, so being active still means something'
 # AND OFF WHERE NOTHING DECLARED ANYTHING. This is what keeps the shared script safe for a consumer that
 # never adopted the model: their entries have no table and no 'Tier:' line, every one reads as tier 0, and
 # the opposite reading would refuse every release they ever cut.
