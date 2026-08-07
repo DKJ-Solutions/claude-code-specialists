@@ -173,7 +173,7 @@ exists for, and a forge suggesting it in its own error text does not make it the
 `Get-PrMergeMethod` in its own `scripts/repo-config.ps1`; the function is optional, so a repo that
 never thought about it gets `merge`.
 
-**The merge commit is named `merge: PR #NN <branch>`**, rather than GitHub's default
+**The merge commit is named `merge: <branch> (#NN)`**, rather than GitHub's default
 `Merge pull request #NN from Owner/branch`. That default is the one line in the graph with no type in
 front of it, while everything around it has one — `feat:`, `fix:`, `docs:`, `chore:`, `release:` — so a
 history scan has to read two shapes instead of one. It also pairs the merge with the fold commit that

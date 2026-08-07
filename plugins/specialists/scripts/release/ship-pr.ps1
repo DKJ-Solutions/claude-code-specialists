@@ -48,7 +48,7 @@
       3. Wait for the required CI check to finish (gh pr checks <pr> --watch). Branch protection on
          main blocks the merge until it is green; if a check FAILS, this stops WITHOUT merging.
       4. Merge (gh pr merge <pr> --<method>, from Get-PrMergeMethod; 'merge' by default), with the
-         merge commit's subject set to 'merge: PR #NN <branch>' so every line in the graph starts with
+         merge commit's subject set to 'merge: <branch> (#NN)' so every line in the graph starts with
          a type. No --admin: the CI gate is never bypassed.
       5. Check out main, fast-forward, and hand the fold to fold-changelog-entry.ps1 -Push, which folds
          the entry AND makes the commit itself -- naming CHANGELOG.md and the entry file as the
@@ -298,15 +298,23 @@ passed, so a re-run picks up from here. There is no -Force for this gate.
 # a type. Everything else does -- feat:, fix:, docs:, chore:, release: -- so scanning the history means
 # reading one shape for every commit except the merges, which are half of them.
 #
-# 'merge: PR #NN <branch>' matches the fold's own subject one commit later
-# ("chore: fold changelog entry <branch> (#NN)"), so a merge and its fold read as a pair.
+# 'merge: <branch> (#NN)' is the shape, and it matches the fold's own subject one commit later
+# ("chore: fold changelog entry <branch> (#NN)") field for field -- type, subject, PR number in brackets.
+# A merge and its fold read as a pair.
+#
+# THE FORMAT WAS INVENTED TWICE ON THE SAME DAY, WHICH IS WHY IT IS WRITTEN DOWN HERE. Derek's lens has
+# prescribed 'merge: <branch> (#<PR-number>)' since ba7081e; the first version of this line shipped
+# 'merge: PR #NN <branch>' instead, because the lens was not checked before the shape was chosen. Two
+# formats for one line is the exact defect this repo spent August 7 removing elsewhere, introduced here by
+# the change that removed it there. The older, already-documented one wins -- it is the one that matches
+# its neighbour.
 #
 # SAFE TO CHANGE, CHECKED RATHER THAN ASSUMED: nothing in this repo parses the merge subject -- not a
 # script, not a gate, not a document. The PR number stays in the line for anyone who greps for it.
 #
 # -t is the short form of --subject and applies to the merge-commit method only; a repo configured for
 # squash or rebase (Get-PrMergeMethod) has no merge commit for it to name, and gh ignores it there.
-$mergeSubject = "merge: PR #$pr $branch"
+$mergeSubject = "merge: $branch (#$pr)"
 $merge = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'merge', "$pr", "--$mergeMethod", '--subject', $mergeSubject, '--repo', $repo)
 $merge.Output | ForEach-Object { Write-Host $_ }
 if ($merge.ExitCode -ne 0) { Write-Error "Merge of PR #$pr failed."; exit 1 }
