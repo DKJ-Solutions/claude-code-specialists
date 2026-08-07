@@ -1719,6 +1719,84 @@ $gapNote = if ($skillGaps.Count -gt 0) { " NOT covered, because they declare no 
 Write-Coverage -Category 'skill-param' -Checked $skillParamChecked `
     -Note "parameters of the $skillDocumented shared entry point(s) that name a documenting skill, held against that skill's text -- a consumer has only the mirror and its page, so an undocumented parameter does not exist for them. Read via the PowerShell parser, not a regex, which missed an attributed parameter when this was first measured. Exemptions are declared per script in the registry.$gapNote"
 
+# --- Check 20: a document claiming how many sections an entry has is held to the scaffolder ---------------
+# Numbered 20 and not 19: the consumer-doc guard above carries no numbered header of its own, but the suite
+# already calls it check 19, and two checks answering to one number is how a finding gets discussed as the
+# wrong one.
+# ISSUE #508 MEASURED THE PROBLEM: the entry format is described in about ten hand-maintained places against
+# two that cannot drift (the templates, held by check 13b, and the scaffolder itself). Two documents were
+# found stale during a sweep that was actively looking, one of them consumer-facing.
+#
+# THE RULE WAS CHOSEN BY MEASUREMENT, NOT BY REASONING, and three earlier candidates were rejected by it:
+#
+#   >=2 section NAMES together, one of them retired          -> 6 findings on the tree, ALL SIX FALSE
+#   the same, minus units that mark the name as history      -> 3 findings, 2 false
+#   fenced skeleton blocks only                              -> 0 findings, but covers 1 of 3 known drifts
+#   a claimed section COUNT vs the scaffolder's              -> 4 claims, 3 correct, 1 genuinely stale
+#
+# The name-matching candidates fail on a collision nobody would predict: 'What does this change do?' and
+# 'Type of change' are RETIRED entry sections and, at the same time, LIVE headings of
+# .github/pull_request_template.md. So a name-matcher accuses two correct documents of being stale for
+# describing the PR body accurately -- and a check that is born red with an exemption list is the shape
+# this repo was already bitten by (Get-RosterIgnoredIds).
+#
+# A COUNT HAS NONE OF THAT. It is a fact the scaffolder owns, stated in a form that cannot mean anything
+# else, and both recorded drifts made exactly this claim -- "three named `###` sections" -- while the
+# scaffolder had moved to six. So this judges the one thing a document says about the shape that is
+# checkable without judging its prose, which is the same line checks 15 and 16 draw.
+#
+# THE LEVEL MARKER IS REQUIRED, and that is what keeps the haystack honest. Without it the pattern matches
+# "one section apart", "two sections went in the same movement", "one section per tier" -- ordinary prose
+# about anything, 18 disagreements of which 17 were noise. Requiring the '###' (backticked or not) between
+# the number and the word narrows it to four claims in the whole tree, which is a haystack small enough to
+# read by hand -- and it was, before this was written.
+#
+# History is excluded exactly as checks 11 and 12 exclude it: CHANGELOG.md and the per-plugin copies, the
+# release notes, RELEASE.md, and the branch working files, which are history in the making. branch/README.md
+# is deliberately NOT excluded -- it is a document ABOUT the shape, which is precisely this check's subject.
+$scExpected = @((Get-EntrySectionHeadings).Keys).Count
+$scLevel = Get-EntrySectionLevel
+$scWords = @{ 'one' = 1; 'two' = 2; 'three' = 3; 'four' = 4; 'five' = 5; 'six' = 6; 'seven' = 7; 'eight' = 8; 'nine' = 9; 'ten' = 10 }
+$scClaimRx = "(?i)(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:named\s+)?``?#{$scLevel}``?\s+section"
+
+$scFiles = @($linkFiles | Where-Object {
+    $rel = $_.Substring($RepoRoot.Length).TrimStart('\', '/')
+    if ($rel -eq 'CHANGELOG.md') { return $false }
+    if ($rel -match '\\CHANGELOG\.md$') { return $false }
+    if ($rel -match '(^|\\)RELEASE\.md$') { return $false }
+    if ($rel -match '^releases\\') { return $false }
+    if (($rel -notmatch '\\') -and (Test-IsChangelogEntryFile -Path $_)) { return $false }
+    # The two branch working files only -- NOT the whole directory. The entry is history in the making and
+    # the step list is a scratch pad; branch/README.md is the convention itself and is checked.
+    #
+    # SEPARATORS ARE NORMALISED, and leaving that out was caught by this check on its first run:
+    # Get-BranchFilePaths returns forward slashes ('branch/branch-progress.md') while $rel is built from a
+    # Windows path, so the two never compared equal and the exclusion did nothing. The step list of the very
+    # branch that added this check was then reported for QUOTING a stale count while explaining it.
+    $scBranchFiles = @((Get-BranchFilePaths).Changelog, (Get-BranchFilePaths).Progress) |
+        ForEach-Object { $_ -replace '/', '\' }
+    if ($scBranchFiles -contains $rel) { return $false }
+    return $true
+})
+
+$scChecked = 0
+foreach ($sf in ($scFiles | Sort-Object -Unique)) {
+    $rel = $sf.Substring($RepoRoot.Length).TrimStart('\', '/')
+    $scLines = ([System.IO.File]::ReadAllText($sf, [System.Text.Encoding]::UTF8)) -split "`r?`n"
+    for ($i = 0; $i -lt $scLines.Count; $i++) {
+        foreach ($m in [regex]::Matches($scLines[$i], $scClaimRx)) {
+            $raw = $m.Groups['n'].Value.ToLowerInvariant()
+            $claimed = if ($scWords.ContainsKey($raw)) { $scWords[$raw] } else { [int]$raw }
+            $scChecked++
+            if ($claimed -ne $scExpected) {
+                Add-Error "[entry-shape] ${rel}:$($i + 1): says an entry has $claimed '$('#' * $scLevel)' sections, and the scaffolder writes $scExpected. The shape has one source (Get-EntrySectionHeadings); a document that states a count is stating a fact it does not own, so either the prose is stale or the format moved without this page. Naming the sections is fine -- the COUNT is what is held here."
+            }
+        }
+    }
+}
+Write-Coverage -Category 'entry-shape' -Checked $scChecked `
+    -Note "claim(s) about how many '$('#' * $scLevel)' sections a changelog entry has, held against the $scExpected the scaffolder writes. The rule is the COUNT and not the section NAMES, chosen by measuring four candidates against this tree: matching names accuses two correct documents, because 'What does this change do?' and 'Type of change' are retired entry sections AND live headings of the PR template. History is excluded as in checks 11 and 12; branch/README.md is not, being a document about the shape"
+
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {
     Write-Host "  No findings." -ForegroundColor Green
