@@ -185,6 +185,45 @@ if (Test-Path -LiteralPath $writtenProgress) {
     Assert-Equal 0 @(Get-EntryScaffoldFindings -EntryText $progressText -Wording (Get-EntryScaffoldWording)).Count 'the step list carries no entry-scaffold markers -- it is not an entry and must not be judged as one'
 }
 
+# --- THE TEMPLATES ARE WRITTEN INTO THE REPO THE WRITER RUNS IN ------------------------------------
+# THE FIXTURE IS A CONSUMER, and that is the whole point of asserting it here. It holds the shared scripts
+# and nothing else -- no lint, no hand-written templates -- which is exactly what a consuming repo has.
+#
+# THE REGRESSION THIS PINS. Until August 7, 2026 nothing created branch/templates/ anywhere: they existed
+# in the source repo because they were written by hand there, and the check that holds them to
+# Get-BranchTemplates is repo-owned. When the working files became bare, the source repo's guidance moved
+# to those templates and a consumer's went away entirely -- their only remaining description of the form
+# was the skill page. Found by asking whether "see the templates" resolves in a consumer repo.
+foreach ($tpl in (Get-BranchTemplates)) {
+    $tplPath = Join-Path $fixture ($tpl.Path -replace '/', '\')
+    Assert-True (Test-Path -LiteralPath $tplPath) "the writer created $($tpl.Path) -- a consumer has no other source for the guidance"
+    if (Test-Path -LiteralPath $tplPath) {
+        $onDisk = ([System.IO.File]::ReadAllText($tplPath, [System.Text.Encoding]::UTF8)) -replace "`r`n", "`n"
+        Assert-Equal ($tpl.Content -replace "`r`n", "`n") $onDisk "and $($tpl.Path) is exactly what the formatters produce"
+    }
+}
+
+# REFRESHED, NOT MERELY CREATED. A template that has drifted -- a consumer carrying last release's copy --
+# is rewritten, which is what carries a format change into their reference through the same plugin update
+# that carries it into their scripts. Without this they would be correct on the day branch/ appeared and
+# stale from the next release on, which is the drift the whole mechanism exists to prevent.
+$driftTpl = Join-Path $fixture ((Get-BranchTemplates)[0].Path -replace '/', '\')
+[System.IO.File]::WriteAllText($driftTpl, "stale content from an older release`n", (New-Object System.Text.UTF8Encoding $false))
+$prevEap2 = $ErrorActionPreference
+try {
+    $ErrorActionPreference = 'Continue'
+    Push-Location $fixture
+    try {
+        $env:CLAUDE_PROJECT_DIR = $fixture
+        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'scripts\release\new-changelog-entry.ps1') 2>$null | Out-Null
+    } finally {
+        Remove-Item Env:\CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue
+        Pop-Location
+    }
+} finally { $ErrorActionPreference = $prevEap2 }
+$refreshed = ([System.IO.File]::ReadAllText($driftTpl, [System.Text.Encoding]::UTF8)) -replace "`r`n", "`n"
+Assert-Equal ((Get-BranchTemplates)[0].Content -replace "`r`n", "`n") $refreshed 'a drifted template is rewritten, so a format change reaches a consumer reference too'
+
 if (Test-Path -LiteralPath $writtenEntry) {
     $text = [System.IO.File]::ReadAllText($writtenEntry, [System.Text.Encoding]::UTF8)
     $roundTrip = @(Get-EntryScaffoldFindings -EntryText $text -Wording (Get-EntryScaffoldWording))

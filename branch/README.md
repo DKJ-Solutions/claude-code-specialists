@@ -23,6 +23,12 @@ same formatters `new-branch` calls (`Get-BranchTemplates`), and the lint gate ho
 it, byte for byte. Editing one by hand is an error the gate reports; change the format and the templates
 follow.
 
+**`new-branch` writes them, and refreshes one that has drifted.** That matters most where this README is
+not: a consuming repo has no lint of its own, so the scaffolder is the only thing keeping their reference
+current — and since the working files became bare, that reference is the only place the guidance exists at
+all. Rewriting a drifted copy is what carries a format change into a consumer's reference through the same
+plugin update that carries it into their scripts.
+
 They mark their own heading **`(template)`**, and that is not decoration. A written entry and a template
 now open with the same `##`, which is the signature the fold and the lint use to tell an entry from any
 other markdown — so the marker is what keeps a template from ever being read as somebody's work.

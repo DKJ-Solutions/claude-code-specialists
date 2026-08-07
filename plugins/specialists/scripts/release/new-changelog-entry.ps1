@@ -206,6 +206,41 @@ if (-not (Test-Path -LiteralPath $branchDirPath)) {
     $null = New-Item -ItemType Directory -Path $branchDirPath -Force
 }
 
+# THE TEMPLATES ARE WRITTEN HERE, AND FOR A CONSUMER THIS IS THE ONLY THING THAT WRITES THEM (August 7,
+# 2026). They are the reference copy of both branch files, with the guidance comment on every field --
+# and since the working files became bare, they are the ONLY place that guidance exists.
+#
+# THE REGRESSION THIS REPAIRS, MEASURED RATHER THAN SUPPOSED. Until now nothing created branch/templates/
+# anywhere: they exist in the source repo because they were written by hand there, and the lint that holds
+# them to Get-BranchTemplates is repo-owned -- plugins/specialists/scripts/lint/ does not exist, so no
+# consumer has ever had it. When the working files stopped carrying guidance in v3.7.0, the source repo's
+# guidance moved to branch/templates/ and a consumer's simply went away. Found by asking whether "see the
+# templates" resolves in a consumer repo instead of assuming it does.
+#
+# REWRITTEN WHENEVER THEY DIFFER, not merely created when absent, and that follows the rule the templates
+# already carry: they are GENERATED, not maintained -- editing one by hand is an error the source repo's
+# lint reports. Refreshing them on every run is what carries a format change into a consumer's reference
+# through the same plugin update that carries it into their scripts. Without that they would be correct on
+# the day the branch directory appeared and stale from the next release onwards, which is the exact drift
+# this whole mechanism exists to prevent.
+#
+# Silent when nothing changes, so a rerun says only what it did.
+foreach ($tpl in (Get-BranchTemplates)) {
+    $tplPath = Join-Path $repoRoot ($tpl.Path -replace '/', '\')
+    $tplDir  = Split-Path -Parent $tplPath
+    if (-not (Test-Path -LiteralPath $tplDir)) { $null = New-Item -ItemType Directory -Path $tplDir -Force }
+    $existing = if (Test-Path -LiteralPath $tplPath) { [System.IO.File]::ReadAllText($tplPath) } else { $null }
+    # Line endings normalised for the COMPARISON only -- whether the working copy checked out CRLF is not
+    # a difference in the format, and reporting it as one would rewrite the file on every single run.
+    if ($null -eq $existing) {
+        [System.IO.File]::WriteAllText($tplPath, $tpl.Content, $Utf8NoBom)
+        Write-Host "Created: $($tpl.Path) (the reference copy, with the guidance for every field)" -ForegroundColor Green
+    } elseif (($existing -replace "`r`n", "`n") -ne ($tpl.Content -replace "`r`n", "`n")) {
+        [System.IO.File]::WriteAllText($tplPath, $tpl.Content, $Utf8NoBom)
+        Write-Host "Refreshed: $($tpl.Path) (generated, not maintained - it had drifted from the format)" -ForegroundColor Yellow
+    }
+}
+
 # IDEMPOTENCY IS PER FILE, not one check for both, because the two can legitimately be out of step: a
 # rerun on a branch whose entry has been written must still not clobber the step list, and vice versa.
 # The test is what the file SAYS it belongs to rather than whether it exists -- both files exist on the
