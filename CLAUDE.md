@@ -425,12 +425,29 @@ The constitution above, concretely implemented here:
      how a check gets switched off rather than heeded.
 
      **1 to 5 against a written rubric** (`Get-EntrySignificanceRubric`, overridable per repo), because an
-     unanchored ordinal scale invites false precision — 5 is *the reader must act*, 1 is *nothing changes for
-     them today*. That is what makes the number a measurement rather than a mood, and it is also why the
-     score is comparable **across** releases. Dave reversed his own earlier "no anchors" answer the same day,
+     unanchored ordinal scale invites false precision — 5 is *the reader must act*, 1 is *cosmetic, or names
+     the failure it prevents*. That is what makes the number a measurement rather than a mood, and it is also
+     why the score is comparable **across** releases. Dave reversed his own earlier "no anchors" answer the same day,
      and the reversal is the reasoning: without anchors there is nothing to drift, but also nothing to check.
      The **`Why` is required** and is the lasting half — the rubric says which band, the `Why` says why *this*
      change is in it.
+
+     **Band 1 asks what is prevented, and that is the repair of a band that invited its own abuse** (Dave,
+     August 7, 2026; [#509](https://github.com/DaveKJohn/claude-code-specialists/issues/509)). It used to read
+     *"cosmetic or preventative — nothing changes for them today"*, and the second half is exactly the sentence
+     the rubric exists to stop: [PR #503](https://github.com/DaveKJohn/claude-code-specialists/pull/503)'s entry
+     scored its tier 0 with "Nothing changes here" — inside the band, and useless to a reader a year later.
+     Four of the five bands describe something the reader can observe; this one describes an **absence**, and
+     an absence has to be named or it cannot be told apart from having nothing to say.
+
+     **The tiers are not nested audiences, so tier 0 may legitimately score below tier 1.** Dave asked whether
+     that should be refused — if nothing changes for this repo's own developers, how can it change for anyone
+     further out? PR #503 is the counterexample: the defect existed **only outside this repo** (consumers had
+     no `branch/templates/`; this repo always did), so it was worth 4 to a consumer and almost nothing here. A
+     consumer is not a colleague of this project. That gate would have refused a correct entry, and the
+     instinct behind it is already encoded one level down and correctly: **tier 0 is the one tier that cannot
+     be `N/A`**, because every change reaches this repo's own developers at least a little. The floor is a
+     score of 1 — and band 1 now asks what that 1 buys.
 
      **Who reads it where.** The fold places the entry at its ranked position in `CHANGELOG.md`, and that is
      the *only* moment it can: the cut **empties the list**, so whatever order the fold leaves is
