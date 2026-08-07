@@ -171,6 +171,29 @@ $outCrlf = Update-PrBodySection -Body $crlf -Heading '## What does this change d
 Assert-True ($outCrlf.Contains("`r`n")) 'a CRLF body stays CRLF'
 Assert-True (-not ($outCrlf -match "[^`r]`n")) 'and gains no bare LF line endings'
 
+# --- Get-PrTitle: the PR title is composed, not typed (#506 + #505) -------------------------------
+# The whole point of the change is that these two facts cannot drift apart, so the asserts are about
+# COMPOSITION and about the shapes that would produce a nameless or malformed PR.
+Write-Host ""
+Write-Host "Get-PrTitle -- the type from the branch, the words from the entry" -ForegroundColor Cyan
+
+Assert-Equal 'fix: the release runs the suites' (Get-PrTitle -Prefix 'fix' -TitleWords 'the release runs the suites') 'the prefix and the words are joined with one colon and one space'
+Assert-Equal 'feat: a thing' (Get-PrTitle -Prefix 'feat' -TitleWords "  a thing  ") 'surrounding whitespace is trimmed off both halves'
+
+# A title reaches `gh pr create --title` as ONE argument; a newline in it is not a formatting nicety.
+Assert-Equal 'docs: first line only' (Get-PrTitle -Prefix 'docs' -TitleWords "first line only`nand a second paragraph") 'a multi-line section yields the first non-empty line'
+Assert-Equal 'docs: after the blanks' (Get-PrTitle -Prefix 'docs' -TitleWords "`n`n  after the blanks`nmore") 'leading blank lines are skipped rather than winning'
+Assert-Equal 'fix: two spaces collapse' (Get-PrTitle -Prefix 'fix' -TitleWords "two   spaces collapse") 'inner whitespace is collapsed to single spaces'
+
+# '' is how open-pr says "this branch prefix is not in the table". Inventing a type there would state
+# something no table backs -- the PR is labelled 'question' for exactly that reason.
+Assert-Equal 'words alone' (Get-PrTitle -Prefix '' -TitleWords 'words alone') 'an empty prefix yields the words without a type'
+
+# EMPTY IN, EMPTY OUT -- and open-pr turns that into a refusal naming the entry, rather than handing
+# `gh` a bare '--title ""' to complain about a flag.
+Assert-Equal '' (Get-PrTitle -Prefix 'fix' -TitleWords '') 'no words means no title, not a bare prefix'
+Assert-Equal '' (Get-PrTitle -Prefix 'fix' -TitleWords "   `n  `n") 'a whitespace-only section is no title either'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red

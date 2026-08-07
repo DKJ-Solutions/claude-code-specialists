@@ -23,7 +23,7 @@
     Get-ChangelogHeading, which it never reads itself -- fold-changelog-entry.ps1 does.
 
     Steps, stopping on the first failure (nothing is forced):
-      1. open-pr.ps1 -Title <Title> [-SkipLint] [-SkipTests] -- runs the local lint + test gate,
+      1. open-pr.ps1 [-SkipLint] [-SkipTests] -- runs the local lint + test gate,
          pushes, and opens the PR. If a gate fails, nothing is pushed and this stops here.
 
          RESUMES A BRANCH WHOSE PR IS ALREADY OPEN. open-pr.ps1 skips only the `gh pr create` in that
@@ -35,7 +35,8 @@
          than here: putting the check in the orchestrator would have skipped the gates and the push
          along with the create, and made `open-pr.ps1` on its own still fail on the same branch.
 
-         -Title is then unused (an existing PR keeps its title), and -Resolves is still honoured: the
+         An existing PR keeps its title -- as every PR now does, the title being composed from the entry
+         at creation and never rewritten afterwards (#506) -- and -Resolves is still honoured: the
          closing keywords are appended to the existing body, because step 6 below verifies exactly what
          the merged body declared. Pass -RefreshBody to also rewrite the PR's description from the
          changelog entry -- worth it whenever the entry was extended after the PR was opened, which is
@@ -92,7 +93,11 @@
     drift lint.
 
 .PARAMETER Title
-    PR title, e.g. "feat: new domain plugin".
+    ACCEPTED AND IGNORED since #506 (August 7, 2026), for the reason open-pr.ps1's own parameter states:
+    the PR title is composed from the branch prefix and the entry's 'Branch title' section, so there is
+    nothing to pass. Kept as a parameter, and passed through, so that a caller who still supplies one gets
+    open-pr's single warning instead of a hard "A parameter cannot be found" at the end of a finished branch
+    -- and so the two scripts say the same thing in one place rather than two.
 
 .PARAMETER SkipLint
     Passed through to open-pr.ps1 (skip the lint gate -- escape valve).
@@ -125,14 +130,14 @@
     No effect when the PR is being created in this run.
 
 .EXAMPLE
-    ./scripts/release/ship-pr.ps1 -Title "feat: group release output by category"
+    ./scripts/release/ship-pr.ps1
 
 .EXAMPLE
-    ./scripts/release/ship-pr.ps1 -Title "fix: the pre-flight reads commits" -Resolves 331,332
+    ./scripts/release/ship-pr.ps1 -Resolves 331,332
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][string]$Title,
+    [string]$Title = '',
     [switch]$SkipLint,
     [switch]$SkipTests,
     [switch]$Force,
@@ -192,7 +197,10 @@ $branch = (git rev-parse --abbrev-ref HEAD).Trim()
 if ($branch -eq 'main') { Write-Error "You are on main; ship-pr runs from a branch."; exit 1 }
 
 # --- Step 1: open the PR (open-pr.ps1 runs the lint + test gate, pushes, opens) ------------------
-$openArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'open-pr.ps1'), '-Title', $Title)
+# -Title is forwarded ONLY when one was given (#506): passing an empty string would make open-pr warn
+# about an ignored title on every ordinary run, which is how a warning stops being read.
+$openArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'open-pr.ps1'))
+if ($Title) { $openArgs += @('-Title', $Title) }
 if ($SkipLint)    { $openArgs += '-SkipLint' }
 if ($SkipTests)   { $openArgs += '-SkipTests' }
 if ($Force)       { $openArgs += '-Force' }

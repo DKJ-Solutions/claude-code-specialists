@@ -37,11 +37,15 @@ step of one.
 Run the shared script from the **root of the consuming repo**, on the branch you want to ship:
 
 ```powershell
-powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/ship-pr.ps1" -Title "feat: short title"
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/ship-pr.ps1"
 ```
 
-`-Title` is required and is the PR title. Running from the main branch is refused before anything
-happens — this ships a branch.
+**Nothing is passed, because there is nothing left to say.** Since
+[#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506) the PR title is composed from the
+branch prefix and the entry's `Branch title` section, so it was already written when the branch was
+created. `-Title` is still accepted and ignored, and is forwarded to `open-pr` only when you actually pass
+one — see the [`open-pr` skill](../open-pr/SKILL.md) for why the parameter was kept rather than removed.
+Running from the main branch is refused before anything happens — this ships a branch.
 
 The six steps, stopping on the first failure:
 
@@ -54,7 +58,8 @@ The six steps, stopping on the first failure:
    `gh pr create` in that case — the gates and the push still run — so this step succeeds and the chain
    carries on to step 2. Until August 4, 2026 it did not: the create was unconditional, a duplicate
    returned non-zero, and **steps 2-6 never ran**, so a branch whose PR was opened in an earlier session
-   had to be merged and folded by hand. `-Title` is then unused (an existing PR keeps its title), while
+   had to be merged and folded by hand. An existing PR keeps its own title — as every PR now does, the
+   title being composed at creation and never rewritten afterwards — while
    `-Resolves` is still honoured — the closing keywords are appended to the existing body, because
    step 6 verifies exactly what the merged body declared. Measured on
    [PR #457](https://github.com/DaveKJohn/claude-code-specialists/pull/457).
@@ -87,7 +92,7 @@ The six steps, stopping on the first failure:
 
 | Parameter | What it does |
 |---|---|
-| `-Title` | **Required.** The PR title, e.g. `"feat: group release output by category"`. |
+| `-Title` | **Accepted and ignored** since [#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506). The PR title comes from the entry's `Branch title` section; passing one here forwards it to `open-pr`, which warns and names the title the entry actually gives. |
 | `-NoMerge` | Open the PR and stop — no CI wait, no merge, no fold. The same as calling `open-pr` directly, but convenient when scripting. |
 | `-Resolves` | Passed through to `open-pr`: the issues this PR closes, **as a string** (`"331,332"`). Step 6 verifies them. |
 | `-NoResolves` | Passed through to `open-pr`: declare that this PR closes no issue. |
@@ -111,12 +116,10 @@ through `powershell -File`.
 
 ```powershell
 # ships and closes two issues
-powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/ship-pr.ps1" `
-  -Title "fix: the pre-flight reads commits" -Resolves "331,332"
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/ship-pr.ps1" -Resolves "331,332"
 
 # open the PR only, e.g. to wait for a review
-powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/ship-pr.ps1" `
-  -Title "docs: short title" -NoResolves -NoMerge
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/ship-pr.ps1" -NoResolves -NoMerge
 ```
 
 ## Why step 3 polls before it watches

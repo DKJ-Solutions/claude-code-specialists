@@ -1242,16 +1242,21 @@ if (Test-Path -LiteralPath $clForHeadings) {
         $ehChecked++
         $clRealLines = (([System.IO.File]::ReadAllText($clForHeadings, [System.Text.Encoding]::UTF8)) -split "`r?`n")
         # WHICH SECTION A WHOLE ENTRY OPENS WITH, and there is more than one right answer -- which is the
-        # repair this rule needed when the dossier form put 'Branch description' in front (August 6, 2026).
+        # repair this rule needed when the dossier form put the title section in front (August 6, 2026).
         # A current entry opens with that; the entries ALREADY in CHANGELOG.md open with the description
         # question, under its current name or its retired one. Testing only the newest opener would have
         # reported every one of the pending entries as a split entry: two dozen false accusations, which is
         # how a check gets switched off rather than heeded -- measured on this very gate when
         # 'Who is this for' was renamed.
+        # AND THE FIRST SECTION'S OWN RETIRED NAMES BELONG HERE TOO (August 7, 2026). 'What' had them from the
+        # start; the opening section did not need them until it was renamed, and the moment it was, all six
+        # pending entries were reported as split -- the very failure the paragraph above describes, reappearing
+        # one section to the left. A rename is not a one-line change while any reader knows only the new name.
         $ehOpeners = @(
             (Get-EntrySectionHeadings)[(Get-EntryFirstSectionKey)]
             (Get-EntrySectionHeadings)['What']
-        ) + @(Get-EntrySectionRetiredNames -Key 'What') | Where-Object { $_ }
+        ) + @(Get-EntrySectionRetiredNames -Key (Get-EntryFirstSectionKey)) +
+            @(Get-EntrySectionRetiredNames -Key 'What') | Where-Object { $_ }
         $ehWhatHeading = $ehOpeners[0]
 
         # WHAT DISTINGUISHES AN ENTRY FROM A BODY HEADING, since markdown gives no marker for it. Every H2

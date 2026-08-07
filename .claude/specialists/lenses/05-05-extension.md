@@ -64,6 +64,10 @@ Edge cases — classify by **what actually changes**, not which files happen to 
 ```sh
 .\scripts\task\new-branch.ps1 -Name <branch-name> -Title "<short title>"
 ```
+**`-Title` is the one place the title is typed**, and since August 7, 2026 it is also the PR title —
+`open-pr` composes `<branch-type>: <this>` from it. Write it without a type prefix; the branch already
+carries the type.
+
 Creating the branch and creating its changelog entry file are no longer two separate manual steps —
 **a branch is never entry-less.** `new-branch.ps1` checks out the branch (idempotently — running it
 again on an existing branch simply resumes it) and writes the branch's two files in `branch/` in the same
@@ -91,12 +95,26 @@ An explicit "open the PR" still counts as approval for the whole movement, so a 
 in one motion. The lint gate in `open-pr.ps1` is the guard that makes the default safe. Use the script:
 
 ```sh
-.\scripts\release\open-pr.ps1 -Title "<branch-type>: short title"
+.\scripts\release\open-pr.ps1
 ```
 
 This pushes the branch and opens the PR with `.github/pull_request_template.md` as the body — walk
-through the checklist. The title prefix mirrors the branch type (`feat:`, `fix:`, `docs:`).
-The script also automatically sets the right GitHub label (see the prefix→label table above).
+through the checklist. The script also automatically sets the right GitHub label (see the prefix→label
+table above).
+
+**The title is no longer typed here — it is composed** (Dave, August 7, 2026;
+[#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506) +
+[#505](https://github.com/DaveKJohn/claude-code-specialists/issues/505)). The PR is called
+`<branch-type>: <the entry's Branch title>`, so the prefix mirrors the branch type by construction and the
+words are the ones already in `branch/branch-changelog.md`. `-Title` is still accepted and ignored, with a
+warning naming the title the entry gives.
+
+**That rule used to live in this very paragraph, and was violated five PRs in a row.** It read "the title
+prefix mirrors the branch type" and nothing measured it: [#499](https://github.com/DaveKJohn/claude-code-specialists/pull/499)
+through [#503](https://github.com/DaveKJohn/claude-code-specialists/pull/503) all merged without one, while
+every commit and every merge line in the graph carried its type. Same shape as `chore/` and the `final`
+rule — a rule that lives in a document, is never measured, and is therefore silently broken. The repair was
+to stop asking for the title twice rather than to add a third check on the second answer.
 
 **Reach for `open-pr` on its own only when you are stopping at the PR** — work waiting under one of the
 two exceptions, or a branch you want reviewed before it lands. **When the work is going all the way
@@ -109,7 +127,7 @@ entry mentions an **open** issue and `open-pr.ps1` stops before the lint, the te
 naming what it saw.
 
 ```sh
-.\scripts\release\open-pr.ps1 -Title "fix: short title" -Resolves "331,332"
+.\scripts\release\open-pr.ps1 -Resolves "331,332"
 ```
 
 **Why this is a gate and not a habit (lesson of August 1, 2026).** A plain `#332` in a PR body closes
@@ -150,7 +168,7 @@ work was waiting under an exception.
 **`ship-pr` is the whole chain, and running it is the whole job:**
 
 ```sh
-.\scripts\release\ship-pr.ps1 -Title "<branch-type>: short title"
+.\scripts\release\ship-pr.ps1
 ```
 
 It runs `open-pr` (gate → push → PR), waits for the required CI check, merges, checks out `main`, and
@@ -318,7 +336,7 @@ Derek prefers not to touch the git commands by hand. His toolbox:
   off in the park commit message. Runs via the `park` skill (#175). **`park` vs `new-branch -Park`:**
   `-Park` parks *at creation* and commits *only the changelog entry*; `park-branch` parks an
   *existing* branch and commits *everything* — start-and-park versus back-up-mid-work.
-- `scripts/release/open-pr.ps1 -Title "…" [-Body "…"] [-SkipLint] [-SkipTests]` — push the branch +
+- `scripts/release/open-pr.ps1 [-Body "…"] [-SkipLint] [-SkipTests]` — push the branch +
   open the PR, with the right label from the prefix. Without `-Body` **the script fills in the
   template itself**. **Lint gate:** before the push, `scripts/lint/check-plugin-integrity.ps1`
   (Sylvester) runs; if it finds an **error** — an invalid `marketplace.json`/`plugin.json`, missing

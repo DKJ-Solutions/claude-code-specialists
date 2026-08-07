@@ -23,8 +23,26 @@ shared here so consumers do not duplicate it. Background in
 Run the shared script from the **root of the consuming repo**:
 
 ```powershell
-powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1" -Title "feat: short title"
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1"
 ```
+
+**No title is passed, and that is the change of August 7, 2026 ([#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506)
++ [#505](https://github.com/DaveKJohn/claude-code-specialists/issues/505)).** The PR is called
+`<branch type>: <the entry's Branch title>` — the type off the branch prefix, the words out of
+`branch/branch-changelog.md`. So the sentence is written **once**, when the branch is created
+(`new-branch -Title`), and the PR, `CHANGELOG.md` and the release documents cannot disagree about what the
+change is called. It also cannot lose its type prefix, which the five PRs before this change all had.
+
+`-Title` is still **accepted and ignored** — passing one prints a warning naming the title the entry
+actually gives. It was kept rather than removed because every branch in flight, here and in every
+consumer, calls this script with `-Title` right now, and consumers receive the new script through a plugin
+update rather than by choosing to; a removed parameter would turn all of those into a hard
+"A parameter cannot be found" at the end of a finished branch. An **override** was the alternative and was
+declined: an override is a second source of the title, which is the thing this change removes.
+
+**A PR is never created nameless.** If the entry's title section is empty, the script stops and says so —
+the emptiness gate normally catches that earlier, but `-Force` can wave that gate through, and an empty
+title would otherwise reach `gh` as a complaint about a flag rather than about the entry.
 
 The script:
 
@@ -63,7 +81,11 @@ the five-step sequence `ship-pr` exists to remove. Measured on
 
 **Title and body are left alone by default.** The body may have been edited on github.com since it was
 opened, and overwriting someone's edits with a freshly generated template loses more than a stale title
-costs — the title is at least visible on the PR. Use `gh pr edit` if you want the title changed.
+costs — the title is at least visible on the PR. Use `gh pr edit` if you want the title changed. Since
+[#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506) that holds for every PR rather
+than only a resumed one: the title is composed once, at creation, and no later run rewrites it. Rewriting
+a rewritten entry's title into an open PR was weighed and left out — a title is what people refer to a PR
+by, and quietly renaming one mid-review is the same class of surprise as overwriting the body.
 
 **`-RefreshBody` rewrites the description from the entry, and only the description.** Pass it when you
 extended the changelog entry after the PR was opened — routine on a branch that keeps growing, and
@@ -205,10 +227,10 @@ So the decision is forced rather than remembered:
 
 ```powershell
 # this PR resolves them -- each gets its own 'Closes #<n>' line in the body
-powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1" -Title "fix: short title" -Resolves "331,332"
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1" -Resolves "331,332"
 
 # this PR resolves no issue (they are cited as context)
-powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1" -Title "docs: short title" -NoResolves
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1" -NoResolves
 ```
 
 - **Neither flag, while the changelog entry mentions an issue that is currently open** → the script

@@ -964,6 +964,42 @@ Assert-Equal 0 @(Get-BranchProgressFindings -Text ((Format-BranchProgressReset) 
 $quoted = "## Steps`n`n- [x] documented the marks`n`n" + '```text' + "`n- [ ] not done yet`n" + '```' + "`n"
 Assert-Equal 0 @(Get-BranchProgressFindings -Text $quoted).Count 'an open step QUOTED inside a fence is not an open step'
 
+# --- 'Branch description' -> 'Branch title' (#506) -------------------------------------------------
+# The rename itself is one line; what needs asserting is that the old name keeps working and that adding
+# it to the retired map did not quietly change the two readers that consume that map WHOLESALE.
+Write-Host ""
+Write-Host "the title section: renamed, and the old name still read" -ForegroundColor Cyan
+
+Assert-Equal 'Branch title' ((Get-EntrySectionHeadings)['Description']) 'the section is written as Branch title'
+Assert-True ((Get-EntrySectionRetiredNames -Key 'Description') -contains 'Branch description') 'and the retired name is registered against its own section'
+
+# The entries in CHANGELOG.md and in every consumer's tree carry the old heading right now. A reader that
+# knew only the new one would find no title on any of them -- silent, and wrong in the direction that
+# empties a highlights document.
+$oldNamed = "## ``feat/x`` changelog`n`n### Branch description`n`nThe old name still reads`n"
+Assert-Equal 'The old name still reads' (Get-EntrySectionAnswer -EntryText $oldNamed -Key 'Description') 'an entry under the retired heading still yields its title'
+Assert-True (Test-EntryHasSection -EntryText $oldNamed -Key 'Description') 'and it counts as HAVING the section, so the emptiness gate does not accuse it'
+
+# THE REGRESSION THIS RENAME NEARLY INTRODUCED, asserted so it cannot come back. Test-EntryDeclaresShape
+# separates an entry from a step list, and it used to accept EVERY retired heading as proof of "entry" --
+# sound while every retired name belonged to a section no step list carried. 'Branch description' broke
+# that: the step lists of early August carry it, on every branch in flight and in every consumer. A
+# blanket retired list would read those as entries again, which is the exact confusion the two-file split
+# was made to remove.
+$oldStepList = "## ``feat/x`` progress`n`n### Branch description`n`nA title`n`n### Steps`n`n- [x] done`n"
+Assert-True (-not (Test-EntryDeclaresShape -EntryText $oldStepList)) 'a step list carrying the retired title heading is still NOT an entry'
+
+# And the title section ALONE proves nothing either -- which is the same rule seen from the entry's side,
+# and the reason the assert above can hold. A real entry proves itself by a section only an entry has.
+Assert-True (-not (Test-EntryDeclaresShape -EntryText $oldNamed)) 'the title section alone proves nothing, whichever file it sits in'
+$oldNamedFull = $oldNamed + "`n### Pull Request`n`n#12`n"
+Assert-True (Test-EntryDeclaresShape -EntryText $oldNamedFull) 'while an entry-only section still proves an entry'
+
+# And the pre-dossier entry stays recognised, which is what the dropped 'Type of change' would have been
+# doing here: it is caught by its own entry-only sections instead, so nothing is lost by the narrowing.
+$preDossier = "### Old entry - Feat - 2026-07-01`n`n### What does this change do?`n`nsomething`n"
+Assert-True (Test-EntryDeclaresShape -EntryText $preDossier) 'a pre-dossier entry is still recognised by its retired entry-only heading'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red

@@ -28,9 +28,9 @@ changelog entry — the same workflow as the consuming repos. The steps:
    ```text
    ## `<your branch>` changelog
 
-   ### Branch description
+   ### Branch title
 
-   … the title you gave -Title …
+   … the title you gave -Title — and the title the PR gets …
 
    ### Branch ID
 
@@ -81,7 +81,8 @@ changelog entry — the same workflow as the consuming repos. The steps:
    the PR** — `- [x]` done, or `- [~]` dropped with the reason on the line. Steps 3 and 4 both refuse
    while anything is still `- [ ]`, and there is no `-Force` for it: the dropped mark already is the way
    past a step that should not be done.
-3. **Open the PR:** [`scripts/release/open-pr.ps1`](scripts/release/open-pr.ps1)`-Title "…"` first runs
+3. **Open the PR:** [`scripts/release/open-pr.ps1`](scripts/release/open-pr.ps1) — no title is passed,
+   it is composed as `<branch type>: <the entry's Branch title>` — first runs
    the **lint gate** [`scripts/lint/check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1)
    (valid manifests, agent-def frontmatter, no dead links, and the flags on every printed
    `claude plugin install`/`update`/`uninstall`) and then the **test gate** (all

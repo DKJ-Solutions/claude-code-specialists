@@ -50,7 +50,7 @@ comments** on the way and writes the PR line into `### Pull Request`:
 ```markdown
 ## `feat/short-name` changelog
 
-### Branch description
+### Branch title
 
 Short strong title
 
@@ -94,7 +94,7 @@ gone, because the number is in the entry's Pull Request section, where the url m
 than merely printed.
 
 **The highlights document is the exception, and only for the heading.** Its reader is a consumer, who has no
-branch — so there the heading is replaced by the entry's `Branch description`, exactly as the PR number and
+branch — so there the heading is replaced by the entry's `Branch title`, exactly as the PR number and
 the merge date are dropped there for being internal administration. `CHANGELOG.md` and the developer notes
 keep the branch heading.
 
