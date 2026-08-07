@@ -549,26 +549,14 @@ if (-not $SkipLint) {
 
 # Test gate: all suites, exactly as CI -- a red suite should already block here, not only at the
 # PR (a lesson from PR #54). -SkipTests is the deliberate escape valve.
+# THE LOOP ITSELF MOVED TO Invoke-TestSuiteGate (native-capture-lib.ps1) on August 7, 2026, when
+# cut-release.ps1 needed the same gate -- see issue #510. Copying fifteen lines into the cut would have
+# been two copies of one rule, free to drift. What stays here is the half that is open-pr's own: the
+# escape valve and what a failure costs at THIS point in the chain (nothing pushed, no PR).
 if (-not $SkipTests) {
-    $testsDir = Join-Path $repoRoot 'scripts\tests'
-    if (Test-Path $testsDir) {
-        Write-Host "test gate: running all test suites for the PR..." -ForegroundColor Cyan
-        $testFailed = $false
-        $suites = @(Get-ChildItem -Path $testsDir -Filter '*.tests.ps1' -File)
-        if ($suites.Count -eq 0) {
-            Write-Warning "no *.tests.ps1 suites found in scripts/tests - test gate had nothing to run."
-        }
-        $suites | ForEach-Object {
-            Write-Host "== $($_.Name) ==" -ForegroundColor Cyan
-            & powershell -NoProfile -ExecutionPolicy Bypass -File $_.FullName
-            if ($LASTEXITCODE -ne 0) { $testFailed = $true }
-        }
-        if ($testFailed) {
-            Write-Error "test gate found failing suites - branch not pushed, no PR opened. Fix the tests, or run with -SkipTests to skip the gate."
-            exit 1
-        }
-    } else {
-        Write-Warning "scripts/tests not found - test gate skipped."
+    if (-not (Invoke-TestSuiteGate -TestsDir (Join-Path $repoRoot 'scripts\tests') -Context 'the PR')) {
+        Write-Error "test gate found failing suites - branch not pushed, no PR opened. Fix the tests, or run with -SkipTests to skip the gate."
+        exit 1
     }
 }
 

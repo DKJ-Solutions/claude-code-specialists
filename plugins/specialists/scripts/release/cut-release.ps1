@@ -18,7 +18,6 @@
     PR" -- see the safety rules). The script therefore runs on main itself and is started ONLY at
     Dave's explicit request.
 
-    Steps (all on main):
     SHARED, WITH THE REPO'S OWN ANSWERS IN THE SEAM (issue #417). This script is mirrored into the
     plugin, so a consumer runs it rather than forking it. Everything that legitimately differs per
     repo is read from the OPTIONAL functions in scripts/repo-config.ps1, and every fallback is what
@@ -37,8 +36,9 @@
 
     Steps (all on main):
       1. Guardrails: clean main, no unfolded entry files in the root, THE BUMP EARNED BY THE PENDING
-         TIERS (any release needs a tier-1 entry, a minor needs a tier-2 one, a major needs enough
-         minors behind it -- Test-ReleaseBumpEarned; -SkipTierGate overrules), lint gate green.
+         TIERS (the bump follows the highest tier pending -- tier 0 only is a patch, tier 1 or higher
+         earns a minor, a major needs enough minors behind it -- Test-ReleaseBumpEarned; -SkipTierGate
+         overrules), lint gate green, AND all test suites green (-SkipTests overrules).
       2. Determines the current version -- the lockstep value from every
          <plugin>/.claude-plugin/plugin.json where this repo publishes plugins, otherwise the newest
          vX.Y.Z tag -- then the new version (-Version or -Bump) and the bump type.
@@ -100,6 +100,12 @@
 .PARAMETER SkipLint
     Deliberately skip the lint gate (escape valve).
 
+.PARAMETER SkipTests
+    Deliberately skip the test-suite gate (escape valve). Separate from -SkipLint for the reason those two
+    are separate in open-pr.ps1: they are two different tools, and skipping one is not a reason to skip the
+    other. The suites run BEFORE anything is written, so skipping them means a release can be committed and
+    tagged on main while a suite is red.
+
 .PARAMETER SkipSignificanceGate
     Cut even though a pending tier-1-or-higher entry has not declared how much it weighs (issue #467).
     The score orders the release documents, so without it an entry cannot be placed; the gate refuses
@@ -137,6 +143,7 @@ param(
     [string]$SummaryFile = '',
     [switch]$NoPush,
     [switch]$SkipLint,
+    [switch]$SkipTests,
     [switch]$SkipTierGate,
     [switch]$SkipSignificanceGate
 )
@@ -567,6 +574,30 @@ if (-not $SkipLint) {
     Write-Host "lint gate: integrity check for the release ($lintRel)..." -ForegroundColor Cyan
     & powershell -NoProfile -ExecutionPolicy Bypass -File $lintPath
     if ($LASTEXITCODE -ne 0) { Write-Error "the lint gate found errors -- release aborted. Fix them, or run with -SkipLint."; exit 1 }
+}
+
+# THE TEST GATE, ADDED AUGUST 7, 2026 (issue #510). Until then the release ran the lint ALONE, which made
+# the release commit the least-checked commit in the whole workflow: every ordinary PR passes the lint AND
+# all the suites locally, and CI runs both again before the merge is allowed. The release ran one of the
+# two, and its push to main is not held back by the required check -- so a red suite could be committed,
+# tagged and pushed, with CI reporting it only afterwards, when the tag was already on it.
+#
+# BEFORE ANY WRITE, deliberately -- same position as the lint above. A release that fails halfway through
+# leaves a half-bumped tree on main under one of this repo's two direct-commit exceptions, which is the
+# one place a failure is expensive to unpick.
+#
+# WHAT THIS STILL CANNOT SEE, so nobody reads more into it than it gives: the suites run against the tree
+# BEFORE the cut, so a defect the cut itself introduces -- a malformed RELEASE.md card, a broken generated
+# note -- is invisible to them. CI on the main push is what catches that, after the fact. The two are
+# complementary and neither replaces the other; that is why #510 asks for both.
+#
+# Shares Invoke-TestSuiteGate with open-pr.ps1 rather than repeating its loop -- one owner, so the two
+# gates cannot drift into checking different things.
+if (-not $SkipTests) {
+    if (-not (Invoke-TestSuiteGate -TestsDir (Join-Path $repoRoot 'scripts\tests') -Context 'the release')) {
+        Write-Error "test gate found failing suites -- release aborted, nothing written. Fix the tests, or run with -SkipTests to cut without them."
+        exit 1
+    }
 }
 
 # --- Build content (before the write actions, so a parse error leaves nothing behind) --------
