@@ -29,6 +29,12 @@ already **measured** empty fields instead of matching placeholder prose, so it i
 its comment stripper: every branch in flight, here and in every consumer, carries comments right now, and
 they meet these scripts through a plugin update rather than by choosing to.
 
+**And the step list carries the plan and nothing else.** Description, ID and type briefly sat at the top of
+both files so the pair would say whose it is; they are the entry's alone now. The same information in two
+places is free to disagree, and here it would have been visible on every branch -- two files side by side,
+each with its own copy of the same three boxes. The step list identifies itself by its heading, which is
+the one thing any script reads out of it besides the step marks.
+
 **And the tier model changed with it.** All three tiers are now written into every entry instead of tier 1
 and 2 arriving commented out, and a tier the change does not reach is **answered** -- `**Score:** N/A` with
 a line saying why -- rather than left out. The reason is the same one behind the bare files: an absent

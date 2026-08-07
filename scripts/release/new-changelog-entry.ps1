@@ -305,10 +305,10 @@ if ($changelogTaken) {
 if ($progressTaken) {
     Write-Host "Kept: $($branchFiles.Progress) (already scaffolded for '$progressOwner')" -ForegroundColor Yellow
 } else {
-    # THE SAME ID AS THE ENTRY. Two stamps taken a few lines apart would differ by a second often enough to
-    # matter, and the whole point of the field is that the pair carries one identifier.
-    $progressText = ((Format-BranchProgressScaffold -Branch $branch -Intent $Intent -Id $branchId `
-        -Description $description) -join "`n") + "`n"
+    # NO DESCRIPTION AND NO ID HERE. They live in the entry alone since August 7, 2026 -- the same three
+    # fields in both files was one fact in two places, free to disagree. This file is the plan and where you
+    # left off; its heading carries the branch, which is the only identifier anything reads out of it.
+    $progressText = ((Format-BranchProgressScaffold -Branch $branch -Intent $Intent) -join "`n") + "`n"
     [System.IO.File]::WriteAllText($progressPath, $progressText, $Utf8NoBom)
     Write-Host "Created: $($branchFiles.Progress)" -ForegroundColor Green
 }

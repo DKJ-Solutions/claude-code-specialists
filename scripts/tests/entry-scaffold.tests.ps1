@@ -898,6 +898,19 @@ Assert-Equal 'still the scaffolded step' $stubFindings[0].Label 'and it is named
 # ...and an UNticked one is reported once, not twice -- it is open, which is the more actionable of the
 # two labels and the one that tells the author what to do.
 $freshScaffold = ((Format-BranchProgressScaffold -Branch 'feat/fresh') -join "`n")
+
+# THE STEP LIST CARRIES THE PLAN AND NOTHING ELSE (Dave, August 7, 2026). Description, ID and type briefly
+# sat at the top of BOTH branch files so the pair would say whose it is; they were removed from this one,
+# because the same information in two places is free to disagree and here it would be visible on every
+# branch. Asserted rather than trusted: the three are still SECTIONS OF THE ENTRY, so a future change that
+# reaches for Add-EntrySection here would put them back without anything else noticing.
+foreach ($gone in @('Description', 'Id', 'Type')) {
+    Assert-True (-not (Test-EntryHasSection -EntryText $freshScaffold -Key $gone)) `
+        "the step list carries no '$gone' section -- that fact lives in the entry alone"
+}
+# What it DOES carry is the identifier every reader of it needs, in the one place a script looks.
+Assert-Equal 'feat/fresh' (Get-BranchFileDeclaredBranch -Text $freshScaffold) 'and the heading still names the branch, which is what the fold reads back'
+
 $freshFindings = @(Get-BranchProgressFindings -Text $freshScaffold)
 Assert-Equal 1 $freshFindings.Count 'a freshly scaffolded list produces exactly one finding, not one per rule'
 Assert-Equal 'still open' $freshFindings[0].Label 'and the open label wins, because that is the actionable one'

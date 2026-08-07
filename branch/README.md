@@ -38,9 +38,13 @@ answer looks like. That is what those copies are for: the file you type in is th
 answers, and the reference is one directory away.
 
 **Three of those fields are filled in for you.** `new-branch` writes the heading, the **Branch ID** (a
-timestamp taken when the branch is created) and the **Branch type** (the prefix of the branch name). The
-same three appear at the top of `branch-progress.md`, with the same ID — the two files are one pair, and
-they say so. What is left for you is the description, the body, and the Significance sections.
+timestamp taken when the branch is created) and the **Branch type** (the prefix of the branch name). What
+is left for you is the description, the body, and the Significance sections.
+
+They live in **this file only**. They briefly sat at the top of `branch-progress.md` as well, so the pair
+would say whose it is — that was removed, because the same information in two places is free to disagree
+and here it would be visible on every branch. The step list identifies itself by its heading, which is the
+one thing any script reads out of it besides the step marks.
 
 **The heading names the branch, not the change.** That is where the description went: `## `feat/x`
 changelog` is what this file is, and *what changed* is the first section under it. Both branch files carry
@@ -91,57 +95,9 @@ placeholder anywhere, so `open-pr` measures instead of matching: it names the de
 any tier whose reason is still blank. That catches the untouched entry the placeholders used to catch
 *and* the one whose placeholder was deleted rather than answered.
 
-A worked example, as it looks just before the PR:
-
-```markdown
-## `fix/dead-link-scan` changelog
-
-### Branch description
-
-The dead-link scan reaches the payload layers it never read
-
-### Branch ID
-
-20260806-114230
-
-### Branch type
-
-fix
-
-### What does the change on this branch bring to main?
-
-Agent defs, `agent-shared/`, `.github/` and `.claude/rules/` matched no rule in the scan set — 40 files,
-and a real dead link had been sitting in one of them, seen by nothing.
-
-### Significance
-
-#### Tier 0
-
-Four more rules in the scan set; nothing changes in how anyone works.
-
-**Score:** 2
-
-#### Tier 1
-
-A dead link in the largest body of prose this repo ships is now caught before it merges.
-
-**Score:** 3
-
-#### Tier 2
-
-Nobody outside this repo can observe a lint rule.
-
-**Score:** N/A
-
-### Pull Request
-
-[PR #123](https://github.com/DaveKJohn/claude-code-specialists/pull/123) · merged 2026-08-06
-```
-
-That entry reaches tier 1: the lint rule gives the project something, and tier 2 says out loud that no
-consumer can see it. **`N/A` is an answer, not a gap** — which is the whole reason the tiers are all in the
-file rather than added when claimed. The `### Pull Request` line is shown filled in because that is how the
-fold leaves it; while you are writing, that section is empty.
+**The shape itself is in [`templates/branch_template_changelog.md`](templates/branch_template_changelog.md)** —
+field by field, with the guidance for each — so it is deliberately not repeated here. Open that file when
+you want to see the whole form at once.
 
 ## branch-progress
 
@@ -149,9 +105,10 @@ The step list is yours. It is never folded and never travels anywhere, so it may
 pick the branch back up — notes, links, a scratch list. Two things in it are read by scripts: **the branch
 name in the heading**, which is how the fold finds the PR, and **the step marks under `### Steps`**.
 
-It opens with the same three fields the entry does — description, ID and type, with the same ID — because
-the two files are one pair and say so. `new-branch` fills those in, and scaffolds one open step so the gate
-below has something to refuse.
+It carries **nothing but that** — no description, no ID, no type. Those are the entry's, and repeating them
+here would be one fact in two files. `new-branch` scaffolds one open step, so the gate below has something
+to refuse; the shape is in
+[`templates/branch_template_progress.md`](templates/branch_template_progress.md).
 
 ## Why two files and not one
 

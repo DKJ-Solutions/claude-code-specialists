@@ -1,17 +1,5 @@
 ## `feat/scaffold-without-comments` progress
 
-### Branch description
-
-The scaffolded branch files carry no guidance comments
-
-### Branch ID
-
-20260807-103608
-
-### Branch type
-
-feat
-
 ### Steps
 
 - [x] One `-Template` switch decides guidance + the `(template)` marker together; only `Get-BranchTemplates` passes it
@@ -26,7 +14,12 @@ feat
 - [x] Retired `Add-TemplateTierPrompt`; there is no commented-out block left to splice
 - [x] Twelve new asserts pinning the N/A semantics, including blank-is-not-N/A
 - [x] Docs: branch/README.md (incl. finishing Dave's half-edit), CONTRIBUTING.md, CLAUDE.md, the new-branch skill
-- [ ] PR -- still on Dave's word
+- [x] Took in his second edit: the three branch fields leave the step list, so nothing is stated twice
+- [x] Dropped the now-unused `-Description`/`-Id` parameters rather than leaving them wired to nothing
+- [x] Removed the worked example from `branch/README.md` too -- the template already carries it
+- [x] Pinned the separation with a test, since the three are still entry sections and could drift back
+- [x] Full suite green (26 suites, 0 failures) and lint clean, twice over after each of his edits
+- [x] PR -- opened on Dave's word, August 7, 2026
 
 ### Where I left off
 

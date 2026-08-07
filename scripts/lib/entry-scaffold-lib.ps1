@@ -2733,19 +2733,23 @@ function Format-BranchProgressScaffold {
         branch records what HAS happened, and a step list scaffolded with someone's status text as its
         only entry would read as an instruction to do it again.
 
-        THE THREE BRANCH FIELDS ARE THE ENTRY'S OWN SECTIONS, written by the same helper from the same
-        wording (Add-EntrySection). Both files carry them in the dossier form, and two writers producing
-        "the same" three sections is how the pair ends up disagreeing about what to put in the same box.
+        THE THREE BRANCH FIELDS ARE NOT HERE, AND THAT IS THE POINT (Dave, August 7, 2026). Description, ID
+        and type briefly appeared at the top of BOTH files, on the reasoning that the pair should say whose
+        it is. He removed them from this one: the same information in two places is the drift this repo
+        keeps paying for, and here it would be visible on every branch -- two files, side by side, free to
+        disagree about the same three boxes. **The heading already carries the identifier**, which is also
+        the only thing any script reads out of this file besides the step marks.
 
-        -Template renders the copy under branch/templates/: it marks its heading '(template)' and omits the
-        scaffolded first step. The step is the one thing the template must NOT show, because a template is
-        read as an example -- and an example whose first line is somebody else's TODO gets copied in.
+        So this file is exactly what its name says: the plan, and where you left off.
+
+        -Template renders the copy under branch/templates/: it marks its heading '(template)', carries the
+        guidance comments, and omits the scaffolded first step. The step is the one thing the template must
+        NOT show, because a template is read as an example -- and an example whose first line is somebody
+        else's TODO gets copied in.
     #>
     param(
         [Parameter(Mandatory)][string]$Branch,
         [string]$Intent = '',
-        [string]$Id = '',
-        [string]$Description = '',
         [switch]$Template
     )
     $w = Get-BranchFileWording
@@ -2754,14 +2758,6 @@ function Format-BranchProgressScaffold {
     $lines.Add((Format-BranchFileHeadingLine -Branch $Branch -Title $w.ProgressTitle `
         -Level $script:EntryHeadingLevel -Suffix $suffix))
     $lines.Add('')
-
-    $info = $null
-    try { $info = Get-BranchInfo -Branch $Branch } catch { $info = $null }
-    $type = if ($info -and $info.Prefix -and $info.IsKnown) { [string]$info.Prefix } else { '' }
-
-    Add-EntrySection -Lines $lines -Key 'Description' -Value $Description -WithGuidance:$Template
-    Add-EntrySection -Lines $lines -Key 'Id'          -Value $Id          -WithGuidance:$Template
-    Add-EntrySection -Lines $lines -Key 'Type'        -Value $type        -WithGuidance:$Template
 
     # THE SCAFFOLDED STEP STAYS IN THE FILE A BRANCH ACTUALLY GETS (Dave, August 6, 2026), asked and answered
     # when the template dropped it. Without it a fresh branch reaches a PR with no plan at all and the
