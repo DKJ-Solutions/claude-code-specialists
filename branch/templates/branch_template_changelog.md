@@ -59,6 +59,6 @@
 -->
 
 ### Pull Request
-<!-- link to the PR in github when branch is merged to main en de datum waarop dit gebeurde-->
+<!-- link to the PR in github when branch is merged to main and the date this happened-->
 
 

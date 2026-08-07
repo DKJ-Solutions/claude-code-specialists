@@ -83,5 +83,5 @@ read, deliberately -- but the file they open on their next branch looks differen
 **Score:** 4
 
 ### Pull Request
-<!-- link to the PR in github when branch is merged to main en de datum waarop dit gebeurde-->
+<!-- link to the PR in github when branch is merged to main and the date this happened-->
 

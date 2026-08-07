@@ -52,13 +52,13 @@ feat
 Built, and both templates verify byte-identical against the generator -- their file timestamps are
 still Dave's own, so they were never written to. Lint 0 errors, all 26 suites green.
 
-Two byte-level questions are deliberately left for Dave rather than decided here, because both live
-in HIS files and the instruction was not to touch them:
+Two byte-level questions were left for Dave rather than decided here, because both live in HIS files
+and the instruction was not to touch them:
 
-  * the Pull Request hint ends in Dutch ("en de datum waarop dit gebeurde"), which conflicts with the
-    repo's rule that script-generated document content is English -- and this one ships to consumers;
-  * `branch_template_progress.md` has no final newline, so the generator reproduces that too.
-
-Both are one-line changes once he says which way. The merge waits on the first: it is outward-facing
-content that a documented rule says should read differently.
+  * the Pull Request hint ended in Dutch ("en de datum waarop dit gebeurde"), which conflicts with the
+    repo's rule that script-generated document content is English -- and this one ships to consumers.
+    **Translated on his word, August 7, 2026**, in the SOURCE, with the template regenerated from it:
+    one line changed, and it changed in the direction the format is meant to travel;
+  * `branch_template_progress.md` has no final newline, so the generator reproduces that too. Left as
+    it is -- he did not ask for it, and it is harmless.
 

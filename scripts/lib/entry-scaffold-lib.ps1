@@ -584,7 +584,11 @@ $script:EntryGuidanceDefaults = [ordered]@{
     Description = @('<!-- Short description of branch-->')
     Id          = @('<!--unique ID for branch like a timestamp of the moment this branch is created-->')
     Type        = @('<!-- options for type are: feat, fix or docs-->')
-    PullRequest = @('<!-- link to the PR in github when branch is merged to main en de datum waarop dit gebeurde-->')
+    # Translated on Dave's word (August 7, 2026): it closed in Dutch, and this line is script-generated
+    # document content that travels to consumers in the plugin cache -- the one layer .claude/rules/
+    # language-layers.md is explicit about. The template followed from here rather than the other way
+    # round, which is the sanctioned direction: change the format, and Get-BranchTemplates regenerates it.
+    PullRequest = @('<!-- link to the PR in github when branch is merged to main and the date this happened-->')
     What = @(
         'What the change DOES, for someone reading CHANGELOG.md months from now --',
         'not a report of what you did on the branch. Name what is different afterwards,',
