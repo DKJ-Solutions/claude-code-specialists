@@ -58,7 +58,14 @@ also how the fold finds the PR, and the human-readable name of the change is its
 
 **The file is bare** — headings and the space under them. The guidance for each field lives in the copies
 under `branch/templates/`, which is what those copies are for: the file you type in is the questions and
-your answers, and the reference is one directory away. Six sections, three of them filled in for you:
+your answers, and the reference is one directory away.
+
+**`new-branch` writes those templates into your repo too**, and rewrites one that has drifted from the
+current format. You get them on your first branch and they stay current through plugin updates, so the
+guidance travels with the scripts rather than living only in the repo the scripts came from. They are
+generated: edit one and the next run puts it back.
+
+Six sections, three of them filled in for you:
 
 ```text
 ## `<your branch>` changelog
