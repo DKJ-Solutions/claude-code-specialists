@@ -207,9 +207,11 @@ function Get-MojibakePaths {
     # moved them (August 6, 2026), and the entry is the single highest-value file in this set: its text is
     # pasted verbatim into CHANGELOG.md and from there into the per-plugin CHANGELOGs that travel to
     # consumers, so a mis-decode caught anywhere later has already been copied three times.
+    # -Recurse for templates/: those are pasted into a real entry, so a mis-decode there is copied forward
+    # into every branch that uses them rather than staying in one file.
     $branchDir = Join-Path $RepoRoot 'branch'
     if (Test-Path -LiteralPath $branchDir) {
-        $paths += @(Get-ChildItem -LiteralPath $branchDir -Filter '*.md' -File |
+        $paths += @(Get-ChildItem -LiteralPath $branchDir -Recurse -Filter '*.md' -File |
             Select-Object -ExpandProperty FullName)
     }
 

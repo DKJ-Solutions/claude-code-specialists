@@ -147,13 +147,21 @@ land with an unfinished plan.
 
 ## The impact gate: how far does this change reach, and how much does it weigh?
 
-The entry also carries an **impact table** — one row per tier it reaches, each row scored 1 to 5:
+The entry also carries a **`### Significance` section** — one `#### Tier N` sub-section per tier it reaches,
+each with a reason and a score from 1 to 5:
 
 ```text
-| Tier | Significance | Why |
-|---|---|---|
-| 2 | 5 | consumers must re-add the marketplace under its new name |
-| 1 | 4 | the routine version bump stops needing a developer |
+#### Tier 1
+
+The routine version bump stops needing a developer.
+
+**Score:** 4
+
+#### Tier 2
+
+Consumers must re-add the marketplace under its new name.
+
+**Score:** 5
 ```
 
 The **tier** (`0` = only this repo's own developers notice, `1` = a colleague on the project gets something

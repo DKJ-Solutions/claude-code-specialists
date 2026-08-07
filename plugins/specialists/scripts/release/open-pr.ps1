@@ -403,18 +403,22 @@ if (Test-Path -LiteralPath $entryPath) {
         $entryRel = $entryPath.Substring($repoRoot.Length).TrimStart('\', '/')
         $detail = ($scaffoldFindings | ForEach-Object { "  - $($_.Label): '$($_.Marker)'" }) -join "`n"
         if ($Force) {
-            Write-Warning "scaffold gate: $entryRel still carries scaffold wording, but -Force was given:`n$detail"
+            Write-Warning "scaffold gate: $entryRel is not finished, but -Force was given:`n$detail"
         } else {
             Write-Error @"
-scaffold gate: $entryRel still carries the wording new-changelog-entry.ps1 scaffolded it with - nothing pushed, no PR opened.
+scaffold gate: $entryRel has not been written yet - nothing pushed, no PR opened.
 
 $detail
 
-That text describes what was still TO DO on the branch. It is about to become permanent: the fold pastes
-this entry into CHANGELOG.md, and the next release copies it into releases/ and into every per-plugin
-CHANGELOG.md that travels to consumers - where nobody will look for it again.
+Each line above is a field the scaffolder left for you and nothing has been put in it, or wording it wrote
+that is still standing. The guidance comments do not count as an answer: the fold strips them, so a section
+that looks filled in on the branch lands in CHANGELOG.md empty.
 
-Rewrite the body to say what the change DOES, then run again. Keeping it as-is is -Force.
+And it is about to become permanent - the fold pastes this entry into CHANGELOG.md, the next release copies
+it into releases/ and into every per-plugin CHANGELOG.md that travels to consumers, where nobody will look
+for it again.
+
+Answer them and run again. Shipping it as it stands is -Force.
 "@
             exit 1
         }

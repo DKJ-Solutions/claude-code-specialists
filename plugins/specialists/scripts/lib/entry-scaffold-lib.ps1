@@ -60,7 +60,12 @@ $script:EntryScaffoldDefaults = [ordered]@{
 # above rather than folded into BodyPlaceholder because that one IS seamed -- a repo that overrode the
 # placeholder would otherwise lose the legacy marker along with the default it replaced.
 $script:EntryScaffoldLegacyMarkers = @(
-    'TODO: what still needs to happen on this branch, and where you left off.'
+    'TODO: what still needs to happen on this branch, and where you left off.',
+    # Retired with the dossier form (August 6, 2026): the tier sub-sections were scaffolded with a visible
+    # why-placeholder under their guidance comment, and now carry the comment alone. Still refused, for the
+    # reason all of these are -- every branch in flight, here and in every consumer, has one in its entry
+    # right now, and a gate that forgot it would wave exactly those into CHANGELOG.md.
+    'TODO: why this change matters at this reach.'
 )
 
 function Get-EntryScaffoldWording {
@@ -497,16 +502,214 @@ $script:EntrySignificanceMax = 5
 # A reader who knows one knows the other, and a parser for either is the same three characters of regex.
 $script:EntryTierSubLevel   = 4
 $script:EntryTierSubPrefix  = 'Tier'
-$script:EntryScoreLabel     = 'Score:'
+# BOLD SINCE THE DOSSIER FORM (Dave, August 6, 2026), and the plain form is still read. 'Score:' sat as bare
+# prose in a section that is otherwise all prose, so it did not read as the field it is; '**Score:**' does.
+# The KEY did not change -- only its decoration -- which is why the pattern below strips the asterisks
+# rather than listing two labels: every entry in CHANGELOG.md and in every consumer's tree carries the
+# plain form right now, and they meet the new parser through a plugin update rather than by choosing to.
+$script:EntryScoreKey       = 'Score'
+$script:EntryScoreLabel     = '**Score:**'
+
+function Get-EntryScoreLabel {
+    <# The label a WRITER puts on the score line ('**Score:**'). #>
+    return $script:EntryScoreLabel
+}
+
+function Get-EntryScorePattern {
+    <#
+        The regex that reads a score line, capturing the value: '**Score:** 3' and the plain 'Score: 3'
+        alike, with or without a value after it.
+
+        ONE PATTERN, BUILT FROM THE KEY, so the two decorations can never become two separately-maintained
+        literals. The asterisks are optional on each side independently rather than as a pair -- a
+        half-bolded '**Score:' costs the entry its ranking if it is not read, and reading it costs nothing.
+    #>
+    return '^\s*(?:\*\*)?' + [regex]::Escape($script:EntryScoreKey) + ':(?:\*\*)?\s*(\S*)\s*$'
+}
 
 $script:EntrySignificanceWordingDefaults = [ordered]@{
-    # One sentence per tier, printed under that tier's score, sending the author to the next one. Written
+    # One question per tier, printed under that tier's score, sending the author to the next one. Written
     # as a QUESTION with both answers spelled out, because the failure it prevents is silence: an author
     # who simply stops after tier 0 has not decided that colleagues get nothing out of the change, they
     # have not been asked. Tier 2 has no successor, so it carries none.
-    Route0 = 'Is this change also relevant to colleagues and employers? Then continue to Tier 1. If not, stop here and move on to the next section.'
-    Route1 = 'Is this change also relevant to the people who consume this product? Then continue to Tier 2. If not, stop here and move on to the next section.'
-    WhyPlaceholder = 'TODO: why this change matters at this reach.'
+    #
+    # LINE ARRAYS, NOT SENTENCES, because these are rendered into a comment block whose width is part of the
+    # form -- see Format-EntryGuidanceComment. A single long string produced one 130-column line in a file
+    # whose every other comment line stops around 78, which is exactly the sort of difference that gets
+    # "tidied" by hand and then reported as template drift by the lint. The break is stated here, once.
+    Route0 = @(
+        'Is this change also relevant to colleagues and employers? Then continue to Tier 1.',
+        'If not, stop here and move on to the next section.'
+    )
+    Route1 = @(
+        'Is this change also relevant to the people who consume this product? Then',
+        'continue to Tier 2. If not, stop here and move on to the next section.'
+    )
+    # The two openers of the template's commented-out tiers. Template-only prose, kept beside the questions
+    # they follow rather than inside Add-TemplateTierPrompt, so a repo that translates the form translates
+    # all of it from one place.
+    Uncomment1 = 'UNCOMMENT Tier 1 if colleagues and employers get something out of this change.'
+    Uncomment2 = 'UNCOMMENT Tier 2 as well if a consumer of the product notices it.'
+}
+
+# RECOGNISED, NEVER WRITTEN -- the one-line forms of the two questions above, as they stood for the day
+# between the sub-sections shipping and the dossier form breaking them over two lines. Read-EntryTierSections
+# filters them out of the Why for the reason it filters the current ones: this repo's own form text must
+# never be read back as the author's reason and published as it. Deliberately not repo-configurable, like
+# every other historical string here -- a repo that translated the questions translated the CURRENT ones.
+$script:EntrySignificanceRetiredRoutes = @(
+    'Is this change also relevant to colleagues and employers? Then continue to Tier 1. If not, stop here and move on to the next section.',
+    'Is this change also relevant to the people who consume this product? Then continue to Tier 2. If not, stop here and move on to the next section.'
+)
+
+$script:EntryGuidanceDefaults = [ordered]@{
+    # One block per field, written as an HTML comment ABOVE the place the answer goes. Borrowed from this
+    # repo's own .github/ISSUE_TEMPLATE/inbound-improvement.md, whose fields each say what a good answer
+    # looks like without occupying the line the answer is written on (Dave, August 6, 2026).
+    #
+    # THE VISIBLE 'TODO:' STAYS UNDERNEATH, and that is the half deliberately NOT borrowed. Replacing it
+    # with a comment would make an unfinished entry render as an EMPTY section rather than as a visible
+    # TODO -- the gate still catches it in the source, but the gate has a -Force, and past that point the
+    # defect ships invisibly instead of obviously. Guidance goes in the comment; the prompt stays in view.
+    # THE THREE BRANCH FIELDS ARE SHARED BY BOTH FILES, and that is why they live here rather than in
+    # Get-BranchFileWording beside the rest of the progress file's prose. The dossier form puts the same
+    # three sections at the top of branch-changelog.md AND branch-progress.md; two copies of the heading
+    # and the hint is the drift shape this repo keeps paying for, and here it would be visible on every
+    # branch -- two files, side by side, disagreeing about what to write in the same box.
+    #
+    # WRITTEN AS COMPLETE COMMENT LINES rather than as text to be wrapped in one. Format-EntryGuidanceComment
+    # passes a block through untouched when it is already a comment, because these four are Dave's own
+    # one-liners and their spacing is not derivable from a rule -- '<!-- Short' has a space after the marker
+    # and '<!--unique' does not. The templates are the spec, so the literal is the honest representation.
+    Description = @('<!-- Short description of branch-->')
+    Id          = @('<!--unique ID for branch like a timestamp of the moment this branch is created-->')
+    Type        = @('<!-- options for type are: feat, fix or docs-->')
+    # Translated on Dave's word (August 7, 2026): it closed in Dutch, and this line is script-generated
+    # document content that travels to consumers in the plugin cache -- the one layer .claude/rules/
+    # language-layers.md is explicit about. The template followed from here rather than the other way
+    # round, which is the sanctioned direction: change the format, and Get-BranchTemplates regenerates it.
+    PullRequest = @('<!-- link to the PR in github when branch is merged to main and the date this happened-->')
+    What = @(
+        'What the change DOES, for someone reading CHANGELOG.md months from now --',
+        'not a report of what you did on the branch. Name what is different afterwards,',
+        'and where a decision was measured rather than assumed, say what was measured.'
+    )
+    Tier = @(
+        'Why the change matters AT THIS REACH specifically. A reason that would read the',
+        'same under every tier is a sign the tier is wrong. Then Score: 1-5 against the',
+        'rubric new-branch printed when it wrote this file.'
+    )
+}
+
+function Get-EntryGuidance {
+    <#
+        The per-field guidance blocks, as an object of string arrays -- this repo's answers where
+        scripts/repo-config.ps1 supplies them via Get-EntryGuidanceOverrides.
+
+        A repo that wants none can return empty arrays: Format-EntryGuidanceComment renders nothing for an
+        empty block, so the scaffold is exactly what it was before this existed.
+    #>
+    $out = [ordered]@{}
+    foreach ($key in $script:EntryGuidanceDefaults.Keys) { $out[$key] = $script:EntryGuidanceDefaults[$key] }
+    if (Get-Command Get-EntryGuidanceOverrides -ErrorAction SilentlyContinue) {
+        $override = Get-EntryGuidanceOverrides
+        if ($override) {
+            foreach ($key in @($out.Keys)) {
+                $v = $null
+                if ($override -is [System.Collections.IDictionary]) {
+                    if (-not $override.Contains($key)) { continue }
+                    $v = $override[$key]
+                } elseif ($override.PSObject.Properties[$key]) {
+                    $v = $override.PSObject.Properties[$key].Value
+                } else { continue }
+                if ($null -ne $v) { $out[$key] = @($v) }
+            }
+        }
+    }
+    return [pscustomobject]$out
+}
+
+function Format-EntryGuidanceComment {
+    <#
+        One guidance block as HTML comment LINES, or @() when the block is empty.
+
+        MULTI-LINE WITH THE MARKERS ON THEIR OWN LINES, deliberately: the stripper below removes whole
+        lines, so a comment sharing a line with content would either survive with its content or take the
+        content with it. Keeping the two apart is what makes the removal exact rather than clever.
+
+        A BLOCK THAT IS ALREADY A COMPLETE ONE-LINE COMMENT IS PASSED THROUGH UNTOUCHED. Four of the fields
+        carry Dave's own hand-written one-liners, whose spacing is not derivable from any rule -- one has a
+        space after the marker and the next does not -- so wrapping them again would both double the markers
+        and normalise away the exact bytes the templates are held to. Remove-EntryHtmlComments strips a
+        single-line comment just as happily as a block, so nothing downstream can tell the two apart.
+    #>
+    param([AllowEmptyCollection()][string[]]$Lines = @())
+    $body = @($Lines | Where-Object { $null -ne $_ })
+    if ($body.Count -eq 0) { return @() }
+    if ($body.Count -eq 1) {
+        $only = ([string]$body[0]).Trim()
+        if ($only.StartsWith('<!--') -and $only.EndsWith('-->')) { return @([string]$body[0]) }
+    }
+    $out = @('<!--')
+    # An empty guidance line stays EMPTY rather than becoming five spaces: trailing whitespace is
+    # invisible in an editor, survives every diff, and is the kind of thing a byte-exact template check
+    # then reports as drift for a reason nobody can see.
+    foreach ($line in $body) { $out += $(if ($line) { '     ' + $line } else { '' }) }
+    $out += '-->'
+    return $out
+}
+
+function Remove-EntryHtmlComments {
+    <#
+        Removes whole-line HTML comments from an entry block -- the guidance the scaffold writes above each
+        field -- leaving everything else, including the line endings, exactly as it was.
+
+        THE FOLD CALLS THIS, WHICH IS WHY THE GUIDANCE CAN BE GENEROUS. An author who replaces the TODO
+        underneath and leaves the comment standing has done nothing wrong: the comment is the form, not the
+        answer, and the form does not belong in CHANGELOG.md. Stripping it at the fold means nobody has to
+        remember to delete it, which is the whole reason this is safe to add -- a guidance block that had to
+        be tidied by hand would just be a second thing the scaffold gate has to police.
+
+        FENCE-AWARE, for the reason every reader here is: an entry documenting this mechanism shows a
+        comment inside a fence, and this very entry does.
+
+        ONLY WHOLE-LINE COMMENTS. A comment sharing a line with prose is somebody's inline note in their own
+        sentence; removing the line would take their sentence with it, and removing only the comment would
+        leave a dangling fragment. Multi-line blocks are handled by tracking the open marker, so the shape
+        Format-EntryGuidanceComment writes is removed entirely.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
+
+    $pair = Get-EntryLineFlagPairs -EntryText $EntryText
+    $parts = $pair.Parts
+    $out = New-Object System.Collections.Generic.List[string]
+    $inComment = $false
+    $any = $false
+    $n = -1
+    for ($i = 0; $i -lt $parts.Count; $i++) {
+        if ($i % 2 -eq 1) { continue }
+        $n++
+        $line = $parts[$i]
+        $sep = if ($i + 1 -lt $parts.Count) { $parts[$i + 1] } else { '' }
+        $t = $line.Trim()
+
+        if ($pair.Fenced[$n]) {
+            $inComment = $false
+        } elseif ($inComment) {
+            $any = $true
+            if ($t.EndsWith('-->')) { $inComment = $false }
+            continue
+        } elseif ($t.StartsWith('<!--')) {
+            $any = $true
+            # A single-line comment opens and closes on the same line; anything else opens a block.
+            if (-not $t.EndsWith('-->')) { $inComment = $true }
+            continue
+        }
+        $out.Add($line + $sep)
+    }
+    $t = ($out -join '')
+    if (-not $any) { return $t }
+    return [regex]::Replace($t, '(\r?\n)\1\1+', '$1$1')
 }
 
 function Get-EntrySignificanceWording {
@@ -552,10 +755,18 @@ function Format-EntrySignificanceSections {
         answer, and each answer decides whether there is a next one. Ordering the document against the
         order it is written in would put the routing questions in reverse.
 
-        Called with no rows it renders the SCAFFOLD: tier 0 alone, its why a placeholder and its score
-        EMPTY. Tier 0 is the honest default claim -- reaches nobody outside this repo -- while a scaffolded
-        SCORE would be a guess at a ranking, which is the failure the retired highlights marker was
-        measured on.
+        Called with no rows it renders the SCAFFOLD: tier 0 alone, its guidance comment standing where the
+        why goes and its score EMPTY. Tier 0 is the honest default claim -- reaches nobody outside this repo
+        -- while a scaffolded SCORE would be a guess at a ranking, which is the failure the retired
+        highlights marker was measured on.
+
+        THE VISIBLE 'TODO:' UNDER THE GUIDANCE IS GONE (Dave, August 6, 2026), which reverses the rule this
+        format carried the day before -- "guidance in the comment, the prompt stays in view". It went because
+        the dossier form removed every other visible placeholder with it, and one lone TODO in a file of
+        comment blocks reads as leftover rather than as a prompt. What replaces it as the gate is not a
+        string but a MEASUREMENT: Get-EntryScaffoldFindings now reports a section that is still EMPTY once
+        the comments are stripped, which catches the untouched entry the placeholder used to catch AND the
+        one whose placeholder was deleted rather than answered. Strictly more, and nothing to keep in sync.
 
         One formatter for the writer and any migration, so the parser below can never meet a shape nothing
         here produced.
@@ -577,9 +788,18 @@ function Format-EntrySignificanceSections {
         if ($i -gt 0) { $lines.Add('') }
         $lines.Add("$hashes $($script:EntryTierSubPrefix) $tier")
         $lines.Add('')
-        $why = if ($row.PSObject.Properties['Why'] -and $row.Why) { [string]$row.Why } else { $w.WhyPlaceholder }
-        foreach ($line in ($why -split '\r?\n')) { $lines.Add($line) }
-        $lines.Add('')
+        # THE GUIDANCE COMMENT STANDS WHERE THE WHY GOES on an unanswered section, and nothing else does --
+        # no placeholder line underneath it. A row that already carries a why is a migration or a rewrite of
+        # a finished entry, and prefixing somebody's written answer with a form instruction would be noise
+        # in exactly the document they just finished, so there the comment is what goes.
+        $answered = [bool]($row.PSObject.Properties['Why'] -and $row.Why)
+        if ($answered) {
+            foreach ($line in ([string]$row.Why -split '\r?\n')) { $lines.Add($line) }
+            $lines.Add('')
+        } else {
+            foreach ($line in (Format-EntryGuidanceComment -Lines (Get-EntryGuidance).Tier)) { $lines.Add($line) }
+            if (@((Get-EntryGuidance).Tier).Count -gt 0) { $lines.Add('') }
+        }
         # An unscored row writes the label with nothing after it -- a question left standing rather than a
         # number nobody chose. Get-EntryImpactFindings is what refuses it before the PR.
         $score = if ($row.PSObject.Properties['Score'] -and [int]$row.Score -gt 0) { ' ' + [string][int]$row.Score } else { '' }
@@ -590,9 +810,13 @@ function Format-EntrySignificanceSections {
         # true of the author and false of the reader: the entry is walked again at the fold, at the cut and
         # in the record, and a question that disappears once answered leaves the next reader unable to see
         # that it WAS asked. Tier 2 has no successor and therefore carries none.
+        #
+        # AS AN HTML COMMENT (Dave, August 6, 2026). It is form text, not the author's answer, and it was
+        # the last piece of form that travelled all the way into CHANGELOG.md and the development notes.
+        # The fold strips comments, so the writer still sees it and the record never does.
         if ($routes.ContainsKey($tier)) {
             $lines.Add('')
-            $lines.Add($routes[$tier])
+            foreach ($line in (Format-EntryGuidanceComment -Lines @($routes[$tier]))) { $lines.Add($line) }
         }
     }
     return @($lines.ToArray())
@@ -779,7 +1003,7 @@ function Read-EntryTierSections {
     )
     $hashes  = '#' * $script:EntryTierSubLevel
     $headRx  = '^\s*' + $hashes + '\s+' + [regex]::Escape($script:EntryTierSubPrefix) + '\s+(\S+)\s*$'
-    $scoreRx = '^\s*' + [regex]::Escape($script:EntryScoreLabel) + '\s*(\S*)\s*$'
+    $scoreRx = Get-EntryScorePattern
     $range   = Get-EntrySignificanceRange
 
     $rows = New-Object System.Collections.Generic.List[pscustomobject]
@@ -831,11 +1055,23 @@ function Read-EntryTierSections {
             }
         }
 
-        # The routing question is this format's own prose, not the author's answer, so it must not become
-        # the Why -- it would otherwise be published as the reason the change matters.
+        # The guidance and the routing question are this format's own prose, not the author's answer, so
+        # neither may become the Why -- it would otherwise be published as the reason the change matters.
+        #
+        # BOTH FORMS ARE FILTERED. They are HTML comments since August 6, 2026 (stripped here by the shared
+        # remover), and they were bare prose before that -- so an entry written on either side of that
+        # change reads back the same. Same "recognise both" rule the three declaration shapes get.
+        #
+        # AND BOTH LINE-BREAKINGS OF THEM. The questions became two-line arrays when the dossier form fixed
+        # the comment width, so the one-line sentences they replaced no longer appear in the wording at all
+        # -- and an entry carrying one as bare prose would have had this repo's own form text read back as
+        # the author's reason and published as it. @() flattens the arrays into individual lines, which is
+        # exactly the granularity the comparison below needs.
         $w = Get-EntrySignificanceWording
-        $routes = @($w.Route0, $w.Route1) | Where-Object { $_ }
-        $why = (@($whyLines | Where-Object {
+        $routes = @(@($w.Route0) + @($w.Route1) + @($script:EntrySignificanceRetiredRoutes)) |
+            Where-Object { $_ }
+        $whyText = Remove-EntryHtmlComments -EntryText (@($whyLines) -join "`n")
+        $why = (@(($whyText -split '\r?\n') | Where-Object {
             $t = $_.Trim()
             if (-not $t) { return $false }
             foreach ($r in $routes) { if ($t -eq ([string]$r).Trim()) { return $false } }
@@ -1426,10 +1662,38 @@ function Get-ImpactInsertOffset {
 # SEES belongs to the repo that owns the document -- the same #410 reasoning that made the entry stubs and
 # the category labels configurable. These are read back by the parser, so a repo that translates them
 # translates both halves at once, which is why they come from one resolver rather than being written twice.
+# THE ENTRY IS THE BRANCH'S OWN DOSSIER, AND IT FOLDS INTO CHANGELOG.md AS IT STANDS (Dave, August 6,
+# 2026). The file used to be the changelog block and nothing else: its H2 was the change's title, and three
+# sections answered what it does, what it weighs and what type it is. It now opens with the BRANCH -- '##
+# `feat/x` changelog' -- and carries the branch's own identity above the description, because the two files
+# a branch works in are a matched pair and both say whose they are.
+#
+# THE SIX SECTIONS, IN THE ORDER THEY ARE WRITTEN:
+#
+#   Branch description   the human-readable name of the change -- what the heading used to carry
+#   Branch ID            a unique stamp, written by the scaffolder at creation
+#   Branch type          feat / fix / docs / chore, from the branch prefix
+#   What does the ...    the description a reader of CHANGELOG.md arrives for
+#   Significance         one '#### Tier N' sub-section per reach the change claims
+#   Pull Request         filled by the fold, from the merge itself
+#
+# DAVE CHOSE THE VERBATIM ROUTE over having the fold derive a slimmer block from this one (August 6, 2026,
+# asked and answered before any of it was built). So CHANGELOG.md receives exactly this shape, branch line
+# and all, and the release documents inherit it. The alternative -- a fold that reads the dossier and emits
+# a different document -- was declined: it would put a SECOND definition of the entry format inside the
+# fold, which is the drift shape this repo has paid for in the fence readers, the scaffold wording and the
+# tier sections. One shape, written once, read everywhere.
+#
+# THE ORDER IS LOAD-BEARING, not presentation. The lint's split-entry rule asks whether a block's FIRST
+# named section is the first of these, which is how a stray heading at the entry's own level is caught --
+# so a reordering here changes what that gate means. Get-EntryFirstSectionKey states it once.
 $script:EntrySectionDefaults = [ordered]@{
-    What         = 'What does this change do?'
+    Description  = 'Branch description'
+    Id           = 'Branch ID'
+    Type         = 'Branch type'
+    What         = 'What does the change on this branch bring to main?'
     Significance = 'Significance'
-    Type         = 'Type of change'
+    PullRequest  = 'Pull Request'
 }
 
 # RECOGNISED, NEVER WRITTEN -- the section headings this format has retired. Measured the moment
@@ -1442,14 +1706,38 @@ $script:EntrySectionDefaults = [ordered]@{
 # Deliberately not repo-configurable: these are historical strings, so there is nothing to choose about
 # them, and a repo that translated the heading translated the CURRENT one -- their old name lives in their
 # own documents, which is why a name-matcher accepts the seam's value AND these.
-$script:EntryRetiredSectionHeadings = @(
-    'Who is this for'
-)
+# KEYED BY SECTION, NOT A FLAT LIST, since the branch dossier renamed two more of them (August 6, 2026).
+# A flat list answers "is this heading one we know", which is all the lint needs; a READER needs to know
+# WHICH section an old name is the old name OF, or Get-EntrySectionBody -Key 'Type' finds nothing in the
+# hundreds of entries that say 'Type of change'. Both questions are answered from this one map, so a name
+# retired for one reader cannot be forgotten by the other.
+$script:EntryRetiredSectionNames = [ordered]@{
+    What         = @('What does this change do?')
+    Significance = @('Who is this for')
+    Type         = @('Type of change')
+}
+
+function Get-EntrySectionRetiredNames {
+    <# The retired headings of ONE section, oldest names included -- @() where that section never had one. #>
+    param([Parameter(Mandatory)][string]$Key)
+    if ($script:EntryRetiredSectionNames.Contains($Key)) { return @($script:EntryRetiredSectionNames[$Key]) }
+    return @()
+}
 
 function Get-EntryRetiredSectionHeadings {
-    <# Section headings that were once written and are still recognised. A name-matcher accepts these
-       alongside Get-EntrySectionHeadings' values; a WRITER must never use them. #>
-    return @($script:EntryRetiredSectionHeadings)
+    <# Section headings that were once written and are still recognised, flattened across every section. A
+       name-matcher accepts these alongside Get-EntrySectionHeadings' values; a WRITER must never use them. #>
+    $out = @()
+    foreach ($key in $script:EntryRetiredSectionNames.Keys) { $out += @($script:EntryRetiredSectionNames[$key]) }
+    return @($out)
+}
+
+function Get-EntryFirstSectionKey {
+    <# The key of the section an entry must OPEN with ('Description'). Stated once because the lint's
+       split-entry rule keys on it: a block whose first named section is not this one has been cut in two by
+       a stray heading at the entry's own level. Read off the order of the map rather than written out, so
+       reordering the sections cannot leave that gate testing the wrong one. #>
+    return @($script:EntrySectionDefaults.Keys)[0]
 }
 
 # The heading levels, stated once. An entry is an H2 and its sections are H3 -- in the entry FILE and in
@@ -1500,9 +1788,9 @@ function Get-EntrySectionHeadings {
 }
 
 function Get-EntrySectionHeading {
-    <# One section's full heading line, e.g. '### Type of change'. One formatter, so the writer and the
+    <# One section's full heading line, e.g. '### Branch type'. One formatter, so the writer and the
        parser cannot disagree about the level or the spacing. #>
-    param([Parameter(Mandatory)][ValidateSet('What', 'Significance', 'Type')][string]$Key)
+    param([Parameter(Mandatory)][ValidateSet('Description', 'Id', 'Type', 'What', 'Significance', 'PullRequest')][string]$Key)
     $headings = Get-EntrySectionHeadings
     return ('#' * $script:EntrySectionLevel) + ' ' + $headings[$Key]
 }
@@ -1516,16 +1804,24 @@ function Get-EntrySectionBody {
         is: an entry documenting this format quotes these headings inside a fence, and the entry for this
         very change does. A section ends at the next heading of ANY level, so a '#### ' sub-heading inside a
         body is kept while the next '### ' or '## ' closes it.
+
+        THE SECTION'S RETIRED NAMES ARE ACCEPTED ALONGSIDE ITS CURRENT ONE, and that is not politeness
+        towards history: 'Type of change' became 'Branch type' and 'What does this change do?' became the
+        branch-facing question, while CHANGELOG.md and every consumer's tree are full of entries carrying the
+        old names. A reader that knew only the new one would find no type on any of them and file the lot
+        under nothing -- silent, correct-looking, and wrong. Recognise both, write one.
     #>
     param(
         [Parameter(Mandatory)][AllowEmptyString()][string]$EntryText,
-        [Parameter(Mandatory)][ValidateSet('What', 'Significance', 'Type')][string]$Key
+        [Parameter(Mandatory)][ValidateSet('Description', 'Id', 'Type', 'What', 'Significance', 'PullRequest')][string]$Key
     )
-    $wanted = (Get-EntrySectionHeadings)[$Key]
-    if (-not $wanted) { return '' }
+    $names = @(@((Get-EntrySectionHeadings)[$Key]) + @(Get-EntrySectionRetiredNames -Key $Key) |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($names.Count -eq 0) { return '' }
     $body = Get-EntryTextOutsideFences -EntryText $EntryText
     $lines = @($body -split '\r?\n')
-    $rx = '^#{' + $script:EntrySectionLevel + '}\s+' + [regex]::Escape($wanted) + '\s*$'
+    $rx = '^#{' + $script:EntrySectionLevel + '}\s+(?:' +
+        ((@($names) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|') + ')\s*$'
 
     $from = -1
     for ($i = 0; $i -lt $lines.Count; $i++) {
@@ -1540,6 +1836,53 @@ function Get-EntrySectionBody {
         $kept += $lines[$i]
     }
     return (($kept -join "`n").Trim())
+}
+
+function Test-EntryHasSection {
+    <#
+        Pure: does this entry carry the named section at all, under its current heading or a retired one?
+
+        ABSENT AND EMPTY ARE DIFFERENT QUESTIONS, and conflating them produced a false accusation on the
+        first run of the emptiness gate. Get-EntrySectionAnswer returns '' for both, so a gate built on it
+        alone reported 'Branch description' as unanswered on every pre-dossier entry -- entries that never
+        had that section, because their title was the heading. Every branch in flight carries one, so that
+        is two dozen refusals for writing an entry correctly under the format that was current at the time.
+
+        A MISSING SECTION IS NOT THIS GATE'S BUSINESS. Whether an entry's structure is right is the lint's
+        question (check 13, which knows both shapes); whether the author answered the questions in front of
+        them is this one's.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$EntryText,
+        [Parameter(Mandatory)][ValidateSet('Description', 'Id', 'Type', 'What', 'Significance', 'PullRequest')][string]$Key
+    )
+    $names = @(@((Get-EntrySectionHeadings)[$Key]) + @(Get-EntrySectionRetiredNames -Key $Key) |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($names.Count -eq 0) { return $false }
+    $rx = '(?m)^#{' + $script:EntrySectionLevel + '}\s+(?:' +
+        ((@($names) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|') + ')\s*$'
+    return [bool]([regex]::IsMatch((Get-EntryTextOutsideFences -EntryText $EntryText), $rx))
+}
+
+function Get-EntrySectionAnswer {
+    <#
+        Pure: what the AUTHOR wrote under a section -- its body with the guidance comments stripped and the
+        result trimmed. '' means the section is still empty, whatever form text is standing in it.
+
+        THE DISTINCTION IS THE WHOLE POINT, and it only became necessary with the dossier form. A scaffolded
+        section is a heading with a comment under it and nothing else; Get-EntrySectionBody returns that
+        comment, which is not nothing, so a caller asking "has this been answered" would get yes for every
+        untouched entry in the repo. The fold strips those comments, so the section that looked answered
+        lands in CHANGELOG.md blank -- found by asking the question the gate actually needs answered rather
+        than the one the reader already had.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$EntryText,
+        [Parameter(Mandatory)][ValidateSet('Description', 'Id', 'Type', 'What', 'Significance', 'PullRequest')][string]$Key
+    )
+    $raw = Get-EntrySectionBody -EntryText $EntryText -Key $Key
+    if (-not $raw) { return '' }
+    return (Remove-EntryHtmlComments -EntryText $raw).Trim()
 }
 
 function Get-ReleaseChangeTypes {
@@ -1620,13 +1963,29 @@ function Resolve-EntryType {
     if (Get-Command Get-BranchTypes -ErrorAction SilentlyContinue) { $repoTypes = @(Get-BranchTypes) }
     $known = @(Get-ReleaseChangeTypes)
 
-    $section = Get-EntrySectionBody -EntryText $EntryText -Key 'Type'
+    # THE ANSWER, NOT THE BODY, and the difference is the guidance comment sitting above it. Reading the raw
+    # body made the FIRST non-empty line the type -- which since the dossier form is
+    # '<!-- options for type are: feat, fix or docs-->', so every new entry declared its type to be that
+    # sentence. It parsed, it was Declared, and the only thing that caught it was a test asserting the
+    # canonical value: a repo without Get-BranchTypes reachable would have published the comment as a change
+    # type into its release documents without a single complaint.
+    $section = Get-EntrySectionAnswer -EntryText $EntryText -Key 'Type'
     if ($section) {
         $result.Raw = $section
         $result.Declared = $true
         # The first non-empty line, stripped of the bold/backtick decoration somebody may reasonably add.
         $first = @($section -split '\r?\n' | Where-Object { $_.Trim() })[0]
         $result.Type = ($first -replace '[*`_]', '').Trim()
+        # CANONICALISED CASE-INSENSITIVELY, because the two shapes of this section disagree about case. The
+        # dossier form's 'Branch type' holds the branch PREFIX ('feat') -- that is what its hint asks for and
+        # what the scaffolder writes from Get-BranchInfo -- while 'Type of change' held the canonical type
+        # ('Feat'), and CHANGELOG.md is full of those. Matching exactly would have reported every new entry
+        # as carrying a type this repo does not produce, which is a refusal at the PR for writing down
+        # exactly what the form asked for.
+        $canonical = @($known | Where-Object {
+            $_ -and ([string]$_).ToLowerInvariant() -eq $result.Type.ToLowerInvariant()
+        })
+        if ($canonical.Count -gt 0) { $result.Type = [string]$canonical[0] }
         if ($repoTypes.Count -gt 0 -and $repoTypes -notcontains $result.Type) {
             $result.Error = "'$($result.Type)' is not a change type this repo produces -- use one of: $($repoTypes -join ', ')."
         }
@@ -1654,43 +2013,90 @@ function Resolve-EntryType {
     return $result
 }
 
-function Format-EntryBlock {
+function Add-EntrySection {
     <#
-        The whole entry as an array of LINES: the H2 heading, then the three H3 sections in order.
+        Private: one section of the entry -- the H3 heading, its guidance comment directly underneath, and
+        the value (if any) under that. Appends to the caller's list.
 
-        ONE FORMATTER FOR THE WRITER AND THE MIGRATION, which is why it takes pieces rather than assembling
-        prose. new-changelog-entry.ps1 calls it with a placeholder body and no rows; a migration calls it
-        with real ones. Two assemblers would drift, and the parser reads what this writes.
+        THE COMMENT SITS TIGHT AGAINST THE HEADING, with no blank line between them, and that is the
+        template's shape rather than a preference: a hint belongs to the heading it explains, and the blank
+        line goes after the pair. The progress file spaces two of its sections the other way, which is why
+        this is per-file layout stated at the call site rather than a rule derived here.
 
-        $Title carries no type and no date. The fold prepends '#NN <midDot> ' to it after the merge, and
-        appends the PR/merge line at the end of the block -- the two facts that do not exist until then.
+        A HELPER RATHER THAN SIX COPIES. The sections differ only in their three inputs, and the blank lines
+        between them are exactly the kind of difference nobody notices until two of them disagree and a
+        byte-exact template check reports drift for a reason no one can see.
     #>
     param(
-        [Parameter(Mandatory)][string]$Title,
+        [Parameter(Mandatory)]$Lines,
+        [Parameter(Mandatory)][string]$Key,
+        [AllowEmptyString()][string]$Value = ''
+    )
+    $Lines.Add((Get-EntrySectionHeading -Key $Key))
+    $all = Get-EntryGuidance
+    $guidance = @()
+    if ($all.PSObject.Properties[$Key]) { $guidance = @($all.PSObject.Properties[$Key].Value) }
+    foreach ($line in (Format-EntryGuidanceComment -Lines $guidance)) { $Lines.Add($line) }
+    if ($Value) {
+        $Lines.Add('')
+        foreach ($line in ($Value -split '\r?\n')) { $Lines.Add($line) }
+    }
+    $Lines.Add('')
+}
+
+function Format-EntryBlock {
+    <#
+        The whole entry as an array of LINES: the H2 branch heading, then the six H3 sections in order.
+
+        THE HEADING NAMES THE BRANCH, NOT THE CHANGE (Dave, August 6, 2026) -- '## `feat/x` changelog', the
+        same heading branch-progress.md carries with its own suffix, because the two files are a matched
+        pair. What the heading used to hold now has a section of its own: 'Branch description'. This whole
+        file is still pasted verbatim into CHANGELOG.md at the merge, so that is what lands there; Dave was
+        offered a fold that derives a slimmer block instead and declined it, on the record, before this was
+        built. See $script:EntrySectionDefaults for the reasoning.
+
+        ONE FORMATTER FOR THE WRITER AND THE MIGRATION, which is why it takes pieces rather than assembling
+        prose. new-changelog-entry.ps1 calls it with empty fields and no rows; a migration calls it with real
+        ones. Two assemblers would drift, and the parser reads what this writes.
+
+        $TitleSuffix is for the copy under branch/templates/, which marks itself '(template)' so it cannot be
+        mistaken for a real entry -- by a reader or by a gate. Empty for the file a branch actually gets.
+    #>
+    param(
+        [AllowEmptyString()][string]$Branch = '',
+        [string]$Description = '',
+        [string]$Id = '',
         [string]$Type = '',
         [string]$Body = '',
-        $ImpactRows = @()
+        $ImpactRows = @(),
+        [string]$TitleSuffix = ''
     )
     # Each line appended on its own statement, NOT as @(<expr>, '') -- the comma operator binds looser than
     # '+', so `@(('#'*2) + ' ' + $Title, '')` concatenates the string with the ARRAY ($Title, '') and joins
     # it with a space. That produced '## A real title ' with a trailing space and no blank line after it,
     # which is well-formed markdown and therefore invisible until a parser expecting the blank line fails.
     # Measured on this function's first run.
-    $heading = ('#' * $script:EntryHeadingLevel) + ' ' + $Title.Trim()
     $lines = New-Object System.Collections.Generic.List[string]
-    $lines.Add($heading)
+    $lines.Add((Format-BranchFileHeadingLine -Branch $Branch -Title (Get-BranchFileWording).ChangelogTitle `
+        -Level $script:EntryHeadingLevel -Suffix $TitleSuffix))
     $lines.Add('')
-    $lines.Add((Get-EntrySectionHeading -Key 'What'))
-    $lines.Add('')
-    foreach ($line in ($Body -split '\r?\n')) { $lines.Add($line) }
-    $lines.Add('')
+
+    Add-EntrySection -Lines $lines -Key 'Description' -Value $Description
+    Add-EntrySection -Lines $lines -Key 'Id'          -Value $Id
+    Add-EntrySection -Lines $lines -Key 'Type'        -Value $Type
+    Add-EntrySection -Lines $lines -Key 'What'        -Value $Body
+
+    # Significance carries no guidance of its own: its '#### Tier N' sub-sections each carry theirs, and a
+    # hint above a section whose every part is already annotated is one the reader has to read twice.
     $lines.Add((Get-EntrySectionHeading -Key 'Significance'))
     $lines.Add('')
     foreach ($line in (Format-EntrySignificanceSections -Rows $ImpactRows)) { $lines.Add($line) }
     $lines.Add('')
-    $lines.Add((Get-EntrySectionHeading -Key 'Type'))
-    $lines.Add('')
-    $lines.Add($Type)
+
+    # WRITTEN EMPTY AND FILLED BY THE FOLD. The section exists from the start so the form is complete on the
+    # page, but the two facts in it -- the number and the merge date -- do not exist until the merge, and a
+    # hand-written one would be a second copy of something nobody has yet.
+    Add-EntrySection -Lines $lines -Key 'PullRequest'
     return @($lines.ToArray())
 }
 
@@ -1751,16 +2157,40 @@ function Test-EntryDeclaresShape {
 
         FENCE-AWARE through the readers it calls, for the reason every reader here is: an entry documenting
         this format quotes these headings inside a fence, and the entry for this very change does.
+
+        THREE OF THE SIX SECTIONS PROVE NOTHING, AND THAT IS NEW (August 6, 2026). The dossier form gave
+        branch-progress.md the same 'Branch description', 'Branch ID' and 'Branch type' headings the entry
+        carries -- deliberately, they are one pair of files -- so a predicate matching ANY named section
+        started answering $true for the step list. Measured immediately: the scaffold gate then judged a
+        freshly written step list as an unfinished ENTRY and reported its empty description. That is the
+        exact confusion the two-file split was made to remove, reappearing inside the discriminator.
+
+        So only the sections an entry ALONE has count: the description question, the significance block, the
+        pull-request section, and every RETIRED name -- 'Type of change' and the rest were written when there
+        was one file, so a step list cannot be carrying one.
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
 
     $body = Get-EntryTextOutsideFences -EntryText $EntryText
     $lines = @($body -split '\r?\n')
-    foreach ($heading in (Get-EntrySectionHeadings).Values) {
+    $headings = @((Get-EntrySectionHeadings)['What'], (Get-EntrySectionHeadings)['Significance'],
+        (Get-EntrySectionHeadings)['PullRequest']) + @(Get-EntryRetiredSectionHeadings)
+    foreach ($heading in $headings) {
         if (-not $heading) { continue }
         $rx = '^#{' + $script:EntrySectionLevel + '}\s+' + [regex]::Escape([string]$heading) + '\s*$'
         foreach ($line in $lines) {
             if ($line -match $rx) { return $true }
+        }
+    }
+    # THE TYPE FALLBACK IS FOR THE HEADING FIELD, NOT FOR THE SECTION. Resolve-EntryType reads the section
+    # first, and 'Branch type' is one of the three a step list also carries -- so on a step list it would
+    # report Declared and undo the whole distinction above. Where that section is present its answer proves
+    # nothing, and the entry-only sections have already had their say.
+    $currentType = (Get-EntrySectionHeadings)['Type']
+    if ($currentType) {
+        $typeRx = '^#{' + $script:EntrySectionLevel + '}\s+' + [regex]::Escape([string]$currentType) + '\s*$'
+        foreach ($line in $lines) {
+            if ($line -match $typeRx) { return $false }
         }
     }
     return [bool](Resolve-EntryType -EntryText $EntryText).Declared
@@ -1781,6 +2211,22 @@ function Get-EntryScaffoldFindings {
         FENCED CODE IS EXCLUDED, for the same reason the entry-heading check excludes it: an entry may
         legitimately quote the scaffold inside a fence while documenting this very mechanism -- this
         repo's own docs do -- and a guard that cannot tell a quote from the real thing gets disabled.
+
+        AND SINCE THE DOSSIER FORM IT ALSO MEASURES EMPTINESS, which is the half that replaced the markers
+        rather than joining them (Dave, August 6, 2026). The scaffold no longer writes a visible 'TODO:'
+        anywhere: every field is a heading with a guidance COMMENT under it, so an untouched entry has empty
+        sections rather than recognisable text. A gate that only matched strings would have gone quiet on
+        exactly the entry it exists to stop -- silently, reporting success, which is this repo's worst
+        failure mode for a guard.
+
+        WHAT IS MEASURED IS STRICTLY MORE THAN WHAT THE MARKERS CAUGHT. An empty section is reported whether
+        the author never touched it OR deleted the placeholder instead of answering it, and the comments are
+        stripped first so leaving the guidance standing is not mistaken for an answer -- which it must not
+        be, because the fold strips those comments and the section would land in CHANGELOG.md blank.
+
+        THE STRING MARKERS STAY, and not out of sentiment: every branch in flight, here and in every
+        consumer, carries an entry written by the older scaffolder right now, and those reach this gate
+        through a plugin update rather than by choosing to. Recognise both, write one.
     #>
     param(
         [Parameter(Mandatory)][AllowEmptyString()][string]$EntryText,
@@ -1803,6 +2249,41 @@ function Get-EntryScaffoldFindings {
         if (-not $p.Marker) { continue }
         if ($body.Contains($p.Marker)) {
             $findings += [pscustomobject]@{ Label = $p.Label; Marker = $p.Marker }
+        }
+    }
+
+    # THE EMPTINESS HALF. Only judged on an entry that actually uses the named sections -- a pre-format entry
+    # has none of them, and reporting all of it as unanswered would refuse every branch whose entry predates
+    # this shape. Test-EntryDeclaresShape is the same discriminator the parser uses, so the two cannot
+    # disagree about which shape they are looking at.
+    if (Test-EntryDeclaresShape -EntryText $EntryText) {
+        # PullRequest is deliberately absent: the fold fills it, so it is empty by design until the merge.
+        # Id and Type are written by the scaffolder itself, so an empty one is a scaffolder fault rather
+        # than an author's, and refusing the author for it would be pointing at the wrong person.
+        # ONLY A SECTION THE ENTRY ACTUALLY HAS. An entry written before the dossier form carries no
+        # 'Branch description' -- its title was the heading -- and reporting the absence would refuse every
+        # branch in flight for having been correct under the format of the day. See Test-EntryHasSection.
+        foreach ($key in @('Description', 'What')) {
+            if (-not (Test-EntryHasSection -EntryText $EntryText -Key $key)) { continue }
+            if (-not (Get-EntrySectionAnswer -EntryText $EntryText -Key $key)) {
+                $findings += [pscustomobject]@{
+                    Label  = 'an unanswered section'
+                    Marker = Get-EntrySectionHeading -Key $key
+                }
+            }
+        }
+        # Every tier the entry claims owes a reason, tier 0 included -- which is where the retired
+        # why-placeholder used to be caught. Get-EntryImpactFindings asks this of tiers 1 and up only,
+        # because its subject is the RANKING and tier 0 is never ranked; the reason is still content.
+        $impact = Resolve-EntryImpact -EntryText $EntryText
+        foreach ($row in @($impact.Rows)) {
+            if ($row.Error) { continue }
+            if (-not $row.Why) {
+                $findings += [pscustomobject]@{
+                    Label  = 'a tier with no reason'
+                    Marker = ('#' * $script:EntryTierSubLevel) + " $($script:EntryTierSubPrefix) $([int]$row.Tier)"
+                }
+            }
         }
     }
     return $findings
@@ -1840,13 +2321,39 @@ function Get-EntryScaffoldFindings {
 # branch-progress.md, the file that has room for it.
 
 $script:BranchFileDefaults = [ordered]@{
-    ChangelogTitle = 'Branch changelog'
-    ProgressTitle  = 'Branch progress'
+    # The branch name is prepended to these by Format-BranchFileHeader -- '# `feat/x` progress' -- so they
+    # are the suffix rather than the whole title. Lowercase for that reason.
+    ChangelogTitle = 'changelog'
+    ProgressTitle  = 'progress'
     BranchLabel    = 'Branch'
     StepsHeading   = 'Steps'
     NotesHeading   = 'Where I left off'
     FirstStep      = 'TODO: the first step of this branch'
-    NotesPlaceholder = 'TODO: what has been done so far, and what you were in the middle of.'
+    # The marker the copies under branch/templates/ carry in their heading, so neither a reader nor a gate
+    # can mistake one for a real branch file. Not merely cosmetic: a template opens with the same H2 a
+    # written entry does, which is the signature the fold and the lint key on.
+    TemplateMarker = '(template)'
+    # THE THREE BRANCH FIELDS ARE NOT HERE. They are sections of the entry now and both files write them
+    # from Get-EntrySectionHeadings + Get-EntryGuidance -- see $script:EntryGuidanceDefaults for why one
+    # source rather than two. The keys that used to hold them (TitleHeading, IdGuidance, ...) are gone
+    # rather than left pointing at nothing, so a consumer overriding one gets a script-contract failure
+    # instead of a silently ignored setting.
+    StepsGuidance  = @(
+        'The plan for this branch. Every step must be resolved before the PR: open-pr and',
+        'ship-pr both refuse while anything is still "- [ ]", and there is no -Force.',
+        '',
+        '  - [ ] not done yet',
+        '  - [x] done',
+        '  - [~] dropped -- why it turned out not to be needed',
+        '',
+        'The dropped mark exists so nobody is pushed into ticking a box for work they did',
+        'not do. It keeps its line and its reason, which is the half worth reading later.'
+    )
+    NotesGuidance  = @(
+        'For picking this branch up again -- tomorrow, or on another machine after a park.',
+        'What is done, what you were in the middle of, and anything you decided but have',
+        'not written down anywhere else yet.'
+    )
     ChangelogReset = @(
         'This file carries the changelog entry of the branch you are on -- the finished description that',
         'folds into `CHANGELOG.md` at the merge. It is written when a branch is created and returns to this',
@@ -1944,6 +2451,31 @@ function Get-BranchFileWording {
     return [pscustomobject]$out
 }
 
+function Format-BranchFileHeadingLine {
+    <#
+        The heading line both branch files open with -- '## `feat/x` changelog', '# `main` progress'.
+
+        ONE FORMATTER FOR FOUR CALLERS, because the two files and their two states all write this line and
+        Get-BranchFileDeclaredBranch READS it back. The branch name is the file's only machine-read fact
+        outside the step marks, so the writer and the reader agreeing about the backticks is not a nicety.
+
+        THE BRANCH IS NAMED IN THE HEADING, not on a line below it (Dave, August 6, 2026). The heading has
+        to say which branch this file belongs to anyway, so a separate '**Branch:**' line was the same fact
+        written twice -- and Get-BranchFileDeclaredBranch reads the heading now, with the old line kept as a
+        fallback for the branches already carrying one.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Branch,
+        [Parameter(Mandatory)][string]$Title,
+        [int]$Level = 2,
+        [string]$Suffix = ''
+    )
+    $shown = if ($Branch) { $Branch } else { Get-BranchTrunkName }
+    $line = ('#' * $Level) + ' `' + $shown + '` ' + $Title
+    if ($Suffix) { $line += ' ' + $Suffix }
+    return $line
+}
+
 function Format-BranchFileHeader {
     <#
         Private: the H1, the branch line and -- on the trunk only -- the warning under it. Both files
@@ -1969,10 +2501,13 @@ function Format-BranchFileHeader {
     $trunk = Get-BranchTrunkName
     $shown = if ($Branch) { $Branch } else { $trunk }
     $lines = New-Object System.Collections.Generic.List[string]
-    $lines.Add('# ' + $Title)
-    $lines.Add('')
-    $lines.Add('**' + $Wording.BranchLabel + ':** `' + $shown + '`')
+    # THE RESET STATE IS AN H1 AND A WRITTEN FILE IS AN H2, and that difference is load-bearing rather than
+    # cosmetic: Test-IsChangelogEntryFile decides "is there an entry here" on the heading level, so the
+    # trunk's own empty file can never be folded as if it were a change, and folding twice is impossible
+    # rather than merely unlikely. This formatter serves the RESET, hence Level 1.
+    $lines.Add((Format-BranchFileHeadingLine -Branch $shown -Title $Title -Level 1))
     if ($shown -eq $trunk) {
+        $lines.Add('')
         $lines.Add('')
         $lines.Add('> **You are on `' + $trunk + '`.** ' + $Wording.TrunkWarning[0])
         foreach ($line in @($Wording.TrunkWarning | Select-Object -Skip 1)) { $lines.Add('> ' + $line) }
@@ -2030,10 +2565,45 @@ function Format-BranchProgressReset {
     $lines.Add('')
     foreach ($line in @($w.ProgressReset)) { $lines.Add($line) }
     $lines.Add('')
-    $lines.Add('## ' + $w.StepsHeading)
+    $lines.Add(('#' * $script:EntrySectionLevel) + ' ' + $w.StepsHeading)
     $lines.Add('')
     $lines.Add('_(' + $w.ScaffoldNote + ')_')
     return @($lines.ToArray())
+}
+
+function Add-BranchProgressSection {
+    <#
+        Private: one of the progress file's OWN sections -- Steps and Where I left off. Heading, a blank
+        line, the guidance comment, then the body. Appends to the caller's list.
+
+        THE BLANK BEFORE THE COMMENT IS WHAT SEPARATES THESE TWO FROM THE THREE BRANCH FIELDS ABOVE THEM,
+        which sit tight against their heading (Add-EntrySection). That is the template's shape and it reads
+        as one: a one-line hint belongs to its heading, a block of prose stands on its own. Not derived from
+        the line count -- the changelog's 'What' section is a block sitting tight -- so it is stated per call
+        site rather than guessed.
+
+        THE HORIZONTAL RULES ARE GONE with the dossier form. They separated five H2 sections; the sections
+        are H3 now and their headings do that work, while a '---' between every pair turned a short file
+        into a ruled form.
+    #>
+    param(
+        [Parameter(Mandatory)]$Lines,
+        [Parameter(Mandatory)][string]$Heading,
+        [AllowEmptyCollection()][string[]]$Guidance = @(),
+        [AllowEmptyCollection()][string[]]$Body = @()
+    )
+    $Lines.Add(('#' * $script:EntrySectionLevel) + ' ' + $Heading)
+    $rendered = @(Format-EntryGuidanceComment -Lines $Guidance)
+    if ($rendered.Count -gt 0) {
+        $Lines.Add('')
+        foreach ($line in $rendered) { $Lines.Add($line) }
+    }
+    $body = @(@($Body) | Where-Object { $null -ne $_ })
+    if ($body.Count -gt 0) {
+        $Lines.Add('')
+        foreach ($line in $body) { $Lines.Add($line) }
+    }
+    $Lines.Add('')
 }
 
 function Format-BranchProgressScaffold {
@@ -2050,30 +2620,165 @@ function Format-BranchProgressScaffold {
         -Intent, when given, becomes the "where I left off" note rather than the first step: parking a
         branch records what HAS happened, and a step list scaffolded with someone's status text as its
         only entry would read as an instruction to do it again.
+
+        THE THREE BRANCH FIELDS ARE THE ENTRY'S OWN SECTIONS, written by the same helper from the same
+        wording (Add-EntrySection). Both files carry them in the dossier form, and two writers producing
+        "the same" three sections is how the pair ends up disagreeing about what to put in the same box.
+
+        -Template renders the copy under branch/templates/: it marks its heading '(template)' and omits the
+        scaffolded first step. The step is the one thing the template must NOT show, because a template is
+        read as an example -- and an example whose first line is somebody else's TODO gets copied in.
     #>
     param(
         [Parameter(Mandatory)][string]$Branch,
-        [string]$Intent = ''
+        [string]$Intent = '',
+        [string]$Id = '',
+        [string]$Description = '',
+        [switch]$Template
     )
     $w = Get-BranchFileWording
-    $lines = New-BranchFileLines -Title $w.ProgressTitle -Branch $Branch -Wording $w
-    # H2 as a literal, NOT ('#' * $script:EntryHeadingLevel). Both happen to be 2 today, and reusing the
-    # entry's level would silently move this file's sections the day the changelog's entry level changes
-    # -- a coupling between two formats that have nothing to do with each other. This file's own shape is
-    # H1 title, H2 sections, and it owns that.
+    $suffix = if ($Template) { $w.TemplateMarker } else { '' }
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add((Format-BranchFileHeadingLine -Branch $Branch -Title $w.ProgressTitle `
+        -Level $script:EntryHeadingLevel -Suffix $suffix))
     $lines.Add('')
-    $lines.Add('## ' + $w.StepsHeading)
-    $lines.Add('')
-    $lines.Add((Get-BranchProgressMarks).Open + $w.FirstStep)
-    $lines.Add('')
-    $lines.Add('## ' + $w.NotesHeading)
-    $lines.Add('')
-    if ($Intent) {
-        foreach ($line in ($Intent -split '\r?\n')) { $lines.Add($line) }
-    } else {
-        $lines.Add($w.NotesPlaceholder)
-    }
+
+    $info = $null
+    try { $info = Get-BranchInfo -Branch $Branch } catch { $info = $null }
+    $type = if ($info -and $info.Prefix -and $info.IsKnown) { [string]$info.Prefix } else { '' }
+
+    Add-EntrySection -Lines $lines -Key 'Description' -Value $Description
+    Add-EntrySection -Lines $lines -Key 'Id'          -Value $Id
+    Add-EntrySection -Lines $lines -Key 'Type'        -Value $type
+
+    # THE SCAFFOLDED STEP STAYS IN THE FILE A BRANCH ACTUALLY GETS (Dave, August 6, 2026), asked and answered
+    # when the template dropped it. Without it a fresh branch reaches a PR with no plan at all and the
+    # step-list gate has nothing to refuse -- Get-BranchProgressFindings reports only steps somebody wrote,
+    # and "no step list at all" is a deliberately permitted state for the one-commit typo fix. One open step
+    # is what makes the gate bite on the ordinary branch while leaving that case alone.
+    $steps = @()
+    if (-not $Template) { $steps = @((Get-BranchProgressMarks).Open + $w.FirstStep) }
+    Add-BranchProgressSection -Lines $lines -Heading $w.StepsHeading -Guidance $w.StepsGuidance -Body $steps
+    $note = if ($Intent) { @($Intent -split '\r?\n') } else { @() }
+    Add-BranchProgressSection -Lines $lines -Heading $w.NotesHeading -Guidance $w.NotesGuidance -Body $note
+
     return @($lines.ToArray())
+}
+
+$script:BranchTemplateDir         = 'branch/templates'
+$script:BranchTemplateBranchToken = '<prefix>/<short-name>'
+
+function Add-TemplateTierPrompt {
+    <#
+        Private, template-only: inserts the commented-out Tier 1 and Tier 2 blocks before the entry's last
+        section, so the template shows the WHOLE form while the scaffolded file still shows tier 0 alone.
+
+        THE TWO TIERS SIT IN ONE COMMENT, not one each, and that is HTML rather than a choice: comments do
+        not nest, so the first '-->' would close an outer block early. It costs the reader one thing --
+        uncommenting Tier 1 also uncomments Tier 2 -- which is why the block says so in its own first line.
+        The routing question between them is plain text inside that block for the same reason.
+
+        SCAFFOLDED FILES DO NOT GET THIS. There, a missing section IS the answer; the expansion exists so a
+        first-time reader can see what the other two look like without going and finding an example.
+    #>
+    # AllowEmptyString as well as AllowEmptyCollection: the input is a document split into lines, so most
+    # of it is blank ones, and a [string[]] without it rejects the whole call on the first. The same trap
+    # Get-FencedLineFlags and Read-EntryTierSections both document.
+    param([AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines = @())
+
+    $w      = Get-EntrySignificanceWording
+    $hashes = '#' * $script:EntryTierSubLevel
+    $score  = $script:EntryScoreLabel
+    # The indent Format-EntryGuidanceComment gives a comment body. Everything below is INSIDE a comment, so
+    # the guidance and the routing question appear as plain indented text: HTML comments do not nest, and a
+    # real '<!--' here would be closed by the first '-->' and take the rest of the block out of the comment
+    # with it.
+    $pad = '     '
+
+    $block = @('<!-- ' + $w.Uncomment1)
+    foreach ($tier in 1, 2) {
+        # EACH TIER OPENS ITS OWN COMMENT MARKER, and tier 2's is what makes the block usable in halves. The
+        # whole thing is one comment as written -- so deleting tier 1's opener alone would uncomment tier 2
+        # as well, which is precisely what a reader who stopped at tier 1 must not get. With tier 2 carrying
+        # a marker of its own, dropping the first line leaves a well-formed comment from tier 2's line to
+        # the closing '-->': the tiers come out one at a time, in order, with nothing else to edit.
+        if ($tier -eq 2) {
+            # The inner parentheses are load-bearing: the comma binds TIGHTER than '+', so
+            # @('', '<!-- ' + $w.Uncomment2) builds the array ('', '<!-- ') and then CONCATENATES the
+            # string onto it as a third element -- '<!-- ' alone on its line and the text below it. The
+            # same trap Format-EntryBlock documents, caught here by the byte-exact template check.
+            $block += @('', ('<!-- ' + $w.Uncomment2))
+        }
+        $block += @('', "$hashes $($script:EntryTierSubPrefix) $tier", '')
+        foreach ($line in @((Get-EntryGuidance).Tier)) { $block += $(if ($line) { $pad + $line } else { '' }) }
+        $block += @('', $score)
+        # Only tier 1 routes onward; tier 2 has no successor, exactly as in a written entry.
+        if ($tier -eq 1) {
+            $block += ''
+            foreach ($line in @($w.Route1)) { $block += $(if ($line) { $pad + $line } else { '' }) }
+        }
+    }
+    $block += @('', '-->')
+
+    # Inserted before the LAST section heading, which is 'Pull Request'. Found rather than assumed: the
+    # section order comes from Get-EntrySectionHeadings, and hardcoding an index here would put the block
+    # in the wrong place the day that order changes -- as it just did, when the dossier form retired the
+    # 'Type of change' section this used to search for and the block would have been appended at the end.
+    $lastKey = @((Get-EntrySectionHeadings).Keys)[-1]
+    $lastHeading = Get-EntrySectionHeading -Key $lastKey
+    $at = -1
+    for ($i = 0; $i -lt $Lines.Count; $i++) {
+        if ($Lines[$i] -eq $lastHeading) { $at = $i; break }
+    }
+    if ($at -lt 0) { return @($Lines) }
+
+    $out = New-Object System.Collections.Generic.List[string]
+    for ($i = 0; $i -lt $at; $i++) { $out.Add($Lines[$i]) }
+    foreach ($line in $block) { $out.Add($line) }
+    $out.Add('')
+    for ($i = $at; $i -lt $Lines.Count; $i++) { $out.Add($Lines[$i]) }
+    return @($out.ToArray())
+}
+
+function Get-BranchTemplates {
+    <#
+        The copy-paste templates under branch/template/, as objects with Path (repo-relative) and Content
+        (exactly what that file must contain).
+
+        WHY THEY ARE GENERATED RATHER THAN WRITTEN, and why a lint check reads this same function. A
+        template beside a scaffolder that writes the same shape is TWO SOURCES OF ONE FORMAT, which is the
+        drift this repo keeps paying for -- the entry-scaffold wording, the fence readers, the tier
+        sections. The entry format changed three times in one day while these templates were being added;
+        a hand-written copy would have been wrong before it was committed.
+
+        So the content comes from the same formatters the scaffolder calls, and check-plugin-integrity.ps1
+        holds the files on disk to it. The templates are then genuinely a convenience -- something to look
+        at and paste from -- without being a second definition of anything.
+
+        BOTH TEMPLATES NAME A PLACEHOLDER BRANCH rather than a real one, because they belong to no branch,
+        and both mark their heading '(template)'. That marker is not decoration: a written entry and a
+        template now open with the same H2, which is the signature Test-IsChangelogEntryFile keys on.
+
+        THE TRAILING BYTES ARE PART OF THE FILE and are set here rather than left to the join, because the
+        lint holds these two to the byte with only CRLF normalised. The changelog template closes on a blank
+        line after its last comment; the progress template closes on the comment itself. Both match the
+        files Dave designed, which are the spec for this shape -- see branch/README.md.
+    #>
+    $nl = "`n"
+    $token = $script:BranchTemplateBranchToken
+    $marker = (Get-BranchFileWording).TemplateMarker
+    $changelog = Add-TemplateTierPrompt -Lines (Format-EntryBlock -Branch $token -TitleSuffix $marker)
+    $progress  = Format-BranchProgressScaffold -Branch $token -Template
+    return @(
+        [pscustomobject]@{
+            Path    = "$($script:BranchTemplateDir)/branch_template_changelog.md"
+            Content = (($changelog -join $nl).TrimEnd("`n")) + $nl + $nl + $nl
+        },
+        [pscustomobject]@{
+            Path    = "$($script:BranchTemplateDir)/branch_template_progress.md"
+            Content = ($progress -join $nl).TrimEnd("`n")
+        }
+    )
 }
 
 function Get-BranchFileDeclaredBranch {
@@ -2093,12 +2798,29 @@ function Get-BranchFileDeclaredBranch {
         repo as unscaffolded and overwrite it.
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
+
+    # TWO SHAPES, ONE WRITTEN. The branch is named in the file's H1 -- '# `feat/x` progress' -- since
+    # August 6, 2026, because that heading has to say which branch this is anyway and a second line
+    # repeating it is one fact in two places. Before that it was a '**Branch:** `feat/x`' line, and every
+    # branch in flight still carries one, here and in every consumer.
+    #
+    # The heading wins where both are present: it is the one a writer edits.
+    #
+    # BOTH LEVELS, because the reset state is an H1 and a written file is an H2 -- the difference the fold
+    # keys on to tell an empty trunk file from an entry. This predicate must read them BOTH: it is the
+    # idempotency test, and a scaffolded H2 file it could not read would come back as '' and be overwritten,
+    # taking a step list somebody had been ticking off with it. An H1-only regex was correct for exactly the
+    # few hours in which both files opened with one.
+    $headingRx = '^#{1,2}\s+`([^`]+)`'
     $label = (Get-BranchFileWording).BranchLabel
-    $rx = '^\*\*' + [regex]::Escape([string]$label) + ':\*\*\s*`([^`]+)`\s*$'
+    $lineRx = '^\*\*' + [regex]::Escape([string]$label) + ':\*\*\s*`([^`]+)`\s*$'
+
+    $fallback = ''
     foreach ($line in ($Text -split '\r?\n')) {
-        if ($line -match $rx) { return $Matches[1] }
+        if ($line -match $headingRx) { return $Matches[1] }
+        if ((-not $fallback) -and $line -match $lineRx) { $fallback = $Matches[1] }
     }
-    return ''
+    return $fallback
 }
 
 $script:BranchProgressMarks = [ordered]@{
@@ -2136,11 +2858,18 @@ function Get-BranchProgressFindings {
         FENCE-AWARE, like every reader of this format: a step list may quote the convention it follows --
         this repo's own README does -- and a guard that cannot tell a quote from a real step gets
         switched off by the first person it accuses wrongly.
+
+        AND COMMENT-AWARE, FOR THE SAME REASON AND A SHARPER CASE. The Steps section's own guidance shows
+        all three marks as examples -- '- [ ] not done yet' among them -- inside an HTML comment. Reading
+        those as steps meant a freshly scaffolded list reported FOUR open steps: its own real one plus three
+        the form was using to explain itself. Worse than noise, because the three cannot be resolved: they
+        come back with the next scaffold, so the only way past the gate is to delete the instructions.
+        Measured the moment the guidance comments and this gate first met.
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
 
     $marks = Get-BranchProgressMarks
-    $body = Get-EntryTextOutsideFences -EntryText $Text
+    $body = Remove-EntryHtmlComments -EntryText (Get-EntryTextOutsideFences -EntryText $Text)
     $placeholder = (Get-BranchFileWording).FirstStep
 
     $findings = @()

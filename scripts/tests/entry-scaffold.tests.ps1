@@ -189,7 +189,13 @@ if (Test-Path -LiteralPath $writtenEntry) {
     $text = [System.IO.File]::ReadAllText($writtenEntry, [System.Text.Encoding]::UTF8)
     $roundTrip = @(Get-EntryScaffoldFindings -EntryText $text -Wording (Get-EntryScaffoldWording))
     Assert-True ($roundTrip.Count -gt 0) 'the matcher sees the writer output as scaffolded -- writer and guard share one source'
-    Assert-Equal 2 $roundTrip.Count 'and it finds both strings the writer wrote (the to-do heading is no longer one of them)'
+    # THREE FINDINGS, AND NONE OF THEM IS A STRING. The dossier form writes no visible placeholder at all --
+    # every field is a heading with a guidance comment above an empty space -- so what the gate reports is
+    # EMPTINESS: the two sections the author owes and the tier that has no reason yet. A gate still looking
+    # for 'TODO: title' would have gone silent on the very entry it exists to stop.
+    Assert-Equal 3 $roundTrip.Count 'and it names each unanswered field: the description, the body, and tier 0 with no reason'
+    Assert-Equal 0 @($roundTrip | Where-Object { $_.Label -notmatch 'unanswered|no reason' }).Count `
+        'all three are measurements of an empty field rather than matches on placeholder prose'
     # THE ENTRY NO LONGER ASKS FOR A TO-DO LIST, which is the whole point of the split: the file whose text
     # folds verbatim into CHANGELOG.md must prompt for what the change DOES.
     Assert-True (-not ($text -match 'To do / where I left off')) 'the entry carries no to-do heading -- that job moved to the step list'
@@ -211,25 +217,39 @@ if (Test-Path -LiteralPath $writtenEntry) {
     $entryLines = @(($text -split "`r?`n") | Where-Object { $_.Trim() -ne '' })
     Assert-True ($entryLines[0] -match ('^#{' + (Get-EntryHeadingLevel) + '} ')) 'the entry opens with its own heading, at the entry level'
     Assert-True ($entryLines[0] -notmatch '^#{4}') 'and not one level deeper'
-    foreach ($key in @('What', 'Significance', 'Type')) {
+    # THE HEADING NAMES THE BRANCH, not the change (Dave, August 6, 2026). Asserted against the reader that
+    # has to get it back out: the fold looks the PR up by this name, so writer and reader agreeing about the
+    # backticks is the whole contract.
+    Assert-Equal 'feat/round-trip' (Get-BranchFileDeclaredBranch -Text $text) 'the entry heading names the branch, and reads back as it'
+    $sectionKeys = @((Get-EntrySectionHeadings).Keys)
+    foreach ($key in $sectionKeys) {
         Assert-True ($text -match ('(?m)^' + [regex]::Escape((Get-EntrySectionHeading -Key $key)) + '\s*$')) `
             "the '$key' section heading is written verbatim as the parser expects it"
     }
     # ORDER, not just presence: the parser finds a section wherever it is, but a reader meets them in the
-    # order they are written, and the three answer the questions in the order somebody arrives with them.
-    $posWhat = $text.IndexOf((Get-EntrySectionHeading -Key 'What'))
-    $posWho  = $text.IndexOf((Get-EntrySectionHeading -Key 'Significance'))
-    $posType = $text.IndexOf((Get-EntrySectionHeading -Key 'Type'))
-    Assert-True ($posWhat -lt $posWho -and $posWho -lt $posType) 'and the three sections are written in reading order'
-    # The type is STATED in its own section now rather than parsed out of the heading as a middot field.
+    # order they are written, and the lint's split-entry rule keys on which one comes FIRST. Walked from the
+    # map rather than spelled out, so reordering the sections cannot leave this assert testing yesterday.
+    $positions = @($sectionKeys | ForEach-Object { $text.IndexOf((Get-EntrySectionHeading -Key $_)) })
+    $ascending = $true
+    for ($i = 1; $i -lt $positions.Count; $i++) { if ($positions[$i] -le $positions[$i - 1]) { $ascending = $false } }
+    Assert-True $ascending 'and the sections are written in the order the map declares them'
+    Assert-Equal 'Description' (Get-EntryFirstSectionKey) 'the entry opens with the description -- what the lint tests a split entry against'
+    # The type is STATED in its own section, and the section holds the lowercase PREFIX while the readers
+    # canonicalise it -- so 'feat' here and 'Feat' in every older entry both come back as one type.
     $writtenType = Resolve-EntryType -EntryText $text
     Assert-Equal $true $writtenType.Declared 'the type is declared in its own section'
     Assert-Equal $null $writtenType.Error 'and is a type this repo actually produces'
-    Assert-True ($entryLines[0] -notmatch [regex]::Escape($writtenType.Type)) 'and it is no longer a field in the heading'
-    # The table is NOT scaffold prose: a tier-0 row is a legitimate final answer, so the gate must never
-    # treat it as evidence of an unedited entry -- the reasoning that keeps Get-EntryFallbackType out too.
-    $tierAsFinding = @($roundTrip | Where-Object { $_.Marker -match 'Tier' })
-    Assert-Equal 0 $tierAsFinding.Count 'the impact table is not one of the scaffold findings -- a low tier is a decision, not a stub'
+    Assert-Equal 'Feat' $writtenType.Type 'the prefix written in the file reads back as the canonical type'
+    Assert-Equal 'feat' (Get-EntrySectionAnswer -EntryText $text -Key 'Type') 'while the file itself carries the prefix its own hint asks for'
+    # DECLARING TIER 0 IS NOT A STUB -- a tier-0 entry is a legitimate final answer about reach, and the gate
+    # must never report the NUMBER as evidence of an unedited entry. What it may report is the empty reason
+    # underneath it, which is content the author still owes. The distinction is the whole difference between
+    # "you chose the lowest tier" and "you have not said why this matters", so it is asserted rather than
+    # assumed: the one tier finding here is about the missing why.
+    $tierFindings = @($roundTrip | Where-Object { $_.Marker -match 'Tier' })
+    Assert-Equal 1 $tierFindings.Count 'the tier itself is not faulted -- only the reason it is still missing'
+    Assert-Equal 'a tier with no reason' $tierFindings[0].Label 'and the finding says so, rather than accusing the tier of being a stub'
+    Assert-Equal 0 @(Get-EntryImpactFindings -EntryText $text).Count 'while the RANKING gates stay silent: tier 0 owes no score'
 }
 Remove-Item -Recurse -Force -LiteralPath $fixture -ErrorAction SilentlyContinue
 
@@ -725,12 +745,16 @@ $sigText = (Format-EntrySignificanceSections -Rows $sigRows) -join "`n"
 # and that walk starts at tier 0 -- each answer decides whether there is a next one.
 Assert-True ($sigText.IndexOf('#### Tier 0') -lt $sigText.IndexOf('#### Tier 1')) 'sections: tier 0 comes first, because that is the order they are filled in'
 Assert-True ($sigText.IndexOf('#### Tier 1') -lt $sigText.IndexOf('#### Tier 2')) 'sections: and tier 1 before tier 2'
-Assert-True ($sigText -match '(?m)^Score: 5$') 'sections: the score is its own line, echoing the retired Tier: line'
+Assert-True ($sigText -match ('(?m)^' + [regex]::Escape((Get-EntryScoreLabel)) + ' 5$')) 'sections: the score is its own line, echoing the retired Tier: line'
 # The routing question is under EVERY tier 0 and 1, including one whose successor is already there. An
 # author who has answered does not need it; a reader at the fold, the cut or in the record needs to see
-# that it WAS asked.
-Assert-Equal 1 (@([regex]::Matches($sigText, [regex]::Escape((Get-EntrySignificanceWording).Route0))).Count) 'sections: tier 0 carries its routing question even when tier 1 follows'
-Assert-Equal 1 (@([regex]::Matches($sigText, [regex]::Escape((Get-EntrySignificanceWording).Route1))).Count) 'sections: and tier 1 carries its own'
+# that it WAS asked. Matched on the question's FIRST line: the two are line arrays since the dossier form
+# fixed the comment width, and joining them back would assert against a string nothing writes.
+$sigWording = Get-EntrySignificanceWording
+Assert-Equal 1 (@([regex]::Matches($sigText, [regex]::Escape(@($sigWording.Route0)[0]))).Count) 'sections: tier 0 carries its routing question even when tier 1 follows'
+Assert-Equal 1 (@([regex]::Matches($sigText, [regex]::Escape(@($sigWording.Route1)[0]))).Count) 'sections: and tier 1 carries its own'
+# ...and both are HTML comments, so the fold takes them out and the record never carries the form.
+Assert-True (-not ((Remove-EntryHtmlComments -EntryText $sigText) -match [regex]::Escape(@($sigWording.Route0)[0]))) 'sections: the routing question is comment, so the fold strips it'
 Assert-True (-not ($sigText -match 'continue to Tier 3')) 'sections: tier 2 carries none -- there is no successor to route to'
 
 # The scaffold: tier 0 alone, why placeholdered, score EMPTY. A scaffolded score would be a guess at a
@@ -738,10 +762,13 @@ Assert-True (-not ($sigText -match 'continue to Tier 3')) 'sections: tier 2 carr
 $sigScaffold = (Format-EntrySignificanceSections) -join "`n"
 Assert-True ($sigScaffold -match '(?m)^#### Tier 0$') 'scaffold: tier 0 is the only section'
 Assert-True (-not ($sigScaffold -match '(?m)^#### Tier [12]$')) 'scaffold: no tier 1 or 2 -- not every change has one, which is why the table went'
-Assert-True ($sigScaffold -match '(?m)^Score:\s*$') 'scaffold: the score is a question left standing, not a number nobody chose'
+Assert-True ($sigScaffold -match ('(?m)^' + [regex]::Escape((Get-EntryScoreLabel)) + '\s*$')) 'scaffold: the score is a question left standing, not a number nobody chose'
+# BOTH DECORATIONS READ BACK, one is written. Every entry in CHANGELOG.md carries the plain 'Score:'.
+Assert-True ([regex]::IsMatch('**Score:** 4', (Get-EntryScorePattern))) 'the bold form is read'
+Assert-True ([regex]::IsMatch('Score: 4', (Get-EntryScorePattern))) 'and the plain form every existing entry carries'
 
 Write-Host "Resolve-EntryImpact reads three shapes and writes one" -ForegroundColor Cyan
-$sigRound = Resolve-EntryImpact -EntryText ((Format-EntryBlock -Title 'T' -Type 'Feat' -Body 'b' -ImpactRows $sigRows) -join "`n")
+$sigRound = Resolve-EntryImpact -EntryText ((Format-EntryBlock -Branch 'feat/t' -Description 'T' -Type 'feat' -Body 'b' -ImpactRows $sigRows) -join "`n")
 Assert-Equal 2 $sigRound.Tier 'sections round trip: the reach is the highest section'
 Assert-Equal $true $sigRound.Declared 'sections round trip: declared'
 Assert-Equal 0 @($sigRound.Errors).Count 'sections round trip: no complaints'
@@ -768,10 +795,10 @@ $dupTier = "### Significance`n`n#### Tier 0`n`na`n`nScore: 1`n`n#### Tier 0`n`nb
 Assert-True (@((Resolve-EntryImpact -EntryText $dupTier).Errors -match 'a second time').Count -gt 0) 'the same tier twice is two answers to one question'
 
 Write-Host "Stripping the declaration for the documents that travel outward" -ForegroundColor Cyan
-$sigBlock = (Format-EntryBlock -Title 'T' -Type 'Feat' -Body 'body text' -ImpactRows $sigRows) -join "`n"
+$sigBlock = (Format-EntryBlock -Branch 'feat/t' -Description 'T' -Type 'feat' -Body 'body text' -ImpactRows $sigRows) -join "`n"
 $sigStripped = Remove-EntrySignificanceDeclaration -EntryText $sigBlock
 Assert-True (-not ($sigStripped -match '#### Tier')) 'stripped: every tier section is gone, not just the first'
-Assert-True (-not ($sigStripped -match '(?m)^Score:')) 'stripped: and the scores with them -- a self-assigned number at a consumer is a marketing claim'
+Assert-True (-not [regex]::IsMatch($sigStripped, '(?m)' + (Get-EntryScorePattern))) 'stripped: and the scores with them -- a self-assigned number at a consumer is a marketing claim'
 # THE HEADING GOES WITH THEM, and this assert is inherited rather than invented: leaving it standing was
 # measured on the table this shape replaced, shipping a named question with nothing under it into 17
 # sections per release card. The sub-sections ARE the section's content, so removing them empties it the

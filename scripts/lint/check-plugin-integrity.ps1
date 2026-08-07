@@ -410,9 +410,12 @@ if (Test-Path -LiteralPath $pluginsRootDir) {
 # as the plugins/ one above and worth stating separately rather than merging the two comments, because
 # these two documents went dark in the same week for two unrelated reasons -- which is the actual lesson
 # about this scan set: a file leaves it by MOVING, and nothing reports that it has.
+#
+# RECURSIVE here, unlike the two globs above, because branch/ has a subdirectory: templates/. Those files
+# are prose somebody pastes from, so a dead link in one is copied forward into every branch that uses it.
 $branchDirForLinks = Join-Path $RepoRoot ((Get-BranchFilePaths).Directory)
 if (Test-Path -LiteralPath $branchDirForLinks) {
-    $linkFiles += @(Get-ChildItem -Path $branchDirForLinks -Filter '*.md' -File |
+    $linkFiles += @(Get-ChildItem -Path $branchDirForLinks -Recurse -Filter '*.md' -File |
         Select-Object -ExpandProperty FullName)
 }
 # The specialists handbook lives next to the lenses (at family level) -- validate its links too.
@@ -515,6 +518,11 @@ foreach ($lf in $linkFiles) {
     # illustration, not a real link -- otherwise e.g. a `[..](#anchor)` example would get validated.
     $scan = [regex]::Replace($content, '(?s)```.*?```', '')
     $scan = [regex]::Replace($scan, '`[^`]*`', '')
+    # HTML comments too, for the same reason as code: nothing in one is a rendered link. This became a
+    # real finding the moment the entry format grew guidance comments -- one of them shows the closing
+    # line the fold writes, '[PR #NN](url) - merged <date>', and the scanner reported 'url' as dead.
+    # Illustrating a link is not publishing one.
+    $scan = [regex]::Replace($scan, '(?s)<!--.*?-->', '')
     # Persona templates are destined for .claude/extensions/ of a consuming repo; their relative
     # links need to resolve THERE, not at the source location in the plugin. So validate them as if
     # the file were already at that destination (this repo mirrors the consumer layout).
@@ -1179,11 +1187,24 @@ function Test-IsDeclaredSectionHeading([string]$Line) {
 # check with nothing to judge on every branch -- and it would still report [OK], because "no unfolded entry
 # file" is a legitimate state between merges. A check that goes quiet for the right-looking reason is worse
 # than one that errors. Both locations are walked, for the same "recognise both" reason the fold walks both.
+#
+# AND THE STEP LIST IS EXCLUDED BY NAME, which it never had to be before (Dave, August 6, 2026). Both branch
+# files open with an H2 in the dossier form, so the structural test alone -- which is the only thing that
+# tells an entry from a root doc -- now says yes to branch-progress.md as well. It is not an entry: its
+# sections are 'Steps' and 'Where I left off', so every branch would have collected two [entry-heading]
+# errors for a file that is doing exactly what it should. Excluded by PATH rather than by inspecting its
+# headings, because the path is what makes it not an entry; the heading names are just how it shows.
+#
+# The fold needed no such repair: it reaches branch-changelog.md by path and only ever applies the
+# structural test to loose *.md in the ROOT, where the step list has never lived.
 $entryFilesForHeadings = @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
     Where-Object { Test-IsChangelogEntryFile -Path $_.FullName })
-$branchDirForHeadings = Join-Path $RepoRoot ((Get-BranchFilePaths).Directory)
+$branchPathsForHeadings = Get-BranchFilePaths
+$branchDirForHeadings = Join-Path $RepoRoot $branchPathsForHeadings.Directory
+$progressForHeadings = Join-Path $RepoRoot ($branchPathsForHeadings.Progress -replace '/', '\')
 if (Test-Path -LiteralPath $branchDirForHeadings) {
     $entryFilesForHeadings += @(Get-ChildItem -Path $branchDirForHeadings -Filter '*.md' -File |
+        Where-Object { $_.FullName -ne $progressForHeadings } |
         Where-Object { Test-IsChangelogEntryFile -Path $_.FullName })
 }
 foreach ($ef in $entryFilesForHeadings) {
@@ -1220,7 +1241,18 @@ if (Test-Path -LiteralPath $clForHeadings) {
     if ($clFirstEntry -ge 0) {
         $ehChecked++
         $clRealLines = (([System.IO.File]::ReadAllText($clForHeadings, [System.Text.Encoding]::UTF8)) -split "`r?`n")
-        $ehWhatHeading = (Get-EntrySectionHeadings)['What']
+        # WHICH SECTION A WHOLE ENTRY OPENS WITH, and there is more than one right answer -- which is the
+        # repair this rule needed when the dossier form put 'Branch description' in front (August 6, 2026).
+        # A current entry opens with that; the entries ALREADY in CHANGELOG.md open with the description
+        # question, under its current name or its retired one. Testing only the newest opener would have
+        # reported every one of the pending entries as a split entry: two dozen false accusations, which is
+        # how a check gets switched off rather than heeded -- measured on this very gate when
+        # 'Who is this for' was renamed.
+        $ehOpeners = @(
+            (Get-EntrySectionHeadings)[(Get-EntryFirstSectionKey)]
+            (Get-EntrySectionHeadings)['What']
+        ) + @(Get-EntrySectionRetiredNames -Key 'What') | Where-Object { $_ }
+        $ehWhatHeading = $ehOpeners[0]
 
         # WHAT DISTINGUISHES AN ENTRY FROM A BODY HEADING, since markdown gives no marker for it. Every H2
         # here is read as one change, so a stray body heading becomes a phantom entry: no impact table, so an
@@ -1260,7 +1292,7 @@ if (Test-Path -LiteralPath $clForHeadings) {
                 }
             }
             if ($null -ne $firstDeclared) {
-                if ($firstDeclared -cne $ehWhatHeading) {
+                if ($ehOpeners -cnotcontains $firstDeclared) {
                     Add-Error "[entry-heading] CHANGELOG.md:$($from + 1): this H$ehEntryLevel's first named section is '$firstDeclared' rather than '$ehWhatHeading'. Every H$ehEntryLevel here is read as one change, so an entry whose sections do not start at the beginning is one that has been SPLIT -- almost certainly by a body sub-heading written at the entry's own level, which the release documents then file as a separate change declaring no impact. Demote that sub-heading to '$('#' * ($ehSectionLevel + 1)) '."
                 }
             } else {
@@ -1284,6 +1316,34 @@ if (Test-Path -LiteralPath $clForHeadings) {
 
 Write-Coverage -Category 'entry-heading' -Checked $ehChecked `
     -Note $(if ($entryFilesForHeadings.Count -eq 0) { 'no unfolded entry in branch/ or the root, so only CHANGELOG.md was judged -- normal between merges' } else { "$($entryFilesForHeadings.Count) unfolded entry file(s) plus CHANGELOG.md" })
+
+# --- 13b. the branch/ templates still match what the scaffolder writes -------------------------------------
+# A template beside a scaffolder that writes the same shape is TWO SOURCES OF ONE FORMAT. This repo has paid
+# for that shape repeatedly -- the scaffold wording, the fence readers, the tier sections -- and the entry
+# format changed THREE TIMES on the day these templates were added, so a hand-maintained copy would have gone
+# stale before it was committed.
+#
+# The templates are therefore generated from the same formatters new-changelog-entry.ps1 calls, and this holds
+# the files on disk to Get-BranchTemplates. Compared with line endings normalised: whether the working copy
+# checked out CRLF is not a property of the format.
+$btChecked = 0
+$btMissing = 0
+foreach ($tpl in (Get-BranchTemplates)) {
+    $btChecked++
+    $tplPath = Join-Path $RepoRoot ($tpl.Path -replace '/', '\')
+    if (-not (Test-Path -LiteralPath $tplPath)) {
+        $btMissing++
+        Add-Error "[branch-template] $($tpl.Path) is missing. It is generated from the same formatters the scaffolder uses -- see Get-BranchTemplates in scripts/lib/entry-scaffold-lib.ps1."
+        continue
+    }
+    $onDisk   = ([System.IO.File]::ReadAllText($tplPath, [System.Text.Encoding]::UTF8)) -replace "`r`n", "`n"
+    $expected = $tpl.Content -replace "`r`n", "`n"
+    if ($onDisk -ne $expected) {
+        Add-Error "[branch-template] $($tpl.Path) no longer matches what the scaffolder writes. It is a copy-paste convenience, not a second definition of the format -- regenerate it from Get-BranchTemplates rather than editing it by hand."
+    }
+}
+Write-Coverage -Category 'branch-template' -Checked $btChecked `
+    -Note $(if ($btMissing -gt 0) { "$btMissing missing" } else { 'held against the formatters the scaffolder calls, so the template cannot drift from the file a branch actually gets' })
 
 # --- 14. mojibake: a double-encoded character is a silent content change -----------------------------------
 # MEASURED HERE, August 1, 2026, and it nearly shipped. Demoting four headings in CHANGELOG.md with

@@ -22,13 +22,29 @@ changelog entry — the same workflow as the consuming repos. The steps:
    [`branch/README.md`](branch/README.md).
 
    **`branch-changelog.md` holds the entry block and nothing around it**, so it pastes into the
-   changelog in one go. **The entry is one `##` heading with three `###` sections under it**, and that is
+   changelog in one go. **The entry is one `##` heading with six `###` sections under it**, and that is
    exactly the block that lands there:
 
    ```text
-   ## <the title you gave -Title>
+   ## `<your branch>` changelog
 
-   ### What does this change do?
+   ### Branch description
+   <!-- Short description of branch-->
+
+   … the title you gave -Title …
+
+   ### Branch ID
+   <!--unique ID for branch like a timestamp of the moment this branch is created-->
+
+   20260806-114230
+
+   ### Branch type
+   <!-- options for type are: feat, fix or docs-->
+
+   feat
+
+   ### What does the change on this branch bring to main?
+   <!-- what the change DOES, for whoever reads CHANGELOG.md later -->
 
    … the description you write …
 
@@ -38,19 +54,16 @@ changelog entry — the same workflow as the consuming repos. The steps:
 
    … why it matters to this repo's own developers …
 
-   Score: <1-5>
+   **Score:** <1-5>
 
-   Is this change also relevant to colleagues and employers? Then continue to Tier 1.
-   If not, stop here and move on to the next section.
-
-   ### Type of change
-
-   Feat
+   ### Pull Request
+   <!-- filled in by the fold, from the merge itself -->
    ```
 
-   The heading and the type arrive filled in, and **the heading is just the title** — it is the line every
-   reader of the changelog and of all three release documents scans, so it says what changed and nothing
-   else. **The PR number and the merge date are added by the fold**, together on the entry's closing line:
+   **The heading, the ID and the type arrive filled in**, and every field carries a guidance comment above
+   the space where your answer goes. Those comments are **stripped by the fold**, so leaving them standing
+   costs the changelog nothing — and an empty field is refused at step 3, which is what replaced the old
+   `TODO:` placeholders. **The PR number and the merge date are added by the fold** into `### Pull Request`:
    neither exists yet, and a date written now would be the branch's birth date rather than its landing date. Valid prefixes (prefix → label → changelog type): `feat/` → enhancement → Feat ·
    `fix/` → bug → Fix · `docs/` → documentation → Docs · `chore/` → documentation → Chore
    (maintenance: scripts, tooling, config). The table is in
@@ -100,10 +113,12 @@ scaffolded with tier 0 alone. Filling it in is an edit in a file you are already
 
 … why it matters at this reach …
 
-Score: <1-5>
+**Score:** <1-5>
 
-Is this change also relevant to colleagues and employers? Then continue to Tier 1.
-If not, stop here and move on to the next section.
+<!--
+     Is this change also relevant to colleagues and employers? Then continue to Tier 1.
+     If not, stop here and move on to the next section.
+-->
 ```
 
 **Work down the tiers and stop where the answer is no.** Tier 0 can always be answered; each section ends
@@ -140,24 +155,30 @@ and the routing questions walk you there:
 
 The routine version bump stops needing a developer.
 
-Score: 4
+**Score:** 4
 
-Is this change also relevant to the people who consume this product? Then continue to Tier 2.
-If not, stop here and move on to the next section.
+<!--
+     Is this change also relevant to the people who consume this product? Then
+     continue to Tier 2. If not, stop here and move on to the next section.
+-->
 
 #### Tier 2
 
 Consumers must re-add the marketplace under its new name; installs break without it.
 
-Score: 5
+**Score:** 5
 ```
+
+**Tier 1 and Tier 2 arrive commented out**, each behind its own `<!-- UNCOMMENT … -->` line. Delete the
+first to bring Tier 1 in; Tier 2 has a marker of its own, so it stays commented until you delete that one
+too. The tiers come out one at a time, in order, with nothing else to edit.
 
 **Why it matters even though nothing breaks if you leave it at 0:** the release cut refuses a bump the tiers
 have not earned — a release needs at least one tier-1 entry, a minor needs a tier-2 one — and it also refuses
 a release whose tier-1-or-higher entries carry no significance, because an unscored entry cannot be placed.
 So an entry left at 0 is work that cannot carry a release on its own. `open-pr.ps1` prints what it read and
-names anything unsettled, so you find out before the PR rather than at the cut; it refuses a cell the model
-has no meaning for (`| 2 | 9 | … |`) outright.
+names anything unsettled, so you find out before the PR rather than at the cut; it refuses a score the
+rubric has no meaning for (`**Score:** 9`) outright.
 
 **The score cells are empty on purpose.** The tier defaults to 0 because 0 is a harmless final answer; a
 *score* has no harmless value, so any number scaffolded for you would be a guess at a ranking. The rubric is

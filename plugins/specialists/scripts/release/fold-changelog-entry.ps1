@@ -372,6 +372,22 @@ foreach ($file in $entryFiles) {
     $nl = if ($usesCRLF) { "`r`n" } else { "`n" }
     $entryContent = ($entryContent -replace "`r`n", "`n") -replace "`n", $nl
 
+    # THE GUIDANCE COMMENTS ARE STRIPPED HERE, AND THIS IS THE ONLY PLACE THAT DOES IT. Every field in the
+    # dossier form carries an HTML comment saying what a good answer looks like -- that is the form, not the
+    # author's answer, and it has no business in CHANGELOG.md or in the three release documents built from
+    # it. Stripping at the fold is what makes the guidance safe to be generous with: nobody has to remember
+    # to delete it, so leaving a block standing is not a defect and the scaffold gate has one less thing to
+    # police.
+    #
+    # WIRED IN LATE, AND THE GAP WAS REAL. Remove-EntryHtmlComments was written for this caller and its own
+    # header said "the fold calls this" while nothing did -- so between the guidance shipping and this line,
+    # every comment block in an entry would have folded into the changelog verbatim. Found by reading the
+    # fold rather than by anything failing, which is how a stripper that is never called stays invisible:
+    # the output is well-formed either way, just full of form text.
+    #
+    # BEFORE the promote and the footer below, so the comment count cannot change what those measure.
+    $entryContent = (Remove-EntryHtmlComments -EntryText $entryContent).TrimEnd()
+
     # THE DOCUMENT'S TAIL IS NORMALISED BEFORE ANYTHING IS MEASURED IN IT: it ends with exactly one blank
     # line, whatever it ended with before. BOTH insertion paths below need that, and only one of them used
     # to ensure it -- the one that runs when nothing is pending, which is the rarer of the two.
