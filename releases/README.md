@@ -344,7 +344,7 @@ list sits at the **end** of the page:
 
 | Version | Date | Type | Title |
 |---|---|---|---|
-| [3.7.0](development/3.x/3.7.0.md) | 2026-08-07 | Minor | The branch files take their designed form |
+| [3.7.0](internal/3.x/3.7.0.md) | 2026-08-07 | Minor | The branch files take their designed form |
 | [3.6.0](internal/3.x/3.6.0.md) | 2026-08-06 | Minor | The changelog ranks itself by reach and weight, a branch keeps its plan in branch/, and a filled lens survives the teardown |
 | [3.5.0](development/3.x/3.5.0.md) | 2026-08-05 | Minor | The changelog gets three tiers and a release has to earn its bump, and the shared workflow stops assuming it runs in the repo it was written in |
 | [3.4.0](development/3.x/3.4.0.md) | 2026-08-04 | Minor | Every shared script has a page, and the changelog leads with the release instead of archiving them |
