@@ -72,7 +72,25 @@ function Test-BranchName {
           - empty/whitespace-only name
           - name equal to 'main'
           - name contains the substring 'final' (case-insensitive, so also 'finalize'/'refinalization' --
-            Derek's hard rule, deliberately broad)
+            deliberately broad; see below)
+
+        WHY 'final' IS REFUSED, IN DAVE'S OWN WORDS (August 7, 2026): "je weet nooit zeker of iets echt
+        final is" -- you can never be certain something really is final. A branch named for being the last
+        word on something is a prediction, and the prediction is wrong often enough that the name outlives
+        its own truth: the next round has to be called 'final-2' or 'really-final', which is the shape the
+        rule exists to prevent. **Use a version suffix instead** -- 'fix/template-newline-v2' -- because a
+        number makes no claim about being the last one.
+
+        The rule is Dave's, recorded here rather than only in a memory note because this repo's convention
+        is that a lesson lives in the doc closest to what it governs. It was attributed to Derek in this
+        docstring until the day the reasoning was actually asked for, which is how a rule ends up looking
+        like a habit somebody picked up.
+
+        AND THE OPPOSITE RULE ONCE EXISTED, WHICH IS WORTH KNOWING BEFORE ANYONE "RESTORES" IT. A written
+        rule used to forbid exactly that '-v2' suffix, because the fold looked an entry file up by the exact
+        branch name ('feat-x.md') and a suffix broke both the match and the cleanup that followed it. The
+        branch/ split (August 6, 2026) retired it: the fold reads the branch out of the document rather than
+        guessing it from a filename, so a suffix costs nothing. Nothing here rejects '-v2', deliberately.
 
         An unknown prefix is NOT a hard reject (IsValid stays $true); the caller reads IsKnown and
         decides for itself whether/how a soft warning is needed, consistent with
@@ -88,7 +106,14 @@ function Test-BranchName {
         return [pscustomobject]@{ IsValid = $false; Reason = "Branch name must not be 'main'."; IsKnown = $false }
     }
     if ($Branch -match 'final') {
-        return [pscustomobject]@{ IsValid = $false; Reason = "Branch name must not contain the token 'final'."; IsKnown = $false }
+        # THE REFUSAL NAMES THE REMEDY, which this one did not. A gate that says only "not that" leaves the
+        # next person guessing, and the guess for a rejected 'final' is 'finished' or 'done' -- the same
+        # claim in a different word. '-v2' is the answer Dave gave when asked, and it is one word longer.
+        return [pscustomobject]@{
+            IsValid = $false
+            Reason  = "Branch name must not contain the token 'final' -- you can never be sure something really is final, and the next round then has to be called 'final-2'. Use a version suffix instead, e.g. 'fix/template-newline-v2'."
+            IsKnown = $false
+        }
     }
 
     $info = Get-BranchInfo -Branch $Branch
