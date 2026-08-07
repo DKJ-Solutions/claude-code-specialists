@@ -167,6 +167,21 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # The one implementation of parking (#507): Invoke-GitPark, dot-sourced by BOTH parking entry
+            # points -- park-branch.ps1 and new-branch.ps1 -Park. Mirrored for the same reason as the libs
+            # above: both callers are mirrored and would otherwise dot-source a file the consumer does not
+            # have.
+            #
+            # ITS OWN FILE RATHER THAN native-capture-lib.ps1, where Invoke-TestSuiteGate landed the same
+            # week. That one documents its fit as imperfect and asks the next person not to widen the file
+            # again; a park is not a gate, and the cost here is this entry and one mirror -- nothing in it
+            # is repo-owned, so no contract row follows.
+            Name    = 'park-lib'
+            Source  = 'scripts\lib\park-lib.ps1'
+            Mirror  = 'plugins\specialists\scripts\lib\park-lib.ps1'
+            LibOnly = $true
+        },
+        @{
             # The third release tier (August 3, 2026). Its own script rather than part of cut-release, and
             # the reason changed on the way: the source repo kept it separate because cut-release was
             # "temporarily diverged" and must not be extended, which #417 settled. What holds instead is

@@ -24,6 +24,9 @@ $ParkBranchSrc    = Join-Path $RepoRoot 'scripts\task\park-branch.ps1'
 # park-branch dot-sources this sibling shared lib for every git call (the #107 stderr guard), so the
 # fixture must carry it too.
 $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
+# And the shared park implementation itself since #507 -- park-branch is now the thin entry point and
+# Invoke-GitPark does the work, so a fixture without this file has no script at all.
+$ParkLibSrc       = Join-Path $RepoRoot 'scripts\lib\park-lib.ps1'
 
 $script:pass = 0
 $script:fail = 0
@@ -83,6 +86,7 @@ function New-Fixture {
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\lib')  -Force | Out-Null
     Copy-Item -LiteralPath $ParkBranchSrc    -Destination (Join-Path $dir 'scripts\task\park-branch.ps1')        -Force
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')  -Force
+    Copy-Item -LiteralPath $ParkLibSrc       -Destination (Join-Path $dir 'scripts\lib\park-lib.ps1')            -Force
 
     $bareRemote = "$dir.git"
     if (Test-Path -LiteralPath $bareRemote) { Remove-Item -Recurse -Force -LiteralPath $bareRemote }
@@ -243,6 +247,19 @@ try {
     } finally { $ErrorActionPreference = $prevEap }
     Assert-True ($lastMsg -match [regex]::Escape('park: feat/intent')) '-Intent: park commit still carries the park subject'
     Assert-True ($lastMsg -match [regex]::Escape($intentText)) '-Intent: the intent text is recorded in the commit body'
+
+    # --- (d2) The subject NAMES THE SCOPE (#507) ----------------------------------------------------
+    # THE DEFECT THIS SUITE COULD NOT SEE. Both parking entry points wrote the identical subject --
+    # `park: <branch> (work parked for later)` -- while committing different things, so a reader could not
+    # tell afterwards whether only the two branch files or everything outstanding had reached origin.
+    # Nothing here asserted the subject beyond the branch name, which is why the drift survived a suite
+    # that otherwise checks this script closely. The phrase is read from the lib rather than retyped, so
+    # rewording a scope stays a one-place change and this assert cannot quietly stop matching.
+    . (Join-Path $RepoRoot 'scripts\lib\park-lib.ps1')
+    $scopes = Get-GitParkScopes
+    Assert-True ($lastMsg -match [regex]::Escape($scopes['Everything'])) '-Intent: the subject names the scope that was committed (everything outstanding)'
+    Assert-True (-not ($lastMsg -match [regex]::Escape($scopes['BranchFiles']))) 'and does not claim the narrower scope it did not use'
+    Assert-True ($scopes['Everything'] -ne $scopes['BranchFiles']) 'the two scopes are told apart by their words -- the whole point of #507'
 
     # --- (e) No PR interaction: park never invokes gh / opens a PR ---------------------------------
     Write-Host "park-branch.ps1 -- no PR is opened" -ForegroundColor Cyan

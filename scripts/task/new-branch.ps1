@@ -349,52 +349,21 @@ if ($changelogTaken -and $progressTaken) {
 # either exits or throws under EAP=Stop, so reaching this line means the files are there.
 if ($Park) {
     . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
+    # ONE IMPLEMENTATION SINCE #507 (August 7, 2026). These four steps used to be written out here as
+    # well as in park-branch.ps1, and the copies had drifted where it hurts a reader rather than a
+    # script: both wrote `park: <branch> (work parked for later)` while committing different things, so
+    # the log could not say which half of the work was safely on origin. The scope now picks the words
+    # too, and the shared function owns both.
+    . (Join-Path $PSScriptRoot '..\lib\park-lib.ps1')
 
     # BOTH branch files, since the branch/ split (Dave, August 6, 2026). Parking exists to make work
     # reachable from another device, and the step list is the half that says what was still in flight --
     # parking the entry alone would push the description and leave the plan behind, which is the opposite
     # of what -Park is for. They are named explicitly rather than swept up, so the commit stays exactly as
     # narrow as it was: this pushes to a branch, but the pathspec discipline is the same everywhere.
-    $parkPaths = @($branchFiles.Changelog, $branchFiles.Progress) |
-        Where-Object { Test-Path -LiteralPath (Join-Path $repoRoot $_) }
-
-    if ($parkPaths.Count -gt 0) {
-        $addRes = Invoke-NativeCapture -FilePath 'git' -Arguments (@('-C', $repoRoot, 'add', '--') + $parkPaths)
-        $addRes.Output | ForEach-Object { Write-Host $_ }
-        if ($addRes.ExitCode -ne 0) { Write-Error "park: staging the branch files failed."; exit 1 }
-    }
-
-    # Everything below is scoped to the branch-file pathspec (`-- $parkPaths`), so a park commits ONLY
-    # those two files: any content the caller already staged for their own next commit is left exactly as
-    # it was (staged, uncommitted), not swept into the park commit.
-    #
-    # Commit only if those paths actually have staged changes: a re-park of already-committed branch files
-    # stages nothing (`git diff --cached --quiet -- <paths>` -> exit 0), and we then just push the existing
-    # commit rather than failing on an empty commit.
-    $diffRes = Invoke-NativeCapture -FilePath 'git' -Arguments (@('-C', $repoRoot, 'diff', '--cached', '--quiet', '--') + $parkPaths)
-    if ($diffRes.ExitCode -ne 0) {
-        # The commit message goes via `git commit -F <file>`, not `-m "...$Name..."`: a branch name
-        # may legally carry a `"` (git check-ref-format allows it, and Test-BranchName does not
-        # restrict characters), which embedded in an -m argument would break native argv
-        # reconstruction (the quoting lesson). A message file sidesteps argv entirely -- the same
-        # pattern open-pr.ps1 uses for the PR body. Cleaned up in finally, whether or not git succeeds.
-        $msgFile = Join-Path ([System.IO.Path]::GetTempPath()) "new-branch-park-msg-$PID.txt"
-        [System.IO.File]::WriteAllText($msgFile, "park: $Name (work parked for later)", (New-Object System.Text.UTF8Encoding $false))
-        try {
-            $commitRes = Invoke-NativeCapture -FilePath 'git' -Arguments (@('-C', $repoRoot, 'commit', '-F', $msgFile, '--') + $parkPaths)
-            $commitRes.Output | ForEach-Object { Write-Host $_ }
-            if ($commitRes.ExitCode -ne 0) { Write-Error "park: committing the branch files failed."; exit 1 }
-        } finally {
-            Remove-Item -Path $msgFile -Force -ErrorAction SilentlyContinue
-        }
-    } else {
-        Write-Host "park: nothing new to commit (branch files already committed) -- pushing as-is." -ForegroundColor Yellow
-    }
-
-    $pushRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'push', '-u', 'origin', $Name)
-    $pushRes.Output | ForEach-Object { Write-Host $_ }
-    if ($pushRes.ExitCode -ne 0) { Write-Error "park: git push failed (is 'origin' configured and reachable?)."; exit 1 }
-    Write-Host "Branch '$Name' parked on origin (pushed, no PR)." -ForegroundColor Green
+    $ok = Invoke-GitPark -RepoRoot $repoRoot -Branch $Name -Scope 'BranchFiles' `
+        -Paths @($branchFiles.Changelog, $branchFiles.Progress)
+    if (-not $ok) { exit 1 }
 }
 
 exit 0

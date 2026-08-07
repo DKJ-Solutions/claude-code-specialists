@@ -32,6 +32,10 @@ $BranchInfoSrc    = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 # new-branch -Park dot-sources this sibling shared lib for its git push (the #107 stderr guard),
 # so the fixture must carry it too.
 $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
+# And since #507 the -Park path dot-sources the shared park implementation as well: Invoke-GitPark does
+# the stage/commit/push that used to be written out here AND in park-branch.ps1, in two copies that had
+# drifted into writing the same commit message for different scopes.
+$ParkLibSrc       = Join-Path $RepoRoot 'scripts\lib\park-lib.ps1'
 # new-branch.ps1 dot-sources this for the entry format -- the single source it shares with open-pr.ps1's
 # scaffold gate. Without it in the fixture, every entry-writing case here dies on a raw path-not-found
 # instead of testing anything.
@@ -44,6 +48,9 @@ $EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 # so a path change breaks the writer and the test together instead of leaving the test asserting a stale
 # location that still passes.
 . $EntryScaffoldSrc
+# Same reasoning for the park scopes: the -Park asserts read the commit-subject phrases from Get-GitParkScopes
+# rather than repeating them, so rewording a scope cannot leave a test matching text nobody writes any more.
+. $ParkLibSrc
 
 $script:pass = 0
 $script:fail = 0
@@ -176,6 +183,7 @@ function New-Fixture {
     Copy-Item -LiteralPath $NewBranchSrc     -Destination (Join-Path $dir 'scripts\task\new-branch.ps1')             -Force
     Copy-Item -LiteralPath $BranchInfoSrc    -Destination (Join-Path $dir 'scripts\lib\branch-info.ps1')             -Force
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')      -Force
+    Copy-Item -LiteralPath $ParkLibSrc       -Destination (Join-Path $dir 'scripts\lib\park-lib.ps1')               -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')      -Force
 
     $prevEap = $ErrorActionPreference
@@ -575,6 +583,21 @@ try {
         $ErrorActionPreference = $prevEap
     }
     Assert-Equal 'origin/feat/parked-branch' $upstream '-Park: upstream tracking set to origin/<branch>'
+
+    # THE SUBJECT NAMES THE NARROWER SCOPE (#507), and this is the half of the pair that proves the two
+    # are told apart: park-branch's suite asserts the same thing for 'everything outstanding'. Both wrote
+    # `park: <branch> (work parked for later)` until August 7, 2026 -- identical words for two different
+    # commits, so the log could not say which half of the work had reached origin. Read from the lib
+    # rather than retyped, so rewording a scope stays a one-place change.
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $parkMsgI = ((& git -C $fixtureI log -1 --pretty=%B 2>$null) | Out-String)
+    } finally { $ErrorActionPreference = $prevEap }
+    $parkScopes = Get-GitParkScopes
+    Assert-True ($parkMsgI -match [regex]::Escape('park: feat/parked-branch')) '-Park: the commit carries the park subject'
+    Assert-True ($parkMsgI -match [regex]::Escape($parkScopes['BranchFiles'])) '-Park: and names the branch-files scope it actually committed'
+    Assert-True (-not ($parkMsgI -match [regex]::Escape($parkScopes['Everything']))) '-Park: and does not claim to have saved everything outstanding'
 
     # --- (j) Regression: a malicious -Intent (quotes + backslashes) survives intact via the env-var
     # handoff, just like -Title (f) -- same boundary, same guard (Sebastian's advisory). ----------
