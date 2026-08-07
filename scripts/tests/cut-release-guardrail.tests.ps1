@@ -107,6 +107,13 @@ $openPrForGate = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\rel
 Assert-True ($openPrForGate -match 'Invoke-TestSuiteGate') 'and open-pr runs the SAME shared gate, not a copy of it'
 $captureLib = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'))
 Assert-True ($captureLib -match '(?m)^function Invoke-TestSuiteGate') 'which is defined once, in the lib both of them already load'
+# AND CI IS THE THIRD CALLER, not the third copy (issue #512, August 7, 2026). ci.yml carried its own
+# inline foreach over scripts/tests until that date, which is how a gate improvement can reach both local
+# callers and silently miss the one that actually blocks the merge -- the required check. Asserted on the
+# workflow text because nothing else in this repo can: CI is the one caller no suite gets to run.
+$ciYml = [System.IO.File]::ReadAllText((Join-Path $RepoRoot '.github\workflows\ci.yml'))
+Assert-True ($ciYml -match 'Invoke-TestSuiteGate') 'CI runs the same shared gate as well'
+Assert-True ($ciYml -notmatch 'Get-ChildItem[^\r\n]*tests') 'and no longer walks scripts/tests itself'
 # BEFORE THE FIRST WRITE, like the lint above it: a release that fails halfway leaves a half-bumped tree on
 # main under one of this repo's two direct-commit exceptions, which is where a failure costs most to undo.
 #

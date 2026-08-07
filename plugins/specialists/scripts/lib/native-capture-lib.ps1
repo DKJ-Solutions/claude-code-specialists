@@ -98,12 +98,43 @@ function Invoke-TestSuiteGate {
         -SkipTests, the cut's is its own flag, and a lib that knew about either would be reaching into its
         callers' parameter sets.
 
+        THE SUITES RUN IN PARALLEL (issue #512, August 7, 2026). Measured in the source repo on one machine
+        within one session, all 27 suites green every time: 510s one at a time, against 128-263s parallel
+        over six runs (median 159s). Every suite is an independent child process that spends most of its
+        time waiting on children of its own, so running them sequentially was the simplest possible
+        arrangement rather than a considered one. Parallel, the gate costs what its SLOWEST SINGLE SUITE
+        costs instead of the sum -- which is why the remaining half of #512 matters more after this change
+        than before it (check-plugin-integrity.tests, ~154s for 86 full lint runs over its fixture: the
+        critical path all by itself), and also why the spread above is wide where the sequential figure is
+        not. A sum averages its own variance out; a maximum does the opposite.
+
+        WHY Start-Process AND NOT A JOB. Windows PowerShell 5.1 has no ForEach-Object -Parallel, and
+        Start-Job pays for a whole runspace to then spawn the same child process this does directly. What
+        parallelism costs here is the console: two dozen suites writing to one screen interleave into an
+        unreadable weave, so each child's output is captured to its own pair of files and printed as ONE
+        BLOCK when it exits. Attribution therefore comes from the '== <suite> ==' header the block opens
+        with, not from its position -- which is the property that mattered in the sequential version too.
+        Blocks arrive in COMPLETION order, so the log is no longer alphabetical; the closing summary names
+        the failures in a fixed order for that reason.
+
+        -WorkingDirectory IS NOT OPTIONAL, and leaving it off is the one way this rewrite could have
+        broken a suite silently. Start-Process starts the child in [Environment]::CurrentDirectory, which
+        does NOT follow Set-Location -- so a suite that asks git about "the tree I am in" would have been
+        answered by whatever directory the process was launched from, days ago. roster-sync.tests.ps1
+        asserts exactly that (Sylvester's lens: "run a suite from the tree it is meant to judge"), and a
+        false red there reads like a regression in the branch under test. Passing PowerShell's own location
+        reproduces precisely what '& powershell -File' handed the child before.
+
         Returns $true when every suite exited 0, $false when any did not, and $true with a warning when
         there is nothing to run -- an empty or missing directory is a repo without suites, not a failure.
     #>
     param(
         [Parameter(Mandatory)][string]$TestsDir,
-        [string]$Context = 'the gate'
+        [string]$Context = 'the gate',
+        # 0 = decide from the machine. 1 = run them one at a time, which is the valve for debugging a
+        # suite that only fails with 25 siblings competing for the disk -- a real possibility this
+        # function introduces, so it ships with the way to rule it out.
+        [int]$MaxParallel = 0
     )
 
     if (-not (Test-Path -LiteralPath $TestsDir)) {
@@ -111,18 +142,107 @@ function Invoke-TestSuiteGate {
         return $true
     }
 
-    $suites = @(Get-ChildItem -Path $TestsDir -Filter '*.tests.ps1' -File)
+    $suites = @(Get-ChildItem -Path $TestsDir -Filter '*.tests.ps1' -File | Sort-Object Name)
     if ($suites.Count -eq 0) {
         Write-Warning "no *.tests.ps1 suites found in $TestsDir - test gate had nothing to run."
         return $true
     }
 
-    Write-Host "test gate: running all $($suites.Count) test suites for $Context..." -ForegroundColor Cyan
-    $failed = $false
-    $suites | ForEach-Object {
-        Write-Host "== $($_.Name) ==" -ForegroundColor Cyan
-        & powershell -NoProfile -ExecutionPolicy Bypass -File $_.FullName
-        if ($LASTEXITCODE -ne 0) { $failed = $true }
+    if ($MaxParallel -le 0) {
+        # Two cores held back: the suites spawn children of their own, and a gate that saturates the
+        # machine it runs on makes every other window on it unusable for two minutes. The floor is 2 and
+        # not 1, because on a four-core machine that reservation would otherwise cost HALF the box and a
+        # two-core one would fall back to the sequential loop this replaced -- and the suites spend most
+        # of their time waiting on children rather than computing, so a little oversubscription is cheap.
+        # A runner nobody is sitting at should pass its own core count instead; ci.yml does.
+        $MaxParallel = [Math]::Max(2, [Environment]::ProcessorCount - 2)
     }
-    return (-not $failed)
+    if ($MaxParallel -gt $suites.Count) { $MaxParallel = $suites.Count }
+
+    $modeLabel = if ($MaxParallel -eq 1) { 'one at a time' } else { "$MaxParallel at a time" }
+    Write-Host "test gate: running all $($suites.Count) test suites for $Context ($modeLabel)..." -ForegroundColor Cyan
+
+    $captureDir = Join-Path ([System.IO.Path]::GetTempPath()) ("test-suite-gate-$PID")
+    $launchDir  = (Get-Location).Path
+    $sw         = [System.Diagnostics.Stopwatch]::StartNew()
+    $failedNames = New-Object System.Collections.ArrayList
+
+    try {
+        if (Test-Path -LiteralPath $captureDir) { Remove-Item -Recurse -Force -LiteralPath $captureDir }
+        New-Item -ItemType Directory -Path $captureDir -Force | Out-Null
+
+        $queue = New-Object System.Collections.Queue
+        foreach ($s in $suites) { $queue.Enqueue($s) | Out-Null }
+        $running = New-Object System.Collections.ArrayList
+
+        while ($queue.Count -gt 0 -or $running.Count -gt 0) {
+            while ($queue.Count -gt 0 -and $running.Count -lt $MaxParallel) {
+                $suite   = $queue.Dequeue()
+                $outFile = Join-Path $captureDir ($suite.BaseName + '.out.txt')
+                $errFile = Join-Path $captureDir ($suite.BaseName + '.err.txt')
+                # The suite path is quoted: Start-Process joins ArgumentList on spaces, so an unquoted
+                # path under a folder with a space in it would arrive as two arguments.
+                $proc = Start-Process -FilePath 'powershell' `
+                    -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $suite.FullName + '"')) `
+                    -WorkingDirectory $launchDir -NoNewWindow -PassThru `
+                    -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+                # READING .Handle IS NOT A NO-OP -- it is what makes .ExitCode readable later, and leaving
+                # it out is how this rewrite first shipped. Start-Process -PassThru hands back a Process
+                # object without retaining the OS handle, so once the child has exited .NET has nothing
+                # left to ask and .ExitCode comes back EMPTY. Empty is not 0: every suite was then judged
+                # 'FAILED (exit )', and the gate reported all of them failing while printing each one's
+                # green, passing output directly underneath. Same family as the rest of this file -- the
+                # wrong answer arrives as a plausible value instead of as an error.
+                $null = $proc.Handle
+                $running.Add([pscustomobject]@{
+                    Name = $suite.Name; Process = $proc; OutFile = $outFile; ErrFile = $errFile
+                }) | Out-Null
+            }
+
+            $done = @($running | Where-Object { $_.Process.HasExited })
+            if ($done.Count -eq 0) {
+                Start-Sleep -Milliseconds 100
+                continue
+            }
+
+            foreach ($d in $done) {
+                $d.Process.WaitForExit()          # settles ExitCode before it is read
+                $code = $d.Process.ExitCode
+                if ($code -eq 0) {
+                    Write-Host "== $($d.Name) ==" -ForegroundColor Cyan
+                } else {
+                    Write-Host "== $($d.Name) == FAILED (exit $code)" -ForegroundColor Red
+                    $failedNames.Add($d.Name) | Out-Null
+                }
+                # -Encoding Oem matches what a redirected Windows PowerShell child writes (its
+                # [Console]::OutputEncoding is the OEM codepage). Everything in scope here is ASCII by
+                # repo convention, where every candidate decoder agrees; the choice only shows on a high
+                # byte that reached a suite's output from a document it was reading.
+                foreach ($f in @($d.OutFile, $d.ErrFile)) {
+                    if (-not (Test-Path -LiteralPath $f)) { continue }
+                    $text = Get-Content -LiteralPath $f -Raw -Encoding Oem
+                    if ([string]::IsNullOrWhiteSpace($text)) { continue }
+                    Write-Host $text.TrimEnd()
+                }
+                $running.Remove($d)
+            }
+        }
+    } finally {
+        $sw.Stop()
+        if (Test-Path -LiteralPath $captureDir) {
+            Remove-Item -Recurse -Force -LiteralPath $captureDir -ErrorAction SilentlyContinue
+        }
+    }
+
+    # The verdict is printed here rather than left to the caller, because completion-order blocks bury it:
+    # in a 27-suite weave the one red header is 2000 lines up. Sorted, so two runs name the same failures
+    # in the same order. The elapsed line is deliberate too -- the whole point of this function's shape is
+    # a number, and one it reports at every run cannot go stale in a document.
+    if ($failedNames.Count -eq 0) {
+        Write-Host ("test gate: all {0} suites passed in {1:N0}s." -f $suites.Count, $sw.Elapsed.TotalSeconds) -ForegroundColor Green
+        return $true
+    }
+    $namesInOrder = @($failedNames | Sort-Object) -join ', '
+    Write-Host ("test gate: {0} of {1} suites FAILED in {2:N0}s: {3}" -f $failedNames.Count, $suites.Count, $sw.Elapsed.TotalSeconds, $namesInOrder) -ForegroundColor Red
+    return $false
 }

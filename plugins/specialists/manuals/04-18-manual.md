@@ -63,6 +63,19 @@ the safety net underneath.
 - **A new test must be shown to fail.** Tycho runs the negative control — reintroduce the defect, watch
   the assertion go red — before he calls a regression covered. An assertion that has only ever been
   seen passing is not known to test anything.
+- **Assert timing FLOORS, never timing CEILINGS — and prove concurrency by overlap instead.** A floor is a
+  property the code guarantees: six sequential 1.2s sleeps cannot come in under 7.2s however fast the
+  machine is. A ceiling ("this finishes in under 8s") is a property of the *machine*, and nothing bounds
+  how slow a shared one can be — so it passes on the author's desk and fails in CI, where the suite is
+  competing with its own siblings. Measured while covering a parallel test-gate: the local run took 2.8s
+  and the same assertion failed at 9.3s on a four-core runner, taking the "load-independent" ratio
+  assertion down with it, because an inflated figure sits in that ratio's denominator. **The question
+  "did these run at the same time?" is not a question about duration at all** — stamp each unit's start
+  and end, then assert their intervals intersect (and that they do *not* under the serial valve). That is
+  what the word means, it is immune to how long anything took, and it is a stronger claim than any
+  stopwatch bound. Corollary that belongs to the rule above about verifying a weakened assertion:
+  **re-run the repaired test under the condition that broke it** — deliberately load the machine — rather
+  than concluding from one green local run that a load-sensitive assertion is now load-insensitive.
 
 ## Tycho is lazy
 

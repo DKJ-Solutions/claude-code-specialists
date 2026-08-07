@@ -59,7 +59,14 @@ infrastructure.
   runs before a release.
 - **`.github/workflows/ci.yml`** — the CI gate on GitHub: runs the same lint gate + all test suites
   (`scripts/tests/*.tests.ps1`) on every PR and every push to `main`, so the guard also applies to
-  work that comes about outside `open-pr.ps1`. Since July 15, 2026, the repo ruleset
+  work that comes about outside `open-pr.ps1`. **"The same" is literal since August 7, 2026** — the step
+  dot-sources `native-capture-lib.ps1` and calls `Invoke-TestSuiteGate`, the one function `open-pr.ps1`
+  and `cut-release.ps1` also call. It held its own inline `foreach` until then, which is how a gate
+  improvement can land in both local callers and miss the only one that actually blocks a merge; the
+  asserts that keep it from coming back are in `cut-release-guardrail.tests.ps1`. It passes
+  `-MaxParallel ([Environment]::ProcessorCount)` deliberately: the lib's default holds two cores back so a
+  developer's machine stays usable, and on a four-core runner nobody is sitting at, that reservation would
+  cost half the box. Since July 15, 2026, the repo ruleset
   **`main-ci-gate`** (renamed from `main-ci-poort` by Dave on July 26, 2026; found at GitHub →
   Settings → Rules) enforces that gate as a **required status check**: a PR to `main` only merges
   on a green `lint-en-tests` job. The bypass list (Repository admin + the Write role, "Always
@@ -117,6 +124,25 @@ infrastructure.
 - **The lint gate may never become quieter than the risks.** As the repo grows (more plugins, more
   complex manifests), Sylvester extends the checks — with [Tycho #18](04-18-extension.md) building
   tests alongside.
+- **The test gate is bound by its SLOWEST SINGLE SUITE, not by their sum — so the next second saved is
+  bought inside one file.** Measured August 7, 2026 on the same machine within one session, all 27 suites
+  green every time: **510s one at a time, against 128–263s parallel over six runs (median 159s)**
+  ([#512](https://github.com/DaveKJohn/claude-code-specialists/issues/512)). **That spread is the mechanism,
+  not noise** — a sum averages its own variance out, a maximum does the opposite, so a gate bound by its
+  slowest suite is inherently less predictable than one bound by the total. Quote the range rather than the
+  best run: the first parallel measurement taken was the 128s one, and on its own it would have promised a
+  4× improvement the gate delivers only sometimes. **CI gains less, and for a stated reason:** its runner
+  has four cores against this machine's eighteen, so the throttle is four wide and the `lint-en-tests` job
+  went from about eleven minutes to **7m2s**. What made that safe rather than
+  lucky was checked before it was built, not after: no suite writes into the repo tree (every `$RepoRoot`
+  reference is a read, or a `Copy-Item` *out of* it into a fixture), and no two suites share a fixture path
+  — the fixed-name ones each own their name, the rest key on `$PID`. **Re-check both before adding a suite
+  that touches either.** The remaining half of #512 is now the whole critical path:
+  `check-plugin-integrity.tests.ps1` spends its ~154s on **86** `Invoke-Integrity` calls, each a fresh
+  `powershell` start (~0.18s) plus a full lint over its fixture (~1.6s) — real work, not waste, and it
+  cannot be parallelised the way the gate was, because all 86 scenarios mutate **one** fixture directory in
+  sequence. `-MaxParallel 1` is the valve, and it is worth reaching for before believing a suite that only
+  fails with 26 siblings competing for the disk.
 - **Renaming or moving this checkout unlinks its own plugin install — plan the re-install into the same
   move.** Because this repo consumes itself, it is a consumer like any other, and the install record is
   keyed on `projectPath`. Measured August 3, 2026: after the directory was renamed from

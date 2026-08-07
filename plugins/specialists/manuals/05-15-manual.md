@@ -103,7 +103,7 @@ and safe hook construction.
   INSTALL.md's "Staying up to date" section for the detail). Note: this applies to plugin
   content; changes to `CLAUDE.md` imports and settings still load only on a restart.
 
-## Two PowerShell traps that produce well-formed wrong output
+## Four PowerShell traps that produce well-formed wrong output
 
 Both were measured in this system, not read about, and both share the property that makes them
 expensive: **nothing errors.** The script runs, the output parses, the markdown renders — and it says
@@ -124,8 +124,26 @@ something other than what the author meant. Neither is caught by a linter, so ea
   blocking session signal for a repo with nothing wrong. **So never write a report marker inside a
   message, a description or a config value** — describe it ("the info signal") instead of spelling it —
   and where a set of such strings exists, assert that none of them contains one.
+- **`Start-Process -PassThru` hands back a process whose `ExitCode` you cannot read.** It does not retain
+  the OS handle, so once the child has exited .NET has nothing left to ask and the property comes back
+  **empty** — and empty is not zero. `WaitForExit()` first does not help; the handle is what is missing,
+  not the timing. Measured while parallelising a test gate: every child was judged `FAILED (exit )` and
+  the gate reported all of them failing while printing each one's green, passing output directly
+  underneath. **Read `$proc.Handle` once, immediately after starting it** (`$null = $proc.Handle`) — that
+  single access is what keeps the handle alive, which is why it looks exactly like the dead line a later
+  cleanup deletes. Comment it, or `Start-Process` will silently go back to reporting a fleet of
+  false failures.
+- **`Start-Process` does not start the child in the directory you are standing in.** Its default is
+  `[Environment]::CurrentDirectory`, which does **not** follow `Set-Location` — so a child launched
+  without `-WorkingDirectory` inherits wherever the *process* began, which for a long-lived session can be
+  a directory nobody has thought about for hours. Anything the child then asks about "the tree I am in" —
+  `git rev-parse --show-toplevel` above all — is answered for the wrong tree. Nothing errors; you get a
+  confident answer about somewhere else. **Pass `-WorkingDirectory (Get-Location).Path` explicitly**
+  whenever the child's location can matter, which reproduces what `& powershell -File …` did before.
+  Sibling of the trap above, from the same change: both are `Start-Process` quietly declining to inherit
+  something the direct call-operator form gave for free.
 
-The general shape behind both, worth carrying to the next one: when a mistake cannot announce itself,
+The general shape behind all four, worth carrying to the next one: when a mistake cannot announce itself,
 the assert is the announcement. Prefer a test over a comment for anything in this class.
 
 ## Sylvester is lazy

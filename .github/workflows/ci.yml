@@ -26,13 +26,19 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint/check-plugin-integrity.ps1
           exit $LASTEXITCODE
 
+      # THE SAME SHARED GATE open-pr.ps1 AND cut-release.ps1 RUN, not a third copy of its loop. This step
+      # held an inline copy until August 7, 2026 (issue #512), which is how it would have kept running the
+      # suites one at a time for days after both local callers were parallelised -- the copy nobody looks
+      # at being the one that drifts.
+      #
+      # -MaxParallel IS PASSED EXPLICITLY, because the default is wrong here for a good reason. The gate
+      # holds two cores back so a developer's machine stays usable while it runs; a GitHub runner has
+      # nobody sitting at it and only four cores, so that reservation would cost half the box. The
+      # knowledge of which kind of machine this is lives here, not in the lib.
       - name: Test suites (scripts/tests/*.tests.ps1)
         shell: powershell
         run: |
-          $failed = 0
-          Get-ChildItem -Path scripts/tests -Filter *.tests.ps1 -File | ForEach-Object {
-            Write-Host "== $($_.Name) ==" -ForegroundColor Cyan
-            powershell -NoProfile -ExecutionPolicy Bypass -File $_.FullName
-            if ($LASTEXITCODE -ne 0) { $failed = 1 }
-          }
-          exit $failed
+          . ./scripts/lib/native-capture-lib.ps1
+          $gateOk = Invoke-TestSuiteGate -TestsDir ./scripts/tests -Context 'CI' -MaxParallel ([Environment]::ProcessorCount)
+          if (-not $gateOk) { exit 1 }
+          exit 0
