@@ -2760,9 +2760,14 @@ function Get-BranchTemplates {
         template now open with the same H2, which is the signature Test-IsChangelogEntryFile keys on.
 
         THE TRAILING BYTES ARE PART OF THE FILE and are set here rather than left to the join, because the
-        lint holds these two to the byte with only CRLF normalised. The changelog template closes on a blank
-        line after its last comment; the progress template closes on the comment itself. Both match the
-        files Dave designed, which are the spec for this shape -- see branch/README.md.
+        lint holds these two to the byte with only CRLF normalised.
+
+        BOTH END WITH A NEWLINE (Dave, August 7, 2026). The progress template ended on its last '-->' with
+        no terminator at all -- an accident of the editor it was designed in, faithfully reproduced here
+        while the templates were being treated as the spec, and then repaired on his word. A file without a
+        final newline is the one whose next diff shows a line nobody edited, and git says so out loud every
+        time ("\ No newline at end of file"). The changelog template keeps the blank line before its
+        terminator, which is its author's spacing rather than an accident.
     #>
     $nl = "`n"
     $token = $script:BranchTemplateBranchToken
@@ -2776,7 +2781,7 @@ function Get-BranchTemplates {
         },
         [pscustomobject]@{
             Path    = "$($script:BranchTemplateDir)/branch_template_progress.md"
-            Content = ($progress -join $nl).TrimEnd("`n")
+            Content = (($progress -join $nl).TrimEnd("`n")) + $nl
         }
     )
 }
