@@ -189,11 +189,13 @@ if (Test-Path -LiteralPath $writtenEntry) {
     $text = [System.IO.File]::ReadAllText($writtenEntry, [System.Text.Encoding]::UTF8)
     $roundTrip = @(Get-EntryScaffoldFindings -EntryText $text -Wording (Get-EntryScaffoldWording))
     Assert-True ($roundTrip.Count -gt 0) 'the matcher sees the writer output as scaffolded -- writer and guard share one source'
-    # THREE FINDINGS, AND NONE OF THEM IS A STRING. The dossier form writes no visible placeholder at all --
-    # every field is a heading with a guidance comment above an empty space -- so what the gate reports is
-    # EMPTINESS: the two sections the author owes and the tier that has no reason yet. A gate still looking
-    # for 'TODO: title' would have gone silent on the very entry it exists to stop.
-    Assert-Equal 3 $roundTrip.Count 'and it names each unanswered field: the description, the body, and tier 0 with no reason'
+    # FIVE FINDINGS, AND NONE OF THEM IS A STRING. The dossier form writes no visible placeholder at all --
+    # every field is a heading with an empty space under it -- so what the gate reports is EMPTINESS: the
+    # two sections the author owes, plus one per tier with no reason yet. All THREE tiers are scaffolded
+    # since August 7, 2026 (an unreached one is answered 'N/A' with a line saying why, rather than left
+    # out), so three of the five are tiers. A gate still looking for 'TODO: title' would have gone silent
+    # on the very entry it exists to stop.
+    Assert-Equal 5 $roundTrip.Count 'and it names each unanswered field: the description, the body, and all three tiers'
     Assert-Equal 0 @($roundTrip | Where-Object { $_.Label -notmatch 'unanswered|no reason' }).Count `
         'all three are measurements of an empty field rather than matches on placeholder prose'
     # THE ENTRY NO LONGER ASKS FOR A TO-DO LIST, which is the whole point of the split: the file whose text
@@ -247,8 +249,8 @@ if (Test-Path -LiteralPath $writtenEntry) {
     # "you chose the lowest tier" and "you have not said why this matters", so it is asserted rather than
     # assumed: the one tier finding here is about the missing why.
     $tierFindings = @($roundTrip | Where-Object { $_.Marker -match 'Tier' })
-    Assert-Equal 1 $tierFindings.Count 'the tier itself is not faulted -- only the reason it is still missing'
-    Assert-Equal 'a tier with no reason' $tierFindings[0].Label 'and the finding says so, rather than accusing the tier of being a stub'
+    Assert-Equal 3 $tierFindings.Count 'one finding per scaffolded tier -- the tier itself is not faulted, only its missing reason'
+    Assert-Equal 0 @($tierFindings | Where-Object { $_.Label -ne 'a tier with no reason' }).Count 'and each says so, rather than accusing the tier of being a stub'
     Assert-Equal 0 @(Get-EntryImpactFindings -EntryText $text).Count 'while the RANKING gates stay silent: tier 0 owes no score'
 }
 Remove-Item -Recurse -Force -LiteralPath $fixture -ErrorAction SilentlyContinue
@@ -765,8 +767,15 @@ Assert-True (-not ($sigText -match 'continue to Tier 3')) 'sections: tier 2 carr
 # The scaffold: tier 0 alone, why placeholdered, score EMPTY. A scaffolded score would be a guess at a
 # ranking, which is the failure the retired highlights marker was measured on.
 $sigScaffold = (Format-EntrySignificanceSections) -join "`n"
-Assert-True ($sigScaffold -match '(?m)^#### Tier 0$') 'scaffold: tier 0 is the only section'
-Assert-True (-not ($sigScaffold -match '(?m)^#### Tier [12]$')) 'scaffold: no tier 1 or 2 -- not every change has one, which is why the table went'
+# ALL THREE TIERS ARE SCAFFOLDED (Dave, August 7, 2026), which reverses what this asserted the day before.
+# Tier 1 and 2 used to be left out, and their absence WAS the claim that the change reaches nobody there --
+# but an absent section and an unfinished one look identical, so the gate could not tell "reaches no
+# consumer" from "nobody got to tier 2 yet". Each tier is answered now: a score, or 'N/A' with a line
+# saying why.
+foreach ($t in 0..(Get-EntryTierMax)) {
+    Assert-True ($sigScaffold -match ('(?m)^#### Tier ' + $t + '$')) "scaffold: tier $t has a section of its own"
+}
+Assert-Equal 3 (@([regex]::Matches($sigScaffold, '(?m)^#### Tier \d+$')).Count) 'scaffold: exactly the three the model has, no more'
 Assert-True ($sigScaffold -match ('(?m)^' + [regex]::Escape((Get-EntryScoreLabel)) + '\s*$')) 'scaffold: the score is a question left standing, not a number nobody chose'
 # BOTH DECORATIONS READ BACK, one is written. Every entry in CHANGELOG.md carries the plain 'Score:'.
 Assert-True ([regex]::IsMatch('**Score:** 4', (Get-EntryScorePattern))) 'the bold form is read'
@@ -790,6 +799,43 @@ Assert-Equal 2 (Resolve-EntryImpact -EntryText $tableEntry).Tier 'the impact tab
 Assert-Equal 1 (Resolve-EntryImpact -EntryText "### X`n`nTier: 1`n`nbody`n").Tier 'and the pre-table Tier: line'
 # ...and the heading those entries carry is not reported as a misspelling by anything that matches names.
 Assert-True ((Get-EntryRetiredSectionHeadings) -contains 'Who is this for') "the retired section heading is recognised, so 24 existing entries are not accused of a typo"
+
+Write-Host "'N/A' is a tier declaring it reaches nobody" -ForegroundColor Cyan
+# THE ASSERT THE WHOLE AUGUST 7 CHANGE RESTS ON. All three tiers are always in the document, so their
+# PRESENCE says nothing about reach -- the answer inside does. Counting a section rather than its answer
+# would file every entry as tier 2 and publish repo-internal work to consumers.
+$naLabel = Get-EntryScoreNotApplicable
+$naEntry = "### Significance`n`n#### Tier 0`n`nmatters here`n`n**Score:** 3`n`n" +
+           "#### Tier 1`n`nno colleague can observe it`n`n**Score:** $naLabel`n`n" +
+           "#### Tier 2`n`nand no consumer either`n`n**Score:** $naLabel`n"
+$naImpact = Resolve-EntryImpact -EntryText $naEntry
+Assert-Equal 0 $naImpact.Tier "N/A: the reach is the highest SCORED tier, not the highest section present"
+Assert-Equal $true $naImpact.Declared 'N/A: and the entry has still declared itself -- that is a decision, not a silence'
+Assert-Equal 3 @($naImpact.Rows).Count 'N/A: all three rows are read'
+Assert-Equal 0 @($naImpact.Errors).Count 'N/A: and none of them is an error -- N/A is a valid answer, not a malformed score'
+Assert-Equal $true ([bool](@($naImpact.Rows | Where-Object { $_.Tier -eq 2 })[0].NotApplicable)) 'N/A: the row carries the flag, so a caller can tell it from an unanswered one'
+Assert-Equal 0 @(Get-EntryImpactFindings -EntryText $naEntry).Count 'N/A: a fully answered entry has nothing outstanding'
+
+# AN UNANSWERED TIER IS NOT AN N/A, and keeping those apart is the reason the flag exists at all. Both read
+# back as score 0; only one of them is a decision somebody made.
+$blankEntry = "### Significance`n`n#### Tier 0`n`nmatters here`n`n**Score:** 3`n`n#### Tier 1`n`nsomething`n`n**Score:**`n"
+$blankRow = @((Resolve-EntryImpact -EntryText $blankEntry).Rows | Where-Object { $_.Tier -eq 1 })[0]
+Assert-Equal $false ([bool]$blankRow.NotApplicable) 'blank: an unanswered score is NOT flagged as N/A'
+Assert-Equal 0 ([int]$blankRow.Score) 'blank: and reads as 0, the fail-safe direction'
+
+# THE LADDER STILL CANNOT BE SKIPPED, and N/A is the new way to try it: tier 1 declaring it reaches nobody
+# while tier 2 is scored says a change consumers notice gives this project's colleagues nothing.
+$skipEntry = "### Significance`n`n#### Tier 0`n`na`n`n**Score:** 2`n`n#### Tier 1`n`nb`n`n**Score:** $naLabel`n`n#### Tier 2`n`nc`n`n**Score:** 4`n"
+$skipFindings = @(Get-EntryImpactFindings -EntryText $skipEntry)
+Assert-True ($skipFindings.Count -gt 0) 'ladder: N/A under a scored tier is refused'
+Assert-True (@($skipFindings -match 'cumulative').Count -gt 0) 'ladder: and the refusal names the reason rather than asking for a number'
+
+# A score the rubric has no meaning for is still an error, and the message now offers N/A as the other
+# legitimate answer -- a gate that says "write 1 to 5" at somebody who meant "this reaches nobody" is
+# asking them to invent a number.
+$badNa = Resolve-EntryImpact -EntryText "### Significance`n`n#### Tier 1`n`nwhy`n`n**Score:** nvt`n"
+Assert-True (@($badNa.Errors).Count -gt 0) 'a score that is neither a number nor N/A is reported'
+Assert-True (@($badNa.Errors -match [regex]::Escape($naLabel)).Count -gt 0) 'and the message names N/A as the other way to answer'
 
 Write-Host "A malformed section is reported rather than absorbed" -ForegroundColor Cyan
 $badTier = "### Significance`n`n#### Tier two`n`nwhy`n`nScore: 3`n"

@@ -56,9 +56,9 @@ prompts for what the change does, and nothing else.
 what makes it pasteable in one go. Its heading names the **branch** (`` ## `feat/x` changelog ``), which is
 also how the fold finds the PR, and the human-readable name of the change is its first section.
 
-**Every field is a heading with a guidance comment under it**, and you write underneath. The comments are
-stripped by the fold, so leaving them standing costs the changelog nothing and there is nothing to tidy
-before the PR. Six sections, three of them filled in for you:
+**The file is bare** — headings and the space under them. The guidance for each field lives in the copies
+under `branch/templates/`, which is what those copies are for: the file you type in is the questions and
+your answers, and the reference is one directory away. Six sections, three of them filled in for you:
 
 ```text
 ## `<your branch>` changelog
@@ -81,15 +81,21 @@ kept on the line — that third mark exists so nobody is ever pushed into tickin
 not do. There is no `-Force`. Full convention and reasoning: the `open-pr` skill, and the source repo's
 [`branch/README.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/branch/README.md).
 
-## The entry declares its Significance, scaffolded at tier 0
+## The entry declares its Significance, one section per tier
 
-Under `### Significance` the entry gets one `#### Tier N` sub-section per reach it claims, starting with
-tier 0 alone:
+Under `### Significance` the entry gets a `#### Tier N` sub-section for each of the three reaches, each
+waiting for a reason and a score:
 
 ```text
 #### Tier 0
 
-<!-- why the change matters AT THIS REACH specifically -->
+**Score:**
+
+#### Tier 1
+
+**Score:**
+
+#### Tier 2
 
 **Score:**
 ```
@@ -115,11 +121,14 @@ produced. Score it 1 to 5 against this rubric:
 | `2` | small; noticed if somebody points it out |
 | `1` | cosmetic or preventative -- nothing changes for them today |
 
-**Raising the reach is adding a section, and every section needs a reason and a score.** The ladder is
-cumulative: a change consumers notice is also a change this project's colleagues get something out of, so a
-tier-2 entry owes a tier-1 section too. Each is one document's reader answering their own question.
-Tier 1 and Tier 2 arrive **commented out**, each behind its own `<!-- UNCOMMENT … -->` line — delete the
-first to bring Tier 1 in, and Tier 2 stays commented until you delete its own.
+**All three tiers are in the file, and each one is answered.** Where the change reaches nobody, write
+`N/A` in the score and say in one line why -- that is an answer rather than a gap, and it is what lets a
+gate tell "reaches no consumer" from "nobody has got to tier 2 yet". **The reach is the highest tier
+carrying a number.**
+
+**Every tier needs a reason, `N/A` ones included, and the ladder cannot be skipped.** It is cumulative: a
+change consumers notice is also a change this project's colleagues get something out of, so `N/A` at tier 1
+under a scored tier 2 is refused by name.
 
 ```text
 #### Tier 1
@@ -173,14 +182,14 @@ entry unreadable to your own fold.
 Two optional parameters cover the "start now, continue later (maybe on another device)" case:
 
 - **`-Intent "<what is next / where I left off>"`** -- recorded in **`branch-progress.md`**, under
-  its "where I left off" section. Omit it and that section carries its guidance comment alone, so the
-  question is still standing when you come back.
+  its "where I left off" section. Omit it and that section is simply left empty for you.
   **It deliberately does not touch the entry.** An intent is a status, and the entry's text folds
   verbatim into `CHANGELOG.md` -- this repo measured three released entries that shipped a progress
   note that way. The entry's body is left empty, and the PR gate keeps refusing it until somebody
   writes what the change does.
-  **The prose in these files is repo-owned.** The guidance comments, the section headings, the routing
-  questions and the rubric can all be set from your own `scripts/repo-config.ps1`
+  **The prose in these files is repo-owned.** The guidance comments (which reach the templates rather
+  than the working files), the section headings, the routing questions and the rubric can all be set from
+  your own `scripts/repo-config.ps1`
   (`Get-EntryGuidanceOverrides`, `Get-EntrySectionHeadingOverrides`,
   `Get-EntrySignificanceWordingOverrides`, `Get-EntrySignificanceRubricLevels`,
   `Get-BranchFileWordingOverrides`), along with the type an unknown prefix falls back to

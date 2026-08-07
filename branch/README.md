@@ -27,39 +27,15 @@ They mark their own heading **`(template)`**, and that is not decoration. A writ
 now open with the same `##`, which is the signature the fold and the lint use to tell an entry from any
 other markdown — so the marker is what keeps a template from ever being read as somebody's work.
 
-## The entry template
+## branch-changelog
 
 `new-branch` already writes this shape into `branch-changelog.md`, so on a fresh branch you are filling
-in a form rather than starting from a blank page. Every field is a **heading with an HTML comment under
-it** saying what a good answer looks like; you write underneath. The comments are stripped by the fold, so
-leaving them standing costs the changelog nothing and there is nothing to tidy before the PR:
+in a form rather than starting from a blank page.
 
-```markdown
-## `<prefix>/<short-name>` changelog
-
-### Branch description
-<!-- Short description of branch-->
-
-### Branch ID
-<!--unique ID for branch like a timestamp of the moment this branch is created-->
-
-### Branch type
-<!-- options for type are: feat, fix or docs-->
-
-### What does the change on this branch bring to main?
-<!-- what the change DOES, for whoever reads CHANGELOG.md later -->
-
-### Significance
-
-#### Tier 0
-
-<!-- why it matters to this repo's own developers -->
-
-**Score:**
-
-### Pull Request
-<!-- filled in by the fold, from the merge itself -->
-```
+**The file it writes is bare** — the headings, the three fields it fills in itself, and nothing else. The
+guidance lives in [`templates/`](templates/), where every field carries an HTML comment saying what a good
+answer looks like. That is what those copies are for: the file you type in is the questions and your
+answers, and the reference is one directory away.
 
 **Three of those fields are filled in for you.** `new-branch` writes the heading, the **Branch ID** (a
 timestamp taken when the branch is created) and the **Branch type** (the prefix of the branch name). The
@@ -70,24 +46,28 @@ they say so. What is left for you is the description, the body, and the Signific
 changelog` is what this file is, and *what changed* is the first section under it. Both branch files carry
 that heading, which is also how the fold finds the branch it needs to look the PR up by.
 
-**Work down the tiers, and stop where the answer is no.** Tier 0 can always be filled in — every change
-matters to the people who maintain this repo, if only a little. Each section ends by asking whether there
-is a next one:
+**All three tiers are in the file, and each one is answered.** Tier 0 can always be filled in — every
+change matters to the people who maintain this repo, if only a little. For the two above it, the answer may
+well be *"this reaches nobody here"*, and you say so:
 
-| section | who notices | add it when |
+| section | who notices | answer it with |
 |---|---|---|
-| `#### Tier 0` | this repo's own developers | always |
-| `#### Tier 1` | colleagues and employers | the change gives the project something, not just the code |
-| `#### Tier 2` | the people who consume this product | a consumer would notice |
+| `#### Tier 0` | this repo's own developers | a score, always |
+| `#### Tier 1` | colleagues and employers | a score, or `N/A` if the project gets nothing out of it |
+| `#### Tier 2` | customers and users | a score, or `N/A` if no consumer would notice |
 
 Each section carries **why it matters at that reach**, then **`**Score:** N`** — 1 to 5 against the rubric
 `new-branch` prints when it writes the file. The tier decides which release documents the entry appears
 in; the score decides where in each of them it sits.
 
-Tier 1 and Tier 2 are in the template **commented out**, each behind its own `<!-- UNCOMMENT … -->` line.
-Delete the first line to bring Tier 1 into the document; Tier 2 has a marker of its own, so it stays
-commented until you delete that one too. The tiers come out one at a time, in order, with nothing else to
-edit.
+**`N/A` needs its reason too**, and that is the point of answering rather than leaving a blank: *"no
+consumer can observe this at all"* is information, and it survives into the record. A blank cannot say
+that — it means both "reaches nobody" and "nobody has got to this yet", and the gate has to be able to tell
+those apart. **The reach is the highest tier with a number**, so an `N/A` costs nothing but a sentence.
+
+**The ladder cannot be skipped.** `N/A` at tier 1 with a score at tier 2 says a change consumers notice
+gives this project's colleagues nothing; `open-pr` refuses that by name rather than asking you for a
+number.
 
 **Four things about this shape, each of which someone has got wrong before:**
 
@@ -147,17 +127,31 @@ A dead link in the largest body of prose this repo ships is now caught before it
 
 **Score:** 3
 
+#### Tier 2
+
+Nobody outside this repo can observe a lint rule.
+
+**Score:** N/A
+
 ### Pull Request
 
-<!-- the fold writes this line -->
+[PR #123](https://github.com/DaveKJohn/claude-code-specialists/pull/123) · merged 2026-08-06
 ```
 
-The guidance comments are gone from that example because it is shown **as the fold leaves it** — comments
-stripped, the PR line written in. What you edit still has them.
+That entry reaches tier 1: the lint rule gives the project something, and tier 2 says out loud that no
+consumer can see it. **`N/A` is an answer, not a gap** — which is the whole reason the tiers are all in the
+file rather than added when claimed. The `### Pull Request` line is shown filled in because that is how the
+fold leaves it; while you are writing, that section is empty.
 
-That entry stops at tier 1: nobody outside this repo notices a lint rule, so there is no `#### Tier 2`
-and its absence *is* the answer. That is why this replaced a table — a missing row read as an omission,
-a missing section reads as a decision.
+## branch-progress
+
+The step list is yours. It is never folded and never travels anywhere, so it may hold whatever helps you
+pick the branch back up — notes, links, a scratch list. Two things in it are read by scripts: **the branch
+name in the heading**, which is how the fold finds the PR, and **the step marks under `### Steps`**.
+
+It opens with the same three fields the entry does — description, ID and type, with the same ID — because
+the two files are one pair and say so. `new-branch` fills those in, and scaffolds one open step so the gate
+below has something to refuse.
 
 ## Why two files and not one
 
@@ -234,9 +228,10 @@ does, so the lint's entry check excludes it **by path**. It is not an entry, and
    teaches people to tick boxes for work they did not do, and then reports success — worse than no gate.
    A dropped step keeps its line and its reason, which is the half worth reading later. **There is no
    `-Force` for this gate**; the dropped mark already is the way past a step that should not be done.
-   The three marks are *shown* in the Steps guidance comment, and the gate does not read them there — it
-   strips comments before it counts, exactly as it already ignored them inside a fence. Otherwise a fresh
-   branch would report four open steps: its own, plus the three the form uses to explain itself.
+   The three marks are *shown* in the template's Steps guidance, and the gate does not read them there — it
+   strips comments before it counts, exactly as it already ignored them inside a fence. Without that, a
+   branch created from the template by hand would report four open steps: its own, plus the three the form
+   uses to explain itself.
 4. **A step still carrying the scaffold's own placeholder is refused, ticked or not.** Ticking the
    scaffolded first step without replacing it reports a plan as finished that was never written. The
    template shows the Steps section **empty** — an example whose first line is somebody else's TODO gets
@@ -253,8 +248,8 @@ does, so the lint's entry check excludes it **by path**. It is not an entry, and
 [`scripts/release/fold-changelog-entry.ps1`](../scripts/release/fold-changelog-entry.ps1), run on `main`
 right after the merge:
 
-1. **strips the guidance comments** — they are the form, not the answer, and this is what makes them safe
-   to leave standing while you write;
+1. **strips any HTML comments** — the scaffolder writes none, but a branch created before that, or one
+   pasted from a template, carries them, and they are the form rather than the answer;
 2. inserts the entry into `CHANGELOG.md` at its ranked position (furthest reach first, highest
    significance first within a tier), with the PR link and merge date written into `### Pull Request`;
 3. **resets both files** to the empty state you see on the trunk;

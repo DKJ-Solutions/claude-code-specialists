@@ -29,20 +29,31 @@ already **measured** empty fields instead of matching placeholder prose, so it i
 its comment stripper: every branch in flight, here and in every consumer, carries comments right now, and
 they meet these scripts through a plugin update rather than by choosing to.
 
+**And the tier model changed with it.** All three tiers are now written into every entry instead of tier 1
+and 2 arriving commented out, and a tier the change does not reach is **answered** -- `**Score:** N/A` with
+a line saying why -- rather than left out. The reason is the same one behind the bare files: an absent
+section and an unfinished one look identical, so no gate could tell *"this reaches no consumer"* from
+*"nobody has got to tier 2 yet"*, and those need opposite responses. **The reach is now the highest tier
+carrying a number**, where it used to be the highest tier with a section -- without that, every entry would
+have read as tier 2 and repo-internal work would have been published to consumers. A `Yes/No` field was
+drafted alongside the score and dropped: a score and a yes are one fact, free to contradict each other.
+
 ### Significance
 
 #### Tier 0
 
-The file you actually type in is now the questions and your answers, with the reference one directory away.
+The file you actually type in is now the questions and your answers, with the reference one directory away
+-- and an unreached tier states its reason instead of vanishing, so a negative claim survives into the
+record rather than being thrown away.
 
 **Score:** 3
 
 #### Tier 1
 
-It reverses a decision from the day before -- the routing questions were added so an author who stops at
-tier 0 has decided there is nothing above it rather than never having been asked. Weighed against both
-shapes side by side and chosen deliberately: the ladder is learned from the template and `CONTRIBUTING.md`
-now, rather than from the file in front of you.
+Two decisions from the day before are reversed here, both deliberately and both after being shown side by
+side: the routing questions leave the working file, and an unreached tier is answered rather than absent.
+The first has a cost worth naming -- the ladder is learned from the template and `CONTRIBUTING.md` now,
+not from the file in front of you. The second removes one: a blank no longer has to mean two things.
 
 **Score:** 3
 

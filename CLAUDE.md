@@ -329,8 +329,8 @@ The constitution above, concretely implemented here:
      **reaches**, and therefore which document it appears in. A significance score says how much it
      **weighs** for that document's reader, and therefore **where in it** the entry sits — so the most
      consequential change leads instead of sitting third under whichever heading its branch prefix produced.
-     Both are declared under **`### Significance`**, one `#### Tier N` sub-section per reach the change
-     claims, each carrying why it matters there and then its score:
+     Both are declared under **`### Significance`**, one `#### Tier N` sub-section per reach the model has,
+     each carrying why it matters there and then its score:
 
      ```text
      #### Tier 0
@@ -339,17 +339,32 @@ The constitution above, concretely implemented here:
 
      **Score:** 4
 
-     <!--
-          Is this change also relevant to colleagues and employers? Then continue to Tier 1.
-          If not, stop here and move on to the next section.
-     -->
+     #### Tier 1
+
+     Nobody but this repo's own developers can observe it.
+
+     **Score:** N/A
      ```
 
-     **The score label is bold and the routing question is a comment** (Dave, August 6, 2026). `Score:` sat
-     as bare prose in a section that is otherwise all prose, so it did not read as the field it is. The
-     question moved into a comment for the reason all the form text did: it is asked of the author, not of
-     the reader of the record. Both are **read in either form** — plain `Score:` and the pre-comment
-     question alike — because `CHANGELOG.md` and every consumer's tree are full of entries carrying them.
+     **The score label is bold** (Dave, August 6, 2026). `Score:` sat as bare prose in a section that is
+     otherwise all prose, so it did not read as the field it is. The plain form is still **read**, because
+     `CHANGELOG.md` and every consumer's tree are full of entries carrying it.
+
+     **All three tiers are always present, and `N/A` is how one says it reaches nobody** (Dave, August 7,
+     2026). Tier 1 and tier 2 used to be commented out, and uncommenting one *was* the claim — so an
+     unreached tier and an unfinished one looked identical, and no gate could tell "this reaches no
+     consumer" from "nobody got to tier 2 yet". Each tier is answered now: a score, or `N/A` with a line
+     saying why. **The reach is the highest tier carrying a number**, so an `N/A` costs a sentence and
+     nothing else — and the reasoning behind a *negative* claim survives into the record, which the
+     absence model threw away. A `Yes/No` field was drafted alongside the score the same day and dropped:
+     a score and a yes are one fact, free to contradict each other.
+
+     **The scaffolded working files carry no comments at all** (Dave, August 7, 2026). Guidance is written
+     only into `branch/templates/`, which is what those copies are for; the file a branch gets is the
+     headings and the space under them. The routing questions went with the guidance — the trade being
+     that the ladder is now learned from the template and this document rather than from the file in front
+     of you. The fold keeps its comment stripper regardless: every branch in flight carries comments, and
+     they reach the new scripts through a plugin update rather than by choosing to.
 
      **SUB-SECTIONS RATHER THAN A TABLE** (Dave, August 6, 2026), which replaced the impact table that had
      itself replaced the `Tier: N` line the day before. The table forced a rectangle onto something that is

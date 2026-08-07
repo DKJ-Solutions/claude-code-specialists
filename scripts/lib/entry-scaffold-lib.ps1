@@ -510,9 +510,33 @@ $script:EntryTierSubPrefix  = 'Tier'
 $script:EntryScoreKey       = 'Score'
 $script:EntryScoreLabel     = '**Score:**'
 
+# ALL THREE TIERS ARE ALWAYS IN THE DOCUMENT, AND 'N/A' IS HOW A TIER SAYS IT IS NOT REACHED (Dave,
+# August 7, 2026). This replaces "the sections an entry has ARE the documents it appears in": tier 1 and
+# tier 2 used to be commented out and uncommenting one was the claim. They are now always present, each
+# answered -- a score from the rubric, or 'N/A' with a line saying why the change reaches nobody there.
+#
+# WHY THE ANSWER IS BETTER THAN THE ABSENCE, which is the whole trade. An absent section and an unfinished
+# one look identical, so the gate could not tell "this change reaches no consumer" from "nobody has got to
+# tier 2 yet" -- and those need opposite responses. An N/A with a reason is a decision on the page; a blank
+# is a question nobody answered. It also leaves the reasoning behind a NEGATIVE claim in the record, which
+# the absence model threw away entirely.
+#
+# A 'Yes/No' FIELD WAS WEIGHED AND DROPPED the same day. Dave's own draft carried
+# '**Significant to this tier as well?** Yes/No | **Score:**', and it says the reach twice: a score and a
+# yes are one fact, free to contradict each other, which is the drift this file exists to prevent. The
+# score alone answers it -- a number means yes, N/A means no.
+$script:EntryScoreNotApplicable = 'N/A'
+
 function Get-EntryScoreLabel {
     <# The label a WRITER puts on the score line ('**Score:**'). #>
     return $script:EntryScoreLabel
+}
+
+function Get-EntryScoreNotApplicable {
+    <# The literal a tier writes when the change does not reach it ('N/A'). Machine-read by four scripts,
+       so it is stated once and is deliberately NOT repo-configurable -- the same class as 'Tier' and
+       'Plugins:'. A repo that translated it would make its own entries unreadable to its own fold. #>
+    return $script:EntryScoreNotApplicable
 }
 
 function Get-EntryScorePattern {
@@ -537,13 +561,17 @@ $script:EntrySignificanceWordingDefaults = [ordered]@{
     # form -- see Format-EntryGuidanceComment. A single long string produced one 130-column line in a file
     # whose every other comment line stops around 78, which is exactly the sort of difference that gets
     # "tidied" by hand and then reported as template drift by the lint. The break is stated here, once.
+    # THE 'IF NOT' HALF NAMES AN ACTION NOW (Dave, August 7, 2026). It used to say "stop here", then
+    # briefly "leave tier 1 and 2 empty" -- and that second wording contradicted the tier guidance below,
+    # which asked for a reason and an N/A. One instruction per case: an unreached tier is ANSWERED, because
+    # a blank cannot be told apart from an unfinished one and the gate has to tell those apart.
     Route0 = @(
         'Is this change also relevant to colleagues and employers? Then continue to Tier 1.',
-        'If not, stop here and move on to the next section.'
+        'If not, say so there in one line and put N/A in its Score.'
     )
     Route1 = @(
-        'Is this change also relevant to the people who consume this product? Then',
-        'continue to Tier 2. If not, stop here and move on to the next section.'
+        'Is this change also relevant to customers and users? Then continue to Tier 2.',
+        'If not, say so there in one line and put N/A in its Score.'
     )
     # The two openers of the template's commented-out tiers. Template-only prose, kept beside the questions
     # they follow rather than inside Add-TemplateTierPrompt, so a repo that translates the form translates
@@ -598,6 +626,16 @@ $script:EntryGuidanceDefaults = [ordered]@{
         'Why the change matters AT THIS REACH specifically. A reason that would read the',
         'same under every tier is a sign the tier is wrong. Then Score: 1-5 against the',
         'rubric new-branch printed when it wrote this file.'
+    )
+    # TIER 0 IS THE ONE TIER THAT IS ALWAYS REACHED -- every change matters to the people maintaining this
+    # repo, if only a little -- so it is the only one with no N/A to offer. Tiers 1 and 2 get the extra
+    # paragraph, which is why this is a second block rather than a longer version of the one above.
+    TierOptional = @(
+        'Why the change matters AT THIS REACH specifically. A reason that would read the',
+        'same under every tier is a sign the tier is wrong. Then Score: 1-5 against the',
+        'rubric new-branch printed when it wrote this file.',
+        '',
+        'If it has no significance at this reach at all, then explain shortly why and insert N/A in Score.'
     )
 }
 
@@ -786,9 +824,16 @@ function Format-EntrySignificanceSections {
     # reader meets the trade rather than only the result.
     $routes = if ($WithGuidance) { @{ 0 = $w.Route0; 1 = $w.Route1 } } else { @{} }
 
+    # EVERY TIER IS WRITTEN, ALWAYS (Dave, August 7, 2026). The scaffold used to emit tier 0 alone, with 1
+    # and 2 offered as a commented-out block to uncomment. All three are sections now and each is answered
+    # -- a score, or 'N/A' with a line saying why the change reaches nobody there. A caller passing rows
+    # (a migration, a rewrite) gets exactly its own rows back, so nothing invents a tier for an entry that
+    # was written under the older model.
     $ordered = @(@($Rows) | Sort-Object -Property @{Expression = { [int]$_.Tier }; Descending = $false})
     if ($ordered.Count -eq 0) {
-        $ordered = @([pscustomobject]@{ Tier = 0; Score = 0; Why = '' })
+        $ordered = @(0..(Get-EntryTierMax) | ForEach-Object {
+            [pscustomobject]@{ Tier = $_; Score = 0; Why = '' }
+        })
     }
 
     $lines = New-Object System.Collections.Generic.List[string]
@@ -807,15 +852,25 @@ function Format-EntrySignificanceSections {
             foreach ($line in ([string]$row.Why -split '\r?\n')) { $lines.Add($line) }
             $lines.Add('')
         } elseif ($WithGuidance) {
-            foreach ($line in (Format-EntryGuidanceComment -Lines (Get-EntryGuidance).Tier)) { $lines.Add($line) }
-            if (@((Get-EntryGuidance).Tier).Count -gt 0) { $lines.Add('') }
+            # Tier 0 cannot be N/A -- see $script:EntryGuidanceDefaults.TierOptional -- so it gets the
+            # block without that paragraph, and every tier above it gets the one that offers the way out.
+            $g = Get-EntryGuidance
+            $block = if ($tier -eq 0) { @($g.Tier) } else { @($g.TierOptional) }
+            foreach ($line in (Format-EntryGuidanceComment -Lines $block)) { $lines.Add($line) }
+            if ($block.Count -gt 0) { $lines.Add('') }
         }
         # An unanswered section in a WORKING file is the heading, one blank line, and the score label -- the
         # blank is where the reason goes. Not two blanks: the guidance used to occupy that space, and leaving
         # its surrounding whitespace behind is the shape that reads as "something was deleted here".
-        # An unscored row writes the label with nothing after it -- a question left standing rather than a
-        # number nobody chose. Get-EntryImpactFindings is what refuses it before the PR.
-        $score = if ($row.PSObject.Properties['Score'] -and [int]$row.Score -gt 0) { ' ' + [string][int]$row.Score } else { '' }
+        # THREE THINGS THIS LINE CAN SAY, matching what the parser reads back: a number, 'N/A' for a tier
+        # the change reaches nobody at, or nothing at all -- a question left standing rather than a number
+        # nobody chose. Get-EntryImpactFindings is what refuses the third before the PR.
+        $score = ''
+        if ($row.PSObject.Properties['NotApplicable'] -and $row.NotApplicable) {
+            $score = ' ' + $script:EntryScoreNotApplicable
+        } elseif ($row.PSObject.Properties['Score'] -and [int]$row.Score -gt 0) {
+            $score = ' ' + [string][int]$row.Score
+        }
         $lines.Add($script:EntryScoreLabel + $score)
         # EVERY tier 0 and tier 1 section closes with it, including one that already has its successor
         # below it (Dave: "het kopje sluit altijd af met"). An earlier draft wrote it only under the last
@@ -1057,10 +1112,17 @@ function Read-EntryTierSections {
         }
         $seen[$tier] = $true
 
+        # THREE STATES, NOT TWO. A tier is scored (a number), declared unreached ('N/A'), or unanswered
+        # (nothing) -- and the last two must not collapse into one, because a blank is a question nobody
+        # answered while an N/A is a decision somebody made. NotApplicable carries that apart; Score stays 0
+        # for both so every existing caller that only reads the number keeps its fail-safe behaviour.
         $score = 0
+        $notApplicable = $false
         if ($scoreCell -and $scoreCell -ne $script:EntryImpactEmptyCell) {
-            if ($scoreCell -notmatch '^\d+$') {
-                $errs += "'$($script:EntryScoreLabel) $scoreCell' under tier $tier is not a number -- write $($range.Min) to $($range.Max)."
+            if ($scoreCell -eq $script:EntryScoreNotApplicable) {
+                $notApplicable = $true
+            } elseif ($scoreCell -notmatch '^\d+$') {
+                $errs += "'$($script:EntryScoreLabel) $scoreCell' under tier $tier is neither a number nor '$($script:EntryScoreNotApplicable)' -- write $($range.Min) to $($range.Max), or '$($script:EntryScoreNotApplicable)' with a line saying why the change reaches nobody there."
             } elseif ([int]$scoreCell -lt $range.Min -or [int]$scoreCell -gt $range.Max) {
                 $errs += "'$($script:EntryScoreLabel) $scoreCell' under tier $tier is outside the rubric -- write $($range.Min) to $($range.Max)."
             } else {
@@ -1092,11 +1154,12 @@ function Read-EntryTierSections {
         }) -join "`n").Trim()
 
         $rows.Add([pscustomobject]@{
-            Tier  = $tier
-            Score = $score
-            Why   = $why
-            Raw   = $raw
-            Error = $null
+            Tier          = $tier
+            Score         = $score
+            NotApplicable = $notApplicable
+            Why           = $why
+            Raw           = $raw
+            Error         = $null
         })
     }
 
@@ -1158,7 +1221,19 @@ function Resolve-EntryImpact {
         $declared = @($sections.Rows | Where-Object { $null -eq $_.Error })
         if ($declared.Count -gt 0) {
             $result.Declared = $true
-            $result.Tier = (@($declared | ForEach-Object { [int]$_.Tier }) | Measure-Object -Maximum).Maximum
+            # THE REACH IS THE HIGHEST TIER THAT IS ACTUALLY SCORED (Dave, August 7, 2026). It used to be
+            # the highest tier with a SECTION, which was right while tier 1 and 2 were commented out and
+            # uncommenting one was the claim. All three sections are always present now, so their presence
+            # says nothing -- an 'N/A' row is a tier explicitly declaring it reaches nobody, and counting it
+            # would file every entry as tier 2 and publish repo-internal work to consumers.
+            #
+            # An UNANSWERED row (no score, no N/A) does not count either, and that is the fail-safe
+            # direction: forgetting to answer under-promotes, which Get-EntryImpactFindings then reports by
+            # name, while the reverse would be silent and would reach people outside this repo.
+            $reaching = @($declared | Where-Object { -not $_.NotApplicable -and [int]$_.Score -gt 0 })
+            if ($reaching.Count -gt 0) {
+                $result.Tier = (@($reaching | ForEach-Object { [int]$_.Tier }) | Measure-Object -Maximum).Maximum
+            }
         }
         return $result
     }
@@ -1290,6 +1365,15 @@ function Get-EntryImpactFindings {
 
     for ($tier = 1; $tier -le $impact.Tier; $tier++) {
         $row = @(@($impact.Rows) | Where-Object { [int]$_.Tier -eq $tier })
+        # THE LADDER CANNOT BE SKIPPED, and 'N/A' is the new way to try (August 7, 2026). A tier declaring
+        # it reaches nobody, UNDER one that is scored, says a change consumers notice gives this project's
+        # colleagues nothing -- which is the half-claim the cumulative ladder exists to rule out. Reported
+        # as its own finding rather than as "no significance", because the author did answer: they answered
+        # something that cannot be true alongside the tier above it.
+        if ($row.Count -gt 0 -and $row[0].NotApplicable) {
+            $findings += "tier $tier says '$(Get-EntryScoreNotApplicable)' while tier $($impact.Tier) is scored -- the ladder is cumulative, so a change that reaches tier $($impact.Tier) reaches tier $tier too. Score it, or drop the claim at tier $($impact.Tier)."
+            continue
+        }
         if ($row.Count -eq 0) {
             # $($impact.Tier), not "$impact.Tier": the second interpolates the OBJECT and then appends the
             # literal '.Tier', so the message read "reaches tier @{Table=True; Rows=System.Object[]...}".
@@ -2698,78 +2782,6 @@ function Format-BranchProgressScaffold {
 $script:BranchTemplateDir         = 'branch/templates'
 $script:BranchTemplateBranchToken = '<prefix>/<short-name>'
 
-function Add-TemplateTierPrompt {
-    <#
-        Private, template-only: inserts the commented-out Tier 1 and Tier 2 blocks before the entry's last
-        section, so the template shows the WHOLE form while the scaffolded file still shows tier 0 alone.
-
-        THE TWO TIERS SIT IN ONE COMMENT, not one each, and that is HTML rather than a choice: comments do
-        not nest, so the first '-->' would close an outer block early. It costs the reader one thing --
-        uncommenting Tier 1 also uncomments Tier 2 -- which is why the block says so in its own first line.
-        The routing question between them is plain text inside that block for the same reason.
-
-        SCAFFOLDED FILES DO NOT GET THIS. There, a missing section IS the answer; the expansion exists so a
-        first-time reader can see what the other two look like without going and finding an example.
-    #>
-    # AllowEmptyString as well as AllowEmptyCollection: the input is a document split into lines, so most
-    # of it is blank ones, and a [string[]] without it rejects the whole call on the first. The same trap
-    # Get-FencedLineFlags and Read-EntryTierSections both document.
-    param([AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines = @())
-
-    $w      = Get-EntrySignificanceWording
-    $hashes = '#' * $script:EntryTierSubLevel
-    $score  = $script:EntryScoreLabel
-    # The indent Format-EntryGuidanceComment gives a comment body. Everything below is INSIDE a comment, so
-    # the guidance and the routing question appear as plain indented text: HTML comments do not nest, and a
-    # real '<!--' here would be closed by the first '-->' and take the rest of the block out of the comment
-    # with it.
-    $pad = '     '
-
-    $block = @('<!-- ' + $w.Uncomment1)
-    foreach ($tier in 1, 2) {
-        # EACH TIER OPENS ITS OWN COMMENT MARKER, and tier 2's is what makes the block usable in halves. The
-        # whole thing is one comment as written -- so deleting tier 1's opener alone would uncomment tier 2
-        # as well, which is precisely what a reader who stopped at tier 1 must not get. With tier 2 carrying
-        # a marker of its own, dropping the first line leaves a well-formed comment from tier 2's line to
-        # the closing '-->': the tiers come out one at a time, in order, with nothing else to edit.
-        if ($tier -eq 2) {
-            # The inner parentheses are load-bearing: the comma binds TIGHTER than '+', so
-            # @('', '<!-- ' + $w.Uncomment2) builds the array ('', '<!-- ') and then CONCATENATES the
-            # string onto it as a third element -- '<!-- ' alone on its line and the text below it. The
-            # same trap Format-EntryBlock documents, caught here by the byte-exact template check.
-            $block += @('', ('<!-- ' + $w.Uncomment2))
-        }
-        $block += @('', "$hashes $($script:EntryTierSubPrefix) $tier", '')
-        foreach ($line in @((Get-EntryGuidance).Tier)) { $block += $(if ($line) { $pad + $line } else { '' }) }
-        $block += @('', $score)
-        # Only tier 1 routes onward; tier 2 has no successor, exactly as in a written entry.
-        if ($tier -eq 1) {
-            $block += ''
-            foreach ($line in @($w.Route1)) { $block += $(if ($line) { $pad + $line } else { '' }) }
-        }
-    }
-    $block += @('', '-->')
-
-    # Inserted before the LAST section heading, which is 'Pull Request'. Found rather than assumed: the
-    # section order comes from Get-EntrySectionHeadings, and hardcoding an index here would put the block
-    # in the wrong place the day that order changes -- as it just did, when the dossier form retired the
-    # 'Type of change' section this used to search for and the block would have been appended at the end.
-    $lastKey = @((Get-EntrySectionHeadings).Keys)[-1]
-    $lastHeading = Get-EntrySectionHeading -Key $lastKey
-    $at = -1
-    for ($i = 0; $i -lt $Lines.Count; $i++) {
-        if ($Lines[$i] -eq $lastHeading) { $at = $i; break }
-    }
-    if ($at -lt 0) { return @($Lines) }
-
-    $out = New-Object System.Collections.Generic.List[string]
-    for ($i = 0; $i -lt $at; $i++) { $out.Add($Lines[$i]) }
-    foreach ($line in $block) { $out.Add($line) }
-    $out.Add('')
-    for ($i = $at; $i -lt $Lines.Count; $i++) { $out.Add($Lines[$i]) }
-    return @($out.ToArray())
-}
-
 function Get-BranchTemplates {
     <#
         The copy-paste templates under branch/template/, as objects with Path (repo-relative) and Content
@@ -2804,7 +2816,12 @@ function Get-BranchTemplates {
     # -Template is what carries the guidance comments AND the '(template)' marker -- see Format-EntryBlock.
     # These two calls are the only place in the system that passes it, which is the whole point: the
     # reference lives here, and the file a branch gets is the bare form.
-    $changelog = Add-TemplateTierPrompt -Lines (Format-EntryBlock -Branch $token -Template)
+    # RETIRED WITH THE COMMENTED-OUT TIERS (August 7, 2026): Add-TemplateTierPrompt used to splice a
+    # '<!-- UNCOMMENT Tier 1 ... -->' block in here, because the template showed the whole form while the
+    # scaffold showed tier 0 alone. All three tiers are real sections in both now -- the answer inside each
+    # is the claim, not its presence -- so there is nothing left to splice and the function is gone rather
+    # than left standing with no caller.
+    $changelog = Format-EntryBlock -Branch $token -Template
     $progress  = Format-BranchProgressScaffold -Branch $token -Template
     return @(
         [pscustomobject]@{
