@@ -177,6 +177,43 @@ Plugins: specialists
 
 ---
 
+## `fix/template-trailing-newline` changelog
+
+### Branch description
+
+The progress template ends with a newline
+
+### Branch ID
+
+20260807-091625
+
+### Branch type
+
+fix
+
+### What does the change on this branch bring to main?
+
+`branch/templates/branch_template_progress.md` ends with a newline. It had none: an accident of the editor
+the form was designed in, reproduced faithfully by `Get-BranchTemplates` while the hand-written templates
+were being treated as the spec for the shape. A file without a terminator is the one whose next diff shows
+a line nobody edited, and git says so on every one of them.
+
+### Significance
+
+#### Tier 0
+
+One byte, and it stops every future diff of that file carrying a phantom line.
+
+**Score:** 1
+
+### Pull Request
+
+Plugins: specialists
+
+[PR #499](https://github.com/DaveKJohn/claude-code-specialists/pull/499) · merged 2026-08-07
+
+---
+
 ## The v3.6.0 release documents: the internal note and the edited highlights
 
 ### What does this change do?
