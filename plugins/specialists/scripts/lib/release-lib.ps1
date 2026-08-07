@@ -186,12 +186,16 @@ function Test-ReleaseBumpEarned {
         THE RULES (Dave, August 5, 2026), and each answers a question the version number was already
         supposed to answer but nothing enforced:
 
-          any release   at least one entry of tier 1 or higher. A release consisting entirely of
-                        repo-internal work has nobody to announce it to -- and cutting one spends a
-                        version number, a tag and three documents on that.
-          minor         at least one TIER-2 entry. "A minor is cut when a consumer actually notices
-                        something" was already the written rule here; this makes the entries prove it,
-                        which also means the highlights document always has a reader by construction.
+          any release   nothing. A release made entirely of tier-0 work is a PATCH -- publishing to no
+                        audience is what a patch is for (Dave, August 7, 2026). This used to refuse
+                        outright, on the grounds that such a release "has nobody to announce it to";
+                        the answer is that it announces nothing, which is allowed.
+          minor         at least one entry of TIER 1 or higher -- something a colleague on this project
+                        or a consumer gets out of it. It used to demand a tier-2 entry, so tier-1 work
+                        earned only a patch. Loosened deliberately: the version here speaks to all
+                        stakeholders, not to consumers alone. What keeps it honest is that the DOCUMENTS
+                        follow the tier and not the bump -- a tier-1-only minor writes the internal note
+                        and no highlights, so nobody outside is handed an empty document.
           major         at least $MinMinorsForMajor minors cut in the current major line, on top of the
                         general minimum. A major is a RECAP of those minors, so what earns it is their
                         accumulation rather than any single pending change -- which is why a tier-2 entry
@@ -254,24 +258,37 @@ function Test-ReleaseBumpEarned {
 
     # What the pending set warrants, computed once and reported whether or not it matches what was asked
     # -- so a refusal can name the bump that WOULD work instead of only what will not.
+    # THE BUMP FOLLOWS THE HIGHEST TIER PENDING (Dave, August 7, 2026), and the rule is one sentence:
+    #
+    #   tier 0 only            -> patch. Nobody outside this repo notices, which is what a patch IS.
+    #   tier 1 or higher       -> minor. Something beyond this repo's own developers got something.
+    #
+    # TWO THINGS CHANGED HERE, AND BOTH LOOSEN THE LADDER BY ONE STEP.
+    #
+    # A TIER-0-ONLY RELEASE IS NOW ALLOWED, where it used to be refused outright ("nothing pending reaches
+    # beyond this repo... a release needs at least one tier-1 entry"). That refusal read the absence of an
+    # audience as a reason not to publish; Dave's answer is that publishing to no audience is precisely what
+    # a patch is for. The version still moves, the record is still written, and no announcement is owed.
+    #
+    # AND TIER 1 NOW EARNS A MINOR, where it used to earn a patch and a minor demanded tier 2. Weighed
+    # explicitly: it means a release can bump the minor with nothing in it for a consumer, which is the
+    # opposite of what a minor usually promises. Dave chose it knowing that -- the version speaks to ALL
+    # stakeholders here, colleagues included, not to consumers alone. What keeps that honest is that the
+    # DOCUMENTS still follow the tier rather than the bump: a tier-1-only release writes the internal note
+    # and no highlights, so nobody outside is handed a document with nothing in it. See the highlights
+    # trigger in cut-release.ps1, which keys on a tier-2 entry rather than on this bump type for exactly
+    # that reason.
     $result.MajorAvailable = ($minorsSoFar -ge $MinMinorsForMajor)
-    $result.EarnedBump = if ($notable -eq 0) {
-        $null
-    } elseif ($consumerFacing -gt 0) {
-        'minor'
-    } else {
-        'patch'
-    }
+    $result.EarnedBump = if ($notable -gt 0) { 'minor' } else { 'patch' }
 
+    # BOTH minor AND major, and that second one is a defect this file's own suite caught on the first run.
+    # The refusal was written for 'minor' alone, which let a MAJOR through on tier-0-only work -- a bigger
+    # claim than the one being refused beside it. A major recaps the minors behind it, but it still has to
+    # be a release, and a release of nothing but repo-internal work is a patch whatever its history.
     $tier0 = if ($counts.ContainsKey(0)) { $counts[0] } else { 0 }
-    if ($notable -eq 0) {
+    if (@('minor', 'major') -contains $BumpType -and $notable -eq 0) {
         $result.Earned = $false
-        $result.Reason = "nothing pending reaches beyond this repo: $tier0 entry/entries, all tier 0. A release needs at least one tier-1 entry (something a colleague on this project gets out of it) or a tier-2 one (something a consumer notices)."
-        return $result
-    }
-    if ($BumpType -eq 'minor' -and $consumerFacing -eq 0) {
-        $result.Earned = $false
-        $result.Reason = "a minor is what a consumer notices, and nothing pending is tier 2 ($notable tier-1 entry/entries, $tier0 tier-0). Cut a patch, or raise the tier of the entry that a consumer does notice."
+        $result.Reason = "a $BumpType is what somebody outside this repo's own developers gets something out of, and everything pending is tier 0 ($tier0 entry/entries). Cut a patch, or raise the tier of the entry that a colleague or a consumer does notice."
         return $result
     }
     if ($BumpType -eq 'major' -and $minorsSoFar -lt $MinMinorsForMajor) {

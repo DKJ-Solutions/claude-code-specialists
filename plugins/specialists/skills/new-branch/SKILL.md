@@ -156,7 +156,7 @@ Consumers must re-add the marketplace under its new name; installs break without
 
 **What it costs to leave it at tier 0.** Nothing breaks, which is exactly why it is worth knowing: where the
 repo's entries declare their impact at all, the release cut refuses a bump the entries have not earned -- a
-release needs at least one tier-1 entry, a minor needs a tier-2 one -- and it **also** refuses a release whose
+bump follows the highest tier pending (tier 0 only is a patch, tier 1 or higher earns a minor) -- and it **also** refuses a release whose
 tier-1-or-higher entries carry no significance, because an unscored entry cannot be placed. So an entry left at 0 is work that
 cannot carry a release on its own. `open-pr` prints what it read and names anything still unsettled, so you
 learn that before the PR rather than at the cut.

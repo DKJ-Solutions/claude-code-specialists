@@ -451,11 +451,16 @@ The constitution above, concretely implemented here:
      **And a release now has to earn its bump.** `cut-release.ps1` refuses one that the pending entries do
      not justify, before it writes anything:
 
-     - **any release** needs at least one **tier-1** entry — a release made entirely of repo-internal work
-       has nobody to announce it to, and cutting one spends a version, a tag and three documents on that;
-     - a **minor** needs a **tier-2** entry. "A minor is cut when a consumer actually notices something"
-       was already the written rule; this makes the entries prove it, which also means the highlights
-       document always has a reader by construction;
+     - **the bump follows the highest tier pending** (Dave, August 7, 2026): **tier 0 only → patch**,
+       **tier 1 or higher → minor**. A release made entirely of repo-internal work used to be refused
+       outright, on the grounds that it "has nobody to announce it to" — the answer is that announcing
+       nothing is exactly what a patch is for. And a minor used to demand a **tier-2** entry, so tier-1
+       work earned only a patch;
+     - **the audience of each note follows the TIER, not the bump**, and that is what keeps the looser
+       rule honest. A tier-1-only minor writes the internal note and **no highlights**, so nobody outside
+       is handed a document about work they cannot see. `cut-release.ps1` keys the highlights on a tier-2
+       entry being present rather than on the bump type — a condition that was belt-and-braces while a
+       minor required tier 2, and is now the whole mechanism;
      - a **major** needs **10 minors** in the current major line, on top of that minimum. A major is a
        *recap* — which is what both of this repo's majors already were — so what earns it is the
        accumulation, not any single pending change. `Get-ReleaseMajorMinMinors` owns the number.

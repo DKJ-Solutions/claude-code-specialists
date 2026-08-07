@@ -252,10 +252,19 @@ not "did the marker put this in the wrong half", but "did whoever wrote this ent
 A tier that is wrong is now a one-line edit on the branch, or a section move on `main` after the merge.
 
 **And a release now has to earn its bump, so Rendall no longer decides whether a version number is
-justified — the entries do.** `cut-release.ps1` refuses a release with no tier-1 entry, a minor with no
-tier-2 entry, and a major with fewer than 10 minors behind it (`Get-ReleaseMajorMinMinors`), all before it
-writes anything. The rule "a minor is cut when a consumer actually notices something" was already written
-here; it is now enforced, which also means a release that earned a minor always has a highlights reader.
+justified — the entries do.** `cut-release.ps1` refuses a bump the pending entries have not earned, before
+it writes anything.
+
+**The bump follows the highest tier pending** (Dave, August 7, 2026): **tier 0 only → patch**, **tier 1 or
+higher → minor**, and a **major** additionally needs 10 minors in the current major line
+(`Get-ReleaseMajorMinMinors`). Both of the first two loosened that day. A release made entirely of
+repo-internal work used to be refused outright — the answer is that announcing nothing is precisely what a
+patch is for. And a minor used to demand a tier-2 entry, so tier-1 work earned only a patch.
+
+**What keeps the looser rule honest is that the documents follow the TIER, not the bump.** A tier-1-only
+minor writes the internal note and no highlights, because the highlights condition asks for a tier-2 entry
+rather than for a bump type. So a consumer is never handed a document about work they cannot see, even
+though their version number moved.
 `-SkipTierGate` overrules it and should be a conversation, not a habit: the refusal names the bump the
 pending work *does* earn, and taking that is nearly always the right move.
 
