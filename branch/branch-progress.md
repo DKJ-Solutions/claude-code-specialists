@@ -1,20 +1,13 @@
-## `docs/score-1-names-what-it-prevents` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] Reword band 1 in `Get-EntrySignificanceRubricDefaults` so it asks for the prevented failure
-- [x] The places that quote the band verbatim: `CONTRIBUTING.md`, the `new-branch` skill, the contract's default summary
-- [x] Record WHY a `tier0 < tier1` gate was rejected, where the next person would go looking for it
-- [x] Mirrors, lint, suites
-
-### Where I left off
-
-Lint 0 findings, all 26 suites green, script contract 0 errors.
-
-Worth carrying forward: **no suite asserts the band texts**, deliberately left that way. A test pinning the
-wording would fail on every deliberate retune and prove nothing about behaviour -- the rubric is prose the
-gates print, not a value they branch on. What IS worth guarding is the shape (five bands, 1 to 5), and
-`Get-EntrySignificanceRange` already has that covered.
-
-Next in the queue: #507 (parking: one goal, two mechanisms -- note the rename is consumer-visible), then
-#508, #512, #456.
+_(filled in when a branch is created)_
