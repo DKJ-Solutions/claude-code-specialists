@@ -14,74 +14,6 @@ but tier 0 is a changelog with no release in it yet.
 
 ---
 
-## `feat/branch-file-form` changelog
-
-### Branch description
-
-The branch files take the form Dave designed
-
-### Branch ID
-
-20260807-000213
-
-### Branch type
-
-feat
-
-### What does the change on this branch bring to main?
-
-The two files a branch works in now carry the form Dave designed, and `branch/templates/` holds it as the
-spec rather than as a copy: the generator reproduces both files **byte for byte**, so they were never
-edited to match the code. The entry became the branch's own dossier -- the heading names the branch, and
-six sections carry the description, a creation timestamp, the type, what the change brings to `main`, the
-Significance sub-sections and a `Pull Request` section the fold fills from the merge.
-
-Every field is now a heading with a guidance comment above an empty space, which retired the last visible
-`TODO:`. So the scaffold gate stopped matching prose and started **measuring**: it refuses an entry whose
-description, body or any tier's reason is empty once the comments are stripped -- strictly more than the
-strings caught, because it also catches a placeholder deleted rather than answered. Every older shape is
-still read: the retired section headings, the plain `Score:`, the one-line routing questions and the
-`Tier: N` line.
-
-Three defects surfaced while wiring it, each found by a check rather than by a report. The fold never
-called the comment stripper written for it, so every guidance block would have folded into `CHANGELOG.md`
-verbatim. The step gate read the three example marks out of its own guidance comment, reporting four open
-steps on a fresh branch -- three of which no one could resolve, since they return with the next scaffold.
-And `Resolve-EntryType` took the first line of its section, which is now the hint, so every new entry
-declared its type to be `<!-- options for type are: feat, fix or docs-->`.
-
-### Significance
-
-#### Tier 0
-
-Filling either branch file is now a form with the guidance beside each box, and the three defects above
-would each have reached `main` silently.
-
-**Score:** 4
-
-#### Tier 1
-
-Every branch in this project starts from these two files, so the shape is the first thing anyone working
-here meets -- and the gates that read it decide what a release can be cut from.
-
-**Score:** 3
-
-#### Tier 2
-
-The scaffolder and the gates are plugin-carried, so a consumer's next `new-branch` writes this form
-whether or not they went looking for it. Nothing they already have breaks -- every older shape is still
-read, deliberately -- but the file they open on their next branch looks different.
-
-**Score:** 4
-
-### Pull Request
-
-Plugins: specialists
-
-[PR #498](https://github.com/DaveKJohn/claude-code-specialists/pull/498) · merged 2026-08-07
-
----
-
 ## `feat/scaffold-without-comments` changelog
 
 ### Branch description
@@ -159,6 +91,165 @@ still carry the full reference, and everything they already have keeps working.
 Plugins: specialists
 
 [PR #501](https://github.com/DaveKJohn/claude-code-specialists/pull/501) · merged 2026-08-07
+
+---
+
+## `docs/branch-name-rule-why` changelog
+
+### Branch description
+
+The branch-name rule records why it exists
+
+### Branch ID
+
+20260807-100032
+
+### Branch type
+
+docs
+
+### What does the change on this branch bring to main?
+
+`Test-BranchName` refuses a branch name containing `final`, and now records **why** and **what to do
+instead**. The rule is Dave's — *"je weet nooit zeker of iets echt final is"* — so a name claiming to be
+the last word is a prediction, and a wrong one forces the next round to be called `final-2`. The remedy is
+a version suffix (`fix/template-newline-v2`), which makes no such claim.
+
+The refusal message says so too. It used to be `"Branch name must not contain the token 'final'."` and
+nothing else, so the obvious next guess was `finished` or `done` — the same claim in a different word.
+
+The docstring also records that the **opposite** rule once existed, before anyone restores it: a `-v2`
+suffix used to be forbidden, because the fold looked an entry up by the exact branch name and a suffix
+broke both the match and the cleanup after it. The `branch/` split retired that — the fold reads the branch
+out of the document now — so nothing rejects `-v2`, deliberately.
+
+Attributed to Derek in that docstring until the reasoning was actually asked for, which is how a decision
+ends up looking like a habit somebody picked up.
+
+### Significance
+
+#### Tier 0
+
+A gate that only says "not that" gets guessed at; this one now answers the question it provokes, and the
+reasoning behind a hard rule is on the page instead of in one person's head.
+
+**Score:** 2
+
+#### Tier 1
+
+Anyone creating a branch here meets this refusal sooner or later, and the retired `-v2` prohibition is
+exactly the kind of dead rule a later reader reinstates in good faith.
+
+**Score:** 2
+
+### Pull Request
+
+[PR #500](https://github.com/DaveKJohn/claude-code-specialists/pull/500) · merged 2026-08-07
+
+---
+
+## `fix/template-trailing-newline` changelog
+
+### Branch description
+
+The progress template ends with a newline
+
+### Branch ID
+
+20260807-091625
+
+### Branch type
+
+fix
+
+### What does the change on this branch bring to main?
+
+`branch/templates/branch_template_progress.md` ends with a newline. It had none: an accident of the editor
+the form was designed in, reproduced faithfully by `Get-BranchTemplates` while the hand-written templates
+were being treated as the spec for the shape. A file without a terminator is the one whose next diff shows
+a line nobody edited, and git says so on every one of them.
+
+### Significance
+
+#### Tier 0
+
+One byte, and it stops every future diff of that file carrying a phantom line.
+
+**Score:** 1
+
+### Pull Request
+
+Plugins: specialists
+
+[PR #499](https://github.com/DaveKJohn/claude-code-specialists/pull/499) · merged 2026-08-07
+
+---
+
+## `feat/branch-file-form` changelog
+
+### Branch description
+
+The branch files take the form Dave designed
+
+### Branch ID
+
+20260807-000213
+
+### Branch type
+
+feat
+
+### What does the change on this branch bring to main?
+
+The two files a branch works in now carry the form Dave designed, and `branch/templates/` holds it as the
+spec rather than as a copy: the generator reproduces both files **byte for byte**, so they were never
+edited to match the code. The entry became the branch's own dossier -- the heading names the branch, and
+six sections carry the description, a creation timestamp, the type, what the change brings to `main`, the
+Significance sub-sections and a `Pull Request` section the fold fills from the merge.
+
+Every field is now a heading with a guidance comment above an empty space, which retired the last visible
+`TODO:`. So the scaffold gate stopped matching prose and started **measuring**: it refuses an entry whose
+description, body or any tier's reason is empty once the comments are stripped -- strictly more than the
+strings caught, because it also catches a placeholder deleted rather than answered. Every older shape is
+still read: the retired section headings, the plain `Score:`, the one-line routing questions and the
+`Tier: N` line.
+
+Three defects surfaced while wiring it, each found by a check rather than by a report. The fold never
+called the comment stripper written for it, so every guidance block would have folded into `CHANGELOG.md`
+verbatim. The step gate read the three example marks out of its own guidance comment, reporting four open
+steps on a fresh branch -- three of which no one could resolve, since they return with the next scaffold.
+And `Resolve-EntryType` took the first line of its section, which is now the hint, so every new entry
+declared its type to be `<!-- options for type are: feat, fix or docs-->`.
+
+### Significance
+
+#### Tier 0
+
+Filling either branch file is now a form with the guidance beside each box, and the three defects above
+would each have reached `main` silently.
+
+**Score:** 4
+
+#### Tier 1
+
+Every branch in this project starts from these two files, so the shape is the first thing anyone working
+here meets -- and the gates that read it decide what a release can be cut from.
+
+**Score:** 3
+
+#### Tier 2
+
+The scaffolder and the gates are plugin-carried, so a consumer's next `new-branch` writes this form
+whether or not they went looking for it. Nothing they already have breaks -- every older shape is still
+read, deliberately -- but the file they open on their next branch looks different.
+
+**Score:** 4
+
+### Pull Request
+
+Plugins: specialists
+
+[PR #498](https://github.com/DaveKJohn/claude-code-specialists/pull/498) · merged 2026-08-07
 
 ---
 
@@ -254,97 +345,6 @@ Feat
 Plugins: specialists
 
 [PR #496](https://github.com/DaveKJohn/claude-code-specialists/pull/496) · merged 2026-08-06
-
----
-
-## `docs/branch-name-rule-why` changelog
-
-### Branch description
-
-The branch-name rule records why it exists
-
-### Branch ID
-
-20260807-100032
-
-### Branch type
-
-docs
-
-### What does the change on this branch bring to main?
-
-`Test-BranchName` refuses a branch name containing `final`, and now records **why** and **what to do
-instead**. The rule is Dave's — *"je weet nooit zeker of iets echt final is"* — so a name claiming to be
-the last word is a prediction, and a wrong one forces the next round to be called `final-2`. The remedy is
-a version suffix (`fix/template-newline-v2`), which makes no such claim.
-
-The refusal message says so too. It used to be `"Branch name must not contain the token 'final'."` and
-nothing else, so the obvious next guess was `finished` or `done` — the same claim in a different word.
-
-The docstring also records that the **opposite** rule once existed, before anyone restores it: a `-v2`
-suffix used to be forbidden, because the fold looked an entry up by the exact branch name and a suffix
-broke both the match and the cleanup after it. The `branch/` split retired that — the fold reads the branch
-out of the document now — so nothing rejects `-v2`, deliberately.
-
-Attributed to Derek in that docstring until the reasoning was actually asked for, which is how a decision
-ends up looking like a habit somebody picked up.
-
-### Significance
-
-#### Tier 0
-
-A gate that only says "not that" gets guessed at; this one now answers the question it provokes, and the
-reasoning behind a hard rule is on the page instead of in one person's head.
-
-**Score:** 2
-
-#### Tier 1
-
-Anyone creating a branch here meets this refusal sooner or later, and the retired `-v2` prohibition is
-exactly the kind of dead rule a later reader reinstates in good faith.
-
-**Score:** 2
-
-### Pull Request
-
-[PR #500](https://github.com/DaveKJohn/claude-code-specialists/pull/500) · merged 2026-08-07
-
----
-
-## `fix/template-trailing-newline` changelog
-
-### Branch description
-
-The progress template ends with a newline
-
-### Branch ID
-
-20260807-091625
-
-### Branch type
-
-fix
-
-### What does the change on this branch bring to main?
-
-`branch/templates/branch_template_progress.md` ends with a newline. It had none: an accident of the editor
-the form was designed in, reproduced faithfully by `Get-BranchTemplates` while the hand-written templates
-were being treated as the spec for the shape. A file without a terminator is the one whose next diff shows
-a line nobody edited, and git says so on every one of them.
-
-### Significance
-
-#### Tier 0
-
-One byte, and it stops every future diff of that file carrying a phantom line.
-
-**Score:** 1
-
-### Pull Request
-
-Plugins: specialists
-
-[PR #499](https://github.com/DaveKJohn/claude-code-specialists/pull/499) · merged 2026-08-07
 
 ---
 
