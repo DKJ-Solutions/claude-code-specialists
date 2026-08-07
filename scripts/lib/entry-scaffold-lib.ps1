@@ -771,10 +771,20 @@ function Format-EntrySignificanceSections {
         One formatter for the writer and any migration, so the parser below can never meet a shape nothing
         here produced.
     #>
-    param($Rows = @())
+    param(
+        $Rows = @(),
+        [switch]$WithGuidance
+    )
     $w      = Get-EntrySignificanceWording
     $hashes = '#' * $script:EntryTierSubLevel
-    $routes = @{ 0 = $w.Route0; 1 = $w.Route1 }
+    # THE ROUTING QUESTIONS GO WITH THE GUIDANCE (Dave, August 7, 2026), which is the half of this worth
+    # stating out loud, because it reverses his own decision of the day before. They were added so an author
+    # who stops at tier 0 has DECIDED there is nothing above it rather than never having been asked -- and
+    # they are comments, so the working file is where they did that work. Taking them out means the ladder
+    # is now something you learn from branch/templates/ or from CONTRIBUTING.md rather than from the file in
+    # front of you. He was shown both shapes side by side and chose this one; recorded here so the next
+    # reader meets the trade rather than only the result.
+    $routes = if ($WithGuidance) { @{ 0 = $w.Route0; 1 = $w.Route1 } } else { @{} }
 
     $ordered = @(@($Rows) | Sort-Object -Property @{Expression = { [int]$_.Tier }; Descending = $false})
     if ($ordered.Count -eq 0) {
@@ -796,10 +806,13 @@ function Format-EntrySignificanceSections {
         if ($answered) {
             foreach ($line in ([string]$row.Why -split '\r?\n')) { $lines.Add($line) }
             $lines.Add('')
-        } else {
+        } elseif ($WithGuidance) {
             foreach ($line in (Format-EntryGuidanceComment -Lines (Get-EntryGuidance).Tier)) { $lines.Add($line) }
             if (@((Get-EntryGuidance).Tier).Count -gt 0) { $lines.Add('') }
         }
+        # An unanswered section in a WORKING file is the heading, one blank line, and the score label -- the
+        # blank is where the reason goes. Not two blanks: the guidance used to occupy that space, and leaving
+        # its surrounding whitespace behind is the shape that reads as "something was deleted here".
         # An unscored row writes the label with nothing after it -- a question left standing rather than a
         # number nobody chose. Get-EntryImpactFindings is what refuses it before the PR.
         $score = if ($row.PSObject.Properties['Score'] -and [int]$row.Score -gt 0) { ' ' + [string][int]$row.Score } else { '' }
@@ -2026,17 +2039,26 @@ function Add-EntrySection {
         A HELPER RATHER THAN SIX COPIES. The sections differ only in their three inputs, and the blank lines
         between them are exactly the kind of difference nobody notices until two of them disagree and a
         byte-exact template check reports drift for a reason no one can see.
+
+        -WithGuidance IS OFF BY DEFAULT, AND ONLY THE TEMPLATE TURNS IT ON (Dave, August 7, 2026). The file
+        a branch actually gets carries no comments at all: the templates under branch/templates/ are the
+        reference you consult, and duplicating that reference into every working file made the thing you
+        write in mostly form text. What the working file keeps is the questions themselves -- the headings --
+        which is the part that has to be answered rather than read.
     #>
     param(
         [Parameter(Mandatory)]$Lines,
         [Parameter(Mandatory)][string]$Key,
-        [AllowEmptyString()][string]$Value = ''
+        [AllowEmptyString()][string]$Value = '',
+        [switch]$WithGuidance
     )
     $Lines.Add((Get-EntrySectionHeading -Key $Key))
-    $all = Get-EntryGuidance
-    $guidance = @()
-    if ($all.PSObject.Properties[$Key]) { $guidance = @($all.PSObject.Properties[$Key].Value) }
-    foreach ($line in (Format-EntryGuidanceComment -Lines $guidance)) { $Lines.Add($line) }
+    if ($WithGuidance) {
+        $all = Get-EntryGuidance
+        $guidance = @()
+        if ($all.PSObject.Properties[$Key]) { $guidance = @($all.PSObject.Properties[$Key].Value) }
+        foreach ($line in (Format-EntryGuidanceComment -Lines $guidance)) { $Lines.Add($line) }
+    }
     if ($Value) {
         $Lines.Add('')
         foreach ($line in ($Value -split '\r?\n')) { $Lines.Add($line) }
@@ -2069,8 +2091,14 @@ function Format-EntryBlock {
         [string]$Type = '',
         [string]$Body = '',
         $ImpactRows = @(),
-        [string]$TitleSuffix = ''
+        [string]$TitleSuffix = '',
+        [switch]$Template
     )
+    # -Template renders the copy under branch/templates/: it marks its heading and it is the ONLY rendering
+    # that carries the guidance comments. Kept as one switch rather than two knobs because those two facts
+    # are the same fact -- "this is the reference, not somebody's working file" -- and a caller that set one
+    # without the other would produce a file that is neither.
+    if ($Template -and -not $TitleSuffix) { $TitleSuffix = (Get-BranchFileWording).TemplateMarker }
     # Each line appended on its own statement, NOT as @(<expr>, '') -- the comma operator binds looser than
     # '+', so `@(('#'*2) + ' ' + $Title, '')` concatenates the string with the ARRAY ($Title, '') and joins
     # it with a space. That produced '## A real title ' with a trailing space and no blank line after it,
@@ -2081,22 +2109,22 @@ function Format-EntryBlock {
         -Level $script:EntryHeadingLevel -Suffix $TitleSuffix))
     $lines.Add('')
 
-    Add-EntrySection -Lines $lines -Key 'Description' -Value $Description
-    Add-EntrySection -Lines $lines -Key 'Id'          -Value $Id
-    Add-EntrySection -Lines $lines -Key 'Type'        -Value $Type
-    Add-EntrySection -Lines $lines -Key 'What'        -Value $Body
+    Add-EntrySection -Lines $lines -Key 'Description' -Value $Description -WithGuidance:$Template
+    Add-EntrySection -Lines $lines -Key 'Id'          -Value $Id          -WithGuidance:$Template
+    Add-EntrySection -Lines $lines -Key 'Type'        -Value $Type        -WithGuidance:$Template
+    Add-EntrySection -Lines $lines -Key 'What'        -Value $Body        -WithGuidance:$Template
 
     # Significance carries no guidance of its own: its '#### Tier N' sub-sections each carry theirs, and a
     # hint above a section whose every part is already annotated is one the reader has to read twice.
     $lines.Add((Get-EntrySectionHeading -Key 'Significance'))
     $lines.Add('')
-    foreach ($line in (Format-EntrySignificanceSections -Rows $ImpactRows)) { $lines.Add($line) }
+    foreach ($line in (Format-EntrySignificanceSections -Rows $ImpactRows -WithGuidance:$Template)) { $lines.Add($line) }
     $lines.Add('')
 
     # WRITTEN EMPTY AND FILLED BY THE FOLD. The section exists from the start so the form is complete on the
     # page, but the two facts in it -- the number and the merge date -- do not exist until the merge, and a
     # hand-written one would be a second copy of something nobody has yet.
-    Add-EntrySection -Lines $lines -Key 'PullRequest'
+    Add-EntrySection -Lines $lines -Key 'PullRequest' -WithGuidance:$Template
     return @($lines.ToArray())
 }
 
@@ -2647,9 +2675,9 @@ function Format-BranchProgressScaffold {
     try { $info = Get-BranchInfo -Branch $Branch } catch { $info = $null }
     $type = if ($info -and $info.Prefix -and $info.IsKnown) { [string]$info.Prefix } else { '' }
 
-    Add-EntrySection -Lines $lines -Key 'Description' -Value $Description
-    Add-EntrySection -Lines $lines -Key 'Id'          -Value $Id
-    Add-EntrySection -Lines $lines -Key 'Type'        -Value $type
+    Add-EntrySection -Lines $lines -Key 'Description' -Value $Description -WithGuidance:$Template
+    Add-EntrySection -Lines $lines -Key 'Id'          -Value $Id          -WithGuidance:$Template
+    Add-EntrySection -Lines $lines -Key 'Type'        -Value $type        -WithGuidance:$Template
 
     # THE SCAFFOLDED STEP STAYS IN THE FILE A BRANCH ACTUALLY GETS (Dave, August 6, 2026), asked and answered
     # when the template dropped it. Without it a fresh branch reaches a PR with no plan at all and the
@@ -2658,9 +2686,11 @@ function Format-BranchProgressScaffold {
     # is what makes the gate bite on the ordinary branch while leaving that case alone.
     $steps = @()
     if (-not $Template) { $steps = @((Get-BranchProgressMarks).Open + $w.FirstStep) }
-    Add-BranchProgressSection -Lines $lines -Heading $w.StepsHeading -Guidance $w.StepsGuidance -Body $steps
+    $stepsGuidance = if ($Template) { $w.StepsGuidance } else { @() }
+    $notesGuidance = if ($Template) { $w.NotesGuidance } else { @() }
+    Add-BranchProgressSection -Lines $lines -Heading $w.StepsHeading -Guidance $stepsGuidance -Body $steps
     $note = if ($Intent) { @($Intent -split '\r?\n') } else { @() }
-    Add-BranchProgressSection -Lines $lines -Heading $w.NotesHeading -Guidance $w.NotesGuidance -Body $note
+    Add-BranchProgressSection -Lines $lines -Heading $w.NotesHeading -Guidance $notesGuidance -Body $note
 
     return @($lines.ToArray())
 }
@@ -2771,8 +2801,10 @@ function Get-BranchTemplates {
     #>
     $nl = "`n"
     $token = $script:BranchTemplateBranchToken
-    $marker = (Get-BranchFileWording).TemplateMarker
-    $changelog = Add-TemplateTierPrompt -Lines (Format-EntryBlock -Branch $token -TitleSuffix $marker)
+    # -Template is what carries the guidance comments AND the '(template)' marker -- see Format-EntryBlock.
+    # These two calls are the only place in the system that passes it, which is the whole point: the
+    # reference lives here, and the file a branch gets is the bare form.
+    $changelog = Add-TemplateTierPrompt -Lines (Format-EntryBlock -Branch $token -Template)
     $progress  = Format-BranchProgressScaffold -Branch $token -Template
     return @(
         [pscustomobject]@{

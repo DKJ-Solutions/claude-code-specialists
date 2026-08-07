@@ -746,13 +746,18 @@ $sigText = (Format-EntrySignificanceSections -Rows $sigRows) -join "`n"
 Assert-True ($sigText.IndexOf('#### Tier 0') -lt $sigText.IndexOf('#### Tier 1')) 'sections: tier 0 comes first, because that is the order they are filled in'
 Assert-True ($sigText.IndexOf('#### Tier 1') -lt $sigText.IndexOf('#### Tier 2')) 'sections: and tier 1 before tier 2'
 Assert-True ($sigText -match ('(?m)^' + [regex]::Escape((Get-EntryScoreLabel)) + ' 5$')) 'sections: the score is its own line, echoing the retired Tier: line'
-# The routing question is under EVERY tier 0 and 1, including one whose successor is already there. An
-# author who has answered does not need it; a reader at the fold, the cut or in the record needs to see
-# that it WAS asked. Matched on the question's FIRST line: the two are line arrays since the dossier form
-# fixed the comment width, and joining them back would assert against a string nothing writes.
+# THE ROUTING QUESTIONS BELONG TO THE TEMPLATE NOW (Dave, August 7, 2026). They are comments, and the file
+# a branch gets carries none -- so the claim they were written for moved with them: it is the reference
+# under branch/templates/ that has to keep asking whether there is a next tier. Asserted on the -WithGuidance
+# rendering, which is the only one that produces them, and on the bare one NOT producing them. Matched on
+# the question's FIRST line: the two are line arrays, and joining them would assert against a string
+# nothing writes.
 $sigWording = Get-EntrySignificanceWording
-Assert-Equal 1 (@([regex]::Matches($sigText, [regex]::Escape(@($sigWording.Route0)[0]))).Count) 'sections: tier 0 carries its routing question even when tier 1 follows'
-Assert-Equal 1 (@([regex]::Matches($sigText, [regex]::Escape(@($sigWording.Route1)[0]))).Count) 'sections: and tier 1 carries its own'
+$sigTemplate = (Format-EntrySignificanceSections -Rows $sigRows -WithGuidance) -join "`n"
+Assert-Equal 1 (@([regex]::Matches($sigTemplate, [regex]::Escape(@($sigWording.Route0)[0]))).Count) 'template: tier 0 carries its routing question even when tier 1 follows'
+Assert-Equal 1 (@([regex]::Matches($sigTemplate, [regex]::Escape(@($sigWording.Route1)[0]))).Count) 'template: and tier 1 carries its own'
+Assert-True (-not ($sigText -match [regex]::Escape(@($sigWording.Route0)[0]))) 'working file: and the bare rendering carries no question at all -- the templates are the reference'
+Assert-True (-not ($sigText -match '<!--')) 'working file: no comment of any kind survives into the file a branch gets'
 # ...and both are HTML comments, so the fold takes them out and the record never carries the form.
 Assert-True (-not ((Remove-EntryHtmlComments -EntryText $sigText) -match [regex]::Escape(@($sigWording.Route0)[0]))) 'sections: the routing question is comment, so the fold strips it'
 Assert-True (-not ($sigText -match 'continue to Tier 3')) 'sections: tier 2 carries none -- there is no successor to route to'

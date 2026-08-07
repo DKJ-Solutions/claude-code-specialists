@@ -1,13 +1,33 @@
-# `main` progress
+## `feat/scaffold-without-comments` progress
 
+### Branch description
 
-> **You are on `main`.** Do not work in this file yet -- create a branch first.
-> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
-> of the next person who does create one.
+The scaffolded branch files carry no guidance comments
 
-This file carries the step list of the branch you are on. It is written when a branch is created
-and returns to this state after the merge.
+### Branch ID
+
+20260807-103608
+
+### Branch type
+
+feat
 
 ### Steps
 
-_(filled in when a branch is created)_
+- [x] One `-Template` switch decides guidance + the `(template)` marker together; only `Get-BranchTemplates` passes it
+- [x] The routing questions go with the guidance -- Dave chose that over keeping them, shown both shapes
+- [x] Both templates verify byte-identical, so the reference is untouched by this
+- [x] Moved the two routing-question asserts onto the template rendering, and added the mirror assert
+- [ ] Docs still to follow: branch/README.md, CONTRIBUTING.md, CLAUDE.md, the new-branch skill
+- [ ] Dave is making his own adjustments first -- no PR until he says so
+
+### Where I left off
+
+Code is done and green: entry-scaffold 259 asserts, new-branch 98, lint 0 errors, mirrors rebuilt.
+Committed locally, nothing pushed.
+
+**Paused on Dave's word** -- he wants to adjust something himself before this goes anywhere. The docs
+were deliberately left for after that, since his edits may change what they have to say.
+
+Worth knowing when picking this back up: the templates were verified byte-identical AFTER the change,
+which is what proves the guidance only moved rather than being rewritten.
