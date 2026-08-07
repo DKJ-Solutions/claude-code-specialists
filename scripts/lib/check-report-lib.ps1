@@ -10,7 +10,7 @@
     plugin/mirror payload as its callers, so a $PSScriptRoot-relative path resolves correctly
     whether the caller runs from the workshop root, a consumer's plugin cache, or the plugin mirror
     tree (the same reasoning new-branch.ps1 already relies on for its sibling
-    new-changelog-entry.ps1 call):
+    new-branch.ps1 call):
 
         . (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')          -- from scripts/sync/*
         . (Join-Path $PSScriptRoot '..\..\scripts\lib\check-report-lib.ps1') -- from skills/<name>/*

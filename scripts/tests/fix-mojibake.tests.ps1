@@ -244,7 +244,7 @@ function Get-MojibakePaths {
     Assert-Equal "### #1 $ONCE Title $ONCE Fix" (Get-FixtureText -Path (Join-Path $rootB 'CHANGELOG.md')) 'configured set: the root fallback did NOT also run -- the repo-owned list replaces it, it does not extend it'
 
     Write-Host 'A broken repo-config degrades to the fallback rather than stopping (#413)' -ForegroundColor Cyan
-    #      Same discipline as new-changelog-entry (#410): a repair tool that refuses to run because a
+    #      Same discipline as new-branch (#410): a repair tool that refuses to run because a
     #      config file has a syntax error helps nobody, least of all the person whose repo is already
     #      in a state worth repairing.
     $rootC = New-DefaultPathsRoot -Label 'c'

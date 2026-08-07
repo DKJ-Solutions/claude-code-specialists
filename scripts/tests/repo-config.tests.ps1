@@ -105,7 +105,7 @@ foreach ($gone in 'Get-ReleaseHighlightsStakeholderTypes', 'Get-ReleaseHighlight
 $liveStage = Get-LiveStage
 Assert-Equal '' $liveStage "Get-LiveStage defaults to '' in this workshop (no separate live stage)"
 
-# The stub wording new-changelog-entry.ps1 writes (issue #410, all four Optional in the script
+# The stub wording new-branch.ps1 writes (issue #410, all four Optional in the script
 # contract). Asserted against the LITERAL values rather than merely "is non-empty", because these four
 # are the fallbacks the shared script hardcodes as well: if the two ever disagree, a consumer that
 # defines nothing and a consumer that copies this file get different entries, which is exactly the

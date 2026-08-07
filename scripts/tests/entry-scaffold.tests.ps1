@@ -14,7 +14,7 @@
          answers when it does, and an empty override IGNORED rather than honoured.
       2. Get-EntryScaffoldFindings -- the pure matcher, including the exact shape that shipped in
          v3.2.0 (heading kept, status appended) and the fenced-code exclusion.
-      3. THE ROUND TRIP, which is the real point: an entry written by the actual new-changelog-entry.ps1
+      3. THE ROUND TRIP, which is the real point: an entry written by the actual new-branch.ps1
          must be seen as scaffolded by the actual matcher. That is the assert that makes the writer and
          the guard incapable of disagreeing -- the whole reason the wording became one shared source
          rather than a copy in each script.
@@ -25,7 +25,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot        = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $LibSrc          = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
-$NewChangelogSrc = Join-Path $RepoRoot 'scripts\release\new-changelog-entry.ps1'
+$NewBranchSrc = Join-Path $RepoRoot 'scripts\task\new-branch.ps1'
 $BranchInfoSrc   = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 $OpenPrSrc       = Join-Path $RepoRoot 'scripts\release\open-pr.ps1'
 
@@ -129,15 +129,15 @@ $unclosed = "### T $midDot Feat $midDot 2026-08-03`n`n" + '```' + "`n**To do / w
 Assert-Equal 0 (@(Get-EntryScaffoldFindings -EntryText $unclosed -Wording $wording)).Count 'an unclosed fence hides the tail -- the safe direction (a miss, not a false accusation)'
 
 # --- 3. The round trip: the writer's output must trip the guard -----------------------------------
-Write-Host "the round trip (new-changelog-entry writes what the gate refuses)" -ForegroundColor Cyan
+Write-Host "the round trip (new-branch writes what the gate refuses)" -ForegroundColor Cyan
 # THE ASSERT THIS SUITE EXISTS FOR. Both scripts read the wording from the lib, so they cannot disagree
 # -- but "cannot" is a claim about code, and this measures it by running the real writer and handing its
 # output to the real matcher. If someone reintroduces a literal in either place, this goes red.
 $fixture = Join-Path ([System.IO.Path]::GetTempPath()) "entry-scaffold-test-$PID"
 if (Test-Path -LiteralPath $fixture) { Remove-Item -Recurse -Force -LiteralPath $fixture }
-New-Item -ItemType Directory -Path (Join-Path $fixture 'scripts\release') -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $fixture 'scripts\task') -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $fixture 'scripts\lib') -Force | Out-Null
-Copy-Item -LiteralPath $NewChangelogSrc -Destination (Join-Path $fixture 'scripts\release\new-changelog-entry.ps1') -Force
+Copy-Item -LiteralPath $NewBranchSrc -Destination (Join-Path $fixture 'scripts\task\new-branch.ps1') -Force
 Copy-Item -LiteralPath $BranchInfoSrc -Destination (Join-Path $fixture 'scripts\lib\branch-info.ps1') -Force
 Copy-Item -LiteralPath $LibSrc -Destination (Join-Path $fixture 'scripts\lib\entry-scaffold-lib.ps1') -Force
 
@@ -151,15 +151,14 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $fixture 'README.md'), "# fixture`n", (New-Object System.Text.UTF8Encoding $false))
     & git -C $fixture add -A 2>$null | Out-Null
     & git -C $fixture commit -q -m 'init' 2>$null | Out-Null
-    # The writer takes no -Branch/-RepoRoot: it derives both from git, so the fixture must actually BE on
-    # the branch. CLAUDE_PROJECT_DIR is what the shared scripts read for their repo root (the dual-context
-    # contract), and it is set for the child only rather than for this runner.
-    & git -C $fixture checkout -q -b 'feat/round-trip' 2>$null | Out-Null
-    # No -Title and no -Intent: that is the path that writes every one of the three scaffold strings.
+    # new-branch makes the branch ITSELF since the two scripts merged (August 7, 2026) -- the fixture no
+    # longer checks one out first. CLAUDE_PROJECT_DIR is what the shared scripts read for their repo root
+    # (the dual-context contract), and it is set for the child only rather than for this runner.
+    # No -Title: that is the path that leaves every field for the gate to report.
     Push-Location $fixture
     try {
         $env:CLAUDE_PROJECT_DIR = $fixture
-        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'scripts\release\new-changelog-entry.ps1') 2>$null | Out-Null
+        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'scripts\task\new-branch.ps1') -Name 'feat/round-trip' 2>$null | Out-Null
     } finally {
         Remove-Item Env:\CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue
         Pop-Location
@@ -215,7 +214,9 @@ try {
     Push-Location $fixture
     try {
         $env:CLAUDE_PROJECT_DIR = $fixture
-        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'scripts\release\new-changelog-entry.ps1') 2>$null | Out-Null
+        # Same branch again: new-branch is idempotent, so this is the rerun that has to refresh the drifted
+        # template while leaving the entry and the step list exactly as the author left them.
+        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'scripts\task\new-branch.ps1') -Name 'feat/round-trip' 2>$null | Out-Null
     } finally {
         Remove-Item Env:\CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue
         Pop-Location
@@ -295,7 +296,7 @@ if (Test-Path -LiteralPath $writtenEntry) {
 Remove-Item -Recurse -Force -LiteralPath $fixture -ErrorAction SilentlyContinue
 
 # --- 4. The wiring: the gate is really installed in open-pr --------------------------------------
-Write-Host "the wiring (open-pr installs the gate, new-changelog-entry keeps no copy)" -ForegroundColor Cyan
+Write-Host "the wiring (open-pr installs the gate, new-branch keeps no copy)" -ForegroundColor Cyan
 # Text asserts, for the same reason the cut-release guardrail suite uses them: open-pr.ps1 drives a live
 # push and gh, so the gate cannot be exercised end-to-end here without a remote. What IS checkable is
 # that the wiring exists and that the duplication did not come back.
@@ -309,15 +310,15 @@ $gateIdx = $openPrText.IndexOf('scaffold gate:')
 $pushIdx = $openPrText.IndexOf("'push'")
 Assert-True ($gateIdx -gt 0 -and $pushIdx -gt 0 -and $gateIdx -lt $pushIdx) 'the gate runs before the git push'
 
-$writerText = [System.IO.File]::ReadAllText($NewChangelogSrc)
-Assert-True ($writerText -match 'entry-scaffold-lib\.ps1') 'new-changelog-entry reads the wording from the shared lib'
+$writerText = [System.IO.File]::ReadAllText($NewBranchSrc)
+Assert-True ($writerText -match 'entry-scaffold-lib\.ps1') 'new-branch reads the entry format from the shared lib'
 # The literals must be GONE as VALUES, not absent as words. Matched on an ASSIGNMENT rather than on the
 # bare string, because the writer legitimately names 'TODO: title' in a comment explaining why its -Title
 # default is an empty sentinel -- prose about a historical value is not a second copy of it, and an
 # assert that cannot tell those apart would push someone to delete a useful comment to get green.
 foreach ($literal in @('TODO: title', '**To do / where I left off:**', 'TODO: what still needs to happen')) {
     $assignment = "=\s*'" + [regex]::Escape($literal)
-    Assert-True ($writerText -notmatch $assignment) "new-changelog-entry assigns no literal '$literal'"
+    Assert-True ($writerText -notmatch $assignment) "new-branch assigns no literal '$literal'"
 }
 
 # --- 5. The tier line: the entry's other declared fact -------------------------------------------

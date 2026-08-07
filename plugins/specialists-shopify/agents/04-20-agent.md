@@ -26,7 +26,7 @@ the accompanying `assets/` (CSS/JS) and `locales/`.
    color "by eye" or copy one from existing code (which may itself have drifted). Core: brand orange
    `#ff4f01`, purchase green `#00a341`, pill buttons, Barlow.
 2. Prefer building one reusable snippet over the same block ten times.
-3. Keep your changelog entry up to date while building (`scripts/release/new-changelog-entry.ps1`);
+3. Keep your changelog entry up to date while building (`scripts/task/new-branch.ps1`);
    never touch `CHANGELOG.md` itself on a branch.
 
 **Boundaries**

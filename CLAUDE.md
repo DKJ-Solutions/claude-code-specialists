@@ -186,7 +186,12 @@ The constitution above, concretely implemented here:
 
 - **The main branch is `main`.** All changes via a `<prefix>/<short-name>` branch + PR to
   `main`. Valid prefixes ([`scripts/lib/branch-info.ps1`](scripts/lib/branch-info.ps1)):
-  `feat/` → enhancement · `fix/` → bug · `docs/` → documentation · `chore/` → documentation. See
+  `feat/` → enhancement · `fix/` → bug · `docs/` → documentation. **Three, and `chore/` is refused**
+  (Dave, August 7, 2026): chore is the name for work that lands *directly on the trunk* under one of the
+  named exceptions, so a chore branch is a contradiction. `Chore` remains a recognised changelog **type**
+  — every entry already written under it still has to validate — it just has no prefix any more. The rule
+  had always held and was never enforced; measured on the day it was written down, `chore/` had been used
+  12 times. See
   [Derek #05](.claude/specialists/lenses/05-05-extension.md#classifying-naming-and-creating-a-branch).
 - **The lint and test gates are the safety guard before every PR.**
   [`scripts/lint/check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1) validates the
@@ -198,7 +203,7 @@ The constitution above, concretely implemented here:
   does. `open-pr.ps1` runs both gates first; on an error or a failing suite nothing is pushed and
   no PR is opened (`-SkipLint`/`-SkipTests` are the escape valves). See [Sylvester #15](.claude/specialists/lenses/05-15-extension.md).
 - **A third gate, on the changelog entry itself: the scaffold gate** (August 3, 2026). `open-pr.ps1`
-  refuses to push a branch whose entry still carries the wording `new-changelog-entry.ps1` scaffolded
+  refuses to push a branch whose entry still carries the wording `new-branch.ps1` scaffolded
   it with — the placeholder title, the "to do / where I left off" heading, or the fallback body.
   **Measured, after it had already shipped:** three of v3.2.0's twenty-one entries kept that heading
   with a status appended behind it, and it reached the release notes *and* the per-plugin
@@ -247,6 +252,23 @@ The constitution above, concretely implemented here:
      **empties `CHANGELOG.md` down to its intro**, (re)generates each plugin's consumer-facing `RELEASE.md`
      card, commits that on `main`, and tags `vX.Y.Z`. Deliberately no branch/PR — just like the
      fold. See [Rendall #06](.claude/specialists/lenses/05-06-extension.md#versioning--releases).
+
+     **Why no PR, in Dave's own words (August 7, 2026): "aan het product zelf verandert verder niks."**
+     A release republishes what is already merged — it bumps versions, generates documents and moves a
+     tag. There is no change to review, so a PR would add a checkpoint over a diff nobody has to judge.
+     Weighed against the alternative the same day rather than assumed: routing it through a PR would need
+     a `release/` prefix that the table deliberately excludes, would conflict on `CHANGELOG.md` with every
+     branch that folds while the release PR is open (the cut empties that file), and would meet two gates
+     — the scaffold gate and the step-list gate — that a release branch cannot satisfy by construction,
+     since its changelog is empty by design.
+
+     **What the PR route WOULD have bought is real, and is being closed another way.** Measured on
+     August 7, 2026: `open-pr` runs the lint *and* all 26 suites, and CI runs both again — while
+     `cut-release` runs the lint alone and its push to `main` bypasses the required check. The release
+     commit is therefore the least-gated commit in the workflow, and it is the one that rewrites four
+     `RELEASE.md` cards and empties the changelog. The repair is coverage, not route: the cut runs the
+     suites too, and CI runs on `main` pushes so the artefacts the cut itself generates are checked after
+     they land.
      Since August 3, 2026 it is a **shared** script, mirrored into the plugin like the rest of the
      workflow ([#417](https://github.com/DaveKJohn/claude-code-specialists/issues/417)): everything
      that legitimately differs per repo — which root docs are permanent, how the notes are foldered,

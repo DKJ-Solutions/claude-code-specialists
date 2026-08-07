@@ -28,11 +28,35 @@ $script:BranchTypeOrder = @('Feat', 'Fix', 'Docs', 'Chore')
 # prefix -> GitHub label (PR) + branch type (changelog entry).
 # Note: a release does NOT run via a branch/PR (cut-release.ps1 commits directly to main),
 # so there is deliberately no 'release' prefix here.
+#
+# AND NO 'chore' PREFIX EITHER, SINCE AUGUST 7, 2026 (Dave). There are three branch prefixes -- feat,
+# fix, docs -- because chore is not something a branch does: it is the name for work that lands
+# DIRECTLY ON main under one of the named exceptions. The commit log agrees emphatically: 15 of the
+# last 30 first-parent commits are 'chore:' and every one of them is a direct commit (the fold, and
+# the changelog re-sort Dave authorised the same day).
+#
+# THE RULE ALWAYS HELD; THE TOOLING NEVER SAID SO. Measured when it was written down: 'chore/' had been
+# used as a branch prefix 12 times, against 70 docs/, 58 fix/ and 51 feat/. Dave's answer on seeing that
+# count was that all twelve were wrong at the time too -- he had simply never noticed. So this is not a
+# rule changing, it is a rule that existed only in someone's head finally being enforced, and the twelve
+# are what a silently unenforced rule costs.
+#
+# 'Chore' STAYS A TYPE below, and that is the whole nuance. Entries already in CHANGELOG.md and in
+# every consumer's tree carry it, and Resolve-EntryType validates against that list -- dropping it
+# would make those entries declare a type this repo "does not produce" and fail their own gate.
+# Recognise both, write one: no branch produces Chore any more, and every reader still knows it. It is
+# also still the fallback for an unknown prefix, which is exactly what it now means -- the name for work
+# that is neither a feature, a fix, nor documentation.
+#
+# TEST-BranchName REFUSES IT OUTRIGHT, rather than the row merely going missing. Removing the row alone
+# would demote 'chore/' to an unknown prefix -- soft warn, proceed -- and a soft warn is what let it
+# through twelve times. THIS FILE IS REPO-OWNED and does not travel into the plugin: every consumer has
+# their own copy with their own table, so refusing it here states our rule without touching a consumer
+# who legitimately runs chore/ branches of their own.
 $script:BranchPrefixTable = @{
     feat  = @{ Label = 'enhancement';   Type = 'Feat' }
     fix   = @{ Label = 'bug';           Type = 'Fix' }
     docs  = @{ Label = 'documentation'; Type = 'Docs' }
-    chore = @{ Label = 'documentation'; Type = 'Chore' }
 }
 
 function Get-BranchTypes {
@@ -71,6 +95,9 @@ function Test-BranchName {
         Hard rejects (IsValid = $false, Reason filled in):
           - empty/whitespace-only name
           - name equal to 'main'
+          - name starting with the prefix 'chore' -- chore work goes directly on the trunk, so a chore
+            BRANCH is a contradiction. Anchored to the prefix, unlike 'final' below: a branch may well be
+            ABOUT chores.
           - name contains the substring 'final' (case-insensitive, so also 'finalize'/'refinalization' --
             deliberately broad; see below)
 
@@ -94,7 +121,7 @@ function Test-BranchName {
 
         An unknown prefix is NOT a hard reject (IsValid stays $true); the caller reads IsKnown and
         decides for itself whether/how a soft warning is needed, consistent with
-        new-changelog-entry/open-pr which also fall back (Chore/'question') on an unknown prefix
+        new-branch/open-pr which also fall back (Chore/'question') on an unknown prefix
         instead of blocking.
     #>
     param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Branch)
@@ -104,6 +131,18 @@ function Test-BranchName {
     }
     if ($Branch -eq 'main') {
         return [pscustomobject]@{ IsValid = $false; Reason = "Branch name must not be 'main'."; IsKnown = $false }
+    }
+    # 'chore/' IS NOT A BRANCH (Dave, August 7, 2026). Chore is the name for work that lands directly on
+    # main under one of the named exceptions -- the fold commit, the release commit -- so a chore BRANCH is
+    # a contradiction. Anchored to the prefix rather than matched anywhere in the name, unlike 'final':
+    # 'chore' is a perfectly good word for a branch to be about ('docs/explain-the-chore-commits'), and it
+    # is only the prefix position that makes a claim.
+    if ($Branch -match '^chore(/|$)') {
+        return [pscustomobject]@{
+            IsValid = $false
+            Reason  = "'chore' is not a branch prefix -- chore work goes directly on the trunk under one of the named exceptions (the fold commit, the release commit). Use feat/, fix/ or docs/, or make the commit on the trunk if it genuinely is a chore."
+            IsKnown = $false
+        }
     }
     if ($Branch -match 'final') {
         # THE REFUSAL NAMES THE REMEDY, which this one did not. A gate that says only "not that" leaves the

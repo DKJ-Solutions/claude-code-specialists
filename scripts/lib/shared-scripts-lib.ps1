@@ -78,14 +78,11 @@ function Get-SharedScriptPairs {
             # invokes it as a procedure, so there is no procedure to write down.
             Skill  = ''
         },
-        @{
-            Name   = 'new-changelog-entry'
-            Source = 'scripts\release\new-changelog-entry.ps1'
-            Mirror = 'plugins\specialists\scripts\release\new-changelog-entry.ps1'
-            # Documented by new-branch's skill rather than one of its own: it is reached as that
-            # script's child step, and a branch is never entry-less.
-            Skill  = 'new-branch'
-        },
+        # RETIRED, AUGUST 7, 2026: 'new-changelog-entry'. It was new-branch's child step, and this entry
+        # noted that it had no skill of its own because that skill documented both. The name stopped being
+        # true when the branch/ split gave it a step list to write, and again when it gained the templates
+        # -- it described one of four outputs. Merged into new-branch.ps1, which is the one concept it was
+        # ever a half of. Nothing else called it and no document told anyone to run it.
         @{
             Name   = 'new-branch'
             Source = 'scripts\task\new-branch.ps1'

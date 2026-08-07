@@ -38,12 +38,22 @@ table lives in [`scripts/lib/branch-info.ps1`](../../../scripts/lib/branch-info.
 | New or extended capability (new plugin/specialist, migrated manual, new script) | `feat/<description>` | `enhancement` | Feat |
 | Correction of an error in an existing agent def/manual/script/manifest | `fix/<description>` | `bug` | Fix |
 | Documentation: `README.md`, `CLAUDE.md`, workflow explanation, manual content | `docs/<description>` | `documentation` | Docs |
-| Maintenance: scripts, tooling, config without a behavior extension | `chore/<description>` | `documentation` | Chore |
+
+**There is no `chore/` row, and that is the point** (Dave, August 7, 2026). Chore is the name for work
+that lands **directly on the trunk** under one of the named exceptions — the fold commit, the release
+commit — so a chore *branch* is a contradiction and `Test-BranchName` refuses the prefix outright. Where
+maintenance genuinely needs a branch, it is one of the three above: `fix/` if something was broken,
+`feat/` if the tooling can now do something it could not, `docs/` if the change is text.
+
+`Chore` stays a recognised changelog **type**: entries already written under it must still validate, and
+it is still what an unknown prefix falls back to. Recognise both, write one.
+
+**The rule always held; the tooling never said so.** Measured on the day it was written down: `chore/` had
+been used as a branch prefix 12 times, against 70 `docs/`, 58 `fix/` and 51 `feat/`. Dave's answer on
+seeing that count was that all twelve were wrong at the time too — he had simply never noticed. Twelve is
+what a rule costs when it lives only in someone's head.
 
 Edge cases — classify by **what actually changes**, not which files happen to move along:
-- **`fix/` vs `chore/`**: `fix/` repairs an error in existing content (a broken agent def, a dead
-  link, wrong frontmatter). `chore/` is maintenance on scripts/tooling/config without anything
-  being broken.
 - **`docs/` vs `feat/`**: `docs/` is purely documentation/text; `feat/` is a new or extended
   capability (even when docs come with it — the docs follow the capability).
 - Unknown prefix → label `question` (to be classified later).
@@ -56,11 +66,13 @@ Edge cases — classify by **what actually changes**, not which files happen to 
 ```
 Creating the branch and creating its changelog entry file are no longer two separate manual steps —
 **a branch is never entry-less.** `new-branch.ps1` checks out the branch (idempotently — running it
-again on an existing branch simply resumes it) and then immediately calls the shared
-`new-changelog-entry.ps1` ([Rendall #06](05-06-extension.md#changelog)) as a child step to scaffold
-the branch's two files in `branch/` — `branch-changelog.md` (the entry) and `branch-progress.md` (the
-step list, which also names the branch). Mechanism ownership of both stays with Rendall; Derek's
-`new-branch` is what triggers it at the moment the branch is born. The assigned specialist then fills in
+again on an existing branch simply resumes it) and writes the branch's two files in `branch/` in the same
+run: `branch-changelog.md` (the entry) and `branch-progress.md` (the step list). It also writes the
+reference templates beside them, refreshing one that has drifted. **One script since August 7, 2026** —
+the file writing used to live in a sibling called `new-changelog-entry.ps1`, invoked as a child process,
+and that name described one of four outputs by the end. Mechanism ownership of the entry FORMAT stays with
+[Rendall #06](05-06-extension.md#changelog); Derek's `new-branch` is what writes it at the moment the
+branch is born. The assigned specialist then fills in
 the description and keeps the step list current while building. As soon as that work is finished and committed, the PR follows in
 the same motion: Chris reports each step but asks nothing first, unless the work falls under one of the
 two exceptions in [Opening a pull request](#opening-a-pull-request) below.
@@ -83,7 +95,7 @@ in one motion. The lint gate in `open-pr.ps1` is the guard that makes the defaul
 ```
 
 This pushes the branch and opens the PR with `.github/pull_request_template.md` as the body — walk
-through the checklist. The title prefix mirrors the branch type (`feat:`, `fix:`, `docs:`, `chore:`).
+through the checklist. The title prefix mirrors the branch type (`feat:`, `fix:`, `docs:`).
 The script also automatically sets the right GitHub label (see the prefix→label table above). Then
 continue without an intermediate question to [Merging to main](#merging-to-main) and
 [folding the changelog entry #06](05-06-extension.md#changelog).
@@ -196,7 +208,7 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
 
 ### Branch & repo hygiene
 
-- Everything goes through a `feat/`/`fix/`/`docs/`/`chore/` branch + PR to `main` — **no direct
+- Everything goes through a `feat/`/`fix/`/`docs/` branch + PR to `main` — **no direct
   commits on `main`** except the fold exception in [the safety rules](../../../CLAUDE.md#safety-rules).
   There is no second reviewer; the PR opens by default as soon as the branch is done, after which
   opening → merging → folding runs through in one motion, guarded by the lint gate and transparently
@@ -269,7 +281,7 @@ Derek prefers not to touch the git commands by hand. His toolbox:
 
 - `scripts/task/new-branch.ps1 -Name <branch-name> [-Title "…"] [-Intent "…"] [-Park]` — create (or
   idempotently resume) the branch and, in the same move, write its two files in `branch/` by
-  calling the shared `new-changelog-entry.ps1` as a child step. `-Intent` records where you left
+  calling the shared `new-branch.ps1` as a child step. `-Intent` records where you left
   off / what is next in **`branch-progress.md`** — deliberately not in the entry, whose text folds
   verbatim into `CHANGELOG.md`; `-Park` commits **both** files and pushes the branch to `origin` for
   later / another device — **still no PR** (#162). Without `-Park`: no push, no PR — just the branch +
@@ -294,7 +306,7 @@ Derek prefers not to touch the git commands by hand. His toolbox:
   branch conventions: the prefix table (prefix → GitHub label + changelog type) and the branch name →
   entry-filename conversion (`/` → `-`). Changing the mapping? Here, nowhere else.
 
-`new-changelog-entry.ps1` is mechanism-owned by [Rendall #06](05-06-extension.md); it is now shared
+`new-branch.ps1` is mechanism-owned by [Rendall #06](05-06-extension.md); it is now shared
 (mirrored to the plugin, [issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81))
 and normally reached indirectly, via Derek's `new-branch.ps1` above. `fold-changelog-entry.ps1`
 remains [Rendall #06](05-06-extension.md)'s tool, run on `main` after the merge. A new recurring

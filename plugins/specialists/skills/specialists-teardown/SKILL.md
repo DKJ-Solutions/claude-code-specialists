@@ -324,7 +324,7 @@ the requirement itself in the [claude-code-specialists README](../../../../READM
 
 **1. A runtime dependency no teardown can undo -- the one that actually hurts.** The plugin is the
 single source of truth for the operational scripts (`new-branch.ps1`, `park-branch.ps1`,
-`new-changelog-entry.ps1`, `open-pr.ps1`, `fold-changelog-entry.ps1`;
+`new-branch.ps1`, `open-pr.ps1`, `fold-changelog-entry.ps1`;
 [issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81)), and a consumer reaches them
 through a resolver of its own that locates the marketplace cache and **throws** when that cache is gone.
 In the measured consumer that resolver is `scripts/lib/plugin-paths.ps1`, and three operational scripts

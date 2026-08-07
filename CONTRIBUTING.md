@@ -7,7 +7,7 @@ changelog entry — the same workflow as the consuming repos. The steps:
    [`scripts/task/new-branch.ps1`](scripts/task/new-branch.ps1)`-Name <prefix>/<short-name> -Title "…"`
    creates (or idempotently resumes) the `<prefix>/<short-name>` branch and, as a child step,
    writes both files via
-   [`scripts/release/new-changelog-entry.ps1`](scripts/release/new-changelog-entry.ps1) — a branch is
+   [`scripts/task/new-branch.ps1`](scripts/task/new-branch.ps1) — a branch is
    never entry-less:
 
    | file | subject | lifetime |
@@ -73,9 +73,9 @@ changelog entry — the same workflow as the consuming repos. The steps:
    at step 3, which is what replaced the old `TODO:` placeholders.
    **The PR number and the merge date are added by the fold** into `### Pull Request`:
    neither exists yet, and a date written now would be the branch's birth date rather than its landing date. Valid prefixes (prefix → label → changelog type): `feat/` → enhancement → Feat ·
-   `fix/` → bug → Fix · `docs/` → documentation → Docs · `chore/` → documentation → Chore
-   (maintenance: scripts, tooling, config). The table is in
-   [`scripts/lib/branch-info.ps1`](scripts/lib/branch-info.ps1).
+   `fix/` → bug → Fix · `docs/` → documentation → Docs. **There is no `chore/`** — chore work goes
+   directly on the trunk under one of the named exceptions, so `new-branch` refuses that prefix. The table
+   is in [`scripts/lib/branch-info.ps1`](scripts/lib/branch-info.ps1).
 2. **Work + commit** on the branch: keep the step list current as you go, write the entry's
    description, then commit both along with the rest of the work. **Every step must be resolved before
    the PR** — `- [x]` done, or `- [~]` dropped with the reason on the line. Steps 3 and 4 both refuse

@@ -363,7 +363,11 @@ try {
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
     Assert-Equal 0 $r.Code 'stub wording absent: exit-code 0 (every string has a fallback, not a breach)'
     Assert-NotMatch '\[ERROR\]' $r.Out 'stub wording absent: no error'
-    Assert-Match "\[INFO\].*'Get-EntryTitlePlaceholder' missing from scripts\\repo-config\.ps1.*used by: new-changelog-entry.*optional.*falls back to 'TODO: title'" $r.Out 'stub wording absent: INFO for Get-EntryTitlePlaceholder names caller and default'
+    # 'used by: open-pr' ALONE since August 7, 2026, and the change is the point rather than a detail. The
+    # scaffolder stopped WRITING the placeholders when the dossier form gave every field an empty space
+    # under a comment; only open-pr's gate still reads them, to refuse an entry written by an older
+    # scaffolder. Declaring new-branch as a caller would announce a dependency it no longer has.
+    Assert-Match "\[INFO\].*'Get-EntryTitlePlaceholder' missing from scripts\\repo-config\.ps1.*used by: open-pr.*optional.*falls back to 'TODO: title'" $r.Out 'stub wording absent: INFO for Get-EntryTitlePlaceholder names the gate as its only caller'
     Assert-Match ("\[INFO\].*'Get-EntryBodyHeading' missing.*falls back to '" + [regex]::Escape('**To do / where I left off:**') + "'") $r.Out 'stub wording absent: INFO for Get-EntryBodyHeading quotes the literal default heading'
     Assert-Match "\[INFO\].*'Get-EntryFallbackType' missing.*falls back to 'Chore'" $r.Out 'stub wording absent: INFO for Get-EntryFallbackType names the Chore default'
     $infoCount6e = @([regex]::Matches($r.Out, '\[INFO\]')).Count
@@ -451,7 +455,7 @@ function Get-RosterIgnoredIds { return @() }
     foreach ($p in $pairs) { $pairsByName[$p.Name] = $p }
 
     $expectedContract = @(
-        @{ Function = 'Get-BranchInfo';      Lib = 'scripts\lib\branch-info.ps1'; Scripts = @('new-changelog-entry', 'open-pr') },
+        @{ Function = 'Get-BranchInfo';      Lib = 'scripts\lib\branch-info.ps1'; Scripts = @('new-branch', 'open-pr') },
         @{ Function = 'Test-BranchName';      Lib = 'scripts\lib\branch-info.ps1'; Scripts = @('new-branch') },
         @{ Function = 'Get-RepoName';         Lib = 'scripts\repo-config.ps1';     Scripts = @('open-pr', 'fold-changelog-entry', 'ship-pr', 'verify-resolved-issues') },
         # TWO CALLERS SINCE AUGUST 5, 2026 (inbound #464). cut-release resolved its gate by a fixed path
@@ -469,20 +473,23 @@ function Get-RosterIgnoredIds { return @() }
         # if either came back, the count assert below would have to change too, which is the conversation
         # that should happen.
         # The four stub-wording knobs (issue #410). These DO belong in this loop, unlike Get-LiveStage:
-        # they are attributed to 'new-changelog-entry', a genuinely registered shared script, so the
+        # they are attributed to 'new-branch', a genuinely registered shared script, so the
         # per-script assertions below apply to them unchanged.
-        # Three of the four gained a SECOND reader: open-pr.ps1's scaffold gate refuses a PR whose entry
-        # still carries this wording, through the same shared lib the writer uses. The per-script assertion
-        # below therefore now checks BOTH scripts really reference each one -- which is what would catch the
-        # gate being removed while the contract still promised it.
-        @{ Function = 'Get-EntryTitlePlaceholder'; Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry', 'open-pr'); ViaLib = 'entry-scaffold-lib' },
-        # open-pr ONLY since the branch/ split: new-changelog-entry stopped writing the to-do heading when
-        # the step list moved to branch-progress.md, so the gate is the last reader of this knob.
+        # THREE OF THE FOUR ARE NOW open-pr's ALONE. They were the writer's placeholders and gained the
+        # gate as a second reader; then the dossier form stopped WRITING them altogether -- every field is
+        # a heading with an empty space under it, and the gate measures emptiness instead of matching
+        # prose. What survives is refusal: an entry written by an older scaffolder still carries this
+        # wording, here and in every consumer, and open-pr still has to recognise it.
+        #
+        # ATTRIBUTED TO THE GATE ONLY, deliberately. Leaving 'new-branch' in the list would promise a
+        # dependency it does not have, and this loop's per-script assertion would then demand that the
+        # writer reference a knob it never reads -- a contract asserting a fiction.
+        @{ Function = 'Get-EntryTitlePlaceholder'; Lib = 'scripts\repo-config.ps1'; Scripts = @('open-pr'); ViaLib = 'entry-scaffold-lib' },
         @{ Function = 'Get-EntryBodyHeading';      Lib = 'scripts\repo-config.ps1'; Scripts = @('open-pr'); ViaLib = 'entry-scaffold-lib' },
-        @{ Function = 'Get-EntryBodyPlaceholder';  Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry', 'open-pr'); ViaLib = 'entry-scaffold-lib' },
+        @{ Function = 'Get-EntryBodyPlaceholder';  Lib = 'scripts\repo-config.ps1'; Scripts = @('open-pr'); ViaLib = 'entry-scaffold-lib' },
         # The fourth stays single-reader on purpose: a changelog TYPE is not scaffold prose, so 'Chore' is a
         # legitimate final value and can never be evidence of an unedited entry.
-        @{ Function = 'Get-EntryFallbackType';     Lib = 'scripts\repo-config.ps1'; Scripts = @('new-changelog-entry') },
+        @{ Function = 'Get-EntryFallbackType';     Lib = 'scripts\repo-config.ps1'; Scripts = @('new-branch') },
         # The two knobs the newly mirrored scripts brought with them (issues #411 and #413). Both belong
         # in this loop for the same reason the Get-Entry* four do: they are attributed to real registered
         # shared scripts, so the per-script assertions below apply unchanged -- and those assertions are

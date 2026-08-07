@@ -79,7 +79,7 @@ will be folded after it. Only the heading's LEVEL changes; its fields (the title
 where one was scaffolded in) are left exactly as written.
 
 THE DATE MOVED HERE FROM THE SCAFFOLD ON AUGUST 5, 2026 (Dave), and both halves of that were
-deliberate. It is the FOLD's to write, because new-changelog-entry.ps1 runs when the branch is created
+deliberate. It is the FOLD's to write, because new-branch.ps1 runs when the branch is created
 and could only ever record the branch's birth date -- wrong by however many days the branch lived, in
 the one document whose subject is when things landed. And it goes at the BOTTOM, because the heading
 carries what the author knows (title, type) while this line carries what only the merge knows.
@@ -181,7 +181,7 @@ if ($canDetectPlugins) { . $releaseLibPath }
 # The entry format: the heading levels this script recognises and normalises to, the impact table it reads
 # the reach and the significance from, and the ranked insert offset it places the entry at.
 # $PSScriptRoot-relative for the same reason as the lib above -- it travels with this script, so the writer
-# (new-changelog-entry.ps1), the validator (open-pr.ps1) and this reader always hold the same version of
+# (new-branch.ps1), the validator (open-pr.ps1) and this reader always hold the same version of
 # the format.
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
 
@@ -194,7 +194,7 @@ function Write-Utf8NoBom([string]$Path, [string]$Content) {
 }
 
 function Test-IsChangelogEntryFile {
-    # A changelog entry file (created by new-changelog-entry.ps1) always opens with its own heading, and
+    # A changelog entry file (created by new-branch.ps1) always opens with its own heading, and
     # since August 5, 2026 that heading is an H2 ('## <title>') rather than the H3 it was before. Repo-root
     # meta docs (CONTRIBUTING.md, SECURITY.md, a future CODE_OF_CONDUCT.md, ...) open with an H1 ('# ...').
     # Fold-all mode keys off this structural signature so it only ever folds a genuine entry, never
@@ -224,7 +224,7 @@ function Test-IsChangelogEntryFile {
 }
 
 # THE ENTRY NOW ARRIVES IN branch/, AND THE ROOT FORM IS STILL FOLDED (Dave, August 6, 2026). Since the
-# branch/ split, new-changelog-entry.ps1 writes branch/branch-changelog.md; every branch created before
+# branch/ split, new-branch.ps1 writes branch/branch-changelog.md; every branch created before
 # that -- here and in every consumer, who get these scripts through a plugin update rather than by
 # choosing to -- carries a root <branch-name>.md instead. Recognising only the new path would leave those
 # entries sitting unfolded in the root, which is precisely the silent half-state this repo keeps
