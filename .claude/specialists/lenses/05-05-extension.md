@@ -96,9 +96,12 @@ in one motion. The lint gate in `open-pr.ps1` is the guard that makes the defaul
 
 This pushes the branch and opens the PR with `.github/pull_request_template.md` as the body — walk
 through the checklist. The title prefix mirrors the branch type (`feat:`, `fix:`, `docs:`).
-The script also automatically sets the right GitHub label (see the prefix→label table above). Then
-continue without an intermediate question to [Merging to main](#merging-to-main) and
-[folding the changelog entry #06](05-06-extension.md#changelog).
+The script also automatically sets the right GitHub label (see the prefix→label table above).
+
+**Reach for `open-pr` on its own only when you are stopping at the PR** — work waiting under one of the
+two exceptions, or a branch you want reviewed before it lands. **When the work is going all the way
+through, run [`ship-pr`](#merging-to-main) instead**: its first step *is* this script, so running both
+puts the lint and all 26 suites through a second time for no added coverage.
 
 **Name the issues the PR closes — the gate now insists.** A PR that repairs an issue passes
 `-Resolves "331,332"`; a PR that repairs none passes `-NoResolves`. Leave both off while the changelog
@@ -142,13 +145,34 @@ if you want to override the auto-fill; do that via `--body-file`, never inline �
 ### Merging to main
 
 No separate merge approval is needed — the default covers it, as does Dave's "open the PR" when the
-work was waiting under an exception. The order is fixed, though: **first the PR open, then check the body on GitHub, only then merge** — never the other way
-around. Once that is done (and the lint gate is green):
+work was waiting under an exception.
+
+**`ship-pr` is the whole chain, and running it is the whole job:**
+
+```sh
+.\scripts\release\ship-pr.ps1 -Title "<branch-type>: short title"
+```
+
+It runs `open-pr` (gate → push → PR), waits for the required CI check, merges, checks out `main`, and
+folds the entry. One command, one gate run.
+
+**Do NOT run `open-pr` first and then `ship-pr`** — measured August 7, 2026 and it cost about 91 minutes
+in a single day. `ship-pr`'s step 1 *is* `open-pr`, so running both puts the lint and all 26 suites
+through twice: roughly 13 minutes each, on top of the ~11 that CI spends on the same commit. This section
+used to show a bare `gh pr merge` and never named `ship-pr`, which is what led into that route.
+
+The by-hand route below is the **fallback**, for when `ship-pr` cannot finish — a CI check that never
+reports, or a PR opened from the GitHub UI. The order is fixed either way: **first the PR open, then
+check the body on GitHub, only then merge**, never the other way around.
 
 ```sh
 git checkout main
 gh pr merge <branch> --merge --delete-branch --subject "merge: <branch> (#<PR-number>)"
 ```
+
+**That `--subject` is the same string `ship-pr` writes**, and it has to be: two formats for one line is
+how the graph stops being scannable. Written down here because it was invented twice on August 7, 2026 —
+`ship-pr` briefly shipped `merge: PR #NN <branch>` because this line was not read first.
 
 `--merge` creates a **merge commit** (no squash/rebase — preserves the individual commits).
 `--subject` gives the merge commit the `merge:` prefix. `--delete-branch` cleans up the branch
