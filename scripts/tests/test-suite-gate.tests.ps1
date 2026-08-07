@@ -10,8 +10,10 @@
     into a throttled parallel scheduler. Three of its properties can now break silently:
 
       1. IT MUST ACTUALLY RUN THEM IN PARALLEL. A scheduler with an off-by-one that leaves the throttle at
-         1 is indistinguishable from the old loop except by the clock, and a gate that quietly went back
-         to 572s would be read as "the machine is busy today".
+         1 is indistinguishable from the old loop except by how long the run takes, and a gate that quietly
+         went back to sequential would be read as "the machine is busy today". Proven by OVERLAP rather
+         than by the clock -- see the comment above case 4, which is where the first version of this suite
+         went wrong and had to be repaired against CI rather than against a local run.
       2. ATTRIBUTION MOVED FROM POSITION TO HEADER. Sequentially, a suite's output followed its own
          '== name ==' line because nothing else could be printed in between. In parallel that is only true
          because each child's output is buffered to its own files and flushed as one block. An interleaving
@@ -165,23 +167,63 @@ Write-Host "GATE-RESULT: `$r"
     Assert-True ($r.Text -match 'MARKER-Z') 'the failing suite still prints its own output -- attributable without a second run'
 
     # --- 4. It really is parallel, and -MaxParallel 1 really is the way back ------------------------
-    Write-Host "the point of the exercise -- six 2s suites do not cost twelve seconds" -ForegroundColor Cyan
-    $slow = Join-Path $Fixture 'suites-slow'
+    #
+    # ASSERTED ON OVERLAP, NOT ON THE CLOCK -- and the first version of this suite got that wrong in a way
+    # worth keeping written down. It asserted that six 2s suites finish "well under" their 12s serial sum,
+    # which passed locally at 2.8s and FAILED IN CI at 9.3s: a four-core runner, this suite itself running
+    # alongside three others, and six Start-Process launches competing with all of it. The ratio assert
+    # that was supposed to be the load-independent backstop failed with it, because an inflated parallel
+    # figure sits in its denominator.
+    #
+    # THE RULE THAT FALLS OUT OF IT: a timing FLOOR is a testable property, because Start-Sleep guarantees
+    # it; a timing CEILING is not, because nothing bounds how slow a shared machine can be. So the question
+    # "did these run at the same time?" is answered by asking whether their lifetimes OVERLAP, which is
+    # what the word means and is immune to how long each one took. Each fake suite stamps its own start and
+    # end; parallel must produce at least one intersecting pair, serial exactly none. That is a stronger
+    # claim than any stopwatch bound, and it let the sleeps shrink from 2s to 1.2s.
+    Write-Host "the point of the exercise -- do the suites overlap in time, or queue behind each other" -ForegroundColor Cyan
+    $slow   = Join-Path $Fixture 'suites-slow'
+    $stamps = Join-Path $Fixture 'stamps'
+    New-Item -ItemType Directory -Path $stamps -Force | Out-Null
     1..6 | ForEach-Object {
-        New-FakeSuite -Dir $slow -Name "s$_.tests.ps1" -Body "Start-Sleep -Seconds 2`r`nWrite-Host 'SLEPT-$_'`r`nexit 0`r`n"
+        $body = "`$s = [DateTime]::UtcNow.Ticks`r`n" +
+                "Start-Sleep -Milliseconds 1200`r`n" +
+                "Set-Content -LiteralPath '$stamps\s$_.txt' -Value (`"`$s `" + [DateTime]::UtcNow.Ticks) -Encoding Ascii`r`n" +
+                "Write-Host 'SLEPT-$_'`r`nexit 0`r`n"
+        New-FakeSuite -Dir $slow -Name "s$_.tests.ps1" -Body $body
     }
+
+    # Counts pairs of [start,end] intervals that intersect. Reads the stamp files the fake suites wrote.
+    function Get-OverlapCount {
+        param([string]$StampDir)
+        $iv = @(Get-ChildItem -Path $StampDir -Filter '*.txt' -File | ForEach-Object {
+            $parts = (Get-Content -LiteralPath $_.FullName -Raw).Trim() -split '\s+'
+            [pscustomobject]@{ Start = [long]$parts[0]; End = [long]$parts[1] }
+        })
+        $n = 0
+        for ($a = 0; $a -lt $iv.Count; $a++) {
+            for ($b = $a + 1; $b -lt $iv.Count; $b++) {
+                if ($iv[$a].Start -lt $iv[$b].End -and $iv[$b].Start -lt $iv[$a].End) { $n++ }
+            }
+        }
+        return $n
+    }
+
     $par = Invoke-Gate -TestsDir $slow
     Assert-True ($par.Text -match 'GATE-RESULT: True') 'all six slow suites pass'
     Assert-Equal 6 (@($par.Lines | Where-Object { $_ -match '^SLEPT-\d$' }).Count) 'and all six actually ran'
-    Assert-True ($par.Seconds -lt 8) "six 2s suites finish well under their 12s serial sum (took $([math]::Round($par.Seconds,1))s)"
+    Assert-Equal 6 (@(Get-ChildItem -Path $stamps -Filter '*.txt' -File).Count) 'and all six stamped their own lifetime'
+    $parOverlap = Get-OverlapCount -StampDir $stamps
+    Assert-True ($parOverlap -ge 1) "their lifetimes overlap -- they ran at the same time ($parOverlap intersecting pair(s) of 15)"
 
+    Get-ChildItem -Path $stamps -Filter '*.txt' -File | Remove-Item -Force
     $ser = Invoke-Gate -TestsDir $slow -MaxParallel 1
     Assert-True ($ser.Text -match 'GATE-RESULT: True') '-MaxParallel 1 still passes them'
-    Assert-True ($ser.Text -match 'one at a time') 'and says which mode it is in'
-    Assert-True ($ser.Seconds -ge 10) "serially the same six cost their sum (took $([math]::Round($ser.Seconds,1))s)"
-    # The ratio assert is the load-independent one: on a machine busy enough to blow the absolute bounds
-    # above, this still separates a scheduler from a loop.
-    Assert-True ($ser.Seconds -gt ($par.Seconds * 2)) 'serial is more than twice parallel -- the throttle is doing the work, not the clock'
+    Assert-True ($ser.Flat -match 'one at a time') 'and says which mode it is in'
+    Assert-Equal 0 (Get-OverlapCount -StampDir $stamps) 'serially NOTHING overlaps -- the valve really queues them'
+    # The one timing assert that is safe, because it is a floor the sleeps guarantee: six 1.2s suites in
+    # sequence cannot come in under 7.2s of sleeping, however fast the machine is.
+    Assert-True ($ser.Seconds -ge 6) "and it costs their sum (took $([math]::Round($ser.Seconds,1))s)"
 
     # --- 5. The working directory the child is handed ----------------------------------------------
     Write-Host "-WorkingDirectory -- the child inherits PowerShell's location, not the process's" -ForegroundColor Cyan

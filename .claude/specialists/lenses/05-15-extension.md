@@ -131,7 +131,9 @@ infrastructure.
   not noise** — a sum averages its own variance out, a maximum does the opposite, so a gate bound by its
   slowest suite is inherently less predictable than one bound by the total. Quote the range rather than the
   best run: the first parallel measurement taken was the 128s one, and on its own it would have promised a
-  4× improvement the gate delivers only sometimes. What made that safe rather than
+  4× improvement the gate delivers only sometimes. **CI gains less, and for a stated reason:** its runner
+  has four cores against this machine's eighteen, so the throttle is four wide and the `lint-en-tests` job
+  went from about eleven minutes to **7m2s**. What made that safe rather than
   lucky was checked before it was built, not after: no suite writes into the repo tree (every `$RepoRoot`
   reference is a read, or a `Copy-Item` *out of* it into a fixture), and no two suites share a fixture path
   — the fixed-name ones each own their name, the rest key on `$PID`. **Re-check both before adding a suite

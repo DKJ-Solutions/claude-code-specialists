@@ -8,6 +8,7 @@
 - [x] Point `ci.yml` at the same shared gate instead of its own inline loop over `scripts/tests`
 - [x] Mirror the lib into `plugins/specialists/scripts/lib/` via `build-shared-scripts.ps1`
 - [x] New suite `test-suite-gate.tests.ps1`: the empty contracts, atomic blocks, the exit code, the timing, the working directory
+- [x] Repair that suite's stopwatch assertion after CI failed it at 9.3s: prove parallelism by interval overlap instead, verify the repair under deliberate load, and record the floors-not-ceilings rule in Tycho's manual
 - [x] Assert in `cut-release-guardrail.tests.ps1` that CI is the third *caller* and not a third copy
 - [x] Measure before and after on one machine in one session: 510s sequential against 128-263s parallel over six runs (median 159s), all 27 suites green every time
 - [x] Record the two measured `Start-Process` traps in Sylvester's portable manual, and the gate's numbers + remaining critical path in his lens

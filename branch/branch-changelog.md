@@ -64,6 +64,21 @@ empty-input contracts, atomic per-suite blocks, stderr landing inside its own bl
 surviving into the verdict, that it genuinely runs in parallel and that the valve genuinely does not, and
 the working directory the child is handed.
 
+**That suite's own first version was wrong, CI caught it, and the repair is a rule now in Tycho's manual.**
+It proved parallelism with a stopwatch — "six 2s suites finish well under their 12s serial sum" — which
+passed locally at 2.8s and failed on the four-core runner at **9.3s**, where the suite competes with three
+siblings and their children; the ratio assertion meant as the load-independent backstop failed with it,
+because an inflated parallel figure sits in its denominator. **A timing floor is a property the code
+guarantees and a timing ceiling is a property of the machine**, so the question "did these run at the same
+time?" is not a question about duration: each fake suite now stamps its own start and end, and the
+assertion is that the intervals intersect under the throttle and do not under the valve. The repaired suite
+was then re-run with eight processes deliberately saturating the machine, rather than being declared
+load-insensitive on the strength of one green local run.
+
+**CI gains too, and less than the local gate does.** Its runner has four cores against this machine's
+eighteen, so the throttle is four wide; the `lint-en-tests` job came in at **7m2s** against the ~11 minutes
+it had been taking — including, on that run, the failing suite above.
+
 ### Significance
 
 #### Tier 0
