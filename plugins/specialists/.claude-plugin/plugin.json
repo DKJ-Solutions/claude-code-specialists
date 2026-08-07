@@ -2,7 +2,7 @@
   "name": "specialists",
   "displayName": "Claude Specialists",
   "description": "Portable executable core of the Claude Specialists system: the shared subagents plus the portable persona templates (personas/) of the main-loop specialists and the generic bootstrap skill specialists-init. Deliberately contains NO safety/guardrail hooks and NO repo-SPECIFIC skills — the governance layer (CLAUDE.md + repo lenses), the safety hooks, and the repo's own specialists stay at repo level. Two deliberate, repo-neutral exceptions: the skill specialists-init (the adoption path itself) and the informational SessionStart hook connector-sessioncheck (hooks/, read-only, never blocks — see the connectors README in the marketplace repo).",
-  "version": "3.6.0",
+  "version": "3.7.0",
   "author": { "name": "DaveKJohn" },
   "keywords": ["specialists", "workflow", "claude-code"]
 }

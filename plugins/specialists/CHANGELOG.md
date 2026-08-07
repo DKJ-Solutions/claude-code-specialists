@@ -4,6 +4,193 @@ Consumer-facing history of this plugin: per release, the changes that touched th
 Automatically appended by `cut-release.ps1` of the marketplace repo (claude-code-specialists); the
 full repository history lives there in `CHANGELOG.md` and `releases/`.
 
+## v3.7.0 — 2026-08-07
+
+### `feat/scaffold-without-comments` changelog
+
+#### Branch description
+
+The scaffolded branch files carry no guidance comments
+
+#### Branch ID
+
+20260807-103608
+
+#### Branch type
+
+feat
+
+#### What does the change on this branch bring to main?
+
+`new-branch` writes both branch files **bare**: headings, the three fields it fills in itself, and nothing
+else. Every HTML comment -- the per-field guidance and the two routing questions under Tier 0 and Tier 1 --
+is now written only into the copies under `branch/templates/`, which is what those copies are for. The file
+you write in stopped being mostly form text.
+
+One switch carries it. `Format-EntryBlock -Template` and `Format-BranchProgressScaffold -Template` are the
+only renderings that emit guidance, and they are also the only ones that mark their heading `(template)` --
+one flag rather than two, because those are the same fact: this is the reference, not somebody's working
+file. `Get-BranchTemplates` is the only caller that passes it.
+
+Nothing downstream changed, and that is the part that was checked rather than assumed. The scaffold gate
+already **measured** empty fields instead of matching placeholder prose, so it is unaffected. The fold keeps
+its comment stripper: every branch in flight, here and in every consumer, carries comments right now, and
+they meet these scripts through a plugin update rather than by choosing to.
+
+**And the step list carries the plan and nothing else.** Description, ID and type briefly sat at the top of
+both files so the pair would say whose it is; they are the entry's alone now. The same information in two
+places is free to disagree, and here it would have been visible on every branch -- two files side by side,
+each with its own copy of the same three boxes. The step list identifies itself by its heading, which is
+the one thing any script reads out of it besides the step marks.
+
+**And the tier model changed with it.** All three tiers are now written into every entry instead of tier 1
+and 2 arriving commented out, and a tier the change does not reach is **answered** -- `**Score:** N/A` with
+a line saying why -- rather than left out. The reason is the same one behind the bare files: an absent
+section and an unfinished one look identical, so no gate could tell *"this reaches no consumer"* from
+*"nobody has got to tier 2 yet"*, and those need opposite responses. **The reach is now the highest tier
+carrying a number**, where it used to be the highest tier with a section -- without that, every entry would
+have read as tier 2 and repo-internal work would have been published to consumers. A `Yes/No` field was
+drafted alongside the score and dropped: a score and a yes are one fact, free to contradict each other.
+
+#### Pull Request
+
+[PR #501](https://github.com/DaveKJohn/claude-code-specialists/pull/501) · merged 2026-08-07
+
+---
+
+### `feat/branch-file-form` changelog
+
+#### Branch description
+
+The branch files take the form Dave designed
+
+#### Branch ID
+
+20260807-000213
+
+#### Branch type
+
+feat
+
+#### What does the change on this branch bring to main?
+
+The two files a branch works in now carry the form Dave designed, and `branch/templates/` holds it as the
+spec rather than as a copy: the generator reproduces both files **byte for byte**, so they were never
+edited to match the code. The entry became the branch's own dossier -- the heading names the branch, and
+six sections carry the description, a creation timestamp, the type, what the change brings to `main`, the
+Significance sub-sections and a `Pull Request` section the fold fills from the merge.
+
+Every field is now a heading with a guidance comment above an empty space, which retired the last visible
+`TODO:`. So the scaffold gate stopped matching prose and started **measuring**: it refuses an entry whose
+description, body or any tier's reason is empty once the comments are stripped -- strictly more than the
+strings caught, because it also catches a placeholder deleted rather than answered. Every older shape is
+still read: the retired section headings, the plain `Score:`, the one-line routing questions and the
+`Tier: N` line.
+
+Three defects surfaced while wiring it, each found by a check rather than by a report. The fold never
+called the comment stripper written for it, so every guidance block would have folded into `CHANGELOG.md`
+verbatim. The step gate read the three example marks out of its own guidance comment, reporting four open
+steps on a fresh branch -- three of which no one could resolve, since they return with the next scaffold.
+And `Resolve-EntryType` took the first line of its section, which is now the hint, so every new entry
+declared its type to be `<!-- options for type are: feat, fix or docs-->`.
+
+#### Pull Request
+
+[PR #498](https://github.com/DaveKJohn/claude-code-specialists/pull/498) · merged 2026-08-07
+
+---
+
+### The impact table becomes a Significance section with one sub-heading per tier
+
+#### What does this change do?
+
+`### Who is this for` and its impact table are replaced by `### Significance`, holding one
+`#### Tier N` sub-section per reach the change claims -- each with why it matters at that reach, then
+its score, then a question asking whether there is a next tier:
+
+```text
+#### Tier 0
+
+The routine version bump stops needing a developer.
+
+Score: 4
+
+Is this change also relevant to colleagues and employers? Then continue to Tier 1.
+If not, stop here and move on to the next section.
+```
+
+**The table went because it forced a rectangle onto something that is not always rectangular.** Not
+every change has a tier 1 or a tier 2. In a table that absence is a missing row, which reads as an
+omission; as a section it is simply absent, which reads as an answer. The heading stopped naming an
+audience for the same reason the shape changed: each sub-section names its own by its number, and what
+the section carries is how much the change *weighs* for each of them.
+
+**Every section closes by asking whether there is a next one, including one whose successor is already
+below it.** An earlier draft wrote the question only under the last section, reasoning that a tier
+whose successor exists has been answered. True of the author, false of every later reader: the entry is
+walked again at the fold, at the cut and in the record, and a question that disappears once answered
+leaves them unable to see that it was asked.
+
+**Three shapes are read and one is written.** The sub-sections, the impact table, and the older
+`Tier: N` line -- because `CHANGELOG.md` holds all three right now, every consumer's tree holds at
+least one, and they reach the new parser through a plugin update rather than by choosing to. A parser
+that knew only the newest shape would read every other entry as tier 0: silent, correct-looking, and
+wrong in the direction that empties a release.
+
+**The retired section heading is recognised too, and that one was measured rather than foreseen.** The
+moment `Who is this for` became `Significance`, the lint reported all 24 pending entries in this repo's
+own changelog as *misspelled* section headings -- its most alarming finding and its least true. Twenty-four
+false accusations at once is how a check gets switched off rather than heeded, so a name-matcher now
+accepts the retired names alongside the current ones.
+
+Two defects were found by their own tests while building this, both worth naming because both fail
+silently:
+
+- **`[ref]` to a property of a `pscustomobject` writes to a copy.** The section reader collected its
+  complaints through one, so every malformed section parsed, reported nothing, and fell through to the
+  legacy reader as an undeclared tier 0 -- the exact failure class this parser exists to prevent, inside
+  the parser. It returns the pair instead now, which cannot go wrong at all.
+- **An entry whose every section is malformed has zero rows**, and falling through on that count alone
+  would have discarded the complaints with it. Errors now count as "this entry used the section shape"
+  just as rows do.
+
+#### Significance
+
+#### Type of change
+
+Feat
+
+[PR #496](https://github.com/DaveKJohn/claude-code-specialists/pull/496) · merged 2026-08-06
+
+---
+
+### `fix/template-trailing-newline` changelog
+
+#### Branch description
+
+The progress template ends with a newline
+
+#### Branch ID
+
+20260807-091625
+
+#### Branch type
+
+fix
+
+#### What does the change on this branch bring to main?
+
+`branch/templates/branch_template_progress.md` ends with a newline. It had none: an accident of the editor
+the form was designed in, reproduced faithfully by `Get-BranchTemplates` while the hand-written templates
+were being treated as the spec for the shape. A file without a terminator is the one whose next diff shows
+a line nobody edited, and git says so on every one of them.
+
+#### Pull Request
+
+[PR #499](https://github.com/DaveKJohn/claude-code-specialists/pull/499) · merged 2026-08-07
+
+---
+
 ## v3.6.0 — 2026-08-06
 
 ### Every change is an H2 with three named sections, and the tier sections are gone
