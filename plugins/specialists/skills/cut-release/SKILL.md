@@ -64,6 +64,12 @@ each command as you go — do not skip a step or reorder them from memory.
      where a human sees the assembled artifact before it is public.
    - **`-SkipLint`** skips the integrity gate that otherwise runs first. It exists for a genuinely broken
      gate, not for a hurry — the gate is what stops a release refusing to cut halfway through.
+   - **`-SkipTests`** skips the test suites, which run right after the lint and before anything is
+     written. **Added August 7, 2026**, because until then the cut ran the lint *alone* — making the
+     release the least-checked commit in the workflow, while every ordinary PR passes the lint *and* the
+     suites locally and again in CI. A release could be committed, tagged and pushed with a suite red.
+     Separate from `-SkipLint` for the same reason those two are separate in `open-pr`: two tools, and
+     skipping one is no reason to skip the other.
    - **`-SkipTierGate`** cuts a bump the pending changelog entries have not earned. **Expect not to need
      it.** Where the pending entries declare their impact, **the bump follows the highest tier pending**:
 

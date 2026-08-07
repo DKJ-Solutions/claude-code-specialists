@@ -93,6 +93,31 @@ Assert-True ($plannedBlock.Success -and $plannedBlock.Value -match 'highlightsRe
 Assert-True ($cutReleaseText -notmatch 'ConvertTo-ReleaseHtml') 'cut-release calls no HTML renderer'
 Assert-True ($cutReleaseText -notmatch "\.html") 'cut-release writes no .html path at all'
 
+Write-Host "cut-release.ps1 -- the release passes the same test gate every PR does" -ForegroundColor Cyan
+# ISSUE #510. Until August 7, 2026 the cut ran the LINT ALONE, which made the release commit the
+# least-checked commit in the workflow -- every ordinary PR passes the lint AND all the suites locally, and
+# CI runs both again before the merge is allowed. Wiring-level asserts for the reason the block below gives:
+# this script refuses to run anywhere but a clean main, so the gate cannot be exercised in-process.
+Assert-True ($cutReleaseText -match 'Invoke-TestSuiteGate') 'cut-release runs the test suites'
+Assert-True ($cutReleaseText -match '(?m)\[switch\]\$SkipTests') 'and declares -SkipTests as the escape valve'
+# ONE OWNER FOR THE LOOP. open-pr had run the suites since PR #54; copying its fifteen lines into the cut
+# would have been two copies of one rule, free to drift. Both call the same shared helper -- asserted here
+# because a later "simplification" that inlines either one is exactly how that drift starts.
+$openPrForGate = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\open-pr.ps1'))
+Assert-True ($openPrForGate -match 'Invoke-TestSuiteGate') 'and open-pr runs the SAME shared gate, not a copy of it'
+$captureLib = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'))
+Assert-True ($captureLib -match '(?m)^function Invoke-TestSuiteGate') 'which is defined once, in the lib both of them already load'
+# BEFORE THE FIRST WRITE, like the lint above it: a release that fails halfway leaves a half-bumped tree on
+# main under one of this repo's two direct-commit exceptions, which is where a failure costs most to undo.
+#
+# ANCHORED ON THE FIRST CALL OF THE WRITE HELPER, not on 'WriteAllText'. The first version searched for
+# that string and failed -- because it matches the DEFINITION of Write-Utf8NoBom near the top of the file,
+# which sits before the gate while writing nothing. A position assert has to point at the thing that
+# happens, not at the thing that is declared.
+$gateIdx  = $cutReleaseText.IndexOf('Invoke-TestSuiteGate')
+$writeIdx = $cutReleaseText.IndexOf('Write-Utf8NoBom -Path')
+Assert-True ($gateIdx -gt 0 -and $writeIdx -gt 0 -and $gateIdx -lt $writeIdx) 'and it runs before the first write'
+
 Write-Host "cut-release.ps1 -- the bump gate runs before the first write, and only its own flag skips it" -ForegroundColor Cyan
 # The RULES are unit-tested where they live (Test-ReleaseBumpEarned, release-lib.tests.ps1). What can only
 # be checked here is the WIRING, and the same constraint applies as above: this script refuses to be
