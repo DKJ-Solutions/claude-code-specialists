@@ -85,7 +85,12 @@ Assert-Equal "Branch name must not be 'main'." $mainCheck.Reason "'main' -> expe
 
 $finalCheck = Test-BranchName -Branch 'feat/final-version'
 Assert-Equal $false $finalCheck.IsValid "name with token 'final' -> IsValid false"
-Assert-Equal "Branch name must not contain the token 'final'." $finalCheck.Reason "token 'final' -> expected Reason"
+# THE REASON NAMES THE REMEDY, so it is asserted in two halves rather than as one literal: what was
+# refused, and what to do instead. A whole-string compare would go red on every rewording of the
+# explanation, which is the half most likely to be improved -- and it would say nothing about the part
+# that actually has to be there.
+Assert-True ($finalCheck.Reason -match "must not contain the token 'final'") "token 'final' -> the Reason says what was refused"
+Assert-True ($finalCheck.Reason -match '-v2') "token 'final' -> and names the remedy, so the next guess is not 'finished'"
 
 $emptyCheck = Test-BranchName -Branch ''
 Assert-Equal $false $emptyCheck.IsValid 'empty name -> IsValid false'
