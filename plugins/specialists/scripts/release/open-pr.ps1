@@ -17,6 +17,13 @@
     issue verification) never ran, so the merge and the fold had to be done by hand -- exactly the
     five-step sequence ship-pr exists to remove. Measured August 4, 2026 on PR #457.
 
+    THE TITLE IS NOT TYPED HERE -- IT IS DERIVED (Dave, #506 + #505, August 7, 2026). A fresh PR is called
+    '<branch type>: <the entry's Branch title>': the type off the branch prefix, the words out of
+    branch/branch-changelog.md. So the sentence is written once, at `new-branch -Title`, and the PR, the
+    changelog and the release documents cannot disagree about what the change is called -- nor can the title
+    lose its type prefix, which the last five PRs before this change all had (#499-#503). Get-PrTitle
+    composes it; -Title is still accepted and ignored, see that parameter.
+
     Title and body are LEFT ALONE by default when a PR already exists. The body may have been edited on
     github.com since it was opened, and silently overwriting a reviewer's or the author's edits with a
     freshly generated template is a worse failure than a stale title: the title is visible on the PR, an
@@ -110,7 +117,16 @@
     scripts/tests/pr-issues.tests.ps1.
 
 .PARAMETER Title
-    PR title, e.g. "feat: new domain plugin" or "fix: broken agent-def frontmatter".
+    ACCEPTED AND IGNORED since #506 (August 7, 2026). The PR title is composed from the branch prefix and
+    the entry's 'Branch title' section; passing one here warns and changes nothing. Retitle an open PR with
+    `gh pr edit`, and change a future one by editing the entry.
+
+    NOT REMOVED, on the standing reason: every branch in flight -- here and in every consumer -- calls this
+    script with -Title right now, and consumers receive the new script through a plugin update rather than
+    by choosing to. A removed parameter turns all of those into "A parameter cannot be found", which is a
+    stop at the end of a finished branch. Accepting it costs one warning; refusing it costs somebody's
+    afternoon. An OVERRIDE was the alternative and Dave declined it in the issue: an override is a second
+    source of the title, which is the whole thing this change removes.
 
 .PARAMETER Body
     (Optional) PR description. Default: the filled-in .github/pull_request_template.md.
@@ -150,14 +166,14 @@
     Ignored on a fresh PR, where the body is generated from the template anyway.
 
 .EXAMPLE
-    ./scripts/release/open-pr.ps1 -Title "feat: new domain plugin"
+    ./scripts/release/open-pr.ps1
 
 .EXAMPLE
-    ./scripts/release/open-pr.ps1 -Title "fix: the pre-flight reads commits" -Resolves 331,332
+    ./scripts/release/open-pr.ps1 -Resolves 331,332
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][string]$Title,
+    [string]$Title = '',
     [string]$Body = '',
     [switch]$SkipLint,
     [switch]$SkipTests,
@@ -243,9 +259,39 @@ if (-not (Test-Path -LiteralPath $entryPath)) {
 
 # The entry's description, read ONCE here because two paths need it: the template auto-fill for a fresh
 # PR, and -RefreshBody for a resumed one. Reading it twice would be two chances to read it differently.
+# The same single read now also supplies the PR TITLE (#506) -- one file read, one set of facts.
 $entryDescription = ''
+$prTitle = ''
 if (Test-Path -LiteralPath $entryPath) {
-    $entryDescription = Get-EntryDescription -EntryText ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8))
+    $entryText = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
+    $entryDescription = Get-EntryDescription -EntryText $entryText
+
+    # Get-EntrySectionAnswer, not the raw section body: it strips the guidance comments, so a template
+    # comment left standing above the answer cannot end up in the PR title. It also accepts the section's
+    # RETIRED name, so an entry written as 'Branch description' still names its own PR.
+    $titleWords = Get-EntrySectionAnswer -EntryText $entryText -Key 'Description'
+
+    # A PRE-SPLIT ENTRY HAS NO TITLE SECTION -- ITS TITLE IS THE HEADING, and it must still be able to open
+    # a PR. Such branches exist right now in every consumer, which receives this script through a plugin
+    # update rather than by choosing to; refusing them would turn a branch that worked yesterday into a stop
+    # at the last step. Test-EntryHasSection rather than the empty answer, because ABSENT and EMPTY are
+    # different questions: an entry that HAS the section and left it blank is an author who has not written
+    # the title yet, and falling back to the branch heading would hide that behind a plausible-looking PR.
+    #
+    # Convert-EntryHeadingToTitle does the field-dropping, which is why release-lib is loaded here rather
+    # than the rule being written a second time: it already knows that a heading's leading '#NN' and its
+    # trailing type/date fields are administration, decided by the SHAPE of each field rather than by
+    # counting them -- the distinction that lets one rule read both eras of heading. A copy here would be
+    # free to disagree with the document the fold produces from the same heading.
+    if (-not $titleWords -and -not (Test-EntryHasSection -EntryText $entryText -Key 'Description')) {
+        . (Join-Path $PSScriptRoot '..\lib\release-lib.ps1')
+        $headingLine = @((Convert-EntryHeadingToTitle -EntryText $entryText) -split "\r?\n")[0]
+        $titleWords = ($headingLine -replace '^#+\s*', '').Trim()
+    }
+
+    # An UNKNOWN prefix is passed as '' -- see Get-PrTitle -- so the title carries a type only where the
+    # branch table backs one.
+    $prTitle = Get-PrTitle -Prefix $(if ($info.IsKnown) { $info.Prefix } else { '' }) -TitleWords $titleWords
 }
 
 # --- Does this branch already have an open PR? ----------------------------------------------------
@@ -275,6 +321,18 @@ if ($prLookup.ExitCode -ne 0) {
     # cannot be. It returns $null for anything it cannot read, which is the same "no existing PR" the
     # failed-query branch above assumes.
     $existingPr = Get-ExistingPrRecord -Json ($prLookup.Output -join "`n")
+}
+
+# -Title IS ACCEPTED AND IGNORED (#506). Said out loud rather than silently dropped: a caller who passed a
+# title has an expectation about what the PR will be called, and the one thing worse than not honouring it
+# is not honouring it quietly. HERE and not at the parameter, because the answer needs the entry AND the
+# existing-PR lookup: on a resumed branch the title was never going to be touched by any route.
+if ($Title) {
+    if ($existingPr) {
+        Write-Warning "-Title is ignored since #506, and this branch already has a PR, which keeps its own title either way. Retitle with 'gh pr edit'."
+    } else {
+        Write-Warning "-Title is ignored since #506 - the PR title comes from the entry's title section. This PR will be called '$prTitle'; edit that section (or 'gh pr edit' afterwards) if that is wrong."
+    }
 }
 
 # --- Resolves gate --------------------------------------------------------------------------------
@@ -667,6 +725,17 @@ if ($info.IsKnown) {
     Write-Warning "Unknown branch prefix '$($info.Prefix)' - label 'question' set; classify the PR manually."
 }
 
+# A PR CANNOT BE CREATED NAMELESS, and this is the one place that has to hold. The emptiness gate above
+# already refuses an entry whose title section is empty -- but -Force waves that gate through for the entry
+# that legitimately quotes the scaffold wording, and an empty title would then reach `gh pr create --title ''`
+# and be refused by gh with a message about a flag rather than about the entry. Checked HERE, on the create
+# path only: a resumed PR keeps its own title and has already exited above.
+if (-not $prTitle) {
+    Write-Error ("open-pr cannot name this PR -- the entry's title section is empty ($entryPath).`n`nThe PR title is composed from the branch prefix and that section (#506), so fill it in and run again. It is what CHANGELOG.md and the release documents will call this change too.")
+    exit 1
+}
+Write-Host "PR title (from the entry): $prTitle" -ForegroundColor DarkGray
+
 if (-not $Body) {
     $templatePath = Join-Path $repoRoot ".github\pull_request_template.md"
     if (Test-Path $templatePath) {
@@ -770,7 +839,7 @@ try {
     # so a stderr line cannot become a terminating error before the exit-code check (#107, the same
     # pitfall as the push above). The optional assignee/milestone args are appended to the fixed
     # argument list. The temp body file is cleaned up in finally, whether or not gh succeeds.
-    $create = Invoke-NativeCapture -FilePath 'gh' -Arguments (@('pr', 'create', '--base', 'main', '--head', $branch, '--title', $Title, '--body-file', $bodyFile, '--label', $label, '--repo', $repo) + $extraGhArgs)
+    $create = Invoke-NativeCapture -FilePath 'gh' -Arguments (@('pr', 'create', '--base', 'main', '--head', $branch, '--title', $prTitle, '--body-file', $bodyFile, '--label', $label, '--repo', $repo) + $extraGhArgs)
     $create.Output | ForEach-Object { Write-Host $_ }
     if ($create.ExitCode -ne 0) { Write-Error "Creating the PR failed (is gh logged in?)."; exit 1 }
 } finally {

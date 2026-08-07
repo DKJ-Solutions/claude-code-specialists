@@ -609,7 +609,12 @@ $script:EntryGuidanceDefaults = [ordered]@{
     # passes a block through untouched when it is already a comment, because these four are Dave's own
     # one-liners and their spacing is not derivable from a rule -- '<!-- Short' has a space after the marker
     # and '<!--unique' does not. The templates are the spec, so the literal is the honest representation.
-    Description = @('<!-- Short description of branch-->')
+    # THE HINT FOLLOWED THE SECTION'S JOB (#506, August 7, 2026). It read '<!-- Short description of
+    # branch-->' while the section was called 'Branch description'; it is the PR title now, and a hint that
+    # still said "description" would send the next author to write a paragraph into a field that becomes a
+    # one-line title. Dave's one-liners are the spec here, so this stays one line in the same register --
+    # and the templates are REGENERATED from it rather than edited beside it.
+    Description = @('<!-- Short title of the change -- also the PR title, so no feat:/fix:/docs: prefix-->')
     Id          = @('<!--unique ID for branch like a timestamp of the moment this branch is created-->')
     Type        = @('<!-- options for type are: feat, fix or docs-->')
     # Translated on Dave's word (August 7, 2026): it closed in Dutch, and this line is script-generated
@@ -1508,7 +1513,14 @@ function Remove-EmptyImpactSection {
     # The retired names matter for the same reason they matter to the lint: an entry written under the old
     # heading still carries a table, and stripping that table has to take the old heading with it or the
     # hole simply moves to the older entries.
-    $headings = @((Get-EntrySectionHeadings)['Significance']) + @(Get-EntryRetiredSectionHeadings) |
+    #
+    # THIS SECTION'S RETIRED NAMES, NOT EVERY SECTION'S (August 7, 2026). It read the flattened list, which
+    # answers "is this a heading we know" -- a different question from "does this heading open the
+    # significance block". While every retired name happened to belong to a section no other document
+    # carried, the two questions gave the same answer and the shortcut was invisible. Renaming
+    # 'Branch description' to 'Branch title' broke that coincidence: this remover would have accepted an
+    # entry's empty TITLE heading as the significance block's and deleted it. Ask the section, not the set.
+    $headings = @((Get-EntrySectionHeadings)['Significance']) + @(Get-EntrySectionRetiredNames -Key 'Significance') |
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     if (@($headings).Count -eq 0) { return $EntryText }
     $headingRx = '^#{' + (Get-EntrySectionLevel) + '}\s+(?:' +
@@ -1767,7 +1779,7 @@ function Get-ImpactInsertOffset {
 #
 # THE SIX SECTIONS, IN THE ORDER THEY ARE WRITTEN:
 #
-#   Branch description   the human-readable name of the change -- what the heading used to carry
+#   Branch title         the human-readable name of the change -- what the heading used to carry
 #   Branch ID            a unique stamp, written by the scaffolder at creation
 #   Branch type          feat / fix / docs / chore, from the branch prefix
 #   What does the ...    the description a reader of CHANGELOG.md arrives for
@@ -1784,8 +1796,14 @@ function Get-ImpactInsertOffset {
 # THE ORDER IS LOAD-BEARING, not presentation. The lint's split-entry rule asks whether a block's FIRST
 # named section is the first of these, which is how a stray heading at the entry's own level is caught --
 # so a reordering here changes what that gate means. Get-EntryFirstSectionKey states it once.
+# AND IT IS 'Branch title', NOT 'Branch description', SINCE AUGUST 7, 2026 (Dave, #506). The field is what
+# the change is CALLED -- in this file, in CHANGELOG.md, in the release documents, and since the same day in
+# the PR title, which open-pr.ps1 now composes from it rather than taking on the command line. "Description"
+# undersold that, and it read as a synonym of the 'What does the change...' section two rows below it, which
+# genuinely is the description. The KEY stays 'Description': it is machine-read, every caller names it, and
+# renaming a key to match a heading is how a rename stops being cosmetic.
 $script:EntrySectionDefaults = [ordered]@{
-    Description  = 'Branch description'
+    Description  = 'Branch title'
     Id           = 'Branch ID'
     Type         = 'Branch type'
     What         = 'What does the change on this branch bring to main?'
@@ -1809,6 +1827,7 @@ $script:EntrySectionDefaults = [ordered]@{
 # hundreds of entries that say 'Type of change'. Both questions are answered from this one map, so a name
 # retired for one reader cannot be forgotten by the other.
 $script:EntryRetiredSectionNames = [ordered]@{
+    Description  = @('Branch description')
     What         = @('What does this change do?')
     Significance = @('Who is this for')
     Type         = @('Type of change')
@@ -1941,7 +1960,8 @@ function Test-EntryHasSection {
 
         ABSENT AND EMPTY ARE DIFFERENT QUESTIONS, and conflating them produced a false accusation on the
         first run of the emptiness gate. Get-EntrySectionAnswer returns '' for both, so a gate built on it
-        alone reported 'Branch description' as unanswered on every pre-dossier entry -- entries that never
+        alone reported the title section (then called 'Branch description') as unanswered on every
+        pre-dossier entry -- entries that never
         had that section, because their title was the heading. Every branch in flight carries one, so that
         is two dozen refusals for writing an entry correctly under the format that was current at the time.
 
@@ -2156,7 +2176,7 @@ function Format-EntryBlock {
 
         THE HEADING NAMES THE BRANCH, NOT THE CHANGE (Dave, August 6, 2026) -- '## `feat/x` changelog', the
         same heading branch-progress.md carries with its own suffix, because the two files are a matched
-        pair. What the heading used to hold now has a section of its own: 'Branch description'. This whole
+        pair. What the heading used to hold now has a section of its own: 'Branch title'. This whole
         file is still pasted verbatim into CHANGELOG.md at the merge, so that is what lands there; Dave was
         offered a fold that derives a slimmer block instead and declined it, on the record, before this was
         built. See $script:EntrySectionDefaults for the reasoning.
@@ -2271,22 +2291,33 @@ function Test-EntryDeclaresShape {
         this format quotes these headings inside a fence, and the entry for this very change does.
 
         THREE OF THE SIX SECTIONS PROVE NOTHING, AND THAT IS NEW (August 6, 2026). The dossier form gave
-        branch-progress.md the same 'Branch description', 'Branch ID' and 'Branch type' headings the entry
+        branch-progress.md the same title, 'Branch ID' and 'Branch type' headings the entry
         carries -- deliberately, they are one pair of files -- so a predicate matching ANY named section
         started answering $true for the step list. Measured immediately: the scaffold gate then judged a
         freshly written step list as an unfinished ENTRY and reported its empty description. That is the
         exact confusion the two-file split was made to remove, reappearing inside the discriminator.
 
-        So only the sections an entry ALONE has count: the description question, the significance block, the
-        pull-request section, and every RETIRED name -- 'Type of change' and the rest were written when there
-        was one file, so a step list cannot be carrying one.
+        So only the sections an entry ALONE has count: the 'what does it bring' question, the significance
+        block and the pull-request section -- WITH THEIR OWN RETIRED NAMES, and no others.
+
+        THAT LAST CLAUSE IS A REPAIR, not a restatement (August 7, 2026). This read every retired name in the
+        format's history, justified as "'Type of change' and the rest were written when there was one file,
+        so a step list cannot be carrying one". True of every name in that list on the day it was written,
+        and it stopped being true the moment 'Branch description' was retired in favour of 'Branch title':
+        that name dates from AFTER the split, so the step lists of that fortnight -- on every branch in
+        flight here and in every consumer -- carry it. A blanket retired list would have read those step
+        lists as entries again. Retired names are inherited per section now, so a name can only ever prove
+        what its own section proves. Nothing is lost by dropping 'Type of change' from this set: an entry old
+        enough to carry it carries 'What does this change do?' and 'Who is this for' as well, both still here.
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
 
     $body = Get-EntryTextOutsideFences -EntryText $EntryText
     $lines = @($body -split '\r?\n')
-    $headings = @((Get-EntrySectionHeadings)['What'], (Get-EntrySectionHeadings)['Significance'],
-        (Get-EntrySectionHeadings)['PullRequest']) + @(Get-EntryRetiredSectionHeadings)
+    $entryOnlyKeys = @('What', 'Significance', 'PullRequest')
+    $headings = @($entryOnlyKeys | ForEach-Object {
+        @((Get-EntrySectionHeadings)[$_]) + @(Get-EntrySectionRetiredNames -Key $_)
+    })
     foreach ($heading in $headings) {
         if (-not $heading) { continue }
         $rx = '^#{' + $script:EntrySectionLevel + '}\s+' + [regex]::Escape([string]$heading) + '\s*$'
@@ -2373,7 +2404,7 @@ function Get-EntryScaffoldFindings {
         # Id and Type are written by the scaffolder itself, so an empty one is a scaffolder fault rather
         # than an author's, and refusing the author for it would be pointing at the wrong person.
         # ONLY A SECTION THE ENTRY ACTUALLY HAS. An entry written before the dossier form carries no
-        # 'Branch description' -- its title was the heading -- and reporting the absence would refuse every
+        # title section at all -- its title WAS the heading -- and reporting the absence would refuse every
         # branch in flight for having been correct under the format of the day. See Test-EntryHasSection.
         foreach ($key in @('Description', 'What')) {
             if (-not (Test-EntryHasSection -EntryText $EntryText -Key $key)) { continue }

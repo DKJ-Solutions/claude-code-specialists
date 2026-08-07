@@ -547,11 +547,12 @@ if ($args -contains 'create') {
     New-Item -ItemType Directory -Path (Join-Path $prFixtureRoot '.github') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $prFixtureRoot 'scripts\lib') -Force | Out-Null
     Copy-Item -Path (Join-Path $RepoRoot 'scripts\lib\branch-info.ps1') -Destination (Join-Path $prFixtureRoot 'scripts\lib\branch-info.ps1') -Force
-    $prEntryContent = @'
-### Open-PR 101 test - Feat - 2026-07-21
-
-This is the test description text.
-'@
+    # THE HEADING CARRIES ITS FIELDS IN THE SHAPE THE RECORD ACTUALLY USES -- middot-separated, as every
+    # entry in releases/ does. It read '- Feat - 2026-07-21' until August 7, 2026, a shape that appears
+    # NOWHERE in this repo's history (measured: zero hits across releases/), so the fixture was proving the
+    # legacy path against a legacy format that never existed. That went unnoticed while nothing parsed the
+    # heading; the PR title now does, and a fixture in an invented shape would have asserted the wrong title.
+    $prEntryContent = "### Open-PR 101 test $([char]0x00B7) Feat $([char]0x00B7) 2026-07-21`n`nThis is the test description text.`n"
     [System.IO.File]::WriteAllText((Join-Path $prFixtureRoot 'feat-openpr-101-test.md'), $prEntryContent, $Utf8NoBomTest)
 
     Set-Location $prFixtureRoot
@@ -590,6 +591,15 @@ This is the test description text.
     # auto-fills exactly as it did -- which is the case every consumer with a branch in flight is in.
     Assert-True ($bodyA -match '- \[x\] Changelog entry written') 'default path: changelog-entry checklist item ticked'
     Assert-True ($bodyA -match '- \[x\] Requested by Dave') 'default path: approval checklist item ticked (default pattern)'
+
+    # THE TITLE IS COMPOSED, AND NOTHING WAS PASSED TO COMPOSE IT FROM (#506 + #505). This is the only
+    # end-to-end proof of the derivation: Get-PrTitle's own asserts are pure-string, and what could still go
+    # wrong here is the wiring -- the prefix read off the wrong thing, or the words read out of the wrong
+    # section. It is also the legacy half of the rule: this entry has NO title section at all, so the words
+    # come from its heading with the administrative fields dropped, which is what lets a branch created
+    # before the split still open a PR after a plugin update.
+    Assert-True ($argsA -match '(?m)^--title$') 'default path: a title was passed to gh even though none was given on the command line'
+    Assert-True ($argsA -match '(?m)^feat: Open-PR 101 test$') 'default path: the title is the branch type plus the entry heading, with the type and date fields dropped'
 
     # Scenario B: override path -- repo-config defines all four optional #101 functions.
     $rcOverride = @'

@@ -56,6 +56,14 @@ one thing any script reads out of it besides the step marks.
 changelog` is what this file is, and *what changed* is the first section under it. Both branch files carry
 that heading, which is also how the fold finds the branch it needs to look the PR up by.
 
+**That first section is `Branch title`, and it is also the PR title** (Dave, August 7, 2026;
+[#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506)). `open-pr` composes the PR title
+as `<branch type>: <this section>` rather than taking one on the command line, so the sentence is written
+once — at `new-branch -Title` — and what the PR is called, what `CHANGELOG.md` says and what the release
+documents carry are the same words by construction. Write it **without** a `feat:`/`fix:`/`docs:` prefix:
+the branch name already states the type and `open-pr` puts it in front. The section was called
+`Branch description` for a day; that name is still read, so a branch created under it folds unharmed.
+
 **All three tiers are in the file, and each one is answered.** Tier 0 can always be filled in — every
 change matters to the people who maintain this repo, if only a little. For the two above it, the answer may
 well be *"this reaches nobody here"*, and you say so:

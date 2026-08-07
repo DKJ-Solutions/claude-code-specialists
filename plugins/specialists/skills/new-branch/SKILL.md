@@ -70,13 +70,21 @@ Six sections, three of them filled in for you:
 ```text
 ## `<your branch>` changelog
 
-### Branch description     <- the title you gave -Title
+### Branch title           <- the title you gave -Title; also the PR title
 ### Branch ID              <- a timestamp, stamped at creation
 ### Branch type            <- the branch prefix
 ### What does the change on this branch bring to main?
 ### Significance
 ### Pull Request           <- filled in by the fold, from the merge
 ```
+
+**`Branch title` is what the change is CALLED, everywhere.** Since
+[#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506) `open-pr` composes the PR title as
+`<branch type>: <this section>` instead of taking one on the command line — so the sentence you give
+`-Title` here is the one on the PR, in `CHANGELOG.md` and in the release documents, written once. Give it
+**without** a `feat:`/`fix:`/`docs:` prefix: the branch name already carries the type and `open-pr` puts it
+in front. The section was called `Branch description` until that day and is still read under that name, so
+a branch created before the change folds unharmed.
 
 **An empty field is refused.** There is no visible `TODO:` anywhere, so `open-pr` measures instead of
 matching: it names the description, the body and any tier whose reason is still blank. That catches an

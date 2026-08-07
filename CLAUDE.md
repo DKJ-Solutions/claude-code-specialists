@@ -300,12 +300,23 @@ The constitution above, concretely implemented here:
 
      **And since August 6, 2026 the entry is the branch's own dossier, folded in as it stands.** The heading
      names the **branch** — `` ## `feat/x` changelog `` — and six `###` sections answer, in order:
-     `Branch description` (the human-readable name of the change, which the heading used to carry),
+     `Branch title` (the human-readable name of the change, which the heading used to carry),
      `Branch ID` (a timestamp stamped at creation), `Branch type` (the prefix, lowercase),
      `What does the change on this branch bring to main?`, `Significance` (one `#### Tier N` sub-section per
      reach the change claims, each closing with `**Score:**`) and `Pull Request`, which the **fold** fills
      from the merge itself. `Plugins:` stays a plain line, because a heading around one fact is more
      structure than content.
+
+     **That first section is called `Branch title`, and it IS the PR title** (Dave, August 7, 2026;
+     [#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506) +
+     [#505](https://github.com/DaveKJohn/claude-code-specialists/issues/505)). `open-pr.ps1` composes
+     `<branch type>: <this section>` instead of taking a title on the command line, so the sentence is typed
+     once — at `new-branch -Title` — and the PR, `CHANGELOG.md` and the release documents cannot disagree
+     about what the change is called. It also closes a rule that had lived in a document and was never
+     measured: Derek's manual has always said the PR title mirrors the branch type, and the five PRs before
+     this change all merged without one. `-Title` is accepted and ignored rather than removed, because every
+     branch in flight — here and in every consumer — passes one right now. The section was named
+     `Branch description` for one day and is **still read** under that name, for the standing reason.
 
      **Dave chose that `CHANGELOG.md` receives this shape verbatim**, asked and answered before any of it was
      built. The alternative he was offered — a fold that reads the dossier and derives a slimmer entry from

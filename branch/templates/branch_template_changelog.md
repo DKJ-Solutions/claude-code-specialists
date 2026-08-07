@@ -1,7 +1,7 @@
 ## `<prefix>/<short-name>` changelog (template)
 
-### Branch description
-<!-- Short description of branch-->
+### Branch title
+<!-- Short title of the change -- also the PR title, so no feat:/fix:/docs: prefix-->
 
 ### Branch ID
 <!--unique ID for branch like a timestamp of the moment this branch is created-->

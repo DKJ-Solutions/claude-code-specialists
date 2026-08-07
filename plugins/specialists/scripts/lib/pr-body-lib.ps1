@@ -58,6 +58,65 @@ function Get-EntryDescription {
     return (($lines[($h3 + 1)..($lines.Count - 1)]) -join "`n").Trim()
 }
 
+function Get-PrTitle {
+    <#
+    .SYNOPSIS
+        The PR title, composed: '<branch type>: <the entry's Branch title>'. '' when there are no words.
+
+    .DESCRIPTION
+        THE TITLE IS DERIVED, NOT TYPED (Dave, #506 + #505, August 7, 2026). It used to be given twice --
+        once to new-branch.ps1, which writes it into the entry, and again to open-pr.ps1 -Title at the end
+        of the branch -- with nothing holding the two together. One of them is what CHANGELOG.md and the
+        release documents carry; the other is what the PR is called; and which one a reader met depended on
+        where they were standing.
+
+        The type half is the same repair from the other side. Derek's manual has always said the title reads
+        '<branch-type>: ...', and measured on August 7, 2026 the last FIVE merged PRs (#499-#503) all
+        violated it -- a rule that lives in a document, is never measured, and is therefore silently broken.
+        Composing it here means it cannot be omitted and cannot contradict the branch: the type comes off the
+        branch prefix, which is the same source as the PR's label and the entry's own type section.
+
+        PURE, and given the words rather than the entry text, so this stays a function of two strings. The
+        caller reads the section (Get-EntrySectionAnswer -Key 'Description'), which is the reader that
+        already knows about retired heading names -- duplicating that here would be a second definition of
+        where the title lives.
+
+        THE FIRST NON-EMPTY LINE WINS, with its inner whitespace collapsed. A title is one line by nature and
+        the section is free-form markdown; a two-line answer would otherwise reach `gh pr create --title`
+        with a newline in it.
+
+        NO PREFIX IS STRIPPED, deliberately. A title already reading 'fix: ...' would compose to
+        'fix: fix: ...', and the guard for that is three lines. Measured before leaving it out: of every entry
+        in CHANGELOG.md and the release record, NOT ONE title carries a type prefix -- the convention has
+        always been to write the words alone. Building the strip would be guarding a defect that has never
+        happened, and a stripper that guesses at prefixes is how a legitimate title like 'sync-roster: ...'
+        gets mangled. Named here rather than repaired: if it ever does happen, this is the note to come back to.
+
+        THE WORDS MAY COME FROM A PRE-SPLIT ENTRY'S HEADING, which is why the caller passes them rather than
+        this reading the section itself. An entry written before the dossier form has NO title section at
+        all -- its title WAS the heading -- and every consumer with such a branch in flight receives these
+        scripts through a plugin update rather than by choosing to. Refusing them would turn a branch that worked
+        yesterday into a stop at the PR. Recognise both, write one.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Prefix,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$TitleWords
+    )
+
+    $words = ''
+    foreach ($line in ($TitleWords -split "\r?\n")) {
+        if (-not [string]::IsNullOrWhiteSpace($line)) { $words = $line.Trim(); break }
+    }
+    $words = [regex]::Replace($words, '\s+', ' ')
+    if (-not $words) { return '' }
+
+    # AN EMPTY PREFIX YIELDS THE WORDS ALONE, which is how the caller says "this branch's prefix is not one
+    # of ours": open-pr passes '' for an unknown prefix, warns about it, and labels the PR 'question'.
+    # Putting that unknown word in front of the title would state a type no table backs.
+    if ([string]::IsNullOrWhiteSpace($Prefix)) { return $words }
+    return ($Prefix.Trim() + ': ' + $words)
+}
+
 function Update-PrBodySection {
     <#
     .SYNOPSIS

@@ -312,7 +312,8 @@ function Test-EntryDeclaresType {
 }
 
 function Get-EntryDescription {
-    <# The 'Branch description' section's answer -- where the title given to new-branch now lands. #>
+    <# The 'Branch title' section's answer -- where the title given to new-branch lands, and since #506
+       what open-pr composes the PR title from. #>
     param([Parameter(Mandatory = $true)][string]$EntryText)
     return (Get-EntrySectionAnswer -EntryText $EntryText -Key 'Description')
 }
@@ -463,7 +464,7 @@ try {
     $entryPathF = Join-Path $fixtureF ((Get-BranchFilePaths).Changelog)
     Assert-True (Test-Path -LiteralPath $entryPathF) 'malicious title: entry file created anyway'
     $entryTextF = [System.IO.File]::ReadAllText($entryPathF, [System.Text.Encoding]::UTF8)
-    # THE PAYLOAD LANDS IN 'Branch description' SINCE THE DOSSIER FORM -- the title given to new-branch is a
+    # THE PAYLOAD LANDS IN THE TITLE SECTION SINCE THE DOSSIER FORM -- the title given to new-branch is a
     # section now, not the heading. The assert follows it there and keeps its shape: an EXACT compare of the
     # whole section answer, which proves nothing was appended or lost at a broken argv boundary. A prefix
     # match would pass on exactly the damage this scenario is about.

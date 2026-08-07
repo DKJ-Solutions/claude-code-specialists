@@ -1365,7 +1365,7 @@ function Convert-EntryHeadingToTitle {
     if (-not $hm.Success) { return $EntryText }
 
     # THE DOSSIER HEADING NAMES THE BRANCH, AND THIS DOCUMENT'S READER HAS NO BRANCH. Since August 6, 2026
-    # an entry opens with '## `feat/x` changelog' and its human-readable name lives in 'Branch description'
+    # an entry opens with '## `feat/x` changelog' and its human-readable name lives in 'Branch title'
     # -- so for the highlights the title IS that section. Without this the tier-2 document, the one written
     # for consumers, would list its changes as "`feat/x` changelog": no middot and no '#NN' in that heading,
     # so the field-dropping below leaves it exactly as it found it.
