@@ -211,10 +211,25 @@ The constitution above, concretely implemented here:
   [`branch/templates/`](branch/templates/) — was weighed and declined: the prose costs every reader on
   every read, while a check costs nothing per read. **What is checked is the section COUNT, not the
   section names**, and that was settled by measuring four candidate rules against the tree rather than by
-  argument. A name-matching rule accuses **six** correct documents, because `What does this change do?`
-  and `Type of change` are retired entry sections *and* live headings of the PR template — so it would
-  have been born red behind an exemption list, the shape this repo was already bitten by. The count is a
+  argument. A name-matching rule produced **six** findings on the tree, **all six false**: `What does this
+  change do?` and `Type of change` are retired entry sections *and* live headings of the PR template, so it
+  accuses **two** correct documents of being stale for describing that template accurately — and would have
+  been born red behind an exemption list, the shape this repo was already bitten by. The count is a
   fact the scaffolder owns, both recorded drifts stated it, and holding it needs no exemptions at all.
+
+  **The gate reaches `CHANGELOG.md`'s intro, and getting it there took two independent repairs** (August 8,
+  2026; [#525](https://github.com/DaveKJohn/claude-code-specialists/pull/525)). The check was born
+  excluding that file whole, on the history grounds it shares with checks 11 and 12 — but only the entries
+  below the intro are history. The intro is a live statement about the present mechanism that every cut
+  copies through **verbatim**, so it is the one piece of prose here that no release rewrites and no reviewer
+  opens; measured on the day it was repaired, it had promised *three* named sections for two days, with one
+  release and a consumer-facing highlights page in between. **Repairing either half alone changes nothing**:
+  the file was unread, *and* the pattern would have walked past the sentence anyway, because it carried no
+  `###` marker and ran across a line break. So the intro gets its **own pass with the level marker
+  optional**, and matching runs over the whole text instead of per line. Both relaxations were chosen by
+  measuring: whole-text matching finds the same **4** claims in the scanned tree as per-line, while dropping
+  the marker tree-wide would find **50** — which is why it is dropped only across the dozen lines of the
+  intro, where it was the whole difference between catching the drift and not.
 - **A third gate, on the changelog entry itself: the scaffold gate** (August 3, 2026). `open-pr.ps1`
   refuses to push a branch whose entry still carries the wording `new-branch.ps1` scaffolded
   it with — the placeholder title, the "to do / where I left off" heading, or the fallback body.

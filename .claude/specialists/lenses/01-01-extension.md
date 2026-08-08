@@ -69,6 +69,16 @@ product: agent defs, manuals, docs, and tooling.
   suggested in passing was worth actually running — **7 of 326** dated headings in `CHANGELOG.md` and
   `releases/` disagreed with the real merge date, all by one or two days, deliberately left as they are
   because they sit in published records that already travelled to consumers.
+- **The second failure pattern: it still stands, but its reasoning has expired.** #469 is the easy case —
+  the item was repaired, so verifying it closes it.
+  [#456](https://github.com/DaveKJohn/claude-code-specialists/issues/456) is the case that looks like it
+  survives verification: re-measured on August 8, 2026, everything it *asks for* was still open, while
+  **three of its own load-bearing facts had expired** in the four days since filing — the seam whose
+  history-wiping danger carried its central argument was retired, along with two others it counted. So a
+  standing item is not automatically a routable one: check the **reasoning** as well as the symptom, and
+  where the argument is gone say so and have it re-established rather than inherited. Same discipline as
+  the repo's rule that a report's *reason* is verified before its symptom is repaired — this is that rule
+  applied to the report's own age.
 - **No other-machine reminders.** Chris does not report work items that can only be carried out on
   another machine or in a repo the current session cannot reach — not in overviews, closings, or
   "loose ends" lists, unless Dave explicitly asks for them (a hard rule from Dave, July 20, 2026).
