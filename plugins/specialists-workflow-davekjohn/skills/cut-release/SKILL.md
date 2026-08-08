@@ -19,7 +19,8 @@ Inbound [issue #177](https://github.com/DaveKJohn/claude-code-specialists/issues
 shareable version of it exists. It does not: this workshop's own
 `scripts/release/cut-release.ps1` is 284 lines of marketplace-specific machinery (it reads
 `.claude-plugin/marketplace.json` as the source of truth for what a plugin is, bumps every
-`plugin.json` in lockstep, writes per-plugin `CHANGELOG.md` sections and `RELEASE.md` cards) and
+`plugin.json` in lockstep; it also wrote per-plugin `CHANGELOG.md` sections and `RELEASE.md` cards
+until those were retired on August 8, 2026) and
 dot-sources `scripts/lib/release-lib.ps1`, which is deliberately not mirrored into the plugin
 (workshop-specific tooling). Mirroring it as-is would have handed a fresh consumer a script that
 stops on its very first line (`.claude-plugin/marketplace.json is missing`).

@@ -8,9 +8,9 @@ the repo heading at the end, the **full list of releases** actually cut. The rel
 
 [`scripts/release/cut-release.ps1`](../scripts/release/cut-release.ps1) itself publishes nothing to GitHub
 Releases — that is a separate, manual closing step. Releases are cut **only on the repo owner's explicit
-request**; see [Cutting a release](#cutting-a-release) below for the full mechanics. Each release also
-refreshes, per plugin, the `RELEASE.md` card that consumers see (version + short notes, travelling along
-with the plugin cache via `claude plugin update`).
+request**; see [Cutting a release](#cutting-a-release) below for the full mechanics. Each release bumps
+every plugin's `version` in lockstep, and that number in `.claude-plugin/plugin.json` is what tells a
+consumer which release they are on.
 
 ## The tier model
 
@@ -174,13 +174,14 @@ In one motion, on a clean `main`:
    block: the section that used to hold one had grown to 434 of the changelog's 1,062 lines across 72 blocks
    each saying no more than "see the notes", while this page already listed all 72 with a date, a type and a
    title. What replaced it is the intro's own one-line pointer to this page;
-3. appends, per plugin, the entries that touched that plugin (selected via the `Plugins:` line that the fold
-   derives from the PR's files; as internal bookkeeping, the line itself doesn't travel along) to the
-   **per-plugin `CHANGELOG.md`**, and regenerates that plugin's **`RELEASE.md`** card (version, one-line
-   summary, and the entries for that version) — both consumer-facing artifacts that travel along with the
-   plugin cache. In all three outputs (the full notes, the per-plugin CHANGELOG, and the RELEASE.md card)
-   the entries are grouped by category — Features, Fixes, Documentation, Maintenance, Other — with features
-   and fixes at the top;
+3. **(retired, August 8, 2026)** step 3 used to append, per plugin, the entries that touched it to a
+   **per-plugin `CHANGELOG.md`** and regenerate that plugin's **`RELEASE.md`** card. Both were built to
+   give a consumer a history inside the plugin cache — and measured against how a consumer actually
+   receives this repo, they were a second copy of something already in reach: the marketplace source is
+   a git clone of the WHOLE repository, so `CHANGELOG.md` and this entire `releases/` tree sit at
+   `~/.claude/plugins/marketplaces/<marketplace>/`. Ten files, 11,684 lines, free to disagree with the
+   original — which is exactly what lint checks 9 and 17 existed to police. One repository, one product,
+   one changelog. The `Plugins:` line survives: the release notes still read it;
 4. commits that directly on `main` (`release: vX.Y.Z`) and sets an annotated tag `vX.Y.Z`;
 5. pushes `main` + the tag (unless `-NoPush` for inspection first).
 
@@ -267,10 +268,11 @@ than arbitrary: the `1.x` line ran to `1.18` and the `2.x` line to `2.16` before
 major.
 
 **`Get-LintScript` is [`scripts/lint/check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1),
-which is what the release route runs here.** Its check 9 is the one written *for* this route: it guards that
-every plugin's `RELEASE.md` card exists and that its version matches `plugin.json`, the two only ever moving
-together via `cut-release.ps1`. That pairing is repo-specific — a repo with no plugin tier has no cards to
-check — which is why the gate is named here and not in the portable half.
+which is what the release route runs here.** It used to carry a check written *for* this route — check 9,
+guarding that every plugin's `RELEASE.md` card existed and that its version matched `plugin.json`. Both the
+card and the check were retired on August 8, 2026: with no second statement of a plugin's version, there is
+nothing left to compare `plugin.json` against. The gate is still named here because it is what the cut runs;
+the rest of its checks are unaffected.
 
 **What a non-English consumer loses with `Get-ChangelogReleaseWording`, stated rather than glossed over.**
 That seam existed because those four strings were the most visible generated output in `CHANGELOG.md`, and

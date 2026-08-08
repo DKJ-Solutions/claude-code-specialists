@@ -184,8 +184,8 @@ The full picture, top-level folder by folder:
 - **[`plugins/`](plugins/)** — the plugin source. One folder per plugin (`specialists`,
   `specialists-lifehub`, `specialists-shopify`, `specialists-ecomm`,
   `specialists-workflow-davekjohn`), each carrying
-  `agents/`/`manuals/`/`personas/`/`skills/` plus its own `plugin.json`, `CHANGELOG.md` and `RELEASE.md`
-  card — and next to them **`agent-shared/`**, the canonical source of the shared agent-def blocks
+  `agents/`/`manuals/`/`personas/`/`skills/` plus its own `plugin.json` — and next to them
+  **`agent-shared/`**, the canonical source of the shared agent-def blocks
   described under
   [Shared agent-def blocks](#shared-agent-def-blocks--one-source-for-the-verbatim-boundaries). See
   [Manuals — the split model](#manuals--the-split-model) for the manual/agent-def/persona split.
@@ -236,12 +236,18 @@ front door; the way back out is its mirror,
 [UNINSTALL.md](plugins/UNINSTALL.md). This section keeps only the two marketplace-wide facts that matter
 beyond any one consumer:
 
-**Seeing which release you're on — `RELEASE.md`.** Each plugin folder carries a `RELEASE.md` card
-(version + date/type, a one-line summary, and the entries for that version) that travels with the
-plugin cache exactly like its `CHANGELOG.md`. Because `claude plugin update` pins the cache to a
-specific version (see [Versioning](#versioning)), the cached `RELEASE.md` copy is always *exactly*
-the installed release — a consumer opens it under the plugin path in their own cache to see which
-release they're on, without cross-referencing this repo's own `releases/` history.
+**Seeing which release you're on — `plugin.json`.** Each plugin folder carries a `.claude-plugin/plugin.json`
+whose `version` is the release it belongs to, bumped in lockstep across all five. Because
+`claude plugin update` pins the cache to a specific version (see [Versioning](#versioning)), the
+cached `version` is *exactly* the installed release. The full history of that release lives in this
+repo's [`CHANGELOG.md`](CHANGELOG.md) and [`releases/`](releases/) — and a consumer has both, because
+the marketplace source is a git clone of the whole repository at
+`~/.claude/plugins/marketplaces/<marketplace>/`, not a per-plugin extract.
+
+That last fact is why the per-plugin `CHANGELOG.md` and `RELEASE.md` card were **retired on August 8,
+2026**. They existed to give a reader a history inside the plugin cache; measured, the reader already
+had the real one, and the 11,684 lines across those ten files were a second copy free to disagree with
+it. One repository, one product, one changelog.
 
 **One canonical channel — mind the old repo names.** The marketplace is named `claude-code-specialists`
 (repo `DaveKJohn/claude-code-specialists`) and that is the only channel; use that name in
@@ -272,7 +278,7 @@ idempotent insurance in front of an update; it stays in front of both. With both
 repo itself, which consumes itself) only pulls in merged changes after the `version` has been
 bumped — a merge without a release stays invisible to consumers, and a shared agent-def change
 therefore always lands here first, never the other way around. The full mechanics — cutting a
-release, the per-plugin `CHANGELOG.md`s and `RELEASE.md` cards, the lint guardrails — are in
+release, the three release documents, the lint guardrails — are in
 [`releases/README.md`](releases/README.md#cutting-a-release).
 
 ## Manuals — the split model
@@ -497,11 +503,14 @@ Once enabled, the specialists can be invoked with the **plugin name as namespace
 
 ## Which release am I on?
 
-Every plugin folder carries a `RELEASE.md` card (version, a one-line summary, and the entries for
-that version) right next to its `CHANGELOG.md`. It travels with the plugin cache, so once
-`claude plugin update` has pinned your install to a version, the cached copy of `RELEASE.md` is
-exactly that release — open it under the plugin path in your own cache to see which one you're on.
-See [Consumption](#consumption) above for the mechanics.
+Read the `version` in your cached `<plugin>/.claude-plugin/plugin.json`. It travels with the plugin
+cache, so once `claude plugin update` has pinned your install to a version, that number is exactly the
+release you are on. All five plugins bump in lockstep, so any one of them answers the question.
+
+For **what changed** in that release, read [`CHANGELOG.md`](CHANGELOG.md) and
+[`releases/`](releases/) in the marketplace clone you already have —
+`~/.claude/plugins/marketplaces/claude-code-specialists/`. See [Consumption](#consumption) above for
+the mechanics.
 
 A newly added **skill** additionally needs a session restart before it becomes visible, and the
 skill counters `/reload-plugins`/`/reload-skills` print are not reliable evidence either way — see
@@ -962,8 +971,9 @@ lint and the docs enumerate the plugins and go stale silently if you forget them
 checklist (learned from adding `specialists-ecomm`):
 
 1. **The plugin folder** `plugins/<plugin>/` with `.claude-plugin/plugin.json` (the lockstep
-   `version`, matching the other plugins), a `CHANGELOG.md` intro, and a `RELEASE.md` card whose
-   `# Release vX.Y.Z` heading matches `plugin.json` (lint check 9).
+   `version`, matching the other plugins). That is the whole of it since August 8, 2026 — a new plugin
+   used to owe a `CHANGELOG.md` intro and a `RELEASE.md` card as well, and both were retired with the
+   documents themselves.
 2. **The marketplace entry** — register the plugin in
    [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) with a repo-relative
    `source`.

@@ -37,7 +37,8 @@ discovery — as an earlier pass did for `.github/workflows/ci.yml` — not a qu
   of the exceptions below, had simply been missed. New scripts and edits are written in English; no new
   non-English text is added anywhere in scope.
 - **Script-*generated* document content is in scope too.** The `CHANGELOG.md` sections, release notes,
-  and per-plugin CHANGELOGs that `scripts/lib/release-lib.ps1` builds are English going forward: its
+  that `scripts/lib/release-lib.ps1` builds are English going forward (it built per-plugin CHANGELOGs
+  too until August 8, 2026, when those files were retired): its
   document-generating template strings (the category labels, the reference line, the
   `## Releases`/plugin-CHANGELOG intro texts, the date label) were translated in that pass.
   `CHANGELOG.md` itself is now fully English (its intro paragraphs and every `## Releases` reference

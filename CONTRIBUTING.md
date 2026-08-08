@@ -103,7 +103,7 @@ changelog entry — the same workflow as the consuming repos. The steps:
    headings at all**, so the fold does not pick a section: it inserts the block at the **position its own
    Significance sections rank it at**, furthest reach first and, within a tier, highest significance first. It
    appends the PR link and the merge date as the entry's closing line, derives a `Plugins:` line from the PR's files
-   along the way (for the per-plugin CHANGELOGs — see
+   along the way (which the release notes read — see
    [Cutting a release](releases/README.md#cutting-a-release)), and **resets both `branch/` files** to
    their empty state — so the trunk is ready for the next branch and the merged branch's ticked-off steps
    do not greet whoever opens it. Commits that directly on `main`, naming exactly those three paths.
@@ -203,8 +203,8 @@ something this page grants.
 
 It is described in full in [`releases/README.md`](releases/README.md#cutting-a-release): what a release
 is, the `cut-release.ps1` steps, [what a bump must earn](releases/README.md#what-a-release-must-earn), the
-three release documents, the per-plugin `CHANGELOG.md`s and `RELEASE.md` cards, and the guardrails. That
-same page carries the list of releases actually cut, at the end.
+three release documents, and the guardrails. That same page carries the list of releases actually cut, at
+the end.
 
 **The one thing worth knowing from here:** a release is repo-wide and in lockstep, which works because
 this repository holds **one** product whose five plugins are one system — see

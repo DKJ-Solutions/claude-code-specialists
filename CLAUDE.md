@@ -262,9 +262,17 @@ The constitution above, concretely implemented here:
      See [Rendall #06](.claude/specialists/lenses/05-06-extension.md#changelog).
   2. The **release commit** (only on explicit request): [`cut-release.ps1`](scripts/release/cut-release.ps1)
      bumps all plugin versions in lockstep, generates the release notes in `releases/development/`,
-     **empties `CHANGELOG.md` down to its intro**, (re)generates each plugin's consumer-facing `RELEASE.md`
-     card, commits that on `main`, and tags `vX.Y.Z`. Deliberately no branch/PR — just like the
-     fold. See [Rendall #06](.claude/specialists/lenses/05-06-extension.md#versioning--releases).
+     **empties `CHANGELOG.md` down to its intro**, commits that on `main`, and tags `vX.Y.Z`.
+     Deliberately no branch/PR — just like the fold. See
+     [Rendall #06](.claude/specialists/lenses/05-06-extension.md#versioning--releases).
+
+     **It also used to write a per-plugin `CHANGELOG.md` and a consumer-facing `RELEASE.md` card into
+     every plugin folder; both were retired on August 8, 2026 (Dave).** The repo has become the product,
+     so there is one changelog. And measured before removing them: a consumer receives the marketplace
+     source as a git clone of the **whole repository**, so `CHANGELOG.md` and `releases/` were always in
+     their reach — those ten files were a second copy, 11,684 lines, free to disagree with the original.
+     Lint checks 9 and 17 existed to police exactly that disagreement and went with them. A plugin's
+     version now has one statement: `plugin.json`.
 
      **Why no PR, in Dave's own words (August 7, 2026): "aan het product zelf verandert verder niks."**
      A release republishes what is already merged — it bumps versions, generates documents and moves a
@@ -278,8 +286,8 @@ The constitution above, concretely implemented here:
      **What the PR route WOULD have bought is real, and is being closed another way.** Measured on
      August 7, 2026: `open-pr` runs the lint *and* all 26 suites, and CI runs both again — while
      `cut-release` runs the lint alone and its push to `main` bypasses the required check. The release
-     commit is therefore the least-gated commit in the workflow, and it is the one that rewrites four
-     `RELEASE.md` cards and empties the changelog. The repair is coverage, not route: the cut runs the
+     commit is therefore the least-gated commit in the workflow, and it is the one that empties the
+     changelog and bumps every plugin. The repair is coverage, not route: the cut runs the
      suites too, and CI runs on `main` pushes so the artefacts the cut itself generates are checked after
      they land.
      Since August 3, 2026 it is a **shared** script, mirrored into the plugin like the rest of the
@@ -469,9 +477,10 @@ The constitution above, concretely implemented here:
      must be able to misplace at most the one entry being folded rather than scramble a list it did not write. The **highlights** re-read the tier-2 row (its reader is the consumer); the **internal
      note** reads the tier-1 row. **Tier 0 is never ranked** — the development note is the record: complete
      and chronological. The table **survives into the record** because that is the last place each ranking's
-     justification lives, and is **stripped from everything that travels outward** (highlights, per-plugin
-     `CHANGELOG.md`, `RELEASE.md`), because a self-assigned number printed at a consumer is a marketing
-     claim. `cut-release.ps1` refuses a release whose tier-1-or-higher entries have not scored themselves;
+     justification lives, and is **stripped from everything that travels outward** (the highlights),
+     because a self-assigned number printed at a consumer is a marketing claim. It used to be stripped
+     from the per-plugin `CHANGELOG.md` and `RELEASE.md` too; those were retired on August 8, 2026, so
+     the highlights are the only outward document left to strip. `cut-release.ps1` refuses a release whose tier-1-or-higher entries have not scored themselves;
      `-SkipSignificanceGate` overrules it, separate from `-SkipTierGate` because one overrules whether the
      release should exist and the other how its contents are ordered.
 

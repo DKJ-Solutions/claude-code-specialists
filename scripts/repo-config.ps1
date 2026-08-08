@@ -179,7 +179,7 @@ function Get-EntryFallbackType {
 # --- Which files the mojibake tool examines by default (issue #413) -------------------------------
 #
 # scripts/maintenance/fix-mojibake.ps1 used to carry this list itself, and the list is workshop-shaped:
-# it walks plugins/** for the per-plugin CHANGELOG.md/RELEASE.md and releases/** for the archived notes.
+# it walks plugins/** for the manuals, agent defs and personas, and releases/** for the archived notes.
 # In a consumer neither directory exists, so the tool's own Test-Path filter quietly reduced the set to
 # whatever root docs happened to be there -- a gate that examines almost nothing while reporting
 # "clean". Which files a repo has is a property of the repo, so the list belongs here.
@@ -205,8 +205,8 @@ function Get-MojibakePaths {
 
     # branch/ -- the branch's entry and step list. They were covered by the root glob above until the split
     # moved them (August 6, 2026), and the entry is the single highest-value file in this set: its text is
-    # pasted verbatim into CHANGELOG.md and from there into the per-plugin CHANGELOGs that travel to
-    # consumers, so a mis-decode caught anywhere later has already been copied three times.
+    # pasted verbatim into CHANGELOG.md and from there into the release notes, so a mis-decode caught
+    # anywhere later has already been copied twice.
     # -Recurse for templates/: those are pasted into a real entry, so a mis-decode there is copied forward
     # into every branch that uses them rather than staying in one file.
     $branchDir = Join-Path $RepoRoot 'branch'
@@ -215,9 +215,9 @@ function Get-MojibakePaths {
             Select-Object -ExpandProperty FullName)
     }
 
-    # Every markdown file under plugins/: the per-plugin CHANGELOG.md and RELEASE.md that cut-release.ps1
-    # writes entry text into, and the manuals, agent defs and personas beside them -- all prose, all
-    # equally able to carry a mis-decode.
+    # Every markdown file under plugins/: the manuals, agent defs, personas and skill pages -- all prose,
+    # all equally able to carry a mis-decode. It used to name the per-plugin CHANGELOG.md and RELEASE.md
+    # first; those were retired on August 8, 2026 and the rest of the set is unchanged.
     #
     # -Filter, NOT -Include, and that is a bug fix rather than a preference. PowerShell SILENTLY IGNORES
     # -Include when the path is given as -LiteralPath, so the previous form --
@@ -225,7 +225,8 @@ function Get-MojibakePaths {
     # returned EVERY file under plugins/, .ps1 and .json included, while the comment above it named two
     # file names. Nothing broke, because the extra files were clean and the tool leaves anything that is
     # not mojibake alone; what was wrong is that the code and its own description disagreed, and the
-    # description is what the lint gate quotes to the reader as its coverage.
+    # description is what the lint gate quotes to the reader as its coverage. Worth keeping now that the
+    # two named files are gone: the WIDE set is what this function has actually returned all along.
     $pluginRoot = Join-Path $RepoRoot 'plugins'
     if (Test-Path -LiteralPath $pluginRoot) {
         $paths += @(Get-ChildItem -LiteralPath $pluginRoot -Recurse -File -Filter '*.md' |
@@ -357,8 +358,9 @@ function Get-ReleaseHistoryPath {
 }
 
 # Whether cut-release runs the plugin/marketplace half: enumerating the manifests from
-# .claude-plugin/marketplace.json, writing each plugin's consumer-facing CHANGELOG.md and RELEASE.md
-# card, and bumping every plugin.json in lockstep. TRUE here -- that half IS this repo's release.
+# .claude-plugin/marketplace.json and bumping every plugin.json in lockstep. TRUE here -- that half IS
+# this repo's release. It also wrote a consumer-facing CHANGELOG.md and RELEASE.md card per plugin
+# until August 8, 2026; the lockstep bump is what the half is now.
 #
 # THE ONE KNOB WITH A COMPUTED FALLBACK, and the reason is that its answer is a fact rather than a
 # preference: a repo with no .claude-plugin/marketplace.json has no plugins to bump, so a consumer
@@ -368,7 +370,7 @@ function Get-ReleaseHistoryPath {
 $script:ReleasePluginTier = $true
 
 function Get-ReleasePluginTier {
-    <# $true if this repo publishes plugins that cut-release must version and card. #>
+    <# $true if this repo publishes plugins whose versions cut-release must bump in lockstep. #>
     return $script:ReleasePluginTier
 }
 
