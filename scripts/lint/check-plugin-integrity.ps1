@@ -1803,6 +1803,41 @@ if (Test-Path -LiteralPath $scChangelog) {
 Write-Coverage -Category 'entry-shape' -Checked $scChecked `
     -Note "claim(s) about how many '$('#' * $scLevel)' sections a changelog entry has, held against the $scExpected the scaffolder writes. The rule is the COUNT and not the section NAMES, chosen by measuring four candidates against this tree: matching names accuses two correct documents, because 'What does this change do?' and 'Type of change' are retired entry sections AND live headings of the PR template. History is excluded as in checks 11 and 12; branch/README.md is not, being a document about the shape, and neither is CHANGELOG.md's INTRO -- the entries below it are history, the intro is a live statement about the present mechanism that every cut copies through verbatim, so it gets its own pass with the level marker optional"
 
+# --- 21. The config blueprint matches what the source's own libs say right now -----------------------------
+#
+# The blueprint (plugins/specialists-workflow-davekjohn/blueprint/config-blueprint.json) is what a
+# consumer adopts its workflow config FROM: the source's own answers, with the reasoning that produced
+# them. It is generated from scripts/repo-config.ps1, scripts/lib/branch-info.ps1 and the contract
+# registry -- so the moment any of those three changes, the shipped artefact describes a repo that no
+# longer exists.
+#
+# HELD BY REGENERATING IT, not by inspecting it. The generator is the only thing that knows the answer,
+# so a check that re-derived the comparison would be a second implementation free to disagree with the
+# first -- the shape this repo keeps paying for. Same mechanism as the shared-scripts drift check
+# (check 9): build in memory, compare, report.
+#
+# WHY THIS DEFECT WOULD BE INVISIBLE OTHERWISE: nothing in the repo reads the artefact. A stale one
+# breaks nothing here, passes every other check, and is discovered by a consumer adopting last week's
+# answers under this week's explanations -- which is worse than no blueprint, because it carries a
+# citation.
+#
+# Run through Invoke-NativeCapture rather than a bare '2>&1', which this repo forbids and its own suite
+# scans for: in Windows PowerShell 5.1 redirecting a native command's stderr wraps each line in an
+# ErrorRecord and sets $? to $false even on exit code 0. Caught by shared-scripts.tests.ps1 on the first
+# draft of this very check.
+$bpChecked = 0
+$bpScript = Join-Path $repoRoot 'scripts\sync\build-config-blueprint.ps1'
+if (Test-Path -LiteralPath $bpScript -PathType Leaf) {
+    $bpChecked = 1
+    . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
+    $bpRun = Invoke-NativeCapture -FilePath 'powershell' -Arguments @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $bpScript, '-Check')
+    if ($bpRun.ExitCode -ne 0) {
+        Add-Error "[config-blueprint] $(($bpRun.Output | Out-String).Trim())"
+    }
+}
+Write-Coverage -Category 'config-blueprint' -Checked $bpChecked `
+    -Note 'the shipped config blueprint, held against a fresh generation from this repo own libs and the contract registry. Regenerated rather than inspected: the generator is the only thing that knows the answer, so a second implementation here could only disagree with it. Nothing in this repo READS the artefact, which is exactly why it needs a gate -- a stale one breaks nothing here and hands a consumer last week answers under this week explanations'
+
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {
     Write-Host "  No findings." -ForegroundColor Green

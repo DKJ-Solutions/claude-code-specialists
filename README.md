@@ -108,6 +108,22 @@ itself reads.
 
 Decision by Dave, August 8, 2026; packaged the same day.
 
+**And for a repo that does want this workflow, the seam now comes with its answers.** Splitting the
+enforcement out fixed the repo that works differently; it left the repo that works the *same* way
+re-deriving twenty values by hand, because the checker only ever named the **fallback** a shared script
+uses — never what this repo chose, or why. The pack therefore ships a **config blueprint**: each seam
+function with the source's own text, comments and reasoning included, and a marker saying whether that
+answer is safe to take. The [`adopt-config`](plugins/specialists-workflow-davekjohn/skills/adopt-config/SKILL.md)
+skill reads it, **places** what states the shared way of working, and **proposes** — never places — what
+states what a repo *is*, in a document a person works through.
+
+The two markers are a second, independent axis from the roster/workflow split, and
+`Get-ReleasePluginTier` is why: it sits in the workflow half, so the split says it travels, and `$true`
+would tell a storefront repo it publishes plugins. One field could not carry both answers. A `decide`
+value is never written as a stub either, which is a mechanism rather than a courtesy — a stub returning
+a placeholder overrides a documented fallback that is usually right, so absent beats wrong. Issue
+[#456](https://github.com/DaveKJohn/claude-code-specialists/issues/456); decisions by Dave, August 8, 2026.
+
 ## The five plugins — what's the difference?
 
 **Four of them answer "what kind of repo is this"; the fifth answers "whose way of working is this".**
@@ -122,7 +138,7 @@ split in mind: groups 2–4 are domains, group 5 is a working method, and only t
 | [`specialists-lifehub/`](plugins/specialists-lifehub/) | **Domain group 2.** Five specialists for a personal information hub / brain-based knowledge repo (Astrid, Fiona, Hugo, Ian, Onyx). Deliberately domain-flavored: they know their repo and teammates by name. | Only a life-hub-style repo. |
 | [`specialists-shopify/`](plugins/specialists-shopify/) | **Domain group 3.** Three specialists for a Shopify store repo (Liam · Liquid, Sandra · store management, Steven · configuration) plus the domain skill `start-task`. Also deliberately domain-flavored. | Only a Shopify repo (e.g. smartwatchbanden). |
 | [`specialists-ecomm/`](plugins/specialists-ecomm/) | **Domain group 4.** E-commerce specialists for a commercial webshop repo of any platform (Sergio · SEO, Craig · CRO, Sean · performance/SEA). Platform-agnostic, and complementary to a platform group rather than exclusive. | Any commercial webshop repo — including a Shopify repo alongside `specialists-shopify`. |
-| [`specialists-workflow-davekjohn/`](plugins/specialists-workflow-davekjohn/) | **Group 5 — a way of working, not a domain.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the seven workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`), their shared scripts, and the two session hooks that belong to running this across several repos. Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that wants *this* workflow. Enable nothing and the specialists use plain `git`/`gh` instead. |
+| [`specialists-workflow-davekjohn/`](plugins/specialists-workflow-davekjohn/) | **Group 5 — a way of working, not a domain.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the eight workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-config`), their shared scripts, and the two session hooks that belong to running this across several repos. Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-config` places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that wants *this* workflow. Enable nothing and the specialists use plain `git`/`gh` instead. |
 
 In short: **`specialists` is the foundation; everything else is optional, along two different axes.**
 `specialists-lifehub` and `specialists-shopify` describe what *kind* of repo it is, so a repo
@@ -446,7 +462,8 @@ Concretely for claude-code-specialists: the specialists roster (the subagents un
 SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`)
 function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `fix-mojibake`,
-`specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `cut-release`)<!-- /skills:all -->
+`specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `cut-release`,
+`adopt-config`)<!-- /skills:all -->
 remain available there.
 
 Skills themselves are Anthropic's general **Agent Skills** mechanism — organized folders of
@@ -462,7 +479,7 @@ interchangeable with — a Claude Code subagent.
 
 <!-- skills:all -->Most skills in claude-code-specialists today (`fold-changelog`, `open-pr`, `ship-pr`,
 `new-branch`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`, `sync-roster`,
-`start-task`) are a thin wrapper around a script — procedural **mechanism** (branch, PR, ship, fold,
+`start-task`, `adopt-config`) are a thin wrapper around a script — procedural **mechanism** (branch, PR, ship, fold,
 bootstrap, teardown, roster-sync, encoding repair). `cut-release`<!-- /skills:all --> is the deliberate exception:
 a checklist with no script of its own (see below). Either way, the specialists' craft and judgment
 live in the persona/manual context (agent defs), not in skills. That's a deliberate split, but it
