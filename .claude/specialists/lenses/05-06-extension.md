@@ -104,7 +104,7 @@ entries rather than off which section they sit in.
 #### Entry format
 
 **The format, the filename rule (including why a `-v2` suffix breaks the auto-delete), and the `##`-in-a-
-body trap are all in the portable [`fold-changelog` skill](../../../plugins/specialists/skills/fold-changelog/SKILL.md)** —
+body trap are all in the portable [`fold-changelog` skill](../../../plugins/specialists-workflow-davekjohn/skills/fold-changelog/SKILL.md)** —
 they are properties of the shared scripts, so a consumer meets them identically. Local instances worth
 keeping: the `##` trap was seen in **v2.13.2**, where a body's two subheadings came out looking like two
 extra release categories next to `## Fixes`, and it is the same
@@ -137,7 +137,7 @@ description while building; ownership of the entry mechanism stays Rendall's.
    (`chore: fold changelog entry <branch> (#NN)`) and pushes, in one step. **The `-Commit`/`-Push`
    opt-in, the path-scoped commit, the "check you are really on `main`" guard against
    `gh pr merge --delete-branch`, and the always-fold-with-`-Branch` rule for working from two machines
-   are all in the portable [`fold-changelog` skill](../../../plugins/specialists/skills/fold-changelog/SKILL.md)** —
+   are all in the portable [`fold-changelog` skill](../../../plugins/specialists-workflow-davekjohn/skills/fold-changelog/SKILL.md)** —
    properties of the shared script, met identically by any consumer. Measured here on July 16, 2026 (the
    stranded checkout) and PRs #46/#47 (the two-machine collision), and the flags arrived August 2, 2026
    after four hand-typed fold commits in one session. Repo-specific half: this fold commit runs under
@@ -334,13 +334,21 @@ committed, and only then is picked up by the consuming repos.
 **A milestone release: `-SummaryFile <path>`.** The mechanics — that the file normally lives outside the
 repo, that a missing or empty one is a hard stop, that its links are left exactly as authored, and the rule
 to say plainly whether anything breaks — are in the portable
-[`cut-release` skill](../../../plugins/specialists/skills/cut-release/SKILL.md#a-milestone-release---summaryfile).
+[`cut-release` skill](../../../plugins/specialists-workflow-davekjohn/skills/cut-release/SKILL.md#a-milestone-release---summaryfile).
 The local instance behind that last rule: **the seam, the largest change in 2.x, broke nothing** — it is
 backward compatible by construction, every reader accepts the old layouts — so a `major` bump here can be
 one a consumer needs to do nothing about, and the summary has to say so or they sit on an old version
 waiting for a migration that does not exist.
 
 ### Rendall's toolkit
+
+**Where these live for a consumer, since August 8, 2026.** The paths below are this repo's own
+`scripts/` and are unchanged — that is still the canonical source. The **mirror** moved: the fold, the
+cut, the internal note and `release-lib` now ship in `specialists-workflow-davekjohn` rather than in
+the core, and so do the `fold-changelog` and `cut-release` skill pages that document them. A consuming
+repo that did not enable that pack has none of this, and that is correct: the changelog entry format,
+the tier ladder and the release cut are one particular way of running a release, not the craft of
+release management. Rendall's craft in such a repo is whatever *that* repo's release process is.
 
 - `scripts/task/new-branch.ps1 [-Title <string>] [-Intent <string>]` — write the branch's
   two files in `branch/`. `-Intent` records where you left off / what is next in

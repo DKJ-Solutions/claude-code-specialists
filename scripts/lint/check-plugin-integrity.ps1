@@ -1707,9 +1707,13 @@ foreach ($pair in $sharedPairs) {
     # own piece of work, and failing the gate over it would block every unrelated PR until someone did.
     if ([string]::IsNullOrEmpty($pair.Skill)) { $skillGaps += $pair.Name; continue }
 
-    $skillPath = Join-Path $repoRoot ("plugins\specialists\skills\$($pair.Skill)\SKILL.md")
+    # SkillRel, not a hardcoded 'plugins\specialists\...' path. The registry derives it from the
+    # mirror, so a script that moves to another plugin takes its page lookup with it. Measured on
+    # August 8, 2026 during the workflow split: with the path hardcoded here, all nine moved entry
+    # points reported their existing skill as a typo.
+    $skillPath = Join-Path $repoRoot $pair.SkillRel
     if (-not (Test-Path -LiteralPath $skillPath)) {
-        Add-Error "[skill-param] $($pair.SourceRel) names skill '$($pair.Skill)' in the shared-scripts registry, but plugins/specialists/skills/$($pair.Skill)/SKILL.md does not exist. Either the skill was renamed (update the registry) or the mapping is a typo."
+        Add-Error "[skill-param] $($pair.SourceRel) names skill '$($pair.Skill)' in the shared-scripts registry, but $($pair.SkillRel -replace '\\', '/') does not exist. Either the skill was renamed or moved to another plugin (update the registry) or the mapping is a typo."
         continue
     }
     $skillText = Get-Content -LiteralPath $skillPath -Raw

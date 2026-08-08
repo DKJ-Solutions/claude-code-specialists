@@ -39,12 +39,19 @@ function Invoke-Script {
 
 # Builds a consumer with its OWN CLAUDE.md content, then bootstraps it. -ExtraClaudeMdLines lets a case
 # add lines the bootstrap did not write, which is how the unrelated-@-import case is built.
+# EVERY FIXTURE IN THIS SUITE ENABLES BOTH PLUGINS SINCE AUGUST 8, 2026. The suite is about a consumer
+# that adopted the system and then disconnects, and its round trips turn on the script-config scaffolds:
+# the [keep] lines for an already-occupied address, the "2 already present" count, and the scripts\lib\
+# empty-directory pruning from #331. After the workflow split none of those exist for a consumer that
+# never enabled the workflow pack -- branch-info.ps1 is that pack's file and is not placed without it --
+# so a single-plugin fixture would leave three assertions passing vacuously. The core-only shape is
+# covered in bootstrap-drift.tests.ps1 instead of being folded in here.
 function New-BootstrappedConsumer {
     param([string[]]$ExtraClaudeMdLines = @())
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
     New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.json'),
-        '{ "enabledPlugins": { "specialists@claude-code-specialists": true } }')
+        '{ "enabledPlugins": { "specialists@claude-code-specialists": true, "specialists-workflow-davekjohn@claude-code-specialists": true } }')
     $md = @('# CLAUDE.md - my own project', '', '## Conventions', '', '- Feature work goes on a branch.') + $ExtraClaudeMdLines
     [System.IO.File]::WriteAllLines((Join-Path $Fixture 'CLAUDE.md'), $md)
     $prevPlugin = $env:CLAUDE_PLUGIN_ROOT
@@ -389,25 +396,32 @@ function Get-LintScript { return `$script:LintScript }
     #     alone -- that file is the consumer's own wrapper, i.e. authored content.
     New-BootstrappedConsumer | Out-Null
     $pluginPayload = Join-Path $Plugin 'scripts'
-    # A consumer wrapper sitting exactly where a vendored script wants to go.
-    $wrapper = Join-Path $Fixture 'scripts\release\open-pr.ps1'
+    # RETARGETED AUGUST 8, 2026, and the two roles had to swap files. Since the branch/release scripts
+    # moved to specialists-workflow-davekjohn, this plugin's payload is check-roster-sync.ps1 plus the
+    # lib it dot-sources -- so the collision case and the copied-correctly case can no longer share one
+    # file. The operational script is now the wrapper's address, and the lib carries the copy assertions.
+    $wrapper = Join-Path $Fixture 'scripts\sync\check-roster-sync.ps1'
     New-Item -ItemType Directory -Path (Split-Path -Parent $wrapper) -Force | Out-Null
-    [System.IO.File]::WriteAllText($wrapper, "# my own wrapper around the shared open-pr`nWrite-Host 'wrapping'")
+    [System.IO.File]::WriteAllText($wrapper, "# my own wrapper around the shared roster check`nWrite-Host 'wrapping'")
     $wrapperBefore = [System.IO.File]::ReadAllText($wrapper, [System.Text.Encoding]::UTF8)
 
     $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-VendorScripts')
     Assert-Equal 0 $r.Code 'vendor dry run: exit-code 0'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\task\new-branch.ps1'))) 'vendor dry run: writes NOTHING without -Apply'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\lib\check-report-lib.ps1'))) 'vendor dry run: writes NOTHING without -Apply'
     Assert-True ($r.Out -match 'would be written') 'vendor dry run: says what it would write'
 
     $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply', '-VendorScripts')
     Assert-Equal 0 $r.Code 'vendor: exit-code 0'
-    $vendoredBranch = Join-Path $Fixture 'scripts\task\new-branch.ps1'
-    Assert-True (Test-Path -LiteralPath $vendoredBranch) 'vendor: the operational script is now local'
-    Assert-True (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\lib\native-capture-lib.ps1')) 'vendor: the sibling lib it dot-sources came along'
-    Assert-Equal (Get-FileHash -LiteralPath (Join-Path $pluginPayload 'task\new-branch.ps1')).Hash `
-                 (Get-FileHash -LiteralPath $vendoredBranch).Hash `
+    $vendoredLib = Join-Path $Fixture 'scripts\lib\check-report-lib.ps1'
+    Assert-True (Test-Path -LiteralPath $vendoredLib) 'vendor: the operational script is now local'
+    Assert-Equal (Get-FileHash -LiteralPath (Join-Path $pluginPayload 'lib\check-report-lib.ps1')).Hash `
+                 (Get-FileHash -LiteralPath $vendoredLib).Hash `
                  "vendor: byte-identical to the plugin's copy -- no drift on arrival"
+    # Structure preserved: the payload's own subdirectories arrive as subdirectories, because the
+    # scripts reach their siblings $PSScriptRoot-relative.
+    Assert-True ($vendoredLib -like '*\scripts\lib\*') 'vendor: the tree structure the dot-sources depend on is preserved'
+    # The cap is stated, not silent: a run listing four files must not read as "that was all of it".
+    Assert-True ($r.Out -match 'specialists-workflow-davekjohn') 'vendor: names the pack whose scripts this run does NOT cover'
     # THE SAFETY PROPERTY, same family as "an authored lens is kept".
     Assert-Equal $wrapperBefore ([System.IO.File]::ReadAllText($wrapper, [System.Text.Encoding]::UTF8)) "vendor: the consumer's own wrapper is NOT overwritten"
     Assert-True ($r.Out -match 'yours, not overwritten') 'vendor: the collision is reported, not silent'
@@ -562,7 +576,7 @@ function Get-LintScript { return `$script:LintScript }
     New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'scripts\lib') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.json'),
-        '{ "enabledPlugins": { "specialists@claude-code-specialists": true } }')
+        '{ "enabledPlugins": { "specialists@claude-code-specialists": true, "specialists-workflow-davekjohn@claude-code-specialists": true } }')
     # The consumer's OWN CLAUDE.md, which is also what triggers the report path that used to be broken:
     # this block only runs when a CLAUDE.md exists and does not yet carry the guard import.
     [System.IO.File]::WriteAllLines((Join-Path $Fixture 'CLAUDE.md'), @(
@@ -731,7 +745,7 @@ function Get-LintScript { return `$script:LintScript }
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
     New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.json'),
-        '{ "enabledPlugins": { "specialists@claude-code-specialists": true } }')
+        '{ "enabledPlugins": { "specialists@claude-code-specialists": true, "specialists-workflow-davekjohn@claude-code-specialists": true } }')
     # Deliberately NO CLAUDE.md. That is the whole fixture.
     $prevPlugin = $env:CLAUDE_PLUGIN_ROOT
     $env:CLAUDE_PLUGIN_ROOT = $Plugin

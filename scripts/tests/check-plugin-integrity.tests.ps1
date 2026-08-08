@@ -1597,7 +1597,7 @@ try {
     # positive-only test would pass against a check that examines nothing at all.
     Write-Host "check 18: shared-script parameters vs. their skill" -ForegroundColor Cyan
     $parkSrc   = Join-Path $Fixture 'scripts\task\park-branch.ps1'
-    $parkSkill = Join-Path $Fixture 'plugins\specialists\skills\park\SKILL.md'
+    $parkSkill = Join-Path $Fixture 'plugins\specialists-workflow-davekjohn\skills\park\SKILL.md'
     New-Item -ItemType Directory -Path (Split-Path -Parent $parkSrc) -Force | Out-Null
     New-Item -ItemType Directory -Path (Split-Path -Parent $parkSkill) -Force | Out-Null
     # A real param block, so the AST reader is what is being exercised -- not a string the test planted.

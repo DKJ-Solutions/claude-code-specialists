@@ -179,8 +179,19 @@ From your repo root:
 
 ```powershell
 claude plugin uninstall specialists@claude-code-specialists --scope project
-# and once more for each domain group you enabled
+# and once more for each domain group you enabled -- and for
+# specialists-workflow-davekjohn if you enabled the workflow pack
 ```
+
+**If you ran the workflow pack, take its scripts out before you uninstall it.** Step 1's
+`-VendorScripts` hands back working copies of the **core's** payload only, and says so in its own
+output: the two plugins are separately versioned and separately installed, so the teardown that ships
+in one deliberately does not reach into the other's cache. `new-branch`, `open-pr`, `ship-pr`,
+`fold-changelog-entry`, `cut-release` and the libs they dot-source live in
+`~\.claude\plugins\cache\claude-code-specialists\specialists-workflow-davekjohn\<version>\scripts\` —
+copy that tree into your own `scripts/` first if you want to keep the workflow after disconnecting.
+Its structure matters: those scripts reach their siblings `$PSScriptRoot`-relative, so a flattened copy
+breaks at the next branch rather than at the copy.
 
 **Keep the scope flag.** `uninstall` defaults to `--scope user` like its siblings, so without it the
 command does not act on a project-scoped install. What it says instead depends on your CLI version — on

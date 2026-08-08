@@ -117,7 +117,7 @@ destructive actions above happen only on Dave's explicit request.
 `claude-code-specialists` is the **home repo of one product**: the Claude Specialists system, built and
 maintained here by Dave (DaveKJohn), and the **single source of truth** for all shareable subagent
 definitions — every consuming repo (life-hub, smartwatchbanden) points here and enables or disables
-per plugin. The full story — the four plugins and how they differ, the split manual model, the
+per plugin. The full story — the five plugins and how they differ, the split manual model, the
 bootstrap path, and consumption — is in the [root `README.md`](README.md); the drift lint is in the
 [connectors README](connectors/README.md#maintenance-drift-lint).
 
@@ -131,9 +131,9 @@ tag would span two products, and one changelog would mix two histories. So the n
 own repository and its own marketplace instead.
 
 **The nuance, so nobody repairs the wrong thing: lockstep *within* this product is correct** and
-[`cut-release.ps1`](scripts/release/cut-release.ps1) needs no change. The four plugins are one system —
-a shared core plus domain groups — and a consumer running group 1 alongside group 3 needs matching
-versions. What was wrong was never the lockstep, but housing unrelated products in a single release
+[`cut-release.ps1`](scripts/release/cut-release.ps1) needs no change. The five plugins are one system —
+a shared core, domain groups, and one opt-in way-of-working pack — and a consumer running group 1
+alongside group 3 needs matching versions. What was wrong was never the lockstep, but housing unrelated products in a single release
 train, and that dissolved with the reorganisation rather than needing a fix. Decision by Dave,
 August 3, 2026; the reader-facing statement is in
 [`README.md`](README.md#one-product-one-repository).

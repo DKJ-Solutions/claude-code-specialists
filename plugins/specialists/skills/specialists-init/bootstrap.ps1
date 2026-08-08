@@ -437,43 +437,38 @@ group: $group
 }
 
 # --- 1c. Repo-specific script config scaffolds (never overwrite) -----------------------------------
-# Shared skills open-pr/fold-changelog rely on two repo-specific files in consumer repo root
-# (scripts/repo-config.ps1 + scripts/lib/branch-info.ps1). Without them, clean consumer hits raw dot-source error (#86).
-# specialists-init places them as VUL-IN scaffolds: repo-agnostic structure with empty spots to fill.
-# Branch taxonomy differs per repo and deliberately remains an EMPTY table -- never another repo's taxonomy.
-$repoConfigScaffold = @'
+# Two repo-specific files in the consumer's repo root. Without them, a clean consumer hits a raw
+# dot-source error (#86). specialists-init places them as VUL-IN scaffolds: repo-agnostic structure
+# with empty spots to fill. Branch taxonomy differs per repo and deliberately remains an EMPTY table
+# -- never another repo's taxonomy.
+#
+# SPLIT BY WHO ASKS FOR IT (August 8, 2026), because the workflow moved into its own opt-in plugin.
+# Only two of these functions serve the core: Get-RosterPath and Get-RosterIgnoredIds, both read by
+# check-roster-sync. Everything else -- the repo name, the lint gate, the changelog heading, the live
+# stage, the PR markers -- and the WHOLE of branch-info.ps1 serve the branch/release scripts, which a
+# repo that never enabled the workflow pack does not have. Scaffolding those unconditionally asked a
+# consumer to configure scripts that are not there, which is the exact defect the
+# plugin-serves-the-consumer doctrine names. So the roster half is always written and the workflow
+# half joins it only when the pack is enabled.
+#
+# ASSEMBLED FROM PARTS RATHER THAN WRITTEN AS TWO COMPLETE VARIANTS: a second full scaffold would put
+# a second copy of the roster functions in this file, free to drift from the first.
+$repoConfigHeader = @'
 <#
 .SYNOPSIS
-    Repo-specific configuration for shared workflow scripts (open-pr / fold-changelog).
+    Repo-specific configuration read by the Claude Specialists scripts.
 .DESCRIPTION
-    Placed by specialists-init as a VUL-IN scaffold. Shared skills read this small block of
-    repo data from repo root; scripts themselves are repo-agnostic. Fill in remaining VUL-IN values
-    below and remove VUL-IN markers. RepoName is automatically derived from git remote (origin) by
-    bootstrap if it has a github.com address; otherwise remains VUL-IN.
+    Placed by specialists-init. The scripts themselves are repo-agnostic and read this small block of
+    repo data from the repo root. Anything below carrying a VUL-IN marker is yours to fill in; a
+    section without one is complete as generated.
 
     No Set-StrictMode here: dot-sourcing would modify calling script's strict mode.
     Pure ASCII (repo convention for .ps1): Windows PowerShell 5.1 reads BOM-less script as ANSI.
 #>
 
-# VUL-IN: GitHub repo hosting this repository (owner/name), e.g. 'DaveKJohn/my-repo'.
-$script:RepoName = 'VUL-IN/repo'
+'@
 
-function Get-RepoName {
-    return $script:RepoName
-}
-
-function Get-RepoBlobUrl {
-    return "https://github.com/$($script:RepoName)/blob/main/"
-}
-
-# VUL-IN: repo-root-relative path to lint gate executed by open-pr before PR,
-# e.g. 'scripts/lint/check-plugin-integrity.ps1' or 'scripts/maintenance/lint-brain.ps1'.
-$script:LintScript = 'VUL-IN'
-
-function Get-LintScript {
-    return $script:LintScript
-}
-
+$repoConfigRosterPart = @'
 # Repo-root-relative path to the file holding the specialist roster, read by check-roster-sync.
 # Points at the seam inclusion, because that is where specialists-init puts the roster slot -- change it
 # only if you move the roster somewhere else. Required by the contract, so the scaffold defines it rather
@@ -498,6 +493,35 @@ $script:RosterIgnoredIds = @()
 
 function Get-RosterIgnoredIds {
     return $script:RosterIgnoredIds
+}
+
+'@
+
+# The workflow half: written only for a consumer that enabled the workflow pack. Every function here
+# is called by a branch/release script, so a repo without that pack has nothing that reads any of it.
+$repoConfigWorkflowPart = @'
+# --- The workflow pack's half -------------------------------------------------------------------
+# These are read by the branch/release scripts (open-pr, fold-changelog, ship-pr, cut-release). They
+# are here because this repo enabled specialists-workflow-davekjohn; without that plugin nothing
+# reads them. Fill in the VUL-IN values below and remove the VUL-IN markers.
+
+# VUL-IN: GitHub repo hosting this repository (owner/name), e.g. 'DaveKJohn/my-repo'.
+$script:RepoName = 'VUL-IN/repo'
+
+function Get-RepoName {
+    return $script:RepoName
+}
+
+function Get-RepoBlobUrl {
+    return "https://github.com/$($script:RepoName)/blob/main/"
+}
+
+# VUL-IN: repo-root-relative path to lint gate executed by open-pr before PR,
+# e.g. 'scripts/lint/check-plugin-integrity.ps1' or 'scripts/maintenance/lint-brain.ps1'.
+$script:LintScript = 'VUL-IN'
+
+function Get-LintScript {
+    return $script:LintScript
 }
 
 # The CHANGELOG.md section heading fold-changelog folds a merged entry into -- the literal heading
@@ -640,29 +664,55 @@ function Get-DerivedRepoName([string]$Root) {
 # literal '__SEAM_ROSTER_PATH__' as its roster path, which is worse than the bug being fixed. It repeats the
 # literal knowingly, and the test asserts the two agree.
 $seamRosterRel = if ($seam) { $seam.RelInclusion } else { '.claude/specialists/SPECIALISTS.md' }
-$repoConfigScaffold = $repoConfigScaffold.Replace('__SEAM_ROSTER_PATH__', $seamRosterRel)
+$repoConfigRosterPart = $repoConfigRosterPart.Replace('__SEAM_ROSTER_PATH__', $seamRosterRel)
 
-# Insert derived name into repo config scaffold (before $scriptScaffolds assembly so new content is included).
-# If derivation fails, VUL-IN placeholder remains.
-$derivedRepo = Get-DerivedRepoName $ConsumerRoot
-if ($derivedRepo) {
-    $repoConfigScaffold = $repoConfigScaffold.Replace(
-        "# VUL-IN: GitHub repo hosting this repository (owner/name), e.g. 'DaveKJohn/my-repo'.",
-        "# Derived by specialists-init from git remote (origin) of this repo. Adjust if incorrect.")
-    $repoConfigScaffold = $repoConfigScaffold.Replace(
-        "`$script:RepoName = 'VUL-IN/repo'",
-        "`$script:RepoName = '$derivedRepo'")
+# Did this repo choose the workflow pack? Read from the SAME enabled-plugin answer the lens loop uses
+# (Get-EnabledPlugins over the whole settings chain) rather than from a second reader -- one reader per
+# question is the lesson of inbound #294. A chain that could not be read at all degrades to "no": the
+# roster half is what every consumer needs, and writing a workflow half nobody reads is the defect being
+# repaired, so the safe direction is to leave it out and say so.
+$workflowPluginName = 'specialists-workflow-davekjohn'
+$hasWorkflowPack = ($pluginNames -contains $workflowPluginName)
+
+$repoConfigScaffold = $repoConfigHeader + $repoConfigRosterPart
+if ($hasWorkflowPack) {
+    $repoConfigScaffold += "`n" + $repoConfigWorkflowPart
+
+    # Insert derived name into repo config scaffold (before $scriptScaffolds assembly so new content is
+    # included). If derivation fails, VUL-IN placeholder remains. Only meaningful in the workflow half --
+    # RepoName lives there, so with the pack absent there is nothing to derive into.
+    $derivedRepo = Get-DerivedRepoName $ConsumerRoot
+    if ($derivedRepo) {
+        $repoConfigScaffold = $repoConfigScaffold.Replace(
+            "# VUL-IN: GitHub repo hosting this repository (owner/name), e.g. 'DaveKJohn/my-repo'.",
+            "# Derived by specialists-init from git remote (origin) of this repo. Adjust if incorrect.")
+        $repoConfigScaffold = $repoConfigScaffold.Replace(
+            "`$script:RepoName = 'VUL-IN/repo'",
+            "`$script:RepoName = '$derivedRepo'")
+    }
+} else {
+    $derivedRepo = $null
+    Write-Host "  [notice] '$workflowPluginName' is not enabled here -- scripts/repo-config.ps1 gets the roster half only, and scripts/lib/branch-info.ps1 is not scaffolded at all. Nothing in this repo reads them: the branch/release scripts ship with that pack. Enable it and re-run this to have both filled in." -ForegroundColor DarkGray
 }
 
 $scriptScaffolds = @(
     @{ Rel = 'scripts/repo-config.ps1';     Content = $repoConfigScaffold }
-    @{ Rel = 'scripts/lib/branch-info.ps1'; Content = $branchInfoScaffold }
 )
-# The functions the shared workflow scripts call on each lib. Kept next to the scaffolds that define
-# them, so a contract that grows is noticed here rather than at a consumer's next session start.
+# branch-info.ps1 is ENTIRELY the workflow pack's: both its contract functions are called only by
+# new-branch and open-pr. A repo without the pack has nothing that dot-sources it.
+if ($hasWorkflowPack) {
+    $scriptScaffolds += @{ Rel = 'scripts/lib/branch-info.ps1'; Content = $branchInfoScaffold }
+}
+# The functions the shared scripts call on each lib. Kept next to the scaffolds that define them, so a
+# contract that grows is noticed here rather than at a consumer's next session start. Split the same way
+# the scaffold is: the roster pair is the core's, the rest belongs to the workflow pack, so a repo
+# without it is never told it is missing a function nothing there calls.
 $contractFunctions = @{
-    'scripts/repo-config.ps1'     = @('Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds')
-    'scripts/lib/branch-info.ps1' = @('Get-BranchInfo', 'Test-BranchName')
+    'scripts/repo-config.ps1'     = @('Get-RosterPath', 'Get-RosterIgnoredIds')
+}
+if ($hasWorkflowPack) {
+    $contractFunctions['scripts/repo-config.ps1'] += @('Get-RepoName', 'Get-LintScript')
+    $contractFunctions['scripts/lib/branch-info.ps1'] = @('Get-BranchInfo', 'Test-BranchName')
 }
 
 $scriptScaffolded = 0; $scriptKept = 0
@@ -935,10 +985,15 @@ Write-Host "     the title makes it list your written lens as removable." -Foreg
 if ($seamMode) {
     Write-Host "  1b. Put this repo's roster, routing table and chains in $($seam.RelDir)/SPECIALISTS.md (the '## The roster (VUL-IN)' slot) -- NOT in CLAUDE.md, which keeps exactly one import line." -ForegroundColor Gray
 }
-if ($repoConfigDerived) {
-    Write-Host "  2. Want to use shared workflow skills (open-pr / fold-changelog)? RepoName already derived from git remote ($derivedRepo) -- fill Get-LintScript in scripts/repo-config.ps1 and branch prefix table in scripts/lib/branch-info.ps1." -ForegroundColor Gray
+if (-not $hasWorkflowPack) {
+    # The honest step for a repo that did not take the pack: it has its own way of working, and nothing
+    # here needs filling in. Naming the pack is not a nudge to enable it -- it is what makes the absence
+    # of the branch/release scaffolds legible instead of looking like a gap.
+    Write-Host "  2. Branches, PRs and releases run this repo's own way here -- the specialists use plain git/gh. The scripted workflow (new-branch / open-pr / ship-pr / cut-release) is a separate opt-in plugin, '$workflowPluginName'; enable it and re-run this only if you want THAT way of working." -ForegroundColor Gray
+} elseif ($repoConfigDerived) {
+    Write-Host "  2. Want to use the workflow skills (open-pr / fold-changelog)? RepoName already derived from git remote ($derivedRepo) -- fill Get-LintScript in scripts/repo-config.ps1 and branch prefix table in scripts/lib/branch-info.ps1." -ForegroundColor Gray
 } else {
-    Write-Host "  2. Want to use shared workflow skills (open-pr / fold-changelog)? Fill scripts/repo-config.ps1 (RepoName + LintScript) and scripts/lib/branch-info.ps1 (branch prefix table) -- VUL-IN scaffolds ready." -ForegroundColor Gray
+    Write-Host "  2. Want to use the workflow skills (open-pr / fold-changelog)? Fill scripts/repo-config.ps1 (RepoName + LintScript) and scripts/lib/branch-info.ps1 (branch prefix table) -- VUL-IN scaffolds ready." -ForegroundColor Gray
 }
 $suggestReminder = if ($suggestIgnored -eq $true) { 'it is gitignored here, so git will not remind you' }
                    elseif ($suggestIgnored -eq $false) { 'it is not gitignored here, so git status will keep showing it until you do' }

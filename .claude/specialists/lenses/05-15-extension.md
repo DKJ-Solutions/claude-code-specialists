@@ -118,6 +118,37 @@ infrastructure.
 
 ### Repo-specific rules
 
+- **The shared-scripts registry spans TWO plugins since August 8, 2026, and the plugin is read off the
+  mirror path rather than declared.** `Get-SharedScriptPairs` maps each source to a mirror in either
+  `plugins/specialists/` (the core: `check-roster-sync`, `check-report-lib`) or
+  `plugins/specialists-workflow-davekjohn/` (everything branch- and release-shaped). Three things to
+  know before touching it:
+  - **`SkillRel` is derived from `MirrorRel`, not stored.** Check 18 and `shared-scripts.tests.ps1`
+    both used to look for a script's documenting page at a hardcoded `plugins\specialists\skills\…`,
+    and the moment nine entry points moved, the gate reported every one of their existing skills as a
+    typo. A second field naming the plugin would have been free to disagree with the path beside it;
+    deriving it means a script that moves takes its page lookup with it.
+  - **`check-report-lib` is registered TWICE on purpose** — one source, two mirrors — because
+    `check-roster-sync` stayed in the core while `check-script-contract` went to the pack. The
+    alternative, a mirror reaching into the other plugin's cache, was rejected on sight: separately
+    versioned, separately installed, so a version mismatch breaks it silently. **A duplicate entry
+    needs a distinct `Name`**: the suite looks pairs up with `Where-Object { $_.Name -eq … }` in
+    eleven places and would get an array back.
+  - **The thing that parked this work for days was a MENTION read as a USE — the fifth instance in
+    this file.** The note that stopped it said `check-report-lib` and `native-capture-lib` each had
+    readers in both halves. Neither did: `open-pr`/`fold-changelog-entry` name the first only in a
+    comment, and `check-report-lib` names the second to say it *needs none of* its EAP dance. Both
+    rows dissolved on being read. The assert that now refuses any mirror dot-sourcing a lib from the
+    other plugin is in `shared-scripts.tests.ps1` — write the check that would have caught the
+    misreading, not just the fix.
+- **A scaffold with nothing to fill in is invisible to a placeholder test.** The same split gave a
+  core-only consumer a `repo-config.ps1` holding just the roster pair — complete as generated, so no
+  `VUL-IN` value anywhere. `specialists-teardown` classifies by placeholder VALUE (the #333 lesson),
+  so it read that file as authored and would have kept it forever, making adoption exactly as
+  irreversible as that skill promises it is not. The second recognised shape keys on "still exactly
+  what the bootstrap wrote", which is conservative in the right direction: every way an owner can
+  touch that file ADDS something. **General rule: when a generator gains a mode that emits no
+  placeholder, check every consumer that classifies its output by one.**
 - **The agent-def frontmatter and the `plugin.json` `version` land here first**, never in a consuming
   repo — those pull them in. An agent-def config change is Sylvester's side; the agent-def *text* is
   Tessa's side.

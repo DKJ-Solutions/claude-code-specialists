@@ -6,17 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/connector-sessioncheck.ps1\"",
-            "timeout": 120
-          },
-          {
-            "type": "command",
             "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/roster-sessioncheck.ps1\"",
-            "timeout": 120
-          },
-          {
-            "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/script-contract-sessioncheck.ps1\"",
             "timeout": 120
           }
         ]

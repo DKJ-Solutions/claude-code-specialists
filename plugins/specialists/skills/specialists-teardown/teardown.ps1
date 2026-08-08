@@ -174,7 +174,34 @@ function Test-LooksGenerated {
             if ($EmptyLensPattern -and ($text -match $EmptyLensPattern)) { return $true }
             return $false
         }
-        'repo-config' { return ($text -match "=\s*'[^']*VUL-IN") }
+        'repo-config' {
+            # An unfilled placeholder VALUE -- the shape a consumer WITH the workflow pack receives,
+            # whose RepoName/LintScript are theirs to fill in.
+            if ($text -match "=\s*'[^']*VUL-IN") { return $true }
+            # SECOND SHAPE SINCE AUGUST 8, 2026, and it exists because the split created a scaffold with
+            # nothing to fill in. A consumer that did NOT enable the workflow pack gets the roster half
+            # alone: RosterPath derived from the seam, RosterIgnoredIds empty. It is complete as
+            # generated, so it carries no placeholder -- and the rule above would therefore have read it
+            # as authored and kept it forever, making adoption exactly as irreversible as this skill
+            # promises it is not.
+            #
+            # KEYED ON "STILL EXACTLY WHAT THE BOOTSTRAP WROTE", which is conservative in the direction
+            # this file requires: every way an owner can touch this file ADDS something -- an ignored id,
+            # a workflow function when they later enable the pack, a helper of their own. Any of those
+            # fails one of the three tests below and the file is kept. Only the untouched shape matches.
+            # FOUR TESTS, AND THE FIRST IS THE ONE THAT MAKES THIS SAFE. The other three establish that
+            # the file LOOKS like the generated shape; this one establishes that the bootstrap SAYS it
+            # wrote it. Without it, a consumer who happened to hand-write a repo-config holding exactly
+            # these two functions and an empty ignore list would have it deleted -- "resembles ours"
+            # is not "is ours", and for a script that removes, every remaining doubt resolves toward
+            # keeping.
+            $claimsGenerated = $text -match 'Placed by specialists-init'
+            $hasRosterPair = ($text -match '(?m)^\s*function\s+Get-RosterPath\b') -and
+                             ($text -match '(?m)^\s*function\s+Get-RosterIgnoredIds\b')
+            $ignoredStillEmpty = $text -match '(?m)^\s*\$script:RosterIgnoredIds\s*=\s*@\(\s*\)\s*$'
+            $noOtherFunctions = @([regex]::Matches($text, '(?m)^\s*function\s+([A-Za-z-]+)')).Count -eq 2
+            return ($claimsGenerated -and $hasRosterPair -and $ignoredStillEmpty -and $noOtherFunctions)
+        }
         'branch-info' { return ($text -match '(?m)\$script:BranchPrefixTable\s*=\s*@\{\s*\}') }
     }
     return $false
@@ -629,6 +656,14 @@ if ($VendorScripts) {
             $vendored += $destRel
             Write-Host ("  [vendor] " + $destRel + $(if ($Apply) { '' } else { ' (would be written)' })) -ForegroundColor Green
         }
+        # NO SILENT CAP (August 8, 2026). Since the branch/release workflow became its own plugin, this
+        # payload is the CORE's only -- the sync/check scripts and their lib. new-branch, open-pr,
+        # ship-pr, fold-changelog and cut-release ship in specialists-workflow-davekjohn and are not
+        # reachable from here: the two plugins are separately versioned and separately installed, so
+        # copying across their cache directories would be a runtime dependency on a path a version
+        # mismatch silently breaks. Stated rather than left to be discovered, because a vendor run that
+        # lists four files reads as "that was all of it".
+        $notes += "-VendorScripts covers this plugin's payload only. If you also run specialists-workflow-davekjohn, its scripts (new-branch, open-pr, ship-pr, fold-changelog-entry, cut-release and the libs they dot-source) are NOT in this list -- copy them out of that plugin's own scripts/ directory before you uninstall it."
         $verb = if ($Apply) { 'vendored' } else { 'to vendor' }
         $note = "-VendorScripts: $($vendored.Count) script(s) $verb into scripts/, $($vendorCurrent.Count) already current"
         if ($vendorSkipped.Count -gt 0) {

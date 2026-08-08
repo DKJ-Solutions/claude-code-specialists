@@ -1,6 +1,6 @@
 {
   "name": "claude-code-specialists",
-  "description": "The Claude Specialists system by Dave (DaveKJohn): a team of specialized Claudes under one Chief of Staff, across four plugins (plugins/) — the shared, repo-neutral core plus three domain groups — consumable by multiple repos that toggle each plugin on or off. One product, one repository, one marketplace.",
+  "description": "The Claude Specialists system by Dave (DaveKJohn): a team of specialized Claudes under one Chief of Staff, across five plugins (plugins/) — the shared, repo-neutral core, three domain groups, and one opt-in way-of-working pack — consumable by multiple repos that toggle each plugin on or off. One product, one repository, one marketplace.",
   "owner": { "name": "Dave (DaveKJohn)" },
   "plugins": [
     {
@@ -22,6 +22,11 @@
       "name": "specialists-ecomm",
       "source": "./plugins/specialists-ecomm",
       "description": "Group 4 — domain plugin for commercial webshop repos (any platform): Sergio (SEO), Craig (CRO), Sean (performance/SEA), with room to grow into the wider e-commerce craft (lifecycle/email, analytics). Complementary to a platform group like specialists-shopify — a commercial webshop repo can enable both."
+    },
+    {
+      "name": "specialists-workflow-davekjohn",
+      "source": "./plugins/specialists-workflow-davekjohn",
+      "description": "Group 5 — DaveKJohn's own way of working, packaged as an opt-in: the branch-and-entry model, the tier ladder, the fold, the release cut, and the gates that hold them, as skills plus their shared scripts. Unlike groups 2-4 this is not a domain but a workflow, and the name says whose it is — a consuming repo has its own way of working, and the specialists adapt to it. Enable this only if you want THIS one. Requires group 1."
     }
   ]
 }

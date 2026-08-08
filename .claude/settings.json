@@ -5,7 +5,8 @@
     ]
   },
   "enabledPlugins": {
-    "specialists@claude-code-specialists": true
+    "specialists@claude-code-specialists": true,
+    "specialists-workflow-davekjohn@claude-code-specialists": true
   },
   "extraKnownMarketplaces": {
     "claude-code-specialists": {

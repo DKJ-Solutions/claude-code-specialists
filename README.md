@@ -5,7 +5,7 @@ work with a **team of specialized Claudes** under one Chief of Staff: every assi
 and delivered to the specialist (subagent) with the right playbook — a DevOps engineer for branches
 and PRs, a technical writer for docs, a copy editor for the final pass, and so on.
 
-This repository is that product's **source and its marketplace**: the **four plugins** that together
+This repository is that product's **source and its marketplace**: the **five plugins** that together
 make up the system, plus the machinery that builds, lints and releases them. It is the **single source
 of truth** for every shareable subagent definition — a consuming repo points here instead of keeping
 its own copies, and enables or disables **per plugin** which groups it needs.
@@ -18,7 +18,7 @@ its own copies, and enables or disables **per plugin** which groups it needs.
 | **connect my own repo — and know why** | **[INSTALL.md, the adoption half](plugins/INSTALL.md#adoption--how-to-connect-your-repo)** — the full, measurement-backed adoption manual for someone who did not build this, ~47 min (August 6, 2026). Read its *Before you start* section first if the machine is new or has adopted this family before. |
 | **disconnect it again** | [UNINSTALL.md](plugins/UNINSTALL.md) — the install page's mirror: the repo teardown and the machine-side removal, in the order they have to happen. |
 | know **what this promises my repo** | [The plugin serves the consumer's repo](#the-plugin-serves-the-consumers-repo) — the specialists adapt to your way of working; ours is not a standard you inherit. |
-| know **which plugin does what** | [The four plugins](#the-four-plugins--whats-the-difference) |
+| know **which plugin does what** | [The five plugins](#the-five-plugins--whats-the-difference) |
 | know **how a specialist is built** | [Manuals — the split model](#manuals--the-split-model) |
 | know **how a repo consumes this** | [Consumption](#consumption) · [Versioning](#versioning) |
 | know **where this runs** (Chat / Cowork / Claude Code) | [Where this runs](#where-this-runs-chat-cowork-and-claude-code) |
@@ -46,8 +46,8 @@ histories. So the next product gets its own repository and its own marketplace, 
 layer that used to stand by to hold a second family here has been removed.
 
 **The nuance, so nobody repairs the wrong thing later: lockstep *within* this product is correct.**
-The four plugins are one system — a shared core plus domain groups — and a consumer running group 1
-alongside group 3 needs matching versions. What was wrong was never the lockstep; it was housing
+The five plugins are one system — a shared core, domain groups and the workflow pack — and a consumer
+running group 1 alongside group 3 needs matching versions. What was wrong was never the lockstep; it was housing
 unrelated products in a single release train. The lockstep in
 [`cut-release.ps1`](scripts/release/cut-release.ps1) therefore needs no change, and the versioning
 problem dissolved with the reorganisation instead of needing a fix. (That script *was* changed later
@@ -90,15 +90,31 @@ shipped alongside them was.
 [`scripts/repo-config.ps1`](scripts/repo-config.ps1) looks like the seam that makes the workflow
 adaptable, and its 19 functions genuinely do let a consumer change the trunk name, the merge method and
 the folder grouping. But those are *parameters* of a single changelog model, and the model itself is
-fixed in [`entry-scaffold-lib.ps1`](plugins/specialists/scripts/lib/entry-scaffold-lib.ps1). A consumer
+fixed in [`entry-scaffold-lib.ps1`](plugins/specialists-workflow-davekjohn/scripts/lib/entry-scaffold-lib.ps1). A consumer
 could tune our way of working; they could not have their own. And
-[`check-script-contract.ps1`](plugins/specialists/scripts/sync/check-script-contract.ps1) *enforces*
+[`check-script-contract.ps1`](plugins/specialists-workflow-davekjohn/scripts/sync/check-script-contract.ps1) *enforces*
 that they supply those functions — so a repo that worked differently was not adapted to. It was told at
 every session start that it was misconfigured.
 
-Decision by Dave, August 8, 2026.
+**What the packaging now does about it.** Both files named above are in the paths they are because the
+47% moved out on the same day: the workflow skills, their scripts, the two session hooks that audit a
+repo against this way of working, and the libs only those scripts read now ship as
+[`specialists-workflow-davekjohn`](#the-five-plugins--whats-the-difference) — enabled by choice, absent
+by default. The enforcement went with them, which is the half that mattered most: a repo that works
+differently is no longer told anything at session start, because the checker that had the opinion is
+not there. And `specialists-init` stops scaffolding what it cannot justify — a consumer without the
+pack receives no `branch-info.ps1` and a `repo-config.ps1` holding only the two functions the core
+itself reads.
 
-## The four plugins — what's the difference?
+Decision by Dave, August 8, 2026; packaged the same day.
+
+## The five plugins — what's the difference?
+
+**Four of them answer "what kind of repo is this"; the fifth answers "whose way of working is this".**
+That second axis arrived on August 8, 2026, when the branch/release workflow moved out of the core into
+a pack of its own — the packaging consequence of
+[the plugin serves the consumer's repo](#the-plugin-serves-the-consumers-repo). Read the table with that
+split in mind: groups 2–4 are domains, group 5 is a working method, and only the core is for everyone.
 
 | Plugin | What it is | Who it's for |
 |---|---|---|
@@ -106,8 +122,9 @@ Decision by Dave, August 8, 2026.
 | [`specialists-lifehub/`](plugins/specialists-lifehub/) | **Domain group 2.** Five specialists for a personal information hub / brain-based knowledge repo (Astrid, Fiona, Hugo, Ian, Onyx). Deliberately domain-flavored: they know their repo and teammates by name. | Only a life-hub-style repo. |
 | [`specialists-shopify/`](plugins/specialists-shopify/) | **Domain group 3.** Three specialists for a Shopify store repo (Liam · Liquid, Sandra · store management, Steven · configuration) plus the domain skill `start-task`. Also deliberately domain-flavored. | Only a Shopify repo (e.g. smartwatchbanden). |
 | [`specialists-ecomm/`](plugins/specialists-ecomm/) | **Domain group 4.** E-commerce specialists for a commercial webshop repo of any platform (Sergio · SEO, Craig · CRO, Sean · performance/SEA). Platform-agnostic, and complementary to a platform group rather than exclusive. | Any commercial webshop repo — including a Shopify repo alongside `specialists-shopify`. |
+| [`specialists-workflow-davekjohn/`](plugins/specialists-workflow-davekjohn/) | **Group 5 — a way of working, not a domain.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the seven workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`), their shared scripts, and the two session hooks that belong to running this across several repos. Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that wants *this* workflow. Enable nothing and the specialists use plain `git`/`gh` instead. |
 
-In short: **`specialists` is the foundation; the other three are optional domain extensions.**
+In short: **`specialists` is the foundation; everything else is optional, along two different axes.**
 `specialists-lifehub` and `specialists-shopify` describe what *kind* of repo it is, so a repo
 enables at most one of those; `specialists-ecomm` is orthogonal — it applies to any commercial
 webshop regardless of platform, so a webshop repo can enable it *on top of* a platform group (a
@@ -116,18 +133,27 @@ core is written repo-neutrally (no repo names, paths, or script names — that c
 consumer's repo lens); the domain groups name their domain explicitly, because only a matching repo
 enables them.
 
+**Group 5 sits on neither axis, and its name says so.** It is not "what kind of repo" but "whose
+method", which is why it carries an owner's name where the others carry a subject. A repo that adopts
+the specialists gets colleagues; it does not get somebody else's branch discipline along with them.
+The measurement that forced the split: of what the core used to ship, **9%** described a craft and
+**47%** was workflow machinery — so most of what a consumer received was a way of working they had
+never chosen. What that costs a repo which enables **only** the core is stated plainly under
+[Adoption](#adoption-the-bootstrap-path): no branch scripts, no `branch-info.ps1` to fill in, and a
+`repo-config.ps1` holding the roster half alone.
+
 ### The e-commerce-related plugins
 
-Two of the four plugins serve a **commercial webshop** and are built to work together:
+Two of the five plugins serve a **commercial webshop** and are built to work together:
 
 - **`specialists-shopify`** — the *platform* layer: theme code, store management, configuration for a Shopify store.
 - **`specialists-ecomm`** — the platform-agnostic *disciplines* that any webshop needs: SEO, CRO, and performance/SEA.
 
-They sit on different axes — one is "which platform," the other is "which marketing disciplines" — so they complement rather than replace each other. A **Shopify** store repo typically enables **both**; a **non-Shopify** webshop enables just `specialists-ecomm`. The other two plugins — `specialists` (the core) and `specialists-lifehub` — fall outside this e-commerce grouping. This is a reading aid, not a packaging change: every plugin is still enabled or disabled on its own.
+They sit on different axes — one is "which platform," the other is "which marketing disciplines" — so they complement rather than replace each other. A **Shopify** store repo typically enables **both**; a **non-Shopify** webshop enables just `specialists-ecomm`. The other three plugins — `specialists` (the core), `specialists-lifehub` and `specialists-workflow-davekjohn` — fall outside this e-commerce grouping. This is a reading aid, not a packaging change: every plugin is still enabled or disabled on its own.
 
 ## What lives here and what doesn't
 
-**Does live here:** the four plugin folders under [`plugins/`](plugins/) with **subagent definitions**
+**Does live here:** the five plugin folders under [`plugins/`](plugins/) with **subagent definitions**
 (`agents/`) and the **portable playbook** per specialist (`manuals/<group>-<id>-manual.md`) that the
 agent def reads in via `${CLAUDE_PLUGIN_ROOT}/manuals/`. Group 1 additionally carries two things that
 cover the **main-loop layer** (see [Adoption: the bootstrap path](#adoption-the-bootstrap-path)): the
@@ -138,19 +164,26 @@ cover the **main-loop layer** (see [Adoption: the bootstrap path](#adoption-the-
 at repo level deliberately, because they differ per repo (or are safety-critical). The plugins
 deliberately carry **no safety/guardrail hooks** and **no repo-specific skills** — with a few named,
 repo-neutral exceptions: the skill `specialists-init` (the adoption path itself) and three
-informational, read-only SessionStart hooks that never block — `connector-sessioncheck` (sync
-signaling), `roster-sessioncheck` (roster-drift signaling), and `script-contract-sessioncheck`
-(signals when a repo's own workflow libs no longer expose a function the shared scripts call; see the
-[connectors README](connectors/README.md)); domain groups 2/3 may carry domain skills that a repo
-shares.
+informational, read-only SessionStart hooks that never block — `roster-sessioncheck` (roster-drift
+signaling) in the **core**, and `connector-sessioncheck` (sync signaling) plus
+`script-contract-sessioncheck` (signals when a repo's own workflow libs no longer expose a function the
+shared scripts call) in the **workflow pack**; see the [connectors README](connectors/README.md).
+Domain groups 2/3 may carry domain skills that a repo shares.
+
+**Those last two moved out of the core on August 8, 2026, and the reason is the doctrine rather than
+tidiness.** `connector-sessioncheck` reads a register of *Dave's own* repos, and
+`script-contract-sessioncheck` demands that a repo supply functions for scripts that now ship in the
+opt-in pack. Both ran in every consuming session, so a repo that had only enabled the specialists was
+being audited against somebody else's way of working at every session start.
 
 ### Repo layout
 
 The full picture, top-level folder by folder:
 
-- **`.claude-plugin/marketplace.json`** — the marketplace definition: the four plugins with their `source`.
+- **`.claude-plugin/marketplace.json`** — the marketplace definition: the five plugins with their `source`.
 - **[`plugins/`](plugins/)** — the plugin source. One folder per plugin (`specialists`,
-  `specialists-lifehub`, `specialists-shopify`, `specialists-ecomm`), each carrying
+  `specialists-lifehub`, `specialists-shopify`, `specialists-ecomm`,
+  `specialists-workflow-davekjohn`), each carrying
   `agents/`/`manuals/`/`personas/`/`skills/` plus its own `plugin.json`, `CHANGELOG.md` and `RELEASE.md`
   card — and next to them **`agent-shared/`**, the canonical source of the shared agent-def blocks
   described under
@@ -167,8 +200,9 @@ The full picture, top-level folder by folder:
   `agent-shared-lib.ps1`), the lint gate + drift check, the changelog/PR/release scripts (incl.
   `cut-release.ps1`), the connectors check (`check-connectors.ps1`), the agent-def generator
   (`build-agent-defs.ps1` — fills in the shared blocks from `plugins/agent-shared/`), and the tests. A
-  mirrored copy for consumers lives inside the `specialists` plugin — see its own
-  [README](plugins/specialists/scripts/README.md).
+  mirrored copy for consumers lives inside the plugins — the sync/check scripts in `specialists`, the
+  branch/release workflow in `specialists-workflow-davekjohn` — see its own
+  [README](plugins/specialists-workflow-davekjohn/scripts/README.md).
 - **`releases/`** — the release history: `development/<X>.x/<X.Y.Z>.md` (full notes per version) +
   `README.md` (overview table + the full cutting-a-release mechanics) — see
   [`releases/README.md`](releases/README.md). The `## Releases` section of `CHANGELOG.md` points here.
@@ -939,7 +973,7 @@ checklist (learned from adding `specialists-ecomm`):
    [`scripts/lint/check-consumer-drift.ps1`](scripts/lint/check-consumer-drift.ps1), or a
    consumer's drift check never covers the new ids.
 5. **The docs that enumerate the plugins** — this README (the plugin count, the
-   [four-plugins table](#the-four-plugins--whats-the-difference), the [invocation list](#invocation),
+   [five-plugins table](#the-five-plugins--whats-the-difference), the [invocation list](#invocation),
    the manuals list under [Manuals](#manuals--the-split-model), and whether the group is mutually
    exclusive with the others or complementary) and [`plugins/INSTALL.md`](plugins/INSTALL.md), both
    halves.
