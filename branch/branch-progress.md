@@ -38,14 +38,18 @@
       placeholder test read a core-only `repo-config.ps1` as authored and would have kept it forever
       — adoption exactly as irreversible as that skill promises it is not. `Test-LooksGenerated`
       gained a second recognised shape, keyed on "still exactly what the bootstrap wrote".
-- [ ] Tests: five suites go red on the move — `bootstrap-drift`, `script-contract`, `connectors`,
-      `teardown`, `check-plugin-integrity`. Four are path updates and are done; **`bootstrap-drift`
-      is the real one and is NOT done** — see below.
-- [ ] Docs: `README.md` (the four-plugins table becomes five, the repo layout, "what lives here"),
-      `plugins/INSTALL.md`, `plugins/UNINSTALL.md`, `CLAUDE.md`, and the lenses of Derek #05,
-      Rendall #06 and Sylvester #15. The dead links the lint caught are already repaired; this is the
-      prose that has to say there are five plugins and what the fifth is for.
-- [ ] Fill in the changelog entry
+- [x] Tests: all five suites that went red are green, and `bootstrap-drift` was rebuilt around BOTH
+      scaffold shapes rather than retargeted to one. Two new asserts prove the teardown still reads an
+      untouched core-only `repo-config.ps1` as generated. **All 27 suites green in 139s.**
+- [x] Docs: `README.md` (the table is five, plus what the fifth is and what a core-only consumer
+      loses), `plugins/INSTALL.md` (decide about the pack deliberately), `plugins/UNINSTALL.md` (take
+      the pack's scripts out before uninstalling — `-VendorScripts` covers the core only), `CLAUDE.md`,
+      `CONTRIBUTING.md`, the specialists handbook, `connectors/README.md`, and the lenses of Derek #05,
+      Rendall #06 and Sylvester #15.
+- [x] Fill in the changelog entry
+- [~] A separate teardown for the workflow pack — NOT built, deliberately. `-VendorScripts` states the
+      gap in its own output and `UNINSTALL.md` says where to copy from, which is the honest small
+      answer; building a second teardown before anyone has hit the gap would be a pre-emptive fix.
 
 ### Where I left off
 

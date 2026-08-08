@@ -342,6 +342,14 @@ waiting for a migration that does not exist.
 
 ### Rendall's toolkit
 
+**Where these live for a consumer, since August 8, 2026.** The paths below are this repo's own
+`scripts/` and are unchanged — that is still the canonical source. The **mirror** moved: the fold, the
+cut, the internal note and `release-lib` now ship in `specialists-workflow-davekjohn` rather than in
+the core, and so do the `fold-changelog` and `cut-release` skill pages that document them. A consuming
+repo that did not enable that pack has none of this, and that is correct: the changelog entry format,
+the tier ladder and the release cut are one particular way of running a release, not the craft of
+release management. Rendall's craft in such a repo is whatever *that* repo's release process is.
+
 - `scripts/task/new-branch.ps1 [-Title <string>] [-Intent <string>]` — write the branch's
   two files in `branch/`. `-Intent` records where you left off / what is next in
   **`branch-progress.md`**, not in the entry (#162): an intent is a status, and the entry's text folds

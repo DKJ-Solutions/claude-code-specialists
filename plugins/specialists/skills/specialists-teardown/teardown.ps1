@@ -189,11 +189,18 @@ function Test-LooksGenerated {
             # this file requires: every way an owner can touch this file ADDS something -- an ignored id,
             # a workflow function when they later enable the pack, a helper of their own. Any of those
             # fails one of the three tests below and the file is kept. Only the untouched shape matches.
+            # FOUR TESTS, AND THE FIRST IS THE ONE THAT MAKES THIS SAFE. The other three establish that
+            # the file LOOKS like the generated shape; this one establishes that the bootstrap SAYS it
+            # wrote it. Without it, a consumer who happened to hand-write a repo-config holding exactly
+            # these two functions and an empty ignore list would have it deleted -- "resembles ours"
+            # is not "is ours", and for a script that removes, every remaining doubt resolves toward
+            # keeping.
+            $claimsGenerated = $text -match 'Placed by specialists-init'
             $hasRosterPair = ($text -match '(?m)^\s*function\s+Get-RosterPath\b') -and
                              ($text -match '(?m)^\s*function\s+Get-RosterIgnoredIds\b')
             $ignoredStillEmpty = $text -match '(?m)^\s*\$script:RosterIgnoredIds\s*=\s*@\(\s*\)\s*$'
             $noOtherFunctions = @([regex]::Matches($text, '(?m)^\s*function\s+([A-Za-z-]+)')).Count -eq 2
-            return ($hasRosterPair -and $ignoredStillEmpty -and $noOtherFunctions)
+            return ($claimsGenerated -and $hasRosterPair -and $ignoredStillEmpty -and $noOtherFunctions)
         }
         'branch-info' { return ($text -match '(?m)\$script:BranchPrefixTable\s*=\s*@\{\s*\}') }
     }

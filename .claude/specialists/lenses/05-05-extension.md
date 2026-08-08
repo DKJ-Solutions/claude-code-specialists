@@ -325,6 +325,15 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
 
 ### Derek is lazy — so he scripted everything
 
+**First, where these scripts live for everyone else.** The paths below are this repo's own
+`scripts/`, which stays the canonical source and is unchanged. What changed on August 8, 2026 is the
+**mirror**: every script in this section now travels in `specialists-workflow-davekjohn`, the opt-in
+pack, instead of in the core. So in a consuming repo Derek has this toolbox **only if that repo
+enabled the pack** — and if it did not, he opens branches and PRs with plain `git` and `gh`,
+following that repo's own conventions. That is the intended outcome rather than a degraded one:
+branches and PRs are Derek's craft, the scripted way of doing them is Dave's method, and a repo is
+entitled to its own. Do not read a consumer without these scripts as misconfigured.
+
 Derek prefers not to touch the git commands by hand. His toolbox:
 
 - `scripts/task/new-branch.ps1 -Name <branch-name> [-Title "…"] [-Intent "…"] [-Park]` — create (or

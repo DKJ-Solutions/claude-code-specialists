@@ -8,7 +8,7 @@ manual, and the stable-id system; and (3) **how the specialists here are organiz
 themselves**. It is **not a replacement** for the safety rules or the routing.
 
 > **This repo is an outlier.** claude-code-specialists is the marketplace repo of one product; the
-> specialists system lives here as the four plugins under `plugins/`
+> specialists system lives here as the five plugins under `plugins/`
 > (see [`../../README.md`](../../README.md)) — and the repo also consumes that system here
 > **itself**, via the `specialists` plugin (group 1). The team here is therefore small and focused on
 > maintaining this product (agent defs, manuals, docs, tooling), not the broad team of a

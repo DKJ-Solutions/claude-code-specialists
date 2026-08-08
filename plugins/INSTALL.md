@@ -145,9 +145,23 @@ and code/security reviewers for the independent final pass before a PR or merge.
 charge: the governance (your `CLAUDE.md`, your safety rules) remains yours; the plugins only supply
 the team and its playbooks.
 
-The system consists of **four plugins**: the repo-neutral core `specialists` (group 1 — always
-enable it) and three optional domain groups. Which specialists live in which plugin and who they are
-meant for is covered in the [root README](../README.md).
+The system consists of **five plugins**: the repo-neutral core `specialists` (group 1 — always
+enable it), three optional domain groups, and one optional **way-of-working** pack. Which specialists
+live in which plugin and who they are meant for is covered in the [root README](../README.md).
+
+**The fifth one is different in kind, so decide about it deliberately rather than by habit.**
+`specialists-workflow-davekjohn` carries no specialists at all — it is DaveKJohn's own branch,
+changelog and release method as skills plus scripts (`new-branch`, `open-pr`, `ship-pr`,
+`fold-changelog`, `cut-release`, `park`, `fix-mojibake`). Enable it only if you want *that* workflow in
+your repo. **Leave it off and nothing is broken:** the specialists do branches and PRs with plain
+`git`/`gh`, following whatever conventions your repo already has. Two consequences worth knowing before
+you choose:
+
+- **Enabling it later is a plain enable + re-run of `specialists-init`**, which then adds the config it
+  needs. Nothing has to be undone first.
+- **If you enable it, your repo owes it two files** — `scripts/repo-config.ps1` (repo name, lint gate)
+  and `scripts/lib/branch-info.ps1` (your branch-prefix table). `specialists-init` scaffolds both, and a
+  session check tells you if a function is missing. Without the pack you are asked for neither.
 
 ### Before you start
 

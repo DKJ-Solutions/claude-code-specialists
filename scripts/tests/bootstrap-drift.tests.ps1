@@ -217,6 +217,12 @@ try {
     $touchedRc = Join-Path $Fixture 'scripts\repo-config-touched.ps1'
     [System.IO.File]::WriteAllText($touchedRc, $rcText.Replace('$script:RosterIgnoredIds = @()', "`$script:RosterIgnoredIds = @('06-16')"), $Utf8NoBom)
     Assert-Equal $false (Test-TeardownSeesGenerated $touchedRc) 'teardown: one ignored id added and it reads as authored (kept)'
+    # THE LOOK-ALIKE. A consumer's own file can hold exactly these two functions and an empty ignore
+    # list; only the bootstrap's own docstring says who wrote it. Without this test the shape test
+    # alone would delete somebody's hand-written config -- the direction a removing script must never
+    # resolve doubt in.
+    [System.IO.File]::WriteAllText($touchedRc, $rcText.Replace('Placed by specialists-init', 'Written by hand for this repo'), $Utf8NoBom)
+    Assert-Equal $false (Test-TeardownSeesGenerated $touchedRc) "teardown: a look-alike that never claims the bootstrap wrote it is KEPT"
     Remove-Item -LiteralPath $touchedRc -Force
 
     # --- 1c1. The SAME bootstrap against a consumer that DID enable the workflow pack ---------------
