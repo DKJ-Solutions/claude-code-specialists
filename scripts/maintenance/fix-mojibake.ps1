@@ -157,7 +157,7 @@ $map = [ordered]@{
 # (0xC3,0x201A -> 0xC2) added when double encoding first bit. Damage that is double-encoded in any OTHER
 # character matches nothing: the fixpoint loop has no first rule to apply, so it exits on the first pass
 # and the file is declared clean. Measured on this repo at v3.1.0: 1551 double-encoded sequences across
-# CHANGELOG.md, the specialists CHANGELOG.md, its consumer-facing RELEASE.md and the 3.1.0 release notes
+# CHANGELOG.md, the then-existing per-plugin CHANGELOG.md and RELEASE.md, and the 3.1.0 release notes
 # -- 315 em dashes, 43 arrows, 10 ellipses, 4 en dashes -- while the gate that reads this tool reported
 # "No findings" over three of those four files. A gate that cannot see the damage it exists to catch is
 # worse than no gate, because it is also a claim.

@@ -10,15 +10,14 @@
 
     Supplies Get-NextVersion, Get-BumpType, Get-LockstepVersion, Get-PluginManifestPaths,
     Get-PullRequestEntries, Get-PullRequestEntriesByTier, Convert-ChangelogForRelease,
-    Build-ReleaseNotes, Get-ReleaseTierHeading, Test-ReleaseBumpEarned, and for the
-    per-plugin CHANGELOGs: Get-EntryPlugins, Convert-EntryLinksForPluginChangelog,
-    Build-PluginChangelogSection, Build-PluginChangelogIntro and Add-PluginChangelogSection, plus
-    Get-MarketplaceName. Also Build-PluginReleaseCard: the
-    per-plugin RELEASE.md card (Model A, plugin-carried) that shows which release the plugin is
-    currently on, even if this particular release did not touch the plugin (lockstep version, the
-    card may have no entries). These functions are deliberately pure (string/value in,
-    string/value out) so they can be tested separately without running a release --
-    scripts/release/cut-release.ps1 uses them, and the tests cover them.
+    Build-ReleaseNotes, Get-ReleaseTierHeading, Test-ReleaseBumpEarned, Get-EntryPlugins and
+    Get-MarketplaceName. These functions are deliberately pure (string/value in, string/value out)
+    so they can be tested separately without running a release -- scripts/release/cut-release.ps1
+    uses them, and the tests cover them.
+
+    The per-plugin CHANGELOG and RELEASE.md builders were retired on August 8, 2026; the retirement
+    note further down says why. Get-EntryPlugins survives them: the `Plugins:` line still records
+    which plugins an entry touched, and the release notes still read it.
 
     THE FLAT CHANGELOG (Dave, August 5, 2026). CHANGELOG.md is an intro followed by ONE H2 PER CHANGE,
     with no section headings at all -- the three '## Tier N - Pull Requests' sections and the
@@ -68,16 +67,16 @@
 
     SHARPENED August 3, 2026 -- "only future output changed" is true of every template here EXCEPT
     one, and the exception cost four consumer-facing files. A template that appends (a release
-    section, a reference line, a card that is fully regenerated) reaches its file again on the next
-    release, so editing it does propagate. The per-plugin CHANGELOG INTRO is the one that does not:
-    Add-PluginChangelogSection writes it only for a file that does not exist yet, so the four
-    existing CHANGELOGs kept an intro naming the retired marketplace long after the rename had swept
-    it out of 59 files. "Leave history alone" was the right instinct applied to the wrong text -- the
-    entries below the intro are history, the intro is a live statement about the present mechanism.
-    Repaired by extracting Build-PluginChangelogIntro as the single source and gating the existing
-    files against it (check 17 in check-plugin-integrity.ps1). The general rule, for the next
-    template added here: ask whether the string is rewritten on every release, and if it is not, it
-    needs a gate rather than a good intention.
+    section, a reference line) reaches its file again on the next release, so editing it does
+    propagate. The per-plugin CHANGELOG INTRO was the one that did not: it was written only for a
+    file that did not exist yet, so the four existing CHANGELOGs kept an intro naming the retired
+    marketplace long after the rename had swept it out of 59 files. "Leave history alone" was the
+    right instinct applied to the wrong text -- the entries below the intro were history, the intro
+    was a live statement about the present mechanism.
+
+    THE RULE OUTLIVES THE FILES IT WAS LEARNED ON, which is why it stays here after those documents
+    were retired on August 8, 2026: for the next template added below, ask whether the string is
+    rewritten on every release, and if it is not, it needs a gate rather than a good intention.
 #>
 
 # The branch types (Feat/Fix/Docs/Chore) have a single source in branch-info.ps1; Build-ReleaseNotes
@@ -766,28 +765,15 @@ function Remove-EntryPluginsLine {
 function Convert-RootRelativeLinks {
     <#
         Rewrites repo-root-relative markdown links with the given prefix; external (http/mailto),
-        anchor (#), absolute (/) and ../ links are left alone. The shared engine behind
-        Build-ReleaseNotes and Convert-EntryLinksForPluginChangelog.
+        anchor (#), absolute (/) and ../ links are left alone. The engine behind Build-ReleaseNotes.
+        It had a second caller until August 8, 2026 -- the per-plugin CHANGELOG link rewriter, which
+        went with the documents it wrote.
     #>
     param(
         [Parameter(Mandatory)][string]$EntryText,
         [Parameter(Mandatory)][string]$Prefix
     )
     return [regex]::Replace($EntryText, '\]\((?!https?:|mailto:|#|/|\.\./)([^)]+)\)', "](${Prefix}`$1)")
-}
-
-function Convert-EntryLinksForPluginChangelog {
-    <#
-        Rewrites repo-root-relative markdown links to absolute GitHub blob URLs, so an entry is
-        also readable in a consumer's plugin cache (where the repo files do not exist).
-    #>
-    param(
-        [Parameter(Mandatory)][string]$EntryText,
-        # Live value is injected by cut-release.ps1 from repo-config (Get-RepoBlobUrl); this
-        # literal is only the fallback if the function is called without -RepoBlobUrl.
-        [string]$RepoBlobUrl = 'https://github.com/DaveKJohn/claude-code-specialists/blob/main/'
-    )
-    return Convert-RootRelativeLinks -EntryText $EntryText -Prefix $RepoBlobUrl
 }
 
 # --- MOVED, NOT DELETED: Get-ReleaseChangeTypes now lives in entry-scaffold-lib.ps1 ----------------
@@ -956,172 +942,22 @@ function Format-RankedEntries {
     return (@($items | ForEach-Object { $_.Text }) -join "`n`n---`n`n")
 }
 
-function Build-PluginChangelogSection {
-    <#
-        Builds the '## v<Version> <emDash> <Date>' block for a plugin CHANGELOG from the entries
-        that touch that plugin -- a flat list one level under that heading ('### <entry>', its own
-        sections at '####'). Pure string out -- DELIBERATELY hard LF (instead of the $nl-detection pattern
-        that Split-Changelog/Convert-ChangelogForRelease use): this block is written into a NEW,
-        standalone plugin-CHANGELOG.md, which has no existing newline style of its own to match --
-        unlike the root CHANGELOG.md (which is CRLF and detects and keeps its own style via $nl).
-        $Entries, however, come from that CRLF root CHANGELOG (via Get-PullRequestEntries) -- so
-        Format-RankedEntries normalizes them to LF (#103, Victor #5), otherwise the CRLF inside
-        an entry body would still cross the promised pure-LF output.
-    #>
-    param(
-        [Parameter(Mandatory)][string[]]$Entries,
-        [Parameter(Mandatory)][string]$Version,
-        [Parameter(Mandatory)][string]$Date
-    )
-    $emDash = [char]0x2014
-    # -StripSignificance, and NOT ranked (issue #467). This file ships INSIDE the plugin, so it travels to
-    # every consumer's plugin cache -- exactly the outward direction a self-assigned tier or score must not
-    # take. It is not ranked because its entries are a per-PLUGIN selection cutting across all tiers, so
-    # there is no single audience whose score would order it; the release's own documents are where the
-    # ordering question has an answer. Unranked therefore means document order, which is the order the fold
-    # left CHANGELOG.md in -- a defined order rather than an absence of one.
-    $body = Format-RankedEntries -Entries $Entries -EntryLevel 3 -StripSignificance
-    return "## v$Version $emDash $Date`n`n$body`n"
-}
-
-function Build-PluginChangelogIntro {
-    <#
-        The intro header of a per-plugin CHANGELOG: the title plus the paragraph saying what the file
-        is and where the full history lives. Pure string in/out.
-
-        ITS OWN FUNCTION BECAUSE THIS TEXT IS WRITE-ONCE, AND WRITE-ONCE TEXT DRIFTS SILENTLY.
-        Add-PluginChangelogSection emits it only when the CHANGELOG does not exist yet, so an
-        existing file's intro is never rewritten -- editing the template below reaches future
-        plugins and no current one. Measured August 3, 2026: after the rename swept the old
-        marketplace name out of 59 files, all four per-plugin CHANGELOGs still opened by naming it,
-        because their intro had been written once at creation and no gate looked at it. Check 17 in
-        check-plugin-integrity.ps1 now holds those files against THIS function, which is only
-        trustworthy while the text has exactly one source -- hence the extraction.
-
-        $MarketplaceName is a parameter rather than a literal for the same reason one level up: the
-        name's authority is 'name' in .claude-plugin/marketplace.json, and a copy of it here is a
-        copy that can go stale. The caller reads it there and passes it; the gate reads the same
-        field, so the two agree by construction instead of by upkeep.
-    #>
-    param(
-        [Parameter(Mandatory)][string]$PluginName,
-        [Parameter(Mandatory)][string]$MarketplaceName
-    )
-    $emDash = [char]0x2014
-    return "# Changelog $emDash $PluginName`n`n" +
-        "Consumer-facing history of this plugin: per release, the changes that touched this`n" +
-        "plugin. Automatically appended by ``cut-release.ps1`` of the marketplace repo`n" +
-        "($MarketplaceName); the full repository history lives there in ``CHANGELOG.md`` and`n" +
-        "``releases/``.`n`n"
-}
-
-function Add-PluginChangelogSection {
-    <#
-        Adds a release section to the top of a plugin CHANGELOG (after the intro, before the first
-        version heading, newest first); if no content exists yet, the full CHANGELOG including
-        intro header is built. Pure string in/out.
-    #>
-    param(
-        [string]$Existing = '',
-        [Parameter(Mandatory)][string]$Section,
-        [Parameter(Mandatory)][string]$PluginName,
-        [Parameter(Mandatory)][string]$MarketplaceName
-    )
-    if (-not $Existing) {
-        $intro = Build-PluginChangelogIntro -PluginName $PluginName -MarketplaceName $MarketplaceName
-        return ($intro + $Section.TrimEnd() + "`n")
-    }
-    # Tightened (#103, Victor #5): specifically matches a version heading ('## vX.Y.Z ...', exactly
-    # the pattern Build-PluginChangelogSection itself writes), not just any arbitrary '## ' heading --
-    # otherwise a manually added non-version heading (e.g. '## Notes') would make the insertion
-    # position match incorrectly and cram the new section into the middle of it instead of before it.
-    $m = [regex]::Match($Existing, '(?m)^## v\d+\.\d+\.\d+\b')
-    if ($m.Success) {
-        return $Existing.Substring(0, $m.Index) + $Section.TrimEnd() + "`n`n---`n`n" + $Existing.Substring($m.Index)
-    }
-    return ($Existing.TrimEnd() + "`n`n" + $Section.TrimEnd() + "`n")
-}
-
-function Build-PluginReleaseCard {
-    <#
-        Builds the full RELEASE.md card text for a plugin (Model A, plugin-carried): a consumer
-        who only has the plugin cache sees immediately which release version they are on, even if
-        this particular release did not touch the plugin (the version bumps lockstep, so every
-        plugin gets a fresh card on every release). The body is the flat entry list via
-        Format-RankedEntries (a single-release view: '## <entry>', like the full notes) after
-        Convert-EntryLinksForPluginChangelog rewrites their links. Pure string out (LF newlines), so
-        separately testable.
-
-        $Entries is the array of entry blocks of THIS plugin for THIS release (may be empty --
-        no changes simply means the "no changes" block, no error). $RepoBlobUrl is the base for
-        the link to the full workshop notes (repo-root-relative, so only readable as a blob URL
-        from the plugin cache); the link to its own CHANGELOG.md is deliberately kept
-        folder-relative ("CHANGELOG.md") -- that file travels along with this card in the same
-        plugin folder, so that link works both in this repo and in a consumer's plugin cache.
-    #>
-    param(
-        [Parameter(Mandatory)][string]$PluginName,
-        [Parameter(Mandatory)][string]$Version,
-        [Parameter(Mandatory)][string]$Date,
-        [Parameter(Mandatory)][string]$Type,
-        [string]$Title = '',
-        [string[]]$Entries = @(),
-        [string]$RepoBlobUrl = 'https://github.com/DaveKJohn/claude-code-specialists/blob/main/'
-    )
-    $majorDir = ($Version -split '\.')[0] + '.x'
-    $notesRelPath = "releases/development/$majorDir/$Version.md"
-    $notesUrl = "$RepoBlobUrl$notesRelPath"
-
-    # WHAT THE CARD CAN KNOW, AND WHAT IT CANNOT (inbound #384). This line used to read "You are on
-    # this release." -- written at cut time, about a reader the card has never met. Round v13 measured
-    # it false in the ordinary case: the payload came from `main`, three commits past the tag whose
-    # number the card and plugin.json both carried. And it contradicted the reader's own correct
-    # conclusion, because the adoption page's tag comparison had just told them they were on `main` and
-    # not on the release. So the card now states what it describes and hands the "where am I" question
-    # to the check that can answer it.
-    #
-    # plugins/INSTALL.md, and the path has moved twice. The page was QUICKSTART.md, renamed ADOPTION.md
-    # on August 3, 2026 (inbound #408) when a short commands-only page took the old name; both then left
-    # the root for plugins/, and were merged back into one INSTALL.md with the short page as its first
-    # half. The '#staying-up-to-date' anchor survived all three moves and belongs to the LONG half --
-    # the short half's own section was renamed to keep that anchor unambiguous, because a duplicate
-    # heading would have silently sent this card to the two-command summary instead of the measurement.
-    #
-    # The archived release notes and the older per-plugin CHANGELOGs still name the old pages, and are
-    # deliberately not rewritten -- but a card generated from here points at where the page IS.
-    $backtick = [char]0x60
-    $adoptionUrl = $RepoBlobUrl + 'plugins/INSTALL.md#staying-up-to-date'
-    $mainRef = "$backtick" + 'main' + "$backtick"
-    $titleLine = if ($Title) { "$Title`n`n" } else { '' }
-    $header = "# Release v$Version`n`n" +
-        "**Date:** $Date  `n**Type:** $Type`n`n" +
-        "${titleLine}This card describes v$Version, the version your plugin manifest carries. Whether it is " +
-        "the code you are running is a separate question: the documented update path installs from $mainRef, " +
-        "so a $mainRef that has moved past the tag reports this same number. " +
-        "[The version is not the code]($adoptionUrl) in INSTALL.md is the check.`n`n"
-
-    $emDash = [char]0x2014
-    $realEntries = @($Entries | Where-Object { $_ -and $_.Trim() })
-    if ($realEntries.Count -gt 0) {
-        $converted = @($realEntries | ForEach-Object {
-            Convert-EntryLinksForPluginChangelog -EntryText $_ -RepoBlobUrl $RepoBlobUrl
-        })
-        # Single-release view: entries at '##', exactly like the full notes. (No inner '## vX -- date'
-        # line -- the card header above already states the version + date.)
-        # -StripSignificance for the same reason as the plugin CHANGELOG above: this card ships inside the
-        # plugin and is read by consumers. Unranked for the same reason too -- a per-plugin selection has
-        # no one audience.
-        $body = (Format-RankedEntries -Entries $converted -EntryLevel 2 -StripSignificance).Trim()
-    } else {
-        $body = "No changes to this plugin in this release $emDash see the full notes."
-    }
-
-    $footer = "---`n`n" +
-        "Full workshop notes: [$notesRelPath]($notesUrl)`n" +
-        "Cumulative plugin history: [CHANGELOG.md](CHANGELOG.md)`n"
-
-    return ($header + $body + "`n`n" + $footer)
-}
+# RETIRED, AUGUST 8, 2026: Build-PluginChangelogSection, Build-PluginChangelogIntro,
+# Add-PluginChangelogSection and Build-PluginReleaseCard -- the four builders of the per-plugin
+# CHANGELOG.md and RELEASE.md card.
+#
+# They existed to give a consumer a history and a version card INSIDE the plugin cache, on the
+# reasoning that the cache is all a consumer has. Measured before removing them: the marketplace
+# source is a git clone of the WHOLE repo, so every consumer already holds the root CHANGELOG.md
+# and the full releases/ tree at ~/.claude/plugins/marketplaces/<marketplace>/. The ten files these
+# functions wrote came to 11,684 lines of second copy -- and a copy that could disagree with the
+# original, which is precisely what lint checks 9 and 17 were built to police. Both checks are gone
+# with the functions: there is nothing left to hold against anything.
+#
+# One repository, one product, one changelog. Decision by Dave, August 8, 2026.
+#
+# Convert-EntryLinksForPluginChangelog went with them (its only callers were these), while
+# Format-RankedEntries did NOT -- the release notes and the highlights still use it.
 
 # The two patterns that define where a release row lands, in ONE place because three readers depend on
 # them agreeing: Get-OverviewTargetMajor and Get-OverviewSectionHeading below, and the inserter in
@@ -1211,10 +1047,9 @@ function Get-ReleaseTierHeading {
 function Build-ReleaseNotes {
     <#
         Builds the full release notes (the releases/development/<X>.x/<X.Y.Z>.md file) from the
-        entry blocks. Pure string out -- DELIBERATELY hard LF (see
-        Build-PluginChangelogSection above for the same trade-off: this is a NEW, standalone file
+        entry blocks. Pure string out -- DELIBERATELY hard LF, because this is a NEW, standalone file
         with no existing newline style of its own, unlike the root CHANGELOG.md which detects and
-        keeps its CRLF style via $nl). The entries come from that CRLF root CHANGELOG -- so here they
+        keeps its CRLF style via $nl. The entries come from that CRLF root CHANGELOG -- so here they
         are explicitly normalized to LF (#103, Victor #5), alongside the link rewriting below.
 
         TWO SHAPES, ONE FUNCTION (the tier model, August 5, 2026):

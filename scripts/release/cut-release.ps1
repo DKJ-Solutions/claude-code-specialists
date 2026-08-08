@@ -723,41 +723,23 @@ if (Test-Path $relReadme) {
 
 Write-Utf8NoBom -Path $changelogPath -Content $changelogNew
 
-# --- Per-plugin CHANGELOG + RELEASE.md card (consumer-facing; travel along with the plugin cache) -
-# A combined loop per plugin (#103, Victor #7; previously two separate $manifests loops): both
-# steps share the same $pluginEntries selection (Get-EntryPlugins filter + Remove-EntryPluginsLine),
-# so determine that once per plugin instead of twice. The CHANGELOG step writes ONLY if the plugin
-# actually has entries this release; the RELEASE.md step deliberately runs over EVERY plugin -- the
-# version bumps lockstep, so even a plugin not touched this time must show the new version
-# (Build-PluginReleaseCard then shows the "no changes" block instead of failing). RELEASE.md is a
-# snapshot (not a history like CHANGELOG.md), so overwriting is exactly right there.
+# RETIRED, AUGUST 8, 2026: the per-plugin CHANGELOG.md and RELEASE.md card.
 #
-# The loop is over $manifests, which is EMPTY when the seam says this repo publishes no plugins
-# (#417) -- so no extra `if` is needed here and the block simply does nothing. Stated rather than
-# left to be inferred: an empty collection doing nothing is correct, but silent.
-foreach ($m in $manifests) {
-    $pluginDir = Split-Path (Split-Path $m -Parent) -Parent
-    $pluginName = Split-Path $pluginDir -Leaf
-    # The Plugins: line is internal administration (drove the selection here) -- strip it before
-    # an entry lands in consumer-facing content.
-    $pluginEntries = @($entries | Where-Object { @(Get-EntryPlugins -EntryText $_) -contains $pluginName })
-    $pluginEntries = @($pluginEntries | ForEach-Object { Remove-EntryPluginsLine -EntryText $_ })
-
-    if ($pluginEntries.Count -gt 0) {
-        $convertedEntries = @($pluginEntries | ForEach-Object { Convert-EntryLinksForPluginChangelog -EntryText $_ -RepoBlobUrl (Get-RepoBlobUrl) })
-        $section = Build-PluginChangelogSection -Entries $convertedEntries -Version $new -Date $today
-        $plChangelogPath = Join-Path $pluginDir 'CHANGELOG.md'
-        $existing = if (Test-Path -LiteralPath $plChangelogPath) { Get-Content -Path $plChangelogPath -Raw -Encoding UTF8 } else { '' }
-        Write-Utf8NoBom -Path $plChangelogPath -Content (Add-PluginChangelogSection -Existing $existing -Section $section -PluginName $pluginName -MarketplaceName $marketplaceName)
-        Write-Host "  updated: $pluginName/CHANGELOG.md ($($pluginEntries.Count) entries)" -ForegroundColor DarkGray
-    }
-
-    $card = Build-PluginReleaseCard -PluginName $pluginName -Version $new -Date $today -Type $typeLabel `
-        -Title $Title -Entries $pluginEntries -RepoBlobUrl (Get-RepoBlobUrl)
-    $releaseCardPath = Join-Path $pluginDir 'RELEASE.md'
-    Write-Utf8NoBom -Path $releaseCardPath -Content $card
-    Write-Host "  updated: $pluginName/RELEASE.md" -ForegroundColor DarkGray
-}
+# The cut used to write two documents into every plugin directory -- a per-plugin history and a
+# snapshot card naming the current version -- on the reasoning that they "travel along with the
+# plugin cache" and are therefore what a consumer can actually read. Measured on the day they were
+# removed, that reasoning does not hold: the marketplace source is a GIT CLONE OF THE WHOLE REPO, so
+# a consumer already has the root CHANGELOG.md and the full releases/ tree at
+# ~/.claude/plugins/marketplaces/<marketplace>/. The 11,684 lines in those ten files were a second
+# copy of something the reader had all along -- and a copy that could disagree, which is what checks
+# 9 and 17 existed to police.
+#
+# One repository, one product, one changelog. Decision by Dave, August 8, 2026.
+#
+# What this deliberately does NOT change: the lockstep version bump. plugin.json is still the place a
+# plugin's version lives, and it is still bumped for every plugin in step 3a -- a consumer running
+# group 1 alongside group 3 still needs matching versions. What is gone is a SECOND statement of that
+# same version, in prose, in a file nothing reads back.
 
 # --- 3d. The highlights pair (stakeholder-facing; only for the bump types the seam names) ---------
 # Content and collision were both settled above, so this block is pure IO. It writes NOTHING when the

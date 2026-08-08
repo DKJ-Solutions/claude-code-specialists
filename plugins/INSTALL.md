@@ -635,7 +635,7 @@ done — with an empty lens they simply answer out of their portable playbook.
 
 ### Staying up to date
 
-Updates are *announced* via **releases** — the version bump, the notes, the `RELEASE.md` card — and
+Updates are *announced* via **releases** — the version bump and the notes — and
 getting one takes **two** commands, from your repo's root. What actually lands in your cache is a
 different question, answered under [the version is not the code](#staying-up-to-date) further down: the
 clone these commands read tracks `main`, not the tag.
@@ -690,15 +690,18 @@ step to follow**: that writes a local disable key on top of your project setting
 in place. Earlier releases said *"Plugin `specialists` is not installed at scope user"*, literally true
 and easy to misread as "not installed at all". Whatever the phrasing, the failure means the command
 looked in the wrong scope. Do not answer it by re-running the install either: a scopeless install adds
-a **second, machine-wide record** beside the project one. Each plugin carries its own
-`CHANGELOG.md` that travels with the plugin cache and describes per release what changed for that
-plugin; the full history lives in the workshop itself
-([`CHANGELOG.md`](../CHANGELOG.md) and [`releases/`](../releases/README.md)). Each plugin
-folder also carries a `RELEASE.md` card next to its `CHANGELOG.md` — open it in your plugin cache
-after an update to see, at a glance, which release the card describes and what changed in it. It
-does not tell you where *you* are, and since August 2, 2026 it says so rather than claiming
-otherwise (inbound [#384](https://github.com/DaveKJohn/claude-code-specialists/issues/384)); the section
-directly below is the check for that.
+a **second, machine-wide record** beside the project one. For **what changed**, read
+[`CHANGELOG.md`](../CHANGELOG.md) and [`releases/`](../releases/README.md) — and you already have both,
+because your marketplace source is a git clone of the whole repository at
+`~/.claude/plugins/marketplaces/claude-code-specialists/`, not a per-plugin extract.
+
+**A plugin folder used to carry its own `CHANGELOG.md` and a `RELEASE.md` card; both were removed on
+August 8, 2026.** They existed to give you a history inside the plugin cache, and the sentence above is
+why they were not needed: the real history was always one directory up. Two copies of the same record
+can disagree, and this one did — the cards also could not answer "which release am *I* on", which they
+had to be corrected to admit (inbound
+[#384](https://github.com/DaveKJohn/claude-code-specialists/issues/384)). The question is answered by
+the `version` in your cached `<plugin>/.claude-plugin/plugin.json`, and by the section directly below.
 
 **The version is not the code, and on this marketplace the two routinely disagree.** The cached clone
 this family installs from **checks out `main` and tracks `origin/main`** — not the newest tag. So any

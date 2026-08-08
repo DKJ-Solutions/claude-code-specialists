@@ -857,11 +857,15 @@ Assert-NoMatch $clean '(?m)^Plugins:' 'Plugins line removed'
 Assert-NoMatch $clean '(?m)^\s*$\r?\n\s*$\r?\n\s*$' 'no triple blank line left behind'
 Assert-Equal "## #5 x`n`nBody." (Remove-EntryPluginsLine -EntryText "## #5 x`n`nBody.") 'entry without a Plugins line stays unchanged'
 
-Write-Host "Convert-EntryLinksForPluginChangelog" -ForegroundColor Cyan
-$conv = Convert-EntryLinksForPluginChangelog -EntryText 'See [the lint](scripts/lint/x.ps1) and [site](https://example.com) and [#heading](#heading).' -RepoBlobUrl 'https://gh.test/blob/main/'
-Assert-Match $conv '\[the lint\]\(https://gh\.test/blob/main/scripts/lint/x\.ps1\)' 'root-relative link becomes a GitHub URL'
-Assert-Match $conv '\[site\]\(https://example\.com\)' 'external link untouched (plugin variant)'
-Assert-Match $conv '\[#heading\]\(#heading\)' 'anchor link untouched (plugin variant)'
+# RETIRED, AUGUST 8, 2026, with the functions they covered: Convert-EntryLinksForPluginChangelog,
+# Build-PluginChangelogIntro, Build-PluginChangelogSection, Add-PluginChangelogSection and
+# Build-PluginReleaseCard. The per-plugin CHANGELOG.md and RELEASE.md they built are gone -- a
+# consumer already holds the root CHANGELOG.md and releases/ through the marketplace clone, so those
+# ten files were a second copy that could disagree with the first. See the retirement note in
+# scripts/lib/release-lib.ps1.
+#
+# Get-EntryPlugins and Remove-EntryPluginsLine above are NOT retired with them: the `Plugins:` line
+# still records which plugins an entry touched, and the release notes still read it.
 
 Write-Host "Get-MarketplaceName" -ForegroundColor Cyan
 Assert-Equal 'claude-code-specialists' (Get-MarketplaceName -MarketplaceJson '{ "name": "claude-code-specialists", "plugins": [] }') 'reads the name field'
@@ -874,112 +878,6 @@ Assert-Equal $true $mpNoName 'a manifest without a name throws instead of yieldi
 $mpEmptyName = $false
 try { Get-MarketplaceName -MarketplaceJson '{ "name": "", "plugins": [] }' | Out-Null } catch { $mpEmptyName = $true }
 Assert-Equal $true $mpEmptyName 'an empty name throws too -- present-but-blank is not a name'
-
-Write-Host "Build-PluginChangelogIntro" -ForegroundColor Cyan
-# THE WHOLE POINT OF THIS FUNCTION EXISTING SEPARATELY (measured August 3, 2026): the intro is written
-# once, at file creation, and never revisited -- so it is the one generated string in this library that
-# cannot self-heal on the next release. Extracting it gives check 17 of check-plugin-integrity.ps1 a
-# single source to hold the four existing CHANGELOGs against.
-$intro = Build-PluginChangelogIntro -PluginName 'specialists' -MarketplaceName 'claude-code-specialists'
-Assert-Match $intro '^# Changelog .* specialists' 'intro opens with the plugin title'
-Assert-Match $intro '\(claude-code-specialists\)' 'intro names the marketplace it was given'
-Assert-NoMatch $intro 'workshop' 'intro carries no trace of the retired workshop framing'
-# The name is a parameter, not a literal: a different marketplace must produce a different intro, which
-# is what lets the gate derive its expectation from marketplace.json instead of hardcoding a copy.
-$introOther = Build-PluginChangelogIntro -PluginName 'specialists' -MarketplaceName 'some-other-marketplace'
-Assert-Match $introOther '\(some-other-marketplace\)' 'the marketplace name is injected, not baked in'
-Assert-Equal $false ($intro -eq $introOther) 'a different marketplace name yields a different intro'
-# Add-PluginChangelogSection must emit exactly this text for a new file -- if the two ever diverge, the
-# gate would hold the real CHANGELOGs against a string cut-release.ps1 no longer writes.
-$freshForIntro = Add-PluginChangelogSection -Existing '' -Section '## v1.0.0 - 2026-01-01' -PluginName 'specialists' -MarketplaceName 'claude-code-specialists'
-Assert-Equal $true $freshForIntro.StartsWith($intro) 'a new CHANGELOG begins with exactly Build-PluginChangelogIntro output'
-
-Write-Host "Build-PluginChangelogSection + Add-PluginChangelogSection" -ForegroundColor Cyan
-$section = Build-PluginChangelogSection -Entries @($entryWithPlugins) -Version '1.5.0' -Date '2026-07-17'
-Assert-Match $section '^## v1\.5\.0 ' 'section heading with version'
-Assert-Match $section '(?m)^### #4 ' 'the entry sits one level under the version heading'
-Assert-Match $section ('(?m)^#### ' + $WhatRx + '$') "and the entry's own sections one level under that"
-Assert-Match $section ('(?s)## v1\.5\.0 .*### #4 .*#### ' + $TypeRx) 'nesting: ## version -> ### entry -> #### section'
-# NO CATEGORY HEADINGS. This file ships to consumers; it is a list of changes, each stating its own type.
-foreach ($label in 'Features', 'Fixes', 'Documentation', 'Maintenance') {
-    Assert-NoMatch $section "(?m)^#+ $label$" "the plugin CHANGELOG has no '$label' category heading"
-}
-# -StripSignificance, because this file travels INSIDE the plugin to every consumer's cache -- exactly
-# the outward direction a self-assigned tier or score must not take.
-Assert-NoMatch $section '\| Tier \| Significance \| Why \|' 'the impact table does not travel into the plugin CHANGELOG'
-Assert-NoMatch (Build-PluginChangelogSection -Entries @($legacyTier) -Version '1.5.0' -Date '2026-07-17') '(?m)^Tier: ' "nor does the older 'Tier: N' line"
-# UNRANKED, deliberately: its entries are a per-PLUGIN selection cutting across all tiers, so there is
-# no single audience whose score would order it. Unranked means document order -- the fold's order.
-$twoPlugin = Build-PluginChangelogSection -Entries @($low, $high) -Version '1.5.0' -Date '2026-07-17'
-Assert-Match $twoPlugin '(?s)### #1 .*### #3 ' 'document order is kept -- a per-plugin selection has no one audience to rank for'
-$sectionClean = Build-PluginChangelogSection -Entries @(Remove-EntryPluginsLine -EntryText $entryWithPlugins) -Version '1.5.0' -Date '2026-07-17'
-Assert-NoMatch $sectionClean '(?m)^Plugins:' 'section via the cut-release path contains no Plugins line'
-$fresh = Add-PluginChangelogSection -Existing '' -Section $section -PluginName 'specialists' -MarketplaceName 'fixture-marketplace'
-Assert-Match $fresh '^# Changelog .* specialists' 'new CHANGELOG gets an intro header'
-Assert-Match $fresh '(?s)# Changelog.*## v1\.5\.0' 'section comes after the intro'
-$section2 = Build-PluginChangelogSection -Entries @($entryWithPlugins) -Version '1.6.0' -Date '2026-07-18'
-$appended = Add-PluginChangelogSection -Existing $fresh -Section $section2 -PluginName 'specialists' -MarketplaceName 'fixture-marketplace'
-Assert-Match $appended '(?s)## v1\.6\.0.*## v1\.5\.0' 'newest release is at the top'
-Assert-Equal 1 (@([regex]::Matches($appended, '(?m)^# Changelog')).Count) 'intro header not duplicated'
-
-Write-Host "Add-PluginChangelogSection (tightened ## v match, #103)" -ForegroundColor Cyan
-# A non-version '## ' heading (e.g. a manually added '## Notes') must not disturb the insertion
-# position: the new section should land BEFORE the first REAL '## vX.Y.Z' heading, not before the
-# Notes heading or in the middle of it.
-$existingWithNotes = "# Changelog $emDash specialists`n`n## Notes`n`nManual note, no version.`n`n## v1.0.0 $emDash 2026-01-01`n`nOld content.`n"
-$sectionForNotesTest = "## v1.1.0 $emDash 2026-01-02`n`nNew content."
-$withNotesResult = Add-PluginChangelogSection -Existing $existingWithNotes -Section $sectionForNotesTest -PluginName 'specialists' -MarketplaceName 'fixture-marketplace'
-Assert-Match $withNotesResult '(?s)## Notes.*Manual note.*## v1\.1\.0.*## v1\.0\.0' 'new section inserted after the Notes heading, before the first real version heading'
-$notesHeadingMatches = @([regex]::Matches($withNotesResult, '(?m)^## Notes'))
-Assert-Equal 1 $notesHeadingMatches.Count 'Notes heading stays present exactly once (not duplicated or overwritten)'
-$notesIdx = $withNotesResult.IndexOf('## Notes')
-$v11Idx = $withNotesResult.IndexOf('## v1.1.0')
-$v10Idx = $withNotesResult.IndexOf('## v1.0.0')
-Assert-Equal $true ($notesIdx -lt $v11Idx -and $v11Idx -lt $v10Idx) 'order is Notes, then the new v1.1.0 section, then the existing v1.0.0 section'
-# Normal case (only version headings, no non-version heading) still works -- the same outcome as
-# the existing 'newest release is at the top' test above, here as an explicit regression guard
-# for the tightened regex.
-$onlyVersionsResult = Add-PluginChangelogSection -Existing $fresh -Section $section2 -PluginName 'specialists' -MarketplaceName 'fixture-marketplace'
-Assert-Match $onlyVersionsResult '(?s)## v1\.6\.0.*## v1\.5\.0' 'normal case (only version headings) keeps inserting correctly'
-
-Write-Host "Build-PluginChangelogSection (LF normalization, point e, #103)" -ForegroundColor Cyan
-$crlfEntry = ($entryWithPlugins -replace "`n", "`r`n")
-$lfSection = Build-PluginChangelogSection -Entries @($crlfEntry) -Version '1.7.0' -Date '2026-07-20'
-Assert-Equal $false ($lfSection.Contains("`r")) 'Build-PluginChangelogSection output contains no CR, even with a CRLF input entry'
-Assert-Match $lfSection '### #4 .* Something' 'entry content still included correctly despite the normalization'
-$cardWithCrlf = Build-PluginReleaseCard -PluginName 'specialists' -Version '1.7.0' -Date '2026-07-20' -Type 'Fix' -Entries @($crlfEntry)
-Assert-Equal $false ($cardWithCrlf.Contains("`r")) 'Build-PluginReleaseCard stays pure LF despite a CRLF input entry'
-
-Write-Host "Build-PluginReleaseCard" -ForegroundColor Cyan
-$card = Build-PluginReleaseCard -PluginName 'specialists' -Version '1.5.0' -Date '2026-07-19' -Type 'Minor' -Title 'Test-title' -Entries @($linkEntry) -RepoBlobUrl 'https://gh.test/blob/main/'
-Assert-Match $card '^# Release v1\.5\.0' 'heading with version'
-Assert-Match $card '\*\*Date:\*\* 2026-07-19' 'date line'
-Assert-Match $card '\*\*Type:\*\* Minor' 'type line'
-Assert-Match $card 'Test-title' 'title included'
-Assert-Match $card 'This card describes v1\.5\.0, the version your plugin manifest carries\.' 'the card states what it describes rather than where the reader is (#384)'
-Assert-NoMatch $card 'You are on this release' 'and does not claim the reader is on it -- v13 measured that false in the ordinary case'
-Assert-Match $card '\[The version is not the code\]\(https://gh\.test/blob/main/plugins/INSTALL\.md\#staying-up-to-date\)' 'the "where am I" question is handed to the check that can answer it, as an absolute URL (the card is read from a plugin cache); plugins/INSTALL.md since the page was renamed (#408) and then moved out of the root'
-Assert-Match $card '(?s)Test-title.*This card describes v1\.5\.0' 'title comes before the describes-line'
-# Single-release view: entries at '##', exactly like the full flat notes, and no category heading.
-Assert-Match $card '(?m)^## #9 .* Something' 'entry sits at ## in the single-release view'
-Assert-Match $card ('(?m)^### ' + $WhatRx + '$') "and its sections at ###"
-Assert-NoMatch $card '(?m)^## v1\.5\.0 ' 'card carries no redundant inner ## vX.Y.Z heading (the # Release header already states the version)'
-Assert-NoMatch $card '(?m)^#+ (Features|Fixes|Documentation|Maintenance)$' 'no category heading on the card either'
-Assert-NoMatch $card '\| Tier \| Significance \| Why \|' 'the impact table does not travel onto the card -- it ships inside the plugin'
-Assert-Match $card '\[the lint\]\(https://gh\.test/blob/main/scripts/lint/x\.ps1\)' 'root-relative link in the body rewritten as Convert-EntryLinksForPluginChangelog does'
-Assert-Match $card '\[the site\]\(https://example\.com\)' 'external link in the body stays untouched'
-$card2 = Build-PluginReleaseCard -PluginName 'specialists' -Version '1.5.0' -Date '2026-07-19' -Type 'Minor' -Entries @() -RepoBlobUrl 'https://gh.test/blob/main/'
-Assert-Match $card2 "No changes to this plugin in this release $emDash see the full notes\." 'empty-entries branch: exactly the no-changes block'
-Assert-NoMatch $card2 '(?m)^## v' 'empty-entries branch: no section heading'
-Assert-Match $card2 '\*\*Type:\*\* Minor' 'empty-entries branch: heading stays intact'
-Assert-Match $card '\[releases/development/1\.x/1\.5\.0\.md\]\(https://gh\.test/blob/main/releases/development/1\.x/1\.5\.0\.md\)' 'footer: blob URL to the full release notes'
-Assert-Match $card '\[CHANGELOG\.md\]\(CHANGELOG\.md\)' 'footer: folder-relative link to CHANGELOG.md'
-Assert-Match $card2 '\[releases/development/1\.x/1\.5\.0\.md\]\(https://gh\.test/blob/main/releases/development/1\.x/1\.5\.0\.md\)' 'empty-entries branch: footer links stay correct'
-$cardNoTitle = Build-PluginReleaseCard -PluginName 'specialists' -Version '2.0.0' -Date '2026-07-19' -Type 'Major' -Entries @()
-Assert-Match $cardNoTitle '(?s)\*\*Type:\*\* Major\n\nThis card describes v2\.0\.0' 'without -Title exactly one blank line (no extra) before the describes-line'
-
-Write-Host "Get-OverviewTargetMajor (where a new row would actually land)" -ForegroundColor Cyan
-# The row inserter matches the FIRST '| Version | Date | Type | Title |' header, so on a major bump a
 # v3.0.0 row lands under '### 2.x' and nothing errors -- a quietly wrong overview in the one document
 # whose job is to say which release is which. Never hit before: grouping-by-major arrived in v2.0.1,
 # one release AFTER the only major this repo ever cut.

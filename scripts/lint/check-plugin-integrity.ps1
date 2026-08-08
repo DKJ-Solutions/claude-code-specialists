@@ -716,38 +716,11 @@ foreach ($pair in $sharedPairs) {
 Write-Coverage -Category 'shared-script' -Checked $sharedPairs.Count `
     -Note $(if ($sharedPairs.Count -eq 0) { 'the source/mirror pair list is empty -- a mirror could not have been found out of sync, however far it had drifted' } else { '' })
 
-# --- 9. RELEASE.md present per plugin + version match --------------------------------------------------
-# Model A (plugin-carried, see CHANGELOG/#115-like inbound issue): cut-release.ps1 writes this
-# card on EVERY release for EVERY plugin (lockstep version), even a plugin not touched this time.
-# Because RELEASE.md and plugin.json only change together -- via cut-release.ps1 -- an ordinary
-# feature PR can never trip this; only a forgotten regeneration or hand-edit gets caught.
-$pluginManifests = @(Get-ChildItem -Path $RepoRoot -Recurse -Filter 'plugin.json' -File |
-    Where-Object { $_.FullName -match '\.claude-plugin\\plugin\.json$' })
-$pluginManifests | ForEach-Object {
-        $pluginDir = Split-Path (Split-Path $_.FullName -Parent) -Parent
-        $pluginName = Split-Path $pluginDir -Leaf
-        $pj = Test-JsonFile -Path $_.FullName
-        if (-not $pj) { return }
-        if (-not ($pj.PSObject.Properties.Name -contains 'version') -or -not $pj.version) {
-            Add-Error "[release-card] $pluginName/.claude-plugin/plugin.json is missing a non-empty 'version' -- required for the lockstep RELEASE.md card."
-            return
-        }
-        $pjVersion = $pj.version
-        $releasePath = Join-Path $pluginDir 'RELEASE.md'
-        if (-not (Test-Path -LiteralPath $releasePath -PathType Leaf)) {
-            Add-Error "[release-card] $pluginName is missing RELEASE.md -- run scripts/release/cut-release.ps1 (that regenerates the card for every plugin)."
-            return
-        }
-        $releaseText = [System.IO.File]::ReadAllText($releasePath, [System.Text.Encoding]::UTF8)
-        $vm = [regex]::Match($releaseText, '(?m)^#\s+Release\s+v(\d+\.\d+\.\d+)\s*$')
-        if (-not $vm.Success) {
-            Add-Error "[release-card] $pluginName/RELEASE.md: no '# Release vX.Y.Z' heading found -- regenerate via cut-release.ps1."
-        } elseif ($vm.Groups[1].Value -ne $pjVersion) {
-            Add-Error "[release-card] $pluginName/RELEASE.md carries v$($vm.Groups[1].Value), but plugin.json says v$pjVersion -- run cut-release.ps1 again."
-        }
-    }
-Write-Coverage -Category 'release-card' -Checked $pluginManifests.Count `
-    -Note $(if ($pluginManifests.Count -eq 0) { 'no .claude-plugin/plugin.json found -- there is no plugin here whose card and version could be compared' } else { '' })
+# RETIRED, AUGUST 8, 2026 -- check 9 ("RELEASE.md present per plugin + version match").
+# It held each plugin's RELEASE.md card against its plugin.json version, on the reasoning that both
+# only ever change together via cut-release.ps1, so a mismatch could only be a forgotten regeneration
+# or a hand-edit. Correct, and now moot: the cards are gone. A plugin's version has one statement
+# again -- plugin.json -- so there is no second copy for a check to compare it with.
 
 # --- 10. marked "all skills" enumerations vs. the canonical skillset -----------------------------------
 # A prose bullet list that claims to enumerate "all skills" is a maintenance trap: it silently
@@ -1610,73 +1583,12 @@ foreach ($rel in $consumerDocs) {
 Write-Coverage -Category 'measured-figure' -Checked $figureChecked `
     -Note 'byte counts and file sizes in the PROSE of the consumer-facing docs -- the same staleness class as check 15, outside a fence where no markup marks it. Figures inside fenced blocks are deliberately not counted here: those are check 15''s, and counting them twice would report one sample as two'
 
-# --- 17. the per-plugin CHANGELOG intro still matches the template that generated it -----------------------
-# THE CLASS: A GENERATED HEADER THAT IS WRITTEN ONCE AND THEREAFTER UNREACHABLE. Add-PluginChangelogSection
-# emits the intro only when the CHANGELOG does not exist yet (`if (-not $Existing)`), so every later release
-# appends below it and never revisits it. Editing the template therefore reaches future plugins and no
-# current one -- and nothing said so out loud.
-#
-# MEASURED August 3, 2026, and it had already shipped. The rename swept the retired marketplace name out of
-# 59 files; all four per-plugin CHANGELOGs still opened by naming it, in a sentence describing the present
-# mechanism, in the most consumer-facing file each plugin has. Every existing gate looked past it for a
-# defensible reason: checks 11 and 12 exclude per-plugin CHANGELOGs as history, and they are right about the
-# entries -- the intro is the one part of the file that is not history. So this check is deliberately narrow:
-# it judges the intro and nothing below it.
-#
-# WHY IT COMPARES AGAINST THE FUNCTION AND NOT AGAINST A LITERAL. A literal here would be a second copy of
-# the very text whose copies are the bug, and the gate would then guard a string that can itself go stale.
-# Build-PluginChangelogIntro is the single source; the marketplace name comes from marketplace.json through
-# Get-MarketplaceName, the same field cut-release.ps1 reads. There is no expected value written down in this
-# file, which is the whole point.
-#
-# WHITESPACE-NORMALIZED, ON PURPOSE. The generated text wraps at the column the template happens to break
-# at; a hand-rewrap of the same sentences is not the defect this exists for, and a gate that fails on it
-# would teach the wrong lesson (rewrap to satisfy the linter) about a file no human should be rewrapping.
-# Content is compared, layout is not.
-function Get-NormalizedIntroText([string]$Text) {
-    # One space for any whitespace run, trimmed: compares the sentences, not the line breaks.
-    return (($Text -replace '\s+', ' ').Trim())
-}
-$introChecked = 0
-$mpForIntro = Join-Path $RepoRoot '.claude-plugin\marketplace.json'
-$mpNameForIntro = $null
-if (Test-Path -LiteralPath $mpForIntro) {
-    try {
-        $mpNameForIntro = Get-MarketplaceName -MarketplaceJson ([System.IO.File]::ReadAllText($mpForIntro, [System.Text.Encoding]::UTF8))
-    } catch {
-        Add-Error "[changelog-intro] .claude-plugin/marketplace.json has no readable 'name', so the expected intro cannot be derived: $($_.Exception.Message)"
-    }
-}
-if ($mpNameForIntro) {
-    # Enumerated from the plugin directories rather than by recursing for the filename: the subject is
-    # 'plugins/<plugin>/CHANGELOG.md' exactly, and a directory without one (agent-shared, or a plugin no
-    # release has touched yet) simply is not a subject -- no exclusion list to keep current.
-    foreach ($plDir in @(Get-ChildItem -Path (Join-Path $RepoRoot 'plugins') -Directory | Sort-Object Name)) {
-        $plChangelogPath = Join-Path $plDir.FullName 'CHANGELOG.md'
-        if (-not (Test-Path -LiteralPath $plChangelogPath)) { continue }
-        $plName = $plDir.Name
-        $rel = $plChangelogPath.Replace($RepoRoot, '.').Replace('\', '/')
-        $raw = ([System.IO.File]::ReadAllText($plChangelogPath, [System.Text.Encoding]::UTF8)) -replace "`r`n", "`n"
-        # The intro is everything above the first version heading -- the same boundary
-        # Add-PluginChangelogSection inserts at, so the two agree about where the intro ends.
-        $vMatch = [regex]::Match($raw, '(?m)^## v\d+\.\d+\.\d+\b')
-        if (-not $vMatch.Success) {
-            # No release section yet: nothing has been appended, so there is no intro/history split to
-            # judge. Stated rather than silently skipped.
-            Add-Error "[changelog-intro] ${rel}: no '## vX.Y.Z' heading, so the intro's end cannot be located -- either the file was never written by cut-release.ps1 or its version headings were edited by hand."
-            continue
-        }
-        $introChecked++
-        $actual = Get-NormalizedIntroText $raw.Substring(0, $vMatch.Index)
-        $expected = Get-NormalizedIntroText (Build-PluginChangelogIntro -PluginName $plName -MarketplaceName $mpNameForIntro)
-        if ($actual -ne $expected) {
-            Add-Error "[changelog-intro] ${rel}: the intro above the first '## vX.Y.Z' heading no longer matches what Build-PluginChangelogIntro (scripts/lib/release-lib.ps1) generates. cut-release.ps1 writes this header ONLY for a CHANGELOG that does not exist yet, so it is never refreshed and drifts unseen -- which is how all four files kept naming the retired marketplace after the rename. Bring the file's intro in line with the template (whitespace and line wrapping are ignored); do not edit the template to match a stale file. Expected: $expected"
-        }
-    }
-}
-Write-Coverage -Category 'changelog-intro' -Checked $introChecked `
-    -Note "each per-plugin CHANGELOG's intro header, held against Build-PluginChangelogIntro with the marketplace name read from marketplace.json -- the one part of these files that is NOT history, and the only text cut-release.ps1 writes once and never revisits. Compared whitespace-normalized: content is the subject, line wrapping is not. Everything below the first version heading is deliberately not examined -- that is history, excluded here for the same reason checks 11 and 12 exclude it"
-
+# RETIRED, AUGUST 8, 2026 -- check 17 ("the per-plugin CHANGELOG intro still matches its template").
+# It existed because that intro was write-once: it reached a file at creation and was never rewritten,
+# so all four per-plugin CHANGELOGs kept naming the retired marketplace long after the rename had swept
+# it out of 59 files. The check was the right repair for a real defect. The files it guarded are gone,
+# and with them the write-once text -- see the retirement note in scripts/lib/release-lib.ps1. The
+# LESSON survives in that file's header, because it is about the next template, not about these.
 # --- Check 18: a shared script's parameters appear in the skill that documents it -----------------------
 # A consumer has exactly two things: the plugin mirror of a script, and the skill that describes it. So a
 # parameter the skill never names is, for them, a parameter that does not exist -- including the escape

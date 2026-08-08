@@ -285,7 +285,7 @@ $script:Contract = @(
        Returns = "the repo-root-relative path to the file that lists every release this repo has cut. Since the changelog stopped carrying release blocks it is the ONLY such list, so it must genuinely be complete. Three things read it: the guardrail refusing a new major whose section does not exist yet, the inserter that writes the row, and new-internal-note.ps1, which repoints that row's Version cell at the internal note once the note exists" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleasePluginTier'; Scripts = @('cut-release');
        Optional = $true; Default = 'whether .claude-plugin/marketplace.json exists';
-       Returns = '$true if this repo publishes plugins that the cut must version in lockstep and card (per-plugin CHANGELOG.md + RELEASE.md); $false makes the newest vX.Y.Z tag the version record instead of the manifests' },
+       Returns = '$true if this repo publishes plugins whose versions the cut must bump in lockstep; $false makes the newest vX.Y.Z tag the version record instead of the manifests' },
     # RETIRED, AUGUST 5, 2026: Get-ReleaseCategoryTitles. Display labels for the release-notes category
     # headings (Feat -> Features, Fix -> Fixes, ...), for a repo whose headings are in another language. The
     # release documents have no category headings any more -- they are ranked lists of changes, and each

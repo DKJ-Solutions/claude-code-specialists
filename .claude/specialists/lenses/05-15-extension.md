@@ -19,17 +19,20 @@ infrastructure.
   every `plugin.json` and the agent-def/manual frontmatter (`name`/`id`/`group` + filename match),
   scans for dead links (in `README.md`, `CHANGELOG.md`, the manuals, `SKILL.md`s, and `releases/**`),
   checks that every `scripts/**/*.ps1` parses without errors (catching syntax errors in the
-  orchestration that would only break at runtime), guards (check 7) that every shared-block
-  region in an agent def still equals its source in `agent-shared/`, and guards (check 9) that
-  every plugin's consumer-facing `RELEASE.md` card is present and its `vX.Y.Z` matches that
-  plugin's `plugin.json` — since both only ever change together, via `cut-release.ps1`, a
-  mismatch can only mean a forgotten regeneration or a hand-edit. **Check 11 is the one that guards a
+  orchestration that would only break at runtime), and guards (check 7) that every shared-block
+  region in an agent def still equals its source in `agent-shared/`. **Checks 9 and 17 were retired on
+  August 8, 2026** with the documents they guarded — the per-plugin `RELEASE.md` card and
+  `CHANGELOG.md`. Both were the right repair for a real defect (a version stated twice, and a
+  write-once intro that drifted), and both dissolved rather than being weakened: with the second copy
+  gone there is nothing left to hold against the first. **The general shape is worth keeping: a check
+  that compares two statements of one fact is made unnecessary by deleting one of them, and that is a
+  better outcome than a better check.** **Check 11 is the one that guards a
   doc against reality rather than against itself:** every printed `claude plugin
   install`/`update`/`uninstall` — recognised by its `@`-target, which is what separates an instruction
   from prose discussing the command — must carry `--scope project`, and `install`/`update` must name
   the marketplace refresh nearby. Both fail *silently* when missing, which is why three adoption
   rounds in a row found this same class and four doc fixes only ever closed the instances. History
-  (`CHANGELOG.md`, `releases/**`, `RELEASE.md`, root entry files) is excluded permanently: it records
+  (`CHANGELOG.md`, `releases/**`, root entry files) is excluded permanently: it records
   what was true then. Since #315 the scope rule is **verb-specific** — `uninstall` also accepts
   `--scope local`, because that is the only command that removes a record a session start left at that
   scope, and a gate demanding `project` there would have rejected the correct instruction and enforced the
