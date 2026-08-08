@@ -7,7 +7,7 @@
 - [x] Chris's lens: add the second inbound failure pattern -- still standing, but the reasoning behind it has expired (issue #456)
 - [x] Fill in the changelog entry: body + a score per tier
 - [x] Copy edit the diff (Edith): language, links, consistency
-- [ ] Lint + tests green, then PR + merge + fold
+- [x] Lint + tests green, then PR + merge + fold
 
 ### Where I left off
 
