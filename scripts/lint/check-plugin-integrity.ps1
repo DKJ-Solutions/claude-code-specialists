@@ -121,6 +121,22 @@
          read via the PowerShell parser (a regex missed an attributed one). Per-script exemptions are
          declared in the registry; an entry point declaring no skill at all is reported in the coverage
          line rather than as an error, since writing a missing skill is separate work.
+     19. the consumer-facing document set: a document named in that list but absent from the tree is
+         reported instead of skipped, because checks 15 and 16 walk the same list and a missing entry
+         lowers their coverage silently.
+     20. a claimed entry-section COUNT vs. what the scaffolder writes, so prose describing the changelog
+         entry cannot drift from the shape a branch actually gets. The rule is the count and not the
+         section names, chosen by measuring four candidates. (20b) CHANGELOG.md's intro gets its own pass
+         with the level marker optional: the entries below it are history, but the intro is a live
+         statement that every cut copies through verbatim, so nothing else ever reads it.
+     21. the shipped config blueprint, held by REGENERATING it from this repo's own libs and comparing.
+         Nothing here reads the artefact, which is exactly why it needs a gate.
+     22. a runnable command in a shipped SKILL.md must not name an absolute path. The page tells a
+         consumer what to run, so the path has to resolve on their machine: '${CLAUDE_PLUGIN_ROOT}/...'
+         does, 'C:/Users/<the author>/...' does not. Measured after adopt-config's page shipped with both
+         of its commands pointing at the author's own plugin cache, pinned to a version. The subject is
+         the '-File' argument rather than paths in general, because a tree-wide rule would be born
+         accusing three correct comments that quote a user path to explain a path-mangling bug.
 
     Exit code: 0 = no errors. 1 = at least one error (usable as a gate in open-pr.ps1).
 .EXAMPLE
@@ -1837,6 +1853,50 @@ if (Test-Path -LiteralPath $bpScript -PathType Leaf) {
 }
 Write-Coverage -Category 'config-blueprint' -Checked $bpChecked `
     -Note 'the shipped config blueprint, held against a fresh generation from this repo own libs and the contract registry. Regenerated rather than inspected: the generator is the only thing that knows the answer, so a second implementation here could only disagree with it. Nothing in this repo READS the artefact, which is exactly why it needs a gate -- a stale one breaks nothing here and hands a consumer last week answers under this week explanations'
+
+# --- 22. a skill's own command must not point at the author's disk ----------------------------------------
+# A shipped SKILL.md tells a consumer what to RUN. The path in that command therefore has to resolve on
+# THEIR machine, and '${CLAUDE_PLUGIN_ROOT}' is what does it -- the plugin root, substituted when the skill
+# runs, which is why the other pages already use it.
+#
+# THE MEASURED DEFECT: adopt-config's page shipped in v3.8.0 with both of its commands written as
+# 'C:/Users/<the author>/.claude/plugins/cache/.../3.8.0/scripts/...'. Wrong for every consumer twice over
+# -- a different username, often a different OS -- and pinned to a version that goes stale at the next
+# release. It was the newest skill page and the only one of eleven that did not use the substitution, and
+# it was the first command a consumer runs to use the release's headline feature.
+#
+# WHY THE RULE IS ABOUT COMMANDS AND NOT ABOUT PATHS, which is the obvious shape and was measured first: a
+# tree-wide "no absolute paths in plugins/" rule is born with THREE findings and all three are correct
+# prose -- comments in check-report-lib and check-roster-sync that quote 'C:\Users\x\.claude\...' precisely
+# to explain a path-mangling bug. A check that needs an exemption list on its first run is the shape this
+# repo already has scar tissue from, so the subject is the '-File' argument of a runnable command instead.
+# Measured over the 26 invocations in the 11 shipped skill pages: 23 use the substitution and 3 use the
+# '<plugin>' placeholder, which passes deliberately -- angle brackets tell a reader to substitute, while an
+# absolute path reads as a command to paste. Zero exemptions, and it would have caught the defect on the
+# day it was written.
+$skillCmdChecked = 0
+$skillPagesDir = Join-Path $RepoRoot 'plugins'
+if (Test-Path -LiteralPath $skillPagesDir -PathType Container) {
+    $skillPages = @(Get-ChildItem -Path $skillPagesDir -Recurse -Filter 'SKILL.md' -File)
+    foreach ($page in $skillPages) {
+        $lines = Get-Content -LiteralPath $page.FullName
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            # Only a '-File <path>' argument: that is the one token a reader is told to execute.
+            $m = [regex]::Match($lines[$i], '-File\s+"(?<path>[^"]+)"')
+            if (-not $m.Success) { continue }
+            $skillCmdChecked++
+            $p = $m.Groups['path'].Value
+            # Absolute = a drive letter, a POSIX root, or a home shortcut. Everything else is either the
+            # substitution or a signposted placeholder, and both are honest about needing resolution.
+            if ($p -match '^([A-Za-z]:[\\/]|[\\/]|~)') {
+                $rel = $page.FullName.Substring($RepoRoot.Length).TrimStart('\', '/')
+                Add-Error ("[skill-command] {0}:{1}: the command points at an absolute path ('{2}'), which resolves only on the machine it was written on. Use `${{CLAUDE_PLUGIN_ROOT}}/... so it resolves in the consumer's own plugin install." -f $rel, ($i + 1), $p)
+            }
+        }
+    }
+}
+Write-Coverage -Category 'skill-command' -Checked $skillCmdChecked `
+    -Note "the '-File' argument of every runnable command in the shipped skill pages, held against being machine-specific. The subject is the COMMAND and not the path, chosen by measuring: a tree-wide absolute-path rule is born with three findings, all three correct comments that quote a user path in order to explain a path-mangling bug. A '<plugin>' placeholder passes on purpose -- angle brackets ask the reader to substitute, an absolute path reads as a line to paste"
 
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {
