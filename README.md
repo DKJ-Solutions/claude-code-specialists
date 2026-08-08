@@ -338,12 +338,21 @@ those blocks in **one place** instead of in every agent def, a **build-and-lint*
   ([`check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1), check 7) fails as
   soon as a marked region deviates from its source (a hand edit or a forgotten rebuild), just like
   the drift lint for consumers.
+- **The personas carry blocks too, and the generator writes both.** A persona is prose rather than a
+  bullet list under **Boundaries**, so its block sits under its own `##` heading instead of dangling as
+  a stray bullet — the sentinels and the rule about not editing between them are identical. This is the
+  one part of the model that took a widening (August 8, 2026): the two specialists whose craft *is* a
+  way of working, the DevOps engineer and the release manager, ship as personas, so a shared block about
+  process could never have reached its primary readers while the generator walked `agents/` alone. Note
+  what did **not** widen with it — the lint's agent-def↔manual coupling still leaves personas alone,
+  because that check is about a pairing personas genuinely do not have.
 
 Current blocks — one canonical source file each under `plugins/agent-shared/`, so the directory listing
 is always the up-to-date enumeration: `inbound-behaviour`, `laziness-automation`, `language-behavior`,
-`no-conversation-history`, `no-commit-push-pr`, `browser-compatibility`, `webcontent-boundary`,
-`changelog-entry-boundary`, `design-owner-boundary`, `storefront-preview-boundary`, and
-`artifact-publishing-boundary`. This way changing a shared boundary costs one edit + one build, not a
+`no-conversation-history`, `no-commit-push-pr`, `repo-way-of-working`, `browser-compatibility`,
+`webcontent-boundary`, `changelog-entry-boundary`, `design-owner-boundary`,
+`storefront-preview-boundary`, and `artifact-publishing-boundary`. This way changing a shared boundary
+costs one edit + one build, not a
 manual change in every agent def that carries it.
 
 ## Marking a complete skill enumeration
