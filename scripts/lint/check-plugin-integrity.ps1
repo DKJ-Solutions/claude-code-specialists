@@ -149,10 +149,15 @@ function Add-Error([string]$Msg) { $script:errors.Add($Msg) }
 # the deliberate, documented non-collision check-consumer-drift.ps1 already relies on.
 . (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
 
-# release-lib supplies the two pure helpers check 17 needs: Build-PluginChangelogIntro (the single source
-# of the per-plugin CHANGELOG header) and Get-MarketplaceName. Dot-sourced here with the other lib rather
-# than mid-file, so every import this gate depends on is visible in one place. release-lib deliberately
-# sets no strict mode of its own, so it cannot loosen this script's Set-StrictMode -Version Latest.
+# release-lib supplies the pure helpers this gate reads the release layer through: Get-MarketplaceName,
+# Get-PluginManifestPaths and Split-Changelog. It used to name Build-PluginChangelogIntro and check 17 here
+# instead; both went with the per-plugin CHANGELOG and RELEASE.md on August 8, 2026, and this line outlived
+# them by one day -- a comment naming a deleted function as the reason for an import, which is the same
+# class of drift check 20 below was widened for.
+#
+# Dot-sourced here with the other lib rather than mid-file, so every import this gate depends on is visible
+# in one place. release-lib deliberately sets no strict mode of its own, so it cannot loosen this script's
+# Set-StrictMode -Version Latest.
 . (Join-Path $PSScriptRoot '..\lib\release-lib.ps1')
 
 function Test-JsonFile {
@@ -1671,19 +1676,82 @@ Write-Coverage -Category 'skill-param' -Checked $skillParamChecked `
 # scaffolder had moved to six. So this judges the one thing a document says about the shape that is
 # checkable without judging its prose, which is the same line checks 15 and 16 draw.
 #
-# THE LEVEL MARKER IS REQUIRED, and that is what keeps the haystack honest. Without it the pattern matches
+# THE LEVEL MARKER IS REQUIRED IN THE TREE PASS, and that is what keeps the haystack honest across ~200
+# files. (The one place it is not required is CHANGELOG.md's intro, a dozen lines with its own pass -- the
+# block below states what that costs and why it costs nothing there.) Without it the pattern matches
 # "one section apart", "two sections went in the same movement", "one section per tier" -- ordinary prose
 # about anything, 18 disagreements of which 17 were noise. Requiring the '###' (backticked or not) between
 # the number and the word narrows it to four claims in the whole tree, which is a haystack small enough to
 # read by hand -- and it was, before this was written.
 #
-# History is excluded exactly as checks 11 and 12 exclude it: CHANGELOG.md and the per-plugin copies, the
-# release notes, RELEASE.md, and the branch working files, which are history in the making. branch/README.md
-# is deliberately NOT excluded -- it is a document ABOUT the shape, which is precisely this check's subject.
+# History is excluded exactly as checks 11 and 12 exclude it: CHANGELOG.md's ENTRIES and the per-plugin
+# copies, the release notes, RELEASE.md, and the branch working files, which are history in the making.
+# branch/README.md is deliberately NOT excluded -- it is a document ABOUT the shape, which is precisely this
+# check's subject.
+#
+# AND NEITHER IS CHANGELOG.md'S INTRO (August 8, 2026). It went out with the rest of that file on the history
+# grounds above, and this repo had already written down why that reasoning does not reach the intro:
+# release-lib.ps1 was bitten by it on the per-plugin CHANGELOGs and recorded the lesson one screen above the
+# code -- "the entries below the intro were history, the intro was a live statement about the present
+# mechanism". A cut empties this document down to that intro and carries it through verbatim, so it is the
+# one piece of prose in the repo that no release ever rewrites and no reviewer ever opens. Measured on the
+# day this was written: it claimed THREE sections while the scaffolder wrote six, and had done so since
+# August 6 -- two days, one release, and a consumer-facing highlights page in between.
+#
+# TWO THINGS KEPT IT OUT OF REACH, and repairing either one alone leaves it unchecked:
+#
+#   1. the file was excluded, so nothing read the intro at all;
+#   2. the pattern would have walked past it anyway -- the intro wrote "three named sections" with no '###'
+#      in the sentence, and it wrote it ACROSS A LINE BREAK.
+#
+# So the head is judged by its own pass, with the level marker OPTIONAL, and the matching for both passes
+# moves from per-line to whole-text. Both were chosen by measuring rather than by argument:
+#
+#   strict, per line, over the scanned tree   -> 4 claims   (what this check did)
+#   strict, whole text, over the scanned tree -> 4 claims   (identical -- the 3 extra it finds sit in the
+#                                                            history this check already excludes)
+#   loose, whole text, over the whole tree    -> 50 claims  (the documented noise -- 46 of them)
+#   loose, whole text, over the intro alone   -> 1 claim    (the real one, before and after the repair)
+#
+# The marker therefore keeps earning its place everywhere it was measured to earn it, and nowhere else: it
+# guards ~200 files against 46 false hits, while the intro is a dozen lines this repo owns, where relaxing it
+# costs nothing and is the whole difference between catching the drift and not. Whole-text matching changes
+# nothing about what the tree pass reports -- it only closes the blind spot where a reflowed sentence hides a
+# claim, which is a formatting accident no author would think of as a bypass.
 $scExpected = @((Get-EntrySectionHeadings).Keys).Count
 $scLevel = Get-EntrySectionLevel
 $scWords = @{ 'one' = 1; 'two' = 2; 'three' = 3; 'four' = 4; 'five' = 5; 'six' = 6; 'seven' = 7; 'eight' = 8; 'nine' = 9; 'ten' = 10 }
-$scClaimRx = "(?i)(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:named\s+)?``?#{$scLevel}``?\s+section"
+$scNumRx = '(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)'
+$scMarkerRx = "``?#{$scLevel}``?\s+"
+$scClaimRx = "(?i)${scNumRx}\s+(?:named\s+)?${scMarkerRx}section"
+$scHeadClaimRx = "(?i)${scNumRx}\s+(?:named\s+)?(?:${scMarkerRx})?section"
+
+function Test-EntryShapeClaims {
+    <#
+        Reports every claim in $Text that disagrees with the scaffolder, and returns how many claims it
+        read -- so an empty file and a clean one stay distinguishable in the coverage line.
+
+        Matching is over the WHOLE text rather than line by line, so '\s+' spans the line break a markdown
+        reflow puts in the middle of the sentence. The line number is then derived from the match offset
+        rather than from a loop counter, which is the only bookkeeping that change costs.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Text,
+        [Parameter(Mandatory)][string]$Rel,
+        [Parameter(Mandatory)][string]$Rx
+    )
+    $seen = 0
+    foreach ($m in [regex]::Matches($Text, $Rx)) {
+        $raw = $m.Groups['n'].Value.ToLowerInvariant()
+        $claimed = if ($scWords.ContainsKey($raw)) { $scWords[$raw] } else { [int]$raw }
+        $seen++
+        if ($claimed -ne $scExpected) {
+            $lineNo = 1 + ([regex]::Matches($Text.Substring(0, $m.Index), "`n")).Count
+            Add-Error "[entry-shape] ${Rel}:${lineNo}: says an entry has $claimed '$('#' * $scLevel)' sections, and the scaffolder writes $scExpected. The shape has one source (Get-EntrySectionHeadings); a document that states a count is stating a fact it does not own, so either the prose is stale or the format moved without this page. Naming the sections is fine -- the COUNT is what is held here."
+        }
+    }
+    return $seen
+}
 
 $scFiles = @($linkFiles | Where-Object {
     $rel = $_.Substring($RepoRoot.Length).TrimStart('\', '/')
@@ -1708,20 +1776,32 @@ $scFiles = @($linkFiles | Where-Object {
 $scChecked = 0
 foreach ($sf in ($scFiles | Sort-Object -Unique)) {
     $rel = $sf.Substring($RepoRoot.Length).TrimStart('\', '/')
-    $scLines = ([System.IO.File]::ReadAllText($sf, [System.Text.Encoding]::UTF8)) -split "`r?`n"
-    for ($i = 0; $i -lt $scLines.Count; $i++) {
-        foreach ($m in [regex]::Matches($scLines[$i], $scClaimRx)) {
-            $raw = $m.Groups['n'].Value.ToLowerInvariant()
-            $claimed = if ($scWords.ContainsKey($raw)) { $scWords[$raw] } else { [int]$raw }
-            $scChecked++
-            if ($claimed -ne $scExpected) {
-                Add-Error "[entry-shape] ${rel}:$($i + 1): says an entry has $claimed '$('#' * $scLevel)' sections, and the scaffolder writes $scExpected. The shape has one source (Get-EntrySectionHeadings); a document that states a count is stating a fact it does not own, so either the prose is stale or the format moved without this page. Naming the sections is fine -- the COUNT is what is held here."
-            }
-        }
-    }
+    $scChecked += Test-EntryShapeClaims -Rel $rel -Rx $scClaimRx `
+        -Text ([System.IO.File]::ReadAllText($sf, [System.Text.Encoding]::UTF8))
 }
+
+# The intro of CHANGELOG.md, derived the way check 13 and Split-Changelog derive it: everything above the
+# first entry heading, fence-masked so an intro that QUOTES an entry heading -- this one documents the entry
+# format, so it does -- cannot move the boundary into the middle of a code block.
+#
+# A changelog with NO entry is not a special case here: the head is then the whole file, which is exactly
+# right. That is the normal state between a cut and the next merge, and it is the state the intro is most
+# alone in. Split-Changelog throws there, deliberately (a cut with no entries describes nothing), which is
+# why the boundary is derived here rather than borrowed from it -- a gate that threw in a legitimate state
+# would take the whole lint down with it.
+$scChangelog = Join-Path $RepoRoot 'CHANGELOG.md'
+if (Test-Path -LiteralPath $scChangelog) {
+    $scClLines = (Get-FenceMaskedText -Text ([System.IO.File]::ReadAllText($scChangelog, [System.Text.Encoding]::UTF8))) -split "`r?`n"
+    $scHeadEnd = $scClLines.Count
+    for ($i = 0; $i -lt $scClLines.Count; $i++) {
+        if ($scClLines[$i] -match ('^#{' + $ehEntryLevel + '}\s')) { $scHeadEnd = $i; break }
+    }
+    $scHeadText = if ($scHeadEnd -gt 0) { (@($scClLines[0..($scHeadEnd - 1)])) -join "`n" } else { '' }
+    $scChecked += Test-EntryShapeClaims -Rel 'CHANGELOG.md' -Rx $scHeadClaimRx -Text $scHeadText
+}
+
 Write-Coverage -Category 'entry-shape' -Checked $scChecked `
-    -Note "claim(s) about how many '$('#' * $scLevel)' sections a changelog entry has, held against the $scExpected the scaffolder writes. The rule is the COUNT and not the section NAMES, chosen by measuring four candidates against this tree: matching names accuses two correct documents, because 'What does this change do?' and 'Type of change' are retired entry sections AND live headings of the PR template. History is excluded as in checks 11 and 12; branch/README.md is not, being a document about the shape"
+    -Note "claim(s) about how many '$('#' * $scLevel)' sections a changelog entry has, held against the $scExpected the scaffolder writes. The rule is the COUNT and not the section NAMES, chosen by measuring four candidates against this tree: matching names accuses two correct documents, because 'What does this change do?' and 'Type of change' are retired entry sections AND live headings of the PR template. History is excluded as in checks 11 and 12; branch/README.md is not, being a document about the shape, and neither is CHANGELOG.md's INTRO -- the entries below it are history, the intro is a live statement about the present mechanism that every cut copies through verbatim, so it gets its own pass with the level marker optional"
 
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {

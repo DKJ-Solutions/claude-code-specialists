@@ -1627,6 +1627,75 @@ try {
     $e3 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($e3.Out -match 'says an entry has')) `
         'entry-shape: a count with no level marker is prose about something else, not a claim about the shape'
+
+    # --- check 20b: CHANGELOG.md's INTRO is in scope, its entries are not ---------------------------
+    # The whole file used to be excluded as history, and the intro is not history: a cut empties the
+    # document down to it and copies it through verbatim, so no release rewrites it and no reviewer opens
+    # it. Measured on August 8, 2026 -- it claimed three sections while the scaffolder wrote six, two days
+    # and one release after the format moved.
+    #
+    # TWO SEPARATE THINGS HELD IT OUT OF REACH, so both directions are asserted below: the file was
+    # excluded, AND the pattern would have missed the sentence anyway -- it carried no '###' and it ran
+    # across a line break. A test that only pinned the exclusion would pass against a check that still sees
+    # nothing.
+    Write-Host "check 20b: the changelog intro is held, its entries stay history" -ForegroundColor Cyan
+    $shapeCl = Join-Path $Fixture 'CHANGELOG.md'
+    $shapeEntry = @(
+        ''
+        '## #123 ' + ([char]0x00B7) + ' A real entry'
+        ''
+        '### What does this change do?'
+        ''
+        'A body.'
+        ''
+        '### Significance'
+        ''
+        '#### Tier 0'
+        ''
+        'Only this repo notices.'
+        ''
+        '**Score:** 1'
+        ''
+    )
+    function Write-ShapeChangelog([string]$Intro) {
+        [System.IO.File]::WriteAllText($shapeCl,
+            ((@('# Changelog', '', $Intro) + $shapeEntry) -join "`n") + "`n", $Utf8NoBom)
+    }
+
+    # 47. A stale count in the intro is reported -- WITHOUT a level marker, which the tree-wide pattern
+    #     requires and this one deliberately does not. This is the exact sentence that was on main.
+    Write-ShapeChangelog 'Everything merged since the last release: one `##` per change, and under it three named sections.'
+    $e4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($e4.Out -match '\[entry-shape\] CHANGELOG\.md:3: says an entry has 3') `
+        'entry-shape: a stale count in the changelog intro is reported, with its line, and needs no level marker'
+
+    # 48. THE RELAXATION IS CONFINED TO THE HEAD. The same markerless claim below the first entry heading
+    #     stays silent: entries ARE history, and they are full of prose about older shapes that was true
+    #     when it was written. Without this assert the widening would quietly re-accuse the whole archive.
+    Write-ShapeChangelog 'Everything merged since the last release, furthest reach first.'
+    [System.IO.File]::WriteAllText($shapeCl,
+        ([System.IO.File]::ReadAllText($shapeCl, [System.Text.Encoding]::UTF8)).Replace(
+            'A body.', 'Back then an entry was one `##` heading with three named sections under it.'), $Utf8NoBom)
+    $e5 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($e5.Out -match 'says an entry has')) `
+        'entry-shape: the same markerless claim inside an ENTRY is history and stays silent'
+
+    # 49. A claim REFLOWED across a line break is still caught. Matching is over the whole head rather than
+    #     line by line, because where the wrap falls is a formatting accident no author would think of as a
+    #     bypass -- and the drift that prompted this was written exactly that way.
+    Write-ShapeChangelog "Everything merged since the last release: one ``##`` per change, and under it three`nnamed ``###`` sections."
+    $e6 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($e6.Out -match '\[entry-shape\] CHANGELOG\.md:3: says an entry has 3') `
+        'entry-shape: a claim split across a line break in the intro is caught, at the line it starts on'
+
+    # 50. And the right count clears it -- taken from the scaffolder, not from the literal 'six', so this
+    #     keeps meaning something the day the format gains a section.
+    Write-ShapeChangelog "Everything merged since the last release: one ``##`` per change, and under it $shapeCount named ``###`` sections."
+    $e7 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($e7.Out -match 'says an entry has')) `
+        'entry-shape: an intro stating the count the scaffolder writes clears the finding'
+    Assert-True ($e7.Out -match '\[entry-shape\] checked [1-9]') `
+        'entry-shape: and the intro was actually examined rather than skipped into silence'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }
