@@ -174,7 +174,27 @@ function Test-LooksGenerated {
             if ($EmptyLensPattern -and ($text -match $EmptyLensPattern)) { return $true }
             return $false
         }
-        'repo-config' { return ($text -match "=\s*'[^']*VUL-IN") }
+        'repo-config' {
+            # An unfilled placeholder VALUE -- the shape a consumer WITH the workflow pack receives,
+            # whose RepoName/LintScript are theirs to fill in.
+            if ($text -match "=\s*'[^']*VUL-IN") { return $true }
+            # SECOND SHAPE SINCE AUGUST 8, 2026, and it exists because the split created a scaffold with
+            # nothing to fill in. A consumer that did NOT enable the workflow pack gets the roster half
+            # alone: RosterPath derived from the seam, RosterIgnoredIds empty. It is complete as
+            # generated, so it carries no placeholder -- and the rule above would therefore have read it
+            # as authored and kept it forever, making adoption exactly as irreversible as this skill
+            # promises it is not.
+            #
+            # KEYED ON "STILL EXACTLY WHAT THE BOOTSTRAP WROTE", which is conservative in the direction
+            # this file requires: every way an owner can touch this file ADDS something -- an ignored id,
+            # a workflow function when they later enable the pack, a helper of their own. Any of those
+            # fails one of the three tests below and the file is kept. Only the untouched shape matches.
+            $hasRosterPair = ($text -match '(?m)^\s*function\s+Get-RosterPath\b') -and
+                             ($text -match '(?m)^\s*function\s+Get-RosterIgnoredIds\b')
+            $ignoredStillEmpty = $text -match '(?m)^\s*\$script:RosterIgnoredIds\s*=\s*@\(\s*\)\s*$'
+            $noOtherFunctions = @([regex]::Matches($text, '(?m)^\s*function\s+([A-Za-z-]+)')).Count -eq 2
+            return ($hasRosterPair -and $ignoredStillEmpty -and $noOtherFunctions)
+        }
         'branch-info' { return ($text -match '(?m)\$script:BranchPrefixTable\s*=\s*@\{\s*\}') }
     }
     return $false

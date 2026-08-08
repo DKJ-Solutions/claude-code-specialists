@@ -848,8 +848,41 @@ Assert-True ($libWithSkill.Count -eq 0) "a LibOnly entry declares no Skill (unex
 
 # A non-empty Skill must name a skill that exists, or the gate reports a typo forever.
 foreach ($p in @($pairs | Where-Object { -not $_.LibOnly -and -not [string]::IsNullOrEmpty($_.Skill) })) {
-    $skillFile = Join-Path $RepoRoot ("plugins\specialists\skills\$($p.Skill)\SKILL.md")
-    Assert-True (Test-Path -LiteralPath $skillFile) "$($p.Name) names an existing skill ('$($p.Skill)')"
+    $skillFile = Join-Path $RepoRoot $p.SkillRel
+    Assert-True (Test-Path -LiteralPath $skillFile) "$($p.Name) names an existing skill ('$($p.Skill)' in $($p.Plugin))"
+}
+
+# SkillRel is DERIVED from the mirror rather than declared, so the property that matters is that the
+# two cannot disagree: a pair's page is looked for in the same plugin its mirror travels in. Without
+# this, the split could move a mirror and leave its page lookup pointing at the plugin it left.
+foreach ($p in @($pairs | Where-Object { $null -ne $_.SkillRel })) {
+    Assert-True ($p.SkillRel -like "plugins\$($p.Plugin)\skills\*") "$($p.Name): skill page is looked for in the plugin its mirror lives in ($($p.Plugin))"
+}
+Assert-True (@($pairs | Where-Object { $_.LibOnly -and $null -ne $_.SkillRel }).Count -eq 0) 'a LibOnly entry never derives a skill page (nothing invokes it, so there is no procedure to document)'
+
+# The split's own invariant (August 8, 2026): the two halves are separately versioned and separately
+# installed, so a mirror may never dot-source a lib that ships in the OTHER plugin -- that would be a
+# runtime dependency on a path a version mismatch silently breaks. Asserted by reading each mirror's
+# $PSScriptRoot-relative '..\lib\<name>.ps1' dot-sources and checking the lib is registered into the
+# same plugin. This is the assertion that would have caught the mention-vs-use misreading that had
+# check-report-lib and native-capture-lib filed as shared by both halves.
+# Keyed on the lib's FILE NAME and holding a LIST of plugins, because check-report-lib is
+# deliberately mirrored into both -- so the question is never "which plugin owns this lib" but "is it
+# present in the plugin that dot-sources it".
+$libPlugins = @{}
+foreach ($p in @($pairs | Where-Object { $_.LibOnly })) {
+    $libName = [System.IO.Path]::GetFileNameWithoutExtension($p.MirrorRel)
+    if (-not $libPlugins.ContainsKey($libName)) { $libPlugins[$libName] = @() }
+    $libPlugins[$libName] += $p.Plugin
+}
+foreach ($p in @($pairs | Where-Object { -not $_.LibOnly })) {
+    $mirrorText = Get-NormalizedScriptContent -Path $p.MirrorPath
+    if ($null -eq $mirrorText) { continue }
+    foreach ($m in [regex]::Matches($mirrorText, "\.\s+\(Join-Path \`$PSScriptRoot '\.\.\\lib\\([a-z-]+)\.ps1'\)")) {
+        $lib = $m.Groups[1].Value
+        if (-not $libPlugins.ContainsKey($lib)) { continue }
+        Assert-True ($libPlugins[$lib] -contains $p.Plugin) "$($p.Name) finds $lib inside its own plugin ($($p.Plugin)), not across the split"
+    }
 }
 
 # The parser, not a regex. This is the regression that matters: an attributed parameter

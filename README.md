@@ -90,9 +90,9 @@ shipped alongside them was.
 [`scripts/repo-config.ps1`](scripts/repo-config.ps1) looks like the seam that makes the workflow
 adaptable, and its 19 functions genuinely do let a consumer change the trunk name, the merge method and
 the folder grouping. But those are *parameters* of a single changelog model, and the model itself is
-fixed in [`entry-scaffold-lib.ps1`](plugins/specialists/scripts/lib/entry-scaffold-lib.ps1). A consumer
+fixed in [`entry-scaffold-lib.ps1`](plugins/specialists-workflow-davekjohn/scripts/lib/entry-scaffold-lib.ps1). A consumer
 could tune our way of working; they could not have their own. And
-[`check-script-contract.ps1`](plugins/specialists/scripts/sync/check-script-contract.ps1) *enforces*
+[`check-script-contract.ps1`](plugins/specialists-workflow-davekjohn/scripts/sync/check-script-contract.ps1) *enforces*
 that they supply those functions — so a repo that worked differently was not adapted to. It was told at
 every session start that it was misconfigured.
 
@@ -167,8 +167,9 @@ The full picture, top-level folder by folder:
   `agent-shared-lib.ps1`), the lint gate + drift check, the changelog/PR/release scripts (incl.
   `cut-release.ps1`), the connectors check (`check-connectors.ps1`), the agent-def generator
   (`build-agent-defs.ps1` — fills in the shared blocks from `plugins/agent-shared/`), and the tests. A
-  mirrored copy for consumers lives inside the `specialists` plugin — see its own
-  [README](plugins/specialists/scripts/README.md).
+  mirrored copy for consumers lives inside the plugins — the sync/check scripts in `specialists`, the
+  branch/release workflow in `specialists-workflow-davekjohn` — see its own
+  [README](plugins/specialists-workflow-davekjohn/scripts/README.md).
 - **`releases/`** — the release history: `development/<X>.x/<X.Y.Z>.md` (full notes per version) +
   `README.md` (overview table + the full cutting-a-release mechanics) — see
   [`releases/README.md`](releases/README.md). The `## Releases` section of `CHANGELOG.md` points here.
