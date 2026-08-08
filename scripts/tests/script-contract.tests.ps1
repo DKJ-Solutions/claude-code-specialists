@@ -41,6 +41,10 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot      = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script        = Join-Path $RepoRoot 'scripts\sync\check-script-contract.ps1'
+# The registry moved out of the check on August 8, 2026 (#456), once a third reader appeared -- the
+# blueprint generator. The scenarios below still run the real CHECK; the asserts about how records are
+# DECLARED read the lib, which is where they are now.
+$ContractLib   = Join-Path $RepoRoot 'scripts\lib\script-contract-lib.ps1'
 $Hook          = Join-Path $RepoRoot 'plugins\specialists-workflow-davekjohn\hooks\script-contract-sessioncheck.ps1'
 $BranchInfoSrc = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 $RepoConfigSrc = Join-Path $RepoRoot 'scripts\repo-config.ps1'
@@ -385,7 +389,7 @@ try {
     #     fix. Fenced code is not a concern -- these are single-quoted PowerShell strings, not prose.
     # Both quote styles: these records use single and double quotes interchangeably, and a pattern that
     # knew only one would report "0 offenders" while never looking at half of them.
-    $markerSrc = [System.IO.File]::ReadAllText($Script)
+    $markerSrc = [System.IO.File]::ReadAllText($ContractLib)
     $recordText = @([regex]::Matches($markerSrc, "(?:Returns|Default)\s*=\s*(['""])(.*?)\1") | ForEach-Object { $_.Groups[2].Value })
     Assert-True ($recordText.Count -gt 20) "the marker guard really read the records (found $($recordText.Count) Returns/Default strings)"
     $withMarker = @($recordText | Where-Object { $_ -cmatch '\[(OK|INFO|ERROR|SCOPE|BOOTSTRAP)\]' })
@@ -527,9 +531,9 @@ function Get-RosterIgnoredIds { return @() }
         # per-script assertions that shape is what tests.
     )
 
-    $contractSrc = [System.IO.File]::ReadAllText($Script)
+    $contractSrc = [System.IO.File]::ReadAllText($ContractLib)
     $totalRecordCount = @([regex]::Matches($contractSrc, "Lib\s*=\s*'[^']+';\s*Function\s*=\s*'[^']+';\s*Scripts\s*=\s*@\(")).Count
-    Assert-Equal 22 $totalRecordCount 'contract: exactly twenty-two (lib, function) records declared in check-script-contract.ps1 (the twenty-one below plus the dedicated Get-LiveStage block after this loop). Was twenty-eight until the flat changelog retired six: both section seams, the live marker, the history mode, the category labels and the release-block wording'
+    Assert-Equal 22 $totalRecordCount 'contract: exactly twenty-two (lib, function) records declared in script-contract-lib.ps1 (the twenty-one below plus the dedicated Get-LiveStage block after this loop). Was twenty-eight until the flat changelog retired six: both section seams, the live marker, the history mode, the category labels and the release-block wording'
 
     # Every record must carry a 'Returns' line, so a finding is actionable without any reference to this
     # source repo (Dave, July 28, 2026). Counted against $totalRecordCount rather than listed per record:
@@ -584,7 +588,12 @@ function Get-RosterIgnoredIds { return @() }
     #     comment above this loop for why it is not folded into $expectedContract. Verified by hand
     #     (scratch script, not checked in) before writing this pattern: it correctly matches the real
     #     record and correctly fails to match if the Lib/Scripts/Optional/Default attribution changes.
-    $liveStagePattern = 'Lib\s*=\s*''scripts\\repo-config\.ps1'';\s*Function\s*=\s*''Get-LiveStage'';\s*Scripts\s*=\s*@\(''cut-release skill''\);\s*Optional\s*=\s*\$true;\s*Default\s*=\s*'''''
+    #     THE GAP BEFORE 'Optional' IS DELIBERATE, and bounded so it cannot wander into the next record:
+    #     records gained Adopt/AdoptWhy on August 8, 2026 (#456), which sit between Scripts and Optional.
+    #     A '\s*' here would report a correct record as missing the moment any key is added between the
+    #     two -- the assert would be testing the key ORDER, which is not what it is for. '(?!Lib\s*=)'
+    #     keeps the gap inside one record, so the attribution being tested is still this record's.
+    $liveStagePattern = 'Lib\s*=\s*''scripts\\repo-config\.ps1'';\s*Function\s*=\s*''Get-LiveStage'';\s*Scripts\s*=\s*@\(''cut-release skill''\);(?:(?!Lib\s*=)[\s\S])*?Optional\s*=\s*\$true;\s*Default\s*=\s*'''''
     Assert-True ([regex]::IsMatch($contractSrc, $liveStagePattern)) "contract: record for 'Get-LiveStage' still declared, attributed to scripts\repo-config.ps1 / 'cut-release skill', Optional with an empty-string Default"
 
     $cutReleaseSkillPath = Join-Path $RepoRoot 'plugins\specialists-workflow-davekjohn\skills\cut-release\SKILL.md'

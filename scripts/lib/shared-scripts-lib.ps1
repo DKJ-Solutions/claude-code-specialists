@@ -232,6 +232,34 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # The contract registry, extracted from check-script-contract.ps1 on August 8, 2026 (#456)
+            # once a THIRD reader appeared: the check reports what a consumer is missing, the blueprint
+            # generator ships what the source answered, and the test suite holds the registry to its own
+            # rules. Mirrored because the check that dot-sources it is mirrored -- a consumer running the
+            # mirror would otherwise load a file it does not have.
+            Name    = 'script-contract-lib'
+            Source  = 'scripts\lib\script-contract-lib.ps1'
+            Mirror  = 'plugins\specialists-workflow-davekjohn\scripts\lib\script-contract-lib.ps1'
+            LibOnly = $true
+        },
+        @{
+            # The consumer's side of the blueprint (#456): it reads the artefact this repo generates and
+            # places what is safe to copy, proposing the rest. Shared for the reason every script here is
+            # -- the alternative is each consumer hand-deriving the source's answers, which is what the
+            # issue measured them doing.
+            #
+            # THE GENERATOR IS NOT REGISTERED, deliberately: scripts/sync/build-config-blueprint.ps1 reads
+            # THIS repo's libs to produce the artefact, so it is the source's own tool. A consumer running
+            # it would generate a blueprint of itself and overwrite the one it adopts from.
+            Name   = 'adopt-config'
+            Source = 'scripts\task\adopt-config.ps1'
+            Mirror = 'plugins\specialists-workflow-davekjohn\scripts\task\adopt-config.ps1'
+            Skill  = 'adopt-config'
+            # A test points the command at a fixture blueprint instead of the shipped one. A consumer
+            # never types it, and documenting it would invite someone to.
+            SkillParamsExempt = @('BlueprintPath')
+        },
+        @{
             # Issue #417, phase 1. Two repos ran two independently evolved files of this name, and the
             # owner's goal is one release workflow rather than two that resemble each other. The audit
             # that produced the issue named three divergences; reading both files found six, and the
