@@ -13,7 +13,7 @@
       count clears it (5 asserts, all green)
 - [x] Repair the stale import comment naming `Build-PluginChangelogIntro` and check 17, both retired
       August 8
-- [ ] Run the lint + the suites, review the diff, open the PR
+- [x] Run the lint + the suites, review the diff, open the PR
 
 ### Where I left off
 
