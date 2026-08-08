@@ -1,4 +1,4 @@
----
+﻿---
 name: adopt-config
 description: Adopt the source repo's workflow configuration from the shipped blueprint -- place the values that state the shared way of working into this repo's own seam libs, and get a written proposal for the ones only this repo can answer. Use this after specialists-init has laid down scripts/repo-config.ps1 and scripts/lib/branch-info.ps1, or whenever the script-contract check reports functions this repo has never configured.
 ---
@@ -24,11 +24,15 @@ the marker each record carries.
 ## Run it
 
 ```powershell
-powershell -NoProfile -File "C:/Users/DaveKok/.claude/plugins/cache/claude-code-specialists/specialists-workflow-davekjohn/3.8.0/scripts/task/adopt-config.ps1"
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/task/adopt-config.ps1"
 ```
 
 That is a **dry run**: it prints exactly what it would do and writes nothing. Add `-Apply` when the plan
 looks right.
+
+`${CLAUDE_PLUGIN_ROOT}` resolves **only inside a plugin-owned component** -- that is, when your Claude
+runs this skill. Typing the command by hand in a terminal means spelling out the absolute path to your
+own plugin cache instead, so the easy route is to ask for the skill rather than to copy the line.
 
 ## The two markers, and why one of them never writes anything
 
@@ -72,5 +76,5 @@ has a documented fallback -- answer the ones where your repo genuinely differs f
 Run the contract check to see the same seam from the shared scripts' side:
 
 ```powershell
-powershell -NoProfile -File "C:/Users/DaveKok/.claude/plugins/cache/claude-code-specialists/specialists-workflow-davekjohn/3.8.0/scripts/sync/check-script-contract.ps1"
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/sync/check-script-contract.ps1"
 ```

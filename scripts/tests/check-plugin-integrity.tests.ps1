@@ -1696,6 +1696,57 @@ try {
         'entry-shape: an intro stating the count the scaffolder writes clears the finding'
     Assert-True ($e7.Out -match '\[entry-shape\] checked [1-9]') `
         'entry-shape: and the intro was actually examined rather than skipped into silence'
+
+    # --- check 22: a skill's runnable command must resolve on the reader's machine -------------------------
+    # THE MEASURED DEFECT, August 8-9, 2026: adopt-config's page shipped in v3.8.0 with both commands
+    # written as 'C:/Users/<the author>/.claude/plugins/cache/.../3.8.0/scripts/...'. It was the newest of
+    # eleven skill pages and the only one not using the substitution, and it was the first command a
+    # consumer runs to reach the release's headline feature.
+    #
+    # BOTH DIRECTIONS PLUS THE DELIBERATE PASS, because the third is what keeps this check exemption-free:
+    # a '<plugin>' placeholder must NOT be reported. Angle brackets ask the reader to substitute; an
+    # absolute path reads as a line to paste. A test that only pinned the positive would pass against a
+    # stricter check that starts accusing the teardown page and needs a list to quiet it back down.
+    Write-Host "check 22: a skill's command must not point at the author's disk" -ForegroundColor Cyan
+    $cmdSkill = Join-Path $Fixture 'plugins\specialists-workflow-davekjohn\skills\adopt-config\SKILL.md'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $cmdSkill) -Force | Out-Null
+    function Write-CmdSkill([string]$Path) {
+        [System.IO.File]::WriteAllText($cmdSkill,
+            "# adopt-config`n`n## Run it`n`n``````powershell`npowershell -NoProfile -File `"$Path`"`n```````n", $Utf8NoBom)
+    }
+
+    # 51. The exact defect that shipped: a drive-letter path, reported with its file, its line and the
+    #     offending path, so the finding names what to replace rather than only that something is wrong.
+    Write-CmdSkill 'C:/Users/SomeAuthor/.claude/plugins/cache/mp/plugin/3.8.0/scripts/task/adopt-config.ps1'
+    $c1 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($c1.Out -match '\[skill-command\].*adopt-config\\SKILL\.md:6: the command points at an absolute path') `
+        'skill-command: a hardcoded cache path is reported, with the file and the line'
+    Assert-True ($c1.Out -match [regex]::Escape('C:/Users/SomeAuthor')) `
+        'skill-command: and the finding quotes the offending path, so the repair is obvious'
+    Assert-True ($c1.Out -match '\[skill-command\] checked [1-9]') `
+        'skill-command: the coverage count proves a command was actually examined, not an empty scan'
+
+    # 52. A POSIX absolute path is the same defect on another machine, and would slip a drive-letter-only
+    #     rule -- the plugin cache lives under a home directory on macOS and Linux.
+    Write-CmdSkill '/home/someauthor/.claude/plugins/cache/mp/plugin/3.8.0/scripts/task/adopt-config.ps1'
+    $c2 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($c2.Out -match '\[skill-command\].*the command points at an absolute path') `
+        'skill-command: a POSIX home path is caught too, not just a Windows drive letter'
+
+    # 53. The substitution clears it, changing nothing else about the page. This is the repair the finding
+    #     asks for, so the test proves the advice actually works.
+    Write-CmdSkill '${CLAUDE_PLUGIN_ROOT}/scripts/task/adopt-config.ps1'
+    $c3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($c3.Out -match '\[skill-command\] plugins')) `
+        'skill-command: the ${CLAUDE_PLUGIN_ROOT} form clears the finding'
+
+    # 54. THE EXEMPTION-FREE PROPERTY. The teardown page documents its command with a '<plugin>'
+    #     placeholder, and that is honest rather than broken. Measured before the check was written:
+    #     3 of the tree's 26 invocations are this shape, and reporting them would have needed a list.
+    Write-CmdSkill '<plugin>/skills/specialists-teardown/teardown.ps1'
+    $c4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($c4.Out -match '\[skill-command\] plugins')) `
+        'skill-command: a signposted <plugin> placeholder passes, so the check needs no exemption list'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }
