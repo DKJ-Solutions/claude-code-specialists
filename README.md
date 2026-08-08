@@ -17,6 +17,7 @@ its own copies, and enables or disables **per plugin** which groups it needs.
 | **connect my own repo — just the commands** | **[INSTALL.md, the quickstart half](plugins/INSTALL.md#quickstart--the-commands-and-nothing-else)** — four steps, the commands and nothing else, linking down for every caveat. |
 | **connect my own repo — and know why** | **[INSTALL.md, the adoption half](plugins/INSTALL.md#adoption--how-to-connect-your-repo)** — the full, measurement-backed adoption manual for someone who did not build this, ~47 min (August 6, 2026). Read its *Before you start* section first if the machine is new or has adopted this family before. |
 | **disconnect it again** | [UNINSTALL.md](plugins/UNINSTALL.md) — the install page's mirror: the repo teardown and the machine-side removal, in the order they have to happen. |
+| know **what this promises my repo** | [The plugin serves the consumer's repo](#the-plugin-serves-the-consumers-repo) — the specialists adapt to your way of working; ours is not a standard you inherit. |
 | know **which plugin does what** | [The four plugins](#the-four-plugins--whats-the-difference) |
 | know **how a specialist is built** | [Manuals — the split model](#manuals--the-split-model) |
 | know **how a repo consumes this** | [Consumption](#consumption) · [Versioning](#versioning) |
@@ -56,6 +57,46 @@ moved into the seam. The lockstep behaviour is untouched: the release artefacts 
 byte-identical to what the unshared script produced.)
 
 Decision by Dave, August 3, 2026.
+
+## The plugin serves the consumer's repo
+
+**A consuming repo is unique and has its own way of working, and the specialists adapt to it. That is
+their strength.** This repository's way of working — the branch-and-entry model, the tier ladder, the
+fold, the cut, the gates — is *this* repo's answer to a problem, not a standard a consumer is expected
+to adopt. Nothing that travels outward may assume otherwise.
+
+**The exception is the author, and it is a real one.** Dave runs these plugins across several of his
+own repos and deliberately uses one way of working across them, deviating only where the domain forces
+it — a Shopify store repo differs from a knowledge repo in what it does, not in how work moves through
+it. So his way of working has to be *available*, as something he can switch on per repo, without being
+what a stranger receives by default.
+
+That gives one test question, and it applies to everything added to a plugin from here on:
+
+> **Does this describe a *craft*, or a *way of working*?**
+> A craft is portable and adapts to the repo it lands in — it belongs in the shared core.
+> A way of working belongs to whoever authored it, and is therefore opt-in.
+
+**Why it had to be written down: the core did not pass its own test.** Measured on August 8, 2026, the
+`specialists` plugin shipped 1,973,691 bytes, of which the personas, agent defs and manuals — the craft
+itself — were 175,672, or **9%**. Against that, the shared scripts, the seven workflow skills and the
+session hooks together came to 923,277 bytes, or **47%**: machinery that implements one particular way
+of working. The persona layer itself was clean, and that is worth stating precisely, because it locates
+the leak — no file under `personas/`, `manuals/` or `agents/` names `CHANGELOG.md`, `branch/`,
+`open-pr`, `ship-pr` or `cut-release`. How a specialist was *described* had never been the problem. What
+shipped alongside them was.
+
+**The sharpest instance, because it is the one that reads as compliance.**
+[`scripts/repo-config.ps1`](scripts/repo-config.ps1) looks like the seam that makes the workflow
+adaptable, and its 19 functions genuinely do let a consumer change the trunk name, the merge method and
+the folder grouping. But those are *parameters* of a single changelog model, and the model itself is
+fixed in [`entry-scaffold-lib.ps1`](plugins/specialists/scripts/lib/entry-scaffold-lib.ps1). A consumer
+could tune our way of working; they could not have their own. And
+[`check-script-contract.ps1`](plugins/specialists/scripts/sync/check-script-contract.ps1) *enforces*
+that they supply those functions — so a repo that worked differently was not adapted to. It was told at
+every session start that it was misconfigured.
+
+Decision by Dave, August 8, 2026.
 
 ## The four plugins — what's the difference?
 
