@@ -94,6 +94,46 @@ try {
     Assert-Equal 0 $rb.Code 'build -Check: all shared blocks in sync on the repo'
     $ri = Invoke-Script -Path $Integrity -ScriptArgs @()
     Assert-Equal 0 $ri.Code 'lint gate green on the repo (incl. shared check)'
+
+    # --- 7. THE GENERATOR AND THE GATE WALK THE PERSONAS TOO ----------------------------------------
+    # The widening of August 8, 2026. Both halves are tested, because a generator that writes a file the
+    # gate does not read is the exact shape in which a shared block goes quietly stale: the build keeps
+    # reporting "in sync" and the gate keeps reporting green, while nothing has compared that file with
+    # its source since the day it was placed.
+    Write-Host "the personas are in scope, not just the agent defs" -ForegroundColor Cyan
+    $realAgents = @(Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-agent.md' -File |
+        Where-Object { $_.FullName -match '\\agents\\' })
+    $realPersonas = @(Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-persona.md' -File |
+        Where-Object { $_.FullName -match '\\personas\\' })
+    Assert-True ($realPersonas.Count -gt 0) 'there are personas to cover in the first place'
+
+    # The gate's own coverage line is the measurement: it states what it walked, so a gate that quietly
+    # narrowed back to agents/ fails here instead of staying green on a smaller surface.
+    $sharedCoverage = ($ri.Out -split "`n" | Where-Object { $_ -match '\[shared\]\s+checked\s+(\d+)' } | Select-Object -First 1)
+    Assert-True ($sharedCoverage -match '\[shared\]\s+checked\s+(\d+)') 'the lint reports a [shared] coverage count'
+    $sharedCount = if ($sharedCoverage -match '\[shared\]\s+checked\s+(\d+)') { [int]$Matches[1] } else { -1 }
+    Assert-Equal ($realAgents.Count + $realPersonas.Count) $sharedCount 'the gate walks every agent def AND every persona'
+    Assert-True ($sharedCount -gt $realAgents.Count) 'and that is strictly more than the agent defs alone -- the widening really happened'
+
+    # The generator's scope. A source assertion rather than a drift run, deliberately: build-agent-defs
+    # resolves its own repo root and cannot be pointed at a fixture, so drifting a real persona to prove
+    # the point would mean editing a shipped file inside a test.
+    $buildSrc = [System.IO.File]::ReadAllText($Build, [System.Text.Encoding]::UTF8)
+    Assert-True ($buildSrc -match "'\*-persona\.md'") 'the generator collects *-persona.md'
+    Assert-True ($buildSrc -match "personas") 'and filters on the personas directory'
+
+    # --- 8. Every specialist actually carries the way-of-working block ------------------------------
+    # A block whose whole purpose is "adapt to the repo you are installed in" is worth nothing in the
+    # files it was never placed in, and placement is a one-off editorial act that no gate re-runs.
+    Write-Host "repo-way-of-working reaches every specialist" -ForegroundColor Cyan
+    $missing = @()
+    foreach ($f in ($realAgents + $realPersonas)) {
+        $text = [System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8)
+        if ($text -notmatch 'BEGIN shared:repo-way-of-working') { $missing += $f.Name }
+    }
+    Assert-Equal '' ($missing -join ', ') 'no agent def or persona is missing the block'
+    $srcBlock = Join-Path $RepoRoot 'plugins\agent-shared\repo-way-of-working.md'
+    Assert-True (Test-Path -LiteralPath $srcBlock) 'the canonical source file exists'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

@@ -668,9 +668,19 @@ Write-Coverage -Category 'specialist' -Checked ($agentDefs.Count + $manuals.Coun
 # sentinels (built via scripts/agents/build-agent-defs.ps1). Here we guard that every marked
 # region still equals its source -- this catches a hand-edit inside the sentinels or a forgotten
 # rebuild.
+#
+# THE PERSONAS ARE HELD TO THE SAME RULE, and this check has to walk exactly what the generator writes
+# or the gate goes quiet on half of them. The generator gained the personas because the two specialists
+# whose craft IS a way of working ship as personas rather than agent defs; a gate that kept looking only
+# at agents/ would have let a hand-edit inside a persona's sentinels stand, which is the one failure
+# this check exists to prevent. Both collections are built from the same two filters as there.
 . (Join-Path $PSScriptRoot '..\lib\agent-shared-lib.ps1')
 $agentSharedDir = Get-AgentSharedDir -RepoRoot $RepoRoot
-$agentDefs | ForEach-Object {
+# The outer @() is load-bearing, not decoration: Sort-Object returns a SCALAR for a single-element
+# collection, and $scalar.Count then throws under StrictMode. The real repo has 30 of these so it would
+# never have shown up here -- it surfaced in the fixtures, which are one agent def and no persona.
+$sharedBlockFiles = @(@($agentDefs) + @($personas) | Sort-Object FullName)
+$sharedBlockFiles | ForEach-Object {
         $raw = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)
         $rel = $_.FullName.Replace($RepoRoot, '.')
         $sharedProblems = New-Object System.Collections.Generic.List[string]
@@ -680,8 +690,8 @@ $agentDefs | ForEach-Object {
             Add-Error "[shared] ${rel}: shared block deviates from the source -- run scripts/agents/build-agent-defs.ps1."
         }
     }
-Write-Coverage -Category 'shared' -Checked $agentDefs.Count `
-    -Note $(if ($agentDefs.Count -eq 0) { 'no agent def to expand, so no shared block could be compared with its source' } else { '' })
+Write-Coverage -Category 'shared' -Checked $sharedBlockFiles.Count `
+    -Note $(if ($sharedBlockFiles.Count -eq 0) { 'no agent def or persona to expand, so no shared block could be compared with its source' } else { 'agent defs AND personas -- the generator writes both, so the gate walks both. A persona is where the specialists whose craft is itself a way of working live, which is exactly where a process block must not be allowed to drift' })
 
 # --- 8. shared workflow scripts in sync with their source ----------------------------------------------
 # Repo-agnostic scripts are shared with consumers as a plugin mirror (issue #81): the root copy is
