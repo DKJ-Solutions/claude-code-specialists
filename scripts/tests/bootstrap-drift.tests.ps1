@@ -171,15 +171,74 @@ try {
     # Propose-only, like every other bootstrap output: nothing may be written into the consumer.
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'connectors'))) 'register proposal: writes no connectors/ dir into the consumer'
 
-    # --- 1c. scripts/ scaffolds for the shared workflow skills (#86): repo-config + branch-info ----
-    Write-Host "bootstrap.ps1 -- script-config scaffolds (#86)" -ForegroundColor Cyan
+    # --- 1c. scripts/ scaffolds (#86) -- THE CORE-ONLY SHAPE ---------------------------------------
+    # SPLIT INTO TWO CASES ON AUGUST 8, 2026, when the branch/release workflow became its own opt-in
+    # plugin. What the bootstrap writes now depends on whether the consumer enabled that pack, and this
+    # fixture has no settings.json at all -- so it IS the plain consumer, which is the case the
+    # plugin-serves-the-consumer doctrine is about. Asserting only the full shape here would have left
+    # the case that matters most untested while looking thorough.
+    Write-Host "bootstrap.ps1 -- script-config scaffolds (#86), core-only consumer" -ForegroundColor Cyan
     $rcScaffold = Join-Path $Fixture 'scripts\repo-config.ps1'
     $biScaffold = Join-Path $Fixture 'scripts\lib\branch-info.ps1'
-    Assert-True (Test-Path -LiteralPath $rcScaffold) 'scripts/repo-config.ps1 scaffold placed'
-    Assert-True (Test-Path -LiteralPath $biScaffold) 'scripts/lib/branch-info.ps1 scaffold placed'
+    Assert-True (Test-Path -LiteralPath $rcScaffold) 'core-only: scripts/repo-config.ps1 placed -- check-roster-sync reads the roster half'
+    Assert-True (-not (Test-Path -LiteralPath $biScaffold)) 'core-only: scripts/lib/branch-info.ps1 NOT placed -- both its functions serve scripts this consumer does not have'
+    $rcText = [System.IO.File]::ReadAllText($rcScaffold, [System.Text.Encoding]::UTF8)
+    Assert-True ($rcText -match 'function Get-RosterPath') 'core-only: the roster half is there -- Get-RosterPath'
+    Assert-True ($rcText -match 'function Get-RosterIgnoredIds') 'core-only: the roster half is there -- Get-RosterIgnoredIds'
+    foreach ($wf in 'Get-RepoName', 'Get-LintScript', 'Get-ChangelogHeading', 'Get-LiveStage') {
+        Assert-True (-not ($rcText -match "function $wf\b")) "core-only: $wf is absent -- nothing in this repo would read it"
+    }
+    # The roster half has nothing to fill in, so it carries no placeholder VALUE. Asserted because the
+    # teardown's classification turns on exactly that, and the case below proves it still recognises
+    # this shape as generated rather than authored.
+    Assert-True (-not ($rcText -match "=\s*'[^']*VUL-IN")) 'core-only: no placeholder value -- the roster half is complete as generated'
+    Assert-True ($r1.Out -match 'specialists-workflow-davekjohn') 'core-only: the run NAMES the pack the missing half belongs to, so the absence is legible'
+
+    # --- 1c0. The core-only scaffold must stay REMOVABLE by the teardown ---------------------------
+    # Without this, a file the bootstrap just wrote is classified as authored and kept forever --
+    # adoption exactly as irreversible as specialists-teardown promises it is not.
+    Write-Host "bootstrap.ps1 -- the core-only scaffold stays removable by the teardown" -ForegroundColor Cyan
+    $teardownScript = Join-Path $RepoRoot 'plugins\specialists\skills\specialists-teardown\teardown.ps1'
+    function Test-TeardownSeesGenerated {
+        param([string]$Path)
+        # The classifier alone, lifted out of the script text: running the whole teardown here would
+        # need a fully staged consumer and would test far more than the one question being asked.
+        & {
+            Set-StrictMode -Off
+            $EmptyLensPattern = ''
+            $src = [System.IO.File]::ReadAllText($teardownScript, [System.Text.Encoding]::UTF8)
+            $m = [regex]::Match($src, '(?ms)^function Test-LooksGenerated \{.*?\r?\n\}\r?\n')
+            if (-not $m.Success) { return 'NO-MATCH' }
+            . ([scriptblock]::Create($m.Value))
+            return [bool](Test-LooksGenerated -Path $Path -Kind 'repo-config')
+        }
+    }
+    Assert-Equal $true (Test-TeardownSeesGenerated $rcScaffold) 'teardown: an untouched core-only repo-config reads as generated (removable)'
+    $touchedRc = Join-Path $Fixture 'scripts\repo-config-touched.ps1'
+    [System.IO.File]::WriteAllText($touchedRc, $rcText.Replace('$script:RosterIgnoredIds = @()', "`$script:RosterIgnoredIds = @('06-16')"), $Utf8NoBom)
+    Assert-Equal $false (Test-TeardownSeesGenerated $touchedRc) 'teardown: one ignored id added and it reads as authored (kept)'
+    Remove-Item -LiteralPath $touchedRc -Force
+
+    # --- 1c1. The SAME bootstrap against a consumer that DID enable the workflow pack ---------------
+    # Everything this suite used to assert on the single fixture lives here now: the shape a consumer
+    # receives when they chose that way of working.
+    Write-Host "bootstrap.ps1 -- script-config scaffolds (#86), workflow pack enabled" -ForegroundColor Cyan
+    $FixtureWf = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-wf-$PID"
+    if (Test-Path -LiteralPath $FixtureWf) { Remove-Item -Recurse -Force -LiteralPath $FixtureWf }
+    New-Item -ItemType Directory -Path (Join-Path $FixtureWf '.claude') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $FixtureWf '.claude\settings.json'),
+        '{ "enabledPlugins": { "specialists@claude-code-specialists": true, "specialists-workflow-davekjohn@claude-code-specialists": true } }', $Utf8NoBom)
+    $rWf = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $FixtureWf)
+    Assert-Equal 0 $rWf.Code 'workflow pack: bootstrap exit 0'
+    $rcScaffold = Join-Path $FixtureWf 'scripts\repo-config.ps1'
+    $biScaffold = Join-Path $FixtureWf 'scripts\lib\branch-info.ps1'
+    Assert-True (Test-Path -LiteralPath $rcScaffold) 'workflow pack: scripts/repo-config.ps1 scaffold placed'
+    Assert-True (Test-Path -LiteralPath $biScaffold) 'workflow pack: scripts/lib/branch-info.ps1 scaffold placed'
     $rcText = [System.IO.File]::ReadAllText($rcScaffold, [System.Text.Encoding]::UTF8)
     Assert-True ($rcText -match 'VUL-IN') 'repo-config scaffold carries the VUL-IN marker'
     Assert-True ($rcText -match 'function Get-RepoName') 'repo-config scaffold supplies Get-RepoName'
+    # Both halves in one file: the assembly must not drop the roster pair when the workflow half joins.
+    Assert-True ($rcText -match 'function Get-RosterPath') 'workflow pack: the roster half is still there alongside the workflow half'
     # Get-ChangelogHeading (#178) and Get-LiveStage (#177) both ship a concrete, non-VUL-IN default
     # (unlike Get-RepoName/Get-LintScript above, which are placeholders every consumer must fill in) --
     # both are Optional in the script contract, so a consumer that never touches these two lines still
@@ -204,8 +263,13 @@ try {
     #     bootstrap output, so the invariant holds by construction: add a required contract entry
     #     without extending the scaffold and this fails, whatever the entry happens to be named.
     Write-Host "bootstrap.ps1 -- the scaffolds satisfy check-script-contract (#226)" -ForegroundColor Cyan
+    # AGAINST THE WORKFLOW FIXTURE, not the core-only one, and that is the accurate scope rather than a
+    # convenience: since August 8, 2026 check-script-contract SHIPS IN the workflow pack, so the only
+    # repos it ever runs in are the ones that enabled it. Pointing it at the core-only fixture would
+    # assert a contract on a consumer that will never run the check -- and would fail on branch-info,
+    # which that consumer is correct not to have.
     $contractCheck = Join-Path $RepoRoot 'scripts\sync\check-script-contract.ps1'
-    $rc = Invoke-Script -Path $contractCheck -ScriptArgs @('-ConsumerPathOverride', $Fixture)
+    $rc = Invoke-Script -Path $contractCheck -ScriptArgs @('-ConsumerPathOverride', $FixtureWf)
     Assert-Equal 0 $rc.Code 'scaffolds vs contract: exit-code 0 -- a freshly bootstrapped repo satisfies the contract'
     Assert-True (-not ($rc.Out -match '\[ERROR\]')) 'scaffolds vs contract: no [ERROR] about a file the bootstrap just wrote'
     # And it must be reaching the real per-function verdicts, not passing because the [BOOTSTRAP]
@@ -251,6 +315,12 @@ try {
         try {
             & git -C $gitFix init -q 2>$null | Out-Null
             if ($OriginUrl) { & git -C $gitFix remote add origin $OriginUrl 2>$null | Out-Null }
+            # The workflow pack has to be enabled here: RepoName lives in that half of the scaffold since
+            # August 8, 2026, so without it there is no line for the derivation to land in and every case
+            # below would pass or fail for the wrong reason.
+            New-Item -ItemType Directory -Path (Join-Path $gitFix '.claude') -Force | Out-Null
+            [System.IO.File]::WriteAllText((Join-Path $gitFix '.claude\settings.json'),
+                '{ "enabledPlugins": { "specialists@claude-code-specialists": true, "specialists-workflow-davekjohn@claude-code-specialists": true } }', $Utf8NoBom)
             $rg = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $gitFix)
             Assert-Equal 0 $rg.Code "git derivation ($Label): bootstrap exit 0"
             $txt = [System.IO.File]::ReadAllText((Join-Path $gitFix 'scripts\repo-config.ps1'), [System.Text.Encoding]::UTF8)
@@ -448,6 +518,8 @@ try {
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
+    # Declared in the try block, so it may not exist if the run failed before section 1c1.
+    if ($FixtureWf -and (Test-Path -LiteralPath $FixtureWf)) { Remove-Item -Recurse -Force -LiteralPath $FixtureWf -ErrorAction SilentlyContinue }
     $env:USERPROFILE = $OldUserProfile
 }
 
