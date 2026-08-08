@@ -49,12 +49,15 @@ Write-Host "== build-agent-defs$(if ($Check) {' -Check'}) -- $RepoRoot ==" -Fore
 #
 # Personas carry no agent def, so nothing else in this repo couples the two file kinds -- the sentinel
 # region is self-describing, and Expand-AgentDefShared only ever looked at content.
-$sharedFiles = @(
+# The outer @() is load-bearing: Sort-Object returns a SCALAR for a single-element collection, and a
+# scalar has no .Count under StrictMode. This repo has 30 of these so it would never show up here -- it
+# showed up in the lint's fixtures, which are one agent def and no persona.
+$sharedFiles = @(@(
     Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-agent.md' -File |
         Where-Object { $_.FullName -match '\\agents\\' }
     Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-persona.md' -File |
         Where-Object { $_.FullName -match '\\personas\\' }
-) | Sort-Object FullName
+) | Sort-Object FullName)
 
 $changed = 0
 $problemCount = 0

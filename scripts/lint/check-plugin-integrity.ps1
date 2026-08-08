@@ -676,7 +676,10 @@ Write-Coverage -Category 'specialist' -Checked ($agentDefs.Count + $manuals.Coun
 # this check exists to prevent. Both collections are built from the same two filters as there.
 . (Join-Path $PSScriptRoot '..\lib\agent-shared-lib.ps1')
 $agentSharedDir = Get-AgentSharedDir -RepoRoot $RepoRoot
-$sharedBlockFiles = @($agentDefs) + @($personas) | Sort-Object FullName
+# The outer @() is load-bearing, not decoration: Sort-Object returns a SCALAR for a single-element
+# collection, and $scalar.Count then throws under StrictMode. The real repo has 30 of these so it would
+# never have shown up here -- it surfaced in the fixtures, which are one agent def and no persona.
+$sharedBlockFiles = @(@($agentDefs) + @($personas) | Sort-Object FullName)
 $sharedBlockFiles | ForEach-Object {
         $raw = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)
         $rel = $_.FullName.Replace($RepoRoot, '.')
