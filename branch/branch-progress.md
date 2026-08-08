@@ -1,14 +1,13 @@
-## `feat/specialists-read-the-repo-first` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] Write the canonical block `plugins/agent-shared/repo-way-of-working.md`
-- [x] Widen the generator to `personas/`, so the block reaches the specialists whose craft IS a way of working
-- [x] Widen lint check 7 with it, so the gate reads everything the generator writes
-- [x] Place the sentinels in all 26 agent defs and all 4 personas, then build
-- [x] Tests: the gate's own coverage line proves the widening; no specialist is missing the block
-- [x] Update the README's shared-block model and its enumeration
-- [x] Fill in the changelog entry
-
-### Where I left off
-
+_(filled in when a branch is created)_
