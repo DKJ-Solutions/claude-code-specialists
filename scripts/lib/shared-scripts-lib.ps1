@@ -22,6 +22,11 @@
     Pure ASCII (repo convention for .ps1).
 #>
 
+# WHERE THE PLUGINS ARE, so this registry does not have to know. A pair names the plugin it travels in
+# and nothing about the layout; Get-PluginRootByName turns that name into a folder. Unconditional and
+# unguarded: this lib is workshop-only (it is not itself mirrored), so the sibling is always there.
+. (Join-Path $PSScriptRoot 'plugin-tree-lib.ps1')
+
 function Get-SharedScriptPairs {
     <#
         The registry of shared scripts. Each pair: the canonical root source (Source) and the
@@ -46,25 +51,35 @@ function Get-SharedScriptPairs {
         reason at the registration. Without it the check would be bypassed wholesale the first time it
         fired on a test-only override, and a gate that gets bypassed guards nothing.
     #>
-    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        # The plugin set, when the caller has already resolved it. Optional, and it exists for exactly
+        # one caller: the lint gate derives the set once at its top, inside a try/catch, so that a
+        # marketplace.json it cannot parse degrades to an empty set instead of aborting a run that has
+        # nineteen more checks to report. Without this it would resolve the set a SECOND time in here,
+        # unguarded -- measured before the parameter was added: a corrupt marketplace killed the gate at
+        # check 8, so checks 9 through 22 never ran and no Summary was printed at all. One read per run,
+        # one place that decides what a parse failure means.
+        [AllowNull()][AllowEmptyCollection()][object[]]$PluginRoots
+    )
 
     $pairs = @(
         @{
             Name   = 'fold-changelog-entry'
             Source = 'scripts\release\fold-changelog-entry.ps1'
-            Mirror = 'plugins\specialists-workflow-davekjohn\scripts\release\fold-changelog-entry.ps1'
+            Plugin = 'specialists-workflow-davekjohn'
             Skill  = 'fold-changelog'
         },
         @{
             Name   = 'open-pr'
             Source = 'scripts\release\open-pr.ps1'
-            Mirror = 'plugins\specialists-workflow-davekjohn\scripts\release\open-pr.ps1'
+            Plugin = 'specialists-workflow-davekjohn'
             Skill  = 'open-pr'
         },
         @{
             Name   = 'check-roster-sync'
             Source = 'scripts\sync\check-roster-sync.ps1'
-            Mirror = 'plugins\specialists\scripts\sync\check-roster-sync.ps1'
+            Plugin = 'specialists'
             Skill  = 'sync-roster'
             # All three exist so the test suite can point the check at a fixture instead of the real
             # machine. A consumer never types them, and documenting them would invite someone to.
@@ -79,7 +94,7 @@ function Get-SharedScriptPairs {
             # scripts.
             Name   = 'check-script-contract'
             Source = 'scripts\sync\check-script-contract.ps1'
-            Mirror = 'plugins\specialists-workflow-davekjohn\scripts\sync\check-script-contract.ps1'
+            Plugin = 'specialists-workflow-davekjohn'
             # No skill, and none is wanted: this runs from a SessionStart hook and reports. Nobody
             # invokes it as a procedure, so there is no procedure to write down.
             Skill  = ''
@@ -92,13 +107,13 @@ function Get-SharedScriptPairs {
         @{
             Name   = 'new-branch'
             Source = 'scripts\task\new-branch.ps1'
-            Mirror = 'plugins\specialists-workflow-davekjohn\scripts\task\new-branch.ps1'
+            Plugin = 'specialists-workflow-davekjohn'
             Skill  = 'new-branch'
         },
         @{
             Name   = 'park-branch'
             Source = 'scripts\task\park-branch.ps1'
-            Mirror = 'plugins\specialists-workflow-davekjohn\scripts\task\park-branch.ps1'
+            Plugin = 'specialists-workflow-davekjohn'
             Skill  = 'park'
         },
         @{
@@ -110,7 +125,7 @@ function Get-SharedScriptPairs {
             # because it merges to main and then commits directly to main.
             Name   = 'ship-pr'
             Source = 'scripts\release\ship-pr.ps1'
-            Mirror = 'plugins\specialists-workflow-davekjohn\scripts\release\ship-pr.ps1'
+            Plugin = 'specialists-workflow-davekjohn'
             # The gap declared here on August 4, 2026 is closed: the route the cut-release skill sends
             # the reader to ("the normal new-branch -> ship-pr route") now has a page. It documents
             # verify-resolved-issues too, which is why that entry points here rather than at one of
@@ -124,7 +139,7 @@ function Get-SharedScriptPairs {
             # and pr-issues-lib/native-capture-lib are both mirrored already.
             Name   = 'verify-resolved-issues'
             Source = 'scripts\release\verify-resolved-issues.ps1'
-            Mirror = 'plugins\specialists-workflow-davekjohn\scripts\release\verify-resolved-issues.ps1'
+            Plugin = 'specialists-workflow-davekjohn'
             # No skill of its own, and that is right: it IS ship-pr's step 6 and runs from there, so
             # whatever documents ship-pr documents this. That page now exists and carries a section for
             # running this step on its own, so the inherited gap is closed with ship-pr's rather than
@@ -137,7 +152,7 @@ function Get-SharedScriptPairs {
             # the part that made it unusable elsewhere -- moved into the seam as Get-MojibakePaths.
             Name   = 'fix-mojibake'
             Source = 'scripts\maintenance\fix-mojibake.ps1'
-            Mirror = 'plugins\specialists-workflow-davekjohn\scripts\maintenance\fix-mojibake.ps1'
+            Plugin = 'specialists-workflow-davekjohn'
             # The gap declared here on August 4, 2026 is closed. It was mirrored because three repos had
             # each written their own copy -- three people needing it and none with a page to read -- and
             # that same argument is why the page had to follow the mirror rather than wait for someone to
@@ -148,7 +163,7 @@ function Get-SharedScriptPairs {
         @{
             Name    = 'check-report-lib'
             Source  = 'scripts\lib\check-report-lib.ps1'
-            Mirror  = 'plugins\specialists\scripts\lib\check-report-lib.ps1'
+            Plugin  = 'specialists'
             LibOnly = $true
         },
         @{
@@ -169,19 +184,19 @@ function Get-SharedScriptPairs {
             # not assumed from the absence of a uniqueness assertion.
             Name    = 'check-report-lib-workflow'
             Source  = 'scripts\lib\check-report-lib.ps1'
-            Mirror  = 'plugins\specialists-workflow-davekjohn\scripts\lib\check-report-lib.ps1'
+            Plugin  = 'specialists-workflow-davekjohn'
             LibOnly = $true
         },
         @{
             Name    = 'native-capture-lib'
             Source  = 'scripts\lib\native-capture-lib.ps1'
-            Mirror  = 'plugins\specialists-workflow-davekjohn\scripts\lib\native-capture-lib.ps1'
+            Plugin  = 'specialists-workflow-davekjohn'
             LibOnly = $true
         },
         @{
             Name    = 'pr-issues-lib'
             Source  = 'scripts\lib\pr-issues-lib.ps1'
-            Mirror  = 'plugins\specialists-workflow-davekjohn\scripts\lib\pr-issues-lib.ps1'
+            Plugin  = 'specialists-workflow-davekjohn'
             LibOnly = $true
         },
         @{
@@ -190,7 +205,7 @@ function Get-SharedScriptPairs {
             # above -- open-pr is mirrored and would otherwise dot-source a file the consumer does not have.
             Name    = 'pr-body-lib'
             Source  = 'scripts\lib\pr-body-lib.ps1'
-            Mirror  = 'plugins\specialists-workflow-davekjohn\scripts\lib\pr-body-lib.ps1'
+            Plugin  = 'specialists-workflow-davekjohn'
             LibOnly = $true
         },
         @{
@@ -205,7 +220,7 @@ function Get-SharedScriptPairs {
             # is repo-owned, so no contract row follows.
             Name    = 'park-lib'
             Source  = 'scripts\lib\park-lib.ps1'
-            Mirror  = 'plugins\specialists-workflow-davekjohn\scripts\lib\park-lib.ps1'
+            Plugin  = 'specialists-workflow-davekjohn'
             LibOnly = $true
         },
         @{
@@ -216,7 +231,7 @@ function Get-SharedScriptPairs {
             # empty document inside the release tag while the written version landed afterwards anyway.
             Name   = 'new-internal-note'
             Source = 'scripts\release\new-internal-note.ps1'
-            Mirror = 'plugins\specialists-workflow-davekjohn\scripts\release\new-internal-note.ps1'
+            Plugin = 'specialists-workflow-davekjohn'
             # Documented inside the cut-release skill (step 2) rather than separately: it is a step of
             # cutting a release, and it cannot run before the cut has produced its input.
             Skill  = 'cut-release'
@@ -228,7 +243,7 @@ function Get-SharedScriptPairs {
             # a drift guard that drifts. So it travels with both rather than living in either.
             Name    = 'entry-scaffold-lib'
             Source  = 'scripts\lib\entry-scaffold-lib.ps1'
-            Mirror  = 'plugins\specialists-workflow-davekjohn\scripts\lib\entry-scaffold-lib.ps1'
+            Plugin  = 'specialists-workflow-davekjohn'
             LibOnly = $true
         },
         @{
@@ -239,7 +254,7 @@ function Get-SharedScriptPairs {
             # mirror would otherwise load a file it does not have.
             Name    = 'script-contract-lib'
             Source  = 'scripts\lib\script-contract-lib.ps1'
-            Mirror  = 'plugins\specialists-workflow-davekjohn\scripts\lib\script-contract-lib.ps1'
+            Plugin  = 'specialists-workflow-davekjohn'
             LibOnly = $true
         },
         @{
@@ -253,7 +268,7 @@ function Get-SharedScriptPairs {
             # it would generate a blueprint of itself and overwrite the one it adopts from.
             Name   = 'adopt-config'
             Source = 'scripts\task\adopt-config.ps1'
-            Mirror = 'plugins\specialists-workflow-davekjohn\scripts\task\adopt-config.ps1'
+            Plugin = 'specialists-workflow-davekjohn'
             Skill  = 'adopt-config'
             # A test points the command at a fixture blueprint instead of the shipped one. A consumer
             # never types it, and documenting it would invite someone to.
@@ -272,7 +287,7 @@ function Get-SharedScriptPairs {
             # waits for Dave's own eye rather than merging on the gates.
             Name   = 'cut-release'
             Source = 'scripts\release\cut-release.ps1'
-            Mirror = 'plugins\specialists-workflow-davekjohn\scripts\release\cut-release.ps1'
+            Plugin = 'specialists-workflow-davekjohn'
             Skill  = 'cut-release'
         },
         @{
@@ -284,31 +299,78 @@ function Get-SharedScriptPairs {
             # from the consumer's own root before calling in.
             Name    = 'release-lib'
             Source  = 'scripts\lib\release-lib.ps1'
-            Mirror  = 'plugins\specialists-workflow-davekjohn\scripts\lib\release-lib.ps1'
+            Plugin  = 'specialists-workflow-davekjohn'
+            LibOnly = $true
+        },
+        @{
+            # Which plugins a repo publishes, and where each one's folder is (August 9, 2026). Travels
+            # because release-lib dot-sources it as a $PSScriptRoot sibling: Get-PluginManifestPaths --
+            # which cut-release calls in a consumer that publishes plugins -- is a wrapper over it, and
+            # Get-TouchedPlugins reads the roots it returns.
+            #
+            # DEPENDENCY-FREE ON PURPOSE, and that is what makes it cheap enough to sit this low. The
+            # alternative was putting these functions in check-report-lib, which every SessionStart check
+            # already loads -- but that lib is about a CONSUMER's install state (the settings chain, the
+            # plugin cache), while this one is about a repo that PUBLISHES plugins. Two different
+            # questions that happen to both say 'plugin', and merging them would have put a marketplace
+            # reader into every consumer session that has no marketplace.
+            Name    = 'plugin-tree-lib'
+            Source  = 'scripts\lib\plugin-tree-lib.ps1'
+            Plugin  = 'specialists-workflow-davekjohn'
             LibOnly = $true
         }
     )
 
+    # WHERE EACH PLUGIN'S FOLDER IS, asked of the marketplace rather than spelled out per pair.
+    #
+    # TWO DIFFERENT ABSENCES, AND THEY GET DIFFERENT ANSWERS. A repo that declares NO plugins at all
+    # mirrors nothing -- an empty registry is the correct answer there, and it is what the lint's
+    # minimal fixture is: a synthetic tree with no marketplace.json, where check 8 then reports
+    # 'checked 0' through the note it already carries for exactly this case. But a repo that DOES
+    # publish plugins and does not have the one a pair names is a defect in this registry, and it has to
+    # stop the run: the generator would otherwise compose a mirror path under a folder nobody publishes
+    # and create it, which is a copy of a shared script in a place no consumer will ever receive.
+    #
+    # That every pair resolves in THIS repo is asserted in scripts/tests/shared-scripts.tests.ps1 rather
+    # than left to the throw, so a typo is caught where the claim is actually checkable.
+    # THE OUTER @() IS LOAD-BEARING, and an @() inside each branch is not enough: the output of an if
+    # STATEMENT is unrolled on assignment, so the inner wrap is undone on the way out and an empty set
+    # arrives as $null -- which then fails .Count under StrictMode. Same unrolling this lib's own
+    # $PluginRoots parameters guard against, one level up.
+    $pluginRoots = @(
+        if ($PSBoundParameters.ContainsKey('PluginRoots')) { $PluginRoots }
+        else { Get-RepoPluginRoots -RepoRoot $RepoRoot }
+    )
+    if ($pluginRoots.Count -eq 0) { return }
+
     foreach ($p in $pairs) {
-        # The plugin a pair belongs to is READ OFF THE MIRROR PATH rather than declared in a field of
-        # its own. Since the workflow split (August 8, 2026) the mirrors live in two plugins, and a
-        # second field naming the plugin would be free to disagree with the path right beside it --
-        # the same "one shape, written once" reasoning LibOnly and Skill already carry. Everything
-        # keyed on the plugin (the skill page below) therefore cannot drift from where the mirror
-        # actually is.
-        $pluginName = ($p.Mirror -split '[\\/]')[1]
+        # THE PLUGIN IS THE ONE THING A PAIR STATES ABOUT ITS DESTINATION, and the mirror path is
+        # composed from it. This is the inverse of what stood here until August 9, 2026, and the
+        # reasoning is the one that was already written down: the plugin used to be read OFF a full
+        # mirror literal, precisely so a second field naming it could not disagree with the path beside
+        # it. That instinct was right and the direction was wrong -- every one of the 21 mirrors was
+        # exactly '<plugin root>\<Source>', verified across all of them before this was changed, so the
+        # literal restated the source path and the layout on every line. Naming the plugin and deriving
+        # the rest keeps one statement per fact and removes the layout from this file altogether: the
+        # plugin tree moved twice in 2026, and neither move should be legible here.
+        $root = Get-PluginRootByName -PluginRoots $pluginRoots -Name $p.Plugin
+        if (-not $root) {
+            throw "shared-scripts registry: pair '$($p.Name)' names plugin '$($p.Plugin)', which .claude-plugin/marketplace.json does not declare."
+        }
+        $mirrorRel = Join-Path $root.RelativeRoot $p.Source
         [pscustomobject]@{
             Name       = $p.Name
             SourceRel  = $p.Source
-            MirrorRel  = $p.Mirror
+            MirrorRel  = $mirrorRel
             SourcePath = Join-Path $RepoRoot $p.Source
-            MirrorPath = Join-Path $RepoRoot $p.Mirror
-            # The plugin whose payload this pair travels in ('specialists', or the workflow pack).
-            Plugin     = $pluginName
-            # Where the documenting skill lives, derived from Plugin so a moved mirror moves its page
-            # lookup with it. $null when there is no skill to document (LibOnly, or Skill = '').
+            MirrorPath = Join-Path $RepoRoot $mirrorRel
+            # The plugin whose payload this pair travels in (the core, or the workflow pack).
+            Plugin     = $p.Plugin
+            # Where the documenting skill lives, under the same resolved root so a plugin that moves
+            # takes its page lookup along. $null when there is no skill to document (LibOnly, or
+            # Skill = '').
             SkillRel   = if ($p.ContainsKey('Skill') -and -not [string]::IsNullOrEmpty($p.Skill)) {
-                             "plugins\$pluginName\skills\$($p.Skill)\SKILL.md"
+                             Join-Path $root.RelativeRoot "skills\$($p.Skill)\SKILL.md"
                          } else { $null }
             # Absent on an entry-point script -- normalized to $false so a caller can test the
             # property without ContainsKey gymnastics under StrictMode.

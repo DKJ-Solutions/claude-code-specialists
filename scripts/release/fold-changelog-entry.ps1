@@ -162,15 +162,27 @@ if ($repo -match 'VUL-IN') {
     exit 1
 }
 
-# The 'Plugins:' detection relies on Get-TouchedPlugins from scripts\lib\release-lib.ps1 (#103,
-# Victor #3) -- but release-lib.ps1 is deliberately NOT mirrored to the plugin (workshop-specific
-# tooling, see scripts\lib\shared-scripts-lib.ps1), unlike this fold script itself. In the
-# workshop root it simply exists; in a consumer repo running the plugin mirror it is missing, and
-# the Plugins line is omitted -- functionally the same as before, since
-# plugins/<plugin>/ paths do not exist there anyway.
-$releaseLibPath = Join-Path $repoRoot 'scripts\lib\release-lib.ps1'
-$canDetectPlugins = Test-Path -LiteralPath $releaseLibPath
-if ($canDetectPlugins) { . $releaseLibPath }
+# The 'Plugins:' detection: Get-TouchedPlugins plus the plugin roots it reads (#103, Victor #3).
+# $PSScriptRoot-relative, like the two libs below and for the same reason -- this lib travels in the
+# same mirror payload as this script, so it resolves from the workshop root, a consumer's plugin cache
+# and the mirror tree alike.
+#
+# IT USED TO LOOK release-lib.ps1 UP UNDER $repoRoot, guarded, and the comment here justified that by
+# saying release-lib "is deliberately NOT mirrored to the plugin". That stopped being true on August 8,
+# 2026, when the lib was registered as a mirror pair -- so a consumer running the fold had a perfectly
+# good copy sitting beside the script and looked for it in their own scripts\lib\ instead, where it is
+# not. The outcome was right by accident and for the wrong reason, which is the shape that survives a
+# review.
+#
+# THE DEPENDENCY IS THE SMALL LIB, NOT release-lib. Get-TouchedPlugins moved down into plugin-tree-lib
+# on August 9, 2026 precisely so this dot-source could be the dependency-free one: release-lib pulls
+# entry-scaffold-lib in behind it, three thousand lines, and this script runs immediately after a merge
+# and directly on the trunk.
+#
+# What decides the 'Plugins:' line is the marketplace, not the presence of a lib: a repo that declares
+# no plugins yields no roots and therefore no line. That is an answer rather than a degradation, so the
+# $canDetectPlugins gate is gone along with the reason it existed for.
+. (Join-Path $PSScriptRoot '..\lib\plugin-tree-lib.ps1')
 
 # Shared native-capture helper (#114 item 1). $PSScriptRoot-relative, not $repoRoot: like
 # check-report-lib.ps1 this lib is not repo-owned -- it travels with the SAME plugin/mirror payload
@@ -517,18 +529,20 @@ foreach ($file in $entryFiles) {
         # The heading is left exactly as its author wrote it. $entryHashes is still what the promotion above
         # uses, so a pre-format entry file still arrives at the right level.
 
-        # Deriving touched plugins from the PR files (automation-first): paths under
-        # plugins/<plugin>/ become a 'Plugins:' line, which
-        # cut-release.ps1 later uses to update the per-plugin CHANGELOGs. The detection itself
-        # lives in the pure Get-TouchedPlugins (release-lib.ps1, #103) -- only the guard is here;
-        # 'files' already came along with the gh pr list call above, so no separate gh roundtrip
-        # is needed anymore.
-        if ($canDetectPlugins) {
-            $paths = @($prs[0].files | ForEach-Object { $_.path })
-            $touched = @(Get-TouchedPlugins -Files $paths)
-            if ($touched.Count -gt 0) {
-                $entryContent = $entryContent.TrimEnd() + "$nl$nl" + ('Plugins: ' + ($touched -join ', '))
-            }
+        # Deriving touched plugins from the PR files (automation-first): a file under a plugin root
+        # this repo's marketplace declares becomes a 'Plugins:' line, which the release notes read
+        # (Get-EntryPlugins). It fed the per-plugin CHANGELOGs too until those were retired on
+        # August 8, 2026 -- the line outlived them. The detection itself lives in the pure
+        # Get-TouchedPlugins (plugin-tree-lib.ps1, #103 -- release-lib.ps1 until August 9, 2026, and
+        # this script no longer loads that file at all); 'files' already came along with the gh pr
+        # list call above, so no separate gh roundtrip is needed.
+        #
+        # No guard around it any more: a repo that declares no plugins yields no roots and therefore no
+        # line, so the empty case answers itself instead of being tested for here.
+        $paths = @($prs[0].files | ForEach-Object { $_.path })
+        $touched = @(Get-TouchedPlugins -Files $paths -PluginRoots (Get-RepoPluginRoots -RepoRoot $repoRoot))
+        if ($touched.Count -gt 0) {
+            $entryContent = $entryContent.TrimEnd() + "$nl$nl" + ('Plugins: ' + ($touched -join ', '))
         }
 
         # THE CLOSING LINE CARRIES BOTH FACTS THE MERGE OWNS: which PR this was, and when it landed

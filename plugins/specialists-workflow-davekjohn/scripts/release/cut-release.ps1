@@ -269,18 +269,21 @@ function Get-MarketplaceJsonText {
 }
 
 function Get-PluginManifests {
-    # The marketplace definition is the source of truth about what a plugin is: the manifests are
-    # derived from plugins[].source (incl. containment check) by Get-PluginManifestPaths in
-    # release-lib.ps1 -- pure there and thus tested. Here only the IO: reading + existence check.
-    $paths = @(Get-PluginManifestPaths -RepoRoot $repoRoot `
-        -MarketplaceJson (Get-MarketplaceJsonText))
-    foreach ($manifest in $paths) {
-        if (-not (Test-Path -LiteralPath $manifest)) {
-            $pluginName = Split-Path (Split-Path (Split-Path $manifest -Parent) -Parent) -Leaf
-            Write-Error "Plugin '$pluginName' is listed in marketplace.json but is missing its manifest ($manifest)."; exit 1
+    # The marketplace definition is the source of truth about what a plugin is: the set is derived from
+    # plugins[] (incl. the containment check) by Get-PluginRoots in plugin-tree-lib.ps1 -- pure there and
+    # thus tested. Here only the IO: the existence check.
+    #
+    # RETURNS THE ROOT OBJECTS, NOT BARE PATHS, and that removes two identical derivations further down.
+    # Both this error and the bump report used to reconstruct the plugin's name by walking three
+    # Split-Paths up from the manifest -- which is only the name because of where the folder happens to
+    # sit. The marketplace states the name outright, so both now read it instead of inferring it.
+    $roots = @(Get-PluginRoots -RepoRoot $repoRoot -MarketplaceJson (Get-MarketplaceJsonText))
+    foreach ($p in $roots) {
+        if (-not (Test-Path -LiteralPath $p.ManifestPath)) {
+            Write-Error "Plugin '$($p.Name)' is listed in marketplace.json but is missing its manifest ($($p.ManifestPath))."; exit 1
         }
     }
-    $paths
+    $roots
 }
 
 # --- Guardrails: on main, clean, no unfolded entries ---------------------------------------
@@ -330,8 +333,12 @@ if ($pluginTier) {
     # Read once, outside the per-plugin loop that consumes it: the name is a property of the marketplace,
     # not of the plugin, so re-deriving it per plugin would invite four answers to a one-answer question.
     $marketplaceName = Get-MarketplaceName -MarketplaceJson (Get-MarketplaceJsonText)
+    # KEYED ON THE PLUGIN NAME rather than the manifest path. The key is only ever read back in
+    # Get-LockstepVersion's error text, where a lockstep disagreement has to be readable at a glance --
+    # 'team-alpha: 3.9.0' says which plugin is out of step; an absolute path makes the reader work out
+    # the same fact from a folder name.
     $manifestContents = @{}
-    foreach ($m in $manifests) { $manifestContents[$m] = (Get-Content -Path $m -Raw -Encoding UTF8) }
+    foreach ($p in $manifests) { $manifestContents[$p.Name] = (Get-Content -Path $p.ManifestPath -Raw -Encoding UTF8) }
     $current = Get-LockstepVersion -ManifestContents $manifestContents
 } else {
     $latestTag = @(git tag --list 'v*' --sort=-v:refname) | Select-Object -First 1
@@ -751,12 +758,11 @@ if ($cutHighlights) {
 }
 
 # --- Bump plugin versions (regex on the version line -- preserves the JSON formatting) -----------
-foreach ($m in $manifests) {
-    $raw = Get-Content -Path $m -Raw -Encoding UTF8
+foreach ($p in $manifests) {
+    $raw = Get-Content -Path $p.ManifestPath -Raw -Encoding UTF8
     $bumped = [regex]::Replace($raw, '("version"\s*:\s*")\d+\.\d+\.\d+(")', "`${1}$new`$2", 1)
-    Write-Utf8NoBom -Path $m -Content $bumped
-    $pluginName = Split-Path (Split-Path (Split-Path $m -Parent) -Parent) -Leaf
-    Write-Host "  bumped: $pluginName/.claude-plugin/plugin.json -> $new" -ForegroundColor DarkGray
+    Write-Utf8NoBom -Path $p.ManifestPath -Content $bumped
+    Write-Host "  bumped: $($p.Name)/.claude-plugin/plugin.json -> $new" -ForegroundColor DarkGray
 }
 
 # The follow-up documents this script deliberately does NOT write, printed once at the end whether or

@@ -84,6 +84,10 @@ function New-Fixture {
     # fail loudly here rather than in someone's release.
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1') `
         -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1') -Force
+    # plugin-tree-lib.ps1 travels along for the same reason one layer further: release-lib dot-sources it
+    # for the plugin set (August 9, 2026), so it is a sibling of a sibling and the fixture owes it too.
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\plugin-tree-lib.ps1') `
+        -Destination (Join-Path $dir 'scripts\lib\plugin-tree-lib.ps1') -Force
     if ($null -ne $NotesContent) {
         $notesPath = Join-Path $dir "releases\development\$NotesDir\$Version.md"
         New-Item -ItemType Directory -Path (Split-Path -Parent $notesPath) -Force | Out-Null

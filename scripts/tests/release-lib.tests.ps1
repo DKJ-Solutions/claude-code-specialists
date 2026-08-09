@@ -812,6 +812,17 @@ Assert-Throws { Get-PluginManifestPaths -RepoRoot $fakeRoot -MarketplaceJson '{"
 Assert-Throws { Get-PluginManifestPaths -RepoRoot $fakeRoot -MarketplaceJson 'not json' } 'corrupt JSON throws'
 
 Write-Host "Get-TouchedPlugins" -ForegroundColor Cyan
+# THE ROOTS ARE PASSED IN, so this suite states the layout it is testing against instead of inheriting
+# whatever this repo's tree happens to be today. Two sets are used below: a FLAT one matching the layout
+# as it stands, and a NESTED one -- because the point of reading the marketplace rather than matching
+# '^plugins/<name>/' is that depth stops mattering, and a claim like that is worth an assertion rather
+# than a comment.
+$flatRoots = @(Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson (@'
+{"plugins": [
+  {"name": "specialists",         "source": "./plugins/specialists"},
+  {"name": "specialists-lifehub", "source": "./plugins/specialists-lifehub"}
+]}
+'@))
 $touchedFiles = @(
     'plugins/specialists/agents/01-01-chris.md',
     'plugins/specialists/manuals/01-01-manual.md',
@@ -821,27 +832,66 @@ $touchedFiles = @(
     'README.md',
     'scripts/lib/release-lib.ps1'
 )
-$touched = @(Get-TouchedPlugins -Files $touchedFiles)
+$touched = @(Get-TouchedPlugins -Files $touchedFiles -PluginRoots $flatRoots)
 Assert-Equal 2 $touched.Count 'two touched plugins (deduplicated + sorted)'
 Assert-Equal 'specialists' $touched[0] 'first plugin name alphabetically'
 Assert-Equal 'specialists-lifehub' $touched[1] 'second plugin name alphabetically'
 # The two non-plugin directories, one on each side of the plugins root after the #405 flattening:
-# agent-shared/ sits INSIDE it and has to be excluded by name, connectors/ sits at the ROOT and can no
-# longer match at all. Both are asserted, so neither half can quietly regress into counting as a plugin.
+# agent-shared/ sits INSIDE it, connectors/ at the ROOT. Both are asserted, so neither half can quietly
+# regress into counting as a plugin. Neither needs excluding by name any more -- a directory that is not
+# in the marketplace is not a plugin, which is what makes the pair of assertions cheap to keep.
 Assert-Equal $false ([bool]($touched -contains 'agent-shared')) 'agent-shared is plugin source, not a plugin'
 Assert-Equal $false ([bool]($touched -contains 'connectors')) 'connectors folder does not count as a plugin'
-Assert-Equal 0 (@(Get-TouchedPlugins -Files @('connectors/life-hub.json'))).Count 'connectors at the repo root does not match the plugins pattern at all'
+Assert-Equal 0 (@(Get-TouchedPlugins -Files @('connectors/life-hub.json') -PluginRoots $flatRoots)).Count 'connectors at the repo root is under no plugin root'
 Assert-Equal 0 (@(Get-TouchedPlugins -Files @())).Count 'empty input -> empty set'
-Assert-Equal 0 (@(Get-TouchedPlugins -Files @('README.md', 'scripts/lib/release-lib.ps1'))).Count 'non-plugin paths ignored'
-Assert-Equal 0 (@(Get-TouchedPlugins -Files @('plugins/Specialists/agents/x.md'))).Count 'uppercase plugin slug does not count (-cmatch lowercase rule)'
+Assert-Equal 0 (@(Get-TouchedPlugins -Files $touchedFiles)).Count 'no roots given (a repo that publishes nothing) -> empty set, whatever the paths look like'
+Assert-Equal 0 (@(Get-TouchedPlugins -Files @('README.md', 'scripts/lib/release-lib.ps1') -PluginRoots $flatRoots)).Count 'non-plugin paths ignored'
+Assert-Equal 0 (@(Get-TouchedPlugins -Files @('plugins/Specialists/agents/x.md') -PluginRoots $flatRoots)).Count 'a differently-cased folder does not count (ordinal comparison)'
+# The prefix match is on a whole path SEGMENT, so a sibling whose name merely starts with a plugin name
+# is not swallowed by it. 'plugins/specialists-shopify' begins with 'plugins/specialists'.
+Assert-Equal 0 (@(Get-TouchedPlugins -Files @('plugins/specialists-shopify/agents/x.md') -PluginRoots $flatRoots)).Count 'an unregistered sibling sharing a name prefix does not count as that plugin'
 $dedupFiles = @(
     'plugins/specialists/agents/a.md',
     'plugins/specialists/agents/b.md',
     'plugins/specialists/manuals/c.md'
 )
-$dedupTouched = @(Get-TouchedPlugins -Files $dedupFiles)
+$dedupTouched = @(Get-TouchedPlugins -Files $dedupFiles -PluginRoots $flatRoots)
 Assert-Equal 1 $dedupTouched.Count 'same plugin across multiple files -> once in the set'
 Assert-Equal 'specialists' $dedupTouched[0] 'deduplicated name correct'
+
+Write-Host "Get-TouchedPlugins -- a nested plugin tree" -ForegroundColor Cyan
+# The layout this repo is moving to: plugins grouped by kind, so a plugin root sits TWO levels down and
+# is no longer named after its parent directory. Asserted before that move happens, which is the whole
+# reason the derivation landed on its own branch first.
+$nestedRoots = @(Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson (@'
+{"plugins": [
+  {"name": "team-alpha",         "source": "./plugins/teams/team-alpha"},
+  {"name": "workflow-davekjohn", "source": "./plugins/workflows/workflow-davekjohn"}
+]}
+'@))
+$nestedTouched = @(Get-TouchedPlugins -PluginRoots $nestedRoots -Files @(
+    'plugins/teams/team-alpha/agents/06-16-agent.md',
+    'plugins/workflows/workflow-davekjohn/skills/open-pr/SKILL.md',
+    'plugins/agent-shared/inbound-behaviour.md',
+    'README.md'
+))
+Assert-Equal 2 $nestedTouched.Count 'a plugin two levels down is found'
+Assert-Equal 'team-alpha' $nestedTouched[0] 'the NAME comes from the marketplace, not from the folder above it'
+Assert-Equal 'workflow-davekjohn' $nestedTouched[1] 'and so does the second'
+Assert-Equal 0 (@(Get-TouchedPlugins -PluginRoots $nestedRoots -Files @('plugins/teams/README.md'))).Count 'a file in the grouping directory itself belongs to no plugin'
+
+Write-Host "Get-PluginRoots" -ForegroundColor Cyan
+Assert-Equal 'plugins\teams\team-alpha' $nestedRoots[0].RelativeRoot 'RelativeRoot is repo-relative and separator-normalized'
+Assert-Equal 'C:\fake-repo\plugins\teams\team-alpha\.claude-plugin\plugin.json' $nestedRoots[0].ManifestPath 'ManifestPath sits under the plugin root'
+Assert-Equal './plugins/teams/team-alpha' $nestedRoots[0].Source 'Source is kept exactly as the marketplace wrote it'
+Assert-Throws { Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson '{"plugins": [{"name": "x", "source": "../outside"}]}' } 'source with a ..-path outside the repo throws (containment)'
+Assert-Throws { Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson '{"plugins": [{"name": "x", "source": "C:\\elsewhere"}]}' } 'absolute source throws (containment)'
+
+Write-Host "Get-PluginRootByName" -ForegroundColor Cyan
+Assert-Equal 'plugins\workflows\workflow-davekjohn' (Get-PluginRootByName -PluginRoots $nestedRoots -Name 'workflow-davekjohn').RelativeRoot 'resolves a name to its root'
+Assert-Equal $null (Get-PluginRootByName -PluginRoots $nestedRoots -Name 'workflow-nobody') 'an unknown name resolves to $null rather than a guessed path'
+Assert-Equal $null (Get-PluginRootByName -PluginRoots $nestedRoots -Name 'Team-Alpha') 'the lookup is case-sensitive -- a name is a path segment and an install id'
+Assert-Equal $null (Get-PluginRootByName -PluginRoots @() -Name 'team-alpha') 'an empty set resolves to $null, it does not throw'
 
 Write-Host "Get-EntryPlugins" -ForegroundColor Cyan
 $entryWithPlugins = New-FlatEntry -Heading "#4 $midDot Something" -Rows @('| 1 | 3 | fine |') `

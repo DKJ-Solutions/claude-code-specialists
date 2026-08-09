@@ -79,7 +79,6 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot   = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$PluginsRoot = Join-Path $RepoRoot 'plugins'
 $DriftLint  = Join-Path $RepoRoot 'scripts\lint\check-consumer-drift.ps1'
 
 $script:errors = 0
@@ -90,14 +89,35 @@ $script:infos  = 0
 # register that only exists here), so the lib is dot-sourced unconditionally.
 . (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
 
-# Plugin id (before the '@') -> plugin folder under the plugins root, only if the name is a
-# simple slug AND the folder actually exists under the plugins root; otherwise $null.
+# Which plugins this repo publishes, and where each one's folder is. Read once: the register is walked
+# per consumer and per plugin, and re-reading the marketplace inside that loop is how two answers to one
+# question start appearing in one run.
+. (Join-Path $PSScriptRoot '..\lib\plugin-tree-lib.ps1')
+$PluginRoots = @(Get-RepoPluginRoots -RepoRoot $RepoRoot)
+
+# Plugin id (before the '@') -> that plugin's folder, or $null when this repo does not publish a plugin
+# by that name.
+#
+# IT ASKS THE MARKETPLACE INSTEAD OF JOINING A PATH. This used to be Join-Path <plugins root> <name>,
+# which answers "is there a folder with this name" -- a different question, and one that gives the wrong
+# answer in both directions: a folder under plugins/ that is not a published plugin resolved happily
+# (agent-shared/ would have), while a plugin whose folder is not named after it, or does not sit exactly
+# one level down, resolved to nothing.
+#
+# WHAT THE SLUG CHECK IS FOR NOW, STATED HONESTLY, because it used to be load-bearing and no longer is.
+# Test-PluginNameSlug exists to gate a value "before it becomes a path segment" (see its own docstring),
+# and nothing here builds a path out of $name any more -- the lookup is an ordinal string comparison
+# against names the marketplace declares, so a traversal sequence in the register would simply match
+# nothing. It is kept as a cheap early exit on a malformed id from a register file, not as a
+# path-traversal guard, and removing it would reopen no security hole. Said plainly so the next reader
+# does not infer one from its presence.
 function Get-PluginDir([string]$PluginId) {
     $name = $PluginId.Split('@')[0]
     if (-not (Test-PluginNameSlug -Name $name)) { return $null }
-    $dir = Join-Path $PluginsRoot $name
-    if (-not (Test-Path -LiteralPath $dir)) { return $null }
-    return $dir
+    $root = Get-PluginRootByName -PluginRoots $PluginRoots -Name $name
+    if (-not $root) { return $null }
+    if (-not (Test-Path -LiteralPath $root.Root)) { return $null }
+    return $root.Root
 }
 
 # Ids (<group>-<id>) owned by a plugin: agents/ + personas/.

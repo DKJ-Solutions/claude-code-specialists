@@ -852,11 +852,30 @@ foreach ($p in @($pairs | Where-Object { -not $_.LibOnly -and -not [string]::IsN
     Assert-True (Test-Path -LiteralPath $skillFile) "$($p.Name) names an existing skill ('$($p.Skill)' in $($p.Plugin))"
 }
 
-# SkillRel is DERIVED from the mirror rather than declared, so the property that matters is that the
-# two cannot disagree: a pair's page is looked for in the same plugin its mirror travels in. Without
-# this, the split could move a mirror and leave its page lookup pointing at the plugin it left.
+# SkillRel and MirrorRel are both DERIVED from the pair's Plugin, so the property that matters is that
+# the two cannot disagree: a pair's page is looked for in the same plugin its mirror travels in.
+# Without this, the split could move a mirror and leave its page lookup pointing at the plugin it left.
+#
+# ASSERTED AGAINST THE RESOLVED ROOT, NOT A COMPOSED 'plugins\<name>\' LITERAL. Writing the layout into
+# the assertion would make this test the last place in the chain that still knows how deep a plugin
+# sits -- and it would fail the day the tree is regrouped, on a change that did not break the invariant
+# it is guarding. The roots come from the same marketplace the registry reads.
+$rootByPlugin = @{}
+foreach ($r in (Get-RepoPluginRoots -RepoRoot $RepoRoot)) { $rootByPlugin[$r.Name] = $r.RelativeRoot }
 foreach ($p in @($pairs | Where-Object { $null -ne $_.SkillRel })) {
-    Assert-True ($p.SkillRel -like "plugins\$($p.Plugin)\skills\*") "$($p.Name): skill page is looked for in the plugin its mirror lives in ($($p.Plugin))"
+    $root = $rootByPlugin[$p.Plugin]
+    Assert-True ($p.SkillRel -like "$root\skills\*") "$($p.Name): skill page is looked for in the plugin its mirror lives in ($($p.Plugin))"
+    Assert-True ($p.MirrorRel -like "$root\*") "$($p.Name): and the mirror is under that same plugin root"
+}
+
+# EVERY PAIR NAMES A PLUGIN THIS REPO ACTUALLY PUBLISHES. The registry throws on an unknown name, but
+# only in a repo that declares plugins at all -- a repo declaring none yields an empty registry instead,
+# which is the right answer for a consumer and for the lint's minimal fixture. That escape hatch is
+# exactly what would let a typo here go quiet, so the claim is asserted where it is checkable: here, in
+# the repo the registry belongs to.
+Assert-True ($pairs.Count -gt 0) 'the registry resolves to a non-empty set in this repo'
+foreach ($p in $pairs) {
+    Assert-True ($rootByPlugin.ContainsKey($p.Plugin)) "$($p.Name): names a plugin the marketplace declares ('$($p.Plugin)')"
 }
 Assert-True (@($pairs | Where-Object { $_.LibOnly -and $null -ne $_.SkillRel }).Count -eq 0) 'a LibOnly entry never derives a skill page (nothing invokes it, so there is no procedure to document)'
 

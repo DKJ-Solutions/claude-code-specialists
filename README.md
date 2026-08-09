@@ -213,7 +213,9 @@ The full picture, top-level folder by folder:
   must not travel along with the plugin cache.
 - **`scripts/lib/`, `scripts/lint/`, `scripts/release/`, `scripts/sync/`, `scripts/agents/`,
   `scripts/task/`, `scripts/tests/`** — the shared helpers (`branch-info.ps1`, `release-lib.ps1`,
-  `agent-shared-lib.ps1`), the lint gate + drift check, the changelog/PR/release scripts (incl.
+  `agent-shared-lib.ps1`, and `plugin-tree-lib.ps1`, which answers which plugins this repo publishes
+  and where each folder sits, so no other script has to encode the layout), the lint gate + drift
+  check, the changelog/PR/release scripts (incl.
   `cut-release.ps1`), the connectors check (`check-connectors.ps1`), the agent-def generator
   (`build-agent-defs.ps1` — fills in the shared blocks from `plugins/agent-shared/`), and the tests. A
   mirrored copy for consumers lives inside the plugins — the sync/check scripts in `specialists`, the
@@ -983,9 +985,17 @@ before diagnosing "the specialists stopped loading" as a bug in this repo.
 
 ## Adding a new plugin group
 
-A domain group is its own plugin folder — but adding one touches more than that folder. The drift
-lint and the docs enumerate the plugins and go stale silently if you forget them. The full
-checklist (learned from adding `specialists-ecomm`):
+A domain group is its own plugin folder — but adding one touches more than that folder, because the
+docs enumerate the plugins and go stale silently if you forget them. The full checklist (learned from
+adding `specialists-ecomm`):
+
+**One step left this list on August 9, 2026, and it is worth saying which.** It used to open with the
+plugin folder and then ask you to add that folder's `agents/` directory to a hand-written list in the
+drift lint — a step that existed only because a script kept its own copy of "which plugins are there".
+Both of that check's lists are now derived from the marketplace entry in step 2, so registering the
+plugin *is* covering the drift check. The two lists had already fallen out of step with each other by
+one plugin when this was measured, which is the argument: a checklist item is a reminder, and a
+reminder is what a derivation makes unnecessary.
 
 1. **The plugin folder** `plugins/<plugin>/` with `.claude-plugin/plugin.json` (the lockstep
    `version`, matching the other plugins). That is the whole of it since August 8, 2026 — a new plugin
@@ -996,15 +1006,12 @@ checklist (learned from adding `specialists-ecomm`):
    `source`.
 3. **The specialists** — `agents/<group>-<id>-agent.md` + `manuals/<group>-<id>-manual.md` per
    member, following the `<group>-<id>` convention (a globally unique `id`).
-4. **The drift lint** — add the plugin's `agents` folder to `$SourceDirs` in
-   [`scripts/lint/check-consumer-drift.ps1`](scripts/lint/check-consumer-drift.ps1), or a
-   consumer's drift check never covers the new ids.
-5. **The docs that enumerate the plugins** — this README (the plugin count, the
+4. **The docs that enumerate the plugins** — this README (the plugin count, the
    [five-plugins table](#the-five-plugins--whats-the-difference), the [invocation list](#invocation),
    the manuals list under [Manuals](#manuals--the-split-model), and whether the group is mutually
    exclusive with the others or complementary) and [`plugins/INSTALL.md`](plugins/INSTALL.md), both
    halves.
-6. **The gates** — `scripts/agents/build-agent-defs.ps1 -Check`,
+5. **The gates** — `scripts/agents/build-agent-defs.ps1 -Check`,
    [`scripts/lint/check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1), and
    the `scripts/tests/*.tests.ps1` suites, all green.
 

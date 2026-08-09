@@ -46,6 +46,9 @@ $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
 # rank from, and the ranked insert offset. A $PSScriptRoot-relative sibling of the fold script, so the
 # fixture has to carry it.
 $EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
+# The plugin tree: Get-TouchedPlugins and the roots it reads, for the 'Plugins:' line. Also a
+# $PSScriptRoot-relative sibling of the fold script, so the fixture carries it for the same reason.
+$PluginTreeSrc    = Join-Path $RepoRoot 'scripts\lib\plugin-tree-lib.ps1'
 # Dot-sourced into the RUNNER as well, not only copied into each fixture: the branch/ cases build their
 # fixture files with the real formatters and assert with the real predicates, so a change to the format
 # breaks the script and its test together instead of leaving the test asserting a shape nothing writes.
@@ -90,8 +93,19 @@ function New-FoldFixture {
     <#
         A throwaway repo root with the real fold script + its repo-owned/sibling dependencies
         (repo-config.ps1 for Get-RepoName, native-capture-lib.ps1 for the gh call, entry-scaffold-lib.ps1
-        for the entry format) and a CHANGELOG holding only its intro. release-lib.ps1 is deliberately NOT
-        copied, so the optional 'Plugins:' detection is simply skipped.
+        for the entry format, plugin-tree-lib.ps1 for the 'Plugins:' line) and a CHANGELOG holding only
+        its intro.
+
+        THE FIXTURE CARRIES EVERY SIBLING THE SCRIPT DOT-SOURCES, which is a change from what stood here:
+        release-lib.ps1 was deliberately left out so the 'Plugins:' detection would be "simply skipped".
+        That was testing a deployment state that had stopped existing -- release-lib became a mirrored
+        sibling on August 8, 2026, so it is present everywhere the fold runs. A fixture that omits a
+        sibling is not a lean fixture, it is a different program.
+
+        NO marketplace.json HERE, and that is what the absent 'Plugins:' line now proves. The fold asks
+        the marketplace which plugins exist; a repo that declares none yields none, so the line is absent
+        because the repo has no plugins rather than because a file was withheld from the fixture. Same
+        observable outcome, a reason that is actually the script's.
 
         repo-config.ps1 is copied VERBATIM now. It used to be rewritten per fixture -- stripping the tier
         map, adding back the legacy single-heading getter -- because which changelog sections a repo declared
@@ -106,6 +120,7 @@ function New-FoldFixture {
     Copy-Item -LiteralPath $FoldSrc          -Destination (Join-Path $dir 'scripts\release\fold-changelog-entry.ps1') -Force
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')       -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')       -Force
+    Copy-Item -LiteralPath $PluginTreeSrc    -Destination (Join-Path $dir 'scripts\lib\plugin-tree-lib.ps1')          -Force
     Copy-Item -LiteralPath $RepoConfigSrc    -Destination (Join-Path $dir 'scripts\repo-config.ps1')                  -Force
 
     [System.IO.File]::WriteAllText((Join-Path $dir 'CHANGELOG.md'), $script:FixtureIntro, $Utf8NoBom)
