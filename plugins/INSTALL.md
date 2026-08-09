@@ -214,10 +214,22 @@ below.
 
 ### The command sequence
 
-Refresh before you touch anything else: neither `install` nor `uninstall` does that for you, and a
-stale cache serves a plausible-looking, previous version with no error to say so — the full measurement
-is under [Staying up to date](#staying-up-to-date). Then take out every old id you had enabled, then
-put in its replacement plus the one workflow you decided on above, then restart.
+Refresh before you touch anything else: `install` does not do it for you, and a stale cache serves a
+plausible-looking, previous version with no error to say so — the full measurement is under
+[Staying up to date](#staying-up-to-date). Then take out every old id you had enabled, then put in its
+replacement plus the one workflow you decided on above, then restart.
+
+> **The order below looks wrong and is not, and this is the one thing worth measuring rather than
+> reasoning about.** The refresh replaces the marketplace catalogue with one that lists only the NEW
+> ids, and the uninstalls that follow name the OLD ones — so the obvious worry is that the CLI refuses
+> to remove a plugin its catalogue no longer advertises. **Measured on 2026-08-09**, on the source repo
+> itself, in exactly this order: after
+> `claude plugin marketplace update claude-code-specialists` the uninstalls of
+> `specialists@claude-code-specialists` and `specialists-workflow-davekjohn@claude-code-specialists`
+> both returned `✔ Successfully uninstalled plugin`. `uninstall` resolves against your install record,
+> not against the catalogue. What is *not* claimed here is anything about whether `uninstall` refreshes
+> the cache — nobody has tested that, and this page has been caught generalising an untested claim from
+> one verb to another once before.
 
 ```powershell
 # 1. Refresh -- do this first, every time
@@ -232,15 +244,19 @@ claude plugin uninstall specialists-workflow-davekjohn@claude-code-specialists -
 ```
 
 ```powershell
-# 3. Refresh again, then install the matching new ids -- the core team, whichever add-on
-#    teams matched what you had, and exactly ONE of the two workflow lines below
+# 3. Refresh again, then install the new ids
 claude plugin marketplace update claude-code-specialists
+
+# 3a. The core team -- everyone runs this one
 claude plugin install team-alpha@claude-code-specialists --scope project
+
+# 3b. The add-on teams -- ONLY the ones you uninstalled in step 2. Delete the other lines.
 claude plugin install team-lifehub@claude-code-specialists --scope project
 claude plugin install team-shopify@claude-code-specialists --scope project
 claude plugin install team-ecomm@claude-code-specialists --scope project
+
+# 3c. Your workflow -- exactly ONE of these two, or neither. Never both.
 claude plugin install workflow-default@claude-code-specialists --scope project
-# OR the other one, not both:
 # claude plugin install workflow-davekjohn@claude-code-specialists --scope project
 ```
 
