@@ -1,17 +1,24 @@
 <#
 .SYNOPSIS
     Cuts a repo-wide release directly on main: bumps all plugin versions in lockstep,
-    generates release notes in releases/development/, puts a reference in CHANGELOG.md under
-    ## Releases, updates the overview table in releases/README.md, commits that on main, and sets +
+    generates release notes in releases/development/, empties CHANGELOG.md down to its intro,
+    updates the overview table in releases/README.md, commits that on main, and sets +
     pushes the git tag vX.Y.Z.
 
 .DESCRIPTION
     A release here is a *recorded moment*: all plugins get the same version number
     (lockstep, repo-wide) and the state is tagged as vX.Y.Z. This script itself publishes nothing
-    to GitHub Releases -- only a git tag, release notes in releases/, and a reference in
-    CHANGELOG.md. For a Minor/Major bump, publishing a GitHub Release is a manual follow-up step
+    to GitHub Releases -- only a git tag, release notes in releases/, and a row in the overview
+    table. For a Minor/Major bump, publishing a GitHub Release is a manual follow-up step
     the release manager takes afterward, per the cut-release skill's closing checklist; a Patch
     bump skips that step entirely (tag only).
+
+    NOTHING IS WRITTEN BACK INTO CHANGELOG.md, and that is a change this header used to contradict
+    (August 5, 2026). The cut used to append a '## Latest Release' block naming the version, the date
+    and a pointer to the notes; that accumulating section had grown to 434 of the file's 1,062 lines
+    across 72 blocks that each said no more than "see the notes", while the overview table already
+    listed all 72 with a date, a type and a descriptive title. So the intro carries a one-line pointer
+    to that page, and a cut leaves this document at its intro.
 
     A release deliberately does NOT run via a branch + PR. Like the fold commit, the release
     commit is an allowed direct-on-main action (the second exception to "everything via branch +
@@ -21,18 +28,39 @@
     SHARED, WITH THE REPO'S OWN ANSWERS IN THE SEAM (issue #417). This script is mirrored into the
     plugin, so a consumer runs it rather than forking it. Everything that legitimately differs per
     repo is read from the OPTIONAL functions in scripts/repo-config.ps1, and every fallback is what
-    this script did before it was shared: Get-ReservedRootMd (which root docs are permanent),
-    Get-ReleaseNotesGrouping (notes per major or per minor), Get-ReleaseLiveMarker (the "currently
-    live" suffix, none here), Get-ReleasePluginTier (whether steps 3b/3c and the lockstep bump run at
-    all), Get-ReleaseCategoryTitles (the category labels), Get-ReleaseHighlightsBumps (which bumps get a
-    stakeholder document; see step 3d) and Get-ReleaseMajorMinMinors (how many minors a major must recap).
+    this script did before it was shared. THE LIST IS THE SEVEN THIS SCRIPT ACTUALLY READS, and it is
+    kept that way deliberately: a consumer configures from this list, so a name that does nothing costs
+    them an afternoon and a name that is missing hides a knob they needed.
 
-    THE TIER MODEL (August 5, 2026). CHANGELOG.md holds one entry section per tier -- how far a change
-    reaches, declared per entry on its branch and stated by the section once folded. Three things here
-    follow from it: the bump gate in step 1, the tier grouping of the notes in step 3, and the highlights
-    document in step 3d being the tier-2 entries rather than a category guess. All three switch
-    themselves off in a repo that declares a single section, so a consumer that has not adopted the model
-    cuts exactly the release it always did.
+      Get-LintScript              which script the lint gate in step 1 runs
+      Get-ReservedRootMd          which root docs are permanent
+      Get-ReleaseNotesGrouping    notes foldered per major ('major') or per minor
+      Get-ReleaseHistoryPath      where the release overview table lives (step 3 files the new row
+                                  under that page's top major section, and REFUSES a new major whose
+                                  section does not exist yet -- opening one is a deliberate act)
+      Get-ReleasePluginTier       whether this repo publishes plugins at all: it gates the lockstep
+                                  bump, and it is what decides whether the current version comes from
+                                  a plugin.json or from the newest vX.Y.Z tag
+      Get-ReleaseHighlightsBumps  which bumps get a stakeholder document; see step 3d
+      Get-ReleaseMajorMinMinors   how many minors a major must recap
+
+    TWO NAMES THAT USED TO BE ON THIS LIST ARE GONE, and they are named here rather than silently
+    dropped, because a consumer's repo-config may still define them: Get-ReleaseLiveMarker described
+    the retired release block in CHANGELOG.md (see the seam comment further down), and
+    Get-ReleaseCategoryTitles labelled the category headings the flat document retired. Defining either
+    today does nothing at all -- which is worse than an error, because it looks configured.
+
+    THE TIER MODEL (August 5, 2026). CHANGELOG.md is an intro followed by one '##' per change, ranked
+    furthest-reach-first and, within a reach, highest-significance-first -- there are no sections to file
+    into, and each entry declares its own reach in the '### Significance' section it carries. Three
+    things here follow from it: the bump gate in step 1, the tier grouping of the notes in step 3, and
+    the highlights document in step 3d being the tier-2 entries rather than a category guess.
+
+    All three switch themselves off where NO PENDING ENTRY DECLARED ITS IMPACT AT ALL, so a consumer
+    that has not adopted the model cuts exactly the release it always did. That test counts
+    DECLARATIONS, and it must not be turned back into a count of sections: a flat changelog gives an
+    unadopted repo and an adopting one exactly one group each, so a section-count test would read every
+    repo as not adopting and switch the gate off in silence, with nothing erroring.
 
     Steps (all on main):
       1. Guardrails: clean main, no unfolded entry files in the root, THE BUMP EARNED BY THE PENDING
@@ -42,22 +70,25 @@
       2. Determines the current version -- the lockstep value from every
          <plugin>/.claude-plugin/plugin.json where this repo publishes plugins, otherwise the newest
          vX.Y.Z tag -- then the new version (-Version or -Bump) and the bump type.
-      3. Generates releases/development/<X>.x/<X.Y.Z>.md from the pending entries, grouped by TIER and
-         then by branch type within each tier, adds a row to releases/README.md, puts a reference in
-         CHANGELOG.md under ## Releases and empties every tier section down to its intro, and bumps all
-         plugin.json's.
-      3b. Writes, per plugin, the entries with a matching 'Plugins:' line (derived by the fold
-          from the PR files) into <plugin>/CHANGELOG.md -- the consumer-facing history that
-          travels along with the plugin cache. Root-relative links are rewritten to absolute
-          GitHub URLs in the process.
-      3c. Writes/overwrites, for EVERY plugin (not just the touched ones -- the version bumps
-          lockstep), <plugin>/RELEASE.md: a short card naming the release it describes, with or
-          without its own entries this time, plus links to the full notes and its own CHANGELOG.md.
-          Model A (plugin-carried), deliberately without a session-start hook. The card states what
-          it describes rather than where the reader is -- it is written at cut time and cannot know
-          which commit a consumer will install from (inbound #384).
-      3d. Writes, for a bump type the seam names in Get-ReleaseHighlightsBumps, a second
-          stakeholder-facing rendering of the same release: releases/highlights/<dir>/<X.Y.Z>.md.
+      3. Generates releases/development/<X>.x/<X.Y.Z>.md from the pending entries, grouped by TIER,
+         adds a row to releases/README.md, empties CHANGELOG.md down to its intro, and bumps all
+         plugin.json's. Within a tier the entries are RANKED BY THEIR OWN SIGNIFICANCE SCORES FROM
+         TIER 1 UP, and deliberately not at tier 0: the development note is the record, so it stays in
+         the order the folds left. There is no category grouping any more -- the categories keyed on the
+         branch prefix, which this repo has measured does not predict impact, so a document's most
+         consequential change could only be reordered within whichever label its prefix produced.
+      3b/3c. RETIRED, AUGUST 8, 2026 -- the per-plugin CHANGELOG.md and the per-plugin RELEASE.md card.
+          The step numbers are kept here rather than renumbered, so that a reader who has seen an older
+          copy of this script, or a consumer's release notes referring to "step 3b", lands on the answer
+          instead of on a step that now means something else. The full reasoning is at the point in the
+          code where they used to run; in short, a marketplace source is a git clone of the WHOLE repo,
+          so those ten files were 11,684 lines restating what the reader already had.
+      3d. Writes a second, stakeholder-facing rendering of the same release:
+          releases/highlights/<dir>/<X.Y.Z>.md. TWO CONDITIONS, BOTH REQUIRED: the bump type is one the
+          seam names in Get-ReleaseHighlightsBumps, AND at least one pending entry declared tier 2.
+          The second half is the load-bearing one since a minor stopped needing a tier-2 entry to be
+          earned (August 7, 2026) -- it is what keeps a tier-1-only minor from handing someone outside
+          the project a document about work they cannot see.
           Written for NON-DEVELOPERS, and it is the TIER-2 ENTRIES -- what a consumer notices was
           declared by each entry's own author, so there is no "remove before publishing" marker left to
           cut by hand. Still a draft: the selection is right, the prose is still written for developers.
