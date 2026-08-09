@@ -371,7 +371,18 @@ function Get-SharedScriptPairs {
         # plugin tree moved twice in 2026, and neither move should be legible here.
         $root = Get-PluginRootByName -PluginRoots $pluginRoots -Name $p.Plugin
         if (-not $root) {
-            throw "shared-scripts registry: pair '$($p.Name)' names plugin '$($p.Plugin)', which .claude-plugin/marketplace.json does not declare."
+            # THE MESSAGE LISTS THE WHOLE SET, and that is the repair for a trap rather than politeness
+            # (Tycho, August 9, 2026). This throw is deliberate and stops the run -- see above -- but its
+            # commonest reader is not someone who made a typo: it is someone building a fixture
+            # marketplace, who has to declare every plugin the registry names and has no way to know
+            # what those are except by reading this file. Tycho hit it, went looking with a grep for
+            # "Plugin = '" and missed the entries written with two spaces, which is precisely the sort
+            # of near-miss a list in the error makes impossible.
+            $needed = (@($pairs | ForEach-Object { $_.Plugin } | Sort-Object -Unique) -join ', ')
+            $have = (@($pluginRoots | ForEach-Object { $_.Name } | Sort-Object) -join ', ')
+            throw ("shared-scripts registry: pair '$($p.Name)' names plugin '$($p.Plugin)', which " +
+                   ".claude-plugin/marketplace.json does not declare. This registry needs all of: $needed. " +
+                   "The marketplace declares: $have.")
         }
         $mirrorRel = Join-Path $root.RelativeRoot $p.Source
         [pscustomobject]@{
