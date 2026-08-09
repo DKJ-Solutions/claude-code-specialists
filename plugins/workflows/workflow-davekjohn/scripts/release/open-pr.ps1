@@ -42,7 +42,9 @@
     possible, so the PR never lands on github.com as an empty form:
       1. The template's description placeholder is replaced by the changelog entry
          (branch/branch-changelog.md, or the pre-split <SafeName>.md in the repo root), which always
-         exists on the branch. So you never have to type anything twice.
+         exists on the branch. So you never have to type anything twice. What goes in is the entry from
+         its 'What does the change...' section onwards -- see Get-PrDescription for why the three
+         sections above it and the empty one below it are left out of a PR body but kept in the fold.
       2. Anything else the template asks that this script can answer deterministically is answered:
          a "Type of change" box matching the branch prefix, a "Changelog entry written" item (true
          once the file actually HOLDS an entry -- not merely that it exists, since the branch/ split
@@ -280,7 +282,20 @@ $entryDescription = ''
 $prTitle = ''
 if (Test-Path -LiteralPath $entryPath) {
     $entryText = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
-    $entryDescription = Get-EntryDescription -EntryText $entryText
+
+    # THE PR BODY IS THE ANSWER ONWARDS, NOT THE WHOLE DOSSIER (Dave, August 9, 2026). Get-PrDescription
+    # drops what the PAGE around the body already says -- the Branch title (which is this PR's title, one
+    # line above), the Branch ID, the Branch type (its label) -- and the trailing 'Pull Request' section,
+    # which the FOLD fills and which is therefore empty in every PR body ever produced. Significance stays:
+    # how far a change reaches and what it is worth is the thing a reviewer is deciding about.
+    #
+    # '' MEANS "this entry has no such section", and the fallback is the previous behaviour verbatim. A
+    # pre-dossier entry kept its description straight under the heading, and every consumer with a branch
+    # in flight has one -- they receive this script through a plugin update rather than by choosing to.
+    # CHANGELOG.md is untouched by any of this: the fold still receives the dossier verbatim, front matter
+    # and all, which is what Dave chose on August 6 and what the release documents inherit.
+    $entryDescription = Get-PrDescription -EntryText $entryText
+    if (-not $entryDescription) { $entryDescription = Get-EntryDescription -EntryText $entryText }
 
     # Get-EntrySectionAnswer, not the raw section body: it strips the guidance comments, so a template
     # comment left standing above the answer cannot end up in the PR title. It also accepts the section's
@@ -705,7 +720,7 @@ if ($existingPr) {
             # never searched for a legacy one, and a genuine no-op still reports as a no-op. Each is a
             # heading this repo or a consumer has actually shipped.
             if (-not $refreshed) {
-                foreach ($legacyHeading in @('## What does this change do?', '## Wat doet deze wijziging?')) {
+                foreach ($legacyHeading in @('## Changelog entry', '## What does this change do?', '## Wat doet deze wijziging?')) {
                     if ($legacyHeading -eq $descHeading.Trim()) { continue }
                     $newBody = Update-PrBodySection -Body $newBody -Heading $legacyHeading -Content $entryDescription -Changed ([ref]$refreshed)
                     if ($refreshed) { $descHeading = $legacyHeading; break }

@@ -1,13 +1,24 @@
-# `main` progress
-
-
-> **You are on `main`.** Do not work in this file yet -- create a branch first.
-> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
-> of the next person who does create one.
-
-This file carries the step list of the branch you are on. It is written when a branch is created
-and returns to this state after the merge.
+## `fix/pr-body-starts-at-the-answer` progress
 
 ### Steps
 
-_(filled in when a branch is created)_
+- [x] Read PR #540's published body to see what actually sits under the wrapper heading, rather than
+      reasoning about it from the entry file
+- [x] `Get-PrDescription` in `pr-body-lib.ps1`: the entry from its `What does the change...` section to
+      the `Pull Request` section, fence-aware, `''` when that section is absent
+- [x] `open-pr.ps1`: use it, falling back to `Get-EntryDescription` on `''`
+- [x] Template heading becomes the entry's own question, now that it no longer sits above a copy of it
+- [x] `-RefreshBody` fallback list gains `## Changelog entry`, for the PRs opened under it today
+- [x] Rebuild the plugin mirrors (`open-pr.ps1`, `pr-body-lib.ps1`)
+- [x] Tests: what is dropped, what is kept, the fence case, the pre-dossier fallback, the retired
+      section name, and the heading-fallback string
+- [x] Verify the real output: this branch's own entry rendered through `Get-PrDescription`
+- [x] Gates: lint, script contract, all 30 suites green
+- [~] `### Significance` deliberately NOT dropped — it is the author's statement of reach and worth,
+      which is what a reviewer is deciding about, not front matter
+- [~] `CHANGELOG.md` deliberately unchanged — the fold keeps receiving the dossier verbatim; the two
+      readers differ because a record wants provenance and a review wants the argument
+
+### Where I left off
+
+Done; gates green.

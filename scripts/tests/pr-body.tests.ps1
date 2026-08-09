@@ -194,6 +194,87 @@ Assert-Equal 'words alone' (Get-PrTitle -Prefix '' -TitleWords 'words alone') 'a
 Assert-Equal '' (Get-PrTitle -Prefix 'fix' -TitleWords '') 'no words means no title, not a bare prefix'
 Assert-Equal '' (Get-PrTitle -Prefix 'fix' -TitleWords "   `n  `n") 'a whitespace-only section is no title either'
 
+# --- Get-PrDescription: the PR body is the answer onwards, not the whole dossier --------------------
+#
+# The three sections it drops are answered by the PAGE around the body -- Branch title IS the PR title,
+# Branch ID is a creation timestamp, Branch type is the label -- and the one it drops at the end is
+# filled by the FOLD, so it is empty in every PR body by construction. Kept: the answer and Significance,
+# because how far a change reaches and what it is worth is what a reviewer is deciding about.
+Write-Host "Get-PrDescription -- the PR body starts at the answer" -ForegroundColor Cyan
+$dossier = @'
+## `fix/x` changelog
+
+### Branch title
+
+A short title
+
+### Branch ID
+
+20260809-113542
+
+### Branch type
+
+fix
+
+### What does the change on this branch bring to main?
+
+The real answer.
+
+### Significance
+
+#### Tier 0
+
+Because of this.
+
+**Score:** 3
+
+### Pull Request
+
+'@
+$prDesc = Get-PrDescription -EntryText $dossier
+Assert-True ($prDesc -match '(?m)^The real answer\.$')      'the answer is carried'
+Assert-True ($prDesc -match '(?m)^### Significance$')       'Significance is kept -- it is what a reviewer decides about'
+Assert-True ($prDesc -match '(?m)^\*\*Score:\*\* 3$')       'and its scores come with it'
+Assert-True ($prDesc -notmatch 'A short title')             'the Branch title is dropped -- it IS the PR title, shown above the body'
+Assert-True ($prDesc -notmatch '20260809-113542')           'the Branch ID is dropped -- a timestamp a reviewer cannot act on'
+Assert-True ($prDesc -notmatch '(?m)^### Branch type$')     'the Branch type section is dropped -- it is the PR label'
+Assert-True ($prDesc -notmatch '(?m)^### Pull Request$')    'the Pull Request section is dropped -- the fold fills it, so it is always empty here'
+Assert-True ($prDesc -notmatch 'What does the change on this branch bring to main') 'the heading itself is dropped -- the template carries it, so it cannot appear twice'
+
+# THE FENCE CASE, which is not hypothetical: the entry documenting this change quotes these headings
+# inside a fence. Cutting at a fenced heading would return plausible half-output rather than failing.
+$fenced = @'
+## `fix/y` changelog
+
+### What does the change on this branch bring to main?
+
+Before the fence.
+
+```text
+### Pull Request
+### Significance
+```
+
+After the fence.
+
+### Pull Request
+
+'@
+$fencedDesc = Get-PrDescription -EntryText $fenced
+Assert-True ($fencedDesc -match '(?m)^After the fence\.$') 'a fenced heading does not end the description'
+Assert-True ($fencedDesc -match '(?m)^### Pull Request$')  'and the fenced quote itself survives inside the body'
+
+# BACK-COMPAT: a pre-dossier entry has no such section, and '' is how this says so -- open-pr then falls
+# back to Get-EntryDescription, which is the behaviour every consumer with a branch in flight has today.
+$preDossier = "### Old entry - Feat - 2026-07-01`n`nJust a paragraph.`n"
+Assert-Equal '' (Get-PrDescription -EntryText $preDossier) 'a pre-dossier entry yields "" so the caller can fall back'
+Assert-True ((Get-EntryDescription -EntryText $preDossier) -match 'Just a paragraph') 'and the fallback still reads it whole'
+Assert-Equal '' (Get-PrDescription -EntryText '') 'empty in, empty out -- no throw'
+
+# The retired heading is read too, for the standing reason: entries carrying it exist in every consumer.
+$retired = "## ``fix/z`` changelog`n`n### What does this change do?`n`nOld-style answer.`n"
+Assert-True ((Get-PrDescription -EntryText $retired) -match 'Old-style answer') 'the retired section name is still recognised'
+
 # --- The template and open-pr must agree on the description placeholder (#538) ----------------------
 #
 # THE ONE COUPLING IN THIS MECHANISM THAT FAILS SILENTLY. open-pr fills the PR body by replacing a
@@ -238,7 +319,8 @@ Assert-True ([bool]$firstH2) 'the template has a "## " heading for the descripti
 # fallback such a PR reports "already matches the entry" while matching nothing. Pinned here because
 # the strings are the whole mechanism: they are not derivable from anything, only remembered.
 Assert-True ($openPrText.Contains('## What does this change do?')) 'open-pr still recognises the pre-#538 description heading, so a PR opened under it stays refreshable'
-foreach ($legacy in @('## What does this change do?', '## Wat doet deze wijziging?')) {
+Assert-True ($openPrText.Contains('## Changelog entry')) 'and the one-day-old heading between them, for PRs opened on August 9, 2026'
+foreach ($legacy in @('## Changelog entry', '## What does this change do?', '## Wat doet deze wijziging?')) {
     $legacyBody = "$legacy`nold text`n`n## Resolved issues`nCloses #1"
     $didChange = $false
     $out = Update-PrBodySection -Body $legacyBody -Heading $legacy -Content 'new text' -Changed ([ref]$didChange)
