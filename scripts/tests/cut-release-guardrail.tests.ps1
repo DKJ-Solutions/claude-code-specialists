@@ -161,6 +161,30 @@ foreach ($gone in 'Get-ReleaseHighlightsStakeholderTypes', 'Get-ReleaseHighlight
 # every consumer to one repo's release cadence.
 Assert-True ($cutReleaseText -match 'Get-ReleaseMajorMinMinors') 'the minors-before-a-major threshold comes from the seam'
 
+Write-Host "cut-release.ps1 -- the new-major refusal names BOTH edits a major needs" -ForegroundColor Cyan
+# WHY THIS IS PINNED AT ALL. Opening a new major takes two hand edits, not one: the overview section, and
+# the test that pins which major the overview targets. The refusal used to name only the first, so on
+# August 9, 2026 cutting v4.0.0 meant following advice that read as complete and then hitting a red test
+# nobody had been warned about -- two commits where the message promised one. The advice is prose, so
+# nothing but a check like this keeps it from being trimmed back to the shorter, wronger version.
+#
+# ASSERTED ON THE ADVICE BLOCK, NOT ON THE WHOLE FILE, and that distinction is the point: the file also
+# EXPLAINS this repair in a comment, so a file-wide match would pass on the explanation while the message
+# itself said nothing -- exactly the "satisfied by a mention rather than a use" defect the block above
+# guards against in the other direction.
+$adviceBlock = [regex]::Match($cutReleaseText, '(?s)"Add the section first.*?is not done for you\."')
+Assert-True $adviceBlock.Success 'found the new-major advice block in cut-release.ps1'
+Assert-True ($adviceBlock.Success -and $adviceBlock.Value -match 'pins the targeted major in a test') `
+    'the advice tells the reader the pinned assert has to be repointed too'
+# The advice must keep saying WHERE these commits go, because that is the half the safety rules answer:
+# they run on the trunk ahead of the release commit, under the same request that authorised the cut.
+Assert-True ($adviceBlock.Success -and $adviceBlock.Value -match 'trunk ahead of') `
+    'and that both edits belong to this cut, on the trunk ahead of the release commit'
+# The milestone sentence is the DECISION not to automate any of this. If it ever disappears, the next
+# reader has a checklist with no reason attached, which is how a deliberate manual step gets "fixed".
+Assert-True ($adviceBlock.Success -and $adviceBlock.Value -match 'deliberate milestone moment') `
+    'and it still says why none of it is done for you'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
