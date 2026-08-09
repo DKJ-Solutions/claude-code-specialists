@@ -1,19 +1,13 @@
-## `fix/stamp-the-source-measurement` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] `check-connectors.ps1`: name the measured commit in the run header, once at run level, degrading
-      silently where the source tree is not a git repo
-- [x] `connector-sessioncheck.ps1`: lift that value out of the header into the summary line, with the
-      pointer to `git rev-parse --short HEAD`; no second git call
-- [x] Tests: the check prints a real short sha; the hook forwards it, does not forward the header
-      itself, and invents nothing when the header carries no stamp
-- [x] `connectors/README.md`: the measured instance and the two properties that are the design
-- [x] Gates: lint + all suites green
-- [~] Not extended to `roster-sessioncheck` / `script-contract-sessioncheck` — they make no version
-      claim, which is the specific thing that ages here; widening it would add a token to every
-      session start for a defect not yet measured there
-
-### Where I left off
-
-Done; gates green. Closes #533 together with PR #535, which shipped the other half.
+_(filled in when a branch is created)_
