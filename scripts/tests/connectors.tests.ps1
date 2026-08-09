@@ -362,6 +362,24 @@ try {
         Assert-Match '\[INFO\].*no machine record for this consumer, while the plugin IS enabled' $r.Out 'enabled but no record: the consequence is stated, not just the skipped version check'
         Assert-Match 'loads none of this plugin' $r.Out 'enabled but no record: says what a session there actually gets'
         Assert-Match 'claude plugin install team-alpha@claude-code-specialists --scope project' $r.Out 'enabled but no record: names the one command that settles it'
+        # ...and NOT the marker, because this run is walking a consumer that is not the session's repo.
+        # This is the half that keeps the [INFO]-silence rule intact: promoting the line for every
+        # connector would put another machine's business back into every session start.
+        Assert-NotMatch '\[NOT-INSTALLED-HERE\]' $r.Out 'enabled but no record, ANOTHER repo: no marker -- the session hook must stay quiet about other machines'
+
+        # 8e2 (#533). The same state, in the repo the session is actually in: -OnlyConsumer is how a
+        #      consumer's hook scopes the run to itself, and it makes Test-IsSessionRepo true. Here the
+        #      "the install may belong to another machine" reading that keeps 8e an [INFO] does not exist
+        #      -- the session is running in this checkout -- so the marker is added on top of the [INFO].
+        #      Measured need: on 2026-08-09 a mid-session pull left both enabled plugins recordless here
+        #      and nothing said so, because the [INFO] is suppressed by the hook and roster-sync's marker
+        #      of the same name is unreachable at session start by design.
+        $r = Invoke-Ps $Script @('-SkipDrift', '-Manifest', $mf, '-ConsumerPathOverride', $Fixture, '-OnlyConsumer', $Fixture)
+        Assert-Equal 0 $r.Code 'enabled but no record, SESSION repo: still exit 0 -- non-counting, nothing is broken about the source'
+        Assert-Match '\[NOT-INSTALLED-HERE\]' $r.Out 'enabled but no record, SESSION repo: the marker fires'
+        Assert-Match 'loads none of it' $r.Out 'enabled but no record, SESSION repo: says what a session here actually gets'
+        Assert-Match 'claude plugin install team-alpha@claude-code-specialists --scope project' $r.Out 'enabled but no record, SESSION repo: the marker carries the fix, not just the diagnosis'
+        Assert-Match '\[INFO\].*no machine record for this consumer, while the plugin IS enabled' $r.Out 'enabled but no record, SESSION repo: the [INFO] is kept -- a deliberate run should still list everything'
 
         # 8f. The same fact when the plugin is NOT enabled there keeps the old, milder wording: nothing is
         #     silently loading or failing to load, so the loud reading would be a false alarm.
@@ -582,6 +600,58 @@ try {
     Assert-Match 'signals found' $r.Out 'unregistered mixed: the signals branch fires'
     Assert-Match 'v2\.1\.0' $r.Out 'unregistered mixed: the real [ERROR] surfaces'
     Assert-Match '\[UNREGISTERED\]' $r.Out 'unregistered mixed: the unregistered marker surfaces alongside it'
+
+    # 9l (#533). The marker on its own: its own verdict, and NOT an errors summary. The distinction it has
+    #     to keep is that nothing is wrong with the source -- this machine simply does not have the plugin
+    #     -- which is why it rides in $notices rather than $signals.
+    $notInstalledLine = "  [NOT-INSTALLED-HERE] 'team-alpha@claude-code-specialists' is enabled in .claude/settings.json but has no install record for this checkout -- a session here loads none of it (no skills, no subagents, no hooks). Fix: 'claude plugin install team-alpha@claude-code-specialists --scope project' from this root. Nothing is wrong with the source; this machine simply does not have the plugin."
+    $stub = New-StubWorkshop -Name 'stub-notinstalled' -ExitCode 0 -OutputLines @(
+        $notInstalledLine,
+        'Summary: 0 error(s), 1 info signal(s).'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Equal 0 $r.Code 'not-installed stub: exit code 0'
+    Assert-Match '\[NOT-INSTALLED-HERE\]' $r.Out 'not-installed stub: the marker reaches the session context'
+    Assert-Match 'enabled for this repo is not installed here' $r.Out 'not-installed stub: its own verdict line'
+    Assert-NotMatch "not in the plugin maintainer's register" $r.Out 'not-installed stub: NOT the unregistered verdict -- different state, different fix'
+    Assert-NotMatch 'lens inventory for this repo is behind' $r.Out 'not-installed stub: NOT the inventory verdict either'
+    Assert-NotMatch 'signals found' $r.Out 'not-installed stub: NOT escalated to a signals summary (the source is fine)'
+
+    # 9m. A clean run gains nothing -- the guard against this becoming a line every session start carries.
+    $stub = New-StubWorkshop -Name 'stub-no-notinstalled' -ExitCode 0 -OutputLines @(
+        '  [OK]    machine record is on the source version (v3.9.0)',
+        'Summary: 0 error(s), 0 info signal(s).'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Match 'no errors\.' $r.Out 'no-notinstalled stub: the plain no-errors line is unchanged'
+    Assert-NotMatch 'NOT-INSTALLED' $r.Out 'no-notinstalled stub: no marker'
+    Assert-NotMatch 'not installed here' $r.Out 'no-notinstalled stub: no wording about it at all'
+
+    # 9n. Real signals AND the marker in one run: both surface. Same regression guard as 9k -- the marker
+    #     must not be dropped precisely when something else is also wrong, which is when a session is
+    #     busiest and least able to notice its absence.
+    $stub = New-StubWorkshop -Name 'stub-notinstalled-mixed' -ExitCode 1 -OutputLines @(
+        '  [ERROR] life-hub / team-alpha@claude-code-specialists: machine record is on v2.9.0, source on v2.11.0',
+        $notInstalledLine,
+        'Summary: 1 error(s), 1 info signal(s).'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Match 'signals found' $r.Out 'not-installed mixed: the signals branch fires'
+    Assert-Match 'v2\.9\.0' $r.Out 'not-installed mixed: the real [ERROR] surfaces'
+    Assert-Match '\[NOT-INSTALLED-HERE\]' $r.Out 'not-installed mixed: the marker surfaces alongside it'
+
+    # 9o. The marker AND a register notice together: the marker takes the headline (a session running
+    #     without its specialist surface outranks the maintainer's view of a repo that works), and the
+    #     register notice is still printed rather than swallowed by the branch that won.
+    $stub = New-StubWorkshop -Name 'stub-notinstalled-unreg' -ExitCode 0 -OutputLines @(
+        $notInstalledLine,
+        '  [UNREGISTERED] this repo has no manifest in the workshop register.',
+        'Summary: 0 error(s), 2 info signal(s).'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Match 'enabled for this repo is not installed here' $r.Out 'not-installed + unregistered: the not-installed verdict takes the headline'
+    Assert-Match '\[UNREGISTERED\]' $r.Out 'not-installed + unregistered: the register notice is still printed, not swallowed'
+    Assert-NotMatch 'signals found' $r.Out 'not-installed + unregistered: still not an errors summary'
 
     # 9e. Marker check (Sean guardrail): a candidate path without a valid marker is NOT executed.
     $stub = New-StubWorkshop -Name 'stub-fake' -ExitCode 0 -ValidMarker $false -OutputLines @(

@@ -223,6 +223,30 @@ inventory drift stays an `[INFO]` and stays silent, so the `[INFO]` rule's justi
 business of another machine or user") keeps applying wherever it is actually true. Decision by Dave,
 July 29, 2026.
 
+**Third named exception, and the first that is not about the register's view: `[NOT-INSTALLED-HERE]`**
+(August 9, 2026, [#533](https://github.com/DaveKJohn/claude-code-specialists/issues/533)). Here the
+register is right and the *machine* is wrong: a plugin is enabled for this repo and has no install
+record for this checkout, so a session here loads none of it — no skills, no subagents, no hooks. Check
+4 reports that as an `[INFO]`, and the reasoning for keeping it one is sound for a consumer this check
+is merely walking: the install may legitimately belong to another machine, so the state is not
+conclusive. That second reading **does not exist for the repo the session is running in**, which is
+where the marker is added — the same `Test-IsSessionRepo` scoping as `[INVENTORY]`, for the same reason.
+
+What made it necessary is that the two artefacts that could have spoken both could not. A mid-session
+`git pull` carried this repo across the plugin rename: `.claude/settings.json`, the register and the
+plugin tree all moved to the new names in one fast-forward while `installed_plugins.json` kept the old
+record, leaving **both** enabled plugins without an install record. The `[INFO]` was suppressed by the
+hook, and `check-roster-sync`'s marker of the same name is unreachable at session start **by design** —
+a session start writes the record itself before any hook can look (see `roster-sessioncheck.ps1`). So
+the repo ran with none of its own specialist surface, the one plugin line in the session context
+reported a version gap on a plugin that was no longer enabled, and it was found by hand.
+
+Non-counting like the other two: nothing is wrong with the source, only with what this machine has of
+it, so the exit code stays 0 and the per-signal `[INFO]` still stays suppressed. In the hook it takes
+the headline when it fires — a session running without the surface it thinks it has outranks a register
+finding about a repo that otherwise works — and the register notices are printed next to it rather than
+under it.
+
 **Registering a new consumer is a workshop-side, manual step, and nothing can do it for you.** The
 manifest lives here while the install happens in the consumer, and this registry never writes
 cross-repo — so the `specialists-init` skill closes the loop from the other side: after bootstrapping a

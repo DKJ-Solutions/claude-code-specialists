@@ -393,6 +393,32 @@ foreach ($mf in $manifestFiles) {
                     # honest move is to name both readings and the one command that settles it.
                     if ($consumerEnabled.Ids -contains $p.id) {
                         Write-Info "no machine record for this consumer, while the plugin IS enabled in $($consumerEnabled.LayerById[$p.id]) -- a session in that checkout loads none of this plugin (no skills, no subagents, no hooks). Either the install belongs to another machine, or it was never made for this path (or was taken over -- see inbound #301): 'claude plugin install $pluginIdShown --scope project' from that root settles it. Version check skipped."
+
+                        # ...and for the repo the session is actually in, the [INFO] above is not enough
+                        # (#533). The reasoning that keeps it an [INFO] is 'the install may belong to
+                        # another machine' -- a real second reading for a consumer this check is merely
+                        # walking, and NOT a possible one here: this session is running in that checkout
+                        # right now, so a missing record means a missing install, full stop.
+                        #
+                        # Fourth instance of the [UNREGISTERED]/[INVENTORY]/[ORPHANS] shape, and scoped the
+                        # same way for the same reason: promoting it for EVERY connector would reintroduce
+                        # exactly the other-machine noise the [INFO]-silence rule removed (Dave, July 20,
+                        # 2026). Non-counting, so it never turns an exit-0 run into a failure -- nothing is
+                        # broken about the source, only about what this machine has of it.
+                        #
+                        # Why it was needed (2026-08-09, #533): a mid-session `git pull` moved this repo
+                        # across the plugin rename. settings.json, the register and the plugin tree all went
+                        # to the new names in one fast-forward while installed_plugins.json kept the old
+                        # record, leaving BOTH enabled plugins with no install record -- a session here
+                        # loading none of its own specialist surface. Every artefact that could have said so
+                        # had already run, at a moment when it was not yet true, and the one line about
+                        # plugins in the session context reported a version gap on a plugin that was no
+                        # longer enabled. The marker roster-sync has for this state is unreachable here by
+                        # design (a session start writes the record before any hook can look), and this
+                        # [INFO] was suppressed -- so between the two of them, nothing had a voice.
+                        if (Test-IsSessionRepo $checkout) {
+                            Write-Host "  [NOT-INSTALLED-HERE] '$pluginIdShown' is enabled in $($consumerEnabled.LayerById[$p.id]) but has no install record for this checkout -- a session here loads none of it (no skills, no subagents, no hooks). Fix: 'claude plugin install $pluginIdShown --scope project' from this root. Nothing is wrong with the source; this machine simply does not have the plugin." -ForegroundColor Yellow
+                        }
                     } else {
                         Write-Info "no machine record for this consumer (the install may run via a different machine)."
                     }

@@ -24,14 +24,20 @@
         label) and the summary names what the run covered -- all registered connectors, or just this
         repo under -OnlyConsumer. Without that, two consumers on the same outdated plugin version
         produced two identical, unattributable [ERROR] lines (inbound #203);
-    - two exceptions to the [INFO] silence, both non-counting lines the check emits only about the repo
-        the session is in -- so neither can reintroduce other-machine noise:
+    - three exceptions to the [INFO] silence, all non-counting lines the check emits only about the repo
+        the session is in -- so none of them can reintroduce other-machine noise:
         [UNREGISTERED], because an unregistered consumer is reported as [INFO] and a brand-new repo was
         therefore told "no errors" -- a positive all-clear for a repo the workshop cannot see at all
         (no version check, no lens inventory, no agent-def drift). Found 2026-07-28;
         [INVENTORY], one step further in: the repo IS registered, but its entry lists fewer lenses than
         the repo holds. Also an [INFO], so also silent -- which let six missing ids sit in this
         workshop's own entry until a hand-run found them. Found 2026-07-29;
+        [NOT-INSTALLED-HERE], the only one of the three that is not about the register's view: a plugin
+        is enabled for this repo and has no install record for this path, so a session here loads none of
+        it. An [INFO] for every connector because the install may belong to another machine -- a reading
+        that does not exist for the repo the session is running in, which is why check-connectors adds
+        the marker there. Found 2026-08-09 (#533), after a mid-session pull carried this repo across the
+        plugin rename and left BOTH enabled plugins without a record, silently;
     - the script ALWAYS exits with 0 -- a session start must never fail because of this.
 
     Read-only: the hook modifies nothing in any repo.
@@ -141,10 +147,25 @@ try {
     # emits the line for the repo the session is in, so no other-machine noise can reach this list.
     $inventory = @($out | Where-Object { $_ -cmatch '\[INVENTORY\]' })
 
-    # Both markers are non-counting: they must never turn an exit-0 run into a "signals found" summary,
-    # because in neither case is anything wrong with the plugin install -- only with the register's view
-    # of it. Same reasoning as [ORPHANS] in roster-sessioncheck.
-    $notices = @($unregistered) + @($inventory)
+    # [NOT-INSTALLED-HERE] rides along on the same terms, and it is the one of the three that is NOT about
+    # the register's view (#533). Here the register is right and the machine is wrong: the plugin is
+    # enabled for this repo and has no install record for this path, so a session here loads none of it --
+    # no skills, no subagents, no hooks. check-connectors emits it as an [INFO] for every connector,
+    # because 'the install may belong to another machine' is a real second reading; the marker is added
+    # only for the repo the session is in, where that reading does not exist. Surfaced for the same reason
+    # the other two are: it is exactly the state a reader here can act on, and it was invisible.
+    #
+    # Why it was needed: on 2026-08-09 a mid-session pull carried this repo across the plugin rename,
+    # leaving both enabled plugins without an install record. Nothing reported it -- the [INFO] was
+    # suppressed here, and roster-sync's marker of the same name is unreachable at session start by design
+    # (see its docstring: a session start writes the record itself before any hook can look). Found by hand.
+    $notInstalled = @($out | Where-Object { $_ -cmatch '\[NOT-INSTALLED-HERE\]' })
+
+    # All three markers are non-counting: they must never turn an exit-0 run into a "signals found"
+    # summary, because in none of the three is anything wrong with the SOURCE -- only with the register's
+    # view of this repo, or with what this machine has of the plugin. Same reasoning as [ORPHANS] in
+    # roster-sessioncheck.
+    $notices = @($unregistered) + @($inventory) + @($notInstalled)
 
     # Did the child run to completion? Write-CheckSummary's "Summary: N error(s)" line is the check's
     # last statement, so its absence means the run stopped early and the list below may be partial
@@ -170,7 +191,18 @@ try {
     } elseif ($code -eq 0) {
         # "no errors" is true of the plugin install and false of the workshop's view of it, so the
         # unregistered notice has to survive next to it rather than under it.
-        if ($unregistered.Count -gt 0) {
+        # Ordered by how much it costs the reader to not know. A missing install means this session is
+        # running without the specialist surface it thinks it has, which outranks both register findings:
+        # those are about the maintainer's VIEW of a repo that is otherwise working. So it gets the first
+        # branch and its own verdict, for the same reason the other two have theirs -- folding three
+        # different situations with three different fixes under one line would blur exactly what to do.
+        if ($notInstalled.Count -gt 0) {
+            Write-Host 'connector-sessioncheck: no errors, but a plugin enabled for this repo is not installed here:'
+            foreach ($line in $notInstalled) { Write-Host "  $($line.Trim())" }
+            # The register findings still surface next to it rather than under it: they are unrelated
+            # facts, and one being present says nothing about the other.
+            foreach ($line in @($unregistered) + @($inventory)) { Write-Host "  $($line.Trim())" }
+        } elseif ($unregistered.Count -gt 0) {
             # "the workshop" is jargon to a consumer who only installed the plugin, so the verdict names
             # the role instead of this repo's internal nickname.
             Write-Host "connector-sessioncheck: no errors, but this repo is not in the plugin maintainer's register:"
