@@ -192,9 +192,8 @@ travels with the opt-in workflow, which is where the rest of that way of working
 who does not enable that workflow never sees it — which, since only Dave's repos are in the register, is the
 correct outcome for everyone else.
 
-In the repos that do carry it — life-hub and smartwatchbanden among them —
-locates the workshop checkout and runs the connectors check there. Two guardrails from the
-security review: the found path is **verified** first (a marker check on the marketplace name in
+In the repos that do carry it — life-hub and smartwatchbanden among them — two guardrails from the
+security review apply: the found path is **verified** first (a marker check on the marketplace name in
 `.claude-plugin/marketplace.json` — never run code on a guessed path), and outside the workshop
 the check is **scoped** to the repo's own manifest, so a session never gets another consumer's
 registry data into its context. Beyond that the hook is deliberately soft: no verified workshop
@@ -289,9 +288,12 @@ manifest lives here while the install happens in the consumer, and this registry
 cross-repo — so the `specialists-init` skill closes the loop from the other side: after bootstrapping a
 consumer it prints a **paste-ready manifest block** (repo name derived from the git remote, the lens
 inventory per plugin, `visibility` and `localCheckout` left as `VUL-IN` because it cannot know them),
-which then lands here through the normal branch + PR flow. This hook is — alongside the `specialists-init` skill and the `roster-sessioncheck` hook
-(the roster-sync feature) — one of the named, repo-neutral exceptions to the rule that plugins
-carry no hooks/skills (see the root README). Mind the **version gate**: consumers only receive the
+which then lands here through the normal branch + PR flow. This hook is one of the named, repo-neutral
+exceptions to the rule that plugins carry no hooks/skills — the full list is in the root README under
+[What lives here and what doesn't](../README.md#what-lives-here-and-what-doesnt), and it has grown since
+this paragraph first named its two siblings: four SessionStart hooks (`connector-sessioncheck` and
+`script-contract-sessioncheck` in `workflow-davekjohn`, `roster-sessioncheck` and `workflow-sessioncheck`
+in the core team) plus the skills `specialists-init` and `discover-workflow`. Mind the **version gate**: consumers only receive the
 hook after a release bump plus `claude plugin marketplace update <marketplace>` and
 `claude plugin update <plugin>@<marketplace> --scope project` (neither the refresh nor the scope flag
 is optional — see [Staying up to date](../plugins/INSTALL.md#staying-up-to-date)) + session restart on
