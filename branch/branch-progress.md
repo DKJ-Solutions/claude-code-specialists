@@ -1,15 +1,13 @@
-## `docs/missing-readmes` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] Inventory `scripts/` directory by directory before writing about it
-- [x] Write `scripts/README.md`: the map, the entry points, the four gates, why repo-config sits at the top
-- [x] Write `plugins/agent-shared/README.md`: the sentinel rule, the rebuild, why the duplication is safe
-- [x] Write `plugins/workflows/workflow-davekjohn/README.md`, closing the asymmetry with workflow-default
-- [x] Link all three from the pages that enumerate their directories
-- [~] A per-team README under `plugins/teams/team-alpha/` — dropped: `teams/README.md` already states what a
-      team folder holds, so a per-team page would mostly restate the root README's plugin table
-- [x] Lint + tests green
-
-### Where I left off
-
+_(filled in when a branch is created)_
