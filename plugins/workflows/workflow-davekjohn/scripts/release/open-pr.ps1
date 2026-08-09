@@ -40,17 +40,27 @@
 
     Auto-fill (if you do NOT supply -Body): the script fills in the template itself as much as
     possible, so the PR never lands on github.com as an empty form:
-      1. The correct "Type of change" box is ticked based on the branch prefix (the same source
-         as the label -- the `<prefix>/` rule in the template).
-      2. "What does this change do?" is filled with the description from the changelog entry file
+      1. The template's description placeholder is replaced by the changelog entry
          (branch/branch-changelog.md, or the pre-split <SafeName>.md in the repo root), which always
          exists on the branch. So you never have to type anything twice.
-      3. The two checklist items that are true at that point are ticked: "Changelog entry written"
-         (the entry file actually holds an entry -- not merely that it exists, since the branch/
-         split it exists on the trunk too) and "Requested by Dave" (the script only
-         runs at Dave's request). The remaining checklist items stay empty -- those are human
-         judgement checks the script cannot honestly verify.
+      2. Anything else the template asks that this script can answer deterministically is answered:
+         a "Type of change" box matching the branch prefix, a "Changelog entry written" item (true
+         once the file actually HOLDS an entry -- not merely that it exists, since the branch/ split
+         it exists on the trunk too) and a "Requested by Dave" item.
       If you do supply -Body, it is used literally (override).
+
+      STEP 2 FILLS IN NOTHING FOR THIS REPO ANY MORE, AND IS KEPT DELIBERATELY (#538). Those three
+      sections were removed from this repo's template on August 9, 2026, because measured over 60 PRs
+      not one of their boxes had ever varied: "Type of change" had exactly one of four ticked every
+      single time (a fact the entry already states under `### Branch type`, and which the LABEL takes
+      from Get-BranchInfo rather than from the tick), "Requested by Dave" was ticked 60/60,
+      "Changelog entry written" 60/60, and the two items the docstring used to call "human judgement
+      checks the script cannot honestly verify" were ticked 0/60 -- by anyone, ever, while both were
+      already enforced by gates that block this script. A box that is always ticked and a box that is
+      never ticked carry the same information.
+      The matching stays because a consumer's PR template is their file: every one of them still has
+      those sections right now, and they receive this script through a plugin update rather than by
+      choosing to. Removing the fill logic in the same breath would leave their forms blank.
 
       The description placeholder(s) and the approval-checklist pattern used for steps 2 and 3 are
       configurable per repo (#101): if scripts\repo-config.ps1 defines the optional
@@ -153,8 +163,14 @@
 
 .PARAMETER RefreshBody
     On a branch whose PR is ALREADY OPEN, rewrite the description section of that PR's body from the
-    current changelog entry. Only that one section: the "Type of change" boxes, the checklist, the
-    `## Resolved issues` block and anything a reviewer added stay exactly as they are.
+    current changelog entry. Only that one section: the `## Resolved issues` block, anything a reviewer
+    added, and any section a consumer's template carries that this script did not write (the "Type of
+    change" boxes and the checklist, where those still exist) stay exactly as they are.
+
+    WHICH heading carries the description is read from the template's first '## ' line, so renaming it
+    needs no change here -- but a PR opened BEFORE such a rename carries the old heading in its body,
+    and the rename would make it unrefreshable. So the legacy headings are tried as a fallback when the
+    current one is not found (#538, which renamed this repo's to '## Changelog entry').
 
     OPT-IN ON PURPOSE, and the default silence is the safer half: a body may have been edited on
     github.com, and refreshing on every run would overwrite those edits without being asked. So the
@@ -677,6 +693,25 @@ if ($existingPr) {
         } else {
             $refreshed = $false
             $newBody = Update-PrBodySection -Body $newBody -Heading $descHeading -Content $entryDescription -Changed ([ref]$refreshed)
+
+            # THE HEADING THIS PR WAS OPENED UNDER MAY PREDATE THE ONE THE TEMPLATE NOW CARRIES (#538).
+            # $descHeading is read from the template, which is right for every PR opened since; a PR
+            # opened before a rename holds the old heading in its published body, and Update-PrBodySection
+            # returns the body untouched when it cannot find the heading. Without this fallback such a PR
+            # becomes silently unrefreshable -- it would report "already matches the entry" while in fact
+            # matching nothing, which is the worst of the three possible outcomes.
+            #
+            # Only tried when the first attempt changed nothing, so a body carrying the current heading is
+            # never searched for a legacy one, and a genuine no-op still reports as a no-op. Each is a
+            # heading this repo or a consumer has actually shipped.
+            if (-not $refreshed) {
+                foreach ($legacyHeading in @('## What does this change do?', '## Wat doet deze wijziging?')) {
+                    if ($legacyHeading -eq $descHeading.Trim()) { continue }
+                    $newBody = Update-PrBodySection -Body $newBody -Heading $legacyHeading -Content $entryDescription -Changed ([ref]$refreshed)
+                    if ($refreshed) { $descHeading = $legacyHeading; break }
+                }
+            }
+
             if ($refreshed) {
                 $edits += "the description under '$($descHeading.Trim())'"
             } else {
@@ -777,8 +812,14 @@ if (-not $Body) {
             @(Get-PrDescriptionPlaceholder)
         } else {
             @(
+                # RECOGNISE THREE, WRITE ONE (#538). The third is what this repo's template carries now;
+                # the two older strings stay because a consumer's PR template is THEIR file and this
+                # script must not silently stop filling it in because the template it ships beside moved
+                # on. An unrecognised placeholder is not a warning here -- it is a PR body with no
+                # description at all, which is the one outcome this list exists to prevent.
                 '<!-- Korte beschrijving van wat er verandert en waarom. -->',
-                '<!-- Short description of what changes and why. -->'
+                '<!-- Short description of what changes and why. -->',
+                "<!-- Filled from branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->"
             )
         }
         $approvalPattern = if (Get-Command -Name Get-PrApprovalPattern -ErrorAction SilentlyContinue) {

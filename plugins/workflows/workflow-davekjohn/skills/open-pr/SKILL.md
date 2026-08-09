@@ -90,8 +90,14 @@ by, and quietly renaming one mid-review is the same class of surprise as overwri
 **`-RefreshBody` rewrites the description from the entry, and only the description.** Pass it when you
 extended the changelog entry after the PR was opened — routine on a branch that keeps growing, and
 otherwise the PR keeps describing an earlier version of the work while the merged changelog gets the new
-one. The "Type of change" boxes, the checklist, the `## Resolved issues` block and anything a reviewer
-added all stay exactly as they are.
+one. The `## Resolved issues` block, anything a reviewer added, and any section your template carries that
+the script did not write — "Type of change" boxes, a checklist — all stay exactly as they are.
+
+**Which heading carries the description is read from your template's first `## ` line**, so renaming it
+needs no configuration. One wrinkle worth knowing if you do rename it: a PR opened *before* the rename
+still holds the old heading in its published body. The script therefore falls back to the headings it has
+shipped before (`## What does this change do?` and its Dutch predecessor) when the current one is not
+found, so an older PR stays refreshable instead of silently reporting that it already matches.
 
 It is **opt-in** rather than automatic for the reason above: refreshing on every run would overwrite a
 hand-edited body without being asked. And it is a no-op where there is nothing to do — no open PR, no

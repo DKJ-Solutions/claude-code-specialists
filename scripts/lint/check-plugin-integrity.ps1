@@ -1719,10 +1719,20 @@ Write-Coverage -Category 'skill-param' -Checked $skillParamChecked `
 #   a claimed section COUNT vs the scaffolder's              -> 4 claims, 3 correct, 1 genuinely stale
 #
 # The name-matching candidates fail on a collision nobody would predict: 'What does this change do?' and
-# 'Type of change' are RETIRED entry sections and, at the same time, LIVE headings of
+# 'Type of change' are RETIRED entry sections and, AT THE TIME THIS WAS MEASURED, live headings of
 # .github/pull_request_template.md. So a name-matcher accuses two correct documents of being stale for
 # describing the PR body accurately -- and a check that is born red with an exemption list is the shape
 # this repo was already bitten by (Get-RosterIgnoredIds).
+#
+# THAT COLLISION IS GONE, AND THE MEASUREMENT STANDS ANYWAY (#538, August 9, 2026). Both headings were
+# removed from the PR template that day, so the six false findings are no longer reproducible from the
+# tree. The tense above is deliberate rather than tidied away: it names WHEN the count was measured
+# against the names, which is the only form in which a superseded measurement is still worth anything.
+# Two reasons the conclusion does not move with the collision. First, name-matching lost on more than
+# that: it also scored 3 findings with 2 false on the narrowed variant, against 4 claims with 3 correct
+# for the count. Second, and structurally, a rule keyed on names is one rename away from silence in
+# either direction -- which is precisely what just happened to the collision, and would just as easily
+# happen to a match the check depends on. The count is a fact the scaffolder owns and no rename touches.
 #
 # A COUNT HAS NONE OF THAT. It is a fact the scaffolder owns, stated in a form that cannot mean anything
 # else, and both recorded drifts made exactly this claim -- "three named `###` sections" -- while the

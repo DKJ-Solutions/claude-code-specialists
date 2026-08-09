@@ -212,10 +212,35 @@ The constitution above, concretely implemented here:
   every read, while a check costs nothing per read. **What is checked is the section COUNT, not the
   section names**, and that was settled by measuring four candidate rules against the tree rather than by
   argument. A name-matching rule produced **six** findings on the tree, **all six false**: `What does this
-  change do?` and `Type of change` are retired entry sections *and* live headings of the PR template, so it
-  accuses **two** correct documents of being stale for describing that template accurately — and would have
-  been born red behind an exemption list, the shape this repo was already bitten by. The count is a
-  fact the scaffolder owns, both recorded drifts stated it, and holding it needs no exemptions at all.
+  change do?` and `Type of change` are retired entry sections *and*, at the time of that measurement, were
+  live headings of the PR template, so it accused **two** correct documents of being stale for describing
+  that template accurately — and would have been born red behind an exemption list, the shape this repo was
+  already bitten by. The count is a fact the scaffolder owns, both recorded drifts stated it, and holding it
+  needs no exemptions at all.
+
+  **That collision is gone since August 9, 2026, and the conclusion does not move with it**
+  ([#538](https://github.com/DaveKJohn/claude-code-specialists/issues/538)). Both headings were removed from
+  the PR template, so the six false findings can no longer be reproduced from the tree. The measurement is
+  kept in the past tense rather than deleted, because a superseded measurement is worth something only while
+  it says *when* it was taken. Two reasons the count still wins: name-matching also lost on its narrowed
+  variant (3 findings, 2 false, against 4 claims with 3 correct), and a rule keyed on names is one rename
+  away from going silent — which is exactly what just happened to this collision, and would as easily happen
+  to a match the check depended on.
+
+  **The PR template that caused the collision is itself the change** (Dave, August 9, 2026). It now carries
+  one section — the changelog entry — because `open-pr.ps1` composes the body from
+  `branch/branch-changelog.md`, so everything else it asked was already answered four lines lower. Measured
+  over 60 PRs before removing anything: `Type of change` had exactly **one of four** boxes ticked every
+  single time, a fact the entry states under `### Branch type` and which the GitHub label takes from
+  `Get-BranchInfo` rather than from the tick; of the checklist, `Requested by Dave` and
+  `Changelog entry written` were ticked **60/60** — both by the script itself — while the two items the
+  docstring called "human judgement checks" were ticked **0/60**, by anyone, ever, though both were already
+  enforced by gates that block the PR. A box that is always ticked and a box that is never ticked carry the
+  same information. The template also still offered a `chore/` row, four days after
+  `Test-BranchName` began refusing that prefix outright — the one line in the form that could actively
+  mislead. **`open-pr.ps1` keeps filling all of it in**: a consumer's PR template is their file, every one of
+  them still has those sections, and they receive the script through a plugin update rather than by choosing
+  to. Recognise both, write one.
 
   **The gate reaches `CHANGELOG.md`'s intro, and getting it there took two independent repairs** (August 8,
   2026; [#525](https://github.com/DaveKJohn/claude-code-specialists/pull/525)). The check was born

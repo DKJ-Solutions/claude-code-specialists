@@ -194,6 +194,59 @@ Assert-Equal 'words alone' (Get-PrTitle -Prefix '' -TitleWords 'words alone') 'a
 Assert-Equal '' (Get-PrTitle -Prefix 'fix' -TitleWords '') 'no words means no title, not a bare prefix'
 Assert-Equal '' (Get-PrTitle -Prefix 'fix' -TitleWords "   `n  `n") 'a whitespace-only section is no title either'
 
+# --- The template and open-pr must agree on the description placeholder (#538) ----------------------
+#
+# THE ONE COUPLING IN THIS MECHANISM THAT FAILS SILENTLY. open-pr fills the PR body by replacing a
+# placeholder LINE from .github/pull_request_template.md with the changelog entry, matched by exact
+# string equality against a list inside open-pr.ps1. If someone edits the template's comment -- a
+# typo fix, a reworded hint, a stray trailing space -- the match stops firing and the PR is opened
+# with the placeholder still in it and no description at all. Nothing errors: the template is valid
+# markdown, the script exits 0, and the loss is visible only to whoever reads the published body.
+#
+# Measured need: the template was rewritten on 2026-08-09 (#538) down to a single section, which is
+# exactly the kind of edit that breaks this without anyone looking. Asserted from BOTH files rather
+# than from a constant here, so this suite cannot agree with itself while the repo disagrees.
+Write-Host "template <-> open-pr placeholder agreement" -ForegroundColor Cyan
+$repoRootForTemplate = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$templateFile = Join-Path $repoRootForTemplate '.github\pull_request_template.md'
+$openPrFile   = Join-Path $repoRootForTemplate 'scripts\release\open-pr.ps1'
+
+Assert-True (Test-Path -LiteralPath $templateFile) 'the PR template exists where open-pr looks for it'
+Assert-True (Test-Path -LiteralPath $openPrFile)   'open-pr.ps1 exists where this suite looks for it'
+
+$templateLinesForTest = @(Get-Content -LiteralPath $templateFile -Encoding UTF8)
+$openPrText           = [System.IO.File]::ReadAllText($openPrFile, [System.Text.Encoding]::UTF8)
+
+# A placeholder is an HTML comment on its own line -- the shape open-pr replaces wholesale.
+$placeholderLines = @($templateLinesForTest | Where-Object { $_.Trim() -match '^<!--.*-->$' })
+Assert-True ($placeholderLines.Count -ge 1) 'the template carries at least one comment line to substitute'
+
+# The load-bearing assert: at least one of them appears VERBATIM in open-pr's recognised list. A
+# substring search over the script text is enough and is deliberately not a re-implementation of the
+# match -- if the exact line is not in that file, no equality test in open-pr can ever succeed on it.
+$matched = @($placeholderLines | Where-Object { $openPrText.Contains($_.Trim()) })
+Assert-True ($matched.Count -ge 1) 'open-pr recognises the template placeholder verbatim -- otherwise every PR body loses its description, silently'
+
+# And the description heading open-pr reads (the first '## ' line) must actually be there, since
+# -RefreshBody has nothing to target without it.
+$firstH2 = @($templateLinesForTest | Where-Object { $_ -match '^##\s+\S' }) | Select-Object -First 1
+Assert-True ([bool]$firstH2) 'the template has a "## " heading for the description to live under'
+
+# THE FALLBACK THAT KEEPS OLDER PRs REFRESHABLE. -RefreshBody targets whatever heading the template
+# names today; a PR opened before a rename carries the previous one in its published body, and
+# Update-PrBodySection returns the body untouched when it cannot find a heading -- so without a
+# fallback such a PR reports "already matches the entry" while matching nothing. Pinned here because
+# the strings are the whole mechanism: they are not derivable from anything, only remembered.
+Assert-True ($openPrText.Contains('## What does this change do?')) 'open-pr still recognises the pre-#538 description heading, so a PR opened under it stays refreshable'
+foreach ($legacy in @('## What does this change do?', '## Wat doet deze wijziging?')) {
+    $legacyBody = "$legacy`nold text`n`n## Resolved issues`nCloses #1"
+    $didChange = $false
+    $out = Update-PrBodySection -Body $legacyBody -Heading $legacy -Content 'new text' -Changed ([ref]$didChange)
+    Assert-True $didChange "a body under '$legacy' is rewritable"
+    Assert-True ($out -match '(?m)^new text$') "and the new description lands under '$legacy'"
+    Assert-True ($out -match '(?m)^Closes #1$') "while the resolved-issues block below '$legacy' is untouched"
+}
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
