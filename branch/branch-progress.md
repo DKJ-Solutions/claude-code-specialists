@@ -1,13 +1,13 @@
-## `docs/major-prep-exception` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] Name the preparation step in the release exception in `CLAUDE.md`, bounded to a major, to the two paths, and to a cut that was asked for
-- [x] Mirror that boundary in Rendall #06's repo lens, where the direct-on-`main` exceptions are listed
-- [x] Carry the step into the portable `cut-release` skill as step 0 — a consumer meets the same refusal and had no documented way through it
-- [x] Extend `cut-release.ps1`'s new-major refusal so its advice names the pinned assert as well as the section, and re-mirror it to the plugin
-- [x] Check whether the extended advice needs a test: yes — four asserts in `cut-release-guardrail.tests.ps1`, verified to go red against the previous version of the script
-- [x] Review pass on the diff (copy edit + code review): two findings, both applied — a "Step 0" heading in the lens colliding with the numbered step list it sat behind, and a sentence saying `v4.0.0` went red where the assertion did
-
-### Where I left off
-
+_(filled in when a branch is created)_
