@@ -381,6 +381,14 @@ try {
         Assert-Match 'claude plugin install team-alpha@claude-code-specialists --scope project' $r.Out 'enabled but no record, SESSION repo: the marker carries the fix, not just the diagnosis'
         Assert-Match '\[INFO\].*no machine record for this consumer, while the plugin IS enabled' $r.Out 'enabled but no record, SESSION repo: the [INFO] is kept -- a deliberate run should still list everything'
 
+        # 8e3 (#533). Every 'source on vX' in a run is read from THIS checkout, now -- a point-in-time fact
+        #      the session hook then forwards into a context that keeps it for hours. The run therefore
+        #      names the commit it measured, once at run level: the same answer for every finding below, so
+        #      repeating it per line would cost the reader on every line to say nothing new. The value is
+        #      not asserted (it is whatever HEAD is), only that it is a real short sha and that the run
+        #      says so at all.
+        Assert-Match '== check-connectors .*source read at [0-9a-f]{7}' $r.Out 'source stamp: the run names the commit its version verdicts were read at'
+
         # 8f. The same fact when the plugin is NOT enabled there keeps the old, milder wording: nothing is
         #     silently loading or failing to load, so the loud reading would be a false alarm.
         #     Order matters: New-FixtureConsumer wipes $Fixture, and both the manifest and the
@@ -652,6 +660,34 @@ try {
     Assert-Match 'enabled for this repo is not installed here' $r.Out 'not-installed + unregistered: the not-installed verdict takes the headline'
     Assert-Match '\[UNREGISTERED\]' $r.Out 'not-installed + unregistered: the register notice is still printed, not swallowed'
     Assert-NotMatch 'signals found' $r.Out 'not-installed + unregistered: still not an errors summary'
+
+    # 9p (#533). The summary says WHEN its version claims were true. The stamp is LIFTED from the check's
+    #     own header rather than measured in the hook -- the commit that matters is the one the versions
+    #     were read at, and a second git call could put a wrong timestamp on a right number.
+    $stub = New-StubWorkshop -Name 'stub-stamp' -ExitCode 1 -OutputLines @(
+        '== check-connectors -- 4 manifest(s) -- source read at 855fd40 ==',
+        '  [ERROR] life-hub / team-alpha@claude-code-specialists: machine record is on v3.4.0, source on v3.9.0',
+        'Summary: 1 error(s), 0 info signal(s).'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Match 'signals found' $r.Out 'stamp stub: the signals branch fires'
+    Assert-Match 'source read at 855fd40' $r.Out 'stamp stub: the measured commit reaches the session context'
+    Assert-Match 'git rev-parse --short HEAD' $r.Out 'stamp stub: and says how to check it, which is the whole point of dating it'
+    Assert-NotMatch '== check-connectors' $r.Out 'stamp stub: the header itself is NOT forwarded -- only the fact lifted out of it'
+
+    # 9q. No header, no stamp. A source tree without git (a consumer holding a downloaded copy) makes the
+    #     check omit it, and an omitted stamp is honest where an invented one would invite exactly the
+    #     trust this whole change is trying to make earnable.
+    $stub = New-StubWorkshop -Name 'stub-nostamp' -ExitCode 1 -OutputLines @(
+        '== check-connectors -- 4 manifest(s) ==',
+        '  [ERROR] life-hub / team-alpha@claude-code-specialists: machine record is on v3.4.0, source on v3.9.0',
+        'Summary: 1 error(s), 0 info signal(s).'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Match 'signals found' $r.Out 'no-stamp stub: the signals branch still fires'
+    Assert-Match 'v3\.9\.0' $r.Out 'no-stamp stub: the finding itself is unaffected'
+    Assert-NotMatch 'source read at' $r.Out 'no-stamp stub: nothing is invented'
+    Assert-NotMatch 'rev-parse' $r.Out 'no-stamp stub: and no advice to check a stamp that is not there'
 
     # 9e. Marker check (Sean guardrail): a candidate path without a valid marker is NOT executed.
     $stub = New-StubWorkshop -Name 'stub-fake' -ExitCode 0 -ValidMarker $false -OutputLines @(

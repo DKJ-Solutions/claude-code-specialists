@@ -167,7 +167,32 @@ function Test-IsSessionRepo {
     return $Checkout -eq $RepoRoot
 }
 
-Write-Host "== check-connectors -- $($manifestFiles.Count) manifest(s) ==" -ForegroundColor Cyan
+# WHICH SOURCE TREE THE VERSION VERDICTS BELOW WERE READ FROM (#533).
+#
+# Every 'source on vX' in this run comes from a plugin.json in THIS checkout, read now. That is a
+# point-in-time fact, and the SessionStart hook forwards it into a session that then keeps it for
+# hours -- so the claim outlives the tree it was true of. Measured on 2026-08-09: a session started
+# at faa7273 (source v3.6.0), a `git pull` moved the checkout to 855fd40 (source v3.9.0) at 10:24,
+# and the line already in context still said v3.6.0. Nothing was wrong with it except its age, and
+# nothing about it said how old it was.
+#
+# So the run names the commit it measured. A reader comparing it against `git rev-parse --short HEAD`
+# sees the gap in one step, which is what an undated version claim cannot offer at any price. It is
+# printed ONCE at run level rather than per finding: it is the same answer for every line below, and
+# repeating it would cost the reader on every line to say nothing new.
+#
+# Degrades silently rather than guessing: a checkout without git, or a source tree that is not a git
+# repo at all (a consumer holding a downloaded copy), simply gets the header it always had. An
+# omitted stamp is honest; a fabricated one would be exactly the defect this closes.
+$sourceStamp = ''
+try {
+    $sha = (& git -C $RepoRoot rev-parse --short HEAD 2>$null)
+    if ($LASTEXITCODE -eq 0 -and $sha) { $sourceStamp = " -- source read at $($sha.Trim())" }
+} catch {
+    $sourceStamp = ''
+}
+
+Write-Host "== check-connectors -- $($manifestFiles.Count) manifest(s)$sourceStamp ==" -ForegroundColor Cyan
 
 $checkedConsumers = @{}
 $matched = 0

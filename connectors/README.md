@@ -247,6 +247,22 @@ the headline when it fires — a session running without the surface it thinks i
 finding about a repo that otherwise works — and the register notices are printed next to it rather than
 under it.
 
+**A version verdict says which commit it was read at** (August 9, 2026,
+[#533](https://github.com/DaveKJohn/claude-code-specialists/issues/533)). Every `source on vX` in a run
+comes from a `plugin.json` in the workshop checkout, read at that moment — and the session hook forwards
+it into a context that keeps it for hours. A `git pull` in that window ages the claim with nothing to
+show for it, which is not hypothetical: a session started at `faa7273` (source v3.6.0), the checkout
+moved to `855fd40` (source v3.9.0) at 10:24, and the line already in context still said v3.6.0. It was
+repeated as current fact, because an undated claim is indistinguishable from a fresh one.
+
+So the run header names the commit: `== check-connectors -- 4 manifest(s) -- source read at 5becd87 ==`,
+and the hook lifts that value into its summary line with a pointer to `git rev-parse --short HEAD`. Two
+properties worth keeping when this is touched: it is printed **once at run level**, because it is the
+same answer for every finding and repeating it per line costs the reader on every line to say nothing
+new; and the hook **lifts it rather than measuring its own**, because the commit that matters is the one
+the versions were read at, and a second `git` call could put a wrong timestamp on a right number — worse
+than none, since it invites trust. No git, no header, no stamp: an omitted stamp is honest.
+
 **Registering a new consumer is a workshop-side, manual step, and nothing can do it for you.** The
 manifest lives here while the install happens in the consumer, and this registry never writes
 cross-repo — so the `specialists-init` skill closes the loop from the other side: after bootstrapping a
