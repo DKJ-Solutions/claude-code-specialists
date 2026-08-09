@@ -584,13 +584,20 @@ if ($args -contains 'create') {
     Assert-True ($argsA -notmatch '--assignee') 'default path: no --assignee passed (no repo-config override)'
     Assert-True ($argsA -notmatch '--milestone') 'default path: no --milestone passed (no repo-config override)'
     Assert-True ($bodyA -match 'This is the test description text\.') 'default path: description filled in from the changelog entry'
-    Assert-True ($bodyA -notmatch '<!-- Short description of what changes and why') 'default path: description placeholder was replaced'
-    Assert-True ($bodyA -match '- \[x\] `feat/`') 'default path: type-of-change box ticked'
-    # This fixture deliberately carries a PRE-SPLIT root entry file and no branch/ directory, so scenario A
-    # doubles as the end-to-end proof that a branch created before August 6, 2026 still reads, ticks and
-    # auto-fills exactly as it did -- which is the case every consumer with a branch in flight is in.
-    Assert-True ($bodyA -match '- \[x\] Changelog entry written') 'default path: changelog-entry checklist item ticked'
-    Assert-True ($bodyA -match '- \[x\] Requested by Dave') 'default path: approval checklist item ticked (default pattern)'
+    # The placeholder assert reads the template it actually copied rather than a remembered string --
+    # that coupling has its own guard in pr-body.tests.ps1, and hard-coding it twice is how the two
+    # drift apart. What matters here is that WHATEVER the repo ships got substituted.
+    $templateCommentsA = @(Get-Content -LiteralPath (Join-Path $prFixtureRoot '.github\pull_request_template.md') -Encoding UTF8 |
+        Where-Object { $_.Trim() -match '^<!--.*-->$' })
+    foreach ($commentA in $templateCommentsA) {
+        Assert-True ($bodyA -notmatch [regex]::Escape($commentA.Trim())) "default path: the template comment was replaced, not published ($($commentA.Trim().Substring(0, [Math]::Min(28, $commentA.Trim().Length)))...)"
+    }
+    # NO CHECKBOXES AT ALL SINCE #538, and asserted rather than left implied. The repo's template was cut
+    # down to one section on 2026-08-09 because measured over 60 PRs not one of its boxes ever varied:
+    # 'Type of change' had exactly one of four ticked every time, two checklist items were ticked 60/60
+    # by this very script, and the two called "human judgement checks" were ticked 0/60 by anyone. A body
+    # that grows a checkbox again means the template regained a section, which is the thing to notice.
+    Assert-True ($bodyA -notmatch '(?m)^- \[[ x]\]') 'default path: the body carries no checkbox -- the repo template is the entry and nothing else'
 
     # THE TITLE IS COMPOSED, AND NOTHING WAS PASSED TO COMPOSE IT FROM (#506 + #505). This is the only
     # end-to-end proof of the derivation: Get-PrTitle's own asserts are pure-string, and what could still go
@@ -600,6 +607,50 @@ if ($args -contains 'create') {
     # before the split still open a PR after a plugin update.
     Assert-True ($argsA -match '(?m)^--title$') 'default path: a title was passed to gh even though none was given on the command line'
     Assert-True ($argsA -match '(?m)^feat: Open-PR 101 test$') 'default path: the title is the branch type plus the entry heading, with the type and date fields dropped'
+
+    # --- Scenario A2: a CONSUMER's template, which is the pre-#538 shape ---------------------------
+    #
+    # WHY THIS EXISTS AT ALL. Ticking those boxes used to be proved incidentally by scenario A, because
+    # this repo's own template carried them. It no longer does -- and the ticking logic stayed, on the
+    # standing rule that a consumer's PR template is THEIR file: every consumer has these sections right
+    # now and receives this script through a plugin update rather than by choosing to. Deleting the fill
+    # logic in the same change would have left their forms blank, and deleting the asserts with it would
+    # have left nothing watching the logic that was kept. So the case moved from incidental to explicit,
+    # which is strictly better: it now says which shape it is testing and why.
+    #
+    # This is verbatim the template this repo shipped until 2026-08-09, `chore/` row and all.
+    $legacyTemplate = @'
+## What does this change do?
+<!-- Short description of what changes and why. -->
+
+## Type of change
+- [ ] `feat/` new functionality
+- [ ] `fix/` correction of an error
+- [ ] `docs/` documentation
+
+## Checklist
+- [ ] Changelog entry written (`branch/branch-changelog.md`)
+- [ ] Shared agent defs change here only
+
+## Explicit approval
+- [ ] Requested by Dave (the PR request also counts as merge approval)
+'@
+    [System.IO.File]::WriteAllText((Join-Path $prFixtureRoot '.github\pull_request_template.md'), $legacyTemplate, $Utf8NoBomTest)
+    Remove-Item -Path $prArgsCapture, $prBodyCapture -Force -ErrorAction SilentlyContinue
+    (& powershell -NoProfile -ExecutionPolicy Bypass -File $openPrSrc -Title 'feat-openpr-101-test' -SkipLint -SkipTests 2>&1 | Out-String) | Out-Null
+    Assert-Equal 0 $LASTEXITCODE 'legacy template: open-pr exits 0'
+    $bodyA2 = if (Test-Path $prBodyCapture) { Get-Content -Path $prBodyCapture -Raw } else { '' }
+    Assert-True ($bodyA2 -match 'This is the test description text\.') 'legacy template: description still filled in from the changelog entry'
+    Assert-True ($bodyA2 -notmatch '<!-- Short description of what changes and why') 'legacy template: the old placeholder string is still recognised'
+    Assert-True ($bodyA2 -match '- \[x\] `feat/`') 'legacy template: type-of-change box still ticked for a consumer'
+    Assert-True ($bodyA2 -match '- \[x\] Changelog entry written') 'legacy template: changelog-entry checklist item still ticked'
+    Assert-True ($bodyA2 -match '- \[x\] Requested by Dave') 'legacy template: approval checklist item still ticked (default pattern)'
+    # The one box the script has never claimed to know: it must stay untouched, or a self-ticking
+    # checklist would be asserting something no code verified.
+    Assert-True ($bodyA2 -match '- \[ \] Shared agent defs change here only') 'legacy template: the judgement item is NOT ticked by the script'
+
+    # Back to the repo's own template so the scenarios below are not read through this one.
+    Copy-Item -Path (Join-Path $RepoRoot '.github\pull_request_template.md') -Destination (Join-Path $prFixtureRoot '.github\pull_request_template.md') -Force
 
     # Scenario B: override path -- repo-config defines all four optional #101 functions.
     $rcOverride = @'

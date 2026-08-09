@@ -1651,9 +1651,14 @@ try {
     #
     # THE COUNT AND NOT THE NAMES, and the fixture below is why that matters more than it sounds: a
     # name-matching rule was measured against the real tree first and accused SIX correct documents,
-    # because 'What does this change do?' and 'Type of change' are retired entry sections AND live
-    # headings of .github/pull_request_template.md. Both directions are asserted, since a
-    # positive-only test would pass against a check that examines nothing.
+    # because 'What does this change do?' and 'Type of change' are retired entry sections AND were, at
+    # the time of that measurement, live headings of .github/pull_request_template.md. Both directions
+    # are asserted, since a positive-only test would pass against a check that examines nothing.
+    #
+    # That collision was removed on 2026-08-09 (#538) when the template lost those sections, and the
+    # choice does not move with it: name-matching also lost on its narrowed variant (3 findings, 2
+    # false, against 4 claims with 3 correct), and a rule keyed on names is one rename away from going
+    # silent -- which is exactly what just happened to the collision itself.
     Write-Host "check 20: a claimed section count vs. the scaffolder" -ForegroundColor Cyan
     $shapeDoc = Join-Path $Fixture 'branch\README.md'
     New-Item -ItemType Directory -Path (Split-Path -Parent $shapeDoc) -Force | Out-Null
