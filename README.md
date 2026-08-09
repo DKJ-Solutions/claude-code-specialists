@@ -132,7 +132,8 @@ repo.** That split arrived on August 8, 2026, when the branch/release workflow m
 into a pack of its own — the packaging consequence of
 [the plugin serves the consumer's repo](#the-plugin-serves-the-consumers-repo). Read the table with
 that split in mind: `team-lifehub`, `team-shopify` and `team-ecomm` are add-on teams, `workflow-davekjohn`
-is a working method, and only the core team is for everyone. **Teams stack** — a consuming repo enables
+and `workflow-default` are the two competing answers to the workflow question, and only the core team is
+for everyone. **Teams stack** — a consuming repo enables
 `team-alpha` plus as many add-on teams as its domain calls for. **Workflows do not stack** — at most one
 may be enabled at a time, because two workflows would hand the specialists two contradicting answers to
 the same question about how work moves through the repo.
@@ -143,7 +144,8 @@ the same question about how work moves through the repo.
 | [`team-lifehub/`](plugins/teams/team-lifehub/) | **An add-on team.** Five specialists for a personal information hub / brain-based knowledge repo (Astrid, Fiona, Hugo, Ian, Onyx). Deliberately domain-flavored: they know their repo and teammates by name. | Only a life-hub-style repo. |
 | [`team-shopify/`](plugins/teams/team-shopify/) | **An add-on team.** Three specialists for a Shopify store repo (Liam · Liquid, Sandra · store management, Steven · configuration) plus the domain skill `start-task`. Also deliberately domain-flavored. | Only a Shopify repo (e.g. smartwatchbanden). |
 | [`team-ecomm/`](plugins/teams/team-ecomm/) | **An add-on team.** E-commerce specialists for a commercial webshop repo of any platform (Sergio · SEO, Craig · CRO, Sean · performance/SEA). Platform-agnostic, and complementary to a platform team rather than exclusive. | Any commercial webshop repo — including a Shopify repo alongside `team-shopify`. |
-| [`workflow-davekjohn/`](plugins/workflows/workflow-davekjohn/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the eight workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-config`), their shared scripts, and the two session hooks that belong to running this across several repos. Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-config` places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that wants *this* workflow. Enable nothing and the specialists use plain `git`/`gh` instead. |
+| [`workflow-default/`](plugins/workflows/workflow-default/) | **The workflow — a way of working, not a team.** What a repo gets when it has not chosen a workflow: it imposes nothing, and ships one skill, `discover-workflow`, that reads what the repo already states about how work moves through it — its branch names, its CI, its contribution guide, its own scripts — and records the answer, including where the repo is silent. Carries **no specialists**. | Every repo, by default, until it deliberately picks `workflow-davekjohn` instead. |
+| [`workflow-davekjohn/`](plugins/workflows/workflow-davekjohn/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the eight workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-config`), their shared scripts, and the two session hooks that belong to running this across several repos. Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-config` places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that wants *this* workflow, in place of `workflow-default`. |
 
 In short: **`team-alpha` is the foundation; everything else is optional, along two different axes.**
 `team-lifehub` and `team-shopify` describe what *kind* of repo it is, so a repo
@@ -154,14 +156,17 @@ core is written repo-neutrally (no repo names, paths, or script names — that c
 consumer's repo lens); the add-on teams name their domain explicitly, because only a matching repo
 enables them.
 
-**The workflow sits on neither axis, and its name says so.** It is not "what kind of repo" but "whose
-method", which is why it carries an owner's name where the teams carry a subject. A repo that adopts
-the specialists gets colleagues; it does not get somebody else's branch discipline along with them.
-The measurement that forced the split: of what the core used to ship, **9%** described a craft and
-**47%** was workflow machinery — so most of what a consumer received was a way of working they had
-never chosen. What that costs a repo which enables **only** the core team is stated plainly under
-[Adoption](#adoption-the-bootstrap-path): no branch scripts, no `branch-info.ps1` to fill in, and a
-`repo-config.ps1` holding the roster half alone.
+**The workflow slot sits on neither team axis, and the two plugins in it answer a different question
+than "what kind of repo is this".** `workflow-davekjohn` carries an owner's name because it is *his*
+branch discipline, not a standard; `workflow-default` carries none, because it imposes none — it is the
+deliberate absence of a method, read from what the repo already states rather than assumed. A repo that
+adopts the specialists gets colleagues; it does not get somebody else's branch discipline along with
+them, and `workflow-default` is what makes that true by default rather than merely by omission. The
+measurement that forced the split: of what the core used to ship, **9%** described a craft and **47%**
+was workflow machinery — so most of what a consumer received was a way of working they had never chosen.
+What that costs a repo which enables **only** the core team plus `workflow-default` is stated plainly
+under [Adoption](#adoption-the-bootstrap-path): no branch scripts, no `branch-info.ps1` to fill in, and
+a `repo-config.ps1` holding the roster half alone.
 
 ### The e-commerce-related plugins
 
@@ -170,7 +175,7 @@ Two of the plugins serve a **commercial webshop** and are built to work together
 - **`team-shopify`** — the *platform* layer: theme code, store management, configuration for a Shopify store.
 - **`team-ecomm`** — the platform-agnostic *disciplines* that any webshop needs: SEO, CRO, and performance/SEA.
 
-They sit on different axes — one is "which platform," the other is "which marketing disciplines" — so they complement rather than replace each other. A **Shopify** store repo typically enables **both**; a **non-Shopify** webshop enables just `team-ecomm`. The other plugins — `team-alpha` (the core team), `team-lifehub` and `workflow-davekjohn` (the workflow) — fall outside this e-commerce grouping. This is a reading aid, not a packaging change: every plugin is still enabled or disabled on its own.
+They sit on different axes — one is "which platform," the other is "which marketing disciplines" — so they complement rather than replace each other. A **Shopify** store repo typically enables **both**; a **non-Shopify** webshop enables just `team-ecomm`. The other plugins — `team-alpha` (the core team), `team-lifehub` and the two workflow plugins (`workflow-default`, `workflow-davekjohn`) — fall outside this e-commerce grouping. This is a reading aid, not a packaging change: every plugin is still enabled or disabled on its own.
 
 ## What lives here and what doesn't
 
@@ -185,11 +190,13 @@ Rendall), and the **repo-neutral bootstrap skill** `specialists-init`.
 **Doesn't:** governance (`CLAUDE.md`, the workflow rules), safety hooks, or MCP config. Those stay
 at repo level deliberately, because they differ per repo (or are safety-critical). The plugins
 deliberately carry **no safety/guardrail hooks** and **no repo-specific skills** — with a few named,
-repo-neutral exceptions: the skill `specialists-init` (the adoption path itself) and three
-informational, read-only SessionStart hooks that never block — `roster-sessioncheck` (roster-drift
-signaling) in the **core team**, and `connector-sessioncheck` (sync signaling) plus
-`script-contract-sessioncheck` (signals when a repo's own workflow libs no longer expose a function the
-shared scripts call) in the **workflow**; see the [connectors README](connectors/README.md).
+repo-neutral exceptions: the skill `specialists-init` (the adoption path itself), the skill
+`discover-workflow` (`workflow-default`'s own repo-neutral read, see
+[Teams and workflows](#teams-and-workflows--whats-the-difference)), and three informational, read-only
+SessionStart hooks that never block — `roster-sessioncheck` (roster-drift signaling) in the **core
+team**, and `connector-sessioncheck` (sync signaling) plus `script-contract-sessioncheck` (signals when
+a repo's own workflow libs no longer expose a function the shared scripts call) in **`workflow-davekjohn`**;
+see the [connectors README](connectors/README.md).
 The add-on teams `team-lifehub` and `team-shopify` may carry domain skills that a repo shares.
 
 **Those last two moved out of the core on August 8, 2026, and the reason is the doctrine rather than
@@ -205,7 +212,7 @@ The full picture, top-level folder by folder:
 - **`.claude-plugin/marketplace.json`** — the marketplace definition: the plugins (teams and workflow alike) with their `source`.
 - **[`plugins/`](plugins/)** — the plugin source. One folder per plugin (`team-alpha`,
   `team-lifehub`, `team-shopify`, `team-ecomm`,
-  `workflow-davekjohn`), each carrying
+  `workflow-default`, `workflow-davekjohn`), each carrying
   `agents/`/`manuals/`/`personas/`/`skills/` plus its own `plugin.json` — and next to them
   **`agent-shared/`**, the canonical source of the shared agent-def blocks
   described under
@@ -471,7 +478,7 @@ SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-con
 function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `fix-mojibake`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `cut-release`,
-`adopt-config`)<!-- /skills:all -->
+`adopt-config`, `discover-workflow`)<!-- /skills:all -->
 remain available there.
 
 Skills themselves are Anthropic's general **Agent Skills** mechanism — organized folders of
@@ -487,8 +494,8 @@ interchangeable with — a Claude Code subagent.
 
 <!-- skills:all -->Most skills in claude-code-specialists today (`fold-changelog`, `open-pr`, `ship-pr`,
 `new-branch`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`, `sync-roster`,
-`start-task`, `adopt-config`) are a thin wrapper around a script — procedural **mechanism** (branch, PR, ship, fold,
-bootstrap, teardown, roster-sync, encoding repair). `cut-release`<!-- /skills:all --> is the deliberate exception:
+`start-task`, `adopt-config`, `discover-workflow`) are a thin wrapper around a script — procedural **mechanism** (branch, PR, ship, fold,
+bootstrap, teardown, roster-sync, encoding repair, reading a repo's own conventions). `cut-release`<!-- /skills:all --> is the deliberate exception:
 a checklist with no script of its own (see below). Either way, the specialists' craft and judgment
 live in the persona/manual context (agent defs), not in skills. That's a deliberate split, but it
 also means we currently use only one half of what Agent Skills can carry.

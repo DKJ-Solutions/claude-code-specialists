@@ -167,7 +167,23 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
-            # THE ONE LIB WITH A READER IN BOTH PLUGINS, and therefore the one entry with a second
+            # THE THIRD MIRROR OF THIS LIB (August 9, 2026), and it needs exactly one function:
+            # Get-SeamPaths. discover-workflow writes its document INSIDE the seam so the teardown
+            # removes it without knowing it exists, and where the seam is has one source -- the same
+            # source the bootstrap writes to and the teardown matches on. A literal here would be a
+            # third statement of that path, which is how a writer and a remover start disagreeing.
+            #
+            # The cost is honest and worth naming: a consumer that enables only the default workflow
+            # receives this lib for one function. The alternative was reaching into the core team's
+            # cache directory, which the note below already rejects on sight for the workflow plugin,
+            # and for the same reason: separately versioned, separately installed.
+            Name    = 'check-report-lib-default'
+            Source  = 'scripts\lib\check-report-lib.ps1'
+            Plugin  = 'workflow-default'
+            LibOnly = $true
+        },
+        @{
+            # THE LIB WITH A READER IN MORE THAN ONE PLUGIN, and therefore the entry with a second
             # mirror of the same source (August 8, 2026). check-roster-sync stays in the core while
             # check-script-contract went to the workflow plugin, and both dot-source this file as a
             # $PSScriptRoot-relative sibling. The alternative -- the workflow mirror reaching into the

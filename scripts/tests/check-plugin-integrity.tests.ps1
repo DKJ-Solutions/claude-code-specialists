@@ -271,23 +271,34 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-alpha\references') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-beta') -Force | Out-Null
 
-    # The marketplace: what makes those directories PLUGINS rather than just directories. Both plugins the
-    # shared-scripts registry names are declared, each with a manifest, so checks 1 and 2 pass cleanly and
-    # the registry resolves. See this file's header for why the fixture stopped being marketplace-less.
+    # The marketplace: what makes those directories PLUGINS rather than just directories. EVERY plugin
+    # the shared-scripts registry names is declared here, each with a manifest, so checks 1 and 2 pass
+    # cleanly and the registry resolves. See this file's header for why the fixture stopped being
+    # marketplace-less.
+    #
+    # THAT LIST HAS TO GROW WITH THE REGISTRY, and the failure mode when it does not is loud rather than
+    # subtle: Get-SharedScriptPairs throws on a pair naming a plugin the marketplace does not declare,
+    # which kills the gate mid-run and fails a dozen unrelated scenarios. Measured when workflow-default
+    # was added and this list was not. Loud is the design -- a silently dropped pair would be worse --
+    # but it means adding a plugin means adding it here too.
     New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude-plugin') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\teams\team-alpha\.claude-plugin') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\workflows\workflow-default\.claude-plugin') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\workflows\workflow-davekjohn\.claude-plugin') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude-plugin\marketplace.json'), (@'
 {
   "name": "fixture-marketplace",
   "plugins": [
-    { "name": "team-alpha",                    "source": "./plugins/teams/team-alpha" },
+    { "name": "team-alpha",         "source": "./plugins/teams/team-alpha" },
+    { "name": "workflow-default",   "source": "./plugins/workflows/workflow-default" },
     { "name": "workflow-davekjohn", "source": "./plugins/workflows/workflow-davekjohn" }
   ]
 }
 '@), $Utf8NoBom)
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-alpha\.claude-plugin\plugin.json'),
         "{ `"name`": `"team-alpha`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\workflows\workflow-default\.claude-plugin\plugin.json'),
+        "{ `"name`": `"workflow-default`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\workflows\workflow-davekjohn\.claude-plugin\plugin.json'),
         "{ `"name`": `"workflow-davekjohn`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
 
