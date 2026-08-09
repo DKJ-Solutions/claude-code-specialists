@@ -80,6 +80,17 @@ accepted degree of transparency (security review, July 16, 2026).
   outbound half of [the check](#the-check) report a registered extension as missing from a plugin the
   consumer never installed, turning the register itself into a false alarm about a migration nobody
   performed.
+
+  **This paragraph and the check disagreed for a few hours, and the check was the one that was wrong**
+  (August 9, 2026). Written on the day the teams/workflows rename landed, it described the intended
+  behaviour of a register that the check was at that moment reporting four `[ERROR]` lines against —
+  because resolving a plugin id through the marketplace, which the check had started doing a few
+  branches earlier, turns a renamed-upstream id into a failed lookup indistinguishable from a malformed
+  one. Both collapsed into *"invalid or unknown plugin field"*. The check now tells the two apart and
+  reports an id the marketplace no longer declares as an `[INFO]`: this consumer has not migrated,
+  which is a state rather than a defect. Worth keeping as a shape, not just as a fix — a document
+  written to describe a mechanism is not evidence about it, and this one was published a branch before
+  anybody ran the thing it described.
 - `notes` is the human summary/explanation; updated when something changes substantively, not on
   every check.
 - **The manifest deliberately has no version bookkeeping (anymore)** (decision by Dave, July 20,
