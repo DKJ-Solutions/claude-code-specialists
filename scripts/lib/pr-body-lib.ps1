@@ -58,6 +58,94 @@ function Get-EntryDescription {
     return (($lines[($h3 + 1)..($lines.Count - 1)]) -join "`n").Trim()
 }
 
+function Get-PrDescription {
+    <#
+    .SYNOPSIS
+        What a PR body should carry from an entry: the answer onwards, without the entry's front matter.
+
+    .DESCRIPTION
+        THE PR BODY IS NOT THE WHOLE DOSSIER (Dave, August 9, 2026). Get-EntryDescription returns
+        everything after the entry's own heading, which is right for the fold -- CHANGELOG.md receives the
+        dossier verbatim, front matter and all, and that was chosen deliberately. It is wrong for a PR,
+        where the first three sections are answered by the page around the body:
+
+          Branch title  -> IS the PR title, composed from this same section and shown above the body
+          Branch ID     -> a creation timestamp; nothing a reviewer can act on
+          Branch type   -> the PR's label, and the prefix of the title one line up
+
+        So a reviewer opened a PR and met three restatements before the first sentence about the change.
+        The trailing 'Pull Request' section goes for the mirror-image reason: the FOLD fills it, from the
+        merge -- in a PR body it is a heading with nothing under it, every time, by construction.
+
+        WHAT IS KEPT is the answer and the Significance sections. Significance is not front matter: it is
+        the author saying how far the change reaches and what it is worth to each audience, which is
+        exactly what a reviewer is deciding about.
+
+        RETURNS '' WHEN THE 'What' SECTION IS ABSENT, and the caller falls back to Get-EntryDescription.
+        That is the whole back-compat story: a pre-dossier entry has no such section (its description sat
+        straight under the heading), and every consumer with a branch in flight is in that position --
+        they reach this code through a plugin update rather than by choosing to. Returning '' rather than
+        guessing keeps the old path exactly as it was.
+
+        FENCE-AWARE, like every reader of this format: an entry documenting the entry format quotes these
+        headings inside a fence, and the entry for this very change does. A fenced '### Significance'
+        would otherwise cut the description off mid-sentence -- plausible output rather than a failure,
+        which is the worst shape.
+
+        Section names come from Get-EntrySectionHeadings / Get-EntrySectionRetiredNames when the
+        scaffold lib is loaded (open-pr dot-sources both), so a repo that renamed or translated a heading
+        is read by its own names. Probed with Get-Command rather than required, because this file is
+        dot-sourced on its own by its suite -- the English defaults are the fallback, not a second
+        definition: they are the same strings that lib ships.
+
+    .PARAMETER EntryText
+        The full text of the changelog entry file.
+    #>
+    param([string]$EntryText)
+
+    if (-not $EntryText) { return '' }
+
+    $whatNames = @('What does the change on this branch bring to main?', 'What does this change do?')
+    $endNames  = @('Pull Request')
+    if (Get-Command -Name Get-EntrySectionHeadings -ErrorAction SilentlyContinue) {
+        $headings = Get-EntrySectionHeadings
+        $whatNames = @($headings['What'])
+        $endNames  = @($headings['PullRequest'])
+        if (Get-Command -Name Get-EntrySectionRetiredNames -ErrorAction SilentlyContinue) {
+            $whatNames += @(Get-EntrySectionRetiredNames -Key 'What')
+            $endNames  += @(Get-EntrySectionRetiredNames -Key 'PullRequest')
+        }
+    }
+    $whatNames = @($whatNames | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $endNames  = @($endNames  | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($whatNames.Count -eq 0) { return '' }
+
+    $toPattern = {
+        param($names)
+        '^#{2,4}\s+(?:' + ((@($names) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|') + ')\s*$'
+    }
+    $whatRx = & $toPattern $whatNames
+    $endRx  = if ($endNames.Count -gt 0) { & $toPattern $endNames } else { $null }
+
+    $lines = $EntryText -split "\r?\n"
+    $start = -1
+    $end = $lines.Count
+    $inFence = $false
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '^\s*(```|~~~)') { $inFence = -not $inFence; continue }
+        if ($inFence) { continue }
+        $line = $lines[$i].TrimEnd()
+        if ($start -lt 0) {
+            if ($line -match $whatRx) { $start = $i }
+            continue
+        }
+        if ($endRx -and $line -match $endRx) { $end = $i; break }
+    }
+
+    if ($start -lt 0 -or ($start + 1) -ge $end) { return '' }
+    return (($lines[($start + 1)..($end - 1)]) -join "`n").Trim()
+}
+
 function Get-PrTitle {
     <#
     .SYNOPSIS
