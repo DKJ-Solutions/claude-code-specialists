@@ -990,6 +990,13 @@ Assert-Equal "3" ((Get-OverviewSectionHeading -ReadmeContent $tiers) -replace '^
 # pinned rather than left to inspection. It answered '2' until the 3.x section was opened, which is
 # exactly what made a 3.0.0 cut misfile -- and this assertion is what forced that change to be stated
 # instead of quietly landing. Update it, with a reason, whenever a new major section is opened.
+#
+# '3' -> '4' ON AUGUST 9, 2026, when the 4.x section was opened to cut v4.0.0. Recorded because the
+# mechanism worked exactly as designed and that is worth one line: cut-release refused the cut rather
+# than filing a v4.0.0 row under '#### 3.x', the section was opened by hand because opening a major is a
+# milestone the script deliberately does not perform for you, and THIS assert then went red -- so the
+# same edit could not land with only half of it done. The pairing is the point: the overview and this
+# pin are one fact written twice, and a cut is the one moment they are allowed to disagree.
 # The path comes from the repo's own Get-ReleaseHistoryPath rather than being written out again here, and
 # that choice has now paid off TWICE IN OPPOSITE DIRECTIONS on the same day (August 4, 2026): the overview
 # moved out of releases/README.md into its own HISTORY.md, and then back again when the pages were merged.
@@ -1004,7 +1011,7 @@ $liveReadme = Join-Path $PSScriptRoot ('..\..\' + ((& {
     if (Get-Command Get-ReleaseHistoryPath -ErrorAction SilentlyContinue) { Get-ReleaseHistoryPath } else { 'releases/README.md' }
 }) -replace '/', '\'))
 if (Test-Path -LiteralPath $liveReadme) {
-    Assert-Equal '3' (Get-OverviewTargetMajor -ReadmeContent (Get-Content -LiteralPath $liveReadme -Raw -Encoding UTF8)) "this repo's own overview now targets 3.x -- a 3.0.0 cut lands under its own major, and a 2.x cut would be refused"
+    Assert-Equal '4' (Get-OverviewTargetMajor -ReadmeContent (Get-Content -LiteralPath $liveReadme -Raw -Encoding UTF8)) "this repo's own overview now targets 4.x -- a 4.0.0 cut lands under its own major, and a 3.x cut would be refused"
 }
 
 Write-Host "Test-ReleaseBumpEarned -- the bump has to be earned" -ForegroundColor Cyan
