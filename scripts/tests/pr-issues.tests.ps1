@@ -174,7 +174,28 @@ Assert-True ($block -match '(?m)^Closes #331$') 'block has its own line for #331
 Assert-True ($block -match '(?m)^Closes #332$') 'block has its own line for #332'
 Assert-True ($block -notmatch ',')              'block contains NO comma list (GitHub would close only the first)'
 Assert-Equal 2 (@([regex]::Matches($block, '(?m)^Closes #\d+$')).Count) 'one closing line PER issue'
-Assert-True ($block -match '## Resolved issues')  'block carries its heading'
+Assert-True ($block -match '## Resolved issues')  'block carries its heading, at H2 by default -- what every consumer body still uses'
+
+# THE LEVEL IS A PARAMETER, AND THAT IS A CORRECTNESS FIX RATHER THAN STYLING (August 9, 2026). The
+# block must be a SIBLING of the description: -RefreshBody replaces the description by scanning to the
+# next heading at its level or shallower, so a block DEEPER than the description sits inside it and is
+# deleted by the next refresh -- taking the closing keywords with it. GitHub would then close nothing at
+# the merge, which is the #341-#343 failure walking back in through the door built to stop it.
+$blockH1 = New-ResolvesBlock -Issues @(7) -Level 1
+Assert-True ($blockH1 -match '(?m)^# Resolved issues$')  'the level is honoured: H1 for a body whose description is H1'
+Assert-True ($blockH1 -match '(?m)^Closes #7$')          'and the closing keyword is unaffected by the level'
+Assert-Set @(7) (Get-ClosedIssueNumbers -Text $blockH1)  'the reader is keyword-based, so it reads an H1 block exactly as it reads an H2 one'
+
+# Add-ResolvesBlock DERIVES the level from the body it is appending to, so no caller has to remember.
+$h1Body = "# What does the change on this branch bring to main?`n`nSome text."
+Assert-True ((Add-ResolvesBlock -Body $h1Body -Issues @(9)) -match '(?m)^# Resolved issues$') 'an H1 body gets an H1 block'
+$h2Body = "## What does this change do?`n`nSome text."
+Assert-True ((Add-ResolvesBlock -Body $h2Body -Issues @(9)) -match '(?m)^## Resolved issues$') "a consumer's H2 body still gets an H2 block"
+$noHeading = 'just a paragraph'
+Assert-True ((Add-ResolvesBlock -Body $noHeading -Issues @(9)) -match '(?m)^## Resolved issues$') 'a body with no heading falls back to H2, the level every body carried before this'
+# A fenced heading is sample text and must not decide the level of a real section.
+$fencedFirst = "``````text`n# not a heading`n```````n`n## Real heading`n`ntext"
+Assert-True ((Add-ResolvesBlock -Body $fencedFirst -Issues @(9)) -match '(?m)^## Resolved issues$') 'a heading inside a fence does not set the level'
 # Round trip: what the writer produces is exactly what the recogniser reads back.
 Assert-Set @(331, 332) (Get-ClosedIssueNumbers -Text $block) 'round trip: writer output reads back as both issues'
 

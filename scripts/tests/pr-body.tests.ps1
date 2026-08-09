@@ -233,13 +233,21 @@ Because of this.
 '@
 $prDesc = Get-PrDescription -EntryText $dossier
 Assert-True ($prDesc -match '(?m)^The real answer\.$')      'the answer is carried'
-Assert-True ($prDesc -match '(?m)^### Significance$')       'Significance is kept -- it is what a reviewer decides about'
+Assert-True ($prDesc -match '(?m)^## Significance$')        'Significance is kept -- it is what a reviewer decides about'
 Assert-True ($prDesc -match '(?m)^\*\*Score:\*\* 3$')       'and its scores come with it'
 Assert-True ($prDesc -notmatch 'A short title')             'the Branch title is dropped -- it IS the PR title, shown above the body'
 Assert-True ($prDesc -notmatch '20260809-113542')           'the Branch ID is dropped -- a timestamp a reviewer cannot act on'
 Assert-True ($prDesc -notmatch '(?m)^### Branch type$')     'the Branch type section is dropped -- it is the PR label'
 Assert-True ($prDesc -notmatch '(?m)^### Pull Request$')    'the Pull Request section is dropped -- the fold fills it, so it is always empty here'
 Assert-True ($prDesc -notmatch 'What does the change on this branch bring to main') 'the heading itself is dropped -- the template carries it, so it cannot appear twice'
+
+# PROMOTED ONE LEVEL (Dave, August 9, 2026). The entry's sections are H3 and its tiers H4 because the
+# entry is an H2 inside CHANGELOG.md; a PR body is a document of its own, whose title GitHub prints
+# above it. Carried across unchanged, a body started at H2 with tiers at H4 -- the shape of a fragment.
+Assert-True ($prDesc -match '(?m)^## Significance$')  'Significance is promoted from H3 to H2'
+Assert-True ($prDesc -match '(?m)^### Tier 0$')       'and the tier from H4 to H3'
+Assert-True ($prDesc -notmatch '(?m)^### Significance$') 'the original H3 level is gone, not merely duplicated'
+Assert-True ($prDesc -notmatch '(?m)^#### ')          'nothing in the body is left at H4'
 
 # THE FENCE CASE, which is not hypothetical: the entry documenting this change quotes these headings
 # inside a fence. Cutting at a fenced heading would return plausible half-output rather than failing.
@@ -263,6 +271,9 @@ After the fence.
 $fencedDesc = Get-PrDescription -EntryText $fenced
 Assert-True ($fencedDesc -match '(?m)^After the fence\.$') 'a fenced heading does not end the description'
 Assert-True ($fencedDesc -match '(?m)^### Pull Request$')  'and the fenced quote itself survives inside the body'
+# The promotion must not reach inside a fence either: a fenced heading is SAMPLE TEXT, and an entry
+# explaining this format would have its own example silently rewritten to say something else.
+Assert-True ($fencedDesc -match '(?m)^### Significance$')  'a heading inside a fence keeps its level -- it is a quote, not a section'
 
 # BACK-COMPAT: a pre-dossier entry has no such section, and '' is how this says so -- open-pr then falls
 # back to Get-EntryDescription, which is the behaviour every consumer with a branch in flight has today.
@@ -308,10 +319,14 @@ Assert-True ($placeholderLines.Count -ge 1) 'the template carries at least one c
 $matched = @($placeholderLines | Where-Object { $openPrText.Contains($_.Trim()) })
 Assert-True ($matched.Count -ge 1) 'open-pr recognises the template placeholder verbatim -- otherwise every PR body loses its description, silently'
 
-# And the description heading open-pr reads (the first '## ' line) must actually be there, since
-# -RefreshBody has nothing to target without it.
-$firstH2 = @($templateLinesForTest | Where-Object { $_ -match '^##\s+\S' }) | Select-Object -First 1
-Assert-True ([bool]$firstH2) 'the template has a "## " heading for the description to live under'
+# And the description heading open-pr reads (the template's first heading, AT ANY LEVEL) must actually
+# be there, since -RefreshBody has nothing to target without it. The pattern is level-agnostic on
+# purpose: it read '^##' until this repo's template was promoted to H1, at which point open-pr found
+# nothing and would have degraded to "the description was left as it is" on every run -- a silent loss
+# of the whole feature, worded as a decision. This assert is what would have caught that.
+$firstHeading = @($templateLinesForTest | Where-Object { $_ -match '^#{1,6}\s+\S' }) | Select-Object -First 1
+Assert-True ([bool]$firstHeading) 'the template has a heading for the description to live under'
+Assert-True ($openPrText -match "Where-Object \{ \`$_ -match '\^#\{1,6\}\\s\+\\S' \}") 'and open-pr looks for it at any level, not just H2'
 
 # THE FALLBACK THAT KEEPS OLDER PRs REFRESHABLE. -RefreshBody targets whatever heading the template
 # names today; a PR opened before a rename carries the previous one in its published body, and
@@ -320,7 +335,8 @@ Assert-True ([bool]$firstH2) 'the template has a "## " heading for the descripti
 # the strings are the whole mechanism: they are not derivable from anything, only remembered.
 Assert-True ($openPrText.Contains('## What does this change do?')) 'open-pr still recognises the pre-#538 description heading, so a PR opened under it stays refreshable'
 Assert-True ($openPrText.Contains('## Changelog entry')) 'and the one-day-old heading between them, for PRs opened on August 9, 2026'
-foreach ($legacy in @('## Changelog entry', '## What does this change do?', '## Wat doet deze wijziging?')) {
+Assert-True ($openPrText.Contains('## What does the change on this branch bring to main?')) 'and the H2 form of the current wording, which was live for a single day'
+foreach ($legacy in @('## What does the change on this branch bring to main?', '## Changelog entry', '## What does this change do?', '## Wat doet deze wijziging?')) {
     $legacyBody = "$legacy`nold text`n`n## Resolved issues`nCloses #1"
     $didChange = $false
     $out = Update-PrBodySection -Body $legacyBody -Heading $legacy -Content 'new text' -Changed ([ref]$didChange)
