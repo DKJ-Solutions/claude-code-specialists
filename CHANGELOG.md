@@ -372,10 +372,16 @@ whoever adds check 23. The gate itself costs a developer here nothing: the tree 
 
 #### Tier 1
 
-Nothing here is legible outside this repo's own developers and the consumers below — there is no
-organisational effect distinct from the consumer-facing repair itself, which tier 2 states.
+Scored on 2026-08-09, at the `v3.10.0` cut, because the significance gate refused the entry as it
+stood: it claimed tier 2 while answering `N/A` here, and the ladder is cumulative — a change a consumer
+notices is one this project's colleagues get something out of too. Re-reading the change rather than the
+claim shows what the original reasoning missed, and it is not a technicality: the same PR added **60
+lines to `check-plugin-integrity.ps1`** — check 22 — which now refuses any shipped skill page whose
+runnable command names a machine-specific path. The page repair was the instance; the gate is what makes
+the class unshippable. Anyone writing a skill page here is now stopped before the mistake reaches a
+consumer instead of after.
 
-**Score:** N/A
+**Score:** 3
 
 #### Tier 2
 
