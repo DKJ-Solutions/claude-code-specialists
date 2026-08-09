@@ -41,8 +41,15 @@
 
 ### Where I left off
 
-Branch 1 of 6 is complete and green. Plan for the whole restructure:
-`C:\Users\DaveKok\.claude\plans\serene-sparking-journal.md`.
+Branch 1 of 6 is complete and green. The restructure it prepares, in order:
 
-Next: `feat/teams-and-workflows-rename` -- the five plugins renamed, still flat under `plugins/`.
-That is the only branch in the chain that breaks existing installs.
+1. `feat/plugin-tree-is-name-agnostic` -- this one: the scripts stop encoding the layout.
+2. `feat/teams-and-workflows-rename` -- the five plugins renamed, still flat under `plugins/`.
+   **The only branch in the chain that breaks existing installs.**
+3. `feat/teams-and-workflows-tree` -- moved into `plugins/teams/` and `plugins/workflows/`.
+   Invisible to a consumer: plugin names do not change, only the repo-internal `source`.
+4. `feat/workflow-default` -- the sixth plugin, for a repo that has chosen no workflow.
+5. `feat/one-workflow-at-a-time` -- exactly one workflow may be enabled; the check lives in the core.
+6. `docs/migrating-to-teams-and-workflows` -- how an existing consumer gets from here to there.
+
+Next: branch 2.

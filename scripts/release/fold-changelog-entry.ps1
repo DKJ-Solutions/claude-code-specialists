@@ -533,8 +533,9 @@ foreach ($file in $entryFiles) {
         # this repo's marketplace declares becomes a 'Plugins:' line, which the release notes read
         # (Get-EntryPlugins). It fed the per-plugin CHANGELOGs too until those were retired on
         # August 8, 2026 -- the line outlived them. The detection itself lives in the pure
-        # Get-TouchedPlugins (release-lib.ps1, #103); 'files' already came along with the gh pr list
-        # call above, so no separate gh roundtrip is needed.
+        # Get-TouchedPlugins (plugin-tree-lib.ps1, #103 -- release-lib.ps1 until August 9, 2026, and
+        # this script no longer loads that file at all); 'files' already came along with the gh pr
+        # list call above, so no separate gh roundtrip is needed.
         #
         # No guard around it any more: a repo that declares no plugins yields no roots and therefore no
         # line, so the empty case answers itself instead of being tested for here.

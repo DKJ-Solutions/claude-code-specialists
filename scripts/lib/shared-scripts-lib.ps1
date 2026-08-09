@@ -51,7 +51,17 @@ function Get-SharedScriptPairs {
         reason at the registration. Without it the check would be bypassed wholesale the first time it
         fired on a test-only override, and a gate that gets bypassed guards nothing.
     #>
-    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        # The plugin set, when the caller has already resolved it. Optional, and it exists for exactly
+        # one caller: the lint gate derives the set once at its top, inside a try/catch, so that a
+        # marketplace.json it cannot parse degrades to an empty set instead of aborting a run that has
+        # nineteen more checks to report. Without this it would resolve the set a SECOND time in here,
+        # unguarded -- measured before the parameter was added: a corrupt marketplace killed the gate at
+        # check 8, so checks 9 through 22 never ran and no Summary was printed at all. One read per run,
+        # one place that decides what a parse failure means.
+        [AllowNull()][AllowEmptyCollection()][object[]]$PluginRoots
+    )
 
     $pairs = @(
         @{
@@ -323,7 +333,14 @@ function Get-SharedScriptPairs {
     #
     # That every pair resolves in THIS repo is asserted in scripts/tests/shared-scripts.tests.ps1 rather
     # than left to the throw, so a typo is caught where the claim is actually checkable.
-    $pluginRoots = @(Get-RepoPluginRoots -RepoRoot $RepoRoot)
+    # THE OUTER @() IS LOAD-BEARING, and an @() inside each branch is not enough: the output of an if
+    # STATEMENT is unrolled on assignment, so the inner wrap is undone on the way out and an empty set
+    # arrives as $null -- which then fails .Count under StrictMode. Same unrolling this lib's own
+    # $PluginRoots parameters guard against, one level up.
+    $pluginRoots = @(
+        if ($PSBoundParameters.ContainsKey('PluginRoots')) { $PluginRoots }
+        else { Get-RepoPluginRoots -RepoRoot $RepoRoot }
+    )
     if ($pluginRoots.Count -eq 0) { return }
 
     foreach ($p in $pairs) {

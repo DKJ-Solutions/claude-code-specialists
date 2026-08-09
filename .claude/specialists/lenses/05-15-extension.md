@@ -84,8 +84,9 @@ infrastructure.
   drift check, a `^plugins/<name>/` regex with an exception for the one sibling that is not a plugin, a
   path-segment index in the shared-scripts registry, three `Split-Path`s upward from a `plugin.json`,
   and a `Join-Path <plugins root> <name>`. None of those is a fact about plugins; they are facts about
-  one layout, and this tree has moved twice. Dependency-free on purpose — two callers run at
-  SessionStart. Mirrored, because `release-lib.ps1` dot-sources it.
+  one layout, and this tree has moved twice. Dependency-free on purpose: one caller runs at
+  SessionStart (`check-connectors.ps1`, via `connector-sessioncheck`) and another is the fold, which
+  runs straight after a merge on the trunk. Mirrored, because `release-lib.ps1` dot-sources it.
 - **`scripts/lib/branch-info.ps1`** — the prefix→label→changelog-type table (shared with the
   release scripts). Deliberately no `release` prefix: a release does not go via a branch/PR but
   directly on `main`.

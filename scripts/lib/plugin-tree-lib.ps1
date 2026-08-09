@@ -37,14 +37,19 @@
     at the next function as $null and a [Parameter(Mandatory)] rejects it even behind
     AllowEmptyCollection. Measured the first time the fold ran against a fixture with no
     marketplace.json: 'Cannot bind argument to parameter PluginRoots because it is null'. This repo has
-    paid for the same unrolling before -- the '@() is load-bearing' note in shared-scripts-lib.ps1, and
-    the follow-up commit that made the widened collections survive a single-element repo. Same trap, one
-    layer down: a function whose empty case is normal must not be able to fail on it.
+    paid for the same unrolling before -- the "outer @() is load-bearing" notes in
+    check-plugin-integrity.ps1 and build-agent-defs.ps1, and the follow-up commit that made the widened
+    collections survive a single-element repo. Same trap, one layer down: a function whose empty case is
+    normal must not be able to fail on it.
 
     No Set-StrictMode here: dot-sourcing would change the strict mode of the calling script.
-    No dependencies, deliberately -- two of the callers (check-connectors.ps1 via
-    connector-sessioncheck, and check-script-contract.ps1's neighbours) run at SessionStart, where
-    pulling in a heavyweight lib to resolve a handful of paths is a cost paid on every single session.
+
+    No dependencies, deliberately. One caller runs at SessionStart -- check-connectors.ps1, via the
+    connector-sessioncheck hook -- where pulling a heavyweight lib in to resolve a handful of paths is a
+    cost paid on every single session. The other reason is the fold: fold-changelog-entry.ps1 needs
+    Get-TouchedPlugins and runs immediately after a merge, directly on the trunk, and reaching it
+    through release-lib would load three thousand lines of entry-scaffold-lib behind it.
+
     Pure ASCII (repo convention for .ps1).
 #>
 
@@ -215,11 +220,13 @@ function Get-TouchedPlugins {
 function Get-PluginSubdirs {
     <#
         The <Leaf> directory of every plugin that has one -- e.g. every 'agents' directory across the
-        whole set, as full paths. Existence-filtered, because not every plugin carries every kind:
-        only the core ships personas/, only two ship skills/.
+        whole set, as full paths. Existence-filtered, because not every plugin carries every kind.
 
         Exists so the consumer-drift check stops keeping a hand-written list of directories per kind.
         That list is where the measured asymmetry lived.
+
+        Existence-filtered because not every plugin carries every kind: measured August 9, 2026, one of
+        the five ships personas/ and three ship skills/.
     #>
     param(
         [AllowNull()][AllowEmptyCollection()][object[]]$PluginRoots = @(),

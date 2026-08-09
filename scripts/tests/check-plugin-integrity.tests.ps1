@@ -239,8 +239,22 @@ function Assert-True {
 function Invoke-Integrity {
     param([string]$FixtureRoot)
     $scriptPath = Join-Path $FixtureRoot 'scripts\lint\check-plugin-integrity.ps1'
-    $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath 2>&1
-    return [pscustomobject]@{ Code = $LASTEXITCODE; Out = ($out -join "`n") }
+    # $ErrorActionPreference IS RELAXED AROUND THE CHILD CALL, the same way Invoke-Fold does it in
+    # fold-changelog.tests.ps1. With 'Stop' in force, anything the gate writes to stderr comes back as a
+    # terminating NativeCommandError and kills THIS script -- so a scenario that makes the gate crash
+    # aborts the suite mid-run instead of failing its own assert. Measured while adding the corrupt-
+    # marketplace scenario: the run ended at this line with a raw exception and printed neither a [FAIL]
+    # nor a total, which is a test that discriminates but cannot say why. A gate crashing is exactly the
+    # kind of thing this suite exists to catch, so it has to survive catching it.
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath 2>&1
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+    return [pscustomobject]@{ Code = $code; Out = ($out -join "`n") }
 }
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
@@ -1783,6 +1797,32 @@ try {
     $c4 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($c4.Out -match '\[skill-command\] plugins')) `
         'skill-command: a signposted <plugin> placeholder passes, so the check needs no exemption list'
+
+    # --- Scenario 55: A MARKETPLACE THAT DOES NOT PARSE STILL LEAVES A REPORTING GATE ----------------
+    # 55. The lint reads the plugin set from marketplace.json now, and the whole point of doing that
+    #     inside a swallowing try/catch is that the file it reads can be broken. Measured while this was
+    #     being reviewed, before the repair: a SECOND, unguarded read further down (check 8's registry
+    #     call) threw straight out of the script, so checks 9 through 22 never ran and no Summary line
+    #     was printed at all. A gate that dies is worse than one reporting zero, because it looks like a
+    #     crash rather than like a finding, and nothing downstream of it is heard from.
+    #
+    #     Asserted on the LAST check's coverage line and on the Summary, not on check 8's own output:
+    #     what failed was everything AFTER the throw, so that is what has to be proven present. This is
+    #     the only scenario that writes invalid JSON -- every other malformed-marketplace case in this
+    #     suite (missing plugins list, missing source) is still syntactically valid, which is exactly
+    #     why the suite could not see this.
+    $goodMarketplace = [System.IO.File]::ReadAllText((Join-Path $Fixture '.claude-plugin\marketplace.json'), [System.Text.Encoding]::UTF8)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude-plugin\marketplace.json'), '{ this is not json ', $Utf8NoBom)
+    $c5 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($c5.Out -match 'Summary:') `
+        'corrupt marketplace: the run still reaches its Summary instead of dying mid-gate'
+    Assert-True ($c5.Out -match '\[skill-command\]') `
+        'corrupt marketplace: and the checks after the plugin-set read still report'
+    Assert-True ($c5.Out -match '\[shared-script\] checked 0') `
+        'corrupt marketplace: check 8 degrades to zero pairs, visibly, rather than throwing'
+    Assert-True ($c5.Code -ne 0) `
+        'corrupt marketplace: and the run still fails -- check 1 reported the unparseable file'
+    [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude-plugin\marketplace.json'), $goodMarketplace, $Utf8NoBom)
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

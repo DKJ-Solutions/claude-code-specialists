@@ -102,9 +102,15 @@ $PluginRoots = @(Get-RepoPluginRoots -RepoRoot $RepoRoot)
 # which answers "is there a folder with this name" -- a different question, and one that gives the wrong
 # answer in both directions: a folder under plugins/ that is not a published plugin resolved happily
 # (agent-shared/ would have), while a plugin whose folder is not named after it, or does not sit exactly
-# one level down, resolved to nothing. The slug check stays in front of it as defence in depth: the name
-# comes out of a register file, and it must not be able to become a path segment unvalidated even though
-# nothing is joined with it here any more.
+# one level down, resolved to nothing.
+#
+# WHAT THE SLUG CHECK IS FOR NOW, STATED HONESTLY, because it used to be load-bearing and no longer is.
+# Test-PluginNameSlug exists to gate a value "before it becomes a path segment" (see its own docstring),
+# and nothing here builds a path out of $name any more -- the lookup is an ordinal string comparison
+# against names the marketplace declares, so a traversal sequence in the register would simply match
+# nothing. It is kept as a cheap early exit on a malformed id from a register file, not as a
+# path-traversal guard, and removing it would reopen no security hole. Said plainly so the next reader
+# does not infer one from its presence.
 function Get-PluginDir([string]$PluginId) {
     $name = $PluginId.Split('@')[0]
     if (-not (Test-PluginNameSlug -Name $name)) { return $null }

@@ -201,8 +201,19 @@ if (-not (Test-Path -LiteralPath $marketplacePath)) {
         } else {
             # Containment (Sean's advice): a source that points outside the repo via an absolute
             # or ..-path is always wrong -- what is registered here gets published.
-            # Deliberately mirrored on Get-PluginManifestPaths in scripts/lib/release-lib.ps1 (which
-            # throws; this lint collects) -- if you change the containment rule, change both.
+            #
+            # A SECOND IMPLEMENTATION OF ONE SECURITY-RELEVANT RULE, DELIBERATELY, and the pointer had
+            # gone stale: it named Get-PluginManifestPaths in release-lib.ps1, which since August 9,
+            # 2026 holds none of this logic -- it delegates to Get-PluginRoots in plugin-tree-lib.ps1.
+            # That is the copy to keep this in step with.
+            #
+            # WHY THIS ONE IS NOT SIMPLY A CALL TO IT. Get-PluginRoots THROWS on the first bad source,
+            # because its callers write to the paths it returns and must not proceed. A lint reports
+            # every finding it can and then exits non-zero, so it has to keep walking after the first
+            # -- and it names a different thing per plugin (outside the repo / folder missing / no
+            # manifest), where the lib has one job and one error. Two shapes of the same rule, and the
+            # reason is worth stating so the next reader does not "simplify" the gate into stopping at
+            # its first finding.
             $rootPrefix = [System.IO.Path]::GetFullPath($RepoRoot).TrimEnd('\') + '\'
             foreach ($p in $mp.plugins) {
                 $src = $p.source
@@ -732,7 +743,13 @@ Write-Coverage -Category 'shared' -Checked $sharedBlockFiles.Count `
 # still LF-identical to its source -- this catches a hand-edit in the mirror or a forgotten rebuild
 # (scripts/sync/build-shared-scripts.ps1) before it lands on main via a PR.
 . (Join-Path $PSScriptRoot '..\lib\shared-scripts-lib.ps1')
-$sharedPairs = @(Get-SharedScriptPairs -RepoRoot $RepoRoot)
+# THE ALREADY-RESOLVED SET IS PASSED IN, not resolved again here. The registry composes each mirror
+# path from its plugin's root, so it needs the same answer this script derived at its top -- and
+# deriving it a second time would do so OUTSIDE that guarded try/catch. Measured: with a
+# marketplace.json that does not parse, the unguarded second read threw straight out of this line and
+# ended the run, so checks 9 through 22 never reported and no Summary was printed. A gate that dies is
+# worse than a gate that reports zero, because zero is visible in the coverage line below.
+$sharedPairs = @(Get-SharedScriptPairs -RepoRoot $RepoRoot -PluginRoots $publishedPlugins)
 foreach ($pair in $sharedPairs) {
     $src = Get-NormalizedScriptContent -Path $pair.SourcePath
     if ($null -eq $src) {
