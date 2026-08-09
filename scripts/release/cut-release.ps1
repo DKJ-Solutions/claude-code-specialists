@@ -569,8 +569,21 @@ if (Test-Path -LiteralPath $relReadmePath) {
             # heading is wrong on principle here, because the history file is repo-owned via
             # Get-ReleaseHistoryPath and a consumer's may be structured differently. The '<n>.x' heading
             # is the one shape this script does depend on, so that is the one it may point at.
+            # THE ADVICE NAMES BOTH EDITS, NOT JUST THE SECTION (August 9, 2026). A repo may also PIN the
+            # major its overview targets in a test -- this repo does, deliberately, so the overview and the
+            # pin are one fact written twice and a half-done edit cannot land quietly. The consequence is
+            # that opening the section turns that test red, and until this message said so, the second
+            # commit arrived as a surprise AFTER following advice that read as complete. Naming it costs two
+            # lines and removes nothing: the pin is still repointed by a person, which is the whole point of
+            # having it. Phrased as a conditional because the pin is repo-owned -- a consumer without one
+            # reads a sentence that does not apply, which is strictly better than hitting a red test with no
+            # idea it was coming.
             "Add the section first -- directly ABOVE '$targetHeading', at that same heading level:`n`n" +
             "$newHeading`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n`n" +
+            "Then, IF this repo pins the targeted major in a test, repoint that assertion at '$newMajor' and`n" +
+            "write down why, next to it -- opening the section is what turns it red, and that is the pin doing`n" +
+            "its job rather than a broken test. Both edits belong to this cut, so they go on the trunk ahead of`n" +
+            "the release commit.`n`n" +
             "Then run this again. Opening a new major's section is a deliberate milestone moment, which is why it`n" +
             "is not done for you."
         }

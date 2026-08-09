@@ -323,6 +323,26 @@ a clean `main`:
 5. commits that directly on `main` (`release: vX.Y.Z`) and sets an annotated tag `vX.Y.Z`;
 6. pushes `main` + the tag (unless `-NoPush` for prior inspection).
 
+**Before a MAJOR cut, two edits come first — the section and the pin.** A `X.0.0` cut stops before
+writing anything, because the row would be filed under the previous major's table and nothing would
+error — a silent misfile, which is why the guardrail speaks up. Both edits are made **by hand, directly
+on `main`, ahead of the release commit** (deliberately unnumbered here, so they are not read as steps of
+the list above — they run before its first one):
+
+- add `#### <X>.x` plus its empty table header above the current top section in
+  [`releases/README.md`](../../../releases/README.md) — the refusal prints the exact heading at the
+  level the document uses, so follow what it prints rather than what this page says;
+- repoint the live assert in [`release-lib.tests.ps1`](../../../scripts/tests/release-lib.tests.ps1)
+  at the new major, **with a reason written above it** — the file asks for that in as many words.
+
+**They run under the release exception, and only inside its bounds** (Dave, August 9, 2026): a major
+only, those two paths only, once the cut has been asked for. Outside a cut they are ordinary changes on
+an ordinary branch. **Neither is automated on purpose** — the section is the milestone moment the script
+leaves to a person, and the assert is one fact deliberately written twice, so the day a script repoints
+it is the day it stops catching a half-done edit. It caught exactly that at `v4.0.0`: the assertion went
+red the moment the section was opened, which is what forced the second commit instead of letting the
+pair land half-done.
+
 Guardrails: on a clean `main`, no unfolded entry — neither a pre-split file in the root nor a filled
 `branch/branch-changelog.md`, which is its own check because a filled one looks like the reset state at a
 glance — lint gate green, and the tag must not exist yet. There is deliberately **no release branch and no `release` prefix** — the release

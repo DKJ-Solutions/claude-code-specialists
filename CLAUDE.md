@@ -33,6 +33,16 @@ for this repo (the main branch, the lint gate, the fold exception, being public)
   documents via their PR, publish. Where a repo has a separate **live stage**, that block is not part
   of this — a Release document describes a version, a live push changes what customers see. Decision
   by Dave, August 5, 2026; the release manager's own statement of it is in his portable body.
+
+  **And the same holds at the other end of the checklist, for the preparation a cut cannot run
+  without.** Opening a new **major** stops before anything is written: the release overview needs that
+  major's own section, and the test pinning which major the overview targets has to be repointed at it.
+  Neither edit is made for you — opening a major is a deliberate milestone moment — so both land
+  directly on the trunk, ahead of the release commit they exist to enable. They are covered by the
+  same request, and **bounded by it**: only for a major, only those two files, and only once a cut has
+  actually been asked for. Without a cut on the table there is nothing for them to be part of, and
+  they are then ordinary changes needing an ordinary route. Decision by Dave, August 9, 2026, after the
+  `v4.0.0` cut needed both by hand under an exception nobody had granted.
 - **`git push --force`** (on any branch whatsoever), **`git reset --hard`**, **`git rebase`** on a
   shared branch.
 - **Publishing anything externally** beyond the normal PR flow (issues on other repos, a gist, an
@@ -331,6 +341,29 @@ The constitution above, concretely implemented here:
      **empties `CHANGELOG.md` down to its intro**, commits that on `main`, and tags `vX.Y.Z`.
      Deliberately no branch/PR — just like the fold. See
      [Rendall #06](.claude/specialists/lenses/05-06-extension.md#versioning--releases).
+
+     **A MAJOR NEEDS TWO COMMITS AHEAD OF IT, AND THEY RUN UNDER THIS SAME EXCEPTION** (Dave,
+     August 9, 2026). `cut-release.ps1` refuses to file a `v4.0.0` row under `#### 3.x` and does not
+     open the new section itself, and the live assert in
+     [`release-lib.tests.ps1`](scripts/tests/release-lib.tests.ps1) pins which major
+     [`releases/README.md`](releases/README.md) targets — so cutting `v4.0.0` took `b2cea9c` (the
+     `#### 4.x` heading plus its empty table header) and `1d2d3ff` (that pin, `'3'` → `'4'`, with the
+     reason written above it) before the cut would run at all. Both were made by hand, on `main`,
+     while the exception on paper covered only the release commit itself.
+
+     **The bound is what makes it safe, and it is deliberately narrow**: a **major** only, those
+     **two paths** only, and only once the cut has been **explicitly asked for**. An exception is only
+     safe while it stays the size it was granted at — the lesson `ship-pr.ps1` cost on August 2, 2026 —
+     and this one is granted for the preparation of a requested cut, not for editing the overview or
+     the test whenever it is convenient. Outside a cut, both files take the ordinary branch + PR route.
+
+     **Neither half is automated, and that is the decision rather than a gap.** Opening the section by
+     hand is the milestone moment the script deliberately leaves to a person; the assert is the same
+     fact written a second time on purpose, so a script that repointed it would remove the tripwire
+     that caught the half-done edit here. What *was* repaired is the advice: the refusal now names both
+     edits, because naming only the section is what made the second commit a surprise. **A major is not
+     rare here** — `v1.0.0` through `v4.0.0` fell on July 14, July 23, July 30 and August 9, 2026, one
+     every nine days or so — so this comes round again soon enough to be worth writing down.
 
      **It also used to write a per-plugin `CHANGELOG.md` and a consumer-facing `RELEASE.md` card into
      every plugin folder; both were retired on August 8, 2026 (Dave).** The repo has become the product,
