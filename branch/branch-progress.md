@@ -7,7 +7,7 @@
 - [x] Carry the step into the portable `cut-release` skill as step 0 — a consumer meets the same refusal and had no documented way through it
 - [x] Extend `cut-release.ps1`'s new-major refusal so its advice names the pinned assert as well as the section, and re-mirror it to the plugin
 - [x] Check whether the extended advice needs a test: yes — four asserts in `cut-release-guardrail.tests.ps1`, verified to go red against the previous version of the script
-- [ ] Review pass on the diff (copy edit + code review)
+- [x] Review pass on the diff (copy edit + code review): two findings, both applied — a "Step 0" heading in the lens colliding with the numbered step list it sat behind, and a sentence saying `v4.0.0` went red where the assertion did
 
 ### Where I left off
 
