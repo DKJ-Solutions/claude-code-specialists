@@ -486,7 +486,7 @@ $lensLinkFiles = @()
 foreach ($extDir in @(
     (Join-Path $RepoRoot '.claude\specialists\lenses'),
     (Join-Path $RepoRoot '.claude\specialists'),
-    (Join-Path $RepoRoot '.claude\plugins\claude-specialists\specialists'),
+    (Join-Path $RepoRoot '.claude\plugins\claude-specialists\team-alpha'),
     (Join-Path $RepoRoot '.claude\extensions'))) {
     if (Test-Path -LiteralPath $extDir) {
         $lensLinkFiles += (Get-ChildItem -Path $extDir -Filter '*.md' -File | Select-Object -ExpandProperty FullName)
@@ -965,7 +965,7 @@ if ($skillSpanCount -eq 0) {
 #
 # THE DISCRIMINATOR, and it is the whole reason this can be a generic scan where check 10 could not be.
 # A command with an explicit @-TARGET is an instruction someone runs:
-#     claude plugin install specialists@claude-code-specialists --scope project
+#     claude plugin install team-alpha@claude-code-specialists --scope project
 #     claude plugin update <plugin>@<marketplace> --scope project
 # A BARE mention is prose discussing the command, and demanding flags there would be nonsense:
 #     "`claude plugin update` has the same default", "Because `claude plugin update` pins the cache"
@@ -1858,7 +1858,7 @@ Write-Coverage -Category 'entry-shape' -Checked $scChecked `
 
 # --- 21. The config blueprint matches what the source's own libs say right now -----------------------------
 #
-# The blueprint (plugins/specialists-workflow-davekjohn/blueprint/config-blueprint.json) is what a
+# The blueprint (the workflow plugin's blueprint/config-blueprint.json) is what a
 # consumer adopts its workflow config FROM: the source's own answers, with the reasoning that produced
 # them. It is generated from scripts/repo-config.ps1, scripts/lib/branch-info.ps1 and the contract
 # registry -- so the moment any of those three changes, the shipped artefact describes a repo that no

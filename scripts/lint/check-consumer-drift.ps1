@@ -76,7 +76,7 @@ $PluginRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')
 # three directories on disk and the check's coverage was correct. What it was, was a trap with no way to
 # see it -- the day that group gains a persona, it goes uncovered, silently, and no gate can report a
 # hand-written list as incomplete because there is nothing to measure it against. Item 4 of the README's
-# 'Adding a new plugin group' checklist existed to keep both lists current by hand, and that is the
+# 'Adding a new team' checklist existed to keep both lists current by hand, and that is the
 # maintenance this replaces.
 #
 # Existence-filtered, because not every plugin carries both: only the core ships personas/.

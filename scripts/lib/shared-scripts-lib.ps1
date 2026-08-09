@@ -67,19 +67,19 @@ function Get-SharedScriptPairs {
         @{
             Name   = 'fold-changelog-entry'
             Source = 'scripts\release\fold-changelog-entry.ps1'
-            Plugin = 'specialists-workflow-davekjohn'
+            Plugin = 'workflow-davekjohn'
             Skill  = 'fold-changelog'
         },
         @{
             Name   = 'open-pr'
             Source = 'scripts\release\open-pr.ps1'
-            Plugin = 'specialists-workflow-davekjohn'
+            Plugin = 'workflow-davekjohn'
             Skill  = 'open-pr'
         },
         @{
             Name   = 'check-roster-sync'
             Source = 'scripts\sync\check-roster-sync.ps1'
-            Plugin = 'specialists'
+            Plugin = 'team-alpha'
             Skill  = 'sync-roster'
             # All three exist so the test suite can point the check at a fixture instead of the real
             # machine. A consumer never types them, and documenting them would invite someone to.
@@ -94,7 +94,7 @@ function Get-SharedScriptPairs {
             # scripts.
             Name   = 'check-script-contract'
             Source = 'scripts\sync\check-script-contract.ps1'
-            Plugin = 'specialists-workflow-davekjohn'
+            Plugin = 'workflow-davekjohn'
             # No skill, and none is wanted: this runs from a SessionStart hook and reports. Nobody
             # invokes it as a procedure, so there is no procedure to write down.
             Skill  = ''
@@ -107,13 +107,13 @@ function Get-SharedScriptPairs {
         @{
             Name   = 'new-branch'
             Source = 'scripts\task\new-branch.ps1'
-            Plugin = 'specialists-workflow-davekjohn'
+            Plugin = 'workflow-davekjohn'
             Skill  = 'new-branch'
         },
         @{
             Name   = 'park-branch'
             Source = 'scripts\task\park-branch.ps1'
-            Plugin = 'specialists-workflow-davekjohn'
+            Plugin = 'workflow-davekjohn'
             Skill  = 'park'
         },
         @{
@@ -125,7 +125,7 @@ function Get-SharedScriptPairs {
             # because it merges to main and then commits directly to main.
             Name   = 'ship-pr'
             Source = 'scripts\release\ship-pr.ps1'
-            Plugin = 'specialists-workflow-davekjohn'
+            Plugin = 'workflow-davekjohn'
             # The gap declared here on August 4, 2026 is closed: the route the cut-release skill sends
             # the reader to ("the normal new-branch -> ship-pr route") now has a page. It documents
             # verify-resolved-issues too, which is why that entry points here rather than at one of
@@ -139,7 +139,7 @@ function Get-SharedScriptPairs {
             # and pr-issues-lib/native-capture-lib are both mirrored already.
             Name   = 'verify-resolved-issues'
             Source = 'scripts\release\verify-resolved-issues.ps1'
-            Plugin = 'specialists-workflow-davekjohn'
+            Plugin = 'workflow-davekjohn'
             # No skill of its own, and that is right: it IS ship-pr's step 6 and runs from there, so
             # whatever documents ship-pr documents this. That page now exists and carries a section for
             # running this step on its own, so the inherited gap is closed with ship-pr's rather than
@@ -152,7 +152,7 @@ function Get-SharedScriptPairs {
             # the part that made it unusable elsewhere -- moved into the seam as Get-MojibakePaths.
             Name   = 'fix-mojibake'
             Source = 'scripts\maintenance\fix-mojibake.ps1'
-            Plugin = 'specialists-workflow-davekjohn'
+            Plugin = 'workflow-davekjohn'
             # The gap declared here on August 4, 2026 is closed. It was mirrored because three repos had
             # each written their own copy -- three people needing it and none with a page to read -- and
             # that same argument is why the page had to follow the mirror rather than wait for someone to
@@ -163,7 +163,7 @@ function Get-SharedScriptPairs {
         @{
             Name    = 'check-report-lib'
             Source  = 'scripts\lib\check-report-lib.ps1'
-            Plugin  = 'specialists'
+            Plugin  = 'team-alpha'
             LibOnly = $true
         },
         @{
@@ -184,19 +184,19 @@ function Get-SharedScriptPairs {
             # not assumed from the absence of a uniqueness assertion.
             Name    = 'check-report-lib-workflow'
             Source  = 'scripts\lib\check-report-lib.ps1'
-            Plugin  = 'specialists-workflow-davekjohn'
+            Plugin  = 'workflow-davekjohn'
             LibOnly = $true
         },
         @{
             Name    = 'native-capture-lib'
             Source  = 'scripts\lib\native-capture-lib.ps1'
-            Plugin  = 'specialists-workflow-davekjohn'
+            Plugin  = 'workflow-davekjohn'
             LibOnly = $true
         },
         @{
             Name    = 'pr-issues-lib'
             Source  = 'scripts\lib\pr-issues-lib.ps1'
-            Plugin  = 'specialists-workflow-davekjohn'
+            Plugin  = 'workflow-davekjohn'
             LibOnly = $true
         },
         @{
@@ -205,7 +205,7 @@ function Get-SharedScriptPairs {
             # above -- open-pr is mirrored and would otherwise dot-source a file the consumer does not have.
             Name    = 'pr-body-lib'
             Source  = 'scripts\lib\pr-body-lib.ps1'
-            Plugin  = 'specialists-workflow-davekjohn'
+            Plugin  = 'workflow-davekjohn'
             LibOnly = $true
         },
         @{
@@ -220,7 +220,7 @@ function Get-SharedScriptPairs {
             # is repo-owned, so no contract row follows.
             Name    = 'park-lib'
             Source  = 'scripts\lib\park-lib.ps1'
-            Plugin  = 'specialists-workflow-davekjohn'
+            Plugin  = 'workflow-davekjohn'
             LibOnly = $true
         },
         @{
@@ -231,7 +231,7 @@ function Get-SharedScriptPairs {
             # empty document inside the release tag while the written version landed afterwards anyway.
             Name   = 'new-internal-note'
             Source = 'scripts\release\new-internal-note.ps1'
-            Plugin = 'specialists-workflow-davekjohn'
+            Plugin = 'workflow-davekjohn'
             # Documented inside the cut-release skill (step 2) rather than separately: it is a step of
             # cutting a release, and it cannot run before the cut has produced its input.
             Skill  = 'cut-release'
@@ -243,7 +243,7 @@ function Get-SharedScriptPairs {
             # a drift guard that drifts. So it travels with both rather than living in either.
             Name    = 'entry-scaffold-lib'
             Source  = 'scripts\lib\entry-scaffold-lib.ps1'
-            Plugin  = 'specialists-workflow-davekjohn'
+            Plugin  = 'workflow-davekjohn'
             LibOnly = $true
         },
         @{
@@ -254,7 +254,7 @@ function Get-SharedScriptPairs {
             # mirror would otherwise load a file it does not have.
             Name    = 'script-contract-lib'
             Source  = 'scripts\lib\script-contract-lib.ps1'
-            Plugin  = 'specialists-workflow-davekjohn'
+            Plugin  = 'workflow-davekjohn'
             LibOnly = $true
         },
         @{
@@ -268,7 +268,7 @@ function Get-SharedScriptPairs {
             # it would generate a blueprint of itself and overwrite the one it adopts from.
             Name   = 'adopt-config'
             Source = 'scripts\task\adopt-config.ps1'
-            Plugin = 'specialists-workflow-davekjohn'
+            Plugin = 'workflow-davekjohn'
             Skill  = 'adopt-config'
             # A test points the command at a fixture blueprint instead of the shipped one. A consumer
             # never types it, and documenting it would invite someone to.
@@ -287,7 +287,7 @@ function Get-SharedScriptPairs {
             # waits for Dave's own eye rather than merging on the gates.
             Name   = 'cut-release'
             Source = 'scripts\release\cut-release.ps1'
-            Plugin = 'specialists-workflow-davekjohn'
+            Plugin = 'workflow-davekjohn'
             Skill  = 'cut-release'
         },
         @{
@@ -299,7 +299,7 @@ function Get-SharedScriptPairs {
             # from the consumer's own root before calling in.
             Name    = 'release-lib'
             Source  = 'scripts\lib\release-lib.ps1'
-            Plugin  = 'specialists-workflow-davekjohn'
+            Plugin  = 'workflow-davekjohn'
             LibOnly = $true
         },
         @{
@@ -316,7 +316,7 @@ function Get-SharedScriptPairs {
             # reader into every consumer session that has no marketplace.
             Name    = 'plugin-tree-lib'
             Source  = 'scripts\lib\plugin-tree-lib.ps1'
-            Plugin  = 'specialists-workflow-davekjohn'
+            Plugin  = 'workflow-davekjohn'
             LibOnly = $true
         }
     )

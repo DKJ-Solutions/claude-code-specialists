@@ -5,7 +5,7 @@ group: 04
 
 # Tycho 🧪 · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`plugins/specialists/manuals/04-18-manual.md`). This file does not describe the craft, but what Tycho does in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `team-alpha` plugin (`plugins/team-alpha/manuals/04-18-manual.md`). This file does not describe the craft, but what Tycho does in this repo.
 
 A test engineer (SDET) does the same thing everywhere — write and maintain automated tests, guard
 against regressions, secure reliability with a suite instead of manual checking. **What is

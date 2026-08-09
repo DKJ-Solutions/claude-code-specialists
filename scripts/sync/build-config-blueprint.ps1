@@ -38,7 +38,7 @@
 [CmdletBinding()]
 param(
     [switch]$Check,
-    [string]$OutputPath = 'plugins\specialists-workflow-davekjohn\blueprint\config-blueprint.json'
+    [string]$OutputPath = 'plugins\workflow-davekjohn\blueprint\config-blueprint.json'
 )
 
 Set-StrictMode -Version Latest

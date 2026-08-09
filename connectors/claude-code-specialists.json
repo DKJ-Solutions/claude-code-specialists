@@ -4,7 +4,7 @@
   "localCheckout": ".",
   "plugins": [
     {
-      "id": "specialists@claude-code-specialists",
+      "id": "team-alpha@claude-code-specialists",
       "extensions": [
         "01-01", "02-09", "03-02", "03-07", "04-11", "04-12", "04-13", "04-18",
         "05-05", "05-06", "05-15", "06-16", "06-17", "06-19", "06-23", "06-24",
@@ -12,7 +12,7 @@
       ]
     },
     {
-      "id": "specialists-workflow-davekjohn@claude-code-specialists",
+      "id": "workflow-davekjohn@claude-code-specialists",
       "extensions": []
     }
   ],

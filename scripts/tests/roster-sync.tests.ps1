@@ -21,7 +21,7 @@
         practice this script is not a hook, so that env var is normally unset. The cache-resolution
         branch (incl. semantically-highest-version) IS covered.
       - TWO simultaneously-enabled plugins (the cross-plugin orphan aggregation over the shared
-        $allBackingIds/$pluginNames) IS covered (scenario 12): 'specialists' + a second fixture
+        $allBackingIds/$pluginNames) IS covered (scenario 12): 'team-alpha' + a second fixture
         plugin 'widgets' each ship one agent and one orphan; the test asserts neither plugin's own
         agent is misreported as an orphan by the other plugin's pass, and that BOTH orphans surface
         (not just the first plugin's), proving the aggregation is a union across the whole loop, not
@@ -34,7 +34,7 @@ $Script   = Join-Path $RepoRoot 'scripts\sync\check-roster-sync.ps1'
 $Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) 'roster-sync-test-fixture'
 
 $Marketplace = 'claude-code-specialists'
-$PluginName  = 'specialists'
+$PluginName  = 'team-alpha'
 $PluginId    = "$PluginName@$Marketplace"
 
 $script:pass = 0
@@ -100,7 +100,7 @@ function Invoke-Ps {
 }
 
 # Builds a throwaway ~/.claude/plugins/installed_plugins.json and returns the profile dir to point
-# $env:USERPROFILE at (inbound #302). -Records: @{ 'specialists@claude-code-specialists' = '<projectPath>' };
+# $env:USERPROFILE at (inbound #302). -Records: @{ 'team-alpha@claude-code-specialists' = '<projectPath>' };
 # pass an empty string as the value for a record carrying NO projectPath (the user-scope shape, which
 # covers every repo).
 #
@@ -140,7 +140,7 @@ function New-FixtureAdmin {
 
 # Builds a fixture plugin cache. -VersionAgents: @{ '1.11.0' = @('06-16','06-24') }.
 # -VersionPersonas: @{ '1.11.0' = @('01-01') }. -Plugin: which plugin name to build under the cache
-# root (default the module-level $PluginName, 'specialists'). -KeepExisting: do NOT wipe the cache
+# root (default the module-level $PluginName, 'team-alpha'). -KeepExisting: do NOT wipe the cache
 # root first -- needed to build a SECOND plugin into the same cache (scenario 12, two enabled plugins
 # sharing one cache root, matching the real $env:USERPROFILE\.claude\plugins\cache layout). Returns
 # the cache root.
@@ -368,10 +368,10 @@ try {
     Set-CheckScope ('x' * 400)
     Assert-Equal 120 (Format-CheckScoped '').Trim().TrimEnd(':').Length 'scope label: an absurdly long label is capped, so one manifest field cannot flood the summary'
     # The other half of sanitizing: a REAL label must survive untouched. A sanitizer that also mangles
-    # 'davekokbwj/smartwatchbanden / specialists@claude-code-specialists' would destroy the very
+    # 'davekokbwj/smartwatchbanden / team-alpha@claude-code-specialists' would destroy the very
     # attribution this whole change exists to add.
-    Set-CheckScope 'davekokbwj/smartwatchbanden / specialists@claude-code-specialists'
-    Assert-Equal 'davekokbwj/smartwatchbanden / specialists@claude-code-specialists: real finding' (Format-CheckScoped 'real finding') 'scope label: a real repo/plugin label passes through the sanitizer unchanged'
+    Set-CheckScope 'davekokbwj/smartwatchbanden / team-alpha@claude-code-specialists'
+    Assert-Equal 'davekokbwj/smartwatchbanden / team-alpha@claude-code-specialists: real finding' (Format-CheckScoped 'real finding') 'scope label: a real repo/plugin label passes through the sanitizer unchanged'
     Set-CheckScope
 
     # --- 1. Happy path: agents present in roster + lens -> exit 0 --------------------------------
@@ -509,7 +509,7 @@ try {
     #     roster rows must be reported per specialist.
     $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16', '06-24') }
     $c = New-FixtureConsumer -RosterIds @() -LensIds @('06-16', '06-24') -ExtraRosterLines @(
-        '', '@.claude/plugins/claude-specialists/specialists/06-16-extension.md')
+        '', '@.claude/plugins/claude-specialists/team-alpha/06-16-extension.md')
     $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache)
     Assert-Equal 1 $r.Code 'import line: exit-code 1 -- the missing roster rows are real'
     Assert-Match "\[ERROR\].*'06-16'.*has no roster row" $r.Out 'import line: the id in the @-import is still reported missing'
@@ -1019,7 +1019,7 @@ try {
     Assert-Match 'Summary: \d+ error\(s\)' $r.Out 'crafted id: the check still ran to completion'
 
     # --- Hook (roster-sessioncheck.ps1): soft, surfaces only [ERROR], always exit 0 ---------------
-    $Hook = Join-Path $RepoRoot 'plugins\specialists\hooks\roster-sessioncheck.ps1'
+    $Hook = Join-Path $RepoRoot 'plugins\team-alpha\hooks\roster-sessioncheck.ps1'
     # A stub "check" script with fixed output + exit code, so the hook is tested in isolation.
     function New-StubCheck {
         param([string]$Name, [string[]]$OutputLines, [int]$ExitCode)
@@ -1195,13 +1195,13 @@ try {
     #      genuinely be in sync, but leading with that answers a question nobody can act on yet -- the
     #      reader's first move is the install, not the roster.
     $stub = New-StubCheck -Name 'stub-not-installed' -ExitCode 0 -OutputLines @(
-        '  [NOT-INSTALLED-HERE] 1 of 2 enabled plugin(s) have no install record for this path (specialists-lifehub@claude-code-specialists) -- a session here will not load them.',
+        '  [NOT-INSTALLED-HERE] 1 of 2 enabled plugin(s) have no install record for this path (team-lifehub@claude-code-specialists) -- a session here will not load them.',
         '  [OK]    all present',
         'Summary: 0 error(s), 0 info signal(s).')
     $r = Invoke-Hook @('-CheckScriptOverride', $stub)
     Assert-Equal 0 $r.Code 'hook not-installed: exit 0 (the hook never blocks)'
     Assert-Match 'not installed for this path' $r.Out 'hook not-installed: its own verdict line'
-    Assert-Match 'specialists-lifehub@claude-code-specialists' $r.Out 'hook not-installed: the marker reaches the session context, naming the plugin'
+    Assert-Match 'team-lifehub@claude-code-specialists' $r.Out 'hook not-installed: the marker reaches the session context, naming the plugin'
     Assert-NotMatch 'in sync' $r.Out 'hook not-installed: NOT reported as in sync'
     Assert-NotMatch 'drift found' $r.Out 'hook not-installed: NOT reported as drift either'
 
@@ -1210,7 +1210,7 @@ try {
     #       misleading about which end to start at. Same reasoning as [ORPHANS] in H8.
     $stub = New-StubCheck -Name 'stub-not-installed-drift' -ExitCode 1 -OutputLines @(
         "  [ERROR]  agent '06-24' has no roster row in CLAUDE.md -- add it to the roster.",
-        '  [NOT-INSTALLED-HERE] 1 of 1 enabled plugin(s) have no install record for this path (specialists@claude-code-specialists) -- a session here will not load them.',
+        '  [NOT-INSTALLED-HERE] 1 of 1 enabled plugin(s) have no install record for this path (team-alpha@claude-code-specialists) -- a session here will not load them.',
         'Summary: 1 error(s), 0 info signal(s).')
     $r = Invoke-Hook @('-CheckScriptOverride', $stub)
     Assert-Match 'blocking finding\(s\)' $r.Out 'hook not-installed-drift: the drift branch still fires'
@@ -1222,7 +1222,7 @@ try {
     #       surface that still will not load.
     $stub = New-StubCheck -Name 'stub-not-installed-bootstrap' -ExitCode 0 -OutputLines @(
         '  [BOOTSTRAP] this repo has no lenses and no roster rows -- run the specialists-init skill.',
-        '  [NOT-INSTALLED-HERE] 1 of 1 enabled plugin(s) have no install record for this path (specialists@claude-code-specialists) -- a session here will not load them.',
+        '  [NOT-INSTALLED-HERE] 1 of 1 enabled plugin(s) have no install record for this path (team-alpha@claude-code-specialists) -- a session here will not load them.',
         'Summary: 0 error(s), 0 info signal(s).')
     $r = Invoke-Hook @('-CheckScriptOverride', $stub)
     Assert-Match 'has not been set up yet' $r.Out 'hook not-installed-bootstrap: the bootstrap verdict still leads'
@@ -1245,13 +1245,13 @@ try {
     #      thing the hook can say, because a record administered at 'local' scope is reported by nothing
     #      else on the machine. Same argument that gave [BOOTSTRAP] its own line.
     $stub = New-StubCheck -Name 'stub-record-shape' -ExitCode 0 -OutputLines @(
-        "  [RECORD-SHAPE] 1 of 1 enabled plugin(s) have an install record for this path that is not the assumed shape (specialists@claude-code-specialists).",
+        "  [RECORD-SHAPE] 1 of 1 enabled plugin(s) have an install record for this path that is not the assumed shape (team-alpha@claude-code-specialists).",
         '  [OK]    all present',
         'Summary: 0 error(s), 0 info signal(s).')
     $r = Invoke-Hook @('-CheckScriptOverride', $stub)
     Assert-Equal 0 $r.Code 'hook record-shape: exit 0 (the hook never blocks)'
     Assert-Match 'not the shape the docs assume' $r.Out 'hook record-shape: its own verdict line'
-    Assert-Match 'specialists@claude-code-specialists' $r.Out 'hook record-shape: the marker reaches the session context, naming the plugin'
+    Assert-Match 'team-alpha@claude-code-specialists' $r.Out 'hook record-shape: the marker reaches the session context, naming the plugin'
     Assert-NotMatch 'in sync' $r.Out 'hook record-shape: NOT reported as in sync -- the whole point of the branch'
     Assert-NotMatch 'drift found' $r.Out 'hook record-shape: NOT reported as drift either'
 
@@ -1260,7 +1260,7 @@ try {
     #       run -- an [INFO] the hook suppresses is indistinguishable from no finding at all.
     $stub = New-StubCheck -Name 'stub-record-shape-drift' -ExitCode 1 -OutputLines @(
         "  [ERROR]  agent '06-24' has no roster row in CLAUDE.md -- add it to the roster.",
-        "  [RECORD-SHAPE] 1 of 1 enabled plugin(s) have an install record for this path that is not the assumed shape (specialists@claude-code-specialists).",
+        "  [RECORD-SHAPE] 1 of 1 enabled plugin(s) have an install record for this path that is not the assumed shape (team-alpha@claude-code-specialists).",
         'Summary: 1 error(s), 0 info signal(s).')
     $r = Invoke-Hook @('-CheckScriptOverride', $stub)
     Assert-Match 'blocking finding\(s\)' $r.Out 'hook record-shape-drift: the drift branch still leads'
@@ -1271,8 +1271,8 @@ try {
     #       Ordering matters here -- not-installed leads, because its remedy comes first -- but neither may
     #       swallow the other.
     $stub = New-StubCheck -Name 'stub-both-install-markers' -ExitCode 0 -OutputLines @(
-        '  [NOT-INSTALLED-HERE] 1 of 2 enabled plugin(s) have no install record for this path (specialists-lifehub@claude-code-specialists).',
-        "  [RECORD-SHAPE] 1 of 2 enabled plugin(s) have an install record for this path that is not the assumed shape (specialists@claude-code-specialists).",
+        '  [NOT-INSTALLED-HERE] 1 of 2 enabled plugin(s) have no install record for this path (team-lifehub@claude-code-specialists).',
+        "  [RECORD-SHAPE] 1 of 2 enabled plugin(s) have an install record for this path that is not the assumed shape (team-alpha@claude-code-specialists).",
         'Summary: 0 error(s), 0 info signal(s).')
     $r = Invoke-Hook @('-CheckScriptOverride', $stub)
     Assert-Match 'not installed for this path' $r.Out 'hook both-markers: the not-installed verdict leads'
@@ -1326,14 +1326,14 @@ try {
     Assert-Match "\[ERROR\].*invalid plugin id" $r.Out 'guardrail: malformed plugin id rejected'
 
     # --- 12. Cross-plugin orphan aggregation: TWO enabled plugins, each with its own orphan --------
-    #     Documented test-gap (see file header). 'specialists' ships agent 06-16, 'widgets' ships
+    #     Documented test-gap (see file header). 'team-alpha' ships agent 06-16, 'widgets' ships
     #     agent 07-07; both are satisfied (roster + own lens dir). 09-90 (lens under specialists'
     #     dir) and 09-91 (lens under widgets' dir) are backed by NEITHER plugin -- true orphans.
     #     Assertions prove: (1) 06-16/07-07 are NOT misreported as orphans by the OTHER plugin's
     #     pass (the union $allBackingIds must survive across both loop iterations, not just the
     #     last one), and (2) BOTH orphans surface -- not just the first plugin's -- via the
     #     '2 info signal(s)' summary count.
-    $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') } -Plugin 'specialists'
+    $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') } -Plugin 'team-alpha'
     $cache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('07-07') } -Plugin 'widgets' -KeepExisting
     $c = New-FixtureConsumer -RosterIds @('06-16', '07-07', '09-90', '09-91') -LensIds @('06-16', '09-90') `
         -ExtraEnabledPluginIds @('widgets@claude-code-specialists') `
@@ -1484,12 +1484,12 @@ try {
     Assert-Match '\[ERROR\].*[A-Za-z]:\\' $r.Out 'home-relative dead import: the RESOLVED target is printed as a real Windows path, drive letter and separators intact'
 
     # 18d. Not every '@' is an import. The roster's own prose says a specialist can be invoked as
-    #      '@specialists:<name>', and a fenced block may quote an example import -- neither is a line
+    #      '@team-alpha:<name>', and a fenced block may quote an example import -- neither is a line
     #      the bootstrap wrote, and reporting either would train the reader to ignore this check.
     $c = New-FixtureConsumer -RosterIds @('06-16') -LensIds @('06-16') -ExtraRosterLines @(
         '',
-        '@specialists:tessa',
-        'Invoke them directly as `@specialists:<name>`.',
+        '@team-alpha:tessa',
+        'Invoke them directly as `@team-alpha:<name>`.',
         '```',
         '@this/is/an/example.md',
         '```'

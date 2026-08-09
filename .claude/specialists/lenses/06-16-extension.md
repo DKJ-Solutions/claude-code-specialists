@@ -5,7 +5,7 @@ group: 06
 
 # Tessa 📜 · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`plugins/specialists/manuals/06-16-manual.md`). This file does not describe the craft, but what Tessa does in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `team-alpha` plugin (`plugins/team-alpha/manuals/06-16-manual.md`). This file does not describe the craft, but what Tessa does in this repo.
 
 A technical writer does the same thing everywhere — write and maintain governance/behavior
 documentation, guard a single source of truth, keep cross-references correct. **What is
