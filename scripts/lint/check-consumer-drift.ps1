@@ -65,15 +65,24 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $PluginRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')
-# All plugins carry canonical agent defs: the shared core (specialists) plus the domain groups
-# (specialists-lifehub, specialists-shopify, specialists-ecomm). We scan all of them, so the drift
-# check also covers a consuming repo's domain specialists.
-$SourceDirs = @(
-    (Join-Path $PluginRoot 'plugins\specialists\agents')
-    (Join-Path $PluginRoot 'plugins\specialists-lifehub\agents')
-    (Join-Path $PluginRoot 'plugins\specialists-shopify\agents')
-    (Join-Path $PluginRoot 'plugins\specialists-ecomm\agents')
-) | Where-Object { Test-Path -LiteralPath $_ }
+
+# EVERY PUBLISHED PLUGIN'S agents/ AND personas/, ASKED OF THE MARKETPLACE (August 9, 2026). Both sets
+# used to be hand-written lists of directories here, and the pair is why this changed rather than the
+# tidiness: the agents list named four plugins and the personas list named three, with specialists-ecomm
+# in the first and not the second.
+#
+# STATED PRECISELY, BECAUSE THE DIFFERENCE MATTERS: that asymmetry had cost nothing when it was found.
+# specialists-ecomm ships no personas/ at all, so the shorter list and the longer one selected the same
+# three directories on disk and the check's coverage was correct. What it was, was a trap with no way to
+# see it -- the day that group gains a persona, it goes uncovered, silently, and no gate can report a
+# hand-written list as incomplete because there is nothing to measure it against. Item 4 of the README's
+# 'Adding a new plugin group' checklist existed to keep both lists current by hand, and that is the
+# maintenance this replaces.
+#
+# Existence-filtered, because not every plugin carries both: only the core ships personas/.
+. (Join-Path $PSScriptRoot '..\lib\plugin-tree-lib.ps1')
+$PublishedPlugins = @(Get-RepoPluginRoots -RepoRoot $PluginRoot.Path)
+$SourceDirs = @(Get-PluginSubdirs -PluginRoots $PublishedPlugins -Leaf 'agents')
 if ($SourceDirs.Count -eq 0) {
     Write-Host "Cannot find any canonical agent-defs under $PluginRoot -- stopping." -ForegroundColor Red
     exit 1
@@ -206,11 +215,9 @@ Write-Host ""
 Write-Host "Agent-def summary: $missingCount missing, $identicalCount identical (dead copies), $driftCount drifted." -ForegroundColor Cyan
 
 # --- Persona drift (informational): portable body of the plugin personas vs. the consumer copy ------
-$personaDirs = @(@(
-    (Join-Path $PluginRoot 'plugins\specialists\personas')
-    (Join-Path $PluginRoot 'plugins\specialists-lifehub\personas')
-    (Join-Path $PluginRoot 'plugins\specialists-shopify\personas')
-) | Where-Object { Test-Path -LiteralPath $_ })
+# The same derivation as $SourceDirs above, one leaf over -- this is the list that had gone out of step
+# with it, and deriving both from the marketplace makes that impossible rather than fixing it once.
+$personaDirs = @(Get-PluginSubdirs -PluginRoots $PublishedPlugins -Leaf 'personas')
 
 $personaResults = New-Object System.Collections.Generic.List[object]
 if ($personaDirs.Count -gt 0) {

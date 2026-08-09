@@ -79,7 +79,6 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot   = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$PluginsRoot = Join-Path $RepoRoot 'plugins'
 $DriftLint  = Join-Path $RepoRoot 'scripts\lint\check-consumer-drift.ps1'
 
 $script:errors = 0
@@ -90,14 +89,29 @@ $script:infos  = 0
 # register that only exists here), so the lib is dot-sourced unconditionally.
 . (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
 
-# Plugin id (before the '@') -> plugin folder under the plugins root, only if the name is a
-# simple slug AND the folder actually exists under the plugins root; otherwise $null.
+# Which plugins this repo publishes, and where each one's folder is. Read once: the register is walked
+# per consumer and per plugin, and re-reading the marketplace inside that loop is how two answers to one
+# question start appearing in one run.
+. (Join-Path $PSScriptRoot '..\lib\plugin-tree-lib.ps1')
+$PluginRoots = @(Get-RepoPluginRoots -RepoRoot $RepoRoot)
+
+# Plugin id (before the '@') -> that plugin's folder, or $null when this repo does not publish a plugin
+# by that name.
+#
+# IT ASKS THE MARKETPLACE INSTEAD OF JOINING A PATH. This used to be Join-Path <plugins root> <name>,
+# which answers "is there a folder with this name" -- a different question, and one that gives the wrong
+# answer in both directions: a folder under plugins/ that is not a published plugin resolved happily
+# (agent-shared/ would have), while a plugin whose folder is not named after it, or does not sit exactly
+# one level down, resolved to nothing. The slug check stays in front of it as defence in depth: the name
+# comes out of a register file, and it must not be able to become a path segment unvalidated even though
+# nothing is joined with it here any more.
 function Get-PluginDir([string]$PluginId) {
     $name = $PluginId.Split('@')[0]
     if (-not (Test-PluginNameSlug -Name $name)) { return $null }
-    $dir = Join-Path $PluginsRoot $name
-    if (-not (Test-Path -LiteralPath $dir)) { return $null }
-    return $dir
+    $root = Get-PluginRootByName -PluginRoots $PluginRoots -Name $name
+    if (-not $root) { return $null }
+    if (-not (Test-Path -LiteralPath $root.Root)) { return $null }
+    return $root.Root
 }
 
 # Ids (<group>-<id>) owned by a plugin: agents/ + personas/.

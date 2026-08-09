@@ -23,15 +23,26 @@
     script-contract.tests.ps1's "copy the real dependency" pattern): a throwaway fixture repo root
     gets a copy of the real check-plugin-integrity.ps1 plus its two dot-sourced dependencies
     (agent-shared-lib.ps1, shared-scripts-lib.ps1) at the same relative paths, so the script runs
-    for real as a child process against the fixture. The fixture is deliberately otherwise empty
-    (no marketplace.json, no plugins, no agent defs) -- checks 1/2/3/3b/3c/6/7 simply find nothing to
-    check, and check 8 always reports its 8 shared-script pairs as "missing" against this minimal
-    fixture (expected noise, asserted on nowhere below). The fixture additionally carries a small
-    canonical skillset for check 10: plugins/specialists/skills/
+    for real as a child process against the fixture. The fixture is deliberately otherwise near-empty
+    (no agent defs) -- checks 2/3/3b/3c/6/7 simply find nothing to check, and check 8 always reports its
+    shared-script pairs as "missing" against this minimal fixture (expected noise, asserted on nowhere
+    below). The fixture carries a small canonical skillset for check 10: plugins/specialists/skills/
     skill-alpha/SKILL.md and .../skill-beta/SKILL.md (2 real skills), plus a DEPTH DECOY
     skills/skill-alpha/references/SKILL.md (a SKILL.md one level too deep, which must NOT be picked
     up as a 3rd canonical skill). Only check 4's and check 10's per-file findings are asserted on, so
     the other checks' expected noise does not affect the outcome.
+
+    IT DECLARES ITS PLUGINS NOW, WHERE IT USED TO HAVE NO marketplace.json AT ALL (August 9, 2026). The
+    lint stopped taking "a directory under plugins/" as the definition of a plugin and started asking the
+    marketplace, so a fixture that creates plugins/specialists/skills/ without declaring it publishes
+    nothing -- and check 10's canonical set, the whole subject of a dozen scenarios below, came out
+    empty. The fixture therefore writes a marketplace.json naming the two plugins the shared-scripts
+    registry expects, each with a minimal plugin.json so checks 1 and 2 stay quiet.
+
+    That is a fixture becoming MORE like the repo it stands in for, not a workaround: "a plugin is what
+    the marketplace declares" is the rule under test everywhere else, and a fixture exempt from it was
+    testing a different program. It also means the depth decoy now proves something sharper -- the
+    canonical scan starts at a declared plugin's root and descends exactly one skill folder.
 
     Check 4, Scenario A: a deliberately dead relative link is placed inside BOTH CONTRIBUTING.md and
     the connectors README, plus a THIRD markdown file at the fixture root that is NOT in check 4's
@@ -194,6 +205,10 @@ $BranchInfoSrc = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 # changelog's tier sections. Copied for the same reason as the five above -- this fixture runs the REAL
 # script, so a missing sibling is a broken suite rather than one skipped check.
 $EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
+# Seventh, since the plugin set became derived (August 9, 2026): plugin-tree-lib.ps1, dot-sourced by
+# release-lib AND by shared-scripts-lib, and read by the lint itself for the published plugin roots.
+# Copied for the same reason as the six above.
+$PluginTreeSrc = Join-Path $RepoRoot 'scripts\lib\plugin-tree-lib.ps1'
 # Dot-sourced into the RUNNER as well as copied into the fixture: check 13b's scenarios build their
 # template files from Get-BranchTemplates, so the test and the check read the same definition. A fixture
 # written out by hand here would be the very second source of the format that check exists to prevent.
@@ -242,6 +257,26 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\specialists\skills\skill-alpha\references') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\specialists\skills\skill-beta') -Force | Out-Null
 
+    # The marketplace: what makes those directories PLUGINS rather than just directories. Both plugins the
+    # shared-scripts registry names are declared, each with a manifest, so checks 1 and 2 pass cleanly and
+    # the registry resolves. See this file's header for why the fixture stopped being marketplace-less.
+    New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude-plugin') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\specialists\.claude-plugin') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\specialists-workflow-davekjohn\.claude-plugin') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude-plugin\marketplace.json'), (@'
+{
+  "name": "fixture-marketplace",
+  "plugins": [
+    { "name": "specialists",                    "source": "./plugins/specialists" },
+    { "name": "specialists-workflow-davekjohn", "source": "./plugins/specialists-workflow-davekjohn" }
+  ]
+}
+'@), $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\specialists\.claude-plugin\plugin.json'),
+        "{ `"name`": `"specialists`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\specialists-workflow-davekjohn\.claude-plugin\plugin.json'),
+        "{ `"name`": `"specialists-workflow-davekjohn`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
+
     Copy-Item -Path $IntegritySrc -Destination (Join-Path $Fixture 'scripts\lint\check-plugin-integrity.ps1') -Force
     Copy-Item -Path $AgentSharedLibSrc -Destination (Join-Path $Fixture 'scripts\lib\agent-shared-lib.ps1') -Force
     Copy-Item -Path $SharedScriptsLibSrc -Destination (Join-Path $Fixture 'scripts\lib\shared-scripts-lib.ps1') -Force
@@ -249,6 +284,7 @@ try {
     Copy-Item -Path $ReleaseLibSrc -Destination (Join-Path $Fixture 'scripts\lib\release-lib.ps1') -Force
     Copy-Item -Path $BranchInfoSrc -Destination (Join-Path $Fixture 'scripts\lib\branch-info.ps1') -Force
     Copy-Item -Path $EntryScaffoldSrc -Destination (Join-Path $Fixture 'scripts\lib\entry-scaffold-lib.ps1') -Force
+    Copy-Item -Path $PluginTreeSrc -Destination (Join-Path $Fixture 'scripts\lib\plugin-tree-lib.ps1') -Force
 
     $skillAlphaMd = "---`nname: skill-alpha`ndescription: Fixture skill alpha.`n---`n`n# Skill Alpha`n"
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\specialists\skills\skill-alpha\SKILL.md'), $skillAlphaMd, $Utf8NoBom)

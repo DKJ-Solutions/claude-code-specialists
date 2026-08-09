@@ -222,6 +222,18 @@ if (-not (Test-Path -LiteralPath $marketplacePath)) {
     }
 }
 
+# THE PUBLISHED PLUGIN SET, for the checks below that need to know where a plugin's folder is rather
+# than assuming its shape. Derived once, here, immediately after check 1 has already reported anything
+# wrong with the file it comes from.
+#
+# SWALLOWED ON FAILURE, DELIBERATELY, and this is the one place in this script where that is right: a
+# marketplace this lib refuses to parse is a finding check 1 has just added by itself, with a better
+# message than a rethrow here would give. A lint reports every finding it can rather than stopping at
+# the first, so the checks that need the set degrade to an empty one -- and each of those reports its
+# own zero coverage through Write-Coverage, so an empty set is visible rather than silently green.
+$publishedPlugins = @()
+try { $publishedPlugins = @(Get-RepoPluginRoots -RepoRoot $RepoRoot) } catch { }
+
 # --- 2. every plugin.json: valid JSON with a name ----------------------------------------------------
 Get-ChildItem -Path $RepoRoot -Recurse -Filter 'plugin.json' -File |
     Where-Object { $_.FullName -match '\.claude-plugin\\plugin\.json$' } | ForEach-Object {
@@ -803,21 +815,29 @@ function Get-FenceMaskedText {
     return -join $parts
 }
 
-# Canonical skillset: every plugins/<plugin>/skills/<name>/SKILL.md
-# (exact depth -- plugin, then 'skills', then exactly one skill-name folder, then the file -- so a
-# deeper file such as a level-3 progressive-disclosure skills/<name>/references/SKILL.md, should
-# that pattern ever appear, is not mistaken for a top-level skill), across ALL plugin folders (not
-# just 'specialists' -- specialists-shopify/skills/start-task counts too). The name is read from the
-# frontmatter 'name:' (the authoritative Claude Code call name, /plugin:name) rather than the folder
-# name; as of this writing every skill's folder name happens to equal its frontmatter name, so this
-# made no observable difference here, but frontmatter is the real source of truth if the two ever
-# diverge. Falls back to the folder name only if 'name:' is missing from the frontmatter, so a
-# future skill without that line does not silently drop out of the canonical set (not a new failure
-# mode: the frontmatter's own presence/shape is check 3's domain, not this one's).
+# Canonical skillset: every <plugin root>/skills/<name>/SKILL.md, across ALL published plugins (not
+# just the core -- a domain group's start-task counts too). Exactly one skill-name folder between
+# 'skills' and the file, so a deeper file such as a level-3 progressive-disclosure
+# skills/<name>/references/SKILL.md, should that pattern ever appear, is not mistaken for a top-level
+# skill.
+#
+# THE PLUGIN HALF IS ENFORCED NOW, WHICH IT WAS NOT (August 9, 2026). This walked everything under
+# plugins/ and kept whatever matched '\skills\<one>\SKILL.md', while the comment above it claimed the
+# match began at a plugin. It did not: any skills/ directory anywhere under plugins/ counted, published
+# or not. Nothing was wrong in the output -- measured on the day it was changed, every skills/ directory
+# under plugins/ did belong to a published plugin -- so this is a claim being made true rather than a
+# defect being repaired. Worth doing because the next reader takes the comment at its word, and because
+# the plugin roots are now something this gate can simply ask for.
+#
+# The name is read from the frontmatter 'name:' (the authoritative Claude Code call name, /plugin:name)
+# rather than the folder name; as of this writing every skill's folder name happens to equal its
+# frontmatter name, so this made no observable difference here, but frontmatter is the real source of
+# truth if the two ever diverge. Falls back to the folder name only if 'name:' is missing from the
+# frontmatter, so a future skill without that line does not silently drop out of the canonical set (not
+# a new failure mode: the frontmatter's own presence/shape is check 3's domain, not this one's).
 $skillCanonicalList = New-Object System.Collections.Generic.List[string]
-$skillsRoot = Join-Path $RepoRoot 'plugins'
-if (Test-Path -LiteralPath $skillsRoot) {
-    Get-ChildItem -Path $skillsRoot -Recurse -Filter 'SKILL.md' -File |
+foreach ($skillsDir in (Get-PluginSubdirs -PluginRoots $publishedPlugins -Leaf 'skills')) {
+    Get-ChildItem -Path $skillsDir -Recurse -Filter 'SKILL.md' -File |
         Where-Object { $_.FullName -match '\\skills\\[^\\]+\\SKILL\.md$' } | ForEach-Object {
             $text = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)
             $nm = [regex]::Match($text, '(?m)^name:\s*(\S+)\s*$')

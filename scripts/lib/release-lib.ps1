@@ -110,6 +110,12 @@ if (Test-Path -LiteralPath $branchInfoSibling) { . $branchInfoSibling }
 # has no sections, so there is no map left to agree about.
 . (Join-Path $PSScriptRoot 'entry-scaffold-lib.ps1')
 
+# THE PLUGIN SET: which plugins this repo publishes, and where each one's folder is. Unconditional for
+# the same reason as the sibling above -- it travels in this mirror, so it is present wherever this file
+# is. Get-PluginManifestPaths below is a thin wrapper over it, and Get-TouchedPlugins reads the same
+# roots rather than matching a path shape.
+. (Join-Path $PSScriptRoot 'plugin-tree-lib.ps1')
+
 function Get-NextVersion {
     <# Bumps a SemVer X.Y.Z according to $BumpKind (major|minor|patch). #>
     param(
@@ -319,40 +325,22 @@ function Get-MarketplaceName {
 
 function Get-PluginManifestPaths {
     <#
-        Derives the plugin manifest paths from plugins[].source in the marketplace JSON -- the
-        marketplace is the source of truth about what a plugin is. Pure (does not touch disk):
-        input is the raw JSON text + the repo root, output is an array of full manifest paths.
-        Throws on a missing plugins list, a missing source field, and (containment, Sean's advice)
-        on a source that points outside the repo root via an absolute or ..-path -- the version
-        bump must never write outside the repo.
+        The plugin manifest paths, derived from plugins[].source in the marketplace JSON. Pure (does
+        not touch disk): input is the raw JSON text + the repo root, output is an array of full
+        manifest paths.
+
+        A WRAPPER SINCE plugin-tree-lib.ps1 EXISTS, and kept under this name because it is what the
+        release cut and the lint gate call. The derivation itself -- including the containment check
+        that stops a source pointing outside the repo -- moved to Get-PluginRoots, which answers the
+        same question with the plugin's NAME and ROOT alongside the manifest path. Four other places
+        needed those two fields and were each deriving them from a path shape instead.
     #>
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
         [Parameter(Mandatory)][string]$MarketplaceJson
     )
-    $marketplace = $MarketplaceJson | ConvertFrom-Json
-    if (-not ($marketplace.PSObject.Properties.Name -contains 'plugins') -or -not $marketplace.plugins) {
-        throw "marketplace.json has no 'plugins' list."
-    }
-    $rootPrefix = [System.IO.Path]::GetFullPath($RepoRoot).TrimEnd('\') + '\'
-    foreach ($p in $marketplace.plugins) {
-        if (-not $p.source) { throw "plugin '$($p.name)' is missing a 'source'." }
-        # An absolute source is by definition outside the repo convention -- report explicitly
-        # instead of the confusing Join-Path/GetFullPath error that would otherwise roll out.
-        if ([System.IO.Path]::IsPathRooted($p.source)) {
-            throw "plugin '$($p.name)': source '$($p.source)' points outside the repo (absolute path)."
-        }
-        $manifest = $null
-        try {
-            $manifest = [System.IO.Path]::GetFullPath(
-                (Join-Path $RepoRoot (Join-Path $p.source '.claude-plugin\plugin.json')))
-        } catch {
-            throw "plugin '$($p.name)': source '$($p.source)' is not a valid path."
-        }
-        if (-not $manifest.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "plugin '$($p.name)': source '$($p.source)' points outside the repo ($manifest)."
-        }
-        $manifest
+    foreach ($p in (Get-PluginRoots -RepoRoot $RepoRoot -MarketplaceJson $MarketplaceJson)) {
+        $p.ManifestPath
     }
 }
 
@@ -709,34 +697,17 @@ function Set-ReleaseInternalNoteLink {
     return ($out.TrimEnd() + $nl)
 }
 
-function Get-TouchedPlugins {
-    <#
-        Pure: derives the touched plugin names from a list of PR file paths (repo-root-relative,
-        as gh pr list --json files supplies -- $Files here are already flat path strings, not the
-        gh objects themselves). Only paths under plugins/<plugin>/ count. -cmatch (Sean's advice):
-        -match is case-insensitive and would silently widen the lowercase character class; plugin
-        folder names are always lowercase slugs. Returns a sorted, deduplicated array of plugin names
-        (empty if nothing touches a plugin). Pulled out to here (#103, Victor #3) so the detection
-        is separately testable, instead of inline logic in fold-changelog-entry.ps1.
-
-        THE EXCLUDED SIBLING CHANGED WITH THE LAYOUT (#405). Under the old two-level layout the one
-        non-plugin directory sitting beside the plugins was connectors/, so that was the name excluded
-        here. Flattening moved connectors/ to the repo ROOT -- where it no longer matches this pattern
-        at all -- and moved agent-shared/ IN, beside the plugins. So the exclusion follows the
-        directory rather than the name: agent-shared is plugin SOURCE (its generator writes the shared
-        blocks into plugin agent defs) but is not itself a plugin, and a release must not report it as
-        one. Keeping 'connectors' here instead would have been dead code guarding nothing while the
-        real sibling went uncounted.
-    #>
-    param([string[]]$Files = @())
-    $touched = @()
-    foreach ($f in $Files) {
-        if ($f -cmatch '^plugins/([a-z0-9][a-z0-9-]*)/') {
-            if ($Matches[1] -ne 'agent-shared' -and $touched -notcontains $Matches[1]) { $touched += $Matches[1] }
-        }
-    }
-    return @($touched | Sort-Object)
-}
+# --- MOVED, NOT DELETED: Get-TouchedPlugins now lives in plugin-tree-lib.ps1 ------------------------
+#
+# It is in scope here regardless, because this file dot-sources that lib unconditionally at the top --
+# so release-lib's own callers and its test suite reach it under exactly the same name as before.
+#
+# WHY IT MOVED. It went from matching a path shape to reading the plugin roots, which made it a function
+# about the plugin tree rather than about a release. Keeping it here would have forced the fold script to
+# dot-source THIS file to reach it -- and this file pulls in entry-scaffold-lib, three thousand lines,
+# for a function that walks a list of strings. The fold runs immediately after a merge, directly on the
+# trunk, so what it loads is worth being deliberate about. Moving one pure function down a layer costs
+# nothing and lets the fold depend on a dependency-free lib instead.
 
 function Get-EntryPlugins {
     <#

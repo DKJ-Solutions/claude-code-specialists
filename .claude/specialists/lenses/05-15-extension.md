@@ -78,6 +78,14 @@ infrastructure.
   collaborators and must be revisited as soon as there are.
 - **`scripts/lint/check-consumer-drift.ps1`** — the read-only drift check against a consuming repo
   (`MISSING`/`IDENTICAL`/`DRIFTED`).
+- **`scripts/lib/plugin-tree-lib.ps1`** — the one answer to *which plugins does this repo publish, and
+  where does each one's folder sit*, read from `.claude-plugin/marketplace.json`. Five scripts used to
+  answer that themselves, each by encoding the layout: a hand-written list of four directories in the
+  drift check, a `^plugins/<name>/` regex with an exception for the one sibling that is not a plugin, a
+  path-segment index in the shared-scripts registry, three `Split-Path`s upward from a `plugin.json`,
+  and a `Join-Path <plugins root> <name>`. None of those is a fact about plugins; they are facts about
+  one layout, and this tree has moved twice. Dependency-free on purpose — two callers run at
+  SessionStart. Mirrored, because `release-lib.ps1` dot-sources it.
 - **`scripts/lib/branch-info.ps1`** — the prefix→label→changelog-type table (shared with the
   release scripts). Deliberately no `release` prefix: a release does not go via a branch/PR but
   directly on `main`.
