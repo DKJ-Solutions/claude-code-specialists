@@ -5,7 +5,7 @@ group: 04
 
 # 04-11 · repo-lens (VUL-IN)
 
-> Repo-lens for the portable manual of specialist 04-11 in the `specialists` plugin. This file was put
+> Repo-lens for the portable manual of specialist 04-11 in the `team-alpha` plugin. This file was put
 > in place by `sync-roster` as an empty template; the agent-def reads it along automatically.
 > Fill in below the repo-specific tasks and context specialist 04-11 needs in this repo.
 

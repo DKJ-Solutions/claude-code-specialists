@@ -5,7 +5,7 @@ group: 06
 
 # Ravi ♻️ · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`plugins/specialists/manuals/06-24-manual.md`). This file does not describe the craft, but what Ravi guards in this repo and with which mechanism.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `team-alpha` plugin (`plugins/team-alpha/manuals/06-24-manual.md`). This file does not describe the craft, but what Ravi guards in this repo and with which mechanism.
 
 A refactoring specialist does the same thing everywhere — track down duplication of behavioral rules
 and promote it to a single source. **What is repo-specific in claude-code-specialists is not that Ravi

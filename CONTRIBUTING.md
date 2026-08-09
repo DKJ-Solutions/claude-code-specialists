@@ -207,6 +207,6 @@ three release documents, and the guardrails. That same page carries the list of 
 the end.
 
 **The one thing worth knowing from here:** a release is repo-wide and in lockstep, which works because
-this repository holds **one** product whose five plugins are one system — see
+this repository holds **one** product whose plugins are one system — see
 [One product, one repository](README.md#one-product-one-repository). A second, unrelated product would
 get its own repository and marketplace rather than joining this release train.

@@ -191,7 +191,7 @@ Assert-Throws { Get-LockstepVersion -ManifestContents @{ a = '{"name": "x"}' } }
 # everything below, so a difference in output is a difference in the call rather than in the input.
 $e22 = New-FlatEntry -Heading "#22 $midDot Consumer feature" -Body 'Body twenty-two.' `
     -Rows @('| 2 | 5 | consumers must re-add the marketplace |', '| 1 | 4 | the team stops doing it by hand |') `
-    -Type 'Feat' -Plugins 'specialists' -Pr 22
+    -Type 'Feat' -Plugins 'team-alpha' -Pr 22
 $e21 = New-FlatEntry -Heading "#21 $midDot For colleagues only" -Body 'Body twenty-one.' `
     -Rows @('| 1 | 2 | a small convenience |') -Type 'Fix' -Pr 21
 $e20 = New-FlatEntry -Heading "#20 $midDot Repo housekeeping" -Body 'Body twenty.' `
@@ -252,7 +252,7 @@ Assert-Equal $null (Get-Command 'Resolve-ChangelogTierSections' -ErrorAction Sil
 # four", which is well-formed markdown and therefore invisible to an eye.
 Assert-Equal 3 (@([regex]::Matches($s.Entries[0], '(?m)^### ')).Count) "the entry keeps its three H3 sections rather than being split at them"
 Assert-Match $s.Entries[0] '(?m)^\[PR #22\]' 'and its PR footer'
-Assert-Match $s.Entries[0] '(?m)^Plugins: specialists$' 'and its Plugins line'
+Assert-Match $s.Entries[0] '(?m)^Plugins: team-alpha$' 'and its Plugins line'
 # The '---' separators between entries are structure, not content.
 Assert-NoMatch $s.Entries[0] '(?m)^---\s*$' 'the separator between entries is not carried into an entry'
 
@@ -819,14 +819,14 @@ Write-Host "Get-TouchedPlugins" -ForegroundColor Cyan
 # than a comment.
 $flatRoots = @(Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson (@'
 {"plugins": [
-  {"name": "specialists",         "source": "./plugins/specialists"},
-  {"name": "specialists-lifehub", "source": "./plugins/specialists-lifehub"}
+  {"name": "team-alpha",         "source": "./plugins/team-alpha"},
+  {"name": "team-lifehub", "source": "./plugins/team-lifehub"}
 ]}
 '@))
 $touchedFiles = @(
-    'plugins/specialists/agents/01-01-chris.md',
-    'plugins/specialists/manuals/01-01-manual.md',
-    'plugins/specialists-lifehub/agents/foo.md',
+    'plugins/team-alpha/agents/01-01-chris.md',
+    'plugins/team-alpha/manuals/01-01-manual.md',
+    'plugins/team-lifehub/agents/foo.md',
     'plugins/agent-shared/inbound-behaviour.md',
     'connectors/some-repo.json',
     'README.md',
@@ -834,8 +834,8 @@ $touchedFiles = @(
 )
 $touched = @(Get-TouchedPlugins -Files $touchedFiles -PluginRoots $flatRoots)
 Assert-Equal 2 $touched.Count 'two touched plugins (deduplicated + sorted)'
-Assert-Equal 'specialists' $touched[0] 'first plugin name alphabetically'
-Assert-Equal 'specialists-lifehub' $touched[1] 'second plugin name alphabetically'
+Assert-Equal 'team-alpha' $touched[0] 'first plugin name alphabetically'
+Assert-Equal 'team-lifehub' $touched[1] 'second plugin name alphabetically'
 # The two non-plugin directories, one on each side of the plugins root after the #405 flattening:
 # agent-shared/ sits INSIDE it, connectors/ at the ROOT. Both are asserted, so neither half can quietly
 # regress into counting as a plugin. Neither needs excluding by name any more -- a directory that is not
@@ -846,18 +846,25 @@ Assert-Equal 0 (@(Get-TouchedPlugins -Files @('connectors/life-hub.json') -Plugi
 Assert-Equal 0 (@(Get-TouchedPlugins -Files @())).Count 'empty input -> empty set'
 Assert-Equal 0 (@(Get-TouchedPlugins -Files $touchedFiles)).Count 'no roots given (a repo that publishes nothing) -> empty set, whatever the paths look like'
 Assert-Equal 0 (@(Get-TouchedPlugins -Files @('README.md', 'scripts/lib/release-lib.ps1') -PluginRoots $flatRoots)).Count 'non-plugin paths ignored'
-Assert-Equal 0 (@(Get-TouchedPlugins -Files @('plugins/Specialists/agents/x.md') -PluginRoots $flatRoots)).Count 'a differently-cased folder does not count (ordinal comparison)'
-# The prefix match is on a whole path SEGMENT, so a sibling whose name merely starts with a plugin name
-# is not swallowed by it. 'plugins/specialists-shopify' begins with 'plugins/specialists'.
-Assert-Equal 0 (@(Get-TouchedPlugins -Files @('plugins/specialists-shopify/agents/x.md') -PluginRoots $flatRoots)).Count 'an unregistered sibling sharing a name prefix does not count as that plugin'
+Assert-Equal 0 (@(Get-TouchedPlugins -Files @('plugins/Team-Alpha/agents/x.md') -PluginRoots $flatRoots)).Count 'a differently-cased folder does not count (ordinal comparison)'
+# The prefix match is on a whole path SEGMENT, so a sibling whose name merely STARTS WITH a declared
+# plugin's name is not swallowed by it. 'plugins/team-alpha-extra' begins with 'plugins/team-alpha'.
+#
+# BOTH OF THESE HAD TO BE REWRITTEN WITH THE RENAME, and the reason is worth a line: they are the two
+# asserts here whose subject is a RELATIONSHIP between two strings, not a string. The rename swept
+# 'specialists-shopify' to 'team-shopify' and 'specialists' to 'team-alpha' -- each correct on its own,
+# and together they left this pair comparing names that no longer share a prefix and no longer differ
+# only in case. Both kept passing, testing nothing. A mechanical rename cannot see that; only reading
+# what an assert is FOR can.
+Assert-Equal 0 (@(Get-TouchedPlugins -Files @('plugins/team-alpha-extra/agents/x.md') -PluginRoots $flatRoots)).Count 'an unregistered sibling sharing a name prefix does not count as that plugin'
 $dedupFiles = @(
-    'plugins/specialists/agents/a.md',
-    'plugins/specialists/agents/b.md',
-    'plugins/specialists/manuals/c.md'
+    'plugins/team-alpha/agents/a.md',
+    'plugins/team-alpha/agents/b.md',
+    'plugins/team-alpha/manuals/c.md'
 )
 $dedupTouched = @(Get-TouchedPlugins -Files $dedupFiles -PluginRoots $flatRoots)
 Assert-Equal 1 $dedupTouched.Count 'same plugin across multiple files -> once in the set'
-Assert-Equal 'specialists' $dedupTouched[0] 'deduplicated name correct'
+Assert-Equal 'team-alpha' $dedupTouched[0] 'deduplicated name correct'
 
 Write-Host "Get-TouchedPlugins -- a nested plugin tree" -ForegroundColor Cyan
 # The layout this repo is moving to: plugins grouped by kind, so a plugin root sits TWO levels down and
@@ -895,10 +902,10 @@ Assert-Equal $null (Get-PluginRootByName -PluginRoots @() -Name 'team-alpha') 'a
 
 Write-Host "Get-EntryPlugins" -ForegroundColor Cyan
 $entryWithPlugins = New-FlatEntry -Heading "#4 $midDot Something" -Rows @('| 1 | 3 | fine |') `
-    -Plugins 'specialists, specialists-lifehub' -Pr 4
+    -Plugins 'team-alpha, team-lifehub' -Pr 4
 $plugs = @(Get-EntryPlugins -EntryText $entryWithPlugins)
 Assert-Equal 2 $plugs.Count 'two plugins from the Plugins line'
-Assert-Equal 'specialists' $plugs[0] 'first plugin name correct'
+Assert-Equal 'team-alpha' $plugs[0] 'first plugin name correct'
 Assert-Equal 0 (@(Get-EntryPlugins -EntryText "## #5 x`n`nBody.")).Count 'no Plugins line -> empty list'
 
 Write-Host "Remove-EntryPluginsLine" -ForegroundColor Cyan

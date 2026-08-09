@@ -12,7 +12,7 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot  = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$Plugin    = Join-Path $RepoRoot 'plugins\specialists'
+$Plugin    = Join-Path $RepoRoot 'plugins\team-alpha'
 $Bootstrap = Join-Path $Plugin 'skills\specialists-init\bootstrap.ps1'
 $Teardown  = Join-Path $Plugin 'skills\specialists-teardown\teardown.ps1'
 $Fixture   = Join-Path ([System.IO.Path]::GetTempPath()) 'specialists-teardown-fixture'
@@ -43,7 +43,7 @@ function Invoke-Script {
 # that adopted the system and then disconnects, and its round trips turn on the script-config scaffolds:
 # the [keep] lines for an already-occupied address, the "2 already present" count, and the scripts\lib\
 # empty-directory pruning from #331. After the workflow split none of those exist for a consumer that
-# never enabled the workflow pack -- branch-info.ps1 is that pack's file and is not placed without it --
+# never enabled the workflow plugin -- branch-info.ps1 is that pack's file and is not placed without it --
 # so a single-plugin fixture would leave three assertions passing vacuously. The core-only shape is
 # covered in bootstrap-drift.tests.ps1 instead of being folded in here.
 function New-BootstrappedConsumer {
@@ -51,7 +51,7 @@ function New-BootstrappedConsumer {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
     New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.json'),
-        '{ "enabledPlugins": { "specialists@claude-code-specialists": true, "specialists-workflow-davekjohn@claude-code-specialists": true } }')
+        '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true, "workflow-davekjohn@claude-code-specialists": true } }')
     $md = @('# CLAUDE.md - my own project', '', '## Conventions', '', '- Feature work goes on a branch.') + $ExtraClaudeMdLines
     [System.IO.File]::WriteAllLines((Join-Path $Fixture 'CLAUDE.md'), $md)
     $prevPlugin = $env:CLAUDE_PLUGIN_ROOT
@@ -106,7 +106,7 @@ try {
     #     Disabling the plugin is the owner's act, and the bootstrap never wrote this file either. The
     #     symmetry that makes the teardown safe to run cuts both ways.
     $settings = [System.IO.File]::ReadAllText((Join-Path $Fixture '.claude\settings.json'), [System.Text.Encoding]::UTF8)
-    Assert-True ($settings -match 'specialists@claude-code-specialists') 'settings.json: still enables the plugin -- never edited'
+    Assert-True ($settings -match 'team-alpha@claude-code-specialists') 'settings.json: still enables the plugin -- never edited'
     Assert-True ($r.Out -match 'That file is yours') "settings.json: reported as the owner's to change"
     Assert-True ($r.Out -match 'restart') 'settings.json: the note says a restart is needed'
 
@@ -397,7 +397,7 @@ function Get-LintScript { return `$script:LintScript }
     New-BootstrappedConsumer | Out-Null
     $pluginPayload = Join-Path $Plugin 'scripts'
     # RETARGETED AUGUST 8, 2026, and the two roles had to swap files. Since the branch/release scripts
-    # moved to specialists-workflow-davekjohn, this plugin's payload is check-roster-sync.ps1 plus the
+    # moved to workflow-davekjohn, this plugin's payload is check-roster-sync.ps1 plus the
     # lib it dot-sources -- so the collision case and the copied-correctly case can no longer share one
     # file. The operational script is now the wrapper's address, and the lib carries the copy assertions.
     $wrapper = Join-Path $Fixture 'scripts\sync\check-roster-sync.ps1'
@@ -421,7 +421,7 @@ function Get-LintScript { return `$script:LintScript }
     # scripts reach their siblings $PSScriptRoot-relative.
     Assert-True ($vendoredLib -like '*\scripts\lib\*') 'vendor: the tree structure the dot-sources depend on is preserved'
     # The cap is stated, not silent: a run listing four files must not read as "that was all of it".
-    Assert-True ($r.Out -match 'specialists-workflow-davekjohn') 'vendor: names the pack whose scripts this run does NOT cover'
+    Assert-True ($r.Out -match 'workflow-davekjohn') 'vendor: names the pack whose scripts this run does NOT cover'
     # THE SAFETY PROPERTY, same family as "an authored lens is kept".
     Assert-Equal $wrapperBefore ([System.IO.File]::ReadAllText($wrapper, [System.Text.Encoding]::UTF8)) "vendor: the consumer's own wrapper is NOT overwritten"
     Assert-True ($r.Out -match 'yours, not overwritten') 'vendor: the collision is reported, not silent'
@@ -576,7 +576,7 @@ function Get-LintScript { return `$script:LintScript }
     New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'scripts\lib') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.json'),
-        '{ "enabledPlugins": { "specialists@claude-code-specialists": true, "specialists-workflow-davekjohn@claude-code-specialists": true } }')
+        '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true, "workflow-davekjohn@claude-code-specialists": true } }')
     # The consumer's OWN CLAUDE.md, which is also what triggers the report path that used to be broken:
     # this block only runs when a CLAUDE.md exists and does not yet carry the guard import.
     [System.IO.File]::WriteAllLines((Join-Path $Fixture 'CLAUDE.md'), @(
@@ -745,7 +745,7 @@ function Get-LintScript { return `$script:LintScript }
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
     New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.json'),
-        '{ "enabledPlugins": { "specialists@claude-code-specialists": true, "specialists-workflow-davekjohn@claude-code-specialists": true } }')
+        '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true, "workflow-davekjohn@claude-code-specialists": true } }')
     # Deliberately NO CLAUDE.md. That is the whole fixture.
     $prevPlugin = $env:CLAUDE_PLUGIN_ROOT
     $env:CLAUDE_PLUGIN_ROOT = $Plugin
@@ -831,14 +831,14 @@ function Get-LintScript { return `$script:LintScript }
         # an assumed 'project': an uninstall aimed at the wrong scope is the failure UNINSTALL.md spends
         # a paragraph on, and a session start can put a record in 'local' by itself.
         [System.IO.File]::WriteAllText($recordsFile, (@{
-            plugins = @{ 'specialists@claude-code-specialists' = @(@{
+            plugins = @{ 'team-alpha@claude-code-specialists' = @(@{
                 scope = 'local'; projectPath = $Fixture; version = '3.1.2'
             }) }
         } | ConvertTo-Json -Depth 6))
         $g1 = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
-        Assert-True ($g1.Out -match 'still has a record: specialists@claude-code-specialists \(scope local\)') `
+        Assert-True ($g1.Out -match 'still has a record: team-alpha@claude-code-specialists \(scope local\)') `
             'gate/record: the note names the plugin and the scope the record is actually in'
-        Assert-True ($g1.Out -match 'claude plugin uninstall specialists@claude-code-specialists --scope local') `
+        Assert-True ($g1.Out -match 'claude plugin uninstall team-alpha@claude-code-specialists --scope local') `
             'gate/record: and the command it prints carries that same scope'
         Assert-True (-not ($g1.Out -match 'No install record points at this repo')) `
             'gate/record: it does not also claim the repo is clean'
@@ -846,7 +846,7 @@ function Get-LintScript { return `$script:LintScript }
         # State 2 -- readable, nothing points here. THE case from #381: this is what the Step 4 re-run
         # must read like, and the old note said the opposite.
         [System.IO.File]::WriteAllText($recordsFile, (@{
-            plugins = @{ 'specialists@claude-code-specialists' = @(@{
+            plugins = @{ 'team-alpha@claude-code-specialists' = @(@{
                 scope = 'project'; projectPath = 'C:\somewhere\else'; version = '3.1.2'
             }) }
         } | ConvertTo-Json -Depth 6))

@@ -117,7 +117,7 @@ destructive actions above happen only on Dave's explicit request.
 `claude-code-specialists` is the **home repo of one product**: the Claude Specialists system, built and
 maintained here by Dave (DaveKJohn), and the **single source of truth** for all shareable subagent
 definitions — every consuming repo (life-hub, smartwatchbanden) points here and enables or disables
-per plugin. The full story — the five plugins and how they differ, the split manual model, the
+per plugin. The full story — the plugins (teams and workflow) and how they differ, the split manual model, the
 bootstrap path, and consumption — is in the [root `README.md`](README.md); the drift lint is in the
 [connectors README](connectors/README.md#maintenance-drift-lint).
 
@@ -131,15 +131,15 @@ tag would span two products, and one changelog would mix two histories. So the n
 own repository and its own marketplace instead.
 
 **The nuance, so nobody repairs the wrong thing: lockstep *within* this product is correct** and
-[`cut-release.ps1`](scripts/release/cut-release.ps1) needs no change. The five plugins are one system —
-a shared core, domain groups, and one opt-in way-of-working pack — and a consumer running group 1
-alongside group 3 needs matching versions. What was wrong was never the lockstep, but housing unrelated products in a single release
+[`cut-release.ps1`](scripts/release/cut-release.ps1) needs no change. The plugins are one system —
+a stack of teams plus one opt-in workflow — and a consumer running `team-alpha` alongside `team-shopify`
+needs matching versions. What was wrong was never the lockstep, but housing unrelated products in a single release
 train, and that dissolved with the reorganisation rather than needing a fix. Decision by Dave,
 August 3, 2026; the reader-facing statement is in
 [`README.md`](README.md#one-product-one-repository).
 
 **The repo consumes itself.** Via [`.claude/settings.json`](.claude/settings.json) this repo enables
-its own `specialists` plugin (group 1), with the `github` marketplace source
+its own `team-alpha` plugin (the core team), with the `github` marketplace source
 `DaveKJohn/claude-code-specialists` — so the repo points at itself. That way the maintenance team works
 with exactly the product it maintains. One consequence to be aware of: through the `github` source
 the team sees the **last pushed** version of the plugins, not your ongoing branch work — an agent
@@ -154,7 +154,7 @@ plugin without any error — the measured instance and the repair are in
 output, and script-generated document content. **The session-reply language is separate and follows
 the user.** That second half applies to every turn regardless of which files it touches, which is why
 it lives here rather than in a path-scoped rule. The system-wide norm (and its three exceptions) is in
-[Tessa #16's portable manual](plugins/specialists/manuals/06-16-manual.md#what-tessa-covers)
+[Tessa #16's portable manual](plugins/team-alpha/manuals/06-16-manual.md#what-tessa-covers)
 under **"Guarding the language convention,"** so it travels to every consuming repo.
 
 **The per-layer detail — which layers are in scope, and the deliberate exceptions (`VUL-IN`,
@@ -572,8 +572,8 @@ The constitution above, concretely implemented here:
      nothing but which category heading the entry is grouped under.
 - **This repo is `public`.** A deliberate choice, so the remote `github` marketplace source can be
   read without gh auth. Consequence: **nothing confidential** belongs here — no personal
-  information, credentials, or secrets. The group 1 agent defs are therefore deliberately
-  repo-neutral; repo-specific context lives in the consuming (private) repo's
+  information, credentials, or secrets. The core team's (`team-alpha`) agent defs are therefore
+  deliberately repo-neutral; repo-specific context lives in the consuming (private) repo's
   `.claude/specialists/lenses/` lens.
 - **Changes to shared agent defs land here first**, are committed here, and only then picked up by
   the consuming repos — never the other way around.

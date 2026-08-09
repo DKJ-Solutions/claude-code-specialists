@@ -58,7 +58,7 @@ accepted degree of transparency (security review, July 16, 2026).
   "localCheckout": "../life-hub",
   "plugins": [
     {
-      "id": "specialists@claude-code-specialists",
+      "id": "team-alpha@claude-code-specialists",
       "extensions": ["01-01", "05-05"]
     }
   ],
@@ -158,17 +158,17 @@ structural path difference.
 
 ## The session check (automatic)
 
-The **`specialists-workflow-davekjohn`** plugin carries a **SessionStart hook**
-([`hooks/hooks.json`](../plugins/specialists-workflow-davekjohn/hooks/hooks.json) +
-[`connector-sessioncheck.ps1`](../plugins/specialists-workflow-davekjohn/hooks/connector-sessioncheck.ps1)) that, when a
+The **`workflow-davekjohn`** plugin carries a **SessionStart hook**
+([`hooks/hooks.json`](../plugins/workflow-davekjohn/hooks/hooks.json) +
+[`connector-sessioncheck.ps1`](../plugins/workflow-davekjohn/hooks/connector-sessioncheck.ps1)) that, when a
 session starts, locates the workshop checkout and runs the connectors check there.
 
 **It moved out of the core on August 8, 2026, and the reason is what this register is.** The check
 reads *this* register — Dave's own list of his own repos — and looks for a local workshop checkout to
 run it from. That is one person's multi-repo administration, not a craft any consumer shares, so a repo
 that merely enabled the specialists was running a session hook about somebody else's repos. It now
-travels with the opt-in workflow pack, which is where the rest of that way of working lives. A consumer
-who does not enable that pack never sees it — which, since only Dave's repos are in the register, is the
+travels with the opt-in workflow, which is where the rest of that way of working lives. A consumer
+who does not enable that workflow never sees it — which, since only Dave's repos are in the register, is the
 correct outcome for everyone else.
 
 In the repos that do carry it — life-hub and smartwatchbanden among them —

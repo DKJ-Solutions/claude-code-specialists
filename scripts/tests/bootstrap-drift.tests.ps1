@@ -19,7 +19,7 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot   = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$Bootstrap  = Join-Path $RepoRoot 'plugins\specialists\skills\specialists-init\bootstrap.ps1'
+$Bootstrap  = Join-Path $RepoRoot 'plugins\team-alpha\skills\specialists-init\bootstrap.ps1'
 $DriftLint  = Join-Path $RepoRoot 'scripts\lint\check-consumer-drift.ps1'
 $Integrity  = Join-Path $RepoRoot 'scripts\lint\check-plugin-integrity.ps1'
 $Fixture    = Join-Path ([System.IO.Path]::GetTempPath()) 'specialists-init-test-fixture'
@@ -31,8 +31,8 @@ $SeamInclusion = '.claude\specialists\SPECIALISTS.md'
 $SeamImport = '@.claude/specialists/SPECIALISTS.md'
 # The pre-seam plugin path (family = claude-specialists). Still READ by every reader, and still WRITTEN
 # for a consumer that already has a lens tree there -- the bootstrap never relocates one.
-$PpLegacy   = '.claude\plugins\claude-specialists\specialists'
-$PersonaSrc = Join-Path $RepoRoot 'plugins\specialists\personas\01-01-persona.md'
+$PpLegacy   = '.claude\plugins\claude-specialists\team-alpha'
+$PersonaSrc = Join-Path $RepoRoot 'plugins\team-alpha\personas\01-01-persona.md'
 
 $script:pass = 0
 $script:fail = 0
@@ -192,13 +192,13 @@ try {
     # teardown's classification turns on exactly that, and the case below proves it still recognises
     # this shape as generated rather than authored.
     Assert-True (-not ($rcText -match "=\s*'[^']*VUL-IN")) 'core-only: no placeholder value -- the roster half is complete as generated'
-    Assert-True ($r1.Out -match 'specialists-workflow-davekjohn') 'core-only: the run NAMES the pack the missing half belongs to, so the absence is legible'
+    Assert-True ($r1.Out -match 'workflow-davekjohn') 'core-only: the run NAMES the pack the missing half belongs to, so the absence is legible'
 
     # --- 1c0. The core-only scaffold must stay REMOVABLE by the teardown ---------------------------
     # Without this, a file the bootstrap just wrote is classified as authored and kept forever --
     # adoption exactly as irreversible as specialists-teardown promises it is not.
     Write-Host "bootstrap.ps1 -- the core-only scaffold stays removable by the teardown" -ForegroundColor Cyan
-    $teardownScript = Join-Path $RepoRoot 'plugins\specialists\skills\specialists-teardown\teardown.ps1'
+    $teardownScript = Join-Path $RepoRoot 'plugins\team-alpha\skills\specialists-teardown\teardown.ps1'
     function Test-TeardownSeesGenerated {
         param([string]$Path)
         # The classifier alone, lifted out of the script text: running the whole teardown here would
@@ -225,26 +225,26 @@ try {
     Assert-Equal $false (Test-TeardownSeesGenerated $touchedRc) "teardown: a look-alike that never claims the bootstrap wrote it is KEPT"
     Remove-Item -LiteralPath $touchedRc -Force
 
-    # --- 1c1. The SAME bootstrap against a consumer that DID enable the workflow pack ---------------
+    # --- 1c1. The SAME bootstrap against a consumer that DID enable the workflow plugin ---------------
     # Everything this suite used to assert on the single fixture lives here now: the shape a consumer
     # receives when they chose that way of working.
-    Write-Host "bootstrap.ps1 -- script-config scaffolds (#86), workflow pack enabled" -ForegroundColor Cyan
+    Write-Host "bootstrap.ps1 -- script-config scaffolds (#86), workflow plugin enabled" -ForegroundColor Cyan
     $FixtureWf = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-wf-$PID"
     if (Test-Path -LiteralPath $FixtureWf) { Remove-Item -Recurse -Force -LiteralPath $FixtureWf }
     New-Item -ItemType Directory -Path (Join-Path $FixtureWf '.claude') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $FixtureWf '.claude\settings.json'),
-        '{ "enabledPlugins": { "specialists@claude-code-specialists": true, "specialists-workflow-davekjohn@claude-code-specialists": true } }', $Utf8NoBom)
+        '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true, "workflow-davekjohn@claude-code-specialists": true } }', $Utf8NoBom)
     $rWf = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $FixtureWf)
-    Assert-Equal 0 $rWf.Code 'workflow pack: bootstrap exit 0'
+    Assert-Equal 0 $rWf.Code 'workflow plugin: bootstrap exit 0'
     $rcScaffold = Join-Path $FixtureWf 'scripts\repo-config.ps1'
     $biScaffold = Join-Path $FixtureWf 'scripts\lib\branch-info.ps1'
-    Assert-True (Test-Path -LiteralPath $rcScaffold) 'workflow pack: scripts/repo-config.ps1 scaffold placed'
-    Assert-True (Test-Path -LiteralPath $biScaffold) 'workflow pack: scripts/lib/branch-info.ps1 scaffold placed'
+    Assert-True (Test-Path -LiteralPath $rcScaffold) 'workflow plugin: scripts/repo-config.ps1 scaffold placed'
+    Assert-True (Test-Path -LiteralPath $biScaffold) 'workflow plugin: scripts/lib/branch-info.ps1 scaffold placed'
     $rcText = [System.IO.File]::ReadAllText($rcScaffold, [System.Text.Encoding]::UTF8)
     Assert-True ($rcText -match 'VUL-IN') 'repo-config scaffold carries the VUL-IN marker'
     Assert-True ($rcText -match 'function Get-RepoName') 'repo-config scaffold supplies Get-RepoName'
     # Both halves in one file: the assembly must not drop the roster pair when the workflow half joins.
-    Assert-True ($rcText -match 'function Get-RosterPath') 'workflow pack: the roster half is still there alongside the workflow half'
+    Assert-True ($rcText -match 'function Get-RosterPath') 'workflow plugin: the roster half is still there alongside the workflow half'
     # Get-ChangelogHeading (#178) and Get-LiveStage (#177) both ship a concrete, non-VUL-IN default
     # (unlike Get-RepoName/Get-LintScript above, which are placeholders every consumer must fill in) --
     # both are Optional in the script contract, so a consumer that never touches these two lines still
@@ -270,7 +270,7 @@ try {
     #     without extending the scaffold and this fails, whatever the entry happens to be named.
     Write-Host "bootstrap.ps1 -- the scaffolds satisfy check-script-contract (#226)" -ForegroundColor Cyan
     # AGAINST THE WORKFLOW FIXTURE, not the core-only one, and that is the accurate scope rather than a
-    # convenience: since August 8, 2026 check-script-contract SHIPS IN the workflow pack, so the only
+    # convenience: since August 8, 2026 check-script-contract SHIPS IN the workflow plugin, so the only
     # repos it ever runs in are the ones that enabled it. Pointing it at the core-only fixture would
     # assert a contract on a consumer that will never run the check -- and would fail on branch-info,
     # which that consumer is correct not to have.
@@ -321,12 +321,12 @@ try {
         try {
             & git -C $gitFix init -q 2>$null | Out-Null
             if ($OriginUrl) { & git -C $gitFix remote add origin $OriginUrl 2>$null | Out-Null }
-            # The workflow pack has to be enabled here: RepoName lives in that half of the scaffold since
+            # The workflow plugin has to be enabled here: RepoName lives in that half of the scaffold since
             # August 8, 2026, so without it there is no line for the derivation to land in and every case
             # below would pass or fail for the wrong reason.
             New-Item -ItemType Directory -Path (Join-Path $gitFix '.claude') -Force | Out-Null
             [System.IO.File]::WriteAllText((Join-Path $gitFix '.claude\settings.json'),
-                '{ "enabledPlugins": { "specialists@claude-code-specialists": true, "specialists-workflow-davekjohn@claude-code-specialists": true } }', $Utf8NoBom)
+                '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true, "workflow-davekjohn@claude-code-specialists": true } }', $Utf8NoBom)
             $rg = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $gitFix)
             Assert-Equal 0 $rg.Code "git derivation ($Label): bootstrap exit 0"
             $txt = [System.IO.File]::ReadAllText((Join-Path $gitFix 'scripts\repo-config.ps1'), [System.Text.Encoding]::UTF8)
@@ -405,15 +405,15 @@ try {
     $cacheRoot = Join-Path $Fixture 'cache\claude-code-specialists'
     $ownCache  = Join-Path $cacheRoot 'specialists\1.4.0'
     New-Item -ItemType Directory -Path $ownCache -Force | Out-Null
-    Copy-Item -Path (Join-Path $RepoRoot 'plugins\specialists\*') -Destination $ownCache -Recurse
+    Copy-Item -Path (Join-Path $RepoRoot 'plugins\team-alpha\*') -Destination $ownCache -Recurse
     foreach ($v in '1.9.0', '1.10.0') {
-        New-Item -ItemType Directory -Path (Join-Path $cacheRoot "specialists-lifehub\$v\agents") -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $cacheRoot "team-lifehub\$v\agents") -Force | Out-Null
     }
-    [System.IO.File]::WriteAllText((Join-Path $cacheRoot 'specialists-lifehub\1.9.0\agents\04-88-agent.md'), "---`nname: oldie`nid: 88`ngroup: 04`n---`nfixture")
-    [System.IO.File]::WriteAllText((Join-Path $cacheRoot 'specialists-lifehub\1.10.0\agents\04-99-agent.md'), "---`nname: newest`nid: 99`ngroup: 04`n---`nfixture")
+    [System.IO.File]::WriteAllText((Join-Path $cacheRoot 'team-lifehub\1.9.0\agents\04-88-agent.md'), "---`nname: oldie`nid: 88`ngroup: 04`n---`nfixture")
+    [System.IO.File]::WriteAllText((Join-Path $cacheRoot 'team-lifehub\1.10.0\agents\04-99-agent.md'), "---`nname: newest`nid: 99`ngroup: 04`n---`nfixture")
     $cacheConsumer = Join-Path $Fixture 'cache-consumer'
     New-Item -ItemType Directory -Path (Join-Path $cacheConsumer '.claude') -Force | Out-Null
-    [System.IO.File]::WriteAllText((Join-Path $cacheConsumer '.claude\settings.json'), '{ "enabledPlugins": { "specialists@claude-code-specialists": true, "specialists-lifehub@claude-code-specialists": true } }')
+    [System.IO.File]::WriteAllText((Join-Path $cacheConsumer '.claude\settings.json'), '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true, "team-lifehub@claude-code-specialists": true } }')
     $cachedBootstrap = Join-Path $ownCache 'skills\specialists-init\bootstrap.ps1'
     $rc = Invoke-Script -Path $cachedBootstrap -ScriptArgs @('-ConsumerRoot', $cacheConsumer)
     Assert-Equal 0 $rc.Code 'version cache: bootstrap exit 0'
@@ -437,13 +437,18 @@ try {
     Write-Host "bootstrap.ps1 -- durable body path (cache -> marketplaces clone)" -ForegroundColor Cyan
     $pluginsRoot = Join-Path $Fixture 'plugins'
     $mp = 'mp-fixture'
-    $cacheInit = Join-Path $pluginsRoot "cache\$mp\specialists\9.9.9"
+    # The cache directory is named after the PLUGIN, and the bootstrap derives its own name from exactly
+    # that segment -- so this has to be the same plugin the clone below carries. It said 'specialists'
+    # while the clone said 'team-alpha' for the length of one rename sweep, and the symptom was precisely
+    # what this scenario exists to catch: the @-import fell back to the version-pinned cache path,
+    # because the durable clone it was looking for was under a name nothing had put there.
+    $cacheInit = Join-Path $pluginsRoot "cache\$mp\team-alpha\9.9.9"
     New-Item -ItemType Directory -Path $cacheInit -Force | Out-Null
-    Copy-Item -Path (Join-Path $RepoRoot 'plugins\specialists\*') -Destination $cacheInit -Recurse
+    Copy-Item -Path (Join-Path $RepoRoot 'plugins\team-alpha\*') -Destination $cacheInit -Recurse
     # Versionless marketplaces clone with (at minimum) the personas under plugins/<plugin>/.
-    $cloneP = Join-Path $pluginsRoot "marketplaces\$mp\plugins\specialists\personas"
+    $cloneP = Join-Path $pluginsRoot "marketplaces\$mp\plugins\team-alpha\personas"
     New-Item -ItemType Directory -Path $cloneP -Force | Out-Null
-    Copy-Item -Path (Join-Path $RepoRoot 'plugins\specialists\personas\*') -Destination $cloneP -Recurse
+    Copy-Item -Path (Join-Path $RepoRoot 'plugins\team-alpha\personas\*') -Destination $cloneP -Recurse
     $durConsumer = Join-Path $Fixture 'durable-consumer'
     New-Item -ItemType Directory -Path $durConsumer -Force | Out-Null
     $rd = Invoke-Script -Path (Join-Path $cacheInit 'skills\specialists-init\bootstrap.ps1') -ScriptArgs @('-ConsumerRoot', $durConsumer)
@@ -451,7 +456,7 @@ try {
     # The body import now lives in SPECIALISTS.md, not in CLAUDE.md -- so that is where the durability
     # property has to be asserted. Reading the wrong file here would make this pass vacuously.
     $durIncl = [System.IO.File]::ReadAllText((Join-Path $durConsumer $SeamInclusion), [System.Text.Encoding]::UTF8)
-    Assert-True ($durIncl -match [regex]::Escape("marketplaces/$mp/plugins/specialists/personas/01-01-persona.md")) 'durable body path: @-import points to the marketplaces clone'
+    Assert-True ($durIncl -match [regex]::Escape("marketplaces/$mp/plugins/team-alpha/personas/01-01-persona.md")) 'durable body path: @-import points to the marketplaces clone'
     Assert-True (-not ($durIncl -match '/cache/')) 'durable body path: @-import does NOT point to the version-pinned cache'
     # And CLAUDE.md itself must be free of the cache path too -- the one line it carries is repo-relative.
     $durMd = [System.IO.File]::ReadAllText((Join-Path $durConsumer 'CLAUDE.md'), [System.Text.Encoding]::UTF8)

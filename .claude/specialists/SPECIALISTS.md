@@ -9,7 +9,7 @@
 The orchestrator (Chris) is always loaded -- portable body from the plugin install and repo lens from
 `lenses/`; he routes on demand to the specialists below.
 
-@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/specialists/personas/01-01-persona.md
+@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/team-alpha/personas/01-01-persona.md
 
 @lenses/01-01-extension.md
 ## The Claude Specialists — who does what
@@ -106,7 +106,7 @@ the repo slot.
 
 
 
-Small and maintenance-focused. The portable playbooks come from the `specialists` plugin; each
+Small and maintenance-focused. The portable playbooks come from the `team-alpha` plugin; each
 
 specialist's repo lens lives in [`.claude/specialists/lenses/`](lenses/).
 
@@ -140,7 +140,7 @@ plugin's into every session, so repeating them here only cost tokens (~750/sessi
 
 
 
-The subagents of the enabled `specialists` plugin, by id — their descriptions are already in context,
+The subagents of the enabled `team-alpha` plugin, by id — their descriptions are already in context,
 
 so this line is for **you** and for the roster-sync check:
 
@@ -162,7 +162,7 @@ Editor) · `06-19` Victor (Code Reviewer) · `06-23` Sebastian (Security Enginee
 
 Each has a repo lens at `.claude/specialists/lenses/<g>-<id>-extension.md`. For a
 
-full description, run `claude plugin details specialists@claude-code-specialists` or read their manual.
+full description, run `claude plugin details team-alpha@claude-code-specialists` or read their manual.
 
 
 

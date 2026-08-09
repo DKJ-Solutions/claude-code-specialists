@@ -6,7 +6,7 @@ group: 05
 # Derek 🐙 — the DevOps Engineer (*DevOps Engineer Derek*)
 
 > Repo-lens (lens-only persona) — the portable body lives in the plugin source:
-> `~/.claude/plugins/marketplaces/claude-code-specialists/plugins/specialists/personas/05-05-persona.md`.
+> `~/.claude/plugins/marketplaces/claude-code-specialists/plugins/team-alpha/personas/05-05-persona.md`.
 > Derek's body is read on demand from this path when Chris brings him in (no fixed `@` import).
 
 ## Specific to this repo (claude-code-specialists)
@@ -327,9 +327,9 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
 
 **First, where these scripts live for everyone else.** The paths below are this repo's own
 `scripts/`, which stays the canonical source and is unchanged. What changed on August 8, 2026 is the
-**mirror**: every script in this section now travels in `specialists-workflow-davekjohn`, the opt-in
+**mirror**: every script in this section now travels in `workflow-davekjohn`, the opt-in
 pack, instead of in the core. So in a consuming repo Derek has this toolbox **only if that repo
-enabled the pack** — and if it did not, he opens branches and PRs with plain `git` and `gh`,
+enabled the workflow** — and if it did not, he opens branches and PRs with plain `git` and `gh`,
 following that repo's own conventions. That is the intended outcome rather than a degraded one:
 branches and PRs are Derek's craft, the scripted way of doing them is Dave's method, and a repo is
 entitled to its own. Do not read a consumer without these scripts as misconfigured.

@@ -26,7 +26,7 @@
     for real as a child process against the fixture. The fixture is deliberately otherwise near-empty
     (no agent defs) -- checks 2/3/3b/3c/6/7 simply find nothing to check, and check 8 always reports its
     shared-script pairs as "missing" against this minimal fixture (expected noise, asserted on nowhere
-    below). The fixture carries a small canonical skillset for check 10: plugins/specialists/skills/
+    below). The fixture carries a small canonical skillset for check 10: plugins/team-alpha/skills/
     skill-alpha/SKILL.md and .../skill-beta/SKILL.md (2 real skills), plus a DEPTH DECOY
     skills/skill-alpha/references/SKILL.md (a SKILL.md one level too deep, which must NOT be picked
     up as a 3rd canonical skill). Only check 4's and check 10's per-file findings are asserted on, so
@@ -34,7 +34,7 @@
 
     IT DECLARES ITS PLUGINS NOW, WHERE IT USED TO HAVE NO marketplace.json AT ALL (August 9, 2026). The
     lint stopped taking "a directory under plugins/" as the definition of a plugin and started asking the
-    marketplace, so a fixture that creates plugins/specialists/skills/ without declaring it publishes
+    marketplace, so a fixture that creates plugins/team-alpha/skills/ without declaring it publishes
     nothing -- and check 10's canonical set, the whole subject of a dozen scenarios below, came out
     empty. The fixture therefore writes a marketplace.json naming the two plugins the shared-scripts
     registry expects, each with a minimal plugin.json so checks 1 and 2 stay quiet.
@@ -268,28 +268,28 @@ try {
     # check 10 fixture: two canonical skills (skill-alpha, skill-beta) plus a DEPTH DECOY -- a
     # SKILL.md one level deeper (skills/<name>/references/SKILL.md) that must NOT be picked up as a
     # third canonical skill, exercising the exact-depth binding of check 10's canonical-skillset scan.
-    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\specialists\skills\skill-alpha\references') -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\specialists\skills\skill-beta') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\team-alpha\skills\skill-alpha\references') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\team-alpha\skills\skill-beta') -Force | Out-Null
 
     # The marketplace: what makes those directories PLUGINS rather than just directories. Both plugins the
     # shared-scripts registry names are declared, each with a manifest, so checks 1 and 2 pass cleanly and
     # the registry resolves. See this file's header for why the fixture stopped being marketplace-less.
     New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude-plugin') -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\specialists\.claude-plugin') -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\specialists-workflow-davekjohn\.claude-plugin') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\team-alpha\.claude-plugin') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\workflow-davekjohn\.claude-plugin') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude-plugin\marketplace.json'), (@'
 {
   "name": "fixture-marketplace",
   "plugins": [
-    { "name": "specialists",                    "source": "./plugins/specialists" },
-    { "name": "specialists-workflow-davekjohn", "source": "./plugins/specialists-workflow-davekjohn" }
+    { "name": "team-alpha",                    "source": "./plugins/team-alpha" },
+    { "name": "workflow-davekjohn", "source": "./plugins/workflow-davekjohn" }
   ]
 }
 '@), $Utf8NoBom)
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\specialists\.claude-plugin\plugin.json'),
-        "{ `"name`": `"specialists`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\specialists-workflow-davekjohn\.claude-plugin\plugin.json'),
-        "{ `"name`": `"specialists-workflow-davekjohn`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\team-alpha\.claude-plugin\plugin.json'),
+        "{ `"name`": `"team-alpha`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\workflow-davekjohn\.claude-plugin\plugin.json'),
+        "{ `"name`": `"workflow-davekjohn`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
 
     Copy-Item -Path $IntegritySrc -Destination (Join-Path $Fixture 'scripts\lint\check-plugin-integrity.ps1') -Force
     Copy-Item -Path $AgentSharedLibSrc -Destination (Join-Path $Fixture 'scripts\lib\agent-shared-lib.ps1') -Force
@@ -301,13 +301,13 @@ try {
     Copy-Item -Path $PluginTreeSrc -Destination (Join-Path $Fixture 'scripts\lib\plugin-tree-lib.ps1') -Force
 
     $skillAlphaMd = "---`nname: skill-alpha`ndescription: Fixture skill alpha.`n---`n`n# Skill Alpha`n"
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\specialists\skills\skill-alpha\SKILL.md'), $skillAlphaMd, $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\team-alpha\skills\skill-alpha\SKILL.md'), $skillAlphaMd, $Utf8NoBom)
     $skillBetaMd = "---`nname: skill-beta`ndescription: Fixture skill beta.`n---`n`n# Skill Beta`n"
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\specialists\skills\skill-beta\SKILL.md'), $skillBetaMd, $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\team-alpha\skills\skill-beta\SKILL.md'), $skillBetaMd, $Utf8NoBom)
     # The depth decoy claims its own name (skill-deep-decoy) in frontmatter -- if check 10 ever
     # regressed to a looser depth match, that name would silently become a 3rd canonical skill.
     $skillDeepDecoyMd = "---`nname: skill-deep-decoy`ndescription: Depth decoy -- must not count as a canonical skill.`n---`n`n# Skill Deep Decoy`n"
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\specialists\skills\skill-alpha\references\SKILL.md'), $skillDeepDecoyMd, $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\team-alpha\skills\skill-alpha\references\SKILL.md'), $skillDeepDecoyMd, $Utf8NoBom)
 
     # --- Scenario A: dead links in the two target files + a decoy outside the scan set --------------
     Write-Host "check 4 coverage -- CONTRIBUTING.md + connectors README are IN the scan set" -ForegroundColor Cyan
@@ -358,7 +358,7 @@ try {
     # combined check would pass while three of them were absent.
     Write-Host "check 4 coverage -- the payload layers (#481) are IN the scan set" -ForegroundColor Cyan
     $payloadTargets = @(
-        @{ Rel = 'plugins\specialists\agents\09-99-agent.md';   Label = 'an agent def' },
+        @{ Rel = 'plugins\team-alpha\agents\09-99-agent.md';   Label = 'an agent def' },
         @{ Rel = 'plugins\agent-shared\fixture-block.md';        Label = 'a shared agent-def block' },
         @{ Rel = '.github\pull_request_template.md';             Label = 'a .github template' },
         @{ Rel = '.claude\rules\fixture-rule.md';                Label = 'a path-scoped rule' }
@@ -766,7 +766,7 @@ try {
         ''
         '```powershell'
         'claude plugin marketplace update claude-code-specialists'
-        'claude plugin install specialists@claude-code-specialists --scope project'
+        'claude plugin install team-alpha@claude-code-specialists --scope project'
         '```'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s17Lines -join "`n") + "`n"), $Utf8NoBom)
@@ -781,7 +781,7 @@ try {
     $s18Lines = @(
         '# Contributing'
         ''
-        'Run `claude plugin install specialists@claude-code-specialists` from the repo root.'
+        'Run `claude plugin install team-alpha@claude-code-specialists` from the repo root.'
         ''
         'Refresh first with `claude plugin marketplace update claude-code-specialists`.'
     )
@@ -796,7 +796,7 @@ try {
     $s19Lines = @(
         '# Contributing'
         ''
-        'Run `claude plugin install specialists@claude-code-specialists --scope project` from the root.'
+        'Run `claude plugin install team-alpha@claude-code-specialists --scope project` from the root.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s19Lines -join "`n") + "`n"), $Utf8NoBom)
     $rL19 = Invoke-Integrity -FixtureRoot $Fixture
@@ -829,7 +829,7 @@ try {
     $s21Lines = @(
         '# Contributing'
         ''
-        'Removing it is a separate step: `claude plugin uninstall specialists@claude-code-specialists'
+        'Removing it is a separate step: `claude plugin uninstall team-alpha@claude-code-specialists'
         '--scope project`, run from the repo root.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s21Lines -join "`n") + "`n"), $Utf8NoBom)
@@ -848,7 +848,7 @@ try {
         'Write-Host "an unrelated example"'
         '```'
         ''
-        'Removing it: `claude plugin uninstall specialists@claude-code-specialists'
+        'Removing it: `claude plugin uninstall team-alpha@claude-code-specialists'
         '--scope project`, from the root.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s22Lines -join "`n") + "`n"), $Utf8NoBom)
@@ -861,7 +861,7 @@ try {
     $s23Lines = @(
         '# Contributing'
         ''
-        'Afterwards run `claude plugin uninstall specialists@claude-code-specialists` to detach.'
+        'Afterwards run `claude plugin uninstall team-alpha@claude-code-specialists` to detach.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s23Lines -join "`n") + "`n"), $Utf8NoBom)
     $rL23 = Invoke-Integrity -FixtureRoot $Fixture
@@ -878,7 +878,7 @@ try {
     $s24Changelog = @(
         '# Changelog'
         ''
-        'The install back then was `claude plugin install specialists@claude-code-specialists`, with no'
+        'The install back then was `claude plugin install team-alpha@claude-code-specialists`, with no'
         'scope flag and no refresh -- which is exactly what that release documented.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CHANGELOG.md'), (($s24Changelog -join "`n") + "`n"), $Utf8NoBom)
@@ -898,7 +898,7 @@ try {
         ''
         'Refresh with `claude plugin marketplace update claude-code-specialists` first.'
         ''
-        'Then `claude plugin install specialists@claude-code-specialists --scope project ; claude plugin install specialists-ecomm@claude-code-specialists` for both.'
+        'Then `claude plugin install team-alpha@claude-code-specialists --scope project ; claude plugin install team-ecomm@claude-code-specialists` for both.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s25Lines -join "`n") + "`n"), $Utf8NoBom)
     $rL25 = Invoke-Integrity -FixtureRoot $Fixture
@@ -916,7 +916,7 @@ try {
         '# Contributing'
         ''
         'Remove a record a session start left behind with'
-        '`claude plugin uninstall specialists@claude-code-specialists --scope local`, then re-install.'
+        '`claude plugin uninstall team-alpha@claude-code-specialists --scope local`, then re-install.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s26Lines -join "`n") + "`n"), $Utf8NoBom)
     $rL26 = Invoke-Integrity -FixtureRoot $Fixture
@@ -932,7 +932,7 @@ try {
         ''
         'Refresh with `claude plugin marketplace update claude-code-specialists` first.'
         ''
-        'Then run `claude plugin install specialists@claude-code-specialists --scope local` from the root.'
+        'Then run `claude plugin install team-alpha@claude-code-specialists --scope local` from the root.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s27Lines -join "`n") + "`n"), $Utf8NoBom)
     $rL27 = Invoke-Integrity -FixtureRoot $Fixture
@@ -1006,7 +1006,7 @@ try {
         'A record in `installed_plugins.json` looks like this:'
         ''
         '```json'
-        '{ "plugins": { "specialists@claude-code-specialists": ['
+        '{ "plugins": { "team-alpha@claude-code-specialists": ['
         '  { "scope": "project", "version": "3.0.8", "projectPath": "C:\\repo" } ] } }'
         '```'
     )
@@ -1055,7 +1055,7 @@ try {
         'Remove it again:'
         ''
         '```powershell'
-        'claude plugin uninstall specialists@claude-code-specialists'
+        'claude plugin uninstall team-alpha@claude-code-specialists'
         '```'
     )
     [System.IO.File]::WriteAllText($s33Path, (($s33 -join "`n") + "`n"), $Utf8NoBom)
@@ -1416,7 +1416,7 @@ try {
     #    the way a captured transcript can.
     [System.IO.File]::WriteAllText($qs, @(
         '# Quickstart', '', 'Run this:', '', ($fence + 'powershell'),
-        'claude plugin install specialists@claude-code-specialists --scope project', $fence
+        'claude plugin install team-alpha@claude-code-specialists --scope project', $fence
     ) -join "`n", $Utf8NoBom)
     $s3 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($s3.Out -match '\[expected-output\].*INSTALL\.md')) `
@@ -1568,7 +1568,7 @@ try {
     # positive-only test would pass against a check that examines nothing at all.
     Write-Host "check 18: shared-script parameters vs. their skill" -ForegroundColor Cyan
     $parkSrc   = Join-Path $Fixture 'scripts\task\park-branch.ps1'
-    $parkSkill = Join-Path $Fixture 'plugins\specialists-workflow-davekjohn\skills\park\SKILL.md'
+    $parkSkill = Join-Path $Fixture 'plugins\workflow-davekjohn\skills\park\SKILL.md'
     New-Item -ItemType Directory -Path (Split-Path -Parent $parkSrc) -Force | Out-Null
     New-Item -ItemType Directory -Path (Split-Path -Parent $parkSkill) -Force | Out-Null
     # A real param block, so the AST reader is what is being exercised -- not a string the test planted.
@@ -1758,7 +1758,7 @@ try {
     # absolute path reads as a line to paste. A test that only pinned the positive would pass against a
     # stricter check that starts accusing the teardown page and needs a list to quiet it back down.
     Write-Host "check 22: a skill's command must not point at the author's disk" -ForegroundColor Cyan
-    $cmdSkill = Join-Path $Fixture 'plugins\specialists-workflow-davekjohn\skills\adopt-config\SKILL.md'
+    $cmdSkill = Join-Path $Fixture 'plugins\workflow-davekjohn\skills\adopt-config\SKILL.md'
     New-Item -ItemType Directory -Path (Split-Path -Parent $cmdSkill) -Force | Out-Null
     function Write-CmdSkill([string]$Path) {
         [System.IO.File]::WriteAllText($cmdSkill,

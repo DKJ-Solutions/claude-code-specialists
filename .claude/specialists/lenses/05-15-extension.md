@@ -5,7 +5,7 @@ group: 05
 
 # Sylvester ⚙️ · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `specialists` plugin (`plugins/specialists/manuals/05-15-manual.md`). This file does not describe the craft, but what Sylvester does in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `team-alpha` plugin (`plugins/team-alpha/manuals/05-15-manual.md`). This file does not describe the craft, but what Sylvester does in this repo.
 
 A system administrator does the same thing everywhere — manage the harness and the tooling the team
 works in: scripts, config, the safety guards. **What is repo-specific in claude-code-specialists is not
@@ -123,7 +123,7 @@ infrastructure.
   it in isolation — mirroring the `release-lib` setup. **Never edit between the sentinels by hand.**
 - **`.claude/settings.json`** — this repo's harness config: the `extraKnownMarketplaces` (the
   `github` source `DaveKJohn/claude-code-specialists`) and `enabledPlugins` with which the repo enables
-  its own `specialists` plugin (group 1).
+  its own `team-alpha` plugin (the core team).
 - **The manifests** `.claude-plugin/marketplace.json` and every `<plugin>/.claude-plugin/plugin.json`
   (structure + `version`) — their *structure/config*; the descriptive *texts* he coordinates with
   [Tessa #16](06-16-extension.md).
@@ -132,16 +132,16 @@ infrastructure.
 
 - **The shared-scripts registry spans TWO plugins since August 8, 2026, and the plugin is read off the
   mirror path rather than declared.** `Get-SharedScriptPairs` maps each source to a mirror in either
-  `plugins/specialists/` (the core: `check-roster-sync`, `check-report-lib`) or
-  `plugins/specialists-workflow-davekjohn/` (everything branch- and release-shaped). Three things to
+  `plugins/team-alpha/` (the core: `check-roster-sync`, `check-report-lib`) or
+  `plugins/workflow-davekjohn/` (everything branch- and release-shaped). Three things to
   know before touching it:
   - **`SkillRel` is derived from `MirrorRel`, not stored.** Check 18 and `shared-scripts.tests.ps1`
-    both used to look for a script's documenting page at a hardcoded `plugins\specialists\skills\…`,
+    both used to look for a script's documenting page at a hardcoded `plugins\team-alpha\skills\…`,
     and the moment nine entry points moved, the gate reported every one of their existing skills as a
     typo. A second field naming the plugin would have been free to disagree with the path beside it;
     deriving it means a script that moves takes its page lookup with it.
   - **`check-report-lib` is registered TWICE on purpose** — one source, two mirrors — because
-    `check-roster-sync` stayed in the core while `check-script-contract` went to the pack. The
+    `check-roster-sync` stayed in the core while `check-script-contract` went to the workflow. The
     alternative, a mirror reaching into the other plugin's cache, was rejected on sight: separately
     versioned, separately installed, so a version mismatch breaks it silently. **A duplicate entry
     needs a distinct `Name`**: the suite looks pairs up with `Where-Object { $_.Name -eq … }` in
@@ -195,7 +195,7 @@ infrastructure.
   [`check-roster-sync.ps1`](../../../scripts/sync/check-roster-sync.ps1) reporting
   `[NOT-INSTALLED-HERE]` — the session-start hook cannot report it, because that hook ships in the
   plugin that did not load. The repair is `claude plugin marketplace update claude-code-specialists`
-  followed by `claude plugin install specialists@claude-code-specialists --scope project` from the new
+  followed by `claude plugin install team-alpha@claude-code-specialists --scope project` from the new
   root, after which a leftover record naming the old folder is expected and inert. The mechanism, the
   other two ways a record goes missing, and why that leftover is not a stray duplicate are in the
   family's [INSTALL.md](../../../plugins/INSTALL.md#staying-up-to-date);
@@ -389,7 +389,7 @@ infrastructure.
   the content was *written* in, not which file it ends up in.
 - **A check that scans a file for a token can be satisfied by a *path* containing that token.**
   `check-roster-sync` looks for each `<group>-<id>` in the roster file, and the bootstrap wrote
-  `@.claude/plugins/claude-specialists/specialists/01-01-extension.md` into `CLAUDE.md` (the pre-seam
+  `@.claude/plugins/claude-specialists/team-alpha/01-01-extension.md` into `CLAUDE.md` (the pre-seam
   lens path of the time; since #253 it writes the one seam line instead). That import
   line contains `01-01`, so Chris counts as rostered without a roster row ever existing — measured
   July 29, 2026: 18 ids reported missing after a bootstrap, not 19, with `01-01` the one silently

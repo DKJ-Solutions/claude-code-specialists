@@ -19,7 +19,7 @@ which this half is the summary of.
 
 **1. Write your repo's own `.claude/settings.json`** (create `.claude/` beside your `README.md` if it
 is not there). A complete, pasteable file; if you already have one, merge these two keys into it.
-Strict JSON — no comments, no trailing commas. Add a line per domain group you want.
+Strict JSON — no comments, no trailing commas. Add a line per add-on team you want.
 
 ```json
 {
@@ -29,7 +29,7 @@ Strict JSON — no comments, no trailing commas. Add a line per domain group you
     }
   },
   "enabledPlugins": {
-    "specialists@claude-code-specialists": true
+    "team-alpha@claude-code-specialists": true
   }
 }
 ```
@@ -42,7 +42,7 @@ it, the next command fails with `Marketplace … not found`.
 ```powershell
 claude plugin marketplace update claude-code-specialists                     # never skip: install does not refresh
 claude plugin marketplace list                                               # came the entry from YOUR repo's settings?
-claude plugin install specialists@claude-code-specialists --scope project    # once per plugin
+claude plugin install team-alpha@claude-code-specialists --scope project    # once per plugin
 ```
 
 `--scope project` is not optional — without it the install goes machine-wide and writes no
@@ -92,7 +92,7 @@ Two commands, from your repo's root, one pair per plugin:
 
 ```powershell
 claude plugin marketplace update claude-code-specialists
-claude plugin update specialists@claude-code-specialists --scope project
+claude plugin update team-alpha@claude-code-specialists --scope project
 ```
 
 Same scope flag, same reason. **The version number is not the code** — the clone these commands read
@@ -131,7 +131,7 @@ why it changed.
 
 > **Budget well over an hour, and know where it goes.** Measured August 6, 2026: this file is ~9,300
 > words (~47 min at 200 wpm) and
-> [`specialists-init`'s `SKILL.md`](specialists/skills/specialists-init/SKILL.md) another ~5,600
+> [`specialists-init`'s `SKILL.md`](team-alpha/skills/specialists-init/SKILL.md) another ~5,600
 > (~28 min) — call it **~75 minutes** for a first-time adopter. Both pages grow, so treat
 > that as an order of magnitude. The time is not in the typing: the bootstrap places the whole seam in
 > seconds. It is in **Step 4**, writing your roster and filling your lenses.
@@ -145,12 +145,12 @@ and code/security reviewers for the independent final pass before a PR or merge.
 charge: the governance (your `CLAUDE.md`, your safety rules) remains yours; the plugins only supply
 the team and its playbooks.
 
-The system consists of **five plugins**: the repo-neutral core `specialists` (group 1 — always
-enable it), three optional domain groups, and one optional **way-of-working** pack. Which specialists
+The system consists of **teams and a workflow**: the repo-neutral core team `team-alpha` (always
+enable it), three optional add-on teams, and one optional **way-of-working** plugin. Which specialists
 live in which plugin and who they are meant for is covered in the [root README](../README.md).
 
-**The fifth one is different in kind, so decide about it deliberately rather than by habit.**
-`specialists-workflow-davekjohn` carries no specialists at all — it is DaveKJohn's own branch,
+**The workflow plugin is different in kind, so decide about it deliberately rather than by habit.**
+`workflow-davekjohn` carries no specialists at all — it is DaveKJohn's own branch,
 changelog and release method as skills plus scripts (`new-branch`, `open-pr`, `ship-pr`,
 `fold-changelog`, `cut-release`, `park`, `fix-mojibake`). Enable it only if you want *that* workflow in
 your repo. **Leave it off and nothing is broken:** the specialists do branches and PRs with plain
@@ -161,7 +161,7 @@ you choose:
   needs. Nothing has to be undone first.
 - **If you enable it, your repo owes it two files** — `scripts/repo-config.ps1` (repo name, lint gate)
   and `scripts/lib/branch-info.ps1` (your branch-prefix table). `specialists-init` scaffolds both, and a
-  session check tells you if a function is missing. Without the pack you are asked for neither.
+  session check tells you if a function is missing. Without the workflow you are asked for neither.
 
 ### Before you start
 
@@ -294,7 +294,7 @@ is impossible to satisfy.
 > **Four *steps* here, six *acts* inside Step 1 — a different unit, not a different path.** Step 1
 > below is enable → **restart** → refresh → install → restart → verify, which the
 > [root README](../README.md#adoption-the-bootstrap-path) and
-> [`specialists-init`](specialists/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
+> [`specialists-init`](team-alpha/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
 > both count as its six acts ("step 0" in their numbering). Saying so is the point: those two pages once
 > counted the same procedure as *four* and *three*, and this page's step count made a third number
 > (inbound [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297)). Nothing was missing from
@@ -315,8 +315,8 @@ not be.
 > one. On the fresh profile this was measured on, neither existed yet, and one consumer reasonably read
 > *"in your repo's `.claude/`"* as something still to be **installed** rather than **created**.
 
-Set the marketplace source and the plugins you want in it (always the core; a domain group only if your
-repo has that domain). What follows is a **complete, pasteable file** — if you already have a
+Set the marketplace source and the plugins you want in it (always the core team; an add-on team only if
+your repo has that domain). What follows is a **complete, pasteable file** — if you already have a
 `.claude/settings.json`, merge these two keys into the object that is there instead of pasting over it:
 
 ```json
@@ -327,7 +327,7 @@ repo has that domain). What follows is a **complete, pasteable file** — if you
     }
   },
   "enabledPlugins": {
-    "specialists@claude-code-specialists": true
+    "team-alpha@claude-code-specialists": true
   }
 }
 ```
@@ -380,8 +380,8 @@ of your repo, preceded once by a refresh of that cached clone:
 
 ```powershell
 claude plugin marketplace update claude-code-specialists                     # 1. refresh the cache first
-claude plugin install specialists@claude-code-specialists --scope project    # 2. then install, per plugin
-# and line 2 again for each domain group you enabled
+claude plugin install team-alpha@claude-code-specialists --scope project    # 2. then install, per plugin
+# and line 2 again for each add-on team you enabled
 ```
 
 **Line 1 matters most right here, because this is the command the failure was measured on.** Without
@@ -552,7 +552,7 @@ review). The details of this path are in the
 as "step 0" (enabling + installing, above) and "step 1" (the skill).
 
 **What it should report, so you can check it rather than trust it** (inbound
-[#337](https://github.com/DaveKJohn/claude-code-specialists/issues/337)). With only the core `specialists`
+[#337](https://github.com/DaveKJohn/claude-code-specialists/issues/337)). With only the core `team-alpha`
 plugin enabled, the closing line reads:
 
 ```
@@ -571,7 +571,7 @@ promises; the split depends on what your repo already had. A **fresh** repo — 
 gets everything under `created`, which is the sample above. A repo that already had, say,
 `scripts/repo-config.ps1` sees that one move to `already present` instead. So a figure that is *higher*
 than the sample is not an error, and neither is one that is lower: what matters is that each pair adds up
-and that the skill names anything it skipped. If you enabled a domain group as well, expect its
+and that the skill names anything it skipped. If you enabled an add-on team as well, expect its
 specialists on top of these.
 
 > The sample above was itself the finding: until August 2, 2026 it showed `0 script-scaffold(s) created,
@@ -626,7 +626,7 @@ before you write anything, because every gate stays green while your lenses are 
 `scripts/repo-config.ps1` older than the current script contract (`Get-RosterPath`,
 `Get-RosterIgnoredIds`), which `scripts/sync/check-script-contract.ps1` reports for you.
 
-The worker specialists can be invoked directly as `@specialists:<name>` from the moment Step 3 is
+The worker specialists can be invoked directly as `@team-alpha:<name>` from the moment Step 3 is
 done — with an empty lens they simply answer out of their portable playbook.
 
 > **Do not attribute this half hour to the installer.** `specialists-init` places the seam, 25 lens
@@ -642,7 +642,7 @@ clone these commands read tracks `main`, not the tag.
 
 ```powershell
 claude plugin marketplace update claude-code-specialists          # 1. refresh the marketplace cache
-claude plugin update specialists@claude-code-specialists --scope project   # 2. then update, per plugin
+claude plugin update team-alpha@claude-code-specialists --scope project   # 2. then update, per plugin
 ```
 
 **Keep line 1 in the procedure — and here is exactly what each command was measured to do, because
@@ -839,7 +839,7 @@ When an update adds a **new skill**, restart your Claude Code session before you
 skill file from an updated plugin version. So a slash command that did not exist in the previous
 release stays absent until you restart — `claude plugin update`'s own `Restart to apply changes.` is
 literally true here. Don't trust the skill counter those two commands print as evidence either way:
-it excludes any skill with `disable-model-invocation: true`. Several of `specialists`' own skills
+it excludes any skill with `disable-model-invocation: true`. Several of `team-alpha`' own skills
 (`cut-release`, `fold-changelog`, `open-pr`, `park`) are slash-only for exactly that reason, so an
 unchanged count, or even `0 skills`, proves nothing about whether a new skill has actually landed.
 The only reliable check is the slash list itself.
