@@ -376,6 +376,11 @@ list sits at the **end** of the page:
 - **The table header is described in prose and quoted nowhere on this page**, because the inserter matches
   that exact line and a document explaining a pattern should not be one edit away from triggering it.
 
+#### 4.x
+
+| Version | Date | Type | Title |
+|---|---|---|---|
+
 #### 3.x
 
 | Version | Date | Type | Title |
