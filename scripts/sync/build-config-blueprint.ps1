@@ -31,14 +31,19 @@
     drift. This is what the lint gate and CI run.
 
 .PARAMETER OutputPath
-    Where to write the artefact, repo-root-relative. Defaults to the plugin path below; a test points
-    it at a throwaway file.
+    Where to write the artefact, repo-root-relative. Left empty it is DERIVED: the blueprint belongs to
+    the workflow plugin, and where that plugin's folder sits is a question the marketplace already
+    answers. A test points this at a throwaway file.
+
+    It was a literal until August 9, 2026, and that literal is the reason this parameter is documented
+    at all: it had to be edited when the plugins were renamed, and again when the tree was grouped into
+    teams/ and workflows/. Two edits for a fact the repo states in one place.
 #>
 
 [CmdletBinding()]
 param(
     [switch]$Check,
-    [string]$OutputPath = 'plugins\workflow-davekjohn\blueprint\config-blueprint.json'
+    [string]$OutputPath = ''
 )
 
 Set-StrictMode -Version Latest
@@ -48,6 +53,9 @@ $repoRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git
 
 . (Join-Path $PSScriptRoot '..\lib\script-contract-lib.ps1')
 . (Join-Path $PSScriptRoot '..\repo-config.ps1')
+# Which plugins this repo publishes, for resolving where the blueprint belongs (see $OutputPath below).
+# This generator is the SOURCE's own tool and is deliberately not mirrored, so the sibling is always here.
+. (Join-Path $PSScriptRoot '..\lib\plugin-tree-lib.ps1')
 
 function Get-ScriptVarReferences {
     <#
@@ -245,6 +253,20 @@ $json = ($blueprint | ConvertTo-Json -Depth 6)
 $json = ($json -replace "`r`n", "`n")
 if (-not $json.EndsWith("`n")) { $json += "`n" }
 
+# THE DESTINATION, ASKED OF THE MARKETPLACE when the caller did not name one. The blueprint lives in
+# whichever plugin already ships one; that is a fact about the tree, and the tree is described in
+# .claude-plugin/marketplace.json rather than in this parameter's default. Refuses rather than guessing
+# if no plugin carries a blueprint/ directory -- writing one into a folder chosen by fallback would
+# produce an artefact no consumer ever receives, silently.
+if (-not $OutputPath) {
+    $bpPlugin = @(Get-RepoPluginRoots -RepoRoot $repoRoot |
+        Where-Object { Test-Path -LiteralPath (Join-Path $_.Root 'blueprint') -PathType Container })
+    if ($bpPlugin.Count -ne 1) {
+        Write-Error "cannot decide where the config blueprint belongs: $($bpPlugin.Count) published plugin(s) carry a blueprint/ directory, expected exactly 1. Pass -OutputPath explicitly."
+        exit 1
+    }
+    $OutputPath = Join-Path $bpPlugin[0].RelativeRoot 'blueprint\config-blueprint.json'
+}
 $outPath = Join-Path $repoRoot $OutputPath
 
 if ($Check) {

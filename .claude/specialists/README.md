@@ -37,7 +37,7 @@ just like inline text.
   - **Persona lens (lens-only)** — for the persona-only specialists (Chris, Derek, Rendall), who run
     in the main conversation instead of as subagents. The main loop loads no plugin subagents, so the
     **portable body** comes straight from the plugin install via an `@` import: Chris always
-    (`@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/team-alpha/personas/01-01-persona.md`,
+    (`@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/teams/team-alpha/personas/01-01-persona.md`,
     stated in [`SPECIALISTS.md`](SPECIALISTS.md) rather than in `CLAUDE.md` itself — the seam spends
     two of the four allowed import hops), Derek and Rendall on demand from that same path. The
     extension itself is therefore **lens-only**: only the repo-specific `## Specific to this repo`

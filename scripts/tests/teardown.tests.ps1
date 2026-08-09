@@ -12,7 +12,7 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot  = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$Plugin    = Join-Path $RepoRoot 'plugins\team-alpha'
+$Plugin    = Join-Path $RepoRoot 'plugins\teams\team-alpha'
 $Bootstrap = Join-Path $Plugin 'skills\specialists-init\bootstrap.ps1'
 $Teardown  = Join-Path $Plugin 'skills\specialists-teardown\teardown.ps1'
 $Fixture   = Join-Path ([System.IO.Path]::GetTempPath()) 'specialists-teardown-fixture'

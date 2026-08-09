@@ -187,7 +187,7 @@ In one motion, on a clean `main`:
 
 **Closing step, after the script and after the two written documents have merged: publish a GitHub
 Release.** Not run by `cut-release.ps1` and not automated; the release manager walks through the
-[`cut-release` skill](../plugins/workflow-davekjohn/skills/cut-release/SKILL.md)'s checklist: `gh release create`
+[`cut-release` skill](../plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md)'s checklist: `gh release create`
 with the **internal note** as the release body (`--notes-file`), then `gh release upload` with the full
 development notes **and the edited highlights, where the bump generated one**. Never inline the development
 notes — see [Tier 0 - development](#tier-0---development) for the character limit that makes that fail.

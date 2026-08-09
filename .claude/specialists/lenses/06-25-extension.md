@@ -5,7 +5,7 @@ group: 06
 
 # Nolan ⚡ · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `team-alpha` plugin (`plugins/team-alpha/manuals/06-25-manual.md`). This file does not describe the craft, but what Nolan measures in this repo and with whom he works.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `team-alpha` plugin (`plugins/teams/team-alpha/manuals/06-25-manual.md`). This file does not describe the craft, but what Nolan measures in this repo and with whom he works.
 
 A performance engineer does the same thing everywhere — measure resource cost and trim it without
 losing function. **What is repo-specific in claude-code-specialists is not that Nolan measures, but

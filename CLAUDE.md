@@ -154,7 +154,7 @@ plugin without any error — the measured instance and the repair are in
 output, and script-generated document content. **The session-reply language is separate and follows
 the user.** That second half applies to every turn regardless of which files it touches, which is why
 it lives here rather than in a path-scoped rule. The system-wide norm (and its three exceptions) is in
-[Tessa #16's portable manual](plugins/team-alpha/manuals/06-16-manual.md#what-tessa-covers)
+[Tessa #16's portable manual](plugins/teams/team-alpha/manuals/06-16-manual.md#what-tessa-covers)
 under **"Guarding the language convention,"** so it travels to every consuming repo.
 
 **The per-layer detail — which layers are in scope, and the deliberate exceptions (`VUL-IN`,

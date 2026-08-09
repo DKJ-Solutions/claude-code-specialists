@@ -17,7 +17,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\sync\check-connectors.ps1'
-$Hook     = Join-Path $RepoRoot 'plugins\workflow-davekjohn\hooks\connector-sessioncheck.ps1'
+$Hook     = Join-Path $RepoRoot 'plugins\workflows\workflow-davekjohn\hooks\connector-sessioncheck.ps1'
 $Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) 'connectors-test-fixture'
 
 $script:pass = 0

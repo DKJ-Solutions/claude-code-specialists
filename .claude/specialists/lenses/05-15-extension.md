@@ -5,7 +5,7 @@ group: 05
 
 # Sylvester ⚙️ · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `team-alpha` plugin (`plugins/team-alpha/manuals/05-15-manual.md`). This file does not describe the craft, but what Sylvester does in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `team-alpha` plugin (`plugins/teams/team-alpha/manuals/05-15-manual.md`). This file does not describe the craft, but what Sylvester does in this repo.
 
 A system administrator does the same thing everywhere — manage the harness and the tooling the team
 works in: scripts, config, the safety guards. **What is repo-specific in claude-code-specialists is not
@@ -132,11 +132,11 @@ infrastructure.
 
 - **The shared-scripts registry spans TWO plugins since August 8, 2026, and the plugin is read off the
   mirror path rather than declared.** `Get-SharedScriptPairs` maps each source to a mirror in either
-  `plugins/team-alpha/` (the core: `check-roster-sync`, `check-report-lib`) or
-  `plugins/workflow-davekjohn/` (everything branch- and release-shaped). Three things to
+  `plugins/teams/team-alpha/` (the core: `check-roster-sync`, `check-report-lib`) or
+  `plugins/workflows/workflow-davekjohn/` (everything branch- and release-shaped). Three things to
   know before touching it:
   - **`SkillRel` is derived from `MirrorRel`, not stored.** Check 18 and `shared-scripts.tests.ps1`
-    both used to look for a script's documenting page at a hardcoded `plugins\team-alpha\skills\…`,
+    both used to look for a script's documenting page at a hardcoded `plugins\teams\team-alpha\skills\…`,
     and the moment nine entry points moved, the gate reported every one of their existing skills as a
     typo. A second field naming the plugin would have been free to disagree with the path beside it;
     deriving it means a script that moves takes its page lookup with it.
