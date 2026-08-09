@@ -11,8 +11,12 @@
       path, which would be a third statement of where the bootstrap writes and the teardown deletes
 - [x] The doctrine README and the skill page (Tessa)
 - [x] `README.md` table and `INSTALL.md` default settings block: `team-alpha` + `workflow-default`
-- [x] Both `<!-- skills:all -->` spans in the README -- caught by check 10, which is exactly what that
-      marker is for: a prose list claiming to be complete goes stale silently otherwise
+- [x] Both marked skill enumerations in the README -- caught by check 10, which is exactly what that
+      marker is for: a prose list claiming to be complete goes stale silently otherwise.
+      (Written without quoting the marker itself: check 10 masks fenced code but deliberately not
+      inline backticks, because a real span's own names are backtick-delimited. So a passing mention
+      of it in prose reads as an unterminated live span -- which is how this very line first broke the
+      gate.)
 - [x] `scripts/tests/discover-workflow.tests.ps1`, 37 asserts over six scenarios (Tycho), with the
       bare-repo `SILENT` case and the branch-names-only regression as the two that matter most
 - [x] Two failures of my own, both caught by the gate rather than by reading: a top-level `2>$null` on

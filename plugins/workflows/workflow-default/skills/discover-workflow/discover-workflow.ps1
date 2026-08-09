@@ -55,10 +55,18 @@ function Get-GitRootHere {
        NativeCommandError and sets $? to false even when the exe returned 0, so under the script-wide
        'Stop' this would abort on any repo where `git rev-parse` has something to say. The guard is
        repo-wide (shared-scripts.tests.ps1) precisely because the bare form reads harmless. #>
+    # THE try/catch COVERS A DIFFERENT FAILURE FROM THE 'Continue' ABOVE IT, and the pair is not
+    # redundant (Victor, August 9, 2026). 'Continue' handles git RUNNING and writing to stderr; it does
+    # nothing about git not being on the machine at all, which raises a genuine CommandNotFound that the
+    # script-wide 'Stop' turns terminating. Invoke-Git already says "no commits, no remote, or no git at
+    # all is a repo this still describes" -- this function is reached before that one and made that
+    # sentence false for the last of the three.
     $ErrorActionPreference = 'Continue'
-    $root = & git rev-parse --show-toplevel 2>$null
-    if ($LASTEXITCODE -ne 0 -or -not $root) { return '' }
-    return ([string]$root).Trim()
+    try {
+        $root = & git rev-parse --show-toplevel 2>$null
+        if ($LASTEXITCODE -ne 0 -or -not $root) { return '' }
+        return ([string]$root).Trim()
+    } catch { return '' }
 }
 
 if (-not $ConsumerRoot) {
@@ -138,9 +146,21 @@ function Find-BranchConvention {
     return @{ Answer = ($top -join ', '); Evidence = "read from $($names.Count) branch name(s); commit subjects are deliberately NOT mined -- a `"word/`" in prose is a path as often as a branch" }
 }
 
+# THE EVIDENCE FLOOR, shared by the two readers that call something a repo-wide "style" (Victor,
+# August 9, 2026). Find-BranchConvention already refused to speak on a single branch, and the other two
+# had no equivalent -- so a repo with two commits got a confident verdict on how it writes commit
+# subjects and how it shapes its history. Both readings might even be right; the problem is that they
+# are asserted with the same confidence as one drawn from a hundred commits, in a document whose whole
+# value is that a reader can trust what it states. Below the floor the honest answer is SILENT, which
+# here means "not enough history to call this a convention" rather than "this repo has none".
+$MIN_COMMITS_FOR_A_STYLE = 5
+
 function Find-CommitSubjectStyle {
     $subjects = @(Invoke-Git @('log', '--format=%s', '-n', '100'))
     if ($subjects.Count -eq 0) { return @{ Answer = $SILENT; Evidence = 'no commits to read' } }
+    if ($subjects.Count -lt $MIN_COMMITS_FOR_A_STYLE) {
+        return @{ Answer = $SILENT; Evidence = "only $($subjects.Count) commit(s) -- too little history to call any of it a convention" }
+    }
     $conventional = @($subjects | Where-Object { $_ -match '^[a-z]+(\([^)]+\))?!?:\s' }).Count
     $pct = [math]::Round(100.0 * $conventional / $subjects.Count)
     if ($pct -ge 60) {
@@ -156,6 +176,12 @@ function Find-MergeStyle {
     $merges = @(Invoke-Git @('log', '--merges', '--format=%h', '-n', '60')).Count
     $all = @(Invoke-Git @('log', '--format=%h', '-n', '60')).Count
     if ($all -eq 0) { return @{ Answer = $SILENT; Evidence = 'no commits to read' } }
+    # The same floor as the subject reader above, and for the sharper reason: "no merge commit yet" is
+    # the normal state of a young repo that fully intends to merge, so a handful of commits is evidence
+    # of nothing at all here.
+    if ($all -lt $MIN_COMMITS_FOR_A_STYLE) {
+        return @{ Answer = $SILENT; Evidence = "only $all commit(s) -- an absence of merges this early says nothing about how this repo lands work" }
+    }
     if ($merges -eq 0) { return @{ Answer = 'linear history -- squash or rebase'; Evidence = "no merge commit in the last $all" } }
     return @{ Answer = 'merge commits'; Evidence = "$merges of the last $all commits are merges" }
 }
@@ -185,24 +211,55 @@ function Find-CiGate {
         $text = [System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8)
         $inJobs = $false
         foreach ($line in ($text -split "`r?`n")) {
+            # A BLANK LINE OR A FULL-LINE COMMENT ENDS NOTHING, and skipping them is a repair rather
+            # than a nicety (Victor, August 9, 2026). Both start at column 0, so the "back at top level"
+            # rule below read them as the end of the jobs mapping -- and a comment between two jobs is
+            # an ordinary way to divide a workflow file. Measured against a fixture with jobs 'build'
+            # and 'lint': a comment between them reported only 'build', presented as the complete set,
+            # and a comment directly under 'jobs:' reported none at all. A confidently incomplete answer
+            # is precisely what this script must not produce.
+            if ($line -match '^\s*(#|$)') { continue }
             if ($line -match '^jobs:\s*$') { $inJobs = $true; continue }
             if ($inJobs -and $line -match '^\S') { $inJobs = $false }
             if ($inJobs -and $line -match '^  ([A-Za-z0-9_.-]+):\s*$') { $jobs += $Matches[1] }
         }
     }
-    $names = @($files | ForEach-Object { ".github/workflows/$($_.Name)" })
+    # The job ids come out of a charset-restricted capture above and cannot carry anything. The
+    # FILENAMES do not -- they are whatever is on the consumer's disk -- so they go through the shared
+    # path sanitizer, which strips control characters and square brackets for the reason its own
+    # docstring gives: these lines are forwarded into session context, and a bracket is what the hooks
+    # count markers by. Defence in depth rather than a measured incident; a filename is a far narrower
+    # channel than the guide headings that were removed above, but it is the same kind of channel.
+    $names = @($files | ForEach-Object { Format-SafePathToken -Value ".github/workflows/$($_.Name)" })
     $jobText = if ($jobs.Count -gt 0) { "job(s): $((@($jobs | Sort-Object -Unique)) -join ', ')" } else { 'no job id read' }
     return @{ Answer = "CI runs here -- $jobText"; Evidence = ($names -join ', ') }
 }
 
 function Find-ContributionGuide {
-    $guide = @('CONTRIBUTING.md', 'CONTRIBUTING.rst', 'docs/CONTRIBUTING.md', '.github/CONTRIBUTING.md') |
-        ForEach-Object { Get-RelIfExists $_ } | Where-Object { $_ } | Select-Object -First 1
+    # NO CONTENT FROM THE GUIDE IS COPIED OUT OF IT, and that restriction is a security decision rather
+    # than a style one (Sebastian, August 9, 2026). An earlier version listed the guide's first eight
+    # headings here. Those are prose from a file this script does not control, and they were being
+    # written verbatim into a document whose own opening line says it is "read by the Claude Specialists
+    # before they propose anything about process" -- which makes it a persistence channel: anyone who
+    # can land one line in a repo's CONTRIBUTING.md (an accepted pull request, a vendored template, a
+    # dependency that ships one) plants an instruction-shaped heading that every future session then
+    # reads as established context.
+    #
+    # SANITIZING WAS THE OBVIOUS REPAIR AND IS THE WEAKER ONE. Format-SafeToken exists for exactly this
+    # class and is available here -- but its charset is built for ids, so a real heading comes out
+    # mangled, and a mangled preview is worth less than no preview. The stronger move is to stop
+    # carrying the content at all: the answer a specialist needs is "this repo has a guide, read it",
+    # and the guide itself is one file away. A copy of its headings here would also be a second
+    # statement of the guide's structure, free to go stale against the original -- the shape this repo
+    # keeps repairing elsewhere.
+    #
+    # What is left is a filename from a FIXED candidate list and a count. Neither can carry a payload.
+    $guide = @(@('CONTRIBUTING.md', 'CONTRIBUTING.rst', 'docs/CONTRIBUTING.md', '.github/CONTRIBUTING.md') |
+        ForEach-Object { Get-RelIfExists $_ } | Where-Object { $_ }) | Select-Object -First 1
     if (-not $guide) { return @{ Answer = $SILENT; Evidence = 'no contribution guide found' } }
-    $headings = @([System.IO.File]::ReadAllLines((Join-Path $ConsumerRoot $guide)) |
-        Where-Object { $_ -match '^#{1,3}\s+\S' } | ForEach-Object { ($_ -replace '^#{1,3}\s+', '').Trim() } | Select-Object -First 8)
-    $h = if ($headings.Count -gt 0) { ' -- ' + ($headings -join ' | ') } else { '' }
-    return @{ Answer = "read it first: $guide$h"; Evidence = $guide }
+    $sections = @([System.IO.File]::ReadAllLines((Join-Path $ConsumerRoot $guide)) |
+        Where-Object { $_ -match '^#{1,3}\s+\S' }).Count
+    return @{ Answer = "read it first: $guide"; Evidence = "$guide, $sections section heading(s) -- deliberately not quoted here, see the note in this script" }
 }
 
 # THE @() AROUND EACH PIPELINE IS LOAD-BEARING, not decoration. Assigning a pipeline's output unrolls
@@ -287,6 +344,19 @@ if (-not $OutputPath) {
 } elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath = Join-Path $ConsumerRoot $OutputPath
 }
+
+# CONTAINMENT: the one file this writes must land inside the repo it was pointed at. Sean's advice,
+# applied here for a reason specific to this script rather than as a habit -- it is meant to be invoked
+# by an agent that has just READ the consumer's repo, so a path influenced by something in that repo
+# must not be able to send the write anywhere else on the disk. The shipped invocation passes no
+# -OutputPath at all, which is what keeps this a guard rather than a fix.
+$fullOut = [System.IO.Path]::GetFullPath($OutputPath)
+$rootPrefix = $ConsumerRoot.TrimEnd('\') + '\'
+if (-not $fullOut.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    Write-Error "discover-workflow refuses to write outside the repo it read: '$OutputPath' resolves to '$fullOut', which is not under '$ConsumerRoot'."
+    exit 1
+}
+$OutputPath = $fullOut
 $rel = $OutputPath.Replace($ConsumerRoot, '.')
 
 Write-Host ''
