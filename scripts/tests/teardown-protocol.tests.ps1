@@ -27,7 +27,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$Skill    = Join-Path $RepoRoot 'plugins\team-alpha\skills\specialists-teardown\SKILL.md'
+$Skill    = Join-Path $RepoRoot 'plugins\teams\team-alpha\skills\specialists-teardown\SKILL.md'
 $Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) 'specialists-preflight-fixture'
 
 $script:pass = 0

@@ -9,7 +9,7 @@
 The orchestrator (Chris) is always loaded -- portable body from the plugin install and repo lens from
 `lenses/`; he routes on demand to the specialists below.
 
-@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/team-alpha/personas/01-01-persona.md
+@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/teams/team-alpha/personas/01-01-persona.md
 
 @lenses/01-01-extension.md
 ## The Claude Specialists — who does what

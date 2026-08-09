@@ -19,7 +19,7 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot   = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$Bootstrap  = Join-Path $RepoRoot 'plugins\team-alpha\skills\specialists-init\bootstrap.ps1'
+$Bootstrap  = Join-Path $RepoRoot 'plugins\teams\team-alpha\skills\specialists-init\bootstrap.ps1'
 $DriftLint  = Join-Path $RepoRoot 'scripts\lint\check-consumer-drift.ps1'
 $Integrity  = Join-Path $RepoRoot 'scripts\lint\check-plugin-integrity.ps1'
 $Fixture    = Join-Path ([System.IO.Path]::GetTempPath()) 'specialists-init-test-fixture'
@@ -32,7 +32,7 @@ $SeamImport = '@.claude/specialists/SPECIALISTS.md'
 # The pre-seam plugin path (family = claude-specialists). Still READ by every reader, and still WRITTEN
 # for a consumer that already has a lens tree there -- the bootstrap never relocates one.
 $PpLegacy   = '.claude\plugins\claude-specialists\team-alpha'
-$PersonaSrc = Join-Path $RepoRoot 'plugins\team-alpha\personas\01-01-persona.md'
+$PersonaSrc = Join-Path $RepoRoot 'plugins\teams\team-alpha\personas\01-01-persona.md'
 
 $script:pass = 0
 $script:fail = 0
@@ -198,7 +198,7 @@ try {
     # Without this, a file the bootstrap just wrote is classified as authored and kept forever --
     # adoption exactly as irreversible as specialists-teardown promises it is not.
     Write-Host "bootstrap.ps1 -- the core-only scaffold stays removable by the teardown" -ForegroundColor Cyan
-    $teardownScript = Join-Path $RepoRoot 'plugins\team-alpha\skills\specialists-teardown\teardown.ps1'
+    $teardownScript = Join-Path $RepoRoot 'plugins\teams\team-alpha\skills\specialists-teardown\teardown.ps1'
     function Test-TeardownSeesGenerated {
         param([string]$Path)
         # The classifier alone, lifted out of the script text: running the whole teardown here would
@@ -405,7 +405,7 @@ try {
     $cacheRoot = Join-Path $Fixture 'cache\claude-code-specialists'
     $ownCache  = Join-Path $cacheRoot 'specialists\1.4.0'
     New-Item -ItemType Directory -Path $ownCache -Force | Out-Null
-    Copy-Item -Path (Join-Path $RepoRoot 'plugins\team-alpha\*') -Destination $ownCache -Recurse
+    Copy-Item -Path (Join-Path $RepoRoot 'plugins\teams\team-alpha\*') -Destination $ownCache -Recurse
     foreach ($v in '1.9.0', '1.10.0') {
         New-Item -ItemType Directory -Path (Join-Path $cacheRoot "team-lifehub\$v\agents") -Force | Out-Null
     }
@@ -444,11 +444,11 @@ try {
     # because the durable clone it was looking for was under a name nothing had put there.
     $cacheInit = Join-Path $pluginsRoot "cache\$mp\team-alpha\9.9.9"
     New-Item -ItemType Directory -Path $cacheInit -Force | Out-Null
-    Copy-Item -Path (Join-Path $RepoRoot 'plugins\team-alpha\*') -Destination $cacheInit -Recurse
+    Copy-Item -Path (Join-Path $RepoRoot 'plugins\teams\team-alpha\*') -Destination $cacheInit -Recurse
     # Versionless marketplaces clone with (at minimum) the personas under plugins/<plugin>/.
-    $cloneP = Join-Path $pluginsRoot "marketplaces\$mp\plugins\team-alpha\personas"
+    $cloneP = Join-Path $pluginsRoot "marketplaces\$mp\plugins\teams\team-alpha\personas"
     New-Item -ItemType Directory -Path $cloneP -Force | Out-Null
-    Copy-Item -Path (Join-Path $RepoRoot 'plugins\team-alpha\personas\*') -Destination $cloneP -Recurse
+    Copy-Item -Path (Join-Path $RepoRoot 'plugins\teams\team-alpha\personas\*') -Destination $cloneP -Recurse
     $durConsumer = Join-Path $Fixture 'durable-consumer'
     New-Item -ItemType Directory -Path $durConsumer -Force | Out-Null
     $rd = Invoke-Script -Path (Join-Path $cacheInit 'skills\specialists-init\bootstrap.ps1') -ScriptArgs @('-ConsumerRoot', $durConsumer)
@@ -456,7 +456,7 @@ try {
     # The body import now lives in SPECIALISTS.md, not in CLAUDE.md -- so that is where the durability
     # property has to be asserted. Reading the wrong file here would make this pass vacuously.
     $durIncl = [System.IO.File]::ReadAllText((Join-Path $durConsumer $SeamInclusion), [System.Text.Encoding]::UTF8)
-    Assert-True ($durIncl -match [regex]::Escape("marketplaces/$mp/plugins/team-alpha/personas/01-01-persona.md")) 'durable body path: @-import points to the marketplaces clone'
+    Assert-True ($durIncl -match [regex]::Escape("marketplaces/$mp/plugins/teams/team-alpha/personas/01-01-persona.md")) 'durable body path: @-import points to the marketplaces clone'
     Assert-True (-not ($durIncl -match '/cache/')) 'durable body path: @-import does NOT point to the version-pinned cache'
     # And CLAUDE.md itself must be free of the cache path too -- the one line it carries is repo-relative.
     $durMd = [System.IO.File]::ReadAllText((Join-Path $durConsumer 'CLAUDE.md'), [System.Text.Encoding]::UTF8)

@@ -1019,7 +1019,7 @@ try {
     Assert-Match 'Summary: \d+ error\(s\)' $r.Out 'crafted id: the check still ran to completion'
 
     # --- Hook (roster-sessioncheck.ps1): soft, surfaces only [ERROR], always exit 0 ---------------
-    $Hook = Join-Path $RepoRoot 'plugins\team-alpha\hooks\roster-sessioncheck.ps1'
+    $Hook = Join-Path $RepoRoot 'plugins\teams\team-alpha\hooks\roster-sessioncheck.ps1'
     # A stub "check" script with fixed output + exit code, so the hook is tested in isolation.
     function New-StubCheck {
         param([string]$Name, [string[]]$OutputLines, [int]$ExitCode)

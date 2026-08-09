@@ -91,9 +91,9 @@ shipped alongside them was.
 [`scripts/repo-config.ps1`](scripts/repo-config.ps1) looks like the seam that makes the workflow
 adaptable, and its 19 functions genuinely do let a consumer change the trunk name, the merge method and
 the folder grouping. But those are *parameters* of a single changelog model, and the model itself is
-fixed in [`entry-scaffold-lib.ps1`](plugins/workflow-davekjohn/scripts/lib/entry-scaffold-lib.ps1). A consumer
+fixed in [`entry-scaffold-lib.ps1`](plugins/workflows/workflow-davekjohn/scripts/lib/entry-scaffold-lib.ps1). A consumer
 could tune our way of working; they could not have their own. And
-[`check-script-contract.ps1`](plugins/workflow-davekjohn/scripts/sync/check-script-contract.ps1) *enforces*
+[`check-script-contract.ps1`](plugins/workflows/workflow-davekjohn/scripts/sync/check-script-contract.ps1) *enforces*
 that they supply those functions — so a repo that worked differently was not adapted to. It was told at
 every session start that it was misconfigured.
 
@@ -114,7 +114,7 @@ enforcement out fixed the repo that works differently; it left the repo that wor
 re-deriving twenty values by hand, because the checker only ever named the **fallback** a shared script
 uses — never what this repo chose, or why. The pack therefore ships a **config blueprint**: each seam
 function with the source's own text, comments and reasoning included, and a marker saying whether that
-answer is safe to take. The [`adopt-config`](plugins/workflow-davekjohn/skills/adopt-config/SKILL.md)
+answer is safe to take. The [`adopt-config`](plugins/workflows/workflow-davekjohn/skills/adopt-config/SKILL.md)
 skill reads it, **places** what states the shared way of working, and **proposes** — never places — what
 states what a repo *is*, in a document a person works through.
 
@@ -139,11 +139,11 @@ the same question about how work moves through the repo.
 
 | Plugin | What it is | Who it's for |
 |---|---|---|
-| [`team-alpha/`](plugins/team-alpha/) | **The core team.** Fifteen repo-neutral specialists who work the same way in *every* repo (research, systems administration, technical writing, copy editing, code review, security review, and testing, among others). Also carries the persona templates of the main loop (Chris/Derek/Rendall) and the bootstrap skill `specialists-init`. | **Every** consuming repo — this is the foundation, always enable it. |
-| [`team-lifehub/`](plugins/team-lifehub/) | **An add-on team.** Five specialists for a personal information hub / brain-based knowledge repo (Astrid, Fiona, Hugo, Ian, Onyx). Deliberately domain-flavored: they know their repo and teammates by name. | Only a life-hub-style repo. |
-| [`team-shopify/`](plugins/team-shopify/) | **An add-on team.** Three specialists for a Shopify store repo (Liam · Liquid, Sandra · store management, Steven · configuration) plus the domain skill `start-task`. Also deliberately domain-flavored. | Only a Shopify repo (e.g. smartwatchbanden). |
-| [`team-ecomm/`](plugins/team-ecomm/) | **An add-on team.** E-commerce specialists for a commercial webshop repo of any platform (Sergio · SEO, Craig · CRO, Sean · performance/SEA). Platform-agnostic, and complementary to a platform team rather than exclusive. | Any commercial webshop repo — including a Shopify repo alongside `team-shopify`. |
-| [`workflow-davekjohn/`](plugins/workflow-davekjohn/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the eight workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-config`), their shared scripts, and the two session hooks that belong to running this across several repos. Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-config` places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that wants *this* workflow. Enable nothing and the specialists use plain `git`/`gh` instead. |
+| [`team-alpha/`](plugins/teams/team-alpha/) | **The core team.** Fifteen repo-neutral specialists who work the same way in *every* repo (research, systems administration, technical writing, copy editing, code review, security review, and testing, among others). Also carries the persona templates of the main loop (Chris/Derek/Rendall) and the bootstrap skill `specialists-init`. | **Every** consuming repo — this is the foundation, always enable it. |
+| [`team-lifehub/`](plugins/teams/team-lifehub/) | **An add-on team.** Five specialists for a personal information hub / brain-based knowledge repo (Astrid, Fiona, Hugo, Ian, Onyx). Deliberately domain-flavored: they know their repo and teammates by name. | Only a life-hub-style repo. |
+| [`team-shopify/`](plugins/teams/team-shopify/) | **An add-on team.** Three specialists for a Shopify store repo (Liam · Liquid, Sandra · store management, Steven · configuration) plus the domain skill `start-task`. Also deliberately domain-flavored. | Only a Shopify repo (e.g. smartwatchbanden). |
+| [`team-ecomm/`](plugins/teams/team-ecomm/) | **An add-on team.** E-commerce specialists for a commercial webshop repo of any platform (Sergio · SEO, Craig · CRO, Sean · performance/SEA). Platform-agnostic, and complementary to a platform team rather than exclusive. | Any commercial webshop repo — including a Shopify repo alongside `team-shopify`. |
+| [`workflow-davekjohn/`](plugins/workflows/workflow-davekjohn/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the eight workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-config`), their shared scripts, and the two session hooks that belong to running this across several repos. Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-config` places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that wants *this* workflow. Enable nothing and the specialists use plain `git`/`gh` instead. |
 
 In short: **`team-alpha` is the foundation; everything else is optional, along two different axes.**
 `team-lifehub` and `team-shopify` describe what *kind* of repo it is, so a repo
@@ -226,7 +226,7 @@ The full picture, top-level folder by folder:
   (`build-agent-defs.ps1` — fills in the shared blocks from `plugins/agent-shared/`), and the tests. A
   mirrored copy for consumers lives inside the plugins — the sync/check scripts in `team-alpha`, the
   branch/release workflow in `workflow-davekjohn` — see its own
-  [README](plugins/workflow-davekjohn/scripts/README.md).
+  [README](plugins/workflows/workflow-davekjohn/scripts/README.md).
 - **`releases/`** — the release history: `development/<X>.x/<X.Y.Z>.md` (full notes per version) +
   `README.md` (overview table + the full cutting-a-release mechanics) — see
   [`releases/README.md`](releases/README.md). The `## Releases` section of `CHANGELOG.md` points here.
@@ -323,11 +323,11 @@ the lens in `.claude/specialists/lenses/<group>-<id>-extension.md`. The agent de
 **All four teams have now been migrated** — every handbook lives here in the `manuals/` folder of
 its plugin, and every consuming repo keeps only its repo lens in `.claude/specialists/lenses/`:
 
-- **`team-alpha` (the core team)** → `plugins/team-alpha/manuals/` (Paula, Rebecca, Vera, Gwen, Cody, Tycho,
+- **`team-alpha` (the core team)** → `plugins/teams/team-alpha/manuals/` (Paula, Rebecca, Vera, Gwen, Cody, Tycho,
   Sylvester, Tessa, Edith, Victor, Sebastian, Ravi, Nolan, Marlowe, Auden).
-- **`team-lifehub` (an add-on team)** → `plugins/team-lifehub/manuals/` (Astrid, Fiona, Hugo, Ian, Onyx).
-- **`team-shopify` (an add-on team)** → `plugins/team-shopify/manuals/` (Liam, Sandra, Steven).
-- **`team-ecomm` (an add-on team)** → `plugins/team-ecomm/manuals/` (Sergio, Craig, Sean).
+- **`team-lifehub` (an add-on team)** → `plugins/teams/team-lifehub/manuals/` (Astrid, Fiona, Hugo, Ian, Onyx).
+- **`team-shopify` (an add-on team)** → `plugins/teams/team-shopify/manuals/` (Liam, Sandra, Steven).
+- **`team-ecomm` (an add-on team)** → `plugins/teams/team-ecomm/manuals/` (Sergio, Craig, Sean).
 
 ### Agent def vs. manual — two files, one specialist
 
@@ -374,7 +374,7 @@ The orchestrator and the main-loop specialists (Chris #01, Bianca #02, Derek #05
 the **main loop**, not as subagents — a plugin cannot inject always-on main-loop context, and an
 intake conversation moreover requires direct back-and-forth with the client. They therefore
 deliberately have **no** agent def; their portable source lives in
-`plugins/team-alpha/personas/<group>-<id>-persona.md` as a **self-contained template** (portable body
+`plugins/teams/team-alpha/personas/<group>-<id>-persona.md` as a **self-contained template** (portable body
 + a repo-lens placeholder). The consumer loads the **portable body straight from the plugin install**
 via an `@` import in its `CLAUDE.md` (the orchestrator always, the other personas on demand). The
 local extension `.claude/specialists/lenses/<group>-<id>-extension.md` is
@@ -625,7 +625,7 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > **Why six, and why the same six everywhere** (inbound
   > [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297)). This procedure is described at
   > three entry points, and they used to count it as *four acts* here, *three acts* in
-  > [`specialists-init`](plugins/team-alpha/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
+  > [`specialists-init`](plugins/teams/team-alpha/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
   > and *three steps* in the [adoption page](plugins/INSTALL.md#connecting-in-four-steps) — the same path, no
   > step missing anywhere, three different numbers. A reader following it for the first time has the
   > count as their only check on whether they skipped something, and three counts remove exactly that.
@@ -655,7 +655,7 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > `**five** steps` — the asterisks sit between the two words. Written
   > `(…)\*{0,2} \*{0,2}(acts?|steps?)` it surfaces that line, and one more the original sweep never
   > showed: a fourth counting of the seam migration in
-  > [`specialists-teardown`](plugins/team-alpha/skills/specialists-teardown/SKILL.md). Two lessons worth keeping
+  > [`specialists-teardown`](plugins/teams/team-alpha/skills/specialists-teardown/SKILL.md). Two lessons worth keeping
   > if count-linting is ever built: a sweep that returns few hits is not evidence of few instances, and a
   > file the same PR touched is not automatically covered by that PR's verification.
 
@@ -709,11 +709,11 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > **Verify with the `projectPath` record, not with `claude plugin list`** — that command is not
   > repo-scoped and reported a plugin as `enabled`, at `project` scope, in this very repo while it
   > held no install record of its own and loaded nothing. The exact query is in
-  > [`specialists-init` step 0c](plugins/team-alpha/skills/specialists-init/SKILL.md). This documentation
+  > [`specialists-init` step 0c](plugins/teams/team-alpha/skills/specialists-init/SKILL.md). This documentation
   > path is the only thing a new consumer has, because until the plugin loads, the skill that would
   > say otherwise does not exist.
 - **Step 1 (the skill).** Invoke `specialists-init`. The bundled
-  [`bootstrap.ps1`](plugins/team-alpha/skills/specialists-init/bootstrap.ps1) performs only **additive**
+  [`bootstrap.ps1`](plugins/teams/team-alpha/skills/specialists-init/bootstrap.ps1) performs only **additive**
   actions: for a **fresh** consumer it writes the seam — lens-only persona templates and an empty
   `VUL-IN` lens scaffold per enabled subagent into `.claude/specialists/lenses/` (never overwriting),
   `.claude/specialists/SPECIALISTS.md` carrying the body import, the lens import and the roster slot,
@@ -808,7 +808,7 @@ cannot be removed cleanly; one import pointing at one directory can.
 ### What exists now: the `specialists-teardown` skill
 
 **Built July 29, 2026** — the third item of the target shape below, and the half that could be built
-and tested without restructuring anything first. [`specialists-teardown`](plugins/team-alpha/skills/specialists-teardown/SKILL.md)
+and tested without restructuring anything first. [`specialists-teardown`](plugins/teams/team-alpha/skills/specialists-teardown/SKILL.md)
 is the bootstrap's mirror image: where `specialists-init` is strictly **additive** and never
 overwrites, the teardown is strictly **subtractive** and never deletes what the owner wrote.
 

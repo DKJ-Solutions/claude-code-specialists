@@ -79,7 +79,7 @@ lens tree is not ignored.
 The filter on command 1 is load-bearing rather than tidiness: on Windows a `.gitignore` with CRLF line
 endings and a blank line makes git report a hit with an **empty pattern field** for any path ending in a
 slash, which reads exactly like a real ignore rule. The full measurement is in the
-[skill](team-alpha/skills/specialists-teardown/SKILL.md#pre-flight-is-your-lens-tree-actually-under-version-control).
+[skill](teams/team-alpha/skills/specialists-teardown/SKILL.md#pre-flight-is-your-lens-tree-actually-under-version-control).
 And note where the undo really begins: at the **commit**, not at the bootstrap. If command 2 comes back
 empty because the lenses were never committed, commit them first — a wrongly removed file is only one
 `git checkout` away once git has a copy. **Commit more than the lens tree, though.** This paragraph used to

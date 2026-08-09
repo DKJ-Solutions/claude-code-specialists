@@ -813,8 +813,9 @@ Assert-Throws { Get-PluginManifestPaths -RepoRoot $fakeRoot -MarketplaceJson 'no
 
 Write-Host "Get-TouchedPlugins" -ForegroundColor Cyan
 # THE ROOTS ARE PASSED IN, so this suite states the layout it is testing against instead of inheriting
-# whatever this repo's tree happens to be today. Two sets are used below: a FLAT one matching the layout
-# as it stands, and a NESTED one -- because the point of reading the marketplace rather than matching
+# whatever this repo's tree happens to be today. Two sets are used below: a FLAT one and a NESTED
+# one -- neither of which has to be this repo's current shape, which is the point. Reading the
+# marketplace rather than matching
 # '^plugins/<name>/' is that depth stops mattering, and a claim like that is worth an assertion rather
 # than a comment.
 $flatRoots = @(Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson (@'

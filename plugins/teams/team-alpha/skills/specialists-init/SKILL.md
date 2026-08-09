@@ -23,7 +23,7 @@ that up, plus the governance and safety layer that differs per repo.
 > own agents as the main thread. Verified, and deliberately **not** switched on: it would change every
 > consumer's main loop from a version bump they did not read, and a second `agent`-setting plugin
 > silently wins on load order. The reasoning is in the
-> [claude-code-specialists README](../../../../README.md#delivering-the-orchestrator-from-the-plugin--verified-deliberately-not-switched-on)
+> [claude-code-specialists README](../../../../../README.md#delivering-the-orchestrator-from-the-plugin--verified-deliberately-not-switched-on)
 > and [issue #215](https://github.com/DaveKJohn/claude-code-specialists/issues/215). So this skill exists
 > because of the `CLAUDE.md` half, which is true on its own.
 
@@ -35,9 +35,9 @@ is therefore manual, and it is **six acts, in this order** — enable, restart, 
 verify — grouped below as `0a` (acts 1 and 2), `0b` (acts 3 and 4) and `0c` (acts 5 and 6).
 
 > **The count is deliberately the same six as in the
-> [claude-code-specialists README](../../../../README.md#adoption-the-bootstrap-path)** (inbound
+> [claude-code-specialists README](../../../../../README.md#adoption-the-bootstrap-path)** (inbound
 > [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297)). This page said *three acts* while
-> that one said *four* and the [adoption page](../../../INSTALL.md#connecting-in-four-steps) said *three
+> that one said *four* and the [adoption page](../../../../INSTALL.md#connecting-in-four-steps) said *three
 > steps* — the same path, nothing missing anywhere, three different numbers, and the pages link to each
 > other for exactly this step. For a reader following it the first time the count is the only check they
 > have on whether they skipped something. The letters stay, because they are what the rest of this page
@@ -196,7 +196,7 @@ and a stale cache is invisible by construction because it reports success with a
 number — so the procedure guarantees freshness rather than relying on the CLI to keep doing it. This
 pair is what every "pick up the new release" pointer in this family means — in
 [`sync-roster`](../sync-roster/SKILL.md), in `scripts/sync/check-script-contract.ps1`, in the
-[adoption page](../../../INSTALL.md#staying-up-to-date), and in the release notes. Read a bare
+[adoption page](../../../../INSTALL.md#staying-up-to-date), and in the release notes. Read a bare
 `claude plugin update` anywhere as shorthand for these two lines.
 
 **0c — restart, then verify before invoking.** Verify rather than assume, because **the failure this
@@ -309,7 +309,7 @@ gh api repos/DaveKJohn/claude-code-specialists/tags --jq '.[] | select(.name=="v
 
 That route has no peeling problem to worry about: the API's `.commit.sha` is the commit already, annotated
 tag or not. Equal to your record's `gitCommitSha` means you are on that release; different means you are
-on `main` — see [Staying up to date](../../../INSTALL.md#staying-up-to-date) for why that happens
+on `main` — see [Staying up to date](../../../../INSTALL.md#staying-up-to-date) for why that happens
 without anyone asking for it, and why it is not something you can fix from here.
 
 **One** line per plugin you enabled, each saying `project`, is the green you need — and the *count*
@@ -397,7 +397,7 @@ line: lenses flat in `.claude/specialists/lenses/`, everything else behind
 **already has a lens tree** on the pre-seam plugin path (`.claude/plugins/<family>/<plugin>/`) keeps
 writing there — this script never relocates a file the repo owner owns, and splitting the surface
 across both paths would be worse than either. Migrating is your act, **five** steps — numbered 0 to 4 —
-described in the [claude-code-specialists README](../../../../README.md#the-seam-specified). Every reader accepts both
+described in the [claude-code-specialists README](../../../../../README.md#the-seam-specified). Every reader accepts both
 layouts. **Step 0 is the `.gitignore` check, and it is the one that can cost you the lens tree**, so it
 is named here rather than left to the count: in a repo that ignores `.claude/*` with an exception for the
 old path, moving the lenses to the seam drops them out of version control with every gate still green

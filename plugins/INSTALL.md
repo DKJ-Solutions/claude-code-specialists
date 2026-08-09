@@ -131,7 +131,7 @@ why it changed.
 
 > **Budget well over an hour, and know where it goes.** Measured August 6, 2026: this file is ~9,300
 > words (~47 min at 200 wpm) and
-> [`specialists-init`'s `SKILL.md`](team-alpha/skills/specialists-init/SKILL.md) another ~5,600
+> [`specialists-init`'s `SKILL.md`](teams/team-alpha/skills/specialists-init/SKILL.md) another ~5,600
 > (~28 min) — call it **~75 minutes** for a first-time adopter. Both pages grow, so treat
 > that as an order of magnitude. The time is not in the typing: the bootstrap places the whole seam in
 > seconds. It is in **Step 4**, writing your roster and filling your lenses.
@@ -294,7 +294,7 @@ is impossible to satisfy.
 > **Four *steps* here, six *acts* inside Step 1 — a different unit, not a different path.** Step 1
 > below is enable → **restart** → refresh → install → restart → verify, which the
 > [root README](../README.md#adoption-the-bootstrap-path) and
-> [`specialists-init`](team-alpha/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
+> [`specialists-init`](teams/team-alpha/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
 > both count as its six acts ("step 0" in their numbering). Saying so is the point: those two pages once
 > counted the same procedure as *four* and *three*, and this page's step count made a third number
 > (inbound [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297)). Nothing was missing from
