@@ -30,11 +30,12 @@ just like inline text.
   roster + routing. The single file `CLAUDE.md` names.
 - **`lenses/`** — the **repo layer** of the specialists system: one file per specialist,
   `<group>-<id>-extension.md`, flat (ids are unique family-wide). There are two kinds:
-  - **Subagent lens** — for the specialists that come out of the `team-alpha` plugin as subagents
-    (Sylvester, Tessa, Edith, Victor, Tycho, Sebastian, Ravi, Nolan, Marlowe): only the `## Specific to this repo` part, which
+  - **Subagent lens** — for the fifteen specialists that come out of the `team-alpha` plugin as
+    subagents (the full list is in the [index below](#index-of-the-extensions-present)): only the
+    `## Specific to this repo` part, which
     supplements the portable playbook in the plugin with the context of this repo. The subagent
     reads the plugin playbook + this lens together; the agent def points to both.
-  - **Persona lens (lens-only)** — for the persona-only specialists (Chris, Derek, Rendall), who run
+  - **Persona lens (lens-only)** — for the persona-only specialists (Chris, Bianca, Derek, Rendall), who run
     in the main conversation instead of as subagents. The main loop loads no plugin subagents, so the
     **portable body** comes straight from the plugin install via an `@` import: Chris always
     (`@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/teams/team-alpha/personas/01-01-persona.md`,
@@ -126,18 +127,32 @@ Small and maintenance-focused. Chris leads; the rest executes.
 └─ [group 06] Tessa 📜 #16 (technical writer) · Edith 🔍 #17 (copy editor) · Victor 🧐 #19 (code reviewer) · Sebastian 🛡️ #23 (security engineer) · Ravi ♻️ #24 (refactoring specialist) · Nolan ⚡ #25 (performance engineer) · Marlowe 🕵️ #29 (investigative journalist)
 ```
 
+**This tree is who has work here, not who is available.** Six more arrive with the plugin and are
+invocable today — Bianca 🎙️ #02, Paula 📅 #09, Vera 📊 #11, Gwen 🎨 #12, Cody 💻 #13 and Auden 🖋️ #30 —
+whose crafts this maintenance repo rarely calls on. They are in the index below with their lenses.
+
 ## Index of the extensions present
 
 The full roster + routing lives in [`SPECIALISTS.md`](SPECIALISTS.md#the-team-roster--routing) — the
 seam's inclusion file, which `../../CLAUDE.md` imports; the list below is purely navigation to the
 repo lenses themselves.
 
+**Every specialist the enabled plugin ships has a lens file**, so this table is complete. A lens marked
+*scaffold* is an empty `VUL-IN` template waiting for that specialist's first work here — **the intended
+state, not a backlog item**, exactly as
+[`SPECIALISTS.md`](SPECIALISTS.md#the-team-roster--routing) states it.
+
 | # | Specialist | Repo lens | Agent def |
 |---|---|---|---|
 | 01 | Chris 🧭 — Chief of Staff | [`lenses/01-01-extension.md`](lenses/01-01-extension.md) | — (persona-only) |
+| 02 | Bianca 🎙️ — Biographer | [`lenses/03-02-extension.md`](lenses/03-02-extension.md) *(scaffold)* | — (persona-only) |
 | 05 | Derek 🐙 — DevOps Engineer | [`lenses/05-05-extension.md`](lenses/05-05-extension.md) | — (persona-only) |
 | 06 | Rendall 🎬 — Release Manager | [`lenses/05-06-extension.md`](lenses/05-06-extension.md) | — (persona-only) |
 | 07 | Rebecca 🔬 — Research Specialist | [`lenses/03-07-extension.md`](lenses/03-07-extension.md) | `@team-alpha:rebecca` |
+| 09 | Paula 📅 — Project Planner | [`lenses/02-09-extension.md`](lenses/02-09-extension.md) *(scaffold)* | `@team-alpha:paula` |
+| 11 | Vera 📊 — Data Analyst | [`lenses/04-11-extension.md`](lenses/04-11-extension.md) *(scaffold)* | `@team-alpha:vera` |
+| 12 | Gwen 🎨 — Graphic & Front-end Designer | [`lenses/04-12-extension.md`](lenses/04-12-extension.md) *(scaffold)* | `@team-alpha:gwen` |
+| 13 | Cody 💻 — App Developer | [`lenses/04-13-extension.md`](lenses/04-13-extension.md) *(scaffold)* | `@team-alpha:cody` |
 | 15 | Sylvester ⚙️ — System Administrator | [`lenses/05-15-extension.md`](lenses/05-15-extension.md) | `@team-alpha:sylvester` |
 | 16 | Tessa 📜 — Technical Writer | [`lenses/06-16-extension.md`](lenses/06-16-extension.md) | `@team-alpha:tessa` |
 | 17 | Edith 🔍 — Copy Editor | [`lenses/06-17-extension.md`](lenses/06-17-extension.md) | `@team-alpha:edith` |
@@ -147,10 +162,12 @@ repo lenses themselves.
 | 24 | Ravi ♻️ — Refactoring Specialist | [`lenses/06-24-extension.md`](lenses/06-24-extension.md) | `@team-alpha:ravi` |
 | 25 | Nolan ⚡ — Performance Engineer | [`lenses/06-25-extension.md`](lenses/06-25-extension.md) | `@team-alpha:nolan` |
 | 29 | Marlowe 🕵️ — Investigative Journalist | [`lenses/06-29-extension.md`](lenses/06-29-extension.md) | `@team-alpha:marlowe` |
+| 30 | Auden 🖋️ — Academic & Long-form Writer | [`lenses/06-30-extension.md`](lenses/06-30-extension.md) *(scaffold)* | `@team-alpha:auden` |
 
-The rest of the `team-alpha` plugin (Paula #09, Vera #11, Gwen #12, Cody #13, Auden #30) is also enabled and
-invocable as `@team-alpha:<name>`, but rarely has work in this repo and therefore has no repo lens
-(yet). If such work does come up, [Tessa #16](lenses/06-16-extension.md) writes the lens first.
+The six scaffolds mark specialists who rarely have work in this maintenance repo — Bianca's intake
+interviews, Paula's timelines, Vera's dashboards, Gwen's visuals, Cody's application code, Auden's
+long-form writing. On the day one of them first has work here,
+[Tessa #16](lenses/06-16-extension.md) fills the lens in before that specialist is deployed.
 The add-on teams `team-lifehub` and `team-shopify` are **off** here — this repo is
 not a life-hub-like or Shopify repo.
 
