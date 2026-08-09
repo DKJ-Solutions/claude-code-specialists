@@ -1,13 +1,10 @@
-# `main` progress
-
-
-> **You are on `main`.** Do not work in this file yet -- create a branch first.
-> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
-> of the next person who does create one.
-
-This file carries the step list of the branch you are on. It is written when a branch is created
-and returns to this state after the merge.
+## `docs/plugins-directory-readme` progress
 
 ### Steps
 
-_(filled in when a branch is created)_
+- [x] Write `plugins/README.md`: the teams-vs-workflows split, the decision rule, what else lives here
+- [x] Link it from the root README's repo layout, and from both subdirectory READMEs
+- [x] Copy edit (Edith) + lint and tests green -- 0 lint errors, all suites exit 0
+
+### Where I left off
+

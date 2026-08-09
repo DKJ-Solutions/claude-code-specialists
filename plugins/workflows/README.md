@@ -4,8 +4,9 @@
 [`../teams/`](../teams/) holds the other kind of plugin, which answers *who* the specialists are; a
 workflow answers what happens to a piece of work between starting it and it reaching the trunk — how a
 branch is named, what a change owes before it can open a PR, what a release is. A workflow therefore
-carries **no specialists at all**: it changes how the existing ones work, not who they are. The full
-split between the two kinds is in the root README under
+carries **no specialists at all**: it changes how the existing ones work, not who they are. The two
+kinds are put side by side one level up, in [`../README.md`](../README.md), and the full argument for
+splitting them is in the root README under
 [Teams and workflows — what's the difference?](../../README.md#teams-and-workflows--whats-the-difference).
 
 ## What is in here
