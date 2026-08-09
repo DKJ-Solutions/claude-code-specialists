@@ -697,6 +697,36 @@ try {
     Assert-Equal 0 $r.Code 'fake workshop: exit code 0'
     Assert-Match 'check skipped' $r.Out 'fake workshop: rejected as a workshop'
     Assert-NotMatch 'FAKE-EXECUTED' $r.Out 'fake workshop: script was NOT executed'
+
+    # --- 10. A plugin id the marketplace no longer declares --------------------------------------------
+    #      THE THREE WAYS Get-PluginDir CAN MISS ARE NOT ONE FINDING, and telling them apart is this
+    #      scenario's whole subject. While the lookup was a directory probe there was only one way to
+    #      miss -- a name nobody publishes -- so one [ERROR] covered it. Asking the marketplace added a
+    #      second, and it is not a fault at all: a plugin renamed upstream leaves every consumer holding
+    #      the old id until they migrate.
+    #
+    #      Measured the day the teams/workflows rename shipped: this check raised four [ERROR] lines
+    #      against two real consumers for ids that were correct, deliberately recorded, and which
+    #      connectors/README.md had just been updated to say are kept until each consumer migrates. The
+    #      check and the doctrine contradicted each other and the doctrine was right, because this
+    #      register records what a consumer HAS.
+    Write-Host "a retired plugin id is an unmigrated consumer, not an invalid register" -ForegroundColor Cyan
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    $mfOld = New-FixtureManifest -Extensions @('06-16') -Plugin 'specialists@claude-code-specialists'
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mfOld, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 0 $r.Code 'retired id: exit code 0 -- an unmigrated consumer does not fail the check'
+    Assert-NotMatch '\[ERROR\]' $r.Out 'retired id: and raises no error at all'
+    Assert-Match '\[INFO\]' $r.Out 'retired id: it is reported, as an INFO'
+    Assert-Match 'has not migrated' $r.Out 'retired id: the line says what the state IS, not just that a lookup failed'
+    Assert-Match 'records what they HAVE' $r.Out 'retired id: and why the register is right to still name the old id'
+
+    #      The other two ways must still be errors -- separating them is only worth anything if the
+    #      genuine faults keep their verdict.
+    $mfBad = New-FixtureManifest -Extensions @('06-16') -Plugin '../../etc/passwd@claude-code-specialists'
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mfBad, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 1 $r.Code 'malformed id: still exits 1'
+    Assert-Match '\[ERROR\]' $r.Out 'malformed id: still an error -- a register file defect is not a migration'
+    Assert-Match 'invalid or unknown plugin field' $r.Out 'malformed id: and keeps its own wording'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
 }

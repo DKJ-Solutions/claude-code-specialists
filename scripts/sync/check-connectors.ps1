@@ -111,13 +111,35 @@ $PluginRoots = @(Get-RepoPluginRoots -RepoRoot $RepoRoot)
 # nothing. It is kept as a cheap early exit on a malformed id from a register file, not as a
 # path-traversal guard, and removing it would reopen no security hole. Said plainly so the next reader
 # does not infer one from its presence.
+# THREE WAYS TO FAIL, AND ONLY TWO OF THEM ARE FAULTS (August 9, 2026). This returned a bare $null and
+# the caller reported every one of them as 'invalid or unknown plugin field'. That was survivable while
+# the lookup was a directory probe, because the only way to miss was a name nobody publishes. Asking the
+# marketplace added a second way to miss, and it is not a defect at all: a plugin that HAS been renamed
+# upstream is one this consumer simply has not migrated to yet.
+#
+# Measured the day the teams/workflows rename shipped: this check reported four [ERROR] lines against
+# life-hub and smartwatchbanden for holding 'specialists@...' and 'specialists-shopify@...' -- ids that
+# were correct for those repos, recorded on purpose, and which connectors/README.md had just been
+# updated to say are kept deliberately until each consumer migrates. The check and the doctrine
+# contradicted each other, and the doctrine was right: this register records what a consumer HAS.
+#
+# So the reasons are separated and named:
+#   malformed  -- the id is not a slug at all. A register file defect. Still an error.
+#   retired    -- a well-formed name the marketplace no longer declares. The consumer has not migrated.
+#   no-source  -- declared, but its folder is absent from this checkout. A source-tree defect.
 function Get-PluginDir([string]$PluginId) {
     $name = $PluginId.Split('@')[0]
-    if (-not (Test-PluginNameSlug -Name $name)) { return $null }
+    if (-not (Test-PluginNameSlug -Name $name)) {
+        return [pscustomobject]@{ Dir = $null; Status = 'malformed'; Name = $name }
+    }
     $root = Get-PluginRootByName -PluginRoots $PluginRoots -Name $name
-    if (-not $root) { return $null }
-    if (-not (Test-Path -LiteralPath $root.Root)) { return $null }
-    return $root.Root
+    if (-not $root) {
+        return [pscustomobject]@{ Dir = $null; Status = 'retired'; Name = $name }
+    }
+    if (-not (Test-Path -LiteralPath $root.Root)) {
+        return [pscustomobject]@{ Dir = $null; Status = 'no-source'; Name = $name }
+    }
+    return [pscustomobject]@{ Dir = $root.Root; Status = 'ok'; Name = $name }
 }
 
 # Ids (<group>-<id>) owned by a plugin: agents/ + personas/.
@@ -302,9 +324,28 @@ foreach ($mf in $manifestFiles) {
         # #203); the plugin id is what makes each line actionable.
         Set-CheckScope "$connectorLabel / $($p.id)"
 
-        $pluginDir = Get-PluginDir $p.id
+        $resolved = Get-PluginDir $p.id
+        $pluginDir = $resolved.Dir
         if ($null -eq $pluginDir) {
-            Write-Failure "invalid or unknown plugin field '$(Format-SuspectToken -Value ([string]$p.id))' in $($mf.Name) -- plugin block skipped."
+            $shown = Format-SuspectToken -Value ([string]$p.id)
+            switch ($resolved.Status) {
+                'retired' {
+                    # NOT A FAULT, and an [INFO] rather than an [ERROR] for the reason this register
+                    # exists: it records what a consumer HAS. A plugin renamed upstream leaves every
+                    # consumer holding the old id until they migrate, and writing the new one here
+                    # early would report a migration that has not happened as done. The same
+                    # [INFO]-silence rule the other administrative markers follow applies -- the
+                    # session hook surfaces only [ERROR], so this shows on a deliberate run and does
+                    # not interrupt anybody's session start over somebody else's repo.
+                    Write-Info "$shown is not a plugin this marketplace declares any more -- this consumer has not migrated to the current names yet. Correct as it stands: the register records what they HAVE, so it changes when they do. Their plugin block is skipped, so nothing below is checked for it."
+                }
+                'no-source' {
+                    Write-Failure "$shown is declared by the marketplace but its source folder is missing from this checkout -- plugin block skipped. That is a defect in this repo, not in the consumer."
+                }
+                default {
+                    Write-Failure "invalid or unknown plugin field '$shown' in $($mf.Name) -- plugin block skipped."
+                }
+            }
             continue
         }
 
