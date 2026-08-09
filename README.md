@@ -535,15 +535,19 @@ plain Chat session where subagents and hooks are unavailable.
 
 That doesn't mean maximizing skill usage everywhere. The discipline is: add a skill only where it
 makes a repeatable procedure or piece of knowledge genuinely portable, and where that value covers
-the maintenance cost. Living example: `cut-release` shows both sides of that discipline at once. Its
-**script**, `scripts/release/cut-release.ps1`, stays repo-only and is deliberately not mirrored —
-marketplace-specific machinery that reads `.claude-plugin/marketplace.json` as the source of truth
-for what a plugin is and bumps every `plugin.json` it lists in lockstep, a structure only this
-marketplace has (see the "out of scope" note in
-[`scripts/sync/check-script-contract.ps1`](scripts/sync/check-script-contract.ps1)). Its
-**procedure** — the closing steps every release shares once the version bump is committed (tag +
-push, branch cleanup) — was genuinely portable, so it shipped as the `cut-release` **skill**
-instead: a checklist with no script of its own (issue #177). That checklist also covers the GitHub
+the maintenance cost. Living example: `cut-release` is **two** things with the same name, and keeping
+them apart is the discipline. Its **script**, `scripts/release/cut-release.ps1`, is a shared, mirrored
+script like the rest of the workflow — it became one on August 3, 2026
+([#417](https://github.com/DaveKJohn/claude-code-specialists/issues/417)), with everything that
+legitimately differs per repo read from optional seam functions in
+[`scripts/repo-config.ps1`](scripts/repo-config.ps1) rather than baked in. It used to be deliberately
+repo-only, on the argument that reading `.claude-plugin/marketplace.json` and bumping every
+`plugin.json` in lockstep is a structure only a marketplace has; the seam answered that by making the
+plugin half optional, so a repo without plugins simply does not declare it (see the record in
+[`scripts/sync/check-script-contract.ps1`](scripts/sync/check-script-contract.ps1), which states the
+retirement of its own "out of scope" note). Its **skill** is a different artifact: the closing steps
+every release shares once the version bump is committed (tag + push, branch cleanup), as a checklist
+with no script of its own (issue #177). That checklist also covers the GitHub
 Release, whose body is the highest release tier the repo has and whose other tiers go along as
 attachments — a manual closing step this repo takes at every release (see
 [releases/README.md](releases/README.md#cutting-a-release)), just not one `cut-release.ps1`
