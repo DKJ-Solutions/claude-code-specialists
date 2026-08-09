@@ -14,7 +14,7 @@ splitting them is in the root README under
 | Folder | What it is |
 |---|---|
 | [`workflow-default/`](workflow-default/) | **The workflow a repo gets when it has not chosen one.** It imposes nothing; its one skill, `discover-workflow`, reads what the repo already states about how work moves through it and writes the answer down, including where the repo is silent. It has [its own README](workflow-default/README.md). |
-| [`workflow-davekjohn/`](workflow-davekjohn/) | **DaveKJohn's own branch-and-entry model, packaged so a repo can choose it.** The branch, PR, changelog and release skills, the shared scripts behind them, the two session hooks that belong to running this across several repos, and a config blueprint holding the source's own answers to the repo-owned seam. |
+| [`workflow-davekjohn/`](workflow-davekjohn/) | **DaveKJohn's own branch-and-entry model, packaged so a repo can choose it.** The branch, PR, changelog and release skills, the shared scripts behind them, the two session hooks that belong to running this across several repos, and a config blueprint holding the source's own answers to the repo-owned seam. It has [its own README](workflow-davekjohn/README.md). |
 
 `workflow-default` is what a repo keeps unless it deliberately decides otherwise. The name of the other
 one is a statement rather than vanity: it carries an owner's name because it is *his* branch discipline

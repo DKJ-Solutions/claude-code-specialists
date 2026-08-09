@@ -256,7 +256,9 @@ The full picture, top-level folder by folder:
   and where each folder sits, so no other script has to encode the layout), the lint gate + drift
   check, the changelog/PR/release scripts (incl.
   `cut-release.ps1`), the connectors check (`check-connectors.ps1`), the agent-def generator
-  (`build-agent-defs.ps1` — fills in the shared blocks from `plugins/agent-shared/`), and the tests. A
+  (`build-agent-defs.ps1` — fills in the shared blocks from `plugins/agent-shared/`), and the tests.
+  [`scripts/README.md`](scripts/README.md) is the directory-by-directory map, with the entry points and
+  the four gates. A
   mirrored copy for consumers lives inside the plugins — the sync/check scripts in `team-alpha`, the
   branch/release workflow in `workflow-davekjohn` — see its own
   [README](plugins/workflows/workflow-davekjohn/scripts/README.md).

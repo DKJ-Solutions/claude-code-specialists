@@ -60,7 +60,8 @@ Both are stated in full where they apply: [`teams/README.md`](teams/README.md) a
 
 - **[`agent-shared/`](agent-shared/)** — the canonical source of the boundary blocks that appear
   verbatim in several agent defs. Not a plugin: it is the source a generator writes *into* the plugin
-  folders. See
+  folders, and it has [its own README](agent-shared/README.md) for the never-edit-between-the-sentinels
+  rule and how to add a block. See also
   [Shared agent-def blocks](../README.md#shared-agent-def-blocks--one-source-for-the-verbatim-boundaries).
 - **[`INSTALL.md`](INSTALL.md)** — how to connect your own repo, in a
   [quickstart half](INSTALL.md#quickstart--the-commands-and-nothing-else) and an
