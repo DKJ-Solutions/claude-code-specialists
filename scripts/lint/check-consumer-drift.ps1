@@ -12,9 +12,10 @@
     agent def that has meanwhile also been shared here (e.g. life-hub .claude/agents/<group>-<id>-agent.md,
     or swb .claude-plugins/specialists/agents/<group>-<id>-agent.md). This script:
 
-      1. Reads the ids + groups from all plugins (specialists, specialists-lifehub,
-         specialists-shopify, specialists-ecomm) in this repo (source of truth) -- the shared core
-         plus the domain groups.
+      1. Reads the ids + groups from every plugin this repo publishes (source of truth) -- the core
+         team plus the add-on teams. The set comes from the marketplace, so this list does not name
+         them: it named four by hand until August 9, 2026, and that hand-written list is exactly what
+         Get-PluginSubdirs replaced.
       2. Looks in the given consuming repo, at the known legacy paths, for a local file with that
          same id.
       3. Reports one of three outcomes per found id:

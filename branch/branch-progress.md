@@ -57,6 +57,11 @@ claude plugin install team-alpha@claude-code-specialists --scope project
 claude plugin install workflow-davekjohn@claude-code-specialists --scope project
 ```
 
+**Carry into branch 6, the migration page:** a consumer still on the pre-seam lens path
+`.claude/plugins/claude-specialists/<plugin>/` has the plugin name in that second segment, so after
+reinstalling under the new name their lenses go unseen. Named rather than repaired -- no consumer in the
+register is confirmed to be in that state, and a fallback built for nobody is a fallback nobody tests.
+
 Then restart and check that Chris takes the floor -- that is the only real test of the `@`-import in
 `.claude/specialists/SPECIALISTS.md`, which now points at `plugins/team-alpha/personas/`. Inbound #414
 is what happens when that import breaks silently: the August 3 marketplace rename took it out for every

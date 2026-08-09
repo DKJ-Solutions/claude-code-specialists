@@ -656,7 +656,7 @@ the two differ and an earlier version of this page generalised them.**
   and with the refresh a second fresh folder produced **3.0.5**. So the refresh is what makes the
   difference for this verb — nothing else.
   **And the output cannot warn you, even in principle:** `✔ Successfully installed plugin:
-  team-alpha@claude-code-specialists (scope: project)` names the scope and **no version at all**. The
+  specialists@claude-code-specialists (scope: project)` names the scope and **no version at all**. The
   install record is the only place the version appears, which is exactly why the verification step in
   Step 1 queries `installed_plugins.json` instead of reading a success line.
 - **`update` refreshed the cache by itself when measured.** On July 31, 2026 (CLI `2.1.220`), with the
@@ -687,7 +687,7 @@ so treat the wording as version-bound and the flag as the invariant** (inbound
 [#359](https://github.com/DaveKJohn/claude-code-specialists/issues/359)). On `2.1.220` it names the scope
 and the settings file, and then suggests `claude plugin disable … --scope local` — **which is not the
 step to follow**: that writes a local disable key on top of your project setting and leaves the install
-in place. Earlier releases said *"Plugin `team-alpha` is not installed at scope user"*, literally true
+in place. Earlier releases said *"Plugin `specialists` is not installed at scope user"*, literally true
 and easy to misread as "not installed at all". Whatever the phrasing, the failure means the command
 looked in the wrong scope. Do not answer it by re-running the install either: a scopeless install adds
 a **second, machine-wide record** beside the project one. For **what changed**, read

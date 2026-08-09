@@ -209,7 +209,7 @@ place, so Step 4's verification will not come back empty and you will have added
 removed one. The command you want is the one above, with `--scope project`.
 
 > **The exact wording is version-bound; the flag is not.** Earlier releases phrased this as *"Plugin
-> `team-alpha` is not installed at scope user"* — literally true and easy to misread as *not installed
+> `specialists` is not installed at scope user"* — literally true and easy to misread as *not installed
 > at all*. If your CLI says something different again, the sentence to trust is this one: the scope flag
 > is required, and the failure means the command looked in the wrong scope, never that the plugin is
 > absent.

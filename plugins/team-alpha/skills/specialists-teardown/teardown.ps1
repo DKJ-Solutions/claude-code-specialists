@@ -175,11 +175,11 @@ function Test-LooksGenerated {
             return $false
         }
         'repo-config' {
-            # An unfilled placeholder VALUE -- the shape a consumer WITH the workflow pack receives,
+            # An unfilled placeholder VALUE -- the shape a consumer WITH the workflow plugin receives,
             # whose RepoName/LintScript are theirs to fill in.
             if ($text -match "=\s*'[^']*VUL-IN") { return $true }
             # SECOND SHAPE SINCE AUGUST 8, 2026, and it exists because the split created a scaffold with
-            # nothing to fill in. A consumer that did NOT enable the workflow pack gets the roster half
+            # nothing to fill in. A consumer that did NOT enable the workflow plugin gets the roster half
             # alone: RosterPath derived from the seam, RosterIgnoredIds empty. It is complete as
             # generated, so it carries no placeholder -- and the rule above would therefore have read it
             # as authored and kept it forever, making adoption exactly as irreversible as this skill

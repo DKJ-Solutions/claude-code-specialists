@@ -86,9 +86,9 @@ function Get-SharedScriptPairs {
             SkillParamsExempt = @('ConsumerPathOverride', 'CacheRootOverride', 'UserHomeOverride')
         },
         @{
-            # Travels in the WORKFLOW pack, not the core (August 8, 2026). What it checks is that the
+            # Travels in the WORKFLOW plugin, not the core team (August 8, 2026). What it checks is that the
             # consumer's branch-info.ps1 and repo-config.ps1 expose every function the branch/release
-            # scripts call -- so a repo that never enabled the workflow pack was being told at every
+            # scripts call -- so a repo that never enabled the workflow plugin was being told at every
             # session start to configure scripts it does not have. That is the exact defect the
             # plugin-serves-the-consumer doctrine names, arriving from the checker rather than the
             # scripts.
@@ -169,7 +169,7 @@ function Get-SharedScriptPairs {
         @{
             # THE ONE LIB WITH A READER IN BOTH PLUGINS, and therefore the one entry with a second
             # mirror of the same source (August 8, 2026). check-roster-sync stays in the core while
-            # check-script-contract went to the workflow pack, and both dot-source this file as a
+            # check-script-contract went to the workflow plugin, and both dot-source this file as a
             # $PSScriptRoot-relative sibling. The alternative -- the workflow mirror reaching into the
             # core plugin's cache directory -- was rejected on sight: the two plugins are separately
             # versioned and separately installed, so that builds a runtime dependency on a path a
@@ -364,7 +364,7 @@ function Get-SharedScriptPairs {
             MirrorRel  = $mirrorRel
             SourcePath = Join-Path $RepoRoot $p.Source
             MirrorPath = Join-Path $RepoRoot $mirrorRel
-            # The plugin whose payload this pair travels in (the core, or the workflow pack).
+            # The plugin whose payload this pair travels in (the core, or the workflow plugin).
             Plugin     = $p.Plugin
             # Where the documenting skill lives, under the same resolved root so a plugin that moves
             # takes its page lookup along. $null when there is no skill to document (LibOnly, or

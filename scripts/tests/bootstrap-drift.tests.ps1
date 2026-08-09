@@ -225,26 +225,26 @@ try {
     Assert-Equal $false (Test-TeardownSeesGenerated $touchedRc) "teardown: a look-alike that never claims the bootstrap wrote it is KEPT"
     Remove-Item -LiteralPath $touchedRc -Force
 
-    # --- 1c1. The SAME bootstrap against a consumer that DID enable the workflow pack ---------------
+    # --- 1c1. The SAME bootstrap against a consumer that DID enable the workflow plugin ---------------
     # Everything this suite used to assert on the single fixture lives here now: the shape a consumer
     # receives when they chose that way of working.
-    Write-Host "bootstrap.ps1 -- script-config scaffolds (#86), workflow pack enabled" -ForegroundColor Cyan
+    Write-Host "bootstrap.ps1 -- script-config scaffolds (#86), workflow plugin enabled" -ForegroundColor Cyan
     $FixtureWf = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-wf-$PID"
     if (Test-Path -LiteralPath $FixtureWf) { Remove-Item -Recurse -Force -LiteralPath $FixtureWf }
     New-Item -ItemType Directory -Path (Join-Path $FixtureWf '.claude') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $FixtureWf '.claude\settings.json'),
         '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true, "workflow-davekjohn@claude-code-specialists": true } }', $Utf8NoBom)
     $rWf = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $FixtureWf)
-    Assert-Equal 0 $rWf.Code 'workflow pack: bootstrap exit 0'
+    Assert-Equal 0 $rWf.Code 'workflow plugin: bootstrap exit 0'
     $rcScaffold = Join-Path $FixtureWf 'scripts\repo-config.ps1'
     $biScaffold = Join-Path $FixtureWf 'scripts\lib\branch-info.ps1'
-    Assert-True (Test-Path -LiteralPath $rcScaffold) 'workflow pack: scripts/repo-config.ps1 scaffold placed'
-    Assert-True (Test-Path -LiteralPath $biScaffold) 'workflow pack: scripts/lib/branch-info.ps1 scaffold placed'
+    Assert-True (Test-Path -LiteralPath $rcScaffold) 'workflow plugin: scripts/repo-config.ps1 scaffold placed'
+    Assert-True (Test-Path -LiteralPath $biScaffold) 'workflow plugin: scripts/lib/branch-info.ps1 scaffold placed'
     $rcText = [System.IO.File]::ReadAllText($rcScaffold, [System.Text.Encoding]::UTF8)
     Assert-True ($rcText -match 'VUL-IN') 'repo-config scaffold carries the VUL-IN marker'
     Assert-True ($rcText -match 'function Get-RepoName') 'repo-config scaffold supplies Get-RepoName'
     # Both halves in one file: the assembly must not drop the roster pair when the workflow half joins.
-    Assert-True ($rcText -match 'function Get-RosterPath') 'workflow pack: the roster half is still there alongside the workflow half'
+    Assert-True ($rcText -match 'function Get-RosterPath') 'workflow plugin: the roster half is still there alongside the workflow half'
     # Get-ChangelogHeading (#178) and Get-LiveStage (#177) both ship a concrete, non-VUL-IN default
     # (unlike Get-RepoName/Get-LintScript above, which are placeholders every consumer must fill in) --
     # both are Optional in the script contract, so a consumer that never touches these two lines still
@@ -270,7 +270,7 @@ try {
     #     without extending the scaffold and this fails, whatever the entry happens to be named.
     Write-Host "bootstrap.ps1 -- the scaffolds satisfy check-script-contract (#226)" -ForegroundColor Cyan
     # AGAINST THE WORKFLOW FIXTURE, not the core-only one, and that is the accurate scope rather than a
-    # convenience: since August 8, 2026 check-script-contract SHIPS IN the workflow pack, so the only
+    # convenience: since August 8, 2026 check-script-contract SHIPS IN the workflow plugin, so the only
     # repos it ever runs in are the ones that enabled it. Pointing it at the core-only fixture would
     # assert a contract on a consumer that will never run the check -- and would fail on branch-info,
     # which that consumer is correct not to have.
@@ -321,7 +321,7 @@ try {
         try {
             & git -C $gitFix init -q 2>$null | Out-Null
             if ($OriginUrl) { & git -C $gitFix remote add origin $OriginUrl 2>$null | Out-Null }
-            # The workflow pack has to be enabled here: RepoName lives in that half of the scaffold since
+            # The workflow plugin has to be enabled here: RepoName lives in that half of the scaffold since
             # August 8, 2026, so without it there is no line for the derivation to land in and every case
             # below would pass or fail for the wrong reason.
             New-Item -ItemType Directory -Path (Join-Path $gitFix '.claude') -Force | Out-Null

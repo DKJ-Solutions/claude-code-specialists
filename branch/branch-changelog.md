@@ -58,6 +58,14 @@ because a mechanical rename cannot see any of them, and the next one will not ei
   clone after another. The symptom was exactly what that scenario exists to catch: the `@`-import fell
   back to the version-pinned cache path.
 
+**One consequence named and deliberately not built for.** A consumer whose lenses still sit on the
+pre-seam path `.claude/plugins/claude-specialists/<plugin>/` has that second segment named after the
+plugin — so after they reinstall under the new name, the readers look under `team-alpha/` and their
+lenses go unseen. It is recorded here rather than repaired because nothing has measured such a consumer:
+of the four in the register, the layout is known to be the seam or unknown, never confirmed pre-seam.
+The migration page is where it belongs, and it is on that branch's list. Building the fallback now would
+be a repair for a consumer nobody has found.
+
 **Two boundaries drawn deliberately.** The consumer register keeps the **old** ids for the three repos
 that have not migrated, because it records what a consumer *has* — claiming a migration nobody
 performed turns the register itself into a false alarm. And in `releases/**` only the link **targets**

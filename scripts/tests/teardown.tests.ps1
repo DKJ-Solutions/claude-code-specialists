@@ -43,7 +43,7 @@ function Invoke-Script {
 # that adopted the system and then disconnects, and its round trips turn on the script-config scaffolds:
 # the [keep] lines for an already-occupied address, the "2 already present" count, and the scripts\lib\
 # empty-directory pruning from #331. After the workflow split none of those exist for a consumer that
-# never enabled the workflow pack -- branch-info.ps1 is that pack's file and is not placed without it --
+# never enabled the workflow plugin -- branch-info.ps1 is that pack's file and is not placed without it --
 # so a single-plugin fixture would leave three assertions passing vacuously. The core-only shape is
 # covered in bootstrap-drift.tests.ps1 instead of being folded in here.
 function New-BootstrappedConsumer {

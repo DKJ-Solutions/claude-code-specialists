@@ -745,7 +745,7 @@ Write-Utf8NoBom -Path $changelogPath -Content $changelogNew
 #
 # What this deliberately does NOT change: the lockstep version bump. plugin.json is still the place a
 # plugin's version lives, and it is still bumped for every plugin in step 3a -- a consumer running
-# group 1 alongside group 3 still needs matching versions. What is gone is a SECOND statement of that
+# the core team alongside an add-on team still needs matching versions. What is gone is a SECOND statement of that
 # same version, in prose, in a file nothing reads back.
 
 # --- 3d. The highlights pair (stakeholder-facing; only for the bump types the seam names) ---------

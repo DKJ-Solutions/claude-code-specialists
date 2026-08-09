@@ -168,7 +168,7 @@ reads *this* register — Dave's own list of his own repos — and looks for a l
 run it from. That is one person's multi-repo administration, not a craft any consumer shares, so a repo
 that merely enabled the specialists was running a session hook about somebody else's repos. It now
 travels with the opt-in workflow, which is where the rest of that way of working lives. A consumer
-who does not enable that pack never sees it — which, since only Dave's repos are in the register, is the
+who does not enable that workflow never sees it — which, since only Dave's repos are in the register, is the
 correct outcome for everyone else.
 
 In the repos that do carry it — life-hub and smartwatchbanden among them —

@@ -141,7 +141,7 @@ infrastructure.
     typo. A second field naming the plugin would have been free to disagree with the path beside it;
     deriving it means a script that moves takes its page lookup with it.
   - **`check-report-lib` is registered TWICE on purpose** — one source, two mirrors — because
-    `check-roster-sync` stayed in the core while `check-script-contract` went to the pack. The
+    `check-roster-sync` stayed in the core while `check-script-contract` went to the workflow. The
     alternative, a mirror reaching into the other plugin's cache, was rejected on sight: separately
     versioned, separately installed, so a version mismatch breaks it silently. **A duplicate entry
     needs a distinct `Name`**: the suite looks pairs up with `Where-Object { $_.Name -eq … }` in
@@ -190,7 +190,7 @@ infrastructure.
   move.** Because this repo consumes itself, it is a consumer like any other, and the install record is
   keyed on `projectPath`. Measured August 3, 2026: after the directory was renamed from
   `davekjohns-workshop` to `claude-code-specialists`, `.claude/settings.json` still enabled
-  `team-alpha@claude-code-specialists` correctly while the machine's only record named the old folder,
+  `specialists@claude-code-specialists` correctly while the machine's only record named the old folder,
   so the session loaded no subagent, skill or hook at all. Recognize it by a **deliberate** run of
   [`check-roster-sync.ps1`](../../../scripts/sync/check-roster-sync.ps1) reporting
   `[NOT-INSTALLED-HERE]` — the session-start hook cannot report it, because that hook ships in the

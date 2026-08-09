@@ -833,7 +833,7 @@ function Get-FenceMaskedText {
 }
 
 # Canonical skillset: every <plugin root>/skills/<name>/SKILL.md, across ALL published plugins (not
-# just the core -- a domain group's start-task counts too). Exactly one skill-name folder between
+# just the core -- an add-on team's start-task counts too). Exactly one skill-name folder between
 # 'skills' and the file, so a deeper file such as a level-3 progressive-disclosure
 # skills/<name>/references/SKILL.md, should that pattern ever appear, is not mistaken for a top-level
 # skill.

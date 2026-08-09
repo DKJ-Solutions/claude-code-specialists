@@ -446,7 +446,7 @@ group: $group
 # Only two of these functions serve the core: Get-RosterPath and Get-RosterIgnoredIds, both read by
 # check-roster-sync. Everything else -- the repo name, the lint gate, the changelog heading, the live
 # stage, the PR markers -- and the WHOLE of branch-info.ps1 serve the branch/release scripts, which a
-# repo that never enabled the workflow pack does not have. Scaffolding those unconditionally asked a
+# repo that never enabled the workflow plugin does not have. Scaffolding those unconditionally asked a
 # consumer to configure scripts that are not there, which is the exact defect the
 # plugin-serves-the-consumer doctrine names. So the roster half is always written and the workflow
 # half joins it only when the pack is enabled.
@@ -497,10 +497,10 @@ function Get-RosterIgnoredIds {
 
 '@
 
-# The workflow half: written only for a consumer that enabled the workflow pack. Every function here
+# The workflow half: written only for a consumer that enabled the workflow plugin. Every function here
 # is called by a branch/release script, so a repo without that pack has nothing that reads any of it.
 $repoConfigWorkflowPart = @'
-# --- The workflow pack's half -------------------------------------------------------------------
+# --- The workflow plugin's half -------------------------------------------------------------------
 # These are read by the branch/release scripts (open-pr, fold-changelog, ship-pr, cut-release). They
 # are here because this repo enabled workflow-davekjohn; without that plugin nothing
 # reads them. Fill in the VUL-IN values below and remove the VUL-IN markers.
@@ -666,7 +666,7 @@ function Get-DerivedRepoName([string]$Root) {
 $seamRosterRel = if ($seam) { $seam.RelInclusion } else { '.claude/specialists/SPECIALISTS.md' }
 $repoConfigRosterPart = $repoConfigRosterPart.Replace('__SEAM_ROSTER_PATH__', $seamRosterRel)
 
-# Did this repo choose the workflow pack? Read from the SAME enabled-plugin answer the lens loop uses
+# Did this repo choose the workflow plugin? Read from the SAME enabled-plugin answer the lens loop uses
 # (Get-EnabledPlugins over the whole settings chain) rather than from a second reader -- one reader per
 # question is the lesson of inbound #294. A chain that could not be read at all degrades to "no": the
 # roster half is what every consumer needs, and writing a workflow half nobody reads is the defect being
@@ -698,14 +698,14 @@ if ($hasWorkflowPack) {
 $scriptScaffolds = @(
     @{ Rel = 'scripts/repo-config.ps1';     Content = $repoConfigScaffold }
 )
-# branch-info.ps1 is ENTIRELY the workflow pack's: both its contract functions are called only by
+# branch-info.ps1 is ENTIRELY the workflow plugin's: both its contract functions are called only by
 # new-branch and open-pr. A repo without the pack has nothing that dot-sources it.
 if ($hasWorkflowPack) {
     $scriptScaffolds += @{ Rel = 'scripts/lib/branch-info.ps1'; Content = $branchInfoScaffold }
 }
 # The functions the shared scripts call on each lib. Kept next to the scaffolds that define them, so a
 # contract that grows is noticed here rather than at a consumer's next session start. Split the same way
-# the scaffold is: the roster pair is the core's, the rest belongs to the workflow pack, so a repo
+# the scaffold is: the roster pair is the core's, the rest belongs to the workflow plugin, so a repo
 # without it is never told it is missing a function nothing there calls.
 $contractFunctions = @{
     'scripts/repo-config.ps1'     = @('Get-RosterPath', 'Get-RosterIgnoredIds')
