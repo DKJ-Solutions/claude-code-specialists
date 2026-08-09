@@ -232,9 +232,11 @@ was being audited against somebody else's way of working at every session start.
 The full picture, top-level folder by folder:
 
 - **`.claude-plugin/marketplace.json`** — the marketplace definition: the plugins (teams and workflow alike) with their `source`.
-- **[`plugins/`](plugins/)** — the plugin source. One folder per plugin (`team-alpha`,
-  `team-lifehub`, `team-shopify`, `team-ecomm`,
-  `workflow-default`, `workflow-davekjohn`), each carrying
+- **[`plugins/`](plugins/)** — the plugin source, split by kind: the teams under
+  [`plugins/teams/`](plugins/teams/) (`team-alpha`, `team-lifehub`, `team-shopify`, `team-ecomm`) and
+  the workflows under [`plugins/workflows/`](plugins/workflows/) (`workflow-default`,
+  `workflow-davekjohn`), each of those two directories carrying its own README for what belongs in it
+  and the rules that govern it. One folder per plugin, each carrying
   `agents/`/`manuals/`/`personas/`/`skills/` plus its own `plugin.json` — and next to them
   **`agent-shared/`**, the canonical source of the shared agent-def blocks
   described under
