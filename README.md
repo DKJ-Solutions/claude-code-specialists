@@ -138,6 +138,25 @@ for everyone. **Teams stack** — a consuming repo enables
 may be enabled at a time, because two workflows would hand the specialists two contradicting answers to
 the same question about how work moves through the repo.
 
+**That "at most one" is enforced since August 9, 2026, not merely stated.** A SessionStart hook in the
+core team, `workflow-sessioncheck`
+(`plugins/teams/team-alpha/hooks/workflow-sessioncheck.ps1`), counts the enabled plugin ids whose name
+starts with `workflow-`. It never blocks — it always exits 0, whatever it finds, because a session start
+is not the place to refuse somebody their own repo over a configuration question they can fix in one
+line — and it writes nothing. **Zero enabled workflows stays silent**, and that is a legitimate state
+rather than an oversight: this page already says "Enable nothing and the specialists use plain git/gh."
+**One enabled workflow also stays silent**, because that is the ordinary case and a session start should
+be quiet about ordinary states. Only at **two or more** does it print an `[ERROR]` naming each enabled id
+together with the settings layer that enabled it (`~/.claude/settings.json`, `.claude/settings.json`, or
+`.claude/settings.local.json`), because a conflict introduced from the machine layer looks identical from
+inside the repo to one the repo caused. **The naming half is what makes that count trustworthy in the
+first place**: lint check 23 (`[plugin-kind]`) in
+[`check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1) holds every published plugin to
+being `team-*` under `plugins/teams/` or `workflow-*` under `plugins/workflows/`, because the hook above
+counts a workflow by that prefix and nothing else. A workflow published under a different name would be
+invisible to the count and could sit enabled alongside another in silence — the exact failure the hook
+exists to catch, arriving through a naming choice nobody thought was load-bearing.
+
 | Plugin | What it is | Who it's for |
 |---|---|---|
 | [`team-alpha/`](plugins/teams/team-alpha/) | **The core team.** Fifteen repo-neutral specialists who work the same way in *every* repo (research, systems administration, technical writing, copy editing, code review, security review, and testing, among others). Also carries the persona templates of the main loop (Chris/Derek/Rendall) and the bootstrap skill `specialists-init`. | **Every** consuming repo — this is the foundation, always enable it. |
@@ -192,11 +211,13 @@ at repo level deliberately, because they differ per repo (or are safety-critical
 deliberately carry **no safety/guardrail hooks** and **no repo-specific skills** — with a few named,
 repo-neutral exceptions: the skill `specialists-init` (the adoption path itself), the skill
 `discover-workflow` (`workflow-default`'s own repo-neutral read, see
-[Teams and workflows](#teams-and-workflows--whats-the-difference)), and three informational, read-only
-SessionStart hooks that never block — `roster-sessioncheck` (roster-drift signaling) in the **core
-team**, and `connector-sessioncheck` (sync signaling) plus `script-contract-sessioncheck` (signals when
-a repo's own workflow libs no longer expose a function the shared scripts call) in **`workflow-davekjohn`**;
-see the [connectors README](connectors/README.md).
+[Teams and workflows](#teams-and-workflows--whats-the-difference)), and four informational, read-only
+SessionStart hooks that never block — `roster-sessioncheck` (roster-drift signaling) plus
+`workflow-sessioncheck` (flags two or more enabled workflows, see
+[Teams and workflows](#teams-and-workflows--whats-the-difference)) in the **core team**, and
+`connector-sessioncheck` (sync signaling) plus `script-contract-sessioncheck` (signals when a repo's own
+workflow libs no longer expose a function the shared scripts call) in **`workflow-davekjohn`**; see the
+[connectors README](connectors/README.md).
 The add-on teams `team-lifehub` and `team-shopify` may carry domain skills that a repo shares.
 
 **Those last two moved out of the core on August 8, 2026, and the reason is the doctrine rather than
@@ -473,9 +494,9 @@ matters operationally for the skills/subagents/hooks split described under
 bundled in a plugin works across all three surfaces, but a **subagent** or a **hook** runs only in
 Cowork and in Claude Code — in a plain Claude.ai Chat session they show up grayed out (see
 [Use plugins in Claude](https://support.claude.com/en/articles/13837440-use-plugins-in-claude)).
-Concretely for claude-code-specialists: the specialists roster (the subagents under Chris) and the three
-SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`)
-function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
+Concretely for claude-code-specialists: the specialists roster (the subagents under Chris) and the four
+SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`,
+`workflow-sessioncheck`) function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `fix-mojibake`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `cut-release`,
 `adopt-config`, `discover-workflow`)<!-- /skills:all -->
@@ -1001,12 +1022,12 @@ before diagnosing "the specialists stopped loading" as a bug in this repo.
 An add-on team is its own plugin folder — but adding one touches more than that folder, because the
 docs enumerate the plugins and go stale silently if you forget them. The full checklist (learned from
 adding `team-ecomm`) is written for a **team**; a **workflow** carries no specialists, so it would
-differ at step 3:
+differ at step 4:
 
 **One step left this list on August 9, 2026, and it is worth saying which.** It used to open with the
 plugin folder and then ask you to add that folder's `agents/` directory to a hand-written list in the
 drift lint — a step that existed only because a script kept its own copy of "which plugins are there".
-Both of that check's lists are now derived from the marketplace entry in step 2, so registering the
+Both of that check's lists are now derived from the marketplace entry in step 3, so registering the
 plugin *is* covering the drift check. The two lists had already fallen out of step with each other by
 one plugin when this was measured, which is the argument: a checklist item is a reminder, and a
 reminder is what a derivation makes unnecessary.
@@ -1015,17 +1036,26 @@ reminder is what a derivation makes unnecessary.
    `version`, matching the other plugins). That is the whole of it since August 8, 2026 — a new plugin
    used to owe a `CHANGELOG.md` intro and a `RELEASE.md` card as well, and both were retired with the
    documents themselves.
-2. **The marketplace entry** — register the plugin in
+2. **The name, and where it sits.** `team-<name>` under `plugins/teams/`, `workflow-<name>` under
+   `plugins/workflows/` — for a **team**, always the first; a **workflow** is the rare exception, see
+   the diverging note at step 4 below. Since August 9, 2026 this is not a style preference: the prefix
+   decides both which directory the plugin has to sit in and, for a workflow, whether the core team's
+   `workflow-sessioncheck` hook counts it at all when it checks that at most one workflow is enabled.
+   Lint check 23 (`[plugin-kind]`) in
+   [`check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1) holds both halves of that
+   pairing, so getting this step wrong is caught before the PR merges rather than at the next session
+   that happens to enable two workflows at once.
+3. **The marketplace entry** — register the plugin in
    [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) with a repo-relative
    `source`.
-3. **The specialists** — `agents/<group>-<id>-agent.md` + `manuals/<group>-<id>-manual.md` per
+4. **The specialists** — `agents/<group>-<id>-agent.md` + `manuals/<group>-<id>-manual.md` per
    member, following the `<group>-<id>` convention (a globally unique `id`).
-4. **The docs that enumerate the plugins** — this README (the plugin count, the
+5. **The docs that enumerate the plugins** — this README (the plugin count, the
    [teams-and-workflows table](#teams-and-workflows--whats-the-difference), the [invocation list](#invocation),
    the manuals list under [Manuals](#manuals--the-split-model), and whether the team is mutually
    exclusive with the others or complementary) and [`plugins/INSTALL.md`](plugins/INSTALL.md), both
    halves.
-5. **The gates** — `scripts/agents/build-agent-defs.ps1 -Check`,
+6. **The gates** — `scripts/agents/build-agent-defs.ps1 -Check`,
    [`scripts/lint/check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1), and
    the `scripts/tests/*.tests.ps1` suites, all green.
 

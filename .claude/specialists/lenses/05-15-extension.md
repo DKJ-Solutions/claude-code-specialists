@@ -59,7 +59,21 @@ infrastructure.
   as an error — `ship-pr`, `fix-mojibake`, `verify-resolved-issues` and `check-script-contract` are in that
   state today, and the first three are real gaps rather than deliberate ones. This is the safety guard that
   [Derek #05](05-05-extension.md)'s `open-pr.ps1` runs before every push — and that `cut-release.ps1`
-  runs before a release.
+  runs before a release. **Check 23, `[plugin-kind]`, added August 9, 2026, guards the naming rule a
+  session hook now depends on:** every published plugin must be `team-*` under `plugins/teams/` or
+  `workflow-*` under `plugins/workflows/`, and a name carrying neither prefix is an error rather than a
+  style note. The reason it has teeth: the core team's `workflow-sessioncheck` hook (below) decides what
+  counts as a workflow by that prefix alone, so a workflow published under a different name would be
+  invisible to the count that exists to catch two enabled at once — the directory half of the check keeps
+  the tree readable, but the naming half is the one a reader cannot see for themselves.
+- **`plugins/teams/team-alpha/hooks/workflow-sessioncheck.ps1`** — the fourth informational, read-only
+  SessionStart hook, registered in that plugin's `hooks/hooks.json` alongside `roster-sessioncheck`. It
+  counts the enabled plugin ids whose name starts with `workflow-`, stays silent at zero (a repo may run
+  the specialists on plain git/gh, and this hook having an opinion about that would be exactly what the
+  teams/workflows split exists to stop) and at one (the ordinary state), and at two or more prints an
+  `[ERROR]` naming each id together with the settings layer that enabled it — because a conflict arriving
+  from the machine layer looks identical from inside the repo to one the repo caused. Same posture as its
+  three siblings: it never blocks (always exit 0) and writes nothing.
 - **`.github/workflows/ci.yml`** — the CI gate on GitHub: runs the same lint gate + all test suites
   (`scripts/tests/*.tests.ps1`) on every PR and every push to `main`, so the guard also applies to
   work that comes about outside `open-pr.ps1`. **"The same" is literal since August 7, 2026** — the step

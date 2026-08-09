@@ -1935,6 +1935,41 @@ if (Test-Path -LiteralPath $skillPagesDir -PathType Container) {
 Write-Coverage -Category 'skill-command' -Checked $skillCmdChecked `
     -Note "the '-File' argument of every runnable command in the shipped skill pages, held against being machine-specific. The subject is the COMMAND and not the path, chosen by measuring: a tree-wide absolute-path rule is born with three findings, all three correct comments that quote a user path in order to explain a path-mangling bug. A '<plugin>' placeholder passes on purpose -- angle brackets ask the reader to substitute, an absolute path reads as a line to paste"
 
+# --- 23. a plugin's name says which kind it is, and it must sit where that says ---------------------------
+# Since August 9, 2026 the prefix is a MECHANISM, not a label. The core team's workflow-sessioncheck
+# decides what counts as a workflow by asking whether the plugin's name starts with 'workflow-', and it
+# does that on purpose: a workflow written by somebody else is then covered by naming alone, without
+# having to carry any code of ours. That only holds while the name is trustworthy, which is what this
+# check is for.
+#
+# TWO HALVES, AND THE SECOND IS THE ONE WITH TEETH. The directory rule ('team-*' under plugins/teams/,
+# 'workflow-*' under plugins/workflows/) keeps the tree readable, and a reader can see a violation.
+# The NAME rule cannot be seen: a plugin called 'davekjohn-workflow' would be a workflow that the
+# session check never counts, so enabling it alongside another would pass in silence -- the exact
+# failure the check exists to prevent, arriving through the door of a naming choice nobody thought was
+# load-bearing. So an unprefixed name is an error rather than a style note.
+#
+# Anchored on the published set, so a directory under plugins/ that is not a plugin (agent-shared/) is
+# not held to a rule about plugins.
+$kindChecked = 0
+foreach ($p in $publishedPlugins) {
+    $kindChecked++
+    $rel = $p.RelativeRoot
+    if ($p.Name -like 'team-*') {
+        if ($rel -notmatch '^plugins\\teams\\') {
+            Add-Error "[plugin-kind] '$($p.Name)' is a team by its name but its source is '$rel' -- a team belongs under plugins/teams/."
+        }
+    } elseif ($p.Name -like 'workflow-*') {
+        if ($rel -notmatch '^plugins\\workflows\\') {
+            Add-Error "[plugin-kind] '$($p.Name)' is a workflow by its name but its source is '$rel' -- a workflow belongs under plugins/workflows/."
+        }
+    } else {
+        Add-Error "[plugin-kind] '$($p.Name)' is neither 'team-*' nor 'workflow-*'. Every plugin here is one or the other, and the name is what says which: the core team's workflow-sessioncheck counts enabled workflows BY THAT PREFIX, so a workflow named otherwise would never be counted and could be enabled alongside another in silence."
+    }
+}
+Write-Coverage -Category 'plugin-kind' -Checked $kindChecked `
+    -Note $(if ($kindChecked -eq 0) { 'no published plugin was read, so neither the naming rule nor the directory rule could be applied' } else { "every published plugin is a team or a workflow by name, and sits in the directory its name claims. The naming half is the one that cannot be seen by reading the tree: the prefix is what the core's session check counts workflows by, so an unprefixed workflow would be invisible to it" })
+
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {
     Write-Host "  No findings." -ForegroundColor Green

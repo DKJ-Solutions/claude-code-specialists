@@ -104,6 +104,16 @@ one and restart. Moving **onto** `workflow-davekjohn` also asks your repo for tw
 scaffolds. Moving **onto** `workflow-default` needs nothing further: it reads what your repo already
 states and writes one document the first time its skill runs.
 
+**If you get this wrong — both flipped on, or the old one never turned off — you find out at your next
+session start, not at the moment you made the mistake.** The core team's `workflow-sessioncheck` hook
+counts the enabled workflow plugin ids on every `SessionStart`, and once it counts two or more it prints
+a line that opens with the exact marker `[ERROR]`, naming each enabled id together with the settings
+layer that enabled it — `~/.claude/settings.json` (machine-wide), your repo's own `.claude/settings.json`,
+or `.claude/settings.local.json` (personal) — so you know which file to open rather than guessing. It does
+**not** block: the session starts anyway, because a configuration mistake you can fix in one line is not
+grounds for refusing you your own repo. One enabled workflow, or zero, is the ordinary state and produces
+no line at all.
+
 ### Staying up to date — the two commands
 
 Two commands, from your repo's root, one pair per plugin:
