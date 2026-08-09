@@ -1,12 +1,13 @@
-## `docs/v4-0-0-release-body-lead-in` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] Check how `v3.10.0`'s note states the same thing, so this is the same block rather than a new shape
-- [x] Write the lead-in: the release asks nothing, the version you come from may, the routing is attached
-- [x] Confirm the highlights really carry the from-which-version sections the block promises
-
-### Where I left off
-
-Done. This lands before the GitHub Release is created, which is what keeps it an edit to a file rather
-than an edit to a published page.
+_(filled in when a branch is created)_
