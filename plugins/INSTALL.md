@@ -15,6 +15,12 @@ which this half is the summary of.
 > policy alone will stop you); or **you are an agent executing this for someone**
 > ([where it has to stop](#if-an-agent-is-doing-this-for-you--where-it-has-to-stop) —
 > two of these acts are ones you structurally cannot perform).
+>
+> **Read neither half, and go straight to
+> [Migrating from the old plugin names](#migrating-from-the-old-plugin-names) instead, if you already
+> have this family installed under the ids it used before it split into teams and a workflow** —
+> `specialists@claude-code-specialists` and its siblings. That is a third procedure, not a shorter or
+> longer version of either half below.
 
 ### Step 1 — enable and install
 
@@ -143,6 +149,174 @@ An improvement to the shared core (an agent def, playbook, persona, or skill) is
 locally: file it as an issue on this repo with the label `inbound` — there is an
 [issue template](../.github/ISSUE_TEMPLATE/inbound-improvement.md). Repo-specific additions belong in
 your own lenses, which do not travel with the plugin.
+
+---
+
+## Migrating from the old plugin names
+
+> **This section is for a repo that already has this family installed under the plugin ids it used
+> before it split into teams and a workflow** — `specialists@claude-code-specialists`,
+> `specialists-lifehub@claude-code-specialists`, `specialists-shopify@claude-code-specialists`,
+> `specialists-ecomm@claude-code-specialists`, or `specialists-workflow-davekjohn@claude-code-specialists`.
+> It is neither the quickstart above (you are not adopting for the first time) nor the adoption manual
+> below (you are not connecting a repo that has never seen this family) — it is a third procedure, and
+> it earns its own section because a mechanical id swap alone silently loses something neither of the
+> other two ever had to account for. Read [Decide your workflow first](#decide-your-workflow-first)
+> before you run a single command.
+
+| old plugin id | new plugin id |
+|---|---|
+| `specialists@claude-code-specialists` | `team-alpha@claude-code-specialists` |
+| `specialists-lifehub@claude-code-specialists` | `team-lifehub@claude-code-specialists` |
+| `specialists-shopify@claude-code-specialists` | `team-shopify@claude-code-specialists` |
+| `specialists-ecomm@claude-code-specialists` | `team-ecomm@claude-code-specialists` |
+| `specialists-workflow-davekjohn@claude-code-specialists` | `workflow-davekjohn@claude-code-specialists` |
+
+Every plugin is now either a **team** (who the specialists are) or a **workflow** (how work moves
+through the repo) — see
+[Teams and workflows](../README.md#teams-and-workflows--whats-the-difference) in the root README for
+what each one is and does. Teams stack, exactly as your old plugins did; a workflow does not, which is
+the one genuinely new rule in this table rather than a renaming of an old one.
+
+### Decide your workflow first
+
+**Which half of this applies to you depends on one thing: whether you had
+`specialists-workflow-davekjohn` enabled.**
+
+- **If you did**, its replacement in the table — `workflow-davekjohn` — is a workflow, so a
+  straight swap carries your answer across and you are covered. Read on anyway for the one new rule:
+  exactly one workflow may be enabled, so make sure you did not also pick up a second.
+- **If you did not**, the table gives you back every team and leaves you with **no workflow enabled at
+  all** — because none of the ids you are removing was one, so the swap has nothing to carry over.
+  That is the case for every consumer in this project's own register, and it is the part of the
+  migration that will not announce itself afterwards: your session keeps working, your specialists
+  keep answering, and nothing says that a question which did not use to exist now sits unanswered.
+  Enabling none is a legitimate answer and the session check stays deliberately quiet about it — which
+  is exactly why nothing will remind you.
+
+Decide on purpose, before you touch a command, between the two plugins that answer it:
+
+- **`workflow-default`** — needs nothing further from your repo: it reads what your repo already states
+  about its own conventions and writes one document the first time its skill runs.
+- **`workflow-davekjohn`** — the specific branch, changelog and release model. This is a rename and
+  nothing more: it was already its own opt-in plugin under the old name, so if you had it you are
+  choosing it again rather than for the first time. It asks your repo for two files it reads,
+  `scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1` — already covered under
+  [Switching workflows](#switching-workflows), which applies here unchanged: the `specialists-init` run
+  under [After the reinstall](#after-the-reinstall) below scaffolds both.
+
+Install **exactly one of the two**, or deliberately neither. Neither is a real answer — the specialists
+then use plain `git`/`gh` and follow whatever your repo already does — and it is the only one of the
+three states nothing will ever remind you of. What is refused is *both*: two workflows answer the same
+questions differently and nothing tells the specialists which answer is yours, which is what the core
+team's session check reports at the next session start. Carry your choice into the install command
+below.
+
+### The command sequence
+
+Refresh before you touch anything else: `install` does not do it for you, and a stale cache serves a
+plausible-looking, previous version with no error to say so — the full measurement is under
+[Staying up to date](#staying-up-to-date). Then take out every old id you had enabled, then put in its
+replacement plus the one workflow you decided on above, then restart.
+
+> **The order below looks wrong and is not, and this is the one thing worth measuring rather than
+> reasoning about.** The refresh replaces the marketplace catalogue with one that lists only the NEW
+> ids, and the uninstalls that follow name the OLD ones — so the obvious worry is that the CLI refuses
+> to remove a plugin its catalogue no longer advertises. **Measured on 2026-08-09**, on the source repo
+> itself, in exactly this order: after
+> `claude plugin marketplace update claude-code-specialists` the uninstalls of
+> `specialists@claude-code-specialists` and `specialists-workflow-davekjohn@claude-code-specialists`
+> both returned `✔ Successfully uninstalled plugin`. `uninstall` resolves against your install record,
+> not against the catalogue. What is *not* claimed here is anything about whether `uninstall` refreshes
+> the cache — nobody has tested that, and this page has been caught generalising an untested claim from
+> one verb to another once before.
+
+```powershell
+# 1. Refresh -- do this first, every time
+claude plugin marketplace update claude-code-specialists
+
+# 2. Uninstall every old id you had enabled -- skip whichever you never enabled
+claude plugin uninstall specialists@claude-code-specialists --scope project
+claude plugin uninstall specialists-lifehub@claude-code-specialists --scope project
+claude plugin uninstall specialists-shopify@claude-code-specialists --scope project
+claude plugin uninstall specialists-ecomm@claude-code-specialists --scope project
+claude plugin uninstall specialists-workflow-davekjohn@claude-code-specialists --scope project
+```
+
+```powershell
+# 3. Refresh again, then install the new ids
+claude plugin marketplace update claude-code-specialists
+
+# 3a. The core team -- everyone runs this one
+claude plugin install team-alpha@claude-code-specialists --scope project
+
+# 3b. The add-on teams -- ONLY the ones you uninstalled in step 2. Delete the other lines.
+claude plugin install team-lifehub@claude-code-specialists --scope project
+claude plugin install team-shopify@claude-code-specialists --scope project
+claude plugin install team-ecomm@claude-code-specialists --scope project
+
+# 3c. Your workflow -- exactly ONE of these two, or neither. Never both.
+claude plugin install workflow-default@claude-code-specialists --scope project
+# claude plugin install workflow-davekjohn@claude-code-specialists --scope project
+```
+
+**4. Restart your Claude Code session.**
+
+`--scope project` is not optional here any more than it is anywhere else on this page — see
+[Step 1](#step-1--enable-and-install) for what it costs to leave off. Expect the uninstalls and the
+installs to rewrite `.claude/settings.json` on the way, the same rewriting behaviour
+[documented above](#connecting-in-four-steps): the old `enabledPlugins` entries come out, the new ones
+go in, and any diff beyond that is formatting.
+
+### After the reinstall
+
+Once the new session comes up, re-run `specialists-init` (see [Step 2](#step-2--run-the-bootstrap-skill)
+above). It is purely additive, so a repo that already has its seam, its lenses and its roster keeps all
+of that; it only adds what the newly installed plugin brings — a new add-on team's specialists, or
+`workflow-davekjohn`'s two script scaffolds. Then verify the same way a fresh install does: the
+`installed_plugins.json` query under [Step 1](#step-1--enable-and-install) above, read against your new
+ids rather than your old ones. One `project` line per plugin you just installed, each ending in
+`payload present`, is what you are checking for — the count is part of the check here exactly as it is
+for a first-time adopter.
+
+### If your lenses sit on the pre-seam path
+
+**A named caveat, stated as it stands rather than smoothed over: this has not been repaired in code.**
+A repo lens lives in one of two places — the seam (`.claude/specialists/lenses/`, which does not name
+any plugin) or, for a repo that adopted before the seam existed, the pre-seam path
+`.claude/plugins/claude-specialists/<plugin>/`, where `<plugin>` is the plugin's own folder name. On
+that second path the plugin name is part of the path a reader constructs, and this migration changed
+exactly that name — `specialists` became `team-alpha`, `specialists-shopify` became `team-shopify`, and
+so on for the rest of the table above. A repo still on the pre-seam path is therefore left looking for
+its lenses under the *old* folder name while every specialist now reads from the new one, and finds
+nothing there.
+
+This has not been fixed by a script or a lint rule, because no consumer in this repo's own connector
+register is confirmed to be in that state — repairing a state nobody has been measured to occupy would
+be exactly the pre-emptive fix this family's own working method argues against building. If it does
+bite you, the fix is one `git mv`: rename that one directory from the old plugin name to the new one
+(`git mv .claude/plugins/claude-specialists/specialists .claude/plugins/claude-specialists/team-alpha`,
+and the matching rename for any add-on team you had) — or, the better long-term move, since it is what
+this page already recommends to anyone still on that layout regardless of this migration, move onto the
+seam instead, per [The seam, specified](../README.md#the-seam-specified) in the root README.
+
+**The seam itself is unaffected by all of this, and most readers are already on it.**
+`.claude/specialists/lenses/` does not encode a plugin name anywhere in its path, so nothing about this
+rename touches it, and nothing about the content of any lens you have written changes either — see
+[What does not change](#what-does-not-change) next.
+
+### What does not change
+
+- **Skill names.** Only the plugin prefix in front of them moved; the names themselves — `new-branch`,
+  `open-pr`, `specialists-init`, and the rest — did not.
+- **The marketplace name**, `claude-code-specialists`, and the source you registered it under in
+  `extraKnownMarketplaces`.
+- **The lens-family path segment**, `claude-specialists`, used by a pre-seam lens directory (see above)
+  — it names the family, not any one plugin, so this rename does not touch it.
+- **The seam itself**, `.claude/specialists/`, and everything under it — your roster, your routing
+  table, your chains.
+- **Your repo lenses' content.** Nothing about what you wrote in them changes; only where a plugin
+  folder is found, for the pre-seam layout specifically, does.
 
 ---
 

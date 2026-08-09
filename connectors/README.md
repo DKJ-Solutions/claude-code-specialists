@@ -70,6 +70,16 @@ accepted degree of transparency (security review, July 16, 2026).
   checkout is not on the machine, the check skips it. Absolute paths and paths outside the scope
   root are rejected by the check.
 - `plugins` contains, per installed plugin, that plugin's `extensions` inventory.
+- **A plugin rename does not get written into `plugins[].id` on the day the rename lands here — only
+  after the consumer itself has migrated.** The same "registry data should follow reality" discipline
+  that already governs the `extensions` inventory (see
+  [Persona drift](#persona-drift-how-to-read-a-drifted-report-doctrine)) applies to the id itself: this
+  register records what a consumer HAS, not what it is expected to have next, so a manifest still
+  naming an old id after a plugin has been renamed here is not stale — it is accurate, right up until
+  that consumer actually runs the reinstall. Writing the new id ahead of that reinstall would have the
+  outbound half of [the check](#the-check) report a registered extension as missing from a plugin the
+  consumer never installed, turning the register itself into a false alarm about a migration nobody
+  performed.
 - `notes` is the human summary/explanation; updated when something changes substantively, not on
   every check.
 - **The manifest deliberately has no version bookkeeping (anymore)** (decision by Dave, July 20,
