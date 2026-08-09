@@ -1,13 +1,13 @@
-## `docs/readme-consistency-sweep` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] Measure the shared-script registry rather than trusting the page (23 pairs, three destination plugins)
-- [x] Rewrite the shared-scripts README: title, the SSOT contradiction, the complete table, the hook claim
-- [x] Repair the subjectless sentence in `connectors/README.md` and its two-item exception list
-- [x] Add Bianca #02 to the handbook, complete the index, correct the "no lens (yet)" claim
-- [x] Correct the root README's persona cell
-- [x] Lint + tests green
-
-### Where I left off
-
+_(filled in when a branch is created)_
