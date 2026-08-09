@@ -227,6 +227,32 @@ The constitution above, concretely implemented here:
   away from going silent — which is exactly what just happened to this collision, and would as easily happen
   to a match the check depended on.
 
+  **A check on stale PATH references in prose was measured and declined** (August 9, 2026), and the reason
+  generalises past this one rule, which is why it is recorded rather than forgotten. The proposal came out of
+  a README sweep that found a title naming `specialists/scripts/`, a directory the plugin reorganisation had
+  removed — a defect no gate sees, since check 4 reads markdown **links** and this was a path in inline code.
+  The obvious rule is "a path in backticks must resolve against the tree". Five candidates were measured over
+  120 documents (history excluded as in checks 11 and 12), each with the most generous resolver a checker
+  could honestly use — repo root, the document's own directory, and every ancestor between:
+  requiring a separator **and** an extension gave **124** findings, a separator alone **349**, an extension
+  alone **621**, either **736**. **Not one of the 124 was a true finding**, and the narrowest rule does not
+  even reach the measured defect — `specialists/scripts/` carries no extension — so catching the one real
+  instance means adopting a rule born with 349.
+
+  **The reason is structural, and it is about what this repo is.** Being a plugin source, most paths it
+  names correctly describe *somebody else's* repo: `.claude/extensions/…` is the legacy lens location this
+  family deliberately still documents for unmigrated consumers, `config/settings_data.json` is a Shopify
+  store's file named in `team-shopify`'s manual, `PRETTY/[Emotie]/README.md` is a life-hub folder. All three
+  answer "no such file here", exactly as the stale title does — and **the difference is whose repo the line
+  is about, which the line never says**. An existence check reads "describes a consumer" as "stale", and no
+  regex recovers that distinction. Do not revive it behind an exemption list: that is the shape this repo has
+  already been bitten by, and the list would need to hold the entire consumer-facing vocabulary.
+
+  **What survived, unbuilt and deliberately so:** a title claiming a path must name its own location. It
+  sidesteps the anchor question entirely, because a document knows where it sits — 4 subjects tree-wide,
+  0 findings today, and verified against `33a41a2` to fire on the real defect. Not built, because four
+  subjects is close to nothing to guard; worth revisiting when per-directory READMEs multiply.
+
   **The PR template that caused the collision is itself the change** (Dave, August 9, 2026). It now carries
   one section — the changelog entry — because `open-pr.ps1` composes the body from
   `branch/branch-changelog.md`, so everything else it asked was already answered four lines lower. Measured
