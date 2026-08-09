@@ -1,13 +1,17 @@
-# `main` progress
-
-
-> **You are on `main`.** Do not work in this file yet -- create a branch first.
-> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
-> of the next person who does create one.
-
-This file carries the step list of the branch you are on. It is written when a branch is created
-and returns to this state after the merge.
+## `fix/smartwatchbanden-is-gemigreerd` progress
 
 ### Steps
 
-_(filled in when a branch is created)_
+- [x] Measure the consumer's end state after its own PR merged: enabled ids, lens inventory, remote
+- [x] Map the 25 lenses onto the four plugins from the plugin source, rather than guessing the split
+- [x] Rewrite `connectors/smartwatchbanden.json`: new ids, `team-ecomm` added, real org slug
+- [x] Keep the two standing lessons in `notes` and record what today's migration measured
+- [x] Verify with `check-connectors.ps1` — all four blocks `[OK]`, 0 errors
+- [~] Do not touch `connectors/life-hub.json`: that consumer has not migrated, so its two `[INFO]`
+      signals are correct as they stand and the register must keep recording what it HAS
+
+### Where I left off
+
+Done. The three inbound issues the migration produced (#555, #556, #557) are verified as still
+standing and are deliberately not part of this branch — they are product changes, this is bookkeeping.
+
