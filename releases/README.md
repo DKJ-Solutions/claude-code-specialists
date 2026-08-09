@@ -26,20 +26,27 @@ release document it appears in, and — together with its significance score —
 **`CHANGELOG.md` has no sections to file into** (Dave, August 5, 2026). It is an intro followed by one `##`
 per change, ranked furthest-reach-first and, within a tier, highest-significance-first — so what the three
 `## Tier N - Pull Requests` sections used to say visually is now the ordering, and each entry states its own
-reach in the impact table it carries. The **fold** is the only moment that order can be decided, because the
-cut empties the list: whatever order it leaves is what these three documents inherit, with nothing
-re-estimated days later.
+reach in the `### Significance` section it carries, one `#### Tier N` sub-section per reach it claims. The
+**fold** is the only moment that order can be decided, because the cut empties the list: whatever order it
+leaves is what these three documents inherit, with nothing re-estimated days later.
 
 **The ladder is cumulative, so the documents are not disjoint.** Something a consumer notices is something
 a colleague should hear about too — a tier-2 entry therefore appears in the highlights *and* in the internal
 note. The development note carries everything, tier 0 included, because it is the record rather than a
 summary of one.
 
-**Where the number comes from: the author of the entry, on the branch.** `new-changelog-entry.ps1` writes
-`Tier: 0` into the entry file; whoever finishes the branch raises it. `open-pr.ps1` refuses a value the model
-has no meaning for (and prints the one it read, so an entry still at the default says so before the PR), and
-`fold-changelog-entry.ps1` files the entry under the matching section and then **removes the line** — from
-then on the section states the tier, so the fact lives in exactly one place.
+**Where the number comes from: the author of the entry, on the branch.** `new-branch.ps1` writes all three
+`#### Tier N` sub-sections with their scores left empty; whoever finishes the branch answers each one, with a
+score or with `N/A` and the reason it reaches nobody there. **The reach is the highest tier carrying a
+number**, so an `N/A` costs a sentence and keeps the reasoning behind a negative claim in the record.
+`open-pr.ps1` refuses an entry whose description, body or any tier's reason is still blank, and
+`fold-changelog-entry.ps1` folds the entry **verbatim** — so the declaration lives in exactly one place, the
+entry itself, and no second definition of the format sits inside the fold.
+
+**The older `Tier: N` line is still read and is deliberately not stripped.** Every entry written before
+August 6, 2026 — here and in every consumer's tree — carries it instead of the sub-sections, and a parser
+that only knew the new shape would read all of them as tier 0: silent, correct-looking, and wrong in the
+direction that empties a release. Recognise both, write one.
 
 **Deliberately not derived from the branch prefix**, which this repo has measured does not predict impact:
 held against the 19 entries pending at v3.2.0, the single most consequential change for a consumer —
@@ -52,16 +59,20 @@ anything is written:
 
 | bump | requires |
 |---|---|
-| any release | at least one entry of **tier 1 or higher** |
-| **minor** | at least one **tier-2** entry |
+| **patch** | nothing — a release made entirely of tier-0 work is what a patch is for |
+| **minor** | at least one entry of **tier 1 or higher** |
 | **major** | at least **10 minors** cut in the current major line, on top of the general minimum |
 
-**Why a release needs a tier-1 entry at minimum:** a release consisting entirely of repo-internal work has
-nobody to announce it to, and cutting one spends a version number, a tag and three documents on that.
+**Why a tier-0-only release is a patch rather than a refusal** (Dave, August 7, 2026). It used to be refused
+outright, on the grounds that such a release "has nobody to announce it to" — and the answer is that
+announcing nothing is exactly what a patch is for. The version number still moves, the tag still marks the
+moment, and the one document that gets written is the record.
 
-**Why a minor needs a tier-2 entry:** "a minor is cut when a consumer actually notices something" was
-already the written rule here — this makes the entries prove it. It also means the highlights document
-always has a reader by construction, so the tier and the bump agree without a second rule.
+**Why a minor needs tier 1 rather than tier 2.** It demanded a tier-2 entry until August 7, 2026, so work a
+colleague on this project got something out of earned only a patch — while the version here speaks to all
+stakeholders, not to consumers alone. What keeps the looser rule honest is that **the documents follow the
+tier and not the bump**: a tier-1-only minor writes the internal note and **no highlights**, so nobody
+outside is handed a document about work they cannot see.
 
 **Why a major counts minors rather than pending work:** a major is a **recap** of the minors before it,
 which is what both of this repo's majors actually were (`v2.0.0` consolidated v1.0–v1.18, `v3.0.0`
@@ -73,9 +84,17 @@ the component *is* the count.
 judgement about **content** rather than skipping a tool — folding them into one flag would let someone
 skipping a slow lint run also, silently, cut a minor with nothing in it for a consumer.
 
-**The gate switches itself off in a repo that declares no tier split.** One entry section means there is no
-tier information to judge, not that nothing qualifies — the opposite reading would refuse every release such
-a repo ever cuts. That is what makes this safe to share.
+**The gate switches itself off where no pending entry declared its impact at all**, and that is what makes it
+safe to share: a repo that never adopted the model is untouched rather than refused at every cut.
+
+**The signal is a count of declarations, not a count of sections**, and the difference is not academic. The
+test used to be "does this repo declare more than one changelog section", which had a real basis while the
+tier headings existed and became a landmine the moment they went: a flat changelog gives an unadopted repo
+and an adopting one exactly one group each, so the old line would have read **every** repo as not adopting
+and switched the gate off in silence — in the same change that made the tier the model's primary fact.
+Nothing would have errored. Counting declarations keeps "declared tier 0" distinct from "declared nothing",
+which is the whole difference between a release with nobody to announce itself to and a repo that never
+chose the model.
 
 ## The three documents
 
@@ -87,7 +106,7 @@ stands for whichever this repo uses.
 |---|---|---|---|
 | `development/<dir>/<X.Y.Z>.md` | developers — the full per-PR record, auto-complete | every release | `cut-release.ps1` |
 | `internal/<dir>/<X.Y.Z>.md` | colleagues, employers — what the work is worth | every release, patch included | `new-internal-note.ps1` |
-| `highlights/<dir>/<X.Y.Z>.md` | consumers — what they actually notice | minor/major only | `cut-release.ps1` |
+| `highlights/<dir>/<X.Y.Z>.md` | consumers — what they actually notice | minor/major, **and** only with a tier-2 entry pending | `cut-release.ps1` |
 
 ### Tier 0 - development
 
@@ -96,30 +115,39 @@ rewritten — literally the whole changelog, generated in full by `cut-release.p
 the per-PR record a developer goes back to, which is why it is never edited down: a summary of it is what
 the other two are for.
 
-**Structured the way `CHANGELOG.md` itself is**: `## Tier <n> - <audience>` first, then that tier's entries
-as a flat ranked list (`### <title>`), each keeping its own three sections (`#### What does this change
-do?` and its siblings) and its impact table. There are no branch-type categories in between — the grouping
-came from the branch prefix, which this repo measured does not predict impact — and an entry heading is just
-its title, with the PR number and merge date on the entry's closing line. Tier 0 is in it, unlike in the
-other two documents: this is the record.
+**It is the one document that still groups by tier**, and that is a difference from `CHANGELOG.md` rather
+than a copy of it: `## Tier <n> - <audience>` first, then that tier's entries as a flat ranked list in the
+order the fold left them. The changelog dropped its tier headings in the same change that made the entry
+declare its own reach; this document keeps them because it carries all three tiers at once and is the only
+place a reader needs them separated.
+
+Each entry arrives whole, exactly as it was folded — its `###` heading naming the **branch**, and beneath it
+the same six `####` sections the scaffolder writes: `Branch title`, `Branch ID`, `Branch type`, `What does
+the change on this branch bring to main?`, `Significance` and `Pull Request`, one heading level deeper than
+in `CHANGELOG.md`. Nothing is rewritten and nothing is cut, which is what "the record" means. There are no
+branch-type categories in between — the grouping came from the branch prefix, which this repo measured does
+not predict impact. Tier 0 is in it, unlike in the other two documents.
 
 Its size is also why it is never the body of a GitHub Release but always an attachment: `gh`'s
 release-notes body has a hard **125,000-character** limit, which a full notes file can exceed.
 
 ### Tier 1 - internal
 
-**The tier that covers a patch, and that is the whole reason it exists next to highlights.** The two answer
-different questions: highlights is *what a consumer notices*, internal is *what the organisation gets out
-of it*. They come apart most clearly on a patch — a release with nothing for a consumer, correctly a patch
-and therefore without highlights, can still be the one where a routine change stopped needing a developer.
+**The tier that covers a release with nothing for a consumer, and that is the whole reason it exists next to
+highlights.** The two answer different questions: highlights is *what a consumer notices*, internal is *what
+the organisation gets out of it*. They come apart wherever a release has no tier-2 entry — a patch, or a
+minor made of tier-1 work — and get no highlights at all, while still being the release where a routine
+change stopped needing a developer.
 
 `new-internal-note.ps1` generates only the skeleton (metadata + the entry titles as bullets + three fixed
 headings). The middle heading, **what it is worth**, cannot be derived from a changelog and is the point of
 the document — so this tier is written by hand at **every** release, patch included.
 
-**It carries over the tier-1 *and* tier-2 entries**, the ladder being cumulative, and skips tier 0. A release
-whose pending work was all tier 0 cannot be cut at all, so the empty case here means every entry was tier 0
-in a run that bypassed the gate — the script says so rather than handing you a blank list without a reason.
+**It carries over the tier-1 *and* tier-2 entries**, the ladder being cumulative, and skips tier 0. The empty
+case is reachable and ordinary since August 7, 2026: a release made entirely of tier-0 work is a legitimate
+patch, and its internal note has no entry to list. The script says so rather than handing you a blank list
+without a reason — which used to mean "somebody bypassed the gate" and now usually means "this was a
+tier-0 patch".
 
 **It is published output, not an internal file.** It is the body of the GitHub Release, which has a
 consequence worth stating: anything its "what is still open" section phrases as a *live* claim goes stale in
@@ -128,10 +156,16 @@ statement about now.
 
 ### Tier 2 - highlights
 
-**It is the tier-2 entries, and nothing else.** Entry metadata is stripped, and the document is generated
-only for a minor or major — which needs no separate rule, since [a minor requires a tier-2
-entry](#what-a-release-must-earn), so a release that earned a minor has a highlights reader by
-construction. A patch has no highlights, for the same reason it is a patch.
+**It is the tier-2 entries, and nothing else.** Entry metadata is stripped, and the document is written only
+when **two** conditions hold at once: the bump is one the seam names (`Get-ReleaseHighlightsBumps` — minor
+or major here), **and** at least one pending entry actually declared tier 2. A patch has no highlights, for
+the same reason it is a patch.
+
+**That second condition became load-bearing on August 7, 2026, and used to be belt-and-braces.** While
+[a minor required a tier-2 entry](#what-a-release-must-earn), a release that earned a minor had a
+highlights reader by construction and the tier check could never fire on its own. Since a minor needs only
+tier 1, it is the only thing standing between a tier-1-only release and a document written for consumers
+about work no consumer can see — and a highlights file with a header and no content is worse than none.
 
 **Still a draft to be edited, and the reason never depended on the selection.** Entry bodies are written for
 whoever reviews the diff, even when the change reaches a consumer — so the *selection* is right and the
