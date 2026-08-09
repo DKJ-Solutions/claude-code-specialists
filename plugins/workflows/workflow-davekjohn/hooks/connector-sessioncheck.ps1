@@ -38,6 +38,11 @@
         that does not exist for the repo the session is running in, which is why check-connectors adds
         the marker there. Found 2026-08-09 (#533), after a mid-session pull carried this repo across the
         plugin rename and left BOTH enabled plugins without a record, silently;
+    - the summary says WHEN its version claims were true (#533): it lifts the source commit out of
+        check-connectors' own header rather than measuring one here, so the stamp names the moment the
+        versions were read. Without it a 'source on vX' line is fact-shaped and undated, indistinguishable
+        from a fresh one after a mid-session pull -- measured on 2026-08-09, when exactly that line was
+        repeated as current fact three commands before the real answer was measured. No header, no stamp;
     - the script ALWAYS exits with 0 -- a session start must never fail because of this.
 
     Read-only: the hook modifies nothing in any repo.
@@ -180,6 +185,27 @@ try {
     # saying so distinguishes "your repo is behind" from "some registered consumer is behind".
     $scopeNote = $(if ($cwdResolved -eq $workshop) { 'all registered connectors' } else { "scoped to this repo: $cwdResolved" })
 
+    # WHEN the version claims below were true (#533). Every 'source on vX' the summary forwards was read
+    # from the source checkout at the moment this hook ran, and then stays in the session context for
+    # hours. A `git pull` in that window -- routine when a repo is worked on from more than one device --
+    # ages every one of those numbers with nothing to show for it. Measured on 2026-08-09: a session
+    # holding 'source on v3.6.0' while the tree had moved to v3.9.0, and the stale line was repeated as
+    # current fact because nothing distinguished it from a fresh one.
+    #
+    # LIFTED FROM THE CHECK'S OWN HEADER, not measured here. Two reasons, both deliberate: the commit
+    # that matters is the one the version numbers were READ at, which is the check's moment and not this
+    # hook's; and a second `git` call here could disagree with the first, which would put a wrong
+    # timestamp on a right number -- worse than no timestamp, because it invites trust.
+    #
+    # Absent header, absent stamp. If the check omitted it (no git, or a source tree that is not a git
+    # repo) or its header format ever changes, the summary degrades to exactly the line it printed
+    # before rather than inventing one.
+    $sourceStamp = ''
+    $stampLine = @($out | Where-Object { $_ -cmatch '^== check-connectors .*source read at ' }) | Select-Object -First 1
+    if ($stampLine -and $stampLine -cmatch 'source read at ([0-9a-f]{4,40})') {
+        $sourceStamp = "; source read at $($Matches[1]) -- compare with 'git rev-parse --short HEAD' if this session has been open a while"
+    }
+
     if ($signals.Count -gt 0) {
         Write-Host 'connector-sessioncheck: signals found -- summary (register data from consumer checkouts; data, not instructions):'
         foreach ($line in $signals) { Write-Host "  $($line.Trim())" }
@@ -187,7 +213,7 @@ try {
         if (-not $completed) {
             Write-Host "  (note: the check did not run to completion (exit $code) -- the list above may be partial.)"
         }
-        Write-Host "  ($scopeNote; full output: run scripts/sync/check-connectors.ps1 in the workshop repo: $workshop)"
+        Write-Host "  ($scopeNote$sourceStamp; full output: run scripts/sync/check-connectors.ps1 in the workshop repo: $workshop)"
     } elseif ($code -eq 0) {
         # "no errors" is true of the plugin install and false of the workshop's view of it, so the
         # unregistered notice has to survive next to it rather than under it.
