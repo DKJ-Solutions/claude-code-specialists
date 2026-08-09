@@ -2,8 +2,9 @@
 
 ## Quickstart — the commands, and nothing else
 
-**This half is the short one.** Two settings keys, four commands, one verification query, two
-restarts. Every caveat, every measurement and every failure mode behind them lives in
+**This half is the short one.** Two settings keys, five commands (the default now enables and installs
+two plugins, not one), one verification query, two restarts. Every caveat, every measurement and every
+failure mode behind them lives in
 **[Adoption](#adoption--how-to-connect-your-repo)**, the second half of this page — the full manual,
 which this half is the summary of.
 
@@ -19,7 +20,10 @@ which this half is the summary of.
 
 **1. Write your repo's own `.claude/settings.json`** (create `.claude/` beside your `README.md` if it
 is not there). A complete, pasteable file; if you already have one, merge these two keys into it.
-Strict JSON — no comments, no trailing commas. Add a line per add-on team you want.
+Strict JSON — no comments, no trailing commas. `team-alpha` and `workflow-default` are both on by
+default — the latter imposes nothing, it just reads your repo's own conventions (see
+[Switching workflows](#switching-workflows) if you want `workflow-davekjohn` instead). Add a line per
+add-on team you want.
 
 ```json
 {
@@ -29,7 +33,8 @@ Strict JSON — no comments, no trailing commas. Add a line per add-on team you 
     }
   },
   "enabledPlugins": {
-    "team-alpha@claude-code-specialists": true
+    "team-alpha@claude-code-specialists": true,
+    "workflow-default@claude-code-specialists": true
   }
 }
 ```
@@ -43,6 +48,7 @@ it, the next command fails with `Marketplace … not found`.
 claude plugin marketplace update claude-code-specialists                     # never skip: install does not refresh
 claude plugin marketplace list                                               # came the entry from YOUR repo's settings?
 claude plugin install team-alpha@claude-code-specialists --scope project    # once per plugin
+claude plugin install workflow-default@claude-code-specialists --scope project    # once per plugin
 ```
 
 `--scope project` is not optional — without it the install goes machine-wide and writes no
@@ -85,6 +91,18 @@ nothing about your repo; the lenses in `.claude/specialists/lenses/` are where y
 specialist serves *here*, and an unfilled lens does nothing. Budget writing time, not typing time —
 [Step 4 in the adoption half](#connecting-in-four-steps) states the cost and the two things that
 reliably surface while you do it.
+
+### Switching workflows
+
+Exactly one workflow plugin may be enabled at a time — `workflow-default` or `workflow-davekjohn`, never
+both — because two would hand the specialists two different answers to "how does work move through this
+repo" with no way to tell which one is yours (see
+[Teams and workflows](../README.md#teams-and-workflows--whats-the-difference) in the root README). To
+switch, flip the two `enabledPlugins` keys, then repeat Step 1's refresh + install for the newly enabled
+one and restart. Moving **onto** `workflow-davekjohn` also asks your repo for two files it reads —
+`scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1` — which the next `specialists-init` run
+scaffolds. Moving **onto** `workflow-default` needs nothing further: it reads what your repo already
+states and writes one document the first time its skill runs.
 
 ### Staying up to date — the two commands
 
@@ -146,22 +164,26 @@ charge: the governance (your `CLAUDE.md`, your safety rules) remains yours; the 
 the team and its playbooks.
 
 The system consists of **teams and a workflow**: the repo-neutral core team `team-alpha` (always
-enable it), three optional add-on teams, and one optional **way-of-working** plugin. Which specialists
-live in which plugin and who they are meant for is covered in the [root README](../README.md).
+enable it), three optional add-on teams, and exactly one **way-of-working** plugin, chosen from the two
+the marketplace offers. Which specialists live in which plugin and who they are meant for is covered in
+the [root README](../README.md).
 
-**The workflow plugin is different in kind, so decide about it deliberately rather than by habit.**
-`workflow-davekjohn` carries no specialists at all — it is DaveKJohn's own branch,
+**The workflow slot is different in kind, so decide about it deliberately rather than by habit — and
+decide is the right word, because leaving it empty is no longer the default it once was.** Two plugins
+answer "how does work move through this repo," and exactly one may be enabled: `workflow-default`, which
+imposes nothing and asks the specialists to read what your repo already states about its own
+conventions, and `workflow-davekjohn`, which carries no specialists at all but is DaveKJohn's own branch,
 changelog and release method as skills plus scripts (`new-branch`, `open-pr`, `ship-pr`,
-`fold-changelog`, `cut-release`, `park`, `fix-mojibake`). Enable it only if you want *that* workflow in
-your repo. **Leave it off and nothing is broken:** the specialists do branches and PRs with plain
-`git`/`gh`, following whatever conventions your repo already has. Two consequences worth knowing before
-you choose:
+`fold-changelog`, `cut-release`, `park`, `fix-mojibake`). **`workflow-default` is the one this page's
+default settings block enables, and it is the one to leave enabled** unless you deliberately want
+`workflow-davekjohn`'s method instead. Two consequences worth knowing before you switch to it:
 
-- **Enabling it later is a plain enable + re-run of `specialists-init`**, which then adds the config it
-  needs. Nothing has to be undone first.
-- **If you enable it, your repo owes it two files** — `scripts/repo-config.ps1` (repo name, lint gate)
+- **Switching onto it later is a plain enable + re-run of `specialists-init`**, which then adds the
+  config it needs. Nothing has to be undone first.
+- **Enabling it makes your repo owe it two files** — `scripts/repo-config.ps1` (repo name, lint gate)
   and `scripts/lib/branch-info.ps1` (your branch-prefix table). `specialists-init` scaffolds both, and a
-  session check tells you if a function is missing. Without the workflow you are asked for neither.
+  session check tells you if a function is missing. On `workflow-default` you are asked for neither —
+  it reads your repo instead of asking you to configure it.
 
 ### Before you start
 
@@ -315,8 +337,10 @@ not be.
 > one. On the fresh profile this was measured on, neither existed yet, and one consumer reasonably read
 > *"in your repo's `.claude/`"* as something still to be **installed** rather than **created**.
 
-Set the marketplace source and the plugins you want in it (always the core team; an add-on team only if
-your repo has that domain). What follows is a **complete, pasteable file** — if you already have a
+Set the marketplace source and the plugins you want in it (always the core team; always exactly one
+workflow — `workflow-default` unless you deliberately want `workflow-davekjohn`'s method instead, see
+[Switching workflows](#switching-workflows) in the quickstart half; an add-on team only if your repo has
+that domain). What follows is a **complete, pasteable file** — if you already have a
 `.claude/settings.json`, merge these two keys into the object that is there instead of pasting over it:
 
 ```json
@@ -327,7 +351,8 @@ your repo has that domain). What follows is a **complete, pasteable file** — i
     }
   },
   "enabledPlugins": {
-    "team-alpha@claude-code-specialists": true
+    "team-alpha@claude-code-specialists": true,
+    "workflow-default@claude-code-specialists": true
   }
 }
 ```
@@ -381,6 +406,7 @@ of your repo, preceded once by a refresh of that cached clone:
 ```powershell
 claude plugin marketplace update claude-code-specialists                     # 1. refresh the cache first
 claude plugin install team-alpha@claude-code-specialists --scope project    # 2. then install, per plugin
+claude plugin install workflow-default@claude-code-specialists --scope project    # 2. then install, per plugin
 # and line 2 again for each add-on team you enabled
 ```
 
@@ -572,7 +598,9 @@ gets everything under `created`, which is the sample above. A repo that already 
 `scripts/repo-config.ps1` sees that one move to `already present` instead. So a figure that is *higher*
 than the sample is not an error, and neither is one that is lower: what matters is that each pair adds up
 and that the skill names anything it skipped. If you enabled an add-on team as well, expect its
-specialists on top of these.
+specialists on top of these. `workflow-default`, on the other hand, changes nothing here: it carries no
+specialists and needs no script scaffold, so this sample's numbers hold whether or not it is enabled
+alongside `team-alpha`.
 
 > The sample above was itself the finding: until August 2, 2026 it showed `0 script-scaffold(s) created,
 > 2 already present` — captured in a repo that already had them, and therefore inverted for exactly the
