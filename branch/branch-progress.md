@@ -1,16 +1,13 @@
-## `docs/release-readme-tier-model` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] Measure every tier/gate claim in `releases/README.md` against `release-lib.ps1` and `cut-release.ps1`
-- [x] Correct the bump table and its two reasoning paragraphs (patch/minor/major)
-- [x] Correct the gate's off-switch: declarations counted, not sections
-- [x] Correct the entry-shape claims: `### Significance`, not the impact table; six sections, not three
-- [x] Correct the writer and the fold: `new-branch.ps1`, verbatim fold, legacy `Tier: N` kept
-- [x] Correct the highlights condition to the measured pair (seam bump AND tier-2 pending)
-- [x] Correct the development-note and internal-note structure paragraphs
-- [x] Correct the root README's `cut-release.ps1` "not mirrored" claim and its stale citation
-- [x] Lint + tests green
-
-### Where I left off
-
+_(filled in when a branch is created)_
