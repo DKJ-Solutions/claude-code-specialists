@@ -169,10 +169,10 @@
     added, and any section a consumer's template carries that this script did not write (the "Type of
     change" boxes and the checklist, where those still exist) stay exactly as they are.
 
-    WHICH heading carries the description is read from the template's first '## ' line, so renaming it
-    needs no change here -- but a PR opened BEFORE such a rename carries the old heading in its body,
-    and the rename would make it unrefreshable. So the legacy headings are tried as a fallback when the
-    current one is not found (#538, which renamed this repo's to '## Changelog entry').
+    WHICH heading carries the description is read from the template's FIRST heading, at any level, so
+    renaming or re-levelling it needs no change here -- but a PR opened BEFORE such a change carries the
+    old heading in its body, and it would then be unrefreshable. So the headings this repo has published
+    under are tried as a fallback when the current one is not found.
 
     OPT-IN ON PURPOSE, and the default silence is the safer half: a body may have been edited on
     github.com, and refreshing on every run would overwrite those edits without being asked. So the
@@ -688,19 +688,25 @@ if ($existingPr) {
     }
 
     if ($RefreshBody) {
-        # The heading that carries the description is the FIRST '## ' line of the PR template -- the one
-        # the placeholder sits under, so the template answers this instead of a new repo-config seam a
+        # The heading that carries the description is the FIRST heading of the PR template -- the one the
+        # placeholder sits under, so the template answers this instead of a new repo-config seam a
         # consumer would have to set. If the template is missing or has no such heading there is nothing
         # to refresh, and that is a warning rather than a failure: the branch is pushed and the PR is
         # open, which is the outcome the caller asked for.
+        #
+        # ANY LEVEL, not '## ' (August 9, 2026). This matched two hashes exactly, from a time when every
+        # template started at H2. The moment this repo's template was promoted to H1 that pattern found
+        # nothing, and -RefreshBody would have degraded to its warning branch on every run -- a silent
+        # loss of the whole feature, reported as "the description was left as it is", which reads like a
+        # decision rather than a miss.
         $descHeading = ''
         $templateForHeading = Join-Path $repoRoot ".github\pull_request_template.md"
         if (Test-Path -LiteralPath $templateForHeading) {
             $descHeading = (Get-Content -LiteralPath $templateForHeading -Encoding UTF8 |
-                Where-Object { $_ -match '^##\s+\S' } | Select-Object -First 1)
+                Where-Object { $_ -match '^#{1,6}\s+\S' } | Select-Object -First 1)
         }
         if (-not $descHeading) {
-            Write-Warning "-RefreshBody: no '## ' heading found in .github/pull_request_template.md - the description was left as it is."
+            Write-Warning "-RefreshBody: no heading found in .github/pull_request_template.md - the description was left as it is."
         } elseif (-not $entryDescription) {
             # The resolved path, not a name rebuilt from the branch: which of the two forms was actually
             # read is the first thing the reader needs in order to open the right file.
@@ -720,7 +726,14 @@ if ($existingPr) {
             # never searched for a legacy one, and a genuine no-op still reports as a no-op. Each is a
             # heading this repo or a consumer has actually shipped.
             if (-not $refreshed) {
-                foreach ($legacyHeading in @('## Changelog entry', '## What does this change do?', '## Wat doet deze wijziging?')) {
+                # Every heading this repo has published a PR under, newest first. The H2 form of the
+                # current wording is on the list because it was live for a single day -- long enough for
+                # open PRs to carry it, which is the only thing that decides membership here.
+                foreach ($legacyHeading in @(
+                    '## What does the change on this branch bring to main?',
+                    '## Changelog entry',
+                    '## What does this change do?',
+                    '## Wat doet deze wijziging?')) {
                     if ($legacyHeading -eq $descHeading.Trim()) { continue }
                     $newBody = Update-PrBodySection -Body $newBody -Heading $legacyHeading -Content $entryDescription -Changed ([ref]$refreshed)
                     if ($refreshed) { $descHeading = $legacyHeading; break }

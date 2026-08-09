@@ -143,7 +143,39 @@ function Get-PrDescription {
     }
 
     if ($start -lt 0 -or ($start + 1) -ge $end) { return '' }
-    return (($lines[($start + 1)..($end - 1)]) -join "`n").Trim()
+    $slice = @($lines[($start + 1)..($end - 1)])
+
+    # PROMOTED ONE LEVEL (Dave, August 9, 2026). In the entry file the sections are H3 and the tiers H4,
+    # because the entry itself is an H2 -- it is one block among many in CHANGELOG.md. A PR body is not:
+    # it is a document of its own, whose own title is the heading GitHub prints above it. Carrying the
+    # entry's levels across left the body starting at H2 with tiers at H4, which reads as a fragment of
+    # something larger, and it is:
+    #
+    #   in the entry / CHANGELOG.md          in a PR body
+    #   ## `fix/x` changelog                 (the PR title, not part of the body)
+    #   ### What does the change...          # What does the change...
+    #   ### Significance                     ## Significance
+    #   #### Tier 0                          ### Tier 0
+    #
+    # CHANGELOG.md and the release documents are untouched: this shifts the COPY that goes into the PR,
+    # at the one point where that copy is made. The record keeps the levels the fold and the renderers
+    # depend on.
+    #
+    # Fence-aware for the reason the boundary search above is, and floored at 1 -- a heading cannot be
+    # promoted past H1, and a body that already starts at H1 is returned as it is rather than mangled.
+    $inFence = $false
+    $promoted = foreach ($line in $slice) {
+        if ($line -match '^\s*(```|~~~)') { $inFence = -not $inFence; $line; continue }
+        if ($inFence) { $line; continue }
+        $m = [regex]::Match($line, '^(#+)(\s+\S.*)$')
+        if ($m.Success -and $m.Groups[1].Value.Length -gt 1) {
+            ('#' * ($m.Groups[1].Value.Length - 1)) + $m.Groups[2].Value
+        } else {
+            $line
+        }
+    }
+
+    return ((@($promoted)) -join "`n").Trim()
 }
 
 function Get-PrTitle {

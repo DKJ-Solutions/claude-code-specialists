@@ -262,13 +262,30 @@ function New-ResolvesBlock {
         distribute a single keyword over a list, so `Closes #331, #332` closes only #331 and leaves
         the second silently open -- the exact failure mode this whole gate exists to prevent.
         Returns '' for an empty set, so a caller can append unconditionally.
+
+    .PARAMETER Issues
+        The issue numbers this PR closes. Non-positive numbers are ignored; duplicates collapse.
+
+    .PARAMETER Level
+        The heading level of the block, defaulting to 2 -- what every body carried before the PR body's
+        headings were promoted (Dave, August 9, 2026). It is a PARAMETER rather than a constant because
+        the block must be a SIBLING of the description, not a child of it, and that is not decoration:
+        -RefreshBody replaces the description section by scanning forward to the next heading at the
+        description's level or shallower. A body whose description is H1 with a '## Resolved issues'
+        under it would have its closing keywords SWALLOWED by the next refresh -- the block deleted,
+        GitHub closing nothing at the merge, which is the #341-#343 failure arriving through the door
+        that was built to prevent it. Add-ResolvesBlock reads the level off the body rather than making
+        the caller state it, so a consumer whose template is still H2 keeps an H2 block.
     #>
-    param([int[]]$Issues)
+    param(
+        [int[]]$Issues,
+        [ValidateRange(1, 6)][int]$Level = 2
+    )
 
     $unique = @($Issues | Where-Object { $_ -gt 0 } | Sort-Object -Unique)
     if ($unique.Count -eq 0) { return '' }
 
-    $lines = @('## Resolved issues', '')
+    $lines = @((('#' * $Level) + ' Resolved issues'), '')
     foreach ($n in $unique) { $lines += "Closes #$n" }
     return ($lines -join "`n")
 }
@@ -281,6 +298,16 @@ function Add-ResolvesBlock {
     .DESCRIPTION
         Idempotent per issue: a number the body already closes is not added a second time, so
         re-running against an already-annotated body is a no-op rather than a duplicate block.
+
+        THE BLOCK MATCHES THE BODY'S OWN TOP LEVEL, read off its first heading outside a fence. Derived
+        rather than passed, because this is called from three places on two paths (a fresh auto-filled
+        template, a caller-supplied -Body, and an already-open PR's published body) and each of those can
+        legitimately differ: this repo's template is H1 since August 9, 2026, a consumer's is still H2,
+        and a hand-written -Body is whatever its author wrote. Reading the answer off the text is the
+        only form that is right for all three without a knob anyone has to remember to set.
+
+        Why it matters is in New-ResolvesBlock's -Level: a block deeper than the description is inside
+        it, and the next -RefreshBody deletes it along with the description it replaces.
     #>
     param(
         [string]$Body,
@@ -289,7 +316,17 @@ function Add-ResolvesBlock {
 
     $already = @(Get-ClosedIssueNumbers -Text $Body)
     $missing = @($Issues | Where-Object { $_ -gt 0 -and $already -notcontains $_ } | Sort-Object -Unique)
-    $block = New-ResolvesBlock -Issues $missing
+
+    $level = 2
+    $inFence = $false
+    foreach ($line in ($Body -split "\r?\n")) {
+        if ($line -match '^\s*(```|~~~)') { $inFence = -not $inFence; continue }
+        if ($inFence) { continue }
+        $m = [regex]::Match($line, '^(#+)\s+\S')
+        if ($m.Success) { $level = [Math]::Min(6, $m.Groups[1].Value.Length); break }
+    }
+
+    $block = New-ResolvesBlock -Issues $missing -Level $level
     if (-not $block) { return $Body }
     if (-not $Body) { return $block }
 
