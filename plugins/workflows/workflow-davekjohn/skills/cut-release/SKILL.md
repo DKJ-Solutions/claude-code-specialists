@@ -193,6 +193,31 @@ each command as you go — do not skip a step or reorder them from memory.
    1,034, below the marker, because it arrived on a `chore/` branch. The tier selection removes the second
    half of that problem; the rewrite is still yours.
 
+   **Seven tests, taken from the field rather than from taste** (August 10, 2026). Five dev-tool changelogs
+   were read before this list was written — Linear, Stripe, Vercel, Raycast and GitHub — because the failure
+   this is written against is not sloppiness but *audience drift*: a maintainer editing the draft keeps
+   writing for the reader they have been writing for all week. Hold the finished page against each of these.
+
+   | | the test | what the field does |
+   |---|---|---|
+   | 1 | **Every item opens with what the reader can now do**, in the second person. | Linear: *"You can now edit text with Linear Agent."* · Vercel: *"Deploy a `Bun.serve()` server to Vercel Functions."* |
+   | 2 | **No internal metric or process decision.** The test is not "is it measured" but *does it describe our effort or their outcome*. | Raycast's changelog contains *zero* references to internal decision-making or development metrics. Linear's one internal figure is one the reader can use: *"resolves roughly 30% of incoming bug reports."* |
+   | 3 | **Ordered by urgency, action at the top.** If the most useful part is at the bottom, the page is upside down — and telling the reader to scroll is the symptom, not the fix. | React's 19 upgrade guide orders its whole contents by urgency: install → codemods → breaking → deprecations → notable. |
+   | 4 | **Say "no action needed" explicitly, or say exactly what the action is.** | Stripe carries a `Breaking change? Yes/No` field on *every* entry rather than leaving it to be inferred. |
+   | 5 | **A silent failure gets its visible symptom.** "It fails quietly" is a category; what the reader can check is a fact. | React 19 quotes the actual console message and names who is affected. |
+   | 6 | **Short, and link out.** Detail belongs in the document written for the reader who wants it. | Vercel runs 2–4 sentences per entry; Stripe runs a title plus a link. |
+   | 7 | **Never link the reader into a tier written for somebody else.** | The industry equivalent is GitHub, which keeps a terse engineering changelog *separate* from its readable announcements rather than pointing one at the other. |
+
+   **Only the seventh is a gate, and that was measured too.** In this family's own repo,
+   `check-plugin-integrity.ps1` refuses a consumer document that links into `development/` or `internal/` —
+   a rule born with **2 findings, both real**, both of which had been inviting a paying reader into the
+   per-PR record. Two neighbouring rules were measured on the same tree and **declined**: "no significance
+   score in this document" produced 4 findings, all false, and "no branch name or PR number" produced 3, all
+   false — every one of them a release whose subject *was* the entry format, quoting the shape it was
+   announcing. The other six tests therefore stay prose that a person applies, because no regex separates an
+   illustration from a leak. **If you adopt this list, adopt the measurement with it**: run the seven over
+   your own last few consumer documents before deciding which one your repo can afford to automate.
+
 4. **Ship the hand-written documents via a branch + PR.** The internal note and the edited consumer
    draft are both written after the cut, and `cut-release.ps1` has already committed and tagged by
    then — so neither can ride along on the release commit, and neither is one of the two named

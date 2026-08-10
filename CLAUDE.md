@@ -521,6 +521,36 @@ The constitution above, concretely implemented here:
      `Get-ReleaseHighlightsStakeholderTypes` and `Get-ReleaseHighlightsWording` keep their names too — they
      name functions that no longer exist under any name.
 
+     **AND THE DOCUMENT NOW HAS A WRITING NORM, WITH EXACTLY ONE OF ITS SEVEN TESTS AS A GATE** (Dave,
+     August 10, 2026). The rename came out of reviewing `v4.0.0`'s own consumer document against the
+     question *"is this written for someone who paid for the product?"*, and the answer was: partly. Of its
+     four substantive blocks one was in the second person; it opened with **"twenty-one releases and
+     fifty-one pull requests in ten days"** (our effort, not their outcome), carried a full block about a
+     lint check we measured and declined (tier-0 material in a tier-2 document), used in-house vocabulary
+     (*"against the tree they describe"*), had to tell the reader to skip to the bottom for the useful part,
+     and linked them into the development notes. The seven tests are in the
+     [`cut-release` skill](plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md) — the portable
+     half, so a consumer receives them — each one carried by what a named dev-tool changelog actually does.
+
+     **The split between prose and gate was measured, not assumed, and that is the transferable part.**
+     Three candidate rules were run over this repo's eleven consumer documents:
+
+     | candidate rule | findings | true | verdict |
+     |---|---|---|---|
+     | links into `development/` or `internal/` | 2 | **2** | **built** — lint check 25 |
+     | a significance score in the document | 4 | 0 | declined |
+     | a branch name or PR number in the document | 3 | 0 | declined |
+
+     Both declined rules fail on the same document and for the same reason: `v3.7.0`'s release **was about
+     the entry format**, so its consumer document correctly quotes `#### Tier 2`, `**Score:** N/A` and
+     `` ## `feat/your-branch` changelog `` as illustrations of the shape it was announcing. **No regex
+     separates an illustration from a leak**, and both would have needed an exemption list on the day they
+     landed — the shape this repo has already been bitten by. Check 25 escapes it by reading the link
+     **target** only: a path in prose is
+     [check 4's declined territory](#claude-code-specialistss-safety-implementation) (124 findings, none
+     real), while a link is not a path being discussed but a destination being offered, and whose repo it
+     lives in stops being ambiguous. The other six tests stay prose that a person applies.
+
      **The release documents follow the same flat shape**, and that deletion is part of the decision rather
      than a tidy-up alongside it: the category grouping (`## Features`, `## Fixes`, …) is gone, together with
      `Format-CategorizedEntries`, the category labels and the `Get-ReleaseCategoryTitles` seam. It grouped on

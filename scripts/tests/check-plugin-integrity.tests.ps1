@@ -1939,6 +1939,60 @@ try {
     Assert-True ($p5.Out -match '\[pr-template\] checked 1') `
         'pr-template: and the coverage line says so, instead of reporting the same number as a full run'
 
+    # --- check 25: the consumer document does not misroute its own reader -----------------------------
+    # 62-67. The defect is measured rather than imagined: on the day this landed, TWO of eleven consumer
+    #        documents linked into releases/development/, the tree defined as "only this repo's own
+    #        developers", and both labelled it invitingly ("The full recap is in the release notes").
+    #        What has to be asserted is not only that a link is caught, but the three ways this check is
+    #        deliberately NARROWER than the obvious version -- each of those is a false finding it would
+    #        otherwise produce on this repo's own tree.
+    Write-Host "  check 25: a consumer document does not link into another tier" -ForegroundColor DarkCyan
+    $ctrDir = Join-Path $Fixture 'releases\consumer\9.x'
+    New-Item -ItemType Directory -Path $ctrDir -Force | Out-Null
+    $ctrDoc = Join-Path $ctrDir '9.0.0.md'
+
+    # 62. The measured defect itself, in the exact shape it had.
+    [System.IO.File]::WriteAllText($ctrDoc,
+        "# Release notes v9.0.0`n`nThe full recap is in the [release notes](../../development/9.x/9.0.0.md).`n", $Utf8NoBom)
+    $t1 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($t1.Out -match "\[consumer-tier\].*links into 'development/'") `
+        'consumer-tier: a link into the development tree is reported'
+    Assert-True ($t1.Out -match 'line 3') `
+        'consumer-tier: and the finding names the LINE, so the repair does not need a search'
+    # The internal tier too -- tier 1 is not this document's reader either, and a check that knew only
+    # about tier 0 would wave through the nearer half of the same mistake.
+    [System.IO.File]::WriteAllText($ctrDoc,
+        "# Release notes v9.0.0`n`nSee the [summary](../../internal/9.x/9.0.0.md).`n", $Utf8NoBom)
+    $t2 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($t2.Out -match "\[consumer-tier\].*links into 'internal/'") `
+        'consumer-tier: a link into the internal tree is reported too'
+
+    # 63. THE LINK TEXT IS NOT THE TARGET. v3.7.0's real consumer document writes ABOUT the tiers, and a
+    #     check matching anywhere on the line would accuse it. This is the first of the three narrowings.
+    [System.IO.File]::WriteAllText($ctrDoc,
+        "# Release notes v9.0.0`n`nThe development notes carry the full record; see [the tier model](../../README.md).`n", $Utf8NoBom)
+    $t3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($t3.Out -match '\[consumer-tier\] releases')) `
+        'consumer-tier: a tier NAMED in prose or link text is not a finding -- only the link target counts'
+
+    # 64. A link to another CONSUMER document is the correct thing to offer, and the most common one.
+    [System.IO.File]::WriteAllText($ctrDoc,
+        "# Release notes v9.0.0`n`nStart at [the v3.2.0 notes](../3.x/3.2.0.md).`n", $Utf8NoBom)
+    $t4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($t4.Out -match '\[consumer-tier\] releases')) `
+        'consumer-tier: a link to another consumer document clears the check'
+    Assert-True ($t4.Out -match '\[consumer-tier\] checked \d+') `
+        'consumer-tier: and the coverage line proves a document was actually read, not skipped into silence'
+
+    # 65. NO CONSUMER TREE IS NOT A FINDING -- that is the tier switched off, which is the default for
+    #     every consumer that has not opted into it. Refusing here is how a gate gets switched off.
+    Remove-Item -Recurse -Force -LiteralPath (Join-Path $Fixture 'releases\consumer') -ErrorAction SilentlyContinue
+    $t5 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($t5.Out -match '\[consumer-tier\] releases')) `
+        'consumer-tier: a repo with no consumer tier is not accused of anything'
+    Assert-True ($t5.Out -match '\[consumer-tier\] checked 0') `
+        'consumer-tier: and it says so, rather than reporting the same coverage as a full run'
+
     # --- Scenario 55: A MARKETPLACE THAT DOES NOT PARSE STILL LEAVES A REPORTING GATE ----------------
     # 55. The lint reads the plugin set from marketplace.json now, and the whole point of doing that
     #     inside a swallowing try/catch is that the file it reads can be broken. Measured while this was
