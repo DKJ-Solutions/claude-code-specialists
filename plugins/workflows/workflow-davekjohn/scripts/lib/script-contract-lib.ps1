@@ -19,6 +19,13 @@
     re-declare the function list, which is the second-literal shape this repo has been bitten by often
     enough to have a name for it: a new record silently falls out of one of the two copies.
 
+    IT ALSO SUPPLIES THE REACHABILITY MODEL (inbound #580, August 10, 2026): Test-ContractLibReachable
+    and the AST walk under it. A record says a shared script CALLS a repo-owned function; whether that
+    claim can hold at all is whether the script ever dot-sources the lib the function lives in, and
+    until #580 nothing anywhere modelled it. The walk lives HERE rather than in the check because the
+    claim it tests is the record's, and because the suite has to be able to test it without running the
+    check -- the same two reasons the records themselves moved out of the check.
+
     No Set-StrictMode here: dot-sourcing would change the strict mode of the calling script.
     Pure ASCII (repo convention for .ps1).
 #>
@@ -84,6 +91,31 @@ $script:ContractRecords = @(
     @{ Lib = 'scripts\lib\branch-info.ps1'; Function = 'Test-BranchName'; Scripts = @('new-branch');
        Adopt = 'decide'; AdoptWhy = "the validation logic is generic, but one of its hard rejects is not: it refuses 'chore/' outright, which is this repo's rule and was written down as one that must NOT reach a consumer who legitimately runs chore/ branches. Copying the function would impose exactly that";
        Returns = 'an object with IsValid plus a Reason when invalid; reject an empty name and the main branch' },
+    # THE RECORD INBOUND #580 WAS FILED ABOUT, and it is the first one declared for a function nothing
+    # CALLS directly: entry-scaffold-lib's Get-ReleaseChangeTypes PROBES for it with Get-Command and falls
+    # back to the canonical four. That probe is the right design -- branch-info.ps1 is repo-owned and does
+    # not travel, so 'absent' is the ordinary case in a consumer -- and it is precisely why the gap was
+    # silent for so long: nothing crashes, nothing warns, the fallback simply answers a question it was
+    # never asked.
+    #
+    # WHAT THE FALLBACK COSTS IS NOT A DEGRADED FOLD BUT A REFUSED ONE, which is why the Default below says
+    # so in those words. A consumer whose branch table produces types outside Feat/Fix/Docs/Chore ('Liquid',
+    # 'Tooling') gets every such entry read as declaring no type at all: under 4.0.0 that was silent -- the
+    # internal note dropped the type off every bullet it took from a historical heading -- and since 4.1.0
+    # the fold names those H2 blocks and refuses the document. The refusal is an improvement over the
+    # silence; what was missing is any way to learn it before the fold.
+    #
+    # AND IT IS THE RECORD THE REACHABILITY WALK EXISTS FOR. Declaring it fixes one function; it is
+    # reported unreachable wherever the calling script never loads branch-info.ps1, which is what turns the
+    # class from invisible into a named line. A consumer closes it by making the seam reachable through the
+    # one file every shared script loads -- chaining branch-info.ps1 from their own repo-config.ps1, the
+    # repair the reporting consumer made -- or leaves it, which is correct wherever the canonical four ARE
+    # the repo's types.
+    @{ Lib = 'scripts\lib\branch-info.ps1'; Function = 'Get-BranchTypes'; Scripts = @('fold-changelog-entry', 'cut-release', 'new-internal-note');
+       Adopt = 'decide'; AdoptWhy = "the same reason as the two records above: it is a projection of the branch-prefix table, which branch-info.ps1 says of itself is repo-owned and does not travel. Copying this repo's four types into a repo that produces 'Liquid' or 'Tooling' states somebody else's table as theirs, and the value is indistinguishable from the built-in fallback, so a copy also hides whether the seam was ever answered";
+       ViaLib = 'entry-scaffold-lib';
+       Optional = $true; Default = "the canonical four (Feat, Fix, Docs, Chore) -- which REFUSES the fold for a repo whose types differ, rather than degrading it";
+       Returns = "the changelog types this repo's own branch table produces, as an array of strings in the order the release documents should read them -- a projection of that table, never a second list beside it. Two readers, and they use it differently: recognition (which H2 blocks in CHANGELOG.md are entries, and what the type field of a pre-format heading says) falls back to Feat/Fix/Docs/Chore where this function is out of scope, so a repo producing other types has every such entry read as typeless and its fold REFUSED by name; validation (is a declared type one this repo produces) only fires where the function is genuinely reachable. Being present is not enough -- the script that reads it has to load the lib" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-RepoName';    Scripts = @('open-pr', 'fold-changelog-entry', 'ship-pr', 'verify-resolved-issues');
        Adopt = 'decide'; AdoptWhy = "the one value here where copying is actively destructive rather than merely wrong: it would point every gh call in the consumer at the SOURCE repo, so a PR or a merge lands in somebody else's repository";
        Returns = "this repo as 'owner/name', the form ``gh --repo`` takes" },
@@ -282,3 +314,231 @@ $script:ContractRecords = @(
        Optional = $true; Default = 'the English headings and hints';
        Returns = "overrides for the internal note's own text, merged over the English defaults: Title, AudienceLabel, Audience, SkeletonNote, SectionChanged, SectionValue, HintValue, SectionOpen, HintOpen, NoEntries and Unknown -- the document is read by this repo's own colleagues, so its language is the repo's rather than the script's" }
 )
+
+# --- Reachability: is a record's Lib in scope for the script that reads it? (inbound #580) ---------
+#
+# A CONTRACT RECORD MAKES TWO CLAIMS AND ONLY ONE OF THEM WAS EVER CHECKED. "Get-RepoName lives in
+# scripts\repo-config.ps1" is presence, which the check probes by dot-sourcing that lib in isolation.
+# "fold-changelog-entry calls it" is REACHABILITY, and a lib the calling script never dot-sources is not
+# in scope at runtime however present it is. The reported instance is Get-BranchTypes: a consumer whose
+# branch table produces types outside the canonical four had every folded entry read as typeless, then --
+# once the fold learned to say so -- a refused fold, while a record declaring the function would have
+# reported [OK] the whole time.
+#
+# WHY IT MUST BE THE AST AND NOT A TEXT MATCH, measured over this tree on August 10, 2026 before any of
+# it was built. Three candidate rules were run over the declared records and over the reported defect:
+#
+#   rule                                     findings  true  why it lost
+#   text mention of the lib leaf                    0     0  fold-changelog-entry.ps1 NAMES branch-info.ps1
+#                                                            in a comment, so the defect reports green
+#   ViaLib may satisfy reachability                 0     0  fold reaches entry-scaffold-lib, which merely
+#                                                            PROBES for the function -- green on the one
+#                                                            record the rule exists for
+#   AST, literals and named variables only          3     0  false on the '& { . $args[0] }' child-scope
+#                                                            idiom (check-roster-sync x2, fix-mojibake)
+#
+# So ViaLib is deliberately NOT an escape hatch here: it names the PLUGIN lib a function is reached
+# through, which is a different question from whether the CONSUMER lib is loaded, and letting it answer
+# both is how the rule would have been born blind to its own case.
+#
+# PATHS, NOT LEAF NAMES, and that distinction is the whole difference between telling a consumer the
+# truth about their repo and telling them the truth about this one. release-lib.ps1 dot-sources its
+# SIBLING branch-info.ps1 behind a Test-Path: in this workshop the two are siblings and the sibling is
+# there, so new-internal-note genuinely reaches Get-BranchTypes here -- and in the plugin mirror
+# branch-info.ps1 is absent (it is repo-owned and does not travel), so the same script does not. A walk
+# collecting leaf NAMES would report this repo's answer at every consumer.
+
+# The parse cache for the walk below -- see Get-ScriptDotSourceTargets for what it costs without one.
+# Assigned here rather than on first use because every caller runs under Set-StrictMode -Version Latest.
+$script:DotSourceCache = @{}
+
+function Get-AstPathHints {
+    <# The string literals and the base a path expression is built from, as
+       @{ Literals = @(...); FromScriptRoot = $bool; FromRepoRoot = $bool }. $VarMap carries the same
+       shape per variable name so '. $configPath' resolves through its assignment, which is how three of
+       the four dot-source shapes in this tree are written. #>
+    param($Ast, [hashtable]$VarMap, [hashtable]$ArgMap, [int]$Depth = 0)
+
+    $hints = @{ Literals = @(); FromScriptRoot = $false; FromRepoRoot = $false }
+    if ($null -eq $Ast -or $Depth -gt 4) { return $hints }
+
+    foreach ($n in $Ast.FindAll({ $true }, $true)) {
+        if ($n -is [System.Management.Automation.Language.StringConstantExpressionAst]) {
+            $hints.Literals += $n.Value
+            continue
+        }
+        if ($n -isnot [System.Management.Automation.Language.VariableExpressionAst]) { continue }
+
+        $name = $n.VariablePath.UserPath
+        if ($name -eq 'PSScriptRoot' -or $name -eq 'PSCommandPath') { $hints.FromScriptRoot = $true; continue }
+        if (@('repoRoot', 'RepoRoot') -contains $name) { $hints.FromRepoRoot = $true; continue }
+
+        # '. $args[0]' inside a '& { ... } $libPath' block -- the child-scope idiom the checks use to
+        # dot-source a consumer lib with StrictMode off. Resolved through the arguments the '&' call
+        # passed, which are themselves the variables handled above. This is the shape whose absence made
+        # the third candidate rule report three findings and get all three wrong.
+        if ($name -eq 'args') {
+            foreach ($a in @(Resolve-EnclosingBlockArgs -Ast $n -ArgMap $ArgMap)) {
+                $inner = Get-AstPathHints -Ast $a -VarMap $VarMap -ArgMap $ArgMap -Depth ($Depth + 1)
+                $hints.Literals += $inner.Literals
+                if ($inner.FromScriptRoot) { $hints.FromScriptRoot = $true }
+                if ($inner.FromRepoRoot) { $hints.FromRepoRoot = $true }
+            }
+            continue
+        }
+
+        if ($VarMap.ContainsKey($name)) {
+            $v = $VarMap[$name]
+            $hints.Literals += $v.Literals
+            if ($v.FromScriptRoot) { $hints.FromScriptRoot = $true }
+            if ($v.FromRepoRoot) { $hints.FromRepoRoot = $true }
+        }
+    }
+    return $hints
+}
+
+function Resolve-EnclosingBlockArgs {
+    <# The arguments the '&' call passed to the script block this AST node sits in, so a '$args' inside
+       it can be resolved. Walks up the parent chain: the block is the invoking command's first element
+       and its arguments are the rest. Returns @() when the node is not inside an invoked block, which is
+       the honest answer rather than a guess. #>
+    param($Ast, [hashtable]$ArgMap)
+
+    $node = $Ast
+    while ($null -ne $node) {
+        if ($node -is [System.Management.Automation.Language.ScriptBlockExpressionAst] -and $ArgMap.ContainsKey($node)) {
+            return @($ArgMap[$node])
+        }
+        $node = $node.Parent
+    }
+    return @()
+}
+
+function Get-ScriptDotSourceTargets {
+    <# Every EXISTING file this script dot-sources, as absolute paths. Resolved from the AST, so a
+       comment naming a lib is not mistaken for loading it -- the failure the text-match candidate showed
+       on the very record this exists for. A target that resolves to no existing file is dropped rather
+       than reported: an unresolvable path is not evidence that the lib IS loaded, and the caller's
+       question is only ever "is it". #>
+    param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$RepoRoot)
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return @() }
+
+    # MEMOISED, AND IT IS NOT AN OPTIMISATION THAT CAN BE SKIPPED. This check runs from a SessionStart
+    # hook, so its runtime is paid at every session. Measured when the walk was first wired in: 3,625 ms
+    # over the 23 records, essentially the whole cost of the check -- because the transitive closure
+    # re-parses the same libs for every record that reaches them, and entry-scaffold-lib.ps1 alone is
+    # over three thousand lines. The recursive directory scan was NOT the cost (108 ms per forty calls);
+    # re-parsing was. Keyed on the repo root too, since the same file resolves differently against a
+    # different consumer.
+    # DECLARED AT LOAD TIME, NOT LAZILY, and that is a strict-mode requirement rather than a style
+    # choice: every caller of this walk runs under Set-StrictMode -Version Latest, where reading an
+    # unset variable throws -- so even the "is it initialised yet" test would have to be the first
+    # thing to fail. See the assignment beside the records above.
+    $cacheKey = "$Path|$RepoRoot"
+    if ($script:DotSourceCache.ContainsKey($cacheKey)) { return @($script:DotSourceCache[$cacheKey]) }
+
+    $tokens = $null
+    $parseErrors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($Path, [ref]$tokens, [ref]$parseErrors)
+    if ($null -eq $ast) { return @() }
+
+    $fileDir = Split-Path -Parent $Path
+
+    # var name -> the hints of whatever it was assigned. Built before the dot-sources are walked, so the
+    # order inside the file does not matter.
+    $varMap = @{}
+    foreach ($a in $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true)) {
+        if ($a.Left -isnot [System.Management.Automation.Language.VariableExpressionAst]) { continue }
+        $varMap[$a.Left.VariablePath.UserPath] = (Get-AstPathHints -Ast $a.Right -VarMap @{} -ArgMap @{})
+    }
+
+    # script block -> the arguments it is invoked with, for the '$args' shape above.
+    $argMap = @{}
+    foreach ($c in $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.CommandAst] }, $true)) {
+        if ($c.CommandElements.Count -lt 2) { continue }
+        if ($c.CommandElements[0] -isnot [System.Management.Automation.Language.ScriptBlockExpressionAst]) { continue }
+        $argMap[$c.CommandElements[0]] = @($c.CommandElements[1..($c.CommandElements.Count - 1)])
+    }
+
+    $found = @()
+    foreach ($c in $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.CommandAst] }, $true)) {
+        if ($c.InvocationOperator -ne [System.Management.Automation.Language.TokenKind]::Dot) { continue }
+        if ($c.CommandElements.Count -lt 1) { continue }
+
+        $hints = Get-AstPathHints -Ast $c.CommandElements[0] -VarMap $varMap -ArgMap $argMap
+        foreach ($lit in @($hints.Literals)) {
+            if ($lit -notmatch '\.ps1$') { continue }
+
+            # Both bases are tried when the expression named neither -- a bare literal is ambiguous, and
+            # picking one base would invent an answer.
+            $bases = @()
+            if ($hints.FromScriptRoot) { $bases += $fileDir }
+            if ($hints.FromRepoRoot) { $bases += $RepoRoot }
+            if ($bases.Count -eq 0) { $bases = @($fileDir, $RepoRoot) }
+
+            foreach ($b in $bases) {
+                $resolved = Resolve-Path -LiteralPath (Join-Path $b $lit) -ErrorAction SilentlyContinue
+                if ($resolved) { $found += $resolved.Path }
+            }
+        }
+    }
+    $result = @($found | Sort-Object -Unique)
+    $script:DotSourceCache[$cacheKey] = $result
+    return $result
+}
+
+function Test-ContractLibReachable {
+    <# Is $LibRelPath (a record's Lib, relative to the consumer repo root) in scope for $ScriptPath at
+       runtime? Transitive: a script reaches a lib directly or through any lib it loads, which is the
+       route new-internal-note takes to entry-scaffold-lib (through release-lib) and the route a consumer
+       opens when they chain branch-info.ps1 from their own repo-config.ps1 -- the repair the consumer who
+       reported #580 made on their side, and the one this returns $true for. #>
+    param(
+        [Parameter(Mandatory)][string]$ScriptPath,
+        [Parameter(Mandatory)][string]$RepoRoot,
+        [Parameter(Mandatory)][string]$LibRelPath
+    )
+
+    $target = Resolve-Path -LiteralPath (Join-Path $RepoRoot $LibRelPath) -ErrorAction SilentlyContinue
+    # No such lib in this repo: absence is what the presence half of the check already reports, and
+    # calling it unreachable as well would print one gap twice under two names.
+    if (-not $target) { return $true }
+    $targetPath = $target.Path
+
+    $start = Resolve-Path -LiteralPath $ScriptPath -ErrorAction SilentlyContinue
+    if (-not $start) { return $true }
+
+    $seen = @{}
+    $queue = New-Object System.Collections.Queue
+    $queue.Enqueue($start.Path)
+
+    while ($queue.Count -gt 0) {
+        $current = $queue.Dequeue()
+        if ($null -eq $current -or $seen.ContainsKey($current)) { continue }
+        $seen[$current] = $true
+
+        foreach ($t in @(Get-ScriptDotSourceTargets -Path $current -RepoRoot $RepoRoot)) {
+            if ($t -eq $targetPath) { return $true }
+            if (-not $seen.ContainsKey($t)) { $queue.Enqueue($t) }
+        }
+    }
+    return $false
+}
+
+function Resolve-SharedScriptPath {
+    <# The file behind a record's Scripts name ('fold-changelog-entry'), searched under the scripts tree
+       this lib sits in -- the workshop's scripts/ at the source and the plugin's scripts/ in a consumer,
+       so one lookup serves both. Returns '' when there is no such file, and the caller then makes NO
+       reachability claim: check-roster-sync ships in a DIFFERENT plugin and 'cut-release skill' is not a
+       script at all, so an unresolvable name is a normal state rather than a finding. #>
+    param([Parameter(Mandatory)][string]$Name, [string]$ScriptsRoot = '')
+
+    if (-not $ScriptsRoot) { $ScriptsRoot = Split-Path -Parent $PSScriptRoot }
+    if (-not (Test-Path -LiteralPath $ScriptsRoot)) { return '' }
+
+    $hit = @(Get-ChildItem -LiteralPath $ScriptsRoot -Filter "$Name.ps1" -File -Recurse -ErrorAction SilentlyContinue |
+        Select-Object -First 1)
+    if ($hit.Count -gt 0) { return $hit[0].FullName }
+    return ''
+}

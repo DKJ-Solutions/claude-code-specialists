@@ -181,7 +181,7 @@ try {
     # select), Get-ReleaseCategoryTitles (no category headings to label) and Get-ChangelogReleaseWording (no
     # release-block text to override). Each is now asserted on ABSENCE from the register, further down.
     $okCount = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 20 $okCount 'happy path: exactly twenty [OK] lines -- every declared record this repo defines (four mandatory functions plus every optional: Get-LiveStage, the two Get-Roster* made optional by #445, the four Get-Entry* stub-wording knobs, Get-PrMergeMethod, Get-MojibakePaths, the cut-release knobs from #417 plus Get-ReleaseMajorMinMinors and Get-ReleaseHistoryPath, and the internal tier''s Get-InternalNoteWording, nothing else)'
+    Assert-Equal 21 $okCount 'happy path: exactly twenty-one [OK] lines -- every declared record this repo defines (four mandatory functions plus every optional: Get-LiveStage, the two Get-Roster* made optional by #445, the four Get-Entry* stub-wording knobs, Get-PrMergeMethod, Get-MojibakePaths, the cut-release knobs from #417 plus Get-ReleaseMajorMinMinors and Get-ReleaseHistoryPath, the internal tier''s Get-InternalNoteWording, and Get-BranchTypes from inbound #580, nothing else)'
     # inbound #203: the run names the root it inspected and how it resolved it. Asserted on the clean
     # run too, not only on a drifted one -- the [SCOPE] line is context that must always be emitted, so
     # that the hook has something to surface the moment a finding does appear.
@@ -196,7 +196,14 @@ try {
     # TWO, DOWN FROM FOUR: the superseded Get-ChangelogHeading and Get-ChangelogReleaseWording were both
     # among them, and both records retired with the flat changelog. Counted rather than named, deliberately
     # -- the number is what catches a record quietly gaining or losing an [INFO].
-    Assert-Match 'Summary: 0 error\(s\), 2 info signal\(s\)' $r.Out 'happy path: [SCOPE] is non-counting (0 errors, and only the deliberately-undefined seams)'
+    #
+    # FOUR SINCE INBOUND #580, and the extra two are worth reading carefully, because the same check run
+    # against THIS repo prints only one of them. A fixture consumer is a separate repo root, so the
+    # release-lib that new-internal-note loads is still the WORKSHOP's -- and the branch-info.ps1 sitting
+    # next to it is the workshop's too, not the fixture's. Its Get-BranchTypes is therefore genuinely not
+    # the one this consumer wrote, which is exactly the answer a real consumer needs and exactly what a
+    # walk over leaf NAMES would have got wrong.
+    Assert-Match 'Summary: 0 error\(s\), 4 info signal\(s\)' $r.Out 'happy path: [SCOPE] is non-counting (0 errors; the two deliberately-undefined seams, plus two reachability signals -- neither fold-changelog-entry nor new-internal-note can see this consumer''s Get-BranchTypes, which is the ordinary state for a repo that has not chained branch-info.ps1 into its repo-config)'
 
     # --- 2. Missing function in branch-info.ps1 (the exact #147 incident): Test-BranchName ---------
     #     new-branch crashed at runtime with "The term 'Test-BranchName' is not recognized" because
@@ -315,7 +322,7 @@ try {
         Assert-NotMatch $optFn $r.Out "optional Get-Pr*: '$optFn' never mentioned (not in the contract)"
     }
     $okCount6 = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 20 $okCount6 'optional Get-Pr*: still exactly twenty [OK] (the mandatory four + the declared optionals this repo defines; the four UNdeclared Get-Pr* excluded)'
+    Assert-Equal 21 $okCount6 'optional Get-Pr*: still exactly twenty-one [OK] (the mandatory four + the declared optionals this repo defines; the four UNdeclared Get-Pr* excluded)'
 
     # --- 6c. An optional contract function that is ABSENT -> [INFO] naming the fallback, exit 0 -----
     #     Get-ReleaseHistoryPath is declared Optional: the shared scripts fall back to 'releases/README.md',
@@ -375,7 +382,7 @@ try {
     Assert-Match ("\[INFO\].*'Get-EntryBodyHeading' missing.*falls back to '" + [regex]::Escape('**To do / where I left off:**') + "'") $r.Out 'stub wording absent: INFO for Get-EntryBodyHeading quotes the literal default heading'
     Assert-Match "\[INFO\].*'Get-EntryFallbackType' missing.*falls back to 'Chore'" $r.Out 'stub wording absent: INFO for Get-EntryFallbackType names the Chore default'
     $infoCount6e = @([regex]::Matches($r.Out, '\[INFO\]')).Count
-    Assert-Equal 6 $infoCount6e 'stub wording absent: exactly six [INFO] lines -- one per stripped knob, plus the two impact-table seams this repo deliberately never defines (their defaults are already its answers), and nothing else downgraded along with them. Was eight until the flat changelog retired the superseded Get-ChangelogHeading and Get-ChangelogReleaseWording records'
+    Assert-Equal 8 $infoCount6e 'stub wording absent: exactly eight [INFO] lines -- one per stripped knob, plus the two impact-table seams this repo deliberately never defines (their defaults are already its answers) and the two reachability signals on Get-BranchTypes, and nothing else downgraded along with them. Was eight until the flat changelog retired the superseded Get-ChangelogHeading and Get-ChangelogReleaseWording records, then six until inbound #580 added a record whose seam a consumer leaves unreachable'
 
     # --- 6f. NO CONTRACT RECORD MAY SPELL A REPORT MARKER IN ITS OWN TEXT --------------------------
     #     Measured while adding the tier records: a Returns line that mentioned the info marker made the
@@ -424,7 +431,7 @@ function Get-RosterIgnoredIds { return @() }
         Assert-Match "\[OK\]\s+'$fn' present in" $r.Out "strict-mode regression: '$fn' still reported OK"
     }
     $okCount6b = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 6 $okCount6b 'strict-mode regression: exactly six [OK] lines (all functions detected despite the loose top-level code)'
+    Assert-Equal 7 $okCount6b 'strict-mode regression: exactly seven [OK] lines (all functions detected despite the loose top-level code -- seven since inbound #580 declared Get-BranchTypes, which this fixture''s branch-info.ps1 also defines)'
 
     Write-Host "`n== script-contract.tests: contract-completeness drift guard ==" -ForegroundColor Cyan
     # Two-layered defense against the declared $script:Contract array in check-script-contract.ps1
@@ -454,6 +461,9 @@ function Get-RosterIgnoredIds { return @() }
     # count and this test goes red until a maintainer adds either a new $expectedContract entry (a real
     # shared script) or a new dedicated block (a skill or other non-mirrored attribution).
     . (Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1')
+    # The reachability walk (inbound #580) -- the ViaLib guard below asks it whether a script really
+    # reaches the lib its route runs through, instead of matching the file name in the script's text.
+    . $ContractLib
     $pairs = @(Get-SharedScriptPairs -RepoRoot $RepoRoot)
     $pairsByName = @{}
     foreach ($p in $pairs) { $pairsByName[$p.Name] = $p }
@@ -461,6 +471,11 @@ function Get-RosterIgnoredIds { return @() }
     $expectedContract = @(
         @{ Function = 'Get-BranchInfo';      Lib = 'scripts\lib\branch-info.ps1'; Scripts = @('new-branch', 'open-pr') },
         @{ Function = 'Test-BranchName';      Lib = 'scripts\lib\branch-info.ps1'; Scripts = @('new-branch') },
+        # INBOUND #580. The first record for a function nothing calls DIRECTLY -- entry-scaffold-lib probes
+        # for it with Get-Command and falls back to the canonical four -- so it carries a ViaLib, and it is
+        # the record whose route made that guard transitive: new-internal-note reaches entry-scaffold-lib
+        # through release-lib and names it nowhere in its own source.
+        @{ Function = 'Get-BranchTypes';      Lib = 'scripts\lib\branch-info.ps1'; Scripts = @('fold-changelog-entry', 'cut-release', 'new-internal-note'); ViaLib = 'entry-scaffold-lib' },
         @{ Function = 'Get-RepoName';         Lib = 'scripts\repo-config.ps1';     Scripts = @('open-pr', 'fold-changelog-entry', 'ship-pr', 'verify-resolved-issues') },
         # TWO CALLERS SINCE AUGUST 5, 2026 (inbound #464). cut-release resolved its gate by a fixed path
         # into the source repo, so a consumer's release ran without a lint gate at all -- and the release
@@ -533,7 +548,7 @@ function Get-RosterIgnoredIds { return @() }
 
     $contractSrc = [System.IO.File]::ReadAllText($ContractLib)
     $totalRecordCount = @([regex]::Matches($contractSrc, "Lib\s*=\s*'[^']+';\s*Function\s*=\s*'[^']+';\s*Scripts\s*=\s*@\(")).Count
-    Assert-Equal 22 $totalRecordCount 'contract: exactly twenty-two (lib, function) records declared in script-contract-lib.ps1 (the twenty-one below plus the dedicated Get-LiveStage block after this loop). Was twenty-eight until the flat changelog retired six: both section seams, the live marker, the history mode, the category labels and the release-block wording'
+    Assert-Equal 23 $totalRecordCount 'contract: exactly twenty-three (lib, function) records declared in script-contract-lib.ps1 (the twenty-two below plus the dedicated Get-LiveStage block after this loop). Was twenty-eight until the flat changelog retired six: both section seams, the live marker, the history mode, the category labels and the release-block wording; Get-BranchTypes joined on August 10, 2026 (inbound #580)'
 
     # Every record must carry a 'Returns' line, so a finding is actionable without any reference to this
     # source repo (Dave, July 28, 2026). Counted against $totalRecordCount rather than listed per record:
@@ -563,6 +578,13 @@ function Get-RosterIgnoredIds { return @() }
             # (ViaLib). Then the proof is two-part and stricter than the direct match: the script must
             # really dot-source that lib, and the lib must really name the function. The direct form was
             # satisfiable by a mention in a docstring; this one is not, because a dot-source line is code.
+            #
+            # THE FIRST HALF IS THE REAL WALK SINCE INBOUND #580, and it had to become one for a route this
+            # tree already contains: new-internal-note reaches entry-scaffold-lib THROUGH release-lib, two
+            # hops, and names it nowhere in its own source. The text match this replaces would have called
+            # that a stale record. It also had the failure it was written to avoid, one level up -- a
+            # dot-source line is code, but a COMMENT naming the same file is not, and $srcText could not
+            # tell them apart. Test-ContractLibReachable reads the AST and follows the chain.
             $viaLib = if ($e.ContainsKey('ViaLib')) { $e.ViaLib } else { $null }
             if ($viaLib) {
                 Assert-True $pairsByName.ContainsKey($viaLib) "contract: '$viaLib' is a registered shared lib (Get-SharedScriptPairs)"
@@ -573,7 +595,9 @@ function Get-RosterIgnoredIds { return @() }
                     $srcText = [System.IO.File]::ReadAllText($pairsByName[$scriptName].SourcePath)
                     if ($viaLib -and $pairsByName.ContainsKey($viaLib)) {
                         $libLeaf = Split-Path $pairsByName[$viaLib].SourcePath -Leaf
-                        Assert-True ($srcText -match [regex]::Escape($libLeaf)) "contract: shared script '$scriptName' really dot-sources '$libLeaf' (the route to '$($e.Function)')"
+                        $viaRel = $pairsByName[$viaLib].SourceRel
+                        Assert-True (Test-ContractLibReachable -ScriptPath $pairsByName[$scriptName].SourcePath -RepoRoot $RepoRoot -LibRelPath $viaRel) `
+                            "contract: shared script '$scriptName' really reaches '$libLeaf' (the route to '$($e.Function)'), directly or through a lib it loads"
                         $libText = [System.IO.File]::ReadAllText($pairsByName[$viaLib].SourcePath)
                         Assert-True ($libText -match [regex]::Escape($e.Function)) "contract: shared lib '$libLeaf' really references '$($e.Function)' (not a stale entry)"
                     } else {
@@ -602,6 +626,83 @@ function Get-RosterIgnoredIds { return @() }
         $skillText = [System.IO.File]::ReadAllText($cutReleaseSkillPath)
         Assert-True ($skillText -match 'Get-LiveStage') "contract: cut-release SKILL.md really references 'Get-LiveStage' in its own real source (not a stale entry)"
     }
+
+    Write-Host "`n== script-contract.tests: reachability (inbound #580) ==" -ForegroundColor Cyan
+    # A record claims a shared script CALLS a repo-owned function. Presence was checked; whether the lib
+    # is ever in scope for that script was not, so a declared-and-present function could be answered by
+    # the built-in fallback with the check reporting [OK]. These asserts pin the walk that closes it.
+    #
+    # THE SHAPES ARE ASSERTED INDIVIDUALLY because each one is a way a real script in this tree writes a
+    # dot-source, and a walk that handles three of the four is not partially right -- it is wrong on
+    # whichever scripts use the fourth. The measurement that produced this list found exactly that: an
+    # AST walk reading literals and named variables missed the child-scope idiom and reported three
+    # findings, all three false.
+    $shapes = @(
+        @{ Script = 'scripts\task\new-branch.ps1';          Lib = 'scripts\lib\branch-info.ps1'; Shape = 'a named variable built from $repoRoot' },
+        @{ Script = 'scripts\release\cut-release.ps1';       Lib = 'scripts\lib\branch-info.ps1'; Shape = 'a literal Join-Path in the dot-source itself' },
+        @{ Script = 'scripts\sync\check-roster-sync.ps1';    Lib = 'scripts\repo-config.ps1';     Shape = 'the "& { . $args[0] }" child-scope idiom' },
+        @{ Script = 'scripts\maintenance\fix-mojibake.ps1';  Lib = 'scripts\repo-config.ps1';     Shape = 'the child-scope idiom inside a function' },
+        @{ Script = 'scripts\lib\release-lib.ps1';           Lib = 'scripts\lib\branch-info.ps1'; Shape = 'a guarded $PSScriptRoot sibling' }
+    )
+    foreach ($s in $shapes) {
+        Assert-True (Test-ContractLibReachable -ScriptPath (Join-Path $RepoRoot $s.Script) -RepoRoot $RepoRoot -LibRelPath $s.Lib) `
+            "reachability: '$(Split-Path $s.Script -Leaf)' reaches '$(Split-Path $s.Lib -Leaf)' -- $($s.Shape)"
+    }
+
+    # NAMING A LIB IS NOT LOADING IT, and this is the assert that separates the built rule from the
+    # cheapest candidate. fold-changelog-entry.ps1 mentions branch-info.ps1 in a comment about branch
+    # names; a text match reads that as a dot-source and reports the reported defect as green.
+    $foldPath = Join-Path $RepoRoot 'scripts\release\fold-changelog-entry.ps1'
+    Assert-True ([System.IO.File]::ReadAllText($foldPath) -match 'branch-info\.ps1') `
+        'reachability: fold-changelog-entry.ps1 does mention branch-info.ps1 in its text (the premise of the next assert)'
+    Assert-True (-not (Test-ContractLibReachable -ScriptPath $foldPath -RepoRoot $RepoRoot -LibRelPath 'scripts\lib\branch-info.ps1')) `
+        'reachability: ...and still does not REACH it -- a comment is not a dot-source (the text-match candidate failed here)'
+
+    # Transitive, which is not a nicety: this exact route is in the tree today and the ViaLib guard above
+    # depends on it. new-internal-note names entry-scaffold-lib nowhere in its own source.
+    $noteText = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\new-internal-note.ps1'))
+    Assert-True (-not ($noteText -match 'entry-scaffold-lib')) `
+        'reachability: new-internal-note.ps1 names entry-scaffold-lib nowhere in its own source (the premise of the next assert)'
+    Assert-True (Test-ContractLibReachable -ScriptPath (Join-Path $RepoRoot 'scripts\release\new-internal-note.ps1') -RepoRoot $RepoRoot -LibRelPath 'scripts\lib\entry-scaffold-lib.ps1') `
+        'reachability: ...and still reaches it, through release-lib.ps1 -- the walk follows the chain'
+
+    # A NAME THAT RESOLVES TO NO SCRIPT MAKES NO CLAIM. check-roster-sync ships in the OTHER plugin and
+    # 'cut-release skill' is not a script at all, so from the workflow mirror both resolve to nothing --
+    # and a file this check cannot find is not evidence that a lib goes unloaded. Guessing here would put
+    # false findings in every consumer's session, which is how a check gets ignored rather than heeded.
+    Assert-Equal '' (Resolve-SharedScriptPath -Name 'cut-release skill' -ScriptsRoot (Join-Path $RepoRoot 'scripts')) `
+        "reachability: 'cut-release skill' resolves to no script, so no reachability claim is made about it"
+    Assert-Equal '' (Resolve-SharedScriptPath -Name 'no-such-script-anywhere' -ScriptsRoot (Join-Path $RepoRoot 'scripts')) `
+        'reachability: an unknown script name resolves to nothing rather than throwing'
+
+    # --- The consumer-facing half: the reported defect, and the repair that closes it ---------------
+    # This is inbound #580 end to end. The fixture consumer has Get-BranchTypes present and its
+    # repo-config does not chain branch-info.ps1, which is the state the reporting consumer was in and
+    # the state this workshop is in. Chaining the lib -- their repair -- must turn the finding green,
+    # because a check nobody can satisfy teaches nothing.
+    $c = New-FixtureConsumer
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c)
+    Assert-Equal 0 $r.Code 'reachability: an unreachable seam is never an error -- the caller falls back by design'
+    Assert-Match "\[OK\]\s+'Get-BranchTypes' present in" $r.Out 'reachability: the presence half still reports OK'
+    Assert-Match "NOT IN SCOPE for 'fold-changelog-entry'" $r.Out 'reachability: ...and the reachability half names the script that cannot see it'
+    Assert-Match 'REFUSES the fold' $r.Out 'reachability: the finding states what the fallback COSTS, not merely that there is one'
+
+    # -SkipReachability, which the SessionStart hook passes. The walk adds ~1,470 ms to a ~510 ms check
+    # and the hook filters its output to [ERROR]/[SCOPE], so an always-[INFO] finding could never reach
+    # the session context anyway. Asserted rather than trusted: the switch must drop the reachability
+    # half and NOTHING else, or a session start would quietly stop reporting real contract gaps.
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c, '-SkipReachability')
+    Assert-Equal 0 $r.Code 'skip-reachability: exit-code 0'
+    Assert-NotMatch 'NOT IN SCOPE' $r.Out 'skip-reachability: no reachability findings are produced'
+    Assert-Match "\[OK\]\s+'Get-BranchTypes' present in" $r.Out 'skip-reachability: the presence half is untouched'
+    Assert-Match 'Summary: 0 error\(s\), 2 info signal\(s\)' $r.Out 'skip-reachability: only the two deliberately-undefined seams remain -- the switch drops the reachability half and nothing else'
+
+    $fixtureConfig = Join-Path $c 'scripts\repo-config.ps1'
+    [System.IO.File]::AppendAllText($fixtureConfig, "`r`n. (Join-Path `$PSScriptRoot 'lib\branch-info.ps1')`r`n")
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c)
+    Assert-Equal 0 $r.Code 'reachability: exit code still 0 after the repair'
+    Assert-NotMatch "NOT IN SCOPE for 'fold-changelog-entry'" $r.Out 'reachability: chaining branch-info from repo-config closes the finding -- the consumer repair really works'
+    Assert-Match "\[OK\]\s+'Get-BranchTypes' present in" $r.Out 'reachability: and the record is still reported present'
 
     Write-Host "`n== script-contract.tests: script-contract-sessioncheck.ps1 (hook) ==" -ForegroundColor Cyan
 
