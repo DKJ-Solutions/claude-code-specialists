@@ -679,9 +679,15 @@ function Get-EntryPlugins {
 function Remove-EntryPluginsLine {
     <#
         Removes the 'Plugins: ...' metadata line (plus the blank line left behind by it) from an
-        entry block. That line drives the per-plugin selection in cut-release.ps1, but is workshop
-        administration and should not be visible in the consumer-facing per-plugin CHANGELOG; the
-        root CHANGELOG and the release notes do show it.
+        entry block. That line drives the per-plugin selection in cut-release.ps1, but is repo
+        administration and should not be visible in a document written for a consumer; the root
+        CHANGELOG and the development notes do show it.
+
+        ITS CALLER IS THE CONSUMER DOCUMENT, since August 10, 2026 -- Format-RankedEntries under
+        -StripAdminSections. It had none for two days: the per-plugin CHANGELOG it was written for was
+        retired on August 8 and this function was deliberately kept because the line it strips still
+        existed. That reasoning turned out to be right for the wrong reason -- what wanted it was not the
+        line surviving but a reader who should not see it, and that reader was already being handed it.
     #>
     param([Parameter(Mandatory)][string]$EntryText)
     $t = [regex]::Replace($EntryText, '(?m)^Plugins:[^\r\n]*(\r?\n)?', '')
@@ -820,13 +826,20 @@ function Format-RankedEntries {
 
         $StripSignificance removes the impact table AND the older 'Tier: N' line. For the documents that
         travel OUTWARD only; the record keeps both. See Remove-EntryImpactTable for why the two differ.
+
+        $StripAdminSections removes the four branch-administration sections and the 'Plugins:' line. It is
+        the same objection as $BareTitles -- this reader has no branch and no PR number -- applied to where
+        that metadata actually lives since August 6, 2026. Deliberately a SECOND switch rather than folded
+        into $BareTitles: that one reduces a heading and is safe on any document, while this deletes named
+        sections and must never reach the record.
     #>
     param(
         [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$Entries,
         [int]$EntryLevel = 2,
         [switch]$BareTitles,
         [int]$RankByTier = 0,
-        [switch]$StripSignificance
+        [switch]$StripSignificance,
+        [switch]$StripAdminSections
     )
     $items = @()
     $index = -1
@@ -848,6 +861,17 @@ function Format-RankedEntries {
             # dropped here -- the same class of thing as a self-assigned score.
             $text = Remove-EntrySignificanceDeclaration -EntryText $text
             $text = Remove-EntryTierLine -EntryText $text
+        }
+        # STRICTLY AFTER Convert-EntryHeadingToTitle ABOVE, and that order is the whole trick: the heading
+        # rewrite READS the 'Branch title' section this strip deletes. Reversed, the consumer document would
+        # list every change as '`fix/x` changelog' -- the same read-before-strip trap -RankByTier and
+        # -StripSignificance already document one case of, met a third time.
+        if ($StripAdminSections) {
+            $text = Remove-EntryAdminSections -EntryText $text
+            # ITS FIRST PRODUCTION CALLER SINCE AUGUST 8, 2026, when the per-plugin CHANGELOG it was written
+            # for was retired and the function was deliberately kept. Its own header names this reader: the
+            # line is repo administration that drives the cut's plugin selection, and the record shows it.
+            $text = Remove-EntryPluginsLine -EntryText $text
         }
         $items += [pscustomobject]@{
             Text  = (Set-EntryHeadingLevel -EntryText $text.Trim() -EntryLevel $EntryLevel)
@@ -1203,6 +1227,10 @@ function Build-ConsumerNotes {
         before anything about it is reduced -- see Format-RankedEntries for what stripping too early costs.
         Links are rewritten first, at the same depth the developer notes use (both documents sit three
         folders down).
+
+        -StripAdminSections is passed for the same reason and has the same ordering constraint, one step
+        sharper: the four sections it deletes include the one -BareTitles READS to build the heading. Both
+        travel to the renderer so that order lives in one place rather than being re-established here.
     #>
     param(
         [AllowEmptyCollection()][string[]]$Entries = @(),
@@ -1230,7 +1258,7 @@ function Build-ConsumerNotes {
     # The number does its work by deciding the order and then gets out of the way; the reason stays in the
     # development notes, where it is auditable by the people who can check it.
     $body = if ($linked.Count -gt 0) {
-        Format-RankedEntries -Entries $linked -EntryLevel 2 -BareTitles -RankByTier 2 -StripSignificance
+        Format-RankedEntries -Entries $linked -EntryLevel 2 -BareTitles -RankByTier 2 -StripSignificance -StripAdminSections
     } else {
         ''
     }

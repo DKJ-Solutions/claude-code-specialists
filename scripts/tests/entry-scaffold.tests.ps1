@@ -1107,6 +1107,107 @@ Remove-Item -Path Function:\Get-BranchFileWordingOverrides
 Assert-Equal $defaultReset ((Format-BranchChangelogReset) -join "`n") 'teardown: the default reset is restored once the seam function is gone'
 
 Write-Host ""
+Write-Host "Remove-EntryAdminSections" -ForegroundColor Cyan
+# THE DEFECT THESE GUARD is not a missing stripper but a stripper aimed one level up: the heading rewrite
+# dropped the PR number, type and date while they lived in the heading, and the dossier format moved them
+# into '###' sections in August 2026 without the stripping following. Measured on the v4.2.0 consumer draft
+# before the repair: 125 of 396 rendered lines were these four sections, with 'Branch title' printed
+# directly under the heading it had just become.
+$adminEntry = @(
+    '## `fix/x` changelog'
+    ''
+    '### Branch title'
+    ''
+    'A readable name'
+    ''
+    '### Branch ID'
+    ''
+    '20260810-212615'
+    ''
+    '### Branch type'
+    ''
+    'fix'
+    ''
+    '### What does the change on this branch bring to main?'
+    ''
+    'The substance, which a consumer is here for.'
+    ''
+    '### Pull Request'
+    ''
+    'Plugins: workflow-davekjohn'
+    ''
+    '[PR #1](https://example.test/1) - merged 2026-08-10'
+) -join "`n"
+
+$stripped = Remove-EntryAdminSections -EntryText $adminEntry
+Assert-True ($stripped -notmatch '(?m)^### Branch title')  'the title section goes -- by this point it IS the heading'
+Assert-True ($stripped -notmatch '(?m)^### Branch ID')     'the creation timestamp goes'
+Assert-True ($stripped -notmatch '(?m)^### Branch type')   'the branch prefix goes'
+Assert-True ($stripped -notmatch '(?m)^### Pull Request')  'the PR section goes -- this reader has no PR numbers'
+Assert-True ($stripped -notmatch 'PR #1')                  'and its BODY goes with it, not just the heading'
+Assert-True ($stripped -notmatch '20260810-212615')        'the timestamp body goes too'
+Assert-True ($stripped -match '(?m)^## `fix/x` changelog') "the entry's OWN heading is left standing -- a different function's job"
+Assert-True ($stripped -match 'What does the change')      'the substance section survives'
+Assert-True ($stripped -match 'The substance, which a consumer is here for\.') 'and so does its body'
+
+# RETIRED NAMES ARE REMOVED, and a miss here is worse than a reader missing one: a reader returns nothing
+# and its caller usually notices, while a remover leaves the section standing in the one document that
+# travels outward. CHANGELOG.md and every consumer tree hold both names right now.
+$retiredEntry = @(
+    '## `fix/y` changelog'
+    ''
+    '### Branch description'
+    ''
+    'An older name for the title'
+    ''
+    '### Type of change'
+    ''
+    'fix'
+    ''
+    '### What does this change do?'
+    ''
+    'Still the substance.'
+) -join "`n"
+$strippedRetired = Remove-EntryAdminSections -EntryText $retiredEntry
+Assert-True ($strippedRetired -notmatch 'Branch description')      'the retired title heading is removed too'
+Assert-True ($strippedRetired -notmatch '(?m)^### Type of change') 'and the retired type heading'
+Assert-True ($strippedRetired -match 'Still the substance\.')      "while the retired What section's body survives"
+
+# FENCE-AWARE, and this function needs it more than most: the entry introducing it quotes these very
+# headings to show what is dropped. A non-fence-aware remover would eat the illustration out of the entry
+# that documents the mechanism -- and then out of every later entry that cites it.
+$fencedEntry = @(
+    '## `docs/z` changelog'
+    ''
+    '### What does the change on this branch bring to main?'
+    ''
+    'The four sections dropped are:'
+    ''
+    '```text'
+    '### Branch title'
+    '### Branch ID'
+    '```'
+    ''
+    'That is the whole list.'
+) -join "`n"
+$strippedFenced = Remove-EntryAdminSections -EntryText $fencedEntry
+Assert-True ($strippedFenced -match '(?m)^### Branch title') 'a heading QUOTED inside a fence is left alone'
+Assert-True ($strippedFenced -match '(?m)^### Branch ID')    'both of them'
+Assert-True ($strippedFenced -match 'That is the whole list\.') 'and the prose after the fence is not swallowed'
+
+$noAdmin = "## `fix/w` changelog`n`n### What does the change on this branch bring to main?`n`nJust substance."
+Assert-Equal $noAdmin (Remove-EntryAdminSections -EntryText $noAdmin) 'an entry carrying none of them is returned untouched'
+Assert-Equal '' (Remove-EntryAdminSections -EntryText '') 'and an empty entry is not a special case'
+
+# THE KEY LIST IS THE DECISION POINT. A seventh section added to the format defaults to being PUBLISHED,
+# which is the safe direction -- but these two asserts are what make that a choice somebody made rather
+# than a list nobody looked at.
+$adminKeys = @(Get-EntryAdminSectionKeys)
+Assert-Equal 4 $adminKeys.Count 'four sections are administration, not five'
+Assert-True ($adminKeys -notcontains 'What') "'What' is the substance and is never dropped"
+Assert-True ($adminKeys -notcontains 'Significance') 'Significance has its own remover -- a score is a different objection from administration'
+
+Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
     exit 1

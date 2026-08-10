@@ -1,13 +1,16 @@
-# `main` progress
-
-
-> **You are on `main`.** Do not work in this file yet -- create a branch first.
-> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
-> of the next person who does create one.
-
-This file carries the step list of the branch you are on. It is written when a branch is created
-and returns to this state after the merge.
+## `fix/the-consumer-draft-strips-its-branch-metadata` progress
 
 ### Steps
 
-_(filled in when a branch is created)_
+- [x] Verify the reason before repairing it: read the stripper and establish it works on the HEADING
+- [x] `Remove-EntryAdminSections` in `entry-scaffold-lib.ps1`, fence-aware, retired names included
+- [x] `-StripAdminSections` on `Format-RankedEntries`, passed only by `Build-ConsumerNotes`
+- [x] Give `Remove-EntryPluginsLine` its caller back instead of writing a second one
+- [x] Measure the before/after on the real v4.2.0 draft: 396 -> 271 lines
+- [x] Asserts: the four sections, retired names, the fenced illustration, the read-before-strip ORDER
+- [x] Assert the asymmetry: the development notes keep everything
+- [x] Repair the two docstrings this change made stale, and regenerate the plugin mirror
+
+### Where I left off
+
+Done. The gates are the last word: `open-pr` runs the lint and all 30 suites.
