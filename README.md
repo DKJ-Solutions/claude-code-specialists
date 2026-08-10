@@ -545,12 +545,14 @@ legitimately differs per repo read from optional seam functions in
 [`scripts/repo-config.ps1`](scripts/repo-config.ps1) rather than baked in. It used to be deliberately
 repo-only, on the argument that reading `.claude-plugin/marketplace.json` and bumping every
 `plugin.json` in lockstep is a structure only a marketplace has; the seam answered that by making the
-plugin half optional, so a repo without plugins simply does not declare it (see the record in
-[`scripts/sync/check-script-contract.ps1`](scripts/sync/check-script-contract.ps1), which states the
-retirement of its own "out of scope" note). Its **skill** is a different artifact: the closing steps
-every release shares once the version bump is committed (tag + push, branch cleanup), as a checklist
-with no script of its own (issue #177). That checklist also covers the GitHub
-Release, whose body is the highest release tier the repo has and whose other tiers go along as
+plugin half optional, so a repo without plugins simply does not declare it (see its record in
+[`scripts/lib/script-contract-lib.ps1`](scripts/lib/script-contract-lib.ps1), and the retirement of the
+"out of scope" note in
+[`scripts/sync/check-script-contract.ps1`](scripts/sync/check-script-contract.ps1), which held both
+until the registry moved out). Its **skill** is a different artifact: the closing steps every release
+shares once the version bump is committed (tag + push, branch cleanup), as a checklist with no script
+of its own (issue #177). That checklist also covers the GitHub Release, whose body is the highest
+release tier the repo has and whose other tiers go along as
 attachments — a manual closing step this repo takes at every release (see
 [releases/README.md](releases/README.md#cutting-a-release)), just not one `cut-release.ps1`
 itself automates. *Which* bumps get a Release is repo policy and lives in the release manager's lens,

@@ -384,7 +384,7 @@ owes this text. Write it there, and the cut carries it outward for you.
 
 - `scripts\repo-config.ps1` with, optionally, `Get-LiveStage` — same shape as the existing `Get-LintScript`
   getter. Absent or empty: only Block 1 applies. Declared in
-  `check-script-contract.ps1` as an **Optional** record (the mechanism introduced for
+  `script-contract-lib.ps1` as an **Optional** record (the mechanism introduced for
   `Get-ChangelogHeading`, issue #178): a consumer without the function gets `[INFO]` naming the
   fallback (`''`, i.e. no live stage), never `[ERROR]`.
 - The script's own getters are separate from this skill's and all optional in the same way:
