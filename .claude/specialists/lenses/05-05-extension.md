@@ -244,9 +244,27 @@ order can be decided, and after that a correction is a re-insert on `main`.
 `gh`; write it to a file* — see his portable persona. It is stated there without the numbers, because
 the trap is the shell's, not this repo's. What stays here is the local evidence:
 
-- **Quotes mangled, July 16, 2026.** PowerShell 5.1 broke the argument boundaries on a `"` inside a
-  commit message — even inside a here-string — so `git commit -m` read the rest of the message as a
-  pathspec and the commit bounced.
+- **Quotes mangled, July 16, 2026 — and again on August 10, 2026, in a session that could quote this
+  rule.** PowerShell 5.1 broke the argument boundaries on a `"` inside a commit message, so
+  `git commit -m` read the rest of the message as a pathspec and the commit bounced. The recurrence is
+  the more useful half: the rule was already written in Derek's portable body *and* here, and it was
+  broken anyway — by reasoning that a **single-quoted here-string** (`@'…'@`) is literal and therefore
+  safe. It is literal, and that is the wrong axis.
+
+  **Measured that day rather than argued, because the mechanism is what the portable rule now states.**
+  One argument carrying `"names a migration"` was handed to a native command three ways; the child
+  printed its own `argv`:
+
+  ```text
+  single-quoted here-string:  argv = 3  ->  <no gate -- recognising names> <a> <migration in prose is the trap>
+  plain single-quoted string: argv = 3  ->  identical, to the character
+  same text, no double quotes: argv = 1
+  ```
+
+  The two quoting forms are **indistinguishable** downstream, and `argv[2]` is literally `a` — which is
+  exactly the `pathspec 'a' did not match any file(s)` git reported. So the split is not a property of
+  the here-string, of PowerShell's parser, or of "some shells": it is where the argument is serialised
+  for the executable. Nothing you do on the PowerShell side reaches it.
 - **Newlines split, July 30, 2026.** `gh` answered `accepts 1 arg(s), received 4` on a multiline
   `--comment`. The half-success that makes this a hard rule was measured the same day:
   `gh issue close 275 --comment "<multiline>"` **closed the issue and dropped the comment**, reporting
