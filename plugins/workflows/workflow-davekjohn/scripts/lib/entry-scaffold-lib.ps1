@@ -1644,6 +1644,91 @@ function Remove-EntrySignificanceDeclaration {
     return (Remove-EntryImpactTable -EntryText (Remove-EntryTierSections -EntryText $EntryText))
 }
 
+# THE SECTIONS THAT ARE ADMINISTRATION RATHER THAN CONTENT, for a reader who has no branch. Four of the
+# six: the title (which IS the heading by the time a renderer gets here), the creation timestamp, the
+# prefix, and the PR link. 'What' is the substance and 'Significance' has its own remover above -- a
+# self-assigned score is a different objection from branch administration, and collapsing the two would
+# make one switch answer two questions.
+$script:EntryAdminSectionKeys = @('Description', 'Id', 'Type', 'PullRequest')
+
+function Get-EntryAdminSectionKeys {
+    <# The section keys a document written for someone outside this repo drops. Stated once so the remover
+       and its suite cannot disagree about which four, and so adding a seventh section forces a decision
+       here rather than silently defaulting to "publish it". #>
+    return @($script:EntryAdminSectionKeys)
+}
+
+function Remove-EntryAdminSections {
+    <#
+        Removes the branch-administration sections -- heading and body -- from an entry block, leaving the
+        substance and the entry's own heading standing.
+
+        WHY THIS EXISTS AT ALL, because the stripping it completes was never absent: it was aimed one level
+        up. Convert-EntryHeadingToTitle drops the PR number, the type and the date from an entry's HEADING,
+        which is where all three lived until August 6, 2026. The branch dossier then moved that metadata into
+        named '###' sections, and nothing followed it down. So the heading rewrite kept working perfectly and
+        the same facts arrived one line lower: measured on the v4.2.0 consumer draft, 133 of 396 lines -- 34%
+        -- were these four sections, with 'Branch title' printed directly beneath the heading it had just
+        become. Duplicated, in the one document written for someone who is paying for the product.
+
+        The intent was never in doubt, which is what makes this a defect rather than a change of mind:
+        Convert-EntryHeadingToTitle's own header says this document's reader "has no PR numbers", and the
+        draft shipped seven.
+
+        RETIRED NAMES ARE REMOVED TOO, and here that matters more than it does for a reader. A reader that
+        misses an old name returns nothing and the caller usually notices; a REMOVER that misses one leaves
+        the section standing in the document that travels outward -- silent, and in front of the wrong
+        audience. CHANGELOG.md and every consumer's tree are full of 'Type of change' and
+        'Branch description' right now. Recognise both, write one.
+
+        Fence-aware through the shared reader, and this function needs it more than most: the entry that
+        introduces it quotes these very headings inside a fence to show what is dropped. Same inherited
+        assumption as Remove-EntryTierSections about a fence INSIDE a dropped section -- none of these four
+        sections holds one by construction (a title, a timestamp, one word, a link).
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
+
+    $headings = Get-EntrySectionHeadings
+    $names = @()
+    foreach ($key in (Get-EntryAdminSectionKeys)) {
+        $names += @($headings[$key]) + @(Get-EntrySectionRetiredNames -Key $key)
+    }
+    $names = @($names | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() })
+    if ($names.Count -eq 0) { return $EntryText }
+
+    $hashes = '#' * $script:EntrySectionLevel
+    $headRx = '^\s*' + $hashes + '\s+(' + ((@($names | ForEach-Object { [regex]::Escape($_) })) -join '|') + ')\s*$'
+    # Any heading at this level or shallower closes the section: the next '###', or the next entry.
+    $closeRx = '^\s*#{1,' + $script:EntrySectionLevel + '}\s'
+
+    $pair = Get-EntryLineFlagPairs -EntryText $EntryText
+    $parts = $pair.Parts
+    $out = New-Object System.Collections.Generic.List[string]
+    $inSection = $false
+    $any = $false
+    $n = -1
+    for ($i = 0; $i -lt $parts.Count; $i++) {
+        if ($i % 2 -eq 1) { continue }
+        $n++
+        $line = $parts[$i]
+        $sep = if ($i + 1 -lt $parts.Count) { $parts[$i + 1] } else { '' }
+
+        if ($pair.Fenced[$n]) {
+            $inSection = $false
+        } else {
+            if ($line -match $headRx) { $inSection = $true; $any = $true; continue }
+            if ($inSection) {
+                if ($line -match $closeRx) { $inSection = $false }
+                else { continue }
+            }
+        }
+        $out.Add($line + $sep)
+    }
+    $t = ($out -join '')
+    if (-not $any) { return $t }
+    return [regex]::Replace($t, '(\r?\n)\1\1+', '$1$1')
+}
+
 function Get-ImpactInsertOffset {
     <#
         Pure: where in a changelog tier SECTION a new entry with $Score belongs -- a character offset into

@@ -747,6 +747,71 @@ $hlLink = Build-ConsumerNotes -Entries @($linkEntry) -Version '3.5.0' -Date '202
 Assert-Match $hlLink '\[the lint\]\(\.\./\.\./\.\./scripts/lint/x\.ps1\)' 'root-relative links get the prefix here too'
 Assert-Match $hlLink '\[the site\]\(https://example\.com\)' 'external links untouched'
 
+# THE BRANCH ADMINISTRATION IS STRIPPED, and the fixtures above could not have caught its absence: they
+# are pre-dossier entries, whose metadata sits in the HEADING. Convert-EntryHeadingToTitle handled that
+# correctly all along -- the defect was that the August 6, 2026 format moved the same facts into named
+# '###' sections and the stripping never followed. Measured on the real v4.2.0 draft before the repair:
+# 125 of 396 rendered lines, including 'Branch title' printed directly under the heading it had become.
+$dossier = @(
+    '## `fix/dossier` changelog'
+    ''
+    '### Branch title'
+    ''
+    'A change with a readable name'
+    ''
+    '### Branch ID'
+    ''
+    '20260810-212615'
+    ''
+    '### Branch type'
+    ''
+    'fix'
+    ''
+    '### What does the change on this branch bring to main?'
+    ''
+    'What the reader is actually here for.'
+    ''
+    '### Significance'
+    ''
+    '#### Tier 2'
+    ''
+    'They notice it.'
+    ''
+    '**Score:** 4'
+    ''
+    '### Pull Request'
+    ''
+    'Plugins: workflow-davekjohn'
+    ''
+    '[PR #99](https://example.test/99) - merged 2026-08-10'
+) -join "`n"
+
+$hlDossier = Build-ConsumerNotes -Entries @($dossier) -Version '4.2.0' -Date '2026-08-10' -Type 'Minor'
+# READ BEFORE STRIP, and this is the assert that pins the ORDER rather than the removal. The heading is
+# built FROM the 'Branch title' section that the same pass deletes, so a future edit that strips first
+# would leave every change in this document listed as '`fix/dossier` changelog' -- a slug, published.
+Assert-Match $hlDossier '(?m)^## A change with a readable name$' 'the heading is the readable title, so the strip ran AFTER the heading was built from it'
+Assert-NoMatch $hlDossier '(?m)^### Branch title'  'the title section itself does not travel'
+Assert-NoMatch $hlDossier '(?m)^### Branch ID'     'nor the creation timestamp'
+Assert-NoMatch $hlDossier '20260810-212615'        'nor its value'
+Assert-NoMatch $hlDossier '(?m)^### Branch type'   'nor the branch prefix'
+Assert-NoMatch $hlDossier '(?m)^### Pull Request'  'nor the PR section'
+Assert-NoMatch $hlDossier 'PR #99'                 'nor the PR number this reader has no use for'
+Assert-NoMatch $hlDossier '(?m)^Plugins:'          "nor the 'Plugins:' line, which is this repo's own selection administration"
+Assert-Match $hlDossier 'What the reader is actually here for\.' 'while the substance survives'
+Assert-NoMatch $hlDossier '\*\*Score:\*\* 4'       'and the score is still stripped, by the switch that always did it'
+
+# THE RECORD KEEPS EVERY ONE OF THEM -- the asymmetry IS the design, so it is asserted rather than assumed.
+# The development notes are the last place an entry's administration and its ranking justification live once
+# the cut has emptied CHANGELOG.md; a strip that reached them would delete the audit trail instead of
+# sparing a reader.
+$dossierGroups = @([pscustomobject]@{ Tier = 2; Heading = 'Tier 2 - consumers'; Entries = @($dossier); Declared = 1 })
+$dossierNotes = Build-ReleaseNotes -TierGroups $dossierGroups -Version '4.2.0' -Date '2026-08-10' -Type 'Minor'
+Assert-Match $dossierNotes 'Branch ID'   'the development notes KEEP the branch id'
+Assert-Match $dossierNotes 'Branch type' 'and the branch type'
+Assert-Match $dossierNotes 'PR #99'      'and the PR number'
+Assert-Match $dossierNotes '(?m)^Plugins:' "and the 'Plugins:' line"
+
 Write-Host "the consumer tier produces markdown ONLY (no HTML renderer)" -ForegroundColor Cyan
 # Dave, August 3, 2026: the print-ready .html is not wanted anywhere, so ConvertTo-ReleaseHtml and
 # Format-InlineMarkdown were removed the same day they were ported. ASSERTED ON THEIR ABSENCE rather
@@ -924,6 +989,11 @@ Assert-Equal "## #5 x`n`nBody." (Remove-EntryPluginsLine -EntryText "## #5 x`n`n
 #
 # Get-EntryPlugins and Remove-EntryPluginsLine above are NOT retired with them: the `Plugins:` line
 # still records which plugins an entry touched, and the release notes still read it.
+#
+# AND SINCE AUGUST 10, 2026 Remove-EntryPluginsLine HAS A PRODUCTION CALLER AGAIN -- Format-RankedEntries
+# under -StripAdminSections, for the consumer document. Worth recording because it kept the function alive
+# for two days on the strength of a line that still existed rather than a reader that wanted it removed,
+# and the reader it was originally written for describes the consumer document exactly.
 
 Write-Host "Get-MarketplaceName" -ForegroundColor Cyan
 Assert-Equal 'claude-code-specialists' (Get-MarketplaceName -MarketplaceJson '{ "name": "claude-code-specialists", "plugins": [] }') 'reads the name field'

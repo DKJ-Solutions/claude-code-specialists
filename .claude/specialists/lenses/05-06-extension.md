@@ -217,8 +217,18 @@ The `releases/` directory (modeled on life-hub):
   rows are touched, so the existing 72 keep pointing where they always did.
 - **`releases/consumer/<X>.x/<X.Y.Z>.md`** — the tier-2 document, generated **only for a minor or
   major** (`Get-ReleaseConsumerBumps`) and built from **the tier-2 entries**. Written for the reader who
-  decides whether to *update*, not for the one who reviews the diff: entry metadata (PR number, branch
-  type, date) is stripped. **It is a draft and Rendall edits it before it is published** — the selection
+  decides whether to *update*, not for the one who reviews the diff: the branch administration is stripped
+  — the `Branch title`, `Branch ID`, `Branch type` and `Pull Request` sections plus the `Plugins:` line,
+  alongside the significance scores.
+  - **That sentence described the heading until August 10, 2026, and the sections outlived it.** The strip
+    was aimed at the entry *heading*, where the PR number, type and date lived until the branch dossier
+    (August 6) moved them into named `###` sections. Nothing followed them down, so the heading rewrite
+    kept succeeding while the same facts arrived one line lower: **125 of the v4.2.0 draft's 396 rendered
+    lines**, with `Branch title` printed directly beneath the heading it had just become. The lesson is the
+    shape of the bug rather than the bug — **a format change moves what a reader reads and what a stripper
+    strips at different speeds**, and the stripper is the half nobody opens afterwards. If a section is
+    added or renamed, `Get-EntryAdminSectionKeys` is where that decision has to be made, and the default
+    for a new section is *published*. **It is a draft and Rendall edits it before it is published** — the selection
   arrives already made, the prose does not. Turned on August 3, 2026, after this lens had briefly said the
   opposite. **Markdown only** — the tier generated a print-ready `.html` alongside it for exactly one
   release (v3.2.0) and no longer does; Dave does not want it anywhere. A PDF, if ever needed, comes from
