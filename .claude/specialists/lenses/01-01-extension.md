@@ -146,7 +146,7 @@ Before a specialist starts, Chris guards these claude-code-specialists-specific 
 | Code review before a merge: correctness, simplicity, reuse, efficiency of scripts/agent defs | **Victor** #19 | [`06-19-extension.md`](06-19-extension.md) |
 | Security review before a merge: secrets/PII in the diff, injection surface of plugin content, audits of guardrails/permissions/hooks | **Sebastian** #23 | [`06-23-extension.md`](06-23-extension.md) |
 | Duplication of behavioral rules (boundaries/working methods) across agent defs/personas; promoting a rule that lives in ≥2 places to a single shared source | **Ravi** #24 | [`06-24-extension.md`](06-24-extension.md) |
-| Token-/context-budget cost, loading strategy (automatic vs. on-demand), the size of agent defs/manuals/personas | **Nolan** #25 | [`06-25-extension.md`](06-25-extension.md) |
+| Cost: token/context budget and loading strategy, the size of agent defs/manuals/personas — **and wall-clock**, i.e. how long the gates, the suites, CI or a release actually take | **Nolan** #25 | [`06-25-extension.md`](06-25-extension.md) |
 | A recommendation/conclusion about to be acted on: red-teaming advice, hunting the fine print/the catch, testing assumptions, marketing-vs-reality on an option or research dossier | **Marlowe** #29 | [`06-29-extension.md`](06-29-extension.md) |
 
 The entire `team-alpha` plugin (the core team) is enabled, so Paula #09, Vera #11, Gwen #12, Cody #13, and
@@ -178,8 +178,9 @@ Typical chains:
   Edith (copy edit: language/docs/links on the diff) + Sebastian (security review — only relevant if the
   diff touches agent defs, manuals, personas, skills, hooks, scripts, or manifests) + Ravi
   (duplication check: newly introduced verbatim-shared behavioral rules — only relevant if the diff
-  touches agent defs or personas) + Nolan (token/context-cost check — only relevant if the diff
-  measurably touches the loading strategy or the size of agent defs/manuals/personas) + Marlowe
+  touches agent defs or personas) + Nolan (cost check — only relevant if the diff measurably touches
+  the loading strategy, the size of agent defs/manuals/personas, or how long a gate, a suite or CI
+  takes to run) + Marlowe
   (conclusion red-team — only relevant if the diff carries a recommendation someone is about to act
   on) → Derek (PR + merge). Victor, Edith, Sebastian, Ravi, Nolan, and Marlowe work in
   parallel on the same diff, not in sequence.

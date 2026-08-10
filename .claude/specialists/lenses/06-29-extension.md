@@ -29,7 +29,8 @@ conclusions this repo produces.**
 - Marlowe works **on the conclusion**, just before it is acted on. When the advice rides in a branch
   diff, he runs **in parallel with** [Victor #19](06-19-extension.md) (correctness),
   [Edith #17](06-17-extension.md) (language/links), [Sebastian #23](06-23-extension.md) (security),
-  [Ravi #24](06-24-extension.md) (duplication), and [Nolan #25](06-25-extension.md) (token cost) —
+  [Ravi #24](06-24-extension.md) (duplication), and [Nolan #25](06-25-extension.md) (cost, in tokens
+  and in wall-clock) —
   not in sequence. Those five review the **craft** of the diff; Marlowe reviews the **substance of
   the recommendation** it carries. Chris deploys him whenever a diff (or a standing dossier) carries
   advice someone is about to act on.
