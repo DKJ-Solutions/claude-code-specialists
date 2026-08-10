@@ -93,8 +93,8 @@ otherwise the PR keeps describing an earlier version of the work while the merge
 one. The `## Resolved issues` block, anything a reviewer added, and any section your template carries that
 the script did not write — "Type of change" boxes, a checklist — all stay exactly as they are.
 
-**Which heading carries the description is read from your template's first `## ` line**, so renaming it
-needs no configuration. One wrinkle worth knowing if you do rename it: a PR opened *before* the rename
+**Which heading carries the description is read from your template's first heading line, at any level**,
+so renaming it needs no configuration. One wrinkle worth knowing if you do rename it: a PR opened *before* the rename
 still holds the old heading in its published body. The script therefore falls back to the headings it has
 shipped before (`## What does this change do?` and its Dutch predecessor) when the current one is not
 found, so an older PR stays refreshable instead of silently reporting that it already matches.
@@ -103,9 +103,21 @@ It is **opt-in** rather than automatic for the reason above: refreshing on every
 hand-edited body without being asked. And it is a no-op where there is nothing to do — no open PR, no
 description in the entry, or a body that already matches, in which case nothing is sent to GitHub at all.
 
-The heading it replaces under is the **first `## ` heading of your PR template**, so no extra
-configuration is needed: that is where the description placeholder sits. If your template has no `## `
-heading, the switch warns and changes nothing rather than guessing.
+The heading it replaces under is the **first heading of your PR template, at any level** (`#` through
+`######`), so no extra configuration is needed: that is where the description placeholder sits. If your
+template has no heading at all, the switch warns and changes nothing rather than guessing. It matched
+`## ` exactly until August 9, 2026, which meant a template promoted to `#` silently lost the whole
+feature — worth knowing if your own template starts at a different level than it used to.
+
+**If your template's placeholder LINE differs, define `Get-PrDescriptionPlaceholder`.** The description
+is inserted by an exact whole-line match against three built-in strings, so a template one word away
+from one of them gets a PR body with no description at all. Since
+[#573](https://github.com/DaveKJohn/claude-code-specialists/issues/573) a run that matched no
+placeholder **warns** and prints the strings it compared against — before that it was silent, and a
+consumer merged 12 of 60 PRs with an empty description before anyone noticed. Your own line is the
+answer: return it from `Get-PrDescriptionPlaceholder` in `scripts/repo-config.ps1`, or make the template
+carry one of the built-in strings verbatim. `check-script-contract.ps1` cannot catch this for you — the
+function is optional, so a repo that does not define it is correct.
 
 **The one exception appends rather than replaces: a `-Resolves` the existing body does not carry yet.**
 Dropping it would be the whole point of the resolves gate failing from the other side — GitHub closes

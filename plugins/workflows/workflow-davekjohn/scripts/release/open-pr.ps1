@@ -69,7 +69,10 @@
       Get-PrDescriptionPlaceholder / Get-PrApprovalPattern functions, those are used; otherwise the
       script falls back to this repo's own template markers (current behavior, unchanged) -- so a
       consumer whose PR template uses different marker text can point at its own markers without a
-      wrapper script.
+      wrapper script. IF YOUR TEMPLATE'S PLACEHOLDER LINE DIFFERS FROM THE THREE BUILT-IN STRINGS,
+      DEFINE Get-PrDescriptionPlaceholder -- that is the seam for it, and a consumer only reaches for
+      a seam it knows exists (#573). Since that same issue, a run whose template matched no
+      placeholder at all warns instead of producing a PR body with no description in silence.
 
     Optional assignee/milestone (#101): if scripts\repo-config.ps1 defines Get-PrAssignee and/or
     Get-PrMilestone (both optional), a non-empty return value is passed to `gh pr create` as
@@ -836,7 +839,12 @@ if (-not $Body) {
         # via optional repo-config functions, so a consumer with its own PR template text does not
         # need a wrapper. Guard via Get-Command so a repo-config.ps1 that does not define these
         # (the workshop's own, and every existing consumer) keeps exactly today's behavior.
+        # Which of the two sources the list came from, kept for the warning below: "your repo-config
+        # answered this" and "the built-in list answered this" send the reader to different files, and
+        # that is the first thing they need in order to repair it.
+        $descPlaceholderSource = 'the built-in list'
         $descPlaceholders = if (Get-Command -Name Get-PrDescriptionPlaceholder -ErrorAction SilentlyContinue) {
+            $descPlaceholderSource = 'Get-PrDescriptionPlaceholder in scripts/repo-config.ps1'
             @(Get-PrDescriptionPlaceholder)
         } else {
             @(
@@ -856,10 +864,23 @@ if (-not $Body) {
             '^- \[ \] (Aangevraagd door Dave|Requested by Dave)'
         }
 
+        # A PLACEHOLDER THE LIST HAS NEVER SEEN IS THE ONE FAILURE THAT LOOKS LIKE SUCCESS (#573).
+        # The comparison below is an exact whole-line match, so a template one word away from a
+        # recognised string falls straight through to the `else` that passes the line on: the
+        # description is never inserted, and the run reports success. Measured at a consumer -- 12 of
+        # 60 merged PRs carried no description at all, found months later by diffing their template
+        # against this repo's rather than by anything failing.
+        # The asymmetry is what earns the flag: a MISSING placeholder is caught by the first person
+        # who reads the PR, while a NEAR-MISS produces a body that is structurally correct and empty
+        # exactly where it matters. Recorded here rather than inside the `else`, because the `else`
+        # also runs for every ordinary line and cannot tell the two apart.
+        $descPlaceholderMatched = $false
+
         $filled = foreach ($line in $templateLines) {
             if ($line -match $prefixPattern) {
                 $line -replace '^- \[ \]', '- [x]'
             } elseif ($desc -and ($descPlaceholders -contains $line)) {
+                $descPlaceholderMatched = $true
                 $desc
             # 'written' joined the alternation with the branch/ split, which renamed the item: the file is
             # no longer *created* by the branch (it exists on the trunk in its reset state), it is written
@@ -875,6 +896,28 @@ if (-not $Body) {
             }
         }
         $Body = ($filled -join "`n")
+
+        # A WARNING RATHER THAN A REFUSAL, deliberately. The branch is sound, the entry is filled in
+        # and the PR is worth opening; what is wrong is one line of a file this script does not own.
+        # Refusing would block a consumer on a template they may not be able to edit right now, while
+        # a warning turns a defect nobody could see into one nobody can miss. It names the file, the
+        # strings it compared against and the seam that overrides them, because the reader of this
+        # line is by definition somebody who does not know this list exists.
+        # No opt-out for a template that deliberately carries no placeholder: an entry description
+        # that reaches no PR body is the outcome this whole block exists to produce, so there is no
+        # correct silent version of it -- and an exemption list is the shape this repo keeps getting
+        # bitten by.
+        if ($desc -and -not $descPlaceholderMatched) {
+            Write-Warning (
+                "The PR body was built from .github/pull_request_template.md, but NONE of its lines matched a description placeholder -- this PR gets no description at all.`n" +
+                # $(...) around the variable, not a bare $name: a colon straight after a variable name
+                # is parsed as a scope/drive qualifier, so the subexpression is what keeps the line
+                # readable AND correct.
+                "  Compared against $($descPlaceholderSource):`n" +
+                (($descPlaceholders | ForEach-Object { "    $_" }) -join "`n") + "`n" +
+                "  Fix: make the template carry one of those lines verbatim, or define Get-PrDescriptionPlaceholder in scripts/repo-config.ps1 to name your own."
+            )
+        }
     }
 }
 

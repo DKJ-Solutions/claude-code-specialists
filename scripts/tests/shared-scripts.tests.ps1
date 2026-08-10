@@ -693,6 +693,43 @@ function Get-PrMilestone { return 'v9.9.9' }
     Assert-True ($bodyB -match 'This is the test description text\.') 'override path: description still filled in from the changelog entry'
     Assert-True ($bodyB -match '- \[x\] Custom approval line') 'override path: custom approval pattern (Get-PrApprovalPattern) ticked the custom checklist line'
 
+    # --- Scenario B2: a NEAR-MISS placeholder must be loud (#573) ---------------------------------
+    # The failure this guards is the one that looks like success: an exact whole-line comparison, a
+    # template one word away from a recognised string, and a run that exits 0 with a PR body carrying
+    # no description. Measured at a consumer -- 12 of 60 merged PRs, found by diffing templates rather
+    # than by anything failing. Asserted in BOTH directions on purpose: the warning must appear AND
+    # the body must genuinely be missing the description, or a passing test would only prove that a
+    # message is printed.
+    Write-Host "  open-pr: an unrecognised description placeholder warns" -ForegroundColor DarkCyan
+    Copy-Item -Path (Join-Path $RepoRoot 'scripts\repo-config.ps1') -Destination (Join-Path $prFixtureRoot 'scripts\repo-config.ps1') -Force
+    # One word away from the recognised English string, which is exactly how the consumer's drifted.
+    $templateNearMiss = @'
+# What does the change on this branch bring to main?
+<!-- Brief description of what changes and why. -->
+'@
+    [System.IO.File]::WriteAllText((Join-Path $prFixtureRoot '.github\pull_request_template.md'), $templateNearMiss, $Utf8NoBomTest)
+    Remove-Item -Path $prArgsCapture, $prBodyCapture -Force -ErrorAction SilentlyContinue
+    $outB2 = (& powershell -NoProfile -ExecutionPolicy Bypass -File $openPrSrc -Title 'feat-openpr-101-test' -SkipLint -SkipTests 2>&1 | Out-String)
+    # WHITESPACE-COLLAPSED BEFORE MATCHING, and this cost a red CI run to learn: Write-Warning wraps its
+    # text at the HOST's buffer width, which is wide in a developer console and narrow on the runner. The
+    # exact same warning therefore arrives here as one line locally and as two on CI, and a match on any
+    # phrase long enough to be worth asserting lands straight on the break. Wrapping only ever inserts a
+    # newline where a space was, so collapsing whitespace restores the sentence verbatim -- and it makes
+    # the assert independent of a width nothing in this repo controls.
+    $warnB2 = ($outB2 -replace '\s+', ' ')
+    Assert-Equal 0 $LASTEXITCODE 'near-miss placeholder: open-pr still exits 0 (a warning, not a refusal)'
+    $bodyB2 = if (Test-Path $prBodyCapture) { Get-Content -Path $prBodyCapture -Raw } else { '' }
+    Assert-True ($bodyB2 -notmatch 'This is the test description text\.') 'near-miss placeholder: the description is indeed absent from the body (the defect is reproduced)'
+    Assert-True ($warnB2 -match 'NONE of its lines matched a description placeholder') 'near-miss placeholder: the run warns instead of staying silent'
+    Assert-True ($warnB2 -match 'Get-PrDescriptionPlaceholder') 'near-miss placeholder: the warning names the seam that overrides the list'
+    Assert-True ($warnB2 -match '<!-- Short description of what changes and why\. -->') 'near-miss placeholder: the warning prints the strings it compared against'
+    # The mirror image: with a recognised placeholder the warning must stay away, or it would be
+    # noise on every ordinary run and get ignored exactly when it matters.
+    Copy-Item -Path (Join-Path $RepoRoot '.github\pull_request_template.md') -Destination (Join-Path $prFixtureRoot '.github\pull_request_template.md') -Force
+    Remove-Item -Path $prArgsCapture, $prBodyCapture -Force -ErrorAction SilentlyContinue
+    $outB3 = ((& powershell -NoProfile -ExecutionPolicy Bypass -File $openPrSrc -Title 'feat-openpr-101-test' -SkipLint -SkipTests 2>&1 | Out-String) -replace '\s+', ' ')
+    Assert-True ($outB3 -notmatch 'NONE of its lines matched a description placeholder') 'recognised placeholder: no warning on the ordinary path'
+
     # --- Scenario C: the resolves gate, wired into open-pr (not just its decision table) ----------
     # pr-issues.tests.ps1 asserts the table; this asserts the WIRING -- that the gate actually runs,
     # blocks BEFORE the push/gh call, and that the closing keyword reaches the PR body. The gate is
