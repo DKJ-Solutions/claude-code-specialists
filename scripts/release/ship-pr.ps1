@@ -320,8 +320,17 @@ passed, so a re-run picks up from here. There is no -Force for this gate.
 # SAFE TO CHANGE, CHECKED RATHER THAN ASSUMED: nothing in this repo parses the merge subject -- not a
 # script, not a gate, not a document. The PR number stays in the line for anyone who greps for it.
 #
-# -t is the short form of --subject and applies to the merge-commit method only; a repo configured for
-# squash or rebase (Get-PrMergeMethod) has no merge commit for it to name, and gh ignores it there.
+# -t is the short form of --subject. This line used to add "and applies to the merge-commit method only;
+# a repo configured for squash or rebase has no merge commit for it to name, and gh ignores it there" --
+# and that second half was never checked. `gh pr merge --help` documents -t as "Subject text for the merge
+# commit" with NO method restriction, and GitHub's merge endpoint takes commit_title for a squash as well,
+# so the likelier behaviour is that a squash consumer's squashed commit gets titled 'merge: <branch> (#NN)'
+# -- a type label that is wrong for a commit which is the change rather than a merge of it.
+#
+# NOT REPAIRED HERE, DELIBERATELY. It cannot be reproduced from this repo, which merges, so a fix would be
+# built on the same unverified reading that produced the retired sentence. What is corrected is the claim:
+# the flag's scope is unknown for squash, and known-harmless for merge. Measure it in a squash-configured
+# repo before changing anything.
 $mergeSubject = "merge: $branch (#$pr)"
 $merge = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'merge', "$pr", "--$mergeMethod", '--subject', $mergeSubject, '--repo', $repo)
 $merge.Output | ForEach-Object { Write-Host $_ }
@@ -361,6 +370,36 @@ if ($ff.ExitCode -ne 0) { Write-Error "git merge --ff-only of origin/main failed
 # -Push rather than a separate push here, for the reason that flag exists: a fold commit sitting
 # unpushed on main is its own silent half-state, and splitting the commit from the push across two
 # scripts is how you get one.
+#
+# THE FOLD STAYS ITS OWN COMMIT, AND THE REASON IS GIT'S RATHER THAN THIS REPO'S (Dave, August 10, 2026;
+# inbound #571). The obvious tidy-up is to fold INTO the merge -- `git merge --no-ff --no-commit <branch>`,
+# run the fold without -Commit so it writes to disk only, then one `git commit` -- so a PR leaves one
+# commit on main instead of a merge with a `chore: fold ...` sitting on top of it. The request is
+# well-founded on its symptom: measured on August 10, 2026 this repo held 398 merge commits (206 typed
+# 'merge: ', 192 older 'Merge pull request') against 410 folds, 394 of which sit directly on a merge in
+# first-parent order. They really are one movement written as two commits.
+#
+# IT IS DECLINED, AND THE DECIDING FACT WAS MEASURED RATHER THAN ARGUED. The pathspec above is not merely
+# weakened by that flow -- git refuses to express it at all:
+#
+#     $ git commit -m "merge: feat/x (#1)" -- CHANGELOG.md branch/branch-changelog.md
+#     fatal: cannot do a partial commit during a merge.
+#
+# The only commit git will make while MERGE_HEAD exists is a whole-index one, and in the same test it swept
+# an unrelated stray.txt straight into the merge commit -- the exact `git add -A` defect the pathspec was
+# introduced to remove. So the guarantee could not move, only be downgraded to a pre-flight "was the
+# tree clean before the merge?", which is checked earlier and on different state than the commit it
+# protects.
+#
+# TWO FURTHER COSTS, both real and neither decisive on its own. The merge date loses its provenance: a
+# local merge leaves the PR open, so mergedAt is empty and Format-EntryFoldFooter falls back to the clock
+# -- the source #469 deliberately moved away from. And the merge stops going through the button, so the
+# repo ruleset's required check no longer gates it; CLAUDE.md already records the release commit as the
+# least-gated commit in this workflow, and this would extend that to every PR.
+#
+# WHAT A CONSUMER SHOULD DO INSTEAD: nothing. Two commits per PR is the cost of a fold whose scope git
+# enforces, and the typed merge subject above already makes the pair scannable. A repo on squash that wants
+# the readable arc should switch to merge on its own merits and accept the trailing fold commit.
 Write-Host "ship-pr: folding the changelog entry..." -ForegroundColor Cyan
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'fold-changelog-entry.ps1') -Branch $branch -Push
 if ($LASTEXITCODE -ne 0) { Write-Error "fold-changelog-entry failed -- the fold is NOT committed or NOT pushed. Its own output above says which; do not re-run the fold if it already removed the entry file."; exit 1 }
