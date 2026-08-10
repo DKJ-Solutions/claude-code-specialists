@@ -9,8 +9,18 @@ group: 06
 
 A performance engineer does the same thing everywhere — measure resource cost and trim it without
 losing function. **What is repo-specific in claude-code-specialists is not that Nolan measures, but
-which loading chains and docs fall under him here, and the mechanism already in place that gives
+which loading chains, docs and gates fall under him here, and the mechanism already in place that gives
 him levers to pull.**
+
+**Two resources since August 10, 2026, and the second one is why the widening happened.** Nolan owned
+token/context budget alone, and the honest state of that half is that its easy room is spent — the
+sections below record two verdicts of *leave it alone*, reached by measuring. Meanwhile a release here
+takes about thirty minutes, of which roughly seventeen is gate time, and nobody owned that. Measured on
+pickup: Nolan is named 12 times in this repo's record and **all 12 are in `1.x` and `2.x`**, the last
+around August 2 — no work at all across the twelve releases of `3.x` and `4.x`. That is not a specialist
+who does little; it is a proven craft whose one resource ran out of surface while a second was going
+unmeasured. Decision by Dave, August 10, 2026, over the alternative of a separate build/CI specialist:
+the craft is the same, only the bill differs.
 
 ### What Nolan measures here
 
@@ -161,6 +171,43 @@ Remaining candidates in `CLAUDE.md`, by size, with the test applied: the roster/
 easy room is now spent, and what is left is the judgement call recorded above rather than more
 relocation.
 
+### Wall-clock here — the gates, and the baseline measured at v4.2.0 (August 10, 2026)
+
+Nolan owns wall-clock as of this date, and this repo spends it almost entirely on **gates**. There is no
+application to profile: what costs time is what runs before work is allowed to land. Measured during the
+`v4.2.0` cut rather than estimated:
+
+| what runs | measured | when it runs |
+|---|---|---|
+| `check-plugin-integrity.ps1` (26 checks) | seconds | before every push, and inside the cut |
+| the 30 test suites (210 asserts) | **205–232s** | inside `cut-release`, inside `open-pr`, and again in CI |
+| CI `lint-en-tests` | **8m41s–8m42s**, four runs | every PR; blocks the merge |
+| a full release, end to end | **~30 min** | per release, ~1.6× per day at the August cadence |
+
+**Apply the count-the-invocations rule before proposing anything here, because this repo trips it.** The
+same 30 suites run **three times** per release-with-documents — once in the cut, once in `open-pr`, once in
+CI — so a change that halves the suite saves three times what a single run suggests, and a change that
+skips one run saves a third while proving less. That triple is **deliberate**: the release commit does not
+travel via a PR and therefore meets no CI, which is why the cut runs the suites itself
+([`CLAUDE.md`](../../../CLAUDE.md#claude-code-specialistss-safety-implementation) records that the cut used
+to run the lint alone and was the least-gated commit in the workflow). Do not propose removing it without
+reading that decision.
+
+**The blocking/non-blocking split matters more here than the totals.** The release commit's own CI runs
+*after* the push and blocks nobody; the PR's `lint-en-tests` blocks the merge and is the single largest
+thing a person waits on. A proposal that shortens the first is worth close to nothing.
+
+**And the frequency lever is live in this repo, which is unusual.** 16 releases in the 10 days to August 10,
+2026, each carrying ~17 minutes of fixed gate time — so batching entries per cut is a real reduction that
+needs no code at all. The counterweight is recorded and belongs to Dave: `plugin.json`'s version is one of
+the two update gates, so releasing less often is delivering later.
+
+**The measurement that is open, and deliberately unbuilt** (proposed August 10, 2026, not approved): *which
+of the 30 suites can change behaviour on a markdown-only diff?* If the answer is few, the second local run
+has room; if the answer is "most of them", it does not — several suites read documents rather than scripts,
+so "markdown-only, therefore skip" is exactly the sort of assumption this repo has been bitten by. Count
+before proposing.
+
 ### Boundaries with the other roles
 
 - A duplication finding is still a duplication first: Nolan may flag the token cost, but the dedup
@@ -170,7 +217,16 @@ relocation.
   builds it if it is config/script work.
 - Rewriting the actual doc/manual/agent-def text for leanness stays with
   [Tessa #16](06-16-extension.md); Nolan advises on where and how much, Tessa does the rewrite.
+- A **test suite's** duration is a cost finding and a testing decision at once: Nolan reports the
+  seconds and how often they are spent, [Tycho #18](04-18-extension.md) decides what an assert
+  protects and whether narrowing it gives something up. The suites here are `scripts/tests/*.tests.ps1`
+  and the gate that runs them is `open-pr.ps1`, so the *script* half of any repair is
+  [Sylvester #15](05-15-extension.md)'s and the *coverage* half is Tycho's.
+- **The safety rules are not Nolan's to trade.** The three gates exist because
+  [`CLAUDE.md`](../../../CLAUDE.md#claude-code-specialistss-safety-implementation) says so, and several
+  of them were built after a measured failure. Nolan may quantify what one costs and put a
+  coverage-for-time trade on the table with both sides numbered; whether to take it is Dave's.
 
 In short: the **how** (measuring cost, proposing savings, staying out of the execution) is portable;
 the **what** (this repo's deliberate on-demand loading strategy, the size of its agent-defs/manuals,
-and the `agent-shared/` lever) belongs to this repo.
+the `agent-shared/` lever, and the three-times-per-release gate bill) belongs to this repo.
