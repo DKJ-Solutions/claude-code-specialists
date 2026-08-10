@@ -2081,6 +2081,58 @@ if (-not (Test-Path -LiteralPath $prtOwnPath)) {
 Write-Coverage -Category 'pr-template' -Checked $prtChecked `
     -Note $(if ($prtNote) { $prtNote } else { "the shipped reference held byte for byte to Get-PrTemplateReference, and this repo's own template held to the contract open-pr relies on -- a first heading and a placeholder the matcher recognises. Two strengths on purpose: the reference is an answer we hand out, the repo's own template is a file its owner edits" })
 
+# --- 25. the consumer document does not send its reader into a tier written for somebody else -------------
+# WHAT THIS IS FOR, and it is measured rather than imagined (August 10, 2026). The tier model gives each
+# release document a named reader, and tier 0 -- releases/development/ -- is defined as "only this repo's own
+# developers". A link from the consumer document into that tree hands a paying reader the per-PR record and
+# calls it theirs. Measured on the day this landed: TWO of eleven consumer documents did exactly that, both
+# of them labelling it invitingly -- v4.0.0's "The full recap is in the release notes" and v3.5.0's "Full
+# per-change record". Both were removed in the same change, so this check is not born red.
+#
+# LINKS ONLY, DELIBERATELY. A path mentioned in prose or inline code is check 4's declined territory: this
+# repo measured five variants of "a path in backticks must resolve" over 120 documents and the narrowest was
+# born with 124 findings, none real, because most paths this product names describe somebody ELSE's repo. A
+# markdown LINK escapes that entirely -- it is not a path being discussed, it is a destination being offered,
+# and whose repo it is in is no longer ambiguous.
+#
+# TWO RULES WERE MEASURED ALONGSIDE THIS ONE AND BOTH DECLINED, recorded here because the next person to
+# have the idea should not have to re-measure it:
+#   * "no significance score in a consumer document" -- 4 findings, ALL FALSE. v3.7.0's release was ABOUT
+#     the entry format, so its consumer document correctly quotes '#### Tier 2' and '**Score:** N/A' as
+#     illustrations of the shape it is announcing. The generator already strips real scores
+#     (-StripSignificance, asserted in release-lib.tests.ps1); what a human adds afterwards is prose.
+#   * "no branch name or PR number in a consumer document" -- 3 findings, ALL FALSE, and the same reason:
+#     '## `feat/your-branch` changelog' is v3.7.0 showing the reader the new heading.
+# Both would have needed an exemption list on the day they landed, which is the shape this repo has already
+# been bitten by. The rest of the writing norm therefore travels as PROSE in the cut-release skill, where a
+# person applies it, rather than as gates that cannot tell an illustration from a leak.
+$ctrChecked = 0
+$ctrRoot = Join-Path $RepoRoot 'releases\consumer'
+if (-not (Test-Path -LiteralPath $ctrRoot)) {
+    $ctrNote = 'this repo has no releases/consumer/ tree, so the tier is off here and there is nothing to hold'
+} else {
+    foreach ($ctrFile in @(Get-ChildItem -LiteralPath $ctrRoot -Recurse -Filter *.md -File)) {
+        $ctrChecked++
+        $ctrRel = $ctrFile.FullName.Substring($RepoRoot.Length).TrimStart('\')
+        $ctrLines = @(Get-Content -LiteralPath $ctrFile.FullName -Encoding UTF8)
+        for ($i = 0; $i -lt $ctrLines.Count; $i++) {
+            # The link TARGET only -- '](...)'. A tier name in the link TEXT is someone writing about the
+            # tiers, which is what v3.7.0 legitimately does.
+            foreach ($m in [regex]::Matches($ctrLines[$i], '\]\(([^)]+)\)')) {
+                $ctrTarget = $m.Groups[1].Value
+                if ($ctrTarget -match '(^|/)(development|internal)/') {
+                    $ctrTier = if ($Matches[2] -eq 'development') { 'tier 0, only this repo''s own developers' } else { 'tier 1, colleagues on this project' }
+                    Add-Error ("[consumer-tier] $ctrRel line $($i + 1) links into '$($Matches[2])/' ($ctrTier): $ctrTarget`n" +
+                        '  This document''s reader is a consumer of the product. Point them at another consumer document, at the docs, or at nothing -- ' +
+                        'a link offered to them has to lead somewhere written for them.')
+                }
+            }
+        }
+    }
+}
+Write-Coverage -Category 'consumer-tier' -Checked $ctrChecked `
+    -Note $(if ($ctrChecked -eq 0) { $ctrNote } else { "every document in releases/consumer/, held against offering its reader a link into the development (tier 0) or internal (tier 1) tree. LINK TARGETS only -- a tier named in link text or prose is someone writing ABOUT the model, which is check 4's declined-path territory. Two neighbouring rules (a score, a branch name) were measured on this same tree and declined at 4 and 3 findings, all false; the reasoning is above the check" })
+
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {
     Write-Host "  No findings." -ForegroundColor Green
