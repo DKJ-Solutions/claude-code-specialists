@@ -96,6 +96,29 @@
     functions (they just return placeholder text), so open-pr.ps1's own VUL-IN pre-flight catches
     that case. This check's job is narrower and stays that way: function PRESENCE, not content.
 
+    SINCE INBOUND #580 IT ALSO CHECKS REACHABILITY, which is the second half of what a record claims.
+    "Get-BranchTypes lives in scripts\lib\branch-info.ps1" is presence; "fold-changelog-entry calls it"
+    is whether that lib is ever in scope for that script, and a lib nothing dot-sources is not in scope
+    at runtime however present it is. Both halves have to hold or the function is answered by the
+    caller's built-in fallback while this check reports [OK] -- which is what happened: a consumer whose
+    branch table produces types outside the canonical four had every folded entry read as typeless, and
+    then a refused fold, with the contract green throughout.
+
+    THE REACHABILITY FINDING IS ALWAYS [INFO], NEVER [ERROR]. Every function reached this way is probed
+    with Get-Command by the lib that wants it, so the fallback is a designed state rather than a breach,
+    and for most repos it is also the right one -- branch-info.ps1 is repo-owned, and a repo whose types
+    ARE the canonical four loses nothing. What the reader needs is to know which of the two answers they
+    are getting, before the fold rather than at it. A consumer closes it by making the lib reachable from
+    a file the script already loads (chaining it from scripts\repo-config.ps1 is the shortest route);
+    leaving it open is a legitimate choice, not a defect.
+
+    WHERE THE SHARED SCRIPT CANNOT BE LOCATED, NO CLAIM IS MADE. check-roster-sync ships in the core
+    plugin rather than this one and 'cut-release skill' is not a script at all, so from the mirror both
+    resolve to nothing -- and a file this check cannot find is not evidence that a lib goes unloaded.
+
+    The walk itself (Test-ContractLibReachable) lives in script-contract-lib.ps1 beside the records,
+    with the measurement that chose it over a text match written down there.
+
     Soft/read-only, mirroring check-roster-sync.ps1: this script changes nothing, in any repo.
     [OK]/[INFO]/[ERROR] convention shared via check-report-lib.ps1 (issue #114).
 
@@ -113,11 +136,18 @@
 .PARAMETER ConsumerPathOverride
     (Optional, for tests) Use this path as the consumer repo root instead of the dual-context default.
 
+.PARAMETER SkipReachability
+    Run the presence half only. Passed by the SessionStart hook, which filters this check's output to
+    [ERROR]/[SCOPE] -- so a reachability finding, always [INFO], could never reach the session context,
+    while the AST walk behind it measured ~1,470 ms against a ~510 ms check. Off by default, because a
+    deliberate run is exactly where those findings are read.
+
 .EXAMPLE
     .\scripts\sync\check-script-contract.ps1
 #>
 param(
-    [string]$ConsumerPathOverride = ''
+    [string]$ConsumerPathOverride = '',
+    [switch]$SkipReachability
 )
 
 Set-StrictMode -Version Latest
@@ -176,6 +206,51 @@ function Get-RecordReturns {
     param([hashtable]$Record)
     if ($Record.ContainsKey('Returns') -and $Record.Returns) { return " It must return $($Record.Returns)." }
     return ''
+}
+
+# PRESENT IS NOT THE SAME AS IN SCOPE (inbound #580). A record claims a shared script calls the
+# function; a lib that script never dot-sources is not in scope at runtime however present it is, so the
+# probe above reports [OK] while the shared script silently runs on its built-in fallback. The measured
+# instance: a consumer whose branch table produces types outside the canonical four had every folded
+# entry read as typeless and then a refused fold, with this check green throughout.
+#
+# ALWAYS [INFO], NEVER [ERROR], and that is a deliberate ceiling rather than caution. Every function
+# reached this way is probed with Get-Command by the lib that wants it, so the fallback is a designed
+# state, not a breach -- and for most repos it is also the RIGHT state, since branch-info.ps1 is
+# repo-owned and a repo whose types are the canonical four loses nothing. What the reader needs is to
+# learn which answer they are getting, before the fold rather than at it.
+#
+# A SCRIPT THIS CHECK CANNOT LOCATE PRODUCES NO CLAIM AT ALL. check-roster-sync ships in a different
+# plugin and 'cut-release skill' is not a script, so both resolve to nothing here -- and a missing file
+# is not evidence that a lib is unloaded. Silence is the honest report; guessing would put two false
+# findings in every consumer's session, which is how a check gets switched off rather than heeded.
+#
+# AND IT IS SKIPPED AT SESSION START, WHICH IS THE POINT OF -SkipReachability. Measured when the walk
+# was built: it adds ~1,470 ms to a check that ran in ~510 ms, paid at every session in every consumer
+# -- and the hook filters the output to '[ERROR]|[SCOPE]', so a finding that is ALWAYS [INFO] can never
+# reach the session context anyway. That is 1.5 seconds buying nothing, forever. The walk stays ON by
+# default, where it is read: a deliberate run, the adopt-config flow, CI. Surfacing it from the hook
+# instead was considered and rejected for the reason this repo already has written down -- a signal a
+# healthy repo cannot clear is noise, and a repo that legitimately leaves the seam unreachable would
+# get the same line at every session until it stopped reading the check at all.
+function Write-ReachabilityGaps {
+    param([hashtable]$Record, [string]$LibRel)
+
+    if ($SkipReachability) { return }
+
+    foreach ($scriptName in @($Record.Scripts)) {
+        $scriptPath = Resolve-SharedScriptPath -Name $scriptName
+        if (-not $scriptPath) { continue }
+        if (Test-ContractLibReachable -ScriptPath $scriptPath -RepoRoot $repoRoot -LibRelPath $LibRel) { continue }
+
+        $def = Get-RecordDefault -Record $Record
+        $fallback = if ($def) { "'$def'" } else { 'its built-in fallback' }
+        Write-Info ("'$($Record.Function)' is present in $LibRel but NOT IN SCOPE for '$scriptName': " +
+            "that script never dot-sources $LibRel, directly or through a lib it loads, so it runs on $fallback " +
+            "instead of your answer. Nothing crashes -- the caller probes for the function and falls back by " +
+            "design -- and if that fallback is right for this repo there is nothing to do. To make your answer " +
+            "reachable, dot-source $LibRel from a file the script does load, such as scripts\repo-config.ps1.")
+    }
 }
 
 # One finding line for a contract record that could not be satisfied: [ERROR] when required, [INFO]
@@ -263,6 +338,7 @@ foreach ($libRel in $contractLibs) {
         $needed = if (Test-OptionalRecord -Record $r) { 'used by' } else { 'required by' }
         if ($probe.Present[$r.Function]) {
             Write-Ok "'$($r.Function)' present in $libRel"
+            Write-ReachabilityGaps -Record $r -LibRel $libRel
         } else {
             Write-ContractGap -Record $r -Message "'$($r.Function)' missing from $libRel ($needed`: $scriptList) -- this lib predates the contract the shared script(s) call; add the function.$(Get-RecordReturns -Record $r)"
         }

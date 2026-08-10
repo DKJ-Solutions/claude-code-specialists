@@ -56,7 +56,13 @@ try {
         exit 0
     }
 
-    $checkArgs = @()
+    # The reachability half of the check is deliberately NOT run here. Its findings are always [INFO],
+    # and the filter below passes only [ERROR]/[SCOPE] -- so nothing it produces could reach the session
+    # context, while the AST walk behind it measured ~1,470 ms against a ~510 ms check. Paying that at
+    # every session start, in every consumer, for output that is filtered out again, is the clearest
+    # possible case of cost without benefit. A deliberate run of check-script-contract.ps1 still does the
+    # full check, which is where those findings are read.
+    $checkArgs = @('-SkipReachability')
     if ($ConsumerPathOverride) { $checkArgs += @('-ConsumerPathOverride', $ConsumerPathOverride) }
 
     $out = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $checkScript @checkArgs)
