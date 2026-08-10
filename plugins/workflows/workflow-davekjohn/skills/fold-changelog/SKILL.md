@@ -93,7 +93,7 @@ first section under it. The fold used to prepend `#NN · ` to a title heading; n
 gone, because the number is in the entry's Pull Request section, where the url makes it clickable rather
 than merely printed.
 
-**The highlights document is the exception, and only for the heading.** Its reader is a consumer, who has no
+**The consumer document is the exception, and only for the heading.** Its reader is a consumer, who has no
 branch — so there the heading is replaced by the entry's `Branch title`, exactly as the PR number and
 the merge date are dropped there for being internal administration. `CHANGELOG.md` and the developer notes
 keep the branch heading.

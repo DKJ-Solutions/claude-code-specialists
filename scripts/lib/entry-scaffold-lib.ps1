@@ -222,7 +222,7 @@ function Get-EntryTextOutsideFences {
 #   Tier 2 -- a consumer of the product notices it.
 #
 # CUMULATIVE, NOT THREE BOXES: tier 2 implies tier 1, so a tier-2 entry appears in both the internal
-# note and the highlights. That is what keeps 'tier' one axis of impact instead of three categories
+# note and the consumer document. That is what keeps 'tier' one axis of impact instead of three categories
 # somebody has to choose between.
 #
 # THE LABEL IS NOT REPO-OWNED, unlike the four scaffold strings above, and that is deliberate rather
@@ -360,7 +360,7 @@ function Remove-EntryTierLine {
         What did not change is that the line must never travel OUTWARD. A self-assigned tier printed at a
         consumer is the same class of thing as a self-assigned score, and the line now reaches CHANGELOG.md
         where it never used to -- so this belongs on the same stripping path as Remove-EntryImpactTable, in
-        the renderers that build the highlights, the per-plugin CHANGELOGs and the release cards. That wiring
+        the renderers that build the consumer document, the per-plugin CHANGELOGs and the release cards. That wiring
         is the release side's to make; this function is unchanged and waiting for it.
 
         Same shape as Remove-EntryPluginsLine in release-lib.ps1, deliberately: both strip one
@@ -417,7 +417,7 @@ function Remove-EntryTierLine {
 #     | 1 | 4 | the routine version bump stops needing a developer |
 #
 # WHAT THE SHAPE BUYS, beyond reading better than three colon-separated keys. The tier ladder is
-# CUMULATIVE -- tier 2 implies tier 1, so a tier-2 change appears in the highlights AND in the internal
+# CUMULATIVE -- tier 2 implies tier 1, so a tier-2 change appears in the consumer document AND in the internal
 # note -- and until now that was implied by two differently-suffixed keys ('Significance' and
 # 'SignificanceConsumer') that a reader had to know were audiences. As rows it is literal: the rows an
 # entry has ARE the documents it appears in, and each row's number is that document's reader answering
@@ -472,7 +472,7 @@ function Remove-EntryTierLine {
 # NO SCAFFOLDED NUMBER, WHICH IS THE OPPOSITE CHOICE FROM THE OLD TIER DEFAULT, AND DELIBERATE. 'Tier: 0'
 # had a default because 0 is a legitimate, harmless final answer -- forgetting it under-promotes, which is
 # loud at the cut. A significance score has no harmless value: any number written for the author would be
-# a GUESS, and this repo has measured what a guessed ranking costs. The retired highlights marker guessed
+# a GUESS, and this repo has measured what a guessed ranking costs. The retired remove-before-publishing marker guessed
 # from the branch prefix which changes a consumer would notice and put v3.2.0's single most consequential
 # change -- renaming the marketplace, which breaks every existing install -- below the line, because it
 # arrived on a chore/ branch. So the scaffold writes the tier-0 row and nothing else, and the cut refuses a
@@ -801,7 +801,7 @@ function Format-EntrySignificanceSections {
         Called with no rows it renders the SCAFFOLD: tier 0 alone, its guidance comment standing where the
         why goes and its score EMPTY. Tier 0 is the honest default claim -- reaches nobody outside this repo
         -- while a scaffolded SCORE would be a guess at a ranking, which is the failure the retired
-        highlights marker was measured on.
+        remove-before-publishing marker was measured on.
 
         THE VISIBLE 'TODO:' UNDER THE GUIDANCE IS GONE (Dave, August 6, 2026), which reverses the rule this
         format carried the day before -- "guidance in the comment, the prompt stays in view". It went because
@@ -1360,7 +1360,7 @@ function Get-EntryImpactFindings {
         merge without one, the release may not be cut. Two gates, one definition of "wrong", or they drift
         and the earlier one starts passing what the later one refuses.
 
-        THE LADDER IS CHECKED AS A LADDER. An entry claiming tier 2 appears in the highlights AND in the
+        THE LADDER IS CHECKED AS A LADDER. An entry claiming tier 2 appears in the consumer document AND in the
         internal note, so it owes a row for tier 1 as well -- and being asked for it is the point rather
         than a chore, because "reaches consumers" without "and here is what colleagues get out of it" is
         half a claim. Every tier from 1 up to the declared reach needs a row, a score and a why.
@@ -1425,9 +1425,9 @@ function Remove-EntryImpactTable {
         be reproduced without re-estimating it. The record therefore keeps the table, and the development
         notes are the last place each ranking's justification survives.
 
-        THE DOCUMENTS THAT TRAVEL OUTWARD STRIP IT: the highlights, the per-plugin CHANGELOGs and the
+        THE DOCUMENTS THAT TRAVEL OUTWARD STRIP IT: the consumer document, the per-plugin CHANGELOGs and the
         release cards. A self-assigned number printed at a consumer is a marketing claim, and this repo has
-        measured what a published guess costs -- the retired highlights marker is in release-lib's history
+        measured what a published guess costs -- the retired remove-before-publishing marker is in release-lib's history
         for exactly that. The number does its work by deciding the order and then gets out of the way.
 
         The fold also calls it for an UNSCORED table -- a tier-0 entry's scaffold row, which is a question
@@ -1443,7 +1443,7 @@ function Remove-EntryImpactTable {
         own '### Who is this for' heading, and that heading exists to introduce the table -- the entry format
         is explicit that the table IS the answer rather than prose beside it, so a stripped table leaves a
         question with no answer under it. Measured while cutting v3.6.0 with -NoPush: 17 empty sections in
-        each release card, 17 in the per-plugin CHANGELOG and 16 in the highlights draft, in exactly the
+        each release card, 17 in the per-plugin CHANGELOG and 16 in the consumer draft, in exactly the
         documents that travel to consumers in the plugin cache. The record was correct throughout, which is
         why nothing upstream noticed -- the development notes keep the table, so they keep the heading too.
 
@@ -1580,7 +1580,7 @@ function Remove-EntryTierSections {
         THE HEADING GOES TOO WHEN NOTHING IS LEFT UNDER IT, via the same Remove-EmptyImpactSection the
         table remover calls. That behaviour was measured on the shape this one replaces: leaving the heading
         standing shipped a named question with no answer under it into 17 sections per release card, 17 per
-        per-plugin CHANGELOG and 16 in the highlights draft, in exactly the documents that travel to a
+        per-plugin CHANGELOG and 16 in the consumer draft, in exactly the documents that travel to a
         consumer. The sub-sections inherit the finding because they inherit the position -- they ARE the
         section's content, so removing them empties it in precisely the same way.
 
@@ -1652,7 +1652,7 @@ function Get-ImpactInsertOffset {
         THE FOLD IS WHAT KEEPS CHANGELOG.md ORDERED, and it has to be, because the cut EMPTIES the tier
         sections. There is no later moment at which the pending list could be sorted: the release documents
         read the section in document order, so whatever order the fold leaves behind IS the order the notes
-        and the highlights inherit. That is also what makes the ordering reproducible across the two moments
+        and the consumer document inherits. That is also what makes the ordering reproducible across the two moments
         days apart, with nothing re-estimated -- the numbers are read from the file both times, and the
         second reader does not sort at all.
 

@@ -163,15 +163,15 @@ August 4, 2026). The two halves of that decision have separate reasons, so keep 
 
 - **Every release.** Until this date a patch skipped the step entirely (tag only). It no longer does, so
   the Release page becomes a continuous record rather than one with gaps where the patches were.
-- **The internal note as the body**, with the **highlights and the development notes as attachments** —
-  the three-row table in the skill's step 5. Dave's reasoning: highlights only exist at a minor or major,
+- **The internal note as the body**, with the **consumer document and the development notes as attachments** —
+  the three-row table in the skill's step 5. Dave's reasoning: the consumer document only exists at a minor or major,
   while the internal note exists at every release, so it is the only tier that can be the body under a
   no-exceptions rule. It is also the tier written as *what the work is worth*, which is what a public
   Release page is read as.
 - **The cost, stated rather than discovered.** The internal tier deliberately carries no file names, no
   commands and no code. On a release that requires the reader to act — `v3.2.0`, where the marketplace
   rename breaks every existing install *with no error message* — the migration steps are in the attached
-  highlights, not on the page. So when a release needs an action, say that in the body and point at the
+  consumer document, not on the page. So when a release needs an action, say that in the body and point at the
   attachment. This was raised as an objection before the decision and Dave chose the internal note
   anyway; it is recorded as a known trade-off, not as an open question.
 
@@ -215,8 +215,8 @@ The `releases/` directory (modeled on life-hub):
   inside an immutable tag. The cell was chosen over a fourth column because the table's shape is matched by
   one regex that three readers share — including the row inserter and the new-major guardrail — and only new
   rows are touched, so the existing 72 keep pointing where they always did.
-- **`releases/highlights/<X>.x/<X.Y.Z>.md`** — the tier-2 document, generated **only for a minor or
-  major** (`Get-ReleaseHighlightsBumps`) and built from **the tier-2 entries**. Written for the reader who
+- **`releases/consumer/<X>.x/<X.Y.Z>.md`** — the tier-2 document, generated **only for a minor or
+  major** (`Get-ReleaseConsumerBumps`) and built from **the tier-2 entries**. Written for the reader who
   decides whether to *update*, not for the one who reviews the diff: entry metadata (PR number, branch
   type, date) is stripped. **It is a draft and Rendall edits it before it is published** — the selection
   arrives already made, the prose does not. Turned on August 3, 2026, after this lens had briefly said the
@@ -236,7 +236,7 @@ The `releases/` directory (modeled on life-hub):
     tiers that cannot be regenerated from anything.
   - Think in time, risk and reduced dependence on a developer. A release with nothing for a consumer
     can still be the one where a routine change stopped needing one — that gap **is** why this tier
-    exists, and it is the reason it covers patches while highlights does not.
+    exists, and it is the reason it covers patches while the consumer document does not.
   - **The third heading is past tense** — *"What was still open at this release"*, since August 4, 2026.
     The reason and the rule are in the `cut-release` skill and in the script's own skeleton hint, both
     portable. Local measurement that produced it: three present-tense lines went stale within hours on
@@ -245,7 +245,7 @@ The `releases/` directory (modeled on life-hub):
 - **All three group per major (`3.x`)**, from the single answer in `Get-ReleaseNotesGrouping`. The
   consumer this model came from folders per minor; Dave chose to keep `<X>.x` here.
 
-**What Rendall no longer has to do, and the measurement behind it.** Until August 5, 2026 the highlights
+**What Rendall no longer has to do, and the measurement behind it.** Until August 5, 2026 the consumer
 draft put `Feat`/`Fix` above a "remove before publishing" marker and everything else below it, and Rendall's
 editing pass had to read both halves and promote what a consumer would want to know. In the repo this tier
 was ported from that split is reliable, because a `Style` or `Content` branch there *is* a storefront
@@ -271,14 +271,14 @@ repo-internal work used to be refused outright — the answer is that announcing
 patch is for. And a minor used to demand a tier-2 entry, so tier-1 work earned only a patch.
 
 **What keeps the looser rule honest is that the documents follow the TIER, not the bump.** A tier-1-only
-minor writes the internal note and no highlights, because the highlights condition asks for a tier-2 entry
+minor writes the internal note and no consumer document, because the consumer-document condition asks for a tier-2 entry
 rather than for a bump type. So a consumer is never handed a document about work they cannot see, even
 though their version number moved.
 `-SkipTierGate` overrules it and should be a conversation, not a habit: the refusal names the bump the
 pending work *does* earn, and taking that is nearly always the right move.
 
 **Rendall's two hand-written documents land via a branch + PR, not on the release commit** (confirmed by
-Dave, August 4, 2026). Both the edited highlights draft and the filled-in internal note are written
+Dave, August 4, 2026). Both the edited consumer draft and the filled-in internal note are written
 *after* the cut — `cut-release.ps1` commits and tags in one motion, and `new-internal-note.ps1` needs the
 development notes as its input — so by the time either exists, the tag is already set. Neither is one of
 the two named direct-on-`main` exceptions, so Rendall ships them the ordinary way: `new-branch` →

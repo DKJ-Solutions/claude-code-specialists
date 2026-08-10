@@ -97,7 +97,7 @@ gate's floor *is* this repo's policy — tier 0 only is a patch, tier 1 or highe
 additionally needs ten minors in the current major line.
 
 The audience of each release document follows the **tier**, not the bump, which is what keeps that looser
-rule honest: a tier-1-only minor writes the internal note and no highlights, so nobody outside is handed a
+rule honest: a tier-1-only minor writes the internal note and no consumer document, so nobody outside is handed a
 document about work they cannot see. Full model:
 [the tier model](releases/README.md#the-tier-model) and
 [what a release must earn](releases/README.md#what-a-release-must-earn).

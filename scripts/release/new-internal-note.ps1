@@ -8,23 +8,23 @@
 
       releases/development/<dir>/<X.Y.Z>.md   tier 0   developers   -- always, complete and long
       releases/internal/<dir>/<X.Y.Z>.md      tier 1   colleagues   -- always, what the work is worth
-      releases/highlights/<dir>/<X.Y.Z>.md    tier 2   consumers    -- minor/major, what they notice
+      releases/consumer/<dir>/<X.Y.Z>.md    tier 2   consumers    -- minor/major, what they notice
 
-    THE DISTINCTION THAT KEEPS THE TIERS WORKABLE: highlights = WHAT THE CONSUMER NOTICES, internal =
+    THE DISTINCTION THAT KEEPS THE TIERS WORKABLE: consumer = WHAT THE CONSUMER NOTICES, internal =
     WHAT THE ORGANISATION GETS OUT OF IT. They come apart most clearly on a patch, which is where this
     tier was first needed: a release with nothing for a consumer -- correctly a patch, therefore no
-    highlights -- can still be the release where a team stopped needing a developer for a routine change.
+    consumer document -- can still be the release where a team stopped needing a developer for a routine change.
 
     WHICH ENTRIES IT CARRIES OVER: tier 1 AND tier 2, because the ladder is cumulative. Something a
     consumer notices is something a colleague should hear about too, so a tier-2 entry appears in this
-    document as well as in the highlights. Tier-0 entries do not: they are repo-internal by definition,
+    document as well as in the consumer document. Tier-0 entries do not: they are repo-internal by definition,
     the developer notes are their record, and copying them here would rebuild the document this tier
     exists to avoid.
 
     IT GENERATES ONLY HALF, AND THAT IS THE POINT. Version, date, type and the entry titles come from the
     developer notes; "what it is worth" cannot be derived from a changelog. So what you get is a SKELETON
     with the titles as bullets and three fixed headings to fill in -- the same "edit it afterwards" shape
-    the highlights tier has. The three headings are fixed on purpose: without that boundary this tier
+    the consumer tier has. The three headings are fixed on purpose: without that boundary this tier
     grows back into the developer notes it was created to avoid.
 
     WHY THIS IS ITS OWN SCRIPT RATHER THAN PART OF cut-release.ps1. In the repo this was ported from the
@@ -39,7 +39,7 @@
     output and errors are English like every shared script here, but the DOCUMENT it writes is read by a
     given repo's own colleagues -- so every string that lands in the file comes from the optional
     Get-InternalNoteWording in scripts/repo-config.ps1, falling back to the English text below. Same
-    #410 reasoning as the entry stubs and the highlights marker.
+    #410 reasoning as the entry stubs and the remove-before-publishing marker.
 
     Pure ASCII (repo convention for .ps1): Windows PowerShell 5.1 reads a BOM-less script using the system
     ANSI codepage, so a literal non-ASCII character in the source is decoded wrongly. The middot that
@@ -238,7 +238,7 @@ if (-not $typeLabel) {
 #
 # ONLY TIER 1 AND ABOVE REACH THIS DOCUMENT. The ladder is cumulative: tier 2 is what a consumer notices
 # and therefore also something a colleague should hear about, so it belongs here as well as in the
-# highlights. Tier 0 is repo-internal by definition -- it is in the developer notes, which is where the
+# consumer document. Tier 0 is repo-internal by definition -- it is in the developer notes, which is where the
 # record belongs, and putting it here would rebuild exactly the document this tier exists to avoid.
 #
 # NOTES WITH NO TIER HEADINGS AT ALL take everything, which is the repo-without-a-tier-split case: there

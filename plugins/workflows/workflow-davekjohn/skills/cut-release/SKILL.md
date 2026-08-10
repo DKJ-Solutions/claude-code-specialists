@@ -2,7 +2,7 @@
 name: cut-release
 description: >-
   Checklist for the closing steps of cutting a release: the git tag + push, the internal summary and
-  the highlights edit, then a GitHub Release (body = the highest tier the repo has, every other tier
+  the consumer-document edit, then a GitHub Release (body = the highest tier the repo has, every other tier
   as an attachment -- gh's release-notes body has a hard 125,000-character limit), plus branch cleanup.
   Where the repo has a separate "go live" stage (Get-LiveStage in scripts/repo-config.ps1), also the
   push to that live target and moving the "<- LIVE" marker. Prints ready-to-paste command blocks in
@@ -96,13 +96,13 @@ each command as you go — do not skip a step or reorder them from memory.
      |---|---|---|
      | `0` | patch | the development notes |
      | `1` | minor | + the internal note |
-     | `2` | minor | + the highlights, for consumers |
+     | `2` | minor | + the consumer document, for consumers |
 
      A major additionally needs enough minors behind the line. So a refusal usually means the bump is
      wrong, not the gate — the script names the bump the work *does* earn; take that instead.
 
      **The documents follow the TIER, not the bump**, which is why a tier-1-only minor writes no
-     highlights: the version moves for everyone, but nobody outside is handed a document about work they
+     consumer document: the version moves for everyone, but nobody outside is handed a document about work they
      cannot see. Deliberately a separate flag from `-SkipLint`, because it overrules a judgement about
      **content** rather than skipping a tool.
    - **`-SkipSignificanceGate`** cuts even though a pending entry that reaches tier 1 or higher has not said
@@ -163,17 +163,17 @@ each command as you go — do not skip a step or reorder them from memory.
    note is the Release body (step 5), it is published output and does not move with reality, so a
    present-tense line in it goes stale in hours rather than months. Write that section as a snapshot of
    the release, and expect to re-read the *previous* note whenever something it called open closes. The
-   development notes and the highlights need no such pass: they are written once and left alone.
+   development notes and the consumer document needs no such pass: they are written once and left alone.
 
-   **This is the tier that covers a patch, and that is why it exists.** Highlights answers *what a
+   **This is the tier that covers a patch, and that is why it exists.** The consumer document answers *what a
    consumer notices*; this answers *what the organisation gets out of it*. A release with nothing for a
-   consumer — correctly a patch, so no highlights — can still be the one where a routine change stopped
+   consumer — correctly a patch, so no consumer document — can still be the one where a routine change stopped
    needing a developer. It refuses to overwrite an existing note without `-Force`: this is the one
    document of the three that cannot be regenerated from anything.
 
-3. **Edit the highlights draft — where the repo generates one.** Where the repo sets
-   `Get-ReleaseHighlightsBumps` in `scripts\repo-config.ps1` and this bump is one of them,
-   `cut-release.ps1` has already written `releases/highlights/<dir>/<X.Y.Z>.md` — markdown only. It is the
+3. **Edit the consumer draft — where the repo generates one.** Where the repo sets
+   `Get-ReleaseConsumerBumps` in `scripts\repo-config.ps1` and this bump is one of them,
+   `cut-release.ps1` has already written `releases/consumer/<dir>/<X.Y.Z>.md` — markdown only. It is the
    release's **tier-2 entries**: the ones whose author declared that a consumer notices them.
 
    **Nothing to delete, and that is the change.** This document used to carry a developer-only block under
@@ -193,7 +193,7 @@ each command as you go — do not skip a step or reorder them from memory.
    1,034, below the marker, because it arrived on a `chore/` branch. The tier selection removes the second
    half of that problem; the rewrite is still yours.
 
-4. **Ship the hand-written documents via a branch + PR.** The internal note and the edited highlights
+4. **Ship the hand-written documents via a branch + PR.** The internal note and the edited consumer
    draft are both written after the cut, and `cut-release.ps1` has already committed and tagged by
    then — so neither can ride along on the release commit, and neither is one of the two named
    direct-on-`main` exceptions. Use the normal `new-branch` → `ship-pr` route.
@@ -229,8 +229,8 @@ each command as you go — do not skip a step or reorder them from memory.
 
    | the repo has | body | attachments |
    |---|---|---|
-   | an internal note | `releases/internal/<dir>/<X.Y.Z>.md` | the development notes + the highlights, where one exists |
-   | highlights but no internal note | the edited `releases/highlights/<dir>/<X.Y.Z>.md` | the development notes |
+   | an internal note | `releases/internal/<dir>/<X.Y.Z>.md` | the development notes + the consumer document, where one exists |
+   | a consumer document but no internal note | the edited `releases/consumer/<dir>/<X.Y.Z>.md` | the development notes |
    | neither | the development notes | — |
 
    **Never inline the development notes**, whichever row applies: `gh release create`'s notes body has a
@@ -238,11 +238,11 @@ each command as you go — do not skip a step or reorder them from memory.
    characters** and the "paste everything into the body" approach returned an HTTP 422 from `gh`. The
    body/attachment split is what keeps the command from failing on anything but the smallest release.
 
-   **Why the internal note outranks the highlights as the body, where both exist.** It is the only tier
+   **Why the internal note outranks the consumer document as the body, where both exist.** It is the only tier
    written at *every* release, so the page reads the same way whether the release was a patch or a major —
    and it answers what the work is worth, which is what a Release page is read as. The cost is real and
    worth naming: the internal tier deliberately carries no file names, no commands and no code, so on a
-   release that requires the reader to *act*, the instruction lives in the attached highlights rather than
+   release that requires the reader to *act*, the instruction lives in the attached consumer document rather than
    on the page. Say so in the body when that applies, rather than leaving the reader to find it.
 
 6. **Name the cache refresh in the closing report — pushing the tag is not the end of a release.** A
@@ -364,7 +364,7 @@ owes this text. Write it there, and the cut carries it outward for you.
   fallback (`''`, i.e. no live stage), never `[ERROR]`.
 - The script's own getters are separate from this skill's and all optional in the same way:
   `Get-ReservedRootMd`, `Get-ReleaseNotesGrouping`, `Get-ReleaseHistoryPath`, `Get-ReleasePluginTier`,
-  `Get-ReleaseHighlightsBumps` and `Get-ReleaseMajorMinMinors`. Define none of them and the cut behaves
+  `Get-ReleaseConsumerBumps` and `Get-ReleaseMajorMinMinors`. Define none of them and the cut behaves
   exactly as it does in the source repo. Run `check-script-contract.ps1` to see which ones this repo answers
   and which fall back.
 - **Six seams retired on August 5, 2026, and a consumer that still defines one is unaffected** — nothing
@@ -408,7 +408,7 @@ owes this text. Write it there, and the cut carries it outward for you.
   `Get-LiveStage` says there is one to run.
 - **And inside Block 1 the GitHub Release moved to last, which is a correction rather than a
   preference** (August 4, 2026). It used to be step 2, directly after the tag, because its body was the
-  highlights file that `cut-release.ps1` had already generated. Once the body is the internal note — a
+  consumer file that `cut-release.ps1` had already generated. Once the body is the internal note — a
   document step 2 only *starts* and step 4 merges — publishing from step 2 would publish a body that does
   not exist yet. A checklist meant to impose itself has to be walked in an order that is possible.
 - **A release itself is cut only at explicit request** (a version bump is never automatic) — that

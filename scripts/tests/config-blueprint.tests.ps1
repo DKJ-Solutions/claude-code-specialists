@@ -137,7 +137,7 @@ Assert-Equal 0 $markerInWhy.Count 'no AdoptWhy text contains a report marker tha
 
 # The four the issue named, plus Get-RepoName -- the case that is obvious under this question and was
 # absent from the issue's list because it answers a different one.
-foreach ($fn in 'Get-ReservedRootMd', 'Get-ReleasePluginTier', 'Get-ReleaseHighlightsBumps', 'Get-ReleaseMajorMinMinors', 'Get-RepoName') {
+foreach ($fn in 'Get-ReservedRootMd', 'Get-ReleasePluginTier', 'Get-ReleaseConsumerBumps', 'Get-ReleaseMajorMinMinors', 'Get-RepoName') {
     $rec = $contract | Where-Object { $_.Function -eq $fn }
     Assert-Equal 'decide' $rec.Adopt "$fn is the consumer's to decide"
 }

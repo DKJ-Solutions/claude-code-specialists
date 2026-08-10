@@ -298,7 +298,7 @@ function Get-SharedScriptPairs {
             # seam (scripts\repo-config.ps1), each optional, each falling back to what this script did
             # unshared, so registering it here changes nothing about how the workshop cuts a release.
             #
-            # The highlights tier the other repo generates is NOT part of this entry: porting it is
+            # The consumer tier the other repo generates is NOT part of this entry: porting it is
             # phase 2, and it renders stakeholder-facing HTML, which under the safety rules is work that
             # waits for Dave's own eye rather than merging on the gates.
             Name   = 'cut-release'

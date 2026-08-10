@@ -856,7 +856,7 @@ Assert-True (-not ((Remove-EntryHtmlComments -EntryText $sigText) -match [regex]
 Assert-True (-not ($sigText -match 'continue to Tier 3')) 'sections: tier 2 carries none -- there is no successor to route to'
 
 # The scaffold: tier 0 alone, why placeholdered, score EMPTY. A scaffolded score would be a guess at a
-# ranking, which is the failure the retired highlights marker was measured on.
+# ranking, which is the failure the retired remove-before-publishing marker was measured on.
 $sigScaffold = (Format-EntrySignificanceSections) -join "`n"
 # ALL THREE TIERS ARE SCAFFOLDED (Dave, August 7, 2026), which reverses what this asserted the day before.
 # Tier 1 and 2 used to be left out, and their absence WAS the claim that the change reaches nobody there --
@@ -1026,7 +1026,7 @@ Assert-True ((Get-EntrySectionRetiredNames -Key 'Description') -contains 'Branch
 
 # The entries in CHANGELOG.md and in every consumer's tree carry the old heading right now. A reader that
 # knew only the new one would find no title on any of them -- silent, and wrong in the direction that
-# empties a highlights document.
+# empties a consumer document.
 $oldNamed = "## ``feat/x`` changelog`n`n### Branch description`n`nThe old name still reads`n"
 Assert-Equal 'The old name still reads' (Get-EntrySectionAnswer -EntryText $oldNamed -Key 'Description') 'an entry under the retired heading still yields its title'
 Assert-True (Test-EntryHasSection -EntryText $oldNamed -Key 'Description') 'and it counts as HAVING the section, so the emptiness gate does not accuse it'

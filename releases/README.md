@@ -19,7 +19,7 @@ release document it appears in, and — together with its significance score —
 
 | tier | who notices | release document |
 |---|---|---|
-| **2** | consumers of the product | `highlights/<dir>/<X.Y.Z>.md` |
+| **2** | consumers of the product | `consumer/<dir>/<X.Y.Z>.md` |
 | **1** | colleagues working on this project | `internal/<dir>/<X.Y.Z>.md` |
 | **0** | only this repo's own developers | `development/<dir>/<X.Y.Z>.md` |
 
@@ -31,7 +31,7 @@ reach in the `### Significance` section it carries, one `#### Tier N` sub-sectio
 leaves is what these three documents inherit, with nothing re-estimated days later.
 
 **The ladder is cumulative, so the documents are not disjoint.** Something a consumer notices is something
-a colleague should hear about too — a tier-2 entry therefore appears in the highlights *and* in the internal
+a colleague should hear about too — a tier-2 entry therefore appears in the consumer document *and* in the internal
 note. The development note carries everything, tier 0 included, because it is the record rather than a
 summary of one.
 
@@ -71,7 +71,7 @@ moment, and the one document that gets written is the record.
 **Why a minor needs tier 1 rather than tier 2.** It demanded a tier-2 entry until August 7, 2026, so work a
 colleague on this project got something out of earned only a patch — while the version here speaks to all
 stakeholders, not to consumers alone. What keeps the looser rule honest is that **the documents follow the
-tier and not the bump**: a tier-1-only minor writes the internal note and **no highlights**, so nobody
+tier and not the bump**: a tier-1-only minor writes the internal note and **no consumer document**, so nobody
 outside is handed a document about work they cannot see.
 
 **Why a major counts minors rather than pending work:** a major is a **recap** of the minors before it,
@@ -106,7 +106,7 @@ stands for whichever this repo uses.
 |---|---|---|---|
 | `development/<dir>/<X.Y.Z>.md` | developers — the full per-PR record, auto-complete | every release | `cut-release.ps1` |
 | `internal/<dir>/<X.Y.Z>.md` | colleagues, employers — what the work is worth | every release, patch included | `new-internal-note.ps1` |
-| `highlights/<dir>/<X.Y.Z>.md` | consumers — what they actually notice | minor/major, **and** only with a tier-2 entry pending | `cut-release.ps1` |
+| `consumer/<dir>/<X.Y.Z>.md` | consumers — what they actually notice | minor/major, **and** only with a tier-2 entry pending | `cut-release.ps1` |
 
 ### Tier 0 - development
 
@@ -134,9 +134,9 @@ release-notes body has a hard **125,000-character** limit, which a full notes fi
 ### Tier 1 - internal
 
 **The tier that covers a release with nothing for a consumer, and that is the whole reason it exists next to
-highlights.** The two answer different questions: highlights is *what a consumer notices*, internal is *what
+the consumer document.** The two answer different questions: the consumer document is *what a consumer notices*, internal is *what
 the organisation gets out of it*. They come apart wherever a release has no tier-2 entry — a patch, or a
-minor made of tier-1 work — and get no highlights at all, while still being the release where a routine
+minor made of tier-1 work — and get no consumer document at all, while still being the release where a routine
 change stopped needing a developer.
 
 `new-internal-note.ps1` generates only the skeleton (metadata + the entry titles as bullets + three fixed
@@ -154,18 +154,18 @@ consequence worth stating: anything its "what is still open" section phrases as 
 place within hours of publishing. Write that section as "open at the time of this release", not as a
 statement about now.
 
-### Tier 2 - highlights
+### Tier 2 - the consumer document
 
 **It is the tier-2 entries, and nothing else.** Entry metadata is stripped, and the document is written only
-when **two** conditions hold at once: the bump is one the seam names (`Get-ReleaseHighlightsBumps` — minor
-or major here), **and** at least one pending entry actually declared tier 2. A patch has no highlights, for
+when **two** conditions hold at once: the bump is one the seam names (`Get-ReleaseConsumerBumps` — minor
+or major here), **and** at least one pending entry actually declared tier 2. A patch has no consumer document, for
 the same reason it is a patch.
 
 **That second condition became load-bearing on August 7, 2026, and used to be belt-and-braces.** While
 [a minor required a tier-2 entry](#what-a-release-must-earn), a release that earned a minor had a
-highlights reader by construction and the tier check could never fire on its own. Since a minor needs only
+consumer reading it by construction and the tier check could never fire on its own. Since a minor needs only
 tier 1, it is the only thing standing between a tier-1-only release and a document written for consumers
-about work no consumer can see — and a highlights file with a header and no content is worse than none.
+about work no consumer can see — and a consumer document with a header and no content is worse than none.
 
 **Still a draft to be edited, and the reason never depended on the selection.** Entry bodies are written for
 whoever reviews the diff, even when the change reaches a consumer — so the *selection* is right and the
@@ -182,7 +182,7 @@ whoever reviews the diff, even when the change reaches a consumer — so the *se
 ### Where the two hand-written documents land
 
 **Both go through a branch + PR.** `cut-release.ps1` commits and tags in one motion, so by the time you edit
-the highlights draft or run `new-internal-note.ps1` (which needs the development notes as input), the
+the consumer document draft or run `new-internal-note.ps1` (which needs the development notes as input), the
 release commit is already tagged. Neither is one of the two named direct-on-`main` exceptions, so they
 travel the normal reviewed route. The alternative — widening the release exception to cover the written
 notes as well — was offered and declined: an exception is only safe while it stays the size it was granted
@@ -223,7 +223,7 @@ In one motion, on a clean `main`:
 Release.** Not run by `cut-release.ps1` and not automated; the release manager walks through the
 [`cut-release` skill](../plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md)'s checklist: `gh release create`
 with the **internal note** as the release body (`--notes-file`), then `gh release upload` with the full
-development notes **and the edited highlights, where the bump generated one**. Never inline the development
+development notes **and the edited consumer document, where the bump generated one**. Never inline the development
 notes — see [Tier 0 - development](#tier-0---development) for the character limit that makes that fail.
 
 **Upload the attachments under unique filenames.** All three tiers call their file `<X.Y.Z>.md` and an
@@ -319,7 +319,7 @@ outright, so it needs no seam to be in their language. It simply is.
 **A GitHub Release is published at every release, patch included** (Dave, August 4, 2026). Two consequences
 of that "every release" half: patches now get one — so `v2.6.1` and `v2.7.1`, cited here for years as
 examples of releases deliberately without one, describe the **old** rule and are left standing as history
-rather than as guidance. And a patch has no highlights by construction, so on a patch the attachment list is
+rather than as guidance. And a patch has no consumer document by construction, so on a patch the attachment list is
 the development notes alone.
 
 > **Named `davekjohns-workshop` until August 3, 2026.** The marketplace was renamed with the
@@ -336,7 +336,7 @@ the development notes alone.
 
 - **The branch prefix does not predict impact here**, and this is the measurement the whole tier model rests
   on. Held against v3.2.0's 19 entries, the most consequential change for a consumer — renaming the
-  marketplace, which breaks every existing install — arrived on a `chore/` branch. While the highlights
+  marketplace, which breaks every existing install — arrived on a `chore/` branch. While the consumer document
   document was assembled from `Feat`/`Fix` that change landed *below* the remove-before-publishing marker, so
   the guidance here used to be "expect to promote `Docs`/`Chore` items". Since August 5, 2026 there is nothing
   to promote: the entry's author declares the tier, and the branch prefix decides nothing but the category
@@ -351,7 +351,7 @@ the development notes alone.
   [PR #432](https://github.com/DaveKJohn/claude-code-specialists/pull/432) shipped `v3.2.0`'s internal note
   post-tag, gates green and entry folded, with nothing about being post-tag causing friction.
 - **The closing step used to sit directly after the tag** and was moved to last on August 4, 2026. It had
-  worked only because the body was then the highlights file the script itself had already generated.
+  worked only because the body was then the consumer document file the script itself had already generated.
 
 ### The release list
 

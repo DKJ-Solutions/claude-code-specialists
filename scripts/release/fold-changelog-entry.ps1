@@ -25,7 +25,7 @@ the old "could not find the heading -- stopping" path existed for cannot occur.
 WHERE IN that list is decided by the entry's TIER first and its SIGNIFICANCE SCORE second (issue #467),
 and this is the only moment either can be: the cut EMPTIES the pending list, and the release documents
 read what is left in document order without sorting it. So the order this script leaves behind is the
-order the notes and the highlights inherit -- which is what makes it reproducible across two moments days
+order the notes and the consumer document inherits -- which is what makes it reproducible across two moments days
 apart with nothing re-estimated in between. Furthest reach at the top, highest score within a tier; an
 equal rank keeps the NEWER entry above its equals, which is exactly what the fold did before ranking
 existed. That ordering is what the three section headings used to communicate visually, kept as an
