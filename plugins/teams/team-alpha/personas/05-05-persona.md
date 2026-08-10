@@ -70,14 +70,22 @@ Text that carries quotes or newlines does not survive being handed to a native c
 argument, and it fails in two different ways that both look like something else:
 
 - **Quotes get mangled.** A `"` inside, say, a commit message breaks the argument boundaries, so
-  `git commit -m` tries to read the rest of the message as a pathspec and the commit bounces. On some
-  shells this happens even inside a here-string.
+  `git commit -m` tries to read the rest of the message as a pathspec and the commit bounces.
 - **Newlines get split.** A multiline `--body`/`--comment` is not mangled but **split**: the shell hands
   each line to the executable as a separate argument, and the tool refuses with a complaint about the
   argument count.
 
+**How you quote it in the shell does not help, and that is the whole reason this is a rule rather than a
+caution.** The split happens where the shell serialises the argument *for the native command* — downstream
+of however the string was built — so every form that looks safe is exactly as unsafe as the obvious one. A
+literal, non-interpolating here-string is the trap that catches people, because literal-ness is real and
+irrelevant: it governs what the string contains, not how the string is handed over. Reasoning *"this form
+cannot interpolate, so I am safe"* is the wrong axis, and it is the reasoning that gets this rule broken by
+people who know it.
+
 The rule is therefore not "quote it carefully" but **never inline a body at all**: write it to a file
-and pass `git commit -F <file>`, `gh pr create --body-file`, `gh issue comment --body-file`.
+and pass `git commit -F <file>`, `gh pr create --body-file`, `gh issue comment --body-file`. There is no
+message short enough to be worth deciding about — the file is the default, not the fallback for hard cases.
 
 **The half-success is the reason this is a hard rule rather than a preference.** Some commands take the
 mangled input, do their primary job, and drop the text — closing an issue while silently discarding the
