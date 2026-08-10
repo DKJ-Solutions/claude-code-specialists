@@ -1,13 +1,14 @@
-# `main` progress
-
-
-> **You are on `main`.** Do not work in this file yet -- create a branch first.
-> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
-> of the next person who does create one.
-
-This file carries the step list of the branch you are on. It is written when a branch is created
-and returns to this state after the merge.
+## `docs/v4-2-0-release-documents` progress
 
 ### Steps
 
-_(filled in when a branch is created)_
+- [x] Run `new-internal-note.ps1 -Version 4.2.0` (skeleton + the overview row's Version cell)
+- [x] Write the internal note: what is different, what it is worth, what was still open at this release
+- [x] Rewrite the generated consumer draft for the reader who decides whether to update
+- [x] Hold the consumer document against all seven tests, check 25 included
+- [ ] Gates green and the PR opened
+
+### Where I left off
+
+Both documents are written. What remains is the PR: `open-pr` runs the lint and all 30 suites, so the
+last step is where check 25 actually judges the consumer document.
