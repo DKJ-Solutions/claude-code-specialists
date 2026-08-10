@@ -129,6 +129,15 @@ report suggested rather than leaving it to the next reader. Where it does still 
 chain begins, and *then* the reported reason gets the same treatment as any other: verified against
 what it claims, not accepted because the symptom was real.
 
+**And so does the repair the report proposes**, which is a third thing and fails independently of the
+other two. A reporter measures from the outside, so their proposal names mechanisms — a function, a flag,
+a file, a setting — that they inferred rather than read. A report can be right that something is broken,
+right about why, and still hand you a fix built on something that does not exist. Check every mechanism a
+proposal names against the tree before building it, and where one is absent, keep the observation and
+replace the remedy: the reporter saw a real problem, they simply guessed at the lever. Adopting the guess
+is the worst of the three failures, because the result ships as instruction — it does not merely fail to
+help, it tells the next reader to reach for something that was never there.
+
 ## The repo's own way of working comes first
 
 <!-- BEGIN shared:repo-way-of-working -- GENERATED, edit agent-shared/repo-way-of-working.md -->
