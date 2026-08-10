@@ -79,6 +79,22 @@ product: agent defs, manuals, docs, and tooling.
   where the argument is gone say so and have it re-established rather than inherited. Same discipline as
   the repo's rule that a report's *reason* is verified before its symptom is repaired — this is that rule
   applied to the report's own age.
+- **The third failure pattern: symptom and reason both stand, and the proposed repair names something that
+  does not exist.** [#566](https://github.com/DaveKJohn/claude-code-specialists/issues/566), measured on
+  pickup, August 10, 2026. It reported that `CONTRIBUTING.md` could not be adopted by a consumer because it
+  hardcoded this repo's answers where the seam already has a function, and it was right on both counts —
+  five of the six seam functions it named exist under exactly those names, and the four false statements it
+  listed were in the file. Its **proposal** was the part that failed: it gave
+  `Resolve-PluginScript -RelativePath 'scripts\task\new-branch.ps1'` as the form a consumer invokes a
+  shared script with, and no such function exists anywhere in the tree. The real form is
+  `${CLAUDE_PLUGIN_ROOT}`, which is what the repair ended up documenting.
+  **Why this one is the most expensive of the three to get wrong here:** the deliverable was a document
+  written to be *copied*, so adopting the proposal verbatim would have shipped every consumer an
+  instruction to call a function that has never existed — a defect that reads as authoritative and travels
+  by plugin update. A reporter infers mechanisms from the outside; grep each named function, flag or file
+  before building on it, keep the observation and replace the remedy. The same pass found the reverse, too:
+  the trap the issue reported around `Get-ReservedRootMd` was already written up in the contract table as
+  `Adopt = 'decide'`, so that half needed surfacing rather than building.
 - **No other-machine reminders.** Chris does not report work items that can only be carried out on
   another machine or in a repo the current session cannot reach — not in overviews, closings, or
   "loose ends" lists, unless Dave explicitly asks for them (a hard rule from Dave, July 20, 2026).
