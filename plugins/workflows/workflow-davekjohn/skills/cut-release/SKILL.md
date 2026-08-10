@@ -323,6 +323,38 @@ mechanically, and a milestone may well break nothing — a large change can be b
 construction. If nothing breaks, the summary's opening lines have to say so, or a consumer sits on an old
 version waiting for a migration that does not exist.
 
+## When something a consumer builds on disappears, the release has to say so
+
+**The paragraph above is about a milestone; this is about any cut, and it is a convention rather than a
+gate.** Three things a consumer can build on directly are not covered by "the entries carry the detail",
+because a consumer reads the notes to learn what changed *for them* and an entry describes what changed *in
+here*:
+
+- a **shared script** that is removed or renamed (they resolve it by path through the seam);
+- a **script-contract function** that leaves the contract (they may still define it, with a test around it,
+  and nothing will tell them it is dead);
+- a **written convention** the scripts read — a file name, a directory, a document shape.
+
+For each one the release document names it, says what to call or write instead, and states what the
+difference is. One line each is enough; the cost of leaving it out is not.
+
+**Measured, three times in one day** (2026-08-09, inbound
+[#556](https://github.com/DaveKJohn/claude-code-specialists/issues/556),
+[#557](https://github.com/DaveKJohn/claude-code-specialists/issues/557) and
+[#561](https://github.com/DaveKJohn/claude-code-specialists/issues/561)). `v4.0.0` removed
+`new-changelog-entry.ps1`, moved the changelog entry from the repo root into `branch/`, and dropped
+`Get-ChangelogHeading` from the contract. All three were improvements; none was named as breaking. What the
+consumer got instead: a script lookup that threw while they were picking up a Dependabot PR, a CI gate that
+failed *after* the work was done, and a seam function still sitting in their repo with a test around it and
+nothing reading it. **Two of those three fail loudly, which was not the problem** — the problem was that the
+moment of discovery was chosen by the release rather than by them.
+
+**Why this is a convention and not a refusal.** A gate would have to recognise "names a migration" in prose,
+which is exactly the kind of matcher this project has been bitten by — one satisfied by a mention rather than
+a use. What the model *does* already give you is the place to put it: significance band 5 is *the reader must
+act — a breaking change or a required migration*, so an entry that scores a 5 for tier 2 is the entry that
+owes this text. Write it there, and the cut carries it outward for you.
+
 ## Requirements in the consumer
 
 - `scripts\repo-config.ps1` with, optionally, `Get-LiveStage` — same shape as the existing `Get-LintScript`
