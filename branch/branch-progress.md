@@ -10,6 +10,9 @@
 - [x] Tests: `pr-body.tests.ps1` for the lib and the shipped file; six scenarios in
       `check-plugin-integrity.tests.ps1` for check 24, including the near-miss and the no-template case
 - [x] Repair the existing assert that grepped `open-pr.ps1` for the literals — it can call the list now
+- [x] Copy the new lib into BOTH lint fixtures, and warn about that trap at the dot-source: a lib a
+      fixture does not copy kills the script rather than skipping a check — the test gate caught it as
+      four failures in check 23, which this branch never touched
 - [x] `open-pr` skill: the two promises, where the reference lives, and item 3's measurement-not-answer
 - [x] `CONTRIBUTING-portable.md` + the plugin README's folder table
 - [x] `CLAUDE.md`: what travels from #538, and why the placeholder list moved

@@ -181,6 +181,12 @@ function Add-Error([string]$Msg) { $script:errors.Add($Msg) }
 # anything, which is how a consumer merged twelve PRs with no description.
 . (Join-Path $PSScriptRoot '..\lib\pr-body-lib.ps1')
 
+# ADDING A DOT-SOURCE HERE MEANS ADDING IT TO TWO TEST FIXTURES TOO -- check-plugin-integrity.tests.ps1
+# and workflow-exclusivity.tests.ps1 both COPY this script into a temp tree and run it for real. A lib
+# they do not copy does not make one check misbehave: the script dies at this line, so every check after
+# it silently never runs. Measured on the day check 24 landed -- the exclusivity suite reported four
+# failures in check 23, a check that change had not touched.
+
 function Test-JsonFile {
     param([string]$Path)
     try {

@@ -68,6 +68,13 @@ while every heading in a PR template is repeated in **every PR body forever**, s
 would be a permanent empty section in a consumer's PR list. Both documents say to add one when there is
 something to put in it, and say why it is not there already.
 
+**A trap this branch fell into, now written where the next person will be standing.** Two suites COPY
+`check-plugin-integrity.ps1` into a temp tree and run it for real, so each one has to mirror the lint's
+dot-source list by hand. A lib a fixture does not copy does not make one check misbehave — the script
+**dies at the import**, and every check after it silently never runs. It surfaced as four failures in
+check 23, a check this branch never touched. The warning now sits at the import block in the lint rather
+than in the suite that felt it.
+
 Two smaller repairs came along because the same files were open: `pr-body.tests.ps1`'s load-bearing assert
 was a substring search over `open-pr.ps1`'s text — the only thing available while the literals lived there
 — and now calls the list, performing the same whole-line comparison the script performs instead of an
