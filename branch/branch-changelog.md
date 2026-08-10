@@ -45,6 +45,14 @@ open question: the seam function is **optional**, so a repo that does not define
 shape as `Get-BranchTypes`, where a missing function fell back to a wrong default and no gate said
 anything.
 
+**One lesson the branch paid for, kept in the test beside the assert that learned it:** the first CI run
+was red while all 30 suites were green locally, on this change's own new assert. `Write-Warning` wraps its
+text at the **host's buffer width** — wide in a developer console, narrow on the runner — so the identical
+warning arrived as one line here and two there, and the phrase worth asserting landed exactly on the break.
+Wrapping only ever replaces a space with a newline, so the asserts collapse whitespace before matching and
+are now independent of a width nothing in this repo controls. Anything asserting on warning *text* has this
+problem; asserting on a short token would have hidden it rather than solved it.
+
 Alongside it, two statements about the same mechanism in the `open-pr` skill were repaired: both said the
 description heading is read from the template's first `## ` line, which stopped being true on August 9,
 2026 when the match was widened to any level — the promotion that would otherwise have silently switched

@@ -10,6 +10,8 @@
 - [x] Test (`shared-scripts.tests.ps1`): a near-miss template warns AND loses the description; the
       ordinary path stays quiet
 - [x] Mirror the shared script into the plugin (`build-shared-scripts.ps1`) and run the suites
+- [x] Repair the CI-only failure on PR #574: `Write-Warning` wraps at the host width, so the asserts
+      collapse whitespace before matching instead of depending on the runner's console width
 - [~] Ship the template's shape with the plugin (#573 item 2) and the "#538 as a measurement" caution
       (item 3) — dropped from THIS branch on purpose: a separate `docs/` branch, because it is a design
       choice (a shipped file versus rendering it like `branch/templates/`) rather than a defect repair.
