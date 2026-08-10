@@ -373,6 +373,41 @@ Assert-True ($subject9 -notmatch '^chore:') `
 Assert-True ((((Invoke-Git -Dir $dir9 -GitArgs @('status', '--porcelain')) -join '').Trim()) -eq '') `
     '-Commit: the working tree is clean afterwards -- nothing half-done is left behind'
 
+# ---------------------------------------------------------------------------------------------------
+Write-Host "-Commit on a fold-all run names every entry it folded" -ForegroundColor Cyan
+#      THE RARE HALF, AND THE ONE NOBODY WATCHES. Measured on August 10, 2026: of 410 fold commits in
+#      this repo's history exactly ONE folded more than one entry, and it did so under wording that has
+#      been replaced twice since -- so the plural subject the script writes today has never been produced
+#      by a real run. That is precisely why it needs a test: it is a commit that lands directly on main
+#      under a named exception, written by a code path no reviewer has ever seen the output of.
+#
+#      "We only ever merge one PR at a time" is true and does not close it. Two entries reach one fold
+#      two ways that have nothing to do with merging twice: a fold-all run (no -Branch) picks up every
+#      legacy root entry, which is the normal state of a consumer that has not migrated to branch/; and
+#      even -Branch mode folds branch/branch-changelog.md AND a legacy <branch>.md together when both
+#      exist.
+$dir11 = New-FoldFixture -Label 'commitplural'
+New-EntryFile -Dir $dir11 -Name 'fix-plural-one.md' -Title 'First of two'
+New-EntryFile -Dir $dir11 -Name 'docs-plural-two.md' -Title 'Second of two'
+Initialize-FoldGitRepo -Dir $dir11
+$r11 = Invoke-Fold -Dir $dir11 -ExtraArgs @('-Commit')
+Assert-True ($r11.ExitCode -eq 0)                                           '-Commit fold-all: exits 0'
+$subject11 = ((Invoke-Git -Dir $dir11 -GitArgs @('log', '-1', '--pretty=%s')) -join '').Trim()
+Assert-True ($subject11 -match '^fold: 2 changelogs: ') `
+    '-Commit fold-all: the plural subject counts the entries and is typed as a fold'
+# Both names, not just the first: a subject that silently described half of what the commit did would be
+# worse than one that described none of it, because it reads as complete.
+Assert-True ($subject11 -match 'plural-one') `
+    '-Commit fold-all: the first entry is named in the subject'
+Assert-True ($subject11 -match 'plural-two') `
+    '-Commit fold-all: the second entry is named too, so the subject describes the whole commit'
+Assert-True ((Get-Changelog -Dir $dir11) -match 'First of two') `
+    '-Commit fold-all: the first entry really landed in CHANGELOG.md'
+Assert-True ((Get-Changelog -Dir $dir11) -match 'Second of two') `
+    '-Commit fold-all: the second entry landed too'
+Assert-True ((((Invoke-Git -Dir $dir11 -GitArgs @('status', '--porcelain')) -join '').Trim()) -eq '') `
+    '-Commit fold-all: the working tree is clean afterwards'
+
 # THE SCOPE PROPERTY, which is the whole reason this may commit to main at all. An unrelated modified
 # file -- and one already STAGED, which is the case a plain 'git commit' would sweep in -- must not end
 # up in the fold commit.

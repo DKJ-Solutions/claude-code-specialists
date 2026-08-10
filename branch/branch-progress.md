@@ -13,6 +13,8 @@
 - [x] Docs: Rendall's lens, the `ship-pr` skill, and the `fold-changelog` skill — which did not state
       the subject shape at all, so a consumer had nowhere to read it
 - [x] Mirror into the plugin and run the suites
+- [x] Test the PLURAL subject too (Dave's question): measured at 1 multi-entry fold in 410, under
+      wording replaced twice since — so the shape the script writes had never been produced or asserted
 
 ### Where I left off
 

@@ -47,6 +47,16 @@ consumer's log stays exactly as valid as it was, because nobody was reading it. 
 migrate**, and the skill page says so, since the first thing a consumer will wonder on seeing the new
 type is whether their old commits still count.
 
+**The plural form is now tested, and the reason is a measurement.** Of the **410** fold commits in this
+repo's history exactly **one** folded more than one entry (`976e8f4`, July 2026), and it did so under
+wording that has been replaced twice since — so the plural subject the script writes has never been
+produced by a real run. "We only ever merge one PR at a time" is true and does not close it: two entries
+reach one fold in two ways that have nothing to do with merging twice — a **fold-all** run (no `-Branch`)
+picks up every legacy root entry, which is the normal state of a consumer that has not migrated to
+`branch/`, and even `-Branch` mode folds `branch/branch-changelog.md` *and* a legacy `<branch>.md`
+together when both exist. A code path that writes directly to `main` under a named exception and that no
+reviewer has ever seen the output of is the one that most needs an assert, not the least.
+
 The test that guards it now asserts the **type** separately from the branch name: that fixture has no PR
 to look up, so a branch-name match alone would still pass against a subject typed anything at all — which
 is precisely the half a rename takes away silently.
