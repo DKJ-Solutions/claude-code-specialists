@@ -178,10 +178,15 @@ never thought about it gets `merge`.
 
 **The merge commit is named `merge: <branch> (#NN)`**, rather than GitHub's default
 `Merge pull request #NN from Owner/branch`. That default is the one line in the graph with no type in
-front of it, while everything around it has one — `feat:`, `fix:`, `docs:`, `chore:`, `release:` — so a
+front of it, while everything around it has one — `feat:`, `fix:`, `docs:`, `fold:`, `release:` — so a
 history scan has to read two shapes instead of one. It also pairs the merge with the fold commit that
-follows it (`chore: fold changelog entry <branch> (#NN)`). Passed as `--subject`; a repo that squashes or
+follows it (`fold: <branch> changelog (#NN)`). Passed as `--subject`; a repo that squashes or
 rebases has no merge commit for it to name, and `gh` ignores it there.
+
+**The fold was typed `chore:` until August 10, 2026**, and the rename is worth knowing about if you
+scan your own history: folding is a named act with its own script and its own exception to
+"never commit directly", while `chore` said only "housekeeping". Nothing reads the subject, so every
+`chore: fold ...` already in your log stays exactly as valid as it was — there is nothing to migrate.
 
 The value is **validated before use** — anything other than `merge`, `squash` or `rebase` stops the
 script with a named error. An unrecognized value would otherwise reach `gh` as an unknown flag at the

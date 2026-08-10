@@ -195,6 +195,21 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/fold-changelo
   -Branch <prefix>/<name> -Push
 ```
 
+**The subject is typed `fold:`, and names the branch and its PR:**
+
+```text
+fold: <branch> changelog (#NN)                     one entry
+fold: 3 changelogs: a (#1), b (#2), c (#3)         a fold-all run
+```
+
+The PR number is looked up from the merge; a fold whose PR cannot be determined simply drops it, and a
+fold whose *branch* cannot be determined falls back to the entry's file name — the subject always names
+something. It was typed `chore:` until August 10, 2026: folding is a named act with its own script and
+its own governance exception, while `chore` said only "housekeeping", and `fold:` is the same choice
+[`ship-pr`](../ship-pr/SKILL.md) made for `merge: <branch> (#NN)` one commit earlier, so a merge and its
+fold read as a pair. **Nothing parses this subject**, so every `chore: fold ...` in your existing log
+stays exactly as valid as it was and there is nothing to migrate.
+
 **The commit names its paths**, so `CHANGELOG.md`, the entries it folded and the step list it reset are
 the only things that can land in it however messy the working tree is. That scope limit is the point rather than tidiness: where this
 commit runs under a "never commit directly to main, except the fold" exception, an unscoped

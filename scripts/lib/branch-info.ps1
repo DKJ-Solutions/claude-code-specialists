@@ -33,7 +33,10 @@ $script:BranchTypeOrder = @('Feat', 'Fix', 'Docs', 'Chore')
 # fix, docs -- because chore is not something a branch does: it is the name for work that lands
 # DIRECTLY ON main under one of the named exceptions. The commit log agrees emphatically: 15 of the
 # last 30 first-parent commits are 'chore:' and every one of them is a direct commit (the fold, and
-# the changelog re-sort Dave authorised the same day).
+# the changelog re-sort Dave authorised the same day). That measurement is kept in the past tense on
+# purpose: since August 10, 2026 the fold commit is typed 'fold:', so the count cannot be reproduced
+# from today's log -- which strengthens the point rather than weakening it. Nothing produces a 'chore:'
+# subject any more, and the type survives only as an entry TYPE below.
 #
 # THE RULE ALWAYS HELD; THE TOOLING NEVER SAID SO. Measured when it was written down: 'chore/' had been
 # used as a branch prefix 12 times, against 70 docs/, 58 fix/ and 51 feat/. Dave's answer on seeing that

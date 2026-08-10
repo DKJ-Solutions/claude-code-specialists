@@ -135,7 +135,7 @@ description while building; ownership of the entry mechanism stays Rendall's.
    fill in the description and keep the step list current while building. Never touch `CHANGELOG.md`.
 2. **Merge to `main`** ([Derek #05](05-05-extension.md#merging-to-main)) → the entry travels
    along. Rendall runs `fold-changelog-entry.ps1 -Branch <name> -Push` on `main`: that folds, commits
-   (`chore: fold changelog entry <branch> (#NN)`) and pushes, in one step. **The `-Commit`/`-Push`
+   (`fold: <branch> changelog (#NN)`) and pushes, in one step. **The `-Commit`/`-Push`
    opt-in, the path-scoped commit, the "check you are really on `main`" guard against
    `gh pr merge --delete-branch`, and the always-fold-with-`-Branch` rule for working from two machines
    are all in the portable [`fold-changelog` skill](../../../plugins/workflows/workflow-davekjohn/skills/fold-changelog/SKILL.md)** —
