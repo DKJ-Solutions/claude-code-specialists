@@ -2677,6 +2677,25 @@ $script:BranchFileDefaults = [ordered]@{
         'This file carries the step list of the branch you are on. It is written when a branch is created',
         'and returns to this state after the merge.'
     )
+    # THE OPENING SENTENCE OF THE TRUNK WARNING, AND IT IS A SEAM BECAUSE IT WAS THE ONE FRAGMENT THAT WAS
+    # NOT (inbound #562, August 10, 2026). Format-BranchFileHeader used to build this line itself, so a
+    # consumer who had translated everything else got a document whose FIRST sentence was still English:
+    #
+    #   > **You are on `main`.** Schrijf hier nog niet -- maak eerst een branch.
+    #
+    # Exactly the case these knobs exist for -- the rest of the sentence is repo-owned language, and the
+    # only way out was forking new-branch.ps1, which is the duplication #410 had just removed.
+    #
+    # '{0}' IS REPLACED BY THE TRUNK NAME, and by a plain string replace rather than -f / [string]::Format.
+    # A seam value is hand-written, so a stray '{' in somebody's translation would make a format string
+    # throw at scaffold time; a replace cannot fail. The placeholder is OPTIONAL for the same reason it is
+    # useful: a translation needs the trunk name in a different position than English does, and one that
+    # leaves it out simply does not repeat the name -- the heading directly above already carries it.
+    #
+    # AN EMPTY OVERRIDE KEEPS THIS DEFAULT, like every other key here -- see Get-BranchFileWording's
+    # fail-safe. So there is no way to drop the sentence through the seam, only to replace it. The first
+    # draft of this change claimed there was, and the test written to prove it is what disproved it.
+    TrunkWarningLead = '**You are on `{0}`.**'
     TrunkWarning   = @(
         'Do not work in this file yet -- create a branch first.',
         'Anything written here on the trunk belongs to no branch, will not be folded, and is in the way',
@@ -2733,9 +2752,11 @@ function Get-BranchFileWording {
         ONE GETTER RETURNING A MAP, unlike Get-EntryScaffoldWording's three separate ones, and the
         difference is deliberate rather than inconsistency. Those three are each read by a GATE that
         must match the writer string-for-string, so each is its own contract with its own name. These
-        nine are document prose read by nobody but the reader of the file; a repo translating one
-        translates all of them, and nine seam functions to translate a template would be nine entries in
-        the script contract for one act.
+        are document prose read by nobody but the reader of the file; a repo translating one translates
+        all of them, and one seam function per string would be one script-contract entry per string for
+        a single act. (This sentence said 'these nine' until August 10, 2026, when it was thirteen and
+        gaining a fourteenth -- a count of the keys directly below it goes stale every time one is added,
+        and buys a reader nothing that reading the map does not.)
 
         A key present but EMPTY is ignored, the same fail-safe Get-EntryScaffoldWording uses: an empty
         heading would produce a document with a blank line where its title should be, and nothing would
@@ -2823,7 +2844,14 @@ function Format-BranchFileHeader {
     if ($shown -eq $trunk) {
         $lines.Add('')
         $lines.Add('')
-        $lines.Add('> **You are on `' + $trunk + '`.** ' + $Wording.TrunkWarning[0])
+        # THE LEAD COMES FROM THE WORDING TOO (inbound #562). It was built here, inline, which made it the
+        # one fragment of these two documents a consumer could not translate. '{0}' is replaced rather than
+        # formatted -- see the TrunkWarningLead default for why a hand-written seam value must not be handed
+        # to a format string. A lead that is empty leaves the two warning lines standing on their own, which
+        # is a legitimate answer: the heading above already names the trunk.
+        $lead = [string]$Wording.TrunkWarningLead
+        if ($lead) { $lead = $lead.Replace('{0}', $trunk) + ' ' }
+        $lines.Add('> ' + $lead + $Wording.TrunkWarning[0])
         foreach ($line in @($Wording.TrunkWarning | Select-Object -Skip 1)) { $lines.Add('> ' + $line) }
     }
     return @($lines.ToArray())
