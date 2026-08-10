@@ -362,59 +362,19 @@ function Get-PluginManifestPaths {
 # CHANGELOG rather than one entry, so a name claiming otherwise would be wrong at three call sites -- and
 # keeping it meant the move changed no call site in either lib.
 
-function Get-EntryHeadingPattern {
-    <#
-        The anchored regex that matches an entry's OWN heading and nothing else -- '^##\s' while the entry
-        level is 2. Built from Get-EntryHeadingLevel so the parser, the splitter and the re-leveller cannot
-        end up looking for different things.
-
-        THE EXACT LEVEL, NOT A RANGE, and that is the one decision in this whole file that cannot be
-        loosened. An entry carries H3 sections of its own ('### What does this change do?'), so a pattern
-        accepting H3 as well would read every entry as four. It is safe as an exact match for the mirror
-        image of the same reason: '^##' followed by '\s' cannot match '### ', because the third character
-        is a '#'.
-    #>
-    return '^#{' + (Get-EntryHeadingLevel) + '}\s'
-}
-
-function Split-EntryBlocks {
-    <#
-        Private helper: turns a run of lines into entry blocks. A new block starts at every entry heading
-        (Get-EntryHeadingPattern); '---' separators between entries are skipped.
-
-        BOTH of those tests must ignore FENCED CODE BLOCKS. An entry body may legitimately quote markdown
-        -- a broken heading structure, a YAML frontmatter example -- and without fence awareness the
-        parser reads that quoted text as structure. Measured while cutting v2.13.3: an entry that quoted
-        a '### #242 ...' line inside a ``` fence produced a THIRD entry from two PRs, split the fence
-        open, and duplicated '## Fixes' in the generated notes. Caught by -NoPush before it shipped.
-        Fourth instance of the same defect class in one day (#227, #235, and the teardown's VUL-IN test):
-        a matcher satisfied by a MENTION rather than a use.
-
-        Its own function since the changelog gained one section per tier, and kept now that the sections
-        are gone: Split-Changelog calls it once, but the entry-boundary rule and the fence handling are one
-        answer and belong in one place.
-    #>
-    param(
-        [AllowEmptyCollection()][string[]]$Lines = @(),
-        [Parameter(Mandatory)][string]$Nl
-    )
-    $headingRx = Get-EntryHeadingPattern
-    $fenced = Get-FencedLineFlags -Lines $Lines
-    $entries = @()
-    $cur = $null
-    for ($i = 0; $i -lt $Lines.Count; $i++) {
-        $ln = $Lines[$i]
-        if ((-not $fenced[$i]) -and $ln -match $headingRx) {
-            if ($null -ne $cur) { $entries += (($cur -join $Nl).Trim()) }
-            $cur = @($ln)
-        } elseif ($null -ne $cur) {
-            if ((-not $fenced[$i]) -and $ln -match '^---\s*$') { continue }
-            $cur += $ln
-        }
-    }
-    if ($null -ne $cur) { $entries += (($cur -join $Nl).Trim()) }
-    return @($entries)
-}
+# --- MOVED, NOT DELETED: Get-EntryHeadingPattern and Split-EntryBlocks -----------------------------
+#
+# Both now live in entry-scaffold-lib.ps1, on August 10, 2026, and the readers below still call them by
+# exactly those names -- they are in scope because this file dot-sources that lib unconditionally, at the
+# top, exactly as with Get-FencedLineFlags above.
+#
+# WHY THEY MOVED DOWN A LAYER. The fold needs the entry-boundary rule too, and it deliberately does not
+# load this file: its header rejects pulling three thousand lines of release machinery into a script that
+# runs immediately after a merge and directly on the trunk. The dependency can only run one way -- the
+# fold and entry-scaffold-lib's own suite load that lib standalone, while nothing loads this one without
+# it -- so a rule both the cut and the fold read has to sit down there. Inbound #561 is the defect that
+# forced the question: the two scripts shared an assumption about what an H2 means and only one of them
+# checked it.
 
 function Split-Changelog {
     <#
@@ -485,21 +445,16 @@ function Split-Changelog {
     # correct-looking, and it loses data on a repo that never asked for the change; a shared script reaches
     # a consumer through a plugin update rather than by their choosing.
     #
-    # Test-EntryDeclaresShape is the discriminator and it is exact rather than a heuristic -- see its header.
-    # Named per offending block, and BEFORE anything is written, so a cut stops with the document intact.
-    $notEntries = @($entries | Where-Object { -not (Test-EntryDeclaresShape -EntryText $_) })
-    if ($notEntries.Count -gt 0) {
-        $names = @($notEntries | ForEach-Object { "'" + (($_ -split "`r?`n")[0]) + "'" })
-        throw ("CHANGELOG.md carries $($notEntries.Count) H$(Get-EntryHeadingLevel) block(s) that declare " +
-            "neither an entry's named sections nor a change type: $($names -join ', '). Every " +
-            "H$(Get-EntryHeadingLevel) below the intro is read as one change, so these would be released as " +
-            "changes -- and the cut empties this file, which would remove them. That is what a pre-flat " +
-            "CHANGELOG.md looks like to this parser: a section heading ('## Pull Requests', " +
-            "'## Tier N - Pull Requests', '## Releases') sits at the level an entry now occupies. Migrate the " +
-            "document first: drop the section headings, promote each entry to H$(Get-EntryHeadingLevel), and " +
-            "give it the three named sections. An entry written before this format is fine as it is -- it " +
-            "declares its type in its heading.")
-    }
+    # THE TEXT IS SHARED WITH THE FOLD SINCE AUGUST 10, 2026 (inbound #561). It was written here first,
+    # and the fold -- which makes the same assumption about what an H2 means -- had no check at all: it
+    # wrote the entry above the section heading and reported success. Get-PreFlatChangelogRefusal in
+    # entry-scaffold-lib.ps1 now owns the diagnosis and the migration advice; this call supplies only the
+    # clause that differs, which is what each script is about to DO to a block it cannot read.
+    #
+    # Still named per offending block, and still BEFORE anything is written, so a cut stops with the
+    # document intact.
+    $refusal = Get-PreFlatChangelogRefusal -Content $Content -Consequence 'these would be released as changes -- and the cut empties this file, which would remove them'
+    if ($refusal) { throw $refusal }
 
     return [pscustomobject]@{
         Nl      = $nl

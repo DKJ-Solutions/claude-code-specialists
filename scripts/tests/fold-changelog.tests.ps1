@@ -686,6 +686,66 @@ Assert-Equal 2 @(Get-EntryOrder -Changelog $clNB).Count 'tail blanks: both entri
 Assert-True ($clNB -notmatch "`n`n`n") 'tail blanks: the run of blank lines is capped, not merely pushed up the document'
 
 # ---------------------------------------------------------------------------------------------------
+Write-Host "A PRE-FLAT CHANGELOG.md is refused, not written into (inbound #561)" -ForegroundColor Cyan
+#      THE MEASURED CONSUMER DEFECT. A repo whose changelog still carries section headings has '## ' blocks
+#      at exactly the level an entry now occupies, so the fold took the first one as the top of the list and
+#      inserted above it -- outside the section they keep their entries in -- and reported success. Their
+#      real output, 2026-08-09: "placed above 2 existing entries", where the 2 were '## Pull Requests' and
+#      '## Releases'. cut-release.ps1 has refused over the same assumption since August 5; the fold had no
+#      check at all.
+#
+#      THE FIXTURE IS THE CONSUMER'S DOCUMENT, not a minimal one: both section headings, with a real entry
+#      already filed under the first. That way "refused" cannot be an artifact of an empty list.
+$dirPF = New-FoldFixture -Label 'preflat'
+$preFlatDoc = @(
+    '# Changelog', '',
+    'Everything merged since the last release.', '',
+    '## Pull Requests', '',
+    'Merged PRs land here.', '',
+    '### An older change ' + [char]0x00B7 + ' Feat', '',
+    'Something that was folded before the flat model.', '',
+    '## Releases', '',
+    'The recorded versions.', ''
+) -join "`n"
+[System.IO.File]::WriteAllText((Join-Path $dirPF 'CHANGELOG.md'), $preFlatDoc, $Utf8NoBom)
+New-EntryFile -Dir $dirPF -Name 'feat-refused.md' -Title 'Must not land here' -Rows '| 1 | 3 | a clear improvement |'
+$rPF = Invoke-Fold -Dir $dirPF -Branch 'feat/refused'
+
+Assert-Equal 1 $rPF.ExitCode                                                    'pre-flat: the run exits 1 instead of reporting success'
+# BOTH offending blocks are named. Naming one would leave the reader migrating half a document, and the
+# consumer's report turned on the count being visibly wrong ("2 existing entries").
+Assert-True ($rPF.Output -match "'## Pull Requests'")                           'pre-flat: the section heading it cannot read is named'
+Assert-True ($rPF.Output -match "'## Releases'")                                'pre-flat: and so is the second one -- the scan did not stop at the first'
+Assert-True ($rPF.Output -match 'Migrate the')                                  'pre-flat: the refusal says how to get out of it, not only what is wrong'
+# The half-state this refusal deliberately accepts is the one it has to REPORT: the fold runs after a merge,
+# so the entry is still sitting there and the caller has to be told so by name.
+Assert-True ($rPF.Output -match [regex]::Escape('feat-refused.md'))             'pre-flat: the entry still waiting to be folded is named'
+# NOTHING WAS WRITTEN. Byte-identical, not "still contains the headings": the whole failure being repaired
+# is a write that leaves a well-formed document with the entry in the wrong place.
+Assert-Equal $preFlatDoc ([System.IO.File]::ReadAllText((Join-Path $dirPF 'CHANGELOG.md')))  'pre-flat: CHANGELOG.md is byte-identical -- the refusal came before the write'
+Assert-True (Test-Path (Join-Path $dirPF 'feat-refused.md'))                     'pre-flat: and the entry file survives, so nothing has to be reconstructed'
+# The pre-pass placement, asserted where it can be seen: an entry ALREADY under the section is not touched
+# either, which is what would go wrong if the check ran per file inside the loop instead of once before it.
+Assert-True ($preFlatDoc -match 'An older change')                              'pre-flat: (fixture) a real entry sat under the section heading'
+
+Write-Host "A quoted section heading does not make a flat document pre-flat" -ForegroundColor Cyan
+#      The same fence rule every reader of this format has. This repo's own changelog intro quotes an entry
+#      heading to document the format, and a consumer documenting their migration quotes the section headings
+#      they are removing -- so a refusal blind to fences would refuse the very document that describes it.
+$dirPFQ = New-FoldFixture -Label 'preflat-fenced'
+$fencedIntro = @(
+    '# Changelog', '',
+    'The pre-flat shape this repo migrated away from looked like:', '',
+    '```text', '## Pull Requests', '', '### A change ' + [char]0x00B7 + ' Feat', '```', ''
+) -join "`n"
+[System.IO.File]::WriteAllText((Join-Path $dirPFQ 'CHANGELOG.md'), $fencedIntro, $Utf8NoBom)
+New-EntryFile -Dir $dirPFQ -Name 'feat-allowed.md' -Title 'Lands normally' -Rows '| 0 | - | - |'
+$rPFQ = Invoke-Fold -Dir $dirPFQ -Branch 'feat/allowed'
+Assert-Equal 0 $rPFQ.ExitCode                                                   'fenced: the fold runs'
+Assert-True ((Get-Changelog -Dir $dirPFQ) -match 'Lands normally')              'fenced: and the entry lands'
+Assert-True ((Get-Changelog -Dir $dirPFQ) -match '(?m)^## Pull Requests\s*$')   'fenced: the quoted heading is still there, untouched inside its fence'
+
+# ---------------------------------------------------------------------------------------------------
 foreach ($f in $script:fixtures) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }
 
 Write-Host ""

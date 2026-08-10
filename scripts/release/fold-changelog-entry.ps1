@@ -292,6 +292,55 @@ if ($entryFiles.Count -eq 0) {
 
 $changelogPath = Join-Path $repoRoot "CHANGELOG.md"
 
+# --- The document has to BE a flat list before anything is inserted into it (inbound #561) ---------
+#
+# THE ASSUMPTION THIS SCRIPT MAKES IS THAT EVERY H2 BELOW THE INTRO IS ONE CHANGE, and until August 10,
+# 2026 it made that assumption without ever checking it. cut-release.ps1 makes the same one and has
+# refused over it by name since August 5 -- the two came apart in the direction that loses the least
+# noise and the most trust. Measured in a consumer on 2026-08-09, one day after they adopted the entry
+# convention:
+#
+#   Folded and reset: branch/branch-changelog.md (tier 1, significance 3 -- placed above 2 existing entries)
+#   CHANGELOG.md updated.
+#
+# Exit 0, no warning. Their "2 existing entries" were two SECTION headings ('## Pull Requests',
+# '## Releases'), which sit at exactly the level an entry now occupies -- so the insert landed above the
+# first of them, outside the section they keep their entries in. The only way to see it is to open the
+# file afterwards, which is precisely what nobody does after a green fold.
+#
+# SO IT REFUSES, AND IT REFUSES HERE: in the pre-pass, before the first entry is written and before any
+# entry file is reset or deleted. A fold-all run writes one entry at a time, so finding this on the third
+# file would leave the first two folded into the wrong place with their sources already gone.
+#
+# NO -Force, AND THAT IS DELIBERATE. Every other refusal in this workflow that overrules a judgement about
+# content has an escape valve; this one overrules a FACT about the document, and there is no state in which
+# writing into the wrong section is what the caller wanted. The cut has no valve for it either.
+#
+# WHAT IT COSTS, SAID OUT LOUD RATHER THAN GLOSSED. This script runs after a merge, so a refusal leaves an
+# unfolded entry on the trunk -- the silent half-state this repo has measured, and the reason a missing
+# significance score is warned about here instead of refused. The difference is that a missing score still
+# produces a CORRECT write, while this cannot: the choice is between a state the caller is told about in
+# full and a wrong write nothing reports. So the message names the file that is still waiting and both ways
+# out of it, which is what turns a half-state into a next step.
+#
+# READ DEFENSIVELY, because this is now the FIRST read of the document rather than the third. An absent or
+# empty CHANGELOG.md used to reach the loop below and fail there; '' keeps that unchanged -- the check finds
+# nothing in an empty document, which is correct (there is no block to misread), and whatever the loop did
+# about a missing file it still does.
+$changelogRaw = ''
+if (Test-Path -LiteralPath $changelogPath) {
+    $changelogRaw = [string](Get-Content -Path $changelogPath -Raw -Encoding UTF8)
+}
+$preFlat = Get-PreFlatChangelogRefusal -Content $changelogRaw `
+    -Consequence 'this entry would be inserted ABOVE the first of them -- outside the section you keep your entries in, which is only visible to somebody who opens the file afterwards'
+if ($preFlat) {
+    Write-Host "Nothing was folded -- CHANGELOG.md is not the flat list this script writes into:" -ForegroundColor Red
+    Write-Host "  $preFlat" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "  Your entry is untouched: $($entryFiles -join ', '). Either migrate CHANGELOG.md as described above and run this again, or paste the entry under your own section by hand and reset the file." -ForegroundColor Yellow
+    exit 1
+}
+
 # Does this repo rank its entries at all (issue #467)? Switchable off via Get-EntrySignificanceEnabled --
 # see Test-EntrySignificanceActive. Resolved once here rather than per entry.
 #

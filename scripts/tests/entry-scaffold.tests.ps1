@@ -644,6 +644,57 @@ $inlineMatcher = "-match '^\s*" + $tick3 + "'" # the shape the three walks used
 Assert-Equal 1 (@([regex]::Matches($escLibText, [regex]::Escape($unionMatcher))).Count) 'one owner: the fence rule is written exactly once, and it is the union rule'
 Assert-Equal 0 (@([regex]::Matches($escLibText, [regex]::Escape($inlineMatcher))).Count) 'one owner: and no reader tests for a fence inline any more'
 
+# --- The entry-boundary readers moved down too, and for the same reason ----------------------------
+# Get-EntryHeadingPattern and Split-EntryBlocks joined Get-FencedLineFlags here on August 10, 2026
+# (inbound #561). The asserts mirror the three above exactly, because the failure they guard is the same
+# one: a second copy in release-lib would be shadowed in every real caller and therefore invisible.
+foreach ($moved in @('Get-EntryHeadingPattern', 'Split-EntryBlocks')) {
+    Assert-True ($relLibText -notmatch ('(?m)^function ' + $moved)) "one owner: release-lib no longer DEFINES $moved"
+    Assert-True ($relLibText -match $moved) "one owner: but it still calls $moved, from the lib it dot-sources"
+    Assert-Equal 1 (@([regex]::Matches($escLibText, ('(?m)^function ' + $moved))).Count) "one owner: and this lib defines $moved exactly once"
+}
+# WHY THEY HAD TO COME DOWN, asserted rather than only written in the comment: the fold reads the shared
+# refusal, and it deliberately does not load release-lib -- so if that dot-source ever appears, the whole
+# reason for the move is gone and this test should be the thing that says so.
+#
+# KEYED ON THE DOT-SOURCE LINE, NOT ON THE NAME, and the first version of this assert was itself the defect
+# class this file keeps catching: '-notmatch release-lib' failed on the fold's own HEADER, which explains at
+# length why it does not load that lib. A matcher satisfied by a MENTION rather than a use -- the fifth
+# instance in this repo, and this time it fired against a correct script.
+$foldText = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\release\fold-changelog-entry.ps1'), [System.Text.Encoding]::UTF8)
+Assert-True ($foldText -notmatch '(?m)^\s*\.\s.*release-lib') 'the fold still does not DOT-SOURCE release-lib -- the dependency direction the move rests on'
+Assert-True ($foldText -match 'Get-PreFlatChangelogRefusal') 'and it reads the shared pre-flat refusal'
+
+# --- Get-PreFlatChangelogRefusal: the guardrail two scripts share (inbound #561) -------------------
+# THE MEASURED DEFECT. A consumer on the pre-flat shape had their entry folded ABOVE '## Pull Requests'
+# with exit 0 and no warning, because the fold read the first '## ' as the top of the list. cut-release
+# refused over the identical assumption; the text is shared now so the two cannot drift.
+$flatDoc = "# Changelog`n`nIntro.`n`n## A real change`n`n### What does this change do?`n`nBody.`n"
+Assert-Equal '' (Get-PreFlatChangelogRefusal -Content $flatDoc -Consequence 'x') 'pre-flat: a flat document produces no refusal'
+Assert-Equal '' (Get-PreFlatChangelogRefusal -Content "# Changelog`n`nIntro only.`n" -Consequence 'x') 'pre-flat: a document with NO entries yields nothing -- there is no block to misread'
+Assert-Equal '' (Get-PreFlatChangelogRefusal -Content '' -Consequence 'x') 'pre-flat: and an empty document does not throw'
+# The consumer's actual document: both section headings, a real pre-format entry filed under the first.
+$preFlatDoc = "# Changelog`n`nIntro.`n`n## Pull Requests`n`nMerged PRs land here.`n`n### An older change " +
+              [char]0x00B7 + " Feat`n`nBody.`n`n## Releases`n`nThe recorded versions.`n"
+$refusal = Get-PreFlatChangelogRefusal -Content $preFlatDoc -Consequence 'THE CALLER SAYS THIS'
+Assert-True ($refusal -ne '') 'pre-flat: the pre-flat shape IS refused'
+Assert-True ($refusal -match "'## Pull Requests'") 'pre-flat: the offending block is named'
+Assert-True ($refusal -match "'## Releases'") 'pre-flat: and so is the second -- both, or a reader migrates half a document'
+Assert-True ($refusal -match '2 H2 block') 'pre-flat: the COUNT is stated, which is the number the consumer saw go wrong'
+Assert-True ($refusal -match 'THE CALLER SAYS THIS') 'pre-flat: the caller''s consequence clause is spliced in -- the one part that differs between the cut and the fold'
+Assert-True ($refusal -match 'Migrate the document first') 'pre-flat: the way out is in the message, not only the diagnosis'
+# THE PRE-FORMAT ENTRY UNDER THAT HEADING IS NOT ACCUSED. It declares its type in its heading, which is a
+# legitimate shape -- so a refusal counting it would tell a consumer to migrate an entry that is already fine.
+Assert-True ($refusal -notmatch 'An older change') 'pre-flat: a pre-format entry is not one of the findings'
+# Fence-aware, like every reader here: a document DESCRIBING the pre-flat shape is not in it.
+$quotedDoc = "# Changelog`n`nThe old shape was:`n`n" + '```text' + "`n## Pull Requests`n" + '```' + "`n`n## A real change`n`n### What does this change do?`n`nBody.`n"
+Assert-Equal '' (Get-PreFlatChangelogRefusal -Content $quotedDoc -Consequence 'x') 'pre-flat: a section heading quoted in a fence is not a section heading'
+# Get-ChangelogEntryBlocks, the boundary reader underneath it -- the intro is dropped, the entries are not.
+$blocks = @(Get-ChangelogEntryBlocks -Content $flatDoc)
+Assert-Equal 1 $blocks.Count 'blocks: the intro is not one of them'
+Assert-True ($blocks[0].StartsWith('## A real change')) 'blocks: and the block starts at the entry heading'
+Assert-Equal 0 @(Get-ChangelogEntryBlocks -Content "# Changelog`n`nIntro only.`n").Count 'blocks: a document with no entry yields an empty array rather than the intro'
+
 # --- The insert offset ----------------------------------------------------------------------------
 # ENTRIES ARE H2 HERE, matching the flat list the fold writes since August 5, 2026 -- and this fixture is
 # where that mattered first: the function's $EntryPattern default moved from '### ' to '## ', so a fixture
