@@ -51,6 +51,10 @@
     Check 4, Scenario B: the dead links in CONTRIBUTING.md / the connectors README are fixed
     (removed) -- asserts the two specific findings disappear, proving the failure in scenario A was
     genuinely driven by that file's content (not a false positive / accidental match).
+    Check 4, Scenario B5: plugins/ is read whole -- a plugin-level README and a README in a plugin
+    subdirectory matched no rule at all until inbound #566 -- AND a file that two rules now both claim is
+    reported exactly once, proving the scan set is deduped. The out-of-scope decoy is asserted a third time
+    here, because "read plugins/ whole" must not drift into "walk every .md in the tree".
 
     Check 10, scenarios 1-8 (all reuse CONTRIBUTING.md as the varying doc; the connectors README is
     left marker-free throughout, per check 4 Scenario B, so every finding below is attributable to
@@ -422,6 +426,51 @@ try {
         'entry links: the step list keeps the ordinary nested convention -- it never travels, so ../ is correct there'
 
     Remove-Item -LiteralPath $entryFx, $progressFx -Force
+
+    # --- Scenario B5: plugins/ is read WHOLE, and a file gathered twice is reported once -------------
+    # Inbound #566. Every rule in the scan set names either a SHAPE of file (SKILL.md, *-manual.md,
+    # */agents/*.md) or a PLACE it takes entirely (the root, branch/, releases/). A markdown file sitting at
+    # plugin level matched neither, which is exactly where a plugin's own README.md lives -- the first page a
+    # consumer reads. Five such files were in the tree, unread, when a sixth was added: a portable
+    # contribution guide whose whole purpose is to be copied, and whose dead links would be copied with it.
+    #
+    # Both halves are asserted because each one alone is satisfiable by a wrong fix. Widening the glob
+    # without deduping double-reports every file two rules now claim; deduping without widening leaves the
+    # gap. And the decoy is asserted a third time: plugins/ being read whole must not become "every .md in
+    # the tree", which is the property scenarios A and B2 already defend at their own boundaries.
+    Write-Host "check 4 coverage -- a plugin-level document is IN the scan set, and counted once" -ForegroundColor Cyan
+    $pluginDocTargets = @(
+        @{ Rel = 'plugins\teams\team-alpha\README.md';         Label = "a plugin's own README (plugin level, no shape rule matches it)" },
+        @{ Rel = 'plugins\teams\team-alpha\scripts\README.md'; Label = 'a README in a plugin subdirectory that no shape rule reaches' }
+    )
+    # The dedupe witness: an agent def is gathered by the */agents/*.md payload rule AND by the recursive
+    # plugins/ glob. One dead link in it must produce exactly one [link] finding. Counted on LINES carrying
+    # both the path and the [link] tag, because check 3 also names this file (no frontmatter) and a naive
+    # match on the path alone would count that too.
+    $dupWitnessRel = 'plugins\teams\team-alpha\agents\09-98-agent.md'
+    foreach ($pd in @($pluginDocTargets.Rel + $dupWitnessRel)) {
+        $pdFull = Join-Path $Fixture $pd
+        New-Item -ItemType Directory -Path (Split-Path -Parent $pdFull) -Force | Out-Null
+        [System.IO.File]::WriteAllText($pdFull, "# Fixture`n`nSee [nope]($deadLink) for details.`n", $Utf8NoBom)
+    }
+    $b5 = Invoke-Integrity -FixtureRoot $Fixture
+    foreach ($pd in $pluginDocTargets) {
+        Assert-True ($b5.Out -match [regex]::Escape('.\' + $pd.Rel)) `
+            ("plugin-doc scan: a dead link in $($pd.Label) is reported -- " + $pd.Rel)
+    }
+    $dupHits = @(($b5.Out -split "`r?`n") | Where-Object { $_ -match [regex]::Escape($dupWitnessRel) -and $_ -match '\[link\]' })
+    Assert-Equal 1 $dupHits.Count `
+        'plugin-doc scan: a file gathered by two rules yields ONE dead-link finding -- the scan set is deduped, so widening a rule never double-reports'
+    Assert-True (-not ($b5.Out -match [regex]::Escape('NOTES.md'))) `
+        'plugin-doc scan: the out-of-scope decoy is STILL not reported -- plugins/ is read whole, the tree is not'
+
+    # Removing them clears exactly those findings, so the assertions above are bound to these files rather
+    # than to other noise this near-empty fixture produces.
+    foreach ($pd in @($pluginDocTargets.Rel + $dupWitnessRel)) { Remove-Item -LiteralPath (Join-Path $Fixture $pd) -Force }
+    Remove-Item -LiteralPath (Join-Path $Fixture 'plugins\teams\team-alpha\scripts') -Recurse -Force
+    $b6 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($b6.Out -match [regex]::Escape('.\plugins\teams\team-alpha\README.md'))) `
+        "plugin-doc scan: removing the plugin README clears its finding -- the report tracked the file, not the fixture"
 
     # === check 10: marked "all skills" enumerations vs. the canonical skillset ==========================
     # From here on, only CONTRIBUTING.md's content is varied per scenario. The connectors README is

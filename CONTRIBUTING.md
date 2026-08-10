@@ -1,212 +1,120 @@
 # Contributing — changelog & PR workflow
 
-Changes to this repo go through a branch + Pull Request to `main`, with a folded
-changelog entry — the same workflow as the consuming repos. The steps:
+Changes to this repo go through a branch + Pull Request to `main`, with a folded changelog entry. **That
+cycle is not this repo's own** — it is what the `workflow-davekjohn` plugin does, in every repo that
+enables it, and it is described once, with the plugin:
 
-1. **Branch — its two files in `branch/` come along in the same move:**
-   [`scripts/task/new-branch.ps1`](scripts/task/new-branch.ps1)`-Name <prefix>/<short-name> -Title "…"`
-   creates (or idempotently resumes) the `<prefix>/<short-name>` branch and, as a child step,
-   writes both files via
-   [`scripts/task/new-branch.ps1`](scripts/task/new-branch.ps1) — a branch is
-   never entry-less:
+📄 **[The contribution cycle — the portable half](plugins/workflows/workflow-davekjohn/CONTRIBUTING-portable.md)**
 
-   | file | subject | lifetime |
-   |---|---|---|
-   | `branch/branch-changelog.md` | what the change **does** — the entry that folds into `CHANGELOG.md` | folded at the merge, then reset |
-   | `branch/branch-progress.md` | what still **must happen** — the branch's name, its step list, where you left off | reset at the merge; never folded |
+Read that first. It covers the five steps, the two files a branch works in, the gates on the PR, and the
+Significance model — naming the *seam* wherever a repo owns the answer instead of asserting one repo's
+answer as the rule. **This page is this repo's set of answers to it**, and nothing more.
 
-   **Fixed names, not one per branch.** Git already tracks these per branch, so branches in flight
-   cannot collide on them. On `main` both sit in an empty **reset state** carrying a warning not to
-   write there until a branch exists — that state opens with an `#`, which is exactly what stops the
-   fold mistaking it for an entry. The full convention, including the three step marks, is in
-   [`branch/README.md`](branch/README.md).
+The split is the same one the manuals and the repo lenses already use: the portable half travels with the
+plugin, the local half stays in the repo. It exists because a document that hardcodes one repo's answers
+cannot be adopted by the next repo — it has to be rewritten, and a rewrite is a second source. That was
+[inbound #566](https://github.com/DaveKJohn/claude-code-specialists/issues/566), from a consumer who tried
+to adopt this page and measured why it could not be done.
 
-   **`branch-changelog.md` holds the entry block and nothing around it**, so it pastes into the
-   changelog in one go. **The entry is one `##` heading with six `###` sections under it**, and that is
-   exactly the block that lands there:
+---
 
-   ```text
-   ## `<your branch>` changelog
+## Specific to this repo (claude-code-specialists)
 
-   ### Branch title
+> *Everything in the portable half is the cycle, and it travels to every repo that enables the plugin. This
+> part is the claude-code-specialists lens: if you copy that page into your own repo, this is the section
+> you replace.*
 
-   … the title you gave -Title — and the title the PR gets …
+### The seam, answered — the whole table in one place
 
-   ### Branch ID
+| the portable half says | this repo's answer | declared in |
+|---|---|---|
+| your lint gate | [`scripts/lint/check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1) | `Get-LintScript` |
+| your branch prefixes | `feat/` · `fix/` · `docs/` — and **no `chore/`** | [`scripts/lib/branch-info.ps1`](scripts/lib/branch-info.ps1) |
+| the type an unknown prefix falls back to | `Chore` | `Get-EntryFallbackType` |
+| your entry's section headings | the English defaults — nothing is overridden | *(no override defined)* |
+| your significance rubric | the shared default, 1–5 | *(no override defined)* |
+| your permanent root docs | `CHANGELOG` · `CLAUDE` · `README` · `LICENSE` · `CONTRIBUTING` · `SECURITY` | `Get-ReservedRootMd` |
+| your merge method | `merge` — a merge commit, not a squash | `Get-PrMergeMethod` |
+| whether you have a plugin tier | yes — the `Plugins:` line is derived | `Get-ReleasePluginTier` |
+| whether you have a separate live stage | no | `Get-LiveStage` |
+| how release notes are foldered | per **major** (`3.x`) | `Get-ReleaseNotesGrouping` |
 
-   20260806-114230
+All of them live in [`scripts/repo-config.ps1`](scripts/repo-config.ps1) except the prefix table, which is
+its own repo-owned lib. Where the table above says *no override defined*, this repo deliberately runs on
+the shared default — that is an answer, not an omission.
 
-   ### Branch type
+### The prefixes, and why there are three
 
-   feat
+| Type of work | Branch name | GitHub label | Changelog type |
+|---|---|---|---|
+| New or extended capability | `feat/<description>` | `enhancement` | Feat |
+| Correction of an error in something existing | `fix/<description>` | `bug` | Fix |
+| Documentation, workflow explanation, manual content | `docs/<description>` | `documentation` | Docs |
 
-   ### What does the change on this branch bring to main?
+**There is no `chore/`, and `Test-BranchName` refuses it outright.** Chore is the name for work that lands
+*directly on the trunk* under one of the named exceptions, so a chore branch is a contradiction. `Chore`
+stays a recognised changelog **type** — every entry already written under it must still validate, and it is
+what an unknown prefix falls back to. Recognise both, write one.
 
-   … the description you write …
+Classify by **what actually changes**, not by which files move along: `docs/` is purely text, `feat/` is a
+capability that is new or larger than it was, even when documentation comes with it.
 
-   ### Significance
+### The gates, and the CI check the merge waits on
 
-   #### Tier 0
+`open-pr.ps1` runs the lint gate above and then every `scripts/tests/*.tests.ps1`, and refuses to push on
+any error or failing suite. The same pair runs as CI in
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) — on every PR and every push to `main` — under the
+job id **`lint-en-tests`**, which is the exact name the `main` ruleset requires as a passing status check.
+A merge attempted before it goes green returns `BLOCKED`.
 
-   … why it matters to this repo's own developers …
+That job id is deliberately not English, and renaming it would silently break the ruleset binding — every
+future PR would sit unmergeable, waiting on a check that no longer exists. See
+[`.claude/rules/language-layers.md`](.claude/rules/language-layers.md).
 
-   **Score:** <1-5>
+### Merging — it does not wait, with two exceptions
 
-   #### Tier 1
+The portable half leaves this to each repo, because it is a governance decision rather than a configuration
+value. Here, a finished branch **opens, merges and folds in one motion without waiting for Dave**. The lint
+gate, the test gate and CI prove this class of change is sound, and anything that does turn out wrong is one
+revert PR away.
 
-   … why it matters to colleagues, or why it does not …
+Two kinds of change stop and wait for his word: work with a **visible result** that has to be judged by eye,
+and work that is **irreversible or outward-facing** (a release, a version bump, a tag, repo settings, or
+publishing beyond the normal PR flow). The full statement is in
+[the safety rules](CLAUDE.md#never-directly-on-the-main-branch--via-branch--pr).
 
-   **Score:** <1-5, or N/A>
+### The two direct-on-`main` exceptions
 
-   #### Tier 2
+Both are named, narrow, and nothing else may use them: the **fold commit** after a merge, and the
+**release commit** on explicit request. Their exact scope is in
+[the safety rules](CLAUDE.md#never-directly-on-the-main-branch--via-branch--pr).
 
-   … why it matters to customers and users, or why it does not …
+### The bump — this repo runs the shared floor, unchanged
 
-   **Score:** <1-5, or N/A>
+The portable half asks each repo to say so out loud where its own rule is stricter than the gate's, because
+a contributor otherwise picks their bump type from the wrong rule. **Here there is no stricter rule:** the
+gate's floor *is* this repo's policy — tier 0 only is a patch, tier 1 or higher earns a minor, and a major
+additionally needs ten minors in the current major line.
 
-   ### Pull Request
-   ```
+The audience of each release document follows the **tier**, not the bump, which is what keeps that looser
+rule honest: a tier-1-only minor writes the internal note and no highlights, so nobody outside is handed a
+document about work they cannot see. Full model:
+[the tier model](releases/README.md#the-tier-model) and
+[what a release must earn](releases/README.md#what-a-release-must-earn).
 
-   **The heading, the ID and the type arrive filled in**, and the file is otherwise **bare** — headings and
-   the space under them. The guidance for each field lives in
-   [`branch/templates/`](branch/templates/), which is what those copies are for. An empty field is refused
-   at step 3, which is what replaced the old `TODO:` placeholders.
-   **The PR number and the merge date are added by the fold** into `### Pull Request`:
-   neither exists yet, and a date written now would be the branch's birth date rather than its landing date. Valid prefixes (prefix → label → changelog type): `feat/` → enhancement → Feat ·
-   `fix/` → bug → Fix · `docs/` → documentation → Docs. **There is no `chore/`** — chore work goes
-   directly on the trunk under one of the named exceptions, so `new-branch` refuses that prefix. The table
-   is in [`scripts/lib/branch-info.ps1`](scripts/lib/branch-info.ps1).
-2. **Work + commit** on the branch: keep the step list current as you go, write the entry's
-   description, then commit both along with the rest of the work. **Every step must be resolved before
-   the PR** — `- [x]` done, or `- [~]` dropped with the reason on the line. Steps 3 and 4 both refuse
-   while anything is still `- [ ]`, and there is no `-Force` for it: the dropped mark already is the way
-   past a step that should not be done.
-3. **Open the PR:** [`scripts/release/open-pr.ps1`](scripts/release/open-pr.ps1) — no title is passed,
-   it is composed as `<branch type>: <the entry's Branch title>` — first runs
-   the **lint gate** [`scripts/lint/check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1)
-   (valid manifests, agent-def frontmatter, no dead links, and the flags on every printed
-   `claude plugin install`/`update`/`uninstall`) and then the **test gate** (all
-   `scripts/tests/*.tests.ps1`, exactly as CI does); on an error or a failing suite nothing is pushed and
-   no PR is opened. If both gates pass, the script pushes and opens the PR with label + auto-filled body.
-   The same gate also runs as **CI** on GitHub ([`.github/workflows/ci.yml`](.github/workflows/ci.yml):
-   lint + all test suites, on every PR and every push to `main`) — so a PR created outside the
-   scripts still passes through it all the same.
-4. **Merge** — after the required CI check `lint-en-tests` has gone green. Branch protection on
-   `main` blocks the merge until then (a merge attempt before it passes returns `BLOCKED`); wait for
-   CI, then merge. This step does not wait for Dave: under
-   [the safety rules](CLAUDE.md#never-directly-on-the-main-branch--via-branch--pr) a finished branch
-   opens, merges, and folds in one motion, and only work with a **visible result** — or work that is
-   **irreversible/outward-facing** — stops for his word first.
-5. **Fold:** on `main`, right after the merge,
-   [`scripts/release/fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)`-Branch <name>`
-   folds the entry into [`CHANGELOG.md`](CHANGELOG.md) — which is **one flat list with no section
-   headings at all**, so the fold does not pick a section: it inserts the block at the **position its own
-   Significance sections rank it at**, furthest reach first and, within a tier, highest significance first. It
-   appends the PR link and the merge date as the entry's closing line, derives a `Plugins:` line from the PR's files
-   along the way (which the release notes read — see
-   [Cutting a release](releases/README.md#cutting-a-release)), and **resets both `branch/` files** to
-   their empty state — so the trunk is ready for the next branch and the merged branch's ticked-off steps
-   do not greet whoever opens it. Commits that directly on `main`, naming exactly those three paths.
+### Releases
 
-   **The fold is the only moment that order can be decided**, which is why the Significance sections have
-   to be right before the merge: the cut empties the list, so whatever order the fold leaves is what the release
-   documents inherit. Nothing is re-sorted afterwards.
+A release here is **repo-wide and in lockstep**, which works because this repository holds *one* product
+whose plugins are one system — see [One product, one repository](README.md#one-product-one-repository). A
+second, unrelated product would get its own repository and marketplace rather than joining this release
+train.
 
-### One thing to do while writing the entry: fill in its Significance sections
+The cycle itself — what a release is, the `cut-release.ps1` steps, the three release documents and the
+guardrails — is in [Cutting a release](releases/README.md#cutting-a-release), which also carries the list of
+releases actually cut.
 
-Every entry carries a `### Significance` section with a `#### Tier N` sub-section for each of the three
-reaches. Filling them in is an edit in a file you are already editing before the PR:
+### Where the rest lives
 
-```text
-#### Tier 0
-
-… why it matters at this reach …
-
-**Score:** <1-5>
-```
-
-**All three tiers are in the file, and each one is answered.** Tier 0 can always be scored. For the two
-above it the answer may well be *"this reaches nobody here"* — write `N/A` in the score and say in one line
-why. **That is an answer, not a gap:** a blank means both "reaches nobody" and "nobody has got to this yet",
-and the gate has to be able to tell those apart. The reach is the **highest tier with a number**, so an
-`N/A` costs nothing but a sentence.
-
-The **tier** says how far the change reaches, and therefore which release document the entry appears in:
-
-| tier | who notices |
-|---|---|
-| `0` | only this repo's own developers — docs, config, repo-internal work |
-| `1` | a colleague working on this project gets something out of it |
-| `2` | a consumer of the product notices it |
-
-The **significance** says how much it weighs for that reader, and therefore **where in the list** the entry
-sits — first in `CHANGELOG.md` at the fold, and then in the release document that inherits that order. The
-most consequential change leads. Score it against this rubric:
-
-| | |
-|---|---|
-| `5` | the reader must act — a breaking change, a required migration, or a long-standing blocker that is now gone |
-| `4` | materially changes how they work; they notice within a day without being told |
-| `3` | a clear improvement, noticed the moment they touch that part |
-| `2` | small; noticed if somebody points it out |
-| `1` | cosmetic, or prevents a failure that has not happened yet — then name the failure, because that is the only part a later reader can use |
-
-**Every tier needs a why, including the ones you answer `N/A`.** The ladder is cumulative — a change
-consumers notice is also a change colleagues get something out of — so a scored tier 2 obliges a scored
-tier 1:
-
-```text
-#### Tier 1
-
-The routine version bump stops needing a developer.
-
-**Score:** 4
-
-#### Tier 2
-
-Consumers must re-add the marketplace under its new name; installs break without it.
-
-**Score:** 5
-```
-
-**The ladder cannot be skipped.** `N/A` at tier 1 with a score at tier 2 says a change consumers notice
-gives this project's colleagues nothing, and `open-pr.ps1` refuses that by name rather than asking you for
-a number.
-
-**Why it matters even though nothing breaks if you leave it at 0:** the release cut refuses a bump the tiers
-have not earned — the bump follows the highest tier pending: tier 0 only is a patch, tier 1 or higher earns a minor — and it also refuses
-a release whose tier-1-or-higher entries carry no significance, because an unscored entry cannot be placed.
-So an entry left at 0 is work that cannot carry a release on its own. `open-pr.ps1` prints what it read and
-names anything unsettled, so you find out before the PR rather than at the cut; it refuses a score the
-rubric has no meaning for (`**Score:** 9`) outright.
-
-**The score cells are empty on purpose.** The tier defaults to 0 because 0 is a harmless final answer; a
-*score* has no harmless value, so any number scaffolded for you would be a guess at a ranking. The rubric is
-what makes it a measurement rather than a mood, and the `Why` is what makes the resulting order auditable —
-it says why *this* change is in that band.
-
-**Do not infer it from your branch prefix.** This repo has measured that the prefix does not predict
-impact: the single most consequential change for a consumer in v3.2.0 — renaming the marketplace, which
-breaks every existing install — arrived on a `chore/` branch. A `docs/` branch can carry a tier-2 change and
-a `feat/` branch a tier-0 one.
-
-The full model, and what each tier means for the release documents, is in
-[`releases/README.md`](releases/README.md#the-tier-model).
-
-## Releases — a different cycle, described elsewhere
-
-Everything above is the **contribution cycle**: everyone runs it, on every branch, and it does not wait
-for Dave. Cutting a release is a separate cycle with different rules — only the release manager, only on
-Dave's explicit request, and under a **direct-on-`main` exception that deliberately does not apply to
-ordinary contributions**. Keeping the two apart is the point; do not read the exception below as
-something this page grants.
-
-It is described in full in [`releases/README.md`](releases/README.md#cutting-a-release): what a release
-is, the `cut-release.ps1` steps, [what a bump must earn](releases/README.md#what-a-release-must-earn), the
-three release documents, and the guardrails. That same page carries the list of releases actually cut, at
-the end.
-
-**The one thing worth knowing from here:** a release is repo-wide and in lockstep, which works because
-this repository holds **one** product whose plugins are one system — see
-[One product, one repository](README.md#one-product-one-repository). A second, unrelated product would
-get its own repository and marketplace rather than joining this release train.
+- The two files a branch works in, and the three step marks: [`branch/README.md`](branch/README.md).
+- The pending changelog entries, ranked: [`CHANGELOG.md`](CHANGELOG.md).
+- Which specialist owns which kind of change: [`CLAUDE.md`](CLAUDE.md) and the roster it imports.

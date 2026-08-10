@@ -444,9 +444,27 @@ $linkFiles += @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
 # consumer has no plugins/ at all, and neither does a lint fixture that never creates one. Without the
 # guard Get-ChildItem raises ItemNotFound there -- which is how the first version of this line broke the
 # test suite in a place that had nothing to do with links.
+#
+# RECURSIVE SINCE AUGUST 10, 2026, AND THAT ENDS THE CLASS RATHER THAN PATCHING IT (inbound #566). This
+# glob was non-recursive with the comment "every subdirectory is gathered by its own rule below" -- true of
+# agent defs, skills, manuals, personas and the plugin CHANGELOGs, and false of anything else. A markdown
+# file at PLUGIN level matched no rule at all, which is where a plugin's own README.md sits: the first page
+# a consumer reads, its links never once validated. Measured on the day this was widened: six such files,
+# five of them already in the tree (plugins\teams\README.md, plugins\workflows\README.md, both workflow
+# plugin READMEs, and workflow-davekjohn\scripts\README.md) and the sixth the portable contribution guide
+# added by that same change -- a consumer-facing page whose whole purpose is to be copied, and whose dead
+# links would therefore be copied with it. All six were clean, so this arrives green; the point is that
+# nothing would have said otherwise.
+#
+# THIS IS THE THIRD TIME THE SAME OMISSION HAS BEEN WRITTEN UP in this block -- the family glob, then
+# plugins/, then branch/ -- each time as "a file leaves the scan set by moving, and nothing reports that it
+# has". A shape-by-shape list keeps losing that race, so plugins/ is now read whole: every markdown under it
+# is payload, and payload gets its links read. The rules below that also reach in here are left exactly as
+# they are, because each one covers paths OUTSIDE plugins/ too; their overlap is removed by the dedupe at
+# the end of this set rather than by trimming them back.
 $pluginsRootDir = Join-Path $RepoRoot 'plugins'
 if (Test-Path -LiteralPath $pluginsRootDir) {
-    $linkFiles += @(Get-ChildItem -Path $pluginsRootDir -Filter '*.md' -File |
+    $linkFiles += @(Get-ChildItem -Path $pluginsRootDir -Recurse -Filter '*.md' -File |
         Select-Object -ExpandProperty FullName)
 }
 # AND THE THIRD, ARRIVING THE SAME WAY: branch/ -- the entry and the step list. They used to be root *.md
@@ -548,6 +566,18 @@ $linkFiles += (Get-ChildItem -Path $RepoRoot -Recurse -Filter 'RELEASE.md' -File
 #
 # Note this covers check 10 (the skills:all spans) as well, since that check reuses this same set --
 # and check 10 is precisely what #234 tripped over.
+
+# DEDUPED ONCE, HERE, so that widening a rule above never has to be weighed against double-reporting.
+# The rules in this set are deliberately overlapping: several name a SHAPE of file wherever it sits (SKILL.md,
+# *-manual.md, */agents/*.md) while others name a PLACE and take everything in it (the root, plugins/,
+# branch/, releases/). Under the previous shape-by-shape arrangement the two kinds happened not to collide,
+# and that coincidence was load-bearing -- the plugins/ glob carried a comment justifying non-recursion by
+# it. It is not load-bearing any more: a file gathered twice is scanned twice, every finding in it reported
+# twice, and the coverage line would overcount the set. First occurrence wins, so the order the rules run in
+# still decides nothing.
+#
+# Checks 10, 11 and 12 derive their own sets from $linkFiles, so they inherit this for free.
+$linkFiles = @($linkFiles | Select-Object -Unique)
 
 Write-Coverage -Category 'link-scan' -Checked $linkFiles.Count `
     -Note $(if ($linkFiles.Count -eq 0) { 'the scan set is empty -- no dead link anywhere could be found, which is not the same as there being none' } else { '' })
