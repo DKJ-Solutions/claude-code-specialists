@@ -279,6 +279,127 @@ ids rather than your old ones. One `project` line per plugin you just installed,
 `payload present`, is what you are checking for — the count is part of the check here exactly as it is
 for a first-time adopter.
 
+### The two things inside your repo that the id swap does not fix
+
+**Re-running `specialists-init` will not repair either of these, and that is correct rather than a
+shortcoming: it never overwrites** (inbound
+[#555](https://github.com/DaveKJohn/claude-code-specialists/issues/555), measured on 2026-08-09 in a repo
+that had just completed the swap). Its report says so out loud —
+
+```text
+[keep]   .claude/specialists/SPECIALISTS.md already exists -- not overwritten.
+[keep]   CLAUDE.md already has the orchestrator import(s).
+Done: 0 persona-lens(es) created, 4 already present; 0 lens-scaffold(s) created, 21 already present; ...
+```
+
+— so both repairs below are yours to make by hand, once, in your seam. `sync-roster` does not do them
+either: it creates missing lens scaffolds and prints roster rows to paste, and it never rewrites an id that
+is already there or touches an import. That is what it says of itself; this is a gap beside it, not a bug
+in it.
+
+**1. The `@`-import of the orchestrator's body names a path inside the marketplace clone, and that path
+changed too.** Two things moved at once — the plugin's **id** and its **directory** — and only the first is
+in the table above:
+
+| what | before | after |
+|---|---|---|
+| a team's folder in the clone | `claude-code-plugins/claude-specialists/specialists/` | `plugins/teams/team-alpha/` |
+| an add-on team | `claude-code-plugins/claude-specialists/specialists-shopify/` | `plugins/teams/team-shopify/` |
+| the workflow | `claude-code-plugins/claude-specialists/specialists-workflow-davekjohn/` | `plugins/workflows/workflow-davekjohn/` |
+
+So the line in your `.claude/specialists/SPECIALISTS.md` changes as follows — **bound to this repo's layout
+as of `v4.0.0`, which the table above is read off, and to the marketplace name `claude-code-specialists`;
+substitute yours if you registered it under another name**:
+
+```text
+# before -- the path this import had, and which no longer exists
+@~/.claude/plugins/marketplaces/claude-code-specialists/claude-code-plugins/claude-specialists/specialists/personas/01-01-persona.md
+
+# after -- the line you want
+@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/teams/team-alpha/personas/01-01-persona.md
+```
+
+**This one fails silently, which is why it is first.** Claude Code drops an `@`-import it cannot resolve
+**without a word**: the roster around it renders, the session looks entirely normal, and the orchestrator
+runs without its ritual and its delegation rules. The one thing that will tell you is the core team's
+`roster-sessioncheck` hook, which reports it as a blocking `[ERROR]` at session start — it did exactly that
+in the measured case. If you would rather not construct the path yourself, read it off this repo, which
+consumes its own plugin: its
+[`.claude/specialists/SPECIALISTS.md`](../.claude/specialists/SPECIALISTS.md) carries the import in its
+current, correct form.
+
+**2. Every `<plugin>:<name>` id in your roster still names a plugin that no longer exists.** The
+**names did not change** — 21 of them in the measured case, all still present — so this is purely the
+prefix, which is exactly the kind of mechanical rename a reader's eye slides over:
+
+| before | after |
+|---|---|
+| `specialists:paula` | `team-alpha:paula` |
+| `specialists-lifehub:<name>` | `team-lifehub:<name>` |
+| `specialists-shopify:liam` | `team-shopify:liam` |
+| `specialists-ecomm:sergio` | `team-ecomm:sergio` |
+
+**The rename changes no count, which is worth knowing before you start editing.** In the measured repo — three
+teams enabled — it was 4 personas + 21 subagents = 25 both before and after, every name still present. For
+`team-alpha` on its own the figures are the ones [Step 2](#step-2--run-the-bootstrap-skill) prints. So if a
+count moves while you are rewriting prefixes, you have edited one line too many.
+
+### If you call the shared workflow scripts yourself
+
+**Two things `workflow-davekjohn@4.0.0` changed that a consumer building on those scripts has to act on**,
+neither of which was named as a breaking change when it shipped (inbound
+[#556](https://github.com/DaveKJohn/claude-code-specialists/issues/556) and
+[#557](https://github.com/DaveKJohn/claude-code-specialists/issues/557), both measured on 2026-08-09). If
+you only ever invoke the skills, both are handled for you and you can skip this.
+
+**`scripts/release/new-changelog-entry.ps1` is gone.** It existed in `specialists@3.1.2` and does not exist
+in `workflow-davekjohn@4.0.0`; what it did now lives in `scripts/lib/entry-scaffold-lib.ps1` plus
+`scripts/task/new-branch.ps1`. Resolved through the documented seam it fails **loudly** — the lookup says
+the script does not exist in the plugin — so nothing goes quietly wrong; the problem was that nothing said
+it was coming.
+
+- **What to call instead: `scripts/task/new-branch.ps1 -Name <branch> -Title "<title>"`.** The obvious
+  objection is that it also *creates* a branch, and the case the old script served is a branch that already
+  exists — a Dependabot PR, say. It handles that: the script is **idempotent on an existing branch**, it
+  checks the branch out rather than failing, and writes the two files beside it. So the replacement covers
+  the old caller after all; it simply does more than the name it replaced.
+- One difference to expect: a branch prefix your own table does not know (`dependabot/…`) is a **soft
+  warn**, not a refusal, and the entry's type falls back to whatever `Get-EntryFallbackType` says.
+
+**The entry files moved out of your repo root.** A branch used to carry `<branch-name>.md` beside your
+`README.md`; it now carries `branch/branch-changelog.md` (what the change does) and
+`branch/branch-progress.md` (what still has to happen), with reference copies under `branch/templates/`.
+
+- **Look for a gate keyed on the old name before you use the `new-branch` skill.** The measured case was a
+  CI step asserting that `"$(echo "$BRANCH" | tr '/' '-').md"` exists in the repo root — which fails
+  **after** the work is done rather than before it starts. Nothing but reading both files together would
+  have warned you.
+- **Your branches already in flight are safe.** The fold, the PR gate and the lint all still recognise a
+  root `<branch>.md` — "recognise both, write one" — so nothing has to be migrated in a hurry. It is the
+  *gate* that has to learn the new location, not the entries.
+- `branch/templates/` is written into your repo and rewritten whenever it drifts from the current format.
+  That is deliberate (it is the only place the guidance exists for you to read), and it is not something you
+  have to maintain.
+
+**And one seam function in your `scripts/repo-config.ps1` may now be dead code.** `Get-ChangelogHeading`
+named the `##` section a folded entry was filed under; `CHANGELOG.md` has no section headings any more — it
+is an intro followed by one `##` per change — so nothing reads that function, and `check-script-contract`
+no longer names it either (inbound
+[#561](https://github.com/DaveKJohn/claude-code-specialists/issues/561)). **Nothing reports this**, which is
+the point of mentioning it: if you still define it, possibly with a test around it, it answers a question
+nobody asks. Delete it when convenient; leaving it costs nothing but a reader's time.
+
+That retirement has a consequence worth knowing before your next fold, and it is the one thing in this
+section that is not merely tidy-up: **the shared scripts now assume your `CHANGELOG.md` is that flat list.**
+If yours still carries section headings, `cut-release.ps1` refuses by name — and `fold-changelog-entry.ps1`
+now refuses too, listing each `##` block it cannot read and leaving your entry file untouched. **That second
+refusal is on `main` and reaches you at your next refresh, whether or not a release has been cut** — the
+cached clone tracks `main` rather than the tag, which is the asymmetry
+[the version is not the code](#staying-up-to-date) describes. Until it arrived, the fold wrote the entry
+**above** your first section heading and reported success, visible only if you opened the file afterwards.
+So: migrate the document, or keep folding by hand — both are answers, and the refusal tells you which blocks
+are in the way.
+
 ### If your lenses sit on the pre-seam path
 
 **A named caveat, stated as it stands rather than smoothed over: this has not been repaired in code.**
