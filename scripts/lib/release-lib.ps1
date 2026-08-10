@@ -1269,3 +1269,73 @@ function Build-ConsumerNotes {
 
     return ($header + $body + "`n")
 }
+
+function Build-GitHubReleaseBody {
+    <#
+        The body of a GitHub Release: the release title, an optional pointer at the attached document,
+        and one linked line per change that landed. Pure string out, hard LF.
+
+        WHY THIS IS GENERATED AND THE OTHER DOCUMENTS ARE NOT (Dave, August 10, 2026). The body used to be
+        a hand-written tier document, and that coupled the Release page to which tier happened to exist:
+        the internal note is the body precisely BECAUSE it was the only tier written at every release,
+        which is the reasoning that made a note mandatory at a patch nobody needed one for. A generated
+        body cuts the dependency -- the page can be published at any release, including one with no
+        hand-written document at all, and the hand-written documents become attachments rather than the
+        page itself.
+
+        THE COMPLETE LIST, EVERY TIER. This answers "what landed", which is the one question a Release
+        page is read for by someone who arrived from a tag or a diff, and the tier ladder does not apply:
+        a repo-internal change is still a change that landed. The tiers decide which DOCUMENT a change
+        appears in; this is not one of those documents.
+
+        AN ENTRY WITH NO PR LINK IS LISTED WITHOUT ONE, never dropped. A hand-filed entry, or one whose
+        fold could not reach the PR, would otherwise vanish from the only complete list -- and it would
+        vanish silently, which is the failure mode this repo keeps meeting. Same reason the title falls
+        back to the entry's own heading rather than to nothing.
+
+        IT MUST BE BUILT AT CUT TIME, which is not a preference. The cut EMPTIES CHANGELOG.md, so the
+        entries this reads do not exist a moment later; there is no way to regenerate this body after the
+        fact from anything but the archived notes.
+    #>
+    param(
+        [AllowEmptyCollection()][string[]]$Entries = @(),
+        [Parameter(Mandatory)][string]$Version,
+        [string]$Title = '',
+        [string]$NotePointer = ''
+    )
+    $real = @($Entries | Where-Object { $_ -and $_.Trim() })
+
+    $items = @()
+    foreach ($e in $real) {
+        # The readable name, from the section that owns it -- with the entry's own heading as the fallback
+        # so a nameless entry is still listed. Retired section names come along via Get-EntrySectionBody.
+        $name = ''
+        $described = Get-EntrySectionBody -EntryText $e -Key 'Description'
+        if ($described) { $name = @($described -split '\r?\n' | Where-Object { $_.Trim() })[0].Trim() }
+        if (-not $name) {
+            $hm = [regex]::Match($e, '^\s*#+\s+(.*)$', 'Multiline')
+            if ($hm.Success) { $name = $hm.Groups[1].Value.Trim() }
+        }
+        if (-not $name) { $name = 'untitled change' }
+
+        # The link the FOLD wrote, read out of the section that holds it rather than off the whole entry:
+        # an entry body may quote a PR link of its own, and the first match tree-wide would take that one.
+        $url = ''
+        $prBody = Get-EntrySectionBody -EntryText $e -Key 'PullRequest'
+        if ($prBody) {
+            $lm = [regex]::Match($prBody, '\[PR #(\d+)\]\(([^)]+)\)')
+            if ($lm.Success) { $url = $lm.Groups[2].Value }
+        }
+
+        $items += if ($url) { "- [$name]($url)" } else { "- $name" }
+    }
+
+    $out = @()
+    if ($Title) { $out += @($Title, '') }
+    if ($NotePointer) { $out += @($NotePointer, '') }
+    $out += '## What landed'
+    $out += ''
+    if ($items.Count -gt 0) { $out += $items } else { $out += '_No changes were pending at this release._' }
+
+    return (($out -join "`n") + "`n")
+}

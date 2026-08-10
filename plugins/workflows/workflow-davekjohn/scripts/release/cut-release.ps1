@@ -746,7 +746,21 @@ if ($cutConsumerDoc) {
 # Kept as REPO-RELATIVE paths and joined per check: the message has to name the file the way the repo
 # does, and [System.IO.Path]::GetRelativePath does not exist in the .NET Framework that Windows
 # PowerShell 5.1 runs on -- it would throw here instead of reporting the collision it was written for.
-$plannedFiles = @($notesRelPath)
+
+# --- The GitHub Release body (generated, every release) -------------------------------------------
+# WRITTEN HERE BECAUSE IT CANNOT BE WRITTEN LATER: this run empties CHANGELOG.md, so the entries the
+# body is a list of are gone by the time anyone reaches the publish step. Its pointer is gated on a
+# hand-written document actually being expected -- naming an attachment that will not exist is exactly
+# the sort of confidently wrong line this repo keeps finding in published records.
+$bodyRelPath = "releases/development/$notesDirName/$new-github-body.md"
+$bodyPointer = if ($cutConsumerDoc) {
+    "Whether you need to act, and what it is worth: see the notes attached to this release."
+} else {
+    ''
+}
+$bodyContent = Build-GitHubReleaseBody -Entries $entries -Version $new -Title $Title -NotePointer $bodyPointer
+
+$plannedFiles = @($notesRelPath, $bodyRelPath)
 if ($cutConsumerDoc) { $plannedFiles += @($consumerRelPath) }
 foreach ($rel in $plannedFiles) {
     if (Test-Path -LiteralPath (Join-Path $repoRoot ($rel -replace '/', '\'))) {
@@ -760,6 +774,8 @@ $notesDir = Join-Path $repoRoot ("releases\development\$notesDirName")
 New-Item -ItemType Directory -Force -Path $notesDir | Out-Null
 Write-Utf8NoBom -Path $notesAbs -Content $notesContent
 Write-Host "  created: $notesRelPath ($($entries.Count) entries)" -ForegroundColor DarkGray
+Write-Utf8NoBom -Path (Join-Path $repoRoot ($bodyRelPath -replace '/', '\')) -Content $bodyContent
+Write-Host "  created: $bodyRelPath (the GitHub Release body -- generated, no editing needed)" -ForegroundColor DarkGray
 
 # --- Update the releases/README.md overview table ------------------------------------------------
 # The overview table header is English ("Version | Date | Type | Title", #114 follow-up), so
@@ -857,6 +873,13 @@ function Write-FollowUpSteps {
 
     $hasOwn      = Test-Path -LiteralPath $internalOwn
     $hasInternal = $hasOwn -or (Test-Path -LiteralPath $internalMirror)
+
+    # The body is generated, so it is reported whether or not anything is left to write by hand -- a
+    # patch with no hand-written document still gets a Release page, which is the whole point of
+    # generating it.
+    Write-Host ""
+    Write-Host "The GitHub Release body is written for you:" -ForegroundColor Cyan
+    Write-Host "  gh release create $tagName --title `"$tagName - <short title>`" --notes-file $bodyRelPath"
 
     if (-not ($cutConsumerDoc -or $hasInternal)) { return }
     Write-Host ""
