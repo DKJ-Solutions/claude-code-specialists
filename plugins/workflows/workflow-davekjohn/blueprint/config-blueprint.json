@@ -182,11 +182,11 @@
                     {
                         "lib":  "scripts\\repo-config.ps1",
                         "function":  "Get-ReleaseNotesGrouping",
-                        "adopt":  "copy",
-                        "adoptWhy":  "\u0027major\u0027 is also the built-in fallback, so adopting it states the source\u0027s foldering without changing any behaviour; a repo that cuts often enough for per-minor folders to help sets \u0027minor\u0027 and nothing else moves",
+                        "adopt":  "decide",
+                        "adoptWhy":  "it describes this repo\u0027s TREE, not a way of working -- and copying a description of somebody else\u0027s tree is exactly what the decide marker exists to prevent. Measured: a consumer foldering per minor since v2.0.0 (fourteen directories) had \u0027major\u0027 placed into their seam unseen, which would have started a second tree beside their history at their next cut and pointed the overview row at a path none of it lives in. It fails at neither adoption nor the contract check, because \u0027major\u0027 is a valid answer -- just not theirs",
                         "optional":  true,
                         "default":  "major",
-                        "returns":  "\u0027major\u0027 for releases/development/\u003cX\u003e.x/ or \u0027minor\u0027 for releases/development/\u003cX.Y\u003e/ -- where the generated notes are foldered, and therefore what the overview row links to",
+                        "returns":  "\u0027major\u0027 for releases/development/\u003cX\u003e.x/ or \u0027minor\u0027 for releases/development/\u003cX.Y\u003e/ -- where the generated notes are foldered, and therefore what the overview row links to. READ IT OFF YOUR EXISTING TREE rather than choosing: a directory named \u003cX\u003e.x (3.x) means major, one named \u003cX.Y\u003e (2.13) means minor, so for any repo that has cut a release before this is a fact to look up, not a decision to make. Answering it differently from the tree you already have starts a second tree beside the first",
                         "declared":  true,
                         "text":  "# \u0027major\u0027 -\u003e releases/development/\u003cX\u003e.x/\u003cX.Y.Z\u003e.md   (this workshop)\n# \u0027minor\u0027 -\u003e releases/development/\u003cX.Y\u003e/\u003cX.Y.Z\u003e.md   (a repo that cuts often enough for that to help)\n$script:ReleaseNotesGrouping = \u0027major\u0027\n\nfunction Get-ReleaseNotesGrouping {\n    \u003c# How the generated release notes are foldered: \u0027major\u0027 or \u0027minor\u0027. #\u003e\n    return $script:ReleaseNotesGrouping\n}"
                     },

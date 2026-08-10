@@ -142,6 +142,17 @@ foreach ($fn in 'Get-ReservedRootMd', 'Get-ReleasePluginTier', 'Get-ReleaseHighl
     Assert-Equal 'decide' $rec.Adopt "$fn is the consumer's to decide"
 }
 
+# AND THE ONE THAT WAS MARKED 'copy' UNTIL AUGUST 10, 2026 (inbound #560). It belongs in the family
+# directly above -- same three functions, same question -- and was justified on the value being harmless
+# rather than on the question being shared: 'major' is also the built-in fallback, so copying it "changes no
+# behaviour". True of the value, false of the question. Measured in a consumer foldering per minor since
+# v2.0.0: 'major' was placed into their seam unseen and their next cut would have started a second
+# releases/development/ tree beside fourteen directories of history. Its own assert, with its own reason,
+# because that reasoning is what has to fail if anyone reclassifies it back.
+$grpRec = $contract | Where-Object { $_.Function -eq 'Get-ReleaseNotesGrouping' }
+Assert-Equal 'decide' $grpRec.Adopt 'Get-ReleaseNotesGrouping describes a TREE, not a way of working -- so it is proposed, never placed'
+Assert-Match 'releases/development' $grpRec.Returns 'and its Returns text names the tree the answer is read off, so a decider does not have to guess'
+
 # branch-info.ps1 says of ITSELF that it is repo-owned and does not travel, and its refusal of 'chore/'
 # is written down as this repo's rule. Both records were classified 'copy' on the first pass; this
 # assert is what stops that returning.
@@ -215,8 +226,11 @@ $before = [System.IO.File]::ReadAllText($repoConfig)
 $r = Invoke-Adopt -ConsumerRoot $Fixture
 Assert-Equal 0 $r.Code 'dry run: exit 0'
 Assert-Match 'DRY RUN' $r.Out 'dry run: says so'
-Assert-Match '\[copy\]\s+Get-ReleaseNotesGrouping' $r.Out 'dry run: names a value it would place'
+# The copy example is Get-RosterPath. It was Get-ReleaseNotesGrouping until August 10, 2026, when that
+# record became a decide one (#560) -- so this line asserted the classification the repair reverses.
+Assert-Match '\[copy\]\s+Get-RosterPath' $r.Out 'dry run: names a value it would place'
 Assert-Match '\[decide\]\s+Get-ReleasePluginTier' $r.Out 'dry run: names a value it would only propose'
+Assert-Match '\[decide\]\s+Get-ReleaseNotesGrouping' $r.Out 'dry run: and the foldering scheme is among the ones it would only propose (#560)'
 Assert-Equal $before ([System.IO.File]::ReadAllText($repoConfig)) 'dry run: the consumer lib is byte-identical afterwards'
 Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'config-adoption-proposal.md'))) 'dry run: no proposal document is written'
 
@@ -225,7 +239,7 @@ $r = Invoke-Adopt -ConsumerRoot $Fixture -ScriptArgs @('-Apply')
 Assert-Equal 0 $r.Code 'apply: exit 0'
 
 $after = [System.IO.File]::ReadAllText($repoConfig)
-Assert-Match 'Get-ReleaseNotesGrouping' $after 'apply: a copy record landed in the consumer lib'
+Assert-Match 'Get-RosterPath' $after 'apply: a copy record landed in the consumer lib'
 Assert-Match 'Adopted from the DaveKJohn/claude-code-specialists config blueprint' $after 'apply: the placed block says where it came from'
 
 # NEVER OVERWRITES: the consumer's own answer survives, and the source's is not appended beside it.
@@ -233,7 +247,10 @@ Assert-Match "someone/their-repo" $after "apply: the consumer's own Get-RepoName
 Assert-NotMatch 'DaveKJohn/claude-code-specialists.{0,40}Single place this is stated' $after "apply: the source's repo name was not written into the consumer"
 
 # A decide record is proposed and NEVER placed -- the assert that protects the whole doctrine.
-foreach ($fn in 'Get-ReleasePluginTier', 'Get-ReservedRootMd', 'Get-PrMergeMethod', 'Get-LintScript') {
+# Get-ReleaseNotesGrouping joined the list on August 10, 2026 (#560), and it is the case that shows what the
+# doctrine is FOR: this is the value a consumer was measured to have received wrongly, and the only signal
+# would have been a second releases/development/ tree appearing at their next cut.
+foreach ($fn in 'Get-ReleasePluginTier', 'Get-ReservedRootMd', 'Get-PrMergeMethod', 'Get-LintScript', 'Get-ReleaseNotesGrouping') {
     Assert-NotMatch ("(?m)^\s*function\s+$fn\b") $after "apply: '$fn' was NOT defined in the consumer lib"
 }
 
@@ -243,6 +260,10 @@ $prop = [System.IO.File]::ReadAllText($proposal)
 Assert-Match '## `Get-ReleasePluginTier`' $prop 'proposal: one section per decision'
 Assert-Match 'Why this is yours to decide' $prop 'proposal: each section carries the reason'
 Assert-Match 'do not paste this in unadapted' $prop "proposal: the source's version is marked as reference"
+# #560's user-visible half: the reclassified record now reaches the document a person actually answers, and
+# it arrives with the way to look the answer up rather than only the question.
+Assert-Match '## `Get-ReleaseNotesGrouping`' $prop 'proposal: the foldering scheme is asked rather than assumed (#560)'
+Assert-Match 'READ IT OFF YOUR EXISTING TREE' $prop 'proposal: and it says the answer is readable off the existing directories, so it is a lookup rather than a choice'
 
 # The placed functions must actually ANSWER in the consumer -- the thing extraction bug 2 broke.
 $answers = & {
@@ -251,14 +272,18 @@ $answers = & {
     [pscustomobject]@{
         RepoName    = Get-RepoName
         RosterPath  = Get-RosterPath
-        Grouping    = Get-ReleaseNotesGrouping
+        # Get-ReleaseNotesGrouping used to be read here as a third adopted answer. It is a decide record
+        # since August 10, 2026 (#560), so it is deliberately NOT defined in the consumer and calling it
+        # would fail on a command that does not exist -- which is the correct outcome, asserted in the
+        # not-placed loop above rather than by reading a value that should not be there.
+        HistoryPath = Get-ReleaseHistoryPath
         BodyHolder  = Get-EntryBodyPlaceholder
         Fallback    = Get-EntryFallbackType
     }
 } $repoConfig
 Assert-Equal 'someone/their-repo' $answers.RepoName 'the consumer keeps its own repo name'
 Assert-Equal '.claude/specialists/SPECIALISTS.md' $answers.RosterPath 'an adopted function answers'
-Assert-Equal 'major' $answers.Grouping 'an adopted function answers'
+Assert-Equal 'releases/README.md' $answers.HistoryPath 'an adopted function answers'
 Assert-Equal 'Chore' $answers.Fallback 'an adopted function answers'
 Assert-True ($null -ne $answers.BodyHolder -and $answers.BodyHolder.Length -gt 0) 'a function that sits below the shared assignment block still answers (extraction bug 2)'
 
