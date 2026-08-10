@@ -209,6 +209,11 @@ Two optional parameters cover the "start now, continue later (maybe on another d
   `Get-EntrySignificanceWordingOverrides`, `Get-EntrySignificanceRubricLevels`,
   `Get-BranchFileWordingOverrides`), along with the type an unknown prefix falls back to
   (`Get-EntryFallbackType`; issue #410). Define none of them and you get exactly the English text above.
+  **That now includes the trunk warning's opening sentence** (`TrunkWarningLead`, inbound #562): it used to
+  be built by the formatter, so a repo that translated everything else still got
+  `> **You are on \`main\`.**` in English as the first line its readers saw, and forking the script was the
+  only way out. Put `{0}` where the trunk name belongs in your sentence — a translation rarely wants it in
+  the English position — or leave it out and let the heading above carry the name.
   That exists so a repo whose changelog is not in English does not have to keep a private copy of the
   script -- which is the duplication this skill exists to prevent. The three retired placeholder strings
   (`Get-EntryTitlePlaceholder`, `Get-EntryBodyHeading`, `Get-EntryBodyPlaceholder`) are **no longer

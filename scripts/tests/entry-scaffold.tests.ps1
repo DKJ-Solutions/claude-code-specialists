@@ -1051,6 +1051,61 @@ Assert-True (Test-EntryDeclaresShape -EntryText $oldNamedFull) 'while an entry-o
 $preDossier = "### Old entry - Feat - 2026-07-01`n`n### What does this change do?`n`nsomething`n"
 Assert-True (Test-EntryDeclaresShape -EntryText $preDossier) 'a pre-dossier entry is still recognised by its retired entry-only heading'
 
+# --- The trunk warning's opening sentence is seamable too (inbound #562) ---------------------------
+# THE MEASURED DEFECT. Get-BranchFileWordingOverrides made the branch files translatable, and this one
+# fragment was built inline by the formatter -- so a consumer who translated everything got a Dutch
+# document whose FIRST sentence was English: '> **You are on `main`.** Schrijf hier nog niet -- ...'.
+# Their only way out was forking new-branch.ps1, the duplication #410 had just removed.
+Write-Host ""
+Write-Host "the trunk warning: its lead is wording, not formatter output" -ForegroundColor Cyan
+$defaultReset = (Format-BranchChangelogReset) -join "`n"
+Assert-True ($defaultReset -match '(?m)^> \*\*You are on `main`\.\*\* Do not work in this file yet') 'default: the lead is unchanged, on one line with the first warning line'
+
+# The override, injected the way the seam is reached in a real repo: repo-config.ps1 defines the function
+# and Get-BranchFileWording probes for it with Get-Command. Both keys at once, because the point is that the
+# whole sentence is now one repo's language rather than two halves owned by two parties.
+function Get-BranchFileWordingOverrides {
+    return @{
+        TrunkWarningLead = 'LET OP: je zit op `{0}`.'
+        TrunkWarning     = @('Schrijf hier nog niet -- maak eerst een branch.', 'De tweede regel.')
+    }
+}
+$dutchReset = (Format-BranchChangelogReset) -join "`n"
+Assert-True ($dutchReset -match '(?m)^> LET OP: je zit op `main`\. Schrijf hier nog niet') 'override: the lead is the consumer''s sentence, with the trunk name in the position THEY chose'
+# SCOPED TO THE WARNING BLOCK, and the first version of this assert was not -- it read the whole document
+# for 'You are on' and went red on the reset prose ('the changelog entry of the branch you are on'), which
+# this override never touched. An assert has to look at the thing it is about; a document-wide search for a
+# fragment of English cannot tell the sentence under test from the one beside it.
+$dutchWarning = (@($dutchReset -split "`n") | Where-Object { $_ -like '> *' }) -join "`n"
+Assert-True ($dutchWarning -notmatch 'You are on') 'override: no English survives in the WARNING -- which is the whole finding'
+Assert-True ($dutchReset -match '(?m)^> De tweede regel\.$') 'override: the lines below the lead still come from TrunkWarning, unchanged'
+Remove-Item -Path Function:\Get-BranchFileWordingOverrides
+
+# A LEAD CONTAINING A LITERAL BRACE MUST NOT THROW, and that is why the trunk name is substituted by a
+# string replace instead of -f / [string]::Format. A seam value is hand-written; '{' is an ordinary
+# character in prose, and a format string would fail at scaffold time on somebody's translation.
+function Get-BranchFileWordingOverrides { return @{ TrunkWarningLead = 'Pas op {let op} op `{0}`:' } }
+$braceReset = ''
+$threw = $false
+try { $braceReset = (Format-BranchChangelogReset) -join "`n" } catch { $threw = $true }
+Assert-Equal $false $threw 'brace: a lead carrying a literal brace does not throw'
+Assert-True ($braceReset -match [regex]::Escape('Pas op {let op} op `main`:')) 'brace: the brace is passed through verbatim and the placeholder still resolves'
+Remove-Item -Path Function:\Get-BranchFileWordingOverrides
+
+# AN EMPTY OVERRIDE KEEPS THE DEFAULT, which is this seam's documented fail-safe for every key and not a
+# special case for this one: a blank heading or a blank warning would produce a document with a gap where a
+# sentence belongs, and nothing would report it. Asserted here because the first draft of this change claimed
+# the opposite -- that an empty lead was a legitimate way to drop the sentence -- and this assert is what
+# established it is not. The formatter's own guard against a dangling '> ' is therefore unreachable through
+# the seam and stays as a guard on the DEFAULT being non-empty, which is worth having either way.
+function Get-BranchFileWordingOverrides { return @{ TrunkWarningLead = '' } }
+$noLead = (Format-BranchChangelogReset) -join "`n"
+Assert-Equal $defaultReset $noLead 'empty lead: an empty override is ignored -- the default sentence stands, as for every other key'
+Remove-Item -Path Function:\Get-BranchFileWordingOverrides
+# The default is back, so nothing below inherits an override. Asserted rather than assumed: a leaked
+# override would make every later assert read a document no repo produces.
+Assert-Equal $defaultReset ((Format-BranchChangelogReset) -join "`n") 'teardown: the default reset is restored once the seam function is gone'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
