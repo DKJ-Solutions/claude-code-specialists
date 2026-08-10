@@ -8,9 +8,8 @@
 - [x] Write the seven-test norm into the portable `cut-release` skill, each test carried by what a named changelog in the field does
 - [x] Eight asserts on check 25 in `check-plugin-integrity.tests.ps1`, including all three deliberate narrowings and the tier-off case
 - [x] Record the decision and the three-rule measurement in `CLAUDE.md`
-- [ ] Lint + all suites green
+- [x] Lint + all suites green -- 0 errors, 11 consumer documents scanned with 0 findings, 30/30 suites, 202 asserts in the lint's own suite
 
 ### Where I left off
 
-Lint is green (11 consumer documents, 0 findings) and the lint's own suite passes 202 asserts. The full
-suite run is the last step.
+Done.
