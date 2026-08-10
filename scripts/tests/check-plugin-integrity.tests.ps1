@@ -1993,6 +1993,63 @@ try {
     Assert-True ($t5.Out -match '\[consumer-tier\] checked 0') `
         'consumer-tier: and it says so, rather than reporting the same coverage as a full run'
 
+    # --- check 26: a frontmatter document opens with '---', read as bytes -----------------------------
+    # 66-71. The defect is measured, not imagined: adopt-config/SKILL.md shipped with EF BB BF in 4.1.0
+    #        and was the one model-invocable skill of eleven missing from the agent's skill listing
+    #        (#581). What makes it worth a gate is that NOTHING ELSE CAN SEE IT -- ReadAllText strips a
+    #        BOM before any regex in this script runs, and no editor shows it -- so the assertions below
+    #        pin the byte-level reading as much as the finding.
+    Write-Host "  check 26: frontmatter opens with '---', with no byte-order mark" -ForegroundColor DarkCyan
+    $bomSkill = Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-alpha\SKILL.md'
+    $bomGoodBytes = [System.IO.File]::ReadAllBytes($bomSkill)
+
+    # 66. The measured defect, in the exact shape it shipped: three bytes in front of a correct file.
+    [System.IO.File]::WriteAllBytes($bomSkill, (@([byte]0xEF, [byte]0xBB, [byte]0xBF) + $bomGoodBytes))
+    $fmb1 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($fmb1.Out -match '\[frontmatter-bom\].*byte-order mark') `
+        'frontmatter-bom: a BOM before the opening --- is reported'
+    Assert-True ($fmb1.Out -match 'skill-alpha') `
+        'frontmatter-bom: and the finding names the file, which is the only way to find a defect nothing renders'
+    Assert-True ($fmb1.Code -ne 0) `
+        'frontmatter-bom: and it fails the gate rather than warning -- the skill does not load at all'
+
+    # 67. THE POINT OF READING BYTES. The same file is perfectly valid UTF-8 with valid YAML frontmatter,
+    #     so every other check here passes it. If this assert ever fails it means the check started
+    #     reading text, and the defect became invisible again.
+    Assert-True (-not ($fmb1.Out -match '\[agent-def\].*skill-alpha')) `
+        'frontmatter-bom: the BOMed file is otherwise valid -- no other check sees anything wrong with it'
+    [System.IO.File]::WriteAllBytes($bomSkill, $bomGoodBytes)
+
+    # 68. Removing the three bytes clears the finding, so the assert above is bound to the BOM rather than
+    #     to something else the fixture happens to produce. Asserted on THIS file rather than on the
+    #     absence of any finding at all: the suite's own fixtures for checks 18 and 22 are deliberately
+    #     frontmatter-less minimal pages, which this check does not accuse -- see 69.
+    $fmb2 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($fmb2.Out -match '\[frontmatter-bom\].*skill-alpha')) `
+        'frontmatter-bom: stripping the BOM clears the finding -- it tracked the bytes, not the file'
+    Assert-True ($fmb2.Out -match '\[frontmatter-bom\] checked [1-9]') `
+        'frontmatter-bom: and the pass is not an empty scan'
+
+    # 69. THE SUBJECT IS THE BOM, NOT "MUST HAVE FRONTMATTER". This repo deliberately tolerates a skill
+    #     page with no 'name:' line -- the canonical reader falls back to the folder name for exactly that
+    #     reason -- so a check demanding the block would be inventing a policy the repo declined. The
+    #     proof is already sitting in this fixture: check 18's park page and check 22's adopt-config page
+    #     are frontmatter-less on purpose. A rule requiring '---' was born accusing both, and quieting
+    #     them meant shifting the line numbers check 22 asserts on. This assert is what keeps it narrow.
+    Assert-True (-not ($fmb2.Out -match '\[frontmatter-bom\].*park')) `
+        'frontmatter-bom: a frontmatter-less skill page is NOT a finding -- the subject is the BOM, not the block'
+
+    # 70. THE REGISTRATION SCOPE. A deeper references/SKILL.md is a progressive-disclosure page that
+    #     nothing registers, so there is no positional frontmatter parse for a BOM to break. The depth
+    #     decoy already in this fixture is the subject, given a BOM it must NOT be reported for.
+    $bomDecoy = Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-alpha\references\SKILL.md'
+    $bomDecoyGood = [System.IO.File]::ReadAllBytes($bomDecoy)
+    [System.IO.File]::WriteAllBytes($bomDecoy, (@([byte]0xEF, [byte]0xBB, [byte]0xBF) + $bomDecoyGood))
+    $fmb4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($fmb4.Out -match '\[frontmatter-bom\].*references')) `
+        'frontmatter-bom: a progressive-disclosure references/SKILL.md is out of scope -- nothing registers it'
+    [System.IO.File]::WriteAllBytes($bomDecoy, $bomDecoyGood)
+
     # --- Scenario 55: A MARKETPLACE THAT DOES NOT PARSE STILL LEAVES A REPORTING GATE ----------------
     # 55. The lint reads the plugin set from marketplace.json now, and the whole point of doing that
     #     inside a swallowing try/catch is that the file it reads can be broken. Measured while this was

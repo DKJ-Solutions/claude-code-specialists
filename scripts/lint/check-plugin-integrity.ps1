@@ -137,6 +137,26 @@
          of its commands pointing at the author's own plugin cache, pinned to a version. The subject is
          the '-File' argument rather than paths in general, because a tree-wide rule would be born
          accusing three correct comments that quote a user path to explain a path-mangling bug.
+     23. a plugin's name says which kind it is, and it must sit where that says: 'team-*' under
+         plugins/teams/, 'workflow-*' under plugins/workflows/, and every plugin one or the other. The
+         core team's workflow-sessioncheck counts enabled workflows BY THAT PREFIX, so a workflow named
+         otherwise would never be counted and could be enabled alongside another in silence.
+     24. the PR template keeps the two promises open-pr makes about it: the shipped reference under
+         plugins/workflows/workflow-davekjohn/templates/ byte for byte against Get-PrTemplateReference,
+         and THIS repo's own .github/pull_request_template.md only to the contract (a first heading, plus
+         one placeholder line the matcher recognises). Deliberately weaker for the second, which is
+         genuinely repo-owned: a byte rule would refuse a correct change the day it grows a section.
+     25. the consumer document does not send its reader into a tier written for somebody else -- a link
+         from releases/consumer/ into the development (tier 0) or internal (tier 1) tree. LINK TARGETS
+         only; a tier named in prose is check 4's declined-path territory. Two neighbouring rules (a
+         score, a branch name) were measured on the same tree and declined at 4 and 3 findings, all false.
+     26. no frontmatter-bearing shipped document carries a byte-order mark, read as BYTES. Every other
+         reader here uses ReadAllText, which strips a BOM before any regex sees it, so a BOM is invisible
+         to this gate AND to any editor a reviewer would open -- the one defect findable by neither.
+         Measured: adopt-config/SKILL.md shipped with EF BB BF in 4.1.0 and was the one model-invocable
+         skill of eleven missing from the agent's skill listing. The subject is the BOM and NOT "must have
+         frontmatter": this repo deliberately tolerates a skill page without a 'name:' line, so demanding
+         the block would be this gate inventing a policy the repo declined.
 
     Exit code: 0 = no errors. 1 = at least one error (usable as a gate in open-pr.ps1).
 .EXAMPLE
@@ -2132,6 +2152,77 @@ if (-not (Test-Path -LiteralPath $ctrRoot)) {
 }
 Write-Coverage -Category 'consumer-tier' -Checked $ctrChecked `
     -Note $(if ($ctrChecked -eq 0) { $ctrNote } else { "every document in releases/consumer/, held against offering its reader a link into the development (tier 0) or internal (tier 1) tree. LINK TARGETS only -- a tier named in link text or prose is someone writing ABOUT the model, which is check 4's declined-path territory. Two neighbouring rules (a score, a branch name) were measured on this same tree and declined at 4 and 3 findings, all false; the reasoning is above the check" })
+
+# --- 26. no frontmatter-bearing shipped document carries a byte-order mark --------------------------------
+# READ AS BYTES, AND THAT IS THE WHOLE POINT. Every other reader in this gate goes through
+# [System.IO.File]::ReadAllText(..., UTF8), which DETECTS AND STRIPS a BOM before any regex sees it -- so a
+# BOM is invisible to all twenty-five checks above, to the canonical-skillset reader that takes each skill's
+# name from '(?m)^name:', and to every editor a reviewer would open the file in. It is the one defect
+# findable by neither reading nor this gate, and the first three bytes are the only vantage point from which
+# it exists at all.
+#
+# A REPAIR, NOT A PRECAUTION. plugins/workflows/workflow-davekjohn/skills/adopt-config/SKILL.md shipped with
+# EF BB BF in 4.1.0 -- the only one of the eleven skills across the two shipped plugins to carry it, and the
+# only model-invocable one absent from the agent's skill listing. A frontmatter parser that wants '---' at
+# offset 0 sees a BOM in front of it and reads the file as having no frontmatter, so the skill has no name
+# and never registers. Nothing errors; the page is simply not there. It bites the consumer who can least
+# afford it -- a fresh one, whose seam adopt-config exists to fill, and who cannot tell a skill that failed
+# to load from one deliberately hidden behind disable-model-invocation. Reported as #581 from
+# BWJ-ecommerce/smartwatchbanden, who found it by diffing first bytes because reading cannot.
+# (Described in words rather than quoted: a literal BOM in the sentence explaining the bug is invisible here
+# too, which is how one got into this very comment on the first draft.)
+#
+# THE SET IS EVERY FRONTMATTER-BEARING SHIPPED DOCUMENT, not only SKILL.md -- an agent def, manual or
+# persona whose frontmatter the harness parses for 'name:'/'id:'/'group:' breaks identically and just as
+# quietly, and checks 3/3b/3c already enumerate three of the four sets. Measured before widening rather than
+# assumed: 69 documents (26 agent defs, 26 manuals, 4 personas, 13 registered skill pages), all four sets
+# non-empty, ZERO findings once the one BOM was stripped, zero exemptions. A check needing an exemption list
+# on its first run is the shape this repo has scar tissue from; this one is born green, and reintroducing
+# the byte was used to prove it fires rather than merely passes.
+#
+# THE SUBJECT IS THE BOM AND NOT "MUST HAVE FRONTMATTER", and that narrowing was forced by measurement. The
+# first draft also reported a file not opening with '---' at all, which reads as the same defect and is not:
+# this repo DELIBERATELY tolerates a skill page without the line -- the canonical reader above falls back to
+# the folder name precisely "so a future skill without that line does not silently drop out". Demanding the
+# block would be this gate inventing a policy the repo declined, and it showed up at once, because the lint
+# suite's own minimal fixtures for checks 18 and 22 are frontmatter-less on purpose: the rule was born with
+# two findings, both false, and quieting them meant shifting the line numbers check 22 asserts on.
+#
+# A BOM needs no such policy -- it is never intentional in any of these files and always breaks a positional
+# parse where frontmatter is present. A stray blank line above the block is a real but UNMEASURED cousin:
+# named here and deliberately not guarded, per the standing rule that a risk which has not bitten gets
+# written down rather than built against.
+$bomChecked = 0
+$fmDocs = New-Object System.Collections.Generic.List[string]
+foreach ($d in (@($agentDefs) + @($manuals) + @($personas))) { $fmDocs.Add($d.FullName) }
+$fmSkillDir = Join-Path $RepoRoot 'plugins'
+if (Test-Path -LiteralPath $fmSkillDir -PathType Container) {
+    # EXACTLY ONE skill-name folder between 'skills' and the file, the same narrowing the canonical
+    # skillset above applies. A top-level SKILL.md is what the harness REGISTERS, so a BOM in front of its
+    # frontmatter costs the whole skill; a deeper skills/<name>/references/SKILL.md is a
+    # progressive-disclosure page that nothing registers, so there is no positional parse for a BOM to
+    # break. Check 22 globs broadly on purpose -- a runnable command is machine-specific wherever it sits
+    # -- while this check's subject is registration, which only the top level has.
+    foreach ($p in @(Get-ChildItem -Path $fmSkillDir -Recurse -Filter 'SKILL.md' -File |
+                     Where-Object { $_.FullName -match '\\skills\\[^\\]+\\SKILL\.md$' })) { $fmDocs.Add($p.FullName) }
+}
+foreach ($fmPath in $fmDocs) {
+    $bomChecked++
+    $rel = $fmPath.Replace($RepoRoot, '.')
+    $head = New-Object byte[] 3
+    $readCount = 0
+    $fs = [System.IO.File]::OpenRead($fmPath)
+    try { $readCount = $fs.Read($head, 0, 3) } finally { $fs.Dispose() }
+    if ($readCount -ge 3 -and $head[0] -eq 0xEF -and $head[1] -eq 0xBB -and $head[2] -eq 0xBF) {
+        Add-Error ("[frontmatter-bom] $rel begins with a UTF-8 byte-order mark (EF BB BF) before its '---'." +
+            " A frontmatter parser that requires '---' at offset 0 reads the file as having no frontmatter, so the" +
+            " document registers under no name and fails with no error anywhere. The BOM is invisible in every editor" +
+            " and to ReadAllText, so no reviewer and no other check here can see it. Strip the three bytes and save" +
+            " the file as UTF-8 WITHOUT a BOM.")
+    }
+}
+Write-Coverage -Category 'frontmatter-bom' -Checked $bomChecked `
+    -Note "the first three bytes of every frontmatter-bearing shipped document (agent defs, manuals, personas, and the skill pages a plugin REGISTERS), held against a UTF-8 byte-order mark. Read as bytes because ReadAllText strips a BOM before any other check here can see it -- which is how adopt-config/SKILL.md shipped one in 4.1.0 and silently failed to register (#581). The subject is the BOM and not the presence of frontmatter: this repo deliberately tolerates a skill page without a 'name:' line. Measured at introduction: 69 documents across all four sets, 0 findings once that one BOM was stripped, 0 exemptions"
 
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {
