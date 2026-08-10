@@ -19,6 +19,13 @@ in `CHANGELOG.md` and which release documents it appears in. The merge folds the
 a release empties the changelog into dated notes and moves a tag. Four gates hold the whole thing together,
 and none of them is advisory.
 
+**The cycle itself is written out in [`CONTRIBUTING-portable.md`](CONTRIBUTING-portable.md), beside this
+file.** That is the page to read — and the page to point your own contributors at — because it names the
+seam wherever your repo owns the answer instead of asserting one repo's answer as the rule. Pair it with a
+`## Specific to this repo` section in your own root `CONTRIBUTING.md` holding your values; the source repo's
+[own answers](https://github.com/DaveKJohn/claude-code-specialists/blob/main/CONTRIBUTING.md) are a worked
+example of that half.
+
 The full reasoning — the tier ladder, why the fold rewrites nothing, what a release must earn — lives in
 the source repo's [`releases/README.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/releases/README.md)
 and [`branch/README.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/branch/README.md),
@@ -26,8 +33,9 @@ both of which you already have: the marketplace source is a git clone of the who
 
 ## What is in this folder
 
-| folder | what it holds |
+| what | what it holds |
 |---|---|
+| [`CONTRIBUTING-portable.md`](CONTRIBUTING-portable.md) | the contribution cycle in prose, seam-named — the human-facing half, meant to be read alongside your own repo's answers |
 | [`skills/`](skills/) | the eight skills a specialist invokes — this is where most of the workflow lives |
 | [`scripts/`](scripts/) | the scripts and libs those skills run, mirrored from the source repo's own `scripts/`. **Never edit a file there** — see [its README](scripts/README.md) |
 | [`hooks/`](hooks/) | two SessionStart checks that belong to running this across several repos: `connector-sessioncheck` and `script-contract-sessioncheck`. Both are read-only and never block |
