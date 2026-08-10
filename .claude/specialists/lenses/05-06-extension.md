@@ -158,22 +158,27 @@ nothing to GitHub Releases — only a git tag, the full notes in `releases/devel
 reference to them in `CHANGELOG.md`. Publishing a GitHub Release is a manual closing step Rendall walks
 through afterward, per the `cut-release` skill's checklist — not automated by the script.
 
-**Here that happens at *every* release, patch included, and the body is the internal note** (Dave,
-August 4, 2026). The two halves of that decision have separate reasons, so keep them apart:
+**Here that happens at *every* release, patch included, and the body is GENERATED** (Dave, August 4,
+2026, revised August 10, 2026). The two halves of that decision have separate reasons, so keep them apart:
 
-- **Every release.** Until this date a patch skipped the step entirely (tag only). It no longer does, so
+- **Every release.** Until August 4 a patch skipped the step entirely (tag only). It no longer does, so
   the Release page becomes a continuous record rather than one with gaps where the patches were.
-- **The internal note as the body**, with the **consumer document and the development notes as attachments** —
-  the three-row table in the skill's step 5. Dave's reasoning: the consumer document only exists at a minor or major,
-  while the internal note exists at every release, so it is the only tier that can be the body under a
-  no-exceptions rule. It is also the tier written as *what the work is worth*, which is what a public
-  Release page is read as.
-- **The cost, stated rather than discovered.** The internal tier deliberately carries no file names, no
-  commands and no code. On a release that requires the reader to act — `v3.2.0`, where the marketplace
-  rename breaks every existing install *with no error message* — the migration steps are in the attached
-  consumer document, not on the page. So when a release needs an action, say that in the body and point at the
-  attachment. This was raised as an objection before the decision and Dave chose the internal note
-  anyway; it is recorded as a known trade-off, not as an open question.
+- **A generated body**, with every hand-written document and the development notes as **attachments**.
+  `cut-release.ps1` writes `releases/development/<dir>/<X.Y.Z>-github-body.md` — the release title, a
+  pointer at the attached notes where one is expected, and one linked line per change that landed, every
+  tier included. Rendall edits nothing; he points `gh` at it, and the cut prints the exact command.
+- **What this replaced, and why it is the more important half.** The body was the **internal note** from
+  August 4 to August 10, and the reason given was that it is the only tier written at *every* release, so
+  the only one that can be the body under a no-exceptions rule. That is a coupling dressed as a choice: it
+  made the Release page depend on which tier existed, and it is the reason a patch nobody wanted a note
+  for still needed one. A generated body cuts the dependency in the direction that matters — the page no
+  longer needs any hand-written document to exist, which is what lets the *document* model be simplified
+  separately from the *page*.
+- **The cost that came with the internal note is gone with it.** That tier deliberately carries no file
+  names, no commands and no code, so on a release requiring the reader to act — `v3.2.0`, where the
+  marketplace rename breaks every existing install *with no error message* — the page carried no
+  instruction and Rendall had to say so in prose. The generated body's pointer line does that
+  structurally, and the acting instructions live in the attachment where they always did.
 
 Never inline the development notes regardless: `gh release create`'s body has a hard
 125,000-character limit and this repo's development notes have exceeded that.
@@ -408,5 +413,5 @@ In short: the **how** (changelog, SemVer, tags, and — where a release publishe
 Release) is portable; the **what** (these scripts, the per-branch entry + fold convention, and the
 lockstep repo-wide release via `cut-release.ps1` with a git tag, and a `CHANGELOG.md` emptied down to its
 intro) belongs to this repo. Publishing a GitHub Release here is a manual closing step at **every** release, per the
-`cut-release` skill, that `cut-release.ps1` itself does not automate — with the internal note as the
-body and the other tiers attached.
+`cut-release` skill, that `cut-release.ps1` itself does not automate — with a **generated** body it
+*does* write, and the hand-written tiers attached.

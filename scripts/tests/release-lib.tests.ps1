@@ -812,6 +812,72 @@ Assert-Match $dossierNotes 'Branch type' 'and the branch type'
 Assert-Match $dossierNotes 'PR #99'      'and the PR number'
 Assert-Match $dossierNotes '(?m)^Plugins:' "and the 'Plugins:' line"
 
+Write-Host "Build-GitHubReleaseBody (generated, every release, every tier)" -ForegroundColor Cyan
+# THE POINT OF GENERATING IT is that the Release page stops depending on which hand-written tier
+# document happens to exist. The internal note was the body BECAUSE it was the only tier written at
+# every release -- which is what made a note mandatory at a patch nobody wanted one for.
+$bodyEntry2 = @(
+    '## `feat/second` changelog'
+    ''
+    '### Branch title'
+    ''
+    'The second thing'
+    ''
+    '### What does the change on this branch bring to main?'
+    ''
+    'Body.'
+    ''
+    '### Pull Request'
+    ''
+    '[PR #12](https://example.test/pull/12) - merged 2026-08-10'
+) -join "`n"
+$body = Build-GitHubReleaseBody -Entries @($dossier, $bodyEntry2) -Version '4.3.0' `
+    -Title 'A release with two things in it' -NotePointer 'See the attached notes.'
+Assert-Match $body '(?m)^A release with two things in it$' 'the title line opens the body'
+Assert-Match $body '(?m)^See the attached notes\.$' 'the pointer is included when one is given'
+Assert-Match $body '(?m)^## What landed$' 'the list has a heading'
+Assert-Match $body '(?m)^- \[A change with a readable name\]\(https://example\.test/99\)$' 'the readable title links to the PR'
+Assert-Match $body '(?m)^- \[The second thing\]\(https://example\.test/pull/12\)$' 'every entry is listed, not just the first'
+# EVERY TIER, because "what landed" is not a tier question -- a repo-internal change still landed. The
+# tiers decide which DOCUMENT a change appears in, and this is not one of those documents.
+$tier0Body = New-FlatEntry -Heading "#7 $midDot Internal only" -Rows @('| 0 | 2 | ours alone |') -Pr 7
+$bodyAll = Build-GitHubReleaseBody -Entries @($dossier, $tier0Body) -Version '4.3.0'
+Assert-Match $bodyAll 'Internal only' 'a tier-0 entry is in the body -- it landed'
+# NO POINTER WHEN NONE IS GIVEN: naming an attachment that will not exist (a patch writes no
+# hand-written document) is exactly the confidently-wrong published line this guards against.
+Assert-NoMatch $bodyAll 'attached' 'no pointer is invented when the caller passes none'
+Assert-NoMatch $bodyAll '(?m)^\s*$\r?\n\s*$\r?\n\s*$' 'and its absence leaves no gap where the sentence was'
+# AN ENTRY WITH NO PR LINK IS LISTED WITHOUT ONE, never dropped -- a hand-filed entry, or one whose fold
+# could not reach the PR, would otherwise vanish from the only COMPLETE list, and vanish silently.
+$noPr = "## ``fix/nolink`` changelog`n`n### Branch title`n`nNo link for this one`n`n### Pull Request`n`nPlugins: team-alpha"
+$bodyNoPr = Build-GitHubReleaseBody -Entries @($noPr) -Version '4.3.0'
+Assert-Match $bodyNoPr '(?m)^- No link for this one$' 'an entry with no PR link is still listed, unlinked'
+# A nameless entry falls back to its own heading rather than to nothing, for the same reason.
+$noTitle = "## ``fix/untitled`` changelog`n`n### What does the change on this branch bring to main?`n`nBody."
+Assert-Match (Build-GitHubReleaseBody -Entries @($noTitle) -Version '4.3.0') '(?m)^- `fix/untitled` changelog$' 'a title-less entry falls back to its heading'
+# An empty release still returns a page rather than a blank: the cut can reach this only in a test or a
+# hand run, and a sentence is a truthful answer where an empty document is not.
+$bodyEmpty = Build-GitHubReleaseBody -Entries @() -Version '4.3.0' -Title 'Nothing pending'
+Assert-Match $bodyEmpty 'No changes were pending' 'an empty release says so instead of returning an empty list'
+# The entry body may quote a PR link of its own, so the link is read from the PullRequest SECTION rather
+# than from the first match in the whole entry.
+$quoting = @(
+    '## `docs/quotes` changelog'
+    ''
+    '### Branch title'
+    ''
+    'Quotes another PR'
+    ''
+    '### What does the change on this branch bring to main?'
+    ''
+    'This follows up [PR #1](https://example.test/wrong/1).'
+    ''
+    '### Pull Request'
+    ''
+    '[PR #2](https://example.test/right/2) - merged 2026-08-10'
+) -join "`n"
+Assert-Match (Build-GitHubReleaseBody -Entries @($quoting) -Version '4.3.0') '\(https://example\.test/right/2\)' "the link comes from the PullRequest section, not from a link quoted in the body"
+
 Write-Host "the consumer tier produces markdown ONLY (no HTML renderer)" -ForegroundColor Cyan
 # Dave, August 3, 2026: the print-ready .html is not wanted anywhere, so ConvertTo-ReleaseHtml and
 # Format-InlineMarkdown were removed the same day they were ported. ASSERTED ON THEIR ABSENCE rather

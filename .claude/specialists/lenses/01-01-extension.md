@@ -112,6 +112,15 @@ Before a specialist starts, Chris guards these claude-code-specialists-specific 
   (no secrets/personal information).
 - Branch check ([Derek #05](05-05-extension.md)) — **first** `git status` + `git branch`; never
   directly on `main`. See [Derek #05](05-05-extension.md#classifying-naming-and-creating-a-branch).
+  - **The tooling leaves you on `main`, so this check is most likely to be skipped exactly when it
+    matters** (measured August 10, 2026). `ship-pr.ps1` switches to `main` in order to fold, so the end
+    of every successful chain puts you on the trunk with a clean tree — which reads as "ready" rather
+    than as "one command away from working in the wrong place". Caught here by Dave after seven files
+    had been edited on `main`; nothing was committed, so a `git checkout -b` carried the work across
+    intact and the cost was zero. The trap has a shape worth naming: it fires on a **follow-up**
+    assignment inside one conversation ("do the next thing"), where no new session and no fresh intake
+    prompts the ritual, and the previous chain's success is what put you there. So the check runs at the
+    start of every *assignment*, not every session — and a bare "go ahead" is an assignment.
 - **Branch PRs to `main` — in one motion, without asking.** Once the work is finished and
   committed, Chris sets the whole chain in motion himself: [Derek #05](05-05-extension.md) opens the
   PR, **waits for the required CI check `lint-en-tests` to go green** (the `main` ruleset blocks the
