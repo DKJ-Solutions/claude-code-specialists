@@ -205,10 +205,22 @@ $script:ContractRecords = @(
        Adopt = 'decide'; AdoptWhy = "an allowlist entry for a file that is not there is inert, so copying does no damage -- what it does is look complete while missing the consumer's OWN permanent root docs, and each one missing refuses a release over a document nobody failed to fold. This list has gone stale three times in the source alone";
        Optional = $true; Default = "this workshop's own root docs (CHANGELOG, CLAUDE, README, LICENSE, CONTRIBUTING, SECURITY, QUICKSTART, ADOPTION, UNINSTALL)";
        Returns = 'the root *.md file names that are permanent docs rather than unfolded changelog entries; every other root *.md blocks the cut, so a permanent doc missing from this list refuses a release over a file nobody failed to fold' },
+    # DECIDE, NOT COPY, AND THE MARKER WAS WRONG UNTIL AUGUST 10, 2026 (inbound #560). It was justified on
+    # 'major' also being the built-in fallback, so copying it "changes no behaviour" -- true of the value and
+    # false of the question. This function does not state how anyone WORKS; it states what the consumer's
+    # releases/ tree looks like, which is the definition of a decide record and puts it in the same family as
+    # Get-ReleaseHighlightsBumps and Get-ReleaseMajorMinMinors, both of which were always decide.
+    #
+    # MEASURED IN A CONSUMER: smartwatchbanden has foldered per MINOR since v2.0.0 -- fourteen directories,
+    # releases/development/2.0/ through 2.13/. adopt-config placed 'major' into their seam unseen, so their
+    # next cut would have started a SECOND tree beside the first (releases/development/2.x/) and written an
+    # overview row pointing at a path holding none of their history. Nothing fails at adoption time and the
+    # contract check reports [OK] afterwards, because the value is valid -- it is simply not theirs. The
+    # failure surfaces one release later, in the form of a directory nobody asked for.
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseNotesGrouping'; Scripts = @('cut-release');
-       Adopt = 'copy'; AdoptWhy = "'major' is also the built-in fallback, so adopting it states the source's foldering without changing any behaviour; a repo that cuts often enough for per-minor folders to help sets 'minor' and nothing else moves";
+       Adopt = 'decide'; AdoptWhy = "it describes this repo's TREE, not a way of working -- and copying a description of somebody else's tree is exactly what the decide marker exists to prevent. Measured: a consumer foldering per minor since v2.0.0 (fourteen directories) had 'major' placed into their seam unseen, which would have started a second tree beside their history at their next cut and pointed the overview row at a path none of it lives in. It fails at neither adoption nor the contract check, because 'major' is a valid answer -- just not theirs";
        Optional = $true; Default = 'major';
-       Returns = "'major' for releases/development/<X>.x/ or 'minor' for releases/development/<X.Y>/ -- where the generated notes are foldered, and therefore what the overview row links to" },
+       Returns = "'major' for releases/development/<X>.x/ or 'minor' for releases/development/<X.Y>/ -- where the generated notes are foldered, and therefore what the overview row links to. READ IT OFF YOUR EXISTING TREE rather than choosing: a directory named <X>.x (3.x) means major, one named <X.Y> (2.13) means minor, so for any repo that has cut a release before this is a fact to look up, not a decision to make. Answering it differently from the tree you already have starts a second tree beside the first" },
     # RETIRED, AUGUST 5, 2026: Get-ReleaseLiveMarker and Get-ReleaseHistoryMode. The first marked the
     # currently-live release on the newest release heading; the second chose whether that section
     # accumulated a block per release or kept only the newest behind a pointer. A cut writes no release
