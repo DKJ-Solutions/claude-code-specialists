@@ -172,7 +172,7 @@ try {
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
     Assert-Equal 0 $r.Code 'happy path: exit-code 0'
     Assert-NotMatch '\[ERROR\]' $r.Out 'happy path: no errors'
-    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds', 'Get-LiveStage', 'Get-EntryTitlePlaceholder', 'Get-EntryBodyHeading', 'Get-EntryBodyPlaceholder', 'Get-EntryFallbackType', 'Get-PrMergeMethod', 'Get-MojibakePaths', 'Get-ReservedRootMd', 'Get-ReleaseNotesGrouping', 'Get-ReleaseHistoryPath', 'Get-ReleasePluginTier', 'Get-ReleaseHighlightsBumps', 'Get-ReleaseMajorMinMinors', 'Get-InternalNoteWording')) {
+    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds', 'Get-LiveStage', 'Get-EntryTitlePlaceholder', 'Get-EntryBodyHeading', 'Get-EntryBodyPlaceholder', 'Get-EntryFallbackType', 'Get-PrMergeMethod', 'Get-MojibakePaths', 'Get-ReservedRootMd', 'Get-ReleaseNotesGrouping', 'Get-ReleaseHistoryPath', 'Get-ReleasePluginTier', 'Get-ReleaseConsumerBumps', 'Get-ReleaseMajorMinMinors', 'Get-InternalNoteWording')) {
         Assert-Match "\[OK\]\s+'$fn' present in" $r.Out "happy path: '$fn' reported OK"
     }
     # FOUR RECORDS RETIRED ON AUGUST 5, 2026, all of them to the flat changelog rather than four separate
@@ -500,7 +500,7 @@ function Get-RosterIgnoredIds { return @() }
         # exactly what would have caught the mirror being forgotten.
         @{ Function = 'Get-PrMergeMethod';         Lib = 'scripts\repo-config.ps1'; Scripts = @('ship-pr') },
         @{ Function = 'Get-MojibakePaths';         Lib = 'scripts\repo-config.ps1'; Scripts = @('fix-mojibake') },
-        # The eight cut-release knobs (issue #417): five from phase 1, then the three the highlights
+        # The eight cut-release knobs (issue #417): five from phase 1, then the three the consumer tier
         # tier brought in phase 2. Same reasoning again: all attributed to 'cut-release', a registered
         # shared script, so the per-script assertions below cover them -- and those assertions are what
         # would catch the mirror or the seam being forgotten. The last of them is load-bearing for the
@@ -515,9 +515,9 @@ function Get-RosterIgnoredIds { return @() }
         # Get-ReleaseCategoryTitles labelled category headings the release documents no longer have.
         # Get-ReleaseHistoryPath is the survivor and gained a second caller, below.
         @{ Function = 'Get-ReleaseHistoryPath';    Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release', 'new-internal-note') },
-        @{ Function = 'Get-ReleaseHighlightsBumps';            Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },
+        @{ Function = 'Get-ReleaseConsumerBumps';            Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },
         # The two knobs that configured the retired remove-before-publishing marker are gone with it
-        # (August 5, 2026): the highlights document is the tier-2 entries now, so there is nothing to
+        # (August 5, 2026): the consumer document is the tier-2 entries now, so there is nothing to
         # promote and nothing to label. Their absence from this list is the point -- if they came back,
         # the count assert below would have to change too, which is the conversation that should happen.
         @{ Function = 'Get-ReleaseMajorMinMinors';              Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },

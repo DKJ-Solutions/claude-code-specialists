@@ -238,8 +238,8 @@ The gate cannot tell a stricter policy from a mistake, so it enforces only the f
 where the stricter rule is written. If your two rules differ, say so out loud where a contributor picks
 their bump type; both allowing a patch is not the same as agreeing.
 
-Which documents a release writes, how they are foldered, and whether a stakeholder-facing highlights
-document is generated at all are yours too (`Get-ReleaseNotesGrouping`, `Get-ReleaseHighlightsBumps`,
+Which documents a release writes, how they are foldered, and whether a stakeholder-facing consumer
+document is generated at all are yours too (`Get-ReleaseNotesGrouping`, `Get-ReleaseConsumerBumps`,
 `Get-ReleasePluginTier`). The cut-release skill covers all of it.
 
 ---

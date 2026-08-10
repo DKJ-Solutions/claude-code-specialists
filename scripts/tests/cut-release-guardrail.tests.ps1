@@ -70,7 +70,7 @@ Write-Host "cut-release.ps1 -- every planned file is checked before the first on
 # refuses to be anywhere but a clean main), so it cannot be dot-sourced and the collision path cannot
 # be exercised in-process -- the same constraint the allowlist check above works around.
 #
-# WHAT IT PROTECTS. With the highlights tier on (#417) a cut writes TWO files, and the order is
+# WHAT IT PROTECTS. With the consumer tier on (#417) a cut writes TWO files, and the order is
 # load-bearing: collect every target, check them all, then write. Checking each one just before its own
 # write would leave a release whose developer notes exist and whose stakeholder document does not --
 # half a release, discovered by the release manager rather than by a guard, on an action that has
@@ -83,11 +83,11 @@ $firstWrite = $cutReleaseText.IndexOf('Write-Utf8NoBom -Path')
 Assert-True ($firstWrite -gt 0) 'found the first content write in cut-release.ps1'
 Assert-True ($guardLoop.Success -and $firstWrite -gt ($guardLoop.Index + $guardLoop.Length)) `
     'the guard runs BEFORE any file is written, so a collision leaves the tree untouched'
-# And the highlights document is really in that collection -- a guard over one path would pass the
+# And the consumer document is really in that collection -- a guard over one path would pass the
 # asserts above while protecting nothing new.
 $plannedBlock = [regex]::Match($cutReleaseText, '(?ms)^\$plannedFiles\s*=.*?^foreach \(\$rel in \$plannedFiles\)')
-Assert-True ($plannedBlock.Success -and $plannedBlock.Value -match 'highlightsRelPath') `
-    'the highlights target joins the collection when the tier is on'
+Assert-True ($plannedBlock.Success -and $plannedBlock.Value -match 'consumerRelPath') `
+    'the consumer-document target joins the collection when the tier is on'
 # No .html anywhere in the cut: the tier is markdown-only (Dave, August 3, 2026). Asserted on the script
 # text because the removal is the feature -- a reintroduced HTML write should turn this red.
 Assert-True ($cutReleaseText -notmatch 'ConvertTo-ReleaseHtml') 'cut-release calls no HTML renderer'
@@ -143,9 +143,9 @@ Assert-True ($gateBlock.Success -and $firstWrite -gt ($gateBlock.Index + $gateBl
     'the bump gate runs BEFORE any file is written'
 # It reads the changelog per TIER; the flat accessor would give it entries with no tier to judge.
 Assert-True ($cutReleaseText -match 'Get-PullRequestEntriesByTier') 'it reads the pending entries per tier'
-# The highlights document is the tier-2 selection now, not a category guess -- and the two retired seam
+# The consumer document is the tier-2 selection now, not a category guess -- and the two retired seam
 # knobs must not come back with it.
-Assert-True ($cutReleaseText -match 'tier2Entries') 'the highlights document is built from the tier-2 entries'
+Assert-True ($cutReleaseText -match 'tier2Entries') 'the consumer document is built from the tier-2 entries'
 # MATCHED AGAINST CODE ONLY, with comments stripped first. The script explains WHY those knobs were
 # retired, and it names them to do so -- so a plain -notmatch fails on the explanation rather than on a
 # use. That is this repo's own "a matcher satisfied by a mention rather than a use" defect, in reverse:
@@ -160,6 +160,25 @@ foreach ($gone in 'Get-ReleaseHighlightsStakeholderTypes', 'Get-ReleaseHighlight
 # The threshold behind the major rule is repo-owned rather than hardcoded: a shared script must not pin
 # every consumer to one repo's release cadence.
 Assert-True ($cutReleaseText -match 'Get-ReleaseMajorMinMinors') 'the minors-before-a-major threshold comes from the seam'
+
+# THE RENAMED SEAM IS READ UNDER BOTH NAMES (August 10, 2026). The knob was Get-ReleaseHighlightsBumps
+# before the tier was named after its reader, and this is the one rename in the set that can break a
+# consumer in SILENCE: the fallback for an undefined seam is @(), which is the tier switched OFF, so a repo
+# still carrying the old name would cut a minor, write no document for the very consumer it was cut for,
+# and report success. Consumers receive the rename through a plugin update rather than by choosing to.
+# Asserted on the CODE view, so a mention in the explaining comment cannot satisfy it -- the same trap the
+# retired-knob check two blocks up is written around.
+Assert-True ($cutReleaseCode -match 'Get-ReleaseConsumerBumps') 'the current seam name is read'
+Assert-True ($cutReleaseCode -match 'Get-ReleaseHighlightsBumps') `
+    'the retired seam name is STILL read as a fallback -- dropping it silently switches the tier off for a consumer'
+# ORDER MATTERS, not just presence: the current name has to be tried FIRST, or a repo that defines both
+# (mid-migration, which is exactly when this runs) would keep answering from the retired one.
+$newIdx = $cutReleaseCode.IndexOf('Get-ReleaseConsumerBumps')
+$oldIdx = $cutReleaseCode.IndexOf('Get-ReleaseHighlightsBumps')
+Assert-True ($newIdx -ge 0 -and $oldIdx -gt $newIdx) 'the current name is tried before the retired one'
+# And the reader itself must accept more than one name, or the pair above is two arguments to a parameter
+# that only ever looks at the first.
+Assert-True ($cutReleaseText -match '\[string\[\]\]\$Name') 'Get-SeamValue takes a LIST of names, so a renamed seam can be read under both'
 
 Write-Host "cut-release.ps1 -- the new-major refusal names BOTH edits a major needs" -ForegroundColor Cyan
 # WHY THIS IS PINNED AT ALL. Opening a new major takes two hand edits, not one: the overview section, and

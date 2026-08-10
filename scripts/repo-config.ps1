@@ -274,7 +274,7 @@ function Get-PrMergeMethod {
 # measurement produced rather than what the report predicted:
 #
 #   1. where the notes are grouped        Get-ReleaseNotesGrouping    (named in the issue)
-#   2. the highlights tier                Get-ReleaseHighlightsBumps  (named in the issue)
+#   2. the consumer tier                  Get-ReleaseConsumerBumps    (named in the issue)   RENAMED Aug 10
 #   3. the LIVE marker                    Get-ReleaseLiveMarker       (named in the issue)   RETIRED Aug 5
 #   4. the plugin/marketplace half        Get-ReleasePluginTier       (NOT named -- the largest block)
 #   5. the category labels                Get-ReleaseCategoryTitles   (NOT named)            RETIRED Aug 5
@@ -286,7 +286,7 @@ function Get-PrMergeMethod {
 # used to sit, below. Recorded here too because this list is the record of what the #417 measurement
 # found, and a list that quietly shrinks stops being that.
 #
-# KNOB 2 LANDED IN PHASE 2 AS THREE FUNCTIONS AND IS BACK TO ONE (August 5, 2026). "The highlights
+# KNOB 2 LANDED IN PHASE 2 AS THREE FUNCTIONS AND IS BACK TO ONE (August 5, 2026). "The consumer
 # tier" was three independent questions -- whether, for whom, and in whose words -- and the second and
 # third existed only to configure the remove-before-publishing marker. The tier model retired that
 # marker (see the block further down), which retired both knobs with it: what a consumer notices is now
@@ -417,9 +417,20 @@ function Get-ReservedRootMd {
     return $script:ReservedRootMd
 }
 
-# --- The highlights tier: whether, and for which bumps (issue #417 knob 2; narrowed August 5, 2026) --
+# --- The consumer tier: whether, and for which bumps (issue #417 knob 2; narrowed August 5, 2026) ---
 #
-# The second, stakeholder-facing rendering of a release: releases/highlights/<dir>/<X.Y.Z>.md. Written
+# NAMED FOR ITS READER SINCE AUGUST 10, 2026 (Dave). This tier was called "highlights" everywhere --
+# the directory, this seam, the renderer -- and that name described the FORM (a selection of the nice
+# bits) rather than the audience. Its two neighbours name their reader (development = this repo's own
+# developers, internal = the organisation), and the tier table one screen up has always said tier 2 is
+# "consumers", so this was the one of the three whose name disagreed with the model it belongs to.
+# Measured before renaming: of five dev-tool changelogs in the field (Linear, Stripe, Vercel, Raycast,
+# GitHub) not one publishes anything called "highlights" -- the live names are "Changelog", "Release
+# notes" and "What's new", all of which name the document or its reader. The form-name was also
+# earning its keep in the wrong direction: it invited the register a self-selected best-of invites,
+# which is exactly what v4.0.0's document was reviewed and found guilty of.
+#
+# The second, stakeholder-facing rendering of a release: releases/consumer/<dir>/<X.Y.Z>.md. Written
 # for NON-DEVELOPERS (Dave, July 13, 2026), and since the tier model it is assembled from the TIER-2
 # ENTRIES rather than from a category guess plus a marker somebody deletes by hand. MARKDOWN ONLY -- the
 # tier briefly also generated a print-ready .html and no longer does anywhere (Dave, August 3, 2026);
@@ -435,13 +446,13 @@ function Get-ReservedRootMd {
 # So this repo runs three release documents, one per tier of the ladder the entries declare:
 #   releases/development/<X>.x/<X.Y.Z>.md   tier 0   developers   -- every release, complete, raw
 #   releases/internal/<X>.x/<X.Y.Z>.md      tier 1   colleagues   -- every release, what it is worth
-#   releases/highlights/<X>.x/<X.Y.Z>.md    tier 2   consumers    -- minor/major, what they notice
+#   releases/consumer/<X>.x/<X.Y.Z>.md      tier 2   consumers    -- minor/major, what they notice
 #
 # THE TIER NUMBER AND THE DOCUMENT ARE THE SAME SCALE, which is the point of the renumbering (Dave,
 # August 5, 2026 -- they were 1/2/3 before, one off from the entries they describe). A tier-1 entry is
-# in the internal note; a tier-2 entry is in the highlights AND, the ladder being cumulative, in the
-# internal note as well. The development note carries everything, tier 0 included, because it is the
-# record.
+# in the internal note; a tier-2 entry is in the consumer document AND, the ladder being cumulative, in
+# the internal note as well. The development note carries everything, tier 0 included, because it is
+# the record.
 #
 # PER MAJOR, NOT PER MINOR (Dave, August 3, 2026). The consumer this came from folders its notes per
 # minor; this repo keeps <X>.x for all three tiers, which Get-ReleaseNotesGrouping above already says
@@ -452,15 +463,23 @@ function Get-ReservedRootMd {
 # a patch has nothing a consumer would read, which is precisely why it is a patch.
 #
 # SINCE AUGUST 5, 2026 THAT AGREEMENT IS ENFORCED RATHER THAN HOPED FOR: cut-release refuses a minor
-# unless a tier-2 entry is pending, so "this bump has a highlights reader" is a precondition of the
+# unless a tier-2 entry is pending, so "this bump has a consumer reading it" is a precondition of the
 # bump instead of a convention about it. This knob therefore no longer decides WHETHER there is
 # anything to write -- the tier does -- only whether this repo wants the document for that bump type.
-$script:ReleaseHighlightsBumps = @('minor', 'major')
+$script:ReleaseConsumerBumps = @('minor', 'major')
 
-function Get-ReleaseHighlightsBumps {
-    <# Bump types that also get a highlights document: e.g. @('minor','major'). Empty = tier off. #>
-    return $script:ReleaseHighlightsBumps
+function Get-ReleaseConsumerBumps {
+    <# Bump types that also get a consumer document: e.g. @('minor','major'). Empty = tier off. #>
+    return $script:ReleaseConsumerBumps
 }
+
+# THE OLD NAME IS STILL READ, AND ONLY THE NEW ONE IS WRITTEN -- the standing "recognise both, write
+# one" rule, and here it is load-bearing rather than polite: this is a CONSUMER-OVERRIDABLE seam, so a
+# repo that defines Get-ReleaseHighlightsBumps in its own repo-config right now would, without the
+# fallback in cut-release.ps1, silently fall back to the built-in default (@() -- the tier switched
+# OFF) and cut a minor with no document for the reader it was cut for. Nothing would error. Consumers
+# receive this rename through a plugin update rather than by choosing to, so the read has to cover
+# both names for as long as any of them might still carry the old one.
 
 # --- How many minors a major must recap (Dave, August 5, 2026) ------------------------------------
 #
@@ -487,7 +506,7 @@ function Get-ReleaseMajorMinMinors {
 
 # --- RETIRED, AUGUST 5, 2026: Get-ReleaseHighlightsStakeholderTypes + Get-ReleaseHighlightsWording ---
 #
-# Both existed to serve ONE mechanism: the highlights generator wrote out every category, put Feat+Fix
+# Both existed to serve ONE mechanism: the tier-2 generator wrote out every category, put Feat+Fix
 # above a "remove before publishing" marker and left the release manager to cut the rest by hand. The
 # marker was explicitly a PROPOSAL rather than a verdict, and the reason it could only ever be a
 # proposal is the measurement this repo already had: held against the 19 entries pending at v3.2.0, the
@@ -506,12 +525,12 @@ function Get-ReleaseMajorMinMinors {
 # --- The internal tier's own text (the third tier, August 3, 2026) --------------------------------
 #
 # releases/internal/<X>.x/<X.Y.Z>.md, written by new-internal-note.ps1 for colleagues, employers and
-# management -- at EVERY release including a patch, which is exactly what separates it from highlights:
-# highlights = what a CONSUMER notices, internal = what the ORGANISATION gets out of it. A release with
-# nothing for a consumer (correctly a patch, so no highlights) can still be the one where a team stopped
-# needing a developer for a routine change.
+# management -- at EVERY release including a patch, which is exactly what separates it from the consumer
+# document: that one is what a CONSUMER notices, this one is what the ORGANISATION gets out of it. A
+# release with nothing for a consumer (correctly a patch, so no consumer document) can still be the one
+# where a team stopped needing a developer for a routine change.
 #
-# NO ON/OFF KNOB, deliberately, unlike the highlights tier. That tier is generated BY cut-release, so it
+# NO ON/OFF KNOB, deliberately, unlike the consumer tier. That tier is generated BY cut-release, so it
 # needs to be told whether to run; this one is a script you invoke when you want a note. The switch is
 # running it or not. cut-release only decides whether to PRINT the suggestion, and it does that by
 # checking whether the script exists in the repo -- a fact rather than a preference, the same reasoning

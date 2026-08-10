@@ -1800,7 +1800,7 @@ Write-Coverage -Category 'skill-param' -Checked $skillParamChecked `
 # mechanism". A cut empties this document down to that intro and carries it through verbatim, so it is the
 # one piece of prose in the repo that no release ever rewrites and no reviewer ever opens. Measured on the
 # day this was written: it claimed THREE sections while the scaffolder wrote six, and had done so since
-# August 6 -- two days, one release, and a consumer-facing highlights page in between.
+# August 6 -- two days, one release, and a consumer-facing release page in between.
 #
 # TWO THINGS KEPT IT OUT OF REACH, and repairing either one alone leaves it unchecked:
 #

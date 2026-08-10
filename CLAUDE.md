@@ -308,7 +308,7 @@ The constitution above, concretely implemented here:
   below the intro are history. The intro is a live statement about the present mechanism that every cut
   copies through **verbatim**, so it is the one piece of prose here that no release rewrites and no reviewer
   opens; measured on the day it was repaired, it had promised *three* named sections for two days, with one
-  release and a consumer-facing highlights page in between. **Repairing either half alone changes nothing**:
+  release and a consumer-facing release page in between. **Repairing either half alone changes nothing**:
   the file was unread, *and* the pattern would have walked past the sentence anyway, because it carried no
   `###` marker and ran across a line break. So the intro gets its **own pass with the level marker
   optional**, and matching runs over the whole text instead of per line. Both relaxations were chosen by
@@ -417,7 +417,7 @@ The constitution above, concretely implemented here:
      workflow ([#417](https://github.com/DaveKJohn/claude-code-specialists/issues/417)): everything
      that legitimately differs per repo — which root docs are permanent, how the notes are foldered,
      whether there is a plugin tier at all, for which bumps a
-     stakeholder-facing **highlights** document is generated, and how many minors a major must recap — is
+     stakeholder-facing **consumer** document is generated, and how many minors a major must recap — is
      read from optional functions in [`scripts/repo-config.ps1`](scripts/repo-config.ps1), each falling
      back to what this repo already did.
 
@@ -433,7 +433,7 @@ The constitution above, concretely implemented here:
      `Set-ReleaseInternalNoteLink` for why it cannot be the cut's job. **The exception it runs under did not widen**: same scope, same
      "only on explicit request", and the release artefacts it produces here were verified
      byte-identical to the unshared script's, both when the script was shared and again when the
-     highlights tier joined it.
+     consumer tier joined it.
 
      **The document is one change per `##` heading, with no section headings at all** (Dave, August 5,
      2026). `CHANGELOG.md` is an intro followed by a **flat ranked list**: a change *is* the `##`. The three
@@ -481,12 +481,45 @@ The constitution above, concretely implemented here:
 
      | tier | who notices | release document | when |
      |---|---|---|---|
-     | **2** | consumers | `releases/highlights/<X>.x/<X.Y.Z>.md` | minor/major |
+     | **2** | consumers | `releases/consumer/<X>.x/<X.Y.Z>.md` | minor/major |
      | **1** | colleagues on this project | `releases/internal/<X>.x/<X.Y.Z>.md` | every release, patch included |
      | **0** | only this repo's developers | `releases/development/<X>.x/<X.Y.Z>.md` | every release |
 
      The grouping is per **major** (`3.x`) for all three, deliberately differing from the consumer this
      model came from, which folders per minor. `Get-ReleaseNotesGrouping` answers that once.
+
+     **EACH DOCUMENT IS NAMED FOR ITS READER, AND TIER 2 WAS THE ONE THAT WAS NOT** (Dave, August 10,
+     2026). It was `releases/highlights/` — the directory, the seam, the renderer and some ten documents of
+     prose — while its neighbours name their audience and this very table has always said tier 2 is
+     *consumers*. So the name disagreed with the model it belongs to, and it named the **form** (a selection
+     of the nice bits) rather than the reader. **Measured before renaming rather than argued:** five
+     dev-tool changelogs in the field — Linear, Stripe, Vercel, Raycast, GitHub — and **not one publishes
+     anything called "highlights"**; the live names are *Changelog*, *Release notes* and *What's new*, all
+     of which name the document or its reader. That same pass found the split this repo already runs:
+     GitHub keeps a terse engineering changelog beside readable announcements, which is
+     `development`/`internal` beside this tier. The form-name was also earning its keep in the wrong
+     direction — it invites the register a self-selected best-of invites, which is what a review of
+     `v4.0.0`'s own document had just found it guilty of.
+
+     **THE SEAM IS THE HALF THAT COULD HAVE BROKEN A CONSUMER IN SILENCE**, so it is read under both names:
+     `Get-ReleaseConsumerBumps` first, `Get-ReleaseHighlightsBumps` second. The fallback for an undefined
+     seam is `@()` — *the tier switched off* — so a repo still carrying the old name would cut a minor,
+     write no document for the very consumer it was cut for, and report success. That is the same
+     failure-with-no-error-message class the previous release was about, and it is why "recognise both,
+     write one" is not politeness here: consumers receive a rename through a plugin update rather than by
+     choosing to. `Get-SeamValue` takes a **list** of names now, the current one first, and three asserts in
+     `cut-release-guardrail.tests.ps1` hold exactly that.
+
+     **What was deliberately NOT renamed, and the rule behind it.** No GitHub Release body links to a
+     `releases/highlights/…` path — checked rather than assumed, which is what made moving all eleven
+     documents safe. The **prose** in the archived `releases/development/` notes and in the already-folded
+     `CHANGELOG.md` entries keeps the old word, because those describe what the document was called on the
+     day they were written; that is the same published-record rule that left the seven wrong merge dates
+     standing that [Chris's lens](.claude/specialists/lenses/01-01-extension.md#the-dave-rules) records.
+     Their **links** were repointed, since a dead link
+     in a record is worse than a relocated one and repointing one changes no claim the record makes.
+     `Get-ReleaseHighlightsStakeholderTypes` and `Get-ReleaseHighlightsWording` keep their names too — they
+     name functions that no longer exist under any name.
 
      **The release documents follow the same flat shape**, and that deletion is part of the decision rather
      than a tidy-up alongside it: the category grouping (`## Features`, `## Fixes`, …) is gone, together with
@@ -496,7 +529,7 @@ The constitution above, concretely implemented here:
      only reorder the categories, not escape them. Each change states its own type inside itself now, so
      nothing is lost by not grouping on it.
 
-     **The ladder is cumulative**, so a tier-2 entry is in the highlights *and* in the internal note; the
+     **The ladder is cumulative**, so a tier-2 entry is in the consumer document *and* in the internal note; the
      development note carries everything, tier 0 included, because it is the record rather than a summary.
      **The number comes from the author of the entry, on the branch** — and deliberately **not** from the
      branch prefix, which this repo has measured does not predict impact.
@@ -560,7 +593,7 @@ The constitution above, concretely implemented here:
      an entry has are the documents it appears in, and each is that document's reader answering their own
      question. The score is scaffolded **empty**, unlike the tier: 0 is a harmless final answer about
      reach, while any scaffolded *score* would be a guess at a ranking, and this repo has measured what a
-     guessed ranking costs (the retired highlights marker, below).
+     guessed ranking costs (the retired remove-before-publishing marker, below).
 
      **Three shapes are read and one is written.** The sub-sections, the table, and the older `Tier: N`
      line — because `CHANGELOG.md` holds all three right now and every consumer's tree holds at least one.
@@ -597,13 +630,13 @@ The constitution above, concretely implemented here:
      the *only* moment it can: the cut **empties the list**, so whatever order the fold leaves is
      what the release documents inherit — reproducible across two moments days apart with nothing
      re-estimated. Insert-only, never a re-sort: the fold commit lands directly on `main`, so a bug there
-     must be able to misplace at most the one entry being folded rather than scramble a list it did not write. The **highlights** re-read the tier-2 row (its reader is the consumer); the **internal
+     must be able to misplace at most the one entry being folded rather than scramble a list it did not write. The **consumer** re-read the tier-2 row (its reader is the consumer); the **internal
      note** reads the tier-1 row. **Tier 0 is never ranked** — the development note is the record: complete
      and chronological. The table **survives into the record** because that is the last place each ranking's
-     justification lives, and is **stripped from everything that travels outward** (the highlights),
+     justification lives, and is **stripped from everything that travels outward** (the consumer document),
      because a self-assigned number printed at a consumer is a marketing claim. It used to be stripped
      from the per-plugin `CHANGELOG.md` and `RELEASE.md` too; those were retired on August 8, 2026, so
-     the highlights are the only outward document left to strip. `cut-release.ps1` refuses a release whose tier-1-or-higher entries have not scored themselves;
+     the consumer document is the only outward document left to strip. `cut-release.ps1` refuses a release whose tier-1-or-higher entries have not scored themselves;
      `-SkipSignificanceGate` overrules it, separate from `-SkipTierGate` because one overrules whether the
      release should exist and the other how its contents are ordered.
 
@@ -630,8 +663,8 @@ The constitution above, concretely implemented here:
        nothing is exactly what a patch is for. And a minor used to demand a **tier-2** entry, so tier-1
        work earned only a patch;
      - **the audience of each note follows the TIER, not the bump**, and that is what keeps the looser
-       rule honest. A tier-1-only minor writes the internal note and **no highlights**, so nobody outside
-       is handed a document about work they cannot see. `cut-release.ps1` keys the highlights on a tier-2
+       rule honest. A tier-1-only minor writes the internal note and **no consumer document**, so nobody outside
+       is handed a document about work they cannot see. `cut-release.ps1` keys the consumer document on a tier-2
        entry being present rather than on the bump type — a condition that was belt-and-braces while a
        minor required tier 2, and is now the whole mechanism;
      - a **major** needs **10 minors** in the current major line, on top of that minimum. A major is a
@@ -650,14 +683,14 @@ The constitution above, concretely implemented here:
      itself to and a repo that never chose the model.
 
      **And that same ladder is why the internal document exists at every release.** Tier 2 and tier 1 are
-     not the same question: highlights is *what a consumer notices*, internal is *what the organisation
+     not the same question: the consumer document is *what a consumer notices*, internal is *what the organisation
      gets out of it*. They come apart most clearly on a patch — a release with nothing for a consumer can
      still be the one where a routine change stopped needing a developer.
 
-     **Who writes what.** `cut-release.ps1` generates the development notes and the highlights **draft**,
+     **Who writes what.** `cut-release.ps1` generates the development notes and the consumer **draft**,
      then names the two documents it deliberately did not write. The internal note has its own script
      ([`new-internal-note.ps1`](scripts/release/new-internal-note.ps1)), which needs the development
-     notes as input and so can only run *after* the cut. Both the highlights edit and the internal note
+     notes as input and so can only run *after* the cut. Both the consumer-document edit and the internal note
      are hand-written and land **via a branch + PR** — the release commit is already tagged by then, and
      neither is one of the two named direct-on-`main` exceptions. **Confirmed by Dave, August 4, 2026**,
      over the alternative he was offered: widening the release exception to cover "the release *and*
@@ -671,7 +704,7 @@ The constitution above, concretely implemented here:
      put twice without an answer, and the answer-shaped text went into the docs anyway.
 
      **The measurement the whole tier model rests on: the branch prefix does not predict impact in this
-     repo.** Until August 5, 2026 the highlights document put `Feat`/`Fix` above a "remove before
+     repo.** Until August 5, 2026 the consumer document put `Feat`/`Fix` above a "remove before
      publishing" marker and everything else below it, explicitly as a *proposal* rather than a verdict.
      Measured against the 19 entries pending at v3.2.0, the single most consequential change for a consumer
      — renaming the marketplace, which breaks every existing install — arrived on a `chore/` branch and

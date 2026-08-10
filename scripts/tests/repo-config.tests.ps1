@@ -71,7 +71,7 @@ foreach ($id in $ignored) { Assert-Match $id '^\d{2}-\d{2}$' "Get-RosterIgnoredI
 #
 # ASSERTED RATHER THAN JUST DELETED, because a repo-config still answering these would hand values to a
 # mechanism that no longer reads them -- the write-once-config failure this file already guards for the two
-# retired highlights knobs below.
+# retired remove-before-publishing knobs below.
 foreach ($retired in @('Get-ChangelogTierHeadings', 'Get-ChangelogHeading')) {
     Assert-Equal $null (Get-Command $retired -ErrorAction SilentlyContinue) "$retired is retired -- the flat changelog has no sections to name"
 }
@@ -92,7 +92,7 @@ foreach ($gone in @('Pull Requests', 'Latest Release', 'Releases')) {
 # below.
 Assert-Equal 10 (Get-ReleaseMajorMinMinors) 'Get-ReleaseMajorMinMinors is 10 in this workshop'
 
-# The two retired highlights knobs. Asserted on ABSENCE: both configured the remove-before-publishing
+# The two retired remove-before-publishing knobs. Asserted on ABSENCE: both configured the remove-before-publishing
 # marker that the tier model replaced, and a repo-config still answering them would be handing values to
 # a mechanism that no longer reads them.
 foreach ($gone in 'Get-ReleaseHighlightsStakeholderTypes', 'Get-ReleaseHighlightsWording') {
@@ -148,32 +148,41 @@ foreach ($mustHave in @('CHANGELOG.md', 'README.md', 'CLAUDE.md')) {
 Assert-True (($mjPaths | Where-Object { $_ -match '\\plugins\\' }).Count -gt 0) 'Get-MojibakePaths reaches the per-plugin CHANGELOG.md/RELEASE.md files'
 Assert-True (($mjPaths | Where-Object { $_ -match '\\releases\\' }).Count -gt 0) 'Get-MojibakePaths reaches the archived release notes'
 
-# The highlights tier (#417, Optional in the contract). ON for minor/major since August 3, 2026 -- these
+# The consumer tier (#417, Optional in the contract). ON for minor/major since August 3, 2026 -- these
 # asserts were written the other way round one commit earlier, when the tier was off, and were flipped
 # with Dave's decision. Kept as asserts on the VALUE rather than deleted: the tier writes files into
 # releases/ and its output is judged by eye, so a silent change to either knob is worth a red test.
 # Whether the tier WORKS is release-lib.tests.ps1's job; this is only about what this repo answers.
-$hlBumps = @(Get-ReleaseHighlightsBumps)
-Assert-Equal 2 $hlBumps.Count 'Get-ReleaseHighlightsBumps names two bump types'
-Assert-True ($hlBumps -contains 'minor') 'Get-ReleaseHighlightsBumps includes minor'
-Assert-True ($hlBumps -contains 'major') 'Get-ReleaseHighlightsBumps includes major'
+$hlBumps = @(Get-ReleaseConsumerBumps)
+Assert-Equal 2 $hlBumps.Count 'Get-ReleaseConsumerBumps names two bump types'
+Assert-True ($hlBumps -contains 'minor') 'Get-ReleaseConsumerBumps includes minor'
+Assert-True ($hlBumps -contains 'major') 'Get-ReleaseConsumerBumps includes major'
 # Patch is excluded BY DESIGN, not by omission: a minor here is cut when a consumer notices something,
-# so a patch has no highlights reader by definition. Asserted so adding 'patch' becomes a decision.
-Assert-True ($hlBumps -notcontains 'patch') 'Get-ReleaseHighlightsBumps excludes patch -- a patch has nothing a consumer would read'
+# so a patch has no consumer document reader by definition. Asserted so adding 'patch' becomes a decision.
+Assert-True ($hlBumps -notcontains 'patch') 'Get-ReleaseConsumerBumps excludes patch -- a patch has nothing a consumer would read'
 # A bump type that is not one of the three the script understands would silently never match, so the
 # tier would appear configured and generate nothing. Guarded here rather than at release time.
 $badBumps = @($hlBumps | Where-Object { @('major', 'minor', 'patch') -notcontains $_ })
-Assert-Equal 0 $badBumps.Count "Get-ReleaseHighlightsBumps names only major/minor/patch (stray: $($badBumps -join ', '))"
+Assert-Equal 0 $badBumps.Count "Get-ReleaseConsumerBumps names only major/minor/patch (stray: $($badBumps -join ', '))"
 
-# WHAT USED TO BE ASSERTED HERE, and why it is not. Two more knobs configured the highlights draft: which
+# WHAT USED TO BE ASSERTED HERE, and why it is not. Two more knobs configured the consumer draft: which
 # branch types to promote above a "remove before publishing" marker, and in whose words to label that
 # marker. The asserts held them against this repo's own branch table, because a type named there that
 # branch-info never produces would put an empty category above the marker and drop the real ones below it.
 #
-# Both knobs, the marker and that whole failure mode are gone (August 5, 2026): the highlights document is
+# Both knobs, the marker and that whole failure mode are gone (August 5, 2026): the consumer document is
 # now the release's TIER-2 entries, declared per entry by their author rather than inferred from a branch
 # prefix -- which this repo had measured does not predict impact. Their absence is asserted at the top of
 # this file, where the tier map is checked, rather than here where the values used to be read.
+
+# THE RETIRED NAME IS NOT DEFINED HERE, AND THAT IS THE POINT OF ASSERTING IT (August 10, 2026). The knob
+# was Get-ReleaseHighlightsBumps until the tier was renamed after its reader, and cut-release deliberately
+# reads BOTH names. This repo must therefore answer under the CURRENT one only -- if both were defined here
+# the fallback would never be exercised by anything, and the day it broke nothing in this repo would
+# notice. That the fallback still reads the old name is asserted where it lives, in
+# cut-release-guardrail.tests.ps1; this side asserts the other half of the pair.
+Assert-True ($null -eq (Get-Command 'Get-ReleaseHighlightsBumps' -ErrorAction SilentlyContinue)) `
+    'the retired name Get-ReleaseHighlightsBumps is NOT defined here -- only the fallback in cut-release still knows it'
 
 Write-Host ""
 if ($script:fail -gt 0) {

@@ -61,8 +61,9 @@ function Get-ScriptContract {
 # which is the gap #456 was filed about.
 #
 # TEN ARE 'decide' AND SIX OF THEM WERE NOT ON THE ISSUE'S LIST, which named Get-ReservedRootMd,
-# Get-ReleasePluginTier, Get-ReleaseHighlightsBumps and Get-ReleaseMajorMinMinors. That list answered a
-# neighbouring question -- which values a SCRIPT cannot judge from the outside -- so it never mentioned
+# Get-ReleasePluginTier, Get-ReleaseConsumerBumps (then still named ...HighlightsBumps) and
+# Get-ReleaseMajorMinMinors. That list answered a neighbouring question -- which values a SCRIPT cannot
+# judge from the outside -- so it never mentioned
 # Get-RepoName, Get-LintScript, Get-LiveStage or Get-PrMergeMethod: nobody would think to have a script
 # guess a repo's name. Under THIS question they are the clearest cases in the table, Get-RepoName most
 # of all, where copying does not merely assert something false but points every gh call in the consumer
@@ -196,7 +197,7 @@ $script:ContractRecords = @(
     # crashes when absent, so a consumer would discover the wrong one at release time, which is the worst
     # moment this repo has. An [INFO] naming the default makes it a thing you were told.
     #
-    # Six landed in phase 1. Phase 2 added the highlights tier as three functions -- whether, for whom,
+    # Six landed in phase 1. Phase 2 added the consumer tier as three functions -- whether, for whom,
     # and in whose words -- of which only 'whether' survives: the tier model answered the other two at
     # the source (see the retirement note below). Get-ReleaseMajorMinMinors joined in the same movement,
     # because the bump gate it feeds is a hard refusal and a shared script must not pin every consumer to
@@ -209,7 +210,7 @@ $script:ContractRecords = @(
     # 'major' also being the built-in fallback, so copying it "changes no behaviour" -- true of the value and
     # false of the question. This function does not state how anyone WORKS; it states what the consumer's
     # releases/ tree looks like, which is the definition of a decide record and puts it in the same family as
-    # Get-ReleaseHighlightsBumps and Get-ReleaseMajorMinMinors, both of which were always decide.
+    # Get-ReleaseConsumerBumps and Get-ReleaseMajorMinMinors, both of which were always decide.
     #
     # MEASURED IN A CONSUMER: smartwatchbanden has foldered per MINOR since v2.0.0 -- fourteen directories,
     # releases/development/2.0/ through 2.13/. adopt-config placed 'major' into their seam unseen, so their
@@ -225,7 +226,7 @@ $script:ContractRecords = @(
     # currently-live release on the newest release heading; the second chose whether that section
     # accumulated a block per release or kept only the newest behind a pointer. A cut writes no release
     # block into CHANGELOG.md at all now -- it empties the document down to its intro -- so both describe
-    # machinery that is gone. Removed rather than left declared, for the reason the highlights knobs below
+    # machinery that is gone. Removed rather than left declared, for the reason the retired tier-2 knobs below
     # were: a contract record for a knob nothing reads sends a consumer off to write a function that will
     # never be called.
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHistoryPath'; Scripts = @('cut-release', 'new-internal-note');
@@ -243,12 +244,18 @@ $script:ContractRecords = @(
     # it was derived from the BRANCH PREFIX, which this repo measured does not predict what a change is
     # worth: the most consequential change for a consumer at v3.2.0 arrived on a chore/ branch and was
     # therefore filed third, under whichever label its prefix produced.
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseHighlightsBumps'; Scripts = @('cut-release');
+    # RENAMED FROM Get-ReleaseHighlightsBumps, AUGUST 10, 2026. The record names only the current name,
+    # because that is what a consumer should now write -- but cut-release READS BOTH, and it has to: the
+    # fallback for an undefined seam is @(), the tier switched off, so a repo still carrying the old name
+    # would cut a minor with no document for its consumer and nothing would err. The contract check
+    # therefore reports the old name as a missing optional record rather than as an error, which is the
+    # correct signal: it is defined-but-retired, not broken.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseConsumerBumps'; Scripts = @('cut-release');
        Adopt = 'decide'; AdoptWhy = 'it declares that this repo wants a stakeholder-facing document at all, and for which bumps. Whether there is an audience outside the developers is a fact about the organisation around the repo, which no script can read from the tree';
-       Optional = $true; Default = 'no highlights tier at all';
-       Returns = "the bump types that also get a stakeholder-facing highlights document (releases/highlights/<dir>/<X.Y.Z>.md, markdown only), e.g. @('minor','major'); @() switches the tier off, which is what the cut did before this knob existed. The document is the release's TIER-2 entries, so it is only written when there are some" },
+       Optional = $true; Default = 'no consumer tier at all';
+       Returns = "the bump types that also get a stakeholder-facing consumer document (releases/consumer/<dir>/<X.Y.Z>.md, markdown only), e.g. @('minor','major'); @() switches the tier off, which is what the cut did before this knob existed. The document is the release's TIER-2 entries, so it is only written when there are some. The retired name Get-ReleaseHighlightsBumps is still read as a fallback" },
     # Get-ReleaseHighlightsStakeholderTypes and Get-ReleaseHighlightsWording USED TO BE DECLARED HERE and
-    # are gone (August 5, 2026). Both configured the highlights document's "remove before publishing"
+    # are gone (August 5, 2026). Both configured the consumer document's "remove before publishing"
     # marker: which branch types to promote above it, and in whose words to label it. That marker existed
     # because the branch prefix does not predict impact, so the generator wrote out both halves and left
     # the release manager to cut one. The tier model asks the entry's author instead, which removed the

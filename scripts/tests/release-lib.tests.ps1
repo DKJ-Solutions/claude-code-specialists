@@ -500,7 +500,7 @@ Assert-Equal '' (Format-RankedEntries -Entries @() -EntryLevel 2) 'an empty list
 
 Write-Host "Format-RankedEntries -RankByTier" -ForegroundColor Cyan
 # THE DOCUMENT IS ORDERED BY WHAT ITS OWN READER GETS OUT OF EACH CHANGE, so the rank key is a tier
-# number rather than an audience word: the internal note ranks on tier 1, the highlights on tier 2.
+# number rather than an audience word: the internal note ranks on tier 1, the consumer document on tier 2.
 $low  = New-FlatEntry -Heading "#1 $midDot Least" -Rows @('| 1 | 1 | cosmetic |') -Pr 1
 $mid  = New-FlatEntry -Heading "#2 $midDot Middling" -Rows @('| 1 | 3 | a clear improvement |') -Pr 2
 $high = New-FlatEntry -Heading "#3 $midDot Most" -Rows @('| 1 | 5 | the reader must act |') -Pr 3
@@ -543,7 +543,7 @@ Assert-NoMatch $stripped '(?m)^\| 2 \| 5 \|' 'and its rows with it'
 # the rationale stated only in the assert message and in no document anywhere. What it actually produces is
 # a heading naming a question with nothing under it, because the entry format is explicit that the table IS
 # the answer rather than prose beside it. That is a hole, not structure. Measured while cutting v3.6.0 with
-# -NoPush: 17 empty sections per release card, 17 per per-plugin CHANGELOG, 16 in the highlights draft.
+# -NoPush: 17 empty sections per release card, 17 per per-plugin CHANGELOG, 16 in the consumer draft.
 # It had never been seen in a real document -- v3.5.0 was cut hours BEFORE #476 landed, so v3.6.0 would
 # have been the first release to ship it.
 #
@@ -559,7 +559,7 @@ $strippedLegacy = Format-RankedEntries -Entries @($legacyTier) -EntryLevel 2 -St
 Assert-NoMatch $strippedLegacy '(?m)^Tier: ' "-StripSignificance removes the older 'Tier: N' line too"
 Assert-Match $strippedLegacy '(?m)^## #41 ' 'and leaves the entry itself intact'
 # THE SCORE IS READ BEFORE ANYTHING IS STRIPPED, which is what lets the two switches compose -- the
-# highlights need both, and in the other order they would rank an unscored pile. The same trap the
+# consumer document needs both, and in the other order they would rank an unscored pile. The same trap the
 # retired renderer was measured on with -BareTitles and the type.
 $both = Format-RankedEntries -Entries @($low, $high) -EntryLevel 2 -RankByTier 1 -BareTitles -StripSignificance
 Assert-Match $both '(?s)^## Most.*## Least' 'ranking survives -StripSignificance: the score is read before the table is deleted'
@@ -665,7 +665,7 @@ Assert-Equal 'Tier 7' (Get-ReleaseTierHeading -Tier 7) 'an unknown tier degrades
 Write-Host "Convert-EntryHeadingToTitle (the metadata a stakeholder does not have a branch for)" -ForegroundColor Cyan
 # THE COMMON CASE IS NOW A HEADING WITH ONLY A LEADING '#NN', since the type moved into its own section.
 # That case USED TO RETURN THE HEADING UNCHANGED -- the guard asked whether any TRAILING field had been
-# dropped, which is a different question from whether anything had -- so the highlights document, whose
+# dropped, which is a different question from whether anything had -- so the consumer document, whose
 # whole reason for calling this is that its reader has no PR numbers, kept every one of them.
 Assert-Equal '## Consumer feature' ((Convert-EntryHeadingToTitle -EntryText $e22) -split "`n")[0] 'the leading #NN is dropped even with no trailing field -- the current shape'
 Assert-Match (Convert-EntryHeadingToTitle -EntryText $e22) ('(?m)^### ' + $WhatRx + '$') 'and the body is untouched'
@@ -707,17 +707,17 @@ Assert-Equal "### #9 $midDot Fix $midDot 2026-01-01" (($hOnlyMeta -split "`n")[0
 $hLevel = Convert-EntryHeadingToTitle -EntryText "#### #5 $midDot Deeper $midDot Feat $midDot 2026-01-01`n`nBody."
 Assert-Equal '#### Deeper' (($hLevel -split "`n")[0]) 'the heading level is preserved, not normalized'
 
-Write-Host "Build-HighlightsNotes (the tier-2 entries, ranked and stripped)" -ForegroundColor Cyan
+Write-Host "Build-ConsumerNotes (the tier-2 entries, ranked and stripped)" -ForegroundColor Cyan
 $tier2 = @($groups | Where-Object { $_.Tier -eq 2 })[0]
-$hl = Build-HighlightsNotes -Entries $tier2.Entries -Version '3.5.0' -Date '2026-08-05' -Type 'Minor' -Title 'A release for people'
+$hl = Build-ConsumerNotes -Entries $tier2.Entries -Version '3.5.0' -Date '2026-08-05' -Type 'Minor' -Title 'A release for people'
 Assert-Match $hl '(?m)^# Release notes v3\.5\.0 ' 'header names the version'
 Assert-Match $hl '\*\*Date:\*\* 2026-08-05' 'header carries the date'
 Assert-Match $hl 'A release for people' 'the -Title line is included'
 Assert-Match $hl '(?m)^## Consumer feature$' 'the entry is rendered with a bare title, at ##'
-Assert-NoMatch $hl "#22 $midDot" 'entry metadata is stripped in the highlights document'
+Assert-NoMatch $hl "#22 $midDot" 'entry metadata is stripped in the consumer document'
 # THE SCORES AND THE TIER ARE STRIPPED, which is the whole reason -StripSignificance exists: a
 # self-assigned number printed at a consumer is a marketing claim, and this repo has measured what a
-# published guess costs (the retired highlights marker). The reason stays in the development notes,
+# published guess costs (the retired remove-before-publishing marker). The reason stays in the development notes,
 # where it is auditable by the people who can check it.
 Assert-NoMatch $hl '\| Tier \| Significance \| Why \|' 'the impact table does not travel to the consumer'
 Assert-NoMatch $hl 'consumers must re-add the marketplace' "and neither does the row's justification"
@@ -726,28 +726,28 @@ Assert-NoMatch $hl '(?m)^Tier: ' "nor the older 'Tier: N' line"
 # question from 'what does the organisation get out of it', which is why they are separate documents.
 $c1 = New-FlatEntry -Heading "#31 $midDot Barely noticed" -Rows @('| 2 | 1 | cosmetic for them |', '| 1 | 5 | but huge internally |') -Pr 31
 $c2 = New-FlatEntry -Heading "#32 $midDot Must act" -Rows @('| 2 | 5 | they have to migrate |', '| 1 | 1 | nothing for us |') -Pr 32
-$hlOrder = Build-HighlightsNotes -Entries @($c1, $c2) -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
+$hlOrder = Build-ConsumerNotes -Entries @($c1, $c2) -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
 Assert-Match $hlOrder '(?s)^# .*## Must act.*## Barely noticed' 'ordered by the tier-2 score, so the internal five does not lead a consumer document'
 # THE CALLER SELECTS, so this function renders exactly what it is handed and derives no second half.
-$hlOne = Build-HighlightsNotes -Entries @($e22) -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
+$hlOne = Build-ConsumerNotes -Entries @($e22) -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
 Assert-Match $hlOne '(?m)^## Consumer feature$' 'a single tier-2 entry renders on its own'
 Assert-NoMatch $hlOne 'For colleagues only' 'and nothing that was not handed in'
 # THE RETIRED MARKER AND ITS KNOBS. Asserted on absence: the selection now happens before this function
 # is called, and a marker reappearing here would mean the guess has been rebuilt.
-Assert-NoParameter -Command 'Build-HighlightsNotes' -Names @('StakeholderTypes', 'DevBlockComment', 'DevBlockHeading', 'OnlyTypes')
+Assert-NoParameter -Command 'Build-ConsumerNotes' -Names @('StakeholderTypes', 'DevBlockComment', 'DevBlockHeading', 'OnlyTypes')
 Assert-NoMatch $hl 'For developers only' 'no remove-before-publishing marker is written'
 # An empty selection must not throw: the cut never gets here with nothing (its bump gate refuses a minor
 # without a tier-2 entry), so the only callers that can are a test and a hand run -- and for those a
 # header with no body is a truthful answer where an exception is not.
-$hlNone = Build-HighlightsNotes -Entries @() -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
+$hlNone = Build-ConsumerNotes -Entries @() -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
 Assert-Match $hlNone '(?m)^# Release notes v3\.5\.0 ' 'an empty selection still returns the header'
 Assert-NoMatch $hlNone '(?m)^## ' 'and nothing under it'
-# Links are rewritten from the highlights file's depth, which equals the developer notes' depth.
-$hlLink = Build-HighlightsNotes -Entries @($linkEntry) -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
+# Links are rewritten from the consumer file's depth, which equals the developer notes' depth.
+$hlLink = Build-ConsumerNotes -Entries @($linkEntry) -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
 Assert-Match $hlLink '\[the lint\]\(\.\./\.\./\.\./scripts/lint/x\.ps1\)' 'root-relative links get the prefix here too'
 Assert-Match $hlLink '\[the site\]\(https://example\.com\)' 'external links untouched'
 
-Write-Host "the highlights tier produces markdown ONLY (no HTML renderer)" -ForegroundColor Cyan
+Write-Host "the consumer tier produces markdown ONLY (no HTML renderer)" -ForegroundColor Cyan
 # Dave, August 3, 2026: the print-ready .html is not wanted anywhere, so ConvertTo-ReleaseHtml and
 # Format-InlineMarkdown were removed the same day they were ported. ASSERTED ON THEIR ABSENCE rather
 # than simply deleting the old asserts: a partial HTML renderer is exactly the kind of thing that gets
@@ -1036,7 +1036,7 @@ Assert-Equal $true (Test-ReleaseBumpEarned -BumpType minor -TierGroups $g210 -Cu
 Assert-Equal 'minor' (Test-ReleaseBumpEarned -BumpType patch -TierGroups $g210 -CurrentVersion '3.4.0').EarnedBump 'tier 2 pending: the work warrants a minor'
 # Only tier 1: a MINOR is earned now, where this used to be a patch with the minor refused. The version
 # here speaks to all stakeholders, colleagues included -- and the DOCUMENTS still follow the tier, so such
-# a release writes the internal note and no highlights (asserted on cut-release's own condition).
+# a release writes the internal note and no consumer document (asserted on cut-release's own condition).
 Assert-Equal $true (Test-ReleaseBumpEarned -BumpType patch -TierGroups $g10 -CurrentVersion '3.4.0').Earned 'tier 1 only: a patch is still allowed'
 $minorTier1 = Test-ReleaseBumpEarned -BumpType minor -TierGroups $g10 -CurrentVersion '3.4.0'
 Assert-Equal $true $minorTier1.Earned 'tier 1 only: a minor is EARNED -- something beyond this repo got value'

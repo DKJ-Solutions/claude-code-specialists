@@ -200,7 +200,7 @@ function Test-ReleaseBumpEarned {
                         earned only a patch. Loosened deliberately: the version here speaks to all
                         stakeholders, not to consumers alone. What keeps it honest is that the DOCUMENTS
                         follow the tier and not the bump -- a tier-1-only minor writes the internal note
-                        and no highlights, so nobody outside is handed an empty document.
+                        and no consumer document, so nobody outside is handed an empty document.
           major         at least $MinMinorsForMajor minors cut in the current major line, on top of the
                         general minimum. A major is a RECAP of those minors, so what earns it is their
                         accumulation rather than any single pending change -- which is why a tier-2 entry
@@ -280,7 +280,7 @@ function Test-ReleaseBumpEarned {
     # opposite of what a minor usually promises. Dave chose it knowing that -- the version speaks to ALL
     # stakeholders here, colleagues included, not to consumers alone. What keeps that honest is that the
     # DOCUMENTS still follow the tier rather than the bump: a tier-1-only release writes the internal note
-    # and no highlights, so nobody outside is handed a document with nothing in it. See the highlights
+    # and no consumer document, so nobody outside is handed a document with nothing in it. See the tier-2
     # trigger in cut-release.ps1, which keys on a tier-2 entry rather than on this bump type for exactly
     # that reason.
     $result.MajorAvailable = ($minorsSoFar -ge $MinMinorsForMajor)
@@ -484,7 +484,7 @@ function Get-PullRequestEntriesByTier {
 
           the flat list  -- the per-plugin CHANGELOGs and the RELEASE.md cards, which select on the
                             'Plugins:' line and do not care how far a change reaches;
-          per tier       -- the release notes (one section per tier), the highlights (tier 2 only) and the
+          per tier       -- the release notes (one section per tier), the consumer document (tier 2 only) and the
                             cut's bump gate (which tiers are pending at all).
 
         THE TIER NOW COMES FROM THE ENTRY, which is the reversal this change is about. It used to come from
@@ -496,7 +496,7 @@ function Get-PullRequestEntriesByTier {
 
         GROUPED ON THE HIGHEST TIER AN ENTRY CLAIMS, so the groups stay DISJOINT -- exactly as the sections
         were. The ladder is cumulative in terms of which DOCUMENTS an entry reaches, and that is the
-        caller's business: the development note renders every group, the highlights take tier 2 only. An
+        caller's business: the development note renders every group, the consumer document takes tier 2 only. An
         entry appearing in two groups here would put it twice in the record.
 
         Declared IS NOT BOOKKEEPING -- it is what tells an adopting repo from one that never heard of tiers.
@@ -813,10 +813,10 @@ function Format-RankedEntries {
         which for entries read out of CHANGELOG.md is the ranked order the FOLD already left there. A
         document is ordered by what ITS OWN reader gets out of each change, and the reader is named by the
         tier, so this is a tier number rather than an audience word: the internal note ranks on tier 1, the
-        highlights on tier 2.
+        consumer document on tier 2.
 
         $BareTitles reduces each entry heading to its title (Convert-EntryHeadingToTitle) -- for the
-        highlights, whose reader has no branch and no PR number.
+        consumer document, whose reader has no branch and no PR number.
 
         $StripSignificance removes the impact table AND the older 'Tier: N' line. For the documents that
         travel OUTWARD only; the record keeps both. See Remove-EntryImpactTable for why the two differ.
@@ -833,7 +833,7 @@ function Format-RankedEntries {
     foreach ($e in $Entries) {
         $index++
         # THE SCORE IS READ BEFORE ANYTHING IS STRIPPED, because the strip below deletes the table it lives
-        # in. That is what lets -StripSignificance and -RankByTier compose -- the highlights need both, and
+        # in. That is what lets -StripSignificance and -RankByTier compose -- the consumer document needs both, and
         # in the other order they would rank an unscored pile. The same trap the retired renderer was
         # measured on with -BareTitles and the type.
         $rank = 0
@@ -883,7 +883,7 @@ function Format-RankedEntries {
 # One repository, one product, one changelog. Decision by Dave, August 8, 2026.
 #
 # Convert-EntryLinksForPluginChangelog went with them (its only callers were these), while
-# Format-RankedEntries did NOT -- the release notes and the highlights still use it.
+# Format-RankedEntries did NOT -- the release notes and the consumer document still uses it.
 
 # The two patterns that define where a release row lands, in ONE place because three readers depend on
 # them agreeing: Get-OverviewTargetMajor and Get-OverviewSectionHeading below, and the inserter in
@@ -1030,7 +1030,7 @@ function Build-ReleaseNotes {
             # THE DECLARATIONS ARE NOT STRIPPED HERE, and this is the one document where they survive. The
             # cut EMPTIES the changelog, so these notes are the last place holding the reason behind each
             # ranking; deleting it would leave every order asserted with its justification thrown away. The
-            # documents that travel outward strip it -- see Build-HighlightsNotes.
+            # documents that travel outward strip it -- see Build-ConsumerNotes.
             $rankByTier = if ([int]$group.Tier -ge 1) { [int]$group.Tier } else { 0 }
             $inner = Format-RankedEntries -Entries $linked -EntryLevel 3 -RankByTier $rankByTier
             $sections += ("## " + (Get-ReleaseTierHeading -Tier ([int]$group.Tier)) + "`n`n" + $inner)
@@ -1114,7 +1114,7 @@ function Convert-EntryHeadingToTitle {
         '## #475 <md> A significance score per entry' carries only the leading '#NN'. That case USED TO
         RETURN THE HEADING UNCHANGED -- the guard below asked whether any trailing field had been dropped,
         which is a different question from whether anything had been dropped, and with the tail empty the
-        answer was no. So the highlights document, whose whole reason for calling this is that its reader
+        answer was no. So the consumer document, whose whole reason for calling this is that its reader
         has no PR numbers, would have kept every one of them. Caught by this file's own suite; the guard
         now asks about both ends.
     #>
@@ -1127,7 +1127,7 @@ function Convert-EntryHeadingToTitle {
 
     # THE DOSSIER HEADING NAMES THE BRANCH, AND THIS DOCUMENT'S READER HAS NO BRANCH. Since August 6, 2026
     # an entry opens with '## `feat/x` changelog' and its human-readable name lives in 'Branch title'
-    # -- so for the highlights the title IS that section. Without this the tier-2 document, the one written
+    # -- so for the consumer document the title IS that section. Without this the tier-2 document, the one written
     # for consumers, would list its changes as "`feat/x` changelog": no middot and no '#NN' in that heading,
     # so the field-dropping below leaves it exactly as it found it.
     #
@@ -1184,9 +1184,9 @@ function Convert-EntryHeadingToTitle {
     return "$($hm.Groups[1].Value) $title$rest"
 }
 
-function Build-HighlightsNotes {
+function Build-ConsumerNotes {
     <#
-        Builds the highlights document (releases/highlights/<dir>/<X.Y.Z>.md) from the TIER-2 entries of
+        Builds the consumer document (releases/consumer/<dir>/<X.Y.Z>.md) from the TIER-2 entries of
         the release. Pure string out, hard LF -- a new standalone file, like Build-ReleaseNotes.
 
         $Entries is the selection, not the whole release: the caller passes the tier-2 group's entries and
@@ -1196,8 +1196,8 @@ function Build-HighlightsNotes {
 
         AN EMPTY SELECTION RETURNS THE HEADER AND NOTHING ELSE, rather than throwing. cut-release never
         gets here with nothing (its bump gate refuses a minor with no tier-2 entry), so a throw would
-        only ever fire in a test or a hand call -- and a document that says "this release has no
-        highlights" is a truthful answer to a strange question, while an exception is not.
+        only ever fire in a test or a hand call -- and a document that says "this release has nothing
+        for a consumer" is a truthful answer to a strange question, while an exception is not.
 
         -BareTitles is passed to the renderer rather than applied here, so the score is read off each entry
         before anything about it is reduced -- see Format-RankedEntries for what stripping too early costs.
@@ -1226,7 +1226,7 @@ function Build-HighlightsNotes {
     #
     # AND THE SCORES THEMSELVES ARE STRIPPED, which is the whole reason -StripSignificance exists. A
     # self-assigned number printed at a consumer is a marketing claim, and this repo has measured what a
-    # published guess costs -- the retired highlights marker is in this file's history for exactly that.
+    # published guess costs -- the retired remove-before-publishing marker is in this file's history for exactly that.
     # The number does its work by deciding the order and then gets out of the way; the reason stays in the
     # development notes, where it is auditable by the people who can check it.
     $body = if ($linked.Count -gt 0) {

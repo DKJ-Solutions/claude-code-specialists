@@ -41,7 +41,8 @@
       Get-ReleasePluginTier       whether this repo publishes plugins at all: it gates the lockstep
                                   bump, and it is what decides whether the current version comes from
                                   a plugin.json or from the newest vX.Y.Z tag
-      Get-ReleaseHighlightsBumps  which bumps get a stakeholder document; see step 3d
+      Get-ReleaseConsumerBumps    which bumps get a stakeholder document; see step 3d. The retired name
+                                  Get-ReleaseHighlightsBumps is still read as a fallback
       Get-ReleaseMajorMinMinors   how many minors a major must recap
 
     TWO NAMES THAT USED TO BE ON THIS LIST ARE GONE, and they are named here rather than silently
@@ -54,7 +55,7 @@
     furthest-reach-first and, within a reach, highest-significance-first -- there are no sections to file
     into, and each entry declares its own reach in the '### Significance' section it carries. Three
     things here follow from it: the bump gate in step 1, the tier grouping of the notes in step 3, and
-    the highlights document in step 3d being the tier-2 entries rather than a category guess.
+    the consumer document in step 3d being the tier-2 entries rather than a category guess.
 
     All three switch themselves off where NO PENDING ENTRY DECLARED ITS IMPACT AT ALL, so a consumer
     that has not adopted the model cuts exactly the release it always did. That test counts
@@ -84,17 +85,17 @@
           code where they used to run; in short, a marketplace source is a git clone of the WHOLE repo,
           so those ten files were 11,684 lines restating what the reader already had.
       3d. Writes a second, stakeholder-facing rendering of the same release:
-          releases/highlights/<dir>/<X.Y.Z>.md. TWO CONDITIONS, BOTH REQUIRED: the bump type is one the
-          seam names in Get-ReleaseHighlightsBumps, AND at least one pending entry declared tier 2.
+          releases/consumer/<dir>/<X.Y.Z>.md. TWO CONDITIONS, BOTH REQUIRED: the bump type is one the
+          seam names in Get-ReleaseConsumerBumps, AND at least one pending entry declared tier 2.
           The second half is the load-bearing one since a minor stopped needing a tier-2 entry to be
           earned (August 7, 2026) -- it is what keeps a tier-1-only minor from handing someone outside
           the project a document about work they cannot see.
           Written for NON-DEVELOPERS, and it is the TIER-2 ENTRIES -- what a consumer notices was
           declared by each entry's own author, so there is no "remove before publishing" marker left to
           cut by hand. Still a draft: the selection is right, the prose is still written for developers.
-          Markdown only -- no HTML, deliberately (see release-lib.ps1's highlights header).
+          Markdown only -- no HTML, deliberately (see release-lib.ps1's tier-2 header).
       4. Commits that directly to main (release: vX.Y.Z) and sets an annotated tag vX.Y.Z, then names
-         the documents it deliberately did NOT write: the highlights draft still needs editing, and the
+         the documents it deliberately did NOT write: the consumer draft still needs editing, and the
          internal summary (the third tier, for colleagues and management, at EVERY release including a
          patch) has its own script -- new-internal-note.ps1, which needs the notes step 3 just produced.
          Both are hand-written and both land via a branch + PR, because this commit is already tagged.
@@ -220,9 +221,20 @@ if ($absent.Count -gt 0) {
 # Every one of these is OPTIONAL in the script contract, and every fallback is what this script did
 # before it was shared -- so a consumer that defines none of them gets the unchanged behaviour.
 function Get-SeamValue {
-    <# Calls an optional repo-config function, or returns $Default when the repo does not define it. #>
-    param([Parameter(Mandatory)][string]$Name, $Default)
-    if (Get-Command $Name -ErrorAction SilentlyContinue) { return (& $Name) }
+    <#
+        Calls an optional repo-config function, or returns $Default when the repo does not define it.
+
+        $Name takes MORE THAN ONE NAME where a seam has been renamed: they are tried in order and the
+        first one the repo defines wins, so the current name is preferred and a retired one still
+        answers. That matters because this is a CONSUMER-OWNED file -- a repo that defined the old name
+        receives the rename through a plugin update rather than by choosing to, and without the fallback
+        it would drop to $Default in silence. A seam whose default is "off" fails that way without
+        erring once.
+    #>
+    param([Parameter(Mandatory)][string[]]$Name, $Default)
+    foreach ($n in $Name) {
+        if (Get-Command $n -ErrorAction SilentlyContinue) { return (& $n) }
+    }
     return $Default
 }
 
@@ -239,13 +251,19 @@ $historyRelPath = Get-SeamValue -Name 'Get-ReleaseHistoryPath'    -Default 'rele
 $pluginTier    = Get-SeamValue -Name 'Get-ReleasePluginTier' `
     -Default (Test-Path -LiteralPath (Join-Path $repoRoot '.claude-plugin\marketplace.json'))
 
-# The highlights tier (#417 phase 2). Empty by default, which is the tier switched OFF -- what this
+# The consumer tier (#417 phase 2). Empty by default, which is the tier switched OFF -- what this
 # script did for its whole life as a workshop-only file, so nothing changes for a consumer.
 #
 # ONE KNOB NOW, NOT THREE. Get-ReleaseHighlightsStakeholderTypes and Get-ReleaseHighlightsWording are
 # retired (August 5, 2026): both configured the "remove before publishing" marker, and the tier model
-# replaced that marker with the entries' own tier-2 declaration. See release-lib.ps1's highlights header.
-$highlightsBumps = @(Get-SeamValue -Name 'Get-ReleaseHighlightsBumps' -Default @())
+# replaced that marker with the entries' own tier-2 declaration. See release-lib.ps1's tier-2 header.
+#
+# TWO NAMES READ, ONE WRITTEN (August 10, 2026). The knob was Get-ReleaseHighlightsBumps until the tier
+# was renamed after its reader, and the old name is read second rather than dropped -- the standing
+# "recognise both, write one" rule, load-bearing here because the fallback for "not defined" is @(),
+# the tier switched OFF. A consumer whose seam still says Highlights would therefore cut a minor with no
+# document for the very reader it was cut for, and nothing in the run would say so.
+$consumerBumps = @(Get-SeamValue -Name 'Get-ReleaseConsumerBumps', 'Get-ReleaseHighlightsBumps' -Default @())
 
 # How many minors a major line must have had before a major may be cut. A major here is a RECAP of the
 # minors before it, so what earns one is their accumulation -- 10 in this repo. Repo-owned because it is
@@ -698,13 +716,13 @@ $notesContent = Build-ReleaseNotes -TierGroups $tierGroups -Version $new -Date $
 # the pointer in that intro -- which is why this now takes the content and nothing else.
 $changelogNew = Convert-ChangelogForRelease -Content $changelogRaw
 
-# The highlights document, built here with everything else so a failure leaves no half-written release
+# The consumer document, built here with everything else so a failure leaves no half-written release
 # behind. It is the TIER-2 entries and nothing else: what a consumer notices was declared by the author
 # of each entry, so there is no marker block left for the release manager to delete (see release-lib's
-# highlights header for the guess this replaced).
+# tier-2 header for the guess this replaced).
 #
 # TWO CONDITIONS, AND THE SECOND IS THE LOAD-BEARING ONE. The seam must name this bump type, AND there
-# must be tier-2 work to describe. A highlights document with a header and no content is worse than none,
+# must be tier-2 work to describe. A consumer document with a header and no content is worse than none,
 # because it looks written.
 #
 # THE SECOND CONDITION USED TO BE BELT-AND-BRACES AND IS NOW THE WHOLE MECHANISM (August 7, 2026). It was
@@ -714,22 +732,22 @@ $changelogNew = Convert-ChangelogForRelease -Content $changelogRaw
 # about work they cannot see. The audience of each note follows the TIER; only the version number follows
 # the bump.
 $tier2Entries = @($tierGroups | Where-Object { [int]$_.Tier -eq 2 } | ForEach-Object { $_.Entries } | Where-Object { $_ })
-$cutHighlights = ($highlightsBumps -contains $bumpType) -and ($tier2Entries.Count -gt 0)
-$highlightsRelPath = "releases/highlights/$notesDirName/$new.md"
-if ($cutHighlights) {
-    $highlightsContent = Build-HighlightsNotes -Entries $tier2Entries -Version $new -Date $today `
+$cutConsumerDoc = ($consumerBumps -contains $bumpType) -and ($tier2Entries.Count -gt 0)
+$consumerRelPath = "releases/consumer/$notesDirName/$new.md"
+if ($cutConsumerDoc) {
+    $consumerContent = Build-ConsumerNotes -Entries $tier2Entries -Version $new -Date $today `
         -Type $typeLabel -Title $Title
 }
 
 # --- Write the release-notes file -------------------------------------------------------------
-# EVERY target is checked before ANY of them is written. With the highlights tier on there are two
+# EVERY target is checked before ANY of them is written. With the consumer tier on there are two
 # files, and stopping halfway through would leave a release whose notes exist and whose stakeholder
 # document does not -- discovered by the release manager rather than by this guard.
 # Kept as REPO-RELATIVE paths and joined per check: the message has to name the file the way the repo
 # does, and [System.IO.Path]::GetRelativePath does not exist in the .NET Framework that Windows
 # PowerShell 5.1 runs on -- it would throw here instead of reporting the collision it was written for.
 $plannedFiles = @($notesRelPath)
-if ($cutHighlights) { $plannedFiles += @($highlightsRelPath) }
+if ($cutConsumerDoc) { $plannedFiles += @($consumerRelPath) }
 foreach ($rel in $plannedFiles) {
     if (Test-Path -LiteralPath (Join-Path $repoRoot ($rel -replace '/', '\'))) {
         Write-Error "$rel already exists. Nothing was written."
@@ -792,13 +810,13 @@ Write-Utf8NoBom -Path $changelogPath -Content $changelogNew
 # the core team alongside an add-on team still needs matching versions. What is gone is a SECOND statement of that
 # same version, in prose, in a file nothing reads back.
 
-# --- 3d. The highlights pair (stakeholder-facing; only for the bump types the seam names) ---------
+# --- 3d. The consumer document (stakeholder-facing; only for the bump types the seam names) ---------
 # Content and collision were both settled above, so this block is pure IO. It writes NOTHING when the
 # tier is off, which is every release in this repo -- see the seam for why the answer here is empty.
-if ($cutHighlights) {
-    New-Item -ItemType Directory -Force -Path (Join-Path $repoRoot "releases\highlights\$notesDirName") | Out-Null
-    Write-Utf8NoBom -Path (Join-Path $repoRoot ($highlightsRelPath -replace '/', '\')) -Content $highlightsContent
-    Write-Host "  created: $highlightsRelPath (highlights -- edit before publishing)" -ForegroundColor DarkGray
+if ($cutConsumerDoc) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $repoRoot "releases\consumer\$notesDirName") | Out-Null
+    Write-Utf8NoBom -Path (Join-Path $repoRoot ($consumerRelPath -replace '/', '\')) -Content $consumerContent
+    Write-Host "  created: $consumerRelPath (consumer document -- edit before publishing)" -ForegroundColor DarkGray
 }
 
 # --- Bump plugin versions (regex on the version line -- preserves the JSON formatting) -----------
@@ -811,7 +829,7 @@ foreach ($p in $manifests) {
 
 # The follow-up documents this script deliberately does NOT write, printed once at the end whether or
 # not the tag was pushed. Both are hand-written and both need the notes that only exist after this run:
-# the highlights DRAFT (generated above -- the tier-2 entries, selected but not yet rewritten for their
+# the consumer DRAFT (generated above -- the tier-2 entries, selected but not yet rewritten for their
 # reader) and the internal note (its own script, because a skeleton committed here would sit inside the
 # release tag).
 #
@@ -840,11 +858,11 @@ function Write-FollowUpSteps {
     $hasOwn      = Test-Path -LiteralPath $internalOwn
     $hasInternal = $hasOwn -or (Test-Path -LiteralPath $internalMirror)
 
-    if (-not ($cutHighlights -or $hasInternal)) { return }
+    if (-not ($cutConsumerDoc -or $hasInternal)) { return }
     Write-Host ""
     Write-Host "Still to write by hand (both via a branch + PR -- this commit is already tagged):" -ForegroundColor Cyan
-    if ($cutHighlights) {
-        Write-Host "  - $highlightsRelPath -- edit the draft; it is the tier-2 entries, still in the words their author wrote for a reviewer."
+    if ($cutConsumerDoc) {
+        Write-Host "  - $consumerRelPath -- edit the draft; it is the tier-2 entries, still in the words their author wrote for a reviewer."
     }
     if ($hasInternal) {
         $internalCmd = if ($hasOwn) {
