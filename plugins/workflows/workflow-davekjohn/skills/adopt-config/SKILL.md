@@ -1,4 +1,4 @@
-﻿---
+---
 name: adopt-config
 description: Adopt the source repo's workflow configuration from the shipped blueprint -- place the values that state the shared way of working into this repo's own seam libs, and get a written proposal for the ones only this repo can answer. Use this after specialists-init has laid down scripts/repo-config.ps1 and scripts/lib/branch-info.ps1, or whenever the script-contract check reports functions this repo has never configured.
 ---
