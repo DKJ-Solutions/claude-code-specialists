@@ -364,8 +364,12 @@ Initialize-FoldGitRepo -Dir $dir9
 $r9 = Invoke-Fold -Dir $dir9 -ExtraArgs @('-Commit')
 Assert-True ($r9.ExitCode -eq 0)                                            '-Commit: exits 0'
 $subject9 = ((Invoke-Git -Dir $dir9 -GitArgs @('log', '-1', '--pretty=%s')) -join '').Trim()
-Assert-True ($subject9 -match '^chore: fold changelog entry fix/commits-itself') `
+Assert-True ($subject9 -match '^fold: fix/commits-itself changelog') `
     '-Commit: the subject follows the established format and names the branch'
+# The type is asserted on its own, because it is the half a rename would silently take away: this
+# fixture has no PR to look up, so the branch name alone would still match a subject typed anything.
+Assert-True ($subject9 -notmatch '^chore:') `
+    '-Commit: the fold is typed as a fold, not as generic housekeeping'
 Assert-True ((((Invoke-Git -Dir $dir9 -GitArgs @('status', '--porcelain')) -join '').Trim()) -eq '') `
     '-Commit: the working tree is clean afterwards -- nothing half-done is left behind'
 

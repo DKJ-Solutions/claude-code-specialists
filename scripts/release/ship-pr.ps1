@@ -303,12 +303,13 @@ passed, so a re-run picks up from here. There is no -Force for this gate.
 
 # THE MERGE COMMIT GETS A TYPED SUBJECT (Dave, August 7, 2026). GitHub's default is
 # "Merge pull request #504 from Owner/feat/x", which is the one line in the graph that does not start with
-# a type. Everything else does -- feat:, fix:, docs:, chore:, release: -- so scanning the history means
+# a type. Everything else does -- feat:, fix:, docs:, fold:, release: -- so scanning the history means
 # reading one shape for every commit except the merges, which are half of them.
 #
 # 'merge: <branch> (#NN)' is the shape, and it matches the fold's own subject one commit later
-# ("chore: fold changelog entry <branch> (#NN)") field for field -- type, subject, PR number in brackets.
-# A merge and its fold read as a pair.
+# ("fold: <branch> changelog (#NN)") field for field -- type, subject, PR number in brackets. A merge
+# and its fold read as a pair. That pairing is why the fold kept its PR number when it was renamed from
+# 'chore:' to 'fold:' on August 10, 2026, over the shorter form that dropped it.
 #
 # THE FORMAT WAS INVENTED TWICE ON THE SAME DAY, WHICH IS WHY IT IS WRITTEN DOWN HERE. Derek's lens has
 # prescribed 'merge: <branch> (#<PR-number>)' since ba7081e; the first version of this line shipped
@@ -374,7 +375,7 @@ if ($ff.ExitCode -ne 0) { Write-Error "git merge --ff-only of origin/main failed
 # THE FOLD STAYS ITS OWN COMMIT, AND THE REASON IS GIT'S RATHER THAN THIS REPO'S (Dave, August 10, 2026;
 # inbound #571). The obvious tidy-up is to fold INTO the merge -- `git merge --no-ff --no-commit <branch>`,
 # run the fold without -Commit so it writes to disk only, then one `git commit` -- so a PR leaves one
-# commit on main instead of a merge with a `chore: fold ...` sitting on top of it. The request is
+# commit on main instead of a merge with a `fold: ...` sitting on top of it. The request is
 # well-founded on its symptom: measured on August 10, 2026 this repo held 398 merge commits (206 typed
 # 'merge: ', 192 older 'Merge pull request') against 410 folds, 394 of which sit directly on a merge in
 # first-parent order. They really are one movement written as two commits.

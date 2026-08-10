@@ -1,13 +1,19 @@
-# `main` progress
-
-
-> **You are on `main`.** Do not work in this file yet -- create a branch first.
-> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
-> of the next person who does create one.
-
-This file carries the step list of the branch you are on. It is written when a branch is created
-and returns to this state after the merge.
+## `feat/the-fold-commit-says-fold` progress
 
 ### Steps
 
-_(filled in when a branch is created)_
+- [x] Check what reads the fold subject before renaming it (nothing does; the discovery script keys on
+      the shape `^[a-z]+:`, `branch-info.ps1` matches a branch name)
+- [x] `fold-changelog-entry.ps1`: `fold: <branch> changelog (#NN)` and the plural form, with the PR
+      number at the END of the singular line rather than mid-sentence
+- [x] `fold-changelog.tests.ps1`: assert the new shape, and the type separately from the branch name
+- [x] `ship-pr.ps1`: the two comments that quote the fold subject as the merge subject's pair
+- [x] `branch-info.ps1`: keep the August 7 measurement, in the past tense, saying why it no longer
+      reproduces
+- [x] Docs: Rendall's lens, the `ship-pr` skill, and the `fold-changelog` skill — which did not state
+      the subject shape at all, so a consumer had nowhere to read it
+- [x] Mirror into the plugin and run the suites
+
+### Where I left off
+
+Done; the entry is written and the gates are next.

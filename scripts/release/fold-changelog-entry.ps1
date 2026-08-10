@@ -676,8 +676,8 @@ foreach ($file in $entryFiles) {
     $folded += [pscustomobject]@{
         File   = $file
         # The file name as the fallback, so a fold whose branch could not be determined still produces a
-        # commit subject that names something. Without it the message would read 'chore: fold changelog
-        # entry ' -- a commit on main that says nothing about what it folded.
+        # commit subject that names something. Without it the message would read 'fold:  changelog' --
+        # a commit on main that says nothing about what it folded.
         Branch = $(if ($branchForPr) { $branchForPr } else { $file })
         Pr     = $(if ($prs.Count -ge 1) { $prs[0].number } else { $null })
     }
@@ -718,10 +718,34 @@ if ($Commit) {
     $subjects = @($folded | ForEach-Object {
         if ($_.Pr) { "$($_.Branch) (#$($_.Pr))" } else { $_.Branch }
     })
+    # 'fold:' IS THE TYPE, NOT 'chore:' (Dave, August 10, 2026). Folding is a named act with its own
+    # script, its own exception to "never commit directly on main" and its own place in the cycle;
+    # 'chore' said only "housekeeping" and left the reader to parse the rest of the line to find out
+    # which housekeeping. It is also the second half of a shape this repo already chose: 'merge:' was
+    # invented on August 7 for exactly the same reason -- a commit that belongs to no branch still
+    # deserves a type -- and merge + fold are one movement written as two commits, so they now read as
+    # one pair. With 'chore/' refused as a branch prefix since August 7, this was the last thing in the
+    # repo still producing a 'chore:' subject.
+    #
+    # NOTHING TO RECOGNISE ON THE WAY OUT, checked rather than assumed: no script, gate or hook parses
+    # this subject -- only this line writes it and one assert in fold-changelog.tests.ps1 reads it back.
+    # ('^chore(/|$)' in branch-info.ps1 matches a BRANCH NAME and is untouched.) So the usual "recognise
+    # both, write one" rule has nothing to attach to here; every 'chore: fold ...' already in this repo's
+    # history and in every consumer's stays exactly as valid as it was, because nobody was reading it.
+    # The workflow-default discovery script keys on the shape '^[a-z]+:' rather than on a list of types,
+    # so 'fold:' still reads as conventional there.
+    #
+    # THE PR NUMBER STAYS (Dave's call, weighed against the shorter form): it is the only link from this
+    # commit back to the PR it folded, and it is what makes the subject line up field for field with the
+    # 'merge: <branch> (#NN)' one commit below it.
+    # The singular form is composed from Branch and Pr rather than from $subjects, because the number
+    # belongs at the END of the line -- '<branch> (#NN) changelog' would bury it mid-sentence. The plural
+    # form does use $subjects: there the number has to travel with each branch it belongs to.
     $message = if ($folded.Count -eq 1) {
-        "chore: fold changelog entry $($subjects[0])"
+        $prSuffix = if ($folded[0].Pr) { " (#$($folded[0].Pr))" } else { '' }
+        "fold: $($folded[0].Branch) changelog$prSuffix"
     } else {
-        "chore: fold $($folded.Count) changelog entries: " + ($subjects -join ', ')
+        "fold: $($folded.Count) changelogs: " + ($subjects -join ', ')
     }
     # CHANGELOG.md plus the entry files -- named, and nothing else. The entry files are gone from disk
     # by now; naming a deleted path is how git is told to record the deletion.
