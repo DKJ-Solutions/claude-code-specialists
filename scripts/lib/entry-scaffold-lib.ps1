@@ -1891,6 +1891,160 @@ function Get-EntrySectionLevel {
     return $script:EntrySectionLevel
 }
 
+# --- MOVED DOWN FROM release-lib.ps1: the entry-boundary readers ----------------------------------
+#
+# Get-EntryHeadingPattern and Split-EntryBlocks used to live in release-lib.ps1. They moved here on
+# August 10, 2026 for the SAME reason Get-FencedLineFlags did, and that reason is a dependency
+# direction rather than a preference: the fold and this file's own suite load this lib STANDALONE,
+# while nothing loads release-lib without it. So an answer both the cut and the fold need can only
+# live down here. release-lib calls both by exactly these names and is unchanged -- it dot-sources
+# this file unconditionally, at the top.
+#
+# WHAT MADE THE MOVE NECESSARY rather than tidy: Get-PreFlatChangelogRefusal below is that shared
+# answer (inbound #561), and it cannot be written without a splitter. Leaving the splitter up in
+# release-lib would have meant either the fold loading three thousand lines of release machinery
+# immediately after a merge and directly on the trunk -- which its own header rejects, by name -- or a
+# second boundary rule written beside the first, free to disagree with it about where the intro ends.
+#
+# The names deliberately did not gain an 'Entry' prefix on the way down: these readers scan a whole
+# CHANGELOG rather than one entry, so a name claiming otherwise would be wrong at every call site --
+# and keeping them meant the move changed no call site in either lib.
+
+function Get-EntryHeadingPattern {
+    <#
+        The anchored regex that matches an entry's OWN heading and nothing else -- '^##\s' while the entry
+        level is 2. Built from Get-EntryHeadingLevel so the parser, the splitter and the re-leveller cannot
+        end up looking for different things.
+
+        THE EXACT LEVEL, NOT A RANGE, and that is the one decision in this whole file that cannot be
+        loosened. An entry carries H3 sections of its own ('### What does this change do?'), so a pattern
+        accepting H3 as well would read every entry as four. It is safe as an exact match for the mirror
+        image of the same reason: '^##' followed by '\s' cannot match '### ', because the third character
+        is a '#'.
+    #>
+    return '^#{' + (Get-EntryHeadingLevel) + '}\s'
+}
+
+function Split-EntryBlocks {
+    <#
+        Turns a run of lines into entry blocks. A new block starts at every entry heading
+        (Get-EntryHeadingPattern); '---' separators between entries are skipped.
+
+        BOTH of those tests must ignore FENCED CODE BLOCKS. An entry body may legitimately quote markdown
+        -- a broken heading structure, a YAML frontmatter example -- and without fence awareness the
+        parser reads that quoted text as structure. Measured while cutting v2.13.3: an entry that quoted
+        a '### #242 ...' line inside a ``` fence produced a THIRD entry from two PRs, split the fence
+        open, and duplicated '## Fixes' in the generated notes. Caught by -NoPush before it shipped.
+        Fourth instance of the same defect class in one day (#227, #235, and the teardown's VUL-IN test):
+        a matcher satisfied by a MENTION rather than a use.
+
+        Its own function since the changelog gained one section per tier, and kept now that the sections
+        are gone: the entry-boundary rule and the fence handling are one answer and belong in one place.
+        No longer private -- Get-PreFlatChangelogRefusal below and release-lib's Split-Changelog are both
+        callers, which is what brought it down here.
+    #>
+    param(
+        [AllowEmptyCollection()][string[]]$Lines = @(),
+        [Parameter(Mandatory)][string]$Nl
+    )
+    $headingRx = Get-EntryHeadingPattern
+    $fenced = Get-FencedLineFlags -Lines $Lines
+    $entries = @()
+    $cur = $null
+    for ($i = 0; $i -lt $Lines.Count; $i++) {
+        $ln = $Lines[$i]
+        if ((-not $fenced[$i]) -and $ln -match $headingRx) {
+            if ($null -ne $cur) { $entries += (($cur -join $Nl).Trim()) }
+            $cur = @($ln)
+        } elseif ($null -ne $cur) {
+            if ((-not $fenced[$i]) -and $ln -match '^---\s*$') { continue }
+            $cur += $ln
+        }
+    }
+    if ($null -ne $cur) { $entries += (($cur -join $Nl).Trim()) }
+    return @($entries)
+}
+
+function Get-ChangelogEntryBlocks {
+    <#
+        Every entry block in a CHANGELOG.md, in document order -- the intro above the first entry heading
+        dropped. An empty array when the document holds no entry at all, which is a legitimate state here
+        rather than a failure: a repo whose pending list is empty has an intro and nothing else, and the
+        first fold after a release lands in exactly that document.
+
+        THE BOUNDARY IS DERIVED, NOT CONFIGURED, and it is fence-aware for the reason every reader in this
+        file is: this repo's own changelog intro QUOTES an entry heading inside a fence to document the
+        format, so a boundary walk blind to fences puts the intro/list split in the middle of a code block.
+
+        Split out of release-lib's Split-Changelog so the fold can ask the same question without loading
+        release-lib. That function keeps its own richer answer (the newline style and the intro text, which
+        only the cut needs) and now shares this one's boundary rule instead of restating it.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Content)
+
+    $nl = if ($Content.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $lines = @($Content -split "`r?`n")
+    $headingRx = Get-EntryHeadingPattern
+    $fenced = Get-FencedLineFlags -Lines $lines
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ((-not $fenced[$i]) -and $lines[$i] -match $headingRx) {
+            return @(Split-EntryBlocks -Lines @($lines[$i..($lines.Count - 1)]) -Nl $nl)
+        }
+    }
+    return @()
+}
+
+function Get-PreFlatChangelogRefusal {
+    <#
+        The refusal a script owes a consumer whose CHANGELOG.md still carries the PRE-FLAT shape, or '' when
+        the document is fine. Pure: text in, text out, nothing written and nothing thrown -- the caller
+        decides whether to throw it, print it, or exit on it.
+
+        WHY IT IS SHARED, AND IT IS A MEASURED CONSUMER DEFECT (inbound #561, August 10, 2026). Two scripts
+        make the same assumption -- that every H2 below the intro is one change -- and only ONE of them
+        checked it. The cut refused, by name, before writing anything. The fold did not: it took the first
+        '^## ' it found as the top of the list, which in a pre-flat document is the SECTION heading, and
+        inserted the entry above it. Measured in a consumer on 2026-08-09, exit 0 and no warning:
+
+            Folded and reset: branch/branch-changelog.md (tier 1, significance 3 -- placed above 2 existing entries)
+            CHANGELOG.md updated.
+
+        The "2 existing entries" were their two section headings, and the entry landed outside the section
+        it belonged in -- visible only to somebody who opened the file afterwards. Two scripts with the same
+        assumption owe their consumer the same guardrail, so the text lives once and both read it.
+
+        THE CONSEQUENCE CLAUSE IS THE CALLER'S, and that is the only part that varies: the cut EMPTIES this
+        file, so a section heading read as a change is published outward and then deleted, while the fold
+        WRITES INTO it, so the entry lands in the wrong place. Same diagnosis, same migration advice,
+        different thing about to go wrong -- so that one sentence is a parameter rather than a second copy
+        of the whole message.
+
+        Test-EntryDeclaresShape is the discriminator and it is exact rather than a heuristic -- see its
+        header. A document with no entries at all yields no findings: there is nothing to misread.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Content,
+        # What this particular caller is about to do to the blocks it cannot read. One sentence, no
+        # trailing period -- it is spliced into the sentence below.
+        [Parameter(Mandatory)][string]$Consequence
+    )
+
+    $level = Get-EntryHeadingLevel
+    $blocks = @(Get-ChangelogEntryBlocks -Content $Content)
+    $notEntries = @($blocks | Where-Object { -not (Test-EntryDeclaresShape -EntryText $_) })
+    if ($notEntries.Count -eq 0) { return '' }
+
+    $names = @($notEntries | ForEach-Object { "'" + (($_ -split "`r?`n")[0]) + "'" })
+    return ("CHANGELOG.md carries $($notEntries.Count) H$level block(s) that declare " +
+        "neither an entry's named sections nor a change type: $($names -join ', '). Every " +
+        "H$level below the intro is read as one change, so $Consequence. That is what a pre-flat " +
+        "CHANGELOG.md looks like to this parser: a section heading ('## Pull Requests', " +
+        "'## Tier N - Pull Requests', '## Releases') sits at the level an entry now occupies. Migrate the " +
+        "document first: drop the section headings, promote each entry to H$level, and " +
+        "give it the three named sections. An entry written before this format is fine as it is -- it " +
+        "declares its type in its heading.")
+}
+
 function Get-EntrySectionHeadings {
     <#
         The three section headings as an ordered map, key -> heading TEXT (no leading hashes): What, Who,

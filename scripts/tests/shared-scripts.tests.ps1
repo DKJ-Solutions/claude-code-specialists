@@ -791,12 +791,20 @@ This follows the shape PRs #341-#343 established, see https://github.com/o/r/pul
     [System.IO.File]::WriteAllText((Join-Path $prFixtureRoot 'feat-openpr-101-test.md'), $prEntryContent, $Utf8NoBomTest)
 
     Write-Host "  fold-changelog-entry: -RepoRoot override vs. default path" -ForegroundColor DarkCyan
+    # THE SKELETON IS FLAT, AND IT USED TO BE PRE-FLAT ('## Pull Requests' + '## Releases'). It was changed
+    # on August 10, 2026 by the fix for inbound #561, which is the change that gave those two headings a
+    # meaning here: the fold now REFUSES a document carrying section headings at the entry level, so this
+    # fixture described a document the workflow declines to write into -- and the six asserts below, whose
+    # subject is which TREE the fold writes to, went red over the shape of the file instead. A fixture
+    # describing a document the workflow refuses is not a minimal fixture, it is a different program.
+    #
+    # Worth keeping in mind rather than only fixing: this fixture is the evidence that the pre-flat shape was
+    # accepted silently until then. It folded, exit 0, into the wrong place, in this repo's own suite. The
+    # refusal itself is covered where it belongs, in fold-changelog.tests.ps1.
     $changelogSkeleton = @'
 # Changelog
 
-## Pull Requests
-
-## Releases
+Everything merged since the last release, furthest reach first.
 '@
     $rcMinimal = @'
 $script:RepoName = 'DaveKJohn/claude-code-specialists'
@@ -807,13 +815,13 @@ function Get-RepoName { return $script:RepoName }
 
 Testing the -RepoRoot parameter.
 '@
+    # Flat for the same reason as the skeleton above. The decoy's asserts are byte-identity ones, so any
+    # content would pass them -- which is exactly why it should not be a shape this workflow refuses: the
+    # next reader would take it as the format a consumer's changelog has.
     $decoyChangelog = @'
 # Changelog
 
-## Pull Requests
 DECOY-MARKER-MUST-STAY
-
-## Releases
 '@
     $decoyEntryContent = @'
 ### DECOY entry - must not be touched - Chore - 2026-07-21
