@@ -175,6 +175,11 @@ function Add-Error([string]$Msg) { $script:errors.Add($Msg) }
 # in one place. release-lib deliberately sets no strict mode of its own, so it cannot loosen this script's
 # Set-StrictMode -Version Latest.
 . (Join-Path $PSScriptRoot '..\lib\release-lib.ps1')
+# The PR-template contract check (24) needs the placeholder list open-pr matches against, and the
+# reference body it ships. Both live here rather than inline in open-pr.ps1 since August 10, 2026 (#573)
+# precisely so a gate can read them -- a list no gate can reach is a list that cannot be held to
+# anything, which is how a consumer merged twelve PRs with no description.
+. (Join-Path $PSScriptRoot '..\lib\pr-body-lib.ps1')
 
 function Test-JsonFile {
     param([string]$Path)
@@ -2009,6 +2014,66 @@ foreach ($p in $publishedPlugins) {
 }
 Write-Coverage -Category 'plugin-kind' -Checked $kindChecked `
     -Note $(if ($kindChecked -eq 0) { 'no published plugin was read, so neither the naming rule nor the directory rule could be applied' } else { "every published plugin is a team or a workflow by name, and sits in the directory its name claims. The naming half is the one that cannot be seen by reading the tree: the prefix is what the core's session check counts workflows by, so an unprefixed workflow would be invisible to it" })
+
+# --- 24. the PR template keeps the two promises open-pr makes about it ------------------------------------
+# WHAT THIS IS FOR, measured at a consumer rather than imagined (#573). open-pr fills the PR body's
+# description by comparing each template line, WHOLE AND EXACT, against the recognised placeholders. A
+# template one word away from one of them matches nothing, and until August 10, 2026 the run said nothing
+# either: that consumer merged TWELVE of sixty PRs with no description at all, found months later by
+# diffing their template against this repo's. The warning added that day tells the person running open-pr;
+# this check tells the person editing the template, which is one step earlier and one person wider.
+#
+# TWO SUBJECTS, HELD TO DIFFERENT STRENGTHS ON PURPOSE.
+#   * The SHIPPED REFERENCE is held byte for byte to Get-PrTemplateReference. It is not a document anybody
+#     edits -- it is the answer this family hands a consumer, and a reference whose placeholder open-pr
+#     would walk past is worse than no reference at all, because it arrives looking authoritative. Same
+#     reasoning as check 13b for branch/templates/ and check 21 for the config blueprint.
+#   * THIS REPO'S OWN .github/pull_request_template.md is held only to the contract: a first heading, and a
+#     placeholder line the matcher recognises. Deliberately weaker, because that file is genuinely
+#     repo-owned -- the day it grows a section this repo needs, a byte-for-byte rule would refuse a correct
+#     change and the gate would be edited to allow it, which is how a check gets switched off rather than
+#     heeded.
+#
+# A CONSUMER'S TEMPLATE IS NOT CHECKED BY ANYTHING, and that is stated rather than left as a gap: this gate
+# runs in this repo. What travels to them is the warning in open-pr and the shipped reference to diff
+# against. check-script-contract.ps1 cannot help either -- Get-PrDescriptionPlaceholder is OPTIONAL, so a
+# repo that does not define it is correct, exactly the shape recorded for Get-BranchTypes.
+$prtChecked = 0
+$prtNote = ''
+$prtRefRel = 'plugins\workflows\workflow-davekjohn\templates\pull_request_template.md'
+$prtRefPath = Join-Path $RepoRoot $prtRefRel
+$prtExpected = ((Get-PrTemplateReference) -join "`n").TrimEnd()
+if (-not (Test-Path -LiteralPath $prtRefPath)) {
+    Add-Error "[pr-template] $prtRefRel is missing. It is the reference body a consumer copies into their own .github/ -- generated from Get-PrTemplateReference in scripts/lib/pr-body-lib.ps1."
+} else {
+    $prtChecked++
+    $prtOnDisk = (([System.IO.File]::ReadAllText($prtRefPath, [System.Text.Encoding]::UTF8)) -replace "`r`n", "`n").TrimEnd()
+    if ($prtOnDisk -ne $prtExpected) {
+        Add-Error "[pr-template] $prtRefRel no longer matches Get-PrTemplateReference (scripts/lib/pr-body-lib.ps1). It is a copy of that answer, not a second definition of it -- change the function and regenerate, rather than editing the file."
+    }
+}
+
+$prtOwnRel = '.github\pull_request_template.md'
+$prtOwnPath = Join-Path $RepoRoot $prtOwnRel
+if (-not (Test-Path -LiteralPath $prtOwnPath)) {
+    # Not an error: a repo without a PR template is a repo open-pr simply does not pre-fill a body for,
+    # which the script already handles. Only a template that EXISTS makes a promise.
+    $prtNote = 'this repo has no .github/pull_request_template.md, so only the shipped reference was judged'
+} else {
+    $prtChecked++
+    $prtOwnLines = @(Get-Content -LiteralPath $prtOwnPath -Encoding UTF8)
+    if (-not ($prtOwnLines | Where-Object { $_ -match '^#{1,6}\s+\S' })) {
+        Add-Error "[pr-template] $prtOwnRel carries no heading. open-pr's -RefreshBody replaces the description under the FIRST heading of this file, at any level, so without one that switch degrades to a warning and silently stops refreshing anything."
+    }
+    $prtKnown = @(Get-PrDescriptionPlaceholderDefaults)
+    if (-not ($prtOwnLines | Where-Object { $prtKnown -contains $_ })) {
+        Add-Error ("[pr-template] $prtOwnRel carries no placeholder line open-pr recognises, so every PR opened from it gets NO description. The comparison is whole-line and exact; one of these must appear verbatim:`n    " +
+            ($prtKnown -join "`n    ") +
+            "`n  Or define Get-PrDescriptionPlaceholder in scripts/repo-config.ps1 to name your own -- and then this check is the one that has to learn about it.")
+    }
+}
+Write-Coverage -Category 'pr-template' -Checked $prtChecked `
+    -Note $(if ($prtNote) { $prtNote } else { "the shipped reference held byte for byte to Get-PrTemplateReference, and this repo's own template held to the contract open-pr relies on -- a first heading and a placeholder the matcher recognises. Two strengths on purpose: the reference is an answer we hand out, the repo's own template is a file its owner edits" })
 
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {

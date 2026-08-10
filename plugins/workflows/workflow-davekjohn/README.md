@@ -40,6 +40,7 @@ both of which you already have: the marketplace source is a git clone of the who
 | [`scripts/`](scripts/) | the scripts and libs those skills run, mirrored from the source repo's own `scripts/`. **Never edit a file there** — see [its README](scripts/README.md) |
 | [`hooks/`](hooks/) | two SessionStart checks that belong to running this across several repos: `connector-sessioncheck` and `script-contract-sessioncheck`. Both are read-only and never block |
 | [`blueprint/`](blueprint/) | the source's own answers to the repo-owned seam, with the reasoning behind each — read by the `adopt-config` skill |
+| [`templates/`](templates/) | the one file in this cycle that has to be **copied** rather than imported: `pull_request_template.md`. GitHub reads a PR template only from `.github/` in your own repo, so what ships here is the reference to copy and to diff against — see the [`open-pr` skill](skills/open-pr/SKILL.md) for the two promises it makes |
 
 **No `agents/`, no `manuals/`.** Those belong to a team, and a workflow that shipped one would be
 answering the question the other directory owns.
