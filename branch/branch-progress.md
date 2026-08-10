@@ -1,15 +1,13 @@
-## `docs/the-fold-stays-its-own-commit` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] Verify inbound #571 against the tree: the citations, the count claim, and the proposed mechanism
-- [x] Measure the proposed flow in a throwaway repo (`git commit -- <paths>` during a merge)
-- [x] Record the declined design at step 5 of `ship-pr.ps1`, beside the pathspec it would have broken
-- [x] Correct the unverified `--subject` claim in the same docstring, without repairing what cannot be reproduced here
-- [x] Rebuild the shared-script mirror (`build-shared-scripts.ps1`)
-- [x] Write the changelog entry
-- [x] Copy edit on the diff: one sentence fragment repaired, ASCII verified
-- [x] PR + merge + fold
-- [~] Close #571 with the evidence: dropped from this branch's plan -- it happens after the merge, on the trunk, and is not a change this branch carries
-
-### Where I left off
+_(filled in when a branch is created)_
