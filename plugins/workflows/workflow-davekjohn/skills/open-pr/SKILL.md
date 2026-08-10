@@ -109,6 +109,47 @@ template has no heading at all, the switch warns and changes nothing rather than
 `## ` exactly until August 9, 2026, which meant a template promoted to `#` silently lost the whole
 feature — worth knowing if your own template starts at a different level than it used to.
 
+## Your PR template — the two promises this script relies on
+
+`.github/pull_request_template.md` is **your** file: GitHub reads it only from that path in your own
+repo, so unlike the rest of this workflow it cannot live in the plugin and cannot be `@`-imported. What
+the plugin ships instead is a **reference to copy and to diff against**:
+
+```text
+${CLAUDE_PLUGIN_ROOT}/templates/pull_request_template.md
+```
+
+Everything `open-pr` needs from that file is two lines, and they are the whole interface:
+
+| the promise | what depends on it |
+|---|---|
+| a **first heading**, at any level | `-RefreshBody` replaces the description under it |
+| a **placeholder line** the matcher recognises, verbatim | the description is inserted there when the PR is created |
+
+Break either and nothing errors — you get a PR whose body has no description, or a `-RefreshBody` that
+politely reports it changed nothing. Everything else in the file is yours: add sections, checklists and
+headings freely, and the script leaves them exactly as they are.
+
+**Why the reference is only two lines — read the reasoning, not the answer.** This family's template
+carried a "Type of change" block and a six-item checklist until August 9, 2026, and they were removed
+after a measurement rather than on taste: over 60 PRs, "Type of change" had exactly one of four boxes
+ticked *every single time* — a fact the changelog entry already states under `### Branch type`, and which
+the GitHub label takes from `Get-BranchInfo` rather than from the tick — while two checklist items were
+ticked 60/60 by the script itself and two were ticked 0/60 by anyone, ever, though both were already
+enforced by gates that block the PR. A box that is always ticked and a box that is never ticked carry the
+same information. The rule that survives is **"keep what is neither restated by the entry nor proven by a
+gate"**, and in that repo nothing survived it.
+
+**In yours something may.** The consumer who reported this ran the same measurement over their own 60
+PRs and found one box of eight that genuinely varied: a preview-URL approval, on a repo whose result has
+to be judged by eye and which no gate can prove. They kept it, correctly, and dropped the other seven. So
+run the measurement on your own history — the method travels, the answer does not.
+
+**No `## Specific to this repo` slot is pre-written**, unlike `CONTRIBUTING-portable.md`. The difference
+is what the file is: a contributing guide is read once, while every heading in a PR template is repeated
+in every PR body forever, so an empty slot would be a permanent empty section in your PR list. Add one
+when you have something to put in it.
+
 **If your template's placeholder LINE differs, define `Get-PrDescriptionPlaceholder`.** The description
 is inserted by an exact whole-line match against three built-in strings, so a template one word away
 from one of them gets a PR body with no description at all. Since

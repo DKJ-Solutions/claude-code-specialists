@@ -322,3 +322,84 @@ function Update-PrBodySection {
     if ($rebuilt -ne $Body -and $null -ne $Changed) { $Changed.Value = $true }
     return $rebuilt
 }
+
+function Get-PrDescriptionPlaceholderDefaults {
+    <#
+    .SYNOPSIS
+        The template placeholder lines open-pr.ps1 replaces with the entry's description, when the repo
+        defines no Get-PrDescriptionPlaceholder of its own.
+
+    .DESCRIPTION
+        RECOGNISE THREE, WRITE ONE. The last is what this family's template carries now; the two older
+        strings stay because a consumer's PR template is THEIR file, and this script must not silently
+        stop filling it in because the template it ships beside moved on. An unrecognised placeholder is
+        a PR body with no description at all -- the outcome this list exists to prevent.
+
+        MOVED OUT OF open-pr.ps1 ON AUGUST 10, 2026, and the move is the point rather than tidiness
+        (#573). While the list lived inline in the script, nothing else in the repo could read it -- so
+        the reference template shipped with the plugin could not be held against it, and a reference
+        whose placeholder open-pr does not recognise is exactly the defect that issue reported from a
+        consumer: twelve merged PRs with no description, found by diffing templates months later.
+        A gate needs the list; the list therefore lives where a gate can reach it.
+
+        Ordered oldest first, with the written one last, so Get-PrTemplateCanonicalPlaceholder can take
+        it from the end rather than by repeating the string.
+    #>
+    return @(
+        '<!-- Korte beschrijving van wat er verandert en waarom. -->',
+        '<!-- Short description of what changes and why. -->',
+        "<!-- Filled from branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->"
+    )
+}
+
+function Get-PrTemplateCanonicalPlaceholder {
+    <#
+    .SYNOPSIS
+        The single placeholder line a NEW template should carry -- the one of the recognised set that is
+        written rather than merely accepted.
+
+    .DESCRIPTION
+        Taken from the end of the recognised list rather than written out again here, so the reference
+        template and the matcher cannot disagree about it. That is the whole mechanism: a second literal
+        would be free to drift, and drift between those two is the defect #573 was filed about.
+    #>
+    $defaults = @(Get-PrDescriptionPlaceholderDefaults)
+    return $defaults[$defaults.Count - 1]
+}
+
+function Get-PrTemplateReference {
+    <#
+    .SYNOPSIS
+        The canonical PR-template body this family ships as a reference, as an array of lines.
+
+    .DESCRIPTION
+        TWO LINES, AND THE SECOND ONE IS THE CONTRACT. Everything open-pr.ps1 needs from a PR template
+        is here: a first heading (any level -- that is the one -RefreshBody replaces the description
+        under) and a placeholder line the matcher recognises. The placeholder is taken from
+        Get-PrTemplateCanonicalPlaceholder rather than written out, so the reference cannot ship a line
+        the matcher would walk past.
+
+        WHY IT IS ONLY TWO LINES, kept here because the next repo to ask should re-run the measurement
+        rather than inherit the answer. This family's template carried a "Type of change" block and a
+        six-item checklist until August 9, 2026. Measured over 60 PRs before anything was removed:
+        "Type of change" had exactly one of four boxes ticked every single time -- a fact the entry
+        already states under '### Branch type', and which the GitHub label takes from Get-BranchInfo
+        rather than from the tick -- while of the checklist two items were ticked 60/60 (by this script)
+        and two were ticked 0/60 by anyone, ever, though both were already enforced by gates that block
+        the PR. A box that is always ticked and a box that is never ticked carry the same information.
+        So the rule is "keep what is neither restated by the entry nor proven by a gate", and in this
+        repo nothing survived it. IN YOURS SOMETHING MAY: the consumer that reported #573 re-ran the
+        same measurement over their own 60 PRs and found one box of eight that genuinely varied -- a
+        preview-URL approval, on a repo whose result has to be judged by eye, which no gate can prove.
+        They kept it, correctly. The measurement travels; the answer does not.
+
+        NO '## Specific to this repo' SLOT IS PRE-WRITTEN, unlike CONTRIBUTING-portable.md, and the
+        difference is what the file is: a contributing guide is read once, while every heading in a PR
+        template is repeated in every PR body forever. An empty slot would be a permanent empty section
+        in your PR list. Add one when you have something to put in it.
+    #>
+    return @(
+        '# What does the change on this branch bring to main?',
+        (Get-PrTemplateCanonicalPlaceholder)
+    )
+}

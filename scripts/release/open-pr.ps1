@@ -847,16 +847,11 @@ if (-not $Body) {
             $descPlaceholderSource = 'Get-PrDescriptionPlaceholder in scripts/repo-config.ps1'
             @(Get-PrDescriptionPlaceholder)
         } else {
-            @(
-                # RECOGNISE THREE, WRITE ONE (#538). The third is what this repo's template carries now;
-                # the two older strings stay because a consumer's PR template is THEIR file and this
-                # script must not silently stop filling it in because the template it ships beside moved
-                # on. An unrecognised placeholder is not a warning here -- it is a PR body with no
-                # description at all, which is the one outcome this list exists to prevent.
-                '<!-- Korte beschrijving van wat er verandert en waarom. -->',
-                '<!-- Short description of what changes and why. -->',
-                "<!-- Filled from branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->"
-            )
+            # RECOGNISE THREE, WRITE ONE (#538) -- the list itself moved to pr-body-lib.ps1 on
+            # August 10, 2026 (#573). It was three literals right here, which meant nothing outside this
+            # script could read them: the reference template the plugin now ships could not be held
+            # against the list that has to recognise it, and that gap IS the defect #573 reported.
+            @(Get-PrDescriptionPlaceholderDefaults)
         }
         $approvalPattern = if (Get-Command -Name Get-PrApprovalPattern -ErrorAction SilentlyContinue) {
             Get-PrApprovalPattern

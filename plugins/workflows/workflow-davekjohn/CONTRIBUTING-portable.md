@@ -104,6 +104,18 @@ A branch with **no** step list at all is not refused: that is the one-commit typ
 typed once — at `new-branch -Title` — and the PR, the changelog and the release documents cannot disagree
 about what the change is called.
 
+**The body comes from your own `.github/pull_request_template.md`, and that one file cannot travel with
+the plugin.** GitHub reads it only from that path in your repo, so unlike everything else in this cycle it
+has to be a copy rather than an import. The plugin ships the reference to copy and to diff against at
+`${CLAUDE_PLUGIN_ROOT}/templates/pull_request_template.md`, and the whole interface is two lines: a
+**first heading** (any level — `-RefreshBody` replaces the description under it) and a **placeholder
+line** the script recognises verbatim, which is where the description is inserted. Break either and
+nothing errors; you get PRs whose body has no description. The
+[`open-pr` skill](skills/open-pr/SKILL.md) carries both promises, the recognised strings, the
+`Get-PrDescriptionPlaceholder` seam for a line of your own, and — worth reading before you copy the
+two-line default — the measurement behind why it *is* two lines, which is a method to re-run on your own
+history rather than an answer to inherit.
+
 Before anything is pushed the script runs two gates:
 
 - **your lint gate**, whose path your repo declares in `Get-LintScript` (`scripts/repo-config.ps1`). Every

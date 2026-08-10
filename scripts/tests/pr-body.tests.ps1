@@ -313,10 +313,12 @@ $openPrText           = [System.IO.File]::ReadAllText($openPrFile, [System.Text.
 $placeholderLines = @($templateLinesForTest | Where-Object { $_.Trim() -match '^<!--.*-->$' })
 Assert-True ($placeholderLines.Count -ge 1) 'the template carries at least one comment line to substitute'
 
-# The load-bearing assert: at least one of them appears VERBATIM in open-pr's recognised list. A
-# substring search over the script text is enough and is deliberately not a re-implementation of the
-# match -- if the exact line is not in that file, no equality test in open-pr can ever succeed on it.
-$matched = @($placeholderLines | Where-Object { $openPrText.Contains($_.Trim()) })
+# The load-bearing assert: at least one of them is VERBATIM in the recognised list. This was a substring
+# search over open-pr.ps1's own text until August 10, 2026, because the three literals lived inline in
+# that script and there was nothing else to ask. Since #573 moved them into this lib the assert can call
+# the list instead of grepping for it -- the same test, now performing the same whole-line comparison
+# open-pr performs rather than an approximation of it.
+$matched = @($placeholderLines | Where-Object { @(Get-PrDescriptionPlaceholderDefaults) -contains $_.Trim() })
 Assert-True ($matched.Count -ge 1) 'open-pr recognises the template placeholder verbatim -- otherwise every PR body loses its description, silently'
 
 # And the description heading open-pr reads (the template's first heading, AT ANY LEVEL) must actually
@@ -343,6 +345,41 @@ foreach ($legacy in @('## What does the change on this branch bring to main?', '
     Assert-True $didChange "a body under '$legacy' is rewritable"
     Assert-True ($out -match '(?m)^new text$') "and the new description lands under '$legacy'"
     Assert-True ($out -match '(?m)^Closes #1$') "while the resolved-issues block below '$legacy' is untouched"
+}
+
+# ---------------------------------------------------------------------------------------------------
+Write-Host "The placeholder list and the reference template cannot disagree (#573)" -ForegroundColor Cyan
+#      The whole reason those two moved into this lib: while the strings lived inline in open-pr.ps1,
+#      nothing else could read them, so the reference template the plugin ships could not be held against
+#      the list that has to recognise it. These asserts are that guarantee, stated rather than assumed.
+$known = @(Get-PrDescriptionPlaceholderDefaults)
+Assert-True ($known.Count -ge 3) 'the recognised placeholder list still carries the legacy strings, not just the current one'
+Assert-True ($known -contains '<!-- Korte beschrijving van wat er verandert en waarom. -->') `
+    'the Dutch legacy placeholder is still recognised -- consumer templates carry it right now'
+Assert-True ($known -contains '<!-- Short description of what changes and why. -->') `
+    'the English legacy placeholder is still recognised'
+
+$canonical = Get-PrTemplateCanonicalPlaceholder
+Assert-True ($known -contains $canonical) `
+    'the placeholder that gets WRITTEN is one of the ones that gets RECOGNISED'
+
+$reference = @(Get-PrTemplateReference)
+Assert-True (@($reference | Where-Object { $known -contains $_ }).Count -eq 1) `
+    'the reference template carries exactly one recognised placeholder line -- the defect #573 reported was a template carrying none'
+Assert-True (@($reference | Where-Object { $_ -match '^#{1,6}\s+\S' }).Count -ge 1) `
+    'the reference template carries a heading, which is what -RefreshBody replaces the description under'
+Assert-True ($reference[0] -match '^#{1,6}\s+\S') `
+    'and that heading is the FIRST line, because open-pr takes the first heading it finds'
+
+# The shipped file on disk, not just the function: a reference nobody can copy is not a reference. The
+# lint gate holds these byte for byte; this asserts the file exists at the path the docs send people to.
+$refOnDisk = Join-Path $PSScriptRoot '..\..\plugins\workflows\workflow-davekjohn\templates\pull_request_template.md'
+Assert-True (Test-Path -LiteralPath $refOnDisk) `
+    'the reference template is actually shipped at the path the skill and CONTRIBUTING-portable name'
+if (Test-Path -LiteralPath $refOnDisk) {
+    $refText = ([System.IO.File]::ReadAllText($refOnDisk, [System.Text.Encoding]::UTF8)) -replace "`r`n", "`n"
+    Assert-True ($refText.TrimEnd() -eq (($reference -join "`n").TrimEnd())) `
+        'and its contents are what Get-PrTemplateReference says they are'
 }
 
 Write-Host ""

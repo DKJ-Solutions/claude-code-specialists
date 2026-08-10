@@ -66,6 +66,10 @@ $ReleaseLibSrc       = Join-Path $RepoRoot 'scripts\lib\release-lib.ps1'
 $BranchInfoSrc       = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 $EntryScaffoldSrc    = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 $PluginTreeSrc       = Join-Path $RepoRoot 'scripts\lib\plugin-tree-lib.ps1'
+# Added with lint check 24 (August 10, 2026). The lint dot-sources this for the recognised placeholder
+# list and the reference PR template; a fixture missing it does not skip that check, it kills the whole
+# script before check 23 runs -- which is exactly how this suite failed when the check landed.
+$PrBodyLibSrc        = Join-Path $RepoRoot 'scripts\lib\pr-body-lib.ps1'
 
 $ProjectDir    = Join-Path $Fixture 'project'
 $UserHomeDir   = Join-Path $Fixture 'user-home'
@@ -183,6 +187,7 @@ function New-LintFixtureBase {
     Copy-Item -Path $BranchInfoSrc       -Destination (Join-Path $LintFixture 'scripts\lib\branch-info.ps1') -Force
     Copy-Item -Path $EntryScaffoldSrc    -Destination (Join-Path $LintFixture 'scripts\lib\entry-scaffold-lib.ps1') -Force
     Copy-Item -Path $PluginTreeSrc       -Destination (Join-Path $LintFixture 'scripts\lib\plugin-tree-lib.ps1') -Force
+    Copy-Item -Path $PrBodyLibSrc        -Destination (Join-Path $LintFixture 'scripts\lib\pr-body-lib.ps1') -Force
 }
 
 # Rewrites .claude-plugin/marketplace.json to declare exactly $Plugins (each a hashtable with Name +

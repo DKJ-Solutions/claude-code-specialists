@@ -213,10 +213,15 @@ $EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 # release-lib AND by shared-scripts-lib, and read by the lint itself for the published plugin roots.
 # Copied for the same reason as the six above.
 $PluginTreeSrc = Join-Path $RepoRoot 'scripts\lib\plugin-tree-lib.ps1'
+# Eighth, since check 24 (August 10, 2026): pr-body-lib.ps1 holds the recognised placeholder strings and
+# the reference PR template, both dot-sourced by the lint. Copied for the same reason as the seven above.
+$PrBodyLibSrc = Join-Path $RepoRoot 'scripts\lib\pr-body-lib.ps1'
 # Dot-sourced into the RUNNER as well as copied into the fixture: check 13b's scenarios build their
 # template files from Get-BranchTemplates, so the test and the check read the same definition. A fixture
 # written out by hand here would be the very second source of the format that check exists to prevent.
+# Check 24's scenarios do the same with Get-PrTemplateReference, for the same reason.
 . $EntryScaffoldSrc
+. $PrBodyLibSrc
 $Fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("check-plugin-integrity-test-$PID")
 
 $script:pass = 0
@@ -314,6 +319,14 @@ try {
     Copy-Item -Path $BranchInfoSrc -Destination (Join-Path $Fixture 'scripts\lib\branch-info.ps1') -Force
     Copy-Item -Path $EntryScaffoldSrc -Destination (Join-Path $Fixture 'scripts\lib\entry-scaffold-lib.ps1') -Force
     Copy-Item -Path $PluginTreeSrc -Destination (Join-Path $Fixture 'scripts\lib\plugin-tree-lib.ps1') -Force
+    Copy-Item -Path $PrBodyLibSrc -Destination (Join-Path $Fixture 'scripts\lib\pr-body-lib.ps1') -Force
+
+    # The reference PR template check 24 holds, written from the same function the check compares against
+    # -- never typed out here, for the reason stated at the dot-source above.
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\workflows\workflow-davekjohn\templates') -Force | Out-Null
+    [System.IO.File]::WriteAllText(
+        (Join-Path $Fixture 'plugins\workflows\workflow-davekjohn\templates\pull_request_template.md'),
+        (((Get-PrTemplateReference) -join "`n") + "`n"), $Utf8NoBom)
 
     $skillAlphaMd = "---`nname: skill-alpha`ndescription: Fixture skill alpha.`n---`n`n# Skill Alpha`n"
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-alpha\SKILL.md'), $skillAlphaMd, $Utf8NoBom)
@@ -1862,6 +1875,69 @@ try {
     $c4 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($c4.Out -match '\[skill-command\] plugins')) `
         'skill-command: a signposted <plugin> placeholder passes, so the check needs no exemption list'
+
+    # --- check 24: the PR template keeps the two promises open-pr makes about it ---------------------
+    # 56-61. The defect this guards was measured at a consumer, not imagined (#573): a template one word
+    #        away from a recognised placeholder matched nothing, and TWELVE of their sixty merged PRs
+    #        carried no description at all. Both halves are asserted, because they are held to different
+    #        strengths on purpose -- the shipped reference byte for byte, the repo's own template only to
+    #        the contract.
+    Write-Host "  check 24: the PR template's two promises" -ForegroundColor DarkCyan
+    $prtRefFixture = Join-Path $Fixture 'plugins\workflows\workflow-davekjohn\templates\pull_request_template.md'
+    $prtOwnFixture = Join-Path $Fixture '.github\pull_request_template.md'
+    New-Item -ItemType Directory -Path (Join-Path $Fixture '.github') -Force | Out-Null
+
+    # 56. THE NEAR-MISS, which is the whole reason the check exists. One word different from a recognised
+    #     string: a human reads it as correct, and the whole-line comparison in open-pr does not.
+    [System.IO.File]::WriteAllText($prtOwnFixture,
+        "# What does the change on this branch bring to main?`n<!-- Brief description of what changes and why. -->`n", $Utf8NoBom)
+    $p1 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($p1.Out -match '\[pr-template\].*no placeholder line open-pr recognises') `
+        'pr-template: a near-miss placeholder is reported, not walked past'
+    Assert-True ($p1.Out -match [regex]::Escape((Get-PrTemplateCanonicalPlaceholder))) `
+        'pr-template: and the finding prints the strings that WOULD be recognised, so the repair is one paste'
+
+    # 57. A template with no heading at all: -RefreshBody has nothing to target and degrades to a warning
+    #     on every run, which reads like a decision rather than a loss.
+    [System.IO.File]::WriteAllText($prtOwnFixture,
+        ((Get-PrTemplateCanonicalPlaceholder) + "`n"), $Utf8NoBom)
+    $p2 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($p2.Out -match '\[pr-template\].*carries no heading') `
+        'pr-template: a template without a heading is reported'
+
+    # 58. The recognised placeholder clears it -- including a LEGACY one, because a consumer template
+    #     carrying the Dutch string is correct and must not be accused of anything.
+    [System.IO.File]::WriteAllText($prtOwnFixture,
+        "## Wat doet deze wijziging?`n<!-- Korte beschrijving van wat er verandert en waarom. -->`n", $Utf8NoBom)
+    $p3 = Invoke-Integrity -FixtureRoot $Fixture
+    # Matched on the FINDING shape, not on the category tag: every run prints a '[pr-template] checked N'
+    # coverage line, so a bare tag match would pass here for the wrong reason and keep passing after the
+    # check was broken.
+    Assert-True (-not ($p3.Out -match '\[pr-template\] \.github')) `
+        'pr-template: a legacy-but-recognised placeholder clears the finding, so no exemption list is needed'
+    Assert-True (-not ($p3.Out -match 'no placeholder line open-pr recognises')) `
+        'pr-template: and specifically no placeholder finding, matched on the message rather than the tag'
+    Assert-True ($p3.Out -match '\[pr-template\] checked 2') `
+        'pr-template: and both subjects were actually examined, not skipped into silence'
+
+    # 59. THE SHIPPED REFERENCE IS THE STRICT HALF. Editing it by hand is the drift that would hand a
+    #     consumer a template open-pr walks past -- authoritative-looking and wrong.
+    [System.IO.File]::WriteAllText($prtRefFixture,
+        "# What does the change on this branch bring to main?`n<!-- Paste your description here. -->`n", $Utf8NoBom)
+    $p4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($p4.Out -match '\[pr-template\].*no longer matches Get-PrTemplateReference') `
+        'pr-template: a hand-edited shipped reference is reported'
+    [System.IO.File]::WriteAllText($prtRefFixture, (((Get-PrTemplateReference) -join "`n") + "`n"), $Utf8NoBom)
+
+    # 60. NO TEMPLATE AT ALL IS NOT A FINDING. A repo without one is a repo open-pr simply does not
+    #     pre-fill a body for; only a template that exists makes a promise. Refusing here would make the
+    #     check fire on every consumer that has not written one, which is how a gate gets switched off.
+    Remove-Item -LiteralPath $prtOwnFixture -Force
+    $p5 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($p5.Out -match '\[pr-template\] \.github')) `
+        'pr-template: a repo with no template of its own is not accused of anything'
+    Assert-True ($p5.Out -match '\[pr-template\] checked 1') `
+        'pr-template: and the coverage line says so, instead of reporting the same number as a full run'
 
     # --- Scenario 55: A MARKETPLACE THAT DOES NOT PARSE STILL LEAVES A REPORTING GATE ----------------
     # 55. The lint reads the plugin set from marketplace.json now, and the whole point of doing that

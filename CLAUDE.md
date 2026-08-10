@@ -278,6 +278,30 @@ The constitution above, concretely implemented here:
   them still has those sections, and they receive the script through a plugin update rather than by choosing
   to. Recognise both, write one.
 
+  **What travels from that decision is the MEASUREMENT, not the two-line answer** (August 10, 2026;
+  [#573](https://github.com/DaveKJohn/claude-code-specialists/issues/573)). The rule is *"keep what is
+  neither restated by the entry nor proven by a gate"*, and in this repo nothing survived it — which is a
+  fact about this repo, not about the form. The consumer who reported that issue re-ran the same
+  measurement over their own 60 PRs and found **one box of eight that genuinely varied**: a preview-URL
+  approval, on a repo whose result has to be judged by eye and which no gate can prove. They kept it and
+  dropped the other seven, and that is #538 applied rather than #538 ignored. So the portable half — the
+  `open-pr` skill and the reference template the plugin now ships — states *why* the default is two lines
+  and asks the next repo to run the measurement, instead of shipping "the portable template has no
+  checkboxes" as a conclusion. Their same pass confirmed the failure this repo predicted when it removed
+  the prefix checklist: **5 of their 60 PRs ticked two rows and 2 ticked none**, while the label came from
+  `Get-BranchInfo` in all 60.
+
+  **The template's shape is shipped, and the placeholder list moved so a gate could reach it** (same
+  issue). `.github/pull_request_template.md` cannot live in the plugin — GitHub reads it only from that
+  path in the consumer's own repo — so what ships is a reference to copy and diff against, at
+  `plugins/workflows/workflow-davekjohn/templates/pull_request_template.md`, held byte for byte to
+  `Get-PrTemplateReference`. The three recognised placeholder strings were three literals inside
+  `open-pr.ps1`, which meant **nothing outside that script could read them**: the reference could not be
+  held against the list that has to recognise it, and that gap is the defect the issue reported. They now
+  live in `pr-body-lib.ps1`, and lint check 24 holds both files — the shipped reference byte for byte,
+  this repo's own template only to the contract (a first heading, a recognised placeholder), because that
+  one is genuinely repo-owned and a byte rule would refuse a correct change the day it grows a section.
+
   **The gate reaches `CHANGELOG.md`'s intro, and getting it there took two independent repairs** (August 8,
   2026; [#525](https://github.com/DaveKJohn/claude-code-specialists/pull/525)). The check was born
   excluding that file whole, on the history grounds it shares with checks 11 and 12 — but only the entries
