@@ -1,17 +1,13 @@
-## `feat/nolan-owns-cost-not-only-tokens` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] Verify the premise: count Nolan's appearances in the record (12, all in 1.x/2.x)
-- [x] Widen the agent def -- same description length, since it is always-on
-- [x] Widen the portable manual, with the three wall-clock counting rules
-- [x] Add the "a skipped check is not a saving" prohibition to both
-- [x] Add the test engineer as a routing partner
-- [x] Lens: this repo's gate surfaces plus the v4.2.0 baseline, measured not estimated
-- [x] Repoint every place that still narrowed him to tokens: Chris's routing row, the pre-PR chain,
-      Marlowe's lens
-- [~] No shared-script mirror to regenerate -- this branch touches no script
-
-### Where I left off
-
-Done. The gates are the last word.
+_(filled in when a branch is created)_
