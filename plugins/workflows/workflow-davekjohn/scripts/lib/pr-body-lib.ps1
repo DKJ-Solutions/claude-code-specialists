@@ -249,6 +249,18 @@ function Update-PrBodySection {
         would leave half the old description stranded below the new one -- a body that reads as though it
         says two things.
 
+        THE LEVEL RULE ALONE IS NOT ENOUGH WHEN THE SECTION IS AN H1 (inbound #598), and that is what
+        -StopAtHeading is for. At level 1 "the same level or higher" can only ever match another H1, so
+        every '##' section that follows is by definition nested inside the description and gets replaced
+        along with it. Measured in a consumer: a template whose description sits under an H1 lost its one
+        repo-specific section -- heading, guidance and both checkboxes -- on every -RefreshBody, reported
+        as "updated the description" and nothing else.
+
+        The reasoning above stays right, which is why this is an extra boundary rather than a different
+        one: a description CAN contain its own deeper headings, so the level rule cannot simply be
+        loosened to "the next heading of any kind". What the caller knows and this function cannot is
+        which headings belong to the FORM rather than to the description -- so it passes them in.
+
         Fenced code is skipped when looking for the boundary, because a description explaining this
         mechanism will contain a '##' inside a fence. Not hypothetical: this repo's own entry for this
         feature does.
@@ -266,6 +278,13 @@ function Update-PrBodySection {
     .PARAMETER Content
         The replacement content for that section, without the heading.
 
+    .PARAMETER StopAtHeading
+        Extra literal heading lines that also end the section, whatever their level -- the form's own
+        later headings. NARROWING ONLY: the section ends at the EARLIEST of these and the level rule, so
+        passing them can shorten what is replaced and never lengthen it. That is what makes the parameter
+        safe to add to a shared function -- a caller that passes nothing gets byte-identical behaviour to
+        before, and one that passes a heading the body does not contain gets the same.
+
     .PARAMETER Changed
         [ref] set to $true when the returned body differs from the input.
     #>
@@ -273,6 +292,7 @@ function Update-PrBodySection {
         [string]$Body,
         [Parameter(Mandatory)][string]$Heading,
         [string]$Content,
+        [string[]]$StopAtHeading = @(),
         [ref]$Changed
     )
 
@@ -300,14 +320,21 @@ function Update-PrBodySection {
     }
     if ($start -lt 0) { return $Body }
 
-    # Where the section ends: the next heading at $level or shallower, ignoring anything inside a fence.
+    # Where the section ends: the EARLIEST of two boundaries, ignoring anything inside a fence --
+    #   1. the next heading at $level or shallower (the original rule, right for a nested description);
+    #   2. any heading the caller named in -StopAtHeading, at whatever level (the form's own sections,
+    #      which an H1 description would otherwise swallow whole -- inbound #598).
+    # Whichever comes first wins, so the second can only ever shorten the section.
+    $stops = @(@($StopAtHeading) | Where-Object { $_ -and $_.Trim() } | ForEach-Object { $_.TrimEnd() })
     $end = $lines.Count
     $inFence = $false
     for ($i = $start + 1; $i -lt $lines.Count; $i++) {
         if ($lines[$i] -match '^\s*(```|~~~)') { $inFence = -not $inFence; continue }
         if ($inFence) { continue }
         $m = [regex]::Match($lines[$i], '^(#+)\s')
-        if ($m.Success -and $m.Groups[1].Value.Length -le $level) { $end = $i; break }
+        if (-not $m.Success) { continue }
+        if ($m.Groups[1].Value.Length -le $level) { $end = $i; break }
+        if ($stops -contains $lines[$i].TrimEnd()) { $end = $i; break }
     }
 
     $before = if ($start -gt 0) { $lines[0..($start - 1)] } else { @() }
@@ -321,6 +348,49 @@ function Update-PrBodySection {
     $rebuilt = (@($before) + $middle + @($after)) -join $nl
     if ($rebuilt -ne $Body -and $null -ne $Changed) { $Changed.Value = $true }
     return $rebuilt
+}
+
+function Get-LostBodyHeadings {
+    <#
+    .SYNOPSIS
+        The headings present in a PR body that are absent from the version about to replace it.
+
+    .DESCRIPTION
+        THE SIGNAL A SILENT SECTION LOSS NEEDS (inbound #598). -RefreshBody deleted a whole template
+        section along with the description and reported only "the description was updated" -- so the
+        recovery depended on somebody running 'gh pr view' days later and noticing. A green PR with a
+        complete-LOOKING body is exactly the state in which nobody re-reads the form.
+
+        THE SUBJECT IS A HEADING THAT DISAPPEARED, NOT A BODY THAT GOT SHORTER, and that choice is the
+        whole reason this is checkable rather than noisy. A refresh legitimately shrinks a body every time
+        the new description is shorter than the old one, so a size rule would fire on the common case and
+        be switched off within a week. A section that was there and is now gone is never something this
+        script intends.
+
+        Pure and level-agnostic, and fence-aware for the same reason every other reader here is: a body
+        explaining the form quotes the form's headings, and a quotation is not a section.
+
+        Returns an array of the lost heading lines, in the order the old body had them. Empty means
+        nothing was lost -- which after #598's fix is the expected answer, so this survives as a tripwire
+        for the next shape nobody predicted rather than as a routine condition.
+    #>
+    param(
+        [AllowEmptyString()][string]$Before,
+        [AllowEmptyString()][string]$After
+    )
+
+    $headings = {
+        param([string]$text)
+        if (-not $text) { return @() }
+        $inFence = $false
+        return @($text -split "\r?\n" | ForEach-Object {
+            if ($_ -match '^\s*(```|~~~)') { $inFence = -not $inFence; return }
+            if (-not $inFence -and $_ -match '^#{1,6}\s+\S') { $_.TrimEnd() }
+        })
+    }
+
+    $kept = @(& $headings $After)
+    return @(@(& $headings $Before) | Where-Object { $kept -notcontains $_ })
 }
 
 function Get-PrDescriptionPlaceholderDefaults {
