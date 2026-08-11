@@ -428,9 +428,16 @@ The constitution above, concretely implemented here:
      [`releases/README.md`](releases/README.md) already listed every one of those 72 versions with a date,
      a type and a descriptive title — the same coverage, verified in both directions, and richer per row.
      So the intro carries a one-line pointer to that page and the cut leaves the document at its intro.
-     One consequence worth knowing: the internal note's only inbound link is now the **Version cell** of
-     that page's history row, written by `new-internal-note.ps1` rather than by the cut — see
-     `Set-ReleaseInternalNoteLink` for why it cannot be the cut's job. **The exception it runs under did not widen**: same scope, same
+     One consequence worth knowing: the hand-written note's only inbound link is the **Version cell** of
+     that page's history row — and **the cut writes it itself, on the first write** (August 10, 2026). This
+     paragraph said the opposite until August 11, naming `new-internal-note.ps1` as the writer and
+     `Set-ReleaseInternalNoteLink` as the reason it *could not* be the cut's job. That reason was real and it
+     expired: it could not be the cut's job while the note did not exist during the cut, and since the two
+     hand-written documents merged the cut **drafts** the note, so there is a real file to point at by the
+     time the row is written. `Set-ReleaseInternalNoteLink` still exists and is still called by
+     `new-internal-note.ps1`, for a repo running the two-document flow — recognise both, write one.
+     **Measured rather than assumed**: `v4.4.0`'s row pointed at `notes/4.x/4.4.0.md` on the first write,
+     with nothing repointing it afterwards. **The exception it runs under did not widen**: same scope, same
      "only on explicit request", and the release artefacts it produces here were verified
      byte-identical to the unshared script's, both when the script was shared and again when the
      consumer tier joined it.

@@ -2,8 +2,8 @@
 
 **How a release works.** A release is not a deploy but a **recorded moment**: a git tag that marks the
 state of the marketplace, with all plugin versions in lockstep. This page carries both halves: the
-**process** — the tier model, what a release must earn, the three documents, and how one is cut — and, under
-the repo heading at the end, the **full list of releases** actually cut. The release block in
+**process** — the tier model, what a release must earn, the release documents, and how one is cut — and,
+under the repo heading at the end, the **full list of releases** actually cut. The release block in
 [`CHANGELOG.md`](../CHANGELOG.md) points here for everything but the current version.
 
 [`scripts/release/cut-release.ps1`](../scripts/release/cut-release.ps1) itself publishes nothing to GitHub
@@ -15,25 +15,26 @@ consumer which release they are on.
 ## The tier model
 
 **One scale, used twice.** A change declares how far it reaches, and that number decides two things: which
-release document it appears in, and — together with its significance score — where in that document it sits.
+document — and, for tiers 1 and 2, which section of it — the change appears in, and, together with its
+significance score, where within that section it sits.
 
-| tier | who notices | release document |
-|---|---|---|
-| **2** | consumers of the product | `consumer/<dir>/<X.Y.Z>.md` |
-| **1** | colleagues working on this project | `internal/<dir>/<X.Y.Z>.md` |
-| **0** | only this repo's own developers | `development/<dir>/<X.Y.Z>.md` |
+| tier | who notices | where it is written | when |
+|---|---|---|---|
+| **2** | consumers of the product | the *For consumers* section of `notes/<dir>/<X.Y.Z>.md` | minor/major |
+| **1** | colleagues working on this project | the organisation's two sections of that same file | minor/major |
+| **0** | only this repo's own developers | `development/<dir>/<X.Y.Z>.md` | every release |
 
 **`CHANGELOG.md` has no sections to file into** (Dave, August 5, 2026). It is an intro followed by one `##`
 per change, ranked furthest-reach-first and, within a tier, highest-significance-first — so what the three
 `## Tier N - Pull Requests` sections used to say visually is now the ordering, and each entry states its own
 reach in the `### Significance` section it carries, one `#### Tier N` sub-section per reach it claims. The
 **fold** is the only moment that order can be decided, because the cut empties the list: whatever order it
-leaves is what these three documents inherit, with nothing re-estimated days later.
+leaves is what the release documents inherit, with nothing re-estimated days later.
 
-**The ladder is cumulative, so the documents are not disjoint.** Something a consumer notices is something
-a colleague should hear about too — a tier-2 entry therefore appears in the consumer document *and* in the internal
-note. The development note carries everything, tier 0 included, because it is the record rather than a
-summary of one.
+**The ladder is cumulative, so a tier-2 entry does not skip tier 1.** Something a consumer notices is
+something a colleague should hear about too, so a tier-2 entry earns both the *For consumers* section and
+the note's organisational sections. The development note carries everything, tier 0 included, because it is
+the record rather than a summary of one.
 
 **Where the number comes from: the author of the entry, on the branch.** `new-branch.ps1` writes all three
 `#### Tier N` sub-sections with their scores left empty; whoever finishes the branch answers each one, with a
@@ -70,9 +71,9 @@ moment, and the one document that gets written is the record.
 
 **Why a minor needs tier 1 rather than tier 2.** It demanded a tier-2 entry until August 7, 2026, so work a
 colleague on this project got something out of earned only a patch — while the version here speaks to all
-stakeholders, not to consumers alone. What keeps the looser rule honest is that **the documents follow the
-tier and not the bump**: a tier-1-only minor writes the internal note and **no consumer document**, so nobody
-outside is handed a document about work they cannot see.
+stakeholders, not to consumers alone. What keeps the looser rule honest is that **the sections follow the
+tier and not the bump**: a tier-1-only minor writes the note without its *For consumers* section, so nobody
+outside is handed a section about work they cannot see.
 
 **Why a major counts minors rather than pending work:** a major is a **recap** of the minors before it,
 which is what both of this repo's majors actually were (`v2.0.0` consolidated v1.0–v1.18, `v3.0.0`
@@ -96,7 +97,7 @@ Nothing would have errored. Counting declarations keeps "declared tier 0" distin
 which is the whole difference between a release with nobody to announce itself to and a repo that never
 chose the model.
 
-## The three documents
+## The release documents
 
 Which directory scheme groups them — `<X>.x` per major or `<X.Y>` per minor — is answered once by
 `Get-ReleaseNotesGrouping` in [`scripts/repo-config.ps1`](../scripts/repo-config.ps1), so `<dir>` below
@@ -105,15 +106,18 @@ stands for whichever this repo uses.
 | document | for whom | when | generated by |
 |---|---|---|---|
 | `development/<dir>/<X.Y.Z>.md` | developers — the full per-PR record, auto-complete | every release | `cut-release.ps1` |
-| `internal/<dir>/<X.Y.Z>.md` | colleagues, employers — what the work is worth | every release, patch included | `new-internal-note.ps1` |
-| `consumer/<dir>/<X.Y.Z>.md` | consumers — what they actually notice | minor/major, **and** only with a tier-2 entry pending | `cut-release.ps1` |
+| `notes/<dir>/<X.Y.Z>.md` | colleagues and, where earned, consumers — one hand-written note with a named section per reader | minor/major, where a pending entry earns one | drafted by `cut-release.ps1`, written by hand |
+
+**A patch writes no hand-written note at all**, and is announced by the generated GitHub Release body alone
+(see [Cutting a release](#cutting-a-release)). The **sections** inside the note follow the tier; **whether
+the note exists at all** follows the bump.
 
 ### Tier 0 - development
 
 **Raw and complete, and the only document nobody writes.** Every changelog entry as it was written, nothing
 rewritten — literally the whole changelog, generated in full by `cut-release.ps1` at every release. It is
 the per-PR record a developer goes back to, which is why it is never edited down: a summary of it is what
-the other two are for.
+the hand-written note is for.
 
 **It is the one document that still groups by tier**, and that is a difference from `CHANGELOG.md` rather
 than a copy of it: `## Tier <n> - <audience>` first, then that tier's entries as a flat ranked list in the
@@ -126,50 +130,54 @@ the same six `####` sections the scaffolder writes: `Branch title`, `Branch ID`,
 the change on this branch bring to main?`, `Significance` and `Pull Request`, one heading level deeper than
 in `CHANGELOG.md`. Nothing is rewritten and nothing is cut, which is what "the record" means. There are no
 branch-type categories in between — the grouping came from the branch prefix, which this repo measured does
-not predict impact. Tier 0 is in it, unlike in the other two documents.
+not predict impact. Tier 0 is in it, unlike in the hand-written note below.
 
 Its size is also why it is never the body of a GitHub Release but always an attachment: `gh`'s
 release-notes body has a hard **125,000-character** limit, which a full notes file can exceed.
 
-### Tier 1 - internal
+### Tiers 1 and 2 - the hand-written note
 
-**The tier that covers a release with nothing for a consumer, and that is the whole reason it exists next to
-the consumer document.** The two answer different questions: the consumer document is *what a consumer notices*, internal is *what
-the organisation gets out of it*. They come apart wherever a release has no tier-2 entry — a patch, or a
-minor made of tier-1 work — and get no consumer document at all, while still being the release where a routine
-change stopped needing a developer.
+**One document since August 10, 2026, with a named section per reader** (Dave). It replaced two separate
+documents — an internal note for the organisation and a consumer document — and at all twelve releases
+since the internal tier existed, **both were written, about the same changes**. Measured before merging
+them: one release's internal note (962 words) held against test 2 of the writing norm in the
+[cut-release skill](../plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md) (*does this
+describe our effort or their outcome*) gave:
 
-`new-internal-note.ps1` generates only the skeleton (metadata + the entry titles as bullets + three fixed
-headings). The middle heading, **what it is worth**, cannot be derived from a changelog and is the point of
-the document — so this tier is written by hand at **every** release, patch included.
+| | words | |
+|---|---|---|
+| could appear in a consumer-facing section | ~365 (38%) | and **did**, rewritten in a second register in the other document — that is the duplication |
+| could not | ~597 (62%) | including *what it is worth* (316 words), which is not an outlier but the entire reason the organisational sections exist |
 
-**It carries over the tier-1 *and* tier-2 entries**, the ladder being cumulative, and skips tier 0. The empty
-case is reachable and ordinary since August 7, 2026: a release made entirely of tier-0 work is a legitimate
-patch, and its internal note has no entry to list. The script says so rather than handing you a blank list
-without a reason — which used to mean "somebody bypassed the gate" and now usually means "this was a
-tier-0 patch".
+So a **blended** document was refused, since it would have had to drop the 62% or break the writing norm; a
+**sectioned** one keeps each register intact and writes the shared 38% once. The heading *"what is different
+now"* is gone rather than moved — it **was** the duplicated half, and the *For consumers* section is what
+replaced it.
 
-**It is published output, not an internal file.** It is the body of the GitHub Release, which has a
-consequence worth stating: anything its "what is still open" section phrases as a *live* claim goes stale in
-place within hours of publishing. Write that section as "open at the time of this release", not as a
-statement about now.
+`cut-release.ps1` drafts `releases/notes/<dir>/<X.Y.Z>.md` for every bump `Get-ReleaseConsumerBumps` names.
+Three sections, in this order:
 
-### Tier 2 - the consumer document
+| section | for whom | how it arrives |
+|---|---|---|
+| *For consumers* | whoever decides whether to update | **pre-filled** — the tier-2 entries, still in the words their authors wrote for a diff reviewer. Absent where no entry reached tier 2. |
+| *What it is worth* | the organisation | **empty** — it cannot be generated. Think in time, risk and reduced dependence on a developer. |
+| *What was still open at this release* | the organisation | **empty**, and past tense on purpose: a published document does not move with reality, so a present-tense line goes stale in hours rather than months. |
 
-**It is the tier-2 entries, and nothing else.** Entry metadata is stripped, and the document is written only
-when **two** conditions hold at once: the bump is one the seam names (`Get-ReleaseConsumerBumps` — minor
-or major here), **and** at least one pending entry actually declared tier 2. A patch has no consumer document, for
-the same reason it is a patch.
-
-**That second condition became load-bearing on August 7, 2026, and used to be belt-and-braces.** While
-[a minor required a tier-2 entry](#what-a-release-must-earn), a release that earned a minor had a
-consumer reading it by construction and the tier check could never fire on its own. Since a minor needs only
-tier 1, it is the only thing standing between a tier-1-only release and a document written for consumers
-about work no consumer can see — and a consumer document with a header and no content is worse than none.
+**A tier-1-only minor gets the note with no *For consumers* section.** The organisational two sections
+belong to every bump the seam names — the version moves for everyone, so the organisation's question is
+always answered — while a section about work no consumer can see would be worse than none, because it looks
+written.
 
 **Still a draft to be edited, and the reason never depended on the selection.** Entry bodies are written for
-whoever reviews the diff, even when the change reaches a consumer — so the *selection* is right and the
-*prose* still needs rewriting from the reader's end. What is gone is the deleting, not the writing.
+whoever reviews the diff, even when the change reaches a consumer — so the *For consumers* section's
+*selection* is right and its *prose* still needs rewriting from the reader's end. What is gone is the
+deleting, not the writing.
+
+**It is published output, not an internal file.** Where the bump wrote one, the note is uploaded as an
+attachment to the GitHub Release (the release body itself is generated separately — see
+[Cutting a release](#cutting-a-release)), which has a consequence worth stating: anything the *What was
+still open* section phrases as a *live* claim goes stale in place within hours of publishing. Write it as
+"open at the time of this release", not as a statement about now.
 
 > **The "remove before publishing" marker was retired on August 5, 2026**, together with its two seam knobs
 > (`Get-ReleaseHighlightsStakeholderTypes`, `Get-ReleaseHighlightsWording`). It existed because the generator
@@ -179,14 +187,18 @@ whoever reviews the diff, even when the change reaches a consumer — so the *se
 > entry's author instead, at the moment they know. Do not reintroduce a category-based split beside it: that
 > is the guess this replaced.
 
-### Where the two hand-written documents land
+**`new-internal-note.ps1` is still shipped and still works**, for a repo running the two-document flow — a
+separate organisational note alongside a separate consumer document. Nothing in this repo's chain calls it
+any more; it is documented here rather than dropped, because a consumer receives a plugin update rather than
+choosing one, and deleting a working entry point is a breaking change.
 
-**Both go through a branch + PR.** `cut-release.ps1` commits and tags in one motion, so by the time you edit
-the consumer document draft or run `new-internal-note.ps1` (which needs the development notes as input), the
-release commit is already tagged. Neither is one of the two named direct-on-`main` exceptions, so they
-travel the normal reviewed route. The alternative — widening the release exception to cover the written
-notes as well — was offered and declined: an exception is only safe while it stays the size it was granted
-at.
+### Where the hand-written note lands
+
+**It goes through a branch + PR.** `cut-release.ps1` commits and tags in one motion, so by the time you edit
+the note draft, the release commit is already tagged. It is not one of the two named direct-on-`main`
+exceptions, so it travels the normal reviewed route. The alternative — widening the release exception to
+cover the written note as well — was offered and declined: an exception is only safe while it stays the size
+it was granted at.
 
 ## Cutting a release
 
@@ -219,26 +231,30 @@ In one motion, on a clean `main`:
 4. commits that directly on `main` (`release: vX.Y.Z`) and sets an annotated tag `vX.Y.Z`;
 5. pushes `main` + the tag (unless `-NoPush` for inspection first).
 
-**Closing step, after the script and after the two written documents have merged: publish a GitHub
-Release.** Not run by `cut-release.ps1` and not automated; the release manager walks through the
+**Closing step, after the script and after the hand-written note has merged, where the bump wrote one:
+publish a GitHub Release.** Not run by `cut-release.ps1` and not automated; the release manager walks
+through the
 [`cut-release` skill](../plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md)'s checklist: `gh release create`
-with the **internal note** as the release body (`--notes-file`), then `gh release upload` with the full
-development notes **and the edited consumer document, where the bump generated one**. Never inline the development
-notes — see [Tier 0 - development](#tier-0---development) for the character limit that makes that fail.
+with the **generated body** (`--notes-file` pointing at the `<X.Y.Z>-github-body.md` the cut already wrote —
+nothing to edit), then `gh release upload` with the full development notes **and the hand-written note,
+where the bump generated one**. Never inline the development notes — see
+[Tier 0 - development](#tier-0---development) for the character limit that makes that fail.
 
-**Upload the attachments under unique filenames.** All three tiers call their file `<X.Y.Z>.md` and an
-asset's name is its basename, so uploading two of them straight from `releases/` collides — the second
-upload returns `HTTP 404`. `gh`'s `file#label` syntax does not solve it (it sets the label, not the name).
-Copy them to `vX.Y.Z-development-notes.md` and `vX.Y.Z-notes-for-users.md` and upload the copies.
+**Upload the attachments under unique filenames.** Every document a release produces shares the basename
+`<X.Y.Z>.md`, so uploading two of them straight from `releases/` collides — the second upload returns
+`HTTP 404`. `gh`'s `file#label` syntax does not solve it (it sets the label, not the name). Copy them to
+`vX.Y.Z-development-notes.md` and `vX.Y.Z-notes-for-users.md` and upload the copies.
 
-**It comes last on the checklist for a reason that is easy to get wrong.** The body is a document written
-*after* the cut and merged via a branch + PR, so a Release published straight after the tag would have no
-body to publish.
+**It comes last on the checklist, and the reason has outlived one rewrite already.** The body used to be a
+hand-written document merged via its own branch + PR, so publishing straight after the tag would have had no
+body to publish. The body is generated by the cut itself now, so that particular impossibility is gone — but
+publishing early would still publish a page whose attachments are missing the hand-written note and whose
+pointer line names a document nobody can download yet.
 
 **And it needs no separate approval** (Dave, August 5, 2026). Cutting the release is the act that is asked
 for; publishing its Release is the last step of that same procedure, so stopping to ask there is a rubber
-stamp. Once a cut has been requested, the whole run goes through in one motion — generate, ship the two
-written documents, publish. **The boundary that remains is the live stage**, where a repo has one: that is
+stamp. Once a cut has been requested, the whole run goes through in one motion — generate, ship the
+hand-written note, publish. **The boundary that remains is the live stage**, where a repo has one: that is
 Block 2 of the checklist, a different act with a different audience, and this approval covers Block 1. A
 repo wanting a different boundary states that in its own lens rather than softening this paragraph.
 
@@ -284,11 +300,11 @@ decisions behind them, the measured instances, and the release list itself.
 
 ### Seam values in force here
 
-All three documents group **per major** (`3.x`) — the consumer this model came from folders per minor.
+Every release document groups **per major** (`3.x`) — the consumer this model came from folders per minor.
 `Get-ReleaseHistoryPath` is left at its default, `releases/README.md` — this page — since the list lives
-here, and since August 5, 2026 that default carries a second job: the **Version cell** of each new row is
-where `new-internal-note.ps1` points the internal note, because removing the changelog's release block left
-that note with no inbound link anywhere else.
+here. Since the hand-written note merged into one document (August 10, 2026), `cut-release.ps1` drafts that
+note itself before it writes this page's **Version cell**, so the cell points straight at it — the hand-written
+note where the bump wrote one, the development notes on a patch — with nothing repointing it afterwards.
 
 **Six changelog seams retired on August 5, 2026 and are therefore not stated here either.**
 `Get-ChangelogTierHeadings` and the legacy `Get-ChangelogHeading` (#178) named changelog section headings, and
@@ -319,8 +335,8 @@ outright, so it needs no seam to be in their language. It simply is.
 **A GitHub Release is published at every release, patch included** (Dave, August 4, 2026). Two consequences
 of that "every release" half: patches now get one — so `v2.6.1` and `v2.7.1`, cited here for years as
 examples of releases deliberately without one, describe the **old** rule and are left standing as history
-rather than as guidance. And a patch has no consumer document by construction, so on a patch the attachment list is
-the development notes alone.
+rather than as guidance. And a patch gets no hand-written note at all by construction, so on a patch the
+attachment list is the development notes alone.
 
 > **Named `davekjohns-workshop` until August 3, 2026.** The marketplace was renamed with the
 > [one-product decision](../README.md#one-product-one-repository); the older notes under `development/`
