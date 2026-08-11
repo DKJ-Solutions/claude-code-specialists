@@ -936,6 +936,58 @@ Assert-True (@((Resolve-EntryImpact -EntryText $badScore).Errors -match 'outside
 $dupTier = "### Significance`n`n#### Tier 0`n`na`n`nScore: 1`n`n#### Tier 0`n`nb`n`nScore: 2`n"
 Assert-True (@((Resolve-EntryImpact -EntryText $dupTier).Errors -match 'a second time').Count -gt 0) 'the same tier twice is two answers to one question'
 
+Write-Host "A reason below the score line is named as misplaced, not as missing (inbound #596)" -ForegroundColor Cyan
+# THE DEFECT THIS GUARDS. The collecting loop read the lines under '**Score:**' and threw them away, so a
+# tier whose reason was written one line too low reported as 'a tier with no reason' -- the one thing an
+# author staring at their own three paragraphs can see is untrue, which makes distrusting the gate the
+# natural next move instead of moving the text. Measured in the reporting repo: three tiers, all three
+# answered, all three refused as unanswered.
+$scoreLabel  = Get-EntryScoreLabel
+$belowEntry  = "### Significance`n`n#### Tier 0`n`n$scoreLabel 3`n`nthe reason, written under the score`n"
+$belowRow    = @((Resolve-EntryImpact -EntryText $belowEntry).Rows | Where-Object { $_.Tier -eq 0 })[0]
+Assert-Equal '' ([string]$belowRow.Why) 'below-score: the reason is still NOT the Why -- the gate must keep refusing, or the fold publishes that tier empty'
+Assert-Equal 'the reason, written under the score' ([string]$belowRow.WhyBelowScore) 'below-score: but the text is kept, which is what lets the refusal name the real defect'
+
+$belowFindings = @(Get-EntryScaffoldFindings -EntryText $belowEntry -Wording (Get-EntryScaffoldWording))
+$belowTier     = @($belowFindings | Where-Object { $_.Marker -match 'Tier' })
+Assert-Equal 1 $belowTier.Count 'below-score: the tier is still faulted -- naming it better is not excusing it'
+Assert-True ($belowTier[0].Label -match 'BELOW') 'below-score: and the label says where the text is, rather than that there is none'
+Assert-True ($belowTier[0].Label -match [regex]::Escape($scoreLabel)) 'below-score: naming the line to move it above, so the fix needs no second reading'
+
+# THE OTHER HALF, and the reason this is two asserts rather than one: an entry with nothing written must
+# STILL say 'no reason'. A change that renamed both cases to the same thing would pass a test that only
+# checked the new wording, and would have thrown away the distinction it was built to make.
+$emptyTierEntry = "### Significance`n`n#### Tier 0`n`n$scoreLabel 3`n"
+$emptyTierFind  = @(@(Get-EntryScaffoldFindings -EntryText $emptyTierEntry -Wording (Get-EntryScaffoldWording)) |
+    Where-Object { $_.Marker -match 'Tier' })
+Assert-Equal 1 $emptyTierFind.Count 'empty tier: still one finding'
+Assert-Equal 'a tier with no reason' $emptyTierFind[0].Label 'empty tier: and it still reads as missing -- the two cases stay apart'
+
+# THE FALSE-FINDING GUARD, which is why the filtering is one shared helper rather than two copies. The
+# templates put guidance comments in the section, and a comment sitting under the score is this format's
+# own prose -- counted as a misplaced reason it would accuse an entry nobody has written in yet of having
+# put its answer in the wrong place, on every consumer, from the first branch.
+$commentBelow = "### Significance`n`n#### Tier 1`n`n$scoreLabel`n<!-- Why does this matter to a colleague? -->`n"
+$commentRow   = @((Resolve-EntryImpact -EntryText $commentBelow).Rows | Where-Object { $_.Tier -eq 1 })[0]
+Assert-Equal '' ([string]$commentRow.WhyBelowScore) 'guidance below the score is this format''s prose, not a misplaced reason'
+
+# THE RELEASE GATE READS THE SAME ROW, so it carried the same misdiagnosis -- and it is the worse place to
+# meet it: a cut happens days later, when whoever wrote the entry is not the one reading the refusal.
+$belowRanked = "### Significance`n`n#### Tier 0`n`nabove, correctly`n`n$scoreLabel 2`n`n" +
+               "#### Tier 1`n`n$scoreLabel 3`n`nthe colleague-facing reason, one line too low`n"
+$belowRankFindings = @(Get-EntryImpactFindings -EntryText $belowRanked)
+Assert-Equal 1 $belowRankFindings.Count 'below-score: the ranking gate reports the tier once'
+Assert-True ($belowRankFindings[0] -match 'BELOW') 'below-score: and names the placement rather than asking for a Why that is already written'
+
+# THE LEGACY TABLE SHAPE CANNOT CARRY THE PROPERTY, so both gates ask before reading it. Without that guard
+# every pre-section entry -- and CHANGELOG.md is full of them -- would throw on a property that is not there.
+$tableNoWhy = "### Significance`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 3 | |`n"
+$tableRow   = @((Resolve-EntryImpact -EntryText $tableNoWhy).Rows | Where-Object { $_.Tier -eq 1 })[0]
+Assert-Equal $null $tableRow.PSObject.Properties['WhyBelowScore'] 'table shape: carries no WhyBelowScore -- there is no score LINE to be below'
+$tableFindings = @(Get-EntryImpactFindings -EntryText $tableNoWhy)
+Assert-Equal 1 $tableFindings.Count 'table shape: still reported'
+Assert-True ($tableFindings[0] -match "no 'Why'") 'table shape: and in its own wording, which the new branch must not have swallowed'
+
 Write-Host "Stripping the declaration for the documents that travel outward" -ForegroundColor Cyan
 $sigBlock = (Format-EntryBlock -Branch 'feat/t' -Description 'T' -Type 'feat' -Body 'body text' -ImpactRows $sigRows) -join "`n"
 $sigStripped = Remove-EntrySignificanceDeclaration -EntryText $sigBlock

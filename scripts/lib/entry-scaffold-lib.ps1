@@ -1056,10 +1056,50 @@ function Format-EntryImpactTable {
     return $lines
 }
 
+function Get-EntryTierReasonText {
+    <#
+        Private: the author's own reason out of a tier section's raw lines -- this format's guidance
+        comments and its retired routing questions removed, whatever survives trimmed.
+
+        THE GUIDANCE AND THE ROUTING QUESTION ARE THIS FORMAT'S OWN PROSE, not the author's answer, so
+        neither may become the Why -- it would otherwise be published as the reason the change matters.
+
+        BOTH FORMS ARE FILTERED. They are HTML comments since August 6, 2026 (stripped here by the shared
+        remover), and they were bare prose before that -- so an entry written on either side of that change
+        reads back the same. Same "recognise both" rule the three declaration shapes get.
+
+        AND BOTH LINE-BREAKINGS OF THEM. The questions became two-line arrays when the dossier form fixed
+        the comment width, so the one-line sentences they replaced no longer appear in the wording at all --
+        and an entry carrying one as bare prose would have had this repo's own form text read back as the
+        author's reason and published as it. @() flattens the arrays into individual lines, which is exactly
+        the granularity the comparison needs.
+
+        ONE HELPER FOR BOTH SIDES OF THE SCORE LINE, and that is why it exists rather than staying inline
+        (inbound #596). Read-EntryTierSections collects the lines above '**Score:**' into Why and the lines
+        below it into WhyBelowScore, and both need exactly the filtering above: a guidance comment sitting
+        below the score would otherwise read back as a misplaced reason, and the gate would accuse an entry
+        nobody had written in yet of having put its answer in the wrong place -- on every consumer, from
+        their first branch. Two copies of the filter is how that divergence starts.
+    #>
+    param([AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines = @())
+
+    $w = Get-EntrySignificanceWording
+    $routes = @(@($w.Route0) + @($w.Route1) + @($script:EntrySignificanceRetiredRoutes)) |
+        Where-Object { $_ }
+    $text = Remove-EntryHtmlComments -EntryText (@($Lines) -join "`n")
+    return (@(($text -split '\r?\n') | Where-Object {
+        $t = $_.Trim()
+        if (-not $t) { return $false }
+        foreach ($r in $routes) { if ($t -eq ([string]$r).Trim()) { return $false } }
+        return $true
+    }) -join "`n").Trim()
+}
+
 function Read-EntryTierSections {
     <#
         Private: the '#### Tier N' sub-sections in an already-defenced, already-split entry. Returns an
-        object with Rows (the same shape the table produces -- Tier, Score, Why, Raw, Error) and Errors.
+        object with Rows (the shape the table produces -- Tier, Score, Why, Raw, Error -- plus
+        NotApplicable and WhyBelowScore, which only the section shape can carry) and Errors.
         Both empty means the entry carries no sections at all, which is what sends Resolve-EntryImpact on
         to the older shapes.
 
@@ -1109,13 +1149,21 @@ function Read-EntryTierSections {
 
         # The section runs to the next heading of ANY level -- the next tier, the next '###' section, or the
         # next entry. Anything deeper than this level would be a sub-heading of this section and is kept.
+        # TWO LISTS, BECAUSE THE SCORE LINE SPLITS THE SECTION AND ONLY ONE SIDE IS THE REASON. The lines
+        # below '**Score:**' were read and discarded until inbound #596: the loop runs to the next heading
+        # either way, so the text was already in hand at the point the gate said there was none. Keeping it
+        # is what lets the refusal tell "you wrote nothing" apart from "you wrote it one line too low" --
+        # the second is the easy mistake, because the scaffold leaves a single blank line on BOTH sides of
+        # the score and nothing says which one is read.
         $whyLines = New-Object System.Collections.Generic.List[string]
+        $belowScoreLines = New-Object System.Collections.Generic.List[string]
         $scoreCell = $null
         while ($i -lt $Lines.Count) {
             $line = $Lines[$i]
             if ($line -match ('^\s*#{1,' + $script:EntryTierSubLevel + '}\s')) { break }
             if ($null -eq $scoreCell -and $line -match $scoreRx) { $scoreCell = $Matches[1] }
             elseif ($null -eq $scoreCell) { $whyLines.Add($line) }
+            else { $belowScoreLines.Add($line) }
             $i++
         }
 
@@ -1152,34 +1200,24 @@ function Read-EntryTierSections {
             }
         }
 
-        # The guidance and the routing question are this format's own prose, not the author's answer, so
-        # neither may become the Why -- it would otherwise be published as the reason the change matters.
-        #
-        # BOTH FORMS ARE FILTERED. They are HTML comments since August 6, 2026 (stripped here by the shared
-        # remover), and they were bare prose before that -- so an entry written on either side of that
-        # change reads back the same. Same "recognise both" rule the three declaration shapes get.
-        #
-        # AND BOTH LINE-BREAKINGS OF THEM. The questions became two-line arrays when the dossier form fixed
-        # the comment width, so the one-line sentences they replaced no longer appear in the wording at all
-        # -- and an entry carrying one as bare prose would have had this repo's own form text read back as
-        # the author's reason and published as it. @() flattens the arrays into individual lines, which is
-        # exactly the granularity the comparison below needs.
-        $w = Get-EntrySignificanceWording
-        $routes = @(@($w.Route0) + @($w.Route1) + @($script:EntrySignificanceRetiredRoutes)) |
-            Where-Object { $_ }
-        $whyText = Remove-EntryHtmlComments -EntryText (@($whyLines) -join "`n")
-        $why = (@(($whyText -split '\r?\n') | Where-Object {
-            $t = $_.Trim()
-            if (-not $t) { return $false }
-            foreach ($r in $routes) { if ($t -eq ([string]$r).Trim()) { return $false } }
-            return $true
-        }) -join "`n").Trim()
+        # What the filtering itself is for, and why it is a shared helper, is written at
+        # Get-EntryTierReasonText -- the reasoning moved there with the code, so whoever edits it next
+        # reads it rather than finding it at a call site.
+        $why = Get-EntryTierReasonText -Lines @($whyLines)
+
+        # WhyBelowScore is diagnosis, never content. Nothing publishes it and nothing counts it as an
+        # answer -- the gates read it only to name the actual defect, and the reason still has to move
+        # above the score line before the entry passes. Additive, so every existing reader keeps taking
+        # the properties it already names; the legacy table path below sets no such property at all,
+        # which is why both gates ask whether it is there before reading it.
+        $whyBelowScore = Get-EntryTierReasonText -Lines @($belowScoreLines)
 
         $rows.Add([pscustomobject]@{
             Tier          = $tier
             Score         = $score
             NotApplicable = $notApplicable
             Why           = $why
+            WhyBelowScore = $whyBelowScore
             Raw           = $raw
             Error         = $null
         })
@@ -1195,6 +1233,10 @@ function Resolve-EntryImpact {
           Table     $true when an impact table was found outside fenced code.
           Rows      one object per data row -- Tier (int), Score (int, 0 when the cell is empty or '-'),
                     Why (string, '' when empty), Raw (the row as written), Error ($null or the reason).
+                    From the section shape only, two more: NotApplicable, and WhyBelowScore -- text found
+                    UNDER the score line, which is a misplaced reason rather than an answer. A caller that
+                    reads either must ask whether the property is there: the table and 'Tier: N' shapes
+                    cannot produce them.
           Tier      the highest tier any row declares -- the entry's reach, and the same number the old
                     'Tier: N' line carried. 0 when nothing usable is declared, so a caller that ignores
                     Error still fails safe towards the harmless end rather than crashing.
@@ -1409,7 +1451,16 @@ function Get-EntryImpactFindings {
             continue
         }
         if (-not $row[0].Why) {
-            $findings += "tier $tier scores $($row[0].Score) with no 'Why' -- fill in the third column. The rubric says which band; the why says why THIS change is in it, and that is the half a later reader can check."
+            # THE SAME MISDIAGNOSIS LIVES HERE, and this gate is the one that refuses a RELEASE. #596 was
+            # reported against the scaffold gate, but the emptiness is read from the same row, so a reason
+            # written below its score reaches the cut with the same unactionable wording -- days later,
+            # when whoever wrote it is no longer the one reading the refusal.
+            $below = if ($row[0].PSObject.Properties['WhyBelowScore']) { [string]$row[0].WhyBelowScore } else { '' }
+            if ($below) {
+                $findings += "tier $tier scores $($row[0].Score) and its reason sits BELOW the $($script:EntryScoreLabel) line, where nothing reads it -- move the text above that line. Everything up to the score is the reason; everything after it is discarded."
+            } else {
+                $findings += "tier $tier scores $($row[0].Score) with no 'Why' -- fill in the third column. The rubric says which band; the why says why THIS change is in it, and that is the half a later reader can check."
+            }
         }
     }
     return $findings
@@ -2678,8 +2729,20 @@ function Get-EntryScaffoldFindings {
         foreach ($row in @($impact.Rows)) {
             if ($row.Error) { continue }
             if (-not $row.Why) {
+                # A REASON ON THE WRONG SIDE OF THE SCORE IS NOT A MISSING REASON (inbound #596), and
+                # saying which of the two it is IS the repair. The refusal is correct either way -- the
+                # fold would publish that tier empty -- but 'no reason' is the one thing an author looking
+                # at three written paragraphs can see is untrue, so the natural next move is to distrust
+                # the gate rather than to move the text. Measured there: three tiers, all three answered,
+                # all three reported as unanswered, and it took reading this file line by line to find out
+                # why. The data to tell them apart was already in hand; it just was not being kept.
+                $below = if ($row.PSObject.Properties['WhyBelowScore']) { [string]$row.WhyBelowScore } else { '' }
                 $findings += [pscustomobject]@{
-                    Label  = 'a tier with no reason'
+                    Label  = if ($below) {
+                        "a tier whose reason sits BELOW its $($script:EntryScoreLabel) line -- move it above"
+                    } else {
+                        'a tier with no reason'
+                    }
                     Marker = ('#' * $script:EntryTierSubLevel) + " $($script:EntryTierSubPrefix) $([int]$row.Tier)"
                 }
             }
