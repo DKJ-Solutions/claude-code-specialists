@@ -171,6 +171,94 @@ $outCrlf = Update-PrBodySection -Body $crlf -Heading '## What does this change d
 Assert-True ($outCrlf.Contains("`r`n")) 'a CRLF body stays CRLF'
 Assert-True (-not ($outCrlf -match "[^`r]`n")) 'and gains no bare LF line endings'
 
+# --- -StopAtHeading: an H1 description must not swallow the form below it (inbound #598) -----------
+Write-Host "-StopAtHeading (the H1 description's missing boundary)" -ForegroundColor Cyan
+# THE MEASURED FAILURE. Since the PR template was promoted to an H1, the description heading is level 1 --
+# and "the next heading at the same level or shallower" can only ever match another H1. So every '##'
+# section below it was inside the description, and -RefreshBody replaced the lot while reporting that it
+# had updated the description. A consumer lost its one repo-specific section, heading, guidance comment and
+# a ticked checkbox, on every run, on a repo whose CLAUDE.md requires that box to be answered before merge.
+$h1Body = @'
+# What does the change on this branch bring to main?
+
+The old description.
+
+## Preview - specific to this repo
+
+<!-- Tick one before merging. -->
+- [x] n/a - this branch touches no theme file
+'@
+$h1Heading = '# What does the change on this branch bring to main?'
+$h1Stop    = '## Preview - specific to this repo'
+
+# First the defect itself, asserted so nobody "simplifies" the parameter away later: WITHOUT the stops the
+# old behaviour is still there, and it is still wrong. This assert is the bug, kept executable.
+$changed = $false
+$unbounded = Update-PrBodySection -Body $h1Body -Heading $h1Heading -Content 'The new description.' -Changed ([ref]$changed)
+Assert-True ($unbounded -notmatch 'Preview - specific') 'H1: the level rule ALONE still loses the section -- which is why the boundary has to be passed in'
+
+$changed = $false
+$bounded = Update-PrBodySection -Body $h1Body -Heading $h1Heading -Content 'The new description.' -StopAtHeading @($h1Stop) -Changed ([ref]$changed)
+Assert-True ($bounded -match 'The new description\.')       'H1: the description is replaced'
+Assert-True ($bounded -notmatch 'The old description\.')    'H1: and the old text is gone'
+Assert-True ($bounded -match [regex]::Escape($h1Stop))      'H1: while the form section below it survives -- the whole point'
+Assert-True ($bounded -match '\[x\] n/a')                   'H1: including the answer somebody had ticked by hand'
+Assert-True ($bounded -match 'Tick one before merging')     'H1: and its guidance comment'
+Assert-True $changed                                        'H1: and the edit is reported, so it is actually sent'
+
+# NARROWING ONLY, which is what makes the parameter safe to add to a function three paths already call.
+# Passing nothing, passing an empty list, and passing a heading the body does not contain must all be
+# byte-identical to the behaviour before this parameter existed.
+$base = Update-PrBodySection -Body $deepBody -Heading '## What does this change do?' -Content 'Replacement.'
+Assert-Equal $base (Update-PrBodySection -Body $deepBody -Heading '## What does this change do?' -Content 'Replacement.' -StopAtHeading @()) 'narrowing-only: an empty stop list changes nothing'
+Assert-Equal $base (Update-PrBodySection -Body $deepBody -Heading '## What does this change do?' -Content 'Replacement.' -StopAtHeading @('## Nowhere in this body')) 'narrowing-only: a stop heading the body lacks changes nothing'
+Assert-Equal $base (Update-PrBodySection -Body $deepBody -Heading '## What does this change do?' -Content 'Replacement.' -StopAtHeading @('', '   ', $null)) 'narrowing-only: blank entries in the list are ignored rather than matching a blank line'
+
+# THE ORIGINAL REASONING MUST STILL HOLD, and this is the assert that stops the fix overshooting into
+# "stop at the next heading of any kind": a description legitimately contains its own deeper headings, and
+# stopping at the first of those would strand half the old description below the new one.
+$changed = $false
+$nested = Update-PrBodySection -Body $deepBody -Heading '## What does this change do?' -Content 'Replacement.' -StopAtHeading @('## Type of change') -Changed ([ref]$changed)
+Assert-True ($nested -notmatch 'An old sub-heading')  'stops: a deeper heading that is NOT a stop is still part of the section'
+Assert-True ($nested -notmatch 'Old detail')          'stops: and so is the text under it'
+Assert-True ($nested -match '(?m)^- \[x\] `feat/`')   'stops: while the named stop section is kept'
+
+# Fence-aware like every other boundary here: a description explaining the form quotes the form's headings.
+$fencedStop = "# Desc`n`nExplaining the form:`n`n``````text`n$h1Stop`n``````" + "`n`nStill description.`n`n$h1Stop`n`n- [x] done`n"
+$changed = $false
+$outFencedStop = Update-PrBodySection -Body $fencedStop -Heading '# Desc' -Content 'New desc.' -StopAtHeading @($h1Stop) -Changed ([ref]$changed)
+Assert-True ($outFencedStop -notmatch 'Still description') 'stops: a quoted stop heading inside a fence is not the boundary'
+Assert-True ($outFencedStop -match '\[x\] done')           'stops: the real section after the fence is still kept'
+
+# The earliest boundary wins, whichever kind it is -- so a same-level heading before a named stop still ends
+# the section, and a named stop before a same-level heading does too.
+$order = "# Desc`n`nold`n`n## Stop B`n`nb`n`n# Another H1`n`nc`n"
+$outOrder = Update-PrBodySection -Body $order -Heading '# Desc' -Content 'new' -StopAtHeading @('## Stop B')
+Assert-True ($outOrder -match '(?m)^## Stop B')     'earliest boundary: the named stop wins when it comes first'
+Assert-True ($outOrder -match '(?m)^# Another H1')  'earliest boundary: and the later H1 is untouched'
+
+# --- Get-LostBodyHeadings: a section loss is said out loud (inbound #598) --------------------------
+Write-Host "Get-LostBodyHeadings (the tripwire for a silent section loss)" -ForegroundColor Cyan
+Assert-Equal 1 @(Get-LostBodyHeadings -Before $h1Body -After $unbounded).Count 'a swallowed section is reported as lost'
+Assert-Equal $h1Stop @(Get-LostBodyHeadings -Before $h1Body -After $unbounded)[0] 'and the finding names it, which is what the reporter could not get from the output'
+Assert-Equal 0 @(Get-LostBodyHeadings -Before $h1Body -After $bounded).Count 'the FIXED refresh loses nothing -- so this stays quiet in the normal case'
+
+# A SHORTER BODY IS NOT A LOST SECTION, which is the whole reason the subject is headings rather than size.
+# Every refresh whose new description is shorter than the old one shrinks the body, and a rule that fired on
+# that would be switched off inside a week.
+$shorter = Update-PrBodySection -Body $h1Body -Heading $h1Heading -Content 'Tiny.' -StopAtHeading @($h1Stop)
+Assert-True ($shorter.Length -lt $h1Body.Length) 'a shorter description really does shrink the body'
+Assert-Equal 0 @(Get-LostBodyHeadings -Before $h1Body -After $shorter).Count 'and that is not reported -- the subject is a missing heading, not a smaller body'
+
+# Fence-aware on both sides, so a heading only ever QUOTED in the old body is not mourned as lost.
+$quoted = "# Desc`n`n``````text`n## Never a real section`n``````" + "`n"
+Assert-Equal 0 @(Get-LostBodyHeadings -Before $quoted -After "# Desc`n`nnew").Count 'a heading that was only quoted inside a fence was never a section'
+
+# The degenerate inputs, since this runs immediately before a live 'gh pr edit'.
+Assert-Equal 0 @(Get-LostBodyHeadings -Before '' -After '').Count 'two empty bodies lose nothing'
+Assert-Equal 0 @(Get-LostBodyHeadings -Before 'no headings at all' -After '').Count 'a body with no headings cannot lose one'
+Assert-Equal 1 @(Get-LostBodyHeadings -Before "## Only`ntext" -After '').Count 'and losing everything is still one lost heading, not a crash'
+
 # --- Get-PrTitle: the PR title is composed, not typed (#506 + #505) -------------------------------
 # The whole point of the change is that these two facts cannot drift apart, so the asserts are about
 # COMPOSITION and about the shapes that would produce a nameless or malformed PR.
@@ -328,7 +416,15 @@ Assert-True ($matched.Count -ge 1) 'open-pr recognises the template placeholder 
 # of the whole feature, worded as a decision. This assert is what would have caught that.
 $firstHeading = @($templateLinesForTest | Where-Object { $_ -match '^#{1,6}\s+\S' }) | Select-Object -First 1
 Assert-True ([bool]$firstHeading) 'the template has a heading for the description to live under'
-Assert-True ($openPrText -match "Where-Object \{ \`$_ -match '\^#\{1,6\}\\s\+\\S' \}") 'and open-pr looks for it at any level, not just H2'
+# KEYED ON THE PATTERN, NOT ON HOW THE LINES ARE ENUMERATED. This asserted the whole
+# "Where-Object { $_ -match ... }" expression until inbound #598 made the read fence-aware and multi-heading,
+# at which point a correct change failed a test that was watching the wrapper instead of the rule. The rule
+# is that the level is not fixed; the loop around it is open-pr's business.
+Assert-True ($openPrText -match "'\^#\{1,6\}\\s\+\\S'") 'and open-pr looks for it at any level, not just H2'
+# THE SECOND HALF OF THE SAME READ (inbound #598): the headings AFTER the first are the description's
+# boundary, and open-pr must pass them on. Without this the H1 description has no boundary at all and every
+# later section is replaced along with it -- which is exactly what shipped.
+Assert-True ($openPrText -match 'StopAtHeading \$templateStops') 'and it hands the template''s later headings to the section writer as the boundary'
 
 # THE FALLBACK THAT KEEPS OLDER PRs REFRESHABLE. -RefreshBody targets whatever heading the template
 # names today; a PR opened before a rename carries the previous one in its published body, and

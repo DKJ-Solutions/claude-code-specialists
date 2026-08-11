@@ -707,11 +707,28 @@ if ($existingPr) {
         # nothing, and -RefreshBody would have degraded to its warning branch on every run -- a silent
         # loss of the whole feature, reported as "the description was left as it is", which reads like a
         # decision rather than a miss.
+        # AND EVERY LATER HEADING IS THE BOUNDARY (inbound #598). Taking only the first heading was half
+        # the read: the description ends where the form's next section begins, and that answer is in the
+        # same file, one pass, no new seam. Without it an H1 description has no reachable boundary at all
+        # -- Update-PrBodySection stops at "the same level or shallower", nothing is shallower than an H1,
+        # and every '##' section below it was replaced along with the description. A consumer lost the one
+        # section its template is still kept for, on every run, reported as a successful description edit.
+        #
+        # Fence-aware, like every other reader of markdown here: a template explaining its own shape can
+        # quote a heading inside a fence, and that is a quotation rather than a section.
         $descHeading = ''
+        $templateStops = @()
         $templateForHeading = Join-Path $repoRoot ".github\pull_request_template.md"
         if (Test-Path -LiteralPath $templateForHeading) {
-            $descHeading = (Get-Content -LiteralPath $templateForHeading -Encoding UTF8 |
-                Where-Object { $_ -match '^#{1,6}\s+\S' } | Select-Object -First 1)
+            $tplFence = $false
+            $tplHeadings = @(Get-Content -LiteralPath $templateForHeading -Encoding UTF8 | ForEach-Object {
+                if ($_ -match '^\s*(```|~~~)') { $tplFence = -not $tplFence; return }
+                if (-not $tplFence -and $_ -match '^#{1,6}\s+\S') { $_.TrimEnd() }
+            })
+            if ($tplHeadings.Count -gt 0) {
+                $descHeading = $tplHeadings[0]
+                if ($tplHeadings.Count -gt 1) { $templateStops = @($tplHeadings[1..($tplHeadings.Count - 1)]) }
+            }
         }
         if (-not $descHeading) {
             Write-Warning "-RefreshBody: no heading found in .github/pull_request_template.md - the description was left as it is."
@@ -721,7 +738,7 @@ if ($existingPr) {
             Write-Warning "-RefreshBody: $($entryPath.Substring($repoRoot.Length).TrimStart('\', '/')) has no description under its '###' heading - the PR description was left as it is."
         } else {
             $refreshed = $false
-            $newBody = Update-PrBodySection -Body $newBody -Heading $descHeading -Content $entryDescription -Changed ([ref]$refreshed)
+            $newBody = Update-PrBodySection -Body $newBody -Heading $descHeading -Content $entryDescription -StopAtHeading $templateStops -Changed ([ref]$refreshed)
 
             # THE HEADING THIS PR WAS OPENED UNDER MAY PREDATE THE ONE THE TEMPLATE NOW CARRIES (#538).
             # $descHeading is read from the template, which is right for every PR opened since; a PR
@@ -743,7 +760,10 @@ if ($existingPr) {
                     '## What does this change do?',
                     '## Wat doet deze wijziging?')) {
                     if ($legacyHeading -eq $descHeading.Trim()) { continue }
-                    $newBody = Update-PrBodySection -Body $newBody -Heading $legacyHeading -Content $entryDescription -Changed ([ref]$refreshed)
+                    # The stops travel to this path too. A legacy H2 description is bounded by the level
+                    # rule against another H2, but not against a DEEPER form section -- and being narrowing
+                    # only, passing them cannot make an old-heading PR refresh any less than it does today.
+                    $newBody = Update-PrBodySection -Body $newBody -Heading $legacyHeading -Content $entryDescription -StopAtHeading $templateStops -Changed ([ref]$refreshed)
                     if ($refreshed) { $descHeading = $legacyHeading; break }
                 }
             }
@@ -763,6 +783,23 @@ if ($existingPr) {
         if (-not $newBody -or -not $newBody.Trim()) {
             Write-Error "PR #$($existingPr.number) body assembly produced empty text - nothing was sent. The branch is pushed and the PR is open; the body on GitHub is unchanged."
             exit 1
+        }
+
+        # A LOST SECTION IS SAID OUT LOUD (inbound #598). The empty-body guard above catches losing
+        # everything; this catches losing a PART, which is how #598 stayed invisible -- $edits reported
+        # "the description" while a whole section had gone with it, and it took a 'gh pr view' days later
+        # to notice. The rule and the reasoning are in Get-LostBodyHeadings; what is decided HERE is what
+        # to do about it.
+        #
+        # A WARNING RATHER THAN A REFUSAL, deliberately. The body is a file its author may have edited by
+        # hand on github.com, and refusing would leave the branch pushed with the PR body stale and no way
+        # through except editing on the site. Named and loud is what the reporter could not get; blocked
+        # is more than they asked for.
+        $lostHeadings = @(Get-LostBodyHeadings -Before $currentBody -After $newBody)
+        if ($lostHeadings.Count -gt 0) {
+            Write-Warning ("PR #$($existingPr.number): $($lostHeadings.Count) section(s) present in the body are NOT in the version about to be sent:`n" +
+                (($lostHeadings | ForEach-Object { "  - $_" }) -join "`n") +
+                "`nThe body on GitHub is replaced anyway - check it after this run, and reinstate anything that was answered by hand.")
         }
         $editFile = Join-Path ([System.IO.Path]::GetTempPath()) "open-pr-body-edit-$PID.md"
         [System.IO.File]::WriteAllText($editFile, $newBody, (New-Object System.Text.UTF8Encoding $false))
