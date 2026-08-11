@@ -202,8 +202,12 @@ thing a person waits on. A proposal that shortens the first is worth close to no
 needs no code at all. The counterweight is recorded and belongs to Dave: `plugin.json`'s version is one of
 the two update gates, so releasing less often is delivering later.
 
-**THE NEXT RELEASE OWES THREE NUMBERS, and the first is a gap Nolan left himself** (August 11, 2026). All
-three are counting, not building.
+**THREE NUMBERS WERE OWED, AND TWO WERE ANSWERED ON THE DAY THEY WERE ASKED FOR** (August 11, 2026; the
+list was written that morning as *"the next release owes three numbers, and the first is a gap Nolan left
+himself"*). All three are counting, not building — which is why two of them closed inside a day and the
+third is still open: it is the only one whose answer is a decision rather than a count. The original wording
+is kept above rather than replaced, because a list of open questions is worth something only while it says
+when each one was opened.
 
 1. **ANSWERED at `v4.4.0`, August 11, 2026: a release takes 28m 03s, and 15m 44s of that is gates.** Clock
    started at 10:24:11 before the cut and stopped at 10:52:14 when the Release was published; every leg came
@@ -234,10 +238,46 @@ three are counting, not building.
    retroactively. The portable half of that lesson is in
    [Nolan's manual](../../../plugins/teams/team-alpha/manuals/06-25-manual.md) under *report in the unit the
    question was asked in*.
-2. **Which of the 30 suites can change behaviour on a markdown-only diff?** (Proposed August 10, 2026, not
-   approved.) If the answer is few, the second local run has room; if it is "most of them", it does not —
-   several suites read documents rather than scripts, so "markdown-only, therefore skip" is exactly the sort
-   of assumption this repo has been bitten by. Count before proposing.
+2. **ANSWERED August 11, 2026: 9 of the 30 suites can change behaviour on a markdown-only diff — so
+   "markdown-only, therefore skip the second local run" does not hold in this repo.** Measured over all 30
+   files in `scripts/tests/*.tests.ps1` (count confirmed: exactly 30), and every one of the 30 resolved with
+   a cited line rather than a guess: **9** read this repo's own real markdown for content and can flip on a
+   docs-only diff; **21** build and read only their own fixtures in a temp directory and cannot; **0** were
+   undecidable from the source.
+
+   The nine, each with the evidence that makes it a measurement rather than an opinion:
+
+   | suite | what real markdown it reads |
+   |---|---|
+   | `agent-shared.tests.ps1` | recursively enumerates every real `*-agent.md` and `*-persona.md` and asserts the shared-block marker is present in each |
+   | `bootstrap-drift.tests.ps1` | reads the real `01-01-persona.md` for a retired heading, and asserts the real `specialists-init/SKILL.md` names every persona id on disk |
+   | `cut-release-guardrail.tests.ps1` | `git ls-files -- '*.md'` — the real tracked-markdown list — held against `cut-release.ps1`'s reserved-root allowlist, so a new root `.md` file can fail it |
+   | `pr-body.tests.ps1` | the real `.github/pull_request_template.md` and the shipped reference template held byte for byte |
+   | `repo-config.tests.ps1` | the real root `CHANGELOG.md` for retired section headings, and `Get-MojibakePaths` against the real repo root |
+   | `teardown-protocol.tests.ps1` | extracts a `Where-Object` from the real `specialists-teardown/SKILL.md` and executes it — its own docstring says outright that rewriting the doc turns the suite red |
+   | `script-contract.tests.ps1` | the real `cut-release/SKILL.md`, asserting its text contains `Get-LiveStage` |
+   | `shared-scripts.tests.ps1` | copies the real `.github/pull_request_template.md` into a fixture and asserts every comment line was substituted and no checkbox survives |
+   | `release-lib.tests.ps1` | the real `releases/README.md` via `Get-ReleaseHistoryPath`, asserting the overview targets major `'4'` — the live pin `CLAUDE.md` already records |
+
+   **Two findings worth keeping beside the number.** First, the counter-intuitive result is the one that
+   most needed checking, and it held: `check-plugin-integrity.tests.ps1` — the lint-gate suite, which
+   exercises checks over agent defs, manuals, personas, skill pages and the changelog — is in the 21. Every
+   one of those documents is written by the test into its own fixture; its only use of the real repo root is
+   to copy `.ps1` libraries in. The obvious guess (the lint-gate suite must be one of the ones that reads
+   real docs) pointed at the wrong nine. Second, `release-lib.tests.ps1`'s major pin and the stale tier table
+   in `releases/README.md` sit in the same file but different parts — the pin reads the `#### 4.x` heading
+   and the table under it, not the tier table — so repairing that table would not trip the assert. Worth
+   stating for whoever opens that repair.
+
+   **The time figure carries its own caveat, by the rule directly above applied to itself.** The nine, run
+   standalone, came to **108.6s measured for nine suites invoked individually** — an upper bound, not a
+   share of the gate: nine separate PowerShell process starts, against 231s for all thirty inside one
+   process. It is not reported as a percentage of the gate, because doing so would restate a proxy as the
+   measurement.
+
+   For the second local run, that is the finding: on this repo's own 30 suites, a markdown-only diff is not
+   safe to treat as script-free. Whether any run is dropped, skipped, or made conditional on that basis is a
+   change to this repo's safety rules and is Dave's call, not a conclusion of this measurement.
 3. **The cadence, against the fixed cost.** 16 releases in the 10 days to August 10, 2026, each carrying
    ~17 minutes of gate time that does not shrink with the number of entries in it. Batching is a lever
    needing no code; the counterweight is Dave's and it is real — `plugin.json`'s version is one of the two
