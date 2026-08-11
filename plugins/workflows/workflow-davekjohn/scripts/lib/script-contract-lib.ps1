@@ -285,7 +285,15 @@ $script:ContractRecords = @(
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseConsumerBumps'; Scripts = @('cut-release');
        Adopt = 'decide'; AdoptWhy = 'it declares that this repo wants a stakeholder-facing document at all, and for which bumps. Whether there is an audience outside the developers is a fact about the organisation around the repo, which no script can read from the tree';
        Optional = $true; Default = 'no consumer tier at all';
-       Returns = "the bump types that also get a stakeholder-facing consumer document (releases/consumer/<dir>/<X.Y.Z>.md, markdown only), e.g. @('minor','major'); @() switches the tier off, which is what the cut did before this knob existed. The document is the release's TIER-2 entries, so it is only written when there are some. The retired name Get-ReleaseHighlightsBumps is still read as a fallback" },
+    # THE QUESTION THIS KNOB ASKS CHANGED IN v4.3.0 WHILE ITS VALUES STAYED VALID (inbound #605), which is
+    # why nothing reported the drift: the contract check compares which functions exist against which are
+    # requested, and this record's TEXT was the only thing that was wrong. Under the two-document model
+    # @() meant "no consumer document", harmless for a repo whose tier 2 was always empty. Under the one
+    # -document model it means "no hand-written document at all" -- so the same value now switches off the
+    # only note the release gets. A consumer reading the old text was told the opposite of what it does,
+    # and adopt-config places this text VERBATIM into their own repo-config, so being wrong shipped as
+    # their own committed documentation.
+       Returns = "the bump types that get the hand-written release note (releases/notes/<dir>/<X.Y.Z>.md, markdown only), e.g. @('minor','major'); @() switches the tier off, and since v4.3.0 that means those bumps get NO hand-written document at all rather than merely no consumer half. ONE document with a named section per reader, not two: this knob decides WHETHER it is written, while the release's tier-2 entries decide whether that document gets a consumer section. The retired name Get-ReleaseHighlightsBumps is still read as a fallback" },
     # Get-ReleaseHighlightsStakeholderTypes and Get-ReleaseHighlightsWording USED TO BE DECLARED HERE and
     # are gone (August 5, 2026). Both configured the consumer document's "remove before publishing"
     # marker: which branch types to promote above it, and in whose words to label it. That marker existed
@@ -309,10 +317,23 @@ $script:ContractRecords = @(
     # strings repo-owned because they were the most visible generated text in the file. What replaced the
     # block is the changelog intro's own one-line pointer to the release history -- hand-written prose in a
     # file the repo owns outright, which is in the repo's language by construction and needs no seam.
+    # TWO WORDING MAPS, FOR TWO DIFFERENT DOCUMENTS, AND THE CANONICAL NAME CHANGED (inbound #605).
+    # cut-release reads Get-ReleaseNoteWording FIRST and falls back to Get-InternalNoteWording, so a repo
+    # carrying only the old name still gets its language -- and therefore never finds out that the name it
+    # should now write is a different one. It works, which is exactly why it was undeclared for two
+    # releases: nothing errs, so nothing asks. Declared now so a consumer is told rather than left on a
+    # fallback, with the honest note that the two maps have DIFFERENT key sets, because they belong to
+    # different documents rather than being two names for one.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseNoteWording'; Scripts = @('cut-release');
+       Adopt = 'copy'; AdoptWhy = 'empty means the English defaults, which is exactly what a consumer gets without the function. Copying puts the (empty) override map in their own file under the name the cut actually looks for first, so a repo whose readers need another language fills in keys rather than discovering English headings in a published document';
+       Optional = $true; Default = 'the English headings and hints, via Get-InternalNoteWording if that is defined';
+       Returns = "overrides for the hand-written release note's own text, merged over the English defaults: Title, AudienceLabel, Audience, SectionConsumers, HintConsumers, SectionValue, HintValue, SectionOpen and HintOpen. NOT the same key set as Get-InternalNoteWording, which belongs to the retired two-document flow -- SectionConsumers and HintConsumers are this document's consumer section and exist nowhere else, while that map's SkeletonNote, SectionChanged, NoEntries and Unknown are read only by new-internal-note.ps1. Overriding by the wrong list configures a flow you are not running" },
+    # STILL DECLARED, AND NOT AS LEGACY TOLERANCE: new-internal-note.ps1 is still shipped for a repo running
+    # the two-document flow, and it reads all eleven keys below. Nothing in THIS repo calls it.
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-InternalNoteWording'; Scripts = @('new-internal-note');
        Adopt = 'copy'; AdoptWhy = 'empty means the English defaults, which is exactly what a consumer gets without the function. Copying puts the (empty) override map in their own file, where a repo whose colleagues read another language fills in the keys it needs';
        Optional = $true; Default = 'the English headings and hints';
-       Returns = "overrides for the internal note's own text, merged over the English defaults: Title, AudienceLabel, Audience, SkeletonNote, SectionChanged, SectionValue, HintValue, SectionOpen, HintOpen, NoEntries and Unknown -- the document is read by this repo's own colleagues, so its language is the repo's rather than the script's" }
+       Returns = "overrides for the internal note's own text, merged over the English defaults: Title, AudienceLabel, Audience, SkeletonNote, SectionChanged, SectionValue, HintValue, SectionOpen, HintOpen, NoEntries and Unknown -- the document is read by this repo's own colleagues, so its language is the repo's rather than the script's. This is new-internal-note.ps1's map, i.e. the two-document flow; cut-release reads Get-ReleaseNoteWording first and only falls back to this one" }
 )
 
 # --- Reachability: is a record's Lib in scope for the script that reads it? (inbound #580) ---------
