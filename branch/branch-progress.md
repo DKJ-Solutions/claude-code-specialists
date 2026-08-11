@@ -10,9 +10,11 @@
 - [x] Repoint the two older paragraphs the measurement supersedes (the "~17 minutes" estimate and the
       three-numbers intro)
 - [x] Write the changelog entry
-- [ ] Copy edit the diff
-- [ ] Open the PR, wait for `lint-en-tests`, merge, fold
+- [x] Copy edit the diff — link targets resolve, table indentation holds inside the numbered list, and
+      the diff is scoped to the three intended files
+- [x] Run the lint gate before pushing (0 errors, 0 findings)
 
 ### Where I left off
 
-Lens and entry are written. Next: the copy edit on the diff, then the PR chain.
+The work is done: the count is recorded in Nolan's lens and the entry is written. The cadence decision
+itself is deliberately left open — it is Dave's, and counting it does not make it.
