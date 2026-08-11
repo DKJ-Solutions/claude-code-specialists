@@ -1,14 +1,13 @@
-## `docs/v4-3-0-release-note` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] Verify the cut's output before pushing: seven forbidden strings, the history row, no consumer file
-- [x] Rewrite the consumer section against the seven tests, migration first
-- [x] Write "what it is worth" -- the material a consumer section may not carry
-- [x] Write "what was still open" as a snapshot, including the wart found while writing
-- [x] Delete the three guidance comments
-
-### Where I left off
-
-Done. Publishing the GitHub Release is the step after the merge: body = the generated file, attachments =
-the development notes and this document.
+_(filled in when a branch is created)_
