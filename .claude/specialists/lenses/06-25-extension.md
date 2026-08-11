@@ -182,7 +182,7 @@ application to profile: what costs time is what runs before work is allowed to l
 | `check-plugin-integrity.ps1` (26 checks) | seconds | before every push, and inside the cut |
 | the 30 test suites (210 asserts) | **205–232s** | inside `cut-release`, inside `open-pr`, and again in CI |
 | CI `lint-en-tests` | **8m41s–8m42s**, four runs | every PR; blocks the merge |
-| a full release, end to end | **~30 min** | per release, ~1.6× per day at the August cadence |
+| a full release, end to end | **28m 03s**, measured at `v4.4.0` (August 11, 2026) — all of it blocking | per release, ~1.6× per day at the August cadence |
 
 **Apply the count-the-invocations rule before proposing anything here, because this repo trips it.** The
 same 30 suites run **three times** per release-with-documents — once in the cut, once in `open-pr`, once in
@@ -205,10 +205,28 @@ the two update gates, so releasing less often is delivering later.
 **THE NEXT RELEASE OWES THREE NUMBERS, and the first is a gap Nolan left himself** (August 11, 2026). All
 three are counting, not building.
 
-1. **Time the release end to end** — clock started before the cut, stopped when the Release is published,
-   the duration written into the release document's organisational section. Step 0a of the
-   [`cut-release` skill](../../../plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md) now asks
-   for it. **Why it is first: `v4.3.0` improved the release and produced no post-change figure in minutes.**
+1. **ANSWERED at `v4.4.0`, August 11, 2026: a release takes 28m 03s, and 15m 44s of that is gates.** Clock
+   started at 10:24:11 before the cut and stopped at 10:52:14 when the Release was published; every leg came
+   from a git or CI timestamp rather than from recall. **All 28 minutes blocked a person**, in one serial
+   chain — the only non-blocking cost was the release commit's own CI run on `main` (7m 48s), which finished
+   inside the writing and nobody waited for. The gate share breaks down as 231s of suites inside the cut,
+   200s of the same suites when the note's pull request opened, and 8m 36s of `lint-en-tests` on that pull
+   request, which is **56%** of the release and the only place a real reduction can come from. The full table
+   is in [`releases/notes/4.x/4.4.0.md`](../../../releases/notes/4.x/4.4.0.md).
+
+   **Two cautions travel with the number, and they matter more than it does.** That release carried **two**
+   entries against `v4.2.0`'s seven, so it measures the clock well and the writing gain not at all — less to
+   read is less to write, and nothing here shows the merged-document model is faster than the two-document
+   one. And ~30 min was the figure being reasoned about all along: 28m 03s **confirms** the estimate rather
+   than improving on it, which is the honest reading of a first measurement.
+
+   **What running it exposed: the document cannot time its own publication.** The note is frozen for its
+   pull request while its CI, merge and publish are still running, so the frozen subtotal was 9m 42s of the
+   28m 03s — two thirds of the release unmeasurable from inside the file. Step 0a is split into two passes
+   now, the second adding the total in its own pull request afterwards. Recorded because the instinctive
+   repair — publish the Release earlier — is the wrong one, and is refused in the skill.
+
+   The original reason this was first: **`v4.3.0` improved the release and produced no post-change figure in minutes.**
    The whole cycle ran against *"why does a release take about thirty minutes"*, the hand-written half
    measurably shrank, and the result was reported as **43% fewer words** — a proxy, reported because words
    were what somebody had counted. The gate time *was* re-measured and was unchanged (~13 of the ~30

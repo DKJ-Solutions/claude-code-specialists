@@ -331,6 +331,15 @@ the instance: a whole cycle aimed at the thirty-minute release, improved it, and
 in minutes. See [Nolan #25](06-25-extension.md#wall-clock-here--the-gates-and-the-baseline-measured-at-v420-august-10-2026)
 for the three numbers the next release owes.
 
+**And it takes him TWO passes, because the note is frozen before the Release is published** (measured at
+`v4.4.0`, August 11, 2026 — the first release run under step 0a). At step 4 he writes the clock start, the
+legs he can already read off timestamps, the subtotal to freeze, and which legs blocked a person. After step
+5 he comes back with the total in its own small pull request, because at freeze the note's CI gate, its merge
+and the publish are all still running on the file he is writing. **At `v4.4.0` that unmeasurable tail was two
+thirds of the release** — 9m 42s frozen of **28m 03s** total — so the second pass is not a tidy-up, it is
+most of the answer. The wrong repair, and the first one that suggests itself, is publishing the Release
+earlier; step 5's ordering exists for the attachments and the skill refuses it explicitly.
+
 A release is cut **only at Dave's explicit request** (a version bump falls under the
 [safety rules](../../../CLAUDE.md#safety-rules)) and deliberately does **not go via a branch + PR**. Like the
 fold commit, the release commit is a permitted **direct-on-`main` action** — the **second**
