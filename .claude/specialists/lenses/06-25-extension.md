@@ -181,7 +181,7 @@ application to profile: what costs time is what runs before work is allowed to l
 |---|---|---|
 | `check-plugin-integrity.ps1` (26 checks) | seconds | before every push, and inside the cut |
 | the 30 test suites (210 asserts) | **205–232s** | inside `cut-release`, inside `open-pr`, and again in CI |
-| CI `lint-en-tests` | **8m41s–8m42s**, four runs | every PR; blocks the merge |
+| CI `lint-en-tests` | **median 7m 23s**, range 5m 17s–9m 27s over **63** blocking runs (August 11, 2026) | every PR; blocks the merge |
 | a full release, end to end | **28m 03s**, measured at `v4.4.0` (August 11, 2026) — all of it blocking | per release, ~1.6× per day at the August cadence |
 
 **Apply the count-the-invocations rule before proposing anything here, because this repo trips it.** The
@@ -303,17 +303,43 @@ only while it says when each one was opened.
 
    | release kind | blocking gate cost | what it is made of |
    |---|---|---|
-   | minor / major (carries a document) | **15m 47s** | 231s suites in the cut · 200s the same suites at `open-pr` · 8m 36s `lint-en-tests` on that pull request |
+   | minor / major (carries a document) | **14m 34s** | 231s suites in the cut · 200s the same suites at `open-pr` · **443s** median `lint-en-tests` on that pull request |
    | patch (no document, no pull request) | **3m 51s** | the 231s cut suites alone |
 
-   Every leg is cited from [`releases/notes/4.x/4.4.0.md`](../../../releases/notes/4.x/4.4.0.md), which
-   took them from git and CI timestamps. **The 7m 48s CI run on the release commit is excluded** because it
-   blocks nobody. **And a 3-second discrepancy is left standing rather than smoothed**: that note states
-   *15m 44s* of gates while its own three components sum to *15m 47s*. The components are what were
-   measured separately, so the components are what is used here.
+   The two local legs are cited from [`releases/notes/4.x/4.4.0.md`](../../../releases/notes/4.x/4.4.0.md),
+   which took them from git timestamps. **The 7m 48s CI run on the release commit is excluded** because it
+   blocks nobody.
 
-   **Priced at that cost, the window's 16 releases spent 3h 48m 40s of blocking gate time in 10 days —
-   22.9 minutes per day.** One caveat travels with that figure and does not weaken it: **nine of the
+   **THE CI LEG IS A DISTRIBUTION, AND WRITING IT AS ONE RUN WAS THE MISTAKE THIS ENTRY EXISTS TO CORRECT**
+   (August 11, 2026, hours after the count above was first recorded). It was written as `v4.4.0`'s **8m 36s**
+   — correctly cited, and unrepresentative. The very next pull request came in at **6m 25s**, 25% below it,
+   which prompted counting the population instead of collecting a second anecdote. Over every successful run
+   of `ci.yml`:
+
+   | runs | n | min | median | p90 | max |
+   |---|---|---|---|---|---|
+   | `pull_request` — the blocking one | **63** | 5m 17s | **7m 23s** | 8m 36s | 9m 27s |
+   | `push` — blocks nobody | 134 | 5m 03s | 7m 16s | 8m 33s | 9m 24s |
+
+   **`v4.4.0`'s run sits exactly on the p90.** So the figure first recorded here was the slow tail presented
+   as the fixed cost, and the 6m 25s that exposed it was not an outlier at all — it falls between the minimum
+   and the median. The two distributions are near-identical, which says this is **runner variance rather than
+   anything about the event type**, and it removes the tempting explanation that a docs-only diff runs faster.
+   The median is what the model uses; the range is kept beside it because a cost with a 4m 10s spread should
+   never again be quoted as a point.
+
+   **The local legs have spread too, and it is not yet counted.** Three observations exist — 231s in the cut,
+   200s and 226s at `open-pr` — so they are an n=1 and an n=2 standing next to an n=63. They are left as
+   measured rather than silently averaged: their spread is smaller in absolute terms, and inventing a
+   distribution from two points would repeat, at smaller scale, exactly the error this entry corrects.
+
+   **One caveat inherited from the superseded figure is kept.** `v4.4.0`'s note states *15m 44s* of gates
+   while its own three components sum to *15m 47s* — a 3-second discrepancy, left standing rather than
+   smoothed. It no longer affects the model, since that total is not what is used here, but it is a live note
+   about that document's internal arithmetic.
+
+   **Priced at that cost, the window's 16 releases spent 3h 31m 38s of blocking gate time in 10 days —
+   21.2 minutes per day.** One caveat travels with that figure and does not weaken it: **nine of the
    sixteen predate August 7**, when `fix/release-runs-the-suites` (#514) made the cut run the suites, so
    their *historical* bill was lower. This is a re-pricing of past volume at today's cost, which is the
    only pricing a decision about future cadence can use — not a reconstruction of what was actually paid.
@@ -325,18 +351,24 @@ only while it says when each one was opened.
 
    | cadence | releases | gate time /10 days | saves | mean latency | costs | per hour of latency |
    |---|---|---|---|---|---|---|
-   | **as it runs now** | 16 | 3h 48m | — | 7.45h | — | — |
-   | one per day | 8 | 2h 06m | **1h 42m** | 10.92h | +3.47h | **29.5 min** |
-   | one per 2 days | 5 | 1h 19m | **2h 30m** | 23.70h | +16.25h | 9.2 min |
-   | one per 3 days | 3 | 0h 47m | **3h 01m** | 34.30h | +26.85h | 6.8 min |
-   | one per week | 2 | 0h 32m | **3h 17m** | 88.85h | +81.40h | 2.4 min |
+   | **as it runs now** | 16 | 3h 32m | — | 7.45h | — | — |
+   | one per day | 8 | 1h 57m | **1h 35m** | 10.92h | +3.47h | **27.4 min** |
+   | one per 2 days | 5 | 1h 13m | **2h 19m** | 23.70h | +16.25h | 8.5 min |
+   | one per 3 days | 3 | 0h 44m | **2h 48m** | 34.30h | +26.85h | 6.3 min |
+   | one per week | 2 | 0h 29m | **3h 03m** | 88.85h | +81.40h | 2.2 min |
 
    **Two findings, neither of which is the choice.** The **ceiling is low**: even one release per ten days
-   saves at most **3h 32m**, so the entire lever is worth under four hours per ten days — worth knowing
+   saves at most **3h 17m**, so the entire lever is worth under four hours per ten days — worth knowing
    before anyone spends engineering time chasing it. And the **first step is the efficient one**: 16 → 8
    captures **48%** of that ceiling for +3.5h of latency, while each step after it buys less and costs
-   much more, from 29.5 minutes saved per added hour of delivery delay down to 2.4 at weekly. A cadence
+   much more, from 27.4 minutes saved per added hour of delivery delay down to 2.2 at weekly. A cadence
    decision is therefore not a slider where further is better.
+
+   **Correcting the CI leg moved every figure in this section by about 7% and changed none of its
+   conclusions**, which is itself the useful thing to know. The scenarios scale by a common factor, so the
+   ceiling stays under four hours, the 48% capture is unchanged, and the first step remains worth roughly
+   twelve times the last. A cost model whose shape survives a 25% error in its largest component is one
+   worth deciding on; that is a different statement from the model being precise.
 
    **Three limits on the simulation, stated because the table looks more precise than it is.** It holds
    the 73 merge timestamps constant — defensible, since batching changes when work is *published* and not
