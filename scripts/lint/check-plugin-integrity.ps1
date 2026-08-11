@@ -2126,12 +2126,24 @@ Write-Coverage -Category 'pr-template' -Checked $prtChecked `
 # Both would have needed an exemption list on the day they landed, which is the shape this repo has already
 # been bitten by. The rest of the writing norm therefore travels as PROSE in the cut-release skill, where a
 # person applies it, rather than as gates that cannot tell an illustration from a leak.
+#
+# TWO TREES SINCE AUGUST 10, 2026, and the reason they are both read is that one of them is an ARCHIVE.
+# The two hand-written documents became one -- releases/notes/, with a named section per reader -- and the
+# rule follows the reader rather than the directory: a consumer reads the whole of that file, organisation
+# section included, so a link into the per-PR record is exactly as wrong there as it was before. The eleven
+# documents already in releases/consumer/ are published records that stay where they are, and they stay
+# held: relaxing a rule over an archive would let a repair to one of them reintroduce what it caught.
 $ctrChecked = 0
-$ctrRoot = Join-Path $RepoRoot 'releases\consumer'
-if (-not (Test-Path -LiteralPath $ctrRoot)) {
-    $ctrNote = 'this repo has no releases/consumer/ tree, so the tier is off here and there is nothing to hold'
+# @() around the pipeline, not decoration: with only one of the two trees present -- which is every repo
+# until its first cut under this model -- a bare pipeline yields a scalar, and under Set-StrictMode
+# reading .Count on it throws. Caught by this gate's own run.
+$ctrRoots = @(@('releases\notes', 'releases\consumer') |
+    ForEach-Object { Join-Path $RepoRoot $_ } |
+    Where-Object { Test-Path -LiteralPath $_ })
+if ($ctrRoots.Count -eq 0) {
+    $ctrNote = 'this repo has neither a releases/notes/ nor a releases/consumer/ tree, so the tier is off here and there is nothing to hold'
 } else {
-    foreach ($ctrFile in @(Get-ChildItem -LiteralPath $ctrRoot -Recurse -Filter *.md -File)) {
+    foreach ($ctrFile in @($ctrRoots | ForEach-Object { Get-ChildItem -LiteralPath $_ -Recurse -Filter *.md -File })) {
         $ctrChecked++
         $ctrRel = $ctrFile.FullName.Substring($RepoRoot.Length).TrimStart('\')
         $ctrLines = @(Get-Content -LiteralPath $ctrFile.FullName -Encoding UTF8)
@@ -2151,7 +2163,7 @@ if (-not (Test-Path -LiteralPath $ctrRoot)) {
     }
 }
 Write-Coverage -Category 'consumer-tier' -Checked $ctrChecked `
-    -Note $(if ($ctrChecked -eq 0) { $ctrNote } else { "every document in releases/consumer/, held against offering its reader a link into the development (tier 0) or internal (tier 1) tree. LINK TARGETS only -- a tier named in link text or prose is someone writing ABOUT the model, which is check 4's declined-path territory. Two neighbouring rules (a score, a branch name) were measured on this same tree and declined at 4 and 3 findings, all false; the reasoning is above the check" })
+    -Note $(if ($ctrChecked -eq 0) { $ctrNote } else { "every document in releases/notes/ (the one hand-written document, a named section per reader) AND in releases/consumer/ (the archive of the two-document era), held against offering its reader a link into the development (tier 0) or internal (tier 1) tree. The rule follows the READER, not the directory: a consumer reads the organisation section too. LINK TARGETS only -- a tier named in link text or prose is someone writing ABOUT the model, which is check 4's declined-path territory. Two neighbouring rules (a score, a branch name) were measured on this same tree and declined at 4 and 3 findings, all false; the reasoning is above the check" })
 
 # --- 26. no frontmatter-bearing shipped document carries a byte-order mark --------------------------------
 # READ AS BYTES, AND THAT IS THE WHOLE POINT. Every other reader in this gate goes through

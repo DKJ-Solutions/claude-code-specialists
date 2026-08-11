@@ -479,11 +479,28 @@ The constitution above, concretely implemented here:
      **The tier model** (Dave, August 5, 2026). Every change declares **how far it reaches**, and that one
      number decides which release document it appears in:
 
-     | tier | who notices | release document | when |
+     | tier | who notices | where it is written | when |
      |---|---|---|---|
-     | **2** | consumers | `releases/consumer/<X>.x/<X.Y.Z>.md` | minor/major |
-     | **1** | colleagues on this project | `releases/internal/<X>.x/<X.Y.Z>.md` | every release, patch included |
+     | **2** | consumers | the *For consumers* section of `releases/notes/<X>.x/<X.Y.Z>.md` | minor/major |
+     | **1** | colleagues on this project | the organisation's two sections of that same file | minor/major |
      | **0** | only this repo's developers | `releases/development/<X>.x/<X.Y.Z>.md` | every release |
+
+     **ONE HAND-WRITTEN DOCUMENT SINCE AUGUST 10, 2026, WITH A NAMED SECTION PER READER** (Dave). Tier 1 and
+     tier 2 had a document each — `releases/internal/` and `releases/consumer/` — and at **all twelve**
+     releases since the internal tier existed, both were written, about the same changes. The merge was
+     measured rather than argued: `v4.2.0`'s internal note (962 words) held against the writing norm's test 2
+     gave **~365 words (38%) that could appear in a consumer-facing section** — and did, rewritten in a second
+     register in the other document — against **~597 (62%) that could not**, including the 316-word *what it
+     is worth*, which is not an outlier but the whole reason the organisational tier exists. So a **blended**
+     document was refused and a **sectioned** one built: each register intact, the shared 38% written once.
+     The heading *"what is different now"* is gone rather than moved — it *was* the duplicated half.
+     `new-internal-note.ps1` is still shipped for a repo running the two-document flow; nothing here calls
+     it, and the eleven documents in `releases/consumer/` stay put as published records.
+
+     **A patch writes no hand-written document at all**, and is announced by the generated GitHub Release
+     body alone — which is what made this possible in the first place: while the body *was* the internal
+     note, that note had to exist at every release or the page had none. The **sections** follow the tier;
+     whether there is a document follows the bump.
 
      The grouping is per **major** (`3.x`) for all three, deliberately differing from the consumer this
      model came from, which folders per minor. `Get-ReleaseNotesGrouping` answers that once.

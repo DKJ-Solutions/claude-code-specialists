@@ -86,8 +86,12 @@ Assert-True ($guardLoop.Success -and $firstWrite -gt ($guardLoop.Index + $guardL
 # And the consumer document is really in that collection -- a guard over one path would pass the
 # asserts above while protecting nothing new.
 $plannedBlock = [regex]::Match($cutReleaseText, '(?ms)^\$plannedFiles\s*=.*?^foreach \(\$rel in \$plannedFiles\)')
-Assert-True ($plannedBlock.Success -and $plannedBlock.Value -match 'consumerRelPath') `
-    'the consumer-document target joins the collection when the tier is on'
+Assert-True ($plannedBlock.Success -and $plannedBlock.Value -match 'noteRelPath') `
+    'the hand-written note joins the collection when the seam names this bump'
+# AND the generated body, which is written unconditionally: it is the one artefact every release has, so
+# leaving it out of the pre-flight would let a re-cut clobber a published Release body without a word.
+Assert-True ($plannedBlock.Success -and $plannedBlock.Value -match 'bodyRelPath') `
+    'the generated GitHub Release body is guarded too, at every release'
 # No .html anywhere in the cut: the tier is markdown-only (Dave, August 3, 2026). Asserted on the script
 # text because the removal is the feature -- a reintroduced HTML write should turn this red.
 Assert-True ($cutReleaseText -notmatch 'ConvertTo-ReleaseHtml') 'cut-release calls no HTML renderer'
