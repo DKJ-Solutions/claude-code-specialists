@@ -8,8 +8,11 @@
 - [x] Write *What was still open at this release*
 - [~] Repair the stale tier table in `releases/README.md` — dropped: it is the technical writer's
       change, not this document's, and folding it in here would put an unrelated edit in a release-note PR
-- [ ] Open the PR, wait for `lint-en-tests`, merge, fold
-- [ ] Publish the GitHub Release with the generated body and the three attachments
+- [~] Open the PR, merge, fold — dropped as a step: these are the release checklist's steps, not this
+      branch's plan, and the step-list gate refused the PR for exactly that reason. A branch reaches a
+      PR when its own work is done; what happens to it afterwards is the chain's
+- [~] Publish the GitHub Release — dropped for the same reason: step 5 of the `cut-release` checklist,
+      which runs after this branch no longer exists
 
 ### Where I left off
 
