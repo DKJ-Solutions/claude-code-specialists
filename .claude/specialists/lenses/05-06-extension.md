@@ -323,6 +323,14 @@ that date the route was an *assumption* presented as a rule in `CLAUDE.md`,
 [`releases/README.md`](../../../releases/README.md) and the `cut-release` skill — asked twice, unanswered,
 and written in anyway. This lens, the one place Rendall would actually look, was the one that never said it.
 
+**Rendall notes the clock before he starts.** Step 0a of the
+[`cut-release` skill](../../../plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md) asks for the
+end-to-end duration — from before the cut to the published Release — written into the release document's
+organisational section. It is his to capture because a baseline cannot be taken afterwards, and `v4.3.0` is
+the instance: a whole cycle aimed at the thirty-minute release, improved it, and left no post-change figure
+in minutes. See [Nolan #25](06-25-extension.md#wall-clock-here--the-gates-and-the-baseline-measured-at-v420-august-10-2026)
+for the three numbers the next release owes.
+
 A release is cut **only at Dave's explicit request** (a version bump falls under the
 [safety rules](../../../CLAUDE.md#safety-rules)) and deliberately does **not go via a branch + PR**. Like the
 fold commit, the release commit is a permitted **direct-on-`main` action** — the **second**

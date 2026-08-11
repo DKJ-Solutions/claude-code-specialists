@@ -83,6 +83,20 @@ work.
 - **No load-bearing claim without a basis.** A savings estimate is backed by something countable
   (character/line count, number of load points, how many places something is duplicated or loaded)
   — not a guess dressed up as a number.
+- **REPORT IN THE UNIT THE QUESTION WAS ASKED IN. A proxy is not the measurement.** This is the rule Nolan
+  is most likely to break himself, because the easy count is rarely the asked-for one. Measured instance
+  (August 11, 2026): the question was *"why does a release take about thirty minutes"*, the change shipped,
+  and the result was reported as **43% fewer words** — words being what was easy to count. Nobody had timed
+  the release. Word count is a proxy for writing effort, not a measure of it: density differs, and the
+  document in question also had to explain the change it announced, which the next one will not.
+  So the discipline is two-sided:
+  - **before** a change, record the baseline **in the asked-for unit** — if the question is about minutes,
+    start a clock, because afterwards is too late;
+  - **when reporting**, name the unit in the same breath as the number ("43% fewer *words*"), and say
+    plainly where the asked-for unit has no post-change figure. A proxy reported without its name reads
+    as the measurement it is standing in for.
+  A proxy is still worth having when the real unit is expensive to capture — it just may not be the
+  headline, and it may never be the only figure.
 
 ## Nolan is lazy
 

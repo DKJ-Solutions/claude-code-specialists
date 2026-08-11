@@ -40,6 +40,30 @@ each command as you go — do not skip a step or reorder them from memory.
 
 ### Block 1 — cutting (always)
 
+**0a. Note the time before you start, and note it again when the Release is published.** One line, no
+tooling — but it has to be *before*, because a baseline cannot be captured afterwards. Put the end-to-end
+duration in the release document's organisational section, beside whatever else that release cost.
+
+**Why this is step zero and not a nice-to-have.** A release is the most-repeated expensive procedure a repo
+has, so it is the one whose duration is worth knowing — and it is measured in **minutes**, which nothing
+else here records. Measured instance (August 11, 2026): a whole improvement cycle was run against the
+question *"why does a release take about thirty minutes"*, it demonstrably improved things, and the result
+was reported as **43% fewer words** — because words were what somebody had counted. The release itself was
+never timed, before or after, so the question that started the work has no answer in its own unit. That is
+the [performance engineer's own rule](../../../../teams/team-alpha/manuals/06-25-manual.md) broken by the
+person who wrote it: *report in the unit the question was asked in; a proxy is not the measurement.*
+
+Two things worth splitting while you have the clock running, because they behave differently and a single
+total hides both:
+
+- **what blocked you** (the gates you waited on, the writing) versus **what ran behind you** (a CI run on a
+  push nobody is waiting for). Shortening the second is worth close to nothing;
+- **the fixed cost per release** versus **how often you release**. Where the cost is fixed per event,
+  releasing half as often removes exactly as much of it as making it twice as fast — and needs no code.
+
+Deliberately a **convention and not a gate**: it is a number somebody writes down, and a check that refused
+a release for a missing timestamp would be ceremony rather than a guard.
+
 0. **A MAJOR ONLY — open its section first, and repoint the pin with it.** Skip this for a minor or a
    patch. Cutting `X.0.0` stops before anything is written, because the new row would otherwise be filed
    neatly under the previous major's table and *nothing would error* — the failure this guardrail
