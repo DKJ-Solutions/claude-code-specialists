@@ -539,6 +539,20 @@ function Get-EntryScoreNotApplicable {
     return $script:EntryScoreNotApplicable
 }
 
+function Get-EntryTierSectionMarker {
+    <#
+        The heading one tier's section is written under ('#### Tier 2').
+
+        A HELPER RATHER THAN A THIRD HAND-BUILT STRING. The formatter that WRITES the section, the scaffold
+        gate that points AT one, and the ranking-gate refusal that asks for a missing one all need the same
+        heading -- and a refusal telling an author to add a heading the formatter spells differently is
+        worse than no advice at all. The regex readers build their own pattern from the same two variables,
+        which is as close to one source as a matcher and a writer can get.
+    #>
+    param([Parameter(Mandatory)][int]$Tier)
+    return ('#' * $script:EntryTierSubLevel) + " $($script:EntryTierSubPrefix) $Tier"
+}
+
 function Get-EntryScorePattern {
     <#
         The regex that reads a score line, capturing the value: '**Score:** 3' and the plain 'Score: 3'
@@ -828,8 +842,7 @@ function Format-EntrySignificanceSections {
         $Rows = @(),
         [switch]$WithGuidance
     )
-    $w      = Get-EntrySignificanceWording
-    $hashes = '#' * $script:EntryTierSubLevel
+    $w = Get-EntrySignificanceWording
     # THE ROUTING QUESTIONS GO WITH THE GUIDANCE (Dave, August 7, 2026), which is the half of this worth
     # stating out loud, because it reverses his own decision of the day before. They were added so an author
     # who stops at tier 0 has DECIDED there is nothing above it rather than never having been asked -- and
@@ -856,7 +869,7 @@ function Format-EntrySignificanceSections {
         $row  = $ordered[$i]
         $tier = [int]$row.Tier
         if ($i -gt 0) { $lines.Add('') }
-        $lines.Add("$hashes $($script:EntryTierSubPrefix) $tier")
+        $lines.Add((Get-EntryTierSectionMarker -Tier $tier))
         $lines.Add('')
         # THE GUIDANCE COMMENT STANDS WHERE THE WHY GOES on an unanswered section, and nothing else does --
         # no placeholder line underneath it. A row that already carries a why is a migration or a rewrite of
@@ -1252,6 +1265,16 @@ function Resolve-EntryImpact {
                     Error still fails safe towards the harmless end rather than crashing.
           Declared  $true when the reach was actually stated (a table with rows, or a 'Tier:' line).
           Errors    every row-level complaint, ready to print; empty when the table parses.
+          Shape     WHICH of the three shapes was read: 'sections', 'table', 'line', or 'none' when the
+                    entry declares no impact at all. Table stays $true for the first two, because every
+                    existing caller asks it "is there a declaration" rather than "which one".
+
+        WHY THE SHAPE IS RECORDED AND NOT MERELY DETECTED. A gate that reads three shapes has to give
+        advice in ONE of them, and until this property existed it could not tell which one it was looking
+        at: Get-EntryImpactFindings asked a section-shaped entry to "fill in the third column" of a table
+        that this very shape replaced. WhyBelowScore was the nearest thing to a discriminator and does not
+        reach far enough -- it lives on a ROW, so the one refusal that fires when a tier has no row at all
+        had nothing to read. The property is additive, so nothing that already ignores it changes.
 
         THREE SHAPES ARE READ, ONE IS WRITTEN. In order: the '#### Tier N' sub-sections (current), the
         impact table (August 5-6, 2026), and the 'Tier: N' line (before that). That is not legacy
@@ -1276,6 +1299,7 @@ function Resolve-EntryImpact {
         Tier     = 0
         Declared = $false
         Errors   = @()
+        Shape    = 'none'
     }
 
     $body = Get-EntryTextOutsideFences -EntryText $EntryText
@@ -1290,6 +1314,7 @@ function Resolve-EntryImpact {
     # nothing and returns an undeclared tier 0 -- the complaints discarded, the defect invisible.
     if (@($sections.Rows).Count -gt 0 -or @($sections.Errors).Count -gt 0) {
         $result.Table = $true
+        $result.Shape = 'sections'
         $result.Rows = @($sections.Rows)
         $result.Errors = @($sections.Errors)
         $declared = @($sections.Rows | Where-Object { $null -eq $_.Error })
@@ -1325,11 +1350,15 @@ function Resolve-EntryImpact {
         $legacy = Resolve-EntryTier -EntryText $EntryText
         $result.Tier = $legacy.Tier
         $result.Declared = $legacy.Declared
+        # 'line' only where a 'Tier: N' line was actually found -- an entry with no declaration of any kind
+        # keeps 'none', so a caller can tell "wrote it the old way" from "wrote nothing".
+        if ($legacy.Declared) { $result.Shape = 'line' }
         if ($legacy.Error) { $result.Errors = @($legacy.Error) }
         return $result
     }
 
     $result.Table = $true
+    $result.Shape = 'table'
     $range = Get-EntrySignificanceRange
     $rows = New-Object System.Collections.Generic.List[pscustomobject]
     $errors = @()
@@ -1437,6 +1466,19 @@ function Get-EntryImpactFindings {
     # produced three findings. Fix what is unreadable, run again, then hear what is missing.
     if ($findings.Count -gt 0) { return $findings }
 
+    # EVERY REFUSAL BELOW IS WORDED IN THE SHAPE THE ENTRY ACTUALLY USES (inbound: the gate telling a
+    # section-shaped entry to "fill in the third column"). Three shapes are read and one is written, so
+    # advice given in the wrong one sends an author looking for a table that this format replaced -- and
+    # the author is the one person who cannot check the claim, because the file in front of them has no
+    # columns to count.
+    #
+    # THE TEST IS "IS IT A TABLE", NOT "IS IT THE CURRENT SHAPE", and that asymmetry is deliberate. A real
+    # table HAS the columns, so its own wording is the accurate one and keeps it -- "recognise both, write
+    # one" applies to the advice as much as to the parsing. The 'Tier: N' line and an entry with no
+    # declaration at all get the SECTION wording instead of a third variant: neither has anywhere to put a
+    # score, so the only move that resolves the refusal is to write the shape this format writes.
+    $isTable = ($impact.Shape -eq 'table')
+
     for ($tier = 1; $tier -le $impact.Tier; $tier++) {
         $row = @(@($impact.Rows) | Where-Object { [int]$_.Tier -eq $tier })
         # THE LADDER CANNOT BE SKIPPED, and 'N/A' is the new way to try (August 7, 2026). A tier declaring
@@ -1453,11 +1495,17 @@ function Get-EntryImpactFindings {
             # literal '.Tier', so the message read "reaches tier @{Table=True; Rows=System.Object[]...}".
             # Caught by this file's own smoke test; it is the one PowerShell interpolation trap that
             # produces valid output nobody would ever write on purpose.
-            $findings += "this entry reaches tier $($impact.Tier), so it also reaches tier $tier -- add a '| $tier | <$($range.Min)-$($range.Max)> | <why> |' row. The ladder is cumulative: a change consumers notice is also a change this project's colleagues get something out of."
+            $add = if ($isTable) {
+                "add a '| $tier | <$($range.Min)-$($range.Max)> | <why> |' row"
+            } else {
+                "add a '$(Get-EntryTierSectionMarker -Tier $tier)' section with its reason and a '$($script:EntryScoreLabel) <$($range.Min)-$($range.Max)>' line"
+            }
+            $findings += "this entry reaches tier $($impact.Tier), so it also reaches tier $tier -- $add. The ladder is cumulative: a change consumers notice is also a change this project's colleagues get something out of."
             continue
         }
         if ([int]$row[0].Score -le 0) {
-            $findings += "tier $tier has no significance -- write a whole number from $($range.Min) to $($range.Max) against the rubric in that row's second column."
+            $where = if ($isTable) { "in that row's second column" } else { "on that tier's $($script:EntryScoreLabel) line" }
+            $findings += "tier $tier has no significance -- write a whole number from $($range.Min) to $($range.Max) against the rubric $where."
             continue
         }
         if (-not $row[0].Why) {
@@ -1469,7 +1517,8 @@ function Get-EntryImpactFindings {
             if ($below) {
                 $findings += "tier $tier scores $($row[0].Score) and its reason sits BELOW the $($script:EntryScoreLabel) line, where nothing reads it -- move the text above that line. Everything up to the score is the reason; everything after it is discarded."
             } else {
-                $findings += "tier $tier scores $($row[0].Score) with no 'Why' -- fill in the third column. The rubric says which band; the why says why THIS change is in it, and that is the half a later reader can check."
+                $fill = if ($isTable) { 'fill in the third column' } else { "write it above that tier's $($script:EntryScoreLabel) line" }
+                $findings += "tier $tier scores $($row[0].Score) with no 'Why' -- $fill. The rubric says which band; the why says why THIS change is in it, and that is the half a later reader can check."
             }
         }
     }
@@ -2753,7 +2802,7 @@ function Get-EntryScaffoldFindings {
                     } else {
                         'a tier with no reason'
                     }
-                    Marker = ('#' * $script:EntryTierSubLevel) + " $($script:EntryTierSubPrefix) $([int]$row.Tier)"
+                    Marker = Get-EntryTierSectionMarker -Tier ([int]$row.Tier)
                 }
             }
         }
