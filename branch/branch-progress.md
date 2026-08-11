@@ -1,13 +1,14 @@
-# `main` progress
-
-
-> **You are on `main`.** Do not work in this file yet -- create a branch first.
-> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
-> of the next person who does create one.
-
-This file carries the step list of the branch you are on. It is written when a branch is created
-and returns to this state after the merge.
+## `docs/the-cadence-stays-unconstrained` progress
 
 ### Steps
 
-_(filled in when a branch is created)_
+- [x] Record the decision at the head of open number 3, in Dave's own words
+- [x] Write the reasoning: the size of the prize, the absent mechanism, the aligned counterweight
+- [x] Name what would have to change for the lever to be revisited
+- [x] Repoint the two paragraphs elsewhere in the lens that still called the choice open
+- [x] Write the changelog entry
+
+### Where I left off
+
+Done. The cadence is decided: no cap. Nolan's three owed numbers are all counted, and the only one that
+ended in a choice has been answered.

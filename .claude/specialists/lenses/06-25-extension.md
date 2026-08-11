@@ -197,18 +197,19 @@ reading that decision.
 *after* the push and blocks nobody; the PR's `lint-en-tests` blocks the merge and is the single largest
 thing a person waits on. A proposal that shortens the first is worth close to nothing.
 
-**And the frequency lever is live in this repo, which is unusual.** Batching entries per cut is a real
-reduction that needs no code at all, and the counterweight is recorded and belongs to Dave: `plugin.json`'s
-version is one of the two update gates, so releasing less often is delivering later. Both halves are
-**counted** in open number 3 below, which replaced the ~17 minutes this paragraph used to estimate with a
-measured cost that differs per bump type.
+**The frequency lever was live in this repo, was counted, and was DECLINED** (Dave, August 11, 2026).
+Batching entries per cut would have been a real reduction needing no code at all; the counterweight is that
+`plugin.json`'s version is one of the two update gates, so releasing less often is delivering later. Both
+halves are counted in number 3 below — which also replaced the ~17 minutes this paragraph used to estimate
+with a measured cost that differs per bump type — and the answer is **no cap on the cadence**. Do not
+propose batching here as a saving without new evidence that the ceiling has moved.
 
 **THREE NUMBERS WERE OWED, AND ALL THREE WERE COUNTED ON THE DAY THEY WERE ASKED FOR** (August 11, 2026;
 the list was written that morning as *"the next release owes three numbers, and the first is a gap Nolan
-left himself"*). All three are counting, not building. **The third differs from the other two in what its
-count buys**: they end in a finding, while this one ends in a **choice that is Dave's** — so counting it
-closes Nolan's half and opens nothing else. Do not read the table in it as a recommendation; it is priced
-in both directions precisely so that the choice stays with the person who owns the delivery side. The
+left himself"*). All three are counting, not building. **The third differed from the other two in what its
+count bought**: they end in a finding, while that one ended in a choice that was Dave's — **and he made it
+the same day, declining the lever**. Do not read its table as a recommendation in either direction; it was
+priced on both sides so the choice could sit with the person who owns the delivery side, and it did. The
 original wording is kept above rather than replaced, because a list of open questions is worth something
 only while it says when each one was opened.
 
@@ -281,12 +282,19 @@ only while it says when each one was opened.
    For the second local run, that is the finding: on this repo's own 30 suites, a markdown-only diff is not
    safe to treat as script-free. Whether any run is dropped, skipped, or made conditional on that basis is a
    change to this repo's safety rules and is Dave's call, not a conclusion of this measurement.
-3. **COUNTED August 11, 2026; the choice is Dave's and is open. The whole lever is worth under four hours
-   per ten days, and its first step is worth twelve times its last.** The question as first written: 16
-   releases in the 10 days to August 10, 2026, each carrying a fixed gate cost that does not shrink with
-   the number of entries in it. Batching is a lever needing no code; the counterweight is Dave's and it is
-   real — `plugin.json`'s version is one of the two update gates, so releasing less often is delivering
-   later.
+3. **COUNTED AND DECIDED August 11, 2026 — THE CADENCE STAYS UNCONSTRAINED. Do not reopen this as a
+   saving.** Dave's answer, in his own words: *"ik wil gewoon kunnen snijden wanneer ik wil, dat moet niet
+   begrensd worden."* The count below stands and is worth keeping; what it bought was the ability to
+   decline the lever knowing its size, rather than assuming it away. The reasoning is at the end of this
+   item, under **the decision**.
+
+   The whole lever is worth under four hours per ten days, and its first step is worth twelve times its
+   last.
+
+   *The question as it was first written, kept for the record and no longer the state of play:* 16 releases
+   in the 10 days to August 10, 2026, each carrying a fixed gate cost that does not shrink with the number
+   of entries in it. Batching is a lever needing no code; the counterweight is Dave's and it is real —
+   `plugin.json`'s version is one of the two update gates, so releasing less often is delivering later.
 
    **The count had to be redone, and the recount is the reason to distrust a cadence figure that has sat
    for a day.** Re-measured over the 10 days to August 11 it is **16 releases** again — the same number
@@ -386,6 +394,27 @@ only while it says when each one was opened.
    cost side, and it is a single moment for a single consumer: the register keeps no update history, so
    there is no second point to put beside it and **no measured consumer update cadence exists**. Anyone
    arguing the delivery side from this number is arguing from n=1.
+
+   **THE DECISION: no cap, no rule, nothing to build** (Dave, August 11, 2026). Cutting stays available
+   whenever he wants it. Three things make this a decision rather than a deferral, and they are written
+   down so the next reader does not mistake it for one:
+
+   - **The size of the prize is what settles it.** The entire lever is at most **~20 minutes per day** of
+     blocking gate time, and that time is the releaser's own waiting. Twenty minutes a day does not buy a
+     standing rule that removes the freedom to ship on demand. Had the ceiling been four hours a day the
+     same table would have argued the other way — which is precisely why counting it first was worth doing.
+   - **There was never a mechanism to change, only a habit.** A release happens on Dave's explicit request
+     ([`CLAUDE.md`](../../../CLAUDE.md#never-without-daves-explicit-permission)), so the 16 releases in the
+     window were 16 requests. A cadence policy could only ever have been a self-imposed constraint on his
+     own asking, plus a brief telling Rendall to propose fewer. Both were declined.
+   - **The counterweight ran in the same direction, which is unusual and worth noting.** Batching would
+     have traded the releaser's minutes for consumers' hours — `plugin.json`'s version being one of the two
+     update gates. Almost always a cost question has a genuine trade in it; here the cheap side and the
+     fast-delivery side agreed, so declining costs nothing on either.
+
+   **What this closes.** Nolan's third open number is answered *and* acted on. The lever is not "not yet
+   evaluated" — it is measured, priced and declined, and reviving it needs new evidence that the ceiling
+   has moved (a materially slower gate, or a much higher release rate), not a re-reading of this table.
 
 **None of the three is a gate, deliberately.** They are measurements whose answers decide what is worth
 building; a check refusing a release over a missing number would cost every release something in order to
