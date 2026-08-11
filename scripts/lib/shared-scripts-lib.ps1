@@ -117,6 +117,21 @@ function Get-SharedScriptPairs {
             Skill  = 'park'
         },
         @{
+            # TWO SKILLS READ THIS ONE SCRIPT, and Skill is a single field on purpose -- it answers "which
+            # page documents this script's SURFACE", not "who calls it". /lock and /continue run the same
+            # reporter and differ only in what they do with the answer, so the parameter surface is
+            # documented once, in the page a reader reaches first. 'cut-release' is already named by two
+            # entries here, so a name serving more than one relationship is precedented.
+            Name   = 'session-status'
+            Source = 'scripts\task\session-status.ps1'
+            Plugin = 'workflow-davekjohn'
+            Skill  = 'lock'
+            # A fixture path, so the suite can assert the printout against a known lock file instead of
+            # whatever this machine happens to have locked. A consumer never types it, and documenting it
+            # would invite someone to point the command at a file outside their repo.
+            SkillParamsExempt = @('StoreOverride')
+        },
+        @{
             # Issue #411. Was excluded as "workshop-only" on the reasoning that merge policy and the CI
             # check name are repo-specific. Only the first half held: the check NAME never entered the
             # logic (step 3 watches whatever checks exist and reads the exit code), and the merge METHOD
