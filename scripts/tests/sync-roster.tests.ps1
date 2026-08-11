@@ -35,7 +35,7 @@ $env:CLAUDE_PLUGIN_ROOT = $null
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'plugins\teams\team-alpha\skills\sync-roster\sync-roster.ps1'
-$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) 'sync-roster-test-fixture'
+$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "sync-roster-test-fixture-$PID"
 
 $Marketplace = 'claude-code-specialists'
 $PluginName  = 'team-alpha'

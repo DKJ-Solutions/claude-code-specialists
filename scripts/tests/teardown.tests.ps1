@@ -15,7 +15,7 @@ $RepoRoot  = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Plugin    = Join-Path $RepoRoot 'plugins\teams\team-alpha'
 $Bootstrap = Join-Path $Plugin 'skills\specialists-init\bootstrap.ps1'
 $Teardown  = Join-Path $Plugin 'skills\specialists-teardown\teardown.ps1'
-$Fixture   = Join-Path ([System.IO.Path]::GetTempPath()) 'specialists-teardown-fixture'
+$Fixture   = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-teardown-fixture-$PID"
 
 $script:pass = 0
 $script:fail = 0
@@ -339,7 +339,7 @@ function Get-LintScript { return `$script:LintScript }
     Assert-True (-not (Test-Path -LiteralPath $emptyByConvention)) 'own convention: WITH the pattern declared it is removed'
 
     # --- 7. A repo that never adopted is a no-op, not an error --------------------------------------
-    $bare = Join-Path ([System.IO.Path]::GetTempPath()) 'specialists-teardown-bare'
+    $bare = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-teardown-bare-$PID"
     if (Test-Path -LiteralPath $bare) { Remove-Item -Recurse -Force -LiteralPath $bare }
     New-Item -ItemType Directory -Path $bare -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $bare 'CLAUDE.md'), "# plain project`n`nnothing to do with specialists.")
@@ -820,7 +820,7 @@ function Get-LintScript { return `$script:LintScript }
     # "could not look" are different claims and the old code could make neither.
     Write-Host "-- inbound #381: the install-record gate --" -ForegroundColor Cyan
     $null = New-BootstrappedConsumer
-    $fakeHome = Join-Path ([System.IO.Path]::GetTempPath()) 'specialists-teardown-claudehome'
+    $fakeHome = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-teardown-claudehome-$PID"
     $prevCfg  = $env:CLAUDE_CONFIG_DIR
     try {
         New-Item -ItemType Directory -Path (Join-Path $fakeHome 'plugins') -Force | Out-Null

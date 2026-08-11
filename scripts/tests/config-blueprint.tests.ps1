@@ -38,7 +38,7 @@ $Generator  = Join-Path $RepoRoot 'scripts\sync\build-config-blueprint.ps1'
 $Adopt      = Join-Path $RepoRoot 'scripts\task\adopt-config.ps1'
 $ContractLib = Join-Path $RepoRoot 'scripts\lib\script-contract-lib.ps1'
 $Artefact   = Join-Path $RepoRoot 'plugins\workflows\workflow-davekjohn\blueprint\config-blueprint.json'
-$Fixture    = Join-Path ([System.IO.Path]::GetTempPath()) 'config-blueprint-test-fixture'
+$Fixture    = Join-Path ([System.IO.Path]::GetTempPath()) "config-blueprint-test-fixture-$PID"
 
 $script:pass = 0
 $script:fail = 0

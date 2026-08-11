@@ -21,7 +21,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Measure  = Join-Path $RepoRoot 'scripts\tests\round-tally.measure.ps1'
-$TmpDir   = Join-Path ([System.IO.Path]::GetTempPath()) 'round-tally-tests'
+$TmpDir   = Join-Path ([System.IO.Path]::GetTempPath()) "round-tally-tests-$PID"
 
 $script:pass = 0
 $script:fail = 0

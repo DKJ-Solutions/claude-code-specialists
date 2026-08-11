@@ -22,7 +22,7 @@ $RepoRoot   = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Bootstrap  = Join-Path $RepoRoot 'plugins\teams\team-alpha\skills\specialists-init\bootstrap.ps1'
 $DriftLint  = Join-Path $RepoRoot 'scripts\lint\check-consumer-drift.ps1'
 $Integrity  = Join-Path $RepoRoot 'scripts\lint\check-plugin-integrity.ps1'
-$Fixture    = Join-Path ([System.IO.Path]::GetTempPath()) 'specialists-init-test-fixture'
+$Fixture    = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-test-fixture-$PID"
 # Where a FRESH consumer's lenses land as of the seam (issue #221): one flat directory, no per-plugin
 # segment, because <group>-<id> is unique family-wide.
 $Pp         = '.claude\specialists\lenses'
@@ -315,7 +315,7 @@ try {
     Write-Host "bootstrap.ps1 -- RepoName derived from the git remote (origin)" -ForegroundColor Cyan
     function Test-DerivedRepoName {
         param([string]$OriginUrl, [string]$Expected, [bool]$ShouldDerive, [string]$Label)
-        $gitFix = Join-Path ([System.IO.Path]::GetTempPath()) ('specialists-init-git-' + $Label)
+        $gitFix = Join-Path ([System.IO.Path]::GetTempPath()) ("specialists-init-git-$PID-" + $Label)
         if (Test-Path -LiteralPath $gitFix) { Remove-Item -Recurse -Force -LiteralPath $gitFix }
         New-Item -ItemType Directory -Path $gitFix -Force | Out-Null
         try {
