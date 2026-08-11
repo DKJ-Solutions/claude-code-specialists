@@ -97,6 +97,25 @@ work.
     as the measurement it is standing in for.
   A proxy is still worth having when the real unit is expensive to capture — it just may not be the
   headline, and it may never be the only figure.
+- **A COST THAT VARIES PER RUN IS COUNTED OVER ITS POPULATION, NOT CITED FROM ONE RUN.** The sibling of
+  the rule above: there the easy number is the wrong *unit*, here it is the wrong *sample*. One timing of
+  a gate, a suite or a build is a draw from a distribution, and the draw you happen to hold is as likely
+  to come from the tail as from the middle. Measured instance (August 11, 2026): a CI gate was written
+  down as the fixed cost of a release from one carefully measured run; the next run came in **25% below
+  it**. Counting every successful run of that workflow — 63 blocking ones — put the recorded figure
+  **exactly on the p90**. The slow tail had been recorded as the typical, from a citation that was
+  entirely accurate.
+  - **Ask whether the history is queryable before writing a per-run cost as a fixed number.** CI
+    providers, job runners and build systems keep it, so the population is usually one command away.
+    Collecting a *second* run is the wrong instinct — two anecdotes are not a distribution.
+  - **Report an n, a median and a range.** A bare point value invites being quoted as though it had no
+    spread, and nobody who reads it later can tell how much confidence it deserves.
+  - **Compare sub-populations when you have them**; it separates environmental variance from a real
+    difference, and kills the plausible explanation before somebody builds on it.
+  - **Then say whether the conclusion moved.** In that instance the correction shifted every derived
+    figure by ~7% and changed nothing that was concluded from them — worth stating outright, because a
+    model whose shape survives a large error in its largest input is one worth deciding on. That is a
+    different claim from the model being precise, and only one of the two is usually true.
 
 ## Nolan is lazy
 

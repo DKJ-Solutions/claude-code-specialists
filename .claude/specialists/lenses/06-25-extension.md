@@ -326,7 +326,10 @@ only while it says when each one was opened.
    and the median. The two distributions are near-identical, which says this is **runner variance rather than
    anything about the event type**, and it removes the tempting explanation that a docs-only diff runs faster.
    The median is what the model uses; the range is kept beside it because a cost with a 4m 10s spread should
-   never again be quoted as a point.
+   never again be quoted as a point. The portable half of this lesson is in
+   [Nolan's manual](../../../plugins/teams/team-alpha/manuals/06-25-manual.md) under *a cost that varies per
+   run is counted over its population*, alongside the unit rule it is the sibling of — so it applies to every
+   per-run cost he is asked about, not only to a CI gate.
 
    **The local legs have spread too, and it is not yet counted.** Three observations exist — 231s in the cut,
    200s and 226s at `open-pr` — so they are an n=1 and an n=2 standing next to an n=63. They are left as
