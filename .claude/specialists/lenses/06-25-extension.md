@@ -197,17 +197,20 @@ reading that decision.
 *after* the push and blocks nobody; the PR's `lint-en-tests` blocks the merge and is the single largest
 thing a person waits on. A proposal that shortens the first is worth close to nothing.
 
-**And the frequency lever is live in this repo, which is unusual.** 16 releases in the 10 days to August 10,
-2026, each carrying ~17 minutes of fixed gate time — so batching entries per cut is a real reduction that
-needs no code at all. The counterweight is recorded and belongs to Dave: `plugin.json`'s version is one of
-the two update gates, so releasing less often is delivering later.
+**And the frequency lever is live in this repo, which is unusual.** Batching entries per cut is a real
+reduction that needs no code at all, and the counterweight is recorded and belongs to Dave: `plugin.json`'s
+version is one of the two update gates, so releasing less often is delivering later. Both halves are
+**counted** in open number 3 below, which replaced the ~17 minutes this paragraph used to estimate with a
+measured cost that differs per bump type.
 
-**THREE NUMBERS WERE OWED, AND TWO WERE ANSWERED ON THE DAY THEY WERE ASKED FOR** (August 11, 2026; the
-list was written that morning as *"the next release owes three numbers, and the first is a gap Nolan left
-himself"*). All three are counting, not building — which is why two of them closed inside a day and the
-third is still open: it is the only one whose answer is a decision rather than a count. The original wording
-is kept above rather than replaced, because a list of open questions is worth something only while it says
-when each one was opened.
+**THREE NUMBERS WERE OWED, AND ALL THREE WERE COUNTED ON THE DAY THEY WERE ASKED FOR** (August 11, 2026;
+the list was written that morning as *"the next release owes three numbers, and the first is a gap Nolan
+left himself"*). All three are counting, not building. **The third differs from the other two in what its
+count buys**: they end in a finding, while this one ends in a **choice that is Dave's** — so counting it
+closes Nolan's half and opens nothing else. Do not read the table in it as a recommendation; it is priced
+in both directions precisely so that the choice stays with the person who owns the delivery side. The
+original wording is kept above rather than replaced, because a list of open questions is worth something
+only while it says when each one was opened.
 
 1. **ANSWERED at `v4.4.0`, August 11, 2026: a release takes 28m 03s, and 15m 44s of that is gates.** Clock
    started at 10:24:11 before the cut and stopped at 10:52:14 when the Release was published; every leg came
@@ -278,10 +281,76 @@ when each one was opened.
    For the second local run, that is the finding: on this repo's own 30 suites, a markdown-only diff is not
    safe to treat as script-free. Whether any run is dropped, skipped, or made conditional on that basis is a
    change to this repo's safety rules and is Dave's call, not a conclusion of this measurement.
-3. **The cadence, against the fixed cost.** 16 releases in the 10 days to August 10, 2026, each carrying
-   ~17 minutes of gate time that does not shrink with the number of entries in it. Batching is a lever
-   needing no code; the counterweight is Dave's and it is real — `plugin.json`'s version is one of the two
-   update gates, so releasing less often is delivering later.
+3. **COUNTED August 11, 2026; the choice is Dave's and is open. The whole lever is worth under four hours
+   per ten days, and its first step is worth twelve times its last.** The question as first written: 16
+   releases in the 10 days to August 10, 2026, each carrying a fixed gate cost that does not shrink with
+   the number of entries in it. Batching is a lever needing no code; the counterweight is Dave's and it is
+   real — `plugin.json`'s version is one of the two update gates, so releasing less often is delivering
+   later.
+
+   **The count had to be redone, and the recount is the reason to distrust a cadence figure that has sat
+   for a day.** Re-measured over the 10 days to August 11 it is **16 releases** again — the same number
+   over a different window and a **different mix**: 13 minor, 1 major, 2 patch, with the `3.0.x` patch era
+   rolled out of the window. Over the last **seven** days there is **not one patch**, which matters because
+   the two bump types do not cost the same. In that same window `main` took **77 merges, 73 of them
+   released and 4 not** — and those four are exactly the four entries pending in `CHANGELOG.md`, which is
+   the cross-check that says the merge list and the release list are being read consistently.
+
+   **The fixed cost per release, split by what a bump actually triggers.** A patch writes no hand-written
+   document, so it opens no pull request and therefore meets no blocking CI — measured, not assumed:
+   `releases/consumer/3.x/` and `releases/internal/3.x/` hold documents for every minor in the window and
+   **none** for `3.1.1` or `3.1.2`.
+
+   | release kind | blocking gate cost | what it is made of |
+   |---|---|---|
+   | minor / major (carries a document) | **15m 47s** | 231s suites in the cut · 200s the same suites at `open-pr` · 8m 36s `lint-en-tests` on that pull request |
+   | patch (no document, no pull request) | **3m 51s** | the 231s cut suites alone |
+
+   Every leg is cited from [`releases/notes/4.x/4.4.0.md`](../../../releases/notes/4.x/4.4.0.md), which
+   took them from git and CI timestamps. **The 7m 48s CI run on the release commit is excluded** because it
+   blocks nobody. **And a 3-second discrepancy is left standing rather than smoothed**: that note states
+   *15m 44s* of gates while its own three components sum to *15m 47s*. The components are what were
+   measured separately, so the components are what is used here.
+
+   **Priced at that cost, the window's 16 releases spent 3h 48m 40s of blocking gate time in 10 days —
+   22.9 minutes per day.** One caveat travels with that figure and does not weaken it: **nine of the
+   sixteen predate August 7**, when `fix/release-runs-the-suites` (#514) made the cut run the suites, so
+   their *historical* bill was lower. This is a re-pricing of past volume at today's cost, which is the
+   only pricing a decision about future cadence can use — not a reconstruction of what was actually paid.
+
+   **What batching buys and what it costs, on the same data.** The saving is simulated against the **real
+   73 merge timestamps**; the delivery cost is *measured* as merge → next tag, because
+   [`README.md`](../../../README.md#versioning) states that a merge without a release is invisible to
+   consumers. Today that latency is **mean 7.45h**, median 5.72h, p90 17.40h, max 25.29h.
+
+   | cadence | releases | gate time /10 days | saves | mean latency | costs | per hour of latency |
+   |---|---|---|---|---|---|---|
+   | **as it runs now** | 16 | 3h 48m | — | 7.45h | — | — |
+   | one per day | 8 | 2h 06m | **1h 42m** | 10.92h | +3.47h | **29.5 min** |
+   | one per 2 days | 5 | 1h 19m | **2h 30m** | 23.70h | +16.25h | 9.2 min |
+   | one per 3 days | 3 | 0h 47m | **3h 01m** | 34.30h | +26.85h | 6.8 min |
+   | one per week | 2 | 0h 32m | **3h 17m** | 88.85h | +81.40h | 2.4 min |
+
+   **Two findings, neither of which is the choice.** The **ceiling is low**: even one release per ten days
+   saves at most **3h 32m**, so the entire lever is worth under four hours per ten days — worth knowing
+   before anyone spends engineering time chasing it. And the **first step is the efficient one**: 16 → 8
+   captures **48%** of that ceiling for +3.5h of latency, while each step after it buys less and costs
+   much more, from 29.5 minutes saved per added hour of delivery delay down to 2.4 at weekly. A cadence
+   decision is therefore not a slider where further is better.
+
+   **Three limits on the simulation, stated because the table looks more precise than it is.** It holds
+   the 73 merge timestamps constant — defensible, since batching changes when work is *published* and not
+   when it is finished, but an assumption and not a measurement. "One per day" yields **8** releases and
+   not 10, because two days in the window saw no merge after the anchor. And the latency column is a
+   **lower bound on delivery, not delivery**: the second update gate is the consumer's marketplace cache,
+   which sits on their side and does not move with this repo's cadence.
+
+   **One observation on the consumer side, reported as one observation.** This session's connector hook
+   read smartwatchbanden at **v4.1.0** against a source at v4.4.0 — three releases and roughly 20 hours
+   behind, meaning those three marginal releases had delivered that consumer nothing yet. It tempers the
+   cost side, and it is a single moment for a single consumer: the register keeps no update history, so
+   there is no second point to put beside it and **no measured consumer update cadence exists**. Anyone
+   arguing the delivery side from this number is arguing from n=1.
 
 **None of the three is a gate, deliberately.** They are measurements whose answers decide what is worth
 building; a check refusing a release over a missing number would cost every release something in order to
