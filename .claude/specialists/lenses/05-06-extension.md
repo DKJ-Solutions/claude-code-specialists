@@ -220,7 +220,22 @@ The `releases/` directory (modeled on life-hub):
   inside an immutable tag. The cell was chosen over a fourth column because the table's shape is matched by
   one regex that three readers share — including the row inserter and the new-major guardrail — and only new
   rows are touched, so the existing 72 keep pointing where they always did.
-- **`releases/consumer/<X>.x/<X.Y.Z>.md`** — the tier-2 document, generated **only for a minor or
+- **`releases/notes/<X>.x/<X.Y.Z>.md`** — **the one hand-written document, since August 10, 2026**, drafted
+  by the cut for every bump `Get-ReleaseConsumerBumps` names. Three sections: *For consumers* (pre-filled
+  with the tier-2 entries, and absent where none reached tier 2), *What it is worth* and *What was still open
+  at this release* (both empty — neither can be generated). Rendall's pass is a rewrite of the first and an
+  authoring job on the other two. **A patch gets none of it**: the generated Release body announces it.
+  - **The two documents below are the archive, and the measurement that merged them is in
+    [`CLAUDE.md`](../../../CLAUDE.md#claude-code-specialistss-safety-implementation).** Short version: both
+    were written at all twelve releases since the internal tier existed, about the same changes, and 38% of
+    the internal note was material a consumer-facing section could carry — written twice, in two registers.
+    A blended document was refused (62% could not travel, including the whole *what it is worth*); a
+    sectioned one keeps both registers and writes the overlap once.
+  - **The overview row now points here on the first write.** `Set-ReleaseInternalNoteLink` existed because
+    the note did not exist while the cut ran; it does now, so the cut writes the Version cell correctly
+    straight away and nothing repoints it afterwards. A patch's row keeps pointing at the development notes,
+    which is the most readable document that release has.
+- **`releases/consumer/<X>.x/<X.Y.Z>.md`** — *the archive of the two-document era.* Was the tier-2 document, generated **only for a minor or
   major** (`Get-ReleaseConsumerBumps`) and built from **the tier-2 entries**. Written for the reader who
   decides whether to *update*, not for the one who reviews the diff: the branch administration is stripped
   — the `Branch title`, `Branch ID`, `Branch type` and `Pull Request` sections plus the `Plugins:` line,
@@ -238,7 +253,8 @@ The `releases/` directory (modeled on life-hub):
   opposite. **Markdown only** — the tier generated a print-ready `.html` alongside it for exactly one
   release (v3.2.0) and no longer does; Dave does not want it anywhere. A PDF, if ever needed, comes from
   rendering the markdown with a tool built for it.
-- **`releases/internal/<X>.x/<X.Y.Z>.md`** — the tier-1 document, for colleagues, employers and management:
+- **`releases/internal/<X>.x/<X.Y.Z>.md`** — *also the archive now; `new-internal-note.ps1` still ships and
+  still works, for a repo running the two-document flow, and nothing in this repo's chain calls it.* Was the tier-1 document, for colleagues, employers and management:
   *what the work is worth*, at **every** release including a patch. It carries the **tier-1 and tier-2**
   entries, the ladder being cumulative, and leaves tier 0 to the development notes. Written by
   [`new-internal-note.ps1`](../../../scripts/release/new-internal-note.ps1), which lays down a skeleton —

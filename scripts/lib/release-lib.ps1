@@ -1270,6 +1270,115 @@ function Build-ConsumerNotes {
     return ($header + $body + "`n")
 }
 
+function Build-ReleaseNoteDraft {
+    <#
+        The ONE hand-written release document, as a draft: a named section per reader. Pure string out.
+
+        WHAT THIS REPLACED, AND THE MEASUREMENT THAT CHOSE THE SHAPE (Dave, August 10, 2026). There were
+        two hand-written documents per release -- an internal note for the organisation and a consumer
+        document -- and at every one of the twelve releases since the internal tier existed, BOTH were
+        written, about the same changes. Dave proposed one. The question was whether one document can serve
+        both readers, and it was answered by measuring v4.2.0's internal note (962 words) against the
+        consumer writing norm's test 2 (does this describe our effort or their outcome):
+
+          ~365 words (38%)  could appear in a consumer-facing section -- and were, in the other document,
+                            rewritten in a second register. THAT is the duplication.
+          ~597 words (62%)  could not, and the largest block of it -- 'what it is worth', 316 words -- is
+                            not an outlier but the entire reason the organisational tier exists.
+
+        So a BLENDED document was refused: it would have to drop the 62% or break the norm. A document with
+        a NAMED SECTION PER READER keeps each register intact, writes the shared 38% once, and is one file,
+        one editing pass, one publish. The consumer section is what 'what is different now' used to be, so
+        that heading is gone rather than moved -- it was the duplicated half.
+
+        THE CONSUMER SECTION IS PRE-FILLED AND THE ORGANISATIONAL ONE CANNOT BE. The tier-2 entries are a
+        selection the entry authors already made, rendered exactly as the consumer document rendered them
+        (bare titles, ranked on tier 2, significance and branch administration stripped). What the work is
+        worth cannot be derived from a changelog, so those headings arrive empty, with the guidance in an
+        HTML comment the writer deletes.
+
+        NO CONSUMER SECTION WHERE NO ENTRY REACHED TIER 2, and that is the tier-1-only minor: the version
+        moves for everyone and nobody outside is handed a section about work they cannot see. A heading with
+        nothing under it is worse than no heading -- measured on the shape this replaces, where an empty
+        named question shipped into every document that travelled outward.
+    #>
+    param(
+        [AllowEmptyCollection()][string[]]$Entries = @(),
+        [Parameter(Mandatory)][string]$Version,
+        [Parameter(Mandatory)][string]$Date,
+        [Parameter(Mandatory)][string]$Type,
+        [string]$Title = '',
+        [hashtable]$Wording = @{},
+        [string]$LinkPrefix = '../../../'
+    )
+    # Merged over the defaults rather than replacing them, so a repo that renames one heading does not
+    # have to restate the rest -- the same contract the note script's wording seam already had.
+    $w = @{
+        Title             = 'Release notes'
+        AudienceLabel     = 'For whom'
+        Audience          = 'consumers of this product, and colleagues in the organisation -- one section each'
+        SectionConsumers  = 'For consumers'
+        HintConsumers     = @(
+            'DRAFT. These are the tier-2 entries, still in the words their authors wrote for someone',
+            'reviewing a diff. Rewrite them for someone deciding whether to update: what they can now do,',
+            'in the second person, most urgent first, and say plainly whether they must act. The seven',
+            'tests are in the cut-release skill. Delete this comment when you are done.'
+        ) -join "`n     "
+        SectionValue      = 'What it is worth'
+        HintValue         = @(
+            'FOR THE ORGANISATION, not for the consumer -- this is the section the consumer half is not',
+            'allowed to contain. The only part that cannot be generated. Think in time, risk and reduced',
+            'dependence on a developer. For example: "changing an amount took five edits in code and can',
+            'now be done by the team itself".'
+        ) -join "`n     "
+        SectionOpen       = 'What was still open at this release'
+        HintOpen          = @(
+            'What was deliberately left, and with whom the next step sits. "Nothing" is also an answer',
+            '-- leave the heading standing with that one line.',
+            'Write it as a SNAPSHOT of this release, not as a claim about the present: a document that is',
+            'published does not move with reality, so a line here goes stale in hours rather than months.'
+        ) -join "`n     "
+    }
+    foreach ($k in @($Wording.Keys)) { if ($Wording[$k]) { $w[$k] = $Wording[$k] } }
+
+    $real = @($Entries | Where-Object { $_ -and $_.Trim() })
+
+    $rocket = [char]::ConvertFromUtf32(0x1F680)
+    $out = New-Object System.Collections.Generic.List[string]
+    $out.Add("# $($w.Title) v$Version $rocket")
+    $out.Add('')
+    $out.Add("**Date:** $Date  ")
+    $out.Add("**Type:** $Type  ")
+    $out.Add("**$($w.AudienceLabel):** $($w.Audience)")
+    $out.Add('')
+    if ($Title) { $out.Add($Title); $out.Add('') }
+
+    if ($real.Count -gt 0) {
+        $linked = @($real | ForEach-Object { Convert-RootRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
+        # THE SAME SWITCHES THE CONSUMER DOCUMENT USED, called rather than re-derived: the score orders the
+        # section and is then stripped, and the branch administration goes. Entries sit one level deeper
+        # than before because they now live under a section heading rather than under the H1.
+        $body = Format-RankedEntries -Entries $linked -EntryLevel 3 -BareTitles -RankByTier 2 `
+            -StripSignificance -StripAdminSections
+        $out.Add("## $($w.SectionConsumers)")
+        $out.Add('')
+        $out.Add("<!-- $($w.HintConsumers) -->")
+        $out.Add('')
+        $out.Add($body)
+        $out.Add('')
+    }
+
+    $out.Add("## $($w.SectionValue)")
+    $out.Add('')
+    $out.Add("<!-- $($w.HintValue) -->")
+    $out.Add('')
+    $out.Add("## $($w.SectionOpen)")
+    $out.Add('')
+    $out.Add("<!-- $($w.HintOpen) -->")
+
+    return (($out -join "`n") + "`n")
+}
+
 function Build-GitHubReleaseBody {
     <#
         The body of a GitHub Release: the release title, an optional pointer at the attached document,

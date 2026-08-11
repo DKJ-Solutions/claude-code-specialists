@@ -812,6 +812,44 @@ Assert-Match $dossierNotes 'Branch type' 'and the branch type'
 Assert-Match $dossierNotes 'PR #99'      'and the PR number'
 Assert-Match $dossierNotes '(?m)^Plugins:' "and the 'Plugins:' line"
 
+Write-Host "Build-ReleaseNoteDraft (one document, a named section per reader)" -ForegroundColor Cyan
+$draft = Build-ReleaseNoteDraft -Entries @($dossier) -Version '4.3.0' -Date '2026-08-11' -Type 'Minor' `
+    -Title 'A release title sentence'
+Assert-Match $draft '(?m)^# Release notes v4\.3\.0 ' 'the header names the version'
+Assert-Match $draft '\*\*Date:\*\* 2026-08-11' 'and carries the date'
+Assert-Match $draft '(?m)^\*\*For whom:\*\* .*consumers.*colleagues' 'the audience line names BOTH readers, since the document has two'
+Assert-Match $draft '(?m)^A release title sentence$' 'the title line is included'
+Assert-Match $draft '(?m)^## For consumers$' 'the consumer section is present when an entry reached tier 2'
+Assert-Match $draft '(?m)^### A change with a readable name$' 'its entries sit one level DEEPER than before -- they are under a section now, not under the H1'
+Assert-Match $draft '(?m)^## What it is worth$' "the organisation's value section is present"
+Assert-Match $draft '(?m)^## What was still open at this release$' 'and its open section'
+# THE HEADING THAT WAS THE DUPLICATION. 'What is different now' held the same ground as the consumer
+# section, in a second register, in the other document -- the ~365 words the merge measurement found
+# written twice. It is gone rather than moved, and asserted on absence so it cannot grow back.
+Assert-NoMatch $draft 'What is different now' "the internal note's 'what is different' heading is gone -- the consumer section IS it"
+# The stripping is inherited from Format-RankedEntries, asserted once here so a caller that stopped
+# passing the switches turns this red rather than publishing branch administration.
+Assert-NoMatch $draft '(?m)^#### Branch ID' 'branch administration does not reach the draft'
+Assert-NoMatch $draft '\*\*Score:\*\* 4' 'and neither does the self-assigned score'
+# NO EMPTY CONSUMER SECTION -- the tier-1-only minor. A named question with nothing under it looks
+# written, which is the finding that retired the previous shape's empty impact heading.
+$draftNoTier2 = Build-ReleaseNoteDraft -Entries @() -Version '4.3.0' -Date '2026-08-11' -Type 'Minor'
+Assert-NoMatch $draftNoTier2 '(?m)^## For consumers$' 'no consumer section where no entry reached tier 2'
+Assert-Match $draftNoTier2 '(?m)^## What it is worth$' 'while the organisation still gets its sections -- the document is still written'
+Assert-Match $draftNoTier2 '(?m)^## What was still open at this release$' 'both of them'
+# The guidance is an HTML comment, so the writer deletes it rather than working around it -- and the fold's
+# comment stripper is not involved here, this document is not an entry.
+Assert-Match $draft '<!-- DRAFT\.' 'the consumer guidance is an HTML comment'
+Assert-Match $draft '<!-- FOR THE ORGANISATION' 'and so is the value-section guidance, which names who it is NOT for'
+# WORDING MERGES OVER THE DEFAULTS, one key at a time: a repo renaming one heading must not have to
+# restate the other five. Same contract the note script's seam already had.
+$draftW = Build-ReleaseNoteDraft -Entries @($dossier) -Version '4.3.0' -Date '2026-08-11' -Type 'Minor' `
+    -Wording @{ SectionConsumers = 'Voor klanten' }
+Assert-Match $draftW '(?m)^## Voor klanten$' 'an overridden heading is used'
+Assert-Match $draftW '(?m)^## What it is worth$' 'and the headings that were not overridden keep their defaults'
+Assert-Match (Build-ReleaseNoteDraft -Entries @($dossier) -Version '4.3.0' -Date '2026-08-11' -Type 'Minor' -Wording @{ SectionConsumers = '' }) `
+    '(?m)^## For consumers$' 'an override that is present but EMPTY is ignored, like every other wording seam here'
+
 Write-Host "Build-GitHubReleaseBody (generated, every release, every tier)" -ForegroundColor Cyan
 # THE POINT OF GENERATING IT is that the Release page stops depending on which hand-written tier
 # document happens to exist. The internal note was the body BECAUSE it was the only tier written at

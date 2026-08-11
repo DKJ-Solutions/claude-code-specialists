@@ -716,27 +716,28 @@ $notesContent = Build-ReleaseNotes -TierGroups $tierGroups -Version $new -Date $
 # the pointer in that intro -- which is why this now takes the content and nothing else.
 $changelogNew = Convert-ChangelogForRelease -Content $changelogRaw
 
-# The consumer document, built here with everything else so a failure leaves no half-written release
-# behind. It is the TIER-2 entries and nothing else: what a consumer notices was declared by the author
-# of each entry, so there is no marker block left for the release manager to delete (see release-lib's
-# tier-2 header for the guess this replaced).
+# The ONE hand-written release document, drafted here with everything else so a failure leaves no
+# half-written release behind. Two documents used to be written per release -- an internal note for the
+# organisation and a consumer document -- and both were written at all twelve releases since the internal
+# tier existed, about the same changes. This is one file with a named section per reader (Dave, August 10,
+# 2026); the measurement that refused a BLENDED document instead is in Build-ReleaseNoteDraft.
 #
-# TWO CONDITIONS, AND THE SECOND IS THE LOAD-BEARING ONE. The seam must name this bump type, AND there
-# must be tier-2 work to describe. A consumer document with a header and no content is worse than none,
-# because it looks written.
+# THE TWO CONDITIONS SPLIT ACROSS TWO DECISIONS NOW, which is the change. The seam decides whether a
+# document is written AT ALL -- so a patch writes none and the release is announced by the generated body
+# alone. The tier-2 count decides only whether that document gets a CONSUMER SECTION: the organisational
+# half applies to every release the seam names, while a section about work no consumer can see is worse
+# than no section, because it looks written.
 #
-# THE SECOND CONDITION USED TO BE BELT-AND-BRACES AND IS NOW THE WHOLE MECHANISM (August 7, 2026). It was
-# written when a minor REQUIRED a tier-2 entry, so the bump gate already guaranteed it and this only
-# covered a repo that listed 'patch' in the seam. Tier 1 earns a minor now, so a minor with nothing for a
-# consumer is an ordinary outcome here -- and this line is what stops it handing that consumer a document
-# about work they cannot see. The audience of each note follows the TIER; only the version number follows
-# the bump.
+# BEFORE THIS, BOTH CONDITIONS GATED THE WHOLE FILE, so a tier-1-only minor produced no consumer document
+# and an internal note from a second script. The audience of each SECTION follows the tier; whether there
+# is a document follows the bump.
 $tier2Entries = @($tierGroups | Where-Object { [int]$_.Tier -eq 2 } | ForEach-Object { $_.Entries } | Where-Object { $_ })
-$cutConsumerDoc = ($consumerBumps -contains $bumpType) -and ($tier2Entries.Count -gt 0)
-$consumerRelPath = "releases/consumer/$notesDirName/$new.md"
-if ($cutConsumerDoc) {
-    $consumerContent = Build-ConsumerNotes -Entries $tier2Entries -Version $new -Date $today `
-        -Type $typeLabel -Title $Title
+$cutNote = ($consumerBumps -contains $bumpType)
+$noteRelPath = "releases/notes/$notesDirName/$new.md"
+if ($cutNote) {
+    $noteWording = Get-SeamValue -Name 'Get-ReleaseNoteWording', 'Get-InternalNoteWording' -Default @{}
+    $noteContent = Build-ReleaseNoteDraft -Entries $tier2Entries -Version $new -Date $today `
+        -Type $typeLabel -Title $Title -Wording $noteWording
 }
 
 # --- Write the release-notes file -------------------------------------------------------------
@@ -753,7 +754,7 @@ if ($cutConsumerDoc) {
 # hand-written document actually being expected -- naming an attachment that will not exist is exactly
 # the sort of confidently wrong line this repo keeps finding in published records.
 $bodyRelPath = "releases/development/$notesDirName/$new-github-body.md"
-$bodyPointer = if ($cutConsumerDoc) {
+$bodyPointer = if ($cutNote) {
     "Whether you need to act, and what it is worth: see the notes attached to this release."
 } else {
     ''
@@ -761,7 +762,7 @@ $bodyPointer = if ($cutConsumerDoc) {
 $bodyContent = Build-GitHubReleaseBody -Entries $entries -Version $new -Title $Title -NotePointer $bodyPointer
 
 $plannedFiles = @($notesRelPath, $bodyRelPath)
-if ($cutConsumerDoc) { $plannedFiles += @($consumerRelPath) }
+if ($cutNote) { $plannedFiles += @($noteRelPath) }
 foreach ($rel in $plannedFiles) {
     if (Test-Path -LiteralPath (Join-Path $repoRoot ($rel -replace '/', '\'))) {
         Write-Error "$rel already exists. Nothing was written."
@@ -788,7 +789,14 @@ Write-Host "  created: $bodyRelPath (the GitHub Release body -- generated, no ed
 # cannot drift apart.
 $relReadme = Join-Path $repoRoot ($historyRelPath -replace '/', '\')
 $shortTitle = if ($Title) { $Title } else { "$typeLabel release" }
-$newRow = "| [$new](development/$notesDirName/$new.md) | $today | $typeLabel | $shortTitle |"
+# THE VERSION CELL POINTS AT THE MOST READABLE DOCUMENT THIS RELEASE HAS, and the cut can finally write
+# that itself. It used to always name the development notes, with new-internal-note.ps1 repointing the cell
+# afterwards (Set-ReleaseInternalNoteLink) for the one reason that the note did not exist while this ran.
+# The hand-written note is drafted above now, so the row is right the first time and there is no second
+# writer of the same cell. A release with no note -- a patch -- keeps pointing at the record, which is the
+# most readable document it has.
+$versionTarget = if ($cutNote) { "notes/$notesDirName/$new.md" } else { "development/$notesDirName/$new.md" }
+$newRow = "| [$new]($versionTarget) | $today | $typeLabel | $shortTitle |"
 if (Test-Path $relReadme) {
     $rm = Get-Content -Path $relReadme -Raw -Encoding UTF8
     $rmNl = if ($rm.Contains("`r`n")) { "`r`n" } else { "`n" }
@@ -829,10 +837,11 @@ Write-Utf8NoBom -Path $changelogPath -Content $changelogNew
 # --- 3d. The consumer document (stakeholder-facing; only for the bump types the seam names) ---------
 # Content and collision were both settled above, so this block is pure IO. It writes NOTHING when the
 # tier is off, which is every release in this repo -- see the seam for why the answer here is empty.
-if ($cutConsumerDoc) {
-    New-Item -ItemType Directory -Force -Path (Join-Path $repoRoot "releases\consumer\$notesDirName") | Out-Null
-    Write-Utf8NoBom -Path (Join-Path $repoRoot ($consumerRelPath -replace '/', '\')) -Content $consumerContent
-    Write-Host "  created: $consumerRelPath (consumer document -- edit before publishing)" -ForegroundColor DarkGray
+if ($cutNote) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $repoRoot "releases\notes\$notesDirName") | Out-Null
+    Write-Utf8NoBom -Path (Join-Path $repoRoot ($noteRelPath -replace '/', '\')) -Content $noteContent
+    $sectionCount = if ($tier2Entries.Count -gt 0) { 'consumer + organisation sections' } else { 'organisation section only -- no entry reached tier 2' }
+    Write-Host "  created: $noteRelPath (draft -- $sectionCount)" -ForegroundColor DarkGray
 }
 
 # --- Bump plugin versions (regex on the version line -- preserves the JSON formatting) -----------
@@ -867,13 +876,6 @@ foreach ($p in $manifests) {
 # is a command in the source repo and a dead path in a consumer. A checklist that prints something
 # unrunnable is worse than one that prints something long.
 function Write-FollowUpSteps {
-    $internalScript = 'scripts/release/new-internal-note.ps1'
-    $internalOwn    = Join-Path $repoRoot ($internalScript -replace '/', '\')
-    $internalMirror = Join-Path $PSScriptRoot 'new-internal-note.ps1'
-
-    $hasOwn      = Test-Path -LiteralPath $internalOwn
-    $hasInternal = $hasOwn -or (Test-Path -LiteralPath $internalMirror)
-
     # The body is generated, so it is reported whether or not anything is left to write by hand -- a
     # patch with no hand-written document still gets a Release page, which is the whole point of
     # generating it.
@@ -881,19 +883,21 @@ function Write-FollowUpSteps {
     Write-Host "The GitHub Release body is written for you:" -ForegroundColor Cyan
     Write-Host "  gh release create $tagName --title `"$tagName - <short title>`" --notes-file $bodyRelPath"
 
-    if (-not ($cutConsumerDoc -or $hasInternal)) { return }
+    # ONE DOCUMENT, AND NO SECOND SCRIPT TO INVOKE (Dave, August 10, 2026). This block used to name two
+    # follow-ups: the consumer draft, and an invocation of new-internal-note.ps1 gated on that script being
+    # present in one of two trees -- machinery that existed only because the second document was written by
+    # a second tool AFTER the cut. The draft above is both readers' sections in one file, so the follow-up
+    # is an edit rather than a command. new-internal-note.ps1 is still shipped and still works for a repo
+    # running the two-document flow; nothing here calls it.
+    if (-not $cutNote) { return }
     Write-Host ""
-    Write-Host "Still to write by hand (both via a branch + PR -- this commit is already tagged):" -ForegroundColor Cyan
-    if ($cutConsumerDoc) {
-        Write-Host "  - $consumerRelPath -- edit the draft; it is the tier-2 entries, still in the words their author wrote for a reviewer."
-    }
-    if ($hasInternal) {
-        $internalCmd = if ($hasOwn) {
-            "./$internalScript -Version $new"
-        } else {
-            "powershell -NoProfile -File `"$((Resolve-Path -LiteralPath $internalMirror).Path)`" -Version $new"
-        }
-        Write-Host "  - the internal summary:  $internalCmd"
+    Write-Host "Still to write by hand (via a branch + PR -- this commit is already tagged):" -ForegroundColor Cyan
+    Write-Host "  - $noteRelPath"
+    if ($tier2Entries.Count -gt 0) {
+        Write-Host "      the consumer section is a DRAFT (the tier-2 entries, in the words their authors wrote for a reviewer);"
+        Write-Host "      'what it is worth' and 'what was still open' are empty and cannot be generated."
+    } else {
+        Write-Host "      no entry reached tier 2, so it carries the organisation's sections only -- both empty."
     }
 }
 

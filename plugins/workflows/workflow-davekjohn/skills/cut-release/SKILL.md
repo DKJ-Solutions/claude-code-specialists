@@ -92,19 +92,19 @@ each command as you go — do not skip a step or reorder them from memory.
    - **`-SkipTierGate`** cuts a bump the pending changelog entries have not earned. **Expect not to need
      it.** Where the pending entries declare their impact, **the bump follows the highest tier pending**:
 
-     | highest tier pending | bump | documents written |
+     | highest tier pending | bump | what is written |
      |---|---|---|
-     | `0` | patch | the development notes |
-     | `1` | minor | + the internal note |
-     | `2` | minor | + the consumer document, for consumers |
+     | `0` | patch | the development notes + the generated Release body |
+     | `1` | minor | + the hand-written note, organisation sections only |
+     | `2` | minor | + a *For consumers* section in that same note |
 
      A major additionally needs enough minors behind the line. So a refusal usually means the bump is
      wrong, not the gate — the script names the bump the work *does* earn; take that instead.
 
-     **The documents follow the TIER, not the bump**, which is why a tier-1-only minor writes no
-     consumer document: the version moves for everyone, but nobody outside is handed a document about work they
-     cannot see. Deliberately a separate flag from `-SkipLint`, because it overrules a judgement about
-     **content** rather than skipping a tool.
+     **The SECTIONS follow the tier; whether there is a document follows the bump.** A tier-1-only minor
+     gets the note without a consumer section: the version moves for everyone, but nobody outside is handed
+     a section about work they cannot see. Deliberately a separate flag from `-SkipLint`, because it
+     overrules a judgement about **content** rather than skipping a tool.
    - **`-SkipSignificanceGate`** cuts even though a pending entry that reaches tier 1 or higher has not said
      **how much it weighs** there. Every tier an entry reaches is a document with its own reader, so every
      one owes a `#### Tier N` sub-section under the entry's `### Significance` — a reason it matters at
@@ -142,46 +142,62 @@ each command as you go — do not skip a step or reorder them from memory.
    git push origin main; git push origin vX.Y.Z
    ```
 
-2. **The internal summary — at EVERY release, patch included.** `cut-release.ps1` has printed this
-   invocation at the end of its run, with the path already resolved for wherever it found the script —
-   paste that rather than retyping it:
+2. **ONE hand-written document, with a named section per reader** (Dave, August 10, 2026). Where the repo
+   names this bump in `Get-ReleaseConsumerBumps`, `cut-release.ps1` has already drafted
+   `releases/notes/<dir>/<X.Y.Z>.md`. There is nothing to invoke — the follow-up is an **edit**, and it
+   goes via a branch + PR like any other change (step 4).
+
+   | section | who it is for | how it arrives |
+   |---|---|---|
+   | *For consumers* | whoever decides whether to update | **pre-filled** — the tier-2 entries, still in the words their authors wrote for a diff reviewer. Rewrite them against the seven tests below. Absent where no entry reached tier 2. |
+   | *What it is worth* | the organisation | **empty** — it cannot be generated. Think in time, risk and reduced dependence on a developer. |
+   | *What was still open at this release* | the organisation | **empty**. Past tense on purpose: a published document does not move with reality, so a present-tense line goes stale in hours rather than months. |
+
+   **A patch writes no document at all**, and the release is announced by the generated body alone. **A
+   minor or major always writes one**, even where nothing reached tier 2 — then it carries the
+   organisation's two sections and no consumer section, because a named question with nothing under it is
+   worse than no question.
+
+   **What this replaced, and the measurement that chose it.** There were two hand-written documents — an
+   internal note for the organisation and a consumer document — and at every one of the twelve releases
+   since the internal tier existed, **both were written, about the same changes**. Before merging them, the
+   internal note of one release (962 words) was held against test 2 of the writing norm below (*does this
+   describe our effort or their outcome*):
+
+   | | words | |
+   |---|---|---|
+   | could appear in a consumer-facing section | ~365 (38%) | and **did**, rewritten in a second register in the other document — that is the duplication |
+   | could not | ~597 (62%) | including *what it is worth* (316 words), which is not an outlier but the entire reason the organisational tier exists |
+
+   So a **blended** document was refused: it would have to drop the 62% or break the norm. A named section
+   per reader keeps each register intact and writes the shared 38% once. The heading *"what is different
+   now"* is gone rather than moved — it **was** the duplicated half, and the consumer section is it.
+
+   **`new-internal-note.ps1` is still shipped and still works**, for a repo running the two-document flow —
+   an organisational note in `releases/internal/<dir>/<X.Y.Z>.md` beside a separate consumer document.
+   Nothing in this checklist calls it any more, and it is documented here rather than dropped because a
+   consumer receives a plugin update rather than choosing one: deleting a working entry point is a breaking
+   change, and an undocumented one is worse than a retired one.
 
    ```powershell
    powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/new-internal-note.ps1" -Version X.Y.Z
    ```
 
-   `-Force` overwrites an existing note — needed rarely and deliberately, since this is the one tier that
-   cannot be regenerated from anything. `-RepoRoot <path>` points it at another checkout, the same override
-   the fold script carries, for a run from a temporary or detached worktree.
+   `-Force` overwrites an existing note — needed rarely and deliberately, since a note rewritten back to a
+   skeleton is a loss you do not want to make by accident. `-RepoRoot <path>` points it at another checkout,
+   the same override the fold script carries, for a run from a temporary or detached worktree.
 
-   It writes a **skeleton** to `releases/internal/<dir>/<X.Y.Z>.md`: the metadata copied from the
-   development notes, the entry titles as bullets, and three fixed headings. **The middle one is the
-   tier** — "what it is worth" cannot be generated from a changelog. Think in time, risk and reduced
-   dependence on a developer.
+3. **Rewrite the consumer section.** It is markdown only, and it is the release's **tier-2 entries**: the
+   ones whose author declared that a consumer notices them.
 
-   **The third heading is past tense on purpose** — *"What was still open at this release"*. Where this
-   note is the Release body (step 5), it is published output and does not move with reality, so a
-   present-tense line in it goes stale in hours rather than months. Write that section as a snapshot of
-   the release, and expect to re-read the *previous* note whenever something it called open closes. The
-   development notes and the consumer document needs no such pass: they are written once and left alone.
-
-   **This is the tier that covers a patch, and that is why it exists.** The consumer document answers *what a
-   consumer notices*; this answers *what the organisation gets out of it*. A release with nothing for a
-   consumer — correctly a patch, so no consumer document — can still be the one where a routine change stopped
-   needing a developer. It refuses to overwrite an existing note without `-Force`: this is the one
-   document of the three that cannot be regenerated from anything.
-
-3. **Edit the consumer draft — where the repo generates one.** Where the repo sets
-   `Get-ReleaseConsumerBumps` in `scripts\repo-config.ps1` and this bump is one of them,
-   `cut-release.ps1` has already written `releases/consumer/<dir>/<X.Y.Z>.md` — markdown only. It is the
-   release's **tier-2 entries**: the ones whose author declared that a consumer notices them.
-
-   **Nothing to delete, and that is the change.** This document used to carry a developer-only block under
+   **Nothing to delete, and that is the change.** This content used to carry a developer-only block under
    a "remove before publishing" marker, because the generator had to guess from branch types which entries
    a consumer cares about — a guess that fails in both directions (in a storefront repo a `Style` branch
    *is* customer-visible; in a tooling repo a `chore/` branch can carry the most consequential change
    there is). The tier asks the entry's author instead, so the selection arrives already made. Retired
-   August 5, 2026, along with the two seam knobs that configured it.
+   August 5, 2026, along with the two seam knobs that configured it. The branch administration — the
+   title, id, prefix and PR link sections — is stripped as of August 10, 2026, which was a third of the
+   draft's lines.
 
    **It is still a draft, for the reason that never depended on the marker:** the prose is the entry
    bodies, written for whoever reviews the diff.
@@ -218,10 +234,14 @@ each command as you go — do not skip a step or reorder them from memory.
    illustration from a leak. **If you adopt this list, adopt the measurement with it**: run the seven over
    your own last few consumer documents before deciding which one your repo can afford to automate.
 
-4. **Ship the hand-written documents via a branch + PR.** The internal note and the edited consumer
-   draft are both written after the cut, and `cut-release.ps1` has already committed and tagged by
-   then — so neither can ride along on the release commit, and neither is one of the two named
-   direct-on-`main` exceptions. Use the normal `new-branch` → `ship-pr` route.
+4. **Ship the edited document via a branch + PR.** The cut drafted it and then committed and tagged in the
+   same motion, so what the tag holds is the draft; the written version lands afterwards and is not one of
+   the two named direct-on-`main` exceptions. Use the normal `new-branch` → `ship-pr` route.
+
+   **The tag holding a draft is not new and is worth stating plainly**: it held an unpublishable consumer
+   draft before this, so "the release commit is purely generated artefacts" was already only half true. What
+   changed is that the draft now also carries two empty headings — and what that bought is one artefact, one
+   editing pass, and an overview row the cut can point at the right document first time.
 
 5. **Publish the GitHub Release — still after step 4, and the reason has changed.** The body no longer
    comes from step 4, so publishing early would no longer publish a body that does not exist. What it
