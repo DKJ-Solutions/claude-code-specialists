@@ -22,3 +22,8 @@ $RECYCLE.BIN/
 
 # Claude Code — per-gebruiker, niet delen (de gedeelde .claude/settings.json blijft wél in de repo)
 .claude/settings.local.json
+
+# The locked next topic (/lock -> /clear -> /continue). Deliberately NOT committed: it is one
+# developer's working intent, it goes stale within hours, and all three commands run on one machine
+# within minutes -- committing it would mean a pull request per session close.
+.claude/handover.md

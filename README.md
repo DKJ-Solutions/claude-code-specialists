@@ -506,7 +506,7 @@ SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-con
 `workflow-sessioncheck`) function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `fix-mojibake`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `cut-release`,
-`adopt-config`, `discover-workflow`)<!-- /skills:all -->
+`adopt-config`, `discover-workflow`, `lock`, `continue`)<!-- /skills:all -->
 remain available there.
 
 Skills themselves are Anthropic's general **Agent Skills** mechanism — organized folders of
@@ -522,8 +522,11 @@ interchangeable with — a Claude Code subagent.
 
 <!-- skills:all -->Most skills in claude-code-specialists today (`fold-changelog`, `open-pr`, `ship-pr`,
 `new-branch`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`, `sync-roster`,
-`start-task`, `adopt-config`, `discover-workflow`) are a thin wrapper around a script — procedural **mechanism** (branch, PR, ship, fold,
-bootstrap, teardown, roster-sync, encoding repair, reading a repo's own conventions). `cut-release`<!-- /skills:all --> is the deliberate exception:
+`start-task`, `adopt-config`, `discover-workflow`, `lock`, `continue`) are a thin wrapper around a script — procedural **mechanism** (branch, PR, ship, fold,
+bootstrap, teardown, roster-sync, encoding repair, reading a repo's own conventions, the standing
+before and after a context clear). `lock` and `continue` are the first pair to wrap **one** script
+between them — they run the same reporter and differ only in what they do with the answer, which is why
+the shared-scripts registry names a script's documenting page rather than its callers. `cut-release`<!-- /skills:all --> is the deliberate exception:
 a checklist with no script of its own (see below). Either way, the specialists' craft and judgment
 live in the persona/manual context (agent defs), not in skills. That's a deliberate split, but it
 also means we currently use only one half of what Agent Skills can carry.
