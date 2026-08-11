@@ -627,20 +627,30 @@ $script:EntryGuidanceDefaults = [ordered]@{
         'not a report of what you did on the branch. Name what is different afterwards,',
         'and where a decision was measured rather than assumed, say what was measured.'
     )
+    # 'ABOVE the Score line' IS LOAD-BEARING, NOT STYLE (inbound #596). The parser takes everything up to
+    # the score as the reason and discards what follows, and the scaffold leaves one blank line on EACH side
+    # of that line -- so the two places read identically and only one is read. Measured in a consumer: three
+    # tiers answered, all three written underneath, all three refused, and finding out why took reading
+    # entry-scaffold-lib.ps1 line by line. The gate names the misplacement now; this is the half that gets
+    # said BEFORE the author writes rather than after, which is the same argument new-branch already makes
+    # for printing the rubric at scaffold time.
     Tier = @(
         'Why the change matters AT THIS REACH specifically. A reason that would read the',
-        'same under every tier is a sign the tier is wrong. Then Score: 1-5 against the',
-        'rubric new-branch printed when it wrote this file.'
+        'same under every tier is a sign the tier is wrong. Write it ABOVE the Score line --',
+        'everything below that line is discarded. Then Score: 1-5 against the rubric',
+        'new-branch printed when it wrote this file.'
     )
     # TIER 0 IS THE ONE TIER THAT IS ALWAYS REACHED -- every change matters to the people maintaining this
     # repo, if only a little -- so it is the only one with no N/A to offer. Tiers 1 and 2 get the extra
     # paragraph, which is why this is a second block rather than a longer version of the one above.
     TierOptional = @(
         'Why the change matters AT THIS REACH specifically. A reason that would read the',
-        'same under every tier is a sign the tier is wrong. Then Score: 1-5 against the',
-        'rubric new-branch printed when it wrote this file.',
+        'same under every tier is a sign the tier is wrong. Write it ABOVE the Score line --',
+        'everything below that line is discarded. Then Score: 1-5 against the rubric',
+        'new-branch printed when it wrote this file.',
         '',
-        'If it has no significance at this reach at all, then explain shortly why and insert N/A in Score.'
+        'If it has no significance at this reach at all, then explain shortly why and insert N/A in Score.',
+        'That reason goes above the Score line too.'
     )
 }
 
