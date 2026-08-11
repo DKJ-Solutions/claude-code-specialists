@@ -15,7 +15,7 @@ docs
 ### What does the change on this branch bring to main?
 
 `workflow-davekjohn` now ships
-[`TICKETWORK-portable.md`](../plugins/workflows/workflow-davekjohn/TICKETWORK-portable.md), beside
+[`TICKETWORK-portable.md`](plugins/workflows/workflow-davekjohn/TICKETWORK-portable.md), beside
 `CONTRIBUTING-portable.md` and picking up where it starts: that page begins at `new-branch`, and this one
 covers the layer before it, in a repo whose work arrives from somebody else's tracker as a desired outcome
 rather than an instruction. Donated from a consumer
