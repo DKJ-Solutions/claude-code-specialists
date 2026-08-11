@@ -380,6 +380,7 @@ list sits at the **end** of the page:
 
 | Version | Date | Type | Title |
 |---|---|---|---|
+| [4.4.0](notes/4.x/4.4.0.md) | 2026-08-11 | Minor | The merged note model gets its first written instance, and a release now times itself end to end |
 | [4.3.0](notes/4.x/4.3.0.md) | 2026-08-11 | Minor | One hand-written release note per release, a generated Release page, and the performance engineer owns wall-clock |
 | [4.2.0](internal/4.x/4.2.0.md) | 2026-08-10 | Minor | The consumer release document is named and written for its reader, and three silent failures gain a check |
 | [4.1.0](internal/4.x/4.1.0.md) | 2026-08-10 | Minor | The workflow's portable half: a consumer can copy the PR template and the contribution cycle, and three seams stop failing quietly |
