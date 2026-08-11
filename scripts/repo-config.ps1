@@ -430,11 +430,18 @@ function Get-ReservedRootMd {
 # earning its keep in the wrong direction: it invited the register a self-selected best-of invites,
 # which is exactly what v4.0.0's document was reviewed and found guilty of.
 #
-# The second, stakeholder-facing rendering of a release: releases/consumer/<dir>/<X.Y.Z>.md. Written
-# for NON-DEVELOPERS (Dave, July 13, 2026), and since the tier model it is assembled from the TIER-2
+# The hand-written rendering of a release: releases/notes/<dir>/<X.Y.Z>.md. Written for NON-DEVELOPERS
+# (Dave, July 13, 2026), and since the tier model its consumer section is assembled from the TIER-2
 # ENTRIES rather than from a category guess plus a marker somebody deletes by hand. MARKDOWN ONLY -- the
 # tier briefly also generated a print-ready .html and no longer does anywhere (Dave, August 3, 2026);
 # whoever wants a PDF renders the markdown with a real tool.
+#
+# ONE DOCUMENT WITH A NAMED SECTION PER READER SINCE v4.3.0 (Dave, August 10, 2026), not two. It used to
+# be releases/consumer/ beside releases/internal/, and at all twelve releases since the internal tier
+# existed both were written about the same changes. The paragraphs below described that retired shape for
+# two releases after the script stopped running it -- inbound #605 -- which mattered more here than in an
+# ordinary comment: adopt-config copies this text VERBATIM into a consumer's own repo-config, so a stale
+# description ships as their committed documentation of a directory the script will never write.
 #
 # ON IN THIS REPO SINCE AUGUST 3, 2026, for minor and major only -- Dave's decision, and it reversed
 # what this file said one commit earlier. The reasoning that had it off was that this repo's release
@@ -443,16 +450,22 @@ function Get-ReservedRootMd {
 # reader does not want the full per-PR record, and giving them only the developer notes is the same
 # mismatch a storefront repo has with its management -- one tier serving two audiences badly.
 #
-# So this repo runs three release documents, one per tier of the ladder the entries declare:
-#   releases/development/<X>.x/<X.Y.Z>.md   tier 0   developers   -- every release, complete, raw
-#   releases/internal/<X>.x/<X.Y.Z>.md      tier 1   colleagues   -- every release, what it is worth
-#   releases/consumer/<X>.x/<X.Y.Z>.md      tier 2   consumers    -- minor/major, what they notice
+# So this repo writes two documents per release plus a generated announcement:
+#   releases/development/<X>.x/<X.Y.Z>.md              tier 0  developers  -- every release, complete, raw
+#   releases/notes/<X>.x/<X.Y.Z>.md                    tiers 1+2           -- minor/major here, hand-written
+#   releases/development/<X>.x/<X.Y.Z>-github-body.md  generated           -- every release, the announcement
 #
-# THE TIER NUMBER AND THE DOCUMENT ARE THE SAME SCALE, which is the point of the renumbering (Dave,
-# August 5, 2026 -- they were 1/2/3 before, one off from the entries they describe). A tier-1 entry is
-# in the internal note; a tier-2 entry is in the consumer document AND, the ladder being cumulative, in
-# the internal note as well. The development note carries everything, tier 0 included, because it is
-# the record.
+# THE SECTIONS INSIDE THE NOTE FOLLOW THE TIER, while whether the note EXISTS follows the bump. Its
+# organisational section ("what it is worth") applies to every release the seam names; its consumer
+# section is written only when there are tier-2 entries, because a section about work no consumer can see
+# is worse than no section -- it looks written. A patch gets no hand-written document at all and is
+# announced by the generated body alone.
+#
+# THE TIER NUMBER AND THE SECTION ARE THE SAME SCALE, which is the point of the renumbering (Dave,
+# August 5, 2026 -- they were 1/2/3 before, one off from the entries they describe). A tier-1 entry
+# reaches the organisational section; a tier-2 entry reaches the consumer section AND, the ladder being
+# cumulative, the organisational one as well. The development note carries everything, tier 0 included,
+# because it is the record.
 #
 # PER MAJOR, NOT PER MINOR (Dave, August 3, 2026). The consumer this came from folders its notes per
 # minor; this repo keeps <X>.x for all three tiers, which Get-ReleaseNotesGrouping above already says
@@ -462,14 +475,25 @@ function Get-ReservedRootMd {
 # is the same test the version number itself answers, so the tier and the bump agree by construction --
 # a patch has nothing a consumer would read, which is precisely why it is a patch.
 #
-# SINCE AUGUST 5, 2026 THAT AGREEMENT IS ENFORCED RATHER THAN HOPED FOR: cut-release refuses a minor
-# unless a tier-2 entry is pending, so "this bump has a consumer reading it" is a precondition of the
-# bump instead of a convention about it. This knob therefore no longer decides WHETHER there is
-# anything to write -- the tier does -- only whether this repo wants the document for that bump type.
+# WHAT THIS KNOB DECIDES INVERTED IN v4.3.0, AND ITS VALUE DID NOT (inbound #605). This paragraph said
+# the opposite until then: that the knob "no longer decides WHETHER there is anything to write -- the
+# tier does -- only whether this repo wants the document for that bump type". That was true while a
+# tier-1-only minor still produced an internal note from a second script, so switching the consumer tier
+# off cost only the consumer half. It is now the whole document: @() here means those bumps get NO
+# hand-written note at all, and the release goes out announced by the generated body alone.
+#
+# WHY THAT WAS INVISIBLE, and worth knowing because the shape recurs: the check compares which functions
+# exist against which are requested, so a knob whose VALUES stay valid while its QUESTION changes passes
+# every gate. @('minor','major') was correct before and is correct after; only the sentence explaining it
+# was wrong, and no gate reads a sentence. It took a consumer aligning two versions to find it.
+#
+# The agreement between the tier and the bump is still enforced, just at the other end: cut-release
+# refuses a minor that no tier-1-or-higher entry has earned, so "somebody outside this repo's developers
+# is reading this bump" is a precondition of the bump rather than a convention about it.
 $script:ReleaseConsumerBumps = @('minor', 'major')
 
 function Get-ReleaseConsumerBumps {
-    <# Bump types that also get a consumer document: e.g. @('minor','major'). Empty = tier off. #>
+    <# Bump types that get the hand-written release note: e.g. @('minor','major'). Empty = none at all. #>
     return $script:ReleaseConsumerBumps
 }
 
@@ -546,4 +570,24 @@ $script:InternalNoteWording = @{}
 function Get-InternalNoteWording {
     <# Overrides for the internal note's headings, audience line and fill-in hints. Empty = English. #>
     return $script:InternalNoteWording
+}
+
+# THE NAME THE CUT ACTUALLY LOOKS FOR FIRST (inbound #605). cut-release.ps1 reads
+# Get-ReleaseNoteWording and only falls back to Get-InternalNoteWording above -- so until this existed,
+# this repo was being served by the retired name and had no way to notice. Nothing was broken, which is
+# precisely why it went two releases undeclared: the fallback works, so no run ever complains.
+#
+# A SEPARATE MAP RATHER THAN AN ALIAS, because the two documents do not share a key set. This one is the
+# ONE hand-written release note (a named section per reader): Title, AudienceLabel, Audience,
+# SectionConsumers, HintConsumers, SectionValue, HintValue, SectionOpen, HintOpen. The four keys above
+# that are missing here -- SkeletonNote, SectionChanged, NoEntries, Unknown -- belong to
+# new-internal-note.ps1, which is still shipped and which nothing here calls.
+#
+# EMPTY HERE, for the same reason as its neighbour: an English repo is already served by the English
+# defaults in the script. Merged over them, so overriding one leaves the rest alone.
+$script:ReleaseNoteWording = @{}
+
+function Get-ReleaseNoteWording {
+    <# Overrides for the release note's headings, audience line and fill-in hints. Empty = English. #>
+    return $script:ReleaseNoteWording
 }

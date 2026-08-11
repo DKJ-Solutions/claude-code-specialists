@@ -172,7 +172,7 @@ try {
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
     Assert-Equal 0 $r.Code 'happy path: exit-code 0'
     Assert-NotMatch '\[ERROR\]' $r.Out 'happy path: no errors'
-    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds', 'Get-LiveStage', 'Get-EntryTitlePlaceholder', 'Get-EntryBodyHeading', 'Get-EntryBodyPlaceholder', 'Get-EntryFallbackType', 'Get-PrMergeMethod', 'Get-MojibakePaths', 'Get-ReservedRootMd', 'Get-ReleaseNotesGrouping', 'Get-ReleaseHistoryPath', 'Get-ReleasePluginTier', 'Get-ReleaseConsumerBumps', 'Get-ReleaseMajorMinMinors', 'Get-InternalNoteWording')) {
+    foreach ($fn in @('Get-BranchInfo', 'Test-BranchName', 'Get-RepoName', 'Get-LintScript', 'Get-RosterPath', 'Get-RosterIgnoredIds', 'Get-LiveStage', 'Get-EntryTitlePlaceholder', 'Get-EntryBodyHeading', 'Get-EntryBodyPlaceholder', 'Get-EntryFallbackType', 'Get-PrMergeMethod', 'Get-MojibakePaths', 'Get-ReservedRootMd', 'Get-ReleaseNotesGrouping', 'Get-ReleaseHistoryPath', 'Get-ReleasePluginTier', 'Get-ReleaseConsumerBumps', 'Get-ReleaseMajorMinMinors', 'Get-ReleaseNoteWording', 'Get-InternalNoteWording')) {
         Assert-Match "\[OK\]\s+'$fn' present in" $r.Out "happy path: '$fn' reported OK"
     }
     # FOUR RECORDS RETIRED ON AUGUST 5, 2026, all of them to the flat changelog rather than four separate
@@ -181,7 +181,7 @@ try {
     # select), Get-ReleaseCategoryTitles (no category headings to label) and Get-ChangelogReleaseWording (no
     # release-block text to override). Each is now asserted on ABSENCE from the register, further down.
     $okCount = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 21 $okCount 'happy path: exactly twenty-one [OK] lines -- every declared record this repo defines (four mandatory functions plus every optional: Get-LiveStage, the two Get-Roster* made optional by #445, the four Get-Entry* stub-wording knobs, Get-PrMergeMethod, Get-MojibakePaths, the cut-release knobs from #417 plus Get-ReleaseMajorMinMinors and Get-ReleaseHistoryPath, the internal tier''s Get-InternalNoteWording, and Get-BranchTypes from inbound #580, nothing else)'
+    Assert-Equal 22 $okCount 'happy path: exactly twenty-two [OK] lines -- every declared record this repo defines (four mandatory functions plus every optional: Get-LiveStage, the two Get-Roster* made optional by #445, the four Get-Entry* stub-wording knobs, Get-PrMergeMethod, Get-MojibakePaths, the cut-release knobs from #417 plus Get-ReleaseMajorMinMinors and Get-ReleaseHistoryPath, BOTH note-wording maps (Get-ReleaseNoteWording, which the cut reads first, and Get-InternalNoteWording, its fallback -- inbound #605), and Get-BranchTypes from inbound #580, nothing else)'
     # inbound #203: the run names the root it inspected and how it resolved it. Asserted on the clean
     # run too, not only on a drifted one -- the [SCOPE] line is context that must always be emitted, so
     # that the hook has something to surface the moment a finding does appear.
@@ -322,7 +322,7 @@ try {
         Assert-NotMatch $optFn $r.Out "optional Get-Pr*: '$optFn' never mentioned (not in the contract)"
     }
     $okCount6 = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 21 $okCount6 'optional Get-Pr*: still exactly twenty-one [OK] (the mandatory four + the declared optionals this repo defines; the four UNdeclared Get-Pr* excluded)'
+    Assert-Equal 22 $okCount6 'optional Get-Pr*: still exactly twenty-two [OK] (the mandatory four + the declared optionals this repo defines; the four UNdeclared Get-Pr* excluded)'
 
     # --- 6c. An optional contract function that is ABSENT -> [INFO] naming the fallback, exit 0 -----
     #     Get-ReleaseHistoryPath is declared Optional: the shared scripts fall back to 'releases/README.md',
@@ -538,6 +538,11 @@ function Get-RosterIgnoredIds { return @() }
         @{ Function = 'Get-ReleaseMajorMinMinors';              Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },
         # The third tier (August 3, 2026), attributed to its own script rather than to cut-release: the
         # internal note is generated AFTER the cut, because the development notes are its input.
+        # Get-ReleaseNoteWording is the name cut-release reads FIRST; Get-InternalNoteWording is the
+        # fallback and belongs to new-internal-note. Both declared, because the two maps have different key
+        # sets and serve different documents -- inbound #605, where being undeclared meant a consumer was
+        # served by the retired name and could never find out the canonical one had changed.
+        @{ Function = 'Get-ReleaseNoteWording';                Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') }
         @{ Function = 'Get-InternalNoteWording';               Lib = 'scripts\repo-config.ps1'; Scripts = @('new-internal-note') }
         # Get-ChangelogReleaseWording (inbound #462) USED TO BE THE LAST RECORD HERE, and the only one read
         # by two release scripts: the cut wrote the release block's intro and notes line, the internal note
@@ -548,7 +553,7 @@ function Get-RosterIgnoredIds { return @() }
 
     $contractSrc = [System.IO.File]::ReadAllText($ContractLib)
     $totalRecordCount = @([regex]::Matches($contractSrc, "Lib\s*=\s*'[^']+';\s*Function\s*=\s*'[^']+';\s*Scripts\s*=\s*@\(")).Count
-    Assert-Equal 23 $totalRecordCount 'contract: exactly twenty-three (lib, function) records declared in script-contract-lib.ps1 (the twenty-two below plus the dedicated Get-LiveStage block after this loop). Was twenty-eight until the flat changelog retired six: both section seams, the live marker, the history mode, the category labels and the release-block wording; Get-BranchTypes joined on August 10, 2026 (inbound #580)'
+    Assert-Equal 24 $totalRecordCount 'contract: exactly twenty-four (lib, function) records declared in script-contract-lib.ps1 (the twenty-three below plus the dedicated Get-LiveStage block after this loop). Was twenty-eight until the flat changelog retired six: both section seams, the live marker, the history mode, the category labels and the release-block wording; Get-BranchTypes joined on August 10, 2026 (inbound #580) and Get-ReleaseNoteWording on August 11 (inbound #605)'
 
     # Every record must carry a 'Returns' line, so a finding is actionable without any reference to this
     # source repo (Dave, July 28, 2026). Counted against $totalRecordCount rather than listed per record:
