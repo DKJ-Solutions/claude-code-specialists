@@ -502,13 +502,18 @@ scaffold gate: $entryRel has not been written yet - nothing pushed, no PR opened
 
 $detail
 
-Each line above is a field the scaffolder left for you and nothing has been put in it, or wording it wrote
-that is still standing. The guidance comments do not count as an answer: the fold strips them, so a section
-that looks filled in on the branch lands in CHANGELOG.md empty.
+Each line above is a field the scaffolder left for you and nothing has been put in it, wording it wrote that
+is still standing, or - for a tier - an answer written one line too low. The guidance comments do not count
+as an answer: the fold strips them, so a section that looks filled in on the branch lands in CHANGELOG.md
+empty.
 
-And it is about to become permanent - the fold pastes this entry into CHANGELOG.md, the next release copies
-it into releases/ and into every per-plugin CHANGELOG.md that travels to consumers, where nobody will look
-for it again.
+That third case is the one worth knowing before you go looking: under a tier heading, everything ABOVE the
+$($script:EntryScoreLabel) line is the reason and everything below it is discarded. The scaffold leaves one
+blank line on each side, so writing the reason underneath is easy to do and impossible to see - and the gate
+names it above when that is what happened, instead of calling it missing.
+
+And it is about to become permanent - the fold pastes this entry into CHANGELOG.md and the next release
+copies it into releases/, where nobody will look for it again.
 
 Answer them and run again. Shipping it as it stands is -Force.
 "@
