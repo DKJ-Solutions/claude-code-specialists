@@ -173,8 +173,19 @@ each command as you go — do not skip a step or reorder them from memory.
    per reader keeps each register intact and writes the shared 38% once. The heading *"what is different
    now"* is gone rather than moved — it **was** the duplicated half, and the consumer section is it.
 
-   **`new-internal-note.ps1` is still shipped and still works**, for a repo running the two-document flow.
-   Nothing in this checklist calls it any more.
+   **`new-internal-note.ps1` is still shipped and still works**, for a repo running the two-document flow —
+   an organisational note in `releases/internal/<dir>/<X.Y.Z>.md` beside a separate consumer document.
+   Nothing in this checklist calls it any more, and it is documented here rather than dropped because a
+   consumer receives a plugin update rather than choosing one: deleting a working entry point is a breaking
+   change, and an undocumented one is worse than a retired one.
+
+   ```powershell
+   powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/new-internal-note.ps1" -Version X.Y.Z
+   ```
+
+   `-Force` overwrites an existing note — needed rarely and deliberately, since a note rewritten back to a
+   skeleton is a loss you do not want to make by accident. `-RepoRoot <path>` points it at another checkout,
+   the same override the fold script carries, for a run from a temporary or detached worktree.
 
 3. **Rewrite the consumer section.** It is markdown only, and it is the release's **tier-2 entries**: the
    ones whose author declared that a consumer notices them.
