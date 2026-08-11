@@ -1,13 +1,15 @@
-# `main` progress
-
-
-> **You are on `main`.** Do not work in this file yet -- create a branch first.
-> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
-> of the next person who does create one.
-
-This file carries the step list of the branch you are on. It is written when a branch is created
-and returns to this state after the merge.
+## `docs/a-release-is-timed-in-the-unit-that-was-asked` progress
 
 ### Steps
 
-_(filled in when a branch is created)_
+- [x] The craft rule in the performance engineer's PORTABLE manual -- both sides of it, since only one
+      half can be done after the fact
+- [x] Step 0a in the `cut-release` skill: the clock, and the two splits that a single total hides
+- [x] The three numbers the next release owes, in Nolan's repo lens, beside what WAS measured properly
+- [x] One pointer in Rendall's lens -- he is the one who cuts, so he is the one who starts the clock
+- [x] Lint green, including the four new cross-document links
+- [~] No gate built for any of the three: a check refusing a release over a missing timestamp is ceremony
+
+### Where I left off
+
+Done. The next cut is where this either holds or turns out to be a line nobody reads.

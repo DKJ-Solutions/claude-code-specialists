@@ -202,11 +202,32 @@ thing a person waits on. A proposal that shortens the first is worth close to no
 needs no code at all. The counterweight is recorded and belongs to Dave: `plugin.json`'s version is one of
 the two update gates, so releasing less often is delivering later.
 
-**The measurement that is open, and deliberately unbuilt** (proposed August 10, 2026, not approved): *which
-of the 30 suites can change behaviour on a markdown-only diff?* If the answer is few, the second local run
-has room; if the answer is "most of them", it does not — several suites read documents rather than scripts,
-so "markdown-only, therefore skip" is exactly the sort of assumption this repo has been bitten by. Count
-before proposing.
+**THE NEXT RELEASE OWES THREE NUMBERS, and the first is a gap Nolan left himself** (August 11, 2026). All
+three are counting, not building.
+
+1. **Time the release end to end** — clock started before the cut, stopped when the Release is published,
+   the duration written into the release document's organisational section. Step 0a of the
+   [`cut-release` skill](../../../plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md) now asks
+   for it. **Why it is first: `v4.3.0` improved the release and produced no post-change figure in minutes.**
+   The whole cycle ran against *"why does a release take about thirty minutes"*, the hand-written half
+   measurably shrank, and the result was reported as **43% fewer words** — a proxy, reported because words
+   were what somebody had counted. The gate time *was* re-measured and was unchanged (~13 of the ~30
+   minutes); the end-to-end figure was captured neither before nor after, and a baseline cannot be taken
+   retroactively. The portable half of that lesson is in
+   [Nolan's manual](../../../plugins/teams/team-alpha/manuals/06-25-manual.md) under *report in the unit the
+   question was asked in*.
+2. **Which of the 30 suites can change behaviour on a markdown-only diff?** (Proposed August 10, 2026, not
+   approved.) If the answer is few, the second local run has room; if it is "most of them", it does not —
+   several suites read documents rather than scripts, so "markdown-only, therefore skip" is exactly the sort
+   of assumption this repo has been bitten by. Count before proposing.
+3. **The cadence, against the fixed cost.** 16 releases in the 10 days to August 10, 2026, each carrying
+   ~17 minutes of gate time that does not shrink with the number of entries in it. Batching is a lever
+   needing no code; the counterweight is Dave's and it is real — `plugin.json`'s version is one of the two
+   update gates, so releasing less often is delivering later.
+
+**None of the three is a gate, deliberately.** They are measurements whose answers decide what is worth
+building; a check refusing a release over a missing number would cost every release something in order to
+guard a decision nobody has made yet.
 
 ### Boundaries with the other roles
 
