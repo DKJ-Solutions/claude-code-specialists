@@ -988,6 +988,58 @@ $tableFindings = @(Get-EntryImpactFindings -EntryText $tableNoWhy)
 Assert-Equal 1 $tableFindings.Count 'table shape: still reported'
 Assert-True ($tableFindings[0] -match "no 'Why'") 'table shape: and in its own wording, which the new branch must not have swallowed'
 
+Write-Host ""
+Write-Host "Every refusal is worded in the shape the entry uses, not in the one it replaced" -ForegroundColor Cyan
+
+# THE SHAPE IS RECORDED, which is what makes the wording possible at all. Asserted per shape rather than
+# via one round trip: the property is read by a gate that must tell a real table from the two shapes that
+# have no columns, and a stamp that were merely "not none" could not.
+Assert-Equal 'sections' (Resolve-EntryImpact -EntryText "#### Tier 0`n`nr`n`n$scoreLabel 1`n").Shape 'shape: the sections are named as such'
+Assert-Equal 'table' (Resolve-EntryImpact -EntryText "| Tier | Significance | Why |`n|---|---|---|`n| 1 | 3 | w |`n").Shape 'shape: the legacy table is named as such'
+Assert-Equal 'line' (Resolve-EntryImpact -EntryText "### T`n`nTier: 2`n`nBody.").Shape 'shape: the pre-table line too -- "wrote it the old way"'
+Assert-Equal 'none' (Resolve-EntryImpact -EntryText "### T`n`nBody only.").Shape 'shape: and an entry declaring nothing is not the same as one of the three'
+
+# THE THREE REFUSALS, EACH IN BOTH BRANCHES. One assert pair per message, because they are three separate
+# strings and a repair that fixed the reported one would leave the other two saying 'row' and 'column' to
+# an author looking at headings. The section side must NOT name a column; the table side must still name
+# one, since a table genuinely has three and its own wording is the accurate one there.
+$sectionCases = @(
+    @{ What  = 'no reason under a scored tier'
+       Entry = "### Significance`n`n#### Tier 0`n`nr`n`n$scoreLabel 2`n`n#### Tier 1`n`n$scoreLabel 3`n"
+       Table = "### Significance`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 3 | |`n" }
+    @{ What  = 'a tier with no score under a scored one'
+       Entry = "### Significance`n`n#### Tier 0`n`nr`n`n$scoreLabel 2`n`n#### Tier 1`n`nwritten`n`n$scoreLabel`n`n#### Tier 2`n`nconsumers`n`n$scoreLabel 4`n"
+       Table = "### Significance`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | - | written |`n| 2 | 4 | consumers |`n" }
+    @{ What  = 'a rung of the ladder missing altogether'
+       Entry = "### Significance`n`n#### Tier 0`n`nr`n`n$scoreLabel 2`n`n#### Tier 2`n`nconsumers`n`n$scoreLabel 4`n"
+       Table = "### Significance`n`n| Tier | Significance | Why |`n|---|---|---|`n| 2 | 4 | consumers |`n" }
+)
+foreach ($case in $sectionCases) {
+    $sec = @(Get-EntryImpactFindings -EntryText $case.Entry)
+    Assert-Equal 1 $sec.Count "sections/$($case.What): reported once"
+    Assert-True (-not ($sec[0] -match 'column|row')) "sections/$($case.What): and says nothing about rows or columns -- there are none"
+    Assert-True ($sec[0] -match [regex]::Escape($scoreLabel)) "sections/$($case.What): it names the score line, which is where the answer actually goes"
+
+    $tab = @(Get-EntryImpactFindings -EntryText $case.Table)
+    Assert-Equal 1 $tab.Count "table/$($case.What): reported once"
+    Assert-True ($tab[0] -match 'column|row') "table/$($case.What): and keeps the column wording -- a real table has them, so that advice is the accurate one"
+}
+
+# THE MISSING-SECTION REFUSAL NAMES THE HEADING THE FORMATTER WRITES, held against the formatter rather
+# than against a literal. A refusal telling an author to add '#### Tier 1' while the writer emits something
+# else is the same defect one level down, and only a shared source can rule it out.
+$ladder = @(Get-EntryImpactFindings -EntryText $sectionCases[2].Entry)
+Assert-True ($ladder[0].Contains((Get-EntryTierSectionMarker -Tier 1))) 'ladder: the refusal quotes the marker the formatter writes'
+$written = @(Format-EntrySignificanceSections)
+Assert-True ([bool](@($written | Where-Object { $_ -eq (Get-EntryTierSectionMarker -Tier 1) }).Count)) 'ladder: and the formatter writes that exact heading -- one source, so the two cannot drift'
+
+# THE 'Tier: N' SHAPE GETS THE SECTION WORDING, deliberately, and this is the case that has no third
+# variant. It has nowhere to put a score, so the only advice that resolves the refusal is the shape this
+# format writes -- pointing at a table it does not have would be the reported defect with a longer history.
+$lineShape = @(Get-EntryImpactFindings -EntryText "### T`n`nTier: 1`n`nBody.")
+Assert-Equal 1 $lineShape.Count 'line shape: a pre-table entry claiming tier 1 is still asked for its score'
+Assert-True (-not ($lineShape[0] -match 'column')) 'line shape: and not sent to a column, which that entry has never had either'
+
 Write-Host "Stripping the declaration for the documents that travel outward" -ForegroundColor Cyan
 $sigBlock = (Format-EntryBlock -Branch 'feat/t' -Description 'T' -Type 'feat' -Body 'body text' -ImpactRows $sigRows) -join "`n"
 $sigStripped = Remove-EntrySignificanceDeclaration -EntryText $sigBlock
