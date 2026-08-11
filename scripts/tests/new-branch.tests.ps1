@@ -396,6 +396,17 @@ try {
     Assert-True (Test-EntryDeclaresType -EntryText $entryText1 -Type 'Feat') 'and the branch type is stated in its own section'
     Assert-True (-not ($headLine1 -match '\d{4}-\d{2}-\d{2}')) 'the scaffold writes NO date -- it would be the branch birth date, not the landing date'
     Assert-True ((Get-EntrySectionAnswer -EntryText $entryText1 -Key 'Id') -match '^\d{8}-\d{6}$') 'the branch ID is stamped at creation'
+    # THE SCAFFOLD SAYS WHERE THE REASON GOES, AT THE MOMENT THE FILE COMES INTO EXISTENCE (inbound #596).
+    # The working file carries no comments by decision (Dave, August 7, 2026), so this printout is the only
+    # place an author who does not open branch/templates/ learns that the text above the score line is the
+    # reason and the space below it is discarded. Both places are one blank line, so nothing in the file
+    # itself distinguishes them -- a consumer answered all three tiers underneath and had all three refused.
+    # Asserted on the OUTPUT rather than on this script's source: what matters is that the author is told,
+    # not which literal does the telling, and a source match would go stale on any rewording (which is
+    # exactly what a text assert keyed on an expression did to inbound #598's fix).
+    Assert-True (Test-Phrase -Text $r1.Out -Phrase 'ABOVE') 'the scaffold printout says the reason goes ABOVE the score line'
+    Assert-True (Test-Phrase -Text $r1.Out -Phrase 'discarded') 'and says what happens to text below it, which is the half that makes it worth moving'
+    Assert-True (Test-Phrase -Text $r1.Out -Phrase (Get-EntryScoreLabel)) 'and names the score label itself, so the reader knows which line is meant'
     # THE ENTRY NO LONGER CARRIES A TO-DO LIST. That job moved to branch-progress.md with the split, and
     # this pair of asserts is what holds the two files to their separate jobs: the file that folds into
     # CHANGELOG.md prompts for what the change DOES, and nothing else.

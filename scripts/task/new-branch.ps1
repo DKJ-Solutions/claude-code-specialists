@@ -334,6 +334,11 @@ if ($changelogTaken -and $progressTaken) {
         $range = Get-EntrySignificanceRange
         Write-Host "  Significance sections written at tier 0. Answer each tier with a score ($($range.Min)-$($range.Max)) or N/A:" -ForegroundColor Cyan
         Format-EntrySignificanceRubricLines | ForEach-Object { Write-Host $_ -ForegroundColor DarkGray }
+        # WHERE the reason goes, by the same argument as the rubric above it (inbound #596): the file leaves
+        # one blank line on each side of the score label, so the two places look identical and only the one
+        # above is read. Said here because this is the moment the author is looking and has not written yet
+        # -- the gate that names the misplacement runs at the PR, by which time the half hour is spent.
+        Write-Host "  Each tier's reason goes ABOVE its $(Get-EntryScoreLabel) line; anything below it is discarded." -ForegroundColor DarkGray
     }
 }
 
