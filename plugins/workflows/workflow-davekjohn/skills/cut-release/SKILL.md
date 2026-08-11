@@ -44,6 +44,32 @@ each command as you go — do not skip a step or reorder them from memory.
 tooling — but it has to be *before*, because a baseline cannot be captured afterwards. Put the end-to-end
 duration in the release document's organisational section, beside whatever else that release cost.
 
+**THE DOCUMENT CANNOT TIME ITS OWN PUBLICATION, so the instruction is split in two** (measured August 11,
+2026, on the first release that followed this step). The release note is frozen for its own pull request at
+step 4, and the Release is published at step 5 — so at the moment you write the timing section, three legs
+are still running *on the file you are writing*: its CI gate, its merge, and the publish. Asking for the
+total there asks for a number that does not exist yet, and the failure mode is obvious the moment it is
+named: whoever writes it fills the gap with an estimate, in a section whose whole purpose is that the figure
+was measured.
+
+So write it in two passes, and expect the second one:
+
+- **at step 4, in the document**: the clock start, the legs you have already measured from timestamps, the
+  subtotal to freeze, and which of them blocked a person. This is the half that cannot be recovered later;
+- **after step 5, in the document again** — the total, added in its own small pull request once the number
+  exists, plus the three legs the first pass could not see. It is a two-line edit on a merged file and the
+  ordinary branch + PR route carries it.
+
+**Do not "solve" this by publishing the Release earlier**, which is the first thing that suggests itself. It
+would put the publish before the attachments exist, which is what step 5's ordering is for; the tail of a
+release is cheap to measure twice and expensive to publish twice. And do not settle for the total living
+only in the closing report you give the requester: a chat message is not where the next person looks for
+what a release costs.
+
+**The measured instance:** at `v4.4.0` the frozen subtotal was 9m 42s of a run that came to **28m 03s**, so
+the three unmeasurable legs were **two thirds of the release**. A document carrying only the first pass is
+not slightly incomplete; it is missing most of the answer.
+
 **Why this is step zero and not a nice-to-have.** A release is the most-repeated expensive procedure a repo
 has, so it is the one whose duration is worth knowing — and it is measured in **minutes**, which nothing
 else here records. Measured instance (August 11, 2026): a whole improvement cycle was run against the
