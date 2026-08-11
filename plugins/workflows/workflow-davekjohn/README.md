@@ -26,6 +26,12 @@ seam wherever your repo owns the answer instead of asserting one repo's answer a
 [own answers](https://github.com/DaveKJohn/claude-code-specialists/blob/main/CONTRIBUTING.md) are a worked
 example of that half.
 
+**And if your work arrives from somebody else's tracker, the cycle starts earlier than `new-branch`.**
+[`TICKETWORK-portable.md`](TICKETWORK-portable.md) covers that layer: how to tell a request that cannot be
+built from one we are merely unconvinced by, which six kinds of question are not blockers, and why a status
+in a heading is always false. Rules only, no template — it comes from one repo and one day, which the page
+says out loud.
+
 The full reasoning — the tier ladder, why the fold rewrites nothing, what a release must earn — lives in
 the source repo's [`releases/README.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/releases/README.md)
 and [`branch/README.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/branch/README.md),
@@ -36,6 +42,7 @@ both of which you already have: the marketplace source is a git clone of the who
 | what | what it holds |
 |---|---|
 | [`CONTRIBUTING-portable.md`](CONTRIBUTING-portable.md) | the contribution cycle in prose, seam-named — the human-facing half, meant to be read alongside your own repo's answers |
+| [`TICKETWORK-portable.md`](TICKETWORK-portable.md) | the rules for the layer *before* a branch, in a repo whose work arrives from somebody else's tracker: whether a request can be built as written, and how the answer is recorded. Rules and reasoning only — no template and no script, deliberately |
 | [`skills/`](skills/) | the eight skills a specialist invokes — this is where most of the workflow lives |
 | [`scripts/`](scripts/) | the scripts and libs those skills run, mirrored from the source repo's own `scripts/`. **Never edit a file there** — see [its README](scripts/README.md) |
 | [`hooks/`](hooks/) | two SessionStart checks that belong to running this across several repos: `connector-sessioncheck` and `script-contract-sessioncheck`. Both are read-only and never block |
