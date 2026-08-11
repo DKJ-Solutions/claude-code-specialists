@@ -1,13 +1,13 @@
-## `docs/a-per-run-cost-is-counted-over-its-population` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] Write the rule into the portable manual, beside the unit rule it is the sibling of
-- [x] Keep it free of repo-specific paths and figures — the manual carries craft, not this repo's tree
-- [x] Point the lens at the portable rule, matching how the unit rule is already split
-- [x] Write the changelog entry, tier 2 since the manual ships to consumers
-
-### Where I left off
-
-The rule is portable and the two layers reference each other. The cadence decision the whole sequence
-started from is still open and still Dave's.
+_(filled in when a branch is created)_
