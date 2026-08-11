@@ -18,7 +18,7 @@ $RepoRoot  = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Lib       = Join-Path $RepoRoot 'scripts\lib\agent-shared-lib.ps1'
 $Build     = Join-Path $RepoRoot 'scripts\agents\build-agent-defs.ps1'
 $Integrity = Join-Path $RepoRoot 'scripts\lint\check-plugin-integrity.ps1'
-$Fixture   = Join-Path ([System.IO.Path]::GetTempPath()) 'agent-shared-test-fixture'
+$Fixture   = Join-Path ([System.IO.Path]::GetTempPath()) "agent-shared-test-fixture-$PID"
 
 . $Lib
 

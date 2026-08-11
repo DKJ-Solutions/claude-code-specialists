@@ -54,7 +54,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Hook     = Join-Path $RepoRoot 'plugins\teams\team-alpha\hooks\workflow-sessioncheck.ps1'
-$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) 'workflow-exclusivity-test-fixture'
+$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "workflow-exclusivity-test-fixture-$PID"
 
 # --- Part (b) sources: the lint script plus every lib it dot-sources (transitively), the same set
 #     check-plugin-integrity.tests.ps1 copies -- read there before writing this, rather than re-derived.

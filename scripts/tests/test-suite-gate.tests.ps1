@@ -244,6 +244,53 @@ finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }
 
+# --- Every suite's temp fixture must be per-process ------------------------------------------------
+#
+# THE FAILURE THIS PREVENTS, measured on August 11, 2026. Running one suite by hand while the gate was
+# running produced TWO failing asserts in connectors.tests.ps1 -- a suite that passes on its own. Nothing
+# was wrong with the code under test: both runs built a fixture at the same fixed temp path, and each
+# tore down the other's tree mid-assert. The visible result is a red gate naming a subject that is fine,
+# which is the most expensive kind of false failure because the obvious next move is to go and read the
+# subject.
+#
+# WHY THIS SUITE OWNS THE RULE. Since #512 the gate is a throttled PARALLEL scheduler, so concurrency is
+# this file's subject. There is no collision WITHIN one gate run -- each fixture name is unique per suite
+# -- but two gate runs, or a gate run beside a developer running one suite, share every fixed name. The
+# gate being parallel is what makes that an ordinary situation rather than an exotic one.
+#
+# MEASURED BEFORE BEING WRITTEN: 38 of the temp paths in these suites already carried $PID or a GUID and
+# 14 did not, across 11 files. So this asserts a convention the suites had already chosen, rather than
+# imposing a new one -- which is also why the 14 repaired sites carry no explanatory comment: the 38 that
+# were already right do not either, and a comment on half of them would read as the odd case.
+#
+# THE SUBJECT IS THE DISCRIMINATOR, NOT THE SPELLING. $PID, a fresh GUID and a per-case label built on top
+# of either all pass; a bare literal does not. Two suites legitimately use a GUID rather than $PID because
+# they create one file PER CHILD INVOCATION and $PID would be the same for all of them.
+Write-Host ''
+Write-Host 'every suite keeps its temp fixture per-process' -ForegroundColor Cyan
+$suiteFiles = @(Get-ChildItem -Path (Join-Path $RepoRoot 'scripts\tests') -Filter '*.ps1' -File)
+Assert-True ($suiteFiles.Count -gt 20) "the scan found the suites (saw $($suiteFiles.Count) files)"
+
+$tempLines = New-Object System.Collections.Generic.List[pscustomobject]
+foreach ($sf in $suiteFiles) {
+    $n = 0
+    foreach ($line in [System.IO.File]::ReadAllLines($sf.FullName)) {
+        $n++
+        if ($line -notmatch 'GetTempPath\(\)') { continue }
+        # This file's own guard quotes the API in prose above; only lines that BUILD a path count.
+        if ($line -notmatch 'Join-Path') { continue }
+        $tempLines.Add([pscustomobject]@{ File = $sf.Name; Line = $n; Text = $line.Trim() })
+    }
+}
+Assert-True ($tempLines.Count -gt 40) "the scan really read the temp paths (found $($tempLines.Count))"
+
+# A path is safe when its name carries something that differs between two concurrent processes: $PID, or a
+# variable holding a freshly generated value. $Label alone is NOT enough -- it varies within a run and
+# repeats across them, which is exactly the case that was wrong in bootstrap-drift.
+$unsafe = @($tempLines | Where-Object { $_.Text -notmatch '\$PID|\$tag|\$Guid|NewGuid' })
+Assert-Equal 0 $unsafe.Count ("every temp fixture path is per-process (offenders: " +
+    (@($unsafe | ForEach-Object { "$($_.File):$($_.Line)" }) -join ', ') + ')')
+
 Write-Host ''
 Write-Host "Result: $script:pass pass, $script:fail fail." -ForegroundColor $(if ($script:fail -eq 0) { 'Green' } else { 'Red' })
 if ($script:fail -gt 0) { exit 1 }

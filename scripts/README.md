@@ -27,7 +27,16 @@ Two consequences worth knowing before you touch anything:
 | [`sync/`](sync/) | keeping the generated artefacts and the connected repos honest |
 | [`agents/`](agents/) | the agent-def generator that fills in the shared blocks |
 | [`maintenance/`](maintenance/) | one-off repairs run by hand |
-| [`tests/`](tests/) | the suites CI runs, one per subject |
+| [`tests/`](tests/) | the suites CI runs, one per subject. **A new suite's temp fixture path carries `$PID`** — see below |
+
+**Writing a new suite: put `$PID` in its temp fixture path.** The test gate is a throttled *parallel*
+scheduler, so two runs overlapping is ordinary rather than exotic — a gate run beside a developer running
+one suite by hand is enough. Two runs that build a fixture at the same fixed temp path tear down each
+other's tree mid-assert, and the visible result is a red gate naming a subject that is perfectly fine.
+Measured on August 11, 2026: `connectors.tests.ps1` passes alone and reported **two** failures when run
+twice at once. `$PID` (or a fresh GUID, where one file per child invocation is created) is enough; a
+per-case `$Label` is not, because it repeats across runs. `test-suite-gate.tests.ps1` enforces this and
+names the offending `file:line`.
 
 `repo-config.ps1` sits at the top level rather than in a directory, deliberately: it is **not machinery
 but data** — this repo's own answers to the seam the shared scripts read (the trunk name, the lint script,
