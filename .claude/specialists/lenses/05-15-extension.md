@@ -199,7 +199,34 @@ infrastructure.
   `powershell` start (~0.18s) plus a full lint over its fixture (~1.6s) — real work, not waste, and it
   cannot be parallelised the way the gate was, because all 86 scenarios mutate **one** fixture directory in
   sequence. `-MaxParallel 1` is the valve, and it is worth reaching for before believing a suite that only
-  fails with 26 siblings competing for the disk.
+  fails with 30 siblings competing for the disk.
+- **Do not hand-roll a second parallel runner — and re-run a red suite alone before believing its assert.**
+  Measured August 12, 2026: a `Start-Job` fan-out over all **31** suites reported **6** failures —
+  `agent-shared`, `bootstrap-drift`, `config-blueprint`, `fix-mojibake`, `roster-sync`,
+  `verify-resolved-issues` — two of them asserting *"lint gate green on the repo"* in as many words, which
+  reads like a finding about the repo rather than about the runner. **Every one of the six passes when run
+  alone**, and `open-pr` then ran all 31 green in **218s**. What the six share is that they scan the **live
+  repo**: three (`agent-shared`, `bootstrap-drift`, `fix-mojibake`) by invoking the lint gate over it, the
+  other three by running their own repo-wide scanner — `build-config-blueprint.ps1`,
+  `check-roster-sync.ps1`, `verify-resolved-issues.ps1`. So 31 at once collide over one tree, which is the
+  same collision the paragraph above describes, in its strongest form to date. **Read that list before
+  adding a suite that touches the tree**, and note that the shared condition is the tree rather than the
+  gate — keying the lesson on the lint gate alone would exempt half the affected suites. The lesson is
+  **not** "never run the suites in parallel": `open-pr` parallelises
+  them, is the tested runner, and was checked against exactly the two conditions above before it did — no
+  suite writes into the tree, no two share a fixture path. A hand-rolled runner is checked against neither,
+  so its red is evidence about the runner, not about the suite.
+- **A count in these documents is either DATED or LIVE, and the two are maintained in opposite directions.**
+  The 27 above is a dated measurement and stays 27 — the 510s-vs-159s figure beside it means nothing when
+  paired with any other count. The 30 in the paragraph above is live advice about what to try next, so it
+  tracks the tree. Where a sentence is dated **and** the count carries none of its argument, the count is *removed*
+  rather than refreshed: that is why [`CLAUDE.md`](../../../CLAUDE.md)'s *"`open-pr` runs the lint and every
+  test suite"* now states no number under its August 7 stamp. It read `26` there for five days — wrong on the
+  day it was written, since there were 27, and wronger every suite since. **And a bare `26` is still correct
+  in two other senses**: the lint's own checks (`CHANGELOG.md`) and the agent-def count
+  ([`README.md`](../../../README.md), [`agent-shared`](../../../plugins/agent-shared/README.md)). Establish
+  which noun a `26` governs before touching it; a find-and-replace here breaks correct statements to repair
+  one.
 - **Renaming or moving this checkout unlinks its own plugin install — plan the re-install into the same
   move.** Because this repo consumes itself, it is a consumer like any other, and the install record is
   keyed on `projectPath`. Measured August 3, 2026: after the directory was renamed from
