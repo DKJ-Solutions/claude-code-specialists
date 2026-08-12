@@ -10,7 +10,12 @@ Three consequences worth knowing before you touch anything:
 
 - **Never *run* a shared script from the plugin cache while you are in this repo — run the copy here.**
   The cache holds the last *released* mirror, so it lags this directory by however many merges have landed
-  since. Two silent failures measured on one day; see below.
+  since. Two silent failures measured on one day; see below. **Eleven of the thirteen shared entry points
+  now refuse outright** ([`lib/source-repo-guard-lib.ps1`](lib/source-repo-guard-lib.ps1)) and name the
+  local path to run instead. The two exceptions are `sync/check-roster-sync.ps1` and
+  `sync/check-script-contract.ps1`: both SessionStart hooks invoke those from the plugin by design, so a
+  refusal there would fail every session start in this repo. That gap is deliberate and stated rather than
+  quietly left.
 - **Never edit a file under `plugins/*/scripts/`.** Change the source here and run
   [`sync/build-shared-scripts.ps1`](sync/build-shared-scripts.ps1). Lint check 8 reports a hand-edited
   mirror as drift.

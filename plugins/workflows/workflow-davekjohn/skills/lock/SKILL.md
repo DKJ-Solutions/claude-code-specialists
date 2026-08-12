@@ -111,9 +111,11 @@ missing. A handover is a pointer; the repo is the inventory.
 
 - `git`, and a repo root -- resolved dual-context (`CLAUDE_PROJECT_DIR` where the mirror runs,
   otherwise the git root).
-- **Nothing else.** The script dot-sources no library and requires no seam function.
+- **Nothing else.** The script needs no library and no seam function to produce its answer.
   `scripts/repo-config.ps1` is read only if it happens to define `Get-ReleaseNoteWording`, to learn what
-  that repo calls its "still open" section; absent, any heading saying *still open* is matched.
+  that repo calls its "still open" section; absent, any heading saying *still open* is matched. It also
+  loads `source-repo-guard-lib.ps1` if the payload carries it, which either stops the run outright (you
+  are in the repo that maintains this script, and ran a released copy of it) or contributes nothing.
 - `.claude/handover.md` should be **gitignored**. It is one developer's working intent, it goes stale
   within hours, and all three steps run on one machine within minutes -- committing it would mean a
   pull request per session close.

@@ -349,6 +349,21 @@ function Get-SharedScriptPairs {
             Source  = 'scripts\lib\plugin-tree-lib.ps1'
             Plugin  = 'workflow-davekjohn'
             LibOnly = $true
+        },
+        @{
+            # The source-repo guard (August 12, 2026). IT HAS TO TRAVEL, and that is the whole reason it is
+            # a pair rather than a source-only helper: the guard fires from inside the copy a reader
+            # wrongly ran, so one that stayed behind in this tree could never fire. Eleven entry points
+            # dot-source it $PSScriptRoot-relative and GUARDED, so a mirror built before this pair existed
+            # degrades to the previous behaviour instead of throwing.
+            #
+            # DEPENDENCY-FREE, like plugin-tree-lib and for the same reason: it is dot-sourced on the first
+            # line that runs, before any script has resolved anything, so it can rely on nothing being
+            # loaded yet.
+            Name    = 'source-repo-guard-lib'
+            Source  = 'scripts\lib\source-repo-guard-lib.ps1'
+            Plugin  = 'workflow-davekjohn'
+            LibOnly = $true
         }
     )
 
