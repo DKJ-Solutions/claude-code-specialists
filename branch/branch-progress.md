@@ -1,18 +1,13 @@
-## `docs/v4-6-0-timing-total` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] Measure the five remaining legs from timestamps (document, gates, CI, merge, publish)
-- [x] Add the end-to-end total of 64m 52s and the tail share, with the note that 29% vs two thirds is not an improvement
-- [x] Recount the gate runs and correct the first pass: ten runs, five local and five in CI, four timed at 26m 58s
-- [x] Correct the same claim in the pending `CHANGELOG.md` entry for #634, and say where it was wrong
-- [x] Record the release CI figure the first pass could only see as still-running (5m 08s, ran behind)
-- [x] Gates, PR, merge, fold
-
-### Where I left off
-
-`v4.6.0` is complete: tagged, pushed, published with both attachments, and its note now carries the total.
-Two follow-ups sit with Dave rather than on a branch — untracking
-`Microsoft/Windows/PowerShell/ModuleAnalysisCache`, and deciding whether `ship-pr` should skip the gate run
-`open-pr` already passed on the same commit.
-
+_(filled in when a branch is created)_
