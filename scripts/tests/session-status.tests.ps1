@@ -244,6 +244,61 @@ try {
     $r = Invoke-Status -Fixture $movedBare
     Assert-True ($r.Flat -match 'no release note was found under releases/stakeholders/') `
         'when there is none, the absent line names the CONFIGURED root rather than the default'
+
+    Write-Host 'The last release note is the highest VERSION, not the newest mtime' -ForegroundColor Cyan
+    # THE MEASURED CASE, August 12, 2026. Merging the twelve releases/consumer/ + releases/internal/ pairs
+    # into releases/audience/ restamped every document with ONE identical mtime, so the sort this replaces
+    # ('Sort-Object LastWriteTime -Descending | Select-Object -First 1') returned whatever the enumeration
+    # order yielded: 4.2.0 while 4.5.0 existed, and unstable between runs. Nothing errored -- the block was
+    # populated, so it read as correct.
+    #
+    # The fixture reproduces BOTH halves of why this needs a [version] cast:
+    #   * every note carries the SAME stamp, and 1.0.0 carries a deliberately NEWER one, so an mtime sort
+    #     would actively prefer the lowest version rather than merely tie;
+    #   * 1.10.0 sits beside 1.9.0, which a string sort orders the wrong way round.
+    $multi = New-Fixture; $fixtures += $multi
+    $notesDir = Join-Path $multi 'releases\notes\1.x'
+    foreach ($v in @('1.9.0', '1.10.0')) {
+        Set-Utf8 (Join-Path $notesDir "$v.md") @(
+            "# Release notes v$v", '',
+            '## What was still open at this release', '',
+            "- marker-for-$v", ''
+        )
+    }
+    $stamp = [datetime]'2026-08-12T17:07:29'
+    Get-ChildItem -Path $notesDir -Filter '*.md' -File | ForEach-Object { $_.LastWriteTime = $stamp }
+    (Get-Item -LiteralPath (Join-Path $notesDir '1.0.0.md')).LastWriteTime = $stamp.AddHours(1)
+    $r = Invoke-Status -Fixture $multi
+    Assert-Equal 0 $r.Code 'several notes present: still exits 0'
+    # ANCHORED ON 'source: ', AND THAT IS THE POINT RATHER THAN TIDINESS. Written as a bare path match this
+    # assert PASSED against the very bug it exists to catch: these notes are created after the fixture's
+    # commit, so the tree block lists them as untracked and the path appears in the output no matter which
+    # note was chosen. Caught by running the suite against the old script -- one assert of four failed where
+    # two should have.
+    Assert-True ($r.Flat -match 'source: releases/notes/1\.x/1\.10\.0\.md') `
+        'the highest VERSION is the source -- 1.10.0, not the most recently touched 1.0.0'
+    Assert-True ($r.Flat -match 'marker-for-1\.10\.0') `
+        "and 1.10.0's own still-open section is what gets read out, so the right file was really parsed"
+    Assert-True (-not ($r.Flat -match 'marker-for-1\.9\.0')) `
+        'not 1.9.0 -- so the comparison is numeric and not textual'
+
+    Write-Host 'A note tree that is not version-named still reports, via the mtime fallback' -ForegroundColor Cyan
+    # The fallback is deliberate, not leftover. This is a SHARED script: a consumer whose documents are not
+    # named X.Y.Z would otherwise have the whole block switched off by a repair they never asked for --
+    # which is the same silent-failure class the repair above is about, one layer along.
+    $named = New-Fixture; $fixtures += $named
+    $namedDir = Join-Path $named 'releases\notes\1.x'
+    Remove-Item -LiteralPath (Join-Path $namedDir '1.0.0.md') -Force
+    Set-Utf8 (Join-Path $namedDir 'spring-release.md') @(
+        '# Spring release', '',
+        '## What was still open at this release', '',
+        '- marker-for-prose-name', ''
+    )
+    $r = Invoke-Status -Fixture $named
+    Assert-Equal 0 $r.Code 'prose-named note: still exits 0'
+    Assert-True (-not ($r.Flat -match 'no release note was found')) `
+        'a note whose name carries no version is still FOUND rather than reported absent'
+    Assert-True ($r.Flat -match 'marker-for-prose-name') 'and its still-open section is read out'
 }
 finally {
     try { [Console]::OutputEncoding = $prevOut } catch { }
