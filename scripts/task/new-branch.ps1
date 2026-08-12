@@ -275,9 +275,49 @@ foreach ($tpl in (Get-BranchTemplates)) {
 $changelogExisting = if (Test-Path -LiteralPath $changelogPath) { [System.IO.File]::ReadAllText($changelogPath) } else { '' }
 $progressExisting  = if (Test-Path -LiteralPath $progressPath)  { [System.IO.File]::ReadAllText($progressPath)  } else { '' }
 
-$changelogTaken = (Test-BranchChangelogIsFilled -Text $changelogExisting)
+# THE TEST IS THE DECLARED OWNER MEASURED AGAINST THIS BRANCH, which is what the comment above has
+# always said it was and what neither half actually asked (inbound #615, reported from a consumer).
+# "Is the entry filled" and "is the owner not the trunk" are BOTH true for any branch stacked on one
+# whose entry has not been folded yet -- so both files were skipped, and the skip was printed under the
+# NEW branch's name. The branch silently started out claiming the previous branch's work as its own:
+# nothing failed, and the one line it printed said the opposite of what had happened.
+#
+# One comparison answers all three states, which is why it replaces both tests. The trunk's reset state
+# declares the trunk (write), a rerun on this branch declares this branch (keep), and a foreign owner
+# declares somebody else (write, and say whose file was replaced). Get-BranchFileDeclaredBranch reads
+# the heading of either file -- '# `main` changelog' on the trunk, '## `feat/x` changelog' once
+# written -- so the same predicate serves both, and Test-BranchChangelogIsFilled is no longer the
+# entry's idempotency test. It still owns the question it is named for, everywhere else.
+$changelogOwner = Get-BranchFileDeclaredBranch -Text $changelogExisting
+$changelogTaken = ($changelogOwner -eq $branch)
 $progressOwner  = Get-BranchFileDeclaredBranch -Text $progressExisting
-$progressTaken  = ($progressOwner -and $progressOwner -ne $trunk)
+$progressTaken  = ($progressOwner -eq $branch)
+
+# A FOREIGN OWNER IS OVERWRITTEN, EXCEPT WHERE THE OVERWRITE WOULD BE UNRECOVERABLE -- and that
+# distinction is measured rather than assumed, because this repair is what creates the destructive
+# path. Before it, a foreign file was kept; after it, it is written over. In the ordinary stacked case
+# that costs nothing: the other branch's entry is committed on that branch, so git still holds it. What
+# git does not hold is an entry edited and never committed -- `git checkout -b` carries those edits
+# into the new branch, and there they exist in exactly one place. So a dirty foreign file is left
+# alone and said out loud instead, which still repairs the defect that was reported: the failure there
+# was the SILENCE and the wrong name, not the keeping.
+#
+# `git -C $repoRoot` and the EAP dance for the same two reasons every other git call in this script has
+# them (see the block at the checkout above): bare `git` would read whatever directory the caller
+# happened to be in, and under ErrorActionPreference=Stop PS 5.1 promotes a native command's stderr to
+# a terminating error. Untracked counts as dirty, deliberately -- a file git has never seen is the
+# case where the working tree is the only copy there is.
+function Test-BranchFileIsDirty {
+    param([Parameter(Mandatory)][string]$RepoRoot, [Parameter(Mandatory)][string]$RelativePath)
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $porcelain = & git -C $RepoRoot status --porcelain -- $RelativePath 2>$null
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+    return [bool]($porcelain | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+}
 
 # BOTH ALREADY WRITTEN IS A SKIP, NOT A STOP, and that is the one exit the merge had to convert. As a
 # child process this was `exit 0` and the caller read it as success and carried on to -Park; inline, an
@@ -308,22 +348,41 @@ if ($changelogTaken -and $progressTaken) {
         -Type $branchType -Body $body
     $template = ($entryLines -join "`n") + "`n"
 
+    # WHOSE FILE THIS WAS IS NAMED IN EVERY OUTCOME, and that is the reported defect's actual repair.
+    # A foreign owner is the one state the old test could not distinguish from its own, so it is the one
+    # state the output has to say out loud -- kept, replaced or written, the line names the branch the
+    # file belonged to.
+    $changelogForeign = ($changelogOwner -and $changelogOwner -ne $trunk -and -not $changelogTaken)
+    $progressForeign  = ($progressOwner  -and $progressOwner  -ne $trunk -and -not $progressTaken)
+
     if ($changelogTaken) {
-        Write-Host "Kept: $($branchFiles.Changelog) (already holds an entry)" -ForegroundColor Yellow
+        Write-Host "Kept: $($branchFiles.Changelog) (already holds this branch's entry)" -ForegroundColor Yellow
+    } elseif ($changelogForeign -and (Test-BranchFileIsDirty -RepoRoot $repoRoot -RelativePath $branchFiles.Changelog)) {
+        Write-Warning "Kept: $($branchFiles.Changelog) -- it holds UNCOMMITTED work belonging to '$changelogOwner', which exists nowhere else. This branch has no entry of its own yet: commit or discard that work, then rerun this script."
     } else {
         [System.IO.File]::WriteAllText($changelogPath, $template, $Utf8NoBom)
-        Write-Host "Created: $($branchFiles.Changelog)" -ForegroundColor Green
+        if ($changelogForeign) {
+            Write-Host "Replaced: $($branchFiles.Changelog) (it held the entry of '$changelogOwner', committed on that branch)" -ForegroundColor Yellow
+        } else {
+            Write-Host "Created: $($branchFiles.Changelog)" -ForegroundColor Green
+        }
     }
 
     if ($progressTaken) {
-        Write-Host "Kept: $($branchFiles.Progress) (already scaffolded for '$progressOwner')" -ForegroundColor Yellow
+        Write-Host "Kept: $($branchFiles.Progress) (already scaffolded for this branch)" -ForegroundColor Yellow
+    } elseif ($progressForeign -and (Test-BranchFileIsDirty -RepoRoot $repoRoot -RelativePath $branchFiles.Progress)) {
+        Write-Warning "Kept: $($branchFiles.Progress) -- it holds UNCOMMITTED work belonging to '$progressOwner', which exists nowhere else. This branch has no step list of its own yet: commit or discard that work, then rerun this script."
     } else {
         # NO DESCRIPTION AND NO ID HERE. They live in the entry alone since August 7, 2026 -- the same three
         # fields in both files was one fact in two places, free to disagree. This file is the plan and where
         # you left off; its heading carries the branch, the only identifier anything reads out of it.
         $progressText = ((Format-BranchProgressScaffold -Branch $branch -Intent $Intent) -join "`n") + "`n"
         [System.IO.File]::WriteAllText($progressPath, $progressText, $Utf8NoBom)
-        Write-Host "Created: $($branchFiles.Progress)" -ForegroundColor Green
+        if ($progressForeign) {
+            Write-Host "Replaced: $($branchFiles.Progress) (it held the step list of '$progressOwner', committed on that branch)" -ForegroundColor Yellow
+        } else {
+            Write-Host "Created: $($branchFiles.Progress)" -ForegroundColor Green
+        }
     }
 
     # The rubric, printed at the moment the entry comes into existence. The scores are filled in later, by
