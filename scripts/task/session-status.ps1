@@ -234,9 +234,30 @@ try {
 # the seam at all, since the segment it looked for was the thing being configured.
 $notesRoot = Join-Path $repoRoot ($noteRootRel -replace '/', '\')
 $newestNote = $null
+#
+# THE NEWEST NOTE IS THE HIGHEST VERSION, NOT THE MOST RECENTLY WRITTEN FILE. This sorted on
+# LastWriteTime until August 12, 2026, and the measurement that retired it is that mtime says when a
+# file was last TOUCHED, which any reorganisation of the tree rewrites for every document at once.
+# Measured the day the twelve releases/consumer/ + releases/internal/ pairs were merged into
+# releases/audience/: all twelve came out with the identical stamp (17:07:29), so
+# 'Sort-Object LastWriteTime -Descending | Select-Object -First 1' returned whatever the enumeration
+# order happened to yield -- 4.2.0 while 4.5.0 existed, and unstable between runs. The block was
+# populated and therefore looked correct, which is why two readers walked straight past it.
+#
+# A STRING SORT WOULD NOT HAVE FIXED IT EITHER: this tree holds 3.10.0.md beside 3.9.0.md, which sorts
+# the wrong way as text. Hence the [version] cast.
+#
+# The mtime path is KEPT as the fallback rather than removed, for a consumer whose note documents are
+# not named X.Y.Z: switching the block off for them would be the silent failure this repair is about,
+# one layer along. Nothing here dot-sources a library, so the parse stays inline.
 if (Test-Path -LiteralPath $notesRoot -PathType Container) {
-    $newestNote = Get-ChildItem -Path $notesRoot -Recurse -Filter '*.md' -File -ErrorAction SilentlyContinue |
-        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $allNotes = @(Get-ChildItem -Path $notesRoot -Recurse -Filter '*.md' -File -ErrorAction SilentlyContinue)
+    $versioned = @($allNotes | Where-Object { $_.BaseName -match '^\d+\.\d+\.\d+$' })
+    if ($versioned.Count -gt 0) {
+        $newestNote = $versioned | Sort-Object { [version]$_.BaseName } -Descending | Select-Object -First 1
+    } elseif ($allNotes.Count -gt 0) {
+        $newestNote = $allNotes | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    }
 }
 
 Write-Section "What the last release left open (from its own note)"
