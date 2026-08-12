@@ -40,6 +40,11 @@ Run the shared script from the **root of the consuming repo**, on the branch you
 powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/ship-pr.ps1"
 ```
 
+**In the source repo, run its own copy instead — `scripts/release/ship-pr.ps1`.**
+`${CLAUDE_PLUGIN_ROOT}` resolves into the plugin cache, which holds the last *released* mirror and so
+lags its own source by however many merges have landed since. A consumer keeps no copy of their own, so
+for them the line above is the correct one.
+
 **Nothing is passed, because there is nothing left to say.** Since
 [#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506) the PR title is composed from the
 branch prefix and the entry's `Branch title` section, so it was already written when the branch was

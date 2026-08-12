@@ -45,6 +45,11 @@ Run the shared script from the **root of the consuming repo**:
 powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/maintenance/fix-mojibake.ps1"
 ```
 
+**In the source repo, run its own copy instead — `scripts/maintenance/fix-mojibake.ps1`.**
+`${CLAUDE_PLUGIN_ROOT}` resolves into the plugin cache, which holds the last *released* mirror and so
+lags its own source by however many merges have landed since. A consumer keeps no copy of their own, so
+for them the line above is the correct one.
+
 | Parameter | What it does |
 |---|---|
 | `-Path` | The files to repair. Omit it and the set is **repo-owned** — see [Which files](#which-files-it-examines) below. |

@@ -6,8 +6,11 @@ change lands *here* and travels outward, never the other way around. The mirror'
 consumer who only has the copy, is
 [`plugins/workflows/workflow-davekjohn/scripts/README.md`](../plugins/workflows/workflow-davekjohn/scripts/README.md).
 
-Two consequences worth knowing before you touch anything:
+Three consequences worth knowing before you touch anything:
 
+- **Never *run* a shared script from the plugin cache while you are in this repo — run the copy here.**
+  The cache holds the last *released* mirror, so it lags this directory by however many merges have landed
+  since. Two silent failures measured on one day; see below.
 - **Never edit a file under `plugins/*/scripts/`.** Change the source here and run
   [`sync/build-shared-scripts.ps1`](sync/build-shared-scripts.ps1). Lint check 8 reports a hand-edited
   mirror as drift.
@@ -15,6 +18,19 @@ Two consequences worth knowing before you touch anything:
   reaches has to be resolvable from this directory alone — which is why a few files
   [deliberately cannot move](../plugins/workflows/workflow-davekjohn/scripts/README.md#what-deliberately-stays-in-the-consumers-root-cannot-move-here)
   into a plugin.
+
+**Why the first of those needs saying, measured on August 12, 2026 against mirror `4.5.0`.** Every skill
+page prints `${CLAUDE_PLUGIN_ROOT}/scripts/…`, because that is the only path that resolves for a consumer
+— and the harness expands it to your own cache **before you read the page**, so the command in front of
+you looks authoritative and points at a release. That mirror was missing two seams this repo had already
+adopted. `new-branch` scaffolded the retired three-tier ladder instead of this repo's `Tier 0` + `Tier 2`,
+and rewrote `branch/templates/branch_template_changelog.md` back into the pre-audience shape;
+`session-status` reported no release note under `releases/notes/` and therefore printed an **empty** "what
+the last release left open" block. Neither errored, because the mirror contains no
+`Get-ReleaseAudienceTier` and no `Get-ReleaseNoteRoot` at all, so each silently used its pre-seam default.
+Both land on the commands that *start* a piece of work, where a wrong answer propagates into everything
+downstream. **Re-syncing or bumping the mirror is not the repair** — the lag is structural, because the
+cache holds a release and this directory is by definition ahead of it between releases.
 
 ## The directories
 

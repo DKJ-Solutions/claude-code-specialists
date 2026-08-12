@@ -39,6 +39,11 @@ also why this is `/lock` and not one combined command.
 powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/task/session-status.ps1"
 ```
 
+**In the source repo, run its own copy instead -- `scripts/task/session-status.ps1`.**
+`${CLAUDE_PLUGIN_ROOT}` resolves into the plugin cache, which holds the last *released* mirror and so
+lags its own source by however many merges have landed since. A consumer keeps no copy of their own, so
+for them the line above is the correct one.
+
 It prints, in this order: any topic already locked, the branch and tree, the recent commits, parked
 branches on `origin`, the open issues, the pending changelog entries with their tiers, the last tag,
 what the last release note recorded as still open, and the gate commands. It **reads only** -- nothing

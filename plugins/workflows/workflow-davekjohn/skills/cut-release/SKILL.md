@@ -114,14 +114,17 @@ a release for a missing timestamp would be ceremony rather than a guard.
    powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/cut-release.ps1" -Bump <major|minor|patch> -Title "<one sentence>"
    ```
 
-   **Run it from the plugin, not from a repo path.** This page used to print
+   **As a consumer, run it from the plugin and not from a repo path.** This page used to print
    `./scripts/release/cut-release.ps1`, which is a real file in the repo the script is *maintained* in
    and nothing at all in the repo you are cutting a release for — a consumer runs the mirrored copy and
    keeps none of its own. So the first command of the checklist failed for exactly the reader this page
    is written for. The `${CLAUDE_PLUGIN_ROOT}` form is what the other shared skills already use, and it
    resolves **only inside a plugin-owned component**: typing this by hand in a terminal means spelling
-   out the absolute path to the plugin cache instead. In the source repo itself, `./scripts/release/…`
-   remains the same file and works as before.
+   out the absolute path to the plugin cache instead. **In the source repo itself, run
+   `./scripts/release/cut-release.ps1` — and not the line above.** This page said only that the repo path
+   "works as before", which reads as a permission where it is a requirement: that cache holds the last
+   *released* mirror, so between releases it lags its own source by however many merges have landed since.
+   Cutting a release through it would run the previous release's cut.
 
    Give it **either** `-Bump` **or** `-Version <X.Y.Z>` when you want to name the number yourself.
    `-SummaryFile` turns it into a milestone (see below). Four escape valves:
