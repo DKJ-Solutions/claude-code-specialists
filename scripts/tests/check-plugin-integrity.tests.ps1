@@ -245,9 +245,26 @@ function Assert-True {
     }
 }
 
+# THE THREE CHECKS THIS SUITE SKIPS BY DEFAULT, AND WHY THE DEFAULT IS THE FAST ONE. Profiled over this
+# suite's own fixture, agent-def, parse and branch-template were half of every run's work, and this suite
+# runs the gate 110 times to assert one thing at a time -- 98% of its 194s was inside those child
+# processes, and it was the whole test gate's wall clock, three times the next slowest suite. Almost no
+# scenario here is about those three, so almost every run was paying for them.
+#
+# FOUR SCENARIOS PASS -Full, and they are the complete list: the two branch-template scenarios (r13bGood,
+# r13bGone), the [COVERAGE] scenario (which asserts 'agent-def' reports its count), and the
+# frontmatter-bom scenario (which asserts the ABSENCE of an [agent-def] finding -- the one shape that
+# would pass VACUOUSLY under a skip, and therefore the one to be careful about).
+#
+# If you add a scenario that asserts anything about those three checks, pass -Full. A presence assert
+# fails loudly without it; an absence assert does not, which is why this note is here rather than in a
+# commit message.
+$script:SkippedForSpeed = 'agent-def,parse,branch-template'
+
 function Invoke-Integrity {
-    param([string]$FixtureRoot)
+    param([string]$FixtureRoot, [switch]$Full)
     $scriptPath = Join-Path $FixtureRoot 'scripts\lint\check-plugin-integrity.ps1'
+    $skipArgs = if ($Full) { @() } else { @('-SkipCheck', $script:SkippedForSpeed) }
     # $ErrorActionPreference IS RELAXED AROUND THE CHILD CALL, the same way Invoke-Fold does it in
     # fold-changelog.tests.ps1. With 'Stop' in force, anything the gate writes to stderr comes back as a
     # terminating NativeCommandError and kills THIS script -- so a scenario that makes the gate crash
@@ -258,7 +275,7 @@ function Invoke-Integrity {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath 2>&1
+        $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath @skipArgs 2>&1
         $code = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $prevEap
@@ -1194,17 +1211,17 @@ try {
         New-Item -ItemType Directory -Path (Split-Path -Parent $tplPath) -Force | Out-Null
         [System.IO.File]::WriteAllText($tplPath, $tpl.Content, $Utf8NoBom)
     }
-    $r13bGood = Invoke-Integrity -FixtureRoot $Fixture
+    $r13bGood = Invoke-Integrity -FixtureRoot $Fixture -Full
     Assert-True (-not ($r13bGood.Out -match '\[branch-template\].*no longer matches')) 'check 13b: generated templates are silent'
     Assert-True ($r13bGood.Out -match '\[branch-template\] checked 2') 'check 13b: and both were actually examined -- the pass is not an empty scan'
 
     $tpl1 = Join-Path $Fixture ((Get-BranchTemplates)[0].Path -replace '/', '\')
     [System.IO.File]::WriteAllText($tpl1, ((Get-BranchTemplates)[0].Content + "`nSomebody edited this by hand.`n"), $Utf8NoBom)
-    $r13bDrift = Invoke-Integrity -FixtureRoot $Fixture
+    $r13bDrift = Invoke-Integrity -FixtureRoot $Fixture -Full
     Assert-Equal 1 $r13bDrift.Code 'check 13b: a hand-edited template is an error'
     Assert-True ($r13bDrift.Out -match 'no longer matches what the scaffolder writes') 'check 13b: and the message says which way the drift runs'
     Remove-Item -LiteralPath $tpl1 -Force
-    $r13bGone = Invoke-Integrity -FixtureRoot $Fixture
+    $r13bGone = Invoke-Integrity -FixtureRoot $Fixture -Full
     Assert-True ($r13bGone.Out -match '\[branch-template\].*is missing') 'check 13b: a deleted template is reported rather than silently passing'
     [System.IO.File]::WriteAllText($tpl1, (Get-BranchTemplates)[0].Content, $Utf8NoBom)
 
@@ -1413,7 +1430,7 @@ try {
     # Deliberately asserts the ZERO cases (the ones that used to be invisible) AND two non-zero cases,
     # because a coverage line that always printed "0" would satisfy the first half while being useless.
     Write-Host "[COVERAGE] every category reports its count, and an empty category is visible" -ForegroundColor Cyan
-    $rc = Invoke-Integrity -FixtureRoot $Fixture
+    $rc = Invoke-Integrity -FixtureRoot $Fixture -Full
     foreach ($cat in @('agent-def', 'manual', 'persona', 'specialist', 'shared')) {
         Assert-True ($rc.Out -match "\[$([regex]::Escape($cat))\] checked 0\b") `
             "coverage: the genuinely empty category '$cat' reports 'checked 0' instead of staying silent"
@@ -2005,7 +2022,7 @@ try {
 
     # 66. The measured defect, in the exact shape it shipped: three bytes in front of a correct file.
     [System.IO.File]::WriteAllBytes($bomSkill, (@([byte]0xEF, [byte]0xBB, [byte]0xBF) + $bomGoodBytes))
-    $fmb1 = Invoke-Integrity -FixtureRoot $Fixture
+    $fmb1 = Invoke-Integrity -FixtureRoot $Fixture -Full
     Assert-True ($fmb1.Out -match '\[frontmatter-bom\].*byte-order mark') `
         'frontmatter-bom: a BOM before the opening --- is reported'
     Assert-True ($fmb1.Out -match 'skill-alpha') `
@@ -2075,6 +2092,50 @@ try {
     Assert-True ($c5.Code -ne 0) `
         'corrupt marketplace: and the run still fails -- check 1 reported the unparseable file'
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude-plugin\marketplace.json'), $goodMarketplace, $Utf8NoBom)
+
+    # --- -SkipCheck: the guard rails around the one parameter that can make this gate check less ------
+    #     The parameter exists for THIS suite and nothing else. Its failure mode is silence -- a gate
+    #     that ran fewer checks and still said "0 errors" -- so the three things that make it safe are
+    #     asserted here rather than trusted: a skip announces itself, an unknown name is refused, and no
+    #     production caller passes it at all.
+    Write-Host "-SkipCheck: a skipped check announces itself and is never reported as 'checked 0'" -ForegroundColor Cyan
+    $skipRun = Invoke-Integrity -FixtureRoot $Fixture
+    foreach ($cat in @('agent-def', 'parse', 'branch-template')) {
+        Assert-True ($skipRun.Out -match ("\[SKIP\]\s+" + [regex]::Escape($cat) + "\b")) `
+            "-SkipCheck: '$cat' prints a [SKIP] line saying nothing was asserted about it"
+        # THE ONE THAT MATTERS MOST. This gate makes an empty scan visible on purpose -- 'checked 0' is a
+        # finding-shaped statement. If a skip printed that instead, a reader (and an assert) could not
+        # tell "there was nothing to check" from "this check did not run".
+        Assert-True (-not ($skipRun.Out -match ("\[" + [regex]::Escape($cat) + "\] checked"))) `
+            "-SkipCheck: and '$cat' prints NO coverage line, so a skip cannot be misread as an empty scan"
+    }
+
+    Write-Host "-SkipCheck: an unknown check name is refused rather than ignored" -ForegroundColor Cyan
+    $badSkipPath = Join-Path $Fixture 'scripts\lint\check-plugin-integrity.ps1'
+    $prevEapSkip = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $badOut  = & powershell -NoProfile -ExecutionPolicy Bypass -File $badSkipPath -SkipCheck 'agentdef' 2>&1
+        $badCode = $LASTEXITCODE
+    } finally { $ErrorActionPreference = $prevEapSkip }
+    Assert-True ($badCode -ne 0) '-SkipCheck: a misspelled name fails the run instead of quietly skipping nothing'
+    Assert-True ($badCode -ne 1) '-SkipCheck: and its exit code is distinct from 1, so bad usage is not read as findings'
+    Assert-True ((($badOut | Out-String) -match 'not a skippable check')) '-SkipCheck: the refusal says what was wrong'
+    Assert-True ((($badOut | Out-String) -match 'agent-def')) '-SkipCheck: and names the ones that ARE skippable, so the fix needs no source reading'
+
+    Write-Host "-SkipCheck: no gate that guards main passes it" -ForegroundColor Cyan
+    # A reduced gate must never run where a merge depends on it. Asserted on the callers rather than on
+    # the parameter, because the parameter cannot know who invoked it -- and these three are the whole
+    # set of places this script runs outside its own suite.
+    foreach ($caller in @('scripts\release\open-pr.ps1', 'scripts\release\cut-release.ps1', '.github\workflows\ci.yml')) {
+        $callerPath = Join-Path $RepoRoot $caller
+        Assert-True (Test-Path -LiteralPath $callerPath) "-SkipCheck: $caller exists to be checked"
+        if (Test-Path -LiteralPath $callerPath) {
+            $callerText = [System.IO.File]::ReadAllText($callerPath, [System.Text.Encoding]::UTF8)
+            Assert-True (-not ($callerText -match '-SkipCheck')) `
+                "-SkipCheck: $caller runs the FULL gate -- it never reduces the check set"
+        }
+    }
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

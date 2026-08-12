@@ -159,9 +159,31 @@
          the block would be this gate inventing a policy the repo declined.
 
     Exit code: 0 = no errors. 1 = at least one error (usable as a gate in open-pr.ps1).
+.PARAMETER SkipCheck
+    (Optional) coverage categories NOT to run, e.g. -SkipCheck parse,branch-template. FOR THIS GATE'S
+    OWN TEST SUITE, and for nothing else: no gate -- open-pr, cut-release, CI -- passes it, and a guard
+    test holds them to that.
+
+    WHY IT EXISTS, MEASURED. check-plugin-integrity.tests.ps1 runs this script 110 times over a fixture,
+    each run a fresh process executing all 26 checks in order to assert one. That suite was 194s, of
+    which 98% was inside those child runs, and it was the test gate's whole wall clock -- three times the
+    next slowest suite, so the gate cost what this one suite cost. Profiled over the fixture, three
+    checks were half of every run: agent-def, parse and branch-template, none of which most scenarios
+    are about.
+
+    A SKIPPED CHECK IS NEVER REPORTED AS 'checked 0'. This gate deliberately makes an empty scan visible
+    -- 'no agent def found' is a finding-shaped statement, because a check that examined nothing must not
+    read as a check that passed. A skip therefore prints its own [SKIP] line and no coverage line at all,
+    so the two states cannot be confused by a reader or by an assert.
+
+    An unknown category is a hard error rather than a no-op, because the failure mode this parameter
+    introduces is silence: a scenario that skips 'agentdef' would run the check it meant to skip, and a
+    scenario asserting the ABSENCE of a finding from a check it accidentally skipped would pass while
+    testing nothing.
 .EXAMPLE
     ./scripts/lint/check-plugin-integrity.ps1
 #>
+param([string[]]$SkipCheck = @())
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -200,6 +222,29 @@ function Add-Error([string]$Msg) { $script:errors.Add($Msg) }
 # precisely so a gate can read them -- a list no gate can reach is a list that cannot be held to
 # anything, which is how a consumer merged twelve PRs with no description.
 . (Join-Path $PSScriptRoot '..\lib\pr-body-lib.ps1')
+
+# -SkipCheck, resolved once here so every wrapped block asks the same question. The list of skippable
+# names is written out rather than derived from the Write-Coverage calls: deriving it would accept any
+# category the file happens to mention, including one in a comment, and the whole point of validating is
+# that a name nobody implemented must not pass silently. Only the three the suite needs are skippable --
+# adding a fourth is a deliberate act, and the narrower the list the smaller the surface for a check to
+# be switched off by accident.
+$script:SkippableChecks = @('agent-def', 'parse', 'branch-template')
+$script:SkippedChecks   = @()
+# SPLIT ON COMMAS AS WELL AS ON ARGUMENT BOUNDARIES, because the only caller invokes this script through
+# 'powershell -File', and -File does no PowerShell parsing of its arguments: '-SkipCheck a,b,c' arrives as
+# the single literal string 'a,b,c'. Without the split that lands on the unknown-name refusal below --
+# which is at least loud, but it would refuse the exact form the docstring's own example uses.
+foreach ($s in (@($SkipCheck) -split ',')) {
+    if ([string]::IsNullOrWhiteSpace($s)) { continue }
+    $name = $s.Trim()
+    if ($script:SkippableChecks -notcontains $name) {
+        Write-Host "check-plugin-integrity: -SkipCheck '$name' is not a skippable check. Known: $($script:SkippableChecks -join ', ')." -ForegroundColor Red
+        exit 2
+    }
+    $script:SkippedChecks += $name
+}
+function Test-CheckEnabled([string]$Name) { return ($script:SkippedChecks -notcontains $Name) }
 
 # ADDING A DOT-SOURCE HERE MEANS ADDING IT TO TWO TEST FIXTURES TOO -- check-plugin-integrity.tests.ps1
 # and workflow-exclusivity.tests.ps1 both COPY this script into a temp tree and run it for real. A lib
@@ -293,7 +338,12 @@ Get-ChildItem -Path $RepoRoot -Recurse -Filter 'plugin.json' -File |
 # asymmetry that let check-consumer-drift's persona section state a clean verdict over 0 comparisons.
 $agentDefs = @(Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-agent.md' -File |
     Where-Object { $_.FullName -match '\\agents\\' })
-$agentDefs | ForEach-Object {
+# THE GATHER ABOVE IS OUTSIDE THE SKIP, DELIBERATELY. $agentDefs is read by three later checks
+# (specialist, shared, frontmatter-bom), so skipping the collection would quietly narrow THEIR scan
+# instead of this one's -- a skip that changes a different check's answer is worse than no skip at all.
+# Only the frontmatter validation below is what -SkipCheck agent-def turns off.
+if (Test-CheckEnabled 'agent-def') {
+    $agentDefs | ForEach-Object {
         $text = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)
         $rel = $_.FullName.Replace($RepoRoot, '.')
         foreach ($key in 'name', 'id', 'group') {
@@ -302,8 +352,11 @@ $agentDefs | ForEach-Object {
             }
         }
     }
-Write-Coverage -Category 'agent-def' -Checked $agentDefs.Count `
-    -Note $(if ($agentDefs.Count -eq 0) { 'no */agents/*-agent.md anywhere under the repo root -- the plugin tree is not where this check looked' } else { '' })
+    Write-Coverage -Category 'agent-def' -Checked $agentDefs.Count `
+        -Note $(if ($agentDefs.Count -eq 0) { 'no */agents/*-agent.md anywhere under the repo root -- the plugin tree is not where this check looked' } else { '' })
+} else {
+    Write-Skip 'agent-def -- not run (-SkipCheck). Nothing is asserted about agent-def frontmatter in this run.'
+}
 
 # --- 3b. manual frontmatter: id/group + file name <group>-<id>-manual.md -----------------------------
 $manuals = @(Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-manual.md' -File |
@@ -694,25 +747,31 @@ foreach ($lf in $linkFiles) {
 # 'plugins' is not a distinctive name: it is also the leaf of .claude/plugins/, so a segment match would
 # widen this check to anything a consumer's plugin layer happens to carry. The old segment name
 # ('claude-code-plugins') was unique enough to get away with it; this one is not.
+# THE GATHER IS INSIDE THE SKIP HERE, unlike agent-def's: $psScripts is read by nothing after this
+# block, so collecting it when the check is off would be work for an answer nobody reads.
 $psScripts = @()
-$pluginsRoot = Join-Path $RepoRoot 'plugins'
-$psScripts += (Get-ChildItem -Path (Join-Path $RepoRoot 'scripts') -Recurse -Filter '*.ps1' -File)
-$psScripts += (Get-ChildItem -Path $RepoRoot -Recurse -Filter '*.ps1' -File |
-    Where-Object {
-        $_.FullName -match '\\skills\\' -or
-        ($_.FullName.StartsWith($pluginsRoot + '\') -and $_.FullName -match '\\scripts\\')
-    })
-$psScripts = @($psScripts | Sort-Object -Property FullName -Unique)
-$psScripts | ForEach-Object {
-    $parseErrors = $null
-    [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$parseErrors) | Out-Null
-    if ($parseErrors -and $parseErrors.Count -gt 0) {
-        $rel = $_.FullName.Replace($RepoRoot, '.')
-        Add-Error "[parse] $rel`: $($parseErrors[0].Message)"
+if (Test-CheckEnabled 'parse') {
+    $pluginsRoot = Join-Path $RepoRoot 'plugins'
+    $psScripts += (Get-ChildItem -Path (Join-Path $RepoRoot 'scripts') -Recurse -Filter '*.ps1' -File)
+    $psScripts += (Get-ChildItem -Path $RepoRoot -Recurse -Filter '*.ps1' -File |
+        Where-Object {
+            $_.FullName -match '\\skills\\' -or
+            ($_.FullName.StartsWith($pluginsRoot + '\') -and $_.FullName -match '\\scripts\\')
+        })
+    $psScripts = @($psScripts | Sort-Object -Property FullName -Unique)
+    $psScripts | ForEach-Object {
+        $parseErrors = $null
+        [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$parseErrors) | Out-Null
+        if ($parseErrors -and $parseErrors.Count -gt 0) {
+            $rel = $_.FullName.Replace($RepoRoot, '.')
+            Add-Error "[parse] $rel`: $($parseErrors[0].Message)"
+        }
     }
+    Write-Coverage -Category 'parse' -Checked $psScripts.Count `
+        -Note $(if ($psScripts.Count -eq 0) { 'no .ps1 found under scripts/ or in any plugin -- a syntax error anywhere could not have been seen' } else { '' })
+} else {
+    Write-Skip 'parse -- not run (-SkipCheck). Nothing is asserted about PowerShell syntax in this run.'
 }
-Write-Coverage -Category 'parse' -Checked $psScripts.Count `
-    -Note $(if ($psScripts.Count -eq 0) { 'no .ps1 found under scripts/ or in any plugin -- a syntax error anywhere could not have been seen' } else { '' })
 
 # --- 6. specialists-system integrity -------------------------------------------------------------------
 # This repo is the source of the specialists system, so the agent-def<->manual link must be at
@@ -1435,22 +1494,28 @@ Write-Coverage -Category 'entry-heading' -Checked $ehChecked `
 # checked out CRLF is not a property of the format.
 $btChecked = 0
 $btMissing = 0
-foreach ($tpl in (Get-BranchTemplates)) {
-    $btChecked++
-    $tplPath = Join-Path $RepoRoot ($tpl.Path -replace '/', '\')
-    if (-not (Test-Path -LiteralPath $tplPath)) {
-        $btMissing++
-        Add-Error "[branch-template] $($tpl.Path) is missing. It is generated from the same formatters the scaffolder uses -- see Get-BranchTemplates in scripts/lib/entry-scaffold-lib.ps1."
-        continue
+# Get-BranchTemplates RENDERS both templates from the formatters, which is what costs here rather than
+# the comparison -- so the call is inside the skip along with everything it feeds.
+if (Test-CheckEnabled 'branch-template') {
+    foreach ($tpl in (Get-BranchTemplates)) {
+        $btChecked++
+        $tplPath = Join-Path $RepoRoot ($tpl.Path -replace '/', '\')
+        if (-not (Test-Path -LiteralPath $tplPath)) {
+            $btMissing++
+            Add-Error "[branch-template] $($tpl.Path) is missing. It is generated from the same formatters the scaffolder uses -- see Get-BranchTemplates in scripts/lib/entry-scaffold-lib.ps1."
+            continue
+        }
+        $onDisk   = ([System.IO.File]::ReadAllText($tplPath, [System.Text.Encoding]::UTF8)) -replace "`r`n", "`n"
+        $expected = $tpl.Content -replace "`r`n", "`n"
+        if ($onDisk -ne $expected) {
+            Add-Error "[branch-template] $($tpl.Path) no longer matches what the scaffolder writes. It is a copy-paste convenience, not a second definition of the format -- regenerate it from Get-BranchTemplates rather than editing it by hand."
+        }
     }
-    $onDisk   = ([System.IO.File]::ReadAllText($tplPath, [System.Text.Encoding]::UTF8)) -replace "`r`n", "`n"
-    $expected = $tpl.Content -replace "`r`n", "`n"
-    if ($onDisk -ne $expected) {
-        Add-Error "[branch-template] $($tpl.Path) no longer matches what the scaffolder writes. It is a copy-paste convenience, not a second definition of the format -- regenerate it from Get-BranchTemplates rather than editing it by hand."
-    }
+    Write-Coverage -Category 'branch-template' -Checked $btChecked `
+        -Note $(if ($btMissing -gt 0) { "$btMissing missing" } else { 'held against the formatters the scaffolder calls, so the template cannot drift from the file a branch actually gets' })
+} else {
+    Write-Skip 'branch-template -- not run (-SkipCheck). Nothing is asserted about the branch/ templates in this run.'
 }
-Write-Coverage -Category 'branch-template' -Checked $btChecked `
-    -Note $(if ($btMissing -gt 0) { "$btMissing missing" } else { 'held against the formatters the scaffolder calls, so the template cannot drift from the file a branch actually gets' })
 
 # --- 14. mojibake: a double-encoded character is a silent content change -----------------------------------
 # MEASURED HERE, August 1, 2026, and it nearly shipped. Demoting four headings in CHANGELOG.md with
