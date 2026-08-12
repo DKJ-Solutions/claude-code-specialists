@@ -1,13 +1,13 @@
-## `fix/releases-reorg-residue` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] Repoint the four history rows (`3.2.0`–`3.5.0`) at their merged `audience/` documents
-- [x] Check the other direction too: every version with an `audience/` document is linked to it, and the
-      patch rows correctly still point at `development/`
-- [x] Remove the dead `$consumerFacing`, and write down why the surviving `$notable` counts `>= 1`
-- [x] Rebuild the shared-script mirror and run the `release-lib` suite
-- [x] Fill in the changelog entry (both tiers, with scores)
-
-### Where I left off
-
+_(filled in when a branch is created)_
