@@ -240,7 +240,13 @@ The `releases/` directory (modeled on life-hub):
     the note did not exist while the cut ran; it does now, so the cut writes the Version cell correctly
     straight away and nothing repoints it afterwards. A patch's row keeps pointing at the development notes,
     which is the most readable document that release has.
-- **`releases/consumer/<X>.x/<X.Y.Z>.md`** — *the archive of the two-document era.* Was the tier-2 document, generated **only for a minor or
+- **`releases/audience/<X>.x/<X.Y.Z>.md`, the *For consumers* section** — *what the two-document era's
+  `releases/consumer/` document became.* **That directory no longer exists**: on August 12, 2026 Dave had its
+  twelve documents merged with their `releases/internal/` counterparts, one merged document per version, so
+  `releases/` holds three reader-named roots and nothing else. Read the paragraph below as history — it
+  describes how the separate document was generated, and every word of it still explains why the section
+  reads the way it does.
+  Was the tier-2 document, generated **only for a minor or
   major** (`Get-ReleaseConsumerBumps`) and built from **the tier-2 entries**. Written for the reader who
   decides whether to *update*, not for the one who reviews the diff: the branch administration is stripped
   — the `Branch title`, `Branch ID`, `Branch type` and `Pull Request` sections plus the `Plugins:` line,
@@ -258,8 +264,12 @@ The `releases/` directory (modeled on life-hub):
   opposite. **Markdown only** — the tier generated a print-ready `.html` alongside it for exactly one
   release (v3.2.0) and no longer does; Dave does not want it anywhere. A PDF, if ever needed, comes from
   rendering the markdown with a tool built for it.
-- **`releases/internal/<X>.x/<X.Y.Z>.md`** — *also the archive now; `new-internal-note.ps1` still ships and
-  still works, for a repo running the two-document flow, and nothing in this repo's chain calls it.* Was the tier-1 document, for colleagues, employers and management:
+- **`releases/audience/<X>.x/<X.Y.Z>.md`, the *What it is worth* and *What was still open* sections** — *what
+  the two-document era's `releases/internal/` document became.* **That directory no longer exists either**,
+  merged in the same movement (Dave, August 12, 2026). `new-internal-note.ps1` still ships and still works for
+  a repo running the two-document flow, and nothing in this repo's chain calls it — **its `releases/internal/`
+  path is that consumer's archive and must not be repointed at `audience/`.** Read the paragraph below as
+  history. Was the tier-1 document, for colleagues, employers and management:
   *what the work is worth*, at **every** release including a patch. It carried the **tier-1 and tier-2**
   entries — written while the ladder was cumulative, which it stopped being on August 12, 2026 — and left
   tier 0 to the development notes. Written by

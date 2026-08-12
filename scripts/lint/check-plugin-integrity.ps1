@@ -2218,9 +2218,22 @@ Write-Coverage -Category 'pr-template' -Checked $prtChecked `
 # ARCHIVES. The two hand-written documents became one -- the tree Get-ReleaseNoteRoot names, since August 12
 # releases/audience/, with a named section per reader -- and the
 # rule follows the reader rather than the directory: a consumer reads the whole of that file, organisation
-# section included, so a link into the per-PR record is exactly as wrong there as it was before. The eleven
-# documents already in releases/consumer/ are published records that stay where they are, and they stay
-# held: relaxing a rule over an archive would let a repair to one of them reintroduce what it caught.
+# section included, so a link into the per-PR record is exactly as wrong there as it was before.
+#
+# THIS REPO'S OWN ARCHIVE IS GONE AND 'releases\consumer' IS STILL READ, which is the point of the list
+# rather than an oversight (August 12, 2026). Dave had the twelve releases/consumer/ + releases/internal/
+# pairs merged into releases/audience/, so this repo has one hand-written tree and nothing else -- but a
+# CONSUMER on the two-document flow still has that directory, and they receive this gate through a plugin
+# update rather than by choosing to. Dropping the name would silently stop holding their outward-facing
+# documents, with a coverage count that still looked healthy. Reading a root that is not there costs
+# nothing: absent roots are filtered out below. Recognise both, write one.
+#
+# 'releases\internal' is deliberately NOT in the list, and that is not symmetry being broken by accident:
+# this check asks whether a document written for a CONSUMER offers them a link into somewhere written for
+# somebody else. An internal note's reader IS the organisation, so reading that tree here would accuse a
+# correct document of the thing it cannot commit. The merged document is covered because its consumer
+# section and its organisational sections share one file, which the reader-not-directory rule already
+# handles -- not because both trees are scanned.
 $ctrChecked = 0
 # THE LIVE ROOT COMES FROM THE SEAM, and that is a repair rather than a flourish (August 12, 2026). This
 # check named 'releases\notes' as a literal, so the day Get-ReleaseNoteRoot moved to 'releases/audience' the
@@ -2253,7 +2266,7 @@ $ctrRoots = @(@($ctrSeamRoot, 'releases\notes', 'releases\consumer') |
     ForEach-Object { Join-Path $RepoRoot $_ } |
     Where-Object { Test-Path -LiteralPath $_ })
 if ($ctrRoots.Count -eq 0) {
-    $ctrNote = 'this repo has neither a hand-written release-note tree (Get-ReleaseNoteRoot) nor a releases/consumer/ tree, so the tier is off here and there is nothing to hold'
+    $ctrNote = 'this repo has neither a hand-written release-note tree (Get-ReleaseNoteRoot) nor a releases/consumer/ archive from the two-document flow, so the tier is off here and there is nothing to hold'
 } else {
     foreach ($ctrFile in @($ctrRoots | ForEach-Object { Get-ChildItem -LiteralPath $_ -Recurse -Filter *.md -File })) {
         $ctrChecked++
@@ -2275,7 +2288,7 @@ if ($ctrRoots.Count -eq 0) {
     }
 }
 Write-Coverage -Category 'consumer-tier' -Checked $ctrChecked `
-    -Note $(if ($ctrChecked -eq 0) { $ctrNote } else { "every document in the hand-written note tree Get-ReleaseNoteRoot names -- releases/audience/ here, one document with a named section per reader -- plus the pre-rename releases/notes/ and the releases/consumer/ archive of the two-document era, held against offering its reader a link into the development (tier 0) or internal (tier 1) tree. The rule follows the READER, not the directory: a consumer reads the organisation section too. LINK TARGETS only -- a tier named in link text or prose is someone writing ABOUT the model, which is check 4's declined-path territory. Two neighbouring rules (a score, a branch name) were measured on this same tree and declined at 4 and 3 findings, all false; the reasoning is above the check" })
+    -Note $(if ($ctrChecked -eq 0) { $ctrNote } else { "every document in the hand-written note tree Get-ReleaseNoteRoot names -- releases/audience/ here, one document with a named section per reader, and since August 12, 2026 the only such tree in this repo: the twelve releases/consumer/ + releases/internal/ pairs were merged into it -- plus the pre-rename releases/notes/ and a releases/consumer/ archive, both still read for a consumer who has one, held against offering its reader a link into the development (tier 0) or internal (tier 1) tree. The rule follows the READER, not the directory: a consumer reads the organisation section too. LINK TARGETS only -- a tier named in link text or prose is someone writing ABOUT the model, which is check 4's declined-path territory. Two neighbouring rules (a score, a branch name) were measured on this same tree and declined at 4 and 3 findings, all false; the reasoning is above the check" })
 
 # --- 26. no frontmatter-bearing shipped document carries a byte-order mark --------------------------------
 # READ AS BYTES, AND THAT IS THE WHOLE POINT. Every other reader in this gate goes through

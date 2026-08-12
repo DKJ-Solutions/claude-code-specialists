@@ -2038,6 +2038,22 @@ try {
     Assert-True ($t4.Out -match '\[consumer-tier\] checked \d+') `
         'consumer-tier: and the coverage line proves a document was actually read, not skipped into silence'
 
+    # 64b. AN INTERNAL NOTE IS NOT SCANNED, and this is the assert that keeps the check from being
+    #      "tidied" into symmetry. releases/internal/ is the two-document flow's ORGANISATIONAL document:
+    #      its reader IS the organisation, so a link from it into the per-PR record is correct, and reading
+    #      that tree here would accuse a right document of the one thing it cannot do. Written down on
+    #      August 12, 2026, when this repo's own releases/consumer/ + releases/internal/ pairs were merged
+    #      into releases/audience/ -- the merged document is covered because both registers share ONE file,
+    #      which the reader-not-directory rule already handles, and not because both trees are read.
+    $ctrIntDir = Join-Path $Fixture 'releases\internal\9.x'
+    New-Item -ItemType Directory -Path $ctrIntDir -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $ctrIntDir '9.0.0.md'),
+        "# Internal summary v9.0.0`n`nThe per-PR record is in [the notes](../../development/9.x/9.0.0.md).`n", $Utf8NoBom)
+    $t4b = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($t4b.Out -match '\[consumer-tier\] releases\\internal')) `
+        'consumer-tier: an internal note linking into the development tree is NOT a finding -- its reader is the organisation'
+    Remove-Item -Recurse -Force -LiteralPath (Join-Path $Fixture 'releases\internal') -ErrorAction SilentlyContinue
+
     # 65. NO CONSUMER TREE IS NOT A FINDING -- that is the tier switched off, which is the default for
     #     every consumer that has not opted into it. Refusing here is how a gate gets switched off.
     Remove-Item -Recurse -Force -LiteralPath (Join-Path $Fixture 'releases\consumer') -ErrorAction SilentlyContinue

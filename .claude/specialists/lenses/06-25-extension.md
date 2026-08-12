@@ -306,8 +306,10 @@ only while it says when each one was opened.
 
    **The fixed cost per release, split by what a bump actually triggers.** A patch writes no hand-written
    document, so it opens no pull request and therefore meets no blocking CI — measured, not assumed:
-   `releases/consumer/3.x/` and `releases/internal/3.x/` hold documents for every minor in the window and
-   **none** for `3.1.1` or `3.1.2`.
+   the hand-written tree held a document for every minor in the window and **none** for `3.1.1` or `3.1.2`.
+   (Measured against `releases/consumer/3.x/` and `releases/internal/3.x/`, the two directories that carried
+   those documents then; they were merged into `releases/audience/3.x/` on August 12, 2026, one document per
+   version, so the count is now read from that single tree and is unchanged.)
 
    | release kind | blocking gate cost | what it is made of |
    |---|---|---|
