@@ -703,6 +703,56 @@ function Get-EntryFallbackType     { return $script:EntryFallbackType }
     Assert-True ($entryTextL -match ('(?m)^' + [regex]::Escape((Get-EntrySectionHeading -Key 'What')) + '$')) 'broken repo-config: falls back to the built-in section wording'
     Assert-True (Test-EntryDeclaresType -EntryText $entryTextL -Type 'Feat') 'broken repo-config: and the branch type is still stated'
     Assert-True (Test-Phrase -Text $rL.Out -Phrase 'could not be loaded') 'broken repo-config: says so out loud instead of failing silently'
+
+    # --- (m) A BRANCH STACKED ON AN UNFOLDED ONE (inbound #615) ------------------------------------
+    #     The reported defect: both idempotency tests were true for any branch created off a branch
+    #     whose entry was written but not yet folded -- "is the entry filled" and "is the owner not the
+    #     trunk" -- so both files were skipped and the skip was printed under the NEW branch's name.
+    #     The branch silently started out carrying the previous branch's entry as its own, and the
+    #     first reader who could notice it was whoever read CHANGELOG.md after the fold.
+    #
+    #     These asserts are on the OWNER the files declare, not on the message, because the owner is
+    #     what every downstream reader (the fold, the scaffold gate, the step-list gate) keys on.
+    Write-Host "new-branch.ps1 -- stacked on an unfolded branch: the files are rewritten, not skipped (#615)" -ForegroundColor Cyan
+    $fixtureM = New-Fixture -Label 'm'
+    $rM1 = Invoke-NewBranch -Dir $fixtureM -Name 'docs/parent' -Title 'The parent branch'
+    Assert-Equal 0 $rM1.Code 'stacked: the parent branch is created'
+    $entryPathM    = Join-Path $fixtureM ((Get-BranchFilePaths).Changelog)
+    $progressPathM = Join-Path $fixtureM ((Get-BranchFilePaths).Progress)
+    # Committed on the parent, which is the ordinary case: git holds that entry, so replacing it in the
+    # child's working tree costs nothing. That is exactly the distinction the write path measures.
+    $prevEapM = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & git -C $fixtureM add -A 2>$null | Out-Null
+        & git -C $fixtureM commit -q -m 'parent entry' 2>$null | Out-Null
+    } finally { $ErrorActionPreference = $prevEapM }
+
+    $rM2 = Invoke-NewBranch -Dir $fixtureM -Name 'feat/child' -Title 'The stacked child branch'
+    Assert-Equal 0 $rM2.Code 'stacked: the child branch is created'
+    $entryTextM    = [System.IO.File]::ReadAllText($entryPathM,    [System.Text.Encoding]::UTF8)
+    $progressTextM = [System.IO.File]::ReadAllText($progressPathM, [System.Text.Encoding]::UTF8)
+    Assert-Equal 'feat/child' (Get-BranchFileDeclaredBranch -Text $entryTextM)    'stacked: the entry declares the CHILD branch, not the parent'
+    Assert-Equal 'feat/child' (Get-BranchFileDeclaredBranch -Text $progressTextM) 'stacked: the step list declares the CHILD branch, not the parent'
+    Assert-True (Test-Phrase -Text $rM2.Out -Phrase "'docs/parent'") 'stacked: the output names the branch whose files were replaced'
+    Assert-True (-not (Test-Phrase -Text $rM2.Out -Phrase 'already written')) 'stacked: and does NOT report the files as already written for this branch'
+
+    # And the half that must not be overwritten: an entry that was never committed exists in exactly one
+    # place, so the write is refused there and said out loud instead. The defect being repaired was the
+    # silence and the wrong name -- not the keeping, which is why keeping is still a correct outcome here.
+    Write-Host "new-branch.ps1 -- stacked on UNCOMMITTED work: kept, and said out loud (#615)" -ForegroundColor Cyan
+    $fixtureN = New-Fixture -Label 'n'
+    $rN1 = Invoke-NewBranch -Dir $fixtureN -Name 'docs/uncommitted-parent' -Title 'Never committed'
+    Assert-Equal 0 $rN1.Code 'stacked/dirty: the parent branch is created'
+    $entryPathN = Join-Path $fixtureN ((Get-BranchFilePaths).Changelog)
+    $entryTextN1 = [System.IO.File]::ReadAllText($entryPathN, [System.Text.Encoding]::UTF8)
+
+    $rN2 = Invoke-NewBranch -Dir $fixtureN -Name 'feat/dirty-child' -Title 'Stacked on uncommitted work'
+    Assert-Equal 0 $rN2.Code 'stacked/dirty: the child branch is still created -- this is a warning, not a stop'
+    $entryTextN2 = [System.IO.File]::ReadAllText($entryPathN, [System.Text.Encoding]::UTF8)
+    Assert-Equal $entryTextN1 $entryTextN2 'stacked/dirty: the uncommitted entry is left exactly as it was'
+    Assert-True (Test-Phrase -Text $rN2.Out -Phrase 'UNCOMMITTED') 'stacked/dirty: the output says the work is uncommitted'
+    Assert-True (Test-Phrase -Text $rN2.Out -Phrase "'docs/uncommitted-parent'") 'stacked/dirty: and names whose work it is'
 } finally {
     foreach ($f in $script:fixtures) {
         if (Test-Path -LiteralPath $f) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }
