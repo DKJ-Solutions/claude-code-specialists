@@ -184,10 +184,26 @@ of this plugin uses:
 |---|---|
 | **which tracker, and where the boundary is** | the whole page assumes the request originates somewhere you do not control |
 | **the folder, and the file naming** | including where research material sits relative to the tickets |
-| **the language** | the originating repo's ticket files are Dutch; this page is English because the plugin is |
+| **the language of the form** | section names, field names, the state vocabulary — one answer per repo |
+| **the language of the outgoing message** | not one answer per repo; see below |
 | **every section and field name** | the roles above are the rule; the names are not |
 | **the state vocabulary** | rule 7 requires it to be *closed*, not to be these eight values |
 | **whether there is an index at all** | rule 10 applies if you have one |
+
+**The language is two questions, and only the first has one answer per repo.** The **form** — the section
+names, the field names, the state vocabulary — is workflow rather than subject matter, so a repo picks a
+language once and is done; the argument for picking English is that a colleague who does not read your prose
+can still open a file and recognise its structure without translating every heading first. This page is
+English because the plugin is — the plugin's answer to its own version of the question, not yours. The
+**outgoing message** — the reply of rules 6 and 8 — is the opposite: it is verbatim what a person receives,
+so its language is a property of **whoever filed the ticket**, and it can differ from one file to the next.
+The instruction is therefore *look up who filed it before you write*, not *write in language X*.
+
+**Measured in the originating repo, 2026-08-12.** It had answered "Dutch" for the whole file, on a reason
+that reads as sound: the outgoing message goes to colleagues, and those colleagues are Dutch-speaking.
+**Some of them are not** — the rule had quietly generalised from the requesters seen so far to every
+requester there will ever be. One answer per repo is the shape that fails here, and it fails silently:
+nothing is wrong until the first request arrives from somebody who cannot read the message.
 
 **And one thing to check before you adopt this**, in the same spirit as the note at the end of
 [`CONTRIBUTING-portable.md`](CONTRIBUTING-portable.md#one-thing-to-do-before-you-adopt-a-root-contributingmd):
