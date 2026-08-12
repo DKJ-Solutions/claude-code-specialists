@@ -7,7 +7,6 @@
 - [x] Keep the measurement that made the split necessary, in the page's own style — no gate, no seam, no template
 - [x] Copy edit the diff (Edith #17) — 7 findings, all applied or judged; see "Where I left off"
 - [x] Write the changelog entry: what the change does + tier 0 (2) and tier 2 (3) scores
-- [ ] PR + merge + fold
 
 ### Where I left off
 
