@@ -164,7 +164,7 @@ through afterward, per the `cut-release` skill's checklist — not automated by 
 - **Every release.** Until August 4 a patch skipped the step entirely (tag only). It no longer does, so
   the Release page becomes a continuous record rather than one with gaps where the patches were.
 - **A generated body**, with every hand-written document and the development notes as **attachments**.
-  `cut-release.ps1` writes `releases/development/<dir>/<X.Y.Z>-github-body.md` — the release title, a
+  `cut-release.ps1` writes `releases/github/<dir>/<X.Y.Z>.md` — the release title, a
   pointer at the attached notes where one is expected, and one linked line per change that landed, every
   tier included. Rendall edits nothing; he points `gh` at it, and the cut prints the exact command.
 - **What this replaced, and why it is the more important half.** The body was the **internal note** from

@@ -235,8 +235,8 @@ In one motion, on a clean `main`:
 publish a GitHub Release.** Not run by `cut-release.ps1` and not automated; the release manager walks
 through the
 [`cut-release` skill](../plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md)'s checklist: `gh release create`
-with the **generated body** (`--notes-file` pointing at the `<X.Y.Z>-github-body.md` the cut already wrote —
-nothing to edit), then `gh release upload` with the full development notes **and the hand-written note,
+with the **generated body** (`--notes-file` pointing at the `releases/github/<dir>/<X.Y.Z>.md` the cut already
+wrote — nothing to edit), then `gh release upload` with the full development notes **and the hand-written note,
 where the bump generated one**. Never inline the development notes — see
 [Tier 0 - development](#tier-0---development) for the character limit that makes that fail.
 
