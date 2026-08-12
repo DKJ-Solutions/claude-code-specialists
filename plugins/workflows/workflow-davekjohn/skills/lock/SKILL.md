@@ -45,8 +45,8 @@ what the last release note recorded as still open, and the gate commands. It **r
 is written, committed or pushed, so it is safe on a dirty tree mid-branch.
 
 Every optional source degrades to a stated line rather than an error: no `gh`, no tags, no
-`CHANGELOG.md`, no `releases/notes/` each print what could not be read. A repo that has adopted none
-of this workflow still gets a useful answer.
+`CHANGELOG.md`, no release-note tree at the root `Get-ReleaseNoteRoot` names each print what could not be
+read. A repo that has adopted none of this workflow still gets a useful answer.
 
 **2. Name ONE subject.** Not a backlog -- the single thing that should happen next, with the reason it
 outranks the others. If two things genuinely tie, say so and pick one; a lock naming three subjects is

@@ -488,9 +488,49 @@ The constitution above, concretely implemented here:
 
      | tier | who notices | where it is written | when |
      |---|---|---|---|
-     | **2** | consumers | the *For consumers* section of `releases/notes/<X>.x/<X.Y.Z>.md` | minor/major |
-     | **1** | colleagues on this project | the organisation's two sections of that same file | minor/major |
+     | **2** | subscribers of the service | the *For consumers* section of `releases/audience/<X>.x/<X.Y.Z>.md` | minor/major |
+     | **1** | management and the employer/commissioner | the organisation's two sections of that same file | minor/major |
      | **0** | only this repo's developers | `releases/development/<X>.x/<X.Y.Z>.md` | every release |
+
+     **TIERS 1 AND 2 ARE TWO KINDS OF AUDIENCE, NOT TWO RUNGS, AND A REPO HAS EXACTLY ONE** (Dave, August 12,
+     2026; inbound [#620](https://github.com/DaveKJohn/claude-code-specialists/issues/620)). Tier 1 is
+     management and whoever commissions or pays for the work — the audience of a repo that *delivers*
+     something, or that sells a **product** whose buyers never read a release note. Tier 2 is the subscriber
+     of a **service**, who decides whether to upgrade. The answer is fixed per repo, before any entry is
+     written, in `Get-ReleaseAudienceTier`; **this repo answers 2**, the webshop that filed #620 answers 1.
+     Same model, opposite answer — which is exactly why it is a knob and not a constant. `new-branch`
+     scaffolds tier 0 plus that tier alone, the routing question under tier 0 points at it, and `open-pr` and
+     `cut-release` require that tier rather than every rung from 1 up.
+
+     **THE MEASUREMENT, AND IT REVERSED AN ARGUMENT MADE AGAINST THIS CHANGE THREE HOURS EARLIER.** Counting
+     tier sections **in aggregate** says tier 1 is a working axis here — 89 of 95 scored — and produces a case
+     for keeping the ladder. Counting the highest scored tier **per entry** over the same 97 says the
+     opposite: **81 top out at tier 2, 8 at tier 1, 8 at tier 0**, so 81 of those 89 tier-1 sections existed
+     only because the ladder demanded one under a scored tier 2 — the same reach argued twice, in a second
+     register, for a reader who here is the same person. The consumer measured the mirror image: 37 open
+     entries, 15 at tier 1, zero ever at tier 2. **Count per entry, never in aggregate**; the aggregate is an
+     artefact of the rule being questioned.
+
+     **TWO SEPARATIONS CARRY THE WHOLE SAFETY OF IT.** `Get-EntryTierMax` stays **2** and every validator
+     keeps reading it: the MAX says which tier numbers are valid to *read* — a tier-1 repo must still parse
+     the tier-2 entries in its own history — while the audience says which tiers a repo is *asked* about. And
+     **an unstated seam means ask about all of them**, exactly as before the knob existed: reading absence as
+     "no audience enabled" would switch the tier off in every consumer the moment they took the plugin update,
+     with nothing erroring and a release document going out empty. The loud channel is the contract, where
+     this is a `decide` record that `adopt-config` scaffolds rather than copies.
+
+     **THE GATE NARROWED WHAT IT ASKS WITHOUT NARROWING WHAT IT ACCEPTS**, which is the half that would
+     otherwise have cost real work: the entries pending when this landed each carried all three tiers, and a
+     gate that began refusing an *extra* answered tier would have turned finished dossiers into PRs that
+     cannot be opened. An asserted test holds exactly that case — do not "tighten" it.
+
+     **`releases/notes/` BECAME `releases/audience/` IN THE SAME MOVEMENT** (August 12, 2026), completing the
+     rule that every root under `releases/` names its **reader**: `development/` the developers, `github/` the
+     Release page, `audience/` whoever this repo publishes to. `notes/` named the *form* — the same mistake
+     `highlights/` made, fixed in that sibling two days earlier and missed in this one. **The shared default
+     stays `releases/notes`** in `cut-release.ps1`, `session-status.ps1` and the contract record: an unstated
+     seam has to keep meaning what it meant yesterday, and a consumer receives these scripts through a plugin
+     update rather than by choosing to. `consumer/` and `internal/` stay as frozen archives.
 
      **ONE HAND-WRITTEN DOCUMENT SINCE AUGUST 10, 2026, WITH A NAMED SECTION PER READER** (Dave). Tier 1 and
      tier 2 had a document each — `releases/internal/` and `releases/consumer/` — and at **all twelve**
@@ -583,7 +623,7 @@ The constitution above, concretely implemented here:
      only reorder the categories, not escape them. Each change states its own type inside itself now, so
      nothing is lost by not grouping on it.
 
-     **The ladder is cumulative**, so a tier-2 entry is in the consumer document *and* in the internal note; the
+     **The audience tier decides which sections of the hand-written note the entry reaches**; the
      development note carries everything, tier 0 included, because it is the record rather than a summary.
      **The number comes from the author of the entry, on the branch** — and deliberately **not** from the
      branch prefix, which this repo has measured does not predict impact.
@@ -614,8 +654,9 @@ The constitution above, concretely implemented here:
      otherwise all prose, so it did not read as the field it is. The plain form is still **read**, because
      `CHANGELOG.md` and every consumer's tree are full of entries carrying it.
 
-     **All three tiers are always present, and `N/A` is how one says it reaches nobody** (Dave, August 7,
-     2026). Tier 1 and tier 2 used to be commented out, and uncommenting one *was* the claim — so an
+     **Every tier the repo asks about is present, and `N/A` is how one says it reaches nobody** (Dave,
+     August 7, 2026; narrowed from "all three" to tier 0 plus the audience tier on August 12). Tier 1 and
+     tier 2 used to be commented out, and uncommenting one *was* the claim — so an
      unreached tier and an unfinished one looked identical, and no gate could tell "this reaches no
      consumer" from "nobody got to tier 2 yet". Each tier is answered now: a score, or `N/A` with a line
      saying why. **The reach is the highest tier carrying a number**, so an `N/A` costs a sentence and
@@ -640,12 +681,14 @@ The constitution above, concretely implemented here:
      **Each section closes by asking whether there is a next one**, and that question is written even where
      the next tier is already there. An author who has answered does not need it; a reader at the fold, at
      the cut and in the record does — a question that disappears once answered leaves them unable to see
-     that it was asked. Tier 2 has no successor and carries none.
+     that it was asked. **The LAST written tier has no successor and carries none** — which used to be a
+     statement about tier 2 specifically and is now about whichever audience tier the repo asked for. The
+     question is keyed on what is actually written rather than on a fixed pair, so a tier-2 repo no longer
+     prints *"continue to Tier 1"* above a file whose next section is Tier 2.
 
-     **The ladder stays cumulative and is still impossible to claim halfway.** A change consumers notice
-     *is* a change colleagues get something out of, so a tier-2 entry owes a tier-1 section — the sections
-     an entry has are the documents it appears in, and each is that document's reader answering their own
-     question. The score is scaffolded **empty**, unlike the tier: 0 is a harmless final answer about
+     **The cumulative ladder is gone** (August 12, 2026), and with it the rule that a tier-2 entry owed a
+     tier-1 section. What remains is that every tier the file *does* carry is answered, `N/A` ones included.
+     The score is scaffolded **empty**, unlike the tier: 0 is a harmless final answer about
      reach, while any scaffolded *score* would be a guess at a ranking, and this repo has measured what a
      guessed ranking costs (the retired remove-before-publishing marker, below).
 
@@ -671,7 +714,7 @@ The constitution above, concretely implemented here:
      Four of the five bands describe something the reader can observe; this one describes an **absence**, and
      an absence has to be named or it cannot be told apart from having nothing to say.
 
-     **The tiers are not nested audiences, so tier 0 may legitimately score below tier 1.** Dave asked whether
+     **The tiers are not nested audiences, so tier 0 may legitimately score below the audience tier.** Dave asked whether
      that should be refused — if nothing changes for this repo's own developers, how can it change for anyone
      further out? PR #503 is the counterexample: the defect existed **only outside this repo** (consumers had
      no `branch/templates/`; this repo always did), so it was worth 4 to a consumer and almost nothing here. A
@@ -715,10 +758,14 @@ The constitution above, concretely implemented here:
        **tier 1 or higher → minor**. A release made entirely of repo-internal work used to be refused
        outright, on the grounds that it "has nobody to announce it to" — the answer is that announcing
        nothing is exactly what a patch is for. And a minor used to demand a **tier-2** entry, so tier-1
-       work earned only a patch;
-     - **the audience of each note follows the TIER, not the bump**, and that is what keeps the looser
-       rule honest. A tier-1-only minor writes the internal note and **no consumer document**, so nobody outside
-       is handed a document about work they cannot see. `cut-release.ps1` keys the consumer document on a tier-2
+       work earned only a patch. It is written as **tier 1 or higher** rather than as "the audience tier"
+       deliberately: `Test-ReleaseBumpEarned` then reads correctly in a tier-1 repo and a tier-2 repo alike,
+       with neither having to translate it, and **#620's "silently wrong bump" cannot happen** — that was the
+       one claim in the report which measurement did not support;
+     - **the sections of the note follow the TIER, not the bump**, and that is what keeps the looser
+       rule honest. A minor whose highest pending entry is tier 1 writes the note **without its *For
+       consumers* section**, so nobody outside is handed a section about work they cannot see —
+       which is every minor in a repo whose audience is tier 1. `cut-release.ps1` keys that section on a tier-2
        entry being present rather than on the bump type — a condition that was belt-and-braces while a
        minor required tier 2, and is now the whole mechanism;
      - a **major** needs **10 minors** in the current major line, on top of that minimum. A major is a

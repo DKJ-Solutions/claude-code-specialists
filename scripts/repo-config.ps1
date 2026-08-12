@@ -366,7 +366,23 @@ function Get-ReleaseHistoryPath {
 # 'releases/highlights' until the rename that named each document for its reader, and the DIRECTORY moved
 # with it -- this is not a compatibility fallback, and a repo still holding notes under the old name says
 # so here rather than relying on anything to guess.
-$script:ReleaseNoteRoot = 'releases/notes'
+#
+# 'releases/audience' SINCE AUGUST 12, 2026 (Dave; inbound #620), completing the same naming rule one step
+# further. Every root under releases/ now names WHO reads it: development/ is the record for this repo's own
+# developers, github/ is the generated Release body, audience/ is the one hand-written document written for
+# whoever this repo publishes to. 'notes/' named the FORM -- which is the mistake 'highlights/' made, caught
+# two days later in the sibling it was renamed alongside rather than in itself. It is also the root that has
+# to agree with Get-ReleaseAudienceTier: the tier says which reader, so the directory should not say
+# something orthogonal to it.
+#
+# THE SHARED DEFAULT IS DELIBERATELY *NOT* MOVED WITH IT. cut-release.ps1 and session-status.ps1 still fall
+# back to 'releases/notes', and script-contract-lib still records that as the Default, because an unstated
+# seam has to keep meaning what it meant yesterday. A consumer who never answered this knob has their
+# documents in releases/notes/ right now and receives these scripts through a plugin update rather than by
+# choosing to -- moving the fallback would have the cut write to a root nobody has and the reader look in a
+# root nobody filled, reported as "no release note was found", which reads as a repo that has not cut one.
+# This is a repo-level rename, so it is stated here, which is the only place that can state it.
+$script:ReleaseNoteRoot = 'releases/audience'
 
 function Get-ReleaseNoteRoot {
     <# Repo-root-relative directory the hand-written release note is written into and read back from. #>

@@ -2047,6 +2047,44 @@ try {
     Assert-True ($t5.Out -match '\[consumer-tier\] checked 0') `
         'consumer-tier: and it says so, rather than reporting the same coverage as a full run'
 
+    # 66. THE LIVE ROOT FOLLOWS Get-ReleaseNoteRoot, AND THIS IS THE ASSERT THAT WOULD HAVE CAUGHT THE BUG.
+    #     Until August 12, 2026 the check named 'releases\notes' as a literal, so a repo that repointed the
+    #     seam -- which this repo then did, to releases/audience -- would have had its live tree walk past
+    #     unread while the coverage line still printed a plausible number. A gate going quiet with nothing
+    #     erroring is the failure class this repo keeps paying for, and the only defence is a fixture whose
+    #     root is deliberately NOT the default. The document below is placed under a third name that is
+    #     neither the default nor the archive, so nothing but the seam can find it.
+    $ctrSeamDir = Join-Path $Fixture 'releases\audience\9.x'
+    New-Item -ItemType Directory -Path $ctrSeamDir -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $ctrSeamDir '9.0.0.md'),
+        "# Release notes v9.0.0`n`nThe full recap is in the [release notes](../../development/9.x/9.0.0.md).`n", $Utf8NoBom)
+    $ctrSeamCfg = Join-Path $Fixture 'scripts\repo-config.ps1'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $ctrSeamCfg) -Force | Out-Null
+    [System.IO.File]::WriteAllText($ctrSeamCfg,
+        "function Get-ReleaseNoteRoot { return 'releases/audience' }`n", $Utf8NoBom)
+    $t6 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($t6.Out -match "\[consumer-tier\].*links into 'development/'") `
+        'consumer-tier: the tree named by Get-ReleaseNoteRoot is walked, not a hardcoded releases/notes'
+    Assert-True ($t6.Out -match '\[consumer-tier\] checked [1-9]') `
+        'consumer-tier: and the coverage counts it, so a repointed root cannot report a healthy zero'
+
+    # 67. THE PRE-RENAME ROOT IS STILL WALKED ALONGSIDE IT. A repo mid-migration has documents under both
+    #     names, and reading only whichever the seam happens to name today would drop the other half in
+    #     silence. Recognise both, write one -- the same rule the retired seam names get.
+    $ctrOldDir = Join-Path $Fixture 'releases\notes\9.x'
+    New-Item -ItemType Directory -Path $ctrOldDir -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $ctrOldDir '8.0.0.md'),
+        "# Release notes v8.0.0`n`nSee the [summary](../../internal/9.x/9.0.0.md).`n", $Utf8NoBom)
+    $t7 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($t7.Out -match "\[consumer-tier\] releases\\notes\\9\.x\\8\.0\.0\.md.*links into 'internal/'") `
+        'consumer-tier: a document left behind under the pre-rename root is still held'
+    Assert-True ($t7.Out -match "\[consumer-tier\] releases\\audience\\9\.x\\9\.0\.0\.md") `
+        'consumer-tier: and the seam root is held in the same run -- both roots, not whichever one wins'
+
+    Remove-Item -Recurse -Force -LiteralPath (Join-Path $Fixture 'releases\audience') -ErrorAction SilentlyContinue
+    Remove-Item -Recurse -Force -LiteralPath (Join-Path $Fixture 'releases\notes') -ErrorAction SilentlyContinue
+    Remove-Item -Force -LiteralPath $ctrSeamCfg -ErrorAction SilentlyContinue
+
     # --- check 26: a frontmatter document opens with '---', read as bytes -----------------------------
     # 66-71. The defect is measured, not imagined: adopt-config/SKILL.md shipped with EF BB BF in 4.1.0
     #        and was the one model-invocable skill of eleven missing from the agent's skill listing

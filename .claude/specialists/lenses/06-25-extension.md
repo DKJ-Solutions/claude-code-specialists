@@ -220,7 +220,7 @@ only while it says when each one was opened.
    inside the writing and nobody waited for. The gate share breaks down as 231s of suites inside the cut,
    200s of the same suites when the note's pull request opened, and 8m 36s of `lint-en-tests` on that pull
    request, which is **56%** of the release and the only place a real reduction can come from. The full table
-   is in [`releases/notes/4.x/4.4.0.md`](../../../releases/notes/4.x/4.4.0.md).
+   is in [`releases/audience/4.x/4.4.0.md`](../../../releases/audience/4.x/4.4.0.md).
 
    **Two cautions travel with the number, and they matter more than it does.** That release carried **two**
    entries against `v4.2.0`'s seven, so it measures the clock well and the writing gain not at all — less to
@@ -314,7 +314,7 @@ only while it says when each one was opened.
    | minor / major (carries a document) | **14m 34s** | 231s suites in the cut · 200s the same suites at `open-pr` · **443s** median `lint-en-tests` on that pull request |
    | patch (no document, no pull request) | **3m 51s** | the 231s cut suites alone |
 
-   The two local legs are cited from [`releases/notes/4.x/4.4.0.md`](../../../releases/notes/4.x/4.4.0.md),
+   The two local legs are cited from [`releases/audience/4.x/4.4.0.md`](../../../releases/audience/4.x/4.4.0.md),
    which took them from git timestamps. **The 7m 48s CI run on the release commit is excluded** because it
    blocks nobody.
 

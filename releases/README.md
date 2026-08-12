@@ -15,14 +15,32 @@ consumer which release they are on.
 ## The tier model
 
 **One scale, used twice.** A change declares how far it reaches, and that number decides two things: which
-document — and, for tiers 1 and 2, which section of it — the change appears in, and, together with its
-significance score, where within that section it sits.
+document — and, where the document has more than one reader, which section of it — the change appears in,
+and, together with its significance score, where within that section it sits.
 
 | tier | who notices | where it is written | when |
 |---|---|---|---|
-| **2** | consumers of the product | the *For consumers* section of `notes/<dir>/<X.Y.Z>.md` | minor/major |
-| **1** | colleagues working on this project | the organisation's two sections of that same file | minor/major |
+| **2** | subscribers of the service | the *For consumers* section of `audience/<dir>/<X.Y.Z>.md` | minor/major |
+| **1** | management and the employer/commissioner | the organisation's two sections of that same file | minor/major |
 | **0** | only this repo's own developers | `development/<dir>/<X.Y.Z>.md` | every release |
+
+**Tiers 1 and 2 are two KINDS of audience, and this repo has exactly one of them** (Dave, August 12, 2026;
+inbound [#620](https://github.com/DaveKJohn/claude-code-specialists/issues/620)). They are not two rungs of a
+ladder. Tier 1 is management and whoever commissions or pays for the work — the audience of a repo that
+*delivers* something, or that sells a **product** whose buyers never read a release note. Tier 2 is the
+subscriber of a **service**, who decides whether to upgrade. A repo answers one of them, once, in
+`Get-ReleaseAudienceTier`, before any entry is written; **this repo answers 2**, being a service rather than
+a product. `new-branch.ps1` then scaffolds tier 0 plus that tier alone, and `open-pr.ps1` and
+`cut-release.ps1` ask for that tier rather than every rung from 1 up.
+
+**A repo that has stated nothing is asked about all three**, exactly as before the knob existed — an
+unstated seam means unchanged, never "switch the audience tier off". The loud channel is the script
+contract, where this is a `decide` record that `adopt-config` puts to the repo rather than answering for it.
+
+**The tier a repo no longer asks about is still read.** `Get-EntryTierMax` stays 2 and every validator keeps
+using it: the maximum says which tier numbers are valid to *parse* — 97 entries in this repo's record were
+written under the cumulative ladder — while the audience says which are *asked*. An extra answered tier is
+accepted, never refused, so no finished dossier became unopenable on the day the knob landed.
 
 **`CHANGELOG.md` has no sections to file into** (Dave, August 5, 2026). It is an intro followed by one `##`
 per change, ranked furthest-reach-first and, within a tier, highest-significance-first — so what the three
@@ -31,14 +49,23 @@ reach in the `### Significance` section it carries, one `#### Tier N` sub-sectio
 **fold** is the only moment that order can be decided, because the cut empties the list: whatever order it
 leaves is what the release documents inherit, with nothing re-estimated days later.
 
-**The ladder is cumulative, so a tier-2 entry does not skip tier 1.** Something a consumer notices is
-something a colleague should hear about too, so a tier-2 entry earns both the *For consumers* section and
-the note's organisational sections. The development note carries everything, tier 0 included, because it is
-the record rather than a summary of one.
+**The cumulative ladder is gone, and the measurement is why.** Until August 12, 2026 a tier-2 entry *owed* a
+tier-1 section, on the reasoning that something a consumer notices is something a colleague should hear
+about too. That reasoning holds for a repo with two genuine audiences and produces nothing but duplication
+for the far more common repo with one. Measured over the 97 scored entries in this repo's record: **81 top
+out at tier 2 and only 8 at tier 1**, so 81 of the 89 tier-1 sections existed only because a scored tier-2
+section sat above them — the same reach argued twice, in a second register, for a reader who here is the
+same person. The reporting consumer measured the mirror image on its own side: 37 open entries, 15 at tier
+1, zero ever at tier 2. The development note still carries everything, tier 0 included, because it is the
+record rather than a summary of one.
 
-**Where the number comes from: the author of the entry, on the branch.** `new-branch.ps1` writes all three
-`#### Tier N` sub-sections with their scores left empty; whoever finishes the branch answers each one, with a
-score or with `N/A` and the reason it reaches nobody there. **The reach is the highest tier carrying a
+**Counting per entry, not in aggregate, is what produced that answer.** In aggregate tier 1 looks like a
+working axis here — 89 of 95 scored entries carry one — and that number argues *against* this change. It is
+an artefact of the ladder that required them.
+
+**Where the number comes from: the author of the entry, on the branch.** `new-branch.ps1` writes the
+`#### Tier N` sub-sections this repo asks about with their scores left empty; whoever finishes the branch
+answers each one, with a score or with `N/A` and the reason it reaches nobody there. **The reach is the highest tier carrying a
 number**, so an `N/A` costs a sentence and keeps the reasoning behind a negative claim in the record.
 `open-pr.ps1` refuses an entry whose description, body or any tier's reason is still blank, and
 `fold-changelog-entry.ps1` folds the entry **verbatim** — so the declaration lives in exactly one place, the
@@ -71,9 +98,11 @@ moment, and the one document that gets written is the record.
 
 **Why a minor needs tier 1 rather than tier 2.** It demanded a tier-2 entry until August 7, 2026, so work a
 colleague on this project got something out of earned only a patch — while the version here speaks to all
-stakeholders, not to consumers alone. What keeps the looser rule honest is that **the sections follow the
-tier and not the bump**: a tier-1-only minor writes the note without its *For consumers* section, so nobody
-outside is handed a section about work they cannot see.
+stakeholders, not to consumers alone. The rule is written as **tier 1 or higher** rather than as "the
+audience tier" on purpose: it then reads correctly in a tier-1 repo and a tier-2 repo alike, without either
+having to translate it. What keeps the looser rule honest is that **the sections follow the tier and not the
+bump**: a minor whose highest pending entry is tier 1 writes the note without its *For consumers* section,
+so nobody outside is handed a section about work they cannot see.
 
 **Why a major counts minors rather than pending work:** a major is a **recap** of the minors before it,
 which is what both of this repo's majors actually were (`v2.0.0` consolidated v1.0–v1.18, `v3.0.0`
@@ -106,7 +135,19 @@ stands for whichever this repo uses.
 | document | for whom | when | generated by |
 |---|---|---|---|
 | `development/<dir>/<X.Y.Z>.md` | developers — the full per-PR record, auto-complete | every release | `cut-release.ps1` |
-| `notes/<dir>/<X.Y.Z>.md` | colleagues and, where earned, consumers — one hand-written note with a named section per reader | minor/major, where a pending entry earns one | drafted by `cut-release.ps1`, written by hand |
+| `audience/<dir>/<X.Y.Z>.md` | whoever this repo publishes to — one hand-written note with a named section per reader | minor/major, where a pending entry earns one | drafted by `cut-release.ps1`, written by hand |
+| `github/<dir>/<X.Y.Z>.md` | whoever opens the GitHub Releases page | every release | `cut-release.ps1` |
+
+**Every root under `releases/` names its READER, and `audience/` was the last one that did not** (Dave,
+August 12, 2026). It was `notes/`, which names the form rather than the reader — the same mistake
+`highlights/` made, and one this repo had already fixed in that sibling two days earlier without noticing it
+in this one. `development/` names the developers, `github/` names the page, `audience/` names whoever the
+repo publishes to, whichever of the two audience tiers that is. The root is stated in `Get-ReleaseNoteRoot`;
+**the shared default is deliberately still `releases/notes`**, so a consumer who never answered the knob is
+not silently pointed at a directory they do not have.
+
+`consumer/` and `internal/` stay where they are as **frozen archives** of the two-document era. Nothing new
+is written into either.
 
 **A patch writes no hand-written note at all**, and is announced by the generated GitHub Release body alone
 (see [Cutting a release](#cutting-a-release)). The **sections** inside the note follow the tier; **whether
@@ -135,7 +176,7 @@ not predict impact. Tier 0 is in it, unlike in the hand-written note below.
 Its size is also why it is never the body of a GitHub Release but always an attachment: `gh`'s
 release-notes body has a hard **125,000-character** limit, which a full notes file can exceed.
 
-### Tiers 1 and 2 - the hand-written note
+### The audience tier - the hand-written note
 
 **One document since August 10, 2026, with a named section per reader** (Dave). It replaced two separate
 documents — an internal note for the organisation and a consumer document — and at all twelve releases
@@ -154,8 +195,8 @@ So a **blended** document was refused, since it would have had to drop the 62% o
 now"* is gone rather than moved — it **was** the duplicated half, and the *For consumers* section is what
 replaced it.
 
-`cut-release.ps1` drafts `releases/notes/<dir>/<X.Y.Z>.md` for every bump `Get-ReleaseConsumerBumps` names.
-Three sections, in this order:
+`cut-release.ps1` drafts a note under `Get-ReleaseNoteRoot` — `releases/audience/<dir>/<X.Y.Z>.md` here —
+for every bump `Get-ReleaseConsumerBumps` names. Three sections, in this order:
 
 | section | for whom | how it arrives |
 |---|---|---|
@@ -163,10 +204,10 @@ Three sections, in this order:
 | *What it is worth* | the organisation | **empty** — it cannot be generated. Think in time, risk and reduced dependence on a developer. |
 | *What was still open at this release* | the organisation | **empty**, and past tense on purpose: a published document does not move with reality, so a present-tense line goes stale in hours rather than months. |
 
-**A tier-1-only minor gets the note with no *For consumers* section.** The organisational two sections
-belong to every bump the seam names — the version moves for everyone, so the organisation's question is
-always answered — while a section about work no consumer can see would be worse than none, because it looks
-written.
+**A minor with no tier-2 entry gets the note with no *For consumers* section** — which is every minor in a
+repo whose audience is tier 1, and an occasional one here. The organisational two sections belong to every
+bump the seam names — the version moves for everyone, so the organisation's question is always answered —
+while a section about work no consumer can see would be worse than none, because it looks written.
 
 **Still a draft to be edited, and the reason never depended on the selection.** Entry bodies are written for
 whoever reviews the diff, even when the change reaches a consumer — so the *For consumers* section's
@@ -396,9 +437,9 @@ list sits at the **end** of the page:
 
 | Version | Date | Type | Title |
 |---|---|---|---|
-| [4.5.0](notes/4.x/4.5.0.md) | 2026-08-11 | Minor | Repairs across the entry, PR-body and release-document machinery: gates and documents that pointed at retired shapes now name the ones actually written. |
-| [4.4.0](notes/4.x/4.4.0.md) | 2026-08-11 | Minor | The merged note model gets its first written instance, and a release now times itself end to end |
-| [4.3.0](notes/4.x/4.3.0.md) | 2026-08-11 | Minor | One hand-written release note per release, a generated Release page, and the performance engineer owns wall-clock |
+| [4.5.0](audience/4.x/4.5.0.md) | 2026-08-11 | Minor | Repairs across the entry, PR-body and release-document machinery: gates and documents that pointed at retired shapes now name the ones actually written. |
+| [4.4.0](audience/4.x/4.4.0.md) | 2026-08-11 | Minor | The merged note model gets its first written instance, and a release now times itself end to end |
+| [4.3.0](audience/4.x/4.3.0.md) | 2026-08-11 | Minor | One hand-written release note per release, a generated Release page, and the performance engineer owns wall-clock |
 | [4.2.0](internal/4.x/4.2.0.md) | 2026-08-10 | Minor | The consumer release document is named and written for its reader, and three silent failures gain a check |
 | [4.1.0](internal/4.x/4.1.0.md) | 2026-08-10 | Minor | The workflow's portable half: a consumer can copy the PR template and the contribution cycle, and three seams stop failing quietly |
 | [4.0.0](internal/4.x/4.0.0.md) | 2026-08-09 | Major | Chapter 3 consolidated (v3.0.0 -> v3.10.0) |

@@ -2214,21 +2214,46 @@ Write-Coverage -Category 'pr-template' -Checked $prtChecked `
 # been bitten by. The rest of the writing norm therefore travels as PROSE in the cut-release skill, where a
 # person applies it, rather than as gates that cannot tell an illustration from a leak.
 #
-# TWO TREES SINCE AUGUST 10, 2026, and the reason they are both read is that one of them is an ARCHIVE.
-# The two hand-written documents became one -- releases/notes/, with a named section per reader -- and the
+# MORE THAN ONE TREE SINCE AUGUST 10, 2026, and the reason they are all read is that some of them are
+# ARCHIVES. The two hand-written documents became one -- the tree Get-ReleaseNoteRoot names, since August 12
+# releases/audience/, with a named section per reader -- and the
 # rule follows the reader rather than the directory: a consumer reads the whole of that file, organisation
 # section included, so a link into the per-PR record is exactly as wrong there as it was before. The eleven
 # documents already in releases/consumer/ are published records that stay where they are, and they stay
 # held: relaxing a rule over an archive would let a repair to one of them reintroduce what it caught.
 $ctrChecked = 0
-# @() around the pipeline, not decoration: with only one of the two trees present -- which is every repo
+# THE LIVE ROOT COMES FROM THE SEAM, and that is a repair rather than a flourish (August 12, 2026). This
+# check named 'releases\notes' as a literal, so the day Get-ReleaseNoteRoot moved to 'releases/audience' the
+# gate would have found no live tree, checked the archive alone, and reported a coverage count that still
+# looked healthy -- a gate going quiet with nothing erroring, which is the failure class this repo keeps
+# paying for. session-status.ps1 states the same lesson two files over about the reader-versus-writer half
+# of this very seam; a GATE keyed on a hardcoded root is the third reader nobody thought of.
+#
+# ALL OF THEM ARE READ, NOT JUST THE CURRENT ONE. The seam's value, the pre-rename 'releases\notes' and the
+# archive are walked together and deduplicated, so a repo mid-migration -- or one that never renamed -- has
+# every document it owns held rather than whichever the seam happens to name today. Reading a root that is
+# not there costs nothing: absent roots are filtered out below. Recognise both, write one.
+#
+# DOT-SOURCED IN A SCRIPTBLOCK, the pattern check 16 above established and for its reason: repo-config is
+# not otherwise loaded in this process, and pulling two dozen repo functions into the whole lint to serve
+# one check is how a gate acquires a dependency nobody meant to give it. A repo without the file falls
+# through to the pre-rename literal, which is exactly what it had before.
+$ctrSeamRoot = & {
+    $ctrCfg = Join-Path $RepoRoot 'scripts\repo-config.ps1'
+    if (Test-Path -LiteralPath $ctrCfg) { . $ctrCfg }
+    if (Get-Command Get-ReleaseNoteRoot -ErrorAction SilentlyContinue) { [string](Get-ReleaseNoteRoot) } else { '' }
+}
+# @() around the pipeline, not decoration: with only one of the trees present -- which is every repo
 # until its first cut under this model -- a bare pipeline yields a scalar, and under Set-StrictMode
 # reading .Count on it throws. Caught by this gate's own run.
-$ctrRoots = @(@('releases\notes', 'releases\consumer') |
+$ctrRoots = @(@($ctrSeamRoot, 'releases\notes', 'releases\consumer') |
+    Where-Object { $_ } |
+    ForEach-Object { $_ -replace '/', '\' } |
+    Select-Object -Unique |
     ForEach-Object { Join-Path $RepoRoot $_ } |
     Where-Object { Test-Path -LiteralPath $_ })
 if ($ctrRoots.Count -eq 0) {
-    $ctrNote = 'this repo has neither a releases/notes/ nor a releases/consumer/ tree, so the tier is off here and there is nothing to hold'
+    $ctrNote = 'this repo has neither a hand-written release-note tree (Get-ReleaseNoteRoot) nor a releases/consumer/ tree, so the tier is off here and there is nothing to hold'
 } else {
     foreach ($ctrFile in @($ctrRoots | ForEach-Object { Get-ChildItem -LiteralPath $_ -Recurse -Filter *.md -File })) {
         $ctrChecked++
@@ -2250,7 +2275,7 @@ if ($ctrRoots.Count -eq 0) {
     }
 }
 Write-Coverage -Category 'consumer-tier' -Checked $ctrChecked `
-    -Note $(if ($ctrChecked -eq 0) { $ctrNote } else { "every document in releases/notes/ (the one hand-written document, a named section per reader) AND in releases/consumer/ (the archive of the two-document era), held against offering its reader a link into the development (tier 0) or internal (tier 1) tree. The rule follows the READER, not the directory: a consumer reads the organisation section too. LINK TARGETS only -- a tier named in link text or prose is someone writing ABOUT the model, which is check 4's declined-path territory. Two neighbouring rules (a score, a branch name) were measured on this same tree and declined at 4 and 3 findings, all false; the reasoning is above the check" })
+    -Note $(if ($ctrChecked -eq 0) { $ctrNote } else { "every document in the hand-written note tree Get-ReleaseNoteRoot names -- releases/audience/ here, one document with a named section per reader -- plus the pre-rename releases/notes/ and the releases/consumer/ archive of the two-document era, held against offering its reader a link into the development (tier 0) or internal (tier 1) tree. The rule follows the READER, not the directory: a consumer reads the organisation section too. LINK TARGETS only -- a tier named in link text or prose is someone writing ABOUT the model, which is check 4's declined-path territory. Two neighbouring rules (a score, a branch name) were measured on this same tree and declined at 4 and 3 findings, all false; the reasoning is above the check" })
 
 # --- 26. no frontmatter-bearing shipped document carries a byte-order mark --------------------------------
 # READ AS BYTES, AND THAT IS THE WHOLE POINT. Every other reader in this gate goes through

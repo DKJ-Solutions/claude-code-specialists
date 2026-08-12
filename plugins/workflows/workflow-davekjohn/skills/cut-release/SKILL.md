@@ -158,10 +158,12 @@ a release for a missing timestamp would be ceremony rather than a guard.
    - **`-SkipSignificanceGate`** cuts even though a pending entry that reaches tier 1 or higher has not said
      **how much it weighs** there. Every tier an entry reaches is a document with its own reader, so every
      one owes a `#### Tier N` sub-section under the entry's `### Significance` — a reason it matters at
-     that reach, plus a significance from 1 to 5 against the rubric:
+     that reach, plus a significance from 1 to 5 against the rubric. Below is what that looks like in a repo
+     whose audience is **tier 2**; one whose audience is tier 1 gets the same two sections with `#### Tier 1`
+     in the second one's place:
 
      ```text
-     #### Tier 1
+     #### Tier 0
 
      The routine version bump stops needing a developer.
 
@@ -193,9 +195,10 @@ a release for a missing timestamp would be ceremony rather than a guard.
    ```
 
 2. **ONE hand-written document, with a named section per reader** (Dave, August 10, 2026). Where the repo
-   names this bump in `Get-ReleaseConsumerBumps`, `cut-release.ps1` has already drafted
-   `releases/notes/<dir>/<X.Y.Z>.md`. There is nothing to invoke — the follow-up is an **edit**, and it
-   goes via a branch + PR like any other change (step 4).
+   names this bump in `Get-ReleaseConsumerBumps`, `cut-release.ps1` has already drafted the note under
+   `Get-ReleaseNoteRoot` — `<note root>/<dir>/<X.Y.Z>.md`, which is `releases/notes/` unless the repo
+   repointed it (the source repo uses `releases/audience/`). There is nothing to invoke — the follow-up is
+   an **edit**, and it goes via a branch + PR like any other change (step 4).
 
    | section | who it is for | how it arrives |
    |---|---|---|
@@ -467,15 +470,31 @@ owes this text. Write it there, and the cut carries it outward for you.
   fallback (`''`, i.e. no live stage), never `[ERROR]`.
 - The script's own getters are separate from this skill's and all optional in the same way:
   `Get-ReservedRootMd`, `Get-ReleaseNotesGrouping`, `Get-ReleaseHistoryPath`, `Get-ReleasePluginTier`,
-  `Get-ReleaseConsumerBumps`, `Get-ReleaseNoteRoot` and `Get-ReleaseMajorMinMinors`. Define none of them and
+  `Get-ReleaseConsumerBumps`, `Get-ReleaseNoteRoot`, `Get-ReleaseAudienceTier` and
+  `Get-ReleaseMajorMinMinors`. Define none of them and
   the cut behaves exactly as it does in the source repo. Run `check-script-contract.ps1` to see which ones
   this repo answers and which fall back.
+- **`Get-ReleaseAudienceTier` says WHICH audience this repo publishes to, and it is a decision taken once,
+  before any entry is written** (August 12, 2026). Tier 1 and tier 2 are two **kinds** of reader rather than
+  two rungs of a ladder: `1` is management and the employer/commissioner — the audience of a repo that
+  *delivers* work, or that sells a **product** whose buyers never read a release note — and `2` is the
+  subscriber of a **service**, who decides whether to upgrade. A repo answers one of them. `new-branch` then
+  scaffolds tier 0 plus that tier alone, and the gates ask for that tier rather than every rung from 1 up.
+  **Define nothing and every tier is asked about**, exactly as before the knob existed — an unstated seam
+  means unchanged, never "the audience tier switched off". The tier your repo does not ask about is still
+  **read** wherever an older entry carries one, so nothing already folded stops parsing, and an extra
+  answered tier is accepted rather than refused.
 - **`Get-ReleaseNoteRoot` is the one to check before you answer `Get-ReleaseConsumerBumps`**, and it was
   added because without it that second knob was unanswerable (inbound #616). The bumps knob says *whether*
   the hand-written note is written; this one says *where*. If your notes already live somewhere other than
   `releases/notes/`, naming the bumps without repointing the root sends the cut at a directory you do not
   have and leaves the one you do have out of the release — so the only safe answer was `@()`, the tier
   switched off, which is not an answer to the question the knob asks. Repoint the root, then name the bumps.
+  **The default is still `releases/notes/` even though the source repo now answers `releases/audience/`**,
+  and that is deliberate: an unstated seam has to keep meaning what it meant yesterday, so a repo that never
+  answered this knob is not silently pointed at a directory it does not have. Consider matching the source's
+  rename if it suits you — every root under its `releases/` now names its **reader** (`development/`,
+  `audience/`, `github/`) rather than the form of the document — but nothing requires it.
   The per-release folder *inside* it stays `Get-ReleaseNotesGrouping`'s answer, so this is the root alone,
   with no trailing slash. `releases/development/` deliberately has no equivalent: nobody has yet been able
   to show a repo that differs on it, and a seam nobody needs is a knob every reader has to read past.
