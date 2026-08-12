@@ -407,7 +407,7 @@ The constitution above, concretely implemented here:
      since its changelog is empty by design.
 
      **What the PR route WOULD have bought is real, and is being closed another way.** Measured on
-     August 7, 2026: `open-pr` runs the lint *and* all 26 suites, and CI runs both again — while
+     August 7, 2026: `open-pr` runs the lint *and* every test suite, and CI runs both again — while
      `cut-release` runs the lint alone and its push to `main` bypasses the required check. The release
      commit is therefore the least-gated commit in the workflow, and it is the one that empties the
      changelog and bumps every plugin. The repair is coverage, not route: the cut runs the
