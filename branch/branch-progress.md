@@ -1,15 +1,13 @@
-## `fix/new-branch-stacked-idempotency` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] Verify #615 against the tree: the two tests, the comment above them, and whether the proposed
-      `Get-BranchFileDeclaredBranch` really reads the entry heading as well as the step list's
-- [x] Replace both tests with one owner comparison against the current branch
-- [x] Decide overwrite-versus-refuse for a foreign owner, and guard the unrecoverable half
-- [x] Name the previous owner in every outcome — kept, replaced or written
-- [x] Add the two regression scenarios and measure them against the pre-fix script
-- [x] Sync the plugin mirror
-- [x] Review the diff and repair what it found: the git call missed `-C $repoRoot` and the
-      `EAP=Continue` wrapper that every other git call in this script carries (the #107 pitfall)
-
-### Where I left off
+_(filled in when a branch is created)_
