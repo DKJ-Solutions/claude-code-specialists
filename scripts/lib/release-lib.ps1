@@ -254,9 +254,13 @@ function Test-ReleaseBumpEarned {
     }
     if (-not $result.Active) { return $result }
 
+    # TIER 1 OR HIGHER, counted as one number rather than per tier. A separate tier-2 count stood here
+    # until August 12, 2026, assigned and read nowhere: it was load-bearing while a minor REQUIRED a
+    # tier-2 entry, and the rule became "tier 1 or higher -> minor" on August 7 without the variable
+    # going with it. Written as >= 1 rather than against the audience tier deliberately, so this reads
+    # correctly in a tier-1 repo and a tier-2 repo alike with neither having to translate it.
     $notable = 0
     foreach ($tier in $counts.Keys) { if ($tier -ge 1) { $notable += $counts[$tier] } }
-    $consumerFacing = if ($counts.ContainsKey(2)) { $counts[2] } else { 0 }
 
     if ($CurrentVersion -notmatch '^\d+\.(\d+)\.\d+$') { throw "CurrentVersion '$CurrentVersion' is not X.Y.Z." }
     $minorsSoFar = [int]$Matches[1]
