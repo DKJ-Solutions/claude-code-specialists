@@ -772,7 +772,19 @@ if ($cutNote) {
 # body is a list of are gone by the time anyone reaches the publish step. Its pointer is gated on a
 # hand-written document actually being expected -- naming an attachment that will not exist is exactly
 # the sort of confidently wrong line this repo keeps finding in published records.
-$bodyRelPath = "releases/development/$notesDirName/$new-github-body.md"
+#
+# IT LIVES IN ITS OWN ROOT, AND THE ROOT IS THE STATEMENT (Dave, August 12, 2026). This file used to be
+# written into releases/development/ as '<X.Y.Z>-github-body.md', which put the one GENERATED document that
+# does get published inside the directory whose whole job is the record nobody publishes. Each root answers
+# one question now: development/ is the record, audience/ is the hand-written published document, github/ is
+# the generated published one. The '-github-body' suffix went with the move, because the root says it and
+# both siblings are '<X.Y.Z>.md' already.
+#
+# NO SEAM, DELIBERATELY, and the precedent is stated one knob over: Get-ReleaseNoteRoot's contract record
+# says releases/development/ "deliberately has no equivalent knob: nobody has been able to show a repo that
+# differs on it". A brand-new root has no legacy placement to accommodate either, so it stays hardcoded
+# until somebody differs -- and the day they do, that is one function, not a migration.
+$bodyRelPath = "releases/github/$notesDirName/$new.md"
 $bodyPointer = if ($cutNote) {
     "Whether you need to act, and what it is worth: see the notes attached to this release."
 } else {
@@ -794,7 +806,13 @@ $notesDir = Join-Path $repoRoot ("releases\development\$notesDirName")
 New-Item -ItemType Directory -Force -Path $notesDir | Out-Null
 Write-Utf8NoBom -Path $notesAbs -Content $notesContent
 Write-Host "  created: $notesRelPath ($($entries.Count) entries)" -ForegroundColor DarkGray
-Write-Utf8NoBom -Path (Join-Path $repoRoot ($bodyRelPath -replace '/', '\')) -Content $bodyContent
+# THE BODY'S DIRECTORY IS DERIVED FROM ITS OWN PATH rather than rebuilt from the root and the grouping.
+# It used to land in $notesDir, so the single New-Item above covered it; now that the two roots differ, a
+# second hand-built path would be a second definition of where this file goes. The first cut into a fresh
+# major is the run that would find out, because that is the only one where the directory does not exist yet.
+$bodyAbs = Join-Path $repoRoot ($bodyRelPath -replace '/', '\')
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $bodyAbs) | Out-Null
+Write-Utf8NoBom -Path $bodyAbs -Content $bodyContent
 Write-Host "  created: $bodyRelPath (the GitHub Release body -- generated, no editing needed)" -ForegroundColor DarkGray
 
 # --- Update the releases/README.md overview table ------------------------------------------------

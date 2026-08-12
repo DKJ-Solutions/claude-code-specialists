@@ -467,9 +467,15 @@ function Get-ReservedRootMd {
 # mismatch a storefront repo has with its management -- one tier serving two audiences badly.
 #
 # So this repo writes two documents per release plus a generated announcement:
-#   releases/development/<X>.x/<X.Y.Z>.md              tier 0  developers  -- every release, complete, raw
-#   releases/notes/<X>.x/<X.Y.Z>.md                    tiers 1+2           -- minor/major here, hand-written
-#   releases/development/<X>.x/<X.Y.Z>-github-body.md  generated           -- every release, the announcement
+#   releases/development/<X>.x/<X.Y.Z>.md  tier 0  developers  -- every release, complete, raw
+#   releases/notes/<X>.x/<X.Y.Z>.md        tiers 1+2           -- minor/major here, hand-written
+#   releases/github/<X>.x/<X.Y.Z>.md       generated           -- every release, the announcement
+#
+# EACH ROOT ANSWERS ONE QUESTION, WHICH IS WHY THE BODY HAS ITS OWN (Dave, August 12, 2026). The generated
+# announcement used to be written into releases/development/ as '<X.Y.Z>-github-body.md' -- the one generated
+# document that DOES get published, inside the directory whose whole job is the record nobody publishes.
+# development/ is the record, github/ is the generated published document, and the hand-written one is the
+# third root. The suffix went with the move: the root says it, and both siblings are '<X.Y.Z>.md' already.
 #
 # THE SECTIONS INSIDE THE NOTE FOLLOW THE TIER, while whether the note EXISTS follows the bump. Its
 # organisational section ("what it is worth") applies to every release the seam names; its consumer

@@ -92,6 +92,24 @@ Assert-True ($plannedBlock.Success -and $plannedBlock.Value -match 'noteRelPath'
 # leaving it out of the pre-flight would let a re-cut clobber a published Release body without a word.
 Assert-True ($plannedBlock.Success -and $plannedBlock.Value -match 'bodyRelPath') `
     'the generated GitHub Release body is guarded too, at every release'
+# THE BODY HAS ITS OWN ROOT SINCE AUGUST 12, 2026 (Dave). Asserted on the ROOT rather than on the whole
+# literal, so a grouping change (<X>.x -> <X.Y>) does not turn this red for a reason it is not about. It
+# used to be written into releases/development/ with a '-github-body' suffix: the one generated document
+# that IS published, sitting in the directory whose whole job is the record nobody publishes.
+Assert-True ($cutReleaseText -match '(?m)^\$bodyRelPath\s*=\s*"releases/github/') `
+    'the generated body is written into releases/github/'
+# THE NEGATIVE HALF IS SCOPED TO THE ASSIGNMENT, and that is not fussiness -- the WHY comment three lines
+# above the assignment quotes the retired filename, so a check over the whole script text would fail on the
+# sentence explaining the move. Assert on the line that decides, not on the file that mentions.
+$bodyAssign = [regex]::Match($cutReleaseText, '(?m)^\$bodyRelPath\s*=.*$')
+Assert-True ($bodyAssign.Success -and $bodyAssign.Value -notmatch 'github-body') `
+    'and no longer carries the -github-body suffix: the root says it, and both siblings are <X.Y.Z>.md'
+# ITS DIRECTORY IS DERIVED FROM ITS OWN PATH. While the body shared releases/development/ the single
+# New-Item for the notes covered it; now that the roots differ, a second hand-built path would be a second
+# definition of where this file goes -- and the FIRST CUT INTO A FRESH MAJOR is the only run that would find
+# out, because it is the only one where the directory does not exist yet.
+Assert-True ($cutReleaseText -match 'New-Item -ItemType Directory -Force -Path \(Split-Path -Parent \$bodyAbs\)') `
+    "the body's directory is created from the body's own path, so a fresh major cannot fail on a missing folder"
 # No .html anywhere in the cut: the tier is markdown-only (Dave, August 3, 2026). Asserted on the script
 # text because the removal is the feature -- a reintroduced HTML write should turn this red.
 Assert-True ($cutReleaseText -notmatch 'ConvertTo-ReleaseHtml') 'cut-release calls no HTML renderer'

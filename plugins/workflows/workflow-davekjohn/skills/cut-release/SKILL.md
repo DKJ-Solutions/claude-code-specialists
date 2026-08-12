@@ -308,7 +308,7 @@ a release for a missing timestamp would be ceremony rather than a guard.
 
    ```powershell
    # the --notes-file is the generated body; cut-release.ps1 printed this exact line for you
-   gh release create vX.Y.Z --title "vX.Y.Z - <short title>" --notes-file releases/development/<dir>/vX.Y.Z-github-body.md
+   gh release create vX.Y.Z --title "vX.Y.Z - <short title>" --notes-file releases/github/<dir>/vX.Y.Z.md
    # copy each attachment to a UNIQUE filename first -- see the collision note below
    gh release upload vX.Y.Z <vX.Y.Z-development-notes.md> [<vX.Y.Z-notes-for-users.md>]
    ```
@@ -322,8 +322,12 @@ a release for a missing timestamp would be ceremony rather than a guard.
    (`vX.Y.Z-development-notes.md`, `vX.Y.Z-notes-for-users.md`). That is worth doing on its own merits: a
    reader downloading `3.3.0.md` cannot tell which of the three tiers they got.
 
+   **The generated body carries that basename too, and stays out of the collision anyway** — it is handed to
+   `--notes-file` by path and never uploaded, so it cannot be the second asset that 404s. What it does add is
+   one more `<X.Y.Z>.md` in the tree: reach for these files by their full path, never by basename.
+
    **The body is GENERATED and every hand-written document is an attachment** (Dave, August 10, 2026).
-   `cut-release.ps1` has written `releases/development/<dir>/<X.Y.Z>-github-body.md`: the release title, a
+   `cut-release.ps1` has written `releases/github/<dir>/<X.Y.Z>.md`: the release title, a
    pointer at the attached notes where one is expected, and one linked line per change that landed —
    **every tier**, because "what landed" is not a tier question. Nothing to edit; point `gh` at it.
 
