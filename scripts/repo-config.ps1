@@ -357,6 +357,22 @@ function Get-ReleaseHistoryPath {
     return $script:ReleaseHistoryPath
 }
 
+# Where the hand-written release note goes -- the one document with a named section per reader, since the
+# consumer note and the internal note merged (August 10, 2026). Declared here rather than left to the
+# fallback, even though it IS the fallback, because this repo is the source: a knob nobody states is a
+# knob the next reader has to go find in a script to learn exists.
+#
+# The per-release folder inside it comes from Get-ReleaseNotesGrouping, so this is the root alone. It was
+# 'releases/highlights' until the rename that named each document for its reader, and the DIRECTORY moved
+# with it -- this is not a compatibility fallback, and a repo still holding notes under the old name says
+# so here rather than relying on anything to guess.
+$script:ReleaseNoteRoot = 'releases/notes'
+
+function Get-ReleaseNoteRoot {
+    <# Repo-root-relative directory the hand-written release note is written into and read back from. #>
+    return $script:ReleaseNoteRoot
+}
+
 # Whether cut-release runs the plugin/marketplace half: enumerating the manifests from
 # .claude-plugin/marketplace.json and bumping every plugin.json in lockstep. TRUE here -- that half IS
 # this repo's release. It also wrote a consumer-facing CHANGELOG.md and RELEASE.md card per plugin

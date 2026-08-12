@@ -463,9 +463,18 @@ owes this text. Write it there, and the cut carries it outward for you.
   fallback (`''`, i.e. no live stage), never `[ERROR]`.
 - The script's own getters are separate from this skill's and all optional in the same way:
   `Get-ReservedRootMd`, `Get-ReleaseNotesGrouping`, `Get-ReleaseHistoryPath`, `Get-ReleasePluginTier`,
-  `Get-ReleaseConsumerBumps` and `Get-ReleaseMajorMinMinors`. Define none of them and the cut behaves
-  exactly as it does in the source repo. Run `check-script-contract.ps1` to see which ones this repo answers
-  and which fall back.
+  `Get-ReleaseConsumerBumps`, `Get-ReleaseNoteRoot` and `Get-ReleaseMajorMinMinors`. Define none of them and
+  the cut behaves exactly as it does in the source repo. Run `check-script-contract.ps1` to see which ones
+  this repo answers and which fall back.
+- **`Get-ReleaseNoteRoot` is the one to check before you answer `Get-ReleaseConsumerBumps`**, and it was
+  added because without it that second knob was unanswerable (inbound #616). The bumps knob says *whether*
+  the hand-written note is written; this one says *where*. If your notes already live somewhere other than
+  `releases/notes/`, naming the bumps without repointing the root sends the cut at a directory you do not
+  have and leaves the one you do have out of the release — so the only safe answer was `@()`, the tier
+  switched off, which is not an answer to the question the knob asks. Repoint the root, then name the bumps.
+  The per-release folder *inside* it stays `Get-ReleaseNotesGrouping`'s answer, so this is the root alone,
+  with no trailing slash. `releases/development/` deliberately has no equivalent: nobody has yet been able
+  to show a repo that differs on it, and a seam nobody needs is a knob every reader has to read past.
 - **Six seams retired on August 5, 2026, and a consumer that still defines one is unaffected** — nothing
   calls them, so they are simply dead code in that repo's config. `Get-ChangelogTierHeadings` and the legacy
   `Get-ChangelogHeading` (#178) configured changelog section headings, and the document has none;

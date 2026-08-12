@@ -293,7 +293,18 @@ $script:ContractRecords = @(
     # only note the release gets. A consumer reading the old text was told the opposite of what it does,
     # and adopt-config places this text VERBATIM into their own repo-config, so being wrong shipped as
     # their own committed documentation.
-       Returns = "the bump types that get the hand-written release note (releases/notes/<dir>/<X.Y.Z>.md, markdown only), e.g. @('minor','major'); @() switches the tier off, and since v4.3.0 that means those bumps get NO hand-written document at all rather than merely no consumer half. ONE document with a named section per reader, not two: this knob decides WHETHER it is written, while the release's tier-2 entries decide whether that document gets a consumer section. The retired name Get-ReleaseHighlightsBumps is still read as a fallback" },
+       Returns = "the bump types that get the hand-written release note (<note root>/<dir>/<X.Y.Z>.md, markdown only), e.g. @('minor','major'); @() switches the tier off, and since v4.3.0 that means those bumps get NO hand-written document at all rather than merely no consumer half. ONE document with a named section per reader, not two: this knob decides WHETHER it is written, while the release's tier-2 entries decide whether that document gets a consumer section. Where that document goes is Get-ReleaseNoteRoot's answer, not this one's. The retired name Get-ReleaseHighlightsBumps is still read as a fallback" },
+    # AND WHERE THAT DOCUMENT GOES (inbound #616). Declared because the knob above was UNANSWERABLE
+    # without it for a repo whose hand-written notes live somewhere else: naming the bumps would point
+    # the cut at a directory that does not exist there, so the only safe value was @() -- the tier
+    # switched off, which is not an answer to the question the knob asks. Two scripts read it, and both
+    # matter: the cut writes the note, session-status looks for the newest one. A seam reaching only the
+    # writer would have the notes written to the new root and looked for in the old, reported as "no
+    # release note was found" -- which reads like a repo that has not cut one yet.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseNoteRoot'; Scripts = @('cut-release', 'session-status');
+       Adopt = 'copy'; AdoptWhy = 'a location convention rather than a fact about the repo, and it is already the default -- the same sentence Get-ReleaseHistoryPath carries, for the same reason. Copy it, then repoint it only if your hand-written notes already live somewhere else';
+       Optional = $true; Default = 'releases/notes';
+       Returns = "the repo-root-relative directory the hand-written release note is written into and read back from. The per-release folder INSIDE it is Get-ReleaseNotesGrouping's answer (<X>.x or <X.Y>), so this is the root alone, with no trailing slash. releases/development/ deliberately has no equivalent knob: nobody has been able to show a repo that differs on it" },
     # Get-ReleaseHighlightsStakeholderTypes and Get-ReleaseHighlightsWording USED TO BE DECLARED HERE and
     # are gone (August 5, 2026). Both configured the consumer document's "remove before publishing"
     # marker: which branch types to promote above it, and in whose words to label it. That marker existed

@@ -206,6 +206,13 @@ try {
 # lib dot-source would have given the exact string and would also have made this reporter fail in a
 # repo that has adopted none of the workflow -- which is the wrong trade for a status command.
 $openHeading = 'still open'
+# WHERE THE NOTES LIVE COMES FROM THE SAME SEAM THE CUT WRITES THEM WITH (inbound #616). This is the
+# reader; cut-release.ps1 is the writer. A seam that reaches only the writer is worse than no seam --
+# the consumer who repoints it would have their notes written to the new root and looked for in the
+# old, and the miss reports as "no release note was found", which reads like a repo that has not cut
+# one yet. Read here the way the wording beside it already is: repo-config directly, in the try that
+# degrades to the default, because this script deliberately dot-sources no library.
+$noteRootRel = 'releases/notes'
 try {
     $cfg = Join-Path $repoRoot 'scripts\repo-config.ps1'
     if (Test-Path -LiteralPath $cfg -PathType Leaf) {
@@ -214,20 +221,27 @@ try {
             $w = Get-ReleaseNoteWording
             if ($w -and $w.ContainsKey('SectionOpen') -and $w['SectionOpen']) { $openHeading = [string]$w['SectionOpen'] }
         }
+        if (Get-Command Get-ReleaseNoteRoot -ErrorAction SilentlyContinue) {
+            $r = Get-ReleaseNoteRoot
+            if ($r) { $noteRootRel = [string]$r }
+        }
     }
 } catch { }
 
-$notesRoot = Join-Path $repoRoot 'releases'
+# The scan starts AT the notes root rather than at releases/ with a path filter behind it. The filter it
+# replaces asked whether the full path contained a 'notes' segment, which is also true of every file in
+# the tree when the checkout itself sits under a folder of that name -- and it could not have honoured
+# the seam at all, since the segment it looked for was the thing being configured.
+$notesRoot = Join-Path $repoRoot ($noteRootRel -replace '/', '\')
 $newestNote = $null
 if (Test-Path -LiteralPath $notesRoot -PathType Container) {
     $newestNote = Get-ChildItem -Path $notesRoot -Recurse -Filter '*.md' -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -match '[\\/]notes[\\/]' } |
         Sort-Object LastWriteTime -Descending | Select-Object -First 1
 }
 
 Write-Section "What the last release left open (from its own note)"
 if (-not $newestNote) {
-    Write-Absent 'no release note was found under releases/notes/'
+    Write-Absent "no release note was found under $noteRootRel/"
 } else {
     Write-Host ("  source: {0}" -f ($newestNote.FullName.Substring($repoRoot.Length).TrimStart('\', '/') -replace '\\', '/'))
     $lines    = @(Get-Content -LiteralPath $newestNote.FullName -Encoding UTF8)

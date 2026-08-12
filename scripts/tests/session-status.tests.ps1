@@ -59,7 +59,10 @@ function New-Fixture {
         entry, a release note carrying a 'still open' section, and a tag. Deliberately NO remote, so the
         gh and ls-remote paths exercise their degrade branches rather than reaching the network.
     #>
-    param([switch]$Bare)
+    # -NoteRoot repoints where the release note lives AND writes the repo-config that declares it, so the
+    # pair is always consistent -- a fixture that moved the file without stating the seam would prove only
+    # that the script cannot find it.
+    param([switch]$Bare, [string]$NoteRoot = 'releases\notes')
     $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("sstat-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
     New-Item -ItemType Directory -Path $dir | Out-Null
     Push-Location $dir
@@ -76,11 +79,19 @@ function New-Fixture {
             '## `feat/a-branch` changelog', '', '### Significance', '',
             '#### Tier 0', '', 'because.', '', '**Score:** 4', ''
         )
-        New-Item -ItemType Directory -Path (Join-Path $dir 'releases\notes\1.x') -Force | Out-Null
+        if ($NoteRoot -ne 'releases\notes') {
+            New-Item -ItemType Directory -Path (Join-Path $dir 'scripts') -Force | Out-Null
+            Set-Utf8 (Join-Path $dir 'scripts\repo-config.ps1') @(
+                'function Get-ReleaseNoteRoot {',
+                ("    return '" + ($NoteRoot -replace '\\', '/') + "'"),
+                '}'
+            )
+        }
+        New-Item -ItemType Directory -Path (Join-Path $dir "$NoteRoot\1.x") -Force | Out-Null
         # The em dash is what the encoding case turns on -- built from its code point so this .ps1 stays
         # pure ASCII while the FIXTURE on disk carries a real multi-byte character.
         $dash = [string][char]0x2014
-        Set-Utf8 (Join-Path $dir 'releases\notes\1.x\1.0.0.md') @(
+        Set-Utf8 (Join-Path $dir "$NoteRoot\1.x\1.0.0.md") @(
             '# Release notes v1.0.0', '',
             '## For consumers', '', 'Nothing to do.', '',
             '## What was still open at this release', '',
@@ -213,6 +224,26 @@ try {
     Assert-True ($r.Flat -match 'no tags') 'the absent tag is named'
     Assert-True ($r.Flat -match 'no release note was found') 'the absent release note is named'
     Assert-True ($r.Flat -match 'Branch and tree') 'and the blocks that CAN be read still are'
+
+    Write-Host 'The release note is found where Get-ReleaseNoteRoot says it is (#616)' -ForegroundColor Cyan
+    # THIS IS THE READER HALF OF THE SEAM, and it is the half that fails in silence. cut-release writes the
+    # note under the configured root; if this reporter kept looking under the default, the note would be
+    # written to one place and looked for in another, and the miss prints as "no release note was found"
+    # -- which reads like a repo that has not cut one yet rather than a repo whose seam is not honoured.
+    $moved = New-Fixture -NoteRoot 'releases\stakeholders'; $fixtures += $moved
+    $r = Invoke-Status -Fixture $moved
+    Assert-Equal 0 $r.Code 'repointed note root: still exits 0'
+    Assert-True ($r.Flat -match 'releases/stakeholders') 'the note is found under the configured root, and the source path says so'
+    Assert-True (-not ($r.Flat -match 'no release note was found')) 'and it is NOT reported as absent'
+    Assert-True ($r.Flat -match 'the widget refactor') 'the still-open section is read out of it, so the file was really parsed'
+    # And the absent-line has to name the configured root too: it is the one message whose whole job is to
+    # tell the reader where to look, so printing the default there sends them to a directory this repo does
+    # not use.
+    $movedBare = New-Fixture -NoteRoot 'releases\stakeholders'; $fixtures += $movedBare
+    Remove-Item -LiteralPath (Join-Path $movedBare 'releases\stakeholders') -Recurse -Force
+    $r = Invoke-Status -Fixture $movedBare
+    Assert-True ($r.Flat -match 'no release note was found under releases/stakeholders/') `
+        'when there is none, the absent line names the CONFIGURED root rather than the default'
 }
 finally {
     try { [Console]::OutputEncoding = $prevOut } catch { }
