@@ -72,6 +72,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# THE SOURCE-REPO GUARD: refuses this script when it is a released copy running in the repo that
+# maintains it. Guarded dot-source, so a tree without the lib behaves as before. Why: the lib's header.
+$guardLib = Join-Path $PSScriptRoot '..\lib\source-repo-guard-lib.ps1'
+if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCopy -ScriptPath $PSCommandPath }
+
 # --- Anchor the repo root -------------------------------------------------------------------------
 # Every path below is absolute and derived from this root. Deliberately no Set-Location: then a
 # divergent process cwd cannot write into the wrong repo (the pitfall cut-release.ps1 has to close with

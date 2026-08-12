@@ -149,6 +149,11 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 
+# THE SOURCE-REPO GUARD: refuses this script when it is a released copy running in the repo that
+# maintains it. Guarded dot-source, so a tree without the lib behaves as before. Why: the lib's header.
+$guardLib = Join-Path $PSScriptRoot '..\lib\source-repo-guard-lib.ps1'
+if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCopy -ScriptPath $PSCommandPath }
+
 # Repo root -- dual context: a consumer running the shared plugin mirror gets its repo root from
 # CLAUDE_PROJECT_DIR; in the workshop root (or outside a session) it falls back to the git root. Same
 # resolution as every other mirrored script, and the reason this file can be byte-identical in both

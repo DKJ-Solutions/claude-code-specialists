@@ -51,6 +51,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# THE SOURCE-REPO GUARD: refuses this script when it is a released copy running in the repo that
+# maintains it. Guarded dot-source, so a tree without the lib behaves as before. Why: the lib's header.
+# This is the one library this script loads, and it loads it OPTIONALLY -- the promise that a repo which
+# has adopted none of this workflow still gets an answer is unchanged.
+$guardLib = Join-Path $PSScriptRoot '..\lib\source-repo-guard-lib.ps1'
+if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCopy -ScriptPath $PSCommandPath }
+
 # The lock file's path is decided HERE and printed below, so the two skills cannot disagree about it.
 # A path repeated in two markdown pages is two literals, and the drift shape this repo has paid for
 # three times; a path the script prints is one.
@@ -211,7 +218,10 @@ $openHeading = 'still open'
 # the consumer who repoints it would have their notes written to the new root and looked for in the
 # old, and the miss reports as "no release note was found", which reads like a repo that has not cut
 # one yet. Read here the way the wording beside it already is: repo-config directly, in the try that
-# degrades to the default, because this script deliberately dot-sources no library.
+# degrades to the default, because this script dot-sources no library in order to produce its ANSWER.
+# (Since August 12, 2026 it does load one, optionally: the source-repo guard, above, which either stops
+# the run outright or contributes nothing to it. The property that matters is unchanged -- a repo
+# carrying neither this seam nor that lib still gets a full report.)
 $noteRootRel = 'releases/notes'
 try {
     $cfg = Join-Path $repoRoot 'scripts\repo-config.ps1'
