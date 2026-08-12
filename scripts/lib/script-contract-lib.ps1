@@ -294,6 +294,26 @@ $script:ContractRecords = @(
     # and adopt-config places this text VERBATIM into their own repo-config, so being wrong shipped as
     # their own committed documentation.
        Returns = "the bump types that get the hand-written release note (<note root>/<dir>/<X.Y.Z>.md, markdown only), e.g. @('minor','major'); @() switches the tier off, and since v4.3.0 that means those bumps get NO hand-written document at all rather than merely no consumer half. ONE document with a named section per reader, not two: this knob decides WHETHER it is written, while the release's tier-2 entries decide whether that document gets a consumer section. Where that document goes is Get-ReleaseNoteRoot's answer, not this one's. The retired name Get-ReleaseHighlightsBumps is still read as a fallback" },
+    # AND WHO THAT DOCUMENT IS FOR, WHICH IS A REPO-LEVEL FACT RATHER THAN A PER-ENTRY ONE (Dave, August 12,
+    # 2026; inbound #620). Tier 1 and tier 2 are two KINDS of audience rather than two rungs of a ladder: 1 is
+    # management and the employer/commissioner, 2 is the subscriber of a service. A repo has exactly one, and
+    # which one it is decides what every entry in that repo is asked.
+    #
+    # 'decide', AND AFTER Get-RepoName THIS IS THE CLEAREST CASE IN THE TABLE. Copying the source's 2 into a
+    # webshop asserts that its product buyers read release notes -- false, and unfalsifiable by any script.
+    # The reporting consumer measured 37 open entries, 15 at tier 1 and zero ever at tier 2, and that zero is
+    # structural rather than a backlog. A copied value is also indistinguishable from a considered one once
+    # written, so it hides whether the question was ever put.
+    #
+    # THE DEFAULT IS 'ASK ABOUT ALL OF THEM', DELIBERATELY, and it is the half most likely to be
+    # "simplified" later by somebody reading the policy as the mechanism. Treating absence as "no audience
+    # enabled" would switch the audience tier off in every consumer the moment they take the plugin update,
+    # silently, in the direction that empties a release document -- the same failure class the rename above
+    # is written about. Absent means unchanged; this record is what makes the question loud instead.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseAudienceTier'; Scripts = @('new-branch', 'open-pr', 'cut-release');
+       Adopt = 'decide'; AdoptWhy = "it states WHO this repo publishes to, which is a fact about the organisation around the repo rather than a way of working. Copying the source's 2 tells a webshop that its product buyers read release notes; copying a 1 tells a service that its subscribers do not. Both are wrong in the direction nobody notices, because either value is valid and neither errors";
+       Optional = $true; Default = 'every tier the model has (0, 1 and 2) -- unchanged from before the knob existed, so a repo that never answers keeps asking every entry about both audiences';
+       Returns = "1 or 2: the one audience tier this repo's entries are asked about, on top of tier 0 which every repo asks unconditionally. 1 is management and the employer/commissioner (a repo delivering work, or selling a product whose buyers never read a note); 2 is the subscriber of a service. It decides which '#### Tier N' sections new-branch scaffolds and which ones open-pr and cut-release require -- NOT which tier numbers are valid to READ: a tier-1 repo must still parse the tier-2 entries already in its own history, and that is Get-EntryTierMax's job, which stays at 2" },
     # AND WHERE THAT DOCUMENT GOES (inbound #616). Declared because the knob above was UNANSWERABLE
     # without it for a repo whose hand-written notes live somewhere else: naming the bumps would point
     # the cut at a directory that does not exist there, so the only safe value was @() -- the tier

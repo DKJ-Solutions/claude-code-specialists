@@ -1311,6 +1311,76 @@ Assert-Equal 4 $adminKeys.Count 'four sections are administration, not five'
 Assert-True ($adminKeys -notcontains 'What') "'What' is the substance and is never dropped"
 Assert-True ($adminKeys -notcontains 'Significance') 'Significance has its own remover -- a score is a different objection from administration'
 
+# --- ONE AUDIENCE TIER PER REPO (Dave, August 12, 2026; inbound #620) -----------------------------
+#     Tier 1 and tier 2 are two KINDS of reader rather than two rungs of a ladder, and a repo has exactly
+#     one. The seam is injected the way a real repo reaches it -- repo-config.ps1 defines the function, and
+#     this suite defines it in its own scope, as the wording override above already does -- and it is
+#     REMOVED again at the end, because every assert before this point was written for the unstated case.
+Write-Host "one audience tier per repo (Get-EntryAudienceTier / Get-EntryAskedTiers)" -ForegroundColor Cyan
+
+# THE UNSTATED CASE FIRST, because it is the case every existing consumer is in and the one a later
+# "simplification" would break. No seam means ask about everything -- identical to before the knob existed.
+Assert-Equal $null (Get-EntryAudienceTier) 'no seam defined: no audience is stated'
+Assert-Equal '0 1 2' ((@(Get-EntryAskedTiers)) -join ' ') 'and an unstated repo is asked about every tier the model has'
+
+function Get-ReleaseAudienceTier { 2 }
+Assert-Equal 2 (Get-EntryAudienceTier) 'a stated audience tier is read'
+Assert-Equal '0 2' ((@(Get-EntryAskedTiers)) -join ' ') 'a tier-2 repo is asked about tier 0 and tier 2 -- not tier 1'
+
+# AN OUT-OF-MODEL ANSWER DEGRADES TO 'UNSTATED' rather than being honoured. 0 is in the list on purpose:
+# tier 0 is asked unconditionally, so naming it here would say nothing and is not a valid answer to THIS
+# question. The alternative -- honouring it -- has the scaffolder write a section no validator accepts,
+# and a gate refusing every entry in the repo is worse than a gate nobody configured.
+foreach ($bad in @('0', '3', '7', '-1', 'two', '')) {
+    Set-Item function:Get-ReleaseAudienceTier -Value ([scriptblock]::Create("return '$bad'"))
+    Assert-Equal $null (Get-EntryAudienceTier) "an out-of-model answer ('$bad') is ignored rather than honoured"
+}
+
+function Get-ReleaseAudienceTier { 1 }
+Assert-Equal '0 1' ((@(Get-EntryAskedTiers)) -join ' ') 'a tier-1 repo -- a shop whose buyers never read a note -- is asked about tier 0 and tier 1'
+
+# THE MAX IS NOT THE AUDIENCE, and this single assert is what keeps one repo's history readable to another.
+# A tier-1 repo must still PARSE the tier-2 entries in its own tree; collapsing the two would read every one
+# of them as undeclared, silently, in the direction that empties a release.
+Assert-Equal 2 (Get-EntryTierMax) 'the model still HAS three tiers while a tier-1 repo asks about two'
+
+# WHAT THE SCAFFOLDER WRITES, AND WHERE THE ROUTING QUESTION POINTS. In a tier-2 repo the question under
+# tier 0 has to say 'continue to Tier 2'; it said 'Tier 1' until the lookup was keyed on the TARGET rather
+# than on a fixed pair -- form text sending an author to a heading that is not in the file.
+function Get-ReleaseAudienceTier { 2 }
+$audienceScaffold = (Format-EntrySignificanceSections -WithGuidance) -join "`n"
+Assert-True ($audienceScaffold -match '(?m)^#### Tier 0$') 'the scaffold writes tier 0'
+Assert-True ($audienceScaffold -match '(?m)^#### Tier 2$') 'and the audience tier'
+Assert-True ($audienceScaffold -notmatch '(?m)^#### Tier 1$') 'and NOT the tier this repo does not publish to'
+Assert-True ($audienceScaffold -match 'continue to Tier 2') "tier 0's routing question points at the audience tier"
+Assert-True ($audienceScaffold -notmatch 'continue to Tier 1') 'and never at a heading the file does not have'
+Assert-Equal 1 ([regex]::Matches($audienceScaffold, 'continue to Tier').Count) 'the LAST written tier carries no routing question'
+
+# THE TOLERANCE, WHICH IS THE LOAD-BEARING HALF OF THE WHOLE CHANGE. Six entries were pending in this repo
+# when the knob landed, each carrying all three tiers under the cumulative model. A gate that started
+# refusing an EXTRA answered tier would have turned six finished dossiers into six PRs that cannot be
+# opened -- narrowing what is ASKED must not narrow what is ACCEPTED.
+$threeTierEntry = @(
+    '## `feat/x` changelog', '', '### Significance', '',
+    '#### Tier 0', '', 'Developers see it.', '', '**Score:** 3', '',
+    '#### Tier 1', '', 'Colleagues see it.', '', '**Score:** 2', '',
+    '#### Tier 2', '', 'Subscribers see it.', '', '**Score:** 4', ''
+) -join "`n"
+Assert-Equal 0 (@(Get-EntryImpactFindings -EntryText $threeTierEntry)).Count `
+    'an entry answering a tier this repo no longer asks about is not faulted for it'
+
+# AND NARROWING IS NOT SWITCHING OFF. The audience tier is still required to carry its reason.
+$audienceNoWhy = @(
+    '## `feat/y` changelog', '', '### Significance', '',
+    '#### Tier 0', '', 'Developers see it.', '', '**Score:** 3', '',
+    '#### Tier 2', '', '**Score:** 4', ''
+) -join "`n"
+Assert-True ((@(Get-EntryImpactFindings -EntryText $audienceNoWhy)).Count -gt 0) `
+    'the audience tier scored with no reason is still refused'
+
+Remove-Item function:Get-ReleaseAudienceTier
+Assert-Equal $null (Get-EntryAudienceTier) 'the seam is removed again, so nothing after this inherits it'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red

@@ -191,20 +191,38 @@ scale invites false precision, and the anchors are what make the number a measur
 **The `Why` above each score is the lasting half**: the rubric says which band, the `Why` says why *this*
 change is in it, and that is the only part a reader a year later can use.
 
-**All three tiers are in the file, and each one is answered.** Where a change reaches nobody at that
-level, write `N/A` in the score and say in one line why. **That is an answer, not a gap** — a blank means
-both "reaches nobody" and "nobody has got to this yet", and a gate has to be able to tell those apart. The
-reach is the **highest tier carrying a number**, so an `N/A` costs a sentence and nothing else, and the
-reasoning behind a negative claim survives into the record.
+**Two tiers are in the file: tier 0, and the one audience tier your repo has** (Dave, August 12, 2026).
+Tier 1 (management and the employer/commissioner) and tier 2 (the subscriber of a service) are two **kinds**
+of reader rather than two rungs of a ladder, and a repo has exactly one — decided before any entry is
+written, and stated once in `Get-ReleaseAudienceTier` in your own `scripts/repo-config.ps1`. A shop selling a
+**product** answers `1`: its buyers never read a release note, while management and whoever pays for the work
+do. A repo that **is** the service somebody subscribes to answers `2`. **State nothing and you are asked
+about both**, exactly as before the knob existed — so three sections in your file means the question is still
+open on your side, not that anything is broken.
+
+Where a change reaches nobody at the level you *do* ask about, write `N/A` in the score and say in one line
+why. **That is an answer, not a gap** — a blank means both "reaches nobody" and "nobody has got to this yet",
+and a gate has to be able to tell those apart. The reach is the **highest tier carrying a number**, so an
+`N/A` costs a sentence and nothing else, and the reasoning behind a negative claim survives into the record.
 
 **Tier 0 is the one tier that cannot be `N/A`**: every change reaches its own repo's developers at least a
 little. The floor is a score of 1.
 
-**The ladder is cumulative and cannot be skipped.** A change consumers notice is also a change colleagues
-get something out of, so `N/A` at tier 1 under a scored tier 2 is refused by name rather than being asked
-for a number. Note that this does **not** mean the scores must ascend: tier 0 may legitimately score below
-tier 1, because these are different audiences and not nested ones. A defect that exists only outside your
-repo is worth a great deal to a consumer and almost nothing at home.
+**The cumulative ladder is gone, and the measurement is why.** It used to be that `N/A` at tier 1 under a
+scored tier 2 was refused by name, on the reasoning that a change consumers notice is also a change
+colleagues get something out of. That reasoning holds for a repo with two genuine audiences and produces
+nothing but duplication for the far more common repo with one: in the source repo, **81 of 89 tier-1 sections
+existed only because a tier-2 section sat above them** — the same reach argued twice, in a second register,
+for a reader who was the same person. What is still enforced is that every tier the file carries has a
+reason, and that the audience tier is answered before a PR opens.
+
+**The scores do not have to ascend, and that was true under the ladder too.** Tier 0 may legitimately score
+below the audience tier, because these are different readers and not nested ones. A defect that exists only
+outside your repo is worth a great deal to whoever is outside it and almost nothing at home.
+
+**A tier your repo no longer asks about is still read.** Every entry already folded, here and in every
+consumer's tree, was written under the cumulative model and carries all three — so nothing already written
+stops folding, and an extra answered tier is never refused. Recognise both, write one.
 
 **The score cells are scaffolded empty on purpose.** The tier defaults to 0 because 0 is a harmless final
 answer about reach; a *score* has no harmless value, so any number scaffolded for you would be a guess at a

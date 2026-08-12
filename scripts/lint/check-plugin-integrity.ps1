@@ -1497,7 +1497,29 @@ $btMissing = 0
 # Get-BranchTemplates RENDERS both templates from the formatters, which is what costs here rather than
 # the comparison -- so the call is inside the skip along with everything it feeds.
 if (Test-CheckEnabled 'branch-template') {
-    foreach ($tpl in (Get-BranchTemplates)) {
+    # GENERATED WITH THE REPO'S OWN CONFIG LOADED, and that is a repair of a gap this check was born with
+    # rather than a concession to a new seam (August 12, 2026). The template's content has ALWAYS depended on
+    # scripts/repo-config.ps1 -- Get-EntryGuidanceOverrides, Get-EntrySectionHeadingOverrides,
+    # Get-EntrySignificanceWordingOverrides and Get-BranchFileWordingOverrides all reach the rendered file --
+    # while this gate generated it with none of them loaded. It agreed with the disk only because THIS repo
+    # answers none of those four, so the neutral generation and the configured one happened to be identical.
+    # The consequence was already live for somebody else: a consumer who translated their entry wording had
+    # this check report drift against their own correctly generated template, with the advice "regenerate it",
+    # which would produce the same file again. Get-ReleaseAudienceTier is simply the first of these seams this
+    # repo answers, so it is what made the gap visible.
+    #
+    # DOT-SOURCED INSIDE A SCRIPTBLOCK rather than at the top of the gate, deliberately. repo-config is not
+    # loaded in this process anywhere else -- the one other check needing a repo-owned value spawns the script
+    # that owns it -- and pulling two dozen repo functions into the whole lint to serve one check is how a gate
+    # acquires a dependency nobody meant to give it. A repo without the file (a fresh consumer mid-bootstrap)
+    # falls through to the neutral generation, which is what it had before.
+    $btTemplates = & {
+        $btCfg = Join-Path $RepoRoot 'scripts\repo-config.ps1'
+        if (Test-Path -LiteralPath $btCfg) { . $btCfg }
+        . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
+        Get-BranchTemplates
+    }
+    foreach ($tpl in $btTemplates) {
         $btChecked++
         $tplPath = Join-Path $RepoRoot ($tpl.Path -replace '/', '\')
         if (-not (Test-Path -LiteralPath $tplPath)) {

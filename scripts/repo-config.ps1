@@ -527,6 +527,43 @@ function Get-ReleaseConsumerBumps {
 # receive this rename through a plugin update rather than by choosing to, so the read has to cover
 # both names for as long as any of them might still carry the old one.
 
+# --- WHICH AUDIENCE THIS REPO PUBLISHES TO (Dave, August 12, 2026; inbound #620) ------------------
+#
+# Tier 1 and tier 2 are NOT two rungs of one ladder. They are two KINDS of audience, and a repo has
+# exactly one:
+#
+#   1  management and the employer/commissioner -- a repo whose output is work DELIVERED to somebody, or
+#      a shop selling a PRODUCT, whose buyers never read a release note.
+#   2  the subscriber of a service -- a repo that IS the thing somebody subscribes to and decides to
+#      upgrade.
+#
+# TWO IS THE ANSWER HERE, because this repo sells a service rather than a product. The consumer that
+# filed #620 is a webshop and its answer is 1: its customers buy a product and never read these notes,
+# while management and the commissioner do. Same model, opposite answer -- which is precisely why it is a
+# knob and not a constant.
+#
+# THE MEASUREMENT BEHIND IT. Under the cumulative ladder a tier-2 entry OWED a tier-1 section, so the two
+# were never independent readings. Across the 97 scored entries in this repo's record, 81 topped out at
+# tier 2 and only 8 at tier 1 -- so 81 of the 89 tier-1 sections were ladder tax: the same reach argued
+# twice, in a second register, for a reader who here is the same person. #620 measured the mirror image on
+# its own side: 37 open entries, 15 declaring tier 1, zero ever declaring tier 2.
+#
+# AN UNSTATED ANSWER MEANS "ASK FOR ALL OF THEM", which is today's behaviour and the only safe default.
+# The tempting reading of "the tier is enabled once the audience is clear" is that an unconfigured repo
+# enables nothing -- and that would switch the audience tier OFF in every consumer the moment they take
+# the plugin update, silently, in the direction that empties a release document. So absent means
+# unchanged. The LOUD channel is the contract instead: this is a 'decide' record, so adopt-config
+# scaffolds the question rather than copying this repo's answer, and check-script-contract reports a repo
+# that never answered it. Nobody inherits somebody else's audience, and nobody is switched off unasked.
+$script:ReleaseAudienceTier = 2
+
+function Get-ReleaseAudienceTier {
+    <# The one audience tier this repo publishes to: 1 (management and the employer) or 2 (subscribers of
+       a service). Tier 0 -- the people maintaining the repo -- is always asked for, so it is deliberately
+       not this function's business. #>
+    return $script:ReleaseAudienceTier
+}
+
 # --- How many minors a major must recap (Dave, August 5, 2026) ------------------------------------
 #
 # A major here is not "a big release" but a RECAP of the minors before it -- which is what the two majors

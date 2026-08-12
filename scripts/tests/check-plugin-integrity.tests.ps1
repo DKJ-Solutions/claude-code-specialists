@@ -1225,6 +1225,43 @@ try {
     Assert-True ($r13bGone.Out -match '\[branch-template\].*is missing') 'check 13b: a deleted template is reported rather than silently passing'
     [System.IO.File]::WriteAllText($tpl1, (Get-BranchTemplates)[0].Content, $Utf8NoBom)
 
+    # THE CHECK READS THE FIXTURE'S OWN repo-config, and this is a gap the check was BORN with rather than one
+    # the audience seam created (August 12, 2026). The rendered template has always depended on repo-config --
+    # Get-EntryGuidanceOverrides and three sibling wording seams all reach it -- while the gate generated its
+    # expectation with none of them loaded. It agreed with the source repo only because that repo answers none
+    # of the four, so a consumer who translated their entry wording got "no longer matches" against their own
+    # correctly generated file, with advice that would have produced the same file again.
+    #
+    # ASSERTED IN BOTH DIRECTIONS ON ONE FIXTURE, because silence alone is also what a check that stopped
+    # reading would produce -- the same reason check 13b was written in both directions to begin with.
+    $fixCfgDir = Join-Path $Fixture 'scripts'
+    New-Item -ItemType Directory -Path $fixCfgDir -Force | Out-Null
+    $fixCfg = Join-Path $fixCfgDir 'repo-config.ps1'
+    [System.IO.File]::WriteAllText($fixCfg, "function Get-ReleaseAudienceTier { 2 }`n", $Utf8NoBom)
+    # The repo-neutral pair is still on disk from the line above. For a fixture that has now declared an
+    # audience it is WRONG -- it asks about a tier that repo does not publish to -- so the very bytes that
+    # were silent three asserts ago must read as drift.
+    $r13bCfgDrift = Invoke-Integrity -FixtureRoot $Fixture -Full
+    Assert-Equal 1 $r13bCfgDrift.Code 'check 13b: once an audience is stated, the repo-NEUTRAL template is drift'
+    $cfgTemplates = & {
+        . $fixCfg
+        . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
+        Get-BranchTemplates
+    }
+    Assert-True ($cfgTemplates[0].Content -notmatch '(?m)^#### Tier 1$') `
+        'check 13b: a configured generation really does omit the tier that fixture does not publish to'
+    foreach ($tpl in $cfgTemplates) {
+        [System.IO.File]::WriteAllText((Join-Path $Fixture ($tpl.Path -replace '/', '\')), $tpl.Content, $Utf8NoBom)
+    }
+    $r13bCfgGood = Invoke-Integrity -FixtureRoot $Fixture -Full
+    Assert-True (-not ($r13bCfgGood.Out -match '\[branch-template\].*no longer matches')) `
+        "check 13b: and the template generated with the fixture's own answer is silent"
+    # Back to the neutral pair with no config, so nothing after this inherits the fixture's answer.
+    Remove-Item -LiteralPath $fixCfg -Force
+    foreach ($tpl in (Get-BranchTemplates)) {
+        [System.IO.File]::WriteAllText((Join-Path $Fixture ($tpl.Path -replace '/', '\')), $tpl.Content, $Utf8NoBom)
+    }
+
     Write-Host 'check 13 -- an entry is an H2 with three named H3 sections, and a body heading may be neither' -ForegroundColor Cyan
     $s34Entry = Join-Path $Fixture 'fix-a-branch-name.md'
     $s34Good = @('## A fixture entry') + @('') + $s34Sections
