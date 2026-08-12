@@ -184,6 +184,37 @@ Assert-True ($newIdx -ge 0 -and $oldIdx -gt $newIdx) 'the current name is tried 
 # that only ever looks at the first.
 Assert-True ($cutReleaseText -match '\[string\[\]\]\$Name') 'Get-SeamValue takes a LIST of names, so a renamed seam can be read under both'
 
+# WHERE THE NOTE GOES IS A SEAM TOO (inbound #616), and this assert exists because the knob above was
+# unanswerable without it: for a repo whose hand-written notes live elsewhere, naming the bumps pointed
+# the cut at a directory that does not exist there, so the only safe value was @() -- the tier switched
+# off. Asserted on the CODE view so an explaining comment cannot satisfy it, and on the ABSENCE of the
+# literal too, because adding the seam beside a hardcoded path would read as adopted while changing
+# nothing.
+Assert-True ($cutReleaseCode -match 'Get-ReleaseNoteRoot') 'the note root comes from the seam'
+# NOT "the literal is absent" -- it must appear exactly once, as the seam's own -Default, which is what
+# keeps this change invisible to every repo that does not repoint it. So the assert is on the COUNT and
+# on where that one occurrence sits: a second use is a path built by hand behind the seam's back, which
+# would read as adopted while changing nothing.
+$noteRootLiteralLines = @($cutReleaseCode -split "`n" | Where-Object { $_ -match 'releases/notes' })
+Assert-True ($noteRootLiteralLines.Count -eq 1) 'the default note root is written exactly once in the code'
+Assert-True ($noteRootLiteralLines.Count -eq 1 -and $noteRootLiteralLines[0] -match '-Default') `
+    'and that one occurrence is the seam default, not a path built behind the seam'
+# A SEAM THAT REACHES ONLY THE WRITER IS THE FAILURE THIS ONE HAD TO AVOID: session-status.ps1 looks for
+# the newest note, so a repo that repointed the root would have it written to the new place and looked
+# for in the old, reported as "no release note was found". Pinned here rather than only in that script's
+# own suite, because the pair is what makes the seam true -- and nothing else compares the two files.
+$sessionStatusPath = Join-Path $RepoRoot 'scripts\task\session-status.ps1'
+$sessionStatusText = [System.IO.File]::ReadAllText($sessionStatusPath, [System.Text.Encoding]::UTF8)
+Assert-True ($sessionStatusText -match 'Get-ReleaseNoteRoot') 'the reader of those notes reads the same seam as the writer'
+
+# The seam has to reach the message that fires when the history file is MISSING, which is the one moment
+# the reader is about to go looking for the path it names. It was the single literal left among three
+# messages about the same file.
+$historyMissing = [regex]::Match($cutReleaseText, '(?m)^\s*Write-Warning "[^"]*row not added[^"]*"$')
+Assert-True $historyMissing.Success 'found the missing-history warning'
+Assert-True ($historyMissing.Success -and $historyMissing.Value -match '\$historyRelPath') `
+    'the missing-history warning names the seam, not the default path'
+
 Write-Host "cut-release.ps1 -- the new-major refusal names BOTH edits a major needs" -ForegroundColor Cyan
 # WHY THIS IS PINNED AT ALL. Opening a new major takes two hand edits, not one: the overview section, and
 # the test that pins which major the overview targets. The refusal used to name only the first, so on

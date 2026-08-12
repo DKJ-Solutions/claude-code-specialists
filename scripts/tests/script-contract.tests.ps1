@@ -181,7 +181,7 @@ try {
     # select), Get-ReleaseCategoryTitles (no category headings to label) and Get-ChangelogReleaseWording (no
     # release-block text to override). Each is now asserted on ABSENCE from the register, further down.
     $okCount = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 22 $okCount 'happy path: exactly twenty-two [OK] lines -- every declared record this repo defines (four mandatory functions plus every optional: Get-LiveStage, the two Get-Roster* made optional by #445, the four Get-Entry* stub-wording knobs, Get-PrMergeMethod, Get-MojibakePaths, the cut-release knobs from #417 plus Get-ReleaseMajorMinMinors and Get-ReleaseHistoryPath, BOTH note-wording maps (Get-ReleaseNoteWording, which the cut reads first, and Get-InternalNoteWording, its fallback -- inbound #605), and Get-BranchTypes from inbound #580, nothing else)'
+    Assert-Equal 23 $okCount 'happy path: exactly twenty-three [OK] lines -- every declared record this repo defines (four mandatory functions plus every optional: Get-LiveStage, the two Get-Roster* made optional by #445, the four Get-Entry* stub-wording knobs, Get-PrMergeMethod, Get-MojibakePaths, the cut-release knobs from #417 plus Get-ReleaseMajorMinMinors, Get-ReleaseHistoryPath and Get-ReleaseNoteRoot (inbound #616), BOTH note-wording maps (Get-ReleaseNoteWording, which the cut reads first, and Get-InternalNoteWording, its fallback -- inbound #605), and Get-BranchTypes from inbound #580, nothing else)'
     # inbound #203: the run names the root it inspected and how it resolved it. Asserted on the clean
     # run too, not only on a drifted one -- the [SCOPE] line is context that must always be emitted, so
     # that the hook has something to surface the moment a finding does appear.
@@ -322,7 +322,7 @@ try {
         Assert-NotMatch $optFn $r.Out "optional Get-Pr*: '$optFn' never mentioned (not in the contract)"
     }
     $okCount6 = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 22 $okCount6 'optional Get-Pr*: still exactly twenty-two [OK] (the mandatory four + the declared optionals this repo defines; the four UNdeclared Get-Pr* excluded)'
+    Assert-Equal 23 $okCount6 'optional Get-Pr*: still exactly twenty-three [OK] (the mandatory four + the declared optionals this repo defines; the four UNdeclared Get-Pr* excluded)'
 
     # --- 6c. An optional contract function that is ABSENT -> [INFO] naming the fallback, exit 0 -----
     #     Get-ReleaseHistoryPath is declared Optional: the shared scripts fall back to 'releases/README.md',
@@ -531,6 +531,11 @@ function Get-RosterIgnoredIds { return @() }
         # Get-ReleaseHistoryPath is the survivor and gained a second caller, below.
         @{ Function = 'Get-ReleaseHistoryPath';    Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release', 'new-internal-note') },
         @{ Function = 'Get-ReleaseConsumerBumps';            Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },
+        # WHERE that document goes, beside the knob saying WHETHER it is written (inbound #616). Two
+        # scripts, and the pair is the point: the cut writes the note, session-status reads the newest one
+        # back. A seam reaching only the writer would have a repointed root written to and looked for in
+        # two different places, reported as "no release note was found".
+        @{ Function = 'Get-ReleaseNoteRoot';                 Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release', 'session-status') },
         # The two knobs that configured the retired remove-before-publishing marker are gone with it
         # (August 5, 2026): the consumer document is the tier-2 entries now, so there is nothing to
         # promote and nothing to label. Their absence from this list is the point -- if they came back,
@@ -553,7 +558,7 @@ function Get-RosterIgnoredIds { return @() }
 
     $contractSrc = [System.IO.File]::ReadAllText($ContractLib)
     $totalRecordCount = @([regex]::Matches($contractSrc, "Lib\s*=\s*'[^']+';\s*Function\s*=\s*'[^']+';\s*Scripts\s*=\s*@\(")).Count
-    Assert-Equal 24 $totalRecordCount 'contract: exactly twenty-four (lib, function) records declared in script-contract-lib.ps1 (the twenty-three below plus the dedicated Get-LiveStage block after this loop). Was twenty-eight until the flat changelog retired six: both section seams, the live marker, the history mode, the category labels and the release-block wording; Get-BranchTypes joined on August 10, 2026 (inbound #580) and Get-ReleaseNoteWording on August 11 (inbound #605)'
+    Assert-Equal 25 $totalRecordCount 'contract: exactly twenty-five (lib, function) records declared in script-contract-lib.ps1 (the twenty-four below plus the dedicated Get-LiveStage block after this loop). Was twenty-eight until the flat changelog retired six: both section seams, the live marker, the history mode, the category labels and the release-block wording; Get-BranchTypes joined on August 10, 2026 (inbound #580), Get-ReleaseNoteWording on August 11 (inbound #605) and Get-ReleaseNoteRoot on August 12 (inbound #616)'
 
     # Every record must carry a 'Returns' line, so a finding is actionable without any reference to this
     # source repo (Dave, July 28, 2026). Counted against $totalRecordCount rather than listed per record:

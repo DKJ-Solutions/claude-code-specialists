@@ -265,6 +265,25 @@ $pluginTier    = Get-SeamValue -Name 'Get-ReleasePluginTier' `
 # document for the very reader it was cut for, and nothing in the run would say so.
 $consumerBumps = @(Get-SeamValue -Name 'Get-ReleaseConsumerBumps', 'Get-ReleaseHighlightsBumps' -Default @())
 
+# AND WHERE THAT DOCUMENT GOES, which until now was the one path in this file with no knob (inbound
+# #616, reported from a consumer). Everything around it was already answered per repo -- the folder
+# component by Get-ReleaseNotesGrouping, the release list by Get-ReleaseHistoryPath -- so the file
+# already accepted that the folder inside this path varies while its root did not. That left the tier
+# above UNANSWERABLE for a repo whose hand-written notes live elsewhere: naming the bumps would have
+# pointed the cut at a directory that does not exist there and left the one that does out of the
+# release, so the only safe answer was @(), the tier switched off.
+#
+# Get-ReleaseHistoryPath is the precedent and the same sentence applies: a location convention rather
+# than a fact about the repo, and it is already the default -- so nothing changes for anyone who does
+# not set it. The name follows this file's own vocabulary for the document (Get-ReleaseNoteWording,
+# below) rather than the tier that reads it: since the two hand-written documents merged there is one
+# release note with a named section per reader, and the consumer is a section of it, not its title.
+#
+# releases/development/ is deliberately NOT given one. The reporter could show a repo that genuinely
+# differs on this path and none that differs on that one, and a seam nobody can be shown to need is a
+# knob a consumer has to read past. It comes back when somebody measures it.
+$noteRootRelPath = Get-SeamValue -Name 'Get-ReleaseNoteRoot' -Default 'releases/notes'
+
 # How many minors a major line must have had before a major may be cut. A major here is a RECAP of the
 # minors before it, so what earns one is their accumulation -- 10 in this repo. Repo-owned because it is
 # a release-cadence policy: a repo that cuts minors rarely would be pinned to a major it never reaches,
@@ -733,7 +752,7 @@ $changelogNew = Convert-ChangelogForRelease -Content $changelogRaw
 # is a document follows the bump.
 $tier2Entries = @($tierGroups | Where-Object { [int]$_.Tier -eq 2 } | ForEach-Object { $_.Entries } | Where-Object { $_ })
 $cutNote = ($consumerBumps -contains $bumpType)
-$noteRelPath = "releases/notes/$notesDirName/$new.md"
+$noteRelPath = "$noteRootRelPath/$notesDirName/$new.md"
 if ($cutNote) {
     $noteWording = Get-SeamValue -Name 'Get-ReleaseNoteWording', 'Get-InternalNoteWording' -Default @{}
     $noteContent = Build-ReleaseNoteDraft -Entries $tier2Entries -Version $new -Date $today `
@@ -811,7 +830,10 @@ if (Test-Path $relReadme) {
         Write-Warning "Overview table not found in $historyRelPath -- add the row manually: $newRow"
     }
 } else {
-    Write-Warning "releases/README.md is missing -- row not added: $newRow"
+    # $historyRelPath, not the literal: the two messages above already use the seam, and this is the one
+    # that fires when the file is MISSING -- i.e. exactly when the reader is about to go looking for the
+    # path it names. A repo that had repointed the seam was being sent to the default instead.
+    Write-Warning "$historyRelPath is missing -- row not added: $newRow"
 }
 
 Write-Utf8NoBom -Path $changelogPath -Content $changelogNew
