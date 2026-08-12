@@ -220,11 +220,16 @@ The `releases/` directory (modeled on life-hub):
   inside an immutable tag. The cell was chosen over a fourth column because the table's shape is matched by
   one regex that three readers share — including the row inserter and the new-major guardrail — and only new
   rows are touched, so the existing 72 keep pointing where they always did.
-- **`releases/notes/<X>.x/<X.Y.Z>.md`** — **the one hand-written document, since August 10, 2026**, drafted
+- **`releases/audience/<X>.x/<X.Y.Z>.md`** — **the one hand-written document, since August 10, 2026**, drafted
   by the cut for every bump `Get-ReleaseConsumerBumps` names. Three sections: *For consumers* (pre-filled
   with the tier-2 entries, and absent where none reached tier 2), *What it is worth* and *What was still open
   at this release* (both empty — neither can be generated). Rendall's pass is a rewrite of the first and an
   authoring job on the other two. **A patch gets none of it**: the generated Release body announces it.
+  - **It was `releases/notes/` until August 12, 2026**, and the root is stated in `Get-ReleaseNoteRoot` —
+    never hardcoded, which is a rule with a measured instance behind it: lint check 25 named the old root as
+    a literal, so on the day of the rename it would have found no live tree, checked the archive alone, and
+    reported a healthy-looking coverage count. Read the seam. The **shared default** stays `releases/notes`,
+    so a consumer who never answered the knob is not silently repointed.
   - **The two documents below are the archive, and the measurement that merged them is in
     [`CLAUDE.md`](../../../CLAUDE.md#claude-code-specialistss-safety-implementation).** Short version: both
     were written at all twelve releases since the internal tier existed, about the same changes, and 38% of
@@ -255,8 +260,9 @@ The `releases/` directory (modeled on life-hub):
   rendering the markdown with a tool built for it.
 - **`releases/internal/<X>.x/<X.Y.Z>.md`** — *also the archive now; `new-internal-note.ps1` still ships and
   still works, for a repo running the two-document flow, and nothing in this repo's chain calls it.* Was the tier-1 document, for colleagues, employers and management:
-  *what the work is worth*, at **every** release including a patch. It carries the **tier-1 and tier-2**
-  entries, the ladder being cumulative, and leaves tier 0 to the development notes. Written by
+  *what the work is worth*, at **every** release including a patch. It carried the **tier-1 and tier-2**
+  entries — written while the ladder was cumulative, which it stopped being on August 12, 2026 — and left
+  tier 0 to the development notes. Written by
   [`new-internal-note.ps1`](../../../scripts/release/new-internal-note.ps1), which lays down a skeleton —
   the metadata and the entry titles as bullets, plus three fixed headings — and leaves the rest to
   Rendall. **The middle heading is the tier**: "what it is worth" cannot be generated from a changelog,

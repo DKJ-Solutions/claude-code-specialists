@@ -321,8 +321,16 @@ $script:ContractRecords = @(
     # matter: the cut writes the note, session-status looks for the newest one. A seam reaching only the
     # writer would have the notes written to the new root and looked for in the old, reported as "no
     # release note was found" -- which reads like a repo that has not cut one yet.
+    # ADOPT FLIPPED FROM 'copy' TO 'decide' ON AUGUST 12, 2026, and the trigger was this repo's own value
+    # moving off the default. The old AdoptWhy justified copying on the grounds that the source's answer
+    # WAS the default, so copying it changed nothing -- a true sentence that expired the moment the source
+    # renamed its root to releases/audience. Copying now would write a directory the consumer does not have
+    # into a consumer that already has notes in releases/notes/, and the miss reports as "no release note
+    # was found", which reads as a repo that has not cut one yet. This is where the documents already live,
+    # which only the consumer can say. The DEFAULT deliberately stays releases/notes for the same reason:
+    # a repo that answers nothing must keep meaning what it meant yesterday.
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseNoteRoot'; Scripts = @('cut-release', 'session-status');
-       Adopt = 'copy'; AdoptWhy = 'a location convention rather than a fact about the repo, and it is already the default -- the same sentence Get-ReleaseHistoryPath carries, for the same reason. Copy it, then repoint it only if your hand-written notes already live somewhere else';
+       Adopt = 'decide'; AdoptWhy = 'where your hand-written notes already live, which is a fact about your tree rather than a convention to inherit. Answer the default releases/notes if you have never cut one; repoint it if they are already somewhere else. The source repo answers releases/audience, so that every root under its releases/ names its READER rather than the form of the document -- copy that rename only if it suits you';
        Optional = $true; Default = 'releases/notes';
        Returns = "the repo-root-relative directory the hand-written release note is written into and read back from. The per-release folder INSIDE it is Get-ReleaseNotesGrouping's answer (<X>.x or <X.Y>), so this is the root alone, with no trailing slash. releases/development/ deliberately has no equivalent knob: nobody has been able to show a repo that differs on it" },
     # Get-ReleaseHighlightsStakeholderTypes and Get-ReleaseHighlightsWording USED TO BE DECLARED HERE and

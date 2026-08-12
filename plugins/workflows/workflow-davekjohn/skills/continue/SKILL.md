@@ -75,7 +75,8 @@ subject from what is actually there, and offer to `/lock` it.
 
 Identical to `/lock` -- `git` and a repo root, nothing else. The script dot-sources no library and
 requires no seam function, so a repo that has adopted none of this workflow still gets a useful answer;
-every optional source (`gh`, tags, `CHANGELOG.md`, `releases/notes/`) degrades to a stated line rather
+every optional source (`gh`, tags, `CHANGELOG.md`, the release-note tree `Get-ReleaseNoteRoot` names)
+degrades to a stated line rather
 than an error.
 
 `.claude/handover.md` should be gitignored -- see the `lock` page for why.
