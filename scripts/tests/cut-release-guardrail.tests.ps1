@@ -217,6 +217,27 @@ $noteRootLiteralLines = @($cutReleaseCode -split "`n" | Where-Object { $_ -match
 Assert-True ($noteRootLiteralLines.Count -eq 1) 'the default note root is written exactly once in the code'
 Assert-True ($noteRootLiteralLines.Count -eq 1 -and $noteRootLiteralLines[0] -match '-Default') `
     'and that one occurrence is the seam default, not a path built behind the seam'
+# AND THE OVERVIEW ROW'S VERSION CELL IS WHERE THE SEAM ESCAPED ANYWAY, which is the reason this assert
+# exists beside the two above rather than trusting them. They were written to catch exactly this class of
+# defect and they PASSED while the row was built from a bare 'notes/': they match the FULLY-QUALIFIED form,
+# and the escape was the short one. That is this repo's own recurring failure -- a matcher that reads as
+# thorough and cannot see the instance -- caught here only because the cut was run with -NoPush and a person
+# read the row.
+#
+# MEASURED AT THE v4.6.0 CUT (August 12, 2026): the row pointed at notes/4.x/4.6.0.md, which did not exist,
+# while the same run wrote releases/audience/4.x/4.6.0.md. Nothing errored. Every neighbouring row was
+# correct, because a PR had repointed them by hand the day before -- so the one row a script wrote was the
+# only wrong one, in the document a reader uses to find any release note at all.
+$versionCell = [regex]::Match($cutReleaseCode, '(?m)^\s*\$versionTarget\s*=.*$')
+Assert-True $versionCell.Success "found the line that builds the overview row's Version cell"
+Assert-True ($versionCell.Success -and $versionCell.Value -notmatch '"notes/') `
+    'the Version cell carries no bare "notes/" literal -- the short form the two asserts above cannot see'
+Assert-True ($versionCell.Success -and $versionCell.Value -match '\$noteRootLeaf') `
+    'and is built from the note-root seam instead'
+# ON THE DERIVATION, NOT JUST THE VARIABLE NAME: a $noteRootLeaf assigned a literal would satisfy the assert
+# above while changing nothing, which is the same "reads as adopted" trap the seam-default count guards.
+Assert-True ($cutReleaseCode -match '\$noteRootLeaf\s*=\s*\$noteRootRelPath') `
+    'and that leaf is derived from the seam variable, so repointing the root moves the row with it'
 # A SEAM THAT REACHES ONLY THE WRITER IS THE FAILURE THIS ONE HAD TO AVOID: session-status.ps1 looks for
 # the newest note, so a repo that repointed the root would have it written to the new place and looked
 # for in the old, reported as "no release note was found". Pinned here rather than only in that script's

@@ -837,7 +837,17 @@ $shortTitle = if ($Title) { $Title } else { "$typeLabel release" }
 # The hand-written note is drafted above now, so the row is right the first time and there is no second
 # writer of the same cell. A release with no note -- a patch -- keeps pointing at the record, which is the
 # most readable document it has.
-$versionTarget = if ($cutNote) { "notes/$notesDirName/$new.md" } else { "development/$notesDirName/$new.md" }
+# AND IT READS Get-ReleaseNoteRoot RATHER THAN SPELLING THE ROOT OUT. This line carried the literal
+# 'notes/' and produced a dead row the day that seam became 'releases/audience' (caught at the v4.6.0 cut,
+# August 12, 2026, by the -NoPush inspection). Nothing errored: the row pointed at a file the same run had
+# just written somewhere else, and every neighbouring row was correct because a PR had repointed them by
+# hand. The rename moved the directory, the reader and the archives, and missed the one place the path was
+# a string -- which is why the release manager's lens states 'read the seam, never hardcode the root'.
+# The '$historyRelPath sits in releases/' assumption is the one the development/ branch has always made;
+# a repo answering this seam with a root OUTSIDE that directory would need a '../' here, which no repo has
+# yet asked for.
+$noteRootLeaf = $noteRootRelPath -replace '^releases/', ''
+$versionTarget = if ($cutNote) { "$noteRootLeaf/$notesDirName/$new.md" } else { "development/$notesDirName/$new.md" }
 $newRow = "| [$new]($versionTarget) | $today | $typeLabel | $shortTitle |"
 if (Test-Path $relReadme) {
     $rm = Get-Content -Path $relReadme -Raw -Encoding UTF8
