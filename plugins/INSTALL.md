@@ -299,25 +299,48 @@ in it.
 
 **1. The `@`-import of the orchestrator's body names a path inside the marketplace clone, and that path
 changed too.** Two things moved at once — the plugin's **id** and its **directory** — and only the first is
-in the table above:
+in the table above.
 
-| what | before | after |
+**And there is more than one "before", so test by SHAPE rather than by matching a literal.** The directory
+moved twice under the old plugin ids, and which of the two your import names depends only on when you last
+updated — a fact your file does not state. The reliable test needs no version at all:
+
+> **Any import whose path does not contain `plugins/teams/<team>/` or `plugins/workflows/<workflow>/`
+> is stale, whatever it contains instead.**
+
+Every layout this family has shipped, measured against this repo's own tags — the first two are what you
+might find, the third is what you are moving to:
+
+| the layout your import names | shipped by | what a team's folder looked like |
 |---|---|---|
-| a team's folder in the clone | `claude-code-plugins/claude-specialists/specialists/` | `plugins/teams/team-alpha/` |
-| an add-on team | `claude-code-plugins/claude-specialists/specialists-shopify/` | `plugins/teams/team-shopify/` |
-| the workflow | `claude-code-plugins/claude-specialists/specialists-workflow-davekjohn/` | `plugins/workflows/workflow-davekjohn/` |
+| the two-level product folder | `v1.1.0` – `v3.1.2` | `claude-code-plugins/claude-specialists/specialists/` |
+| the flat plugin folder | `v3.2.0` – `v3.9.0` | `plugins/specialists/` |
+| **current** — teams and workflows split | `v3.10.0` onward | `plugins/teams/team-alpha/` |
 
-So the line in your `.claude/specialists/SPECIALISTS.md` changes as follows — **bound to this repo's layout
-as of `v4.0.0`, which the table above is read off, and to the marketplace name `claude-code-specialists`;
-substitute yours if you registered it under another name**:
+Read the same three rows for an add-on team (`specialists-shopify` → `plugins/teams/team-shopify/`) and
+for the workflow — with one exception worth knowing before you go looking for it: the workflow plugin
+**first shipped in `v3.8.0`**, so it only ever existed under the flat layout
+(`plugins/specialists-workflow-davekjohn/`). There is no two-level form of that path to find.
+
+So the line in your `.claude/specialists/SPECIALISTS.md` changes as follows — **bound to this repo's
+layout as of `v4.5.0`, which the table above is read off, and to the marketplace name
+`claude-code-specialists`; substitute yours if you registered it under another name**:
 
 ```text
-# before -- the path this import had, and which no longer exists
+# before -- EITHER of these, depending on how long ago you last updated
 @~/.claude/plugins/marketplaces/claude-code-specialists/claude-code-plugins/claude-specialists/specialists/personas/01-01-persona.md
+@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/specialists/personas/01-01-persona.md
 
 # after -- the line you want
 @~/.claude/plugins/marketplaces/claude-code-specialists/plugins/teams/team-alpha/personas/01-01-persona.md
 ```
+
+**If neither literal matches your file, do not conclude the repair is not yours** — apply the shape test
+above instead. That is the failure this section is written around: a consumer searching for a quoted
+line, finding nothing, and reasonably reading that as *"this one does not apply to me"* while their
+orchestrator runs bodyless. If you want to know which form to expect before you look, the verification
+query in [Step 1](#step-1--enable-and-install) prints the version and commit your install record names —
+run that one rather than a shortened variant, for the reasons stated there.
 
 **This one fails silently, which is why it is first.** Claude Code drops an `@`-import it cannot resolve
 **without a word**: the roster around it renders, the session looks entirely normal, and the orchestrator
