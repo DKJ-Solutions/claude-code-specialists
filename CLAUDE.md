@@ -530,7 +530,27 @@ The constitution above, concretely implemented here:
      `highlights/` made, fixed in that sibling two days earlier and missed in this one. **The shared default
      stays `releases/notes`** in `cut-release.ps1`, `session-status.ps1` and the contract record: an unstated
      seam has to keep meaning what it meant yesterday, and a consumer receives these scripts through a plugin
-     update rather than by choosing to. `consumer/` and `internal/` stay as frozen archives.
+     update rather than by choosing to.
+
+     **AND `consumer/` + `internal/` WERE MERGED INTO `audience/` TWO HOURS LATER, WHICH IS WHY THAT MOVEMENT
+     WAS NOT FINISHED** (Dave, August 12, 2026). This paragraph said they *stay as frozen archives* — and that
+     freeze was the assistant's call written as settled, in three places, **none of which named Dave**, while
+     the rename standing beside it in the same entry was attributed to him. Asked why `releases/` still had
+     five folders, he was offered the freeze as one of three options and chose the merge instead: the twelve
+     `consumer/`+`internal/` pairs are now twelve documents in `audience/`, and `releases/` holds three
+     reader-named roots and nothing else. **The identical filenames are why it was a merge and not a rename** —
+     `3.x/3.2.0.md` existed in both trees, so 24 documents became 12 and no `git mv` could do it.
+
+     **The published-record rule is what made it safe, and it is the half to copy.** Each pair kept both
+     registers verbatim — the consumer body under *For consumers*, the organisational prose under *What it is
+     worth* and *What was still open at this release* — and dropped exactly one section, `## What is different
+     now`, which the 62/38 measurement below identifies as the duplicated half. Prose was otherwise left as
+     written, so a merged document may still name `releases/highlights/` or describe itself as one of three
+     tiers; **links** were repointed, because a dead link in a record is worse than a relocated one and
+     repointing one changes no claim the record makes. That is the same rule the `highlights/` → `consumer/`
+     move ran under on August 10, and the same one that left the seven wrong merge dates standing. The one
+     thing genuinely rewritten was a clause that had become **false**: an internal note whose lead said the
+     commands *"are not on this page"* now sits one section below the page that carries them.
 
      **ONE HAND-WRITTEN DOCUMENT SINCE AUGUST 10, 2026, WITH A NAMED SECTION PER READER** (Dave). Tier 1 and
      tier 2 had a document each — `releases/internal/` and `releases/consumer/` — and at **all twelve**
@@ -542,7 +562,9 @@ The constitution above, concretely implemented here:
      document was refused and a **sectioned** one built: each register intact, the shared 38% written once.
      The heading *"what is different now"* is gone rather than moved — it *was* the duplicated half.
      `new-internal-note.ps1` is still shipped for a repo running the two-document flow; nothing here calls
-     it, and the eleven documents in `releases/consumer/` stay put as published records.
+     it, and **its `releases/internal/` path must not be repointed at `audience/`** — that is a consumer's
+     archive, not this repo's, and switching it would be the one failure here that produces no error message.
+     The same holds for `Get-ReleaseNoteRoot`'s shared `releases/notes` default.
 
      **A patch writes no hand-written document at all**, and is announced by the generated GitHub Release
      body alone — which is what made this possible in the first place: while the body *was* the internal
