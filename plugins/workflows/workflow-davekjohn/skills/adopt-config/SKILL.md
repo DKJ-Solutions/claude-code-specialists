@@ -32,7 +32,11 @@ looks right.
 
 `${CLAUDE_PLUGIN_ROOT}` resolves **only inside a plugin-owned component** -- that is, when your Claude
 runs this skill. Typing the command by hand in a terminal means spelling out the absolute path to your
-own plugin cache instead, so the easy route is to ask for the skill rather than to copy the line.
+own plugin cache instead, so the easy route is to ask for the skill rather than to copy the line. That
+cache holds the last *released* mirror, which matters in the repo the scripts are **maintained** in: the
+mirror lags its own source there by however many merges have landed since, so a maintainer runs the copy
+under `scripts/`. The `adopt-config.ps1` command above is the one exception, since there is nothing for
+the source repo to adopt from itself.
 
 ## The two markers, and why one of them never writes anything
 
@@ -78,3 +82,7 @@ Run the contract check to see the same seam from the shared scripts' side:
 ```powershell
 powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/sync/check-script-contract.ps1"
 ```
+
+**In the source repo, run its own copy instead -- `scripts/sync/check-script-contract.ps1`.** That one is
+a gate there rather than a one-off, and reading the seam through a lagging mirror is exactly the reading
+it exists to prevent.

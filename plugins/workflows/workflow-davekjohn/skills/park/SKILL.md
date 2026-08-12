@@ -24,6 +24,11 @@ Run the shared script from the **root of the consuming repo**:
 powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/task/park-branch.ps1"
 ```
 
+**In the source repo, run its own copy instead -- `scripts/task/park-branch.ps1`.**
+`${CLAUDE_PLUGIN_ROOT}` resolves into the plugin cache, which holds the last *released* mirror and so
+lags its own source by however many merges have landed since. A consumer keeps no copy of their own, so
+for them the line above is the correct one.
+
 Optionally record where you left off (appended to the park commit message, so the "what is next"
 state lives in git history):
 

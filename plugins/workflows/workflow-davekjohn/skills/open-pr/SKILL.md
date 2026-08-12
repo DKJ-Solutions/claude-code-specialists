@@ -26,6 +26,11 @@ Run the shared script from the **root of the consuming repo**:
 powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1"
 ```
 
+**In the source repo, run its own copy instead — `scripts/release/open-pr.ps1`.**
+`${CLAUDE_PLUGIN_ROOT}` resolves into the plugin cache, which holds the last *released* mirror and so
+lags its own source by however many merges have landed since. A consumer keeps no copy of their own, so
+for them the line above is the correct one.
+
 **No title is passed, and that is the change of August 7, 2026 ([#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506)
 + [#505](https://github.com/DaveKJohn/claude-code-specialists/issues/505)).** The PR is called
 `<branch type>: <the entry's Branch title>` — the type off the branch prefix, the words out of

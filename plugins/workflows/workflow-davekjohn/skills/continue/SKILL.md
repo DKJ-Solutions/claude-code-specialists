@@ -28,6 +28,11 @@ checks the two still agree.
 powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/task/session-status.ps1"
 ```
 
+**In the source repo, run its own copy instead -- `scripts/task/session-status.ps1`.**
+`${CLAUDE_PLUGIN_ROOT}` resolves into the plugin cache, which holds the last *released* mirror and so
+lags its own source by however many merges have landed since. A consumer keeps no copy of their own, so
+for them the line above is the correct one.
+
 It prints the locked topic first -- verbatim, with how long ago it was set -- and then the repo's own
 answer: branch and tree, recent commits, parked branches on `origin`, open issues, pending changelog
 entries with their tiers, the last tag, and what the last release note recorded as still open.
