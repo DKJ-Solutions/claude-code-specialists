@@ -64,15 +64,22 @@ documents carry are the same words by construction. Write it **without** a `feat
 the branch name already states the type and `open-pr` puts it in front. The section was called
 `Branch description` for a day; that name is still read, so a branch created under it folds unharmed.
 
-**All three tiers are in the file, and each one is answered.** Tier 0 can always be filled in — every
-change matters to the people who maintain this repo, if only a little. For the two above it, the answer may
-well be *"this reaches nobody here"*, and you say so:
+**Two sections are in the file: tier 0, and the one audience tier this repo has.** Tier 0 can always be
+filled in — every change matters to the people who maintain this repo, if only a little. For the audience
+tier the answer may well be *"this reaches nobody here"*, and you say so:
 
 | section | who notices | answer it with |
 |---|---|---|
 | `#### Tier 0` | this repo's own developers | a score, always |
-| `#### Tier 1` | colleagues and employers | a score, or `N/A` if the project gets nothing out of it |
-| `#### Tier 2` | customers and users | a score, or `N/A` if no consumer would notice |
+| `#### Tier 2` | customers and users — **this repo's audience** | a score, or `N/A` if no consumer would notice |
+
+**Which of the two audience tiers you get is a repo-level fact, not a per-entry choice** (Dave, August 12,
+2026). Tier 1 (management and the employer/commissioner) and tier 2 (the subscriber of a service) are two
+kinds of reader rather than two rungs, and a repo has exactly one: it is stated once in
+`Get-ReleaseAudienceTier`, and the scaffolder writes only that one. This repo answers **2**, being a service
+rather than a product. A repo that has stated nothing is asked about both, exactly as before the knob
+existed — and a tier this repo no longer asks about is still *read* wherever an older entry carries one, so
+none of the 97 entries written under the cumulative model stops folding.
 
 Each section carries **why it matters at that reach**, then **`**Score:** N`** — 1 to 5 against the rubric
 `new-branch` prints when it writes the file. The tier decides which release documents the entry appears
@@ -83,9 +90,12 @@ consumer can observe this at all"* is information, and it survives into the reco
 that — it means both "reaches nobody" and "nobody has got to this yet", and the gate has to be able to tell
 those apart. **The reach is the highest tier with a number**, so an `N/A` costs nothing but a sentence.
 
-**The ladder cannot be skipped.** `N/A` at tier 1 with a score at tier 2 says a change consumers notice
-gives this project's colleagues nothing; `open-pr` refuses that by name rather than asking you for a
-number.
+**The ladder is gone, and with it the second reading it forced.** Until August 12, 2026 a scored tier 2
+*owed* a tier-1 section, and `open-pr` refused an `N/A` there by name. Measured before removing it: of this
+repo's 89 tier-1 sections, **81 existed only because a tier-2 section sat above them** — the same reach
+argued twice, in a second register, for a reader who here is the same person. What remains enforced is that
+every tier the file *does* carry has a reason, `N/A` ones included, and that the audience tier this repo asks
+about is answered before a PR opens.
 
 **Four things about this shape, each of which someone has got wrong before:**
 

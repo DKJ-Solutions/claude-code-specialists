@@ -136,17 +136,31 @@ produced. Score it 1 to 5 against this rubric:
 | `2` | small; noticed if somebody points it out |
 | `1` | cosmetic, or prevents a failure that has not happened yet -- then name the failure, because that is the only part a later reader can use |
 
-**All three tiers are in the file, and each one is answered.** Where the change reaches nobody, write
-`N/A` in the score and say in one line why -- that is an answer rather than a gap, and it is what lets a
-gate tell "reaches no consumer" from "nobody has got to tier 2 yet". **The reach is the highest tier
-carrying a number.**
+**Two tiers are in the file: tier 0, and the one audience tier your repo has.** Tier 1 and tier 2 are not
+two rungs of a ladder but two KINDS of reader, and a repo has exactly one -- fixed before any entry is
+written. State it in `Get-ReleaseAudienceTier` in your own `scripts/repo-config.ps1`, and the scaffolder
+writes only what it names. **A repo that has stated nothing is asked about every tier**, exactly as before
+the knob existed, so three sections means your repo has not answered yet rather than that something is
+broken.
 
-**Every tier needs a reason, `N/A` ones included, and the ladder cannot be skipped.** It is cumulative: a
-change consumers notice is also a change this project's colleagues get something out of, so `N/A` at tier 1
-under a scored tier 2 is refused by name.
+**Each tier in the file is answered, and `N/A` is how one says the change reaches nobody there.** Put it in
+the score with one line saying why -- that is an answer rather than a gap, and it is what lets a gate tell
+"reaches no subscriber" from "nobody has got to that section yet". **The reach is the highest tier carrying a
+number**, and **tier 0 is the one tier that can never be `N/A`**: every change reaches the people
+maintaining the repo at least a little.
+
+**Every tier needs a reason, `N/A` ones included.** What is no longer asked for is a second reading of the
+same change for an audience the repo does not publish to. Until August 12, 2026 the ladder was cumulative --
+a tier-2 entry OWED a tier-1 section -- and the source repo measured what that cost: of its 89 tier-1
+sections, **81 existed only because a tier-2 section sat above them**, the same reach argued twice in a
+second register for a reader who was the same person. A tier your repo does not ask about is still **read**
+wherever an older entry carries one, so nothing already written stops folding.
+
+Below is what a **tier-2** repo's file looks like. A repo that answered `1` gets the same two sections with
+`#### Tier 1` in the second one's place:
 
 ```text
-#### Tier 1
+#### Tier 0
 
 The routine version bump stops needing a developer.
 

@@ -250,6 +250,62 @@ function Get-EntryTierMax {
     return $script:EntryTierMax
 }
 
+# --- ONE AUDIENCE TIER PER REPO (Dave, August 12, 2026; inbound #620) -----------------------------
+#
+# Tier 1 and tier 2 stopped being two rungs of one ladder and became two KINDS of audience, of which a
+# repo has exactly one: 1 is management and the employer/commissioner, 2 is the subscriber of a service.
+# A webshop's customers buy a product and never read a release note, so its audience is 1; a repo that IS
+# the service somebody subscribes to answers 2. Tier 0 -- the people maintaining the repo -- is always
+# asked for, in every repo, and is not part of this question.
+#
+# WHAT THIS DOES *NOT* CHANGE: Get-EntryTierMax stays 2, and every validator above and below keeps using
+# it. That separation is the whole safety of the change. The MAX says which tier NUMBERS are valid to
+# READ -- and a tier-1 repo must still read a tier-2 entry, because 97 entries in this repo's record and
+# every entry in a consumer's tree were written under the cumulative model. The AUDIENCE says which tiers
+# this repo ASKS ABOUT when it scaffolds and when it judges completeness. Collapsing the two would make
+# one repo's history unreadable to the other, silently, which is the direction that empties a release.
+function Get-EntryAudienceTier {
+    <#
+        The one audience tier this repo asks its entries about -- Get-ReleaseAudienceTier's answer -- or
+        $null where the repo has stated none.
+
+        PROBED, NEVER REQUIRED, and $null is a real answer rather than a failure: it means "ask about every
+        tier the model has", which is exactly what this system did before the knob existed. That default is
+        deliberate and it is the opposite of the reading the policy invites. "The correct tier is enabled
+        once the audience is clear" is about a repo's own preparation, not about what an unconfigured script
+        should do -- and treating absence as "enable nothing" would switch the audience tier off in every
+        consumer the moment they take the plugin update, with nothing erroring and a release document going
+        out empty. Absent therefore means UNCHANGED.
+
+        A value outside the model is ignored rather than honoured, for the reason every override here is:
+        a seam returning 7 would otherwise have the scaffolder write a section no validator accepts, and a
+        gate that refuses every entry in the repo is worse than a gate nobody configured.
+    #>
+    if (-not (Get-Command Get-ReleaseAudienceTier -ErrorAction SilentlyContinue)) { return $null }
+    $v = & Get-ReleaseAudienceTier
+    if ($null -eq $v) { return $null }
+    if ("$v" -notmatch '^\d+$') { return $null }
+    $t = [int]$v
+    # 1 is the floor, not 0: tier 0 is asked for unconditionally, so naming it here would say nothing.
+    if ($t -lt 1 -or $t -gt $script:EntryTierMax) { return $null }
+    return $t
+}
+
+function Get-EntryAskedTiers {
+    <#
+        The tiers an entry in THIS repo is asked to answer, lowest first: tier 0 plus the audience tier --
+        or every tier the model has, where no audience is stated.
+
+        ONE ANSWER, THREE READERS, which is why it is a function rather than three inline expressions. The
+        scaffolder writes these sections, the routing question under each one points at the NEXT of them,
+        and the completeness gate asks for exactly these. Three copies of that arithmetic is how a
+        scaffolder starts writing a section its own gate does not ask about.
+    #>
+    $audience = Get-EntryAudienceTier
+    if ($null -eq $audience) { return @(0..$script:EntryTierMax) }
+    return @(0, $audience)
+}
+
 function Format-EntryTierLine {
     <# The single line an entry carries, e.g. 'Tier: 0'. One formatter, so the writer and the parser
        below cannot disagree about the spacing. #>
@@ -813,8 +869,8 @@ function Get-EntrySignificanceWording {
 function Format-EntrySignificanceSections {
     <#
         The Significance section's body as an array of LINES: one '#### Tier N' block per row, LOWEST tier
-        first, each with its why, its 'Score: N' line and -- for tier 0 and 1 -- the question routing the
-        author to the next tier.
+        first, each with its why, its 'Score: N' line and -- for every tier except the LAST one written --
+        the question routing the author to the next tier.
 
         LOWEST FIRST, which is the opposite of the table it replaces. The table listed the furthest reach
         at the top because that is what decided the entry's position in the changelog. These sections are
@@ -822,8 +878,10 @@ function Format-EntrySignificanceSections {
         answer, and each answer decides whether there is a next one. Ordering the document against the
         order it is written in would put the routing questions in reverse.
 
-        Called with no rows it renders the SCAFFOLD: tier 0 alone, its guidance comment standing where the
-        why goes and its score EMPTY. Tier 0 is the honest default claim -- reaches nobody outside this repo
+        Called with no rows it renders the SCAFFOLD: the tiers Get-EntryAskedTiers names -- tier 0 plus this
+        repo's one audience tier, or every tier the model has where no audience is stated -- each with its
+        guidance comment standing where the why goes and its score EMPTY. Tier 0 is the honest default claim
+        -- reaches nobody outside this repo
         -- while a scaffolded SCORE would be a guess at a ranking, which is the failure the retired
         remove-before-publishing marker was measured on.
 
@@ -843,6 +901,23 @@ function Format-EntrySignificanceSections {
         [switch]$WithGuidance
     )
     $w = Get-EntrySignificanceWording
+    # EVERY TIER THIS REPO ASKS ABOUT IS WRITTEN, AND EACH IS ANSWERED (Dave, August 7, 2026; narrowed to
+    # one audience tier on August 12, 2026). The scaffold once emitted tier 0 alone with 1 and 2 offered as a
+    # commented-out block; then all three as real sections; now tier 0 plus the ONE audience tier this repo
+    # has, because tier 1 and tier 2 are two kinds of reader rather than two rungs. Get-EntryAskedTiers is
+    # the single answer to "which ones", and where a repo has stated no audience it returns all of them --
+    # so an unconfigured consumer gets exactly the file it got yesterday.
+    #
+    # A caller passing rows (a migration, a rewrite) gets exactly its own rows back, so nothing invents a
+    # tier for an entry written under an older model and nothing DROPS one either: an entry that answered
+    # all three keeps all three, which is what makes 97 existing entries re-renderable.
+    $ordered = @(@($Rows) | Sort-Object -Property @{Expression = { [int]$_.Tier }; Descending = $false})
+    if ($ordered.Count -eq 0) {
+        $ordered = @(Get-EntryAskedTiers | ForEach-Object {
+            [pscustomobject]@{ Tier = $_; Score = 0; Why = '' }
+        })
+    }
+
     # THE ROUTING QUESTIONS GO WITH THE GUIDANCE (Dave, August 7, 2026), which is the half of this worth
     # stating out loud, because it reverses his own decision of the day before. They were added so an author
     # who stops at tier 0 has DECIDED there is nothing above it rather than never having been asked -- and
@@ -850,18 +925,22 @@ function Format-EntrySignificanceSections {
     # is now something you learn from branch/templates/ or from CONTRIBUTING.md rather than from the file in
     # front of you. He was shown both shapes side by side and chose this one; recorded here so the next
     # reader meets the trade rather than only the result.
-    $routes = if ($WithGuidance) { @{ 0 = $w.Route0; 1 = $w.Route1 } } else { @{} }
-
-    # EVERY TIER IS WRITTEN, ALWAYS (Dave, August 7, 2026). The scaffold used to emit tier 0 alone, with 1
-    # and 2 offered as a commented-out block to uncomment. All three are sections now and each is answered
-    # -- a score, or 'N/A' with a line saying why the change reaches nobody there. A caller passing rows
-    # (a migration, a rewrite) gets exactly its own rows back, so nothing invents a tier for an entry that
-    # was written under the older model.
-    $ordered = @(@($Rows) | Sort-Object -Property @{Expression = { [int]$_.Tier }; Descending = $false})
-    if ($ordered.Count -eq 0) {
-        $ordered = @(0..(Get-EntryTierMax) | ForEach-Object {
-            [pscustomobject]@{ Tier = $_; Score = 0; Why = '' }
-        })
+    #
+    # KEYED ON WHAT IS ACTUALLY WRITTEN, NOT ON A FIXED PAIR, and that had to change with the audience knob
+    # (August 12, 2026). It used to be the literal @{ 0 = Route0; 1 = Route1 }, which in a tier-2 repo would
+    # print "continue to Tier 1" above a file whose next section is Tier 2 -- form text sending the author to
+    # a heading that is not there. Each written tier except the LAST gets the question that routes to its
+    # successor, and the wording key follows the TARGET: Route0's own text says "continue to Tier 1" and
+    # Route1's says "continue to Tier 2", so the question routing to tier T is Route<T-1>. The names stay as
+    # they are for that reason -- they are a consumer-overridable seam, and every repo that has translated
+    # one translated it by these keys.
+    $routes = @{}
+    if ($WithGuidance) {
+        for ($r = 0; $r -lt $ordered.Count - 1; $r++) {
+            $target = [int]$ordered[$r + 1].Tier
+            $key = "Route$($target - 1)"
+            if ($w.PSObject.Properties[$key] -and $w.$key) { $routes[[int]$ordered[$r].Tier] = $w.$key }
+        }
     }
 
     $lines = New-Object System.Collections.Generic.List[string]
@@ -900,12 +979,14 @@ function Format-EntrySignificanceSections {
             $score = ' ' + [string][int]$row.Score
         }
         $lines.Add($script:EntryScoreLabel + $score)
-        # EVERY tier 0 and tier 1 section closes with it, including one that already has its successor
-        # below it (Dave: "het kopje sluit altijd af met"). An earlier draft wrote it only under the last
-        # section, on the grounds that a tier whose successor exists has already been answered. That is
+        # EVERY SECTION THAT HAS A SUCCESSOR CLOSES WITH IT, including one whose successor is already
+        # answered below it (Dave: "het kopje sluit altijd af met"). An earlier draft wrote it only under the
+        # last section, on the grounds that a tier whose successor exists has already been answered. That is
         # true of the author and false of the reader: the entry is walked again at the fold, at the cut and
         # in the record, and a question that disappears once answered leaves the next reader unable to see
-        # that it WAS asked. Tier 2 has no successor and therefore carries none.
+        # that it WAS asked. The LAST written tier has no successor and therefore carries none -- which used
+        # to be a statement about tier 2 specifically, and is now about whichever audience tier this repo
+        # asked for.
         #
         # AS AN HTML COMMENT (Dave, August 6, 2026). It is form text, not the author's answer, and it was
         # the last piece of form that travelled all the way into CHANGELOG.md and the development notes.
@@ -1479,7 +1560,19 @@ function Get-EntryImpactFindings {
     # score, so the only move that resolves the refusal is to write the shape this format writes.
     $isTable = ($impact.Shape -eq 'table')
 
-    for ($tier = 1; $tier -le $impact.Tier; $tier++) {
+    # THE TIERS AN ENTRY OWES ARE THE ONES THIS REPO ASKS ABOUT (August 12, 2026), and no longer every rung
+    # from 1 up to the reach. Where a repo has named its one audience tier, that is the only one owed; where
+    # it has named none, Get-EntryAskedTiers returns all of them and this is 1..$impact.Tier exactly as it
+    # was. Tier 0 is excluded here for the reason stated above -- it is never ranked -- and its reason is
+    # still required, by Get-EntryScaffoldFindings, which walks the rows rather than the ladder.
+    #
+    # TOLERANT IN THE ONE DIRECTION THAT MATTERS: a tier this repo does not ask about but the author
+    # answered anyway is simply not examined here. That is not laxity, it is the only behaviour that does not
+    # turn correct work into a blockage -- the 6 entries pending in this repo when the knob landed each
+    # carried all three tiers, written under the cumulative model, and a gate that started refusing an EXTRA
+    # answered tier would have converted six finished dossiers into six PRs that cannot be opened. Their
+    # reasons are still checked; only the completeness ladder narrowed.
+    foreach ($tier in @(Get-EntryAskedTiers | Where-Object { $_ -ge 1 -and $_ -le $impact.Tier })) {
         $row = @(@($impact.Rows) | Where-Object { [int]$_.Tier -eq $tier })
         # THE LADDER CANNOT BE SKIPPED, and 'N/A' is the new way to try (August 7, 2026). A tier declaring
         # it reaches nobody, UNDER one that is scored, says a change consumers notice gives this project's
