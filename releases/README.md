@@ -448,6 +448,7 @@ list sits at the **end** of the page:
 
 | Version | Date | Type | Title |
 |---|---|---|---|
+| [4.6.0](audience/4.x/4.6.0.md) | 2026-08-12 | Minor | One audience tier per repo, and releases/ reduced to three reader-named roots |
 | [4.5.0](audience/4.x/4.5.0.md) | 2026-08-11 | Minor | Repairs across the entry, PR-body and release-document machinery: gates and documents that pointed at retired shapes now name the ones actually written. |
 | [4.4.0](audience/4.x/4.4.0.md) | 2026-08-11 | Minor | The merged note model gets its first written instance, and a release now times itself end to end |
 | [4.3.0](audience/4.x/4.3.0.md) | 2026-08-11 | Minor | One hand-written release note per release, a generated Release page, and the performance engineer owns wall-clock |
