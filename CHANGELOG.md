@@ -47,10 +47,16 @@ does fire. This time it caught the dead overview row before anything was public,
 for keeping it.
 
 **Step 0a was followed this time, and the previous release's note said it was not.** The clock ran from
-before the cut, so the document carries eight measured legs with the two that ran behind a person marked as
+before the cut, so the document carries its measured legs with the ones that ran behind a person marked as
 such, and a frozen subtotal of 46m 05s rather than an estimate. The largest single line is the one nobody had
-counted: shipping one three-line fix ran the same 32 suites **four times** — twice locally, twice in CI — for
-about 27 minutes of the release's wall clock.
+counted: the same 32 suites ran **ten times** over the release, five locally and five in CI, with the four
+timed local runs coming to 26m 58s between them.
+
+**That figure was first written as "four times, twice locally and twice in CI, about 27 minutes" and was
+wrong** — it attributed the whole release's local runs to the one mid-release fix, which accounted for two of
+them. Corrected by the follow-up branch that added the end-to-end total, while the entry was still pending
+rather than published. Worth keeping visible: the release whose theme is *a check and the thing it checks
+disagreeing about wording* produced a measured claim in its own note that did not survive being recounted.
 
 **Three things are written into *what was still open* rather than smoothed over**, including one that cost
 real time in this very release: the tracked `Microsoft/Windows/PowerShell/ModuleAnalysisCache`, a
