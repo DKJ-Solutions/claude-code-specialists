@@ -22,12 +22,20 @@
 - [x] `releases/development/` mentions: one dead link repointed in `4.x/4.0.0.md`; prose left alone
 - [x] Check 25's tests: added assert 64b pinning that an internal note is NOT scanned
 - [x] Write `branch/branch-changelog.md` — body, tier 0 = 3, tier 2 = 3
-- [ ] Gates: `check-plugin-integrity.ps1` green (0 errors, `[consumer-tier] checked 15`, `[link-scan] 234`).
-      Suites running; `check-script-contract.ps1` + `check-roster-sync.ps1` still to run
+- [x] Gates: `check-plugin-integrity.ps1` green (0 errors, `[consumer-tier] checked 15`, `[link-scan] 234`),
+      `check-script-contract.ps1` 0 errors, `check-roster-sync.ps1` 0 errors, and all **31** suites green
 
 ### Where I left off
 
-Everything written. Waiting on the full suite run, then the two sync checks, then `open-pr`.
+Everything written and gated; `open-pr` next.
+
+**One lesson from this branch, for whoever runs the suites by hand.** A hand-rolled `Start-Job` fan-out over
+all 31 suites reported **6 failures** — `agent-shared`, `bootstrap-drift`, `config-blueprint`,
+`fix-mojibake`, `roster-sync`, `verify-resolved-issues` — four of them as *"lint gate green on the repo"*.
+Every one of them passes on its own, and the cause is the harness rather than the code: those suites invoke
+the lint gate and scan the **live repo**, so 31 of them at once interfere with each other. `open-pr.ps1`
+already runs them in parallel safely. Do not hand-roll a second runner — and do not chase a red assert from
+one without re-running the suite alone first.
 
 **Do NOT touch** (verified this session): `new-internal-note.ps1:166`, `release-lib.ps1`'s shared
 `releases/notes` default, `Get-ReleaseNoteRoot`'s fallback, `script-contract-lib.ps1:371`,
