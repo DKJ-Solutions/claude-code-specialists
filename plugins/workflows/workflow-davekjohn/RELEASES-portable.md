@@ -167,7 +167,7 @@ merge: `releases/` holds three reader-named roots and nothing else.
 trees, so 24 documents became 12 and no `git mv` could do it. Each pair kept both registers intact — the
 consumer body under *For consumers*, the organisational prose under *What it is worth* and *What was still
 open at this release* — and dropped exactly one thing: the internal note's `## What is different now`, which
-the 62/38 measurement above identifies as the duplicated half. The prose of a published record was otherwise
+the 62/38 measurement below identifies as the duplicated half. The prose of a published record was otherwise
 left as written, so a merged document may still name `releases/highlights/` or describe itself as one of
 three tiers; that is what it said on the day it went out.
 
