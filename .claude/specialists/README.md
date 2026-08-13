@@ -114,6 +114,42 @@ may change freely; the filename and link paths hang off `id`/`group`, not the na
 guards this** ([Sylvester #15](lenses/05-15-extension.md)): every filename matches the
 frontmatter (`id:` and `group:`).
 
+**So a rename never breaks a reference — it only leaves the name behind in prose**, and
+[`scripts/sync/find-specialist-mentions.ps1`](../../scripts/sync/find-specialist-mentions.ps1) is the
+tool for that half. Run it bare for the overview (which rename is cheap and which is not), or with
+`-Name <specialist>` for every live mention grouped by the layer it sits in: **context** (read by a
+model each session), **docs** (read by a human on GitHub), **scripts** and **tests** (where the one
+rename this repo has done deliberately *kept* the old name as attribution), and **history** (counted,
+never rewritten — the published-record rule). It also splits each layer into **link text** and
+**prose**, because those are two different decisions: the link target already carries the id, so the
+text beside it is reading aid, while a name in prose is the content itself.
+
+**It is a tool, not a gate, and that was decided rather than defaulted into** (August 13, 2026). A
+check matching on names is the shape this repo has already been bitten by — the name-matching
+candidate measured for the entry-format check produced six findings, all six false. Worse, Sean →
+Sebastian (`a437df9`, July 22, 2026) deliberately left mentions standing, so a gate would need an
+exemption list holding exactly what that rename decided to keep. **A gate that is argued with is a
+gate that gets switched off.** This one prints; the reader decides.
+
+**The measurement that made it worth building:** a rename's cost is not uniform. Measured with the
+script itself, against the tree as it stood before the branch that added it, Chris had **179** live
+mentions across 59 files against Sebastian's **46** across 18 — a factor of four. Nothing before this
+could tell you that number *before* you started.
+
+**The same pass answered the question that prompted it**, which was whether the name in a link should
+become the id (`[#16]`) or the filename (`[06-16-extension]`) so a rename would need no edit there.
+Three measurements against that same tree said no:
+
+| | |
+|---|---|
+| link text is a small share | **97 of 1,291** live mentions — 7.5%, so it reaches a fourteenth of the problem |
+| `#16` is already taken | **2,404** `#nnn` references outside `releases/` and `CHANGELOG.md`; `#12` is both Gwen and a PR number |
+| the filename form costs more | 88 link texts of the form `[Name #NN]` average **10.3** characters against 15 for `<gg>-<ii>-extension` — **+46%**, in files loaded every session |
+
+And roughly a quarter of those link texts are grammatically part of the sentence
+(`[Rendall #06](…)'s domain`, `[Tessa #16](…) guards the split`), where a bare id or filename reads as
+a file doing a person's work.
+
 ## The team here
 
 Small and maintenance-focused. Chris leads; the rest executes.
