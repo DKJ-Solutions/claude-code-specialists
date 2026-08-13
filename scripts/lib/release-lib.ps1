@@ -195,8 +195,8 @@ function Test-ReleaseBumpEarned {
                         audience is what a patch is for (Dave, August 7, 2026). This used to refuse
                         outright, on the grounds that such a release "has nobody to announce it to";
                         the answer is that it announces nothing, which is allowed.
-          minor         at least one entry of TIER 1 or higher -- something a colleague on this project
-                        or a consumer gets out of it. It used to demand a tier-2 entry, so tier-1 work
+          minor         at least one entry of TIER 1 or higher -- something an audience beyond this
+                        repo's own developers gets out of it. It used to demand a tier-2 entry, so tier-1 work
                         earned only a patch. Loosened deliberately: the version here speaks to all
                         stakeholders, not to consumers alone. What keeps it honest is that the DOCUMENTS
                         follow the tier and not the bump -- a tier-1-only minor writes the internal note

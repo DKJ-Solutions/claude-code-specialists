@@ -604,8 +604,8 @@ $(($malformed | ForEach-Object { "  $_" }) -join "`n")
 
 The tiers are how far a change reaches, and the release cut reads them:
   0   only this repo's own developers notice (docs, config, internal work)
-  1   a colleague working on this project gets something out of it
-  2   a consumer of the product notices it
+  1   management and the employer/commissioner get something out of it
+  2   a subscriber of the service notices it
 
 The significance is how much it weighs for that reader, and decides where in the document it sits:
 $((Format-EntrySignificanceRubricLines) -join "`n")

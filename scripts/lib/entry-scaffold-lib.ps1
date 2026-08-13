@@ -215,15 +215,20 @@ function Get-EntryTextOutsideFences {
 #
 # 'Tier: N' declares how far an entry reaches. It was superseded by the impact table below on the day it
 # shipped and is kept because every entry written before that carries it; it is also the FIRST key the fold
-# orders CHANGELOG.md's flat list on, since August 5, 2026. The ladder (Dave, August 5, 2026):
+# orders CHANGELOG.md's flat list on, since August 5, 2026. The ladder as it stood then (Dave, August 5,
+# 2026 -- tiers 1 and 2 REDEFINED on August 12, 2026 by the ONE AUDIENCE TIER block below, which wins
+# wherever the two disagree):
 #
 #   Tier 0 -- nobody outside this repo's own developers notices. Docs, config, repo-internal work.
-#   Tier 1 -- a colleague working on this project gets something out of it.
-#   Tier 2 -- a consumer of the product notices it.
+#   Tier 1 -- then "a colleague working on this project"; NOW management and the employer/commissioner.
+#             A colleague maintaining the repo is tier 0's audience, not tier 1's.
+#   Tier 2 -- then "a consumer of the product"; NOW the subscriber of a service. The webshop worked
+#             example separates them: its customers buy a product and never read a release note, so the
+#             old wording sent that repo to 2 and the current model sends it to 1.
 #
-# CUMULATIVE, NOT THREE BOXES: tier 2 implies tier 1, so a tier-2 entry appears in both the internal
-# note and the consumer document. That is what keeps 'tier' one axis of impact instead of three categories
-# somebody has to choose between.
+# The ladder was CUMULATIVE then -- tier 2 implied tier 1, so a tier-2 entry appeared in both documents.
+# Since August 12, 2026 no tier implies another; the cumulative reading survives only in entries written
+# before that date, which every parser here must still read.
 #
 # THE LABEL IS NOT REPO-OWNED, unlike the four scaffold strings above, and that is deliberate rather
 # than an omission. 'Tier:' is a machine-read metadata key -- the same class as the 'Plugins:' line
@@ -635,19 +640,24 @@ $script:EntrySignificanceWordingDefaults = [ordered]@{
     # briefly "leave tier 1 and 2 empty" -- and that second wording contradicted the tier guidance below,
     # which asked for a reason and an N/A. One instruction per case: an unreached tier is ANSWERED, because
     # a blank cannot be told apart from an unfinished one and the gate has to tell those apart.
+    # THE QUESTIONS STATE THE POST-#620 DEFINITION (inbound #640, August 13, 2026). They used to ask about
+    # "colleagues and employers" (tier 1) and "customers and users" (tier 2) -- the pre-#620 ladder, which
+    # inverts the answer for exactly the case the audience model is built on: a webshop's customers are
+    # literally "customers and users", yet its audience is 1, because they buy a product and never read a
+    # release note. One consumer answered the knob wrong from these strings before they were repaired.
     Route0 = @(
-        'Is this change also relevant to colleagues and employers? Then continue to Tier 1.',
+        'Is this change also relevant to management and the employer/commissioner? Then continue to Tier 1.',
         'If not, say so there in one line and put N/A in its Score.'
     )
     Route1 = @(
-        'Is this change also relevant to customers and users? Then continue to Tier 2.',
+        'Is this change also relevant to a subscriber of the service? Then continue to Tier 2.',
         'If not, say so there in one line and put N/A in its Score.'
     )
     # The two openers of the template's commented-out tiers. Template-only prose, kept beside the questions
     # they follow rather than inside Add-TemplateTierPrompt, so a repo that translates the form translates
     # all of it from one place.
-    Uncomment1 = 'UNCOMMENT Tier 1 if colleagues and employers get something out of this change.'
-    Uncomment2 = 'UNCOMMENT Tier 2 as well if a consumer of the product notices it.'
+    Uncomment1 = 'UNCOMMENT Tier 1 if management and the employer/commissioner get something out of this change.'
+    Uncomment2 = 'UNCOMMENT Tier 2 as well if a subscriber of the service notices it.'
 }
 
 # RECOGNISED, NEVER WRITTEN -- the one-line forms of the two questions above, as they stood for the day
@@ -657,7 +667,11 @@ $script:EntrySignificanceWordingDefaults = [ordered]@{
 # every other historical string here -- a repo that translated the questions translated the CURRENT ones.
 $script:EntrySignificanceRetiredRoutes = @(
     'Is this change also relevant to colleagues and employers? Then continue to Tier 1. If not, stop here and move on to the next section.',
-    'Is this change also relevant to the people who consume this product? Then continue to Tier 2. If not, stop here and move on to the next section.'
+    'Is this change also relevant to the people who consume this product? Then continue to Tier 2. If not, stop here and move on to the next section.',
+    # The pre-#640 first lines (retired August 13, 2026): they carried the pre-#620 audience definition.
+    # Their second line is unchanged and still current, so only the questions themselves retire here.
+    'Is this change also relevant to colleagues and employers? Then continue to Tier 1.',
+    'Is this change also relevant to customers and users? Then continue to Tier 2.'
 )
 
 $script:EntryGuidanceDefaults = [ordered]@{

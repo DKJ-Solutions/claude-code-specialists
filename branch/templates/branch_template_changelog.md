@@ -30,7 +30,7 @@
 **Score:**
 
 <!--
-     Is this change also relevant to customers and users? Then continue to Tier 2.
+     Is this change also relevant to a subscriber of the service? Then continue to Tier 2.
      If not, say so there in one line and put N/A in its Score.
 -->
 

@@ -178,8 +178,13 @@ tier says how far the change reaches**, and therefore which release document the
 | tier | who notices |
 |---|---|
 | `0` | only this repo's own developers — docs, config, internal work |
-| `1` | a colleague working on this project gets something out of it |
-| `2` | a consumer of the product notices it |
+| `1` | management and the employer/commissioner get something out of it |
+| `2` | a subscriber of the service notices it |
+
+Tiers 1 and 2 are two **kinds** of audience, not two rungs, and the webshop worked example is what
+separates them: a webshop's customers buy a product and never read a release note, so its audience is `1`
+even though its customers are literally "consumers" — while a repo that IS the service somebody subscribes
+to answers `2`.
 
 **The significance says how much it weighs for that reader**, and therefore where in the list it sits — the
 most consequential change leads instead of sitting wherever its branch prefix happened to put it.
