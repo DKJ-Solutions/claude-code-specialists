@@ -23,6 +23,19 @@ $RECYCLE.BIN/
 # Claude Code — per-gebruiker, niet delen (de gedeelde .claude/settings.json blijft wél in de repo)
 .claude/settings.local.json
 
+# PowerShell's own machine-local caches, which land here when a run resolves its per-user data
+# directory to the repo root instead of %LOCALAPPDATA%. Microsoft/Windows/PowerShell/ModuleAnalysisCache
+# was committed by accident in 65902dd; PowerShell REWRITES it in place on almost every run, so a tracked
+# copy dirties the working tree continuously -- and cut-release.ps1 refuses to run on a dirty tree, which
+# blocked the v4.6.0 cut TWICE (restored by hand both times). Untracked on August 13, 2026; the file
+# itself stays on disk, since it is PowerShell's to write.
+#
+# The whole /Microsoft/ tree is ignored rather than that one path, because the cause is the redirected
+# directory rather than the file: PowerShell writes startup-profile data as a sibling under the same
+# root. Anchored with a leading slash, so this can never silence a legitimately-named folder deeper in
+# the tree.
+/Microsoft/
+
 # The locked next topic (/lock -> /clear -> /continue). Deliberately NOT committed: it is one
 # developer's working intent, it goes stale within hours, and all three commands run on one machine
 # within minutes -- committing it would mean a pull request per session close.
