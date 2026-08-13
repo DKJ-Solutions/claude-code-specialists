@@ -11,7 +11,6 @@
 - [x] Code review (Victor) + copy edit (Edith) on the diff
 - [x] Repair the three defects review found, and re-measure every figure the docs claim
 - [x] Run the lint gate and the full suites
-- [ ] PR, merge, fold
 - [~] Mirror the script into the plugin -- dropped for this branch. It is repo-owned until it has
       been used at a real rename; sharing an unproven tool is how a mirror earns maintenance it has
       not paid for.
