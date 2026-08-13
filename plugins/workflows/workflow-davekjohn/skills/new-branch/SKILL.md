@@ -101,6 +101,24 @@ kept on the line — that third mark exists so nobody is ever pushed into tickin
 not do. There is no `-Force`. Full convention and reasoning: the `open-pr` skill, and the source repo's
 [`branch/README.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/branch/README.md).
 
+**So work that happens AFTER the merge is not a step** — opening the PR, waiting for CI, merging, folding,
+publishing a Release, any measurement that only exists once the run is over. Put it under
+`### Where I left off`, which is what that section is for. The reason is the gate's own timing rather than
+a matter of taste: it reads the list *before* the push, so a post-merge step cannot be done yet, and
+**neither mark fits** — `- [x]` reports work that has not happened, `- [~]` claims the step turned out not
+to be needed when it is needed and merely comes later. The only way past the gate is to tick a box for
+work you did not do, which is the failure the third mark exists to prevent, arriving through the front
+door.
+
+Measured in the source repo across the 105 branches that have carried a step list: **17** wrote a
+post-merge step, **4** were blocked by it, and **14** ticked it in advance — provably in advance, since
+the fold *resets* this file at the merge. One branch is in both counts: it hit the gate on
+`- [ ] Lint + tests green, then PR + merge + fold`, and its next commit changed nothing but that box to
+`- [x]`. **No gate enforces this and none should**: a check would have to spot a post-merge step by its
+wording, and `open-pr`, `merge` and `fold` are also the subjects of ordinary steps (*"`open-pr.ps1`:
+recognise the new placeholder"* is real work), so separating them needs an exclusion list. Run the same
+count over your own branches if you want to know whether it bites here too.
+
 ## The entry declares its Significance, one section per tier
 
 Under `### Significance` the entry gets a `#### Tier N` sub-section for each of the three reaches, each
