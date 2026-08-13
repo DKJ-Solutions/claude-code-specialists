@@ -98,8 +98,8 @@ untouched entry *and* one whose prompt was deleted rather than answered.
 **The step list is enforced, not decorative.** `open-pr` refuses to push and `ship-pr` refuses to merge
 while anything is still `- [ ]`. Resolve each step as `- [x]` done or `- [~]` dropped, with the reason
 kept on the line — that third mark exists so nobody is ever pushed into ticking a box for work they did
-not do. There is no `-Force`. Full convention and reasoning: the `open-pr` skill, and the source repo's
-[`branch/README.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/branch/README.md).
+not do. There is no `-Force`. Full convention and reasoning: the `open-pr` skill, and
+[`BRANCH-portable.md`](../../BRANCH-portable.md), which travels with this plugin.
 
 **So work that happens AFTER the merge is not a step** — opening the PR, waiting for CI, merging, folding,
 publishing a Release, any measurement that only exists once the run is over. Put it under

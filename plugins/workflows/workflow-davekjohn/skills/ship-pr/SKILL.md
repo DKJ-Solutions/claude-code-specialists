@@ -86,7 +86,7 @@ The six steps, stopping on the first failure:
    through that valve, by hand on github.com, or days ago and resumed here would otherwise land with an
    unfinished plan. Checked against the working copy at this moment rather than trusted from step 1, and
    there is no `-Force` for it: `- [~] dropped -- <why>` is the way past a step that should not be done.
-   The three marks are in the `open-pr` skill and in the source repo's `branch/README.md`.
+   The three marks are in the `open-pr` skill and in [`BRANCH-portable.md`](../../BRANCH-portable.md).
    See [The merge method is repo policy](#the-merge-method-is-repo-policy).
 5. **Check out the main branch, fast-forward, and fold** — handed to `fold-changelog-entry.ps1 -Push`,
    which folds the entry, commits it and pushes it. See

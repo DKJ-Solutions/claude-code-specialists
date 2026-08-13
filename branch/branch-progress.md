@@ -1,13 +1,16 @@
-# `main` progress
-
-
-> **You are on `main`.** Do not work in this file yet -- create a branch first.
-> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
-> of the next person who does create one.
-
-This file carries the step list of the branch you are on. It is written when a branch is created
-and returns to this state after the merge.
+## `feat/branch-portable` progress
 
 ### Steps
 
-_(filled in when a branch is created)_
+- [x] Verify the request's shape against the tree (PR cycle already portable; branch/README.md the gap)
+- [x] `BRANCH-portable.md` created in the plugin from branch/README.md, with the RELEASES-portable reading rule
+- [x] Portable adaptations: own-file links to code names, script links absolute, cross-references to the portable siblings, "where this README is not" rephrased
+- [x] `branch/README.md` reduced to the local half with a pointer head (CONTRIBUTING.md model)
+- [x] References repointed: CLAUDE.md, CONTRIBUTING.md, plugin README, CONTRIBUTING-portable.md, new-branch + ship-pr skills
+- [x] Lint gate green; entry-scaffold, check-plugin-integrity, new-branch and pr-body suites green
+- [x] Changelog entry written and scored
+
+### Where I left off
+
+After the merge: the portable family is complete (CONTRIBUTING, RELEASES, BRANCH). The session's four
+inbound issues (#640, #643, #644, #646) are all closed by merged PRs.

@@ -32,10 +32,10 @@ built from one we are merely unconvinced by, which six kinds of question are not
 in a heading is always false. Rules only, no template — it comes from one repo and one day, which the page
 says out loud.
 
-The full reasoning — the tier ladder, why the fold rewrites nothing, what a release must earn — lives in
-the source repo's [`releases/README.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/releases/README.md)
-and [`branch/README.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/branch/README.md),
-both of which you already have: the marketplace source is a git clone of the whole repository.
+The full reasoning — the tier model, why the fold rewrites nothing, what a release must earn — ships with
+this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release workflow and
+[`BRANCH-portable.md`](BRANCH-portable.md) for the two branch files, beside
+[`CONTRIBUTING-portable.md`](CONTRIBUTING-portable.md) for the cycle that connects them.
 
 ## What is in this folder
 
