@@ -41,8 +41,9 @@ Creating the branch writes both of its working files, so **a branch is never ent
 **Fixed names, not one per branch.** Git already tracks them per branch, so branches in flight cannot
 collide. On the trunk both sit in an empty **reset state** carrying a warning not to write there until a
 branch exists — that state opens with an `#`, which is exactly what stops the fold mistaking it for an
-entry. Your repo's `branch/README.md` is where that convention is spelled out for your contributors, and
-`new-branch` keeps reference copies beside them in `branch/templates/`, refreshing one that has drifted
+entry. The full convention is spelled out in [`BRANCH-portable.md`](BRANCH-portable.md), which travels
+with this plugin; your repo's own `branch/README.md` holds its answers to it, and
+`new-branch` keeps reference copies in `branch/templates/`, refreshing one that has drifted
 from the current format.
 
 **The branch name is validated by your own lib, not by the plugin.** `new-branch` calls

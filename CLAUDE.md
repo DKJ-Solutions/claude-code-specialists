@@ -348,7 +348,9 @@ The constitution above, concretely implemented here:
   turned out not to be needed is to tick it, which teaches people to report work they did not do — a
   gate that then says success is worse than no gate. **A branch with no step list at all is not
   refused**: that is the one-commit typo fix, and refusing it would make the mechanism ceremony. The
-  full convention lives in [`branch/README.md`](branch/README.md).
+  full convention ships with the plugin as
+  [`BRANCH-portable.md`](plugins/workflows/workflow-davekjohn/BRANCH-portable.md); this repo's own
+  answers to it stay in [`branch/README.md`](branch/README.md).
 - **Two deliberate exceptions to "never directly on `main`":**
   1. The **fold commit** after a merge: [`fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)
      folds the entry into `CHANGELOG.md` and clears it, and with `-Commit`/`-Push` makes that
