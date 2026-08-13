@@ -35,10 +35,16 @@ jobs:
       # holds two cores back so a developer's machine stays usable while it runs; a GitHub runner has
       # nobody sitting at it and only four cores, so that reservation would cost half the box. The
       # knowledge of which kind of machine this is lives here, not in the lib.
+      # repo-config.ps1 IS DOT-SOURCED HERE TOO (inbound #644): the gate reads the optional
+      # Get-TestCommands from it, and open-pr and cut-release have it in scope from their own
+      # dot-source. Leaving it out here would make CI -- the one caller that actually blocks the
+      # merge -- the one gate that cannot see a repo's extra test commands, silently. Guarded,
+      # because this workflow may be copied into a repo that has no repo-config yet.
       - name: Test suites (scripts/tests/*.tests.ps1)
         shell: powershell
         run: |
           . ./scripts/lib/native-capture-lib.ps1
+          if (Test-Path ./scripts/repo-config.ps1) { . ./scripts/repo-config.ps1 }
           $gateOk = Invoke-TestSuiteGate -TestsDir ./scripts/tests -Context 'CI' -MaxParallel ([Environment]::ProcessorCount)
           if (-not $gateOk) { exit 1 }
           exit 0

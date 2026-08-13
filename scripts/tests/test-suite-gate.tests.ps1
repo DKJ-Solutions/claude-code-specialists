@@ -275,6 +275,20 @@ Write-Host "GATE-RESULT: `$r"
     Assert-True ($r.Text -match 'GATE-RESULT: True') 'commands-only: a missing suites dir does not skip the gate'
     Assert-True ($r.Flat -notmatch 'test gate skipped') 'and it does not claim to have skipped'
     Assert-True ($r.Text -match 'test gate: all 1 suites passed in \d') 'the verdict counts the one command'
+
+    # The two silent-success shapes the judging suffix exists to close (found in review). A bare
+    # 'exit $LASTEXITCODE' coerced both to exit 0: the pure-PowerShell failure sets no native exit
+    # code at all, and the unterminated quote swallowed the suffix into its own string literal.
+    $cmdPsFail = Join-Path $Fixture 'commands-psfail.txt'
+    [System.IO.File]::WriteAllText($cmdPsFail, "Write-Error 'red but native-exit-code-less'`r`n", $Utf8NoBom)
+    $r = Invoke-Gate -TestsDir $ok -CommandsFile $cmdPsFail
+    Assert-True ($r.Text -match 'GATE-RESULT: False') 'a pure-PowerShell failure with no native exit code still fails the gate'
+
+    $cmdNoParse = Join-Path $Fixture 'commands-noparse.txt'
+    [System.IO.File]::WriteAllText($cmdNoParse, "Write-Host `"unterminated`r`n", $Utf8NoBom)
+    $r = Invoke-Gate -TestsDir $ok -CommandsFile $cmdNoParse
+    Assert-True ($r.Text -match 'GATE-RESULT: False') 'a command that does not parse is refused, not run truncated'
+    Assert-True ($r.Text -match 'FAILED \(does not parse') 'and the header says why'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

@@ -20,15 +20,21 @@ globbed `scripts\tests\*.tests.ps1` and nothing else, while both callers describ
 suites green"* — true in this repo, whose suites are all PowerShell, and an overstatement in the
 reporting consumer, whose 4 PowerShell suites sit beside 605 Vitest tests the gate never saw. The
 release route is where that bites: it is the one route with no later gate that can still stop
-anything, since CI fires only after the tagged commit is pushed, against a tag this repo's own rules
-say is not rewritten.
+anything, since CI fires only after the tagged commit is pushed — a commit this repo's own rules say
+is not rewritten.
 
 The seam is the optional `Get-TestCommands` in `scripts/repo-config.ps1`: extra command lines (an
 `npm test`, a `pytest`) the gate runs alongside the suites, each as its own child with the native exit
 code propagated, a non-zero exit failing the gate exactly like a failing suite. It is read **inside**
-the shared gate function rather than at the call sites — both callers dot-source `repo-config.ps1`
-before the gate runs — so `open-pr`'s gate and the cut's gate cannot drift into checking different
-things, which is the function's founding rule. The default is none: a repo that states nothing keeps
+the shared gate function rather than at the call sites, so the gates cannot drift into checking
+different things — and the callers are **three**, not two, which the pre-PR review caught: `open-pr`
+and `cut-release` have `repo-config.ps1` in scope from their own dot-source, while `ci.yml` — the one
+caller that actually blocks a merge — dot-sourced only the gate lib and would have been the one gate
+that could not see the commands, silently. CI now dot-sources `repo-config.ps1` too, guarded for a
+repo that has none. The same review hardened the judging: a command that does not parse is refused
+rather than run truncated, and a pure-PowerShell entry that fails without setting a native exit code
+(`Write-Error` and stop) fails the gate via `$?` instead of coercing to exit 0. The default is none: a
+repo that states nothing keeps
 exactly yesterday's gate, and a repo whose whole suite is `Get-TestCommands` (no `scripts\tests` at
 all) now runs a real gate instead of a skipped one. The contract gains the record (`Adopt = 'decide'`:
 which commands test a repo is a fact about its stack no script can read), the blueprint artefact is

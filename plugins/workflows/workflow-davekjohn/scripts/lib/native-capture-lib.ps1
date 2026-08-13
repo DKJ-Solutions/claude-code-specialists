@@ -108,9 +108,13 @@ function Invoke-TestSuiteGate {
 
         The seam is the optional Get-TestCommands in scripts/repo-config.ps1: extra command lines to run
         alongside the suites (e.g. 'npm test'), defaulting to none, so an unadopting repo keeps exactly
-        yesterday's gate. IT IS READ HERE AND NOT AT THE CALL SITES, deliberately: both callers dot-source
-        repo-config before they call this, and a seam read once in the shared gate cannot leave the two
-        gates checking different things -- which is this function's founding rule, stated above. The
+        yesterday's gate. IT IS READ HERE AND NOT AT THE CALL SITES, deliberately: a seam read once in
+        the shared gate cannot leave the gates checking different things -- which is this function's
+        founding rule, stated above. THE CALLERS ARE THREE, NOT TWO, and each must have dot-sourced
+        repo-config before calling this: open-pr and cut-release do so for their other seams, and
+        ci.yml does so explicitly for this one -- it dot-sources only this lib otherwise, and without
+        that line the required merge-blocking check would be the one gate that cannot see the repo's
+        own commands, silently. The
         commands run SEQUENTIALLY, after the parallel pool: their runtimes and internal parallelism are
         their own (npm test manages its workers itself), and sequential output needs no capture files to
         stay attributable. Each runs as its own powershell child with the caller's location, exit code
@@ -273,12 +277,27 @@ function Invoke-TestSuiteGate {
     if ($extraCommands.Count -gt 0) {
         Write-Host "test gate: running $($extraCommands.Count) repo test command(s) from Get-TestCommands for $Context (one at a time)..." -ForegroundColor Cyan
         foreach ($cmd in $extraCommands) {
+            # A command that does not PARSE is refused rather than run: an unterminated quote would
+            # swallow the judging suffix below into its string literal, and the truncated statement's
+            # own exit code (usually 0) would stand -- the wrong answer arriving as a plausible value,
+            # this file's own failure family (see the .Handle comment above).
+            $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseInput($cmd, [ref]$null, [ref]$parseErrors)
+            if ($parseErrors -and $parseErrors.Count -gt 0) {
+                Write-Host "== $cmd == FAILED (does not parse: $($parseErrors[0].Message))" -ForegroundColor Red
+                $failedNames.Add($cmd) | Out-Null
+                continue
+            }
             # A child powershell rather than in-process invocation: the command line stays an opaque
-            # string ('npm test', a script call, anything), its noise cannot trip this scope's EAP, and
-            # the trailing exit makes the child's exit code the command's own rather than powershell's
-            # did-it-parse verdict.
+            # string ('npm test', a script call, anything) and its noise cannot trip this scope's EAP.
+            # The judging suffix starts on its OWN LINE, so a trailing comment in the command cannot
+            # absorb it, and it judges both halves a command can fail in: a native exit code where one
+            # was set, and $? where none was -- a pure-PowerShell entry ending in a non-terminating
+            # Write-Error sets no $LASTEXITCODE at all, and a bare 'exit $LASTEXITCODE' would have
+            # coerced that to exit 0, a green gate over a red command.
+            $judge = '$__gateOk = $?; if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; if (-not $__gateOk) { exit 1 }; exit 0'
             $r = Invoke-NativeCapture -FilePath 'powershell' -Arguments @(
-                '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', ($cmd + '; exit $LASTEXITCODE'))
+                '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', ($cmd + "`n" + $judge))
             if ($r.ExitCode -eq 0) {
                 Write-Host "== $cmd ==" -ForegroundColor Cyan
             } else {

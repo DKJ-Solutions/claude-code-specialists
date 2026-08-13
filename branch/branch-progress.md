@@ -12,8 +12,12 @@
 - [x] Mirrors updated byte-for-byte (native-capture-lib, script-contract-lib, cut-release, open-pr)
 - [x] Affected suites green (test-suite-gate, script-contract, config-blueprint, cut-release-guardrail, shared-scripts)
 - [x] Changelog entry written and scored
+- [x] Review findings resolved: ci.yml dot-sources repo-config (the third caller), parse-refusal + `$?` judging for commands, the two "needs no config" claims corrected, paragraph order and wording fixes
 
 ### Where I left off
 
-After the merge: close inbound #644 with the evidence. Then inbound #646 (RELEASES-portable.md) is the
-last open issue — its checklist builds on #643's repairs to the same page.
+After the merge: close inbound #644 with the evidence. Then inbound #646 (RELEASES-portable.md), whose
+checklist builds on #643's repairs to the same page. After #646: the BRANCH-portable (Dave, August 13,
+2026) — the same portable/local split applied to branch/README.md, whose dossier convention is the one
+piece of the PR workflow that does not travel; deliberately NOT a PR-portable, because the PR cycle
+itself already travels in CONTRIBUTING-portable.md §§3-5.

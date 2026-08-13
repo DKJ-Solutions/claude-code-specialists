@@ -329,12 +329,6 @@ of them run **before the first file is written**, deliberately: failing after th
 leave a release half-cut on `main` — and for the test gate this is the last moment a red suite can still
 stop anything, because CI fires only after the tagged commit is already pushed.
 
-**And so is the test gate: the `*.tests.ps1` suites in `scripts/tests`, plus whatever the optional
-`Get-TestCommands` names** — extra command lines (an `npm test`, a `pytest`) for a repo whose tests are not
-all PowerShell, each failing the gate exactly like a failing suite. The seam is read inside the one shared
-gate function, so the PR gate and the release gate cannot drift into checking different things; a repo that
-states nothing keeps exactly the gate it had.
-
 **The lint gate is *your* repo's, read from `Get-LintScript` — the same seam `open-pr` uses.** This route
 needs its own gate precisely because it does not travel via a PR, so nothing else on it ever meets that
 copy. Until August 5, 2026 the cut resolved the gate by a fixed path to the script the *source* repo
@@ -342,6 +336,12 @@ happens to carry, which meant every consumer release ran with no gate at all and
 (inbound [#464](https://github.com/DaveKJohn/claude-code-specialists/issues/464)). **A gate the seam names
 but the tree does not have is a hard stop**, not a warning: skipping it is `-SkipLint`, and that choice
 belongs in the command rather than in output that scrolls past.
+
+**And so is the test gate: the `*.tests.ps1` suites in `scripts/tests`, plus whatever the optional
+`Get-TestCommands` names** — extra command lines (an `npm test`, a `pytest`) for a repo whose tests are not
+all PowerShell, each failing the gate exactly like a failing suite. The seam is read inside the one shared
+gate function, so the PR gate and the release gate cannot drift into checking different things; a repo that
+states nothing keeps exactly the gate it had.
 
 The pure logic (version bump, CHANGELOG transformation, notes construction, and the bump rules in
 `Test-ReleaseBumpEarned`) lives in

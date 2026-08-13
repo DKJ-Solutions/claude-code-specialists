@@ -38,8 +38,9 @@ function Get-RepoBlobUrl {
 
 # This repo's lint gate, repo-root-relative. open-pr.ps1 runs this before the PR. This is the
 # only repo-specific part of open-pr: every consumer has its own lint (the workshop
-# check-plugin-integrity, a Brains repo e.g. lint-brain). The test gate is pure convention
-# (scripts/tests/*.tests.ps1) and needs no config.
+# check-plugin-integrity, a Brains repo e.g. lint-brain). The test gate runs the convention
+# (scripts/tests/*.tests.ps1) plus whatever the optional Get-TestCommands names (inbound #644);
+# this repo deliberately defines none -- its suites are all PowerShell, so the convention IS the gate.
 $script:LintScript = 'scripts\lint\check-plugin-integrity.ps1'
 
 function Get-LintScript {
