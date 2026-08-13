@@ -1,21 +1,13 @@
-## `docs/v4-7-0-release-note` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] Rewrite the *For consumers* section from the cut's draft against the seven writing tests: second
-      person, most urgent first, and say plainly whether the reader must act
-- [x] Author *What it is worth* with step 0a's first timing pass — clock start, the legs readable from
-      timestamps, the frozen subtotal, and which of them blocked a person
-- [x] Author *What was still open at this release* as a snapshot, past tense
-- [x] Check no link points into `releases/development/` or `releases/internal/` (lint check 25)
-
-### Where I left off
-
-The document is written and the branch is ready for its gates. Everything remaining happens after the
-merge and is therefore not a step above: opening the PR, waiting for `lint-en-tests`, merging, folding
-the entry, then publishing the GitHub Release for `v4.7.0` (step 5 — the generated body is
-`releases/github/4.x/4.7.0.md`, with the development notes and this document attached under unique
-filenames).
-
-After the publish, step 0a's second pass follows in its own small pull request: the end-to-end total,
-which cannot exist until the Release is public.
+_(filled in when a branch is created)_
