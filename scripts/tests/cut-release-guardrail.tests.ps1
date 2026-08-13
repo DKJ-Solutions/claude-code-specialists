@@ -213,7 +213,16 @@ Assert-True ($cutReleaseCode -match 'Get-ReleaseNoteRoot') 'the note root comes 
 # keeps this change invisible to every repo that does not repoint it. So the assert is on the COUNT and
 # on where that one occurrence sits: a second use is a path built by hand behind the seam's back, which
 # would read as adopted while changing nothing.
-$noteRootLiteralLines = @($cutReleaseCode -split "`n" | Where-Object { $_ -match 'releases/notes' })
+#
+# BOTH SLASH SPELLINGS, and that widening is the transferable half of this file. This matched
+# 'releases/notes' alone until August 13, 2026, and it was CORRECT and PASSING while the note's own
+# directory was built from "releases\notes\$notesDirName" twenty lines below the write -- a third escape
+# of the same seam, invisible here purely because PowerShell accepts a backslash in a path literal.
+# Verified RED against that line before being trusted: with the backslash form matched, the count came to
+# 2 and the second line carried no -Default. The lesson is the one this repo keeps paying for -- a matcher
+# that knows one spelling while the code uses another reads as thorough and sees nothing -- so match the
+# separator as a CLASS rather than adding a third assert per spelling somebody thinks of next.
+$noteRootLiteralLines = @($cutReleaseCode -split "`n" | Where-Object { $_ -match 'releases[\\/]notes' })
 Assert-True ($noteRootLiteralLines.Count -eq 1) 'the default note root is written exactly once in the code'
 Assert-True ($noteRootLiteralLines.Count -eq 1 -and $noteRootLiteralLines[0] -match '-Default') `
     'and that one occurrence is the seam default, not a path built behind the seam'
