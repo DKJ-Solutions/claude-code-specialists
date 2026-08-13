@@ -208,10 +208,12 @@ foreach ($rec in @($bp.records | Where-Object { $_.declared -and $_.text })) {
     }
 }
 
-# The source leaves two contract functions at the built-in fallback. Recorded as declared=false with no
-# text rather than dropped, because "this repo does not state it either" is an answer.
+# The source leaves three contract functions at the built-in fallback (the two impact-table seams, and
+# Get-TestCommands since inbound #644 -- this repo's suites are all PowerShell). Recorded as
+# declared=false with no text rather than dropped, because "this repo does not state it either" is an
+# answer.
 $undeclared = @($bp.records | Where-Object { -not $_.declared })
-Assert-Equal 2 $undeclared.Count 'the two functions the source itself leaves at the fallback are recorded, not dropped'
+Assert-Equal 3 $undeclared.Count 'the three functions the source itself leaves at the fallback are recorded, not dropped'
 foreach ($rec in $undeclared) {
     Assert-Equal '' $rec.text "$($rec.function): an undeclared record carries no text to copy"
 }

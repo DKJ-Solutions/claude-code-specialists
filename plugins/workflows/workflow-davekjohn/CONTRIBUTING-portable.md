@@ -120,7 +120,10 @@ Before anything is pushed the script runs two gates:
 
 - **your lint gate**, whose path your repo declares in `Get-LintScript` (`scripts/repo-config.ps1`). Every
   repo has a different one, and this is the only repo-specific part of `open-pr`;
-- **the test gate** — every `scripts/tests/*.tests.ps1`. That one is pure convention and needs no config.
+- **the test gate** — every `scripts/tests/*.tests.ps1`, plus whatever the optional `Get-TestCommands` in
+  your `scripts/repo-config.ps1` names (an `npm test`, a `pytest`) for a repo whose tests are not all
+  PowerShell. Each command fails the gate exactly like a failing suite; a repo that states nothing keeps
+  the bare convention.
 
 On an error or a failing suite nothing is pushed and no PR is opened. If your repo also runs those gates as
 CI, the merge waits on whatever status check your branch protection requires; both the workflow and the

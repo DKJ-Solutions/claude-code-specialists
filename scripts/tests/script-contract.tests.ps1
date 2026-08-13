@@ -203,7 +203,7 @@ try {
     # next to it is the workshop's too, not the fixture's. Its Get-BranchTypes is therefore genuinely not
     # the one this consumer wrote, which is exactly the answer a real consumer needs and exactly what a
     # walk over leaf NAMES would have got wrong.
-    Assert-Match 'Summary: 0 error\(s\), 4 info signal\(s\)' $r.Out 'happy path: [SCOPE] is non-counting (0 errors; the two deliberately-undefined seams, plus two reachability signals -- neither fold-changelog-entry nor new-internal-note can see this consumer''s Get-BranchTypes, which is the ordinary state for a repo that has not chained branch-info.ps1 into its repo-config)'
+    Assert-Match 'Summary: 0 error\(s\), 5 info signal\(s\)' $r.Out 'happy path: [SCOPE] is non-counting (0 errors; the three deliberately-undefined seams -- the two impact-table ones plus Get-TestCommands since inbound #644 -- plus two reachability signals: neither fold-changelog-entry nor new-internal-note can see this consumer''s Get-BranchTypes, which is the ordinary state for a repo that has not chained branch-info.ps1 into its repo-config)'
 
     # --- 2. Missing function in branch-info.ps1 (the exact #147 incident): Test-BranchName ---------
     #     new-branch crashed at runtime with "The term 'Test-BranchName' is not recognized" because
@@ -382,7 +382,7 @@ try {
     Assert-Match ("\[INFO\].*'Get-EntryBodyHeading' missing.*falls back to '" + [regex]::Escape('**To do / where I left off:**') + "'") $r.Out 'stub wording absent: INFO for Get-EntryBodyHeading quotes the literal default heading'
     Assert-Match "\[INFO\].*'Get-EntryFallbackType' missing.*falls back to 'Chore'" $r.Out 'stub wording absent: INFO for Get-EntryFallbackType names the Chore default'
     $infoCount6e = @([regex]::Matches($r.Out, '\[INFO\]')).Count
-    Assert-Equal 8 $infoCount6e 'stub wording absent: exactly eight [INFO] lines -- one per stripped knob, plus the two impact-table seams this repo deliberately never defines (their defaults are already its answers) and the two reachability signals on Get-BranchTypes, and nothing else downgraded along with them. Was eight until the flat changelog retired the superseded Get-ChangelogHeading and Get-ChangelogReleaseWording records, then six until inbound #580 added a record whose seam a consumer leaves unreachable'
+    Assert-Equal 9 $infoCount6e 'stub wording absent: exactly nine [INFO] lines -- one per stripped knob, plus the three seams this repo deliberately never defines (the two impact-table ones and, since inbound #644, Get-TestCommands: their defaults are already its answers) and the two reachability signals on Get-BranchTypes, and nothing else downgraded along with them. Was eight until the flat changelog retired the superseded Get-ChangelogHeading and Get-ChangelogReleaseWording records, then six until inbound #580 added a record whose seam a consumer leaves unreachable, then eight until #644'
 
     # --- 6f. NO CONTRACT RECORD MAY SPELL A REPORT MARKER IN ITS OWN TEXT --------------------------
     #     Measured while adding the tier records: a Returns line that mentioned the info marker made the
@@ -558,7 +558,7 @@ function Get-RosterIgnoredIds { return @() }
 
     $contractSrc = [System.IO.File]::ReadAllText($ContractLib)
     $totalRecordCount = @([regex]::Matches($contractSrc, "Lib\s*=\s*'[^']+';\s*Function\s*=\s*'[^']+';\s*Scripts\s*=\s*@\(")).Count
-    Assert-Equal 26 $totalRecordCount 'contract: exactly twenty-six (lib, function) records declared in script-contract-lib.ps1 (the twenty-five below plus the dedicated Get-LiveStage block after this loop). Was twenty-eight until the flat changelog retired six: both section seams, the live marker, the history mode, the category labels and the release-block wording; Get-BranchTypes joined on August 10, 2026 (inbound #580), Get-ReleaseNoteWording on August 11 (inbound #605) Get-ReleaseNoteRoot on August 12 (inbound #616) and Get-ReleaseAudienceTier the same day (inbound #620, one audience tier per repo)'
+    Assert-Equal 27 $totalRecordCount 'contract: exactly twenty-seven (lib, function) records declared in script-contract-lib.ps1 (the twenty-six below plus the dedicated Get-LiveStage block after this loop). Was twenty-eight until the flat changelog retired six: both section seams, the live marker, the history mode, the category labels and the release-block wording; Get-BranchTypes joined on August 10, 2026 (inbound #580), Get-ReleaseNoteWording on August 11 (inbound #605), Get-ReleaseNoteRoot on August 12 (inbound #616), Get-ReleaseAudienceTier the same day (inbound #620, one audience tier per repo) and Get-TestCommands on August 13 (inbound #644, the test gate runs the repo''s own test commands)'
 
     # Every record must carry a 'Returns' line, so a finding is actionable without any reference to this
     # source repo (Dave, July 28, 2026). Counted against $totalRecordCount rather than listed per record:
@@ -705,7 +705,7 @@ function Get-RosterIgnoredIds { return @() }
     Assert-Equal 0 $r.Code 'skip-reachability: exit-code 0'
     Assert-NotMatch 'NOT IN SCOPE' $r.Out 'skip-reachability: no reachability findings are produced'
     Assert-Match "\[OK\]\s+'Get-BranchTypes' present in" $r.Out 'skip-reachability: the presence half is untouched'
-    Assert-Match 'Summary: 0 error\(s\), 2 info signal\(s\)' $r.Out 'skip-reachability: only the two deliberately-undefined seams remain -- the switch drops the reachability half and nothing else'
+    Assert-Match 'Summary: 0 error\(s\), 3 info signal\(s\)' $r.Out 'skip-reachability: only the three deliberately-undefined seams remain -- the switch drops the reachability half and nothing else'
 
     $fixtureConfig = Join-Path $c 'scripts\repo-config.ps1'
     [System.IO.File]::AppendAllText($fixtureConfig, "`r`n. (Join-Path `$PSScriptRoot 'lib\branch-info.ps1')`r`n")

@@ -125,6 +125,17 @@ $script:ContractRecords = @(
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-LintScript';  Scripts = @('open-pr', 'cut-release');
        Adopt = 'decide'; AdoptWhy = 'it names a file that exists only in this repo. Every consumer has its own lint, and a cut REFUSES when the file named here is absent -- so a copied value turns the gate into a blocker';
        Returns = 'the repo-root-relative path to the lint script that runs before a PR and before a release cut; a release refuses to cut when the file it names is absent, since a gate that skips itself is not a gate' },
+    # THE TEST GATE'S OWN SEAM (inbound #644, August 13, 2026). The gate globbed scripts\tests\*.tests.ps1
+    # and nothing else, while both callers call it "all test suites green" -- an overstatement in any repo
+    # whose stack is not all PowerShell (the reporting consumer: 4 PowerShell suites beside 605 Vitest
+    # tests, of which the gate saw the first number only). Read INSIDE Invoke-TestSuiteGate rather than at
+    # the call sites, so open-pr's gate and the cut's gate cannot drift into checking different things --
+    # the function's founding rule. The release route is where the gap bites: it is the one route with no
+    # later gate that can still stop anything, since CI fires after the tag is pushed.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-TestCommands'; Scripts = @('open-pr', 'cut-release');
+       Adopt = 'decide'; AdoptWhy = 'which commands test this repo is a fact about its stack that no script can read from the tree. The source answers none (its suites are all PowerShell, and the gate already runs those); copying that none into a repo with an app layer leaves the release gate blind to exactly the tests that layer needs';
+       Optional = $true; Default = 'no extra commands -- the *.tests.ps1 suites in scripts/tests are the whole gate, unchanged from before the seam existed';
+       Returns = "extra command lines the test gate runs alongside the *.tests.ps1 suites, e.g. @('npm test') -- each runs as its own child with the exit code propagated, and a non-zero exit fails the gate exactly like a failing suite" },
     # OPTIONAL SINCE AUGUST 4, 2026, and the reason is a shape rather than a preference (inbound #445).
     # Measured across this table that day: 6 of 23 entries were required, and four of those six serve a
     # script the consumer INVOKES -- Get-BranchInfo, Test-BranchName, Get-RepoName, Get-LintScript. Don't
