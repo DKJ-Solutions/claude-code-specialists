@@ -338,7 +338,8 @@ repo itself, which consumes itself) only pulls in merged changes after the `vers
 bumped — a merge without a release stays invisible to consumers, and a shared agent-def change
 therefore always lands here first, never the other way around. The full mechanics — cutting a
 release, the three release documents, the lint guardrails — are in
-[`releases/README.md`](releases/README.md#cutting-a-release).
+[`RELEASES-portable.md`](plugins/workflows/workflow-davekjohn/RELEASES-portable.md#cutting-a-release),
+with this repo's own answers and release list in [`releases/README.md`](releases/README.md).
 
 ## Manuals — the split model
 
@@ -557,7 +558,8 @@ shares once the version bump is committed (tag + push, branch cleanup), as a che
 of its own (issue #177). That checklist also covers the GitHub Release, whose body is the highest
 release tier the repo has and whose other tiers go along as
 attachments — a manual closing step this repo takes at every release (see
-[releases/README.md](releases/README.md#cutting-a-release)), just not one `cut-release.ps1`
+[RELEASES-portable.md](plugins/workflows/workflow-davekjohn/RELEASES-portable.md#cutting-a-release)),
+just not one `cut-release.ps1`
 itself automates. *Which* bumps get a Release is repo policy and lives in the release manager's lens,
 not in the portable checklist.
 

@@ -187,7 +187,8 @@ Never inline the development notes regardless: `gh release create`'s body has a 
 `<X.Y.Z>.md` and an asset's name is its basename, so two of them collide. The mechanism (including why
 `gh`'s `file#label` syntax does not solve it) is in the `cut-release` skill's step 5, portable, with the
 failing request that proves it. Measured here at `v3.3.0`. See
-[releases/README.md](../../../releases/README.md#cutting-a-release) for the full mechanics. The
+[RELEASES-portable.md](../../../plugins/workflows/workflow-davekjohn/RELEASES-portable.md#cutting-a-release)
+for the full mechanics. The
 `version` in each
 `.claude-plugin/plugin.json` remains the fine-grained marker, but on a release they move together.
 Note: that number is one of **two** update gates — `claude plugin update` compares version numbers
