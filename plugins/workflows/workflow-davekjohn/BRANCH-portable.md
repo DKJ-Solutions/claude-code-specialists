@@ -105,7 +105,7 @@ those apart. **The reach is the highest tier with a number**, so an `N/A` costs 
 *owed* a tier-1 section, and `open-pr` refused an `N/A` there by name. Measured before removing it: of this
 repo's 89 tier-1 sections, **81 existed only because a tier-2 section sat above them** — the same reach
 argued twice, in a second register, for a reader who here is the same person. What remains enforced is that
-every tier the file *does* carry has a reason, `N/A` ones included, and that the audience tier this repo asks
+every tier the file *does* carry has a reason, `N/A` ones included, and that the audience tier a repo asks
 about is answered before a PR opens.
 
 **Four things about this shape, each of which someone has got wrong before:**
@@ -116,7 +116,8 @@ about is answered before a PR opens.
 - **Nothing may use `##` or `###` inside the body.** A `##` becomes a *separate change* the moment the
   fold pastes this into `CHANGELOG.md` — one that declares no impact, so it reads as tier 0 — and a
   `###` collides with the named sections, truncating whichever one it lands in. Use `####` or
-  bold. The lint gate checks this. Inside `### Significance` the `####` level is structural, so there it
+  bold. Your lint gate checks this where you have one — the source repo's does. Inside
+  `### Significance` the `####` level is structural, so there it
   is `Tier 0`, `Tier 1` or `Tier 2` and nothing else.
 - **The `###` section headings are exact.** They are what the parsers look for; a misspelling means the
   entry silently loses that declaration and the gates read nothing.
@@ -205,7 +206,7 @@ does, so the lint's entry check excludes it **by path**. It is not an entry, and
    makes it pasteable into `CHANGELOG.md` in one go, which is its whole reason for existing. Since the
    dossier form the block opens with the branch, and that is what lands in the changelog.
 2. **Links in the entry are written root-relative**, as if the file were already in the repo root —
-   because after the fold it is. The lint gate checks them from there. Links in `branch-progress.md`
+   because after the fold it is. Your lint gate, where you have one, checks them from there. Links in `branch-progress.md`
    follow the ordinary nested convention (`../scripts/...`): that file never travels.
 3. **Every step is resolved before the PR.** `open-pr.ps1` and `ship-pr.ps1` both refuse while anything
    is unresolved. Three marks:

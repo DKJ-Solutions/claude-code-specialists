@@ -42,6 +42,8 @@ this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release work
 | what | what it holds |
 |---|---|
 | [`CONTRIBUTING-portable.md`](CONTRIBUTING-portable.md) | the contribution cycle in prose, seam-named — the human-facing half, meant to be read alongside your own repo's answers |
+| [`RELEASES-portable.md`](RELEASES-portable.md) | the release workflow: the tier model, what a release must earn, the release documents, and how one is cut — your own `releases/README.md` holds your answers and your release list |
+| [`BRANCH-portable.md`](BRANCH-portable.md) | the two files a branch works in: the dossier form, the three step marks, the reset state, and what the fold does at the merge |
 | [`TICKETWORK-portable.md`](TICKETWORK-portable.md) | the rules for the layer *before* a branch, in a repo whose work arrives from somebody else's tracker: whether a request can be built as written, and how the answer is recorded. Rules and reasoning only — no template and no script, deliberately |
 | [`skills/`](skills/) | the eight skills a specialist invokes — this is where most of the workflow lives |
 | [`scripts/`](scripts/) | the scripts and libs those skills run, mirrored from the source repo's own `scripts/`. **Never edit a file there** — see [its README](scripts/README.md) |

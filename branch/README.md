@@ -30,7 +30,7 @@ already travels in `CONTRIBUTING-portable.md`).
   `#### Tier 2` — the worked example in the portable half is this repo's own shape.
 - **The lint gate enforces the convention here**, which a consumer's repo typically cannot: the
   templates are held byte-for-byte to the formatters `new-branch` calls (`Get-BranchTemplates`), the
-  entry-shape claims on this page's portable predecessor are checked against the scaffolder, and the
+  entry-shape claims in the portable half are checked against the scaffolder, and the
   heading-level rules the portable half describes are all checks in
   [`check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1). In a consumer, the
   scaffolder's refresh-on-drift is what keeps the templates current instead.
