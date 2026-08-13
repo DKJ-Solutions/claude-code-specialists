@@ -218,10 +218,36 @@ does, so the lint's entry check excludes it **by path**. It is not an entry, and
    template shows the Steps section **empty** — an example whose first line is somebody else's TODO gets
    copied in — but the file a branch actually gets carries one open step, so the gate has something to
    refuse (Dave, August 6, 2026).
-5. **Fill in the Significance sections before the PR.** How far the change reaches decides which release
+5. **Work that happens after the merge is not a step.** Opening the PR, waiting for CI, merging, folding,
+   publishing a GitHub Release, taking a measurement that only exists once the run is over — none of it
+   belongs under `### Steps`. Put it in **`### Where I left off`**, which is exactly what that section is
+   for.
+
+   **Neither mark fits it, and that is the whole argument.** The gate above runs *before* the push, so at
+   the moment it reads the list the step cannot be done. `- [x]` reports work that has not happened;
+   `- [~]` says the step turned out not to be needed, when it is needed and simply comes later. The only
+   way to satisfy the gate is rule 3's own named failure — ticking a box to get past it, after which the
+   run reports success.
+
+   **Measured across the 105 branches that have carried a step list** (August 13, 2026): **17** wrote a
+   post-merge step. **4** left it open, where it blocked the PR. **14** ticked it in advance — provably in
+   advance, because the fold *resets* this file at the merge, so a ticked PR step can only have been
+   written before the push existed. And one branch is in both counts:
+   `docs/check-20-and-inbound-catch-up` hit the gate on `- [ ] Lint + tests green, then PR + merge + fold`
+   and the next commit changed nothing but that box to `- [x]`. Two other branches reached the right answer
+   on their own and dropped the step with the reason on the line, which is what this rule generalises.
+
+   **No gate enforces this, deliberately.** A check would have to recognise a post-merge step by its
+   wording, and `open-pr`, `merge` and `fold` are also the subjects of perfectly ordinary steps — *"`open-pr.ps1`:
+   recognise the new placeholder alongside the two legacy ones"* is real work on a branch. Separating the two
+   needs an exclusion list, which is the shape this repo has been bitten by often enough to stop reaching
+   for it (see the declined checks in [`CLAUDE.md`](../CLAUDE.md#claude-code-specialistss-safety-implementation)).
+   The convention is cheap to follow and the failure is self-correcting: write it as a step and the gate
+   stops you.
+6. **Fill in the Significance sections before the PR.** How far the change reaches decides which release
    documents the entry appears in; what it weighs there decides where in each of them it sits — see
    [`CONTRIBUTING.md`](../CONTRIBUTING.md).
-6. **Never edit `CHANGELOG.md` from a branch.** Every branch would be editing the same region of the
+7. **Never edit `CHANGELOG.md` from a branch.** Every branch would be editing the same region of the
    same file; that is the merge conflict this directory exists to avoid.
 
 ## What happens at the merge
