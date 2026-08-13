@@ -99,8 +99,8 @@ additionally needs ten minors in the current major line.
 The audience of each release document follows the **tier**, not the bump, which is what keeps that looser
 rule honest: a tier-1-only minor writes the internal note and no consumer document, so nobody outside is handed a
 document about work they cannot see. Full model:
-[the tier model](releases/README.md#the-tier-model) and
-[what a release must earn](releases/README.md#what-a-release-must-earn).
+[the tier model](plugins/workflows/workflow-davekjohn/RELEASES-portable.md#the-tier-model) and
+[what a release must earn](plugins/workflows/workflow-davekjohn/RELEASES-portable.md#what-a-release-must-earn).
 
 ### Releases
 
@@ -110,8 +110,9 @@ second, unrelated product would get its own repository and marketplace rather th
 train.
 
 The cycle itself — what a release is, the `cut-release.ps1` steps, the three release documents and the
-guardrails — is in [Cutting a release](releases/README.md#cutting-a-release), which also carries the list of
-releases actually cut.
+guardrails — is in
+[Cutting a release](plugins/workflows/workflow-davekjohn/RELEASES-portable.md#cutting-a-release); the list
+of releases actually cut is on [this repo's own release page](releases/README.md#the-release-list).
 
 ### Where the rest lives
 
