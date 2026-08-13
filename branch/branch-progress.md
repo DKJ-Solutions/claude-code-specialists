@@ -1,23 +1,13 @@
-## `feat/test-gate-commands` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] Verify inbound #644 still stands (the gate's glob, both call sites, the guardrail list omission)
-- [x] `Invoke-TestSuiteGate`: read the optional `Get-TestCommands` inside the gate, run each command as a child with the exit code propagated
-- [x] Empty-input contract kept: neither suites nor commands is still a quiet pass; commands-only runs a real gate
-- [x] Contract record for `Get-TestCommands` (`Adopt = 'decide'`), blueprint artefact regenerated
-- [x] `cut-release.ps1` seam list grows to eight; `open-pr.ps1` gate comment names the seam
-- [x] `releases/README.md`: guardrail list carries the test gate and `-SkipTests`; the seam described beside the lint gate's
-- [x] Tests: three new gate cases (passing command, native exit-code propagation, commands-only); count asserts updated
-- [x] Mirrors updated byte-for-byte (native-capture-lib, script-contract-lib, cut-release, open-pr)
-- [x] Affected suites green (test-suite-gate, script-contract, config-blueprint, cut-release-guardrail, shared-scripts)
-- [x] Changelog entry written and scored
-- [x] Review findings resolved: ci.yml dot-sources repo-config (the third caller), parse-refusal + `$?` judging for commands, the two "needs no config" claims corrected, paragraph order and wording fixes
-
-### Where I left off
-
-After the merge: close inbound #644 with the evidence. Then inbound #646 (RELEASES-portable.md), whose
-checklist builds on #643's repairs to the same page. After #646: the BRANCH-portable (Dave, August 13,
-2026) — the same portable/local split applied to branch/README.md, whose dossier convention is the one
-piece of the PR workflow that does not travel; deliberately NOT a PR-portable, because the PR cycle
-itself already travels in CONTRIBUTING-portable.md §§3-5.
+_(filled in when a branch is created)_
