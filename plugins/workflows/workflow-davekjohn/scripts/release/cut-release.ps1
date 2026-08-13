@@ -892,9 +892,26 @@ Write-Utf8NoBom -Path $changelogPath -Content $changelogNew
 # --- 3d. The consumer document (stakeholder-facing; only for the bump types the seam names) ---------
 # Content and collision were both settled above, so this block is pure IO. It writes NOTHING when the
 # tier is off, which is every release in this repo -- see the seam for why the answer here is empty.
+#
+# THE NOTE'S DIRECTORY IS DERIVED FROM ITS OWN PATH, exactly as the Release body's is twenty lines up
+# and for the same reason. This line built it from a hardcoded 'releases\notes\' until August 13, 2026,
+# which is the seam escaping in a THIRD spelling: the two asserts that guard the seam match the
+# fully-qualified 'releases/notes', the overview row's escape was the bare 'notes/', and this one was
+# invisible to both because it is spelled with a BACKSLASH. Same shape every time -- a matcher that
+# reads as thorough and cannot see the instance.
+#
+# IT WAS NOT COSMETIC. Write-Utf8NoBom is a bare File.WriteAllText and creates no directories, so this
+# line made releases/notes/<X>.x/ while the write below went to releases/audience/<X>.x/. It worked only
+# because releases/audience/4.x/ already existed from earlier cuts in this major. The first cut into a
+# FRESH major would have created the wrong directory, thrown DirectoryNotFoundException on the write,
+# and died mid-run on main -- after the development notes, the Release body and the releases/README.md
+# row, before the version bump and the commit. Found on a filesystem rather than by a gate: git tracks
+# no empty directory, so the stray releases/notes/4.x/ this left behind at every cut since the rename
+# appeared in no commit, no git status, and in front of nothing.
 if ($cutNote) {
-    New-Item -ItemType Directory -Force -Path (Join-Path $repoRoot "releases\notes\$notesDirName") | Out-Null
-    Write-Utf8NoBom -Path (Join-Path $repoRoot ($noteRelPath -replace '/', '\')) -Content $noteContent
+    $noteAbs = Join-Path $repoRoot ($noteRelPath -replace '/', '\')
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $noteAbs) | Out-Null
+    Write-Utf8NoBom -Path $noteAbs -Content $noteContent
     $sectionCount = if ($tier2Entries.Count -gt 0) { 'consumer + organisation sections' } else { 'organisation section only -- no entry reached tier 2' }
     Write-Host "  created: $noteRelPath (draft -- $sectionCount)" -ForegroundColor DarkGray
 }
