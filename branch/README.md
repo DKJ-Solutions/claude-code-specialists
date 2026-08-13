@@ -71,7 +71,7 @@ tier the answer may well be *"this reaches nobody here"*, and you say so:
 | section | who notices | answer it with |
 |---|---|---|
 | `#### Tier 0` | this repo's own developers | a score, always |
-| `#### Tier 2` | customers and users — **this repo's audience** | a score, or `N/A` if no consumer would notice |
+| `#### Tier 2` | a subscriber of the service — **this repo's audience** | a score, or `N/A` if no subscriber would notice |
 
 **Which of the two audience tiers you get is a repo-level fact, not a per-entry choice** (Dave, August 12,
 2026). Tier 1 (management and the employer/commissioner) and tier 2 (the subscriber of a service) are two

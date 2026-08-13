@@ -650,13 +650,13 @@ $script:EntrySignificanceWordingDefaults = [ordered]@{
         'If not, say so there in one line and put N/A in its Score.'
     )
     Route1 = @(
-        'Is this change also relevant to the subscribers of the service? Then continue to Tier 2.',
+        'Is this change also relevant to a subscriber of the service? Then continue to Tier 2.',
         'If not, say so there in one line and put N/A in its Score.'
     )
     # The two openers of the template's commented-out tiers. Template-only prose, kept beside the questions
     # they follow rather than inside Add-TemplateTierPrompt, so a repo that translates the form translates
     # all of it from one place.
-    Uncomment1 = 'UNCOMMENT Tier 1 if management or the employer/commissioner gets something out of this change.'
+    Uncomment1 = 'UNCOMMENT Tier 1 if management and the employer/commissioner get something out of this change.'
     Uncomment2 = 'UNCOMMENT Tier 2 as well if a subscriber of the service notices it.'
 }
 

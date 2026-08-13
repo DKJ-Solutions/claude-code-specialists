@@ -241,9 +241,9 @@ if (-not $typeLabel) {
 #
 # FENCE-AWARE, which the old walk was not -- and that is exactly how a quoted example became a bullet.
 #
-# ONLY TIER 1 AND ABOVE REACH THIS DOCUMENT. The ladder is cumulative: tier 2 is what a consumer notices
-# and therefore also something a colleague should hear about, so it belongs here as well as in the
-# consumer document. Tier 0 is repo-internal by definition -- it is in the developer notes, which is where the
+# ONLY TIER 1 AND ABOVE REACH THIS DOCUMENT. Under the cumulative ladder the notes this script reads
+# were written under (pre-#620), tier 2 implied tier 1, so a tier-2 entry belongs here as well as in the
+# consumer document -- and that inclusion is kept, because every existing note carries such entries. Tier 0 is repo-internal by definition -- it is in the developer notes, which is where the
 # record belongs, and putting it here would rebuild exactly the document this tier exists to avoid.
 #
 # NOTES WITH NO TIER HEADINGS AT ALL take everything, which is the repo-without-a-tier-split case: there

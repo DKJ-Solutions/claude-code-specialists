@@ -26,8 +26,11 @@ knob wrong from these strings, declaring tier 2 structurally N/A and cutting eve
 
 Repaired, verified against the tree before building: the routing questions and UNCOMMENT openers in
 `entry-scaffold-lib.ps1` (`Route0`/`Route1`/`Uncomment1`/`Uncomment2`), the refused-entry tier table in
-`open-pr.ps1`, and the tier tables in `new-branch/SKILL.md` and `CONTRIBUTING-portable.md` — the last
-a site the issue did not name, found by the verification sweep. Both doc tables now also carry the
+`open-pr.ps1`, the tier tables in `new-branch/SKILL.md` and `CONTRIBUTING-portable.md`, and four
+sites the issue did not name: the tier tables in `branch/README.md` and `open-pr/SKILL.md`, and the
+two gate-refusal messages in `cut-release.ps1` (the tier gate and the significance gate) — found by
+the verification sweep and the pre-PR reviews. Two source comments that still stated the cumulative
+model as current (`release-lib.ps1`, `new-internal-note.ps1`) now mark it as the pre-#620 reading. Both doc tables now also carry the
 webshop worked example, since that is the case that separates the two kinds of audience. The
 contradiction inside `entry-scaffold-lib.ps1` — the cumulative ladder at one comment block and the
 one-audience model thirty lines below it — is resolved: the ladder block now marks itself as the

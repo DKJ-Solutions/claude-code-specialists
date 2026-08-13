@@ -257,8 +257,9 @@ maintaining the repo at least a little. This block showed `#### Tier 1` above `#
 all until August 13, 2026, which is a shape the scaffolder writes under no configuration: with an audience
 stated it writes tier 0 and that tier, and with none it writes all of them.
 
-The **tier** (`0` = only this repo's own developers notice, `1` = a colleague on the project gets something
-out of it, `2` = a consumer notices) decides which release documents the entry appears in, and where the
+The **tier** (`0` = only this repo's own developers notice, `1` = management and the employer/commissioner
+get something out of it, `2` = a subscriber of the service notices it) decides which release documents the
+entry appears in, and where the
 repo's entries declare their impact at all the release cut refuses a bump the pending tiers have not earned.
 The **significance** decides where *in* the list the entry sits — `CHANGELOG.md` is one flat ranked list, and
 the release documents inherit the order the fold leaves — so the most consequential change leads.

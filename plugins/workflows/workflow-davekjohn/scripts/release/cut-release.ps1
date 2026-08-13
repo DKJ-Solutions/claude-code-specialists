@@ -489,11 +489,11 @@ $breakdown
 
 $suggestion
 
-The tiers are how far a change reaches: 0 = only this repo's own developers notice, 1 = a colleague on
-this project gets something out of it, 2 = a consumer notices. An entry's tier is the highest row of its
-own impact table in CHANGELOG.md; raise it, or correct the bump. -SkipTierGate overrules this,
-deliberately separate from -SkipLint because it overrules a judgement about content rather than skipping
-a tool.
+The tiers are how far a change reaches: 0 = only this repo's own developers notice, 1 = management and
+the employer/commissioner get something out of it, 2 = a subscriber of the service notices it. An entry's
+tier is the highest row of its own impact table in CHANGELOG.md; raise it, or correct the bump.
+-SkipTierGate overrules this, deliberately separate from -SkipLint because it overrules a judgement
+about content rather than skipping a tool.
 "@
         exit 1
     }
@@ -549,8 +549,8 @@ its own reader:
 
   | Tier | Significance | Why |
   |---|---|---|
-  | 2 | 5 | what a consumer gets out of it |
-  | 1 | 4 | what this project's colleagues get out of it |
+  | 2 | 5 | what a subscriber of the service gets out of it |
+  | 1 | 4 | what management and the employer/commissioner get out of it |
 
 Add the rows to the entries in CHANGELOG.md and cut again.
 

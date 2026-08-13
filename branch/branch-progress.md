@@ -1,4 +1,4 @@
-﻿## `fix/audience-tier-strings` progress
+## `fix/audience-tier-strings` progress
 
 ### Steps
 
@@ -12,6 +12,8 @@
 - [x] `branch/templates/` regenerated from the new wording
 - [x] All test suites green
 - [x] Changelog entry written and scored
+- [x] Copy-edit findings resolved: `branch/README.md` tier table (missed site), one canonical phrase per tier
+- [x] Code-review findings resolved: `cut-release.ps1` gate refusals + `open-pr/SKILL.md` tier table (missed sites), BOM stripped
 
 ### Where I left off
 
