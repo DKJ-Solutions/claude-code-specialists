@@ -1,13 +1,11 @@
-# `main` progress
-
-
-> **You are on `main`.** Do not work in this file yet -- create a branch first.
-> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
-> of the next person who does create one.
-
-This file carries the step list of the branch you are on. It is written when a branch is created
-and returns to this state after the merge.
+## `docs/v4-8-0-timing-total` progress
 
 ### Steps
 
-_(filled in when a branch is created)_
+- [x] Add the end-to-end total and the five tail legs to `releases/audience/4.x/4.8.0.md`
+- [x] Fill the branch dossier
+
+### Where I left off
+
+This is the closing PR of the v4.8.0 checklist; after the merge and fold, nothing remains open from
+the release.
