@@ -1,16 +1,27 @@
 # Releases
 
 **How a release works.** A release is not a deploy but a **recorded moment**: a git tag that marks the
-state of the marketplace, with all plugin versions in lockstep. This page carries both halves: the
+state of the repo at that version. This page carries both halves: the
 **process** — the tier model, what a release must earn, the release documents, and how one is cut — and,
 under the repo heading at the end, the **full list of releases** actually cut. The release block in
 [`CHANGELOG.md`](../CHANGELOG.md) points here for everything but the current version.
 
-[`scripts/release/cut-release.ps1`](../scripts/release/cut-release.ps1) itself publishes nothing to GitHub
-Releases — that is a separate, manual closing step. Releases are cut **only on the repo owner's explicit
-request**; see [Cutting a release](#cutting-a-release) below for the full mechanics. Each release bumps
-every plugin's `version` in lockstep, and that number in `.claude-plugin/plugin.json` is what tells a
-consumer which release they are on.
+[`scripts/release/cut-release.ps1`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/scripts/release/cut-release.ps1)
+itself publishes nothing to GitHub Releases — that is a separate, manual closing step. Releases are cut
+**only on the repo owner's explicit request**; see [Cutting a release](#cutting-a-release) below for the
+full mechanics. Where the repo publishes plugins — `Get-ReleasePluginTier` answers that, and it gates the
+whole plugin half — each release bumps every plugin's `version` in lockstep, and that number in
+`.claude-plugin/plugin.json` is what tells a consumer which release they are on. Where it does not, the
+current version is read from the newest `vX.Y.Z` tag instead, exactly as the script already does.
+
+**How to read the portable half.** Everything above the horizontal rule near the end of this page travels
+verbatim to any repo that runs this release workflow, and two conventions are what make that literal.
+*This repo*, above that rule, always names the **source repo** the page was written in
+([claude-code-specialists](https://github.com/DaveKJohn/claude-code-specialists)) — its measurements travel
+as the evidence behind the rules, never as the mirroring repo's own record. And links into the source's
+script tree are **absolute** on purpose, so they still resolve after the page is copied; only links to
+files every adopting repo has of its own (`scripts/repo-config.ps1`, `CHANGELOG.md`, `CONTRIBUTING.md`)
+stay relative.
 
 ## The tier model
 
@@ -193,8 +204,8 @@ release-notes body has a hard **125,000-character** limit, which a full notes fi
 documents — an internal note for the organisation and a consumer document — and at all twelve releases
 since the internal tier existed, **both were written, about the same changes**. Measured before merging
 them: one release's internal note (962 words) held against test 2 of the writing norm in the
-[cut-release skill](../plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md) (*does this
-describe our effort or their outcome*) gave:
+[cut-release skill](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md)
+(*does this describe our effort or their outcome*) gave:
 
 | | words | |
 |---|---|---|
@@ -235,7 +246,8 @@ still open* section phrases as a *live* claim goes stale in place within hours o
 > (`Get-ReleaseHighlightsStakeholderTypes`, `Get-ReleaseHighlightsWording`). It existed because the generator
 > had to guess from branch prefixes which entries a consumer cares about, so it wrote out both halves and
 > left the release manager to cut one — explicitly a *proposal*, since the prefix
-> [measurably does not predict impact here](#measured-instances-behind-the-portable-rules). The tier asks the
+> measurably does not predict impact here (the marketplace-rename measurement under
+> [The tier model](#the-tier-model)). The tier asks the
 > entry's author instead, at the moment they know. Do not reintroduce a category-based split beside it: that
 > is the guess this replaced.
 
@@ -254,17 +266,19 @@ it was granted at.
 
 ## Cutting a release
 
-A release is a **captured moment**: all plugins get the same version number (**lockstep, repo-wide**) and
-the state is tagged as `vX.Y.Z`. `cut-release.ps1` produces only a git tag, the full notes here in
+A release is a **captured moment**: the state is tagged as `vX.Y.Z`, and where the repo publishes plugins
+they all get the same version number (**lockstep, repo-wide**). `cut-release.ps1` produces only a git tag,
+the full notes here in
 `development/`, and a reference to them in [`CHANGELOG.md`](../CHANGELOG.md). A release is cut **only on the
 owner's explicit request** and deliberately does **not** go through a branch + PR: like the fold commit, the
 release commit is a permitted direct-on-`main` action (the second exception to "everything via branch + PR"
 — see [`CONTRIBUTING.md`](../CONTRIBUTING.md)).
 
 In one motion, on a clean `main`:
-[`scripts/release/cut-release.ps1`](../scripts/release/cut-release.ps1)`(-Version <X.Y.Z> | -Bump <major|minor|patch>) [-Title "…"]`
+[`scripts/release/cut-release.ps1`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/scripts/release/cut-release.ps1)`(-Version <X.Y.Z> | -Bump <major|minor|patch>) [-Title "…"]`
 
-1. bumps all `plugin.json` versions in lockstep to `X.Y.Z`;
+1. where `Get-ReleasePluginTier` is true, bumps all `plugin.json` versions in lockstep to `X.Y.Z` —
+   otherwise there is nothing to bump and the version lives in the tag alone;
 2. generates the full release notes in `development/<dir>/<X.Y.Z>.md` (from the folded entries, grouped by
    tier and, within a tier, a flat list in the ranked order the fold left), adds a row to the release list at
    the end of this page, and **empties `CHANGELOG.md` down to its intro** — that intro passes through
@@ -273,20 +287,18 @@ In one motion, on a clean `main`:
    each saying no more than "see the notes", while this page already listed all 72 with a date, a type and a
    title. What replaced it is the intro's own one-line pointer to this page;
 3. **(retired, August 8, 2026)** step 3 used to append, per plugin, the entries that touched it to a
-   **per-plugin `CHANGELOG.md`** and regenerate that plugin's **`RELEASE.md`** card. Both were built to
-   give a consumer a history inside the plugin cache — and measured against how a consumer actually
-   receives this repo, they were a second copy of something already in reach: the marketplace source is
-   a git clone of the WHOLE repository, so `CHANGELOG.md` and this entire `releases/` tree sit at
-   `~/.claude/plugins/marketplaces/<marketplace>/`. Ten files, 11,684 lines, free to disagree with the
-   original — which is exactly what lint checks 9 and 17 existed to police. One repository, one product,
-   one changelog. The `Plugins:` line survives: the release notes still read it;
+   **per-plugin `CHANGELOG.md`** and regenerate that plugin's **`RELEASE.md`** card — a second copy of a
+   history the consumer already receives, since a marketplace source arrives as a git clone of the whole
+   repository. One repository, one product, one changelog; the measurement that retired it is under the
+   repo heading at the end. The `Plugins:` line survives: the release notes still read it;
 4. commits that directly on `main` (`release: vX.Y.Z`) and sets an annotated tag `vX.Y.Z`;
 5. pushes `main` + the tag (unless `-NoPush` for inspection first).
 
 **Closing step, after the script and after the hand-written note has merged, where the bump wrote one:
 publish a GitHub Release.** Not run by `cut-release.ps1` and not automated; the release manager walks
 through the
-[`cut-release` skill](../plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md)'s checklist: `gh release create`
+[`cut-release` skill](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md)'s
+checklist: `gh release create`
 with the **generated body** (`--notes-file` pointing at the `releases/github/<dir>/<X.Y.Z>.md` the cut already
 wrote — nothing to edit), then `gh release upload` with the full development notes **and the hand-written note,
 where the bump generated one**. Never inline the development notes — see
@@ -325,10 +337,13 @@ belongs in the command rather than in output that scrolls past.
 
 The pure logic (version bump, CHANGELOG transformation, notes construction, and the bump rules in
 `Test-ReleaseBumpEarned`) lives in
-[`scripts/lib/release-lib.ps1`](../scripts/lib/release-lib.ps1) and is covered by
-[`scripts/tests/release-lib.tests.ps1`](../scripts/tests/release-lib.tests.ps1). The tier line's own format
+[`scripts/lib/release-lib.ps1`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/scripts/lib/release-lib.ps1)
+and is covered by
+[`scripts/tests/release-lib.tests.ps1`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/scripts/tests/release-lib.tests.ps1).
+The tier line's own format
 — writing it, validating it, and the section map it selects — lives in
-[`scripts/lib/entry-scaffold-lib.ps1`](../scripts/lib/entry-scaffold-lib.ps1), shared with the three scripts
+[`scripts/lib/entry-scaffold-lib.ps1`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/scripts/lib/entry-scaffold-lib.ps1),
+shared with the three scripts
 that must not disagree about it.
 
 ---
@@ -348,9 +363,21 @@ decisions behind them, the measured instances, and the release list itself.
 > rather than carrying these versions, dates and PR references across. Two things not to do: do not fold any
 > of this upward into the portable half, and do not delete the section — a mirrored page without it has
 > nowhere to put its own history, and the next release will write a row into a document that never declared
-> where rows go.
+> where rows go. Two things not to repair: the portable half's links into the source's script tree are
+> **absolute** on purpose (relativising them is what kills them in your tree), and *this repo* above the
+> rule names the source, per the reading rule in the intro — its measurements are the evidence behind the
+> rules, not claims about your repo, so they are not yours to restate or delete.
 
 ### Seam values in force here
+
+**`Get-ReleasePluginTier` is true** — this repo is the marketplace source, so every cut bumps all
+`plugin.json` versions in lockstep and the current version is read from a `plugin.json`. **A repo that
+publishes no plugins answers false**, skips step 1 of the cut entirely, and reads its current version from the
+newest `vX.Y.Z` tag; the release is then the tag and the documents, nothing else.
+
+**`Get-ReleaseAudienceTier` is `2`** — this repo is a service its consumers subscribe to, so the
+hand-written note's *For consumers* section is written for them. A repo that delivers to management or a
+commissioner answers `1` and never writes that section.
 
 Every release document groups **per major** (`3.x`) — the consumer this model came from folders per minor.
 `Get-ReleaseHistoryPath` is left at its default, `releases/README.md` — this page — since the list lives
@@ -404,7 +431,7 @@ attachment list is the development notes alone.
 
 - **The branch prefix does not predict impact here**, and this is the measurement the whole tier model rests
   on. Held against v3.2.0's 19 entries, the most consequential change for a consumer — renaming the
-  marketplace, which breaks every existing install — arrived on a `chore/` branch. While the consumer document
+  marketplace, which breaks every existing install — arrived on a `chore/` branch. While the consumer
   document was assembled from `Feat`/`Fix` that change landed *below* the remove-before-publishing marker, so
   the guidance here used to be "expect to promote `Docs`/`Chore` items". Since August 5, 2026 there is nothing
   to promote: the entry's author declares the tier, and the branch prefix decides nothing but the category
@@ -413,6 +440,12 @@ attachment list is the development notes alone.
 - **Both of this repo's majors were already recaps**, which is what the 10-minor rule now requires up front:
   `v2.0.0` consolidated v1.0–v1.18 and `v3.0.0` consolidated v2.2.0–v2.16.0, both written that way after the
   fact. The rule states the practice rather than inventing one.
+- **The per-plugin `CHANGELOG.md` and `RELEASE.md` cards were retired against a measurement** (August 8,
+  2026), which is the source half of the retired step 3 above the rule: a consumer receives this
+  marketplace source as a git clone of the whole repository, so `CHANGELOG.md` and this entire `releases/`
+  tree already sit at `~/.claude/plugins/marketplaces/<marketplace>/` — the cards were ten files and
+  11,684 lines, a second copy free to disagree with the original, which is exactly what lint checks 9
+  and 17 existed to police.
 - **The attachment-filename collision was measured at `v3.3.0`**, where the second upload returned
   `HTTP 404` on `…&name=3.3.0.md`.
 - **The written-notes route has a worked instance**:
