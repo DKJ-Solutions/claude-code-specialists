@@ -233,11 +233,13 @@ land with an unfinished plan.
 
 ## The impact gate: how far does this change reach, and how much does it weigh?
 
-The entry also carries a **`### Significance` section** — one `#### Tier N` sub-section per tier it reaches,
-each with a reason and a score from 1 to 5:
+The entry also carries a **`### Significance` section** — one `#### Tier N` sub-section per tier the repo asks
+about, each with a reason and a score from 1 to 5. That is **tier 0 plus the single audience tier**
+`Get-ReleaseAudienceTier` names (three sections where a repo has named none), so the example below is a
+tier-2 repo's:
 
 ```text
-#### Tier 1
+#### Tier 0
 
 The routine version bump stops needing a developer.
 
@@ -249,6 +251,11 @@ Consumers must re-add the marketplace under its new name.
 
 **Score:** 5
 ```
+
+**Tier 0 is in every entry and is the one tier that can never be `N/A`** — every change reaches the people
+maintaining the repo at least a little. This block showed `#### Tier 1` above `#### Tier 2` and no tier 0 at
+all until August 13, 2026, which is a shape the scaffolder writes under no configuration: with an audience
+stated it writes tier 0 and that tier, and with none it writes all of them.
 
 The **tier** (`0` = only this repo's own developers notice, `1` = a colleague on the project gets something
 out of it, `2` = a consumer notices) decides which release documents the entry appears in, and where the
