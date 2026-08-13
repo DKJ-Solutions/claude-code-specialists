@@ -372,7 +372,7 @@ decisions behind them, the measured instances, and the release list itself.
 
 **`Get-ReleasePluginTier` is true** — this repo is the marketplace source, so every cut bumps all
 `plugin.json` versions in lockstep and the current version is read from a `plugin.json`. **A repo that
-publishes no plugins answers false**, skips step 1 of the cut whole, and reads its current version from the
+publishes no plugins answers false**, skips step 1 of the cut entirely, and reads its current version from the
 newest `vX.Y.Z` tag; the release is then the tag and the documents, nothing else.
 
 **`Get-ReleaseAudienceTier` is `2`** — this repo is a service its consumers subscribe to, so the
@@ -431,7 +431,7 @@ attachment list is the development notes alone.
 
 - **The branch prefix does not predict impact here**, and this is the measurement the whole tier model rests
   on. Held against v3.2.0's 19 entries, the most consequential change for a consumer — renaming the
-  marketplace, which breaks every existing install — arrived on a `chore/` branch. While the consumer document
+  marketplace, which breaks every existing install — arrived on a `chore/` branch. While the consumer
   document was assembled from `Feat`/`Fix` that change landed *below* the remove-before-publishing marker, so
   the guidance here used to be "expect to promote `Docs`/`Chore` items". Since August 5, 2026 there is nothing
   to promote: the entry's author declares the tier, and the branch prefix decides nothing but the category
