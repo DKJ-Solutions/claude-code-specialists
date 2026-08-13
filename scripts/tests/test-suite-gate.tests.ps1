@@ -65,11 +65,12 @@ function New-FakeSuite {
 # measured around the CHILD, so it includes one powershell start-up (~0.2s) on top of the gate itself --
 # irrelevant against the multi-second margins the timing cases work with.
 function Invoke-Gate {
-    param([string]$TestsDir, [int]$MaxParallel = 0, [string]$WorkDir = '')
+    param([string]$TestsDir, [int]$MaxParallel = 0, [string]$WorkDir = '', [string]$CommandsFile = '')
     # NOT $args: that is an automatic variable holding a function's unbound arguments, and splatting it
     # after assignment is the kind of collision this repo already documents for $script:-owned names.
     $psArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $script:Driver, '-TestsDir', $TestsDir, '-MaxParallel', "$MaxParallel")
     if ($WorkDir) { $psArgs += @('-WorkDir', $WorkDir) }
+    if ($CommandsFile) { $psArgs += @('-CommandsFile', $CommandsFile) }
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     $out = & powershell @psArgs 2>&1
     $sw.Stop()
@@ -98,10 +99,16 @@ try {
     # this suite noticing, which is the whole failure mode it exists to catch.
     $script:Driver = Join-Path $Fixture 'drive-gate.ps1'
     $driverBody = @"
-param([string]`$TestsDir, [int]`$MaxParallel = 0, [string]`$WorkDir = '')
+param([string]`$TestsDir, [int]`$MaxParallel = 0, [string]`$WorkDir = '', [string]`$CommandsFile = '')
 `$ErrorActionPreference = 'Stop'
 . '$LibPath'
 if (`$WorkDir) { Set-Location -LiteralPath `$WorkDir }
+# Models a consumer's repo-config defining the optional seam: the gate reads it via Get-Command, the
+# way open-pr and cut-release have it in scope after their own dot-source of repo-config.ps1.
+if (`$CommandsFile) {
+    `$script:GateCommands = @(Get-Content -LiteralPath `$CommandsFile)
+    function Get-TestCommands { return `$script:GateCommands }
+}
 `$r = Invoke-TestSuiteGate -TestsDir `$TestsDir -Context 'the fixture' -MaxParallel `$MaxParallel
 Write-Host "GATE-RESULT: `$r"
 "@
@@ -239,6 +246,35 @@ Write-Host "GATE-RESULT: `$r"
     $reported = @($r.Lines | Where-Object { $_ -match '^CWD:' } | ForEach-Object { $_.Substring(4) })
     Assert-Equal 1 $reported.Count 'the probe suite reported its location'
     Assert-Equal $wdHome $reported[0] 'the suite ran in the gate caller''s location, not in the process working directory'
+
+    # --- 6. Get-TestCommands: the repo's own commands join the gate (inbound #644) -------------------
+    #
+    # The seam is read INSIDE the gate via Get-Command, so the driver models a consumer by defining the
+    # function before the call -- exactly what open-pr/cut-release's dot-source of repo-config.ps1 does.
+    # The exit-code case uses cmd /c exit 7, a NATIVE exit code: the child powershell must propagate it
+    # rather than report its own did-it-parse verdict, which is what the trailing 'exit $LASTEXITCODE'
+    # buys and what this assert would catch losing.
+    Write-Host "Get-TestCommands -- a consumer's own test commands run and are judged like suites" -ForegroundColor Cyan
+    $cmdOk = Join-Path $Fixture 'commands-ok.txt'
+    [System.IO.File]::WriteAllText($cmdOk, "Write-Host 'CMD-MARKER-OK'`r`n", $Utf8NoBom)
+    $r = Invoke-Gate -TestsDir $ok -CommandsFile $cmdOk
+    Assert-True ($r.Text -match 'GATE-RESULT: True') 'three suites plus a passing command: the gate returns true'
+    Assert-True ($r.Flat -match 'running 1 repo test command') 'and it announces the command half separately'
+    Assert-True ($r.Text -match 'CMD-MARKER-OK') 'the command''s own output is printed'
+    Assert-True ($r.Text -match 'test gate: all 4 suites passed in \d') 'the summary counts the command with the suites'
+
+    $cmdBad = Join-Path $Fixture 'commands-bad.txt'
+    [System.IO.File]::WriteAllText($cmdBad, "cmd /c exit 7`r`n", $Utf8NoBom)
+    $r = Invoke-Gate -TestsDir $ok -CommandsFile $cmdBad
+    Assert-True ($r.Text -match 'GATE-RESULT: False') 'a failing command fails the whole gate'
+    Assert-True ($r.Text -match '== cmd /c exit 7 == FAILED \(exit 7\)') 'its header carries the NATIVE exit code, propagated through the child'
+    Assert-True ($r.Text -match 'test gate: 1 of 4 suites FAILED in \d+s: cmd /c exit 7') 'and the closing summary names the command'
+
+    # A repo whose whole suite is Get-TestCommands: no scripts\tests at all, and the gate still runs.
+    $r = Invoke-Gate -TestsDir (Join-Path $Fixture 'no-such-dir') -CommandsFile $cmdOk
+    Assert-True ($r.Text -match 'GATE-RESULT: True') 'commands-only: a missing suites dir does not skip the gate'
+    Assert-True ($r.Flat -notmatch 'test gate skipped') 'and it does not claim to have skipped'
+    Assert-True ($r.Text -match 'test gate: all 1 suites passed in \d') 'the verdict counts the one command'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

@@ -650,7 +650,9 @@ if (-not $SkipLint) {
 }
 
 # Test gate: all suites, exactly as CI -- a red suite should already block here, not only at the
-# PR (a lesson from PR #54). -SkipTests is the deliberate escape valve.
+# PR (a lesson from PR #54). -SkipTests is the deliberate escape valve. A repo whose tests are not
+# all PowerShell names the rest in the optional Get-TestCommands (repo-config); the shared gate
+# reads it itself, so this call site stays identical to the cut's (inbound #644).
 # THE LOOP ITSELF MOVED TO Invoke-TestSuiteGate (native-capture-lib.ps1) on August 7, 2026, when
 # cut-release.ps1 needed the same gate -- see issue #510. Copying fifteen lines into the cut would have
 # been two copies of one rule, free to drift. What stays here is the half that is open-pr's own: the

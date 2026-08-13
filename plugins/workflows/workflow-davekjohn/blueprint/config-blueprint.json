@@ -60,6 +60,17 @@
                     },
                     {
                         "lib":  "scripts\\repo-config.ps1",
+                        "function":  "Get-TestCommands",
+                        "adopt":  "decide",
+                        "adoptWhy":  "which commands test this repo is a fact about its stack that no script can read from the tree. The source answers none (its suites are all PowerShell, and the gate already runs those); copying that none into a repo with an app layer leaves the release gate blind to exactly the tests that layer needs",
+                        "optional":  true,
+                        "default":  "no extra commands -- the *.tests.ps1 suites in scripts/tests are the whole gate, unchanged from before the seam existed",
+                        "returns":  "extra command lines the test gate runs alongside the *.tests.ps1 suites, e.g. @(\u0027npm test\u0027) -- each runs as its own child with the exit code propagated, and a non-zero exit fails the gate exactly like a failing suite",
+                        "declared":  false,
+                        "text":  ""
+                    },
+                    {
+                        "lib":  "scripts\\repo-config.ps1",
                         "function":  "Get-RosterPath",
                         "adopt":  "copy",
                         "adoptWhy":  "\u0027.claude/specialists/SPECIALISTS.md\u0027 is where specialists-init puts the roster in EVERY repo it bootstraps, so the source\u0027s answer IS the bootstrap\u0027s answer -- and the built-in fallback (CLAUDE.md) is the one that reads the wrong file (inbound #333)",

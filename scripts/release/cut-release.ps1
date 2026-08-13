@@ -28,7 +28,7 @@
     SHARED, WITH THE REPO'S OWN ANSWERS IN THE SEAM (issue #417). This script is mirrored into the
     plugin, so a consumer runs it rather than forking it. Everything that legitimately differs per
     repo is read from the OPTIONAL functions in scripts/repo-config.ps1, and every fallback is what
-    this script did before it was shared. THE LIST IS THE SEVEN THIS SCRIPT ACTUALLY READS, and it is
+    this script did before it was shared. THE LIST IS THE EIGHT THIS SCRIPT ACTUALLY READS, and it is
     kept that way deliberately: a consumer configures from this list, so a name that does nothing costs
     them an afternoon and a name that is missing hides a knob they needed.
 
@@ -44,6 +44,9 @@
       Get-ReleaseConsumerBumps    which bumps get a stakeholder document; see step 3d. The retired name
                                   Get-ReleaseHighlightsBumps is still read as a fallback
       Get-ReleaseMajorMinMinors   how many minors a major must recap
+      Get-TestCommands            extra test commands the test gate in step 1 runs beside the
+                                  *.tests.ps1 suites (e.g. 'npm test') -- read inside the shared
+                                  Invoke-TestSuiteGate, so open-pr's gate sees the same list
 
     TWO NAMES THAT USED TO BE ON THIS LIST ARE GONE, and they are named here rather than silently
     dropped, because a consumer's repo-config may still define them: Get-ReleaseLiveMarker described
