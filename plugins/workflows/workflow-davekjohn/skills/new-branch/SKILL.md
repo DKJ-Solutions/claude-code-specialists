@@ -119,17 +119,14 @@ wording, and `open-pr`, `merge` and `fold` are also the subjects of ordinary ste
 recognise the new placeholder"* is real work), so separating them needs an exclusion list. Run the same
 count over your own branches if you want to know whether it bites here too.
 
-## The entry declares its Significance, one section per tier
+## The entry declares its Significance, one section per tier it asks about
 
-Under `### Significance` the entry gets a `#### Tier N` sub-section for each of the three reaches, each
-waiting for a reason and a score:
+Under `### Significance` the entry gets a `#### Tier N` sub-section per tier your repo asks about, each
+waiting for a reason and a score. In a repo whose audience is tier 2 that is these two — which tiers, and
+why it is not three, is the knob further down:
 
 ```text
 #### Tier 0
-
-**Score:**
-
-#### Tier 1
 
 **Score:**
 
