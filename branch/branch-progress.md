@@ -1,13 +1,18 @@
-# `main` progress
-
-
-> **You are on `main`.** Do not work in this file yet -- create a branch first.
-> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
-> of the next person who does create one.
-
-This file carries the step list of the branch you are on. It is written when a branch is created
-and returns to this state after the merge.
+## `docs/v4-7-0-timing-total` progress
 
 ### Steps
 
-_(filled in when a branch is created)_
+- [x] Read the five post-freeze legs off the session's timestamps and add the end-to-end total to
+      *What it is worth*
+- [x] Compare the tail against `v4.6.0` and `v4.4.0`, and say what three measurements agree on
+- [x] Correct the inherited seven-minute estimate for the duplicate gate run against what was measured
+      here, in both places the note states it
+- [x] Say in the note that the attached copy is the frozen one, so a reader meeting both is not confused
+
+### Where I left off
+
+The document is complete. What remains happens after the merge and is therefore not a step above:
+opening the PR, waiting for `lint-en-tests`, merging and folding the entry.
+
+The GitHub Release for `v4.7.0` is already published; its attachment is deliberately left as the frozen
+copy rather than re-uploaded.
