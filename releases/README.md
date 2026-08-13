@@ -149,6 +149,7 @@ list sits at the **end** of the page:
 
 | Version | Date | Type | Title |
 |---|---|---|---|
+| [4.8.0](audience/4.x/4.8.0.md) | 2026-08-13 | Minor | The branch and release conventions and the consumer test gate now travel with the plugin |
 | [4.7.0](audience/4.x/4.7.0.md) | 2026-08-13 | Minor | The documents describe what the tooling actually writes: the entry's tier shape, the post-merge step, and a seam that escaped in a third spelling |
 | [4.6.0](audience/4.x/4.6.0.md) | 2026-08-12 | Minor | One audience tier per repo, and releases/ reduced to three reader-named roots |
 | [4.5.0](audience/4.x/4.5.0.md) | 2026-08-11 | Minor | Repairs across the entry, PR-body and release-document machinery: gates and documents that pointed at retired shapes now name the ones actually written. |
