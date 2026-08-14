@@ -53,6 +53,31 @@ function Get-FlatOutput {
     return (($Captured | Out-String) -replace "`r?`n", '')
 }
 
+function Get-Block {
+    <#
+        The body of ONE printed section, joined into a single string.
+
+        WHY NOT Get-FlatOutput FOR THE ISSUE ASSERTS. Flat removes every newline, so a whole report is one
+        line and a negative assert like "does not say none" would scan past the block it means and match a
+        'none' printed by some later section -- passing or failing on a line the case does not control.
+        Write-Section prints a blank line then the title, so a block is 'title line until the next blank',
+        which is what this returns.
+    #>
+    param($Captured, [string]$TitleLike)
+    $lines = @($Captured | ForEach-Object { [string]$_ })
+    $start = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match [regex]::Escape($TitleLike)) { $start = $i; break }
+    }
+    if ($start -lt 0) { return '' }
+    $body = @()
+    for ($i = $start + 1; $i -lt $lines.Count; $i++) {
+        if (-not $lines[$i].Trim()) { break }
+        $body += $lines[$i].Trim()
+    }
+    return ($body -join ' ')
+}
+
 function New-Fixture {
     <#
         A throwaway git repo with the optional sources this script probes: a CHANGELOG with one pending
@@ -114,10 +139,44 @@ function Set-Utf8 {
     [System.IO.File]::WriteAllText($Path, (($Lines -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding $false))
 }
 
+function New-GhShim {
+    <#
+        A fake `gh` on PATH, so the open-issues block is actually REACHED with a payload this suite
+        controls. Without it every case here takes the degrade path -- the fixture is a bare local repo
+        that no gh can answer for -- which is precisely how the Object[] defect survived: the block was
+        never exercised with more than one record.
+
+        The payload is TYPEd from a file rather than echoed, because a .cmd echo of JSON is a quoting
+        minefield and one stray & or > would fail the test for a reason that is not the script's.
+
+        -ExitCode makes it FAIL with no output, which is the unauthenticated/offline consumer.
+    #>
+    param([string]$Json, [int]$ExitCode = 0)
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("sstat-gh-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+    New-Item -ItemType Directory -Path $dir | Out-Null
+    if ($ExitCode -eq 0) {
+        [System.IO.File]::WriteAllText((Join-Path $dir 'payload.json'), $Json, (New-Object System.Text.UTF8Encoding $false))
+        Set-Content -LiteralPath (Join-Path $dir 'gh.cmd') -Encoding Ascii -Value @(
+            '@echo off',
+            'type "%~dp0payload.json"'
+        )
+    } else {
+        Set-Content -LiteralPath (Join-Path $dir 'gh.cmd') -Encoding Ascii -Value @(
+            '@echo off',
+            "exit /b $ExitCode"
+        )
+    }
+    return $dir
+}
+
 function Invoke-Status {
-    param([string]$Fixture, [string[]]$ExtraArgs = @())
-    $prev = $env:CLAUDE_PROJECT_DIR
+    # GhShim is prepended to PATH for the child, so its gh.cmd wins over any real gh on this machine:
+    # Get-Command walks PATH directories in order.
+    param([string]$Fixture, [string[]]$ExtraArgs = @(), [string]$GhShim = '')
+    $prev     = $env:CLAUDE_PROJECT_DIR
+    $prevPath = $env:PATH
     $env:CLAUDE_PROJECT_DIR = $Fixture
+    if ($GhShim) { $env:PATH = "$GhShim;$prevPath" }
     try {
         $args = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $Fixture 'scripts\task\session-status.ps1')) + $ExtraArgs
         $out  = & powershell @args 2>&1
@@ -125,6 +184,7 @@ function Invoke-Status {
     } finally {
         if ($null -eq $prev) { Remove-Item Env:\CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue }
         else { $env:CLAUDE_PROJECT_DIR = $prev }
+        $env:PATH = $prevPath
     }
 }
 
@@ -299,6 +359,63 @@ try {
     Assert-True (-not ($r.Flat -match 'no release note was found')) `
         'a note whose name carries no version is still FOUND rather than reported absent'
     Assert-True ($r.Flat -match 'marker-for-prose-name') 'and its still-open section is read out'
+
+    Write-Host 'The open-issues block lists every issue, not one Object[]' -ForegroundColor Cyan
+    # THE MEASURED BUG THIS PINS. `@(gh ... | ConvertFrom-Json)` collects PowerShell 5.1's parsed array as
+    # a SINGLE element, so $_.number did member enumeration and the live block printed exactly
+    # '#System.Object[]  System.Object[]' while three issues were open. Asserted through the real script as
+    # a child process against a fake gh, because the output is Write-Host -- invisible to a same-process
+    # pipeline, so an in-process assertion would read empty for the passing AND the failing case.
+    $issuesFx = New-Fixture; $fixtures += $issuesFx
+    $shim3 = New-GhShim -Json '[{"number":655,"title":"first thing"},{"number":657,"title":"second thing"},{"number":660,"title":"third thing"}]'
+    $fixtures += $shim3
+    $r = Invoke-Status -Fixture $issuesFx -GhShim $shim3
+    $block = Get-Block $r.Out 'Open issues'
+    Assert-Equal 0 $r.Code 'three open issues: still exits 0'
+    Assert-True ($block -match '#655\s+first thing')  'the first issue is printed with its number and title'
+    Assert-True ($block -match '#657\s+second thing') 'the second issue is printed -- so the array was really flattened'
+    Assert-True ($block -match '#660\s+third thing')  'and the third, so nothing is lost at the tail'
+    # The regression pin proper: the mangled form is a LITERAL, so this assert can only pass on a real fix.
+    Assert-True (-not ($block -match 'System\.Object\[\]')) 'and no Object[] is rendered where a number belongs'
+
+    Write-Host 'A repo with no open issues says none, rather than a bare hash' -ForegroundColor Cyan
+    # THE SILENT HALF, AND THE ONE A POPULATED-CASE TEST WOULD MISS. $issues.Count was 1 whether the array
+    # held zero items or thirty -- the single pipeline object IS the array -- so `if ($issues.Count -eq 0)`
+    # could NEVER fire and an issue-free repo printed '#' followed by two empty fields.
+    $shim0 = New-GhShim -Json '[]'; $fixtures += $shim0
+    $r = Invoke-Status -Fixture $issuesFx -GhShim $shim0
+    $block = Get-Block $r.Out 'Open issues'
+    Assert-Equal 0 $r.Code 'zero open issues: still exits 0'
+    Assert-Equal 'none' $block 'the empty list reports none -- the branch that was unreachable'
+    Assert-True (-not ($block -match '#')) 'and no bare # with empty fields is printed'
+
+    Write-Host 'Exactly one open issue -- the blind spot that let the defect survive' -ForegroundColor Cyan
+    # AT ONE RECORD THE BROKEN FORM WAS CORRECT: member enumeration over a one-element array yields that
+    # element's own number, so the block only misbehaved at 0 or 2+. Pinned so the repair is not later
+    # "simplified" back on the evidence of the one case that always worked.
+    $shim1 = New-GhShim -Json '[{"number":664,"title":"only one open"}]'; $fixtures += $shim1
+    $r = Invoke-Status -Fixture $issuesFx -GhShim $shim1
+    $block = Get-Block $r.Out 'Open issues'
+    Assert-True ($block -match '#664\s+only one open') 'a single issue is still printed correctly after the fix'
+    Assert-True (-not ($block -match 'none')) 'and one issue is not reported as none'
+
+    Write-Host 'A gh that cannot answer says so, instead of reporting none' -ForegroundColor Cyan
+    # A SECOND, PRE-EXISTING DEFECT IN THE SAME BLOCK, found by running this suite against the pre-fix
+    # script: `2>$null` means an unauthenticated or offline gh throws nothing and prints nothing, so the
+    # catch never fired and the block reported 'none'. 'we could not ask' printed as 'there are none' is a
+    # wrong answer that looks like a right one, and it made the degrade line the docstring promises for
+    # every optional source unreachable here. The flattening repair alone would have preserved it, which is
+    # why the exit code is checked rather than the output being trusted.
+    $shimFail = New-GhShim -Json '' -ExitCode 1; $fixtures += $shimFail
+    $r = Invoke-Status -Fixture $issuesFx -GhShim $shimFail
+    $block = Get-Block $r.Out 'Open issues'
+    Assert-Equal 0 $r.Code 'a failing gh does not fail the reporter'
+    Assert-True ($block -match 'gh could not reach the remote') 'the degrade line is stated'
+    Assert-True (-not ($block -match 'none')) 'and an unanswerable gh is NOT reported as zero open issues'
+    # THE STRUCTURAL PIN: the degrade path is an else-branch, not an early return. A `return` there would be
+    # at SCRIPT scope and would end session-status on the spot, dropping every block below it in silence.
+    Assert-True ($r.Flat -match 'Pending changelog entries') 'and every block BELOW the issues still prints -- no return at script scope'
+    Assert-True ($r.Flat -match 'feat/a-branch') 'including the pending entry itself, so the report really continued'
 }
 finally {
     try { [Console]::OutputEncoding = $prevOut } catch { }

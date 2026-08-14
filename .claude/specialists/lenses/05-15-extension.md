@@ -179,6 +179,38 @@ infrastructure.
     a `catch` that degrades the gate to "cannot check" — so the gate silently never blocked **while
     every pure unit test stayed green**. Only the wiring fixture caught it, which is the general
     lesson: a pure decision table proves the decision, never that it is reached.
+
+    **IT HAS NOW FIRED TWICE, IN TWO UNRELATED SCRIPTS, SO TREAT IT AS A CLASS RATHER THAN AS THIS LIB'S
+    INCIDENT** (August 14, 2026). `session-status.ps1`'s open-issues block carried the same one-liner and
+    printed `#System.Object[]  System.Object[]` for three open issues — in this repo *and* in every
+    consumer's mirror, since both the `lock` and `continue` skills tell a consumer to run it. Grep for
+    `@(` immediately followed by a command piping into `ConvertFrom-Json` before adding another.
+    **Two things that measurement added, neither of which the original write-up had:**
+    - **At exactly ONE record the broken form is correct**, because member enumeration over a
+      one-element array yields that element's own value. So the defect is invisible at 0 or 1 and only
+      shows at 2+ — which is how it survived in a repo that usually had one open issue or none. A test
+      that covers the populated case with a single record proves nothing; use three.
+    - **`.Count` is `1` whether the array holds zero items or thirty**, so an `if ($x.Count -eq 0)`
+      guard behind this pattern is **unreachable**, and the empty case falls into the populated branch.
+      Here that printed a bare `#` with two empty fields. Fix and test *both* branches: the visible
+      symptom is the populated case, the silent one is the empty case.
+- **`scripts/task/session-status.ps1`** — the reporter behind `/lock` and `/continue`; shared and
+  mirrored, and a consumer keeps no copy of their own, so a defect here is invisible to them. Its
+  open-issues block was repaired on **August 14, 2026** and cost **two** lessons beyond the
+  `ConvertFrom-Json` trap above:
+  - **A `2>$null` on a native command makes its `catch` unreachable, so check `$LASTEXITCODE` instead.**
+    The older of the two defects: an unauthenticated or offline `gh` throws nothing and prints nothing,
+    so `ConvertFrom-Json` never ran, the pipeline yielded nothing, and the block reported **`none`** —
+    *"we could not ask"* printed as *"there are none"*. The wrong answer that looks like a right one, and
+    it had quietly disabled the degrade line this script's own docstring promises for **every** optional
+    source. The redirect is still correct (a stderr dump is not a status report); what it costs is the
+    throw, so the exit code is read explicitly and the `catch` kept only for a payload that arrives and
+    does not parse.
+  - **No `return` inside a reporter's section blocks.** They sit at **script scope**, where `return` exits
+    the whole script — so an early return in the middle of this one would silently drop every block below
+    it (the pending entries, the tag, the release note) while still exiting `0`. Caught during the fix
+    above, before it shipped: the degrade path is an `else`, and an assert pins that a block *after* the
+    failing one still prints.
 - **`scripts/lib/release-lib.ps1`** — the pure release helpers (version bump, emptying `CHANGELOG.md` down
   to its intro, and the assembly of the `releases/development/` notes)
   that [`cut-release.ps1`](../../../scripts/release/cut-release.ps1) dot-sources; deliberately
