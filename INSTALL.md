@@ -92,14 +92,14 @@ $root = (Get-Location).Path
 
 **One** `project` line per plugin, ending in `payload present`. The count is part of the check.
 Anything else — empty output, two lines for one plugin, `local`, `PAYLOAD MISSING` — is covered in
-[Connecting in four steps](#connecting-in-four-steps), in the adoption half below.
+[Connecting in four steps](#connecting--the-install-step), in the adoption half below.
 
 ### Step 2 — run the bootstrap skill
 
 In the new session, invoke `specialists-init`. It places the persona lenses, an empty lens scaffold
 per specialist, two script scaffolds, one `@`-import in your `CLAUDE.md` and a settings proposal —
 purely additively, in seconds. Check its closing `Done:` line against
-[what it should report](#connecting-in-four-steps).
+[what it should report](#connecting--the-install-step).
 
 ### Step 3 — restart and verify
 
@@ -111,7 +111,7 @@ belongs to, and why**, before doing it. Look for that invariant, not for a fixed
 **This is the big one, and it is not optional.** Steps 1–3 give you a team that knows its craft and
 nothing about your repo; the lenses in `.claude/specialists/lenses/` are where you say what each
 specialist serves *here*, and an unfilled lens does nothing. Budget writing time, not typing time —
-[Step 4 in the adoption half](#connecting-in-four-steps) states the cost and the two things that
+[Step 4 in the adoption half](#connecting--the-install-step) states the cost and the two things that
 reliably surface while you do it.
 
 ### Switching workflows
@@ -119,7 +119,7 @@ reliably surface while you do it.
 Exactly one workflow plugin may be enabled at a time — `workflow-default` or `workflow-davekjohn`, never
 both — because two would hand the specialists two different answers to "how does work move through this
 repo" with no way to tell which one is yours (see
-[Teams and workflows](../README.md#teams-and-workflows--whats-the-difference) in the root README). To
+[Teams and workflows](README.md#teams-and-workflows--whats-the-difference) in the root README). To
 switch, flip the two `enabledPlugins` keys, then repeat Step 1's refresh + install for the newly enabled
 one and restart. Moving **onto** `workflow-davekjohn` also asks your repo for two files it reads —
 `scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1` — which the next `specialists-init` run
@@ -163,7 +163,7 @@ uninstalling.
 
 An improvement to the shared core (an agent def, playbook, persona, or skill) is not reworked
 locally: file it as an issue on this repo with the label `inbound` — there is an
-[issue template](../.github/ISSUE_TEMPLATE/inbound-improvement.md). Repo-specific additions belong in
+[issue template](.github/ISSUE_TEMPLATE/inbound-improvement.md). Repo-specific additions belong in
 your own lenses, which do not travel with the plugin.
 
 ---
@@ -190,7 +190,7 @@ your own lenses, which do not travel with the plugin.
 
 Every plugin is now either a **team** (who the specialists are) or a **workflow** (how work moves
 through the repo) — see
-[Teams and workflows](../README.md#teams-and-workflows--whats-the-difference) in the root README for
+[Teams and workflows](README.md#teams-and-workflows--whats-the-difference) in the root README for
 what each one is and does. Teams stack, exactly as your old plugins did; a workflow does not, which is
 the one genuinely new rule in this table rather than a renaming of an old one.
 
@@ -281,7 +281,7 @@ claude plugin install workflow-default@claude-code-specialists --scope project
 `--scope project` is not optional here any more than it is anywhere else on this page — see
 [Step 1](#step-1--enable-and-install) for what it costs to leave off. Expect the uninstalls and the
 installs to rewrite `.claude/settings.json` on the way, the same rewriting behaviour
-[documented above](#connecting-in-four-steps): the old `enabledPlugins` entries come out, the new ones
+[documented above](#connecting--the-install-step): the old `enabledPlugins` entries come out, the new ones
 go in, and any diff beyond that is formatting.
 
 ### After the reinstall
@@ -364,7 +364,7 @@ runs without its ritual and its delegation rules. The one thing that will tell y
 `roster-sessioncheck` hook, which reports it as a blocking `[ERROR]` at session start — it did exactly that
 in the measured case. If you would rather not construct the path yourself, read it off this repo, which
 consumes its own plugin: its
-[`.claude/specialists/SPECIALISTS.md`](../.claude/specialists/SPECIALISTS.md) carries the import in its
+[`.claude/specialists/SPECIALISTS.md`](.claude/specialists/SPECIALISTS.md) carries the import in its
 current, correct form.
 
 **2. Every `<plugin>:<name>` id in your roster still names a plugin that no longer exists.** The
@@ -458,7 +458,7 @@ bite you, the fix is one `git mv`: rename that one directory from the old plugin
 (`git mv .claude/plugins/claude-specialists/specialists .claude/plugins/claude-specialists/team-alpha`,
 and the matching rename for any add-on team you had) — or, the better long-term move, since it is what
 this page already recommends to anyone still on that layout regardless of this migration, move onto the
-seam instead, per [The seam, specified](../README.md#the-seam-specified) in the root README.
+seam instead, per [The seam, specified](README.md#the-seam-specified) in the root README.
 
 **The seam itself is unaffected by all of this, and most readers are already on it.**
 `.claude/specialists/lenses/` does not encode a plugin name anywhere in its path, so nothing about this
@@ -487,13 +487,13 @@ of their own who wants to work with the specialists team. Everything below is th
 the deeper explanation sits behind the links and is deliberately not repeated here.
 
 **Why the procedure is what it is** — which step was added when, and what was measured to justify it —
-is not on this page. It lives in the release record: [`releases/README.md`](../workflow-davekjohn/releases/README.md)
+is not on this page. It lives in the release record: [`releases/README.md`](workflow-davekjohn/releases/README.md)
 indexes every version with the changes behind it. This page tells you what to do; that one tells you
 why it changed.
 
 > **Budget well over an hour, and know where it goes.** Measured August 6, 2026: this file is ~9,300
 > words (~47 min at 200 wpm) and
-> [`specialists-init`'s `SKILL.md`](teams/team-alpha/skills/specialists-init/SKILL.md) another ~5,600
+> [`specialists-init`'s `SKILL.md`](plugins/teams/team-alpha/skills/specialists-init/SKILL.md) another ~5,600
 > (~28 min) — call it **~75 minutes** for a first-time adopter. Both pages grow, so treat
 > that as an order of magnitude. The time is not in the typing: the bootstrap places the whole seam in
 > seconds. It is in **Step 4**, writing your roster and filling your lenses.
@@ -510,7 +510,7 @@ the team and its playbooks.
 The system consists of **teams and a workflow**: the repo-neutral core team `team-alpha` (always
 enable it), three optional add-on teams, and exactly one **way-of-working** plugin, chosen from the two
 the marketplace offers. Which specialists live in which plugin and who they are meant for is covered in
-the [root README](../README.md).
+the [root README](README.md).
 
 **The workflow slot is different in kind, so decide about it deliberately rather than by habit — and
 decide is the right word, because leaving it empty is no longer the default it once was.** Two plugins
@@ -643,7 +643,7 @@ work it out.** What it hands back: the output of act 6, and the two acts plus tw
 in the order they must happen. What makes this worth spelling out is that the state it stops in is
 **the one state that reads as healthy from every angle** — three correct `project` records, right
 sha, payload on disk, and a session with no `specialists-init` and no Chris. Identical in symptom to
-the [#327/#355 failure](#connecting-in-four-steps) this page teaches you to fear, and benign: the
+the [#327/#355 failure](#connecting--the-install-step) this page teaches you to fear, and benign: the
 restart simply has not happened yet. An agent that does not know this has two plausible wrong moves —
 report `✔ Successfully installed` and call the adoption done, leaving a consumer who believes they
 have the specialists and has never seen one; or go looking for `specialists-init`, not find it, and
@@ -655,12 +655,12 @@ session, invoke `specialists-init`"*. For a delegated adoption there is no share
 "you" is at that line — the natural one is that whoever executed Step 1 continues, and that reading
 is impossible to satisfy.
 
-### Connecting in four steps
+### Connecting — the install step
 
-> **Four *steps* here, six *acts* inside Step 1 — a different unit, not a different path.** Step 1
+> **One *step* here, six *acts* inside it — a different unit, not a different path.** Step 1
 > below is enable → **restart** → refresh → install → restart → verify, which the
-> [root README](../README.md#adoption-the-bootstrap-path) and
-> [`specialists-init`](teams/team-alpha/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
+> [root README](README.md#adoption-the-bootstrap-path) and
+> [`specialists-init`](plugins/teams/team-alpha/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
 > both count as its six acts ("step 0" in their numbering). Saying so is the point: those two pages once
 > counted the same procedure as *four* and *three*, and this page's step count made a third number
 > (inbound [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297)). Nothing was missing from
@@ -911,99 +911,12 @@ is fine.
 > registers the marketplace and writes a complete, correct-looking record — but never fetches the payload.
 > `marketplace update` + `install` are the pair that does.
 
-**Step 2 — run the bootstrap skill.** In the new session, invoke `specialists-init`. It sets up —
-purely additively, without overwriting anything — the **lens-only** persona lenses (including
-Chris) + an empty repo-lens scaffold per specialist in **the seam**
-(`.claude/specialists/lenses/`), one `@`-import at the bottom of your `CLAUDE.md` pointing at that
-seam (which in turn imports Chris's portable body from the plugin install + his repo lens), and a
-proposal for safety settings (`settings.suggested.jsonc`, for your own
-review). The details of this path are in the
-[root README › Adoption](../README.md#adoption-the-bootstrap-path) — which counts the steps there
-as "step 0" (enabling + installing, above) and "step 1" (the skill).
-
-**What it should report, so you can check it rather than trust it** (inbound
-[#337](https://github.com/DaveKJohn/claude-code-specialists/issues/337)). With only the core `team-alpha`
-plugin enabled, the closing line reads:
-
-```
-Done: 4 persona-lens(es) created, 0 already present; 15 lens-scaffold(s) created, 0 already present;
-2 script-scaffold(s) created, 0 already present.
-```
-
-**4 personas + 15 subagent scaffolds = 19 lens files** in `.claude/specialists/lenses/`, plus 2 script
-scaffolds and 1 `@`-import. Those figures used to appear only in the skill's own `SKILL.md`, which a reader
-sees *after* invoking it — i.e. after the moment they would have needed them. This page is meticulous about
-counting everywhere else (*"the count is part of the check, not a detail"*, two steps up), and this was the
-one step where the script prints numbers with nothing to compare them against.
-
-**Read each pair as `created + already present`, not as a fixed number.** The sum is what this page
-promises; the split depends on what your repo already had. A **fresh** repo — this step's own audience —
-gets everything under `created`, which is the sample above. A repo that already had, say,
-`scripts/repo-config.ps1` sees that one move to `already present` instead. So a figure that is *higher*
-than the sample is not an error, and neither is one that is lower: what matters is that each pair adds up
-and that the skill names anything it skipped. If you enabled an add-on team as well, expect its
-specialists on top of these. `workflow-default`, on the other hand, changes nothing here: it carries no
-specialists and needs no script scaffold, so this sample's numbers hold whether or not it is enabled
-alongside `team-alpha`.
-
-> The sample above was itself the finding: until August 2, 2026 it showed `0 script-scaffold(s) created,
-> 2 already present` — captured in a repo that already had them, and therefore inverted for exactly the
-> fresh-repo reader this section was written for (inbound
-> [#358](https://github.com/DaveKJohn/claude-code-specialists/issues/358)). The guidance covered only the
-> "lower than this" direction, so the one number that could not match had no explanation.
-
-**And one thing it does that no document mentioned:** every file it writes uses **LF** line endings and
-`CLAUDE.md` gets **no trailing newline**, on Windows too. Harmless while nothing is committed, but on a repo
-whose files are CRLF this is the same class of lasting diff that `claude plugin install` is warned about a
-few paragraphs up — and the missing final newline turns any later hand-edit of `CLAUDE.md` into a two-line
-diff. If your repo cares, normalise once after the bootstrap.
-
-**Step 3 — restart and verify.** Start again and check that Chris takes the floor. What that looks
-like: the turn **names the specialist the work belongs to, and why**, before doing it — Chris's ritual
-step is *"This one is for \<name\> — \<reason\>."* So on an ordinary request you should see something
-like:
-
-```text
-**This one is for Rebecca (Research Specialist)** — "what's in this repo" is internal repo
-exploration, her domain.
-```
-
-**Check for the invariant, not for a fixed string** (inbound
-[#361](https://github.com/DaveKJohn/claude-code-specialists/issues/361)). A named owner with a stated reason
-is what the persona guarantees and what proves the orchestrator loaded; the exact shape is not fixed.
-Some repos add a house style on top — a fixed header line per turn, emoji and all — but that is a rule
-those repos write into their own `CLAUDE.md`, not something this plugin ships. Until August 2, 2026 this
-step told you to look for `🧭 Chris — intake & routing`, which no bootstrapped repo emits: a
-verification a fresh consumer could not pass, on the step that exists to prove the install worked.
-
-**Step 4 — write the roster and fill the lenses.** This is the step where the system starts being
-useful, and it is by a wide margin the largest one. Steps 1–3 give you a team that knows its craft
-and nothing about your repo; the lenses in the seam (`.claude/specialists/lenses/`) are where you say
-what each specialist serves *here*. An unfilled lens does nothing — it is a scaffold with a `VUL-IN`
-slot, not a default.
-
-**The honest cost: budget half a day's worth of writing, not a command.** Concretely, on a repo of
-ordinary size (measured during the August 3, 2026 adoption that produced inbound
-[#408](https://github.com/DaveKJohn/claude-code-specialists/issues/408)):
-
-- Chris's lens first — the roster and the routing table. Everything else refers back to it.
-- Then the specialists that actually have work in your repo. In that measurement, 20 of the 25
-  placed lenses got repo-specific content; the rest stayed `VUL-IN` on purpose.
-- **A lens may stay empty, and that is a state rather than a backlog item.** Fill it on the day that
-  specialist first has work.
-
-Two things reliably surface in this step and are not caused by it, so plan for them rather than
-diagnose them: a `.gitignore` that excludes `.claude/` and therefore the whole seam — check that
-before you write anything, because every gate stays green while your lenses are untracked — and a
-`scripts/repo-config.ps1` older than the current script contract (`Get-RosterPath`,
-`Get-RosterIgnoredIds`), which `scripts/sync/check-script-contract.ps1` reports for you.
-
-The worker specialists can be invoked directly as `@team-alpha:<name>` from the moment Step 3 is
-done — with an empty lens they simply answer out of their portable playbook.
-
-> **Do not attribute this half hour to the installer.** `specialists-init` places the seam, 25 lens
-> files, the roster scaffold, the settings proposal and the `@`-import in **seconds**. The time here is
-> yours, spent writing — which is why it is a numbered step rather than a closing remark.
+**Steps 2 to 4 are on their own page now: [ADOPTION.md](plugins/ADOPTION.md).** Running the bootstrap skill,
+verifying that the orchestrator took the floor, and writing your roster and lenses are the same work
+whether you installed these plugins yourself or your organisation published them to you -- while
+everything above this line is an install, which for many readers has already been done centrally and
+must not be repeated. That is the seam, and inbound
+[#664](https://github.com/DaveKJohn/claude-code-specialists/issues/664) is where it was measured.
 
 ### Staying up to date
 
@@ -1063,7 +976,7 @@ in place. Earlier releases said *"Plugin `specialists` is not installed at scope
 and easy to misread as "not installed at all". Whatever the phrasing, the failure means the command
 looked in the wrong scope. Do not answer it by re-running the install either: a scopeless install adds
 a **second, machine-wide record** beside the project one. For **what changed**, read
-[`CHANGELOG.md`](../CHANGELOG.md) and [`releases/`](../workflow-davekjohn/releases/README.md) — and you already have both,
+[`CHANGELOG.md`](CHANGELOG.md) and [`releases/`](workflow-davekjohn/releases/README.md) — and you already have both,
 because your marketplace source is a git clone of the whole repository at
 `~/.claude/plugins/marketplaces/claude-code-specialists/`, not a per-plugin extract.
 
@@ -1160,10 +1073,10 @@ went missing and no session has started since, and from the workshop about a con
 session start is a record of the wrong *shape*, which since `v3.0.9` the checks report as
 `[RECORD-SHAPE]`: `local` where this family assumes `project`, or two records where it assumes one. None of this is a reason to avoid project scope — it is a reason not to treat "the version I
 installed" as a lasting fact. The `projectPath` query from
-[Step 1](#connecting-in-four-steps) is the answer to *"what am I actually running?"* — not the last
+[Step 1](#connecting--the-install-step) is the answer to *"what am I actually running?"* — not the last
 release notes you read, and not the install output, which names no version at all. If it comes back
 empty, re-install from that root — and note that this is the case where the install **adds
-`enabledPlugins`** rather than merely reformatting it (see [Step 1](#connecting-in-four-steps)).
+`enabledPlugins`** rather than merely reformatting it (see [Step 1](#connecting--the-install-step)).
 
 **Check that query again *after* a repair install, because the repair can leave two records where you
 wanted one.** Measured in `DaveKJohn/life-hub` on July 31, 2026, CLI `2.1.220` (inbound
@@ -1229,7 +1142,7 @@ what to do about it while you still can.
 
 - **An improvement to the shared core** (an agent def, playbook, persona, or skill): don't
   rework it locally, but report it as an issue on this repo with the label `inbound` — an
-  [issue template](../.github/ISSUE_TEMPLATE/inbound-improvement.md) is ready for that. The
+  [issue template](.github/ISSUE_TEMPLATE/inbound-improvement.md) is ready for that. The
   workshop processes it through its own chain, and the improvement comes back to all consumers via
   a release.
 - **Repo-specific additions** belong in your own repo lenses in the seam

@@ -296,11 +296,11 @@ this paragraph first named its two siblings: four SessionStart hooks (`connector
 in the core team) plus the skills `specialists-init` and `discover-workflow`. Mind the **version gate**: consumers only receive the
 hook after a release bump plus `claude plugin marketplace update <marketplace>` and
 `claude plugin update <plugin>@<marketplace> --scope project` (neither the refresh nor the scope flag
-is optional — see [Staying up to date](../plugins/INSTALL.md#staying-up-to-date)) + session restart on
+is optional — see [Staying up to date](../INSTALL.md#staying-up-to-date)) + session restart on
 their side.
 
 The same gate applies to a newly added **skill** file — see
-[Staying up to date](../plugins/INSTALL.md#staying-up-to-date) in the adoption page for the full mechanics.
+[Staying up to date](../INSTALL.md#staying-up-to-date) in the adoption page for the full mechanics.
 Watch out here in particular: the `/reload-plugins`/`/reload-skills` skill counters are no proof
 that this hook has landed for a consumer — treating a reload notice as that confirmation is exactly
 the trap from #186.

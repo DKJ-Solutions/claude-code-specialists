@@ -38,9 +38,11 @@ verify — grouped below as `0a` (acts 1 and 2), `0b` (acts 3 and 4) and `0c` (a
 > **The count is deliberately the same six as in the
 > [claude-code-specialists README](../../../../../README.md#adoption-the-bootstrap-path)** (inbound
 > [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297)). This page said *three acts* while
-> that one said *four* and the [adoption page](../../../../INSTALL.md#connecting-in-four-steps) said *three
-> steps* — the same path, nothing missing anywhere, three different numbers, and the pages link to each
-> other for exactly this step. For a reader following it the first time the count is the only check they
+> that one said *four* and the page carrying this procedure said *three steps* — the same path, nothing
+> missing anywhere, three different numbers, and the pages link to each other for exactly this step.
+> (That third page is [`INSTALL.md`](../../../../../INSTALL.md#connecting--the-install-step) today: the
+> procedure below is its install step, and the adoption steps that used to follow it now live one page
+> over.) For a reader following it the first time the count is the only check they
 > have on whether they skipped something. The letters stay, because they are what the rest of this page
 > refers to; the number now counts the same unit as the README.
 >
@@ -50,12 +52,19 @@ verify — grouped below as `0a` (acts 1 and 2), `0b` (acts 3 and 4) and `0c` (a
 > and in the adoption page in the same change. The letters absorbed it (`0a` is now two acts) rather than
 > the count staying at five.
 >
-> **That adoption page is the second half of `plugins/INSTALL.md`.** It was `QUICKSTART.md` until
-> August 3, 2026 (inbound [#408](https://github.com/DaveKJohn/claude-code-specialists/issues/408)),
-> then `ADOPTION.md` with a short commands-only `QUICKSTART.md` beside it, and the two are now one
-> file with the short one as its first half. Its own *step* count moved from three to four in the
-> #408 change — filling the lenses became a numbered step instead of a trailing "at your own pace"
-> clause — so if you are cross-reading, expect **four steps** there and **six acts** here for step 0.
+> **That adoption page is [`plugins/ADOPTION.md`](../../../../ADOPTION.md).** It has been three
+> documents under four names: `QUICKSTART.md` until August 3, 2026 (inbound
+> [#408](https://github.com/DaveKJohn/claude-code-specialists/issues/408)), then `ADOPTION.md` with a
+> short commands-only `QUICKSTART.md` beside it, then both merged into `plugins/INSTALL.md`, and since
+> August 14, 2026 split again — this time on **audience** rather than length (inbound
+> [#664](https://github.com/DaveKJohn/claude-code-specialists/issues/664)): the install plumbing stayed
+> behind as a root `INSTALL.md`, and adoption became its own page again.
+>
+> **Its step count went from four to three in that split, and the missing one is this skill's own
+> neighbour.** What used to be its Step 1 — enabling and installing — is the plumbing that moved out,
+> because for a reader whose organisation published these plugins to them it has already happened. So
+> if you are cross-reading, expect **three steps** there and **six acts** here for step 0, and note
+> that those six acts are now described on a different page than the three steps.
 
 **0a — enable, then restart once.** Verify that the consumer has this in `.claude/settings.json`:
 
@@ -197,7 +206,7 @@ and a stale cache is invisible by construction because it reports success with a
 number — so the procedure guarantees freshness rather than relying on the CLI to keep doing it. This
 pair is what every "pick up the new release" pointer in this family means — in
 [`sync-roster`](../sync-roster/SKILL.md), in `scripts/sync/check-script-contract.ps1`, in the
-[adoption page](../../../../INSTALL.md#staying-up-to-date), and in the release notes. Read a bare
+[adoption page](../../../../../INSTALL.md#staying-up-to-date), and in the release notes. Read a bare
 `claude plugin update` anywhere as shorthand for these two lines.
 
 **0c — restart, then verify before invoking.** Verify rather than assume, because **the failure this
@@ -310,7 +319,7 @@ gh api repos/DaveKJohn/claude-code-specialists/tags --jq '.[] | select(.name=="v
 
 That route has no peeling problem to worry about: the API's `.commit.sha` is the commit already, annotated
 tag or not. Equal to your record's `gitCommitSha` means you are on that release; different means you are
-on `main` — see [Staying up to date](../../../../INSTALL.md#staying-up-to-date) for why that happens
+on `main` — see [Staying up to date](../../../../../INSTALL.md#staying-up-to-date) for why that happens
 without anyone asking for it, and why it is not something you can fix from here.
 
 **One** line per plugin you enabled, each saying `project`, is the green you need — and the *count*

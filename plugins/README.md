@@ -63,11 +63,11 @@ Both are stated in full where they apply: [`teams/README.md`](teams/README.md) a
   folders, and it has [its own README](agent-shared/README.md) for the never-edit-between-the-sentinels
   rule and how to add a block. See also
   [Shared agent-def blocks](../README.md#shared-agent-def-blocks--one-source-for-the-verbatim-boundaries).
-- **[`INSTALL.md`](INSTALL.md)** — how to connect your own repo, in a
-  [quickstart half](INSTALL.md#quickstart--the-commands-and-nothing-else) and an
-  [adoption half](INSTALL.md#adoption--how-to-connect-your-repo). It sits here, beside the plugins it
+- **[`INSTALL.md`](../INSTALL.md)** — how to connect your own repo, in a
+  [quickstart half](../INSTALL.md#quickstart--the-commands-and-nothing-else) and an
+  [adoption half](../INSTALL.md#adoption--how-to-connect-your-repo). It sits here, beside the plugins it
   explains, rather than at the repo root.
-- **[`UNINSTALL.md`](UNINSTALL.md)** — its mirror: the repo teardown and the machine-side removal, in
+- **[`UNINSTALL.md`](../UNINSTALL.md)** — its mirror: the repo teardown and the machine-side removal, in
   the order they have to happen.
 
 Adding a plugin touches more than this directory, because the docs that enumerate the plugins go stale

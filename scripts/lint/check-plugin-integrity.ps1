@@ -18,7 +18,7 @@
          main-loop specialists) DELIBERATELY have no agent def -- they run in the main loop, not
          as a subagent -- and are therefore left alone by check 6's agent-def<->manual link.
       4. dead relative links AND broken anchors in every ROOT *.md (README.md, CHANGELOG.md, CLAUDE.md,
-         CONTRIBUTING.md, SECURITY.md, plugins/INSTALL.md, plugins/UNINSTALL.md and any unfolded changelog entry file
+         CONTRIBUTING.md, SECURITY.md, INSTALL.md, UNINSTALL.md and any unfolded changelog entry file
          -- globbed, never named), every .claude/extensions/*.md, every <plugin>/skills/*/SKILL.md, every
          <plugin>/manuals/*-manual.md, every <plugin>/personas/*-persona.md, every releases/**/*.md,
          every <plugin>/RELEASE.md, connectors/README.md, and
@@ -1650,13 +1650,22 @@ $sampleChecked = 0
 # and the new short QUICKSTART.md carried almost none. Listing only the old name would have left both
 # checks reporting green over the document that actually holds their subject.
 #
-# THE TWO ARE ONE FILE AGAIN -- plugins/INSTALL.md, the short page as its first half -- so the set is
+# THE TWO ARE ONE FILE AGAIN -- INSTALL.md, the short page as its first half -- so the set is
 # three entries, not four. Note what the merge did to the failure mode this comment describes: while
 # they were separate, naming the wrong one silently halved the coverage. Now there is one page and no
 # wrong one to name, which is worth more than the entry it saved.
+#
+# AND THEN THEY WERE THREE AGAIN, on the audience seam rather than the length one (inbound #664,
+# August 14, 2026). The adoption half became plugins/ADOPTION.md and the two plumbing pages moved to
+# the repo root, so the set is four entries at three new paths. ADOPTION.md is the entry that matters
+# most here, and this comment predicted exactly why: the captured samples and measured figures these
+# two checks exist for -- the bootstrap's closing line, the 4+15+2 counts, the verification snippet --
+# travelled WITH the adoption half. Listing only the pages that kept their names would have left both
+# checks reporting green over the document that now holds their subject, for the second time.
 $consumerDocs = @(
-    'plugins\INSTALL.md',
-    'plugins\UNINSTALL.md',
+    'INSTALL.md',
+    'UNINSTALL.md',
+    'plugins\ADOPTION.md',
     'README.md'
 )
 # What counts as saying "here is what this is bound to". A version or a year pins the capture in time; the
