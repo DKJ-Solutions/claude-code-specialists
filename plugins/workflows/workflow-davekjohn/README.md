@@ -58,7 +58,7 @@ answering the question the other directory owns.
 
 | skill | when |
 |---|---|
-| [`new-branch`](skills/new-branch/SKILL.md) | starting any piece of work — creates the branch and both `branch/` files in one move |
+| [`new-branch`](skills/new-branch/SKILL.md) | starting any piece of work — creates the branch and both `workflow-davekjohn/branch/` files in one move |
 | [`park`](skills/park/SKILL.md) | handing an unfinished branch to another machine: push, no PR |
 | [`open-pr`](skills/open-pr/SKILL.md) | the work is committed — runs the four gates, pushes, opens the PR with the title and body composed from the entry |
 | [`ship-pr`](skills/ship-pr/SKILL.md) | open → wait for CI → merge → fold, in one motion |

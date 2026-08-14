@@ -228,7 +228,8 @@ if (-not $branchType) {
 # hypothetical in a repo whose whole workflow is "notice it once, script it the second time".
 $branchId = (Get-Date).ToString('yyyyMMdd-HHmmss')
 
-# THE BRANCH FILES LIVE IN branch/, NOT IN THE REPO ROOT UNDER THE BRANCH'S NAME (Dave, August 6, 2026).
+# THE BRANCH FILES LIVE IN workflow-davekjohn/branch/, NOT IN THE REPO ROOT UNDER THE BRANCH'S NAME
+# (Dave, August 6, 2026; moved under the workflow's own root folder August 14, 2026).
 # Two fixed paths, and git's own per-branch tracking is what keeps two branches from colliding on them --
 # see the block in entry-scaffold-lib.ps1 for why that beats a filename per branch.
 $branchFiles    = Get-BranchFilePaths

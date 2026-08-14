@@ -1,20 +1,25 @@
-# `branch/` — the two files a branch works in
+# `workflow-davekjohn/branch/` — the two files a branch works in
 
 Everything a branch needs to carry lives here, split into two files with one job each — the entry
 (`branch-changelog.md`) and the step list (`branch-progress.md`). **The convention is not this repo's
 own** — it is what the `workflow-davekjohn` plugin does, in every repo that enables it, and it is
 described once, with the plugin:
 
-📄 **[The `branch/` files — the portable half](../plugins/workflows/workflow-davekjohn/BRANCH-portable.md)**
+📄 **[The `branch/` files — the portable half](../../plugins/workflows/workflow-davekjohn/BRANCH-portable.md)**
 
 Read that first. It covers the two files and their jobs, the dossier form, the three step marks, the
 reset state on the trunk, the rules, what the fold does at the merge, and working from more than one
 machine. **This page is this repo's set of answers to it**, and nothing more.
 
-The split is the same one [`CONTRIBUTING.md`](../CONTRIBUTING.md) and [`releases/README.md`](../releases/README.md)
+The split is the same one [`CONTRIBUTING.md`](../../CONTRIBUTING.md) and [`releases/README.md`](../../releases/README.md)
 already use: the portable half travels with the plugin, the local half stays in the repo (Dave,
 August 13, 2026 — proposed as a "PR-portable" and narrowed to this page, because the PR cycle itself
 already travels in `CONTRIBUTING-portable.md`).
+
+The directory sat at the repo root as `branch/` until August 14, 2026 (Dave), when the workflow's
+portable belongings began gathering under `workflow-davekjohn/` — one folder in the consumer's root
+instead of several. A repo still carrying the old root `branch/` removes it by hand; the scripts read
+only this location.
 
 ---
 
@@ -32,5 +37,5 @@ already travels in `CONTRIBUTING-portable.md`).
   templates are held byte-for-byte to the formatters `new-branch` calls (`Get-BranchTemplates`), the
   entry-shape claims in the portable half are checked against the scaffolder, and the
   heading-level rules the portable half describes are all checks in
-  [`check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1). In a consumer, the
+  [`check-plugin-integrity.ps1`](../../scripts/lint/check-plugin-integrity.ps1). In a consumer, the
   scaffolder's refresh-on-drift is what keeps the templates current instead.

@@ -4,7 +4,7 @@ description: >-
   Fold a branch's changelog entry into CHANGELOG.md via the shared, centralized fold script from the
   plugin (single source of truth, issue #81) -- so a consumer does not have to duplicate this script
   locally. Use this on main, immediately after merging a branch, to fold the entry
-  (branch/branch-changelog.md, or a pre-split <branch-name>.md in the repo root) into CHANGELOG.md --
+  (workflow-davekjohn/branch/branch-changelog.md, or a pre-split <branch-name>.md in the repo root) into CHANGELOG.md --
   a flat ranked list with no section headings, where each entry lands at the position its own
   Significance sections rank it at (furthest reach first, highest significance first within a tier) -- and then
   clear it: the branch/ pair is reset to its empty state, a root entry file is removed.
@@ -25,8 +25,8 @@ where a conflict is pure noise, because the two entries never actually disagree.
 writes its **own** entry file, and this skill folds it in after the merge, when the conflict window is
 already closed.
 
-**The entry is `branch/branch-changelog.md`** — a fixed path, the same on every branch. Git tracks it
-per branch, so branches in flight cannot collide on it. Its companion `branch/branch-progress.md` is the
+**The entry is `workflow-davekjohn/branch/branch-changelog.md`** — a fixed path, the same on every branch. Git tracks it
+per branch, so branches in flight cannot collide on it. Its companion `workflow-davekjohn/branch/branch-progress.md` is the
 step list; it is never folded, and it is what the fold reads the branch name back off in order to find
 the PR.
 
@@ -145,7 +145,7 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/fold-changelo
 lags its own source by however many merges have landed since. A consumer keeps no copy of their own, so
 for them the line above is the correct one.
 
-Without `-Branch` it folds everything it finds: `branch/branch-changelog.md` if it holds an entry, plus
+Without `-Branch` it folds everything it finds: `workflow-davekjohn/branch/branch-changelog.md` if it holds an entry, plus
 any pre-split entry file in the root. An optional `-RepoRoot <path>`
 overrides which repo root the script writes to — for a consumer that runs the fold from a
 temporary/detached worktree (e.g. a `ship-pr.ps1` that checks out main elsewhere) and wants the fold
@@ -155,7 +155,7 @@ to land there instead of wherever `CLAUDE_PROJECT_DIR`/git-root would otherwise 
 1. Folds each entry into `CHANGELOG.md`, with the PR number + link included (retrieved via
    `gh pr list` — keyed on `-Branch`, or on the name in `branch-progress.md`, or for a pre-split entry
    on its file name).
-2. Clears it afterwards: **`branch/branch-changelog.md` and `branch/branch-progress.md` are reset** to
+2. Clears it afterwards: **`workflow-davekjohn/branch/branch-changelog.md` and `workflow-davekjohn/branch/branch-progress.md` are reset** to
    their empty state, a pre-split root entry file is **removed**.
 
 **Where it lands is decided by the entry's own Significance section**, not by a heading and not by a seam.
@@ -275,7 +275,7 @@ this skill.
 ## Important
 
 - **Run this on main, after the merge** (after the PR has been merged) — then the PR number exists.
-- The script only touches `CHANGELOG.md`, the entries it folds and `branch/branch-progress.md`; nothing
+- The script only touches `CHANGELOG.md`, the entries it folds and `workflow-davekjohn/branch/branch-progress.md`; nothing
   else.
 - The source of this script lives in the workshop repo; do not modify it locally in the consumer. A
   change lands first in the source (`scripts/release/fold-changelog-entry.ps1`) and then travels via

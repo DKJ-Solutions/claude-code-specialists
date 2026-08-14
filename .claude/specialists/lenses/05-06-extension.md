@@ -34,7 +34,7 @@ sections, and two names that had been retired — for a day after the format mov
 documents [#508](https://github.com/DaveKJohn/claude-code-specialists/issues/508) measured as stale. The
 count is now held by the lint against `Get-EntrySectionHeadings`, so this cannot silently drift again; the
 NAMES are not, and deliberately, for the reason that check's own comment records. **The shape itself is
-written once**, in `branch/templates/branch_template_changelog.md`, which is generated — read it there
+written once**, in `workflow-davekjohn/branch/templates/branch_template_changelog.md`, which is generated — read it there
 rather than trusting any prose, this paragraph included.
 
 **Two sections went in the same movement, and each for a measured reason.**
@@ -62,11 +62,11 @@ entries rather than off which section they sit in.
 
 #### How it works
 
-- **`branch/branch-changelog.md`** — written when the branch is created; contains that branch's single
+- **`workflow-davekjohn/branch/branch-changelog.md`** — written when the branch is created; contains that branch's single
   entry and **nothing around it**, so it pastes into `CHANGELOG.md` in one go. A **fixed** path, the same
   on every branch: git already tracks it per branch, so two branches in flight cannot collide on it, and
   the repo root stops filling up with other people's work.
-- **`branch/branch-progress.md`** — its companion: the branch's name, its step list, and where you left
+- **`workflow-davekjohn/branch/branch-progress.md`** — its companion: the branch's name, its step list, and where you left
   off. Never folded. The branch line is what the fold reads back to find the PR, since the file name no
   longer carries it.
 - **Both live on `main` in an empty reset state**, opening with an `#` and carrying a warning not to write
@@ -74,7 +74,7 @@ entries rather than off which section they sit in.
   levels, so the trunk's own empty file can never be folded as if it were a change.
 - **A pre-split root entry still folds.** Before August 6, 2026 the entry was a `<branch-name>.md` in the
   root — branch `feat/new-plugin` → `feat-new-plugin.md` — and the fold recognises both forms, deleting
-  the root one and resetting the `branch/` pair. On such a branch: **never add a suffix like `-fix` or
+  the root one and resetting the `workflow-davekjohn/branch/` pair. On such a branch: **never add a suffix like `-fix` or
   `-v2`** — without `-Branch` the fold recovers the branch from that file name, and a suffix breaks the
   PR lookup.
 - **After the merge**: `scripts/release/fold-changelog-entry.ps1` reads the entry and inserts it at its
@@ -123,7 +123,7 @@ itself.
 improvement, the entry comes into being **at the moment the branch is created** — no
 separate later scaffolding step: [Derek #05](05-05-extension.md#classifying-naming-and-creating-a-branch)'s
 `new-branch.ps1` checks out the branch and, in the same move, calls the shared
-`scripts/task/new-branch.ps1 -Title "…"` (which writes both `branch/` files, filling in the
+`scripts/task/new-branch.ps1 -Title "…"` (which writes both `workflow-davekjohn/branch/` files, filling in the
 title, the branch name and the type from the prefix automatically) as a child step. A branch is never
 entry-less. Whoever builds on the
 branch (often [Tessa #16](06-16-extension.md) or [Sylvester #15](05-15-extension.md)) fills in the
@@ -131,7 +131,7 @@ description while building; ownership of the entry mechanism stays Rendall's.
 
 #### Lifecycle
 
-1. **Branch** → both `branch/` files are written *at branch creation* (Derek's `new-branch.ps1`); you
+1. **Branch** → both `workflow-davekjohn/branch/` files are written *at branch creation* (Derek's `new-branch.ps1`); you
    fill in the description and keep the step list current while building. Never touch `CHANGELOG.md`.
 2. **Merge to `main`** ([Derek #05](05-05-extension.md#merging-to-main)) → the entry travels
    along. Rendall runs `fold-changelog-entry.ps1 -Branch <name> -Push` on `main`: that folds, commits
@@ -145,7 +145,7 @@ description while building; ownership of the entry mechanism stays Rendall's.
    **this** repo's direct-on-`main` exception, which is what the path-scoped commit exists to keep honest,
    and the branch part of the two-machine lesson sits with
    [Derek #05](05-05-extension.md#branch--repo-hygiene).
-   The fold also **resets both `branch/` files** to their empty state and names them in the same commit,
+   The fold also **resets both `workflow-davekjohn/branch/` files** to their empty state and names them in the same commit,
    so the trunk is ready for the next branch instead of showing the merged one's ticked-off steps.
 3. **More branches merged** → each brings its entry; each gets inserted at the position its own impact
    table ranks it at, so the list stays ordered furthest-reach-first as it grows.
@@ -409,7 +409,7 @@ red the moment the section was opened, which is what forced the second commit in
 pair land half-done.
 
 Guardrails: on a clean `main`, no unfolded entry — neither a pre-split file in the root nor a filled
-`branch/branch-changelog.md`, which is its own check because a filled one looks like the reset state at a
+`workflow-davekjohn/branch/branch-changelog.md`, which is its own check because a filled one looks like the reset state at a
 glance — lint gate green, and the tag must not exist yet. There is deliberately **no release branch and no `release` prefix** — the release
 does not touch the branch workflow. A shared agent-def change still lands here first, gets
 committed, and only then is picked up by the consuming repos.
@@ -434,7 +434,7 @@ the tier ladder and the release cut are one particular way of running a release,
 release management. Rendall's craft in such a repo is whatever *that* repo's release process is.
 
 - `scripts/task/new-branch.ps1 [-Title <string>] [-Intent <string>]` — write the branch's
-  two files in `branch/`. `-Intent` records where you left off / what is next in
+  two files in `workflow-davekjohn/branch/`. `-Intent` records where you left off / what is next in
   **`branch-progress.md`**, not in the entry (#162): an intent is a status, and the entry's text folds
   verbatim into `CHANGELOG.md`. Idempotent per file, judged on what each file says it belongs to rather
   than on its existing — both exist on `main` by design. Shared/mirrored to the plugin

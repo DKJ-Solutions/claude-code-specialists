@@ -218,7 +218,7 @@ The constitution above, concretely implemented here:
   [#508](https://github.com/DaveKJohn/claude-code-specialists/issues/508)). Two of those descriptions were
   measured stale during a sweep that was looking for exactly that, one of them consumer-facing. The
   alternative — deleting the shape from every document and pointing at
-  [`branch/templates/`](branch/templates/) — was weighed and declined: the prose costs every reader on
+  [`workflow-davekjohn/branch/templates/`](workflow-davekjohn/branch/templates/) — was weighed and declined: the prose costs every reader on
   every read, while a check costs nothing per read. **What is checked is the section COUNT, not the
   section names**, and that was settled by measuring four candidate rules against the tree rather than by
   argument. A name-matching rule produced **six** findings on the tree, **all six false**: `What does this
@@ -265,7 +265,7 @@ The constitution above, concretely implemented here:
 
   **The PR template that caused the collision is itself the change** (Dave, August 9, 2026). It now carries
   one section — the changelog entry — because `open-pr.ps1` composes the body from
-  `branch/branch-changelog.md`, so everything else it asked was already answered four lines lower. Measured
+  `workflow-davekjohn/branch/branch-changelog.md`, so everything else it asked was already answered four lines lower. Measured
   over 60 PRs before removing anything: `Type of change` had exactly **one of four** boxes ticked every
   single time, a fact the entry states under `### Branch type` and which the GitHub label takes from
   `Get-BranchInfo` rather than from the tick; of the checklist, `Requested by Dave` and
@@ -339,7 +339,7 @@ The constitution above, concretely implemented here:
   exactly those entries through. **Recognise both, write one** — the same rule the `Tier: N` line gets.
 - **A fourth gate, on the branch's own plan: the step-list gate** (Dave, August 6, 2026). A branch
   reaches a PR when its own plan is finished, so `open-pr.ps1` refuses to push and `ship-pr.ps1` refuses
-  to merge while `branch/branch-progress.md` has an unresolved step. **Both**, deliberately: the
+  to merge while `workflow-davekjohn/branch/branch-progress.md` has an unresolved step. **Both**, deliberately: the
   requirement Dave gave is about the *merge*, and `open-pr` has a `-Force` — a PR opened through that
   valve, or by hand on github.com, would otherwise land with an unfinished plan.
   **Three marks, not two.** `- [x]` is done, `- [~]` is dropped with the reason kept on the line, and a
@@ -350,11 +350,14 @@ The constitution above, concretely implemented here:
   refused**: that is the one-commit typo fix, and refusing it would make the mechanism ceremony. The
   full convention ships with the plugin as
   [`BRANCH-portable.md`](plugins/workflows/workflow-davekjohn/BRANCH-portable.md); this repo's own
-  answers to it stay in [`branch/README.md`](branch/README.md).
+  answers to it stay in [`workflow-davekjohn/branch/README.md`](workflow-davekjohn/branch/README.md). Since
+  August 14, 2026 (Dave) the directory itself sits inside `workflow-davekjohn/`, the workflow's own root
+  folder — the start of gathering everything portable in one place at a consumer instead of scattering it
+  through their root.
 - **Two deliberate exceptions to "never directly on `main`":**
   1. The **fold commit** after a merge: [`fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)
      folds the entry into `CHANGELOG.md` and clears it, and with `-Commit`/`-Push` makes that
-     commit itself — scope limited to `CHANGELOG.md` + the entry + `branch/branch-progress.md`, which
+     commit itself — scope limited to `CHANGELOG.md` + the entry + `workflow-davekjohn/branch/branch-progress.md`, which
      the same run resets, and since August 2, 2026
      enforced rather than merely intended: the commit names its paths, so nothing else in the tree
      can ride along. **The scope grew by one path on August 6, 2026 and the exception did not widen
@@ -689,7 +692,7 @@ The constitution above, concretely implemented here:
      a score and a yes are one fact, free to contradict each other.
 
      **The scaffolded working files carry no comments at all** (Dave, August 7, 2026). Guidance is written
-     only into `branch/templates/`, which is what those copies are for; the file a branch gets is the
+     only into `workflow-davekjohn/branch/templates/`, which is what those copies are for; the file a branch gets is the
      headings and the space under them. The routing questions went with the guidance — the trade being
      that the ladder is now learned from the template and this document rather than from the file in front
      of you. The fold keeps its comment stripper regardless: every branch in flight carries comments, and

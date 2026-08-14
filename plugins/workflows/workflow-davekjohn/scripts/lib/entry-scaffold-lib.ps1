@@ -3050,11 +3050,19 @@ function Get-BranchFilePaths {
         renaming the interface between four scripts, which is what a fork is for. The WORDING inside the
         files is configurable -- see Get-BranchFileWording -- because that is language, and language is
         the thing #410 established a repo owns.
+
+        UNDER workflow-davekjohn/ SINCE AUGUST 14, 2026 (Dave): everything portable about the workflow
+        gathers in that one root folder instead of scattering through the consumer's root, and the
+        branch dossier is its first resident. No dual-read of the old root 'branch/' location,
+        deliberately: new-branch creates the new directory on the first branch (New-Item -Force makes
+        the parents), and a repo still carrying a root branch/ from before removes it by hand -- Dave's
+        call when the move was decided, over a fallback that would have kept two possible locations
+        alive in every reader of this function.
     #>
     return [pscustomobject]@{
-        Directory = 'branch'
-        Changelog = 'branch/branch-changelog.md'
-        Progress  = 'branch/branch-progress.md'
+        Directory = 'workflow-davekjohn/branch'
+        Changelog = 'workflow-davekjohn/branch/branch-changelog.md'
+        Progress  = 'workflow-davekjohn/branch/branch-progress.md'
     }
 }
 
@@ -3319,13 +3327,13 @@ function Format-BranchProgressScaffold {
     return @($lines.ToArray())
 }
 
-$script:BranchTemplateDir         = 'branch/templates'
+$script:BranchTemplateDir         = 'workflow-davekjohn/branch/templates'
 $script:BranchTemplateBranchToken = '<prefix>/<short-name>'
 
 function Get-BranchTemplates {
     <#
-        The copy-paste templates under branch/template/, as objects with Path (repo-relative) and Content
-        (exactly what that file must contain).
+        The copy-paste templates under workflow-davekjohn/branch/templates/, as objects with Path
+        (repo-relative) and Content (exactly what that file must contain).
 
         WHY THEY ARE GENERATED RATHER THAN WRITTEN, and why a lint check reads this same function. A
         template beside a scaffolder that writes the same shape is TWO SOURCES OF ONE FORMAT, which is the

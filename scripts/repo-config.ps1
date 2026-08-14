@@ -204,15 +204,16 @@ function Get-MojibakePaths {
     $paths = @(Get-ChildItem -LiteralPath $RepoRoot -Filter '*.md' -File |
         Select-Object -ExpandProperty FullName)
 
-    # branch/ -- the branch's entry and step list. They were covered by the root glob above until the split
-    # moved them (August 6, 2026), and the entry is the single highest-value file in this set: its text is
-    # pasted verbatim into CHANGELOG.md and from there into the release notes, so a mis-decode caught
-    # anywhere later has already been copied twice.
-    # -Recurse for templates/: those are pasted into a real entry, so a mis-decode there is copied forward
-    # into every branch that uses them rather than staying in one file.
-    $branchDir = Join-Path $RepoRoot 'branch'
-    if (Test-Path -LiteralPath $branchDir) {
-        $paths += @(Get-ChildItem -LiteralPath $branchDir -Recurse -Filter '*.md' -File |
+    # workflow-davekjohn/ -- the workflow's own root folder, which holds the branch's entry and step list
+    # (under branch/, covered by the root glob above until the split moved them on August 6, 2026, and
+    # under this folder since August 14, 2026). The entry is the single highest-value file in this set:
+    # its text is pasted verbatim into CHANGELOG.md and from there into the release notes, so a mis-decode
+    # caught anywhere later has already been copied twice.
+    # -Recurse covers branch/templates/ (pasted into a real entry, so a mis-decode there is copied forward
+    # into every branch that uses them) and, in a consumer, the folder's scaffolded docs.
+    $workflowDir = Join-Path $RepoRoot 'workflow-davekjohn'
+    if (Test-Path -LiteralPath $workflowDir) {
+        $paths += @(Get-ChildItem -LiteralPath $workflowDir -Recurse -Filter '*.md' -File |
             Select-Object -ExpandProperty FullName)
     }
 

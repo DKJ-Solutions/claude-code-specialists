@@ -232,7 +232,7 @@ $script:ContractRecords = @(
        Optional = $true; Default = 'merge';
        Returns = "'merge', 'squash' or 'rebase' -- how this repo merges a PR; ship-pr rejects any other value rather than handing it to gh" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-MojibakePaths'; Scripts = @('fix-mojibake');
-       Adopt = 'copy'; AdoptWhy = 'the one function whose body is workshop-shaped and still safe to copy, because every directory it adds sits behind its own Test-Path: in a repo without plugins/ or releases/ it reduces to the root glob plus branch/, a superset of the fallback that costs an absent directory nothing';
+       Adopt = 'copy'; AdoptWhy = 'the one function whose body is workshop-shaped and still safe to copy, because every directory it adds sits behind its own Test-Path: in a repo without plugins/ or releases/ it reduces to the root glob plus workflow-davekjohn/, a superset of the fallback that costs an absent directory nothing. A copy taken before August 14, 2026 still names the retired root branch/ location -- re-adopt to bring the moved folder back under coverage';
        Optional = $true; Default = 'every *.md in the repo root';
        Returns = "the absolute paths fix-mojibake examines when called without -Path, given a -RepoRoot parameter; without it the tool falls back to every *.md in the repo root, which silently skips whatever else this repo keeps markdown in" },
     # cut-release became shared in #417. All optional, every fallback the behaviour the script had while

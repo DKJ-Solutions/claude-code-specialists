@@ -435,25 +435,25 @@ try {
     # after the move. Both halves are asserted, because a fix that simply stopped scanning branch/ would
     # satisfy the first and lose the check entirely.
     Write-Host "check 4 coverage -- an entry's links are judged where the text LANDS" -ForegroundColor Cyan
-    $entryDirFx = Join-Path $Fixture 'branch'
+    $entryDirFx = Join-Path $Fixture 'workflow-davekjohn\branch'
     New-Item -ItemType Directory -Path $entryDirFx -Force | Out-Null
     $entryFx    = Join-Path $entryDirFx 'branch-changelog.md'
     $progressFx = Join-Path $entryDirFx 'branch-progress.md'
     # 'connectors/README.md' exists in this fixture and is root-relative -- exactly the shape an entry
-    # writes, and exactly what resolving from branch/ would call dead.
+    # writes, and exactly what resolving from workflow-davekjohn/branch/ would call dead.
     [System.IO.File]::WriteAllText($entryFx,
         "## Fixture entry`n`nSee [the connectors README](connectors/README.md) and [nope]($deadLink).`n", $Utf8NoBom)
-    # The step list never travels, so it keeps the ordinary nested convention: '../' to reach the root.
+    # The step list never travels, so it keeps the ordinary nested convention: '../../' to reach the root.
     [System.IO.File]::WriteAllText($progressFx,
-        "# Branch progress`n`n**Branch:** ``feat/fixture```n`n## Steps`n`n- [ ] see [the connectors README](../connectors/README.md)`n", $Utf8NoBom)
+        "# Branch progress`n`n**Branch:** ``feat/fixture```n`n## Steps`n`n- [ ] see [the connectors README](../../connectors/README.md)`n", $Utf8NoBom)
 
     $b4 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($b4.Out -match 'dead link ''connectors/README\.md''')) `
         'entry links: a root-relative link in the entry is NOT dead -- it is judged from the repo root, where the fold puts the text'
-    Assert-True ($b4.Out -match [regex]::Escape('.\branch\branch-changelog.md') -and $b4.Out -match [regex]::Escape($deadLink)) `
+    Assert-True ($b4.Out -match [regex]::Escape('.\workflow-davekjohn\branch\branch-changelog.md') -and $b4.Out -match [regex]::Escape($deadLink)) `
         'entry links: a genuinely dead link in the entry IS still reported -- the rebase is not a way out of the check'
-    Assert-True (-not ($b4.Out -match [regex]::Escape('.\branch\branch-progress.md'))) `
-        'entry links: the step list keeps the ordinary nested convention -- it never travels, so ../ is correct there'
+    Assert-True (-not ($b4.Out -match [regex]::Escape('.\workflow-davekjohn\branch\branch-progress.md'))) `
+        'entry links: the step list keeps the ordinary nested convention -- it never travels, so ../../ is correct there'
 
     Remove-Item -LiteralPath $entryFx, $progressFx -Force
 
@@ -1776,7 +1776,7 @@ try {
     # false, against 4 claims with 3 correct), and a rule keyed on names is one rename away from going
     # silent -- which is exactly what just happened to the collision itself.
     Write-Host "check 20: a claimed section count vs. the scaffolder" -ForegroundColor Cyan
-    $shapeDoc = Join-Path $Fixture 'branch\README.md'
+    $shapeDoc = Join-Path $Fixture 'workflow-davekjohn\branch\README.md'
     New-Item -ItemType Directory -Path (Split-Path -Parent $shapeDoc) -Force | Out-Null
 
     # 44. A wrong count is reported, naming the file, the claim and the truth.
@@ -1794,7 +1794,7 @@ try {
     [System.IO.File]::WriteAllText($shapeDoc, "# branch`n`nAn entry is one ``##`` heading with $shapeCount named ``###`` sections under it.`n", $Utf8NoBom)
     $e2 = Invoke-Integrity -FixtureRoot $Fixture
     # MATCHED ON THE FINDING'S OWN WORDS, not on the file name, and that is a repair rather than a style
-    # choice: '\[entry-shape\].*README\.md' also matches the COVERAGE line, which names branch/README.md
+    # choice: '\[entry-shape\].*README\.md' also matches the COVERAGE line, which names the branch README
     # while explaining what it does not exclude. Both negative asserts here failed on their first run for
     # that reason, against a check that was behaving correctly -- a fixture reproduction showed 'checked 1'
     # and no finding. An assert that can match the check's own prose is testing the note, not the rule.
