@@ -7,7 +7,7 @@ description: >
   behavioral rules (boundaries/working methods) across agent-defs and personas. Raises the alarm as soon as the same rule
   appears in more than one place and promotes it to a single shared source, available to the
   specialists the rule applies to — not automatically to everyone. Goal: keep the project as small
-  and efficient as possible. Delivers the cleaned-up result on the branch; does not commit or merge itself.
+  and efficient as possible. Delivers the cleaned-up result on the working copy; does not land it.
 tools: Read, Grep, Glob, Edit, Write, Bash, Skill
 model: sonnet
 color: green

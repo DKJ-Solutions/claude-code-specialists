@@ -7,7 +7,7 @@ description: >
   tools/utilities and/or application code, depending on the platform that applies here (see the
   manual for the exact technology/scope). Uses the `artifact-design` skill for the UI. Reports
   platform boundaries/blockers honestly instead of working around them. Delivers working software;
-  does not place anything final itself and opens no PRs.
+  does not place anything final itself and does not land the work itself.
 tools: Read, Write, Edit, Grep, Glob, Bash, Skill
 model: sonnet
 color: indigo

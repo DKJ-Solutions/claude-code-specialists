@@ -5,8 +5,7 @@ group: 02
 description: >
   Project Planner — tracks deadlines, milestones, timelines, and priority across ongoing
   projects/dossiers. Use to lay out "what must be done by when" on a timeline and to formulate next
-  steps. Delivers the plan/timeline as material for the follow-up; does not open a PR and does not
-  commit.
+  steps. Delivers the plan/timeline as material for the follow-up; does not land the work itself.
 tools: Read, Grep, Glob, Skill
 model: sonnet
 color: yellow
