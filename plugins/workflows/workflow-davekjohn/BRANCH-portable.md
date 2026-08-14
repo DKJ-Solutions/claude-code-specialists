@@ -147,6 +147,27 @@ here would be one fact in two files. `new-branch` scaffolds one open step, so th
 to refuse; the shape is in
 your `workflow-davekjohn/branch/templates/branch_template_progress.md`.
 
+### The three phases, and the fourth that is not here
+
+`### Steps` is scaffolded with **PLAN**, **CREATE** and **TEST** as headings, so a branch moves through a
+recognisable arc instead of an ad-hoc list. They are headings *inside* the section rather than sections of
+their own, and the gate reads step marks only — so the arc is drawn on top of the mechanism without
+touching it. **A phase with nothing under it is not a finding**: a branch that had nothing to test says so
+by leaving that heading bare, exactly as a branch with no step list at all is permitted.
+
+**DEPLOY is the fourth phase and it is deliberately not in this file** (Dave, August 14, 2026,
+[#655](https://github.com/DaveKJohn/claude-code-specialists/issues/655)). It is not a step, it is the
+**result** — and the result is the other document: `branch-changelog.md` is the part that travels, folding
+into `CHANGELOG.md` at the merge while this file is reset. So the arc runs across the pair, three phases
+here and the fourth beside it.
+
+That also explains a rule which otherwise looks arbitrary: a step written for *after* the merge is refused.
+Post-merge is DEPLOY's territory, and DEPLOY is a different file. A DEPLOY checkbox here could only be
+unresolvable — the list must be clear before `open-pr` will push — or ticked before it happened.
+
+The phase names come from the wording seam, so a repo can rename them; supplying an empty list switches
+them off and restores the plain step list.
+
 ## Why two files and not one
 
 One file used to do both jobs. It was scaffolded with a bold *to do / where I left off* heading **and**

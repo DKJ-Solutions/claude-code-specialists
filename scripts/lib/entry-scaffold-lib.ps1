@@ -2957,6 +2957,30 @@ $script:BranchFileDefaults = [ordered]@{
     StepsHeading   = 'Steps'
     NotesHeading   = 'Where I left off'
     FirstStep      = 'TODO: the first step of this branch'
+    # THE THREE PHASES OF THE STEP LIST (Dave, August 14, 2026; issue #655). A branch moves through a
+    # recognisable arc instead of an ad-hoc list, and these are headings INSIDE '### Steps' rather than
+    # sections of their own: Get-BranchProgressFindings reads lines beginning with a step mark, so a
+    # heading is invisible to the gate and the mechanism is untouched by the arc being drawn on top of it.
+    #
+    # THREE, NOT FOUR, AND THE FOURTH IS THE POINT. The SDLC arc is PLAN / CREATE / TEST & DEPLOY, and
+    # DEPLOY is deliberately absent here -- not because it does not happen, but because it is not a step.
+    # Dave's answer, and it is the one that makes the whole model fit: DEPLOY is the END RESULT, the part
+    # that travels to CHANGELOG.md. So it lives in the OTHER branch file. branch-changelog.md IS the
+    # deploy phase; branch-progress.md carries the three that stay behind and are reset after the merge.
+    #
+    # That also explains a rule that used to look arbitrary: the step-list gate refuses a step written for
+    # after the merge. Post-merge is DEPLOY's territory, and DEPLOY is a different document. A DEPLOY
+    # checkbox could only be unresolvable (blocking every PR, since the list must be clear before open-pr
+    # will push) or a lie (ticked before it happened).
+    #
+    # AN EMPTY PHASE IS NOT A FINDING. A branch with nothing to test says so by leaving that heading bare,
+    # and refusing it would be exactly the ceremony CLAUDE.md warns about for the one-commit typo fix --
+    # the same reason a branch with no step list at all is permitted.
+    StepPhases     = @('PLAN', 'CREATE', 'TEST')
+    # Which phase the scaffolded first step is written under. CREATE, because that is where a branch's
+    # work actually starts once it has been planned -- and because a placeholder under PLAN would read as
+    # "you have not thought about this yet", which is the one thing a fresh branch has just done.
+    FirstStepPhase = 'CREATE'
     # The marker the copies under branch/templates/ carry in their heading, so neither a reader nor a gate
     # can mistake one for a real branch file. Not merely cosmetic: a template opens with the same H2 a
     # written entry does, which is the signature the fold and the lint key on.
@@ -2975,7 +2999,16 @@ $script:BranchFileDefaults = [ordered]@{
         '  - [~] dropped -- why it turned out not to be needed',
         '',
         'The dropped mark exists so nobody is pushed into ticking a box for work they did',
-        'not do. It keeps its line and its reason, which is the half worth reading later.'
+        'not do. It keeps its line and its reason, which is the half worth reading later.',
+        '',
+        'PLAN / CREATE / TEST are the arc, not a quota: a phase with nothing under it is a',
+        'statement that this branch had nothing there. The headings are invisible to the',
+        'gate, which reads step marks only.',
+        '',
+        'DEPLOY is missing on purpose. It is not a step, it is the result -- the changelog',
+        'entry beside this file, which is the part that travels into CHANGELOG.md at the',
+        'merge. That is also why a step written for after the merge is refused here: it',
+        'belongs to the other document.'
     )
     NotesGuidance  = @(
         'For picking this branch up again -- tomorrow, or on another machine after a park.',
@@ -3316,8 +3349,26 @@ function Format-BranchProgressScaffold {
     # step-list gate has nothing to refuse -- Get-BranchProgressFindings reports only steps somebody wrote,
     # and "no step list at all" is a deliberately permitted state for the one-commit typo fix. One open step
     # is what makes the gate bite on the ordinary branch while leaving that case alone.
+    # THE PHASE HEADINGS ARE WRITTEN INTO BOTH THE BRANCH FILE AND THE TEMPLATE (#655). The template shows
+    # the arc without showing somebody else's TODO, which is the one thing it must not carry -- so the
+    # phases are unconditional here and only the scaffolded step is not.
     $steps = @()
-    if (-not $Template) { $steps = @((Get-BranchProgressMarks).Open + $w.FirstStep) }
+    $phases = @($w.StepPhases | Where-Object { $_ })
+    if ($phases.Count -gt 0) {
+        $stepLevel = ('#' * ($script:EntrySectionLevel + 1)) + ' '
+        foreach ($phase in $phases) {
+            if ($steps.Count -gt 0) { $steps += '' }
+            $steps += ($stepLevel + $phase)
+            if (-not $Template -and $phase -eq $w.FirstStepPhase) {
+                $steps += ''
+                $steps += ((Get-BranchProgressMarks).Open + $w.FirstStep)
+            }
+        }
+    } elseif (-not $Template) {
+        # No phases configured (a consumer switched them off through the seam): the pre-#655 shape, which
+        # is still exactly what the gate expects.
+        $steps = @((Get-BranchProgressMarks).Open + $w.FirstStep)
+    }
     $stepsGuidance = if ($Template) { $w.StepsGuidance } else { @() }
     $notesGuidance = if ($Template) { $w.NotesGuidance } else { @() }
     Add-BranchProgressSection -Lines $lines -Heading $w.StepsHeading -Guidance $stepsGuidance -Body $steps
