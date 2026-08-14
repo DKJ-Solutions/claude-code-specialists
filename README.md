@@ -273,9 +273,10 @@ The full picture, top-level folder by folder:
 - **The root documents** — this `README.md`, `CLAUDE.md`, `CHANGELOG.md`, `CONTRIBUTING.md` and
   `SECURITY.md`; the two consumer-facing procedures `plugins/INSTALL.md` and `plugins/UNINSTALL.md`
   sit a level down, beside the plugins they explain — and
-  **`.github/`** (`pull_request_template.md`, the issue templates + `workflows/ci.yml`, the CI gate
-  that runs the lint + test suites on every PR and push to `main`; see
-  [`CONTRIBUTING.md`](CONTRIBUTING.md)).
+  **`.github/`** (`pull_request_template.md`, the issue templates + three workflows: `workflows/ci.yml`,
+  the CI gate that runs the lint + test suites on every PR and push to `main`, plus
+  `workflows/claude.yml` and `workflows/claude-code-review.yml`, which answer an `@claude` mention and
+  review each PR. Only `ci.yml`'s job blocks a merge; see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
 
 ## Consumption
 

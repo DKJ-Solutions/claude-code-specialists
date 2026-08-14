@@ -77,6 +77,14 @@ That job id is deliberately not English, and renaming it would silently break th
 future PR would sit unmergeable, waiting on a check that no longer exists. See
 [`.claude/rules/language-layers.md`](../.claude/rules/language-layers.md).
 
+**A second check appears on every PR, and it does not block.**
+[`.github/workflows/claude-code-review.yml`](../.github/workflows/claude-code-review.yml) runs an
+automated review over the diff and posts inline comments, under the job id `claude-review`. It is
+advisory: the ruleset names `lint-en-tests` and nothing else, so a red `claude-review` is a finding to
+read rather than a merge blocker. On a pull request from a fork it fails by construction — GitHub
+withholds secrets from fork-triggered workflows, which is the safe outcome and not a defect to work
+around by switching that workflow to `pull_request_target`.
+
 ### Merging — it does not wait, with two exceptions
 
 The portable half leaves this to each repo, because it is a governance decision rather than a configuration
