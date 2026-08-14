@@ -36,6 +36,28 @@ function Get-RepoBlobUrl {
     return "https://github.com/$($script:RepoName)/blob/main/"
 }
 
+# --- Where the marketplace is published for the business organisation (Dave, August 14, 2026) ------
+#
+# scripts/release/publish-to-business.ps1 overwrites this repo with the marketplace subset of the
+# workshop (manifest, plugins/, the reader-facing root docs), so Claude Enterprise can sync it as a
+# plugin marketplace for colleagues without GitHub access. The target repo is repo data, so it is
+# stated here -- the same rule that moved Get-RepoName out of open-pr and fold -- and the script reads
+# it as an optional function with a fallback: absent or empty means "no publication target", and the
+# script then requires -TargetRepo instead of guessing. -TargetRepo also overrides a filled-in value,
+# for publishing the same set to a second organisation.
+#
+# The published repo keeps the marketplace NAME 'claude-code-specialists' even though it is called
+# claude-plugins-bwj: the name is the key in every consumer's enabledPlugins
+# ('team-alpha@claude-code-specialists'), so aligning it with the repo name would break that line in
+# every consuming repo. Decision by Dave, August 14, 2026.
+$script:BusinessMarketplaceRepo = 'BWJ-ecommerce/claude-plugins-bwj'
+
+function Get-BusinessMarketplaceRepo {
+    <# owner/name (or full git URL) of the business repo publish-to-business.ps1 publishes the
+       marketplace subset to. Empty string means: no publication target configured. #>
+    return $script:BusinessMarketplaceRepo
+}
+
 # This repo's lint gate, repo-root-relative. open-pr.ps1 runs this before the PR. This is the
 # only repo-specific part of open-pr: every consumer has its own lint (the workshop
 # check-plugin-integrity, a Brains repo e.g. lint-brain). The test gate runs the convention

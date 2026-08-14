@@ -52,6 +52,14 @@ Assert-Match $name '^[\w.-]+/[\w.-]+$' 'Get-RepoName has the form owner/name'
 $blob = Get-RepoBlobUrl
 Assert-Equal "https://github.com/$name/blob/main/" $blob 'Get-RepoBlobUrl is derived from Get-RepoName'
 
+# The business publication target (Dave, August 14, 2026). owner/name form, because
+# publish-to-business.ps1 expands that to an https URL; a full git URL is also legal for the seam
+# in general, but THIS repo states owner/name, and a drift to something unresolvable should go red
+# here rather than at the moment somebody publishes.
+$business = Get-BusinessMarketplaceRepo
+Assert-Match $business '^[\w.-]+/[\w.-]+$' 'Get-BusinessMarketplaceRepo has the form owner/name'
+Assert-True ($business -ne (Get-RepoName)) 'Get-BusinessMarketplaceRepo is not this repo itself -- publishing overwrites the target'
+
 # The lint gate that open-pr.ps1 runs (repo-specific, injected instead of hardcoded in open-pr).
 $lint = Get-LintScript
 Assert-Match $lint '\.ps1$' 'Get-LintScript points to a .ps1'
