@@ -9,7 +9,7 @@ description: >
   in between: turning material into a readable, well-argued, properly structured document. Deploy
   after the groundwork is in and a finished long-form write-up is needed. Distinct from the technical
   writer, who owns the governance/meta-docs, not subject-matter content. Delivers the draft as
-  material for the follow-up; does not place it in the final destination, and opens no PRs.
+  material for the follow-up; does not place it in the final destination, and does not land the work itself.
 tools: Read, Write, Edit, Grep, Glob, Skill
 model: sonnet
 color: indigo

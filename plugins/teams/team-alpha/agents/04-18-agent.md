@@ -6,7 +6,7 @@ description: >
   Test Engineer — writes and maintains automated tests (unit + integration), guards against
   regressions and flags test gaps. Use for new or changed functionality to build out or update the
   test suite. Not every surface lends itself to automated testing — he flags that honestly as a
-  test gap instead of building false confidence. Delivers the test suite, opens no PRs himself.
+  test gap instead of building false confidence. Delivers the test suite, does not land the work itself.
 tools: Read, Write, Edit, Grep, Glob, Bash, Skill
 model: sonnet
 color: gray
