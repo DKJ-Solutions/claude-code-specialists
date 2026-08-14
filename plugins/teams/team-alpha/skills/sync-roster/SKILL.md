@@ -6,6 +6,7 @@ description: >-
   overwriting) and prints proposed roster rows ready to paste -- it never writes to CLAUDE.md, never
   commits, and never touches a branch. Use this when the SessionStart roster check reports drift and
   the mechanical part of the recovery should be staged automatically.
+disable-model-invocation: true
 ---
 
 # sync-roster -- the staged recovery for roster drift
@@ -55,6 +56,20 @@ row"*) — main-loop specialists such as Chris, Derek and Rendall, which ship as
 an agent. It is safe to run repeatedly: it is additive and never overwrites.
 
 ## What the skill does
+
+**First establish that PowerShell exists on this machine.** This skill is a wrapper around a
+`.ps1`, and there are environments where that command is not there at all -- a Linux cloud container,
+a colleague's Mac, the Claude app with no repo connected. Ask once:
+
+```powershell
+powershell -NoProfile -Command "$PSVersionTable.PSVersion.ToString()"
+```
+
+If that answers `command not found` (exit 127), **say so and stop**: the roster drift stays, and the
+manual recovery is the roster rows plus the lens scaffolds by hand. `pwsh` is not a substitute to
+reach for -- these scripts target Windows PowerShell 5.1, which is why this repo's own CI runs them on
+`shell: powershell`. Measured in an environment with no repo at all, inbound
+[#669](https://github.com/DaveKJohn/claude-code-specialists/issues/669) B2.
 
 Run the bundled script from the **root of the consuming repo**:
 

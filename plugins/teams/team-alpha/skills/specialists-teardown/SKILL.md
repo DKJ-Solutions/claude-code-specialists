@@ -7,6 +7,7 @@ description: >-
   it never deletes anything the repo owner filled in, and never edits settings.json. Dry run by
   default. Use this when a consumer is being disconnected from the plugin, or to verify that
   adoption is genuinely reversible before relying on it.
+disable-model-invocation: true
 ---
 
 # specialists-teardown -- give the repo back
@@ -28,6 +29,21 @@ reached the machine half **only by grepping blindly** (inbound
 one -- the order is not free, and it is the page that says why.
 
 ## Run it
+
+**First establish that PowerShell exists on this machine.** This skill is a wrapper around a `.ps1`,
+and there are environments where that command is not there at all -- a Linux cloud container, a
+colleague's Mac, the Claude app with no repo connected. Ask once:
+
+```powershell
+powershell -NoProfile -Command "$PSVersionTable.PSVersion.ToString()"
+```
+
+If that answers `command not found` (exit 127), **say so and stop**. Nothing has been removed at that
+point -- the script never started -- so the repo is exactly as it was; what is gone is the reversibility
+this page promises, and a reader deserves to know that before they plan a disconnection around it.
+`pwsh` is not a substitute to reach for: these scripts target Windows PowerShell 5.1, which is why this
+repo's own CI runs them on `shell: powershell`. Measured in an environment with no repo at all, inbound
+[#669](https://github.com/DaveKJohn/claude-code-specialists/issues/669) B2.
 
 From the root of the consuming repo:
 
