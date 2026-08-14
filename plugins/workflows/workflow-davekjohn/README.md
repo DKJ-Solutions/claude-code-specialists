@@ -101,6 +101,6 @@ skills and scripts that read them stop.
 
 ## Enabling it
 
-Part of the adoption path in [`../../INSTALL.md`](../../INSTALL.md);
-[`../../UNINSTALL.md`](../../UNINSTALL.md) is the mirror. It requires the core team `team-alpha`, which
+Part of the adoption path in [`../../INSTALL.md`](../../../INSTALL.md);
+[`../../UNINSTALL.md`](../../../UNINSTALL.md) is the mirror. It requires the core team `team-alpha`, which
 every consuming repo enables anyway.

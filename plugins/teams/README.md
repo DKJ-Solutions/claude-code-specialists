@@ -76,7 +76,7 @@ does not belong in this repo at all; see
 ## Enabling one in your own repo
 
 Adding this marketplace and enabling the teams you want is the adoption path, described end to end in
-[`../INSTALL.md`](../INSTALL.md) — its
-[quickstart half](../INSTALL.md#quickstart--the-commands-and-nothing-else) if you only want the
-commands, its [adoption half](../INSTALL.md#adoption--how-to-connect-your-repo) if you want the
-reasoning with them. [`../UNINSTALL.md`](../UNINSTALL.md) is the mirror.
+[`../INSTALL.md`](../../INSTALL.md) — its
+[quickstart half](../../INSTALL.md#quickstart--the-commands-and-nothing-else) if you only want the
+commands, its [adoption half](../../INSTALL.md#adoption--how-to-connect-your-repo) if you want the
+reasoning with them. [`../UNINSTALL.md`](../../UNINSTALL.md) is the mirror.

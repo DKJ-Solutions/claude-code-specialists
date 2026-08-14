@@ -89,5 +89,5 @@ configure.
 Swapping workflows is an ordinary plugin change rather than a migration, but the two directions are
 not quite symmetric — `workflow-default`'s own README describes both under
 [Switching to another workflow](workflow-default/README.md#switching-to-another-workflow). Enabling
-one in the first place is part of the adoption path in [`../INSTALL.md`](../INSTALL.md);
-[`../UNINSTALL.md`](../UNINSTALL.md) is its mirror.
+one in the first place is part of the adoption path in [`../INSTALL.md`](../../INSTALL.md);
+[`../UNINSTALL.md`](../../UNINSTALL.md) is its mirror.

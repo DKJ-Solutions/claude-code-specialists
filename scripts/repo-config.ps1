@@ -475,7 +475,13 @@ function Get-ReleasePluginTier {
 # signal worth having: a QUICKSTART.md reappearing in the root now means somebody moved it back by
 # accident, and cut-release should say so rather than wave it through.
 $script:ReservedRootMd = @(
-    'CHANGELOG.md', 'CLAUDE.md', 'README.md', 'LICENSE.md', 'CONTRIBUTING.md', 'SECURITY.md'
+    'CHANGELOG.md', 'CLAUDE.md', 'README.md', 'LICENSE.md', 'CONTRIBUTING.md', 'SECURITY.md',
+    # INSTALL.md and UNINSTALL.md moved here from plugins/ on August 14, 2026 (inbound #664). They are
+    # install plumbing, not plugin payload, so the folder boundary is what keeps them out of the set
+    # published to a business marketplace -- the same reason connectors/ sits at the root. Listing them
+    # here is not bookkeeping: without it the next unfolded-entry scan reads two permanent documents as
+    # changelog entries somebody forgot to fold.
+    'INSTALL.md', 'UNINSTALL.md'
 )
 
 function Get-ReservedRootMd {

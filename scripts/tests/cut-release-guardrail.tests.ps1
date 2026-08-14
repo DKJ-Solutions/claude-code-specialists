@@ -39,12 +39,36 @@ function Assert-True {
 
 Write-Host "cut-release.ps1 -- reserved-root-md allowlist covers every permanent root doc" -ForegroundColor Cyan
 
-# 1. Parse the allowlist literal out of the script text.
+# 1. The allowlist that will ACTUALLY be in force, which is the seam where a repo defines one and the
+#    script's literal only where it does not.
+#
+#    THIS USED TO PARSE THE LITERAL ONLY, and that made it assert about the wrong list (August 14, 2026).
+#    `cut-release.ps1` reads `Get-ReservedRootMd` through `Get-SeamValue` and falls back to the literal;
+#    this repo defines that seam, so the literal is exactly the value that does NOT protect its release.
+#    Measured when INSTALL.md and UNINSTALL.md moved to the root under inbound #664: they were added to
+#    the seam, the release was safe, and this assert failed anyway -- naming two files that were covered.
+#    The repair is not to add them to the literal: that default is the PORTABLE one, and a consumer's
+#    root has neither file. A default carrying this repo's documents would be this repo's specifics
+#    shipped as everyone's.
 $cutReleaseText = [System.IO.File]::ReadAllText($CutReleasePath, [System.Text.Encoding]::UTF8)
-$m = [regex]::Match($cutReleaseText, '\$reservedRootMd\s*=\s*@\(([^)]*)\)')
-Assert-True $m.Success 'found the $reservedRootMd allowlist literal in cut-release.ps1'
-$allowlist = @([regex]::Matches($m.Groups[1].Value, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
-Assert-True ($allowlist.Count -gt 0) 'allowlist parsed to at least one entry'
+$m = [regex]::Match($cutReleaseText, '\$reservedRootMd\s*=\s*@\(Get-SeamValue[^@]*@\(([^)]*)\)')
+if (-not $m.Success) { $m = [regex]::Match($cutReleaseText, '\$reservedRootMd\s*=\s*@\(([^)]*)\)') }
+Assert-True $m.Success 'found the $reservedRootMd fallback literal in cut-release.ps1'
+$fallback = @([regex]::Matches($m.Groups[1].Value, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+Assert-True ($fallback.Count -gt 0) 'fallback literal parsed to at least one entry'
+
+$repoConfig = Join-Path $RepoRoot 'scripts\repo-config.ps1'
+$allowlist = $fallback
+$fromSeam = $false
+if (Test-Path -LiteralPath $repoConfig) {
+    . $repoConfig
+    if (Get-Command -Name 'Get-ReservedRootMd' -ErrorAction SilentlyContinue) {
+        $allowlist = @(Get-ReservedRootMd)
+        $fromSeam = $true
+    }
+}
+Assert-True ($allowlist.Count -gt 0) 'the effective allowlist has at least one entry'
+Assert-True $fromSeam 'this repo answers Get-ReservedRootMd, so the seam is what is being checked'
 
 # 2. Tracked root *.md files (no directory separator = repo root), excluding branch-prefixed entries.
 $prevEap = $ErrorActionPreference
