@@ -163,12 +163,47 @@ $gh = Get-Command gh -ErrorAction SilentlyContinue
 if (-not $gh) {
     Write-Absent 'the gh CLI is not installed'
 } else {
+    # Declared OUTSIDE the try, because both the exit-code branch and the catch print it and the catch can
+    # fire before the try's first line completes. There is no Set-StrictMode here, so an unset variable
+    # would reach Write-Absent's mandatory parameter as $null and throw from inside the handler.
+    $unreachable = 'gh could not reach the remote (not authenticated, or no network)'
     try {
-        $issues = @(gh issue list --state open --limit 30 --json number,title 2>$null | ConvertFrom-Json)
-        if ($issues.Count -eq 0) { Write-Host '  none' }
-        else { $issues | ForEach-Object { Write-Host ("  #{0}  {1}" -f $_.number, $_.title) } }
+        # ASSIGN FIRST, WRAP SECOND. PowerShell 5.1 emits a parsed JSON array to the pipeline as ONE
+        # object, so `@(gh ... | ConvertFrom-Json)` collects a single element that IS the whole array:
+        # $_.number then does member enumeration and prints every number on one line. Measured on this
+        # very block -- three open issues rendered as '#System.Object[]  System.Object[]'.
+        #
+        # AND THE COUNT IS 1 WHETHER THE LIST HOLDS ZERO ITEMS OR THIRTY, which is the half a test misses:
+        # the 'none' branch below could never fire, so an issue-free repo printed a bare '#' with two empty
+        # fields. Exactly ONE open issue is the blind spot that let this survive -- there the broken form is
+        # correct, so the block only misbehaves at 0 or 2+.
+        #
+        # Same trap, same remedy as pr-issues-lib.ps1's Get-OpenPrRecord; the Where-Object is that lib's
+        # 'require a number before believing a record'.
+        #
+        # THE EXIT CODE IS CHECKED BECAUSE THE CATCH BELOW NEVER FIRES. `2>$null` means an unauthenticated
+        # or offline gh throws nothing and yields no stdout, so ConvertFrom-Json never runs, the pipeline
+        # yields nothing, and the branch below reports 'none'. Measured against the pre-fix script: an
+        # unanswerable gh already printed 'none' -- so the degrade line this script's docstring promises
+        # for every optional source was unreachable here, and 'we could not ask' was being printed as
+        # 'there are none'. A wrong answer that looks like a right one. The catch stays for a payload that
+        # arrives but does not parse.
+        #
+        # NO `return` IN HERE: this is script scope, so a return would exit session-status entirely and
+        # silently drop every block below -- the pending entries, the tag, the release note. Hence the
+        # else, and hence the one message declared above rather than the same sentence typed in both
+        # places: two literals of one string is the drift shape this repo has paid for repeatedly.
+        $raw = gh issue list --state open --limit 30 --json number,title 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Absent $unreachable
+        } else {
+            $parsed = $raw | ConvertFrom-Json
+            $issues = @($parsed | Where-Object { $_ -and $_.number })
+            if ($issues.Count -eq 0) { Write-Host '  none' }
+            else { $issues | ForEach-Object { Write-Host ("  #{0}  {1}" -f $_.number, $_.title) } }
+        }
     } catch {
-        Write-Absent 'gh could not reach the remote (not authenticated, or no network)'
+        Write-Absent $unreachable
     }
 }
 
