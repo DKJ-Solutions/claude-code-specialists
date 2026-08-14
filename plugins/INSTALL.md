@@ -1,5 +1,21 @@
 # Install
 
+> **First: did you go and get these plugins, or did they arrive?** Everything on this page registers a
+> marketplace and installs from it, and every command here names the **public** source
+> `DaveKJohn/claude-code-specialists`. If your organisation publishes this family through a marketplace
+> of its own — a private mirror, an Enterprise channel — then the registration and the install were done
+> once, centrally, and **the commands below are not yours to run**. Running them anyway does not fail
+> loudly; it quietly adds a second channel pointing somewhere else, which is the one thing an
+> organisation's own marketplace exists to prevent.
+>
+> What is still yours in that case is the part this page calls **adoption**: connecting your own repo,
+> running the bootstrap, and filling your lenses. Start at
+> [Adoption](#adoption--how-to-connect-your-repo) and skip the Quickstart entirely.
+>
+> Reported from a business mirror on August 14, 2026, inbound
+> [#664](https://github.com/DaveKJohn/claude-code-specialists/issues/664): a republished copy carries
+> this page verbatim, and nothing in it told the reader which copy they were holding.
+
 ## Quickstart — the commands, and nothing else
 
 **This half is the short one.** Two settings keys, five commands (the default now enables and installs
