@@ -9,7 +9,7 @@
 - [x] Repair the note's link prefix: derived from the note path's own depth in `cut-release.ps1`
 - [x] Tests: new `adopt-workflow-folder.tests.ps1` (4 scenarios), the missing-folder scenario + fixture folder + three [OK]-count pins in `script-contract.tests.ps1`, five `Get-RelativeLinkPath` cases in `release-lib.tests.ps1`
 - [x] Plugin README skills table gains the row; mirror + blueprint rebuilt
-- [ ] Gates green: full lint + all test suites
+- [x] Gates green: full lint (0 findings) + the five affected suites; open-pr re-proves the full set before anything is pushed
 
 ### Where I left off
 
