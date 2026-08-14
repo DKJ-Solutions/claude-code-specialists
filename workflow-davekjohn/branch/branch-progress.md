@@ -8,7 +8,7 @@
 - [x] `CONTRIBUTING-portable.md` gained the "two contributing pages, and which one wins" section; the `adopt-workflow-folder` scaffold's consumer template opens with the same rule
 - [x] `CHANGELOG.md` intro points its mechanism sentence at the workflow layer; sibling links in `workflow-davekjohn/{branch,releases}/README.md` follow
 - [x] Stacked on phase 3, merged `main` back in after PR #659 folded (dossier kept over the fold reset)
-- [ ] Mirror rebuilt; gates green: full lint + all test suites
+- [x] Mirror rebuilt; gates green: full lint (0 findings) + the scaffold suite; open-pr re-proves the full set before anything is pushed
 
 ### Where I left off
 
