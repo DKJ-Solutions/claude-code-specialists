@@ -516,8 +516,14 @@ SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-con
 `workflow-sessioncheck`) function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `fix-mojibake`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `cut-release`,
-`adopt-config`, `adopt-workflow-folder`, `discover-workflow`, `lock`, `continue`)<!-- /skills:all -->
+`adopt-config`, `adopt-workflow-folder`, `discover-workflow`, `lock`, `continue`,
+`orchestrator`)<!-- /skills:all -->
 remain available there.
+
+**`orchestrator` is on that list for a reason worth reading twice.** Everything else there is a
+convenience that survives; that one is the *conductor*. Where the roster and the hooks fall away, it is
+what puts Chris back in the conversation — so the layer this table shows as unavailable has a route in
+through the one column that is.
 
 Skills themselves are Anthropic's general **Agent Skills** mechanism — organized folders of
 instructions/scripts/resources that an agent discovers and loads progressively (name + description
@@ -536,8 +542,11 @@ interchangeable with — a Claude Code subagent.
 bootstrap, teardown, roster-sync, encoding repair, reading a repo's own conventions, the standing
 before and after a context clear). `lock` and `continue` are the first pair to wrap **one** script
 between them — they run the same reporter and differ only in what they do with the answer, which is why
-the shared-scripts registry names a script's documenting page rather than its callers. `cut-release`<!-- /skills:all --> is the deliberate exception:
-a checklist with no script of its own (see below). Either way, the specialists' craft and judgment
+the shared-scripts registry names a script's documenting page rather than its callers. `cut-release`
+and `orchestrator`<!-- /skills:all --> are the deliberate exceptions:
+a checklist with no script of its own (see below), and a skill that must not have one — `orchestrator`
+reads a persona file into the conversation, and the environment it exists for is precisely the one
+where `powershell` is absent. Either way, the specialists' craft and judgment
 live in the persona/manual context (agent defs), not in skills. That's a deliberate split, but it
 also means we currently use only one half of what Agent Skills can carry.
 
