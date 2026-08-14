@@ -118,6 +118,6 @@ of releases actually cut is on [this repo's own release page](releases/README.md
 
 - The two files a branch works in, and the three step marks:
   [`BRANCH-portable.md`](plugins/workflows/workflow-davekjohn/BRANCH-portable.md), with this repo's own
-  answers in [`branch/README.md`](branch/README.md).
+  answers in [`workflow-davekjohn/branch/README.md`](workflow-davekjohn/branch/README.md).
 - The pending changelog entries, ranked: [`CHANGELOG.md`](CHANGELOG.md).
 - Which specialist owns which kind of change: [`CLAUDE.md`](CLAUDE.md) and the roster it imports.

@@ -38,7 +38,7 @@ a fact rather than an oversight:
 
 | Script | What it is | Skill |
 |---|---|---|
-| `task/new-branch.ps1` | creates the branch AND writes both `branch/` files plus the reference templates, in one move — a branch is never entry-less | [`new-branch`](../skills/new-branch/SKILL.md) |
+| `task/new-branch.ps1` | creates the branch AND writes both `workflow-davekjohn/branch/` files plus the reference templates, in one move — a branch is never entry-less | [`new-branch`](../skills/new-branch/SKILL.md) |
 | `task/park-branch.ps1` | commits all outstanding work + `git push -u` — no PR, no live action | [`park`](../skills/park/SKILL.md) |
 | `task/adopt-config.ps1` | reads the config blueprint and places or proposes each seam answer | [`adopt-config`](../skills/adopt-config/SKILL.md) |
 | `release/open-pr.ps1` | the gates, the push and the PR; lint gate via `Get-LintScript` in `repo-config` | [`open-pr`](../skills/open-pr/SKILL.md) |

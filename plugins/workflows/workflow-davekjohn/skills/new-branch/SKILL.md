@@ -1,7 +1,7 @@
 ---
 name: new-branch
 description: >-
-  Create (or idempotently resume) a git branch AND its two files in branch/ -- the changelog entry
+  Create (or idempotently resume) a git branch AND its two files in workflow-davekjohn/branch/ -- the changelog entry
   and the step list -- in one move, via the shared, centralized new-branch script from the plugin
   (single source of truth, issue #81), so a consumer does not have to duplicate this script locally.
   Use this whenever a new piece of work starts: a branch is never entry-less -- creating it brings
@@ -34,7 +34,7 @@ The script:
    `final`; soft-warns (but proceeds) on an unknown prefix.
 2. Creates the branch (`git checkout -b`), or checks it out if it already exists -- **idempotent**:
    running it again on the same branch simply resumes it instead of failing.
-3. Immediately writes that branch's **two files in `branch/`** by calling the shared
+3. Immediately writes that branch's **two files in `workflow-davekjohn/branch/`** by calling the shared
    `new-branch.ps1` as a child step (own script, own mirror) -- so the branch and its files
    come into existence in a single step. Idempotent **per file**: a file that already belongs to this
    branch is left exactly as it is.
@@ -42,7 +42,7 @@ The script:
 ## The two files, and why there are two
 
 ```text
-branch/
+workflow-davekjohn/branch/
   branch-changelog.md   what the change DOES  -- nothing but the entry, so it pastes into CHANGELOG.md
   branch-progress.md    what still MUST HAPPEN -- the branch's name, its step list, where you left off
 ```
@@ -62,7 +62,7 @@ what makes it pasteable in one go. Its heading names the **branch** (`` ## `feat
 also how the fold finds the PR, and the human-readable name of the change is its first section.
 
 **The file is bare** — headings and the space under them. The guidance for each field lives in the copies
-under `branch/templates/`, which is what those copies are for: the file you type in is the questions and
+under `workflow-davekjohn/branch/templates/`, which is what those copies are for: the file you type in is the questions and
 your answers, and the reference is one directory away.
 
 **`new-branch` writes those templates into your repo too**, and rewrites one that has drifted from the

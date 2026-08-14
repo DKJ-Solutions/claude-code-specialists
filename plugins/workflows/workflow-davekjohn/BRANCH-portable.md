@@ -1,6 +1,7 @@
 # The `branch/` files — the portable half
 
-Everything a branch needs to carry lives in its repo's `branch/` directory, split into two files with one
+Everything a branch needs to carry lives in its repo's `workflow-davekjohn/branch/` directory — inside
+the workflow's own root folder, where everything portable gathers — split into two files with one
 job each:
 
 | file | subject | who reads it | lifetime |
@@ -19,14 +20,14 @@ repo** the page was written in
 ([claude-code-specialists](https://github.com/DaveKJohn/claude-code-specialists)) — its measurements travel
 as the evidence behind the rules, never as your repo's own record. And links into the source's script tree
 are **absolute** on purpose; files every adopting repo has of its own (the two branch files, the templates
-under `branch/templates/`) are named in code rather than linked, because the copy that matters is yours.
+under `workflow-davekjohn/branch/templates/`) are named in code rather than linked, because the copy that matters is yours.
 
-A blank copy of each file also sits in your own `branch/templates/`, to look at or paste from:
+A blank copy of each file also sits in your own `workflow-davekjohn/branch/templates/`, to look at or paste from:
 
 | template | for |
 |---|---|
-| `branch/templates/branch_template_changelog.md` | `branch-changelog.md` |
-| `branch/templates/branch_template_progress.md` | `branch-progress.md` |
+| `workflow-davekjohn/branch/templates/branch_template_changelog.md` | `branch-changelog.md` |
+| `workflow-davekjohn/branch/templates/branch_template_progress.md` | `branch-progress.md` |
 
 **They are generated, not maintained.** A template beside a scaffolder that writes the same shape is two
 sources of one format, which is the drift this repo keeps paying for — so their content comes from the
@@ -50,7 +51,7 @@ other markdown — so the marker is what keeps a template from ever being read a
 in a form rather than starting from a blank page.
 
 **The file it writes is bare** — the headings, the three fields it fills in itself, and nothing else. The
-guidance lives in your `branch/templates/`, where every field carries an HTML comment saying what a good
+guidance lives in your `workflow-davekjohn/branch/templates/`, where every field carries an HTML comment saying what a good
 answer looks like. That is what those copies are for: the file you type in is the questions and your
 answers, and the reference is one directory away.
 
@@ -131,7 +132,7 @@ placeholder anywhere, so `open-pr` measures instead of matching: it names the de
 any tier whose reason is still blank. That catches the untouched entry the placeholders used to catch
 *and* the one whose placeholder was deleted rather than answered.
 
-**The shape itself is in your `branch/templates/branch_template_changelog.md`** —
+**The shape itself is in your `workflow-davekjohn/branch/templates/branch_template_changelog.md`** —
 field by field, with the guidance for each — so it is deliberately not repeated here. Open that file when
 you want to see the whole form at once.
 
@@ -144,7 +145,7 @@ name in the heading**, which is how the fold finds the PR, and **the step marks 
 It carries **nothing but that** — no description, no ID, no type. Those are the entry's, and repeating them
 here would be one fact in two files. `new-branch` scaffolds one open step, so the gate below has something
 to refuse; the shape is in
-your `branch/templates/branch_template_progress.md`.
+your `workflow-davekjohn/branch/templates/branch_template_progress.md`.
 
 ## Why two files and not one
 

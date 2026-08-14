@@ -390,8 +390,8 @@ it was coming.
   warn**, not a refusal, and the entry's type falls back to whatever `Get-EntryFallbackType` says.
 
 **The entry files moved out of your repo root.** A branch used to carry `<branch-name>.md` beside your
-`README.md`; it now carries `branch/branch-changelog.md` (what the change does) and
-`branch/branch-progress.md` (what still has to happen), with reference copies under `branch/templates/`.
+`README.md`; it now carries `workflow-davekjohn/branch/branch-changelog.md` (what the change does) and
+`workflow-davekjohn/branch/branch-progress.md` (what still has to happen), with reference copies under `workflow-davekjohn/branch/templates/`.
 
 - **Look for a gate keyed on the old name before you use the `new-branch` skill.** The measured case was a
   CI step asserting that `"$(echo "$BRANCH" | tr '/' '-').md"` exists in the repo root — which fails
@@ -400,7 +400,7 @@ it was coming.
 - **Your branches already in flight are safe.** The fold, the PR gate and the lint all still recognise a
   root `<branch>.md` — "recognise both, write one" — so nothing has to be migrated in a hurry. It is the
   *gate* that has to learn the new location, not the entries.
-- `branch/templates/` is written into your repo and rewritten whenever it drifts from the current format.
+- `workflow-davekjohn/branch/templates/` is written into your repo and rewritten whenever it drifts from the current format.
   That is deliberate (it is the only place the guidance exists for you to read), and it is not something you
   have to maintain.
 

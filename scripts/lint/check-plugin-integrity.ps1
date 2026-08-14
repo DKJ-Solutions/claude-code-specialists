@@ -1605,7 +1605,7 @@ Write-Coverage -Category 'mojibake' -Checked $mjFiles `
     } elseif ($mjFiles -eq 0) {
         'the repair tool ran but did not state how many files it examined, so this count is not evidence of scope'
     } else {
-        'the set this repo names in Get-MojibakePaths (scripts/repo-config.ps1): every *.md in the root (the changelog and the root docs), every *.md in branch/ (the entry whose text is pasted into CHANGELOG.md, and the step list), plus every *.md under plugins/ and every note under releases/. Peeled by the inverse round trip rather than matched against a table of known sequences'
+        'the set this repo names in Get-MojibakePaths (scripts/repo-config.ps1): every *.md in the root (the changelog and the root docs), every *.md under workflow-davekjohn/ (the entry whose text is pasted into CHANGELOG.md, the step list, and the templates), plus every *.md under plugins/ and every note under releases/. Peeled by the inverse round trip rather than matched against a table of known sequences'
     })
 
 # --- 15. unbound output samples: an expectation that cannot hold everywhere -------------------------------
@@ -1897,8 +1897,8 @@ Write-Coverage -Category 'skill-param' -Checked $skillParamChecked `
 #
 # History is excluded exactly as checks 11 and 12 exclude it: CHANGELOG.md's ENTRIES and the per-plugin
 # copies, the release notes, RELEASE.md, and the branch working files, which are history in the making.
-# branch/README.md is deliberately NOT excluded -- it is a document ABOUT the shape, which is precisely this
-# check's subject.
+# workflow-davekjohn/branch/README.md is deliberately NOT excluded -- it is a document ABOUT the shape,
+# which is precisely this check's subject.
 #
 # AND NEITHER IS CHANGELOG.md'S INTRO (August 8, 2026). It went out with the rest of that file on the history
 # grounds above, and this repo had already written down why that reasoning does not reach the intro:
@@ -1972,10 +1972,10 @@ $scFiles = @($linkFiles | Where-Object {
     if ($rel -match '^releases\\') { return $false }
     if (($rel -notmatch '\\') -and (Test-IsChangelogEntryFile -Path $_)) { return $false }
     # The two branch working files only -- NOT the whole directory. The entry is history in the making and
-    # the step list is a scratch pad; branch/README.md is the convention itself and is checked.
+    # the step list is a scratch pad; the branch README is the convention itself and is checked.
     #
     # SEPARATORS ARE NORMALISED, and leaving that out was caught by this check on its first run:
-    # Get-BranchFilePaths returns forward slashes ('branch/branch-progress.md') while $rel is built from a
+    # Get-BranchFilePaths returns forward slashes while $rel is built from a
     # Windows path, so the two never compared equal and the exclusion did nothing. The step list of the very
     # branch that added this check was then reported for QUOTING a stale count while explaining it.
     $scBranchFiles = @((Get-BranchFilePaths).Changelog, (Get-BranchFilePaths).Progress) |
@@ -2012,7 +2012,7 @@ if (Test-Path -LiteralPath $scChangelog) {
 }
 
 Write-Coverage -Category 'entry-shape' -Checked $scChecked `
-    -Note "claim(s) about how many '$('#' * $scLevel)' sections a changelog entry has, held against the $scExpected the scaffolder writes. The rule is the COUNT and not the section NAMES, chosen by measuring four candidates against this tree: matching names accuses two correct documents, because 'What does this change do?' and 'Type of change' are retired entry sections AND live headings of the PR template. History is excluded as in checks 11 and 12; branch/README.md is not, being a document about the shape, and neither is CHANGELOG.md's INTRO -- the entries below it are history, the intro is a live statement about the present mechanism that every cut copies through verbatim, so it gets its own pass with the level marker optional"
+    -Note "claim(s) about how many '$('#' * $scLevel)' sections a changelog entry has, held against the $scExpected the scaffolder writes. The rule is the COUNT and not the section NAMES, chosen by measuring four candidates against this tree: matching names accuses two correct documents, because 'What does this change do?' and 'Type of change' are retired entry sections AND live headings of the PR template. History is excluded as in checks 11 and 12; workflow-davekjohn/branch/README.md is not, being a document about the shape, and neither is CHANGELOG.md's INTRO -- the entries below it are history, the intro is a live statement about the present mechanism that every cut copies through verbatim, so it gets its own pass with the level marker optional"
 
 # --- 21. The config blueprint matches what the source's own libs say right now -----------------------------
 #

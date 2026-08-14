@@ -1,6 +1,6 @@
 # The contribution cycle — the portable half
 
-This is the cycle the `workflow-davekjohn` scripts run: a branch, its two files in `branch/`, a Pull
+This is the cycle the `workflow-davekjohn` scripts run: a branch, its two files in `workflow-davekjohn/branch/`, a Pull
 Request that has to get past its gates, a merge, and a fold. **It is written to be read in any repo that
 enables this plugin**, which is why it names the *seam* wherever a repo owns the answer, rather than stating
 one repo's answer as the rule.
@@ -35,15 +35,15 @@ Creating the branch writes both of its working files, so **a branch is never ent
 
 | file | subject | lifetime |
 |---|---|---|
-| `branch/branch-changelog.md` | what the change **does** — the entry that folds into your changelog | folded at the merge, then reset |
-| `branch/branch-progress.md` | what still **must happen** — the step list, and where you left off | reset at the merge; never folded |
+| `workflow-davekjohn/branch/branch-changelog.md` | what the change **does** — the entry that folds into your changelog | folded at the merge, then reset |
+| `workflow-davekjohn/branch/branch-progress.md` | what still **must happen** — the step list, and where you left off | reset at the merge; never folded |
 
 **Fixed names, not one per branch.** Git already tracks them per branch, so branches in flight cannot
 collide. On the trunk both sit in an empty **reset state** carrying a warning not to write there until a
 branch exists — that state opens with an `#`, which is exactly what stops the fold mistaking it for an
 entry. The full convention is spelled out in [`BRANCH-portable.md`](BRANCH-portable.md), which travels
-with this plugin; your repo's own `branch/README.md` holds its answers to it, and
-`new-branch` keeps reference copies in `branch/templates/`, refreshing one that has drifted
+with this plugin; your repo's own `workflow-davekjohn/branch/README.md` holds its answers to it, and
+`new-branch` keeps reference copies in `workflow-davekjohn/branch/templates/`, refreshing one that has drifted
 from the current format.
 
 **The branch name is validated by your own lib, not by the plugin.** `new-branch` calls
@@ -85,7 +85,7 @@ the exception: it is a machine-read key that the writer, the PR gate and the fol
 so it is never translated.
 
 **The file is bare** — headings and the space under them. The guidance for each field lives in
-`branch/templates/`, which is what those copies are for.
+`workflow-davekjohn/branch/templates/`, which is what those copies are for.
 
 ### 2. Work, and keep the plan current
 
@@ -158,7 +158,7 @@ worked in.
 [`skills/fold-changelog/SKILL.md`](skills/fold-changelog/SKILL.md) · `fold-changelog-entry.ps1`
 
 On the trunk, right after the merge, the fold moves the entry into your changelog, appends the PR link and
-the merge date as its closing line, strips the guidance comments, and **resets both `branch/` files** to
+the merge date as its closing line, strips the guidance comments, and **resets both branch files** to
 their empty state — so the trunk is ready for the next branch and the merged branch's ticked-off steps do
 not greet whoever opens it. It commits that directly on the trunk, naming exactly those three paths so
 nothing else in the tree can ride along.
@@ -195,7 +195,7 @@ most consequential change leads instead of sitting wherever its branch prefix ha
 
 **Score it against the rubric your repo declares**, in `Get-EntrySignificanceRubricLevels`. You do not have
 to go looking for it: `new-branch` prints the rubric when it writes the file, and the guidance in
-`branch/templates/` points back at that printout. The bands are anchored on purpose — an unanchored ordinal
+`workflow-davekjohn/branch/templates/` points back at that printout. The bands are anchored on purpose — an unanchored ordinal
 scale invites false precision, and the anchors are what make the number a measurement rather than a mood.
 **The `Why` above each score is the lasting half**: the rubric says which band, the `Why` says why *this*
 change is in it, and that is the only part a reader a year later can use.

@@ -440,7 +440,7 @@ try {
     Assert-Equal $progressText1 $progressText2 'step list unchanged -- a rerun does not clobber work in progress'
     $rootMd = @(Get-ChildItem -LiteralPath $fixtureBC -Filter '*.md' -File | Where-Object { $_.Name -ne 'README.md' })
     Assert-Equal 0 $rootMd.Count 'the repo root stays clean -- no entry file lands there at all'
-    $branchDirFiles = @(Get-ChildItem -LiteralPath (Join-Path $fixtureBC 'branch') -Filter '*.md' -File)
+    $branchDirFiles = @(Get-ChildItem -LiteralPath (Join-Path $fixtureBC 'workflow-davekjohn\branch') -Filter '*.md' -File)
     Assert-Equal 2 $branchDirFiles.Count 'exactly the two branch files, no duplicate per branch'
 
     Write-Host "new-branch.ps1 -- no commit, no push, no PR" -ForegroundColor Cyan
@@ -449,7 +449,7 @@ try {
     $remotes = @(& git -C $fixtureBC remote)
     Assert-Equal 0 $remotes.Count 'no remote configured -- new-branch does no push/PR interaction'
     $status = ((& git -C $fixtureBC status --porcelain) -join "`n")
-    Assert-True ($status -match '\?\? branch/') 'the branch files are untracked -- no git add/commit performed'
+    Assert-True ($status -match '\?\? workflow-davekjohn/') 'the branch files are untracked -- no git add/commit performed'
 
     # --- (e) Soft warn on unknown prefix: branch + entry still created, fallback type, exit 0 -------
     Write-Host "new-branch.ps1 -- unknown prefix: soft warn, no hard reject" -ForegroundColor Cyan

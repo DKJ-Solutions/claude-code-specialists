@@ -400,7 +400,8 @@ function Get-PrDescriptionPlaceholderDefaults {
         defines no Get-PrDescriptionPlaceholder of its own.
 
     .DESCRIPTION
-        RECOGNISE THREE, WRITE ONE. The last is what this family's template carries now; the two older
+        RECOGNISE FOUR, WRITE ONE. The last is what this family's template carries now (the entry path
+        moved under workflow-davekjohn/ on August 14, 2026); the older
         strings stay because a consumer's PR template is THEIR file, and this script must not silently
         stop filling it in because the template it ships beside moved on. An unrecognised placeholder is
         a PR body with no description at all -- the outcome this list exists to prevent.
@@ -418,7 +419,8 @@ function Get-PrDescriptionPlaceholderDefaults {
     return @(
         '<!-- Korte beschrijving van wat er verandert en waarom. -->',
         '<!-- Short description of what changes and why. -->',
-        "<!-- Filled from branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->"
+        "<!-- Filled from branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->",
+        "<!-- Filled from workflow-davekjohn/branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->"
     )
 }
 
