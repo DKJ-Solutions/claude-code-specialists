@@ -119,10 +119,33 @@ infrastructure.
   mechanism that does not exist. The remedy if it ever matters is to drop the plugin and write the review
   prompt inline, not to guess at a `#<sha>`.
 
-  **One question is open and needs the UI**: whether the Claude GitHub App sits in `main-ci-gate`'s
-  bypass list. Three endpoints refuse to return `bypass_actors` to a non-admin token, so this cannot be
-  answered from a session — and it decides whether that App token can reach the trunk past the required
-  check.
+  **The App is NOT in `main-ci-gate`'s bypass list, and the method is the part worth keeping** (August
+  14, 2026). The question decides whether that App token can reach the trunk past the required check, and
+  the REST endpoints all refuse: `bypass_actors` is returned to admins only, and the work account
+  `davekokbwj` has `admin: false, maintain: false, push: true`. It was answered anyway, from three
+  measurements that survive a redacted field:
+  - **GraphQL redacts the entries but not the array.** `repository.rulesets.bypassActors` came back as
+    `nodes: [null, null]` — the contents are hidden from a non-admin, the **count** is not. Exactly two
+    actors.
+  - **`current_user_can_bypass: "always"`** on the REST ruleset, for an account holding nothing but
+    `push`, means the **Write role** is one of the two — it is the only thing that account has which
+    could grant bypass.
+  - **`updated_at` dates the list.** The ruleset was last modified `2026-07-26T20:58`, and the Claude App
+    arrived `2026-08-14T08:46`. A list untouched for nineteen days cannot name an actor that did not
+    exist when it was written. The July 26 field-by-field re-check recorded in
+    [`language-layers.md`](../../rules/language-layers.md) names both actors as *Repository admin + the
+    Write role*, which matches the count of two and leaves no room for a third.
+
+  GitHub's own documentation closes the implicit route: roles and GitHub Apps are **separate** bypass
+  categories, so an App gets nothing from the Write role being listed. **The generalisable half: when an
+  API hides a field, check whether a sibling representation leaks its shape (a count, a length, a
+  timestamp) — three partial reads answered a question no single endpoint would.**
+
+  **What this bounds.** The App cannot push to `main`, delete it, or force-push. It *can* create a branch
+  and open a PR — which then merges only on a green `lint-en-tests`, like everyone else's. So the residual
+  is the ordinary route, and the read-only allowlist above closes the other end. The knob this actually
+  turns on is the **Write-role bypass**, whose condition is already stated in the `ci.yml` bullet above:
+  safe while there are no external collaborators.
 - **`scripts/lint/check-consumer-drift.ps1`** — the read-only drift check against a consuming repo
   (`MISSING`/`IDENTICAL`/`DRIFTED`).
 - **`scripts/lib/plugin-tree-lib.ps1`** — the one answer to *which plugins does this repo publish, and

@@ -61,10 +61,19 @@ mechanism which did not exist ([#566](https://github.com/DaveKJohn/claude-code-s
 and a comment in the file states the real remedy instead: drop the plugin and write the review prompt
 inline, if the dependency does not earn its place.
 
-**One question could not be answered from here and is recorded rather than guessed.** Whether the Claude
-GitHub App sits in the `main-ci-gate` ruleset's bypass list decides whether the App token can reach the
-trunk past the required check. Three endpoints refused to return `bypass_actors`, so it needs a look at
-Settings → Rules.
+**The question that looked unanswerable was answered, and the method is the reusable half.** Whether the
+Claude GitHub App sits in the `main-ci-gate` ruleset's bypass list decides whether the App token can reach
+the trunk past the required check — and every REST endpoint refuses, because `bypass_actors` goes to
+admins only and the work account has `push` without `admin`. Three partial reads settled it regardless:
+GraphQL redacts the entries but not the array, returning `[null, null]` and with it the **count**;
+`current_user_can_bypass: "always"` on an account holding nothing but `push` identifies the **Write role**
+as one of the two; and `updated_at` dates the list to `2026-07-26`, nineteen days before the App existed.
+GitHub documents roles and Apps as separate bypass categories, so the Write role grants an App nothing.
+
+**The App is therefore not in the list**, which bounds the second hardening item above: it cannot push to
+`main`, delete it, or force-push. It can open a branch and a PR, which merge on a green `lint-en-tests`
+like anyone else's. The generalisable rule went into Sylvester's lens: when an API hides a field, check
+whether a sibling representation leaks its shape — a count, a length, a timestamp.
 
 ### Significance
 
