@@ -321,9 +321,22 @@ pointer line names a document nobody can download yet.
 **And it needs no separate approval** (Dave, August 5, 2026). Cutting the release is the act that is asked
 for; publishing its Release is the last step of that same procedure, so stopping to ask there is a rubber
 stamp. Once a cut has been requested, the whole run goes through in one motion — generate, ship the
-hand-written note, publish. **The boundary that remains is the live stage**, where a repo has one: that is
-Block 2 of the checklist, a different act with a different audience, and this approval covers Block 1. A
-repo wanting a different boundary states that in its own lens rather than softening this paragraph.
+hand-written note, publish. **The boundaries that remain are the live stage (Block 2 of the checklist)
+and, in a marketplace source, the business publication (Block 3)** — different acts with different
+audiences, and this approval covers Block 1. A repo wanting a different boundary states that in its own
+lens rather than softening this paragraph.
+
+**Where the repo is itself a marketplace source with a business publication target, one more step exists
+after the cut — and it is a boundary, not a tail.**
+[`scripts/release/publish-to-business.ps1`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/scripts/release/publish-to-business.ps1)
+overwrites the business repo with the marketplace subset of the source, so an organisation's Claude
+Enterprise can sync it as a plugin marketplace for colleagues without GitHub access. It runs **after** a
+release and **only on the owner's explicit request** — releasing without publishing is a normal outcome,
+not a half-finished one (Dave, August 14, 2026). The target is repo data (`Get-BusinessMarketplaceRepo`
+in `scripts/repo-config.ps1`, with `-TargetRepo` as the override for a second organisation); a repo
+without one simply has no such step. The mechanics are Block 3 of the
+[`cut-release` skill](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md)'s
+checklist.
 
 Guardrails: a clean `main`, no unfolded entry files, **[the bump earned by the pending
 tiers](#what-a-release-must-earn)** (`-SkipTierGate` overrules), lint gate green, **all test suites green**

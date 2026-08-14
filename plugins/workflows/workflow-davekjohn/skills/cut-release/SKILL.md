@@ -5,7 +5,9 @@ description: >-
   the consumer-document edit, then a GitHub Release (body = the highest tier the repo has, every other tier
   as an attachment -- gh's release-notes body has a hard 125,000-character limit), plus branch cleanup.
   Where the repo has a separate "go live" stage (Get-LiveStage in scripts/repo-config.ps1), also the
-  push to that live target and moving the "<- LIVE" marker. Prints ready-to-paste command blocks in
+  push to that live target and moving the "<- LIVE" marker. Where the repo is a marketplace source
+  with a business publication target (Get-BusinessMarketplaceRepo), also the separate, deliberate
+  publish step (publish-to-business.ps1). Prints ready-to-paste command blocks in
   a fixed order -- a checklist that imposes itself, not automation: no script is run or mirrored.
   Use this once a release has been cut (version bumped, committed) and its closing git/gh steps need
   to be walked through without skipping one. Inbound issue #177.
@@ -308,9 +310,10 @@ a release for a missing timestamp would be ceremony rather than a guard.
 
    **Do not stop to ask permission here.** Cutting the release is what was asked for, and this is the last
    step of that same procedure — a second approval at the end of a checklist the requester started is a
-   rubber stamp (Dave, August 5, 2026). Steps 1 to 5 therefore run in one motion. The approval that
-   remains is **Block 2 below**, where a repo has a live stage: publishing a document that describes a
-   version and pushing to a target customers see are different acts.
+   rubber stamp (Dave, August 5, 2026). Steps 1 to 5 therefore run in one motion. The approvals that
+   remain are **Block 2 below**, where a repo has a live stage, and **Block 3**, where the repo is a
+   marketplace source: publishing a document that describes a version, pushing to a target customers
+   see, and overwriting the marketplace colleagues receive are three different acts.
 
    ```powershell
    # the --notes-file is the generated body; cut-release.ps1 printed this exact line for you
@@ -410,6 +413,39 @@ tagging) fills in `Get-LiveStage` with a short description of that target. Where
    now empties the changelog and writes no release heading for a marker to sit on. So this is a hand step
    again, which is where it started: the marker is the one release artefact whose correctness a script cannot
    confirm, because only the person who did the push knows it succeeded.
+
+### Block 3 — publishing the marketplace to the business organisation (only where this repo is a marketplace source)
+
+This block is driven by two facts rather than a preference: the repo carries
+`scripts/release/publish-to-business.ps1`, and `Get-BusinessMarketplaceRepo` in its
+`scripts\repo-config.ps1` names a target — the same optional-function-with-a-fallback shape as
+`Get-LiveStage`, with `-TargetRepo` on the script as the override for a second organisation. Most repos
+have neither — a consumer of the plugins is not a marketplace source — and for them this block does not
+exist: stop after Block 1, or after Block 2 where there is a live stage.
+
+Where both facts hold (the source repo publishes its marketplace subset to a private business repo that
+Claude Enterprise syncs, so colleagues without GitHub access receive the plugins):
+
+1. **Publishing is a separate, deliberate decision — releasing without publishing is a normal outcome,
+   not a half-finished one** (Dave, August 14, 2026). The cut records a version; the publication changes
+   what colleagues receive. So this block never runs as part of Block 1's one motion: it runs only when
+   the owner asks for it — the same boundary Block 2 draws for a live stage.
+2. **Publish after the cut, from a clean `main`.** The script warns on a dirty tree and publishes the
+   working copy as-is, so the normal moment is right after a release: the version bumps are on `main`,
+   and the target's history then reads as a release log — the commit message records the source commit
+   and every plugin version it carried.
+3. Run with `-DryRun` first after any change to the published set, then for real:
+
+   ```powershell
+   ./scripts/release/publish-to-business.ps1 -DryRun
+   ./scripts/release/publish-to-business.ps1
+   ```
+
+4. **The target is a publication target, not a second workshop.** Every run empties it (except `.git`)
+   and rebuilds it from the published set, so a plugin removed in the source disappears there too — and
+   anything committed there by hand is lost on the next run, by design. The `version` in each
+   `plugin.json` is the update signal: Claude only hands colleagues a new plugin version when that
+   number goes up, which is why the bump belongs to the release and the script never touches versions.
 
 ## A milestone release — `-SummaryFile`
 
@@ -528,6 +564,12 @@ owes this text. Write it there, and the cut carries it outward for you.
   policy, not part of this checklist** — it is stated in the release manager's repo lens, because a repo
   that publishes at every release and one that publishes at Minor/Major only are both coherent, and the
   choice follows from who reads the page rather than from the mechanics.
+- **`Get-BusinessMarketplaceRepo` (Block 3) is deliberately NOT in the script contract.**
+  `publish-to-business.ps1` is not mirrored into the plugin — it is the marketplace source's own tool,
+  like the blueprint generator — so `check-script-contract.ps1` never asks a consumer about it, and a
+  consumer defining the function would be answering a question no script of theirs reads. It lives in
+  the source repo's `scripts\repo-config.ps1` because that is where repo data goes, not because the
+  contract requires it.
 
 ## Important
 
@@ -539,7 +581,8 @@ owes this text. Write it there, and the cut carries it outward for you.
   This page remains the *procedure* around the script — the parts no script performs: the GitHub
   Release, the live push, the branch cleanup.
 - **Order matters.** Block 1 always runs first; Block 2 only follows it, and only where
-  `Get-LiveStage` says there is one to run.
+  `Get-LiveStage` says there is one to run. Block 3 likewise comes after Block 1, only where the repo
+  is a marketplace source — and only when its publication is itself asked for.
 - **And inside Block 1 the GitHub Release is last, which was a correction and has now outlived its
   original reason** (August 4, 2026; revisited August 10, 2026). It used to be step 2, directly after the
   tag, because its body was a file `cut-release.ps1` had already generated. When the body became the
