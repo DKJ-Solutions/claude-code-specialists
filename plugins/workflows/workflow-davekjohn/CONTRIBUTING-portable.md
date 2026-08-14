@@ -271,6 +271,20 @@ document is generated at all are yours too (`Get-ReleaseNotesGrouping`, `Get-Rel
 
 ---
 
+## The two contributing pages, and which one wins
+
+A repo running this workflow carries **two** contributing pages, deliberately (Dave, August 14, 2026):
+
+- the root `CONTRIBUTING.md` is the **standard workflow** — what holds before any plugin is consulted,
+  and what stays meaningful the day the plugin is absent: a fresh checkout, a teardown, a contributor
+  who installed nothing;
+- `workflow-davekjohn/CONTRIBUTING.md` (the `adopt-workflow-folder` skill scaffolds it) is the
+  **workflow's layer**: everything this plugin owns, plus your repo's answers to its seams. **Where the
+  two disagree, the workflow's page wins.**
+
+So adopting this workflow never rewrites your root page — the folder file arrives beside it and takes
+precedence only where they conflict.
+
 ## One thing to do before you adopt a root `CONTRIBUTING.md`
 
 If your repo overrides `Get-ReservedRootMd` — the list of root `*.md` files that are permanent documents

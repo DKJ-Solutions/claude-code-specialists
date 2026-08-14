@@ -11,7 +11,7 @@ local decisions, the measured instances behind the portable rules, and the full 
 cut. The release block in [`CHANGELOG.md`](../../CHANGELOG.md) points here for everything but the current
 version.
 
-The split is the same one [`CONTRIBUTING.md`](../../CONTRIBUTING.md) already uses: the portable half travels
+The split is the same one [`CONTRIBUTING.md`](../CONTRIBUTING.md) already uses: the portable half travels
 with the plugin, the local half stays in the repo. Until August 13, 2026 both halves lived on this page
 behind a horizontal rule, and two consumers hand-maintained a 4,154-word verbatim mirror of the top half
 because that was the only way to keep it from drifting — inbound
