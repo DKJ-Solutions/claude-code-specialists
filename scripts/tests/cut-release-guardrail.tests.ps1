@@ -241,12 +241,17 @@ $versionCell = [regex]::Match($cutReleaseCode, '(?m)^\s*\$versionTarget\s*=.*$')
 Assert-True $versionCell.Success "found the line that builds the overview row's Version cell"
 Assert-True ($versionCell.Success -and $versionCell.Value -notmatch '"notes/') `
     'the Version cell carries no bare "notes/" literal -- the short form the two asserts above cannot see'
-Assert-True ($versionCell.Success -and $versionCell.Value -match '\$noteRootLeaf') `
-    'and is built from the note-root seam instead'
-# ON THE DERIVATION, NOT JUST THE VARIABLE NAME: a $noteRootLeaf assigned a literal would satisfy the assert
-# above while changing nothing, which is the same "reads as adopted" trap the seam-default count guards.
-Assert-True ($cutReleaseCode -match '\$noteRootLeaf\s*=\s*\$noteRootRelPath') `
-    'and that leaf is derived from the seam variable, so repointing the root moves the row with it'
+# SINCE AUGUST 14, 2026 THE CELL IS A COMPUTED RELATIVE PATH, not a leaf stripped with
+# `-replace '^releases/'`: a consumer whose history lives at workflow-davekjohn/releases/README.md is
+# the root-outside-releases/ case the old line's own comment said no repo had asked for yet. The cell
+# must come from Get-RelativeLinkPath, anchored on the history file's directory, fed by the seam.
+Assert-True ($versionCell.Success -and $versionCell.Value -match 'Get-RelativeLinkPath') `
+    'and is computed relative to the history file rather than by stripping a hardcoded prefix'
+# ON THE DERIVATION, NOT JUST THE FUNCTION NAME: the target handed to that computation must carry the
+# note-root seam variable, or a literal behind the call would read as adopted while changing nothing --
+# the same trap the seam-default count guards.
+Assert-True ($cutReleaseCode -match '\$rowTargetRel\s*=.*\$noteRootRelPath') `
+    'and the row target is derived from the seam variable, so repointing the root moves the row with it'
 # A SEAM THAT REACHES ONLY THE WRITER IS THE FAILURE THIS ONE HAD TO AVOID: session-status.ps1 looks for
 # the newest note, so a repo that repointed the root would have it written to the new place and looked
 # for in the old, reported as "no release note was found". Pinned here rather than only in that script's

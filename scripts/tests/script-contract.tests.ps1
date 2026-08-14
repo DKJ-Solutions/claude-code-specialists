@@ -142,6 +142,7 @@ function New-FixtureConsumer {
     param(
         [switch]$OmitBranchInfo,
         [switch]$OmitRepoConfig,
+        [switch]$OmitWorkflowFolder,
         [string[]]$StripFromBranchInfo = @(),
         [string[]]$StripFromRepoConfig = @(),
         [string]$BranchInfoContentOverride,
@@ -150,6 +151,12 @@ function New-FixtureConsumer {
     $root = Join-Path $Fixture 'consumer'
     if (Test-Path -LiteralPath $root) { Remove-Item -Recurse -Force -LiteralPath $root }
     New-Item -ItemType Directory -Path (Join-Path $root 'scripts\lib') -Force | Out-Null
+    # The workflow's own root folder (August 14, 2026): present by default so every scenario below keeps
+    # testing the record it is about -- the check reports the folder missing as its own [ERROR], which
+    # would otherwise leak into every fixture. -OmitWorkflowFolder is the dedicated negative case.
+    if (-not $OmitWorkflowFolder) {
+        New-Item -ItemType Directory -Path (Join-Path $root 'workflow-davekjohn') -Force | Out-Null
+    }
 
     if (-not $OmitBranchInfo) {
         $content = if ($PSBoundParameters.ContainsKey('BranchInfoContentOverride')) { $BranchInfoContentOverride } else { $script:RealBranchInfo }
@@ -181,7 +188,8 @@ try {
     # select), Get-ReleaseCategoryTitles (no category headings to label) and Get-ChangelogReleaseWording (no
     # release-block text to override). Each is now asserted on ABSENCE from the register, further down.
     $okCount = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 24 $okCount 'happy path: exactly twenty-four [OK] lines -- every declared record this repo defines (four mandatory functions plus every optional: Get-LiveStage, the two Get-Roster* made optional by #445, the four Get-Entry* stub-wording knobs, Get-PrMergeMethod, Get-MojibakePaths, the cut-release knobs from #417 plus Get-ReleaseMajorMinMinors, Get-ReleaseHistoryPath and Get-ReleaseNoteRoot (inbound #616), BOTH note-wording maps (Get-ReleaseNoteWording, which the cut reads first, and Get-InternalNoteWording, its fallback -- inbound #605), Get-BranchTypes from inbound #580, and Get-ReleaseAudienceTier from inbound #620, nothing else)'
+    Assert-Equal 25 $okCount 'happy path: exactly twenty-five [OK] lines -- every declared record this repo defines (four mandatory functions plus every optional: Get-LiveStage, the two Get-Roster* made optional by #445, the four Get-Entry* stub-wording knobs, Get-PrMergeMethod, Get-MojibakePaths, the cut-release knobs from #417 plus Get-ReleaseMajorMinMinors, Get-ReleaseHistoryPath and Get-ReleaseNoteRoot (inbound #616), BOTH note-wording maps (Get-ReleaseNoteWording, which the cut reads first, and Get-InternalNoteWording, its fallback -- inbound #605), Get-BranchTypes from inbound #580, and Get-ReleaseAudienceTier from inbound #620) plus the workflow-folder existence line (August 14, 2026), nothing else'
+    Assert-Match '\[OK\]\s+workflow folder: workflow-davekjohn/ exists' $r.Out 'happy path: the workflow folder is reported present'
     # inbound #203: the run names the root it inspected and how it resolved it. Asserted on the clean
     # run too, not only on a drifted one -- the [SCOPE] line is context that must always be emitted, so
     # that the hook has something to surface the moment a finding does appear.
@@ -204,6 +212,19 @@ try {
     # the one this consumer wrote, which is exactly the answer a real consumer needs and exactly what a
     # walk over leaf NAMES would have got wrong.
     Assert-Match 'Summary: 0 error\(s\), 5 info signal\(s\)' $r.Out 'happy path: [SCOPE] is non-counting (0 errors; the three deliberately-undefined seams -- the two impact-table ones plus Get-TestCommands since inbound #644 -- plus two reachability signals: neither fold-changelog-entry nor new-internal-note can see this consumer''s Get-BranchTypes, which is the ordinary state for a repo that has not chained branch-info.ps1 into its repo-config)'
+
+    # --- 1b. The workflow folder is missing -> its own [ERROR], naming the scaffold skill ----------
+    #     (August 14, 2026.) A plugin install writes nothing into a consumer's repo, so this line is
+    #     the one signal a consumer gets that the folder everything portable gathers in does not exist
+    #     yet. [ERROR] deliberately: the session hook forwards [ERROR] lines only. Existence only --
+    #     the folder's contents differ legitimately per repo.
+    $c = New-FixtureConsumer -OmitWorkflowFolder
+    $r = Invoke-Ps @('-ConsumerPathOverride', $c)
+    Assert-Equal 1 $r.Code 'missing workflow folder: exit-code 1'
+    Assert-Match "\[ERROR\].*'workflow-davekjohn/' does not exist" $r.Out 'missing workflow folder: the ERROR names the folder'
+    Assert-Match 'adopt-workflow-folder' $r.Out 'missing workflow folder: the finding names the skill that scaffolds it'
+    $errCountWf = @([regex]::Matches($r.Out, '\[ERROR\]')).Count
+    Assert-Equal 1 $errCountWf 'missing workflow folder: exactly one error -- every contract record is still satisfied'
 
     # --- 2. Missing function in branch-info.ps1 (the exact #147 incident): Test-BranchName ---------
     #     new-branch crashed at runtime with "The term 'Test-BranchName' is not recognized" because
@@ -322,7 +343,7 @@ try {
         Assert-NotMatch $optFn $r.Out "optional Get-Pr*: '$optFn' never mentioned (not in the contract)"
     }
     $okCount6 = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 24 $okCount6 'optional Get-Pr*: still exactly twenty-four [OK] (the mandatory four + the declared optionals this repo defines; the four UNdeclared Get-Pr* excluded)'
+    Assert-Equal 25 $okCount6 'optional Get-Pr*: still exactly twenty-five [OK] (the mandatory four + the declared optionals this repo defines + the workflow-folder line; the four UNdeclared Get-Pr* excluded)'
 
     # --- 6c. An optional contract function that is ABSENT -> [INFO] naming the fallback, exit 0 -----
     #     Get-ReleaseHistoryPath is declared Optional: the shared scripts fall back to 'releases/README.md',
@@ -431,7 +452,7 @@ function Get-RosterIgnoredIds { return @() }
         Assert-Match "\[OK\]\s+'$fn' present in" $r.Out "strict-mode regression: '$fn' still reported OK"
     }
     $okCount6b = @([regex]::Matches($r.Out, '\[OK\]')).Count
-    Assert-Equal 7 $okCount6b 'strict-mode regression: exactly seven [OK] lines (all functions detected despite the loose top-level code -- seven since inbound #580 declared Get-BranchTypes, which this fixture''s branch-info.ps1 also defines)'
+    Assert-Equal 8 $okCount6b 'strict-mode regression: exactly eight [OK] lines (all functions detected despite the loose top-level code -- seven since inbound #580 declared Get-BranchTypes, which this fixture''s branch-info.ps1 also defines, plus the workflow-folder line since August 14, 2026)'
 
     Write-Host "`n== script-contract.tests: contract-completeness drift guard ==" -ForegroundColor Cyan
     # Two-layered defense against the declared $script:Contract array in check-script-contract.ps1

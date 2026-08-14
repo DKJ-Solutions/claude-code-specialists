@@ -763,8 +763,13 @@ $cutNote = ($consumerBumps -contains $bumpType)
 $noteRelPath = "$noteRootRelPath/$notesDirName/$new.md"
 if ($cutNote) {
     $noteWording = Get-SeamValue -Name 'Get-ReleaseNoteWording', 'Get-InternalNoteWording' -Default @{}
+    # The link prefix is DERIVED FROM THE NOTE'S OWN DEPTH rather than left at the '../../../' default
+    # (August 14, 2026): that default is the depth of releases/audience/<X>.x/, and a consumer whose
+    # note root sits inside the workflow folder is one level deeper -- every root-relative link in the
+    # note would silently point one directory short. For this repo the derivation produces the default.
+    $noteDepth = @($noteRelPath -split '/').Count - 1
     $noteContent = Build-ReleaseNoteDraft -Entries $tier2Entries -Version $new -Date $today `
-        -Type $typeLabel -Title $Title -Wording $noteWording
+        -Type $typeLabel -Title $Title -Wording $noteWording -LinkPrefix ('../' * $noteDepth)
 }
 
 # --- Write the release-notes file -------------------------------------------------------------
@@ -846,11 +851,15 @@ $shortTitle = if ($Title) { $Title } else { "$typeLabel release" }
 # just written somewhere else, and every neighbouring row was correct because a PR had repointed them by
 # hand. The rename moved the directory, the reader and the archives, and missed the one place the path was
 # a string -- which is why the release manager's lens states 'read the seam, never hardcode the root'.
-# The '$historyRelPath sits in releases/' assumption is the one the development/ branch has always made;
-# a repo answering this seam with a root OUTSIDE that directory would need a '../' here, which no repo has
-# yet asked for.
-$noteRootLeaf = $noteRootRelPath -replace '^releases/', ''
-$versionTarget = if ($cutNote) { "$noteRootLeaf/$notesDirName/$new.md" } else { "development/$notesDirName/$new.md" }
+# AND THE ROW IS COMPUTED RELATIVE TO THE HISTORY FILE'S OWN DIRECTORY (August 14, 2026). This was
+# `-replace '^releases/'`, with a comment conceding that a history root outside releases/ "would need a
+# '../' here, which no repo has yet asked for" -- the workflow folder is that ask: a consumer's history
+# lives at workflow-davekjohn/releases/README.md while the generated development notes stay at the repo
+# root. Get-RelativeLinkPath answers both layouts, and for this repo it produces byte-identical rows to
+# the old strip.
+$historyDirRel = if ($historyRelPath -match '/') { $historyRelPath -replace '/[^/]+$', '' } else { '' }
+$rowTargetRel = if ($cutNote) { "$noteRootRelPath/$notesDirName/$new.md" } else { "releases/development/$notesDirName/$new.md" }
+$versionTarget = Get-RelativeLinkPath -FromDir $historyDirRel -To $rowTargetRel
 $newRow = "| [$new]($versionTarget) | $today | $typeLabel | $shortTitle |"
 if (Test-Path $relReadme) {
     $rm = Get-Content -Path $relReadme -Raw -Encoding UTF8

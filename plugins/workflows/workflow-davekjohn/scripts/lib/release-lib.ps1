@@ -998,6 +998,41 @@ function Get-ReleaseTierHeading {
     return "Tier $Tier"
 }
 
+function Get-RelativeLinkPath {
+    <#
+        Pure: the relative link from one repo-relative directory to a repo-relative file, both with
+        forward slashes -- 'audience/4.x/4.9.0.md' from 'releases' to 'releases/audience/4.x/4.9.0.md',
+        and '../../releases/development/4.x/4.9.0.md' from 'workflow-davekjohn/releases' to that file.
+
+        WHY IT EXISTS (August 14, 2026). cut-release.ps1 built the history-table row with
+        `-replace '^releases/'`, which is correct only while the history README sits directly in
+        releases/ -- its own comment said a repo answering the seam with a root outside that directory
+        "would need a '../' here, which no repo has yet asked for". The workflow folder is that ask:
+        a consumer's history lives at workflow-davekjohn/releases/README.md while the generated
+        development notes stay at the repo root. Same class as the v4.6.0 dead-row bug, caught before
+        shipping this time rather than after.
+
+        [System.IO.Path]::GetRelativePath does not exist on the .NET Framework Windows PowerShell 5.1
+        runs on -- the same reason cut-release's collision guard keeps repo-relative strings.
+    #>
+    param(
+        [AllowEmptyString()][string]$FromDir = '',
+        [Parameter(Mandatory)][string]$To
+    )
+    # NOT $from/$to: PowerShell variable names are case-INsensitive, so '$to = @(...)' would assign to
+    # the [string]-typed parameter $To itself -- and the type constraint coerces the segment array back
+    # into one space-joined string, whose [0] is then a single character. Measured on this function's
+    # first test run.
+    $fromParts = @($FromDir -split '/' | Where-Object { $_ })
+    $toParts   = @($To -split '/' | Where-Object { $_ })
+    $i = 0
+    while ($i -lt $fromParts.Count -and $i -lt $toParts.Count -and $fromParts[$i] -ceq $toParts[$i]) { $i++ }
+    $parts = @()
+    for ($u = $i; $u -lt $fromParts.Count; $u++) { $parts += '..' }
+    if ($i -lt $toParts.Count) { $parts += @($toParts[$i..($toParts.Count - 1)]) }
+    return ($parts -join '/')
+}
+
 function Build-ReleaseNotes {
     <#
         Builds the full release notes (the releases/development/<X>.x/<X.Y.Z>.md file) from the

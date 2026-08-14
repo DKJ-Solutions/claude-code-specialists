@@ -54,10 +54,11 @@ this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release work
 **No `agents/`, no `manuals/`.** Those belong to a team, and a workflow that shipped one would be
 answering the question the other directory owns.
 
-## The eight skills
+## The nine skills
 
 | skill | when |
 |---|---|
+| [`adopt-workflow-folder`](skills/adopt-workflow-folder/SKILL.md) | right after installing — scaffolds `workflow-davekjohn/`, the one folder in your root where everything portable gathers (an install alone writes nothing into your repo) |
 | [`new-branch`](skills/new-branch/SKILL.md) | starting any piece of work — creates the branch and both `workflow-davekjohn/branch/` files in one move |
 | [`park`](skills/park/SKILL.md) | handing an unfinished branch to another machine: push, no PR |
 | [`open-pr`](skills/open-pr/SKILL.md) | the work is committed — runs the four gates, pushes, opens the PR with the title and body composed from the entry |

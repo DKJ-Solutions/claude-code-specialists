@@ -306,6 +306,17 @@ function Get-SharedScriptPairs {
             SkillParamsExempt = @('BlueprintPath')
         },
         @{
+            # The workflow's own root folder (Dave, August 14, 2026): a plugin install writes nothing
+            # into a consumer's repo, so the folder that gathers everything portable arrives through
+            # this command -- and check-script-contract reports at session start while it is missing.
+            # Additive-only sibling of adopt-config: that one fills the seam libs, this one puts the
+            # folder down.
+            Name   = 'adopt-workflow-folder'
+            Source = 'scripts\task\adopt-workflow-folder.ps1'
+            Plugin = 'workflow-davekjohn'
+            Skill  = 'adopt-workflow-folder'
+        },
+        @{
             # Issue #417, phase 1. Two repos ran two independently evolved files of this name, and the
             # owner's goal is one release workflow rather than two that resemble each other. The audit
             # that produced the issue named three divergences; reading both files found six, and the
