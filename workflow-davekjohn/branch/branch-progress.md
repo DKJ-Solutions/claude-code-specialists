@@ -1,19 +1,13 @@
-## `feat/workflow-folder-scaffold` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-- [x] Build `scripts/task/adopt-workflow-folder.ps1`: dry-run default, `-Apply`, additive-only, refuses a plugin-publishing repo, branch files from the shared formatters
-- [x] Register it in `shared-scripts-lib.ps1` and write the `adopt-workflow-folder` SKILL.md (params documented, `${CLAUDE_PLUGIN_ROOT}` command form)
-- [x] Add the workflow-folder existence marker to `check-script-contract.ps1` ([ERROR], existence only, after the bootstrap early-exit)
-- [x] Repair the history-table row: `Get-RelativeLinkPath` in `release-lib.ps1`, anchored on the history file's directory; guardrail asserts repinned on the derivation
-- [x] Repair the note's link prefix: derived from the note path's own depth in `cut-release.ps1`
-- [x] Tests: new `adopt-workflow-folder.tests.ps1` (4 scenarios), the missing-folder scenario + fixture folder + three [OK]-count pins in `script-contract.tests.ps1`, five `Get-RelativeLinkPath` cases in `release-lib.tests.ps1`
-- [x] Plugin README skills table gains the row; mirror + blueprint rebuilt
-- [x] Gates green: full lint (0 findings) + the five affected suites; open-pr re-proves the full set before anything is pushed
-
-### Where I left off
-
-The project this belongs to is complete after this branch unless Dave extends it: phase 1 (the
-branch dossier moved into the folder) merged as #654. A consumer adopting the folder answers two
-`decide` seams (`Get-ReleaseNoteRoot`, `Get-ReleaseHistoryPath`) — the scaffold's closing block and
-the skill page both say so.
+_(filled in when a branch is created)_
