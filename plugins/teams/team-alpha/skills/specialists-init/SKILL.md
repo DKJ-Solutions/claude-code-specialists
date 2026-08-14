@@ -8,6 +8,7 @@ description: >-
   deliver a governance/safety-hooks proposal.
   Use this when the shared `team-alpha` plugin is installed and enabled but the conductor and the
   governance layer are still missing ("the workers are there, Chris is not").
+disable-model-invocation: true
 ---
 
 # specialists-init — the adoption path for a new consumer
@@ -382,6 +383,25 @@ your slash list and the session-start hooks have reported. Once both checks are 
 skill.
 
 ## What the skill does
+
+**Before any of it: establish that PowerShell exists on this machine.** This skill ends in a
+`powershell` call, and there are environments where that command is simply not there -- a Linux cloud
+container, a colleague's Mac, the Claude app with no repo connected. Ask once:
+
+```powershell
+powershell -NoProfile -Command "$PSVersionTable.PSVersion.ToString()"
+```
+
+If that answers `command not found` (exit 127), **stop and say so, before step 0**. `pwsh` is not a
+substitute to reach for here: these scripts target Windows PowerShell 5.1 and this repo's own CI runs
+them on `shell: powershell` rather than `pwsh` for that reason.
+
+The reason to check at the front rather than to let the call fail is that the script is the *last*
+thing this page asks for. It cannot half-run -- it never starts -- but everything above it can:
+marketplace registration, a plugin install over the CLI, up to two session restarts. Arriving at a
+call that cannot work on this box after all of that is the failure, and nothing before it gives a
+signal. Measured in an environment with no repo at all, inbound
+[#669](https://github.com/DaveKJohn/claude-code-specialists/issues/669) B2.
 
 Run the bundled bootstrap script from the **root of the consuming repo**:
 
