@@ -345,14 +345,16 @@ function Get-ReleaseNotesGrouping {
 # would land in, the inserter that writes that row, and new-internal-note.ps1, which repoints that row's
 # Version cell at the internal note once the note exists. One edit here moves all three.
 #
-# It is deliberately left at the DEFAULT, releases/README.md. The list lived in its own HISTORY.md for one
-# day (August 4, 2026), on the reasoning that one page should describe the process and another the outcome.
-# That reasoning was superseded the same day: the pages had since been reorganised portable-half first with
-# everything repo-specific in one named slot, and once that split exists, process-versus-outcome stops
-# earning a file boundary -- the outcome IS repo-specific content, so it is simply the last section of the
-# slot. Merging them also removed four cross-references the two pages needed to introduce each other, and
-# left a consumer with one file to mirror instead of two.
-$script:ReleaseHistoryPath = 'releases/README.md'
+# It sat at the DEFAULT, releases/README.md, until August 14, 2026, when the hand-kept release pages
+# moved into workflow-davekjohn/ -- the workflow's own root folder, where everything portable gathers
+# (Dave). The list lived in its own HISTORY.md for one day (August 4, 2026), on the reasoning that one
+# page should describe the process and another the outcome. That reasoning was superseded the same day:
+# the pages had since been reorganised portable-half first with everything repo-specific in one named
+# slot, and once that split exists, process-versus-outcome stops earning a file boundary -- the outcome
+# IS repo-specific content, so it is simply the last section of the slot. Merging them also removed four
+# cross-references the two pages needed to introduce each other, and left a consumer with one file to
+# mirror instead of two.
+$script:ReleaseHistoryPath = 'workflow-davekjohn/releases/README.md'
 
 function Get-ReleaseHistoryPath {
     <# Repo-root-relative path to the file that lists every release this repo has cut. #>
@@ -384,7 +386,15 @@ function Get-ReleaseHistoryPath {
 # choosing to -- moving the fallback would have the cut write to a root nobody has and the reader look in a
 # root nobody filled, reported as "no release note was found", which reads as a repo that has not cut one.
 # This is a repo-level rename, so it is stated here, which is the only place that can state it.
-$script:ReleaseNoteRoot = 'releases/audience'
+#
+# UNDER workflow-davekjohn/ SINCE AUGUST 14, 2026 (Dave), together with the history README above: the
+# hand-kept release pages are the workflow's portable belongings, so they live in its folder -- the same
+# answer the adopt-workflow-folder scaffold proposes to every consumer. The generated development/ and
+# github/ trees stay at the repo root deliberately: they are the machine-written record and the publish
+# artefact, and their roots are hardcoded by design (see cut-release.ps1). The history-table row and the
+# note's link prefix are both computed from these seam values since the same day, which is what makes
+# this repointing a two-line change instead of a dead-link generator.
+$script:ReleaseNoteRoot = 'workflow-davekjohn/releases/audience'
 
 function Get-ReleaseNoteRoot {
     <# Repo-root-relative directory the hand-written release note is written into and read back from. #>

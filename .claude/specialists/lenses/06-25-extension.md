@@ -220,7 +220,7 @@ only while it says when each one was opened.
    inside the writing and nobody waited for. The gate share breaks down as 231s of suites inside the cut,
    200s of the same suites when the note's pull request opened, and 8m 36s of `lint-en-tests` on that pull
    request, which is **56%** of the release and the only place a real reduction can come from. The full table
-   is in [`releases/audience/4.x/4.4.0.md`](../../../releases/audience/4.x/4.4.0.md).
+   is in [`releases/audience/4.x/4.4.0.md`](../../../workflow-davekjohn/releases/audience/4.x/4.4.0.md).
 
    **Two cautions travel with the number, and they matter more than it does.** That release carried **two**
    entries against `v4.2.0`'s seven, so it measures the clock well and the writing gain not at all — less to
@@ -261,7 +261,7 @@ only while it says when each one was opened.
    | `teardown-protocol.tests.ps1` | extracts a `Where-Object` from the real `specialists-teardown/SKILL.md` and executes it — its own docstring says outright that rewriting the doc turns the suite red |
    | `script-contract.tests.ps1` | the real `cut-release/SKILL.md`, asserting its text contains `Get-LiveStage` |
    | `shared-scripts.tests.ps1` | copies the real `.github/pull_request_template.md` into a fixture and asserts every comment line was substituted and no checkbox survives |
-   | `release-lib.tests.ps1` | the real `releases/README.md` via `Get-ReleaseHistoryPath`, asserting the overview targets major `'4'` — the live pin `CLAUDE.md` already records |
+   | `release-lib.tests.ps1` | the real `workflow-davekjohn/releases/README.md` via `Get-ReleaseHistoryPath`, asserting the overview targets major `'4'` — the live pin `CLAUDE.md` already records |
 
    **Two findings worth keeping beside the number.** First, the counter-intuitive result is the one that
    most needed checking, and it held: `check-plugin-integrity.tests.ps1` — the lint-gate suite, which
@@ -269,7 +269,7 @@ only while it says when each one was opened.
    one of those documents is written by the test into its own fixture; its only use of the real repo root is
    to copy `.ps1` libraries in. The obvious guess (the lint-gate suite must be one of the ones that reads
    real docs) pointed at the wrong nine. Second, `release-lib.tests.ps1`'s major pin and the stale tier table
-   in `releases/README.md` sit in the same file but different parts — the pin reads the `#### 4.x` heading
+   in `workflow-davekjohn/releases/README.md` sit in the same file but different parts — the pin reads the `#### 4.x` heading
    and the table under it, not the tier table — so repairing that table would not trip the assert. Worth
    stating for whoever opens that repair.
 
@@ -316,7 +316,7 @@ only while it says when each one was opened.
    | minor / major (carries a document) | **14m 34s** | 231s suites in the cut · 200s the same suites at `open-pr` · **443s** median `lint-en-tests` on that pull request |
    | patch (no document, no pull request) | **3m 51s** | the 231s cut suites alone |
 
-   The two local legs are cited from [`releases/audience/4.x/4.4.0.md`](../../../releases/audience/4.x/4.4.0.md),
+   The two local legs are cited from [`releases/audience/4.x/4.4.0.md`](../../../workflow-davekjohn/releases/audience/4.x/4.4.0.md),
    which took them from git timestamps. **The 7m 48s CI run on the release commit is excluded** because it
    blocks nobody.
 

@@ -551,17 +551,20 @@ if (Test-Path -LiteralPath $pluginsRootDir) {
     $linkFiles += @(Get-ChildItem -Path $pluginsRootDir -Recurse -Filter '*.md' -File |
         Select-Object -ExpandProperty FullName)
 }
-# AND THE THIRD, ARRIVING THE SAME WAY: branch/ -- the entry and the step list. They used to be root *.md
-# and were therefore covered by the root glob; the branch/ split moved them one level down. Same omission
-# as the plugins/ one above and worth stating separately rather than merging the two comments, because
-# these two documents went dark in the same week for two unrelated reasons -- which is the actual lesson
-# about this scan set: a file leaves it by MOVING, and nothing reports that it has.
+# AND THE THIRD, ARRIVING THE SAME WAY: the workflow's own root folder. The branch files used to be root
+# *.md and were therefore covered by the root glob; the branch/ split moved them one level down, and the
+# workflow folder (August 14, 2026) gathered them together with the audience releases and their history
+# README one level further. Same omission as the plugins/ one above and worth stating separately rather
+# than merging the two comments, because these documents went dark in the same week for two unrelated
+# reasons -- which is the actual lesson about this scan set: a file leaves it by MOVING, and nothing
+# reports that it has.
 #
-# RECURSIVE here, unlike the two globs above, because branch/ has a subdirectory: templates/. Those files
-# are prose somebody pastes from, so a dead link in one is copied forward into every branch that uses it.
-$branchDirForLinks = Join-Path $RepoRoot ((Get-BranchFilePaths).Directory)
-if (Test-Path -LiteralPath $branchDirForLinks) {
-    $linkFiles += @(Get-ChildItem -Path $branchDirForLinks -Recurse -Filter '*.md' -File |
+# THE FOLDER IS DERIVED FROM THE SEAM rather than spelled out: the parent of the branch directory IS the
+# workflow folder, so scanning it covers branch/ (templates included -- prose somebody pastes from, so a
+# dead link there is copied forward into every branch), releases/ and whatever docs the folder gains.
+$workflowDirForLinks = Join-Path $RepoRoot (Split-Path -Parent ((Get-BranchFilePaths).Directory -replace '/', '\'))
+if (Test-Path -LiteralPath $workflowDirForLinks) {
+    $linkFiles += @(Get-ChildItem -Path $workflowDirForLinks -Recurse -Filter '*.md' -File |
         Select-Object -ExpandProperty FullName)
 }
 # The specialists handbook lives next to the lenses (at family level) -- validate its links too.
@@ -1140,12 +1143,17 @@ $lifecycleFiles = @($linkFiles | Where-Object {
     if ($rel -match '\\CHANGELOG\.md$') { return $false }
     if ($rel -match '(^|\\)RELEASE\.md$') { return $false }
     if ($rel -match '^releases\\') { return $false }
+    # The moved release pages are the same history at their workflow-folder address (August 14, 2026).
+    if ($rel -match '^workflow-davekjohn\\releases\\') { return $false }
     # A root <branch-name>.md entry file is history in the making; same reasoning as CHANGELOG.md.
     if (($rel -notmatch '\\') -and (Test-IsChangelogEntryFile -Path $_)) { return $false }
     # branch/ is the same subject at its new address. Both files: the entry is history in the making, and
     # the step list is a scratch pad that never travels anywhere -- neither is a document a consumer reads
     # a lifecycle command off, which is what this check judges.
-    if ($rel -match ('^' + [regex]::Escape((Get-BranchFilePaths).Directory) + '\\')) { return $false }
+    # SEPARATORS NORMALISED before the escape, the lesson check 20 already paid for: the seam answers with
+    # forward slashes while $rel is built from a Windows path, and an exclusion that compares the two raw
+    # matches nothing -- silently, since these files rarely carry the commands this check judges.
+    if ($rel -match ('^' + [regex]::Escape(((Get-BranchFilePaths).Directory -replace '/', '\')) + '\\')) { return $false }
     return $true
 })
 
@@ -1970,6 +1978,8 @@ $scFiles = @($linkFiles | Where-Object {
     if ($rel -match '\\CHANGELOG\.md$') { return $false }
     if ($rel -match '(^|\\)RELEASE\.md$') { return $false }
     if ($rel -match '^releases\\') { return $false }
+    # The moved release pages are the same history at their workflow-folder address (August 14, 2026).
+    if ($rel -match '^workflow-davekjohn\\releases\\') { return $false }
     if (($rel -notmatch '\\') -and (Test-IsChangelogEntryFile -Path $_)) { return $false }
     # The two branch working files only -- NOT the whole directory. The entry is history in the making and
     # the step list is a scratch pad; the branch README is the convention itself and is checked.

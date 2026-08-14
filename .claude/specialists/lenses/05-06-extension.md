@@ -41,7 +41,7 @@ rather than trusting any prose, this paragraph included.
 
 - **`## Latest Release`.** It used to accumulate a block per release and had reached **434 of 1,062 lines**
   across 72 blocks that each said no more than "see the notes", while
-  [`releases/README.md`](../../../releases/README.md) already listed all 72 with a date, a type and a
+  [`releases/README.md`](../../../workflow-davekjohn/releases/README.md) already listed all 72 with a date, a type and a
   descriptive title — the same coverage, verified in both directions, and richer per row. `'latest'` mode cut
   it to one block; this removes the last one. The intro's one-line pointer to that page is what answers
   "which version is current" now, and being hand-written prose it cannot go stale at a cut that no longer
@@ -213,15 +213,15 @@ The `releases/` directory (modeled on life-hub):
   impact table, since the cut empties `CHANGELOG.md` and this becomes the last place each ranking's
   justification lives. Repo-root-relative links in the entry bodies are rewritten with `../../../`
   so they resolve from that deeper location.
-- **`releases/README.md`** — an overview table of all versions (newest at the top).
+- **`workflow-davekjohn/releases/README.md`** — an overview table of all versions (newest at the top).
 - In `CHANGELOG.md` the cut writes **nothing at all** — it empties the document down to its intro. The
-  internal note's only inbound link is therefore the **Version cell of the `releases/README.md` row**,
+  internal note's only inbound link is therefore the **Version cell of the `workflow-davekjohn/releases/README.md` row**,
   written by `new-internal-note.ps1`. That the cut cannot write it is unchanged and is the reason the step is
   separate: the note does not exist while the cut runs, and linking to it then would put a dead relative link
   inside an immutable tag. The cell was chosen over a fourth column because the table's shape is matched by
   one regex that three readers share — including the row inserter and the new-major guardrail — and only new
   rows are touched, so the existing 72 keep pointing where they always did.
-- **`releases/audience/<X>.x/<X.Y.Z>.md`** — **the one hand-written document, since August 10, 2026**, drafted
+- **`workflow-davekjohn/releases/audience/<X>.x/<X.Y.Z>.md`** — **the one hand-written document, since August 10, 2026**, drafted
   by the cut for every bump `Get-ReleaseConsumerBumps` names. Three sections: *For consumers* (pre-filled
   with the tier-2 entries, and absent where none reached tier 2), *What it is worth* and *What was still open
   at this release* (both empty — neither can be generated). Rendall's pass is a rewrite of the first and an
@@ -241,7 +241,7 @@ The `releases/` directory (modeled on life-hub):
     the note did not exist while the cut ran; it does now, so the cut writes the Version cell correctly
     straight away and nothing repoints it afterwards. A patch's row keeps pointing at the development notes,
     which is the most readable document that release has.
-- **`releases/audience/<X>.x/<X.Y.Z>.md`, the *For consumers* section** — *what the two-document era's
+- **`workflow-davekjohn/releases/audience/<X>.x/<X.Y.Z>.md`, the *For consumers* section** — *what the two-document era's
   `releases/consumer/` document became.* **That directory no longer exists**: on August 12, 2026 Dave had its
   twelve documents merged with their `releases/internal/` counterparts, one merged document per version, so
   `releases/` holds three reader-named roots and nothing else. Read the paragraph below as history — it
@@ -265,7 +265,7 @@ The `releases/` directory (modeled on life-hub):
   opposite. **Markdown only** — the tier generated a print-ready `.html` alongside it for exactly one
   release (v3.2.0) and no longer does; Dave does not want it anywhere. A PDF, if ever needed, comes from
   rendering the markdown with a tool built for it.
-- **`releases/audience/<X>.x/<X.Y.Z>.md`, the *What it is worth* and *What was still open* sections** — *what
+- **`workflow-davekjohn/releases/audience/<X>.x/<X.Y.Z>.md`, the *What it is worth* and *What was still open* sections** — *what
   the two-document era's `releases/internal/` document became.* **That directory no longer exists either**,
   merged in the same movement (Dave, August 12, 2026). `new-internal-note.ps1` still ships and still works for
   a repo running the two-document flow, and nothing in this repo's chain calls it — **its `releases/internal/`
@@ -337,7 +337,7 @@ at. `v3.2.0`'s internal note is the worked instance
 ([PR #432](https://github.com/DaveKJohn/claude-code-specialists/pull/432)): gates green, entry folded,
 nothing about being post-tag causing friction. **Worth knowing why this is written down at all:** until
 that date the route was an *assumption* presented as a rule in `CLAUDE.md`,
-[`releases/README.md`](../../../releases/README.md) and the `cut-release` skill — asked twice, unanswered,
+[`releases/README.md`](../../../workflow-davekjohn/releases/README.md) and the `cut-release` skill — asked twice, unanswered,
 and written in anyway. This lens, the one place Rendall would actually look, was the one that never said it.
 
 **Rendall notes the clock before he starts.** Step 0a of the
@@ -366,7 +366,7 @@ does everything in one motion:
 `cut-release.ps1 (-Version <X.Y.Z> | -Bump <major|minor|patch>) [-Title "…"] [-SummaryFile <path>]` on
 a clean `main`:
 1. bumps all plugin versions in lockstep to `X.Y.Z`;
-2. generates `releases/development/<X>.x/<X.Y.Z>.md`, adds a row to `releases/README.md`, and **empties
+2. generates `releases/development/<X>.x/<X.Y.Z>.md`, adds a row to `workflow-davekjohn/releases/README.md`, and **empties
    `CHANGELOG.md` down to its intro** — the intro passes through verbatim, so whatever the repo says about
    itself up there survives every cut, in whatever language it wrote it;
 3. **(retired, August 8, 2026 -- Dave)** steps 3 and 4 used to write a per-plugin `CHANGELOG.md` and
@@ -395,7 +395,7 @@ on `main`, ahead of the release commit** (deliberately unnumbered here, so they 
 the list above — they run before its first one):
 
 - add `#### <X>.x` plus its empty table header above the current top section in
-  [`releases/README.md`](../../../releases/README.md) — the refusal prints the exact heading at the
+  [`releases/README.md`](../../../workflow-davekjohn/releases/README.md) — the refusal prints the exact heading at the
   level the document uses, so follow what it prints rather than what this page says;
 - repoint the live assert in [`release-lib.tests.ps1`](../../../scripts/tests/release-lib.tests.ps1)
   at the new major, **with a reason written above it** — the file asks for that in as many words.
@@ -450,7 +450,7 @@ release management. Rendall's craft in such a repo is whatever *that* repo's rel
   omitted, it resolves the repo root as before.
 - `scripts/release/cut-release.ps1 (-Version <X.Y.Z> | -Bump <major|minor|patch>) [-Title "…"] [-NoPush] [-SkipLint] [-SkipTierGate]`
   — cut a repo-wide release, directly on `main`: the **bump gate** (does the pending work earn this bump?)
-  + lockstep bump + release notes in `releases/development/` + `releases/README.md` row +
+  + lockstep bump + release notes in `releases/development/` + `workflow-davekjohn/releases/README.md` row +
   `CHANGELOG.md` emptied down to its intro + commit + tag `vX.Y.Z` + push. It wrote per-plugin
   `CHANGELOG.md`s and `RELEASE.md` cards until August 8, 2026 — see step 3 above for why it no longer does.
   The pure logic (version bump, CHANGELOG transformation, notes assembly) lives in

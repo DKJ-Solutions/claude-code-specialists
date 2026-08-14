@@ -285,7 +285,7 @@ $answers = & {
 } $repoConfig
 Assert-Equal 'someone/their-repo' $answers.RepoName 'the consumer keeps its own repo name'
 Assert-Equal '.claude/specialists/SPECIALISTS.md' $answers.RosterPath 'an adopted function answers'
-Assert-Equal 'releases/README.md' $answers.HistoryPath 'an adopted function answers'
+Assert-Equal 'workflow-davekjohn/releases/README.md' $answers.HistoryPath 'an adopted function answers (the workflow-folder location the source answers since August 14, 2026)'
 Assert-Equal 'Chore' $answers.Fallback 'an adopted function answers'
 Assert-True ($null -ne $answers.BodyHolder -and $answers.BodyHolder.Length -gt 0) 'a function that sits below the shared assignment block still answers (extraction bug 2)'
 
