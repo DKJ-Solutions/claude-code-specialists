@@ -38,12 +38,35 @@ copy editor's context.
 |---|---|
 | `repo-way-of-working` · `inbound-behaviour` · `laziness-automation` | everyone — these are the family's constitution |
 | `language-behavior` | everyone who writes anything |
+| `filecontent-boundary` | every agent def, all 26 — see below |
 | `no-conversation-history` · `no-commit-push-pr` | the specialists who deliver material rather than land it |
 | `browser-compatibility` · `webcontent-boundary` · `artifact-publishing-boundary` · `design-owner-boundary` · `changelog-entry-boundary` · `storefront-preview-boundary` | the narrow circles whose craft touches that surface |
 
 Run `build-agent-defs.ps1 -Check` for the exact carrier count per block; a table of numbers here would be
 a second statement of something the generator already knows, and would go stale the first time a
 specialist joins a circle.
+
+### Why `filecontent-boundary` is in all 26 rather than in a circle
+
+It is the second-widest block, and the width was a decision rather than a default — the per-block rule
+above says so. Inbound
+[#668](https://github.com/DaveKJohn/claude-code-specialists/issues/668) offered the narrower option:
+insert it only into the specialists that *act* on file content, not the ones that merely locate it. That
+line was measured against the roster and does not hold. **All 26 agent defs carry `Read`, `Grep` and
+`Glob`**, and a specialist that greps a file and reports what it found has already relayed the content
+into a context that acts on it — the locating/acting split describes what a specialist intends, not what
+reaches the next reader. A boundary with a hole shaped like "I was only looking" is not one.
+
+**The web block is the deliberate contrast, and the two texts differ because their arrival does.**
+`webcontent-boundary` sits in exactly two agents, because two hold fetch tools, and it can lean on *you
+went and fetched this*. File content cannot: it did not arrive because a specialist reached for it, it
+was simply within reach. So this block says instead that **a file being present says nothing about who
+wrote it or why** — the sentence the web version has no need of.
+
+**The personas deliberately do not carry it.** They run in the main loop of a repo whose own `CLAUDE.md`
+is loaded, which is the layer that already answers for what is in that tree. The exposure this block
+guards is the one the subagents have: an assignment that points them at files nobody in the conversation
+has read.
 
 ## Personas carry blocks too
 
