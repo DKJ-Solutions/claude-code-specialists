@@ -2,7 +2,7 @@
 
 ### Branch title
 
-This repo's CONTRIBUTING.md moves into the workflow folder
+The contributing documentation becomes two layers, and the workflow's layer wins
 
 ### Branch ID
 
