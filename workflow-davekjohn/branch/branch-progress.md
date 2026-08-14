@@ -8,8 +8,10 @@
 - [x] `orchestrator-skill.tests.ps1`: the no-script property, the persona path, the repo pointer, and
       the deliberate absence of `disable-model-invocation`
 - [x] Verify the no-script guard goes red when a script is added, then restore
-- [x] Both `<!-- skills:all -->` spans in the README (the lint demanded them the moment the skill
-      existed, which is the mechanism working)
+- [x] Both marked all-skills enumerations in the README (the lint demanded them the moment the skill
+      existed, which is the mechanism working). Written without the literal marker on purpose: inline
+      code is deliberately NOT masked by check 10, only fences are, so quoting it here would open an
+      unpaired span -- which is exactly how this step list failed the gate on its first run.
 - [x] Lint gate green
 - [x] All 36 test suites green
 
