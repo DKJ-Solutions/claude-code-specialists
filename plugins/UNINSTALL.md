@@ -5,6 +5,14 @@ The counterpart to [INSTALL.md](INSTALL.md), and written for the same reader: so
 be able to install *and* uninstall at any moment (Dave's requirement, July 29, 2026) — and this page is
 the procedure for the second half.
 
+> **If these plugins arrived through your organisation rather than by your own install, only the first
+> of the two removals below is yours.** Taking the family out of *your repo* — the seam, the `@`-import,
+> the scaffolds — is repo work and nothing else documents it. Taking the plugin off *the machine* is the
+> org channel's business: the uninstall commands here name the public marketplace, and the registration
+> they would undo is not one you made. Do Step 1, then stop and say so. Same finding as the note at the
+> top of [INSTALL.md](INSTALL.md), inbound
+> [#664](https://github.com/DaveKJohn/claude-code-specialists/issues/664).
+
 ## Two removals, and confusing them is the usual mistake
 
 They are independent, they are done in a fixed order, and neither one does the other's job:

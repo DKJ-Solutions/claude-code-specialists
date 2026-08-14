@@ -310,8 +310,10 @@ had the real one, and the 11,684 lines across those ten files were a second copy
 it. One repository, one product, one changelog.
 
 **One canonical channel — mind the old repo names.** The marketplace is named `claude-code-specialists`
-(repo `DaveKJohn/claude-code-specialists`) and that is the only channel; use that name in
-`extraKnownMarketplaces`. This repo has been renamed twice — first from `claude-specialists`, then from
+(repo `DaveKJohn/claude-code-specialists`) and that is the only channel **for a reader who registers it
+themselves**; use that name in `extraKnownMarketplaces`. If this copy reached you through an
+organisation's own marketplace, that channel is the canonical one for you and this paragraph is about
+the public source it was mirrored from — do not register a second one alongside it. This repo has been renamed twice — first from `claude-specialists`, then from
 `davekjohns-workshop` (August 3, 2026) — and an old name keeps pointing at the same repo via a
 **GitHub rename redirect**, so a marketplace still registered under one of them refers to exactly the
 same repo. There is **no second source** to mirror to. However, the local marketplace clone of such an
