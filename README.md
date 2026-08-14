@@ -507,7 +507,7 @@ SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-con
 `workflow-sessioncheck`) function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `fix-mojibake`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `cut-release`,
-`adopt-config`, `discover-workflow`, `lock`, `continue`)<!-- /skills:all -->
+`adopt-config`, `adopt-workflow-folder`, `discover-workflow`, `lock`, `continue`)<!-- /skills:all -->
 remain available there.
 
 Skills themselves are Anthropic's general **Agent Skills** mechanism — organized folders of
@@ -523,7 +523,7 @@ interchangeable with — a Claude Code subagent.
 
 <!-- skills:all -->Most skills in claude-code-specialists today (`fold-changelog`, `open-pr`, `ship-pr`,
 `new-branch`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`, `sync-roster`,
-`start-task`, `adopt-config`, `discover-workflow`, `lock`, `continue`) are a thin wrapper around a script — procedural **mechanism** (branch, PR, ship, fold,
+`start-task`, `adopt-config`, `adopt-workflow-folder`, `discover-workflow`, `lock`, `continue`) are a thin wrapper around a script — procedural **mechanism** (branch, PR, ship, fold,
 bootstrap, teardown, roster-sync, encoding repair, reading a repo's own conventions, the standing
 before and after a context clear). `lock` and `continue` are the first pair to wrap **one** script
 between them — they run the same reporter and differ only in what they do with the answer, which is why

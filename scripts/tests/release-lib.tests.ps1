@@ -636,6 +636,22 @@ Assert-Match $ln '\[the lint\]\(\.\./\.\./\.\./scripts/lint/x\.ps1\)' 'root-rela
 Assert-Match $ln '\[the site\]\(https://example\.com\)' 'external link untouched'
 Assert-Match $ln '\[#heading\]\(#heading\)' 'anchor link untouched'
 Assert-Match $ln '\[PR #9\]\(https://example\.test/9\)' 'PR link untouched'
+
+# --- Get-RelativeLinkPath: the history row's anchor (August 14, 2026) ------------------------------
+# The first two cases are the old `-replace '^releases/'` answers, byte for byte -- that identity is
+# what made replacing the strip safe for this repo. The workflow-folder cases are the reason the strip
+# had to go: a history README outside releases/ needs a '../' the strip could never produce.
+Write-Host "Get-RelativeLinkPath -- computed relative to the history file's own directory" -ForegroundColor Cyan
+Assert-Equal 'audience/4.x/4.9.0.md' (Get-RelativeLinkPath -FromDir 'releases' -To 'releases/audience/4.x/4.9.0.md') `
+    'inside releases/: identical to the old prefix strip'
+Assert-Equal 'development/4.x/4.9.0.md' (Get-RelativeLinkPath -FromDir 'releases' -To 'releases/development/4.x/4.9.0.md') `
+    'a patch row in the default layout: identical to the old strip'
+Assert-Equal 'audience/4.x/4.9.0.md' (Get-RelativeLinkPath -FromDir 'workflow-davekjohn/releases' -To 'workflow-davekjohn/releases/audience/4.x/4.9.0.md') `
+    'workflow folder: the audience note sits under the same README'
+Assert-Equal '../../releases/development/4.x/4.9.0.md' (Get-RelativeLinkPath -FromDir 'workflow-davekjohn/releases' -To 'releases/development/4.x/4.9.0.md') `
+    'workflow folder: the development notes stay at the repo root, so the row climbs out'
+Assert-Equal 'CHANGELOG.md' (Get-RelativeLinkPath -FromDir '' -To 'CHANGELOG.md') `
+    'an empty from-dir returns the path itself'
 $lnTier = Build-ReleaseNotes -TierGroups @([pscustomobject]@{ Tier = 1; Entries = @($linkEntry) }) -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
 Assert-Match $lnTier '\[the lint\]\(\.\./\.\./\.\./scripts/lint/x\.ps1\)' 'root-relative links get the prefix inside a tier group too'
 

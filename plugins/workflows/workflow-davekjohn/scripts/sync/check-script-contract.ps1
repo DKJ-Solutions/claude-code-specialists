@@ -289,6 +289,26 @@ if ($contractLibs.Count -gt 0 -and $presentLibs.Count -eq 0) {
     exit 0
 }
 
+# --- The workflow's own root folder (Dave, August 14, 2026) ---------------------------------------
+# workflow-davekjohn/ is where everything portable about the workflow gathers in a consumer: the folder
+# docs, the audience releases root, and the branch dossier the shared scripts read. A plugin install
+# cannot create it -- an install is a clone into the plugin cache -- so the one signal a consumer gets
+# is this line, surfaced at session start by the script-contract hook ([ERROR] is what that hook
+# forwards, which is why this is not an [INFO]). EXISTENCE ONLY, deliberately: the folder's contents
+# differ legitimately per repo (the source keeps its docs at the repo root and carries only branch/
+# here), so anything finer would need the per-repo exemption list this repo keeps declining.
+# Placed AFTER the bootstrap marker: a repo that has not been through specialists-init already got the
+# one message that names its actual state, and this line would be noise on top of it.
+if (-not (Test-Path -LiteralPath (Join-Path $repoRoot 'workflow-davekjohn') -PathType Container)) {
+    Write-Failure ("the workflow folder 'workflow-davekjohn/' does not exist in this repo -- since " +
+        "August 14, 2026 the branch dossier, the folder docs and the audience releases live there, and " +
+        "the shared scripts read only that location. Run the 'adopt-workflow-folder' skill to scaffold " +
+        "it (dry-run by default, additive, never overwrites). A leftover root branch/ from before the " +
+        "move is yours to remove by hand.")
+} else {
+    Write-Ok "workflow folder: workflow-davekjohn/ exists."
+}
+
 foreach ($libRel in $contractLibs) {
     $records = @($script:Contract | Where-Object { $_.Lib -eq $libRel })
     $libPath = Join-Path $repoRoot $libRel
