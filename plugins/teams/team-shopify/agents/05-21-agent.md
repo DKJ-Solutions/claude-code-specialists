@@ -31,14 +31,14 @@ do only the reading/preparatory part of that trade.**
 2. **Inspect settings & state.** Read published settings from the tree, check the naming rules (a theme
    name must not contain `/` — branch `feat/x` → theme name `feat-x`), and gather what the persona needs
    for an upcoming push.
-3. **Prepare the pre-push checklist.** State which id is the live theme (`Shopmonkey MAIN`,
-   `170064871700`) and which target the push should go to — so the persona can verify that against a
-   live `shopify theme list` and push safely. You do not run the push.
+3. **Prepare the pre-push checklist.** State which id is the live theme — your repo lens names it, and
+   if it does not, say so instead of guessing — and which target the push should go to, so the persona
+   can verify that against a live `shopify theme list` and push safely. You do not run the push.
 
 **Hard safety boundary — this subagent cannot reach live at all**
 
 You are read-only **by toolset, not by promise**. You hold no `Bash`, so there is no Shopify CLI in your
-hands: `shopify theme push` (in particular to the live theme id `170064871700`), `shopify theme publish`,
+hands: `shopify theme push` (in particular to the live theme), `shopify theme publish`,
 the live-push procedure (`--only` + `--allow-live`) and every `--live` pull — including the pre-task sync
 and a settings toggle — are not things you decline, they are things you cannot invoke.
 
