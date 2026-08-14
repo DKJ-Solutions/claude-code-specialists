@@ -171,6 +171,61 @@ Remaining candidates in `CLAUDE.md`, by size, with the test applied: the roster/
 easy room is now spent, and what is left is the judgement call recorded above rather than more
 relocation.
 
+### The always-on path, re-measured — it has grown 158% (August 14, 2026)
+
+The July 28 table above is the baseline, and it is now badly out of date in the direction that matters.
+Re-measured on `73579e8`, with the seam document that did not exist then:
+
+| always-on | July 28 | August 14 | |
+|---|---|---|---|
+| `CLAUDE.md` | 24,388 chars | **73,298** | 277 → **875 lines** |
+| Chris's repo lens (`01-01-extension.md`) | 12,274 | 19,405 | |
+| Chris's portable body (`personas/01-01-persona.md`) | 6,628 | 11,075 | |
+| `.claude/specialists/SPECIALISTS.md` (the seam) | *did not exist* | 7,982 | a fourth document on the path |
+| **total** | **43,290 · ~11,700 tokens** | **111,760 · ~30,205 tokens** | **+158%** |
+
+**`CLAUDE.md` is at 4.4× the target this repo set itself.** The July 28 note records it as *"277 lines
+against the documented target of under 200"* and named moving content off the automatic path as the lever
+with room in it. Seventeen days later it is 875. Nothing about that is an accident of one branch: it is
+what recording the reasoning behind every decision costs when the decisions come at a release every nine
+days.
+
+**The lever is unchanged and the constraint on it is unchanged**, so this is a re-measurement rather than
+a new proposal: the `paths:`-scoped candidates were assessed above and the easy room was spent then. What
+has arrived since is a large, genuinely path-scoped body — the release, changelog, tier and significance
+machinery, inert until somebody touches `workflow-davekjohn/**`, `CHANGELOG.md` or runs a cut. It is also
+the body with the worst failure mode if scoped: a rule that is gone after a `/compact` is gone in the
+middle of a release, which is exactly when it is being followed.
+
+**So the number is recorded and the cut is not made.** That is Dave's call on his own governance document,
+and the honest framing is that this is a trade between context cost and the risk of a rule vanishing
+mid-release — not a tidying job. Recorded because a measurement that is seventeen days and 158% stale is
+worse than none: it invites the next reader to plan against ~11,700 tokens that have not been true for a
+fortnight.
+
+### The Claude Code best-practices page, held against this repo (August 14, 2026)
+
+[Issue #657](https://github.com/DaveKJohn/claude-code-specialists/issues/657) asked for the official
+[best practices](https://code.claude.com/docs/en/best-practices) to be measured against what this repo
+already does, rather than adopted wholesale. Done, per practice:
+
+| practice | state here |
+|---|---|
+| **Give Claude a way to verify its work** | **Fully adopted, and then some.** Three gates (`check-plugin-integrity`, `check-script-contract`, `check-roster-sync`), 36 test suites, CI as a required check, plus `open-pr`/`ship-pr` refusing on a red gate. The page's escalation ladder ends where this repo starts. |
+| **Explore first, then plan, then code** | Adopted as a rule rather than a mechanism: an inbound item is verified before it is routed, and a report's *reason* is checked before its symptom is repaired. Since #655 the branch's own plan is PLAN → CREATE → TEST. |
+| **Provide specific context in prompts** | The requester's side; nothing for this repo to build. |
+| **Configure the environment** | Adopted except for one item: the pruned `CLAUDE.md`. See the re-measurement above — this is the single practice the repo visibly and knowingly diverges from. |
+| **Communicate effectively** | Bianca #02 is an entire specialist for interview-to-spec. |
+| **Manage the session** | The `lock` and `continue` skills are exactly the checkpoint/resume pattern, with a reporter behind both. |
+| **Automate and scale** | The shared-scripts layer, and an adversarial review step the page suggests: Marlowe reviews the *conclusion* while the other reviewers check the craft. |
+| **Avoid the failure patterns** | The over-specified `CLAUDE.md` is the one being lived. The trust-then-verify gap is closed by the gates. |
+
+**The conclusion is that there is one gap, it is known, and it is deliberate.** Recorded here rather than
+turned into work, because the page's test — *"would removing this cause mistakes?"* — has an uncomfortable
+answer for most of this document: it records **why** decisions were made, and this repo has repeatedly paid
+for re-deriving a decision whose reasoning was lost. That is not the same kind of content the page is
+warning about, and the honest response is to say so rather than to prune towards a number.
+
 ### Wall-clock here — the gates, and the baseline measured at v4.2.0 (August 10, 2026)
 
 Nolan owns wall-clock as of this date, and this repo spends it almost entirely on **gates**. There is no
