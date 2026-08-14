@@ -375,7 +375,7 @@ The constitution above, concretely implemented here:
      August 9, 2026). `cut-release.ps1` refuses to file a `v4.0.0` row under `#### 3.x` and does not
      open the new section itself, and the live assert in
      [`release-lib.tests.ps1`](scripts/tests/release-lib.tests.ps1) pins which major
-     [`releases/README.md`](releases/README.md) targets — so cutting `v4.0.0` took `b2cea9c` (the
+     [`releases/README.md`](workflow-davekjohn/releases/README.md) targets — so cutting `v4.0.0` took `b2cea9c` (the
      `#### 4.x` heading plus its empty table header) and `1d2d3ff` (that pin, `'3'` → `'4'`, with the
      reason written above it) before the cut would run at all. Both were made by hand, on `main`,
      while the exception on paper covered only the release commit itself.
@@ -430,7 +430,7 @@ The constitution above, concretely implemented here:
      `## Latest Release` block naming the version, the date, the type and a pointer to the notes. Measured
      before removing it: that accumulating section had grown to **434 of the changelog's 1,062 lines**
      across 72 blocks that each said no more than "see the notes", while
-     [`releases/README.md`](releases/README.md) already listed every one of those 72 versions with a date,
+     [`releases/README.md`](workflow-davekjohn/releases/README.md) already listed every one of those 72 versions with a date,
      a type and a descriptive title — the same coverage, verified in both directions, and richer per row.
      So the intro carries a one-line pointer to that page and the cut leaves the document at its intro.
      One consequence worth knowing: the hand-written note's only inbound link is the **Version cell** of
@@ -493,7 +493,7 @@ The constitution above, concretely implemented here:
 
      | tier | who notices | where it is written | when |
      |---|---|---|---|
-     | **2** | subscribers of the service | the *For consumers* section of `releases/audience/<X>.x/<X.Y.Z>.md` | minor/major |
+     | **2** | subscribers of the service | the *For consumers* section of `workflow-davekjohn/releases/audience/<X>.x/<X.Y.Z>.md` | minor/major |
      | **1** | management and the employer/commissioner | the organisation's two sections of that same file | minor/major |
      | **0** | only this repo's developers | `releases/development/<X>.x/<X.Y.Z>.md` | every release |
 

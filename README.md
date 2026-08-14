@@ -25,7 +25,7 @@ keeping its own copies, and enables or disables **per plugin** which teams and w
 | know **how a repo consumes this** | [Consumption](#consumption) · [Versioning](#versioning) |
 | know **where this runs** (Chat / Cowork / Claude Code) | [Where this runs](#where-this-runs-chat-cowork-and-claude-code) |
 | **contribute a change** | [CONTRIBUTING.md](CONTRIBUTING.md) — the branch / PR / fold workflow |
-| see **the version history** | [`releases/README.md`](releases/README.md) |
+| see **the version history** | [`releases/README.md`](workflow-davekjohn/releases/README.md) |
 
 Everything below this table is the underlying explanation, and the page is long on purpose: it is the
 architecture record as much as the landing page. **[INSTALL.md](plugins/INSTALL.md) holds both
@@ -264,7 +264,7 @@ The full picture, top-level folder by folder:
   [README](plugins/workflows/workflow-davekjohn/scripts/README.md).
 - **`releases/`** — the release history: `development/<X>.x/<X.Y.Z>.md` (full notes per version) +
   `README.md` (overview table + the full cutting-a-release mechanics) — see
-  [`releases/README.md`](releases/README.md). The `## Releases` section of `CHANGELOG.md` points here.
+  [`releases/README.md`](workflow-davekjohn/releases/README.md). The `## Releases` section of `CHANGELOG.md` points here.
 - **`.claude/`** — the repo layer, on the seam described under
   [The seam, specified](#the-seam-specified): `specialists/SPECIALISTS.md` (the inclusion carrying the
   body import, the lens import and the roster), `specialists/lenses/` (this repo's own repo lenses),
@@ -339,7 +339,7 @@ bumped — a merge without a release stays invisible to consumers, and a shared 
 therefore always lands here first, never the other way around. The full mechanics — cutting a
 release, the three release documents, the lint guardrails — are in
 [`RELEASES-portable.md`](plugins/workflows/workflow-davekjohn/RELEASES-portable.md#cutting-a-release),
-with this repo's own answers and release list in [`releases/README.md`](releases/README.md).
+with this repo's own answers and release list in [`releases/README.md`](workflow-davekjohn/releases/README.md).
 
 ## Manuals — the split model
 
@@ -1097,4 +1097,4 @@ the roster, the routing) is in [`CLAUDE.md`](CLAUDE.md).
 - **Disconnecting it again?** [UNINSTALL.md](plugins/UNINSTALL.md) is its mirror — the repo teardown and the
   machine-side removal, in the order they have to happen.
 - **Releases** — the full version history and the cutting-a-release mechanics are in
-  [`releases/README.md`](releases/README.md).
+  [`releases/README.md`](workflow-davekjohn/releases/README.md).

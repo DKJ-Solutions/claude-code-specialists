@@ -154,9 +154,12 @@ function Get-Layer {
 
     $p = $RelPath -replace '\\', '/'
 
-    # History: published record. releases/README.md is the living index, not a record, so it is excluded.
+    # History: published record. The release-history README is the living index, not a record, so it is
+    # excluded -- recognised at both of its addresses, since the hand-kept release pages moved into the
+    # workflow folder on August 14, 2026 while a consumer's may still sit at the old one.
     if ($p -eq 'CHANGELOG.md') { return 'history' }
     if ($p -like 'releases/*' -and $p -ne 'releases/README.md') { return 'history' }
+    if ($p -like 'workflow-davekjohn/releases/*' -and $p -ne 'workflow-davekjohn/releases/README.md') { return 'history' }
 
     if ($p -like 'scripts/tests/*') { return 'tests' }
     if ($p -like '*.ps1' -or $p -like '*.json' -or $p -like '*.yml' -or $p -like '*.yaml') { return 'scripts' }

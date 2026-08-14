@@ -11,7 +11,7 @@ Read that first. It covers the two files and their jobs, the dossier form, the t
 reset state on the trunk, the rules, what the fold does at the merge, and working from more than one
 machine. **This page is this repo's set of answers to it**, and nothing more.
 
-The split is the same one [`CONTRIBUTING.md`](../../CONTRIBUTING.md) and [`releases/README.md`](../../releases/README.md)
+The split is the same one [`CONTRIBUTING.md`](../../CONTRIBUTING.md) and [`releases/README.md`](../releases/README.md)
 already use: the portable half travels with the plugin, the local half stays in the repo (Dave,
 August 13, 2026 — proposed as a "PR-portable" and narrowed to this page, because the PR cycle itself
 already travels in `CONTRIBUTING-portable.md`).

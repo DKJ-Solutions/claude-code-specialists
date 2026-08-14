@@ -2,7 +2,7 @@
 
 Everything merged since the last release, furthest reach first: **one `##` per change**, and under it six
 named `###` sections answering what a reader arrives with. Every release ever cut is listed in
-[`releases/README.md`](releases/README.md) — each with its date, type and title, and a link to what that
+[`workflow-davekjohn/releases/README.md`](workflow-davekjohn/releases/README.md) — each with its date, type and title, and a link to what that
 release was worth. How the mechanism works (entry files, the Significance sections, folding) is described in
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
