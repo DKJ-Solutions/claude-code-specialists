@@ -276,8 +276,16 @@ try {
     # which that consumer is correct not to have.
     $contractCheck = Join-Path $RepoRoot 'scripts\sync\check-script-contract.ps1'
     $rc = Invoke-Script -Path $contractCheck -ScriptArgs @('-ConsumerPathOverride', $FixtureWf)
-    Assert-Equal 0 $rc.Code 'scaffolds vs contract: exit-code 0 -- a freshly bootstrapped repo satisfies the contract'
-    Assert-True (-not ($rc.Out -match '\[ERROR\]')) 'scaffolds vs contract: no [ERROR] about a file the bootstrap just wrote'
+    # ONE [ERROR] IS THE DESIGNED STATE SINCE AUGUST 14, 2026, and it is not about anything the
+    # bootstrap wrote: the workflow folder (workflow-davekjohn/) arrives through the workflow plugin's
+    # own adopt-workflow-folder skill, a step AFTER the bootstrap -- the same split that keeps
+    # specialists-init (team-alpha) out of workflow-specific territory. So the guarantee #226 bought is
+    # asserted at its true width: every FUNCTION the bootstrap scaffolds satisfies the contract, and
+    # the single finding left is the pointer at that next step.
+    Assert-Equal 1 $rc.Code 'scaffolds vs contract: exit-code 1 -- the one finding is the workflow-folder pointer, by design'
+    $rcErrors = @([regex]::Matches($rc.Out, '\[ERROR\]')).Count
+    Assert-Equal 1 $rcErrors 'scaffolds vs contract: exactly one [ERROR] -- nothing about a file the bootstrap just wrote'
+    Assert-True ($rc.Out -match "\[ERROR\].*'workflow-davekjohn/' does not exist") 'scaffolds vs contract: and it is the workflow-folder pointer, naming the adopt-workflow-folder step'
     # And it must be reaching the real per-function verdicts, not passing because the [BOOTSTRAP]
     # short-circuit from #225 swallowed the run -- that would make this assertion worthless.
     Assert-True (-not ($rc.Out -match '\[BOOTSTRAP\]')) 'scaffolds vs contract: the libs exist, so the check really did probe them'
