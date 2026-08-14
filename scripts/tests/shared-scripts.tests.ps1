@@ -35,6 +35,82 @@ function Assert-True {
     }
 }
 
+# --- Capturing a child script's output -------------------------------------------------------------
+# EVERY assert in this file that reads a child's TEXT goes through this pair. It is defined here, at
+# script scope, rather than inside the first scenario that happened to need it: a helper reachable only
+# because PowerShell leaks a function out of somebody else's try block is a helper the next scenario
+# writes around instead of using -- which is exactly what scenario C did, and what cost the run below.
+#
+# Test-OutputContains strips ALL whitespace from both sides, because the CHILD wraps its own Write-Error
+# and Write-Warning output at its own console width: a phrase can break mid-word ('#33' + '2') or on a
+# space, and no single substitution survives both.
+#
+# Invoke-CapturedScript exists for the half that whitespace stripping CANNOT repair. Under
+# '& powershell ... 2>&1' the PARENT re-renders the child's stderr as its own NativeCommandError: it
+# truncates the first line at the parent's buffer width and inserts the record decoration -- 'At line:',
+# the '+ ' source echo, CategoryInfo, FullyQualifiedErrorId -- INTO the sentence at that point. The
+# phrase is then not reformatted but interrupted, and a Contains can never match it again.
+#
+# WHERE THAT CUT LANDS IS DECIDED BY TWO THINGS THAT ARE NOT PROPERTIES OF THE SCRIPT UNDER TEST: the
+# host's buffer width, and the LENGTH OF THE ABSOLUTE PATH the child was invoked with -- the parent
+# renders '<powershell.exe> : <full script path> : <message>' and cuts the whole of it at the width. So
+# the same commit passes or fails on where the repo happens to be checked out. Measured August 14, 2026:
+# scenario C1's assert on '#332' failed at width 152 with the source at a 95-character path (the error
+# arrived as '...open issue(s) #33', five lines of decoration, '2, but the PR declares...') and passed on
+# the same machine, same commit, in an 80-column shell. Deterministic in both, twice each.
+function Test-OutputContains {
+    param([string]$Text, [string]$Pattern)
+    return (($Text -replace '\s', '') -match ($Pattern -replace '\s', ''))
+}
+
+function Invoke-CapturedScript {
+    <# Runs a shared script as a child and returns its combined output as plain text plus its exit
+       code. Start-Process with redirect files rather than '2>&1' -- see the reasoning above. Each
+       argument is quoted individually, because Start-Process joins -ArgumentList with plain spaces
+       and a temp path containing a space would otherwise arrive as two arguments. #>
+    param([string]$ScriptPath, [string[]]$ScriptArgs = @())
+    $tag = [Guid]::NewGuid().ToString('N').Substring(0, 8)
+    $outFile = Join-Path ([System.IO.Path]::GetTempPath()) "shared-out-$tag.txt"
+    $errFile = Join-Path ([System.IO.Path]::GetTempPath()) "shared-err-$tag.txt"
+    try {
+        $all = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath) + $ScriptArgs
+        $quoted = @($all | ForEach-Object {
+            if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ }
+        })
+        $proc = Start-Process -FilePath 'powershell' -ArgumentList $quoted -NoNewWindow -Wait -PassThru `
+            -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+        $text = ''
+        foreach ($f in @($outFile, $errFile)) {
+            if (Test-Path -LiteralPath $f) { $text += [System.IO.File]::ReadAllText($f) }
+        }
+        return [pscustomobject]@{ Out = $text; Code = $proc.ExitCode }
+    } finally {
+        foreach ($f in @($outFile, $errFile)) { Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue }
+    }
+}
+
+Write-Host "Invoke-CapturedScript -- a child's stderr arrives uninterrupted" -ForegroundColor Cyan
+# THE GUARD FOR THE FINDING ABOVE, and it is deliberately about the CAPTURE rather than about any one
+# phrase. An assert that merely looks for its own phrase is what was already there, and it only fails on
+# the widths and paths where the cut happens to land inside that phrase -- which is how a broken capture
+# stayed green on CI for days while it was red on a developer's machine.
+#
+# 'NativeCommandError' can only appear in this text if a PARENT rendered the child's stderr as an error
+# record; a redirect file receives what the child wrote and nothing else. Its ABSENCE is therefore proof
+# of which capture ran, at every width and every path length. Asserted in both directions, or an empty
+# capture would pass the negative half on its own.
+$probeChild = Join-Path ([System.IO.Path]::GetTempPath()) ("shared-scripts-capture-probe-$PID.ps1")
+try {
+    $probeBody = "Write-Error 'capture probe: the marker #332 must survive whole'" + [Environment]::NewLine + "exit 3"
+    [System.IO.File]::WriteAllText($probeChild, $probeBody, (New-Object System.Text.UTF8Encoding $false))
+    $probeRun = Invoke-CapturedScript -ScriptPath $probeChild
+    Assert-Equal 3 $probeRun.Code "capture probe: the CHILD's exit code is reported"
+    Assert-True (Test-OutputContains $probeRun.Out 'the marker #332 must survive whole') 'capture probe: the stderr message arrives whole'
+    Assert-True (-not (Test-OutputContains $probeRun.Out 'NativeCommandError')) 'capture probe: no parent error-record decoration was stamped into it'
+} finally {
+    Remove-Item -LiteralPath $probeChild -Force -ErrorAction SilentlyContinue
+}
+
 Write-Host "Get-SharedScriptPairs" -ForegroundColor Cyan
 $pairs = @(Get-SharedScriptPairs -RepoRoot $RepoRoot)
 Assert-True ($pairs.Count -ge 1) 'at least one shared script registered'
@@ -131,39 +207,10 @@ try {
     # lines into its own NativeCommandError and renders that record's header, CategoryInfo and
     # FullyQualifiedErrorId -- so with two stderr lines, ~300 characters of decoration land in the MIDDLE
     # of the first line's sentence. Stripping newlines cannot repair that: the phrase is not reformatted,
-    # it has other content inserted into it. Invoke-CapturedScript below therefore captures the child's
-    # stderr as PLAIN TEXT via a redirect file, and Test-OutputContains strips ALL whitespace so the
-    # child's own remaining wrap -- mid-word or on a space -- cannot break a match either.
-    function Test-OutputContains {
-        param([string]$Text, [string]$Pattern)
-        return (($Text -replace '\s', '') -match ($Pattern -replace '\s', ''))
-    }
-
-    function Invoke-CapturedScript {
-        <# Runs a shared script as a child and returns its combined output as plain text plus its exit
-           code. Start-Process with redirect files rather than '2>&1' -- see the reasoning above. Each
-           argument is quoted individually, because Start-Process joins -ArgumentList with plain spaces
-           and a temp path containing a space would otherwise arrive as two arguments. #>
-        param([string]$ScriptPath, [string[]]$ScriptArgs = @())
-        $tag = [Guid]::NewGuid().ToString('N').Substring(0, 8)
-        $outFile = Join-Path ([System.IO.Path]::GetTempPath()) "shared-out-$tag.txt"
-        $errFile = Join-Path ([System.IO.Path]::GetTempPath()) "shared-err-$tag.txt"
-        try {
-            $all = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath) + $ScriptArgs
-            $quoted = @($all | ForEach-Object {
-                if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ }
-            })
-            $proc = Start-Process -FilePath 'powershell' -ArgumentList $quoted -NoNewWindow -Wait -PassThru `
-                -RedirectStandardOutput $outFile -RedirectStandardError $errFile
-            $text = ''
-            foreach ($f in @($outFile, $errFile)) {
-                if (Test-Path -LiteralPath $f) { $text += [System.IO.File]::ReadAllText($f) }
-            }
-            return [pscustomobject]@{ Out = $text; Code = $proc.ExitCode }
-        } finally {
-            foreach ($f in @($outFile, $errFile)) { Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue }
-        }
-    }
+    # it has other content inserted into it. Invoke-CapturedScript (defined at the top of this file)
+    # therefore captures the child's stderr as PLAIN TEXT via a redirect file, and Test-OutputContains
+    # strips ALL whitespace so the child's own remaining wrap -- mid-word or on a space -- cannot break
+    # a match either.
 
     $foldSrc = ($pairs | Where-Object { $_.Name -eq 'fold-changelog-entry' }).SourcePath
     $foldRun = Invoke-CapturedScript -ScriptPath $foldSrc
@@ -749,25 +796,27 @@ This is the test description text. It repairs the thing reported in #332.
 
     # C1: an open issue is mentioned and no decision is declared -> BLOCKED, and nothing reached gh.
     Remove-Item -Path $prArgsCapture, $prBodyCapture -Force -ErrorAction SilentlyContinue
-    $gateOutRaw = (& powershell -NoProfile -ExecutionPolicy Bypass -File $openPrSrc -Title 'feat-openpr-101-test' -SkipLint -SkipTests 2>&1 | Out-String)
-    $gateCode = $LASTEXITCODE
-    # ALL whitespace removed before matching, not collapsed to single spaces -- and that distinction is
-    # the whole fix. The child renders Write-Error at ITS OWN console buffer width, so the wrap point
-    # moves with how this suite's output is being consumed: measured August 3, 2026, the same assert
-    # failed four runs in a row when the suite's output was redirected to a file and passed four runs in
-    # a row when it went to the terminal, on one commit, with open-pr.ps1 behaving identically.
+    # CAPTURED VIA REDIRECT FILES, NOT '2>&1' -- see Invoke-CapturedScript at the top of this file.
+    # This scenario used to capture with '& powershell ... 2>&1 | Out-String' and strip all whitespace,
+    # on the reasoning that a phrase can only then fail to match if it is genuinely absent "or has other
+    # content inserted into the middle of it (the NativeCommandError decoration case)". That parenthesis
+    # was the whole defect: the decoration case is not an edge of this capture, it IS this capture, and
+    # the asserts below were kept SHORT in the hope of dodging it rather than moved out of its way.
     #
-    # Collapsing ('\s+' -> ' ') only survives a wrap that lands ON A SPACE. A wrap that lands MID-WORD
-    # yields 'resol' + 'ves gate', which collapses to 'resol ves gate' and still does not match -- the
-    # hazard new-branch.tests.ps1's Get-FlatOutput/Test-Phrase pair documents at length after #415 fixed
-    # it in the branch suites. This scenario kept the weaker form and was therefore still width-
-    # dependent: green on the terminal, red on a redirect, which is the worst kind of gate -- it reports
-    # success in exactly the setup a human watches and fails in the one CI uses.
+    # Measured August 14, 2026: at width 152, with $openPrSrc at a 95-character path, the parent cut the
+    # rendered record after '...open issue(s) #33' and put 'At line:', the source echo, CategoryInfo and
+    # FullyQualifiedErrorId between that and the '2, but the PR declares...' remainder. Stripping
+    # whitespace cannot rejoin '#33' and '2' across five lines of other text, so the assert on '#332'
+    # failed while open-pr.ps1 was doing exactly what it is specified to do. The same commit passed in an
+    # 80-column shell on the same machine. Deterministic both ways, twice each -- so it is not flake, it
+    # is the console width and the checkout path deciding a verdict about a script.
     #
-    # So: strip every whitespace character from the output AND from each expected phrase, and compare
-    # those. A phrase can then only fail to match if it is genuinely absent or has other content
-    # inserted into the middle of it (the NativeCommandError decoration case, which is why the asserts
-    # below deliberately match SHORT phrases rather than whole sentences).
+    # A redirect file receives what the child actually wrote. Test-OutputContains still strips ALL
+    # whitespace, because the CHILD's own wrap remains: it can break mid-word ('#33' + newline + '2') or
+    # on a space, and collapsing to single spaces only ever survives the second.
+    $gateRun = Invoke-CapturedScript -ScriptPath $openPrSrc -ScriptArgs @('-Title', 'feat-openpr-101-test', '-SkipLint', '-SkipTests')
+    $gateOutRaw = $gateRun.Out
+    $gateCode = $gateRun.Code
     $gateFlat = ($gateOutRaw -replace '\s', '')
     function Test-GatePhrase { param([string]$Phrase) return $gateFlat.Contains(($Phrase -replace '\s', '')) }
     Assert-Equal 1 $gateCode 'resolves gate: open-pr exits 1 when an open issue is mentioned without a decision'
@@ -819,10 +868,11 @@ This follows the shape PRs #341-#343 established, see https://github.com/o/r/pul
     [System.IO.File]::WriteAllText((Join-Path $prFixtureRoot 'feat-openpr-101-test.md'), $gateEntry, $Utf8NoBomTest)
     $env:GH_FAIL_ISSUE_LIST = '1'
     Remove-Item -Path $prArgsCapture, $prBodyCapture -Force -ErrorAction SilentlyContinue
-    # Same whitespace normalization as C1, for the same console-width wrap reason.
-    $degradedOut = ((& powershell -NoProfile -ExecutionPolicy Bypass -File $openPrSrc -Title 'feat-openpr-101-test' -SkipLint -SkipTests 2>&1 | Out-String) -replace '\s+', ' ')
-    Assert-Equal 0 $LASTEXITCODE 'resolves gate: a failing issue query does not block the PR'
-    Assert-True ($degradedOut -match 'resolves gate cannot check') 'resolves gate: it says out loud that it could not check'
+    # Same capture as C1, and for the same reason: the phrase asserted here arrives on the child's
+    # stderr (a Write-Warning), so under '2>&1' it is subject to exactly the interruption C1 measured.
+    $degradedRun = Invoke-CapturedScript -ScriptPath $openPrSrc -ScriptArgs @('-Title', 'feat-openpr-101-test', '-SkipLint', '-SkipTests')
+    Assert-Equal 0 $degradedRun.Code 'resolves gate: a failing issue query does not block the PR'
+    Assert-True (Test-OutputContains $degradedRun.Out 'resolves gate cannot check') 'resolves gate: it says out loud that it could not check'
     Remove-Item Env:\GH_FAIL_ISSUE_LIST -ErrorAction SilentlyContinue
     Remove-Item Env:\GH_OPEN_ISSUES -ErrorAction SilentlyContinue
     [System.IO.File]::WriteAllText((Join-Path $prFixtureRoot 'feat-openpr-101-test.md'), $prEntryContent, $Utf8NoBomTest)
