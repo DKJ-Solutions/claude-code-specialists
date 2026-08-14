@@ -4,7 +4,7 @@ Everything merged since the last release, furthest reach first: **one `##` per c
 named `###` sections answering what a reader arrives with. Every release ever cut is listed in
 [`workflow-davekjohn/releases/README.md`](workflow-davekjohn/releases/README.md) — each with its date, type and title, and a link to what that
 release was worth. How the mechanism works (entry files, the Significance sections, folding) is described in
-[`CONTRIBUTING.md`](CONTRIBUTING.md).
+[`workflow-davekjohn/CONTRIBUTING.md`](workflow-davekjohn/CONTRIBUTING.md).
 
 Each change declares its own **reach**, and per audience how much it **weighs** there — one `#### Tier N`
 sub-section per tier under *Significance*, each closing with its score. That is what orders this list:

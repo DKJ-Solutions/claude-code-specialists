@@ -128,7 +128,12 @@ $folderClaude = @(
 )
 
 $folderContributing = @(
-    '# Contributing -- this repo''s answers',
+    '# Contributing -- the workflow''s layer',
+    '',
+    'This page sits ON TOP of the repo''s own root `CONTRIBUTING.md`, which describes the standard',
+    'workflow that holds before any plugin is consulted. **Where the two disagree, this page wins**:',
+    'the root page stays meaningful in a repo without the plugin, and everything the',
+    '`workflow-davekjohn` plugin owns is stated here, in the folder that travels with it.',
     '',
     'The contribution cycle itself -- a branch, its two files, the PR gates, the significance model --',
     'is the plugin''s `CONTRIBUTING-portable.md`, which travels with `workflow-davekjohn` and is not',
