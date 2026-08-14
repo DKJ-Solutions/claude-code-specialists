@@ -1,12 +1,23 @@
 name: Claude Code
 
+# TRIGGERS: comment events only, deliberately.
+#
+# The upstream template also triggers on `issues: [opened, assigned]`, so an issue whose BODY
+# contains '@claude' starts a run at the moment it is filed. That trigger was removed here because
+# this repo publishes an `inbound` issue template and asks consumers to file reports through it --
+# a documented, encouraged stream of prose written by people outside this repo. The action's own
+# security doc states that its sanitisation is best-effort ("new bypass techniques may emerge") and
+# recommends reviewing raw external input before Claude processes it.
+#
+# Keeping only the comment events puts a deliberate human act between an outsider's text and a run:
+# somebody with write access has to read the issue and then type '@claude'. The write-access gate
+# the action enforces gives the same guarantee about WHO triggers, but not about who WROTE the text
+# that is read once a run starts.
 on:
   issue_comment:
     types: [created]
   pull_request_review_comment:
     types: [created]
-  issues:
-    types: [opened, assigned]
   pull_request_review:
     types: [submitted]
 
@@ -15,9 +26,13 @@ jobs:
     if: |
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude'))
     runs-on: ubuntu-latest
+    # NOTE: this block does NOT describe what the action can do. `id-token: write` lets the action
+    # exchange an OIDC token for a GitHub App token of its own, which upstream documents as holding
+    # Contents, Pull Requests and Issues at READ & WRITE -- including creating branches. The read-only
+    # scopes below apply to GITHUB_TOKEN, not to that App token. The tool allowlist further down is
+    # what actually bounds Claude here; do not read this block as the boundary.
     permissions:
       contents: read
       pull-requests: read
@@ -26,13 +41,15 @@ jobs:
       actions: read # Required for Claude to read CI results on PRs
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        # Pinned by commit SHA rather than the moving `v4` tag: this repo is a public plugin source,
+        # so a third party who can move a tag can reach every consumer through its CI.
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 1
 
       - name: Run Claude Code
         id: claude
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@e63208cb983318a44e3f945e959ef894b707dcfa # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
@@ -40,11 +57,24 @@ jobs:
           additional_permissions: |
             actions: read
 
+          # READ-ONLY BY DESIGN. Without this, the default tool set includes editing and committing
+          # files, which would let a '@claude' mention produce a branch and a commit that passed none
+          # of this repo's gates -- no branch prefix, no changelog entry, no step list, no open-pr
+          # lint/test run. Changes here go through the specialist chain; this responder reads and
+          # answers, and that is the whole of its job.
+          #
+          # The three mcp__github_ci__* tools are named explicitly because the `actions: read`
+          # permission above exists to enable exactly them, and an allowlist that omitted them would
+          # switch that capability off silently. Upstream documents that the base GitHub tools
+          # (posting and updating the reply comment) are always included regardless of this setting,
+          # so the reply mechanism is unaffected.
+          #
+          # CONSEQUENCE, stated so nobody debugs it as a fault: '@claude fix this' will answer with
+          # what it would change, and will not change it.
+          claude_args: '--allowedTools "Read,Glob,Grep,mcp__github_ci__get_ci_status,mcp__github_ci__get_workflow_run_details,mcp__github_ci__download_job_log"'
+
           # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
           # prompt: 'Update the pull request description to include a summary of changes.'
 
-          # Optional: Add claude_args to customize behavior and configuration
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr *)'
-

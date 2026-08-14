@@ -1,5 +1,10 @@
 name: Claude Code Review
 
+# `pull_request`, NOT `pull_request_target` -- keep it that way. GitHub withholds secrets from
+# workflows triggered by a fork's pull request, so `secrets.CLAUDE_CODE_OAUTH_TOKEN` is empty there
+# and this job fails rather than handing a credential to code from outside the repo. That failure is
+# the safe outcome, not a defect to work around: switching to `pull_request_target` to "fix" the red
+# check would run the fork's PR with this repo's secrets in scope.
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
@@ -19,6 +24,9 @@ jobs:
     #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
 
     runs-on: ubuntu-latest
+    # As in claude.yml: `id-token: write` lets the action mint a GitHub App token that upstream
+    # documents as Contents/Pull Requests/Issues READ & WRITE. These read-only scopes bound
+    # GITHUB_TOKEN, not that token. The single-tool allowlist below is the real boundary here.
     permissions:
       contents: read
       pull-requests: read
@@ -27,19 +35,30 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        # Pinned by commit SHA rather than the moving `v4` tag -- see claude.yml for the reasoning.
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 1
 
       - name: Run Claude Code Review
         id: claude-review
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@e63208cb983318a44e3f945e959ef894b707dcfa # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # NOT PINNED, AND NOT PINNABLE -- checked rather than assumed (August 14, 2026). Both
+          # inputs were read in the action's own `action.yml`: `plugin_marketplaces` takes
+          # "Git URLs to install from" and `plugins` takes plugin names, and neither description --
+          # nor docs/usage.md -- documents a ref, tag or commit syntax. So this marketplace is cloned
+          # fresh on every run and tracks whatever its default branch holds at that moment, which is
+          # an unpinned third-party dependency inside the CI of a public plugin source.
+          #
+          # No syntax was invented to close it. The remedy, if this matters more than the review is
+          # worth, is to drop the plugin and write the review prompt inline instead -- a decision
+          # about whether the dependency earns its place, not a pinning problem with a hidden answer.
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
           prompt: '/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
+          # Already minimal: one tool, and no file-editing or Bash surface.
           claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment"'
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-
