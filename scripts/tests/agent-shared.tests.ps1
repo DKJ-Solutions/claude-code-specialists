@@ -45,7 +45,10 @@ try {
     $blockText = "- hello world`n- second line"
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'greeting.md'), "$blockText`n", (New-Object System.Text.UTF8Encoding($false)))
 
-    $begin = '<!-- BEGIN shared:greeting -- GENERATED, edit agent-shared/greeting.md -->'
+    # THE FIXTURE ASKS THE LIB FOR THE SENTINEL rather than repeating its text. That is the point of the
+    # change this covers: the wording has one source, so a test carrying its own copy would be the 179th
+    # hand-typed instance and would keep passing after the canonical one was reworded.
+    $begin = Format-SharedBeginSentinel -Name 'greeting'
     $end   = '<!-- END shared:greeting -->'
     $inSync = "before`n$begin`n$blockText`n$end`nafter"
 
@@ -63,6 +66,28 @@ try {
     $o2 = Expand-AgentDefShared -Content $stale -SharedDir $Fixture -Problems $p2
     Assert-True ($o2 -ne $stale) 'drift detected (expand deviates from the input)'
     Assert-Equal $inSync $o2 'expand restores the region from the canonical source'
+
+    # --- 2b. The BEGIN SENTINEL is owned too, not copied through (#669 C2) --------------------------
+    # The wording used to be hand-maintained in 178 places, because Expand-AgentDefShared replaced the
+    # content between the sentinels and passed the BEGIN line along untouched. These asserts are what
+    # makes it single-source: they must fail if that line ever goes back to being copied.
+    Write-Host "Expand-AgentDefShared -- the BEGIN sentinel is rebuilt, not copied" -ForegroundColor Cyan
+    $retired = '<!-- BEGIN shared:greeting -- GENERATED, edit agent-shared/greeting.md -->'
+    $withRetired = "before`n$retired`n$blockText`n$end`nafter"
+    $p2b = New-Problems
+    $o2b = Expand-AgentDefShared -Content $withRetired -SharedDir $Fixture -Problems $p2b
+    Assert-Equal $inSync $o2b 'the retired sentinel wording is rewritten to the canonical one'
+    Assert-True (-not ($o2b -match 'edit agent-shared/greeting\.md')) 'the dead pointer is gone from the output'
+    Assert-Equal 0 $p2b.Count 'and a drifted sentinel is a rewrite, not a reported problem -- the builder fixes it'
+    # Any wording at all, not just the one retired string: the rule is that this line is generated.
+    $invented = "before`n<!-- BEGIN shared:greeting -- whatever somebody typed here -->`n$blockText`n$end`nafter"
+    Assert-Equal $inSync (Expand-AgentDefShared -Content $invented -SharedDir $Fixture -Problems (New-Problems)) 'an invented sentinel wording is normalized too'
+    # Indentation survives. No sentinel in this tree is indented today, so this guards the case a nested
+    # shared block would create -- silently unindenting it would change markdown around content the
+    # expander is not allowed to touch.
+    $indented = "before`n    $retired`n$blockText`n    $end`nafter"
+    $oInd = Expand-AgentDefShared -Content $indented -SharedDir $Fixture -Problems (New-Problems)
+    Assert-True ($oInd -match "(?m)^    <!-- BEGIN shared:greeting -- GENERATED, do not edit here -->$") 'the indent of a nested sentinel is carried through'
 
     # --- 3. BEGIN without END is reported ------------------------------------------------------------
     Write-Host "Expand-AgentDefShared -- BEGIN without END" -ForegroundColor Cyan

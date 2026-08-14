@@ -27,6 +27,32 @@ rewrites every carrier. Lint check 7 in
 region deviates from its source — whether from a hand edit or a forgotten rebuild — and
 `build-agent-defs.ps1 -Check` answers the same question without writing.
 
+### The BEGIN line is generated too, and it deliberately points nowhere
+
+It reads `<!-- BEGIN shared:<name> -- GENERATED, do not edit here -->`, and that wording has one source:
+`Format-SharedBeginSentinel` in
+[`agent-shared-lib.ps1`](../../scripts/lib/agent-shared-lib.ps1). Until August 14, 2026 the expander
+copied the line through unchanged, so the text sat hand-maintained in **178** places with nothing
+holding it — and it said `GENERATED, edit agent-shared/<name>.md`.
+
+**That path resolves in this repo and nowhere else.** This directory sits *outside* every plugin root,
+so it does not travel in the package: for a consumer the instruction pointed at a file they do not have.
+Inbound [#669](https://github.com/DaveKJohn/claude-code-specialists/issues/669) C2 reported it as a dead
+pointer, which understates it — three lines below, in the same agent def, the `inbound-behaviour` block
+says *"You do not modify the shared core locally"* and names the issue route. The pointer told a reader
+to do what the paragraph it introduces forbids.
+
+**Both remedies #669 proposed were weighed and declined.** *Shipping this directory in the package* hands
+a consumer a file they may open but which is not the source — precisely the confusion the inbound route
+exists to remove. *Repointing it at `DaveKJohn/claude-code-specialists`* would add 178 references to a
+personal repo, straight against C4 of the same report. And for the only reader who can act on it — a
+maintainer here — the pointer is redundant: `shared:<name>` maps to `agent-shared/<name>.md` by
+construction. Measured: dropping it takes those 178 lines from **17,332 to 13,027 bytes**.
+
+**Owning the line is what makes it a rule rather than a habit.** The builder and lint check 7 both compare
+the whole file against the expander's output, so a reworded sentinel is rebuilt by the one and reported by
+the other — with no check of its own, and no exemption list.
+
 ## What each block is for
 
 The directory listing is the enumeration: one `.md` per block, and the filename is the `<name>` in the
