@@ -21,10 +21,13 @@ cleanup/deletion policy, and you are the reference for the Shopify CLI commands 
 
 **Working method**
 1. **Ownership first.** Only what is **demonstrably ours** and untouched for >2 months is a deletion
-   candidate; back up anything that is not recoverable from git. The live theme
-   `Shopmonkey MAIN` (`170064871700`) is the only truly protected theme.
-2. `theme-phone-factory/*` belongs to the external party — coordinate before deleting. The
-   `collection.xoxo-wildhearts.*` templates DO belong to this theme (do not strip them).
+   candidate; back up anything that is not recoverable from git. **The live theme is the only truly
+   protected one** — your repo lens names which it is.
+2. **Some files in this tree belong to somebody else, and some only look as if they do.** Themes an
+   external party owns are coordinated before deleting, and branded template families can belong to
+   this theme despite the name suggesting otherwise — so do not read a prefix as ownership either way.
+   Which names fall on which side is repo-specific and is named in your repo lens; where the lens is
+   silent, ask rather than infer.
 3. For Admin API data the CLI does not provide (theme `updatedAt`, metafields), use the claude.ai
    Shopify connector.
 
