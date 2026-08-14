@@ -1114,6 +1114,37 @@ Assert-Equal 'still open' $freshFindings[0].Label 'and the open label wins, beca
 # the one-commit typo fix. Deliberate tolerance, asserted so it cannot be tightened by accident.
 Assert-Equal 0 @(Get-BranchProgressFindings -Text ((Format-BranchProgressReset) -join "`n")).Count 'the reset state has nothing to resolve -- an absent plan is not a refusal'
 
+# --- The SDLC arc (#655) ------------------------------------------------------------------------------
+# THE PHASES ARE DRAWN ON TOP OF THE GATE, NEVER INTO IT. Get-BranchProgressFindings reads step marks, so a
+# heading is invisible to it -- which is the entire reason the arc could be added without touching the
+# mechanism. Asserted in that order: the headings are there, AND they change no verdict.
+Write-Host "the step list follows the SDLC arc (#655)" -ForegroundColor Cyan
+$phases = @((Get-BranchFileWording).StepPhases)
+Assert-Equal 3 $phases.Count 'three phases are configured -- PLAN, CREATE, TEST'
+foreach ($phase in $phases) {
+    Assert-True ($freshScaffold -match "(?m)^#{4}\s+$([regex]::Escape($phase))\s*$") "the scaffold carries a '$phase' heading"
+}
+# DEPLOY IS ABSENT ON PURPOSE, and this is the assert that records why (Dave, August 14, 2026). It is not a
+# step but the RESULT -- the changelog entry beside this file, which is the half that travels into
+# CHANGELOG.md at the merge. A DEPLOY checkbox could only be unresolvable, since the list must be clear
+# before open-pr will push, or ticked before it happened. If somebody adds one, this goes red.
+Assert-True (-not ($freshScaffold -match '(?im)^#{2,4}\s+DEPLOY')) 'DEPLOY is NOT a phase of the step list -- it is the changelog entry, the other file'
+
+# The placeholder sits under CREATE, not under PLAN: a fresh branch has just been planned, and a TODO under
+# PLAN would say the opposite.
+$createBlock = if ($freshScaffold -match '(?ms)^####\s+CREATE\s*$(.*?)(?=^####\s|\z)') { $Matches[1] } else { '' }
+Assert-True ($createBlock -match [regex]::Escape((Get-BranchFileWording).FirstStep)) 'the scaffolded step sits under CREATE'
+
+# An empty phase is a statement, not a finding -- the same tolerance the absent-plan case gets above.
+$emptyPhases = "### Steps`n`n#### PLAN`n`n#### CREATE`n`n- [x] did the thing`n`n#### TEST`n"
+Assert-Equal 0 @(Get-BranchProgressFindings -Text $emptyPhases).Count 'a phase with nothing under it is not a finding'
+
+# The template shows the arc but never a step -- an example whose first line is somebody else's TODO gets
+# copied in, which is the rule the template already lived by before the phases existed.
+$phaseTemplate = ((Format-BranchProgressScaffold -Branch 'x/y' -Template) -join "`n")
+Assert-True ($phaseTemplate -match '(?m)^####\s+PLAN\s*$') 'the template carries the arc'
+Assert-Equal 0 @(Get-BranchProgressFindings -Text $phaseTemplate).Count 'and still carries no step of its own'
+
 # Fence-aware, like every reader of this format: this repo's own branch/README.md quotes all three marks
 # while teaching them, and a step list may legitimately do the same.
 $quoted = "## Steps`n`n- [x] documented the marks`n`n" + '```text' + "`n- [ ] not done yet`n" + '```' + "`n"
