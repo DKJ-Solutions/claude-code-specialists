@@ -114,7 +114,7 @@ practice, each worth getting right the first time:
 
 ## The repo's own way of working comes first
 
-<!-- BEGIN shared:repo-way-of-working -- GENERATED, edit agent-shared/repo-way-of-working.md -->
+<!-- BEGIN shared:repo-way-of-working -- GENERATED, do not edit here -->
 - **The repo's own way of working comes first.** How work moves through a repo — its branch and
   commit conventions, its review and release steps, where its documentation lives — belongs to that
   repo, not to you. Before you propose anything about process, read what is already there: its
