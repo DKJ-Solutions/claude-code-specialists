@@ -90,6 +90,62 @@ infrastructure.
   allow") keeps the direct fold/release commits on `main` possible — the work account `davekokbwj`
   has write rights, not admin. That Write bypass is safe as long as there are no external
   collaborators and must be revisited as soon as there are.
+- **`.github/workflows/claude.yml` + `.github/workflows/claude-code-review.yml`** — the two Claude Code
+  workflows, added August 14, 2026 via
+  [PR #658](https://github.com/DaveKJohn/claude-code-specialists/pull/658). The first answers an
+  `@claude` mention in a comment; the second reviews every PR under the job id `claude-review`, which is
+  **advisory** — the ruleset names `lint-en-tests` and nothing else. Four hardening decisions sit in
+  those files and each one reads as arbitrary without its reason, so they are recorded here:
+  - **Both `uses:` are pinned by commit SHA**, not by the moving `v4`/`v1` tags. This repo is a public
+    plugin source: whoever can move a tag reaches every consumer through its CI.
+  - **`claude.yml` runs on a read-only tool allowlist**, because upstream's configuration doc states the
+    default set covers *"reading, committing, editing files"*. Without it, an `@claude` mention could
+    produce a branch and a commit that passed no gate here. The three `mcp__github_ci__*` tools are named
+    explicitly: the `actions: read` permission exists to enable exactly them, and an allowlist omitting
+    them would switch that capability off in silence. **Do not "restore" Edit/Write/Bash to make
+    `@claude fix this` work** — that it only answers is the decision, not a defect.
+  - **The `issues: [opened, assigned]` trigger is deliberately absent** from the upstream template's set.
+    The action's write-access gate governs who *triggers*, never who *wrote* the text a run then reads,
+    and this repo publishes an `inbound` issue template — external prose is a designed-for input here.
+  - **The `permissions:` block is NOT the boundary, and both files say so.** `id-token: write` lets the
+    action mint a GitHub App token documented as Contents/Pull Requests/Issues at read **and** write; the
+    read-only scopes bound `GITHUB_TOKEN` alone. Audit either file by its scopes and you conclude the
+    opposite of what is true.
+
+  **The plugin marketplace is unpinned, and that was checked rather than skipped.** `plugin_marketplaces`
+  takes *"Git URLs to install from"* and neither the action's own `action.yml` nor `docs/usage.md`
+  documents a ref, tag or commit syntax — so no syntax was invented, per the
+  [#566](https://github.com/DaveKJohn/claude-code-specialists/issues/566) rule about a proposal naming a
+  mechanism that does not exist. The remedy if it ever matters is to drop the plugin and write the review
+  prompt inline, not to guess at a `#<sha>`.
+
+  **The App is NOT in `main-ci-gate`'s bypass list, and the method is the part worth keeping** (August
+  14, 2026). The question decides whether that App token can reach the trunk past the required check, and
+  the REST endpoints all refuse: `bypass_actors` is returned to admins only, and the work account
+  `davekokbwj` has `admin: false, maintain: false, push: true`. It was answered anyway, from three
+  measurements that survive a redacted field:
+  - **GraphQL redacts the entries but not the array.** `repository.rulesets.bypassActors` came back as
+    `nodes: [null, null]` — the contents are hidden from a non-admin, the **count** is not. Exactly two
+    actors.
+  - **`current_user_can_bypass: "always"`** on the REST ruleset, for an account holding nothing but
+    `push`, means the **Write role** is one of the two — it is the only thing that account has which
+    could grant bypass.
+  - **`updated_at` dates the list.** The ruleset was last modified `2026-07-26T20:58`, and the Claude App
+    arrived `2026-08-14T08:46`. A list untouched for nineteen days cannot name an actor that did not
+    exist when it was written. The July 26 field-by-field re-check recorded in
+    [`language-layers.md`](../../rules/language-layers.md) names both actors as *Repository admin + the
+    Write role*, which matches the count of two and leaves no room for a third.
+
+  GitHub's own documentation closes the implicit route: roles and GitHub Apps are **separate** bypass
+  categories, so an App gets nothing from the Write role being listed. **The generalisable half: when an
+  API hides a field, check whether a sibling representation leaks its shape (a count, a length, a
+  timestamp) — three partial reads answered a question no single endpoint would.**
+
+  **What this bounds.** The App cannot push to `main`, delete it, or force-push. It *can* create a branch
+  and open a PR — which then merges only on a green `lint-en-tests`, like everyone else's. So the residual
+  is the ordinary route, and the read-only allowlist above closes the other end. The knob this actually
+  turns on is the **Write-role bypass**, whose condition is already stated in the `ci.yml` bullet above:
+  safe while there are no external collaborators.
 - **`scripts/lint/check-consumer-drift.ps1`** — the read-only drift check against a consuming repo
   (`MISSING`/`IDENTICAL`/`DRIFTED`).
 - **`scripts/lib/plugin-tree-lib.ps1`** — the one answer to *which plugins does this repo publish, and
