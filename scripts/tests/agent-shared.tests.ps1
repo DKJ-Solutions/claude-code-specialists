@@ -159,6 +159,30 @@ try {
     Assert-Equal '' ($missing -join ', ') 'no agent def or persona is missing the block'
     $srcBlock = Join-Path $RepoRoot 'plugins\agent-shared\repo-way-of-working.md'
     Assert-True (Test-Path -LiteralPath $srcBlock) 'the canonical source file exists'
+
+    # --- lens-optional: every agent def, no persona, and the pointer it answers (#669 C1) ----------
+    # ASSERTED IN BOTH DIRECTIONS ON PURPOSE. The block tells a specialist that a missing repo lens is a
+    # normal state; a persona is loaded THROUGH the consuming repo's CLAUDE.md, so it can never be in
+    # that position and carrying the block would reassure it about something impossible. A test that
+    # only checked the agent defs would let it spread to the personas unnoticed -- which is how a
+    # per-block scope decision quietly becomes "everyone".
+    Write-Host "lens-optional reaches every agent def and no persona" -ForegroundColor Cyan
+    $lensMissing = @(); $lensStray = @(); $pointerUnqualified = @()
+    foreach ($f in $realAgents) {
+        $text = [System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8)
+        if ($text -notmatch 'BEGIN shared:lens-optional') { $lensMissing += $f.Name }
+        # The per-file half. Both are needed: without this the block would sit under Boundaries
+        # contradicting an opening sentence that still promises a lens is there to be read.
+        if ($text -match 'of the consuming repo(?!, if it has one)') { $pointerUnqualified += $f.Name }
+    }
+    foreach ($f in $realPersonas) {
+        $text = [System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8)
+        if ($text -match 'BEGIN shared:lens-optional') { $lensStray += $f.Name }
+    }
+    Assert-Equal '' ($lensMissing -join ', ') 'no agent def is missing lens-optional'
+    Assert-Equal '' ($lensStray -join ', ') 'and no persona carries it -- the scope is a decision, not a default'
+    Assert-Equal '' ($pointerUnqualified -join ', ') 'every lens pointer says the repo has one only "if it has one"'
+    Assert-True (Test-Path -LiteralPath (Join-Path $RepoRoot 'plugins\agent-shared\lens-optional.md')) 'the canonical source file exists'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

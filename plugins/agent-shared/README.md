@@ -64,7 +64,7 @@ copy editor's context.
 |---|---|
 | `repo-way-of-working` · `inbound-behaviour` · `laziness-automation` | everyone — these are the family's constitution |
 | `language-behavior` | everyone who writes anything |
-| `filecontent-boundary` | every agent def, all 26 — see below |
+| `filecontent-boundary` · `lens-optional` | every agent def, all 26; no persona — see below |
 | `no-conversation-history` · `no-commit-push-pr` | the specialists who deliver material rather than land it |
 | `browser-compatibility` · `webcontent-boundary` · `artifact-publishing-boundary` · `design-owner-boundary` · `changelog-entry-boundary` · `storefront-preview-boundary` | the narrow circles whose craft touches that surface |
 
@@ -93,6 +93,23 @@ wrote it or why** — the sentence the web version has no need of.
 is loaded, which is the layer that already answers for what is in that tree. The exposure this block
 guards is the one the subagents have: an assignment that points them at files nobody in the conversation
 has read.
+
+### Why `lens-optional` has exactly the same 26 carriers
+
+Same scope, and for a reason that is the mirror image rather than a copy. Inbound
+[#669](https://github.com/DaveKJohn/claude-code-specialists/issues/669) C1 measured that **all four**
+specialists put on that assessment hit the same friction first and independently: look for the repo lens,
+fail to find it, continue on the plugin source. Every agent def names its lens in its opening sentence,
+so every agent def could produce that hunt — the width follows the pointer, and the pointer is in all 26.
+
+**A persona cannot be in that position.** It is loaded *through* the consuming repo's `CLAUDE.md`, so a
+persona reading this would already be proof that a repo exists. Giving it the block would be reassuring
+it about a state it can never be in.
+
+The per-file half of the same repair sits in those opening sentences: they now say the lens is in the
+consuming repo **"if it has one"**. Both halves are needed, and neither is sufficient. The pointer alone
+would still leave a specialist deciding for itself what a missing file means; the block alone would sit
+under **Boundaries** contradicting a sentence twenty lines above it.
 
 ## Personas carry blocks too
 
