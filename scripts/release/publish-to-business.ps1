@@ -171,6 +171,25 @@ function Invoke-Git {
     return $output
 }
 
+function Get-JsonField {
+    <#
+        A field from a ConvertFrom-Json object, or $null when it is absent.
+
+        NOT DECORATION. Set-StrictMode -Version Latest makes a missing property a TERMINATING error,
+        so a bare $plugin.source on a malformed entry throws before the check that exists to explain
+        it can report anything -- and the reader gets "The property 'source' cannot be found on this
+        object" instead of the named problem. Measured on Windows PowerShell 5.1: a missing property,
+        a missing top-level key and .Count on a non-array all threw rather than returning $null. On
+        7.4.6, where this script was first tested, the same three are silent, which is why the gap
+        survived a test that specifically covered a malformed manifest.
+    #>
+    param($Object, [string] $Name)
+
+    if ($null -eq $Object) { return $null }
+    if ($Object.PSObject.Properties.Name -notcontains $Name) { return $null }
+    return $Object.$Name
+}
+
 function Get-PluginVersions {
     <# name/version for every plugin the manifest names, in manifest order. #>
     param([string] $Root)
@@ -178,16 +197,23 @@ function Get-PluginVersions {
     $manifestPath = Join-Path $Root '.claude-plugin/marketplace.json'
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 
+    # A malformed manifest is REPORTED rather than crashed on, and reported by the integrity check
+    # further down rather than here: this function only prints what is about to travel, so a missing
+    # field costs it a '?' and nothing else.
     $result = @()
-    foreach ($plugin in $manifest.plugins) {
-        $pluginJson = Join-Path $Root (Join-Path $plugin.source '.claude-plugin/plugin.json')
+    foreach ($plugin in @(Get-JsonField -Object $manifest -Name 'plugins')) {
+        $source = Get-JsonField -Object $plugin -Name 'source'
         $version = '?'
-        if (Test-Path -LiteralPath $pluginJson) {
-            $version = (Get-Content -LiteralPath $pluginJson -Raw | ConvertFrom-Json).version
+        if ($source) {
+            $pluginJson = Join-Path $Root (Join-Path $source '.claude-plugin/plugin.json')
+            if (Test-Path -LiteralPath $pluginJson) {
+                $declared = Get-JsonField -Object (Get-Content -LiteralPath $pluginJson -Raw | ConvertFrom-Json) -Name 'version'
+                if ($declared) { $version = $declared }
+            }
         }
         $result += [pscustomobject]@{
-            Name    = $plugin.name
-            Source  = $plugin.source
+            Name    = (Get-JsonField -Object $plugin -Name 'name')
+            Source  = $source
             Version = $version
         }
     }
@@ -219,18 +245,23 @@ function Assert-MarketplaceIntegrity {
     }
 
     $problems = @()
-    foreach ($plugin in $manifest.plugins) {
-        if (-not $plugin.name)   { $problems += 'a plugin entry has no name'; continue }
-        if (-not $plugin.source) { $problems += "$($plugin.name): no source"; continue }
+    foreach ($plugin in @(Get-JsonField -Object $manifest -Name 'plugins')) {
+        # Read through the helper, not as $plugin.name: under StrictMode a bare property access on an
+        # entry that lacks the field throws, so these two branches would be unreachable and the raw
+        # error would replace the message they exist to give.
+        $name   = Get-JsonField -Object $plugin -Name 'name'
+        $source = Get-JsonField -Object $plugin -Name 'source'
+        if (-not $name)   { $problems += 'a plugin entry has no name'; continue }
+        if (-not $source) { $problems += "${name}: no source"; continue }
 
-        $dir = Join-Path $Root $plugin.source
+        $dir = Join-Path $Root $source
         if (-not (Test-Path -LiteralPath $dir -PathType Container)) {
-            $problems += "$($plugin.name): source '$($plugin.source)' did not travel"
+            $problems += "${name}: source '$source' did not travel"
             continue
         }
         $pluginJson = Join-Path $dir '.claude-plugin/plugin.json'
         if (-not (Test-Path -LiteralPath $pluginJson -PathType Leaf)) {
-            $problems += "$($plugin.name): no .claude-plugin/plugin.json in '$($plugin.source)'"
+            $problems += "${name}: no .claude-plugin/plugin.json in '$source'"
         }
     }
 
@@ -377,10 +408,13 @@ try {
     # --- check what we built before we hand it to anyone
 
     $manifest = Assert-MarketplaceIntegrity -Root $temp
+    # @() around both counts: under StrictMode .Count on an empty pipeline result or on a single
+    # (non-array) JSON value is a terminating error, not 0 or 1.
     $gitDirPrefix = (Join-Path $temp '.git') + [System.IO.Path]::DirectorySeparatorChar
-    $fileCount = (Get-ChildItem -LiteralPath $temp -Recurse -File -Force |
-                  Where-Object { -not $_.FullName.StartsWith($gitDirPrefix) }).Count
-    Write-Host ("Built '{0}': {1} plugins, {2} files." -f $manifest.name, $manifest.plugins.Count, $fileCount)
+    $fileCount = @(Get-ChildItem -LiteralPath $temp -Recurse -File -Force |
+                   Where-Object { -not $_.FullName.StartsWith($gitDirPrefix) }).Count
+    $pluginCount = @(Get-JsonField -Object $manifest -Name 'plugins').Count
+    Write-Host ("Built '{0}': {1} plugins, {2} files." -f (Get-JsonField -Object $manifest -Name 'name'), $pluginCount, $fileCount)
 
     # --- stage and report
 

@@ -250,6 +250,43 @@ function Get-BusinessMarketplaceRepo { return `$script:BusinessMarketplaceRepo }
     $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $sourceDir)
     Assert-Equal 1 $r.ExitCode 'no target anywhere is exit 1'
     Assert-Match $r.Output 'Get-BusinessMarketplaceRepo' 'the refusal names the seam to fill in'
+
+    # --- 9. a malformed manifest is NAMED, not crashed on -------------------------------------------
+    #
+    # THE 5.1 REGRESSION THIS SUITE EXISTS TO PIN. Under Set-StrictMode -Version Latest a missing
+    # property is a TERMINATING error on Windows PowerShell 5.1, so a bare $plugin.source threw before
+    # the check that exists to explain it could report anything -- while on 7.4.6, where this script
+    # was first tested, the same access is silent. A manual test of "manifest missing a required
+    # field" therefore passed on the developer's machine and would have failed on the repo's own
+    # convention. Both asserts are about the MESSAGE, because both paths already exit 1.
+    Write-Host 'publish-to-business: a malformed manifest is named' -ForegroundColor Cyan
+    @'
+{
+    "name": "fixture-marketplace",
+    "owner": { "name": "fixture" },
+    "plugins": [
+        { "name": "alpha", "source": "plugins/alpha" },
+        { "name": "sourceless" }
+    ]
+}
+'@ | Set-Content -LiteralPath (Join-Path $sourceDir '.claude-plugin\marketplace.json') -Encoding Ascii
+    Invoke-FixtureGit -Dir $sourceDir -GitArgs @('commit', '-am', 'fixture: an entry with no source') | Out-Null
+    $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $sourceDir, '-TargetRepo', $bareDir)
+    Assert-Equal 1 $r.ExitCode 'an entry with no source is exit 1'
+    Assert-Match $r.Output 'sourceless: no source' 'the entry with no source is named, not a StrictMode error'
+    Assert-True ($r.Output -notmatch 'cannot be found on this object') 'and no raw StrictMode property error reaches the reader'
+
+    @'
+{
+    "name": "fixture-marketplace",
+    "owner": { "name": "fixture" }
+}
+'@ | Set-Content -LiteralPath (Join-Path $sourceDir '.claude-plugin\marketplace.json') -Encoding Ascii
+    Invoke-FixtureGit -Dir $sourceDir -GitArgs @('commit', '-am', 'fixture: manifest without a plugins field') | Out-Null
+    $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $sourceDir, '-TargetRepo', $bareDir)
+    Assert-Equal 1 $r.ExitCode 'a manifest missing a required field is exit 1'
+    Assert-Match $r.Output "missing the required field 'plugins'" 'the missing field is named'
+    Assert-True ($r.Output -notmatch 'cannot be found on this object') 'and that path stays clean under StrictMode too'
 } finally {
     if (Test-Path -LiteralPath $fixtureRoot) {
         Remove-Item -Recurse -Force -LiteralPath $fixtureRoot -ErrorAction SilentlyContinue
