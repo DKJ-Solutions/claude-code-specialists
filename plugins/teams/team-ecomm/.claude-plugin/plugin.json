@@ -2,7 +2,7 @@
   "name": "team-ecomm",
   "displayName": "Claude Specialists — team e-commerce",
   "description": "Add-on team for commercial webshop repos (any platform): the SEO specialist Sergio, the CRO specialist Craig, and the performance/SEA specialist Sean, with room to grow into the wider e-commerce craft (lifecycle/email, analytics). Deliberately NOT repo-neutral — only a commercial webshop repo enables this team. Teams stack: platform-agnostic, so it sits alongside a platform team like 'team-shopify' rather than replacing it. The governance layer (CLAUDE.md + the repo lenses) and the core team ('team-alpha') stay separate.",
-  "version": "4.10.0",
+  "version": "4.11.0",
   "author": { "name": "DaveKJohn" },
   "keywords": ["specialists", "team", "claude-code", "ecommerce", "seo", "cro", "sea", "webshop"]
 }

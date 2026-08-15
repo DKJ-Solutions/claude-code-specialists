@@ -2,7 +2,7 @@
   "name": "team-shopify",
   "displayName": "Claude Specialists — team Shopify",
   "description": "Add-on team for Shopify store repos (e.g. smartwatchbanden): the subagents Liam, Sandra, and Steven, plus the domain skill start-task (new branch + preview theme). Deliberately NOT repo-neutral — only a Shopify repo enables this team. Teams stack: this one adds to 'team-alpha', and a commercial Shopify repo typically enables 'team-ecomm' alongside it. The governance layer (CLAUDE.md + the repo lenses) stays separate.",
-  "version": "4.10.0",
+  "version": "4.11.0",
   "author": { "name": "DaveKJohn" },
   "keywords": ["specialists", "team", "claude-code", "shopify", "liquid"]
 }

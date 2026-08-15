@@ -2,7 +2,7 @@
   "name": "team-alpha",
   "displayName": "Claude Specialists — team alpha (the core team)",
   "description": "Portable executable core of the Claude Specialists system: the shared subagents plus the portable persona templates (personas/) of the main-loop specialists and the generic bootstrap skill specialists-init. This is the team every consuming repo enables; the other teams add to it, they do not replace it. Deliberately contains NO safety/guardrail hooks and NO repo-SPECIFIC skills — the governance layer (CLAUDE.md + repo lenses), the safety hooks, and the repo's own specialists stay at repo level. Two deliberate, repo-neutral exceptions: the skill specialists-init (the adoption path itself) and the informational SessionStart hook roster-sessioncheck (hooks/, read-only, never blocks).",
-  "version": "4.10.0",
+  "version": "4.11.0",
   "author": { "name": "DaveKJohn" },
   "keywords": ["specialists", "team", "claude-code"]
 }

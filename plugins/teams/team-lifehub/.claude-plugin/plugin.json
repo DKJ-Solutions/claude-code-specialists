@@ -2,7 +2,7 @@
   "name": "team-lifehub",
   "displayName": "Claude Specialists — team life-hub",
   "description": "Add-on team for life-hub-style repos (a personal information hub / brain-based knowledge repo): the subagents Astrid, Fiona, Hugo, Ian, and Onyx. Deliberately NOT repo-neutral — only a life-hub-style repo enables this team. Teams stack: this one adds to 'team-alpha' rather than replacing it. The governance layer (CLAUDE.md + the repo lenses) stays separate.",
-  "version": "4.10.0",
+  "version": "4.11.0",
   "author": { "name": "DaveKJohn" },
   "keywords": ["specialists", "team", "claude-code", "life-hub", "brain"]
 }
