@@ -1696,10 +1696,10 @@ foreach ($rel in $consumerDocs) {
     $lines = [System.IO.File]::ReadAllLines($full, [System.Text.Encoding]::UTF8)
     $open = -1
     for ($i = 0; $i -lt $lines.Count; $i++) {
-        if ($lines[$i] -notmatch '^```') { continue }
+        if (-not (Test-FenceDelimiterLine -Line $lines[$i])) { continue }
         if ($open -lt 0) { $open = $i; continue }
         $close = $i
-        $lang = ($lines[$open] -replace '^```', '').Trim().ToLowerInvariant()
+        $lang = ($lines[$open] -replace '^\s*```', '').Trim().ToLowerInvariant()
         $open2 = $open; $open = -1
         # A block with a language is a command to run, not an expectation to match.
         if ($lang -ne '' -and $lang -ne 'text') { continue }
@@ -1781,7 +1781,7 @@ foreach ($rel in $consumerDocs) {
     # also flag command output that is deliberately verbatim.
     $inFence = $false
     for ($i = 0; $i -lt $lines.Count; $i++) {
-        if ($lines[$i] -match '^```') { $inFence = -not $inFence; continue }
+        if (Test-FenceDelimiterLine -Line $lines[$i]) { $inFence = -not $inFence; continue }
         if ($inFence) { continue }
         if ($lines[$i] -notmatch $figurePattern) { continue }
         $figureChecked++
