@@ -232,6 +232,27 @@ infrastructure.
 
 ### Repo-specific rules
 
+- **NEVER ROUND-TRIP A MARKDOWN FILE THROUGH POWERSHELL TO EDIT IT — USE THE EDITOR'S OWN EDIT.**
+  Measured twice in one session, August 15, 2026, both times on a lens. `Get-Content -Raw` reads with the
+  **ANSI codepage** in Windows PowerShell 5.1, so every em dash, `·` and emoji in a repo whose documents
+  are full of them comes back as mojibake; writing that back produced **127 corrupted sequences** in
+  `06-25-extension.md` in a single command. The second failure is quieter and has no lint behind it: a
+  **double-quoted** PowerShell string eats backticks as escapes, so a line containing `` `v1.0.0` ``
+  silently became a **vertical tab** plus `1.0.0` — valid UTF-8, invisible in a diff, and past every
+  check here.
+  - **The repair for the first is already built**:
+    [`fix-mojibake.ps1`](../../../scripts/maintenance/fix-mojibake.ps1) peels the inverse round trip and
+    repaired all 127 in one run. Verify by diff afterwards — `111 insertions(+), 0 deletions(-)` is what
+    proves nothing else moved.
+  - **The second has no gate, deliberately not proposed as one.** A vertical tab is legal in markdown and
+    a rule against control characters would be a check written for one careless afternoon. The answer is
+    not to write the file that way: use the harness `Edit` tool, or single-quoted strings and
+    `[System.IO.File]::ReadAllText/WriteAllText` with an explicit
+    `New-Object System.Text.UTF8Encoding($false)` when a script genuinely must do it.
+  - **Why it belongs here rather than in the language rule.** This is not a language-layer question — it
+    is the mechanism by which any specialist edits any document in this repo, and it fires hardest on the
+    files that carry the most prose. It cost nothing both times only because the lint's mojibake check
+    caught the loud half within minutes.
 - **The shared-scripts registry spans TWO plugins since August 8, 2026, and the plugin is read off the
   mirror path rather than declared.** `Get-SharedScriptPairs` maps each source to a mirror in either
   `plugins/teams/team-alpha/` (the core: `check-roster-sync`, `check-report-lib`) or
