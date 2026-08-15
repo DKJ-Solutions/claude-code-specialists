@@ -745,3 +745,44 @@ function Get-ReleaseNoteWording {
     <# Overrides for the release note's headings, audience line and fill-in hints. Empty = English. #>
     return $script:ReleaseNoteWording
 }
+
+# --- The hosted page built from those notes (Dave, August 15, 2026) -------------------------------
+#
+# build-release-notes-page.ps1 turns the hand-written notes into one browsable page and, with
+# -Worker, into a Cloudflare Worker that serves it. Two knobs, and neither of them says WHERE the
+# page goes: that is derived from Get-ReleaseNoteRoot above, because the note root already states
+# where this repo keeps its release documents and a second seam would be the same decision written
+# twice.
+#
+# THE PAGE'S OWN NAME. It is what a reader sees in the tab and at the top, so it is the repo's to
+# say rather than the script's. Without it the script falls back to the name half of Get-RepoName,
+# which is a real answer -- 'claude-code-specialists' -- and simply not the one to send anybody.
+$script:ReleasePageTitle = 'Claude Specialists -- release notes'
+
+function Get-ReleasePageTitle {
+    <# The heading and window title of the generated release-notes page. #>
+    return $script:ReleasePageTitle
+}
+
+# THE WORKER THAT HOSTS IT. Empty means this repo builds the page but hosts it nowhere, which is the
+# right answer for most consumers and is why the default is empty rather than a name.
+#
+# WHAT THE NAME BUYS AND WHAT IT DOES NOT. The worker serves the page at /notes/<32 hex>, and that
+# path is the only lock on it -- no login, anyone with the link reads it. That is a deliberate choice
+# here (Dave, August 15, 2026) and it is defensible for exactly one reason: these notes are already
+# public in this repository, so the path guards the ROUTE and not the content. It is also why the
+# page carries noindex in both the header and the meta tag: a link nobody can guess is worth nothing
+# once a crawler has published it.
+#
+# THE TOKEN IS NOT IN THIS REPOSITORY, and that is the half to remember. This repo is public, so a
+# committed token would be a lock with its key taped to the door -- it lives in
+# workflow-davekjohn/releases/page/worker-path-token.txt, which .gitignore keeps out. Nothing in git
+# therefore remembers the URL: whoever creates it records it outside the repo. A consumer whose repo
+# is PRIVATE has the opposite answer available and should take it, since a tracked token survives a
+# lost machine.
+$script:ReleasePageWorkerName = 'ccs-release-notes'
+
+function Get-ReleasePageWorkerName {
+    <# The Cloudflare Worker that serves the generated page; '' = this repo hosts it nowhere. #>
+    return $script:ReleasePageWorkerName
+}

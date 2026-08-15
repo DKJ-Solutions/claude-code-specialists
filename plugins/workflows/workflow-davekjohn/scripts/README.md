@@ -55,6 +55,8 @@ before adding the next one.*
 | `release/fold-changelog-entry.ps1` | folds the entry into `CHANGELOG.md` at its ranked position and resets both branch files | [`fold-changelog`](../skills/fold-changelog/SKILL.md) |
 | `release/cut-release.ps1` | the lockstep version bump, the release notes and the tag | [`cut-release`](../skills/cut-release/SKILL.md) |
 | `release/new-internal-note.ps1` | the tier-1 note's skeleton, which needs the development notes as input | [`cut-release`](../skills/cut-release/SKILL.md) |
+| `release/build-release-notes-page.ps1` | builds the hand-written notes into one browsable page, and with `-Worker` the Cloudflare Worker that serves it — it publishes nothing | [`release-notes-page`](../skills/release-notes-page/SKILL.md) |
+| `release/release-notes-page-template.html` | the page that script fills in — the one shared file here that is not a script, mirrored for the same reason a lib is: its script reads it as a sibling | none — read by the script above |
 | `maintenance/fix-mojibake.ps1` | repairs encoding damage in the markdown the repo names | [`fix-mojibake`](../skills/fix-mojibake/SKILL.md) |
 | `sync/check-script-contract.ps1` | read-only script-contract drift check | none — invoked by the `script-contract-sessioncheck` SessionStart hook |
 | `lib/release-lib.ps1` | the pure release logic: version bump, changelog transformation, notes construction, `Test-ReleaseBumpEarned` | none — dot-sourced lib |

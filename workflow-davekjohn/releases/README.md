@@ -97,6 +97,36 @@ attachment list is the development notes alone.
 > here. `v3.2.0`'s `.html` was removed from `main`; the `v3.2.0` **tag** still contains it, because a tag is
 > a record of a moment and is not rewritten.
 
+**The notes are also readable as one hosted page** (Dave, August 15, 2026). `build-release-notes-page.ps1`
+builds every document under `audience/` into one page with a picker per release; the portable half — what
+the page is, why it is generated rather than edited, and what hosting it decides — is in
+[`RELEASES-portable.md`](../../plugins/workflows/workflow-davekjohn/RELEASES-portable.md#giving-that-note-a-reader-shaped-home--the-release-notes-page).
+This repo's answers:
+
+| | |
+|---|---|
+| `Get-ReleasePageTitle` | `Claude Specialists -- release notes` — the **product's** name, not the repository's. Without it the fallback would head the page `claude-code-specialists`, which is a true answer and not one to send anybody |
+| `Get-ReleasePageWorkerName` | `ccs-release-notes` |
+| where the output lands | `workflow-davekjohn/releases/page/`, derived from `Get-ReleaseNoteRoot` rather than configured — the note root already says where this repo keeps its release documents |
+| what is committed | **nothing from that directory.** The page and the worker are derivatives of the tracked documents, and a 400 KB file changing every release would dirty the tree `cut-release.ps1` refuses to run on |
+
+**The path token is deliberately not in this repository, and that costs something worth stating.** The
+worker serves the page at `/notes/<32 hex>` with no login, so the path is the only lock — and this repo is
+**public**, which would put the key beside the door. It lives in
+`workflow-davekjohn/releases/page/worker-path-token.txt`, which `.gitignore` keeps out, so **nothing in git
+remembers the URL**: the file on the machine that made it is the only copy, and whoever creates it records
+the finished URL outside the repo. A consumer whose repository is private has the opposite answer available
+and should take it — a tracked token is what survives a lost machine.
+
+**What the lock is actually for here, since the notes are public anyway.** It guards the *route*, not the
+content: every document on that page is already readable in this repository. What it buys is that the page
+is not a second, crawlable, permanent surface for the same text — which is why the `noindex` in the header
+and the meta tag matters more than the token does.
+
+**Rebuilding is not part of the cut, and no gate watches it.** The page is a snapshot: after a release it is
+stale until somebody runs the script and deploys again. Same category-A silence as any external link — if
+the worker is ever removed, whoever removes it takes this section with it.
+
 ### Measured instances behind the portable rules
 
 - **The branch prefix does not predict impact here**, and this is the measurement the whole tier model rests

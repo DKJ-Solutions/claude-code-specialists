@@ -521,7 +521,7 @@ SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-con
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `fix-mojibake`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `cut-release`,
 `adopt-config`, `adopt-workflow-folder`, `discover-workflow`, `lock`, `continue`, `prompt`,
-`orchestrator`)<!-- /skills:all -->
+`release-notes-page`, `orchestrator`)<!-- /skills:all -->
 remain available there.
 
 **`orchestrator` is on that list for a reason worth reading twice.** Everything else there is a
@@ -604,9 +604,10 @@ typo there would quietly exclude the plugin it meant to keep and report success.
 <!-- skills:all -->Most skills in claude-code-specialists today (`fold-changelog`, `open-pr`, `ship-pr`,
 `new-branch`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`, `sync-roster`,
 `start-task`, `adopt-config`, `adopt-workflow-folder`, `discover-workflow`, `lock`, `continue`,
-`prompt`) are a thin wrapper around a script — procedural **mechanism** (branch, PR, ship, fold,
-bootstrap, teardown, roster-sync, encoding repair, reading a repo's own conventions, the standing
-before and after a context clear, and the assignment written in an editor rather than the terminal).
+`prompt`, `release-notes-page`) are a thin wrapper around a script — procedural **mechanism** (branch,
+PR, ship, fold, bootstrap, teardown, roster-sync, encoding repair, reading a repo's own conventions, the
+standing before and after a context clear, the assignment written in an editor rather than the terminal,
+and the reading copy of the release notes).
 `lock` and `continue` are the first pair to wrap **one** script
 between them — they run the same reporter and differ only in what they do with the answer, which is why
 the shared-scripts registry names a script's documenting page rather than its callers. `cut-release`

@@ -372,6 +372,36 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # The hosted reading copy of the hand-written notes (Dave, August 15, 2026). Shared rather
+            # than workshop-only because nothing in it is repo-specific: it reads the release history and
+            # the note root through seams that already exist, and the two knobs it adds are optional with
+            # working fallbacks. The consumer this was ported from had written its own, which is the
+            # argument for one source rather than for a second.
+            Name   = 'build-release-notes-page'
+            Source = 'scripts\release\build-release-notes-page.ps1'
+            Plugin = 'workflow-davekjohn'
+            Skill  = 'release-notes-page'
+            # A fixture root, so the suite can build a page from a synthetic tree instead of this repo's
+            # real notes. A consumer never types it.
+            SkillParamsExempt = @('RootOverride')
+        },
+        @{
+            # THE ONE PAIR WHOSE SOURCE IS NOT A SCRIPT, and the flag is a stretch that is worth naming
+            # rather than hiding. LibOnly is documented as marking a DOT-SOURCED library, and this is an
+            # HTML template -- but what the flag actually declares is "this file never resolves a repo
+            # root of its own", which is the invariant the test enforces and which a template satisfies
+            # more completely than a lib does. The alternative was a third flag whose only member would
+            # be this entry.
+            #
+            # A PAIR RATHER THAN A PLUGIN-ONLY FILE, because the script reaches the template as a
+            # $PSScriptRoot sibling: it has to exist beside BOTH copies, which is precisely what this
+            # registry is for. Without it the mirror would build a page from a template it does not have.
+            Name    = 'release-notes-page-template'
+            Source  = 'scripts\release\release-notes-page-template.html'
+            Plugin  = 'workflow-davekjohn'
+            LibOnly = $true
+        },
+        @{
             # Which plugins a repo publishes, and where each one's folder is (August 9, 2026). Travels
             # because release-lib dot-sources it as a $PSScriptRoot sibling: Get-PluginManifestPaths --
             # which cut-release calls in a consumer that publishes plugins -- is a wrapper over it, and

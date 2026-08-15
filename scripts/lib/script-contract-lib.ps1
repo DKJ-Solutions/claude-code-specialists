@@ -378,6 +378,23 @@ $script:ContractRecords = @(
        Adopt = 'copy'; AdoptWhy = 'empty means the English defaults, which is exactly what a consumer gets without the function. Copying puts the (empty) override map in their own file under the name the cut actually looks for first, so a repo whose readers need another language fills in keys rather than discovering English headings in a published document';
        Optional = $true; Default = 'the English headings and hints, via Get-InternalNoteWording if that is defined';
        Returns = "overrides for the hand-written release note's own text, merged over the English defaults: Title, AudienceLabel, Audience, SectionConsumers, HintConsumers, SectionValue, HintValue, SectionOpen and HintOpen. NOT the same key set as Get-InternalNoteWording, which belongs to the retired two-document flow -- SectionConsumers and HintConsumers are this document's consumer section and exist nowhere else, while that map's SkeletonNote, SectionChanged, NoEntries and Unknown are read only by new-internal-note.ps1. Overriding by the wrong list configures a flow you are not running" },
+    # THE HOSTED PAGE'S TWO KNOBS (Dave, August 15, 2026). Both optional, both with a working fallback,
+    # and declared for the reason the release knobs above are: neither absence is a crash. A repo that
+    # never answers the title gets a page headed with its own repo name -- a real answer, and not the one
+    # anybody would send to a reader. A repo that never answers the worker name gets the page and no
+    # hosting, which is the correct default and not a failure.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleasePageTitle'; Scripts = @('build-release-notes-page');
+       Adopt = 'decide'; AdoptWhy = "it is the name a reader sees at the top of a page about THIS repo's releases. Copying the source's answer puts another product's name on your page, and nothing errs -- the page simply lies politely";
+       Optional = $true; Default = "the name half of Get-RepoName, or 'Release notes' where that is absent too";
+       Returns = "the heading and window title of the generated release-notes page -- what the reader should understand the page to be, which is usually the product's name rather than the repository's" },
+    # AND THE HOSTING HALF, WHICH IS THE ONE WITH A CONSEQUENCE OUTSIDE THE REPO. Empty is the default
+    # BECAUSE it is the honest state for a repo that has not set up a worker: the page half runs on its
+    # own and only -Worker refuses, naming this function. A non-empty value asserts that a Cloudflare
+    # Worker of that name exists and is yours.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleasePageWorkerName'; Scripts = @('build-release-notes-page');
+       Adopt = 'decide'; AdoptWhy = "it names a Cloudflare Worker in somebody's account. Copying the source's answer points your deploy at a worker that is not yours -- and unlike most wrong values here, this one is only discovered at the moment you publish";
+       Optional = $true; Default = "'' -- the page is built and hosted nowhere, and -Worker refuses while naming this function";
+       Returns = "the name of the Cloudflare Worker that serves the generated page, or '' when this repo hosts it nowhere. The worker serves the page at /notes/<32 hex>, and that path is the ONLY lock on it -- there is no login, so anyone with the link can read. Answer this only where the notes are safe to be read by whoever receives the link, and keep the token file out of version control wherever the repository is public" },
     # STILL DECLARED, AND NOT AS LEGACY TOLERANCE: new-internal-note.ps1 is still shipped for a repo running
     # the two-document flow, and it reads all eleven keys below. Nothing in THIS repo calls it.
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-InternalNoteWording'; Scripts = @('new-internal-note');

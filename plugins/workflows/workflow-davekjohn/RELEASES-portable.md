@@ -287,6 +287,48 @@ counts. An item that was true at the last release and has been overtaken since t
 note as a **false** statement — the stale line, copied forward, becomes an error. So verify each carried
 item against whatever it is a claim about, not against the note you are copying from.
 
+### Giving that note a reader-shaped home — the release-notes page
+
+The hand-written note is the one release document written for somebody **outside** the development work,
+and it lives as markdown inside a repository. That is the right home for it and the wrong place to read
+it: the reader you wrote it for has to find a directory, pick a version out of a filename, and read raw
+markdown in a code host.
+
+**`build-release-notes-page.ps1` builds those same documents into one page** — a picker per release, the
+document rendered — and with `-Worker` into a Cloudflare Worker that serves it. The
+[`release-notes-page` skill](skills/release-notes-page/SKILL.md) is the procedure; four things belong here,
+because they are decisions rather than steps.
+
+**It is generated, never edited.** Your note is already written for that reader, so a hand-edited summary
+of it would be a second thing to keep true. A repo whose notes are per-PR records — where the summarising
+is the work — wants a *different*, hand-written page, not a mode of this script.
+
+**It reads the release list, not the directory.** Only your history page knows the order, the date, the
+type, the title and which release is live. A directory listing knows none of those and sorts `4.10.0`
+before `4.9.0`.
+
+**It is a snapshot, not a mirror.** After a release: rebuild, then redeploy. Nothing reminds you, and
+nothing can — so the page carries its build date in the footer, which is the honest version of a guarantee
+nobody can make.
+
+**Hosting it is a decision about who may read, and the answer is written into the URL.** The worker serves
+the page at `/notes/<32 hex>` with no login, so *the path is the only lock*: anyone with the link reads it.
+That is defensible where the notes are already public, or where the link only ever goes to the people the
+note was written for — and it is why the page carries `noindex` in both the response header and the meta
+tag, since an unguessable link is worth nothing once a crawler has published it. Two consequences follow:
+
+- **The token is an input, never invented.** A token generated on the fly does not mean *"a new path"* — it
+  means every link you have already sent now 404s, while the build and the deploy both report success. The
+  script refuses instead, and `-InitToken` is the separate, explicit way to make the first one.
+- **Whether the token belongs in git depends on your repository.** Private: commit it, because a tracked
+  token is what survives a lost machine. Public: keep it out, and accept the consequence — nothing in git
+  then remembers your URL, so whoever creates it records it elsewhere.
+
+**Publishing is `npx wrangler deploy`, run by hand.** The script writes the bundle and stops there, because
+publishing is outward-facing. **Verify a redeploy against the bytes the URL serves**, never against the
+deploy command's own output: once wrangler has created a deployment on a worker, an API-side upload only
+creates *inactive* versions — with no error, while the live page stays the old one.
+
 ## Cutting a release
 
 A release is a **captured moment**: the state is tagged as `vX.Y.Z`, and where the repo publishes plugins
