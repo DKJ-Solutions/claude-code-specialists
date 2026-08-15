@@ -81,6 +81,46 @@ the governance of the entire specialists system live here.
   [Derek #05](05-05-extension.md#classifying-naming-and-creating-a-branch)'s `new-branch.ps1`
   rather than called standalone.
 
+### Where the "mark an outside claim" rule came from, and what it already cost
+
+Her manual states the rule timelessly. The instance behind it is here, because it is this repo's:
+
+**A published release note told its readers that colleagues installing internally were *two* releases
+behind. They were one.** Filed as [#712](https://github.com/DaveKJohn/claude-code-specialists/issues/712)
+on August 15, 2026 after a red-team pass; the underlying defect is recorded in `CHANGELOG.md`'s
+`docs/v4-11-0-note-correction` entry (PR #694), which says it plainly: *"The clause was false at the
+moment it was typed"*, *"A stale line copied forward becomes a false line"*, and *"No check was built
+for it."* The copy attached to the GitHub Release still carries the error, because a published record
+is not rewritten.
+
+**Why this repo is unusually exposed to it.** Being a plugin source, a large share of what it writes is
+*about other repos* — which version a consumer runs, whether a connector migrated, what an
+organisation has installed. Those claims sit in the same paragraphs, in the same voice, as the counts
+this repo's own gates hold. The same red-team pass re-ran a sample of the second kind and **every one
+reproduced exactly** (roster ids against agent defs, an empty ignore list, retired PR-template
+headings, 48 asserts, 21 notes). So the discipline is not distrust of the numbers — they are good. It
+is that two kinds of claim were wearing one uniform.
+
+**Two figures that are one edit away from being unauditable, named so nobody re-cites them as fresh:**
+`branch-info.ps1` says outright that its founding *"12 times"* count can no longer be reproduced,
+because the commit shape it counted stopped existing on August 10, 2026 — that is the honest form. The
+path-check counts (124 / 349 / 621 / 736), the 60-PR tally and the tier counts (89 / 81 / 8) are the
+same shape and carry no such note.
+
+### Citations for rules whose portable half carries no attribution
+
+Her manual states the craft timelessly, which means the *who and when* of a decision cannot live
+there — the layer table in the [Specialists handbook](../README.md) measures exactly that and would
+otherwise be false about her own manual. The citations belong here:
+
+- **"State the core in full; let a deviating consumer record its deviation in its own lens" —
+  and its corollary, that the portable text is never softened to pre-empt a consumer.** Both halves:
+  **Dave, August 5, 2026**, after a standing approval about publishing releases was headed for a repo
+  lens and was then nearly narrowed to protect a consumer that could have spoken for itself. The rule
+  itself is in [her manual](../../../plugins/teams/team-alpha/manuals/06-16-manual.md); only the
+  attribution moved here, on August 15, 2026, when the handbook's claim was measured against the tree
+  and found false by two person names, this being one of them.
+
 In short: the **how** (writing, keeping things consistent, securing lessons in the docs) is portable;
 the **what** (`CLAUDE.md`, `README.md`, this specialists system with its portable-vs-lens split and
 `<group>-<id>` convention) belongs to this repo.

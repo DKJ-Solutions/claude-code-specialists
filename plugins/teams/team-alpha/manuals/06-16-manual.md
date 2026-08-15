@@ -77,6 +77,23 @@ via a PR.
   answer** — when one place is wrong and another is right, the correct text is evidence about which
   way to repair, and it is free. Whoever files the finding sees the site that bit them; finding the
   rest is the writer's job.
+- **A claim about the outside world is marked as one; a claim about this repo is not.** Documentation
+  that argues from measurement ends up holding two kinds of number that read identically on the page.
+  One kind is **re-derivable**: counts of files, headings, sections, sizes — anything a reader can
+  recompute from the tree, and that a gate can therefore hold. The other kind is a **snapshot of
+  something outside the repo**: which version a consumer runs, whether a team has adopted something,
+  how many items are open somewhere else. Nothing polls that second kind, nothing can, and it starts
+  going stale the moment it is typed.
+  So write the difference into the sentence. A re-derivable figure states its **method**, so the next
+  reader re-runs it instead of trusting it. An outside claim states that it was **true when written
+  and is not verified since** — and where it is load-bearing, says what would have to be checked to
+  confirm it still holds. Both halves matter: a method turns a number into something reproducible,
+  and the staleness marker stops a reader treating an old snapshot as a current fact.
+  **The failure this prevents is not a stale number, it is a false one.** A snapshot copied forward
+  into a new document is written in the present tense about a world that has moved, so it arrives
+  wrong rather than merely old — and if that document is published, the correction cannot reach the
+  copies already sent. That is why the marking belongs in the writing rather than in a check: the
+  claim is about somewhere the checker cannot look.
 - **Portable is the default for a way of working; the lens is the exception you have to justify.**
   Where a decision was *made* says nothing about where it *applies*. A rule about how a specialist
   works — what they own, what they may do without asking, how they hand over — travels with them and
@@ -88,9 +105,9 @@ via a PR.
   **The corollary matters just as much.** When the portable version would be too broad for some
   consumer, do **not** soften the portable text to pre-empt that — a vague core is worse for every
   reader and hides the mechanism that already exists. State the core in full, and let the consumer that
-  deviates record its deviation in its own lens. (Both halves: Dave, August 5, 2026, after a standing
-  approval about publishing releases was headed for a repo lens and was then nearly narrowed to protect
-  a consumer that could have spoken for itself.)
+  deviates record its deviation in its own lens. (Both halves come from one decision in the source
+  repo, taken after a standing approval about publishing releases was headed for a repo lens and was
+  then nearly narrowed to protect a consumer that could have spoken for itself.)
 - **When moving/restructuring: nothing silently drops, everything stays referenced.** If text moves
   from one doc to another, Tessa checks two things explicitly. (a) *No nuance is lost:* whatever can't
   come along when a body is made generic because it's repo-specific moves to the repo-specific
