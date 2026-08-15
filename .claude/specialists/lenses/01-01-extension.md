@@ -95,6 +95,27 @@ product: agent defs, manuals, docs, and tooling.
   before building on it, keep the observation and replace the remedy. The same pass found the reverse, too:
   the trap the issue reported around `Get-ReservedRootMd` was already written up in the contract table as
   `Adopt = 'decide'`, so that half needed surfacing rather than building.
+- **The fourth failure pattern: symptom, reason and repair are all beside the point, because the subject
+  does not exist.** [#660](https://github.com/DaveKJohn/claude-code-specialists/issues/660), closed
+  August 15, 2026. It asked for a GitHub Projects board for *"pair-cli issues, tickets and project work"*,
+  and everything downstream of that name was sound: two pickups answered the four design points, measured
+  two real blockers, and designed an owner-level board carrying draft items because the repo did not exist
+  yet. Coherent throughout, and about nothing. Asked directly, **Dave did not recognise the name** — and
+  the search that followed found `pair-cli` in exactly one place in the visible world: the issue itself. No
+  file in the tree, no other issue or PR under either owner, no repository of his anywhere on GitHub.
+  **What made it invisible is worth naming, because it will look the same next time.** The issue was
+  written by a session on Dave's spoken word — its own text says so (*"filed so it is not forgotten"*) —
+  in a batch of three dictated within 45 minutes that morning, the other two of which were real and closed
+  the same day. So the name arrived under his name, in the house style, flanked by siblings that checked
+  out. The first pickup did search for the repo, found nothing, and recorded it as **"not visible from
+  here"** rather than as *"not there"* — that single reading is the whole defect, and it cost a second
+  pickup plus an auth-scope refresh requested from Dave for a board that was never going to be built.
+  **Ask the requester before designing**, and treat a name occurring nowhere but in its own report as
+  naming nothing.
+  The same close settled the wish underneath the name, so nobody re-opens it on instinct: measured over
+  every issue ever filed here, **179 total, 178 closed, 170 of them within 24 hours, median lifetime 3.4
+  hours, none older than seven days, and exactly one open** — the issue asking for the board. A board keeps
+  waiting work visible; nothing here waits.
 - **No other-machine reminders.** Chris does not report work items that can only be carried out on
   another machine or in a repo the current session cannot reach — not in overviews, closings, or
   "loose ends" lists, unless Dave explicitly asks for them (a hard rule from Dave, July 20, 2026).
