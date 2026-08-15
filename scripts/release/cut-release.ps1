@@ -169,6 +169,26 @@
 .EXAMPLE
     ./scripts/release/cut-release.ps1 -Bump major -Title "A new milestone" -SummaryFile ..\summary.md -NoPush
     # Milestone release: the authored summary opens the notes, the pending entries follow it.
+
+.NOTES
+    COVERAGE, STATED RATHER THAN LEFT TO INFERENCE (#708, August 15, 2026). This is the
+    highest-blast-radius script here -- it commits on the trunk and tags before any PR or CI can look at
+    the result -- so what is and is not tested should not have to be worked out from the tests directory.
+    Until #708 it said nothing, while its sibling ship-pr.ps1 named its own gap twice, and an absent
+    statement reads as coverage.
+
+    DRIVEN END TO END by scripts/tests/cut-release-drive.tests.ps1, against a throwaway `git init` repo
+    with no remote: the lockstep bump across every plugin.json, CHANGELOG.md emptied to its intro, the
+    development note written at the grouped path carrying the entry the changelog lost, the row inserted
+    into the release history, the commit, the tag pointing at it, and a clean tree afterwards. Plus two
+    refusals, each asserted to leave the tree untouched: a bump the pending entries have not earned, and
+    a new major whose section does not exist yet.
+
+    STILL NOT COVERED, and deliberately: the push (every driven run passes -NoPush, because a suite must
+    not be able to reach a remote), and the hand-written documents downstream of the cut, which are prose
+    a person writes. The source-text asserts in cut-release-guardrail.tests.ps1 remain the other half --
+    they pin what this file SAYS (the reserved-root allowlist, the gate ordering, the escape valves)
+    where the driven suite pins what it DOES.
 #>
 [CmdletBinding()]
 param(
