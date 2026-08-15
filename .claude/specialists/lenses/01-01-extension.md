@@ -116,6 +116,28 @@ product: agent defs, manuals, docs, and tooling.
   every issue ever filed here, **179 total, 178 closed, 170 of them within 24 hours, median lifetime 3.4
   hours, none older than seven days, and exactly one open** — the issue asking for the board. A board keeps
   waiting work visible; nothing here waits.
+- **The fifth pattern, measured on this repo's own reports rather than a consumer's: the finding is
+  real and its SIZE is wrong.** Written August 15, 2026, after a team-wide review filed 22 issues and
+  **three of them turned out to be mis-measured on pickup** — all three mine, all three found only
+  because the repair began with a recount:
+  - **[#697](https://github.com/DaveKJohn/claude-code-specialists/issues/697)** counted **32** uses of
+    the retired name "the workshop repo". The subject — the word *workshop* as a live term — is
+    **342**. Repairing to the report was still right, but the remaining 310 are a separate decision,
+    filed as [#720](https://github.com/DaveKJohn/claude-code-specialists/issues/720) with its
+    measurement rather than swept along on my own authority.
+  - **[#700](https://github.com/DaveKJohn/claude-code-specialists/issues/700)** claimed one identical
+    sentence in **20** agent defs. Exactly **3** are identical; the other 17 carry role-specific tails.
+    The proposed shared block would have put those 17 tails inside a generated region for the next
+    generator run to delete — the same trap that had to be worked around eight times in
+    [#699](https://github.com/DaveKJohn/claude-code-specialists/issues/699).
+  - **[#701](https://github.com/DaveKJohn/claude-code-specialists/issues/701)** reported a claim
+    falsified by **5** dated references in 3 portable files. The claim names four categories and
+    *dates are not among them*: the real count is **2** person names. Repairing to the report would
+    have stripped two correct measurements out of Nolan's manual.
+  **What generalises:** a count in a report is whatever the search matched, and the search is chosen by
+  whoever noticed the symptom. Here the reporter and the repairer were the same team an hour apart, and
+  it still went wrong three times out of 22 — which is the argument for recounting even when the report
+  is your own, and especially then.
 - **No other-machine reminders.** Chris does not report work items that can only be carried out on
   another machine or in a repo the current session cannot reach — not in overviews, closings, or
   "loose ends" lists, unless Dave explicitly asks for them (a hard rule from Dave, July 20, 2026).
