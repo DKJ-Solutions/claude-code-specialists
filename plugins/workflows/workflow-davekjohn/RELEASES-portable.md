@@ -264,6 +264,29 @@ exceptions, so it travels the normal reviewed route. The alternative — widenin
 cover the written note as well — was offered and declined: an exception is only safe while it stays the size
 it was granted at.
 
+### Once it has landed it is a published record — and that protects only what was true
+
+A note that has gone out is not edited into agreement with the present. Links may be repointed when a
+target moves; prose is left as written, so a page may still describe a directory that has since been
+renamed or a model that has since been retired. That is what it said on the day it went out, and going
+stale afterwards is the record working rather than breaking.
+
+**A line that was false when it was written is a different thing, and the rule does not cover it.**
+Correcting one *restores* the record; freezing it preserves a mistake, which is the opposite of what a
+record is for. The two are easy to confuse because they look identical afterwards — the test is not
+whether the line is wrong now, but whether it was wrong when it was typed.
+
+Where you correct one, say so on the page: the date, what it first said, and — if your release process
+attaches a copy of the note to the release itself — that the attached copy still carries the error, since
+an attachment is what was published at the moment of publication and is not replaced. Without that line a
+reader who downloads the asset is misled with no way to know.
+
+**The failure worth naming, because it manufactures the second kind out of the first.** Each note's *what
+was still open* block is easiest to write by carrying the previous one's items forward and updating the
+counts. An item that was true at the last release and has been overtaken since then arrives in the new
+note as a **false** statement — the stale line, copied forward, becomes an error. So verify each carried
+item against whatever it is a claim about, not against the note you are copying from.
+
 ## Cutting a release
 
 A release is a **captured moment**: the state is tagged as `vX.Y.Z`, and where the repo publishes plugins
