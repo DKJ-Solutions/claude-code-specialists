@@ -1,25 +1,13 @@
-## `docs/a-findings-size-is-measured-too` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-#### PLAN
-
-- [x] Establish the lesson is general before writing it portable: three instances, three different
-      shapes of mis-measurement, one common cause (the count is a proxy for the subject)
-
-#### CREATE
-
-- [x] The fourth intake check into Chris's portable body, stated timelessly and with no numbers, so it
-      passes the layer rule his own handbook measures
-- [x] The three measured instances into his repo lens, with their issue numbers and the date
-- [~] Add it to `CLAUDE.md` as well — dropped: intake is Chris's craft and his body is where it
-      belongs, and the always-on path was just trimmed by 23% for exactly this kind of content
-
-#### TEST
-
-- [x] `build-agent-defs.ps1`: 0 files updated -- the persona edit sits outside every shared block
-- [x] `check-plugin-integrity.ps1` green, persona frontmatter and lens links included
-- [x] full test suite green
-
-### Where I left off
-
+_(filled in when a branch is created)_
