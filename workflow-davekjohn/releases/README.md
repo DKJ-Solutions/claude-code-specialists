@@ -151,6 +151,7 @@ list sits at the **end** of the page:
 
 | Version | Date | Type | Title |
 |---|---|---|---|
+| [4.10.0](audience/4.x/4.10.0.md) | 2026-08-15 | Minor | The Claude App marketplace publishes a chosen subset, and an inbound report's subject is verified before it is routed |
 | [4.9.0](audience/4.x/4.9.0.md) | 2026-08-15 | Minor | the workflow gathers into its own root folder at the consumer, and what the plugin ships is held to what a consumer can actually use |
 | [4.8.0](audience/4.x/4.8.0.md) | 2026-08-13 | Minor | The branch and release conventions and the consumer test gate now travel with the plugin |
 | [4.7.0](audience/4.x/4.7.0.md) | 2026-08-13 | Minor | The documents describe what the tooling actually writes: the entry's tier shape, the post-merge step, and a seam that escaped in a third spelling |
