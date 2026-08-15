@@ -20,7 +20,14 @@
       6. the seam: without -TargetRepo the target comes from Get-BusinessMarketplaceRepo in the
          source repo's own scripts/repo-config.ps1;
       7. no seam and no -TargetRepo is a refusal, not a guess;
-      8. -DryRun commits nothing.
+      8. -DryRun commits nothing;
+      9. a malformed manifest is NAMED rather than crashed on (the StrictMode-on-5.1 regression);
+     10. the published SUBSET (#683), on a second fixture shaped like the real marketplace:
+         no filter publishes everything (back-compat), a filter prunes the tree AND rewrites the
+         manifest to match, an emptied kind directory goes whole with its README, a keep-list name
+         matching nothing is a hard stop (it would otherwise exclude silently), a non-ASCII
+         description survives the manifest rewrite, an undeclared plugin folder is a hard stop, and
+         the list comes from Get-BusinessMarketplacePlugins when -Plugins is not passed.
 
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/publish-to-business.tests.ps1
 
@@ -127,6 +134,55 @@ function New-SourceFixture {
     Invoke-FixtureGit -Dir $Dir -GitArgs @('commit', '-m', 'fixture: initial marketplace') | Out-Null
 }
 
+function New-FilterFixture {
+    <#
+        A marketplace shaped like the real one: plugins/<kind>/<plugin>, with a README on the plugins
+        root and on each kind directory. The flat fixture above cannot express the case the subset
+        filter is really about -- a kind directory emptied of plugins, whose README then describes
+        plugins that are not there.
+
+        One description carries an em dash, written as a code point because this file is pure ASCII by
+        repo convention. It is the fixture for the encoding regression: the manifest is the one file
+        the script reads AND writes, so a wrong decode on the way in becomes permanent on the way out.
+    #>
+    param([string]$Dir)
+
+    $emDash = [char]0x2014
+
+    New-Item -ItemType Directory -Path (Join-Path $Dir '.claude-plugin') -Force | Out-Null
+    $manifest = @"
+{
+    "name": "fixture-marketplace",
+    "owner": { "name": "fixture" },
+    "plugins": [
+        { "name": "core",  "source": "./plugins/teams/core",      "description": "the core team $emDash always enabled" },
+        { "name": "extra", "source": "./plugins/teams/extra",     "description": "an add-on team" },
+        { "name": "flow",  "source": "./plugins/workflows/flow",  "description": "a way of working" }
+    ]
+}
+"@
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText((Join-Path $Dir '.claude-plugin\marketplace.json'), $manifest, $utf8NoBom)
+
+    foreach ($p in @(@{ kind = 'teams'; n = 'core' }, @{ kind = 'teams'; n = 'extra' }, @{ kind = 'workflows'; n = 'flow' })) {
+        $pdir = Join-Path $Dir "plugins\$($p.kind)\$($p.n)\.claude-plugin"
+        New-Item -ItemType Directory -Path $pdir -Force | Out-Null
+        "{ ""name"": ""$($p.n)"", ""version"": ""1.0.0"" }" |
+            Set-Content -LiteralPath (Join-Path $pdir 'plugin.json') -Encoding Ascii
+        "# $($p.n) payload" |
+            Set-Content -LiteralPath (Join-Path $Dir "plugins\$($p.kind)\$($p.n)\README.md") -Encoding Ascii
+    }
+
+    '# the plugins'   | Set-Content -LiteralPath (Join-Path $Dir 'plugins\README.md') -Encoding Ascii
+    '# the teams'     | Set-Content -LiteralPath (Join-Path $Dir 'plugins\teams\README.md') -Encoding Ascii
+    '# the workflows' | Set-Content -LiteralPath (Join-Path $Dir 'plugins\workflows\README.md') -Encoding Ascii
+    '# fixture'       | Set-Content -LiteralPath (Join-Path $Dir 'README.md') -Encoding Ascii
+
+    Invoke-FixtureGit -Dir $Dir -GitArgs @('init') | Out-Null
+    Invoke-FixtureGit -Dir $Dir -GitArgs @('add', '-A') | Out-Null
+    Invoke-FixtureGit -Dir $Dir -GitArgs @('commit', '-m', 'fixture: initial kinded marketplace') | Out-Null
+}
+
 function Get-TargetCommitCount {
     <# Commits on main in the bare target; 0 when the branch does not exist yet. #>
     param([string]$BareDir)
@@ -151,9 +207,11 @@ function Get-TargetTree {
 # --- the fixture -----------------------------------------------------------------------------------
 
 $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("publish-tests-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
-$sourceDir   = Join-Path $fixtureRoot 'source'
-$bareDir     = Join-Path $fixtureRoot 'target.git'
-$seamBareDir = Join-Path $fixtureRoot 'seam-target.git'
+$sourceDir     = Join-Path $fixtureRoot 'source'
+$bareDir       = Join-Path $fixtureRoot 'target.git'
+$seamBareDir   = Join-Path $fixtureRoot 'seam-target.git'
+$filterDir     = Join-Path $fixtureRoot 'filter-source'
+$filterBareDir = Join-Path $fixtureRoot 'filter-target.git'
 
 try {
     New-Item -ItemType Directory -Path $sourceDir -Force | Out-Null
@@ -287,6 +345,100 @@ function Get-BusinessMarketplaceRepo { return `$script:BusinessMarketplaceRepo }
     Assert-Equal 1 $r.ExitCode 'a manifest missing a required field is exit 1'
     Assert-Match $r.Output "missing the required field 'plugins'" 'the missing field is named'
     Assert-True ($r.Output -notmatch 'cannot be found on this object') 'and that path stays clean under StrictMode too'
+
+    # --- 10-16. the published SUBSET (issue #683) ---------------------------------------------------
+    #
+    # A second fixture, shaped like the real marketplace -- plugins/<kind>/<plugin>, each kind
+    # directory carrying its own README -- because the flat fixture above cannot express the case that
+    # matters most here: a kind directory emptied of plugins must go whole, README and all.
+    Write-Host 'publish-to-business: the published subset' -ForegroundColor Cyan
+    New-Item -ItemType Directory -Path $filterDir -Force | Out-Null
+    New-FilterFixture -Dir $filterDir
+    Invoke-FixtureGit -Dir $fixtureRoot -GitArgs @('init', '--bare', $filterBareDir) | Out-Null
+
+    # 10. no -Plugins and no seam publishes EVERYTHING. The back-compat guarantee: this is what the
+    #     script did before the subset existed, and a caller that has not heard of it must keep it.
+    $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $filterDir, '-TargetRepo', $filterBareDir)
+    Assert-Equal 0 $r.ExitCode 'an unfiltered run exits 0'
+    $tree = Get-TargetTree -BareDir $filterBareDir
+    Assert-True ($tree -contains 'plugins/workflows/flow/.claude-plugin/plugin.json') 'unfiltered: the workflow travelled'
+    Assert-True ($tree -contains 'plugins/teams/core/.claude-plugin/plugin.json') 'unfiltered: the team travelled'
+    Assert-Match $r.Output 'every entry in the manifest' 'unfiltered: the run says it filtered nothing'
+
+    # 11. the filter: the excluded plugin is gone from the tree AND from the manifest, and the kind
+    #     directory it was the only member of is gone with its README.
+    $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $filterDir, '-TargetRepo', $filterBareDir,
+                                      '-Plugins', 'core,extra')
+    Assert-Equal 0 $r.ExitCode 'the filtered run exits 0'
+    Assert-Match $r.Output 'Excluded from this target: flow' 'the filtered run names what it dropped'
+    $tree = Get-TargetTree -BareDir $filterBareDir
+    Assert-True ($tree -notcontains 'plugins/workflows/flow/.claude-plugin/plugin.json') 'the excluded plugin did not travel'
+    Assert-True ($tree -notcontains 'plugins/workflows/README.md') 'and the emptied kind directory went with it, README included'
+    Assert-True ($tree -contains 'plugins/teams/core/.claude-plugin/plugin.json') 'the kept plugins did travel'
+    Assert-True ($tree -contains 'plugins/teams/README.md') 'and their kind directory kept its README'
+    Assert-True ($tree -contains 'plugins/README.md') 'the plugins root README is untouched by the pruning'
+
+    # Read the published manifest from a CHECKOUT, not from `git show`. Native stdout is decoded with
+    # the console output codepage, so a real UTF-8 em dash in the blob arrives here already mangled --
+    # which would fail the encoding assert below for a reason that has nothing to do with the script
+    # under test. A clone plus ReadAllText measures the bytes that were actually committed.
+    $checkoutDir = Join-Path $fixtureRoot 'filter-checkout'
+    if (Test-Path -LiteralPath $checkoutDir) { Remove-Item -Recurse -Force -LiteralPath $checkoutDir }
+    # --branch main explicitly: `git init --bare` leaves HEAD on master, so a plain clone of this
+    # fixture checks out nothing at all and the read below fails for the wrong reason.
+    Invoke-FixtureGit -Dir $fixtureRoot -GitArgs @('clone', '--quiet', '--branch', 'main', $filterBareDir, $checkoutDir) | Out-Null
+    $publishedManifest = [System.IO.File]::ReadAllText((Join-Path $checkoutDir '.claude-plugin\marketplace.json'))
+    Assert-True ($publishedManifest -notmatch '"flow"') 'the rewritten manifest does not name the excluded plugin'
+    Assert-Match $publishedManifest '"core"' 'the rewritten manifest still names the kept ones'
+
+    # 12. THE MOJIBAKE REGRESSION, measured on the first real dry run of this filter. The manifest is
+    #     the one file the script both reads and writes, and Get-Content -Raw on 5.1 decodes a BOM-less
+    #     UTF-8 file with the system ANSI codepage -- so the em dashes in the descriptions came back as
+    #     three characters and were written out as valid, permanent nonsense. Nothing errors; the
+    #     assert has to be on the character itself.
+    $emDash = [char]0x2014
+    Assert-True ($publishedManifest.Contains($emDash)) 'a non-ASCII description survives the manifest rewrite'
+    Assert-True (-not $publishedManifest.Contains([char]0x00E2 + [char]0x20AC)) 'and is not double-encoded on the way'
+
+    # 13. a name in the keep-list that matches nothing is a HARD STOP, because the failure it would
+    #     otherwise cause is silent: the plugin it meant to keep is simply excluded, and the run
+    #     reports success with one plugin fewer.
+    $before = Get-TargetCommitCount -BareDir $filterBareDir
+    $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $filterDir, '-TargetRepo', $filterBareDir,
+                                      '-Plugins', 'core,kore')
+    Assert-Equal 1 $r.ExitCode 'a keep-list name that matches nothing is exit 1'
+    Assert-Match $r.Output 'kore' 'the refusal names the unmatched entry'
+    Assert-Equal $before (Get-TargetCommitCount -BareDir $filterBareDir) 'and nothing was committed'
+
+    # 14. excluding every plugin is an empty marketplace, not a subset.
+    $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $filterDir, '-TargetRepo', $filterBareDir, '-Plugins', 'nothing-here')
+    Assert-Equal 1 $r.ExitCode 'a keep-list that keeps nothing is exit 1'
+
+    # 15. THE REVERSE INTEGRITY CHECK -- the silent half. A plugin folder that travels while the
+    #     manifest never names it produces no error anywhere: Claude just never offers it, and the
+    #     manifest reads as complete to anyone who checks it instead of the tree.
+    $strayDir = Join-Path $filterDir 'plugins\teams\stray\.claude-plugin'
+    New-Item -ItemType Directory -Path $strayDir -Force | Out-Null
+    '{ "name": "stray", "version": "9.9.9" }' | Set-Content -LiteralPath (Join-Path $strayDir 'plugin.json') -Encoding Ascii
+    Invoke-FixtureGit -Dir $filterDir -GitArgs @('add', '-A') | Out-Null
+    Invoke-FixtureGit -Dir $filterDir -GitArgs @('commit', '-m', 'fixture: a plugin folder the manifest never mentions') | Out-Null
+    $before = Get-TargetCommitCount -BareDir $filterBareDir
+    $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $filterDir, '-TargetRepo', $filterBareDir)
+    Assert-Equal 1 $r.ExitCode 'an undeclared plugin folder is exit 1'
+    Assert-Match $r.Output 'plugins/teams/stray travelled but no manifest entry names it' 'the refusal names the stray folder'
+    Assert-Equal $before (Get-TargetCommitCount -BareDir $filterBareDir) 'and nothing was committed on it either'
+
+    # 16. the subset seam: without -Plugins the list comes from Get-BusinessMarketplacePlugins.
+    Remove-Item -Recurse -Force -LiteralPath (Join-Path $filterDir 'plugins\teams\stray')
+    New-Item -ItemType Directory -Path (Join-Path $filterDir 'scripts') -Force | Out-Null
+    @"
+function Get-BusinessMarketplacePlugins { return @('core', 'extra') }
+"@ | Set-Content -LiteralPath (Join-Path $filterDir 'scripts\repo-config.ps1') -Encoding Ascii
+    Invoke-FixtureGit -Dir $filterDir -GitArgs @('add', '-A') | Out-Null
+    Invoke-FixtureGit -Dir $filterDir -GitArgs @('commit', '-m', 'fixture: add the subset seam') | Out-Null
+    $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $filterDir, '-TargetRepo', $filterBareDir)
+    Assert-Equal 0 $r.ExitCode 'a run without -Plugins exits 0 once the seam answers'
+    Assert-Match $r.Output 'Excluded from this target: flow' 'and the seam is what excluded the workflow'
 } finally {
     if (Test-Path -LiteralPath $fixtureRoot) {
         Remove-Item -Recurse -Force -LiteralPath $fixtureRoot -ErrorAction SilentlyContinue

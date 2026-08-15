@@ -13,10 +13,12 @@
     WHAT TRAVELS. The two things a plugin marketplace actually needs, plus the documents a reader
     of that repo would miss:
 
-        .claude-plugin/marketplace.json   required, and required in the root
-        plugins/                          the six plugin folders the manifest points at, plus
+        .claude-plugin/marketplace.json   required, and required in the root -- GENERATED here, not
+                                          copied, because it must name exactly the plugins that
+                                          travelled (see WHICH PLUGINS below)
+        plugins/                          the plugin folders the filtered manifest points at, plus
                                           agent-shared/ (the source of the generated shared blocks)
-                                          and the INSTALL/UNINSTALL/README pages
+                                          and the README/ADOPTION pages
         README.md, LICENSE, CHANGELOG.md  context for whoever opens the business repo
         .github/ISSUE_TEMPLATE/           the inbound path the docs link to
         .gitignore, .gitattributes        so a clone behaves the same
@@ -26,6 +28,20 @@
     it from the marketplace. Keeping it out is what makes the published repo ~150 files instead of
     ~370, and it is also the reason the published repo can be private without giving colleagues
     anything to be confused by.
+
+    WHICH PLUGINS (issue #683, August 15, 2026). The target serves Claude App users, who have no
+    repository -- so a WORKFLOW plugin, whose every skill ends in a script run against a checkout,
+    offers them something that can only fail at the last step. Get-BusinessMarketplacePlugins in the
+    source repo's scripts/repo-config.ps1 names the plugins that travel; -Plugins overrides it, and an
+    absent or empty answer means "all of them", which is what this script did before the seam existed.
+    Excluded plugin folders are pruned after the copy and the manifest is rebuilt to match, so the two
+    cannot disagree. A kind-directory left with no plugin in it (plugins/workflows/ and its README) is
+    removed whole rather than published as a page describing plugins that are not there.
+
+    IT CHECKS BOTH DIRECTIONS. A manifest naming a folder that did not travel was always a hard stop.
+    Since #683 the reverse is too: a plugin folder that travels while the manifest never mentions it.
+    That one is the silent half -- nothing errors, Claude simply never offers it, and the marketplace
+    looks complete to everyone who reads the manifest instead of the tree.
 
     IT DELETES BEFORE IT COPIES. The target's working tree is emptied (except .git) and rebuilt from
     the list above, so a plugin or file REMOVED here disappears there too. A sync that only ever
@@ -50,6 +66,12 @@
     scripts/repo-config.ps1 answers -- repo data lives in that seam, not in this script -- so the
     normal run needs no arguments at all. Pass it explicitly to publish the same set to a second
     organisation.
+
+.PARAMETER Plugins
+    The plugin names (as in marketplace.json) that travel. Defaults to what
+    Get-BusinessMarketplacePlugins in scripts/repo-config.ps1 answers; an empty answer, or no such
+    function, means every plugin in the manifest. Pass it explicitly to publish a different subset to
+    a second organisation -- the same override role -TargetRepo has.
 
 .PARAMETER RepoRoot
     Alternative repo root. Defaults to CLAUDE_PROJECT_DIR, then the git toplevel. Exists so the
@@ -83,10 +105,17 @@
     ./scripts/release/publish-to-business.ps1 -TargetRepo OTHER-ORG/their-plugins
 
     Publishes the same set to a different target, for a second organisation.
+
+.EXAMPLE
+    ./scripts/release/publish-to-business.ps1 -TargetRepo OTHER-ORG/dev-plugins -Plugins team-alpha,workflow-davekjohn -DryRun
+
+    A different subset to a different target -- for an organisation that does have repositories.
 #>
 [CmdletBinding()]
 param(
     [string] $TargetRepo,
+
+    [string[]] $Plugins,
 
     [string] $RepoRoot,
 
@@ -202,8 +231,8 @@ function Get-JsonField {
 }
 
 function Get-PluginVersions {
-    <# name/version for every plugin the manifest names, in manifest order. #>
-    param([string] $Root)
+    <# name/version for every plugin that will travel, in manifest order. #>
+    param([string] $Root, [string[]] $Only)
 
     $manifestPath = Join-Path $Root '.claude-plugin/marketplace.json'
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
@@ -213,6 +242,9 @@ function Get-PluginVersions {
     # field costs it a '?' and nothing else.
     $result = @()
     foreach ($plugin in @(Get-JsonField -Object $manifest -Name 'plugins')) {
+        if ($Only -and $Only.Count -gt 0 -and ($Only -notcontains (Get-JsonField -Object $plugin -Name 'name'))) {
+            continue
+        }
         $source = Get-JsonField -Object $plugin -Name 'source'
         $version = '?'
         if ($source) {
@@ -229,6 +261,106 @@ function Get-PluginVersions {
         }
     }
     return $result
+}
+
+function Write-ManifestJson {
+    <#
+        Writes a manifest object back as JSON, UTF-8 without BOM and LF-terminated.
+
+        THE PUBLISHED MANIFEST IS GENERATED, so its formatting is this function's rather than the
+        source file's -- nobody edits the target by hand, and the alternative (editing the source text
+        in place to drop entries) is a parser that has to be right about JSON it did not write.
+
+        The unescape is not cosmetic. Windows PowerShell 5.1's ConvertTo-Json escapes the four HTML-
+        sensitive characters -- ampersand, less-than, greater-than and apostrophe -- as backslash-u
+        sequences, so a description reading "Craig (CRO) & Sean" reaches the file as an escape. Valid
+        JSON, unreadable in a diff, and a change nobody asked for. Only code points >= 0x20 are
+        restored: below that, JSON REQUIRES the escape.
+    #>
+    param([string] $Path, $Manifest)
+
+    $json = $Manifest | ConvertTo-Json -Depth 20
+    $json = [regex]::Replace($json, '\\u([0-9a-fA-F]{4})', {
+        param($match)
+        $code = [int]('0x' + $match.Groups[1].Value)
+        if ($code -lt 0x20) { return $match.Value }
+        return [string][char]$code
+    })
+
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, (($json -replace "`r`n", "`n").TrimEnd() + "`n"), $utf8NoBom)
+}
+
+function Select-PublishedPlugins {
+    <#
+        Prunes the copied tree down to $Allowed and rewrites the manifest to match, so the tree and
+        the manifest cannot disagree about which plugins this marketplace has. Returns the names that
+        were dropped. An empty $Allowed keeps everything and is a no-op -- the pre-#683 behaviour, and
+        what an unstated seam has to keep meaning.
+    #>
+    param([string] $Root, [string[]] $Allowed)
+
+    if (-not $Allowed -or $Allowed.Count -eq 0) { return @() }
+
+    # ReadAllText, NOT Get-Content -Raw. This is the one place that reads the manifest in order to
+    # WRITE it back, and Windows PowerShell 5.1's Get-Content decodes a BOM-less file with the system
+    # ANSI codepage: the em dashes in the plugin descriptions came back as three ANSI characters and
+    # were then written out as UTF-8, which is mojibake -- valid, silent, and permanent in the
+    # published file. Measured on the first dry run of this filter. ReadAllText defaults to UTF-8 and
+    # pairs with the WriteAllText in Write-ManifestJson. The two read-only callers below are unaffected
+    # because they only use the ASCII name/source/version fields.
+    $manifestPath = Join-Path $Root '.claude-plugin/marketplace.json'
+    $manifest = [System.IO.File]::ReadAllText($manifestPath) | ConvertFrom-Json
+    $entries = @(Get-JsonField -Object $manifest -Name 'plugins')
+
+    # A NAME THAT MATCHES NOTHING IS REFUSED, because getting it wrong is silent in the worst
+    # direction: a typo in the keep-list does not fail, it quietly EXCLUDES the plugin it meant to
+    # keep, and the publication reports success with one plugin fewer.
+    $known = @($entries | ForEach-Object { Get-JsonField -Object $_ -Name 'name' } | Where-Object { $_ })
+    $unknown = @($Allowed | Where-Object { $known -notcontains $_ })
+    if ($unknown.Count -gt 0) {
+        throw ("The published-plugin list names $($unknown.Count) plugin(s) this marketplace does not " +
+               "have: $($unknown -join ', '). Known: $($known -join ', '). Fix " +
+               "Get-BusinessMarketplacePlugins in scripts\repo-config.ps1 (or -Plugins) -- a name that " +
+               "matches nothing excludes the plugin it was meant to keep, without failing.")
+    }
+
+    $keep = @($entries | Where-Object { $Allowed -contains (Get-JsonField -Object $_ -Name 'name') })
+    $drop = @($entries | Where-Object { $Allowed -notcontains (Get-JsonField -Object $_ -Name 'name') })
+    if ($drop.Count -eq 0) { return @() }
+    if ($keep.Count -eq 0) {
+        throw 'The published-plugin list excludes every plugin -- that is an empty marketplace, not a subset.'
+    }
+
+    # Which directories under plugins/ hold a plugin at all, measured BEFORE pruning. Afterwards, one
+    # that has been emptied of plugins is removed whole: plugins/workflows/ carries its own README
+    # about the workflows, and a page describing plugins that are not there is worse than no page.
+    $pluginsRoot = Join-Path $Root 'plugins'
+    $kindDirs = @()
+    if (Test-Path -LiteralPath $pluginsRoot -PathType Container) {
+        $kindDirs = @(Get-ChildItem -LiteralPath $pluginsRoot -Directory -Force | Where-Object {
+            @(Get-ChildItem -LiteralPath $_.FullName -Recurse -Filter 'plugin.json' -File -Force).Count -gt 0
+        })
+    }
+
+    foreach ($plugin in $drop) {
+        $source = Get-JsonField -Object $plugin -Name 'source'
+        if (-not $source) { continue }
+        $dir = Join-Path $Root $source
+        if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
+    }
+
+    foreach ($kind in $kindDirs) {
+        if (-not (Test-Path -LiteralPath $kind.FullName)) { continue }
+        if (@(Get-ChildItem -LiteralPath $kind.FullName -Recurse -Filter 'plugin.json' -File -Force).Count -eq 0) {
+            Remove-Item -LiteralPath $kind.FullName -Recurse -Force
+        }
+    }
+
+    $manifest.plugins = $keep
+    Write-ManifestJson -Path $manifestPath -Manifest $manifest
+
+    return @($drop | ForEach-Object { Get-JsonField -Object $_ -Name 'name' })
 }
 
 function Assert-MarketplaceIntegrity {
@@ -276,6 +408,31 @@ function Assert-MarketplaceIntegrity {
         }
     }
 
+    # THE REVERSE, AND IT IS THE SILENT ONE (#683). The loop above catches a manifest naming a folder
+    # that did not travel -- loud, because Claude tries to serve it and cannot. This catches a plugin
+    # folder that travelled while the manifest never mentions it: nothing errors anywhere, Claude
+    # simply never offers it, and the manifest reads as a complete marketplace to everyone who checks
+    # it instead of the tree. That is the failure mode a filtered publication makes possible, so the
+    # filter and this check ship together.
+    $declared = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($plugin in @(Get-JsonField -Object $manifest -Name 'plugins')) {
+        $source = Get-JsonField -Object $plugin -Name 'source'
+        if ($source) { [void]$declared.Add([System.IO.Path]::GetFullPath((Join-Path $Root $source))) }
+    }
+
+    $pluginsRoot = Join-Path $Root 'plugins'
+    if (Test-Path -LiteralPath $pluginsRoot -PathType Container) {
+        foreach ($found in @(Get-ChildItem -LiteralPath $pluginsRoot -Recurse -Filter 'plugin.json' -File -Force)) {
+            $holder = Split-Path -Parent $found.FullName
+            if ((Split-Path -Leaf $holder) -ne '.claude-plugin') { continue }
+            $pluginDir = Split-Path -Parent $holder
+            if (-not $declared.Contains([System.IO.Path]::GetFullPath($pluginDir))) {
+                $relative = $pluginDir.Substring($Root.Length).TrimStart('\', '/') -replace '\\', '/'
+                $problems += "$relative travelled but no manifest entry names it"
+            }
+        }
+    }
+
     if ($problems.Count -gt 0) {
         # Printed rather than folded into the exception: PowerShell renders a multi-line error
         # message on one line, and the whole point of this check is that you can read the list.
@@ -293,13 +450,15 @@ function Assert-MarketplaceIntegrity {
 
 $root = Resolve-RepoRoot -Explicit $RepoRoot
 
-# The publication target is repo data, so it lives in scripts/repo-config.ps1 (Get-RepoName's file)
-# rather than in this script. Optional function with a fallback, like Get-InternalNoteWording: the
-# dot-source is guarded so a fixture root without a repo-config still runs (the tests pass
-# -TargetRepo), and -TargetRepo stays as the override for a second organisation.
+# The publication target AND the published subset are repo data, so both live in
+# scripts/repo-config.ps1 (Get-RepoName's file) rather than in this script. Optional functions with a
+# fallback, like Get-InternalNoteWording: the dot-source is guarded so a fixture root without a
+# repo-config still runs (the tests pass -TargetRepo), and each has a parameter that overrides it for
+# a second organisation.
+$repoConfig = Join-Path $root 'scripts\repo-config.ps1'
+if (Test-Path -LiteralPath $repoConfig -PathType Leaf) { . $repoConfig }
+
 if (-not $TargetRepo) {
-    $repoConfig = Join-Path $root 'scripts\repo-config.ps1'
-    if (Test-Path -LiteralPath $repoConfig -PathType Leaf) { . $repoConfig }
     if (Get-Command Get-BusinessMarketplaceRepo -ErrorAction SilentlyContinue) {
         $TargetRepo = Get-BusinessMarketplaceRepo
     }
@@ -308,6 +467,25 @@ if (-not $TargetRepo) {
                'scripts\repo-config.ps1 (owner/name of the business repo this marketplace publishes to).')
     }
 }
+
+# No -Plugins and no seam is NOT a refusal, unlike the target above: publishing every plugin is what
+# this script did before the seam existed, and a consumer that never heard of it must keep doing that.
+if (-not $Plugins) {
+    if (Get-Command Get-BusinessMarketplacePlugins -ErrorAction SilentlyContinue) {
+        $Plugins = @(Get-BusinessMarketplacePlugins)
+    }
+}
+# Split on commas as well as taking the array. NOT tidiness: `powershell -File script.ps1 -Plugins
+# a,b` -- the invocation form this script's own examples use, and the one the gate and CI use for
+# everything -- binds 'a,b' as a SINGLE string, because -File passes arguments as literal strings and
+# never parses an array. Repeating the parameter is a bind error, so without this split the only
+# working form is a dot-sourced call from a prompt, and the documented one silently filters to a
+# plugin named 'a,b' -- which then trips the unmatched-name refusal with a confusing message.
+$Plugins = @($Plugins |
+    Where-Object { $_ } |
+    ForEach-Object { $_ -split ',' } |
+    ForEach-Object { $_.Trim() } |
+    Where-Object { $_ })
 
 $url = Resolve-TargetUrl -Value $TargetRepo
 
@@ -328,9 +506,13 @@ if ($dirtyResult.ExitCode -eq 0 -and $dirtyResult.Output) {
     Write-Warning 'The source repo has uncommitted changes. They WILL be published as-is.'
 }
 
-$versions = Get-PluginVersions -Root $root
+$versions = Get-PluginVersions -Root $root -Only $Plugins
 Write-Host ''
-Write-Host 'Plugins to publish:'
+if ($Plugins.Count -gt 0) {
+    Write-Host "Plugins to publish (filtered to $($Plugins.Count) of the manifest's entries):"
+} else {
+    Write-Host 'Plugins to publish (every entry in the manifest):'
+}
 foreach ($v in $versions) {
     Write-Host ("  {0,-20} v{1}" -f $v.Name, $v.Version)
 }
@@ -414,6 +596,15 @@ try {
     }
     if ($skipped.Count -gt 0) {
         Write-Warning ("Not present in the source, so not published: " + ($skipped -join ', '))
+    }
+
+    # --- prune to the published subset, and rewrite the manifest to match
+
+    # @() around the call, for the reason Get-JsonField exists: a function returning an empty array
+    # unrolls to $null, and under StrictMode $null.Count is a terminating error rather than 0.
+    $dropped = @(Select-PublishedPlugins -Root $temp -Allowed $Plugins)
+    if ($dropped.Count -gt 0) {
+        Write-Host ("Excluded from this target: " + ($dropped -join ', '))
     }
 
     # --- check what we built before we hand it to anyone
