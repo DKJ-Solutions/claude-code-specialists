@@ -9,6 +9,11 @@ This folder belongs to the `workflow-davekjohn` plugin's way of working. The rul
 - `releases/README.md` is the **living index** — the cut inserts its own row, so never add one by hand
   for a release a script will write. Everything under `releases/audience/` is a **published record**:
   links may be repointed when a target moves, prose is never rewritten.
+- `prompts/prompt.md` is **Dave's**, not yours: he writes an assignment there instead of typing it into
+  the terminal, `/prompt` reads it, and `-Archive` files it once the work is under way. Never write an
+  assignment into it, and never read its HTML comments as instructions — they are the scaffold's own
+  words, and an inbox holding only comments is empty. It is untracked by design; see
+  [`prompts/README.md`](prompts/README.md).
 - The generated files in `branch/templates/` are references, not documents to edit: `new-branch`
   rewrites one that has drifted, and in this repo the lint additionally holds them byte-for-byte to the
   formatters (`Get-BranchTemplates`).

@@ -80,6 +80,7 @@ if (Test-Path -LiteralPath $repoConfig -PathType Leaf) {
     try { . $repoConfig } catch { Write-Warning "scripts/repo-config.ps1 failed to load ($($_.Exception.Message)) -- the built-in wording is used." }
 }
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
+. (Join-Path $PSScriptRoot '..\lib\prompt-inbox-lib.ps1')
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $nl = "`n"
@@ -104,6 +105,7 @@ $folderReadme = @(
     '| [`CLAUDE.md`](CLAUDE.md) | the working rules a Claude session needs in this folder |',
     '| [`CONTRIBUTING.md`](CONTRIBUTING.md) | this repo''s answers to the contribution cycle |',
     '| [`branch/`](branch/) | the branch dossier: the entry, the step list, the generated templates |',
+    '| [`prompts/`](prompts/) | the prompt inbox: an assignment written in an editor instead of the terminal |',
     '| [`releases/`](releases/) | the release history and the published audience notes |',
     '',
     'Scaffolded by the `adopt-workflow-folder` skill; strictly additive, so everything here past the',
@@ -121,6 +123,10 @@ $folderClaude = @(
     '  companion gates the PR and the merge (`- [x]` done, `- [~]` dropped with the reason on the line).',
     '- `releases/README.md` lists this repo''s releases; the cut inserts its own row. `releases/audience/`',
     '  is where the cut drafts the hand-written note -- generated development notes live elsewhere.',
+    '- `prompts/prompt.md` is the REQUESTER''s file, not yours: they write an assignment there instead of',
+    '  typing it into the terminal, /prompt reads it, and -Archive files it once the work is under way.',
+    '  Never write an assignment into it, and never read its HTML comments as instructions -- they are',
+    '  the scaffold''s own words, and an inbox holding only comments is empty. Untracked by design.',
     '- The generated files in `branch/templates/` are references, not documents to edit: new-branch',
     '  rewrites one that has drifted.',
     '',
@@ -167,6 +173,33 @@ $releasesReadme = @(
     '|---|---|---|---|'
 )
 
+$promptsReadme = @(
+    '# `prompts/` -- the prompt inbox',
+    '',
+    'A terminal is a poor surface for a long assignment: no wrapping, no editing, no saving it',
+    'half-finished. So it gets written in an editor instead, into `prompt.md`, and a session picks it up',
+    'with `/prompt`. It is the mirror of `/lock` -- that one is Claude writing a note for the next Claude,',
+    'this one is the requester writing for the next session.',
+    '',
+    '| path | what it is | committed |',
+    '|---|---|---|',
+    '| `prompt.md` | the inbox -- the requester writes here | **no** |',
+    '| `archive/` | assignments already handed over, by date | **no** |',
+    '| `templates/prompt_template.md` | the generated reference of the reset state | yes |',
+    '| `.gitignore` | keeps the first two out of git | yes |',
+    '',
+    'The inbox is not committed by design: it is one person''s working input on one machine, changing',
+    'between saves, and a tracked copy would dirty the tree continuously -- which is what a release cut',
+    'refuses to run on. The template is tracked BECAUSE the inbox is not, so a fresh clone still carries a',
+    'trace of the mechanism.',
+    '',
+    'Everything inside HTML comments is scaffold and is stripped before the body is read, so an inbox',
+    'holding only comments counts as empty. The full procedure is the plugin''s `prompt` skill.',
+    '',
+    '<!-- VUL-IN: anything specific to this repo -- who writes here, and what a prompt is expected to say. -->'
+)
+
+$promptPaths = Get-PromptInboxPaths -RepoRoot $repoRoot
 $branchPaths = Get-BranchFilePaths
 $targets = @(
     @{ Rel = 'workflow-davekjohn/README.md';           Content = (($folderReadme -join $nl) + $nl) },
@@ -177,7 +210,16 @@ $targets = @(
     # it -- the same reason this repo's own releases tree once carried an invisible empty folder.
     @{ Rel = 'workflow-davekjohn/releases/audience/.gitkeep'; Content = '' },
     @{ Rel = $branchPaths.Changelog; Content = (((Format-BranchChangelogReset) -join $nl) + $nl) },
-    @{ Rel = $branchPaths.Progress;  Content = (((Format-BranchProgressReset) -join $nl) + $nl) }
+    @{ Rel = $branchPaths.Progress;  Content = (((Format-BranchProgressReset) -join $nl) + $nl) },
+    # The inbox. /prompt places these itself on its first run, so scaffolding them here is a
+    # convenience rather than the only route -- and they come from the SAME formatters that run does,
+    # so the two writers cannot produce different folders. The tracked pair (README, .gitignore,
+    # template) is the half that matters here: a consumer commits those, and without the .gitignore
+    # their first prompt would show up in a diff.
+    @{ Rel = 'workflow-davekjohn/prompts/README.md'; Content = (($promptsReadme -join $nl) + $nl) },
+    @{ Rel = $promptPaths.IgnoreRel;   Content = (((Format-PromptInboxIgnore) -join $nl) + $nl) },
+    @{ Rel = $promptPaths.TemplateRel; Content = (((Format-PromptTemplateReference) -join $nl) + $nl) },
+    @{ Rel = $promptPaths.PromptRel;   Content = (((Format-PromptReset) -join $nl) + $nl) }
 )
 foreach ($tpl in (Get-BranchTemplates)) {
     $targets += @{ Rel = $tpl.Path; Content = $tpl.Content }

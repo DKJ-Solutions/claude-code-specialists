@@ -10,7 +10,13 @@ set of answers** to them.
 | [`CLAUDE.md`](CLAUDE.md) | the working rules a Claude session needs in this folder | — |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | the workflow's contributing layer — it wins over the [root page](../CONTRIBUTING.md) on conflict | [`CONTRIBUTING-portable.md`](../plugins/workflows/workflow-davekjohn/CONTRIBUTING-portable.md) |
 | [`branch/`](branch/) | the branch dossier: the entry, the step list, the generated templates | [`BRANCH-portable.md`](../plugins/workflows/workflow-davekjohn/BRANCH-portable.md) |
+| [`prompts/`](prompts/) | the prompt inbox: an assignment written in an editor instead of the terminal | the `prompt` skill |
 | [`releases/`](releases/) | the release history and the published audience notes | [`RELEASES-portable.md`](../plugins/workflows/workflow-davekjohn/RELEASES-portable.md) |
+
+`prompts/` is the one row whose portable half is a **skill** rather than a page, and deliberately: the
+other three describe a convention with a local half each repo answers, while this mechanism has none —
+one file, one command, and no value anyone configures. A portable page would restate the skill under
+another name.
 
 In this repo the portable pages resolve as relative links because this is the plugin's **source**; in a
 consumer they live in the plugin install instead, which is why the consumer version of this page (the
