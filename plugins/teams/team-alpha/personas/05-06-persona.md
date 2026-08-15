@@ -39,8 +39,7 @@ block is a different act with a different audience: the Release document describ
 push changes what customers see. This approval covers the cutting block. A repo that wants another
 boundary than that says so **in its own lens**; the core does not go vague to anticipate it.
 
-Decision by Dave, August 5, 2026, in the source repo and therefore for every repo working with this
-plugin.
+Decided in the source repo, and therefore binding for every repo working with this plugin.
 
 ## Rendall is lazy
 

@@ -573,6 +573,118 @@ infrastructure.
   refusal. The refusal is not the obstacle to route around — it is the mechanism working. Wait it out.
 - This repo is **public**: config never contains secrets.
 
+### How the gate checks got their shape, and the measurements behind them (August 15, 2026)
+
+*Moved here verbatim from [`CLAUDE.md`](../../../CLAUDE.md)'s lint-gate bullet, where it was 9,440 B
+over 102 lines — 26% of the always-on document, paid by every session before a word of work. The
+operative rule stayed there; this is the evidence for it, and the second half of the same split that
+moved the release craft to [Rendall #06](05-06-extension.md) the day before. Nothing was reworded:
+the passages below still speak in the constitution's voice, and the dates and issue numbers are the
+point of keeping them.*
+
+**The entry format is described in about ten hand-maintained places, and the answer is a check rather
+than a clear-out** (Dave, August 7, 2026;
+[#508](https://github.com/DaveKJohn/claude-code-specialists/issues/508)). Two of those descriptions were
+measured stale during a sweep that was looking for exactly that, one of them consumer-facing. The
+alternative — deleting the shape from every document and pointing at
+[`workflow-davekjohn/branch/templates/`](workflow-davekjohn/branch/templates/) — was weighed and declined: the prose costs every reader on
+every read, while a check costs nothing per read. **What is checked is the section COUNT, not the
+section names**, and that was settled by measuring four candidate rules against the tree rather than by
+argument. A name-matching rule produced **six** findings on the tree, **all six false**: `What does this
+change do?` and `Type of change` are retired entry sections *and*, at the time of that measurement, were
+live headings of the PR template, so it accused **two** correct documents of being stale for describing
+that template accurately — and would have been born red behind an exemption list, the shape this repo was
+already bitten by. The count is a fact the scaffolder owns, both recorded drifts stated it, and holding it
+needs no exemptions at all.
+
+**That collision is gone since August 9, 2026, and the conclusion does not move with it**
+([#538](https://github.com/DaveKJohn/claude-code-specialists/issues/538)). Both headings were removed from
+the PR template, so the six false findings can no longer be reproduced from the tree. The measurement is
+kept in the past tense rather than deleted, because a superseded measurement is worth something only while
+it says *when* it was taken. Two reasons the count still wins: name-matching also lost on its narrowed
+variant (3 findings, 2 false, against 4 claims with 3 correct), and a rule keyed on names is one rename
+away from going silent — which is exactly what just happened to this collision, and would as easily happen
+to a match the check depended on.
+
+**A check on stale PATH references in prose was measured and declined** (August 9, 2026), and the reason
+generalises past this one rule, which is why it is recorded rather than forgotten. The proposal came out of
+a README sweep that found a title naming `specialists/scripts/`, a directory the plugin reorganisation had
+removed — a defect no gate sees, since check 4 reads markdown **links** and this was a path in inline code.
+The obvious rule is "a path in backticks must resolve against the tree". Five candidates were measured over
+120 documents (history excluded as in checks 11 and 12), each with the most generous resolver a checker
+could honestly use — repo root, the document's own directory, and every ancestor between:
+requiring a separator **and** an extension gave **124** findings, a separator alone **349**, an extension
+alone **621**, either **736**. **Not one of the 124 was a true finding**, and the narrowest rule does not
+even reach the measured defect — `specialists/scripts/` carries no extension — so catching the one real
+instance means adopting a rule born with 349.
+
+**The reason is structural, and it is about what this repo is.** Being a plugin source, most paths it
+names correctly describe *somebody else's* repo: `.claude/extensions/…` is the legacy lens location this
+family deliberately still documents for unmigrated consumers, `config/settings_data.json` is a Shopify
+store's file named in `team-shopify`'s manual, `PRETTY/[Emotie]/README.md` is a life-hub folder. All three
+answer "no such file here", exactly as the stale title does — and **the difference is whose repo the line
+is about, which the line never says**. An existence check reads "describes a consumer" as "stale", and no
+regex recovers that distinction. Do not revive it behind an exemption list: that is the shape this repo has
+already been bitten by, and the list would need to hold the entire consumer-facing vocabulary.
+
+**What survived, unbuilt and deliberately so:** a title claiming a path must name its own location. It
+sidesteps the anchor question entirely, because a document knows where it sits — 4 subjects tree-wide,
+0 findings today, and verified against `33a41a2` to fire on the real defect. Not built, because four
+subjects is close to nothing to guard; worth revisiting when per-directory READMEs multiply.
+
+**The PR template that caused the collision is itself the change** (Dave, August 9, 2026). It now carries
+one section — the changelog entry — because `open-pr.ps1` composes the body from
+`workflow-davekjohn/branch/branch-changelog.md`, so everything else it asked was already answered four lines lower. Measured
+over 60 PRs before removing anything: `Type of change` had exactly **one of four** boxes ticked every
+single time, a fact the entry states under `### Branch type` and which the GitHub label takes from
+`Get-BranchInfo` rather than from the tick; of the checklist, `Requested by Dave` and
+`Changelog entry written` were ticked **60/60** — both by the script itself — while the two items the
+docstring called "human judgement checks" were ticked **0/60**, by anyone, ever, though both were already
+enforced by gates that block the PR. A box that is always ticked and a box that is never ticked carry the
+same information. The template also still offered a `chore/` row, four days after
+`Test-BranchName` began refusing that prefix outright — the one line in the form that could actively
+mislead. **`open-pr.ps1` keeps filling all of it in**: a consumer's PR template is their file, every one of
+them still has those sections, and they receive the script through a plugin update rather than by choosing
+to. Recognise both, write one.
+
+**What travels from that decision is the MEASUREMENT, not the two-line answer** (August 10, 2026;
+[#573](https://github.com/DaveKJohn/claude-code-specialists/issues/573)). The rule is *"keep what is
+neither restated by the entry nor proven by a gate"*, and in this repo nothing survived it — which is a
+fact about this repo, not about the form. The consumer who reported that issue re-ran the same
+measurement over their own 60 PRs and found **one box of eight that genuinely varied**: a preview-URL
+approval, on a repo whose result has to be judged by eye and which no gate can prove. They kept it and
+dropped the other seven, and that is #538 applied rather than #538 ignored. So the portable half — the
+`open-pr` skill and the reference template the plugin now ships — states *why* the default is two lines
+and asks the next repo to run the measurement, instead of shipping "the portable template has no
+checkboxes" as a conclusion. Their same pass confirmed the failure this repo predicted when it removed
+the prefix checklist: **5 of their 60 PRs ticked two rows and 2 ticked none**, while the label came from
+`Get-BranchInfo` in all 60.
+
+**The template's shape is shipped, and the placeholder list moved so a gate could reach it** (same
+issue). `.github/pull_request_template.md` cannot live in the plugin — GitHub reads it only from that
+path in the consumer's own repo — so what ships is a reference to copy and diff against, at
+`plugins/workflows/workflow-davekjohn/templates/pull_request_template.md`, held byte for byte to
+`Get-PrTemplateReference`. The three recognised placeholder strings were three literals inside
+`open-pr.ps1`, which meant **nothing outside that script could read them**: the reference could not be
+held against the list that has to recognise it, and that gap is the defect the issue reported. They now
+live in `pr-body-lib.ps1`, and lint check 24 holds both files — the shipped reference byte for byte,
+this repo's own template only to the contract (a first heading, a recognised placeholder), because that
+one is genuinely repo-owned and a byte rule would refuse a correct change the day it grows a section.
+
+**The gate reaches `CHANGELOG.md`'s intro, and getting it there took two independent repairs** (August 8,
+2026; [#525](https://github.com/DaveKJohn/claude-code-specialists/pull/525)). The check was born
+excluding that file whole, on the history grounds it shares with checks 11 and 12 — but only the entries
+below the intro are history. The intro is a live statement about the present mechanism that every cut
+copies through **verbatim**, so it is the one piece of prose here that no release rewrites and no reviewer
+opens; measured on the day it was repaired, it had promised *three* named sections for two days, with one
+release and a consumer-facing release page in between. **Repairing either half alone changes nothing**:
+the file was unread, *and* the pattern would have walked past the sentence anyway, because it carried no
+`###` marker and ran across a line break. So the intro gets its **own pass with the level marker
+optional**, and matching runs over the whole text instead of per line. Both relaxations were chosen by
+measuring: whole-text matching finds the same **4** claims in the scanned tree as per-line, while dropping
+the marker tree-wide would find **50** — which is why it is dropped only across the dozen lines of the
+intro, where it was the whole difference between catching the drift and not.
+
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
 (the plugin lint + drift lint, `branch-info.ps1`, `.claude/settings.json` with the github source, and
 the marketplace/plugin manifests) belongs to this repo.

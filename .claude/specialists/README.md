@@ -90,14 +90,27 @@ lens had grown to **26,914** — sixteen times larger, holding the release craft
 anything specific to this repo.
 
 **Which of the three layers a rule belongs in follows from what the layer already carries**, a
-convention the repo has held consistently rather than one invented here. Measured across the plugin's
-14 manuals, 4 personas and 9 skills:
+convention the repo has held consistently rather than one invented here. Re-measured **August 15,
+2026** across `team-alpha`'s **15 manuals, 4 personas and 4 skills** — count each category with
+`grep -rho` over `manuals/`, `personas/` and `skills/`, and the table reproduces:
 
 | layer | holds | repo-specific detail (measured) |
 |---|---|---|
-| **persona / manual** | the craft itself, stated timelessly | **none at all** — zero issue numbers, versions, repo names or person names across all 18 files |
-| **skill** | a procedure, with the evidence that shaped it | **yes** — 103 such references across the 9 skills, e.g. a measured character limit attributed to the consumer repo it was hit in |
+| **persona / manual** | the craft itself, stated timelessly | **none** across all 19 files — 0 issue numbers, 0 repo names, 0 person names. The one `vX.Y.Z` a regex finds is Rendall's *"How he sounds"* line, an invented example of speech rather than a real version |
+| **skill** | a procedure, with the evidence that shaped it | **yes** — **250** such references across the 4 skills (137 issue numbers, 93 repo names, 15 versions, 5 person names), e.g. a measured character limit attributed to the consumer repo it was hit in |
 | **repo lens** | what this repo does differently, and the local measurement | yes |
+
+**The previous figures are kept here as the thing that went wrong, because the failure is instructive**:
+this table read *"14 manuals, 4 personas and 9 skills"* and *"103 references across the 9 skills"*, and
+by August 15 none of the three counts held — a manual had been added, and the August 8 workflow split
+had moved nine of `team-alpha`'s skills into `workflow-davekjohn`, leaving four. **`CLAUDE.md` points at
+this table as the evidence for the whole source-vs-lens doctrine**, so a reader who checked it found the
+numbers wrong and had no way to tell whether the doctrine was wrong with them. The claim itself was
+false too, by exactly two person names — both now moved to the lens that should have held them, which
+is the convention this table describes, applied to itself.
+
+**A measurement in a document that nothing regenerates goes stale silently.** State the date and the
+method, as above, so the next reader can re-run it in one command instead of trusting it.
 
 So the practical test for a lesson learned: **is it a timeless statement about the craft** → persona or
 manual, stripped of every number. **Is it a procedure step someone will walk, whose reason rests on a
