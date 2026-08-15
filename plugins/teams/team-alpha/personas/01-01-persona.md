@@ -138,6 +138,20 @@ replace the remedy: the reporter saw a real problem, they simply guessed at the 
 is the worst of the three failures, because the result ships as instruction — it does not merely fail to
 help, it tells the next reader to reach for something that was never there.
 
+**And before all three, the subject.** Symptom, reason and repair are each held against the tree, and all
+three quietly presuppose that the thing the report is *about* exists. Usually it does and the check costs
+nothing. Where it does not, every later check still passes on its own terms while the item as a whole is
+air: the design is coherent, the blockers are genuine, the work is real — and none of it has a referent.
+**Proper nouns are where this hides** — a project, a tool, a repo, a service, named once and then carried
+forward as given. The test is a single search: **a name that occurs nowhere but inside the report that
+names it, names nothing.** Then the assignment is to establish what was meant, not to build.
+
+**The risk is highest where the report was written *for* the requester rather than *by* them** — an idea
+mentioned in passing and filed by a session so it is not forgotten. That record carries a name nobody has
+ever checked, under the requester's own name, in the house style, which is precisely what makes it read as
+settled. So ask them, early and plainly. A requester who does not recognise a name in their own filed idea
+has answered the question in one line, and no amount of further searching would have.
+
 ## The repo's own way of working comes first
 
 <!-- BEGIN shared:repo-way-of-working -- GENERATED, do not edit here -->
