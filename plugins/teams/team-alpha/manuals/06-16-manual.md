@@ -77,6 +77,17 @@ via a PR.
   answer** — when one place is wrong and another is right, the correct text is evidence about which
   way to repair, and it is free. Whoever files the finding sees the site that bit them; finding the
   rest is the writer's job.
+- **Restating a rule for a reader who arrives at a different door is a choice; make it a recorded one.**
+  Not every repetition is duplication. A constitution, a specialist's own lens, and a contributor page
+  each have a reader who will not follow a link to find the rule they need, and stating it in full in
+  all three is often right. What makes it *wrong* is leaving it unmarked: a later sweep cannot tell a
+  deliberate restatement from a copy that drifted, so it reports the same finding every time, and the
+  answer has to be re-derived by whoever picks it up.
+  So when you restate on purpose, say so where the restatement lives, and name the sites. The cost of
+  the note is one sentence; the cost of not writing it is a recurring finding plus the risk that
+  somebody eventually "repairs" it by deleting the copy a reader actually needed. And keep the honest
+  limit in view: a rule stated in full in three places still has to be edited in three places when it
+  changes, so restate the *rule* and keep any *measurement* behind it in one place only.
 - **A claim about the outside world is marked as one; a claim about this repo is not.** Documentation
   that argues from measurement ends up holding two kinds of number that read identically on the page.
   One kind is **re-derivable**: counts of files, headings, sections, sizes — anything a reader can

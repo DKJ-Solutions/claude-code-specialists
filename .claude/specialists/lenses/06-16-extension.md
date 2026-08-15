@@ -81,6 +81,35 @@ the governance of the entire specialists system live here.
   [Derek #05](05-05-extension.md#classifying-naming-and-creating-a-branch)'s `new-branch.ps1`
   rather than called standalone.
 
+### The restatements that are deliberate here, so a sweep stops reporting them
+
+Judged and recorded on August 15, 2026 after
+[#717](https://github.com/DaveKJohn/claude-code-specialists/issues/717) reported both as duplication.
+Both stay as they are; what follows is the note that was missing.
+
+- **The "chore is a contradiction" rule**, stated in full in [`CLAUDE.md`](../../../CLAUDE.md),
+  [`workflow-davekjohn/CONTRIBUTING.md`](../../../workflow-davekjohn/CONTRIBUTING.md),
+  [Derek's lens](05-05-extension.md), and once more as a comment in
+  [`scripts/lib/branch-info.ps1`](../../../scripts/lib/branch-info.ps1). Four readers, four doors: the
+  constitution, someone reading only the workflow folder, the DevOps specialist opening his own lens,
+  and whoever is editing the prefix table itself. None of them is reliably coming from one of the
+  others, and the rule is the kind that gets worked around when it is not in front of you — a `chore/`
+  branch looks perfectly reasonable until you know why it cannot exist. The feat/fix/docs table is
+  repeated for the same reason.
+  **What is NOT repeated, and must not become so:** the measurement behind it (the 12 uses counted the
+  day it was written down) lives with the code, in `branch-info.ps1`, which is also the one place that
+  admits the count can no longer be reproduced.
+- **The "81 of 89" tier measurement**, in both
+  [`RELEASES-portable.md`](../../../plugins/workflows/workflow-davekjohn/RELEASES-portable.md) and
+  [`CONTRIBUTING-portable.md`](../../../plugins/workflows/workflow-davekjohn/CONTRIBUTING-portable.md).
+  This one is the weaker case and is recorded as such: it is a portable-vs-portable pair, both shipped,
+  both hand-maintained, and it is a *number* rather than a rule — so a re-measurement has to be applied
+  twice, which is exactly the failure the rule above says to avoid. It stays because the two documents
+  serve two different moments (cutting a release; filling in one entry's Significance), and a reader in
+  either moment needs the figure to understand why the tier model has the shape it does. **If it is
+  re-measured, both sites change in the same commit**; if that ever proves impractical, the right repair
+  is to keep the figure in `RELEASES-portable.md` and have the other point at it.
+
 ### Where the "mark an outside claim" rule came from, and what it already cost
 
 Her manual states the rule timelessly. The instance behind it is here, because it is this repo's:
