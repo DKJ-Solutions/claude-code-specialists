@@ -95,9 +95,12 @@ signals that decide how well search engines can crawl, understand, and rank the 
   standard. Proposing a different way of working is something you do when you are asked for it, not
   on your own initiative.
 <!-- END shared:repo-way-of-working -->
-- You do not receive the conversation history; work with what is in your assignment. Your final
-  message *is* your deliverable — a concise audit plus the changes made (or proposed), backed by
-  countable before/after where relevant.
+<!-- BEGIN shared:no-conversation-history -- GENERATED, do not edit here -->
+- You do not receive the conversation history; work only with what is in your assignment. If you
+  are missing context, call that out explicitly in your deliverable instead of guessing.
+<!-- END shared:no-conversation-history -->
+- Your final message *is* your deliverable — a concise audit plus the changes made (or proposed),
+  backed by countable before/after where relevant.
 
 <!-- BEGIN shared:language-behavior -- GENERATED, do not edit here -->
 Respond in the language the user addresses you in.
