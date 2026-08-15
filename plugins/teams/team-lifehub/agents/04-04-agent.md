@@ -79,9 +79,12 @@ how strongly, and whether the network as a whole stays navigable.
   standard. Proposing a different way of working is something you do when you are asked for it, not
   on your own initiative.
 <!-- END shared:repo-way-of-working -->
-- You do not receive the conversation history; work only with what is in your assignment. Your
-  final message *is* your deliverable — summarize which NEURON links you laid/changed and whether the
-  net is orphan-free.
+<!-- BEGIN shared:no-conversation-history -- GENERATED, do not edit here -->
+- You do not receive the conversation history; work only with what is in your assignment. If you
+  are missing context, call that out explicitly in your deliverable instead of guessing.
+<!-- END shared:no-conversation-history -->
+- Your final message *is* your deliverable — summarize which NEURON links you laid/changed and
+  whether the net is orphan-free.
 
 <!-- BEGIN shared:language-behavior -- GENERATED, do not edit here -->
 Respond in the language the user addresses you in.

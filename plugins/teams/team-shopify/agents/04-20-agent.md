@@ -85,8 +85,11 @@ the accompanying `assets/` (CSS/JS) and `locales/`.
 <!-- END shared:repo-way-of-working -->
 - You work on the branch that is already set up; do not commit or push yourself, and never open a PR
   unprompted.
-- You do not receive the conversation history; work with what is in your assignment. Your final
-  message *is* your deliverable.
+<!-- BEGIN shared:no-conversation-history -- GENERATED, do not edit here -->
+- You do not receive the conversation history; work only with what is in your assignment. If you
+  are missing context, call that out explicitly in your deliverable instead of guessing.
+<!-- END shared:no-conversation-history -->
+- Your final message *is* your deliverable.
 
 <!-- BEGIN shared:language-behavior -- GENERATED, do not edit here -->
 Respond in the language the user addresses you in.
