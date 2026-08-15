@@ -1,4 +1,4 @@
-# OS-rommel
+# OS clutter
 Thumbs.db
 ehthumbs.db
 Desktop.ini
@@ -9,18 +9,18 @@ $RECYCLE.BIN/
 .Spotlight-V100
 .Trashes
 
-# Editors / IDE's
+# Editors / IDEs
 .vscode/
 .idea/
 *.swp
 *~
 
-# Logs & tijdelijke bestanden
+# Logs & temporary files
 *.log
 *.tmp
 *.bak
 
-# Claude Code — per-gebruiker, niet delen (de gedeelde .claude/settings.json blijft wél in de repo)
+# Claude Code — per-user, not shared (the shared .claude/settings.json does stay in the repo)
 .claude/settings.local.json
 
 # PowerShell's own machine-local caches, which land here when a run resolves its per-user data

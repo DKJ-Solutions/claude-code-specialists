@@ -150,7 +150,7 @@ Set-Location $repoRoot
 # dot-source error on the . (dot-source) line below.
 $configPath = Join-Path $repoRoot 'scripts\repo-config.ps1'
 if (-not (Test-Path -LiteralPath $configPath)) {
-    Write-Error "fold-changelog cannot run -- missing repo-owned file: $configPath (Get-RepoName / Get-RepoBlobUrl / Get-LintScript). This file is repo-specific and belongs in the consumer's repo root. Create it (the specialists-init bootstrap lays down a VUL-IN scaffold, or take an existing consumer / the workshop repo as a model) and run again afterward."
+    Write-Error "fold-changelog cannot run -- missing repo-owned file: $configPath (Get-RepoName / Get-RepoBlobUrl / Get-LintScript). This file is repo-specific and belongs in the consumer's repo root. Create it (the specialists-init bootstrap lays down a VUL-IN scaffold, or take an existing consumer / the source repo as a model) and run again afterward."
     exit 1
 }
 

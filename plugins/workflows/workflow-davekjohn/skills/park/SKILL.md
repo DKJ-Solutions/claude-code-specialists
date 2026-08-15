@@ -12,7 +12,7 @@ disable-model-invocation: true
 
 # park -- the shared branch-parker for consumers
 
-This is the **plugin mirror** of `park-branch.ps1`: the same tested source as in the workshop repo,
+This is the **plugin mirror** of `park-branch.ps1`: the same tested source as in the source repo,
 shared here so consumers do not duplicate it. Background in
 [issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81).
 
@@ -125,6 +125,6 @@ resolves its repo root dual-context via `${CLAUDE_PROJECT_DIR}`.
 ## Important
 
 - **No PR, ever, from this skill** -- that remains a separate governance step.
-- The source of this script lives in the workshop repo; do not modify it locally in the consumer. A
+- This script is maintained in the source repo; do not modify it locally in the consumer. A
   change lands first in the source (`scripts/task/park-branch.ps1`) and then travels via a release to
   the plugin mirror -- guarded by the shared-scripts drift lint.

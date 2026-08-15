@@ -123,5 +123,5 @@ After the script:
 - **It never writes to `CLAUDE.md`, never commits, never touches a branch.** Recovery is *staged*, not
   applied -- the governance doc and the branch stay entirely in your hands.
 - **Additive only.** An existing lens is left untouched; the skill is safe to run again.
-- The source of this script lives in the workshop repo; do not modify it locally in a consumer. A
+- This script is maintained in the source repo; do not modify it locally in a consumer. A
   change lands first in the source and travels via a release to the plugin mirror.

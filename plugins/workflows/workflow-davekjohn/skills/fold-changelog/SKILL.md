@@ -14,7 +14,7 @@ disable-model-invocation: true
 # fold-changelog — the shared fold for consumers
 
 This is the **plugin mirror** of `fold-changelog-entry.ps1`: the same tested source as in the
-workshop repo, shared here so consumers (life-hub, smartwatchbanden, …) do not duplicate it.
+source repo, shared here so consumers (life-hub, smartwatchbanden, …) do not duplicate it.
 The background is in [issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81).
 
 ## Why the entry file exists at all
@@ -269,7 +269,7 @@ The script is repo-agnostic, but reads a small block of repo data from the **roo
 
 If `repo-config.ps1` is missing -- typical on a clean consumer -- the script stops before the
 dot-source with a clear pointer instead of a raw error (#86). The `specialists-init` bootstrap
-puts it in place as a `VUL-IN` scaffold; fill it in (see the workshop repo as a model) before you use
+puts it in place as a `VUL-IN` scaffold; fill it in (see the source repo as a model) before you use
 this skill.
 
 ## Important
@@ -277,6 +277,6 @@ this skill.
 - **Run this on main, after the merge** (after the PR has been merged) — then the PR number exists.
 - The script only touches `CHANGELOG.md`, the entries it folds and `workflow-davekjohn/branch/branch-progress.md`; nothing
   else.
-- The source of this script lives in the workshop repo; do not modify it locally in the consumer. A
+- This script is maintained in the source repo; do not modify it locally in the consumer. A
   change lands first in the source (`scripts/release/fold-changelog-entry.ps1`) and then travels via
   a release to the plugin mirror — guarded by the shared-scripts drift lint.

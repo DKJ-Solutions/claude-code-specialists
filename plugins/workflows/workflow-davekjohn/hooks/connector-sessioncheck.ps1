@@ -213,7 +213,7 @@ try {
         if (-not $completed) {
             Write-Host "  (note: the check did not run to completion (exit $code) -- the list above may be partial.)"
         }
-        Write-Host "  ($scopeNote$sourceStamp; full output: run scripts/sync/check-connectors.ps1 in the workshop repo: $workshop)"
+        Write-Host "  ($scopeNote$sourceStamp; full output: run scripts/sync/check-connectors.ps1 in the source repo: $workshop)"
     } elseif ($code -eq 0) {
         # "no errors" is true of the plugin install and false of the workshop's view of it, so the
         # unregistered notice has to survive next to it rather than under it.
@@ -247,7 +247,7 @@ try {
         # A non-zero exit with no signal line at all: the check broke before it could report. Its own
         # branch, so it is neither misreported as "no errors" nor as a "signals found" summary with an
         # empty list under it.
-        Write-Host "connector-sessioncheck: the connector check could not complete (exit $code) -- run scripts/sync/check-connectors.ps1 in the workshop repo to see why: $workshop"
+        Write-Host "connector-sessioncheck: the connector check could not complete (exit $code) -- run scripts/sync/check-connectors.ps1 in the source repo to see why: $workshop"
     }
 } catch {
     Write-Host ('connector-sessioncheck skipped due to an error: ' + $_.Exception.Message)

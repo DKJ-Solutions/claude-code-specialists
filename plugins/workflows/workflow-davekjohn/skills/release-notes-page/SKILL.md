@@ -14,7 +14,7 @@ disable-model-invocation: true
 # release-notes-page — the reading copy of your release notes
 
 This is the **plugin mirror** of `build-release-notes-page.ps1`: the same tested source as in the
-workshop repo, shared here so consumers do not each write their own.
+source repo, shared here so consumers do not each write their own.
 
 **Why it exists.** The hand-written note per release is the one release document written for somebody
 *outside* the development work — management, a commissioner, a subscriber. It lives as markdown under
@@ -141,6 +141,6 @@ can make.
 - **The page is generated, not edited.** If your notes are per-PR records that need summarising for
   their reader, that is a different, hand-written page — not a mode of this script. Here the note is
   already written for that reader, so summarising it again would be a second thing to keep true.
-- **The source of this script lives in the workshop repo**; do not modify it locally in the consumer.
+- **This script is maintained in the source repo**; do not modify it locally in the consumer.
   A change lands first in the source and then travels via a release to the plugin mirror, guarded by
   the shared-scripts drift lint. The page template beside it travels the same way.

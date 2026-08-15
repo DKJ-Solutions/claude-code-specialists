@@ -6,6 +6,7 @@ paths:
   - ".github/**"
   - "releases/**"
   - "CHANGELOG.md"
+  - ".gitignore"
 ---
 
 # Language — which layers are English, and the exceptions
@@ -36,6 +37,15 @@ discovery — as an earlier pass did for `.github/workflows/ci.yml` — not a qu
   documentation audit found between this claim and the actual repo state — a CI workflow, matching none
   of the exceptions below, had simply been missed. New scripts and edits are written in English; no new
   non-English text is added anywhere in scope.
+- **The root `.gitignore` is in scope, and it is the second gap this list has had to close.** Its four
+  section comments were Dutch until August 15, 2026, found by a copy-editing sweep looking for exactly
+  this — while the long explanatory blocks lower in the same file (the PowerShell cache, the
+  release-notes page and its token) had been written in English all along, so the file read as
+  half-translated rather than deliberately Dutch. It matches none of the exceptions below, and this
+  repo being public makes it one of the first files a visitor opens. The same sweep found a layer this
+  file **cannot** reach at all — the GitHub repo description and the `inbound` label description live in
+  repo settings, not in the tree — which is worth knowing before treating this list as complete: it is
+  exhaustive over the tree, and the tree is not the whole product.
 - **Script-*generated* document content is in scope too.** The `CHANGELOG.md` sections, release notes,
   that `scripts/lib/release-lib.ps1` builds are English going forward (it built per-plugin CHANGELOGs
   too until August 8, 2026, when those files were retired): its

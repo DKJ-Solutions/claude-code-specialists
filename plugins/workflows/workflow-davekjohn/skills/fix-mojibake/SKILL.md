@@ -13,7 +13,7 @@ disable-model-invocation: true
 
 # fix-mojibake — the shared encoding repair for consumers
 
-This is the **plugin mirror** of `fix-mojibake.ps1`: the same tested source as in the workshop repo,
+This is the **plugin mirror** of `fix-mojibake.ps1`: the same tested source as in the source repo,
 shared here so consumers do not each keep a copy. Background in
 [issue #413](https://github.com/DaveKJohn/claude-code-specialists/issues/413).
 
@@ -119,6 +119,6 @@ Running this tool is the third-best outcome. In order:
   trip it repairs.
 - **It repairs, and never invents.** Correctly encoded text is left untouched; if a sequence cannot be
   peeled, it stays as it is rather than being guessed at.
-- The source of this script lives in the workshop repo; do not modify it locally in the consumer. A
+- This script is maintained in the source repo; do not modify it locally in the consumer. A
   change lands first in the source (`scripts/maintenance/fix-mojibake.ps1`) and then travels via a release
   to the plugin mirror — guarded by the shared-scripts drift lint.

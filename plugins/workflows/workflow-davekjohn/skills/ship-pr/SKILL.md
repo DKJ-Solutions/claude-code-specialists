@@ -13,7 +13,7 @@ disable-model-invocation: true
 
 # ship-pr — the shared PR chain for consumers
 
-This is the **plugin mirror** of `ship-pr.ps1`: the same tested source as in the workshop repo,
+This is the **plugin mirror** of `ship-pr.ps1`: the same tested source as in the source repo,
 shared here so consumers do not run the five-step chain by hand. Background in
 [issue #411](https://github.com/DaveKJohn/claude-code-specialists/issues/411).
 
@@ -287,6 +287,6 @@ before you use this skill.
 - **If it fails between the merge and the fold, do not re-run it blindly.** The PR is already merged at
   that point; the fold's own output says whether the entry file was removed. Re-running a fold that
   already deleted the entry is a different problem from the one you had.
-- The source of this script lives in the workshop repo; do not modify it locally in the consumer. A
+- This script is maintained in the source repo; do not modify it locally in the consumer. A
   change lands first in the source (`scripts/release/ship-pr.ps1`) and then travels via a release to the
   plugin mirror — guarded by the shared-scripts drift lint.
