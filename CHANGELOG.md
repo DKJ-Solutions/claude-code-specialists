@@ -68,8 +68,9 @@ nothing of the reader -- under the migration item.
 
 **`What was still open` names five items, and the first is again this document.** The end-to-end total
 cannot exist while the words are being written; the merge that re-runs the tests the PR already proved
-is named for the **fifth** release running; the two degraded specialists and the unpublished
-organisation set are unchanged from v4.10.0; and the priced options from the token measurement are
+is named for the **fifth** release running; the two degraded specialists are unchanged from v4.10.0
+while the organisation set is not -- it was published at 4.10.0 on 2026-08-15T10:56:22Z, so it is one
+release behind rather than unpublished; and the priced options from the token measurement are
 recorded as not exhausted, with the next cut owing its own measurement rather than inheriting this one's
 momentum.
 
