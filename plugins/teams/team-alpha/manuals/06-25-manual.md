@@ -116,6 +116,32 @@ work.
     figure by ~7% and changed nothing that was concluded from them — worth stating outright, because a
     model whose shape survives a large error in its largest input is one worth deciding on. That is a
     different claim from the model being precise, and only one of the two is usually true.
+- **A CONVERSION FACTOR IS CALIBRATED, NOT INHERITED.** The third sibling, and the quietest of the
+  three. Where the asked-for unit cannot be counted directly, the estimate rests on a conversion —
+  characters to tokens, lines to effort, requests to spend. **That factor is itself a measurement**, and
+  an inherited one fails in the worst available way: nothing errors, the arithmetic is right, and every
+  figure derived from it is wrong by the same proportion, including the ones a decision gets made on.
+  Measured instance: a factor of 3.70 characters per token had stood in a repo's notes for eighteen
+  days; calibrating it against ten documents of that repo's own prose whose token cost a tool reported
+  authoritatively gave a median of **3.12** (range 2.95–3.23), so every always-on figure recorded in
+  that period under-stated the true cost by about 19%.
+  - **Look for an authoritative count in the same corpus before estimating.** It is usually closer than
+    it seems — a tool that prices one component of the thing being measured is enough, because what is
+    wanted is the ratio, not that tool's coverage.
+  - **Calibrate over a population**, by the rule directly above: a factor derived from one document is
+    one draw, and a factor is exactly the kind of number that gets quoted for years.
+  - **State the factor in the same breath as the figure it produced**, so the next reader can re-derive
+    the estimate instead of inheriting it — and can see at a glance when it has gone stale.
+  - **Re-derive it when the corpus changes character.** Prose, tables, code and links do not convert
+    alike, and a document that has grown mostly tables is no longer the corpus the factor came from.
+- **MEASURE THE COPY THAT IS ACTUALLY LOADED, NOT THE ONE IN THE REPOSITORY.** Where content reaches a
+  session through a cache, a mirror, a package or a published artefact, the file under version control
+  and the file in use are two different objects that happen to share a name — and they diverge by
+  default, silently, for however long the distribution lag is. Measuring the repository copy answers a
+  question nobody asked. Measured instance: a persona measured at 12,294 B in the repository was 11,051 B
+  in the mirror the session actually imported, which was ten commits behind. **Resolve the load path
+  before measuring it**, and where the two differ, report both and say which one the figure is: the gap
+  is not an error to smooth away, it is queued cost that arrives at the next update.
 
 ## Nolan is lazy
 

@@ -102,6 +102,11 @@ documents load in full on every session:
 So roughly **~15.200 tokens are spent before a single assignment is given.** Chris's lens, at ~3.300,
 is the largest single specialist file in the repo and the only one on the automatic path.
 
+> **The token column here is computed at 3.70 chars/token, which was calibrated in 2026 and found to be
+> ~19% too generous** — see [the calibration below](#the-conversion-factor-calibrated--and-the-layer-re-measured-at-it-august-15-2026).
+> The character counts are measurements and stand; the tokens derived from them are under-stated.
+> Left as computed rather than restated, because this table records what was believed on July 28.
+
 Broken down by section: routing table 3.023 chars · chains 2.784 · gatekeepers 2.250 · Dave rules
 1.589 · new-specialists 945 · intro 897.
 
@@ -184,6 +189,12 @@ Re-measured on `73579e8`, with the seam document that did not exist then:
 | `.claude/specialists/SPECIALISTS.md` (the seam) | *did not exist* | 7,982 | a fourth document on the path |
 | **total** | **43,290 · ~11,700 tokens** | **111,760 · ~30,205 tokens** | **+158%** |
 
+> **Same caveat, and here it matters more: the token figures use 3.70 chars/token and are ~19% low**, and
+> this table omits the plugin listings entirely. Corrected in
+> [the calibration below](#the-conversion-factor-calibrated--and-the-layer-re-measured-at-it-august-15-2026);
+> the byte column stands and the **+158%** is unaffected, because a ratio of two figures converted at the
+> same wrong factor is right.
+
 **`CLAUDE.md` is at 4.4× the target this repo set itself.** The July 28 note records it as *"277 lines
 against the documented target of under 200"* and named moving content off the automatic path as the lever
 with room in it. Seventeen days later it is 875. Nothing about that is an accident of one branch: it is
@@ -202,6 +213,106 @@ and the honest framing is that this is a trade between context cost and the risk
 mid-release — not a tidying job. Recorded because a measurement that is seventeen days and 158% stale is
 worse than none: it invites the next reader to plan against ~11,700 tokens that have not been true for a
 fortnight.
+
+### The conversion factor, calibrated — and the layer re-measured at it (August 15, 2026)
+
+**Every always-on token figure in the two tables above is under-stated, and the cause is one number
+nobody had ever checked.** Both convert at **3.70 characters per token**, a factor that entered these
+notes on July 28 and was inherited unexamined through three re-measurements. It is wrong by about 19%,
+in the direction that makes the layer look cheaper than it is.
+
+**How it was calibrated, since the lens's own rule is *do not estimate from file sizes*.**
+`claude plugin details` is the authoritative count and it only prices *plugins* — but that is enough,
+because what is wanted is the ratio and not the tool's coverage. Ten skill pages of this repo's own
+prose, each sized on disk and token-counted by the `count_tokens` API behind that command:
+
+| n | min | median | mean | max |
+|---|---|---|---|---|
+| **10** | 2.95 | **3.12** | 3.07 | 3.23 |
+
+Spanning 5,002 B to 47,434 B, and the spread is tight enough to decide on. **3.12 is the factor to use
+here**; anything derived at 3.70 is low by 19%. The reported on-invoke figures are rounded to two
+significant figures, so the ratio is good to a few percent — not to three digits.
+
+**The layer, re-measured at 3.12 and with the plugin listings included** (they were omitted from both
+earlier tables, which is the second half of the under-count):
+
+| always-on | bytes | ~tokens | basis |
+|---|---|---|---|
+| `CLAUDE.md` | 73,298 | ~23,500 | 3.12 |
+| Chris's repo lens (`01-01-extension.md`) | 21,462 | ~6,900 | 3.12 |
+| Chris's portable body (`01-01-persona.md`) | 11,051 | ~3,500 | 3.12 |
+| `.claude/specialists/SPECIALISTS.md` (the seam) | 7,982 | ~2,600 | 3.12 |
+| **documents** | **113,793** | **~36,500** | |
+| `team-alpha` listing | — | 3,009 | **API-measured** |
+| `workflow-davekjohn` listing | — | 2,317 | **API-measured** |
+| **total** | | **~41,800** | range ~40,600–43,900 |
+
+**~41,800 tokens, not ~30,205.** The plugin listing has also *fallen* since v2.10.0 — 3,009 against the
+~3,505 baseline for `team-alpha`, despite the same 15 agents — so the growth is entirely in the
+documents.
+
+**THE PERSONA MEASURED IS THE MARKETPLACE COPY, AND THAT IS NOT A DETAIL.** `SPECIALISTS.md` imports
+Chris's body from `~/.claude/plugins/marketplaces/…`, not from `plugins/teams/…` in the tree. On the day
+of this measurement that clone sat ten commits behind `main` and the two files differed by **1,243 B**:
+12,294 B in the repo, **11,051 B actually loaded**. The table above reports what the session loads. The
+difference is not error to smooth away — it is **queued cost that arrives at the next plugin update**,
+and it is the always-on face of the consequence
+[`CLAUDE.md`](../../../CLAUDE.md#specific-to-this-repo-claude-code-specialists) already records: through
+the `github` source the team sees the last *pushed* plugins. Resolve the load path before measuring it.
+
+**WHERE THE COST IS: IT IS NOT DIFFUSE, IT IS ONE SUB-ITEM.** `CLAUDE.md` is 875 lines in 9 sections,
+and breaking it down was the finding rather than the total:
+
+| | bytes | share of `CLAUDE.md` |
+|---|---|---|
+| `### claude-code-specialists's safety implementation` | **58,893** | **80%** |
+| the other 8 sections combined | 14,405 | 20% |
+
+Inside that section, one bullet — `**Two deliberate exceptions to "never directly on main"**` — is
+**42,191 B over 485 lines**, against 10,400 B for the gates bullet and 6,188 B for the other six
+together. And inside *that* bullet:
+
+| | bytes | lines |
+|---|---|---|
+| 1. the fold commit | 959 | 10 |
+| **2. the release commit** | **41,168** | **474** |
+
+**Sub-item 2 of a two-item list is 56% of `CLAUDE.md` and ~13,200 tokens — 32% of the entire always-on
+layer, paid on every turn of every session.** It carries the tier model, the significance rubric, the
+audience-tier knob, the two-document merge, the `highlights/`→`audience/` rename and the measurements
+behind each.
+
+**The lever, and the one that does NOT apply.** `.claude/rules/` scoping **fails** on most of this block
+and that is worth stating plainly so nobody proposes it a third time: much of it must hold *before*
+anyone opens a release file — the major-needs-two-commits rule is needed at the decision, not at the
+file — and a rule lost to a `/compact` mid-release is gone exactly when it is being followed. The
+August 14 note said so and was right.
+
+**What does apply is a lever this repo invented on July 28 and then used once.** That note's conclusion
+was *"the justification for a trim does not belong on the always-on path"*, and it generalises:
+**the decision belongs on the always-on path; the evidence for it does not.** Almost all of the 41,168 B
+is evidence, and its destination already exists and is already named — `CLAUDE.md` itself records
+(August 4, 2026) that [Rendall #06's lens](05-06-extension.md) *"holds the release craft itself"*. That
+lens is 39,253 B, read on demand, and costs nothing per session. Probed for overlap, it is already a
+mix rather than a clean move: the 62/38 note split, `Get-ReleaseMajorMinMinors` and "10 minors" appear
+in **both**, while the significance rubric (13 references), the `highlights/` rename (8) and
+`Get-ReleaseAudienceTier` appear only in `CLAUDE.md`. So part is duplication —
+[Ravi #24](06-24-extension.md)'s — and part is relocation — [Tessa #16](06-16-extension.md)'s.
+
+**Priced, so the choice can be made on a number rather than on a feeling:**
+
+| option | saving per session | cost |
+|---|---|---|
+| leave it | 0 | nothing; ~41,800 tokens buys a team that does not re-litigate settled decisions |
+| move the evidence, keep every operative rule | **~12,000 (29%)** | one PR of careful surgery; the risk is a rule mistaken for evidence and moved with it |
+| correct the factor only | 0 | ~20 minutes, and every future cost decision here stops being 19% wrong |
+
+**The last one is this section**, and it is worth having on its own: the first two are a judgement about
+the governance document and the third is arithmetic. **The honest counter-argument to the second, kept
+beside it:** the growth these notes keep recording is
+[the repo's own rule](../../../CLAUDE.md#general-working-practices) working as designed — lessons are
+secured in the docs — and moving the evidence does not stop it, it only redirects where it lands.
 
 ### The Claude Code best-practices page, held against this repo (August 14, 2026)
 
