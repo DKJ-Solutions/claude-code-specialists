@@ -16,7 +16,7 @@
     CLAUDE_PROJECT_DIR IS SET EXPLICITLY FOR EVERY CHILD RUN, and that is load-bearing rather than
     tidiness: this suite runs inside a session that very likely has it set to the real repo, a child
     inherits it, and the script prefers it over the git root. Without pinning it, every case here would
-    silently report on the workshop repo instead of the fixture -- passing or failing on facts the test
+    silently report on the source repo instead of the fixture -- passing or failing on facts the test
     does not control.
 
     Pure ASCII (repo convention for .ps1), which is why the em dash in the encoding case is built from

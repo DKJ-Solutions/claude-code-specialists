@@ -166,7 +166,7 @@ Set-Location $repoRoot
 # would target the wrong repo or none at all. Stop with a pointer instead of a raw dot-source error.
 $configPath = Join-Path $repoRoot 'scripts\repo-config.ps1'
 if (-not (Test-Path -LiteralPath $configPath)) {
-    Write-Error "ship-pr cannot run -- missing repo-owned file: $configPath (Get-RepoName). This file is repo-specific and belongs in the consumer's repo root. Create it (the specialists-init bootstrap lays down a VUL-IN scaffold, or take an existing consumer / the workshop repo as a model) and run again afterward."
+    Write-Error "ship-pr cannot run -- missing repo-owned file: $configPath (Get-RepoName). This file is repo-specific and belongs in the consumer's repo root. Create it (the specialists-init bootstrap lays down a VUL-IN scaffold, or take an existing consumer / the source repo as a model) and run again afterward."
     exit 1
 }
 

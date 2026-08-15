@@ -14,7 +14,7 @@ disable-model-invocation: true
 
 # open-pr — the shared PR opener for consumers
 
-This is the **plugin mirror** of `open-pr.ps1`: the same tested source as in the workshop repo,
+This is the **plugin mirror** of `open-pr.ps1`: the same tested source as in the source repo,
 shared here so consumers do not duplicate it. Background in
 [issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81).
 
@@ -331,7 +331,7 @@ The script is repo-agnostic, but reads its repo data from the **root** of the co
 
 The `specialists-init` bootstrap puts `repo-config.ps1` + `branch-info.ps1` in place as a `VUL-IN`
 scaffold. If they are missing -- or still set to `VUL-IN` -- the script stops before the dot-source
-with a clear pointer instead of a raw error (#86); fill them in first (see the workshop repo as a
+with a clear pointer instead of a raw error (#86); fill them in first (see the source repo as a
 model).
 
 ## Important
@@ -340,6 +340,6 @@ model).
   this script only executes. Under the shared rule a PR opens by default once the branch is done and
   the gates are green, and waits for the owner's word only for work with a visible result or work
   that is irreversible/outward-facing.
-- The source of this script lives in the workshop repo; do not modify it locally in the consumer. A
+- This script is maintained in the source repo; do not modify it locally in the consumer. A
   change lands first in the source (`scripts/release/open-pr.ps1`) and then travels via a release to
   the plugin mirror -- guarded by the shared-scripts drift lint.

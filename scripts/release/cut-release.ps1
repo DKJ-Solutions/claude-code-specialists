@@ -201,7 +201,7 @@ Set-Location $repoRoot
 $needed = @('scripts\repo-config.ps1', 'scripts\lib\branch-info.ps1')
 $absent = @($needed | Where-Object { -not (Test-Path -LiteralPath (Join-Path $repoRoot $_)) })
 if ($absent.Count -gt 0) {
-    Write-Error ("cut-release cannot run -- missing repo-owned configuration in the repo root ($repoRoot):`n  " + ($absent -join "`n  ") + "`n`nCreate them (the specialists-init bootstrap lays down a VUL-IN scaffold, or take an existing consumer / the workshop repo as a model) and run again afterward.")
+    Write-Error ("cut-release cannot run -- missing repo-owned configuration in the repo root ($repoRoot):`n  " + ($absent -join "`n  ") + "`n`nCreate them (the specialists-init bootstrap lays down a VUL-IN scaffold, or take an existing consumer / the source repo as a model) and run again afterward.")
     exit 1
 }
 

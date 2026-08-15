@@ -10,7 +10,7 @@ description: >-
 
 # new-branch -- the shared branch+entry creator for consumers
 
-This is the **plugin mirror** of `new-branch.ps1`: the same tested source as in the workshop repo,
+This is the **plugin mirror** of `new-branch.ps1`: the same tested source as in the source repo,
 shared here so consumers do not duplicate it. Background in
 [issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81).
 
@@ -300,6 +300,6 @@ repo as a model, or use the `VUL-IN` scaffold the `specialists-init` bootstrap p
   each one says it belongs to rather than on whether it exists (both exist on the trunk by design):
   an entry that has been written stays written, and a step list you have been ticking off is never
   clobbered by a rerun.
-- The source of this script lives in the workshop repo; do not modify it locally in the consumer. A
+- This script is maintained in the source repo; do not modify it locally in the consumer. A
   change lands first in the source (`scripts/task/new-branch.ps1`) and then travels via a release to
   the plugin mirror -- guarded by the shared-scripts drift lint.
