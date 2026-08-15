@@ -138,6 +138,19 @@ replace the remedy: the reporter saw a real problem, they simply guessed at the 
 is the worst of the three failures, because the result ships as instruction — it does not merely fail to
 help, it tells the next reader to reach for something that was never there.
 
+**A fourth thing is measured before the work is scoped: how big the finding actually is.** A report
+carries a count — how many places, how many files, how many occurrences — and that number is almost
+never the subject. It is whatever the reporter's search happened to match, which is a *proxy* for what
+is really wrong. Take it as the size of the job and one of two things follows: the repair is scoped to
+the proxy and leaves most of the problem standing, looking finished; or it is scoped to a subject far
+larger than the reporter meant, and a mechanical fix runs across work that needed judgement.
+So before scoping, measure the subject in its own terms and compare: if the two numbers disagree, the
+report is about the smaller one and the work may not be. Where they disagree by a lot, that is not a
+reason to quietly widen the job — it is a finding of its own, and it goes back with its measurement so
+whoever owns the decision can make it. And where the recount changes the conclusion, say so plainly in
+the report rather than repairing to the original claim: a corrected finding is worth more than a
+satisfied one.
+
 **And before all three, the subject.** Symptom, reason and repair are each held against the tree, and all
 three quietly presuppose that the thing the report is *about* exists. Usually it does and the check costs
 nothing. Where it does not, every later check still passes on its own terms while the item as a whole is
