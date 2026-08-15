@@ -446,6 +446,28 @@ Claude Enterprise syncs, so colleagues without GitHub access receive the plugins
    anything committed there by hand is lost on the next run, by design. The `version` in each
    `plugin.json` is the update signal: Claude only hands colleagues a new plugin version when that
    number goes up, which is why the bump belongs to the release and the script never touches versions.
+5. **Not every plugin has to travel, and the question to ask is whether the target's users have a
+   repository at all** (August 15, 2026, issue #683). `Get-BusinessMarketplacePlugins` names the subset
+   that publishes; `-Plugins a,b` overrides it, and an absent or empty answer publishes everything —
+   which is what this script did before the seam existed, so a repo that has never heard of it is
+   unaffected. The source repo's own answer is instructive: its target serves **Claude App** users, who
+   have no checkout, and a *workflow* plugin is a method for moving work through a repository — every
+   one of its skills ends in a script run against one. Offering it there offers something that can only
+   fail at its last step, so both workflows are excluded and the four teams travel.
+
+   Three things about that, in case the same question comes round in another repo:
+
+   - **Exclusion, not a hide flag.** The manifest format has no per-entry way to gate an entry, and
+     inventing one would need Claude to honour it. A plugin that did not travel cannot be offered.
+   - **The unit is the plugin, deliberately.** Individual items inside a travelling plugin may still be
+     unusable at the target — the published plugin has to stay byte-identical to the released one, or
+     its version number stops meaning one thing. Handle those where they live: a skill that needs a
+     shell should be non-model-invocable and should name that dependency in its own description.
+   - **The keep-list is checked three ways**, because each failure is silent on its own: a name the
+     manifest does not have is refused (it would otherwise exclude the plugin it meant to keep), a list
+     that keeps nothing is refused, and a plugin folder that travels while the rebuilt manifest never
+     names it is refused — that last one produces no error anywhere, it just means Claude never offers
+     the plugin while the manifest reads as complete.
 
 ## A milestone release — `-SummaryFile`
 
@@ -564,7 +586,8 @@ owes this text. Write it there, and the cut carries it outward for you.
   policy, not part of this checklist** — it is stated in the release manager's repo lens, because a repo
   that publishes at every release and one that publishes at Minor/Major only are both coherent, and the
   choice follows from who reads the page rather than from the mechanics.
-- **`Get-BusinessMarketplaceRepo` (Block 3) is deliberately NOT in the script contract.**
+- **`Get-BusinessMarketplaceRepo` and `Get-BusinessMarketplacePlugins` (Block 3) are deliberately NOT in
+  the script contract.**
   `publish-to-business.ps1` is not mirrored into the plugin — it is the marketplace source's own tool,
   like the blueprint generator — so `check-script-contract.ps1` never asks a consumer about it, and a
   consumer defining the function would be answering a question no script of theirs reads. It lives in

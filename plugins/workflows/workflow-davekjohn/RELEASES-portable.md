@@ -334,7 +334,11 @@ Enterprise can sync it as a plugin marketplace for colleagues without GitHub acc
 release and **only on the owner's explicit request** — releasing without publishing is a normal outcome,
 not a half-finished one (Dave, August 14, 2026). The target is repo data (`Get-BusinessMarketplaceRepo`
 in `scripts/repo-config.ps1`, with `-TargetRepo` as the override for a second organisation); a repo
-without one simply has no such step. The mechanics are Block 3 of the
+without one simply has no such step. **Which plugins travel is repo data too**
+(`Get-BusinessMarketplacePlugins`, `-Plugins a,b` to override; empty or absent means all of them, as it
+did before the seam existed) — the source repo excludes both workflow plugins from its own target,
+because that target serves Claude App users who have no repository, and a workflow is a method for
+moving work through one. The mechanics are Block 3 of the
 [`cut-release` skill](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md)'s
 checklist.
 

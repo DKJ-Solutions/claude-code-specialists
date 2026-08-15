@@ -60,6 +60,31 @@ $business = Get-BusinessMarketplaceRepo
 Assert-Match $business '^[\w.-]+/[\w.-]+$' 'Get-BusinessMarketplaceRepo has the form owner/name'
 Assert-True ($business -ne (Get-RepoName)) 'Get-BusinessMarketplaceRepo is not this repo itself -- publishing overwrites the target'
 
+# Which plugins travel to that target (issue #683). The target serves Claude App users, who have no
+# repository, so no WORKFLOW plugin may be offered there: every one of its skills ends in a script run
+# against a checkout. This assert is the tripwire on that rule -- the seam is a plain list, so adding a
+# workflow to it is a one-word edit that nothing else would notice, and the failure it causes is a
+# Claude App user being handed a command that can only fail at its last step.
+#
+# Held against the manifest rather than a hardcoded roster: a plugin added to plugins/teams/ should
+# reach the App marketplace by default, and a name the manifest does not know is refused by the script
+# itself -- so what stays worth asserting here is that the list is non-empty (an empty one publishes
+# EVERYTHING, silently reinstating the workflows) and that no workflow is in it.
+$appPlugins = @(Get-BusinessMarketplacePlugins)
+Assert-True ($appPlugins.Count -gt 0) 'Get-BusinessMarketplacePlugins names a subset -- an empty list would publish every plugin'
+$manifestPlugins = @((Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\.claude-plugin\marketplace.json') -Raw |
+                      ConvertFrom-Json).plugins)
+foreach ($declared in $appPlugins) {
+    Assert-True (@($manifestPlugins | ForEach-Object { $_.name }) -contains $declared) `
+        "Get-BusinessMarketplacePlugins entry '$declared' is a plugin the marketplace actually has"
+}
+foreach ($entry in $manifestPlugins) {
+    if ($entry.source -match '/workflows/') {
+        Assert-True ($appPlugins -notcontains $entry.name) `
+            "the workflow '$($entry.name)' does NOT travel to the Claude App target -- it needs a repository"
+    }
+}
+
 # The lint gate that open-pr.ps1 runs (repo-specific, injected instead of hardcoded in open-pr).
 $lint = Get-LintScript
 Assert-Match $lint '\.ps1$' 'Get-LintScript points to a .ps1'

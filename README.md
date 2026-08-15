@@ -271,8 +271,11 @@ The full picture, top-level folder by folder:
   the Specialists handbook `specialists/README.md` next to them, `rules/` (path-scoped rules), and
   `settings.json` (harness config; see [Consumption](#consumption)).
 - **The root documents** — this `README.md`, `CLAUDE.md`, `CHANGELOG.md`, `CONTRIBUTING.md` and
-  `SECURITY.md`; the two consumer-facing procedures `plugins/INSTALL.md` and `plugins/UNINSTALL.md`
-  sit a level down, beside the plugins they explain — and
+  `SECURITY.md`, plus the two consumer-facing procedures [`INSTALL.md`](INSTALL.md) and
+  [`UNINSTALL.md`](UNINSTALL.md) — those sat a level down beside the plugins until
+  [#664](https://github.com/DaveKJohn/claude-code-specialists/issues/664) moved them here, which is
+  what keeps them out of the published marketplace without any exclusion list having to remember
+  them — and
   **`.github/`** (`pull_request_template.md`, the issue templates + three workflows: `workflows/ci.yml`,
   the CI gate that runs the lint + test suites on every PR and push to `main`, plus
   `workflows/claude.yml` and `workflows/claude-code-review.yml`, which answer an `@claude` mention and
@@ -533,6 +536,67 @@ claude-code-specialists already uses to distribute its skills via the marketplac
 and the [docs](https://code.claude.com/docs/en/skills)). Not confirmed: whether Cowork runs on the
 Claude Agent SDK, or whether a Cowork subagent shares its definition format with — or is
 interchangeable with — a Claude Code subagent.
+
+## Which half needs a repository — the Claude App map
+
+The section above answers *which mechanisms* a surface supports. This one answers the question that
+turned out to matter more: **which of this repo's contents can do their job when there is no repository
+at all** — a Claude App user with the plugins installed and nothing checked out. The two questions look
+alike and come apart immediately: a skill is available on every surface, and a skill that ends in
+`powershell -File ...\open-pr.ps1` is available and useless.
+
+**The rule, so a new item can be classified without re-running the sweep.** Applied to the *item*,
+in order:
+
+1. **Does it ship an executable** — a `.ps1` in its own folder, or a `hooks.json` that invokes one?
+2. **Do its instructions send the reader to run one, or to read or write a path in the consuming repo?**
+3. Otherwise it is portable.
+
+Three candidate rules were weighed and this one was kept because it is the only one that can be
+*checked*: "does it shell out" misses the wrappers that shell out one level down, and "does it assume a
+git branch" is a judgement about prose. Test 1 is a directory listing; test 2 is
+`grep -rl '\.ps1' plugins --include='*.md'`, which returned **30** files against the tree on August 15,
+2026 — 28 of them true, and the two that were not are the interesting part.
+
+**The verdict has three values, not two, and that is the finding.** A binary map has to round the two
+`grep` survivors — Ravi's agent def (`06-24`, which names the shared-block generator) and Liam's
+(`04-20`, which names `new-branch.ps1`) — either into "App-safe", handing an App user a step that cannot
+run, or out of their team, losing a whole specialist over one line. Neither is right, because a
+specialist's *craft* is portable and one step of one procedure is not. So:
+
+| verdict | meaning | who |
+|---|---|---|
+| **portable** | works with no repository | the personas, manuals, and 13 of 15 `team-alpha` agent defs; the shared blocks in `agent-shared/`; the `orchestrator` skill |
+| **degraded** | works, minus a named step | Ravi `06-24` and Liam `04-20` — one step each, both of them a script |
+| **repo-bound** | cannot function at all | both workflow plugins whole; `team-alpha`'s three PowerShell skills and its two SessionStart hooks; `team-shopify`'s `start-task` |
+
+**What the Claude App package is: a filtered publication, not a second repository.**
+[`publish-to-business.ps1`](scripts/release/publish-to-business.ps1) already overwrites
+`BWJ-ecommerce/claude-plugins-bwj` from here on every run; since
+[#683](https://github.com/DaveKJohn/claude-code-specialists/issues/683) it publishes the subset
+[`Get-BusinessMarketplacePlugins`](scripts/repo-config.ps1) names — the four teams — and rebuilds the
+manifest to match. The workflow is not offered there because it is not there. No per-entry hide flag was
+invented: the manifest format has none, and one would need Claude to honour it, while a plugin that did
+not travel cannot be offered by anything.
+
+**The marketplace keeps its name.** `claude-code-specialists` is the key in every consumer's
+`enabledPlugins` (`team-alpha@claude-code-specialists`), so the filtered marketplace is the *same*
+marketplace with fewer entries, not a second one under a new key.
+
+**The unit is the plugin, and the degraded items travel.** `team-alpha`'s three PowerShell skills and
+two hooks go to the App target along with everything else in that plugin, because the plugin published
+there has to be byte-identical to the plugin released here — otherwise its version number stops meaning
+one thing. They are handled where they can be handled without forking: the hooks are simply inert in a
+plain Chat session, and `v4.9.0` ([#672](https://github.com/DaveKJohn/claude-code-specialists/issues/672))
+made all three skills non-model-invocable and had each name its PowerShell dependency in its own
+description, so the model cannot walk a user into one.
+
+**How the sync stays honest.** The publication has always refused a manifest naming a folder that did
+not travel. Filtering makes the *reverse* possible — a plugin folder that travels while the manifest
+never mentions it — and that one is silent: nothing errors, Claude simply never offers it, and the
+manifest reads as a complete marketplace to anyone who checks it instead of the tree. Both directions
+are hard stops now, and a keep-list naming a plugin the manifest does not have is a third, because a
+typo there would quietly exclude the plugin it meant to keep and report success.
 
 ## How we use skills — and what we deliberately don't
 
@@ -1089,7 +1153,7 @@ reminder is what a derivation makes unnecessary.
 5. **The docs that enumerate the plugins** — this README (the plugin count, the
    [teams-and-workflows table](#teams-and-workflows--whats-the-difference), the [invocation list](#invocation),
    the manuals list under [Manuals](#manuals--the-split-model), and whether the team is mutually
-   exclusive with the others or complementary) and [`plugins/INSTALL.md`](INSTALL.md), both
+   exclusive with the others or complementary) and [`INSTALL.md`](INSTALL.md), both
    halves.
 6. **The gates** — `scripts/agents/build-agent-defs.ps1 -Check`,
    [`scripts/lint/check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1), and

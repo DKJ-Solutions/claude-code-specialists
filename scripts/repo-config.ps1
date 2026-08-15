@@ -58,6 +58,45 @@ function Get-BusinessMarketplaceRepo {
     return $script:BusinessMarketplaceRepo
 }
 
+# --- Which plugins travel to that target (Dave, August 15, 2026; issue #683) ------------------------
+#
+# THE TARGET SERVES CLAUDE APP USERS, AND A WORKFLOW CANNOT WORK THERE. A workflow plugin is a method
+# for moving work through a REPOSITORY -- branches, a changelog entry, a PR, a fold, a release cut --
+# and every one of its skills ends in a PowerShell script run against a checkout. A Claude App user has
+# no checkout, so offering them a workflow offers something that can only fail at the last step. Both
+# workflows are in scope, not just workflow-davekjohn: workflow-default exists to read the conventions
+# a repo already has, and with no repo there are no conventions to read.
+#
+# WHY THIS IS AN EXCLUSION AND NOT A HIDE FLAG. The manifest format has no per-entry way to gate an
+# entry, and inventing one would need Claude to honour it. A plugin that does not travel is not offered
+# because it is not there -- the mechanism this repo already has, and the one that cannot be
+# misconfigured into offering the thing anyway.
+#
+# THE UNIT IS THE PLUGIN, NOT THE ITEM, AND THAT IS DELIBERATE. team-alpha ships three PowerShell
+# skills (specialists-init, specialists-teardown, sync-roster) and two SessionStart hooks that a Claude
+# App user cannot run either. They travel anyway: the plugin published here has to be byte-identical to
+# the plugin released here, or its version number stops meaning one thing. Those five items are already
+# handled where they can be handled without forking the plugin -- the hooks are inert in a plain Chat
+# session, and v4.9.0 (#672) made all three skills non-model-invocable and had each name its PowerShell
+# dependency in its own description, so the model cannot walk a user into one. Per-item filtering would
+# buy a little tidiness and cost the single-source-of-truth guarantee.
+#
+# AN UNSTATED SEAM MEANS WHAT IT MEANT YESTERDAY. Absent, empty or $null answers "every plugin in the
+# manifest", which is what the script did before this function existed -- so a consumer that has never
+# heard of it publishes exactly as it did.
+$script:BusinessMarketplacePlugins = @(
+    'team-alpha'
+    'team-lifehub'
+    'team-shopify'
+    'team-ecomm'
+)
+
+function Get-BusinessMarketplacePlugins {
+    <# The plugin NAMES (as in marketplace.json) that travel to the business target. An empty list
+       means "all of them" -- the pre-#683 behaviour, and what an unstated seam has to keep meaning. #>
+    return $script:BusinessMarketplacePlugins
+}
+
 # This repo's lint gate, repo-root-relative. open-pr.ps1 runs this before the PR. This is the
 # only repo-specific part of open-pr: every consumer has its own lint (the workshop
 # check-plugin-integrity, a Brains repo e.g. lint-brain). The test gate runs the convention
