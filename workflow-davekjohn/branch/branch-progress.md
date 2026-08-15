@@ -1,22 +1,13 @@
-## `docs/v4-9-0-timing-total` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-#### PLAN
-
-- [x] Collect the five tail legs from this session's measurements and the publish timestamp
-- [x] Hold them against `v4.8.0` and `v4.7.0` to see whether the tail is stable in absolute terms
-
-#### CREATE
-
-- [x] Replace the note's first-pass timing paragraph with the head, the tail and the total
-- [x] State the three-release series for both head and tail, and why the fraction is the wrong statistic
-- [x] Keep the frozen-attachment rule stated, as `v4.7.0` set it
-
-#### TEST
-
-- [x] Lint + suites green via the gate `open-pr` runs
-- [~] No test suite — one markdown paragraph, no behaviour to assert on
-
-### Where I left off
-
+_(filled in when a branch is created)_
