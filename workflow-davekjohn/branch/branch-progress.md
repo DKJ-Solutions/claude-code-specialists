@@ -1,24 +1,13 @@
-## `docs/v4-10-0-timing-total` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-#### PLAN
-
-- [x] Reconstruct every leg from real timestamps (git commit times, command returns) rather than estimates
-- [x] Check the tail against the three previous releases before claiming a pattern
-
-#### CREATE
-
-- [x] Replace the head-only paragraph in `What it is worth` with the total and both series
-- [x] Update the duplicated-merge-leg bullet with this release's fourth measurement
-- [x] Replace the "total not in it yet" bullet with the frozen-attachment rule
-
-#### TEST
-
-- [x] Gates green via `open-pr.ps1`
-- [~] No automated test: the deliverable is prose in a published record, and the one rule with a measured basis (no links into `development/` or `internal/`) is already lint check 25
-
-### Where I left off
-
-Nothing outstanding. The attachment on the GitHub Release is deliberately left frozen at the head-only
-version, and the document now says so.
+_(filled in when a branch is created)_
