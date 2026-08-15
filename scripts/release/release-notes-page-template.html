@@ -1,0 +1,404 @@
+<!doctype html>
+<!--
+  The release-notes page template. build-release-notes-page.ps1 fills in four placeholders:
+
+      @@PAGE_TITLE@@     the page's own name
+      @@PAGE_SUBTITLE@@  one line under it: how many releases the page carries
+      @@BUILD_STAMP@@    the date the page was generated, because it is a SNAPSHOT
+      @@RELEASE_DATA@@   the releases, as JSON, inside a <script type="application/json">
+
+  Every placeholder is replaced with a JSON string or with already-escaped text, so nothing a release
+  note can contain reaches the markup raw. Measured rather than assumed: Windows PowerShell 5.1's
+  ConvertTo-Json escapes the angle brackets into their JSON unicode form, so a note containing a
+  closing script tag cannot end this block early. The script asserts it anyway -- see its header.
+
+  DELIBERATELY SELF-CONTAINED: no external stylesheet, font or script. The page is served by a
+  Cloudflare Worker as one string, and a request to a third party would leak who is reading it.
+
+  NO LITERAL CONTROL CHARACTER LIVES IN THIS FILE. The markdown renderer needs a sentinel that
+  ordinary prose cannot contain; it builds one with String.fromCharCode at runtime instead of
+  carrying the raw byte here, because an invisible character in a template is a defect nobody can
+  see in a diff.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>@@PAGE_TITLE@@</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfbfa;
+    --panel: #ffffff;
+    --ink: #1a1a19;
+    --ink-soft: #5c5b58;
+    --ink-faint: #8b8a85;
+    --line: #e4e2dd;
+    --accent: #b8562f;
+    --accent-soft: #fdf1ec;
+    --code-bg: #f4f2ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #191917;
+      --panel: #22221f;
+      --ink: #ecebe7;
+      --ink-soft: #a9a79f;
+      --ink-faint: #78766f;
+      --line: #33322e;
+      --accent: #e08a63;
+      --accent-soft: #2c211c;
+      --code-bg: #2a2926;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.65 ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 52rem; margin: 0 auto; padding: 0 1.25rem 5rem; }
+
+  header.masthead { padding: 3rem 0 1.5rem; border-bottom: 1px solid var(--line); }
+  header.masthead h1 { margin: 0; font-size: 1.75rem; letter-spacing: -.02em; line-height: 1.2; }
+  header.masthead p { margin: .5rem 0 0; color: var(--ink-soft); font-size: .95rem; }
+
+  .toolbar {
+    position: sticky; top: 0; z-index: 5;
+    display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
+    padding: .85rem 0; margin-bottom: 1.5rem;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  select, button {
+    font: inherit; color: inherit;
+    background: var(--panel);
+    border: 1px solid var(--line); border-radius: .5rem;
+    padding: .45rem .7rem; cursor: pointer;
+  }
+  select { flex: 1 1 18rem; min-width: 0; max-width: 100%; }
+  button { min-width: 2.5rem; }
+  button:hover:not(:disabled), select:hover { border-color: var(--accent); }
+  button:disabled { opacity: .35; cursor: default; }
+  button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .meta { display: flex; gap: .4rem; flex-wrap: wrap; margin: 0 0 1.75rem; }
+  .chip {
+    font-size: .75rem; letter-spacing: .04em; text-transform: uppercase;
+    padding: .2rem .55rem; border-radius: 999px;
+    background: var(--code-bg); color: var(--ink-soft);
+  }
+  .chip.accent { background: var(--accent-soft); color: var(--accent); }
+
+  article h1 { font-size: 1.55rem; letter-spacing: -.015em; margin: 0 0 .5rem; line-height: 1.25; }
+  article h2 { font-size: 1.2rem; margin: 2.25rem 0 .6rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+  article h3 { font-size: 1.02rem; margin: 1.75rem 0 .4rem; }
+  article h4 { font-size: .95rem; margin: 1.4rem 0 .35rem; color: var(--ink-soft); }
+  article p { margin: .85rem 0; }
+  article ul, article ol { padding-left: 1.35rem; margin: .85rem 0; }
+  article li { margin: .35rem 0; }
+  article li > p { margin: .35rem 0; }
+  article a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  article strong { font-weight: 640; }
+  article hr { border: 0; border-top: 1px solid var(--line); margin: 2rem 0; }
+  article blockquote {
+    margin: 1.1rem 0; padding: .1rem 0 .1rem 1rem;
+    border-left: 3px solid var(--line); color: var(--ink-soft);
+  }
+  article code {
+    background: var(--code-bg); border-radius: .3rem; padding: .1em .35em;
+    font: .875em/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    overflow-wrap: break-word;
+  }
+  article pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: .6rem;
+    padding: .85rem 1rem; overflow-x: auto; margin: 1.1rem 0;
+  }
+  article pre code { background: none; padding: 0; }
+  .table-scroll { overflow-x: auto; margin: 1.1rem 0; }
+  article table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  article th, article td { border: 1px solid var(--line); padding: .4rem .6rem; text-align: left; vertical-align: top; }
+  article th { background: var(--code-bg); font-weight: 620; }
+
+  footer.colophon {
+    margin-top: 3.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line);
+    color: var(--ink-faint); font-size: .82rem;
+  }
+  footer.colophon p { margin: .35rem 0; }
+
+  @media (max-width: 34rem) {
+    header.masthead { padding-top: 2rem; }
+    .wrap { padding-bottom: 3rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <h1>@@PAGE_TITLE@@</h1>
+    <p>@@PAGE_SUBTITLE@@</p>
+  </header>
+
+  <nav class="toolbar">
+    <button id="prev" type="button" title="Older release" aria-label="Older release">&larr;</button>
+    <select id="picker" aria-label="Choose a release"></select>
+    <button id="next" type="button" title="Newer release" aria-label="Newer release">&rarr;</button>
+  </nav>
+
+  <div class="meta" id="meta"></div>
+  <article id="doc"></article>
+
+  <footer class="colophon">
+    <p>Generated from the release notes in the repository on @@BUILD_STAMP@@. This page is a
+       <strong>snapshot</strong>: a release cut after that date is not on it until the page is rebuilt
+       and redeployed.</p>
+    <p>The repository is the source; this page is a reading copy of it.</p>
+  </footer>
+
+</div>
+
+<script type="application/json" id="release-data">@@RELEASE_DATA@@</script>
+<script>
+(function () {
+  'use strict';
+
+  var DATA = JSON.parse(document.getElementById('release-data').textContent);
+
+  // --- markdown -------------------------------------------------------------------------------
+  // A small renderer rather than a library: the page is served as one self-contained string by a
+  // worker, so pulling in a CDN would both break offline reading and tell a third party who opened
+  // the page. It covers what a release note actually uses -- headings, paragraphs, nested lists,
+  // fenced code, tables, blockquotes, rules, and the inline set.
+
+  // The code-span sentinel. Built here rather than typed, so the template carries no invisible
+  // byte. It must be something prose cannot contain: a readable placeholder is a trap, because a
+  // note that writes a bare number between markers would have it replaced by a code span that was
+  // never there.
+  var SENT = String.fromCharCode(1);
+  var SENT_RE = new RegExp(SENT + '(\\d+)' + SENT, 'g');
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function inlineMd(src) {
+    // Code spans are lifted out FIRST and put back last, so their contents are never treated as
+    // markup -- a note that shows two asterisks inside backticks must render the asterisks.
+    var codes = [];
+    var s = String(src).replace(/`([^`]+)`/g, function (m, c) {
+      codes.push(esc(c));
+      return SENT + (codes.length - 1) + SENT;
+    });
+    s = esc(s);
+    s = s.replace(/\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, function (m, text, url) {
+      // A repo-relative link has no target on this page, so it renders as plain text rather than
+      // as a link that 404s. Only absolute and in-page links survive.
+      if (!/^(https?:|mailto:|#)/i.test(url)) { return text; }
+      return '<a href="' + url + '" rel="noopener noreferrer">' + text + '</a>';
+    });
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/(^|[\s(])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>');
+    s = s.replace(SENT_RE, function (m, i) { return '<code>' + codes[+i] + '</code>'; });
+    return s;
+  }
+
+  function isBlank(l) { return /^\s*$/.test(l); }
+  function isItem(l) { return /^\s*([-*+]|\d+\.)\s+/.test(l); }
+  function isRule(l) { return /^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(l); }
+  function isTableRow(l) { return /^\s*\|.*\|\s*$/.test(l); }
+  function isHeading(l) { return /^\s*#{1,6}\s/.test(l); }
+
+  function renderTable(rows) {
+    function cells(r) {
+      return r.trim().replace(/^\|/, '').replace(/\|\s*$/, '').split('|').map(function (c) { return c.trim(); });
+    }
+    var head = cells(rows[0]);
+    var body = rows.slice(2).map(cells);
+    return '<div class="table-scroll"><table><thead><tr>' +
+      head.map(function (c) { return '<th>' + inlineMd(c) + '</th>'; }).join('') +
+      '</tr></thead><tbody>' +
+      body.map(function (r) {
+        return '<tr>' + r.map(function (c) { return '<td>' + inlineMd(c) + '</td>'; }).join('') + '</tr>';
+      }).join('') +
+      '</tbody></table></div>';
+  }
+
+  function renderList(block) {
+    var ordered = /^\s*\d+\./.test(block[0]);
+    var baseIndent = block[0].match(/^\s*/)[0].length;
+    var items = [];
+    block.forEach(function (l) {
+      var indent = isBlank(l) ? baseIndent + 99 : l.match(/^\s*/)[0].length;
+      if (isItem(l) && indent <= baseIndent) {
+        items.push({ lines: [l.replace(/^\s*([-*+]|\d+\.)\s+/, '')], sub: [] });
+      } else if (items.length) {
+        var it = items[items.length - 1];
+        if (isItem(l) && indent > baseIndent) { it.sub.push(l.slice(baseIndent + 2)); }
+        else if (it.sub.length) { it.sub.push(isBlank(l) ? '' : l.slice(Math.min(indent, baseIndent + 2))); }
+        else { it.lines.push(l.trim()); }
+      }
+    });
+    var body = items.map(function (it) {
+      var paras = it.lines.join('\n').split(/\n\s*\n/).filter(function (p) { return p.trim(); });
+      var html = paras.map(function (p) { return '<p>' + inlineMd(p.replace(/\n/g, ' ').trim()) + '</p>'; }).join('');
+      if (it.sub.length) { html += renderList(it.sub); }
+      return '<li>' + html + '</li>';
+    }).join('');
+    return (ordered ? '<ol>' : '<ul>') + body + (ordered ? '</ol>' : '</ul>');
+  }
+
+  function renderMd(md) {
+    var lines = String(md).replace(/\r\n/g, '\n').split('\n');
+    var out = [];
+    var i = 0;
+
+    while (i < lines.length) {
+      var l = lines[i];
+
+      if (isBlank(l)) { i++; continue; }
+
+      var fence = l.match(/^\s*```/);
+      if (fence) {
+        var code = [];
+        i++;
+        while (i < lines.length && !/^\s*```\s*$/.test(lines[i])) { code.push(lines[i]); i++; }
+        i++;
+        out.push('<pre><code>' + esc(code.join('\n')) + '</code></pre>');
+        continue;
+      }
+
+      var head = l.match(/^\s*(#{1,6})\s+(.*)$/);
+      if (head) {
+        var level = head[1].length;
+        out.push('<h' + level + '>' + inlineMd(head[2].trim()) + '</h' + level + '>');
+        i++;
+        continue;
+      }
+
+      // A table is tested before a rule: a separator row is otherwise read as a horizontal rule.
+      if (isTableRow(l) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
+        var rows = [];
+        while (i < lines.length && isTableRow(lines[i])) { rows.push(lines[i]); i++; }
+        out.push(renderTable(rows));
+        continue;
+      }
+
+      if (isRule(l)) { out.push('<hr>'); i++; continue; }
+
+      if (/^\s*>/.test(l)) {
+        var quote = [];
+        while (i < lines.length && /^\s*>/.test(lines[i])) {
+          quote.push(lines[i].replace(/^\s*>\s?/, ''));
+          i++;
+        }
+        out.push('<blockquote>' + renderMd(quote.join('\n')) + '</blockquote>');
+        continue;
+      }
+
+      if (isItem(l)) {
+        // A list runs until a blank line that is NOT followed by an indented continuation. That is
+        // what keeps a multi-paragraph bullet -- which every note here uses -- in one item.
+        var block = [];
+        while (i < lines.length) {
+          if (isBlank(lines[i])) {
+            var nxt = lines[i + 1];
+            if (nxt === undefined || !/^\s{2,}\S/.test(nxt)) { i++; break; }
+            block.push('');
+            i++;
+            continue;
+          }
+          if (isHeading(lines[i]) || isRule(lines[i])) { break; }
+          block.push(lines[i]);
+          i++;
+        }
+        out.push(renderList(block));
+        continue;
+      }
+
+      var para = [];
+      while (i < lines.length && !isBlank(lines[i]) && !isItem(lines[i]) && !isRule(lines[i]) &&
+             !isHeading(lines[i]) && !/^\s*>/.test(lines[i]) && !/^\s*```/.test(lines[i]) &&
+             !isTableRow(lines[i])) {
+        para.push(lines[i].trim());
+        i++;
+      }
+      if (para.length) { out.push('<p>' + inlineMd(para.join(' ')) + '</p>'); }
+      else { i++; }
+    }
+    return out.join('\n');
+  }
+
+  // --- the page -------------------------------------------------------------------------------
+
+  var picker = document.getElementById('picker');
+  var prevBtn = document.getElementById('prev');
+  var nextBtn = document.getElementById('next');
+  var metaEl = document.getElementById('meta');
+  var docEl = document.getElementById('doc');
+  var cache = {};
+  var index = 0;
+
+  DATA.releases.forEach(function (r, n) {
+    var opt = document.createElement('option');
+    opt.value = String(n);
+    opt.textContent = 'v' + r.version + '  --  ' + r.title + (r.live ? '  [live]' : '');
+    picker.appendChild(opt);
+  });
+
+  function chip(text, cls) {
+    var el = document.createElement('span');
+    el.className = 'chip' + (cls ? ' ' + cls : '');
+    el.textContent = text;
+    return el;
+  }
+
+  function render() {
+    var rel = DATA.releases[index];
+    picker.value = String(index);
+    prevBtn.disabled = index >= DATA.releases.length - 1;   // older sits further down the list
+    nextBtn.disabled = index <= 0;
+
+    metaEl.innerHTML = '';
+    metaEl.appendChild(chip('v' + rel.version, 'accent'));
+    metaEl.appendChild(chip(rel.date));
+    metaEl.appendChild(chip(rel.type));
+    if (rel.live) { metaEl.appendChild(chip('live', 'accent')); }
+
+    if (!cache[rel.version]) { cache[rel.version] = renderMd(rel.body); }
+    docEl.innerHTML = cache[rel.version];
+    if (location.hash !== '#v' + rel.version) {
+      history.replaceState(null, '', '#v' + rel.version);
+    }
+  }
+
+  function step(delta) {
+    var n = index + delta;
+    if (n < 0 || n >= DATA.releases.length) { return; }
+    index = n;
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  picker.addEventListener('change', function () { index = +picker.value; render(); window.scrollTo(0, 0); });
+  prevBtn.addEventListener('click', function () { step(1); });   // older
+  nextBtn.addEventListener('click', function () { step(-1); });  // newer
+  document.addEventListener('keydown', function (e) {
+    if (e.target === picker || e.metaKey || e.ctrlKey || e.altKey) { return; }
+    if (e.key === 'ArrowLeft') { step(1); }
+    if (e.key === 'ArrowRight') { step(-1); }
+  });
+
+  // Deep link: the fragment #v4.11.0 opens that release. An unknown one falls back to the newest
+  // rather than to an empty page.
+  var wanted = (location.hash || '').replace(/^#v/, '');
+  DATA.releases.forEach(function (r, n) { if (r.version === wanted) { index = n; } });
+
+  render();
+})();
+</script>
+</body>
+</html>

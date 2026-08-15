@@ -36,6 +36,21 @@ $RECYCLE.BIN/
 # the tree.
 /Microsoft/
 
+# The hosted release-notes page (build-release-notes-page.ps1). Two different reasons, and only the
+# first is the ordinary one.
+#
+# The page, the worker bundle and wrangler's scratch directory are DERIVATIVES of documents that are
+# already tracked under releases/audience/ -- rebuildable in a second, and a 200 KB file that changes
+# on every release otherwise dirties the tree that cut-release.ps1 refuses to run on.
+#
+# THE TOKEN IS THE OTHER REASON, and it is about this repo being PUBLIC. The worker serves the page at
+# /notes/<32 hex> and that path is the only lock on it, so committing the token here would publish the
+# key beside the door. The consequence is deliberate and worth stating: nothing in git remembers the
+# URL, so whoever creates it records it outside the repo -- the file itself is the only copy on this
+# machine. A consumer whose repository is PRIVATE should commit theirs instead, where a tracked token
+# is what survives a lost machine.
+workflow-davekjohn/releases/page/
+
 # The locked next topic (/lock -> /clear -> /continue). Deliberately NOT committed: it is one
 # developer's working intent, it goes stale within hours, and all three commands run on one machine
 # within minutes -- committing it would mean a pull request per session close.

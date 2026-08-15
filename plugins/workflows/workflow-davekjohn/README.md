@@ -45,7 +45,7 @@ this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release work
 | [`RELEASES-portable.md`](RELEASES-portable.md) | the release workflow: the tier model, what a release must earn, the release documents, and how one is cut — your own `workflow-davekjohn/releases/README.md` holds your answers and your release list |
 | [`BRANCH-portable.md`](BRANCH-portable.md) | the two files a branch works in: the dossier form, the three step marks, the reset state, and what the fold does at the merge |
 | [`TICKETWORK-portable.md`](TICKETWORK-portable.md) | the rules for the layer *before* a branch, in a repo whose work arrives from somebody else's tracker: whether a request can be built as written, and how the answer is recorded. Rules and reasoning only — no template and no script, deliberately |
-| [`skills/`](skills/) | the twelve skills a specialist invokes — this is where most of the workflow lives |
+| [`skills/`](skills/) | the thirteen skills a specialist invokes — this is where most of the workflow lives |
 | [`scripts/`](scripts/) | the scripts and libs those skills run, mirrored from the source repo's own `scripts/`. **Never edit a file there** — see [its README](scripts/README.md) |
 | [`hooks/`](hooks/) | three read-only SessionStart checks that never block: `connector-sessioncheck` and `script-contract-sessioncheck` belong to running this across several repos, `prompt-sessioncheck` announces an assignment waiting in the prompt inbox and stays silent in a repo that has none |
 | [`blueprint/`](blueprint/) | the source's own answers to the repo-owned seam, with the reasoning behind each — read by the `adopt-config` skill |
@@ -54,18 +54,28 @@ this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release work
 **No `agents/`, no `manuals/`.** Those belong to a team, and a workflow that shipped one would be
 answering the question the other directory owns.
 
-## The nine skills
+## The thirteen skills
+
+**All of them, deliberately.** This table listed nine under the heading "The nine skills" while the
+directory held twelve — `lock`, `continue` and `prompt` had each arrived without a row, and the count in
+the heading is what made the gap look like a decision. A partial list of an enumerable set is worse than
+none: a reader who finds four of their skills undocumented here cannot tell which of the two documents is
+wrong.
 
 | skill | when |
 |---|---|
 | [`adopt-workflow-folder`](skills/adopt-workflow-folder/SKILL.md) | right after installing — scaffolds `workflow-davekjohn/`, the one folder in your root where everything portable gathers (an install alone writes nothing into your repo) |
+| [`adopt-config`](skills/adopt-config/SKILL.md) | first-time setup — reads the blueprint, places what states the shared way of working, proposes the rest |
 | [`new-branch`](skills/new-branch/SKILL.md) | starting any piece of work — creates the branch and both `workflow-davekjohn/branch/` files in one move |
+| [`prompt`](skills/prompt/SKILL.md) | the assignment written in an editor instead of the terminal — reads `workflow-davekjohn/prompts/prompt.md` and takes it through the ordinary intake |
 | [`park`](skills/park/SKILL.md) | handing an unfinished branch to another machine: push, no PR |
 | [`open-pr`](skills/open-pr/SKILL.md) | the work is committed — runs the four gates, pushes, opens the PR with the title and body composed from the entry |
 | [`ship-pr`](skills/ship-pr/SKILL.md) | open → wait for CI → merge → fold, in one motion |
 | [`fold-changelog`](skills/fold-changelog/SKILL.md) | the fold on its own, after a merge done by hand |
 | [`cut-release`](skills/cut-release/SKILL.md) | the release: the bump, the notes, the tag, and the closing steps the script does not automate |
-| [`adopt-config`](skills/adopt-config/SKILL.md) | first-time setup — reads the blueprint, places what states the shared way of working, proposes the rest |
+| [`release-notes-page`](skills/release-notes-page/SKILL.md) | after a release — builds the hand-written notes into one browsable page for the reader they are written for, and optionally the Cloudflare Worker that hosts it |
+| [`lock`](skills/lock/SKILL.md) | closing a session — records where the work stands before a context clear |
+| [`continue`](skills/continue/SKILL.md) | opening the next one — reads that record back |
 | [`fix-mojibake`](skills/fix-mojibake/SKILL.md) | repairing encoding damage in markdown |
 
 ## What it expects from your repo — the seam

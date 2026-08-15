@@ -1,7 +1,8 @@
 # `scripts/` — the canonical source of everything this repo runs
 
-**This directory is the source. Everything else is a copy of it.** Twenty-three of the scripts here are
-mirrored into the plugins for consumers to run, and the mirror is generated rather than maintained — so a
+**This directory is the source. Everything else is a copy of it.** Twenty-eight of the files here are
+mirrored into the plugins for consumers to run — twenty-seven scripts and one HTML template — and the
+mirror is generated rather than maintained, so a
 change lands *here* and travels outward, never the other way around. The mirror's own page, written for the
 consumer who only has the copy, is
 [`plugins/workflows/workflow-davekjohn/scripts/README.md`](../plugins/workflows/workflow-davekjohn/scripts/README.md).
@@ -10,7 +11,7 @@ Three consequences worth knowing before you touch anything:
 
 - **Never *run* a shared script from the plugin cache while you are in this repo — run the copy here.**
   The cache holds the last *released* mirror, so it lags this directory by however many merges have landed
-  since. Two silent failures measured on one day; see below. **Eleven of the thirteen shared entry points
+  since. Two silent failures measured on one day; see below. **Fourteen of the sixteen shared entry points
   now refuse outright** ([`lib/source-repo-guard-lib.ps1`](lib/source-repo-guard-lib.ps1)) and name the
   local path to run instead. The two exceptions are `sync/check-roster-sync.ps1` and
   `sync/check-script-contract.ps1`: both SessionStart hooks invoke those from the plugin by design, so a
@@ -79,6 +80,7 @@ a test, reached by one of these rather than run directly.
 | [`release/fold-changelog-entry.ps1`](release/fold-changelog-entry.ps1) | folds the entry into `CHANGELOG.md` at its ranked position and resets both branch files | `fold-changelog` |
 | [`release/cut-release.ps1`](release/cut-release.ps1) | the lockstep version bump, the release notes and the tag — **only on Dave's explicit request** | `cut-release` |
 | [`release/new-internal-note.ps1`](release/new-internal-note.ps1) | the tier-1 note's skeleton; needs the development notes, so it runs *after* the cut | `cut-release` |
+| [`release/build-release-notes-page.ps1`](release/build-release-notes-page.ps1) | builds the hand-written notes into one browsable page, and with `-Worker` the Cloudflare Worker that serves it — it publishes nothing | `release-notes-page` |
 | [`lint/check-plugin-integrity.ps1`](lint/check-plugin-integrity.ps1) | the lint gate — the manifests, the frontmatter, dead links, and the two dozen checks named in its own docstring | — |
 | [`sync/check-connectors.ps1`](sync/check-connectors.ps1) | the two-way registry check across every connected repo | — |
 | [`sync/find-specialist-mentions.ps1`](sync/find-specialist-mentions.ps1) | every live mention of a specialist's **name**, grouped by layer — the tool you run *at* a rename | — |
