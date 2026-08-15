@@ -291,9 +291,9 @@ inventory per plugin, `visibility` and `localCheckout` left as `VUL-IN` because 
 which then lands here through the normal branch + PR flow. This hook is one of the named, repo-neutral
 exceptions to the rule that plugins carry no hooks/skills — the full list is in the root README under
 [What lives here and what doesn't](../README.md#what-lives-here-and-what-doesnt), and it has grown since
-this paragraph first named its two siblings: four SessionStart hooks (`connector-sessioncheck` and
-`script-contract-sessioncheck` in `workflow-davekjohn`, `roster-sessioncheck` and `workflow-sessioncheck`
-in the core team) plus the skills `specialists-init` and `discover-workflow`. Mind the **version gate**: consumers only receive the
+this paragraph first named its two siblings: five SessionStart hooks (`connector-sessioncheck`,
+`script-contract-sessioncheck` and `prompt-sessioncheck` in `workflow-davekjohn`, `roster-sessioncheck`
+and `workflow-sessioncheck` in the core team) plus the skills `specialists-init` and `discover-workflow`. Mind the **version gate**: consumers only receive the
 hook after a release bump plus `claude plugin marketplace update <marketplace>` and
 `claude plugin update <plugin>@<marketplace> --scope project` (neither the refresh nor the scope flag
 is optional — see [Staying up to date](../INSTALL.md#staying-up-to-date)) + session restart on

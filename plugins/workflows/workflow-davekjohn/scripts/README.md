@@ -32,15 +32,23 @@ set spans three plugins, because a script travels to whichever plugin owns the s
 | `team-alpha` | 2 | `sync/check-roster-sync.ps1` and `lib/check-report-lib.ps1` — the roster check belongs to the core team, since the roster does |
 | `workflow-default` | 1 | `lib/check-report-lib.ps1` again — one source, three destinations, because all three plugins report in the same `[OK]`/`[INFO]`/`[ERROR]` shape |
 
-**The 20 that land here**, one row per registered pair — the complete set for this plugin. Not every one
+**The 25 that land here**, one row per registered pair — the complete set for this plugin. Not every one
 is reached through a skill, and the **Skill** cell says so rather than linking one, so an absent link is
-a fact rather than an oversight:
+a fact rather than an oversight.
+
+*Three rows were missing when this count was last checked (August 15, 2026): `adopt-workflow-folder`,
+`session-status` and `source-repo-guard-lib`, each registered but never listed. The claim above is a
+hand-maintained count of a machine-held registry, which is the shape that goes stale — worth knowing
+before adding the next one.*
 
 | Script | What it is | Skill |
 |---|---|---|
 | `task/new-branch.ps1` | creates the branch AND writes both `workflow-davekjohn/branch/` files plus the reference templates, in one move — a branch is never entry-less | [`new-branch`](../skills/new-branch/SKILL.md) |
 | `task/park-branch.ps1` | commits all outstanding work + `git push -u` — no PR, no live action | [`park`](../skills/park/SKILL.md) |
 | `task/adopt-config.ps1` | reads the config blueprint and places or proposes each seam answer | [`adopt-config`](../skills/adopt-config/SKILL.md) |
+| `task/adopt-workflow-folder.ps1` | scaffolds `workflow-davekjohn/` — the folder docs, the releases root, the branch dossier and the prompt inbox | [`adopt-workflow-folder`](../skills/adopt-workflow-folder/SKILL.md) |
+| `task/session-status.ps1` | reports the locked topic and the repo's own answer beside it | [`lock`](../skills/lock/SKILL.md) · [`continue`](../skills/continue/SKILL.md) |
+| `task/prompt-inbox.ps1` | reads the assignment written into `workflow-davekjohn/prompts/prompt.md`, and archives it on `-Archive` | [`prompt`](../skills/prompt/SKILL.md) |
 | `release/open-pr.ps1` | the gates, the push and the PR; lint gate via `Get-LintScript` in `repo-config` | [`open-pr`](../skills/open-pr/SKILL.md) |
 | `release/ship-pr.ps1` | open → wait for CI → merge → fold, in one motion | [`ship-pr`](../skills/ship-pr/SKILL.md) |
 | `release/verify-resolved-issues.ps1` | checks that a merged PR closed what it declared | [`ship-pr`](../skills/ship-pr/SKILL.md) |
@@ -56,6 +64,8 @@ a fact rather than an oversight:
 | `lib/pr-body-lib.ps1` | composes and refreshes the PR body from the entry | none — dot-sourced lib |
 | `lib/pr-issues-lib.ps1` | reads the issues a PR declares it closes | none — dot-sourced lib |
 | `lib/park-lib.ps1` | `Invoke-GitPark` — the one stage/commit/push behind both parking entry points | none — dot-sourced lib |
+| `lib/prompt-inbox-lib.ps1` | where the prompt inbox lives, its reset state, and the structural test for whether an assignment is waiting — read by the script, the session hook and the folder scaffold | none — dot-sourced lib |
+| `lib/source-repo-guard-lib.ps1` | `Assert-OwnCopy` — refuses a released copy running in the repo that maintains it | none — dot-sourced lib |
 | `lib/native-capture-lib.ps1` | `Invoke-NativeCapture`, the stderr-safe native-command wrapper | none — dot-sourced lib |
 | `lib/check-report-lib.ps1` | the `[OK]`/`[INFO]`/`[ERROR]` report helper | none — dot-sourced lib |
 

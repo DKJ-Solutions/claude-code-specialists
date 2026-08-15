@@ -306,6 +306,33 @@ function Get-SharedScriptPairs {
             SkillParamsExempt = @('BlueprintPath')
         },
         @{
+            # The prompt inbox's one source (Dave, August 15, 2026): where the file is, what its reset
+            # state looks like, and the structural test for whether an assignment is waiting. THREE
+            # readers that must not be able to disagree -- the script hands the assignment over, the
+            # SessionStart hook announces it, and adopt-workflow-folder scaffolds the folder. A copy in
+            # each would let the hook announce a prompt the script then declines to see, which is the
+            # same drift-guard-that-drifts shape entry-scaffold-lib is registered for.
+            Name    = 'prompt-inbox-lib'
+            Source  = 'scripts\lib\prompt-inbox-lib.ps1'
+            Plugin  = 'workflow-davekjohn'
+            LibOnly = $true
+        },
+        @{
+            # The requester's side of the conversation (Dave, August 15, 2026). Shared rather than
+            # workshop-only because nothing in it is repo-specific: it reads one file, and every seam it
+            # would otherwise need -- where the folder is, what counts as empty -- is answered
+            # structurally in the lib above. The mirror of session-status's /lock, which is Claude
+            # writing for the next Claude; this is the requester writing for the next session.
+            Name   = 'prompt-inbox'
+            Source = 'scripts\task\prompt-inbox.ps1'
+            Plugin = 'workflow-davekjohn'
+            Skill  = 'prompt'
+            # A fixture root, so the suite can assert against a scratch folder instead of the real repo.
+            # A consumer never types it -- but the skill names it anyway, in a line saying it is not for
+            # them, because a reader who finds it in the source deserves the answer without reading on.
+            SkillParamsExempt = @('RootOverride')
+        },
+        @{
             # The workflow's own root folder (Dave, August 14, 2026): a plugin install writes nothing
             # into a consumer's repo, so the folder that gathers everything portable arrives through
             # this command -- and check-script-contract reports at session start while it is missing.

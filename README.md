@@ -212,13 +212,14 @@ at repo level deliberately, because they differ per repo (or are safety-critical
 deliberately carry **no safety/guardrail hooks** and **no repo-specific skills** — with a few named,
 repo-neutral exceptions: the skill `specialists-init` (the adoption path itself), the skill
 `discover-workflow` (`workflow-default`'s own repo-neutral read, see
-[Teams and workflows](#teams-and-workflows--whats-the-difference)), and four informational, read-only
+[Teams and workflows](#teams-and-workflows--whats-the-difference)), and five informational, read-only
 SessionStart hooks that never block — `roster-sessioncheck` (roster-drift signaling) plus
 `workflow-sessioncheck` (flags two or more enabled workflows, see
 [Teams and workflows](#teams-and-workflows--whats-the-difference)) in the **core team**, and
-`connector-sessioncheck` (sync signaling) plus `script-contract-sessioncheck` (signals when a repo's own
-workflow libs no longer expose a function the shared scripts call) in **`workflow-davekjohn`**; see the
-[connectors README](connectors/README.md).
+`connector-sessioncheck` (sync signaling), `script-contract-sessioncheck` (signals when a repo's own
+workflow libs no longer expose a function the shared scripts call) plus `prompt-sessioncheck` (announces
+an assignment waiting in the prompt inbox, and stays silent in a repo that has none) in
+**`workflow-davekjohn`**; see the [connectors README](connectors/README.md).
 The add-on teams `team-lifehub` and `team-shopify` may carry domain skills that a repo shares.
 
 **Those last two moved out of the core on August 8, 2026, and the reason is the doctrine rather than
@@ -514,12 +515,12 @@ matters operationally for the skills/subagents/hooks split described under
 bundled in a plugin works across all three surfaces, but a **subagent** or a **hook** runs only in
 Cowork and in Claude Code — in a plain Claude.ai Chat session they show up grayed out (see
 [Use plugins in Claude](https://support.claude.com/en/articles/13837440-use-plugins-in-claude)).
-Concretely for claude-code-specialists: the specialists roster (the subagents under Chris) and the four
+Concretely for claude-code-specialists: the specialists roster (the subagents under Chris) and the five
 SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`,
-`workflow-sessioncheck`) function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
+`workflow-sessioncheck`, `prompt-sessioncheck`) function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `fix-mojibake`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `cut-release`,
-`adopt-config`, `adopt-workflow-folder`, `discover-workflow`, `lock`, `continue`,
+`adopt-config`, `adopt-workflow-folder`, `discover-workflow`, `lock`, `continue`, `prompt`,
 `orchestrator`)<!-- /skills:all -->
 remain available there.
 
@@ -602,9 +603,11 @@ typo there would quietly exclude the plugin it meant to keep and report success.
 
 <!-- skills:all -->Most skills in claude-code-specialists today (`fold-changelog`, `open-pr`, `ship-pr`,
 `new-branch`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`, `sync-roster`,
-`start-task`, `adopt-config`, `adopt-workflow-folder`, `discover-workflow`, `lock`, `continue`) are a thin wrapper around a script — procedural **mechanism** (branch, PR, ship, fold,
+`start-task`, `adopt-config`, `adopt-workflow-folder`, `discover-workflow`, `lock`, `continue`,
+`prompt`) are a thin wrapper around a script — procedural **mechanism** (branch, PR, ship, fold,
 bootstrap, teardown, roster-sync, encoding repair, reading a repo's own conventions, the standing
-before and after a context clear). `lock` and `continue` are the first pair to wrap **one** script
+before and after a context clear, and the assignment written in an editor rather than the terminal).
+`lock` and `continue` are the first pair to wrap **one** script
 between them — they run the same reporter and differ only in what they do with the answer, which is why
 the shared-scripts registry names a script's documenting page rather than its callers. `cut-release`
 and `orchestrator`<!-- /skills:all --> are the deliberate exceptions:
