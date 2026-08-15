@@ -973,6 +973,8 @@ function Write-FollowUpSteps {
     # a second tool AFTER the cut. The draft above is both readers' sections in one file, so the follow-up
     # is an edit rather than a command. new-internal-note.ps1 is still shipped and still works for a repo
     # running the two-document flow; nothing here calls it.
+    Write-SelfConsumptionReminder
+
     if (-not $cutNote) { return }
     Write-Host ""
     Write-Host "Still to write by hand (via a branch + PR -- this commit is already tagged):" -ForegroundColor Cyan
@@ -983,6 +985,53 @@ function Write-FollowUpSteps {
     } else {
         Write-Host "      no entry reached tier 2, so it carries the organisation's sections only -- both empty."
     }
+}
+
+function Write-SelfConsumptionReminder {
+    <#
+        A repo that ENABLES the plugins it just released is now one version behind itself, and nothing
+        else says so.
+
+        THE LOOP HAS A MISSING RETURN EDGE. A cut commits straight to the trunk, so no PR and no CI run
+        afterwards; the installed plugin cache keeps whatever version it had, and the only thing that
+        notices is the connector session check -- at the START of some later session, as an [ERROR] that
+        reads like a fault rather than like the completely ordinary consequence of having just cut.
+        Measured on 2026-08-15: this repo sat on v4.9.0 against a v4.11.0 source, six connector rows red,
+        after two releases were cut the same day. One consequence was invisible until looked for: a hook
+        the release had ADDED could not fire, because the cache predated it.
+
+        Deliberately conditional, and deliberately a REMINDER. It prints only when this repo enables a
+        plugin from the marketplace it declares -- a repo that releases a product it does not itself run
+        has nothing to refresh, and telling it otherwise would be noise. And it prints rather than acts:
+        a plugin update rewrites what every future session in this repo loads, which is not something a
+        release script should do to you while your attention is on the tag.
+    #>
+    $enabled = @()
+    try {
+        $marketplaceName = ((Get-MarketplaceJsonText | ConvertFrom-Json).name)
+        if (-not $marketplaceName) { return }
+        $settingsPath = Join-Path $repoRoot '.claude\settings.json'
+        if (-not (Test-Path -LiteralPath $settingsPath)) { return }
+        $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        $props = @($settings.PSObject.Properties | Where-Object { $_.Name -eq 'enabledPlugins' })
+        if ($props.Count -eq 0 -or $null -eq $props[0].Value) { return }
+        $enabled = @($props[0].Value.PSObject.Properties |
+            Where-Object { $_.Value -and $_.Name -like "*@$marketplaceName" } |
+            ForEach-Object { $_.Name })
+    } catch {
+        # Never let a reminder break a cut that has already committed and tagged.
+        return
+    }
+    if ($enabled.Count -eq 0) { return }
+
+    Write-Host ""
+    Write-Host "This repo runs the plugins it just released, so its own install is now a version behind:" -ForegroundColor Cyan
+    Write-Host "  claude plugin marketplace update $marketplaceName"
+    foreach ($id in $enabled) {
+        Write-Host "  claude plugin update $id --scope project"
+    }
+    Write-Host "      Until then the connector check reports this repo as outdated, and any hook or agent"
+    Write-Host "      def this release added is not loaded here yet."
 }
 
 # --- Commit + tag directly on main ---------------------------------------------------------
