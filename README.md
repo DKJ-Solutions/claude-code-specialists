@@ -47,6 +47,19 @@ it gets bumped for work it never had, one tag covers two products, and one chang
 histories. So the next product gets its own repository and its own marketplace, and the directory
 layer that used to stand by to hold a second family here has been removed.
 
+**What was retired is the framing, not the word — decided August 15, 2026, and written down here
+because it keeps being reported as drift.** The *name* went: "the workshop repo" was used in 32 places
+as a live name for this repository, next to the correct term in the same paragraph in several of them,
+which reads to a newcomer as two repositories one of which they cannot find. Those all say "the source
+repo" now. But **"the workshop" as a role word survives, in 310 places**, and deliberately: it describes
+what this side of the marketplace *does* — it is where the plugins are built — and nothing about the
+one-product rule makes that untrue. Sweeping it would be a prose-sensitive rewrite across 61 files of
+shipped plugin content, buying consistency at the price of worse sentences, and the measurement behind
+that call is in
+[#720](https://github.com/DaveKJohn/claude-code-specialists/issues/720). The three references to the
+literal old repository name `davekjohns-workshop` are the historical record of the rename and are
+correct as past tense.
+
 **The nuance, so nobody repairs the wrong thing later: lockstep *within* this product is correct.**
 The plugins are one system — a stack of teams plus an opt-in workflow — and a consumer running
 `team-alpha` alongside `team-shopify` needs matching versions. What was wrong was never the lockstep;
