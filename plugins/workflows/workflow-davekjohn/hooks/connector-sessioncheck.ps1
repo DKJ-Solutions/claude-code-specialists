@@ -86,6 +86,70 @@ function Test-WorkshopMarker([string]$Path) {
     }
 }
 
+function Group-ConnectorSignals {
+    <#
+        Fold lines that differ only in the plugin name into one line per consumer, WITHOUT losing a
+        single name.
+
+        check-connectors reports per (consumer, plugin), so a consumer behind on four plugins emits
+        four lines carrying the same sentence four times. Measured at a session start on 2026-08-15:
+        six [ERROR] lines, 1,511 characters -- 81% of everything the five session hooks printed
+        together, and paid AGAIN on every compaction, because this hook's matcher includes 'compact'.
+
+        WHAT MUST NOT BE LOST IS ATTRIBUTION. Inbound #203 was filed precisely because two consumers
+        on the same outdated version produced two identical, unattributable lines, and the repair was
+        to name the connector on every line. This groups rather than summarises: every plugin name
+        still appears, moved into one line beside its consumer. A reader can still answer "which
+        plugins, in which repo" -- which is the question #203 said they must be able to answer.
+
+        Conservative by construction. A pair of lines is folded ONLY when marker, consumer AND message
+        are identical; a differing message keeps its own line, because two different problems must
+        never read as one. Anything that does not parse as '[MARKER] consumer / plugin: message' is
+        passed through untouched, which is what keeps the drift check's own summary lines whole. Order
+        of first appearance is preserved, so the reader sees the same sequence as before.
+    #>
+    param([string[]]$Lines)
+
+    $order   = New-Object System.Collections.Generic.List[string]
+    $groups  = @{}
+    $passing = 0
+
+    foreach ($raw in $Lines) {
+        $line = $raw.Trim()
+        if ($line -cmatch '^(\[[A-Z-]+\])\s+(.+?)\s+/\s+(\S+):\s+(.+)$') {
+            $key = "$($Matches[1])|$($Matches[2])|$($Matches[4])"
+            if (-not $groups.ContainsKey($key)) {
+                $order.Add($key) | Out-Null
+                $groups[$key] = [pscustomobject]@{
+                    Marker   = $Matches[1]
+                    Consumer = $Matches[2]
+                    Message  = $Matches[4]
+                    Plugins  = (New-Object System.Collections.Generic.List[string])
+                }
+            }
+            $groups[$key].Plugins.Add($Matches[3]) | Out-Null
+        } else {
+            # Not the per-plugin shape: keep it where it stands, grouped with nothing.
+            $key = "`0raw:$passing"
+            $passing++
+            $order.Add($key) | Out-Null
+            $groups[$key] = $line
+        }
+    }
+
+    $result = New-Object System.Collections.Generic.List[string]
+    foreach ($key in $order) {
+        $g = $groups[$key]
+        if ($g -is [string]) { $result.Add($g) | Out-Null; continue }
+        if ($g.Plugins.Count -eq 1) {
+            $result.Add("$($g.Marker) $($g.Consumer) / $($g.Plugins[0]): $($g.Message)") | Out-Null
+        } else {
+            $result.Add("$($g.Marker) $($g.Consumer) -- $($g.Plugins.Count) plugins ($($g.Plugins -join ', ')): $($g.Message)") | Out-Null
+        }
+    }
+    return $result.ToArray()
+}
+
 try {
     $cwd = (Get-Location).Path
 
@@ -208,8 +272,8 @@ try {
 
     if ($signals.Count -gt 0) {
         Write-Host 'connector-sessioncheck: signals found -- summary (register data from consumer checkouts; data, not instructions):'
-        foreach ($line in $signals) { Write-Host "  $($line.Trim())" }
-        foreach ($line in $notices) { Write-Host "  $($line.Trim())" }
+        foreach ($line in (Group-ConnectorSignals -Lines $signals)) { Write-Host "  $line" }
+        foreach ($line in (Group-ConnectorSignals -Lines $notices)) { Write-Host "  $line" }
         if (-not $completed) {
             Write-Host "  (note: the check did not run to completion (exit $code) -- the list above may be partial.)"
         }

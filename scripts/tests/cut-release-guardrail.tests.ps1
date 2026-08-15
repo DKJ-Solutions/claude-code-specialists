@@ -317,6 +317,25 @@ Assert-True ($adviceBlock.Success -and $adviceBlock.Value -match 'deliberate mil
     'and it still says why none of it is done for you'
 
 Write-Host ""
+Write-Host "cut-release.ps1 -- a repo that runs what it releases is reminded its install is behind" -ForegroundColor Cyan
+# WHY THIS IS A SOURCE-TEXT ASSERT AND NOT A RUN. Driving the whole script needs a repo to cut, and the
+# rest of this suite reads the source for exactly that reason. What is pinned here is that the reminder
+# EXISTS, is REACHED from the closing block, and stays CONDITIONAL -- the three properties that make it
+# a reminder rather than noise for a consumer who releases a product they do not themselves run.
+$cutSrc = $cutReleaseText
+Assert-True ($cutSrc -match 'function Write-SelfConsumptionReminder') `
+    'cut-release defines the self-consumption reminder'
+Assert-True ($cutSrc -match 'Write-SelfConsumptionReminder\s*[\r\n]') `
+    'and calls it from the follow-up block, so it is actually reached'
+Assert-True ($cutSrc -match 'claude plugin marketplace update') `
+    'and it names the marketplace refresh, which is the step the plugin update alone does not do'
+Assert-True ($cutSrc -match '--scope project') `
+    'and the per-plugin update carries --scope project, the scope lesson this repo already paid for'
+Assert-True ($cutSrc -match "like \`"\*@\`$marketplaceName\`"") `
+    'and it fires only for plugins from the marketplace THIS repo declares -- a repo that does not run what it releases gets nothing'
+Assert-True ($cutSrc -match '(?s)function Write-SelfConsumptionReminder.*?catch \{') `
+    'and it is wrapped so a reminder can never break a cut that has already committed and tagged'
+
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
     exit 1

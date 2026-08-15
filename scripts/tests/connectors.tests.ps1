@@ -475,6 +475,36 @@ try {
     Assert-Match 'fixture-error-new' $r.Out 'error stub: new [ERROR] line passed through (bilingual)'
     Assert-Match 'fixture-error-legacy' $r.Out 'error stub: legacy [FOUT] line passed through (bilingual)'
 
+    # 9d1b. Grouping: lines that differ ONLY in the plugin name fold into one line per consumer, and
+    #       every plugin name survives the fold. The saving is real -- measured 2026-08-15, six such
+    #       lines were 1,511 characters, 81% of everything the five session hooks printed, paid again
+    #       on every compaction. What must NOT be lost is attribution: inbound #203 was filed because
+    #       identical unattributable lines could not be traced to a consumer, so these asserts pin the
+    #       NAMES, not merely the line count.
+    $stub = New-StubWorkshop -Name 'stub-group' -ExitCode 1 -OutputLines @(
+        '  [ERROR] owner/consumer-one / plugin-a: machine record is on v1.0.0, source on v2.0.0.',
+        '  [ERROR] owner/consumer-one / plugin-b: machine record is on v1.0.0, source on v2.0.0.',
+        '  [ERROR] owner/consumer-one / plugin-c: machine record is on v1.0.0, source on v2.0.0.',
+        '  [ERROR] owner/consumer-two / plugin-a: machine record is on v1.0.0, source on v2.0.0.',
+        '  [ERROR] owner/consumer-one / plugin-d: a completely different problem.'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Match 'consumer-one -- 3 plugins' $r.Out 'grouping: the three same-message lines fold into one'
+    Assert-Match 'plugin-a, plugin-b, plugin-c' $r.Out 'grouping: every folded plugin name survives (#203 attribution)'
+    Assert-Match 'consumer-two / plugin-a' $r.Out 'grouping: a lone line for another consumer keeps its original shape'
+    Assert-Match 'plugin-d: a completely different problem' $r.Out 'grouping: a DIFFERENT message is never folded in, however similar the consumer'
+    Assert-NotMatch 'consumer-one -- 4 plugins' $r.Out 'grouping: the different message did not inflate the group'
+
+    # 9d1c. Anything that is not the '[MARKER] consumer / plugin: message' shape passes through
+    #       untouched -- the drift check's own summary lines are the reason this matters.
+    $stub = New-StubWorkshop -Name 'stub-group-passthrough' -ExitCode 1 -OutputLines @(
+        '  [ERROR] a line with no consumer or plugin at all',
+        '  [DRIFTED] owner/consumer-one / plugin-a: drifted from the source.'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Match 'a line with no consumer or plugin at all' $r.Out 'grouping: an unparseable line is passed through verbatim'
+    Assert-Match 'consumer-one / plugin-a: drifted' $r.Out 'grouping: a single [DRIFTED] line keeps its shape'
+
     # 9d2. Stub with a blocking signal (new [ERROR]) AND [INFO] in the same run -> the signal
     #      comes through, the INFO stays out (the most sensitive regression scenario for the
     #      separation, Victor's finding).
