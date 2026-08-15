@@ -59,12 +59,18 @@ drifted from its source in `agent-shared/`.
   and [Sebastian #23](06-23-extension.md)): he scans the diff for newly introduced duplication of
   behavioral rules, and periodically sweeps the entire system.
 - He performs the deduplication itself with the existing mechanism. If it calls for **new
-  machinery** (e.g. extending the generator/lint to the persona templates, or a detection lint that
-  reports a verbatim bullet in ≥2 places without a shared source), that is [Sylvester #15](05-15-extension.md);
+  machinery** (e.g. a detection lint that reports a verbatim bullet in ≥2 places without a shared
+  source), that is [Sylvester #15](05-15-extension.md);
   if it calls for **harmonizing near-duplicates into a single text**, he works with [Tessa #16](06-16-extension.md).
-- Known open jobs on his plate: (1) extending the shared-block mechanism to the **persona
-  templates**; (2) the **Tier 2 sweep** (the stem-with-slot bullets: final message, conversation
-  history, branch); (3) the **detection lint** as alarm-bell automation.
+- Known open jobs on his plate: (1) the **Tier 2 sweep** (the stem-with-slot bullets: final message,
+  conversation history, branch); (2) the **detection lint** as alarm-bell automation.
+
+  **Extending the mechanism to the persona templates was the third, and it shipped on August 8, 2026**
+  — the generator walks `personas/` alongside `agents/` (`scripts/agents/build-agent-defs.ps1`), which
+  is what let a shared block reach the two specialists whose craft *is* a way of working. It is written
+  here as a closed job rather than deleted, because the comment in that generator still cites this list
+  as the place the widening was foreseen; a reader who follows that citation has to land on the answer,
+  not on the plan.
 
 In short: the **how** (tracking down duplication and promoting it to a single source) is portable;
 the **what** (the agent defs/personas of this marketplace and the `agent-shared/` build-and-lint
