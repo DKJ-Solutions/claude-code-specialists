@@ -29,7 +29,7 @@ replacing the impact table because not every change has a tier 1 or a tier 2 and
 omission) and `Pull Request`, which the fold fills from the merge. Everything above the first `##` is the
 intro, which is the only part a repo writes by hand and the only thing a cut leaves standing.
 
-**This paragraph is why check 19 exists.** It described the pre-dossier shape — "just the title", three
+**This paragraph is why check 20 exists.** It described the pre-dossier shape — "just the title", three
 sections, and two names that had been retired — for a day after the format moved, and it is one of the two
 documents [#508](https://github.com/DaveKJohn/claude-code-specialists/issues/508) measured as stale. The
 count is now held by the lint against `Get-EntrySectionHeadings`, so this cannot silently drift again; the

@@ -40,7 +40,13 @@ just like inline text.
     **portable body** comes straight from the plugin install via an `@` import: Chris always
     (`@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/teams/team-alpha/personas/01-01-persona.md`,
     stated in [`SPECIALISTS.md`](SPECIALISTS.md) rather than in `CLAUDE.md` itself — the seam spends
-    two of the four allowed import hops), Derek and Rendall on demand from that same path. The
+    two of the four allowed import hops), Derek and Rendall on demand from that same path. **Bianca
+    is the fourth persona and currently has no trigger**: her body would load the same way, but
+    nothing in [Chris's lens](lenses/01-01-extension.md) routes an assignment to her, so in practice
+    she is never read here. That is a statement of the present, not a defect to route around — this
+    repo does no intake interviews. The day it does, she needs a routing row like Derek's and
+    Rendall's, and until then the honest reading of the table below is "has a lens, has no caller".
+    The
     extension itself is therefore **lens-only**: only the repo-specific `## Specific to this repo`
     part, no copy of the body — just like the subagent lens. That way every portable behavioral rule
     lives in one place (the plugin), not duplicated.
@@ -163,9 +169,16 @@ Small and maintenance-focused. Chris leads; the rest executes.
 └─ [group 06] Tessa 📜 #16 (technical writer) · Edith 🔍 #17 (copy editor) · Victor 🧐 #19 (code reviewer) · Sebastian 🛡️ #23 (security engineer) · Ravi ♻️ #24 (refactoring specialist) · Nolan ⚡ #25 (performance engineer) · Marlowe 🕵️ #29 (investigative journalist)
 ```
 
-**This tree is who has work here, not who is available.** Six more arrive with the plugin and are
-invocable today — Bianca 🎙️ #02, Paula 📅 #09, Vera 📊 #11, Gwen 🎨 #12, Cody 💻 #13 and Auden 🖋️ #30 —
-whose crafts this maintenance repo rarely calls on. They are in the index below with their lenses.
+**This tree is who has work here, not who is available.** Six more arrive with the plugin, whose
+crafts this maintenance repo rarely calls on. They are in the index below with their lenses — but
+they are not reachable the same way, and the difference is worth knowing before you type a name:
+
+- **Invocable today as subagents** — Paula 📅 #09, Vera 📊 #11, Gwen 🎨 #12, Cody 💻 #13 and
+  Auden 🖋️ #30. Each ships an agent def, so `@team-alpha:<name>` reaches them.
+- **Not invocable** — Bianca 🎙️ #02, who ships as a **persona** (`personas/03-02-persona.md`, no
+  agent def). Personas run in the main conversation, and the only one loaded here is Chris; Derek and
+  Rendall are read on demand when work reaches them. Nothing reaches Bianca — see the persona-lens
+  note above.
 
 ## Index of the extensions present
 
