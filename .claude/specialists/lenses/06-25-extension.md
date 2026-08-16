@@ -705,28 +705,62 @@ only way to tell it apart from one that does not.
   fingerprint computed once per run (`Get-GateFingerprint`), so the pair is one decision printed twice.
   The 162ms above therefore times the whole path once, not each gate separately.
 - **Six merges is not six firings.** PRs 728–734 all landed fast (`8 · 14 · 16 · 16 · 9 · 27s`), but the
-  record only fires on a split-step ship, and #734 is the one confirmed to be one. The other five are
-  consistent with the result; they are not independent evidence for it.
+  record only fires on a split-step ship. Two are now confirmed to be one — #734 and #735 ([below](#the-second-firing-measured-deliberately-rather-than-waited-for-august-16-2026)) — and the
+  rest are consistent with the result without being independent evidence for it.
 
 **A side finding on the suite band itself, kept separate rather than folded in.** The four post-split runs
 recorded above (142.4 / 145.5 / 170.3 / 169.9s) are the optimistic end of a wider band. Combining them with
 the six here gives n=10 at 43 suites, on two different sessions:
 
 ```text
-139.7  142.4  145.5  168.0  169.9  170.3  174.2  193.0  193.3  193.5  195.0
+139.7  142.4  145.5  168.0  169.9  170.3  174.2  183.0  193.0  193.3  193.5  195.0
 ```
 
-Median **~170s**, spread **139.7–195.0s**. The post-split improvement over the pre-split 196–235s is real;
+Median **~172s**, spread **139.7–195.0s**. The post-split improvement over the pre-split 196–235s is real;
 the **-25%** headline is the best case rather than the typical one. Four of the six runs here sat in a
 2-second band at 193.0–195.0, so the fast readings are the outliers, not the norm. This does not change
 the saving — every second of that band is saved either way — and it is recorded here rather than swept
 into the `-25%` claim, per the rule that a size gets its own measurement.
 
-**The eleventh reading is `open-pr`'s own, on this very branch: 168s, 43/43 green** — quoted rather than
-dropped, following the same precedent the section above set when its fifth reading arrived late. It is the
-useful kind of confirmation, because it was taken by the gate itself rather than by the person arguing for
-the median, and it lands within two seconds of it. That is what moves *"median ~170s"* from a summary of
-one session's runs to a figure an independent run reproduces.
+**The last two readings are `open-pr`'s own, on the branch that carried this section: 168s and 183s, 43/43
+green both times** — quoted rather than dropped, following the same precedent the section above set when
+its fifth reading arrived late. They are the useful kind of confirmation, because the gate took them
+rather than the person arguing for the median, and both land inside the band. That is what moves
+*"median ~172s"* from a summary of one session's runs to a figure independent runs reproduce.
+
+### The second firing, measured deliberately rather than waited for (August 16, 2026)
+
+The section above rests on one firing in the wild (#734) plus a bench reconstruction, and said so. **The
+second firing was then produced on purpose, on this repo's own next ship**, because the chain offers it for
+free: `ship-pr` calls `open-pr` internally, so running `open-pr` first and `ship-pr` afterwards *is* the
+split-step case, and the gates had to run before the merge either way.
+
+| | gates | wall clock |
+|---|---|---|
+| `open-pr` on PR #735's tree | ran for real, 43/43 green | **198.6s** end to end |
+| `ship-pr`'s internal `open-pr`, minutes later, same tree | **both skipped** | — |
+| #735 merged after CI went green | — | **15s** |
+
+Both skip lines printed, and the merge landed 15 seconds after the required check went green — against the
+**264.5s** historical median for exactly this shape. #734 was 27s. **n=2, on two branches, both in the fast
+mode.**
+
+**The 198.6s is the better cost figure than the ~203s bench estimate above**, and it is the one to quote:
+it is a whole `open-pr` invocation measured in the chain rather than a lint number and a suite number added
+together. The bench figures stay because they are what decompose it.
+
+**One constraint is worth recording, because it decides the order of operations.** `Get-GateFingerprint`
+hashes HEAD, so *any* further commit voids the evidence and the next run re-gates. Two suite readings taken
+during this exercise (the 183s above, and the 198.6s total) could therefore either be committed to this
+document **or** be followed by a skipping ship — not both on one branch. The firing was worth more than the
+data point, so the readings landed here on the follow-up instead. Anyone reproducing this should expect the
+same fork rather than discover it mid-run.
+
+**What this does NOT establish.** Two firings confirm the mechanism and place it in the fast mode; they are
+not a distribution. The 27s and 15s differ by more than the skip itself costs (162ms), so nearly all of
+that spread is merge-and-fold work and network, not the record — which is the honest reading of why a
+third, fourth and fifth firing would move the figure very little. **Do not extrapolate a per-merge saving
+from these two gaps**; the saving is the gate that did not run, and that number is 198.6s.
 
 ### Boundaries with the other roles
 
