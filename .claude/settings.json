@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(powershell -NoProfile -File \"scripts/release/cut-release.ps1\"*)"
+      "Bash(powershell -NoProfile -File \"scripts/release/cut-release.ps1\"*)",
+      "PowerShell(./scripts/release/cut-release.ps1*)",
+      "PowerShell(./scripts/release/publish-to-business.ps1*)",
+      "Bash(./scripts/release/cut-release.ps1*)",
+      "Bash(./scripts/release/publish-to-business.ps1*)"
     ]
   },
   "enabledPlugins": {
