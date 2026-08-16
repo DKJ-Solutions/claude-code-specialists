@@ -1,13 +1,20 @@
-# `main` progress
-
-
-> **You are on `main`.** Do not work in this file yet -- create a branch first.
-> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
-> of the next person who does create one.
-
-This file carries the step list of the branch you are on. It is written when a branch is created
-and returns to this state after the merge.
+## `docs/v4-13-0-timing-total` progress
 
 ### Steps
 
-_(filled in when a branch is created)_
+#### PLAN
+
+- [x] Read the legs off timestamps: tag commit, note commit, PR created/merged, publish
+
+#### CREATE
+
+- [x] Add the total and the leg breakdown to *What it is worth*
+- [x] Replace the promise bullet in *What was still open* with the condition it becomes
+
+#### TEST
+
+- [x] Head and total reported together, neither offered as a trend
+
+### Where I left off
+
+Second timing pass written; shipping it.
