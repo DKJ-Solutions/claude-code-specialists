@@ -14,7 +14,7 @@
 - [x] `/lock`'s page: the three-step block, the four cross-references, and a line on the rename.
 - [x] `session-status.ps1` docstring, in both mirrors — held byte-identical afterwards.
 - [x] `shared-scripts-lib.ps1`: the comment explaining why two skills share one script.
-- [x] Docs: both `<!-- skills:all -->` spans + the prose in the root `README.md`, the plugin's skill
+- [x] Docs: both lint-checked skill enumerations + the prose in the root `README.md`, the plugin's skill
       table, `scripts/README.md`, the `.gitignore` comment, lenses 05-15 and 06-25.
 - [~] Rename `.claude/handover.md` — dropped: the file keeps its path, and after this rename the
       reading command and the file it reads finally share a name.
@@ -23,7 +23,9 @@
 
 #### TEST
 
-- [x] `check-plugin-integrity.ps1` green, including `[skill-list]` over both spans (19 canonical skills).
+- [x] `check-plugin-integrity.ps1` green, including `[skill-list]` over both enumerations (19 canonical
+      skills). It caught this branch's own first draft: the entry quoted the span marker literally, which
+      the check read as an unclosed span — so the entry now describes the markers instead of printing one.
 - [x] `check-script-contract.ps1` green — the registry's `Skill = 'lock'` entry is untouched by this rename.
 - [x] Tree-wide grep: no `/continue` or `skills/continue` left outside the four deliberate mentions of
       the built-in and the untouched records.

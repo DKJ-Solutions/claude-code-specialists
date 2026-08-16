@@ -26,7 +26,7 @@ path is unchanged, and so is everything the skill does: the three steps are stil
 
 Renamed everywhere the name is load-bearing: the skill directory and its frontmatter, the `/lock` page
 that points at it, both mirrors of `session-status.ps1` (the reporter both skills run), the shared-scripts
-registry, the test suite's synopsis, the two `<!-- skills:all -->` spans in the root `README.md`, the
+registry, the test suite's synopsis, the two lint-checked skill enumerations in the root `README.md`, the
 plugin's own skill table, `scripts/README.md`, the `.gitignore` comment above the ignored file, and two
 specialist lenses. **The published records are deliberately untouched** — `releases/` and the folded
 entries in `CHANGELOG.md` name the skill as it was called on the day they were written, and rewriting a
