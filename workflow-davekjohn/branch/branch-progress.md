@@ -1,13 +1,24 @@
-# `main` progress
-
-
-> **You are on `main`.** Do not work in this file yet -- create a branch first.
-> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
-> of the next person who does create one.
-
-This file carries the step list of the branch you are on. It is written when a branch is created
-and returns to this state after the merge.
+## `docs/v4-12-0-timing-total` progress
 
 ### Steps
 
-_(filled in when a branch is created)_
+#### PLAN
+
+- [x] Collect the legs the first pass could not see, from command timestamps rather than estimates
+
+#### CREATE
+
+- [x] Add the total and the remaining legs to the note's timing paragraph
+- [x] Attribute the tail movement to shipping in one motion, not to the gate record -- and say so
+- [x] Replace the bullet promising this edit with the frozen-attachment condition
+- [x] File the unmeasured gate-record case in *what was still open*
+
+#### TEST
+
+- [x] Lint and test gates via `open-pr.ps1`
+- [~] No automated test: prose in a published record, already covered by the gates' link and
+      language checks
+
+### Where I left off
+
+Done. The release is complete: cut, documented, published, and its cost recorded end to end.
