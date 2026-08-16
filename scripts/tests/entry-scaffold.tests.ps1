@@ -229,13 +229,13 @@ if (Test-Path -LiteralPath $writtenEntry) {
     $text = [System.IO.File]::ReadAllText($writtenEntry, [System.Text.Encoding]::UTF8)
     $roundTrip = @(Get-EntryScaffoldFindings -EntryText $text -Wording (Get-EntryScaffoldWording))
     Assert-True ($roundTrip.Count -gt 0) 'the matcher sees the writer output as scaffolded -- writer and guard share one source'
-    # FIVE FINDINGS, AND NONE OF THEM IS A STRING. The dossier form writes no visible placeholder at all --
-    # every field is a heading with an empty space under it -- so what the gate reports is EMPTINESS: the
-    # two sections the author owes, plus one per tier with no reason yet. All THREE tiers are scaffolded
-    # since August 7, 2026 (an unreached one is answered 'N/A' with a line saying why, rather than left
-    # out), so three of the five are tiers. A gate still looking for 'TODO: title' would have gone silent
-    # on the very entry it exists to stop.
-    Assert-Equal 5 $roundTrip.Count 'and it names each unanswered field: the description, the body, and all three tiers'
+    # THREE FINDINGS, AND NONE OF THEM IS A STRING. The dossier form writes no visible placeholder at all --
+    # every field is a heading with an empty space under it -- so what the gate reports is EMPTINESS: the PR
+    # title the author owes, plus one per tier with no reason yet. It was five until August 16, 2026, when
+    # the separate title and body sections went: this fixture's repo states no audience tier, so it is
+    # scaffolded with all three, and 1 + 3 is the count. A gate still looking for 'TODO: title' would have
+    # gone silent on the very entry it exists to stop.
+    Assert-Equal 4 $roundTrip.Count 'and it names each unanswered field: the PR title, and all three tiers'
     Assert-Equal 0 @($roundTrip | Where-Object { $_.Label -notmatch 'unanswered|no reason' }).Count `
         'all three are measurements of an empty field rather than matches on placeholder prose'
     # THE ENTRY NO LONGER ASKS FOR A TO-DO LIST, which is the whole point of the split: the file whose text
@@ -263,10 +263,19 @@ if (Test-Path -LiteralPath $writtenEntry) {
     # has to get it back out: the fold looks the PR up by this name, so writer and reader agreeing about the
     # backticks is the whole contract.
     Assert-Equal 'feat/round-trip' (Get-BranchFileDeclaredBranch -Text $text) 'the entry heading names the branch, and reads back as it'
-    $sectionKeys = @((Get-EntrySectionHeadings).Keys)
+    # THE WRITTEN KEYS, NOT EVERY RECOGNISED ONE (August 16, 2026). Get-EntrySectionHeadings answers for the
+    # four retired keys too -- that is what keeps the entries already in CHANGELOG.md readable -- so walking
+    # it here would demand headings the scaffolder deliberately stopped writing.
+    $sectionKeys = @(Get-EntryWrittenSectionKeys)
     foreach ($key in $sectionKeys) {
         Assert-True ($text -match ('(?m)^' + [regex]::Escape((Get-EntrySectionHeading -Key $key)) + '\s*$')) `
             "the '$key' section heading is written verbatim as the parser expects it"
+    }
+    # AND THE RETIRED ONES ARE ABSENT, which is the half that would otherwise go unnoticed: a writer that
+    # kept emitting them would pass every assert above while producing the document this change removed.
+    foreach ($gone in @('Description', 'Id', 'Type', 'Significance')) {
+        Assert-True ($text -notmatch ('(?m)^' + [regex]::Escape((Get-EntrySectionHeading -Key $gone)) + '\s*$')) `
+            "the retired '$gone' section is no longer written"
     }
     # ORDER, not just presence: the parser finds a section wherever it is, but a reader meets them in the
     # order they are written, and the lint's split-entry rule keys on which one comes FIRST. Walked from the
@@ -275,14 +284,26 @@ if (Test-Path -LiteralPath $writtenEntry) {
     $ascending = $true
     for ($i = 1; $i -lt $positions.Count; $i++) { if ($positions[$i] -le $positions[$i - 1]) { $ascending = $false } }
     Assert-True $ascending 'and the sections are written in the order the map declares them'
-    Assert-Equal 'Description' (Get-EntryFirstSectionKey) 'the entry opens with the description -- what the lint tests a split entry against'
-    # The type is STATED in its own section, and the section holds the lowercase PREFIX while the readers
-    # canonicalise it -- so 'feat' here and 'Feat' in every older entry both come back as one type.
+    Assert-Equal 'What' (Get-EntryFirstSectionKey) 'the entry opens with what the change brings -- what the lint tests a split entry against'
+    # AND THE OPENER LIST STILL HOLDS THE OLD ONE. This is the assert that would have caught the six false
+    # accusations this change first produced against CHANGELOG.md: every pending entry there opens with
+    # 'Branch title', and a rule that knew only the current opener reads all of them as split entries.
+    Assert-True ((Get-EntryOpeningSectionKeys) -contains 'What') 'the current opener is an opener'
+    Assert-True ((Get-EntryOpeningSectionKeys) -contains 'Description') 'and so is the one every entry already in CHANGELOG.md uses'
+    # THE TYPE IS THE BRANCH PREFIX IN THE HEADING NOW -- the section that used to state it held the prefix
+    # of the branch beside it, which is one fact in two places. Asserted through the same reader the release
+    # documents use, so a heading this test accepts cannot be one they file under a catch-all.
     $writtenType = Resolve-EntryType -EntryText $text
-    Assert-Equal $true $writtenType.Declared 'the type is declared in its own section'
+    Assert-Equal $true $writtenType.Declared 'the type is declared -- by the branch the heading names'
     Assert-Equal $null $writtenType.Error 'and is a type this repo actually produces'
-    Assert-Equal 'Feat' $writtenType.Type 'the prefix written in the file reads back as the canonical type'
-    Assert-Equal 'feat' (Get-EntrySectionAnswer -EntryText $text -Key 'Type') 'while the file itself carries the prefix its own hint asks for'
+    Assert-Equal 'Feat' $writtenType.Type 'the prefix in the heading reads back as the canonical type'
+    Assert-Equal '' (Get-EntrySectionAnswer -EntryText $text -Key 'Type') 'while the section that used to state it is not written at all'
+    # THE PR TITLE'S NEW HOME, which is the contract open-pr composes its title from. This branch was
+    # created without -Title, so the right answer is EMPTY -- and empty is the interesting case: the
+    # section is present and its guidance stripped, so a reader that returned the hint, or the fold's own
+    # PR link, would look like a title and title somebody's PR with it.
+    Assert-True (Test-EntryHasSection -EntryText $text -Key 'PullRequest') 'the Pull Request section is written from the start'
+    Assert-Equal '' (Get-EntryPrTitle -EntryText $text) 'and a branch created without -Title has no PR title yet, rather than inheriting one'
     # DECLARING TIER 0 IS NOT A STUB -- a tier-0 entry is a legitimate final answer about reach, and the gate
     # must never report the NUMBER as evidence of an unedited entry. What it may report is the empty reason
     # underneath it, which is content the author still owes. The distinction is the whole difference between
@@ -1050,7 +1071,7 @@ Assert-True (-not [regex]::IsMatch($sigStripped, '(?m)' + (Get-EntryScorePattern
 # sections per release card. The sub-sections ARE the section's content, so removing them empties it the
 # same way.
 Assert-True (-not ($sigStripped -match [regex]::Escape((Get-EntrySectionHeading -Key 'Significance')))) 'stripped: the section heading goes with them, or a consumer reads a question with no answer'
-Assert-True ($sigStripped -match [regex]::Escape((Get-EntrySectionHeading -Key 'Type'))) 'stripped: and a section that still has content keeps its heading'
+Assert-True ($sigStripped -match [regex]::Escape((Get-EntrySectionHeading -Key 'PullRequest'))) 'stripped: and a section that still has content keeps its heading'
 Assert-True ($sigStripped -match 'body text') 'stripped: the entry itself is untouched'
 # One call, three shapes: a migrating entry carrying both must come out clean.
 $mixed = $sigBlock + "`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 2 | leftover |`n"
@@ -1175,9 +1196,17 @@ Assert-True (Test-EntryHasSection -EntryText $oldNamed -Key 'Description') 'and 
 $oldStepList = "## ``feat/x`` progress`n`n### Branch description`n`nA title`n`n### Steps`n`n- [x] done`n"
 Assert-True (-not (Test-EntryDeclaresShape -EntryText $oldStepList)) 'a step list carrying the retired title heading is still NOT an entry'
 
-# And the title section ALONE proves nothing either -- which is the same rule seen from the entry's side,
-# and the reason the assert above can hold. A real entry proves itself by a section only an entry has.
-Assert-True (-not (Test-EntryDeclaresShape -EntryText $oldNamed)) 'the title section alone proves nothing, whichever file it sits in'
+# AND THE TITLE SECTION STILL PROVES NOTHING BY ITSELF -- but the HEADING above it now does, since
+# August 16, 2026. A branch heading that says 'changelog' is an entry, which is the fact the type reader
+# takes the change type off; the step list one word away says 'progress' and is refused, which is the
+# assert directly above. So this fixture is an entry for a reason its title section had nothing to do with.
+Assert-True (Test-EntryDeclaresShape -EntryText $oldNamed) 'a changelog branch heading declares an entry, whatever sections follow it'
+# THE FAILURE THIS WHOLE PREDICATE EXISTS FOR, asserted so widening the heading rule cannot quietly undo
+# it: a leftover section heading from the pre-flat CHANGELOG must never read as a change. Measured on two
+# real consumer shapes -- one of them swallowed an entire release history into the release notes and then
+# deleted it from CHANGELOG.md, silently, because nothing refused.
+Assert-True (-not (Test-EntryDeclaresShape -EntryText "## Pull Requests`n`nSome prose.`n")) 'a pre-flat section heading is still not an entry'
+Assert-True (-not (Test-EntryDeclaresShape -EntryText "## Releases`n`nSome prose.`n")) 'and neither is the release-history heading'
 $oldNamedFull = $oldNamed + "`n### Pull Request`n`n#12`n"
 Assert-True (Test-EntryDeclaresShape -EntryText $oldNamedFull) 'while an entry-only section still proves an entry'
 
@@ -1381,11 +1410,20 @@ Assert-Equal 2 (Get-EntryTierMax) 'the model still HAS three tiers while a tier-
 function Get-ReleaseAudienceTier { 2 }
 $audienceScaffold = (Format-EntrySignificanceSections -WithGuidance) -join "`n"
 Assert-True ($audienceScaffold -match '(?m)^#### Tier 0$') 'the scaffold writes tier 0'
-Assert-True ($audienceScaffold -match '(?m)^#### Tier 2$') 'and the audience tier'
+# AND THE AUDIENCE TIER IS HEADED WITH THE QUESTION SINCE AUGUST 16, 2026, not with its number. That is
+# what took the routing comment out of the file: the heading asks it, in the one place a reader cannot
+# skip. The number is not written at all -- which is the point, because a template naming 'Tier 2' is only
+# right for a repo whose audience is 2, and this one ships to consumers who may answer 1.
+Assert-True ($audienceScaffold -match ('(?m)^#### ' + [regex]::Escape((Get-EntryTierHigherHeading)) + '$')) 'and the audience tier, headed with the question'
 Assert-True ($audienceScaffold -notmatch '(?m)^#### Tier 1$') 'and NOT the tier this repo does not publish to'
-Assert-True ($audienceScaffold -match 'continue to Tier 2') "tier 0's routing question points at the audience tier"
-Assert-True ($audienceScaffold -notmatch 'continue to Tier 1') 'and never at a heading the file does not have'
-Assert-Equal 1 ([regex]::Matches($audienceScaffold, 'continue to Tier').Count) 'the LAST written tier carries no routing question'
+Assert-True ($audienceScaffold -notmatch '(?m)^#### Tier 2$') 'and not by its number either -- the heading is repo-neutral'
+Assert-Equal 0 ([regex]::Matches($audienceScaffold, 'continue to Tier').Count) 'no routing comment survives: the heading is the question'
+# IT STILL RESOLVES TO A NUMBER, which is the half that would fail silently. A heading the parser cannot
+# place reads as "no tier above 0" -- a claim about the change, made by a heading nobody read.
+$higherRead = Resolve-EntryImpact -EntryText ("## Branch ``feat/a`` changelog - '1'`n`n### What does the change on this branch bring to main?`n`n#### Tier 0`n`nwhy`n`n**Score:** 1`n`n#### " + (Get-EntryTierHigherHeading) + "`n`nreaches them`n`n**Score:** 4`n")
+Assert-Equal 0 @($higherRead.Errors).Count 'the question heading parses without complaint in a repo that has an audience tier'
+Assert-Equal 2 (@($higherRead.Rows | Where-Object { [int]$_.Tier -eq 2 }).Count + 1) 'and resolves to this repo audience tier, so its score is not lost'
+Assert-Equal 4 ([int](@($higherRead.Rows | Where-Object { [int]$_.Tier -eq 2 })[0].Score)) 'with the score the author actually wrote'
 
 # THE TOLERANCE, WHICH IS THE LOAD-BEARING HALF OF THE WHOLE CHANGE. Six entries were pending in this repo
 # when the knob landed, each carrying all three tiers under the cumulative model. A gate that started

@@ -59,22 +59,30 @@ questions this page deliberately cannot answer for you — check your own table 
 source repo's.
 
 **`branch-changelog.md` holds the entry block and nothing around it**, so it pastes into your changelog in
-one go. The entry is one heading with six `###` sections under it:
+one go. The entry is one heading with two `###` sections under it:
 
 ```text
-## `<your branch>` changelog
+## Branch `<your branch>` changelog - '<stamp>'
 
-### Branch title
-### Branch ID
-### Branch type
 ### What does the change on this branch bring to main?
-### Significance
 ### Pull Request
 ```
 
-The first three arrive filled in — the title you gave `-Title`, a timestamp, and the prefix. `Pull Request`
-is filled in by the fold, from the merge itself: neither the PR number nor the landing date exists yet, and
-a date written now would be the branch's birth date. Everything between is yours to write.
+**The heading carries what three sections used to.** It names the branch — so the branch *type* is its
+prefix — and the stamp beside it is the moment the branch was created. A section restating either would be
+one fact in two places.
+
+`What does the change on this branch bring to main?` holds one `#### Tier N` sub-section per reach the
+change claims, each with its reason and its `**Score:**`; that is the description, written once per
+audience rather than once as prose and again per tier.
+
+`Pull Request` opens with **the PR title** — the sentence you gave `-Title`, which `open-pr` puts the
+branch type in front of. The number and the landing date go underneath it, written by the fold from the
+merge: neither exists yet, and a date written now would be the branch's birth date rather than its
+landing date.
+
+**Every heading this replaced is still read**, so an entry already in your changelog, or on a branch in
+flight, keeps folding exactly as it did. Nothing has to be migrated.
 
 **Those section names are repo-owned prose.** A repo whose changelog is not in English sets its own through
 `Get-EntrySectionHeadingOverrides` in `scripts/repo-config.ps1`, alongside the guidance comments

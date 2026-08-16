@@ -43,30 +43,14 @@ second attempt. Without `-Branch` the fold recovers the branch from the file nam
 PR lookup.
 
 **The entry body carries the description; the fold adds what only exists after the PR.** An entry is one
-`##` heading naming the branch, with six named `###` sections under it — the same block in the entry file
+`##` heading naming the branch, with two named `###` sections under it — the same block in the entry file
 and in `CHANGELOG.md`, so what a contributor writes is exactly what lands. The fold **strips the guidance
 comments** on the way and writes the PR line into `### Pull Request`:
 
 ```markdown
-## `feat/short-name` changelog
-
-### Branch title
-
-Short strong title
-
-### Branch ID
-
-20260806-114230
-
-### Branch type
-
-feat
+## Branch `feat/short-name` changelog - '20260806-114230'
 
 ### What does the change on this branch bring to main?
-
-…the description…
-
-### Significance
 
 #### Tier 0
 
@@ -74,27 +58,37 @@ feat
 
 **Score:** 2
 
+#### Higher than tier 0?
+
+…or one line saying why it reaches nobody there…
+
+**Score:** N/A
+
 ### Pull Request
+
+Short strong title
 
 [PR #123](https://github.com/…/pull/123) · merged 2026-08-06
 ```
 
-One `#### Tier N` sub-section per reach the change claims, lowest first, each ending by asking whether
-there is a next one. **Not every change has a tier 1 or a tier 2** — that is why these are sections rather
-than the table they replaced, where a missing row read as an omission.
+One `#### Tier N` sub-section per reach the change claims, lowest first. **Not every change has a tier 1
+or a tier 2** — that is why these are sections rather than the table they replaced, where a missing row
+read as an omission. The second section is headed with the question where the repo has stated one audience
+tier (`Get-ReleaseAudienceTier`), and with that tier's number where it has not.
 
-The scaffolder fills in the heading, the branch ID and the type. The fold adds what does not exist until
-the merge, and it adds it in **one place**: the **`PR #NN` link and the merge date**, under the entry's own
-`### Pull Request` heading. The separator is a middot. **The heading is left exactly as its author wrote
-it**, and so is everything else — the fold rewrites nothing but the comments it strips.
+**It was six sections until August 16, 2026 and is two since** (Dave). The heading absorbed the branch ID
+and, through the branch it names, the type; the PR title moved into the section that already held the PR's
+other facts; and `Significance` lost a heading that only asked again what the section above it asks.
+**Every retired heading is still read**, so an entry written before this — in your changelog or on a branch
+in flight — folds unchanged.
 
-**The heading names the branch** (Dave, August 6, 2026), and the human-readable name of the change is the
-first section under it. The fold used to prepend `#NN · ` to a title heading; nothing is lost by that being
-gone, because the number is in the entry's Pull Request section, where the url makes it clickable rather
-than merely printed.
+The scaffolder fills in the heading and the PR title. The fold adds what does not exist until the merge,
+and it adds it in **one place**: the **`PR #NN` link and the merge date**, under the entry's own
+`### Pull Request` heading, below the title. The separator is a middot. **The heading is left exactly as
+its author wrote it**, and so is everything else — the fold rewrites nothing but the comments it strips.
 
 **The consumer document is the exception, and only for the heading.** Its reader is a consumer, who has no
-branch — so there the heading is replaced by the entry's `Branch title`, exactly as the PR number and
+branch — so there the heading is replaced by the entry's PR title, exactly as the PR number and
 the merge date are dropped there for being internal administration. `CHANGELOG.md` and the developer notes
 keep the branch heading.
 

@@ -127,9 +127,12 @@ try {
         'entry-shape: the coverage count proves a claim was actually examined, not an empty scan'
 
     # 45. The RIGHT count -- and nothing else changed -- makes the same file pass. Written from
-    #     Get-EntrySectionHeadings rather than the literal 'six', so this asserts the check is DERIVED:
+    #     Get-EntryWrittenSectionKeys rather than the literal 'six', so this asserts the check is DERIVED:
     #     if the format gains a section, the fixture follows and the assert still means something.
-    $shapeCount = @((Get-EntrySectionHeadings).Keys).Count
+    #     THE WRITTEN KEYS, NOT EVERY RECOGNISED ONE (August 16, 2026): Get-EntrySectionHeadings answers
+    #     for the four retired sections too -- which is what keeps older entries readable -- so counting
+    #     it would hold a document to a shape no reader ever meets.
+    $shapeCount = @(Get-EntryWrittenSectionKeys).Count
     [System.IO.File]::WriteAllText($shapeDoc, "# branch`n`nAn entry is one ``##`` heading with $shapeCount named ``###`` sections under it.`n", $Utf8NoBom)
     $e2 = Invoke-Integrity -FixtureRoot $Fixture
     # MATCHED ON THE FINDING'S OWN WORDS, not on the file name, and that is a repair rather than a style

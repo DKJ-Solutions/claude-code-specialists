@@ -309,10 +309,11 @@ if (Test-Path -LiteralPath $entryPath) {
     $entryDescription = Get-PrDescription -EntryText $entryText
     if (-not $entryDescription) { $entryDescription = Get-EntryDescription -EntryText $entryText }
 
-    # Get-EntrySectionAnswer, not the raw section body: it strips the guidance comments, so a template
-    # comment left standing above the answer cannot end up in the PR title. It also accepts the section's
-    # RETIRED name, so an entry written as 'Branch description' still names its own PR.
-    $titleWords = Get-EntrySectionAnswer -EntryText $entryText -Key 'Description'
+    # Get-EntryPrTitle, which knows BOTH places the title has lived: the first line of the 'Pull Request'
+    # section since August 16, 2026, and the 'Branch title'/'Branch description' section before that. It
+    # reads the ANSWER rather than the raw body, so a guidance comment left standing above it cannot end up
+    # in the PR title, and it skips the two lines the fold appends underneath.
+    $titleWords = Get-EntryPrTitle -EntryText $entryText
 
     # A PRE-SPLIT ENTRY HAS NO TITLE SECTION -- ITS TITLE IS THE HEADING, and it must still be able to open
     # a PR. Such branches exist right now in every consumer, which receives this script through a plugin
@@ -326,7 +327,13 @@ if (Test-Path -LiteralPath $entryPath) {
     # trailing type/date fields are administration, decided by the SHAPE of each field rather than by
     # counting them -- the distinction that lets one rule read both eras of heading. A copy here would be
     # free to disagree with the document the fold produces from the same heading.
-    if (-not $titleWords -and -not (Test-EntryHasSection -EntryText $entryText -Key 'Description')) {
+    # EITHER SECTION COUNTS AS HAVING ONE. A new entry carries 'Pull Request' and no 'Branch title', so
+    # asking after the old key alone would send every new entry down the pre-split fallback and title its
+    # PR from the branch heading -- plausible-looking, and hiding the empty title the gate below exists to
+    # report.
+    $hasTitleSection = (Test-EntryHasSection -EntryText $entryText -Key 'Description') -or
+                       (Test-EntryHasSection -EntryText $entryText -Key 'PullRequest')
+    if (-not $titleWords -and -not $hasTitleSection) {
         . (Join-Path $PSScriptRoot '..\lib\release-lib.ps1')
         $headingLine = @((Convert-EntryHeadingToTitle -EntryText $entryText) -split "\r?\n")[0]
         $titleWords = ($headingLine -replace '^#+\s*', '').Trim()
