@@ -346,7 +346,7 @@ application to profile: what costs time is what runs before work is allowed to l
 | what runs | measured | when it runs |
 |---|---|---|
 | `check-plugin-integrity.ps1` (26 checks) | **9.2–10.6s**, n=3, idle machine ([below](#the-gate-records-saving-measured-on-the-case-it-was-built-for-august-16-2026)) | before every push, and inside the cut |
-| the test suites — 30 then, **43** now | **205–232s** then; **196–235s** at 40 suites, n=5 ([below](#the-gates-wall-clock-is-one-suite--re-measured-n5-august-16-2026)); **139.7–195.0s, median ~172s** at 43 post-split, n=10, idle machine ([below](#the-gate-records-saving-measured-on-the-case-it-was-built-for-august-16-2026)) | inside `cut-release`, inside `open-pr`, and again in CI |
+| the test suites — 30 then, **43** now | **205–232s** then; **196–235s** at 40 suites, n=5 ([below](#the-gates-wall-clock-is-one-suite--re-measured-n5-august-16-2026)); **139.7–195.0s, median ~170s** at 43 post-split, n=11, idle machine ([below](#the-gate-records-saving-measured-on-the-case-it-was-built-for-august-16-2026)) | inside `cut-release`, inside `open-pr`, and again in CI |
 | CI `lint-en-tests` | **median 7m 23s**, range 5m 17s–9m 27s over **63** blocking runs (August 11, 2026) | every PR; blocks the merge |
 | a full release, end to end | **28m 03s**, measured at `v4.4.0` (August 11, 2026) — all of it blocking | per release, ~1.6× per day at the August cadence |
 
@@ -713,14 +713,20 @@ recorded above (142.4 / 145.5 / 170.3 / 169.9s) are the optimistic end of a wide
 the six here gives n=10 at 43 suites, on two different sessions:
 
 ```text
-139.7  142.4  145.5  169.9  170.3  174.2  193.0  193.3  193.5  195.0
+139.7  142.4  145.5  168.0  169.9  170.3  174.2  193.0  193.3  193.5  195.0
 ```
 
-Median **~172s**, spread **139.7–195.0s**. The post-split improvement over the pre-split 196–235s is real;
+Median **~170s**, spread **139.7–195.0s**. The post-split improvement over the pre-split 196–235s is real;
 the **-25%** headline is the best case rather than the typical one. Four of the six runs here sat in a
 2-second band at 193.0–195.0, so the fast readings are the outliers, not the norm. This does not change
 the saving — every second of that band is saved either way — and it is recorded here rather than swept
 into the `-25%` claim, per the rule that a size gets its own measurement.
+
+**The eleventh reading is `open-pr`'s own, on this very branch: 168s, 43/43 green** — quoted rather than
+dropped, following the same precedent the section above set when its fifth reading arrived late. It is the
+useful kind of confirmation, because it was taken by the gate itself rather than by the person arguing for
+the median, and it lands within two seconds of it. That is what moves *"median ~170s"* from a summary of
+one session's runs to a figure an independent run reproduces.
 
 ### Boundaries with the other roles
 

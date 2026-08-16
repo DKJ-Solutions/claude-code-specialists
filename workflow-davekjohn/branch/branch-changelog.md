@@ -37,10 +37,15 @@ result; the two "skipped" lines are one fingerprint decision printed twice rathe
 and the six fast merges since the record shipped are consistent with it but are not six firings.
 
 One side finding is kept separate rather than folded in. The four post-split suite runs already recorded
-(142.4 / 145.5 / 170.3 / 169.9s) are the optimistic end of a wider band — combined with the six here,
-n=10 spans 139.7–195.0s with a median near 172s, and four of the six sat at 193.0–195.0. The post-split
-improvement is real; the "-25%" headline is the best case rather than the typical one. The summary table
-is corrected accordingly (40 → 43 suites, and the lint row gets a number where it said "seconds").
+(142.4 / 145.5 / 170.3 / 169.9s) are the optimistic end of a wider band — combined with the six here and
+`open-pr`'s own 168s on this branch, n=11 spans 139.7–195.0s with a median near 170s, and four of the six
+sat at 193.0–195.0. The post-split improvement is real; the "-25%" headline is the best case rather than
+the typical one. The summary table is corrected accordingly (40 → 43 suites, and the lint row gets a
+number where it said "seconds").
+
+That eleventh reading is quoted rather than dropped, following the precedent the section above set for a
+late arrival — and it is the useful kind, taken by the gate itself rather than by the person arguing for
+the median, landing within two seconds of it.
 
 ### Significance
 
