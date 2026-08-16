@@ -119,6 +119,25 @@ via a PR.
   deviates record its deviation in its own lens. (Both halves come from one decision in the source
   repo, taken after a standing approval about publishing releases was headed for a repo lens and was
   then nearly narrowed to protect a consumer that could have spoken for itself.)
+- **A destination has a *reach*, and the reach is checked before the sentence is written.** Picking the
+  right layer is only half of siting a change; the other half is whether that file can still arrive at
+  the reader who needs it. Two destinations look correct and are not, and neither announces itself at
+  the moment of writing — the edit applies cleanly and reads well in place.
+  **A file a plugin scaffolds into a consumer's repo is written once and never again.** Scaffolding is
+  deliberately additive: it creates what is absent and leaves what already exists exactly as it is,
+  whatever it contains. So a repair written into a scaffolded file reaches **new adopters only**, while
+  every consumer who already ran the scaffold keeps the old text forever — and they are the ones who
+  hit the defect. A fix that has to reach an already-adopted consumer ships as **plugin payload**
+  (a manual, a persona, a skill page — content the plugin owns and an update replaces), never as an edit
+  to the copy in their tree. Siting such a repair in the scaffold does not merely fail to land; it
+  demonstrates the exact defect it was written to record.
+  **And a plugin-root path resolves per plugin — to the one shipping the file it is written in.**
+  `${CLAUDE_PLUGIN_ROOT}` is not a path to *a* plugin cache but to *this* plugin's, so a command aimed at
+  one plugin's scripts cannot be written into a document a different plugin ships: it resolves into the
+  wrong root for every reader. Before quoting a runnable command in a doc, check which plugin owns the
+  **file you are typing into**, not which plugin owns the script. Where the right owner for the sentence
+  and the right owner for the command turn out to be different plugins, that is the finding — say so,
+  rather than quoting a path that only resolves from where you happen to be sitting.
 - **When moving/restructuring: nothing silently drops, everything stays referenced.** If text moves
   from one doc to another, Tessa checks two things explicitly. (a) *No nuance is lost:* whatever can't
   come along when a body is made generic because it's repo-specific moves to the repo-specific

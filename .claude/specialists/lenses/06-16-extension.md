@@ -149,6 +149,27 @@ otherwise be false about her own manual. The citations belong here:
   itself is in [her manual](../../../plugins/teams/team-alpha/manuals/06-16-manual.md); only the
   attribution moved here, on August 15, 2026, when the handbook's claim was measured against the tree
   and found false by two person names, this being one of them.
+- **"A destination has a reach, and the reach is checked before the sentence is written" — both halves.**
+  Measured here on **August 16, 2026**, siting the repair for inbound
+  [#731](https://github.com/DaveKJohn/claude-code-specialists/issues/731) (from `life-hub`, reporting that
+  `disable-model-invocation: true` left the owner's explicit *"merge it"* unexecutable). Three targets were
+  measured and rejected there — the third being a settings-level opt-in that does not exist, since
+  `skillOverrides` states outright that plugin skills are not affected by it. **The other two failed on
+  reach rather than on content**, and that is what turned the observation into a rule:
+  - **Wrong plugin root.** Derek's and Rendall's portable personas were the natural owners of a chain
+    command, and they are `team-alpha` — a plugin that ships neither `workflow-davekjohn`'s scripts nor a
+    dependency on it, so `${CLAUDE_PLUGIN_ROOT}` written there resolves into the wrong root.
+  - **Right owner, wrong reach.** `workflow-davekjohn/CLAUDE.md` *is* the correct owner, and
+    `adopt-workflow-folder` never overwrites — so the sentence would have reached new adopters only, while
+    the reporter, who already had the folder, would never have seen it. The fix landed in
+    `new-branch/SKILL.md` instead: plugin payload, replaced by an update, and the one skill in that chain
+    deliberately left model-invocable.
+
+  The repair shipped as [PR #734](https://github.com/DaveKJohn/claude-code-specialists/pull/734) and both
+  halves then lived **only in that branch's folded changelog entry** — a published record nobody reads when
+  deciding where to put a fix. That is precisely the gap `CLAUDE.md`'s "lessons are secured in the docs,
+  not just in memory" rule exists to close, so the rule moved to
+  [her manual](../../../plugins/teams/team-alpha/manuals/06-16-manual.md) and the instance stayed here.
 
 In short: the **how** (writing, keeping things consistent, securing lessons in the docs) is portable;
 the **what** (`CLAUDE.md`, `README.md`, this specialists system with its portable-vs-lens split and
