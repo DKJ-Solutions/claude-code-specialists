@@ -345,8 +345,8 @@ application to profile: what costs time is what runs before work is allowed to l
 
 | what runs | measured | when it runs |
 |---|---|---|
-| `check-plugin-integrity.ps1` (26 checks) | seconds | before every push, and inside the cut |
-| the test suites — 30 then, **40** now | **205–232s** then; **196–235s** re-measured at 40 suites, n=5, idle machine ([below](#the-gates-wall-clock-is-one-suite--re-measured-n5-august-16-2026)) | inside `cut-release`, inside `open-pr`, and again in CI |
+| `check-plugin-integrity.ps1` (26 checks) | **9.2–10.6s**, n=3, idle machine ([below](#the-gate-records-saving-measured-on-the-case-it-was-built-for-august-16-2026)) | before every push, and inside the cut |
+| the test suites — 30 then, **43** now | **205–232s** then; **196–235s** at 40 suites, n=5 ([below](#the-gates-wall-clock-is-one-suite--re-measured-n5-august-16-2026)); **139.7–195.0s, median ~170s** at 43 post-split, n=11, idle machine ([below](#the-gate-records-saving-measured-on-the-case-it-was-built-for-august-16-2026)) | inside `cut-release`, inside `open-pr`, and again in CI |
 | CI `lint-en-tests` | **median 7m 23s**, range 5m 17s–9m 27s over **63** blocking runs (August 11, 2026) | every PR; blocks the merge |
 | a full release, end to end | **28m 03s**, measured at `v4.4.0` (August 11, 2026) — all of it blocking | per release, ~1.6× per day at the August cadence |
 
@@ -661,6 +661,72 @@ all 40 suites' own summary lines the real figure is **4,206**. The row above car
 the same reason and no longer states one — at 30 suites the total was never in the low hundreds either.
 This is [Chris's fifth intake pattern](01-01-extension.md#the-dave-rules) — the finding is real and its
 **size** is wrong — in its fourth instance, and again on a report this team wrote itself.
+
+### The gate record's saving, measured on the case it was built for (August 16, 2026)
+
+`v4.12.0`'s release note left this open in its own words: *"The gate record has not been measured on the
+case it was built for. Its saving shows only when a branch is opened in one step and shipped in a later
+one. This release did neither."* **[PR #734](https://github.com/DaveKJohn/claude-code-specialists/pull/734)
+is that case**, and it is measured here while the evidence is still readable.
+
+**The saving is a difference, so both halves are measured — not one half and an assumption.**
+On this machine, deliberately idle, all suites green, `-SkipLint`/`-SkipTests` never used (they record
+nothing, so a run using them measures something else):
+
+| what `ship-pr` would have paid | n | range | taken |
+|---|---|---|---|
+| the lint gate (`check-plugin-integrity.ps1`) | 3 | 9.2 – 10.6s | mean **9.9s** |
+| the test gate, **43** suites | 6 | 139.7 – 195.0s | median **193.2s** |
+| **what it paid instead** — one fingerprint + one evidence read per gate | 10 | 130.9 – 249.5ms | mean **162ms** |
+
+**About 203 seconds of gate, replaced by about a sixth of a second — a ratio near 1,250:1.** That is the
+number the release note was waiting for. It is a per-ship saving in the split-step case only; a branch
+opened and shipped in one motion never had the duplicate to begin with.
+
+**The field number agrees, and it was measured a different way.** #734's `open-pr` recorded both gates at
+`12:02:29Z` and opened the PR four seconds later; CI went green at `12:09:54Z` and the merge landed at
+`12:10:21Z` — a **CI-green-to-merge gap of 27 seconds**. Against the historical slow mode for exactly this
+shape (median 264.5s, below) that implies a field saving of ~237s, which reconciles with the 203s of gate
+above plus roughly 30s of genuine merge-and-fold work. Two methods, ~15% apart, agreeing on three minutes.
+
+**The historical comparator was recounted rather than quoted, and it SURVIVED** — which is worth recording
+precisely because the four instances above did not. `gate-lib.ps1`'s docstring claims 293 merged PRs split
+bimodally: 205 within 60s (median 14s), 83 at a median of 263s, i.e. 28.3%. Recomputed from `gh` over 281
+matched merges: **187 fast (median 13s), 78 slow (median 264.5s), 27.8%**, with the same void between the
+modes and the same interior peak at 240–300s. The counts differ because `gh run list` truncates older runs,
+not because the shape does. **A figure that holds on recount is still worth the recount** — that is the
+only way to tell it apart from one that does not.
+
+**Three things this measurement is NOT, stated because each is an easy misreading:**
+
+- **The 249s-on-28.3% figure is not this saving.** It is the historical excess the record was *designed
+  against*, computed before the fix existed. It is the comparator, never the result.
+- **"lint skipped" and "tests skipped" are one data point, not two.** Both gates consult a single
+  fingerprint computed once per run (`Get-GateFingerprint`), so the pair is one decision printed twice.
+  The 162ms above therefore times the whole path once, not each gate separately.
+- **Six merges is not six firings.** PRs 728–734 all landed fast (`8 · 14 · 16 · 16 · 9 · 27s`), but the
+  record only fires on a split-step ship, and #734 is the one confirmed to be one. The other five are
+  consistent with the result; they are not independent evidence for it.
+
+**A side finding on the suite band itself, kept separate rather than folded in.** The four post-split runs
+recorded above (142.4 / 145.5 / 170.3 / 169.9s) are the optimistic end of a wider band. Combining them with
+the six here gives n=10 at 43 suites, on two different sessions:
+
+```text
+139.7  142.4  145.5  168.0  169.9  170.3  174.2  193.0  193.3  193.5  195.0
+```
+
+Median **~170s**, spread **139.7–195.0s**. The post-split improvement over the pre-split 196–235s is real;
+the **-25%** headline is the best case rather than the typical one. Four of the six runs here sat in a
+2-second band at 193.0–195.0, so the fast readings are the outliers, not the norm. This does not change
+the saving — every second of that band is saved either way — and it is recorded here rather than swept
+into the `-25%` claim, per the rule that a size gets its own measurement.
+
+**The eleventh reading is `open-pr`'s own, on this very branch: 168s, 43/43 green** — quoted rather than
+dropped, following the same precedent the section above set when its fifth reading arrived late. It is the
+useful kind of confirmation, because it was taken by the gate itself rather than by the person arguing for
+the median, and it lands within two seconds of it. That is what moves *"median ~170s"* from a summary of
+one session's runs to a figure an independent run reproduces.
 
 ### Boundaries with the other roles
 
