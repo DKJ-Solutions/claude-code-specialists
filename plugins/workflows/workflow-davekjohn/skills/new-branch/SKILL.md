@@ -39,6 +39,38 @@ The script:
    come into existence in a single step. Idempotent **per file**: a file that already belongs to this
    branch is left exactly as it is.
 
+## The rest of the chain — the commands, written here because they are readable here
+
+`new-branch` is the one step of this chain the model may reach for on its own. The four that follow
+carry `disable-model-invocation: true`, and that flag removes their pages **from the model's context
+entirely** — it does not gate the work behind them. The scripts are ordinary PowerShell in this
+plugin, and they run exactly the same checks whoever types the line:
+
+```powershell
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1"
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/ship-pr.ps1"
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/fold-changelog-entry.ps1" -Branch <prefix>/<short-name>
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/cut-release.ps1" -Bump <major|minor|patch> -Title "<one sentence>"
+```
+
+**In the source repo, run its own copy instead** — `scripts/release/<name>.ps1` — for the same reason
+the line above gives for `new-branch`: the plugin cache holds the last *released* mirror.
+
+**The flag decides who types the line. It does not decide whether the line may run.** That second
+question is governance, and it is answered outside this plugin: a finished branch ships once the gates
+are green, and waits for the owner's explicit word for work with a **visible result** or work that is
+**irreversible or outward-facing**. `cut-release` is always in that second group. So this list is a
+route, never a licence — read the page for the step you are on before running it, because each carries
+its own flags, pre-flight requirements and refusals, and none of that is repeated here.
+
+**Why the list exists at all.** Without it the flag hides the *instruction* rather than the
+*capability*: the model can still run the script, it simply has no source in context saying where the
+script is. The effect was an inversion — the moment the governance rule is built around, the owner
+saying "merge it", was the one moment the documented route was unavailable while the undocumented one
+was not. Reported from a consumer as
+[#731](https://github.com/DaveKJohn/claude-code-specialists/issues/731). **No flag changed**; the
+route moved to a page the model is allowed to read.
+
 ## The two files, and why there are two
 
 ```text
