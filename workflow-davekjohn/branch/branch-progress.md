@@ -9,7 +9,7 @@
 
 #### CREATE
 
-- [x] Nolan #25's lens: the n=4 re-measure, the one-suite finding, the 8-lane result, the split's ceiling
+- [x] Nolan #25's lens: the n=5 re-measure, the one-suite finding, the 8-lane result, the split's ceiling
 - [x] Nolan #25's lens: correct the wall-clock table row (suite count, timing, the assert figure)
 - [x] Chris #01's lens: fourth instance of the fifth intake pattern, plus "a timing is a count too"
 - [~] Repair the gate itself — dropped here on purpose: splitting `check-plugin-integrity.tests.ps1`
@@ -19,6 +19,7 @@
 #### TEST
 
 - [x] Four repeat runs at `MaxParallel 16` plus one at 8 and one standalone — 40/40 suites green in each
+- [x] The `open-pr` gate's own run added a fifth reading (235s) and the lens was widened to include it
 
 ### Where I left off
 

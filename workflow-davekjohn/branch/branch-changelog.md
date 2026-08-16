@@ -16,9 +16,9 @@ docs
 
 Issue [#714](https://github.com/DaveKJohn/claude-code-specialists/issues/714) reported the local test
 gate at 322.5s, "about +40%", with the growth "diffuse, not one offender". Picking it up began with a
-recount, and the recount inverted the diagnosis: re-measured four times in the gate's own pool
-(`MaxParallel 16`, 18 cores, 40 suites green), the gate runs at **196–213s** — inside the 205–232s
-baseline it was said to have left — and in every single run the **total is one suite to a tenth of a
+recount, and the recount inverted the diagnosis: re-measured five times (four of them in the gate's own
+pool — `MaxParallel 16`, 18 cores, 40 suites green), the gate runs at **196–235s** — around the 205–232s
+baseline it was said to have left — and in every pool run the **total is one suite to a tenth of a
 second**. `check-plugin-integrity.tests.ps1` starts first and finishes last; the other 39 suites are
 done at 126.9s, after which one process runs alone for 70–86s with 15 of 16 lanes empty.
 

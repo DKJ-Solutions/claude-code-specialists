@@ -346,7 +346,7 @@ application to profile: what costs time is what runs before work is allowed to l
 | what runs | measured | when it runs |
 |---|---|---|
 | `check-plugin-integrity.ps1` (26 checks) | seconds | before every push, and inside the cut |
-| the test suites — 30 then, **40** now | **205–232s** then; **196–213s** re-measured at 40 suites, n=4, idle machine ([below](#the-gates-wall-clock-is-one-suite--re-measured-n4-august-16-2026)) | inside `cut-release`, inside `open-pr`, and again in CI |
+| the test suites — 30 then, **40** now | **205–232s** then; **196–235s** re-measured at 40 suites, n=5, idle machine ([below](#the-gates-wall-clock-is-one-suite--re-measured-n5-august-16-2026)) | inside `cut-release`, inside `open-pr`, and again in CI |
 | CI `lint-en-tests` | **median 7m 23s**, range 5m 17s–9m 27s over **63** blocking runs (August 11, 2026) | every PR; blocks the merge |
 | a full release, end to end | **28m 03s**, measured at `v4.4.0` (August 11, 2026) — all of it blocking | per release, ~1.6× per day at the August cadence |
 
@@ -588,7 +588,7 @@ only while it says when each one was opened.
 building; a check refusing a release over a missing number would cost every release something in order to
 guard a decision nobody has made yet.
 
-### The gate's wall clock is ONE suite — re-measured, n=4 (August 16, 2026)
+### The gate's wall clock is ONE suite — re-measured, n=5 (August 16, 2026)
 
 [#714](https://github.com/DaveKJohn/claude-code-specialists/issues/714) reported the local gate at
 **322.5s** against the baseline above — *"about +40%"*, with the growth *"diffuse, not one offender"*.
@@ -610,8 +610,14 @@ another 70–86 seconds with 15 of 16 lanes empty. Standalone the same suite tak
 lengthens this gate. The growth is diffuse in origin and **singular in effect**: nothing that fails to
 shorten that one file can shorten the gate.
 
-**The +40% does not reproduce, and that is a finding about the metric, not about the code.** Four idle
-runs land at **196–213s** — inside the 205–232s baseline recorded when there were 30 suites, now with 40.
+**A fifth reading arrived before this was merged, and it is quoted rather than dropped: 235s** — the
+gate's own run inside `open-pr` on this very branch, lint first, 40/40 green. It is the highest of the
+five and sits just above the old baseline's top end. It stays in because the band **is** the finding: a
+figure that moves between 196s and 235s on one idle machine, and to 322s on a busy one, is not a figure
+anyone should read a 40% regression out of.
+
+**The +40% does not reproduce, and that is a finding about the metric, not about the code.** Five idle
+runs land at **196–235s** — around the 205–232s baseline recorded when there were 30 suites, now with 40.
 #714's 322.5s and the 326s reproduction were both taken on August 15 during the team-wide review, i.e. on
 a machine running many agents at once. Because the wall clock is one single-threaded process, it measures
 what else the machine is doing at least as much as it measures the suites. **State the machine state and
@@ -619,7 +625,7 @@ the n beside this number, or it says nothing** — the same discipline the relea
 already carry.
 
 **Halving the lanes is inside the noise, so it is not a saving.** `MaxParallel 8` measured **194.3s**,
-with the other 39 suites still finishing at 153.2s and 41s of headroom to spare. 19s against a 196–213s
+with the other 39 suites still finishing at 153.2s and 41s of headroom to spare. 19s against a 196–235s
 spread is not a result at n=1 per configuration, and it is not proposed as one.
 
 **What a repair would have to be, and its measured ceiling.** The floor for the local gate is that suite:

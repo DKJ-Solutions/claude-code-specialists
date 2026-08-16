@@ -138,11 +138,11 @@ product: agent defs, manuals, docs, and tooling.
   - **[#714](https://github.com/DaveKJohn/claude-code-specialists/issues/714)**, picked up the next day,
     August 16, 2026, makes it four — and it is the one where the recount changed the *verdict* rather than
     the size. It reported the local test gate at **322.5s**, "+40%", growth "diffuse, not one offender".
-    Re-measured in the gate's own pool, four times: **196–213s**, inside the baseline it was said to have
-    left, with the whole wall clock being **one suite** to a tenth of a second. Its second count was wrong
-    in the same direction as the three above — "234 asserts" is what that one suite prints for itself,
-    against **4,206** across all forty. The measurement and the corrected direction are in
-    [Nolan #25](06-25-extension.md#the-gates-wall-clock-is-one-suite--re-measured-n4-august-16-2026).
+    Re-measured five times, four of them in the gate's own pool: **196–235s**, around the baseline it was
+    said to have left, with the whole wall clock being **one suite** to a tenth of a second. Its second
+    count was wrong in the same direction as the three above — "234 asserts" is what that one suite prints
+    for itself, against **4,206** across all forty. The measurement and the corrected direction are in
+    [Nolan #25](06-25-extension.md#the-gates-wall-clock-is-one-suite--re-measured-n5-august-16-2026).
   **What generalises:** a count in a report is whatever the search matched, and the search is chosen by
   whoever noticed the symptom. Here the reporter and the repairer were the same team an hour apart, and
   it still went wrong **four times out of 22** — which is the argument for recounting even when the report
