@@ -51,7 +51,7 @@ $RECYCLE.BIN/
 # is what survives a lost machine.
 workflow-davekjohn/releases/page/
 
-# The locked next topic (/lock -> /clear -> /continue). Deliberately NOT committed: it is one
+# The locked next topic (/lock -> /clear -> /handover). Deliberately NOT committed: it is one
 # developer's working intent, it goes stale within hours, and all three commands run on one machine
 # within minutes -- committing it would mean a pull request per session close.
 .claude/handover.md

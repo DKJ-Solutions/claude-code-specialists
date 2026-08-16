@@ -47,7 +47,7 @@ before adding the next one.*
 | `task/park-branch.ps1` | commits all outstanding work + `git push -u` — no PR, no live action | [`park`](../skills/park/SKILL.md) |
 | `task/adopt-config.ps1` | reads the config blueprint and places or proposes each seam answer | [`adopt-config`](../skills/adopt-config/SKILL.md) |
 | `task/adopt-workflow-folder.ps1` | scaffolds `workflow-davekjohn/` — the folder docs, the releases root, the branch dossier and the prompt inbox | [`adopt-workflow-folder`](../skills/adopt-workflow-folder/SKILL.md) |
-| `task/session-status.ps1` | reports the locked topic and the repo's own answer beside it | [`lock`](../skills/lock/SKILL.md) · [`continue`](../skills/continue/SKILL.md) |
+| `task/session-status.ps1` | reports the locked topic and the repo's own answer beside it | [`lock`](../skills/lock/SKILL.md) · [`handover`](../skills/handover/SKILL.md) |
 | `task/prompt-inbox.ps1` | reads the assignment written into `workflow-davekjohn/prompts/prompt.md`, and archives it on `-Archive` | [`prompt`](../skills/prompt/SKILL.md) |
 | `release/open-pr.ps1` | the gates, the push and the PR; lint gate via `Get-LintScript` in `repo-config` | [`open-pr`](../skills/open-pr/SKILL.md) |
 | `release/ship-pr.ps1` | open → wait for CI → merge → fold, in one motion | [`ship-pr`](../skills/ship-pr/SKILL.md) |

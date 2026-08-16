@@ -118,7 +118,7 @@ function Get-SharedScriptPairs {
         },
         @{
             # TWO SKILLS READ THIS ONE SCRIPT, and Skill is a single field on purpose -- it answers "which
-            # page documents this script's SURFACE", not "who calls it". /lock and /continue run the same
+            # page documents this script's SURFACE", not "who calls it". /lock and /handover run the same
             # reporter and differ only in what they do with the answer, so the parameter surface is
             # documented once, in the page a reader reaches first. 'cut-release' is already named by two
             # entries here, so a name serving more than one relationship is precedented.

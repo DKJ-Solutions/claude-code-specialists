@@ -4,8 +4,8 @@ description: >-
   Fix the next topic before clearing the context: read where the repo actually stands via the shared
   session-status script, name the single highest-priority next subject, and write it to
   .claude/handover.md so the next session picks up that subject instead of re-deriving one. Use this
-  as the FIRST of three steps -- /lock, then /clear, then /continue. The lock is recorded intent, not
-  a refusal: /continue re-reads the repo and may report the locked topic was already done or
+  as the FIRST of three steps -- /lock, then /clear, then /handover. The lock is recorded intent, not
+  a refusal: /handover re-reads the repo and may report the locked topic was already done or
   overtaken. Writes one gitignored file; it opens no branch, commits nothing and pushes nothing.
 disable-model-invocation: true
 ---
@@ -17,7 +17,7 @@ agreed as next.** Everything else -- the tree, the branch, parked work, open iss
 the last release's open items -- is still a fact the repo holds, and reading it beats reading a summary
 of it.
 
-So this is the half that records a **decision**. `/continue` supplies the other half by re-reading the
+So this is the half that records a **decision**. `/handover` supplies the other half by re-reading the
 repo.
 
 ## The three steps
@@ -25,8 +25,12 @@ repo.
 ```text
 /lock       name the next subject and write it down   <- this page
 /clear      Claude Code's own built-in command
-/continue   read the lock, re-verify against the repo, resume
+/handover   read the lock, re-verify against the repo, resume
 ```
+
+**The third step was called `/continue` until August 16, 2026**, and was renamed because Claude Code
+ships a built-in `/continue` that a skill of the same name collides with. The page it points at explains
+it; nothing about the shape of these three steps changed.
 
 **A skill cannot run `/clear`** -- that is a built-in CLI command, so the clear stays yours. That is
 also why this is `/lock` and not one combined command.
@@ -59,7 +63,7 @@ a list, and a list is what the next session will have to re-prioritise, which is
 exists to avoid.
 
 **3. Write it to the path the script printed** (`.claude/handover.md` at the repo root). The script
-owns that path and prints it, so this page and `/continue` cannot drift apart on where the file lives.
+owns that path and prints it, so this page and `/handover` cannot drift apart on where the file lives.
 
 **4. Show the requester what you wrote, before they clear.** The point of a separate command is that
 the decision is visible and correctable while they are still in the conversation that produced it.
@@ -98,11 +102,11 @@ the pending entries every time, so restating them here only creates something th
 
 ## The lock is recorded intent, not a refusal
 
-Nothing enforces it. `/continue` re-reads the repo on every run and **must** be able to report that the
+Nothing enforces it. `/handover` re-reads the repo on every run and **must** be able to report that the
 locked subject was already done, or overtaken by work merged since -- filing and repairing can cross
 inside one morning.
 
-**Do not "improve" this by making `/continue` obey the lock without re-reading.** That is the failure
+**Do not "improve" this by making `/handover` obey the lock without re-reading.** That is the failure
 this family has already measured from the other direction: a self-verifying start prompt arrived three
 times identically truncated, breaking off mid-word, and nothing in the visible list announced what was
 missing. A handover is a pointer; the repo is the inventory.
@@ -122,7 +126,7 @@ missing. A handover is a pointer; the repo is the inventory.
 
 ## Related
 
-- **`/continue`** -- the other half: reads this lock and re-verifies it.
+- **`/handover`** -- the other half: reads this lock and re-verifies it.
 - **`park`** -- adjacent but different, and worth keeping apart. Parking sets a **branch** aside on the
   remote so it is continuable on another device; locking records **which subject** to pick up next. A
   branch can be parked with no lock set, and a lock can name work no branch exists for yet.

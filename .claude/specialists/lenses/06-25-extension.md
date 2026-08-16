@@ -327,7 +327,7 @@ already does, rather than adopted wholesale. Done, per practice:
 | **Provide specific context in prompts** | The requester's side; nothing for this repo to build. |
 | **Configure the environment** | Adopted except for one item: the pruned `CLAUDE.md`. See the re-measurement above — this is the single practice the repo visibly and knowingly diverges from. |
 | **Communicate effectively** | Bianca #02 is an entire specialist for interview-to-spec. |
-| **Manage the session** | The `lock` and `continue` skills are exactly the checkpoint/resume pattern, with a reporter behind both. |
+| **Manage the session** | The `lock` and `handover` skills are exactly the checkpoint/resume pattern, with a reporter behind both. |
 | **Automate and scale** | The shared-scripts layer, and an adversarial review step the page suggests: Marlowe reviews the *conclusion* while the other reviewers check the craft. |
 | **Avoid the failure patterns** | The over-specified `CLAUDE.md` is the one being lived. The trust-then-verify gap is closed by the gates. |
 
