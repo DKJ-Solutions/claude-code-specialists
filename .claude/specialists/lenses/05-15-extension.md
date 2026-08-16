@@ -183,7 +183,7 @@ infrastructure.
     **IT HAS NOW FIRED TWICE, IN TWO UNRELATED SCRIPTS, SO TREAT IT AS A CLASS RATHER THAN AS THIS LIB'S
     INCIDENT** (August 14, 2026). `session-status.ps1`'s open-issues block carried the same one-liner and
     printed `#System.Object[]  System.Object[]` for three open issues — in this repo *and* in every
-    consumer's mirror, since both the `lock` and `continue` skills tell a consumer to run it. Grep for
+    consumer's mirror, since both the `lock` and `handover` skills tell a consumer to run it. Grep for
     `@(` immediately followed by a command piping into `ConvertFrom-Json` before adding another.
     **Two things that measurement added, neither of which the original write-up had:**
     - **At exactly ONE record the broken form is correct**, because member enumeration over a
@@ -194,7 +194,7 @@ infrastructure.
       guard behind this pattern is **unreachable**, and the empty case falls into the populated branch.
       Here that printed a bare `#` with two empty fields. Fix and test *both* branches: the visible
       symptom is the populated case, the silent one is the empty case.
-- **`scripts/task/session-status.ps1`** — the reporter behind `/lock` and `/continue`; shared and
+- **`scripts/task/session-status.ps1`** — the reporter behind `/lock` and `/handover`; shared and
   mirrored, and a consumer keeps no copy of their own, so a defect here is invisible to them. Its
   open-issues block was repaired on **August 14, 2026** and cost **two** lessons beyond the
   `ConvertFrom-Json` trap above:

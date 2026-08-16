@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Prints where this repo stands right now, plus the next topic if one was locked -- the input for
-    /lock (before a context clear) and /continue (after one).
+    /lock (before a context clear) and /handover (after one).
 
 .DESCRIPTION
     A reporter, and deliberately nothing else. It reads; it never writes, commits, pushes or edits.
@@ -24,7 +24,7 @@
 
     THE LOCK IS RECORDED INTENT, NOT A REFUSAL. Nothing here enforces it and nothing should: this
     script prints both halves and leaves the comparison to the reader. A future change that made
-    /continue obey the lock without re-reading the repo would reintroduce exactly the failure above --
+    /handover obey the lock without re-reading the repo would reintroduce exactly the failure above --
     trusting a handover over the repo -- so the printout keeps them side by side and separately
     labelled.
 

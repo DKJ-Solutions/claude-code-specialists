@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Regression tests for scripts/task/session-status.ps1 -- the reporter behind /lock and /continue.
+    Regression tests for scripts/task/session-status.ps1 -- the reporter behind /lock and /handover.
 
 .DESCRIPTION
     Dependency-free: no Pester needed, only PowerShell. Integration style -- runs the REAL script as a

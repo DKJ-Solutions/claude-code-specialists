@@ -1,24 +1,31 @@
 ---
-name: continue
+name: handover
 description: >-
-  Resume work after clearing the context: read the topic that /lock recorded, re-verify it against what
-  the repo actually says now via the shared session-status script, report any disagreement between the
-  two, and then start. Use this as the LAST of three steps -- /lock, then /clear, then /continue. The
-  repo is the authority, not the lock: if the locked subject was already done or overtaken, say so
-  instead of building it. Reads only; it opens no branch and commits nothing by itself.
+  Resume work after clearing the context: read the topic that /lock recorded in .claude/handover.md,
+  re-verify it against what the repo actually says now via the shared session-status script, report any
+  disagreement between the two, and then start. Use this as the LAST of three steps -- /lock, then
+  /clear, then /handover. The repo is the authority, not the lock: if the locked subject was already
+  done or overtaken, say so instead of building it. Reads only; it opens no branch and commits nothing
+  by itself.
 disable-model-invocation: true
 ---
 
-# continue -- resume the locked topic, with the repo as the authority
+# handover -- resume the locked topic, with the repo as the authority
 
-The second half of `/lock`. That command recorded a **decision**; this one supplies the **facts** and
-checks the two still agree.
+The second half of `/lock`. That command recorded a **decision** and wrote it to `.claude/handover.md`;
+this one supplies the **facts** and checks the two still agree.
 
 ```text
 /lock       name the next subject and write it down
 /clear      Claude Code's own built-in command
-/continue   read the lock, re-verify against the repo, resume   <- this page
+/handover   read the lock, re-verify against the repo, resume   <- this page
 ```
+
+**This command is called `/handover` because `/continue` is taken.** Claude Code ships its own
+`/continue`, so a skill by that name collides with a built-in and the requester cannot reliably reach
+the one they meant. `handover` is also the name of the file this command reads, which is the second
+reason to prefer it: the command and its input now say the same word. **Do not "restore" the old name**
+— the collision is the whole reason it changed (Dave, August 16, 2026).
 
 ## What to do
 
@@ -69,7 +76,7 @@ subject from what is actually there, and offer to `/lock` it.
   repo is the inventory.
 - **It does not delete the lock after reading it.** Re-running is free, a cleared context may need the
   subject twice, and `/lock` overwrites. A command that consumed its own input would leave a second
-  `/continue` with nothing.
+  `/handover` with nothing.
 - **It does not run the gates.** They cost minutes each, and a resume command that costs minutes gets
   avoided -- at which point it reports nothing at all. It prints the commands so the reader runs
   whichever the work in front of them needs.

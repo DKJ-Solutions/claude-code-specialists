@@ -57,7 +57,7 @@ answering the question the other directory owns.
 ## The thirteen skills
 
 **All of them, deliberately.** This table listed nine under the heading "The nine skills" while the
-directory held twelve — `lock`, `continue` and `prompt` had each arrived without a row, and the count in
+directory held twelve — `lock`, `handover` and `prompt` had each arrived without a row, and the count in
 the heading is what made the gap look like a decision. A partial list of an enumerable set is worse than
 none: a reader who finds four of their skills undocumented here cannot tell which of the two documents is
 wrong.
@@ -75,7 +75,7 @@ wrong.
 | [`cut-release`](skills/cut-release/SKILL.md) | the release: the bump, the notes, the tag, and the closing steps the script does not automate |
 | [`release-notes-page`](skills/release-notes-page/SKILL.md) | after a release — builds the hand-written notes into one browsable page for the reader they are written for, and optionally the Cloudflare Worker that hosts it |
 | [`lock`](skills/lock/SKILL.md) | closing a session — records where the work stands before a context clear |
-| [`continue`](skills/continue/SKILL.md) | opening the next one — reads that record back |
+| [`handover`](skills/handover/SKILL.md) | opening the next one — reads that record back (named for the file it reads, and to stay out of the built-in `/continue`'s way) |
 | [`fix-mojibake`](skills/fix-mojibake/SKILL.md) | repairing encoding damage in markdown |
 
 ## What it expects from your repo — the seam
