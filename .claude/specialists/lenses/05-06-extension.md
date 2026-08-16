@@ -23,11 +23,12 @@ rewrite when copying. Managing branches, PRs, and merges up to and including the
 
 `CHANGELOG.md` (repo root) is an **intro followed by one `##` per change, with no section headings at all**
 (Dave, August 5, 2026). A change *is* the `##`, and since August 6, 2026 its heading names the **branch** —
-`` ## `feat/x` changelog `` — with six `###` sections under it: the branch's title, its ID, its type, what
-the change brings to `main`, `Significance` (one `#### Tier N` sub-section per reach the change claims,
-replacing the impact table because not every change has a tier 1 or a tier 2 and a missing row read as an
-omission) and `Pull Request`, which the fold fills from the merge. Everything above the first `##` is the
-intro, which is the only part a repo writes by hand and the only thing a cut leaves standing.
+`` ## Branch `feat/x` changelog - '<stamp>' `` — with two `###` sections under it since August 16, 2026:
+what the change brings to `main` (one `#### Tier N` sub-section per reach it claims, replacing the impact
+table because not every change has a tier 1 or a tier 2 and a missing row read as an omission) and
+`Pull Request`, which carries the PR title and which the fold completes from the merge. Everything above
+the first `##` is the intro, which is the only part a repo writes by hand and the only thing a cut leaves
+standing.
 
 **This paragraph is why check 20 exists.** It described the pre-dossier shape — "just the title", three
 sections, and two names that had been retired — for a day after the format moved, and it is one of the two
@@ -513,13 +514,22 @@ and the entries now say that themselves, in a form that also carries what the ch
 tier the highest significance first.
 
 **And since August 6, 2026 the entry is the branch's own dossier, folded in as it stands.** The heading
-names the **branch** — `` ## `feat/x` changelog `` — and six `###` sections answer, in order:
-`Branch title` (the human-readable name of the change, which the heading used to carry),
-`Branch ID` (a timestamp stamped at creation), `Branch type` (the prefix, lowercase),
-`What does the change on this branch bring to main?`, `Significance` (one `#### Tier N` sub-section per
-reach the change claims, each closing with `**Score:**`) and `Pull Request`, which the **fold** fills
-from the merge itself. `Plugins:` stays a plain line, because a heading around one fact is more
-structure than content.
+names the **branch** — `` ## `feat/x` changelog `` — and its `###` sections answer in order.
+
+**It was six sections until August 16, 2026 and is two since** (Dave). Four of them said something the
+document already said: `Branch ID` is the timestamp the heading now carries, `Branch type` is the prefix
+of the branch that same heading names, `Significance` was a heading over sub-sections that are themselves
+the answer to the question above it, and `Branch title` was never a branch title — it is the PR title, and
+it moved into the `Pull Request` section where the rest of the PR's facts already live. What remains is
+`What does the change on this branch bring to main?` (one `#### Tier N` sub-section per reach the change
+claims, each closing with `**Score:**`, the second headed `#### Higher than tier 0?` where the repo has
+stated an audience tier) and `Pull Request` — the title, then the `Plugins:` line and the
+`[PR #N](…) · merged <date>` footer the **fold** writes underneath it. `Plugins:` stays a plain line,
+because a heading around one fact is more structure than content.
+
+**Every one of the six is still READ**, here and in every consumer: `CHANGELOG.md`, the release documents
+and every branch in flight are full of the old shape, and they meet the new scripts through a plugin
+update rather than by choosing to. Recognise both, write one.
 
 **That first section is called `Branch title`, and it IS the PR title** (Dave, August 7, 2026;
 [#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506) +

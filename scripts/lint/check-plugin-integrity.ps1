@@ -1427,11 +1427,19 @@ if (Test-Path -LiteralPath $clForHeadings) {
         # start; the opening section did not need them until it was renamed, and the moment it was, all six
         # pending entries were reported as split -- the very failure the paragraph above describes, reappearing
         # one section to the left. A rename is not a one-line change while any reader knows only the new name.
-        $ehOpeners = @(
-            (Get-EntrySectionHeadings)[(Get-EntryFirstSectionKey)]
-            (Get-EntrySectionHeadings)['What']
-        ) + @(Get-EntrySectionRetiredNames -Key (Get-EntryFirstSectionKey)) +
-            @(Get-EntrySectionRetiredNames -Key 'What') | Where-Object { $_ }
+        # AND IT HAPPENED A THIRD TIME ON AUGUST 16, 2026, which is why the list of openers is no longer
+        # built here. This read the CURRENT first key plus that key's retired NAMES -- correct until the
+        # first KEY itself moves, which it did when 'Branch title' stopped being written: the retired-name
+        # lookup then answered for 'What' while every pending entry in CHANGELOG.md still opened with
+        # 'Branch title', and six correct entries were reported as split. Get-EntryOpeningSectionKeys is
+        # the format owner's own answer to "which sections have ever opened an entry"; the gate adds each
+        # one's retired names, which is the part that was already right.
+        $ehHeadings = Get-EntrySectionHeadings
+        $ehOpeners = @()
+        foreach ($ehKey in (Get-EntryOpeningSectionKeys)) {
+            $ehOpeners += @($ehHeadings[$ehKey]) + @(Get-EntrySectionRetiredNames -Key $ehKey)
+        }
+        $ehOpeners = @($ehOpeners | Where-Object { $_ })
         $ehWhatHeading = $ehOpeners[0]
 
         # WHAT DISTINGUISHES AN ENTRY FROM A BODY HEADING, since markdown gives no marker for it. Every H2
@@ -1952,7 +1960,11 @@ Write-Coverage -Category 'skill-param' -Checked $skillParamChecked `
 # costs nothing and is the whole difference between catching the drift and not. Whole-text matching changes
 # nothing about what the tree pass reports -- it only closes the blind spot where a reflowed sentence hides a
 # claim, which is a formatting accident no author would think of as a bypass.
-$scExpected = @((Get-EntrySectionHeadings).Keys).Count
+# THE WRITTEN COUNT, NOT THE RECOGNISED ONE (August 16, 2026). Get-EntrySectionHeadings answers "which
+# heading does key X have" for every key that ever existed, retired ones included, so counting its keys
+# would hold a document to a shape the scaffolder stopped producing -- and accuse a correct page of being
+# stale. Get-EntryWrittenSectionKeys is the shape a reader actually meets.
+$scExpected = @(Get-EntryWrittenSectionKeys).Count
 $scLevel = Get-EntrySectionLevel
 $scWords = @{ 'one' = 1; 'two' = 2; 'three' = 3; 'four' = 4; 'five' = 5; 'six' = 6; 'seven' = 7; 'eight' = 8; 'nine' = 9; 'ten' = 10 }
 $scNumRx = '(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)'

@@ -1197,9 +1197,14 @@ function Convert-EntryHeadingToTitle {
     # SAME RULE AS THE REST OF THIS FUNCTION, applied to a new shape rather than a new rule -- the PR number,
     # the type and the date are dropped here for being internal administration, and a branch name is the
     # purest example of it. The developer notes and CHANGELOG.md keep the heading, as they keep the others.
-    $branchHeading = [regex]::Match($hm.Groups[2].Value, '^`([^`]+)`\s+\S+$')
+    # TWO SHAPES OF BRANCH HEADING, both matched here. It was '`feat/x` changelog' until August 16, 2026 and
+    # is 'Branch `feat/x` changelog - <timestamp>' since -- an optional lead word before the backticks and an
+    # optional trailing stamp after the title. A pattern that knew only the old one would leave every new
+    # entry's branch slug standing in the document written for someone outside this repo, which is exactly
+    # the publishing defect this rewrite exists to prevent.
+    $branchHeading = [regex]::Match($hm.Groups[2].Value, '^(?:[^`\s]+\s+)?`([^`]+)`\s+\S+(?:\s+.*)?$')
     if ($branchHeading.Success) {
-        $described = Get-EntrySectionAnswer -EntryText $EntryText -Key 'Description'
+        $described = Get-EntryPrTitle -EntryText $EntryText
         # No description, no rewrite: an entry that never filled it in keeps the branch heading, which is
         # ugly and TRUE. Inventing a title from the branch name would publish a slug as a change name.
         if ($described) {
@@ -1458,7 +1463,7 @@ function Build-GitHubReleaseBody {
         # The readable name, from the section that owns it -- with the entry's own heading as the fallback
         # so a nameless entry is still listed. Retired section names come along via Get-EntrySectionBody.
         $name = ''
-        $described = Get-EntrySectionBody -EntryText $e -Key 'Description'
+        $described = Get-EntryPrTitle -EntryText $e
         if ($described) { $name = @($described -split '\r?\n' | Where-Object { $_.Trim() })[0].Trim() }
         if (-not $name) {
             $hm = [regex]::Match($e, '^\s*#+\s+(.*)$', 'Multiline')

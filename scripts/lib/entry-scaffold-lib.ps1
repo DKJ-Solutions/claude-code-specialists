@@ -611,7 +611,46 @@ function Get-EntryTierSectionMarker {
         which is as close to one source as a matcher and a writer can get.
     #>
     param([Parameter(Mandatory)][int]$Tier)
+    if ((Test-EntryTierHeadingAsksRoute) -and $Tier -gt 0 -and $Tier -eq (Get-EntryAudienceTier)) {
+        return ('#' * $script:EntryTierSubLevel) + " $($script:EntryTierHigherHeading)"
+    }
     return ('#' * $script:EntryTierSubLevel) + " $($script:EntryTierSubPrefix) $Tier"
+}
+
+# --- 'Higher than tier 0?' -- THE AUDIENCE TIER'S HEADING (Dave, August 16, 2026) ------------------
+#
+# The second tier section is headed with the QUESTION instead of with its number. Two things that buys, and
+# the second is why it is worth a special case in a file that otherwise keeps its keys literal:
+#
+#   * the routing comment underneath it disappears, because the heading is the question;
+#   * the TEMPLATE stops naming a tier this repo happens to have. It used to read '#### Tier 2', which is
+#     only right for a repo whose audience is 2 -- a document shipped to consumers, telling a tier-1 repo
+#     the wrong number.
+#
+# IT RESOLVES TO A NUMBER ON READ, from Get-EntryAudienceTier, which is why this is safe at all: the repo
+# states its one audience tier and the heading means that tier. A repo that has stated NONE gets the
+# numbered headings exactly as before -- there is no single tier for the question to resolve to, and a
+# heading that resolved to nothing would silently read as tier 0 and empty every release. That is what
+# Test-EntryTierHeadingAsksRoute guards, and it is deliberately the conservative direction: an
+# unconfigured consumer taking this plugin update sees no change at all.
+#
+# READ ALWAYS, WRITTEN CONDITIONALLY -- the standing rule. Read-EntryTierSections recognises this heading
+# in every repo, configured or not, because an entry carrying it may have been written anywhere and folded
+# here; only the WRITER asks whether this repo has an audience tier to mean by it.
+$script:EntryTierHigherHeading = 'Higher than tier 0?'
+
+function Get-EntryTierHigherHeading {
+    <# The heading text the audience tier's section carries ('Higher than tier 0?'). Machine-read by the
+       parser, so it is stated once and is deliberately not repo-configurable -- the same class as 'Tier'
+       and 'Score'. A repo that translated it would make its own entries unreadable to its own fold. #>
+    return $script:EntryTierHigherHeading
+}
+
+function Test-EntryTierHeadingAsksRoute {
+    <# Does THIS repo write the question as a heading? Only where it has stated one audience tier, which is
+       the tier the heading then means. Where it has not, the numbered headings stay and so does the
+       routing comment -- see the block above for why that fallback is the safe direction. #>
+    return ($null -ne (Get-EntryAudienceTier))
 }
 
 function Get-EntryScorePattern {
@@ -705,7 +744,14 @@ $script:EntryGuidanceDefaults = [ordered]@{
     # document content that travels to consumers in the plugin cache -- the one layer .claude/rules/
     # language-layers.md is explicit about. The template followed from here rather than the other way
     # round, which is the sanctioned direction: change the format, and Get-BranchTemplates regenerates it.
-    PullRequest = @('<!-- link to the PR in github when branch is merged to main and the date this happened-->')
+    # TWO LINES SINCE AUGUST 16, 2026, because the section gained the PR title. The first line says what the
+    # author writes here at creation, the second what the fold writes underneath at the merge -- one hint per
+    # fact, in the order the two arrive. Written as complete comment lines for the reason the four above are:
+    # this is Dave's own spacing and the templates are the spec.
+    PullRequest = @(
+        '<!-- the PR title on the first line -- no feat:/fix:/docs: prefix, open-pr puts the branch type in front.',
+        '     link to the PR in github when branch is merged to main and the date this happened-->'
+    )
     What = @(
         'What the change DOES, for someone reading CHANGELOG.md months from now --',
         'not a report of what you did on the branch. Name what is different afterwards,',
@@ -727,11 +773,12 @@ $script:EntryGuidanceDefaults = [ordered]@{
     # TIER 0 IS THE ONE TIER THAT IS ALWAYS REACHED -- every change matters to the people maintaining this
     # repo, if only a little -- so it is the only one with no N/A to offer. Tiers 1 and 2 get the extra
     # paragraph, which is why this is a second block rather than a longer version of the one above.
+    # SHORTER THAN THE TIER 0 BLOCK ABOVE IT SINCE AUGUST 16, 2026, and the difference is deliberate rather
+    # than an oversight. This block sits one screen below that one, so the three sentences about the Score
+    # line and the rubric were being read twice on the way down a form whose whole revision was about
+    # length. What only this tier needs -- the way out when the change reaches nobody here -- is what stays.
     TierOptional = @(
-        'Why the change matters AT THIS REACH specifically. A reason that would read the',
-        'same under every tier is a sign the tier is wrong. Write it ABOVE the Score line --',
-        'everything below that line is discarded. Then Score: 1-5 against the rubric',
-        'new-branch printed when it wrote this file.',
+        'Why the change matters AT THIS REACH specifically. ',
         '',
         'If it has no significance at this reach at all, then explain shortly why and insert N/A in Score.',
         'That reason goes above the Score line too.'
@@ -783,10 +830,14 @@ function Format-EntryGuidanceComment {
     param([AllowEmptyCollection()][string[]]$Lines = @())
     $body = @($Lines | Where-Object { $null -ne $_ })
     if ($body.Count -eq 0) { return @() }
-    if ($body.Count -eq 1) {
-        $only = ([string]$body[0]).Trim()
-        if ($only.StartsWith('<!--') -and $only.EndsWith('-->')) { return @([string]$body[0]) }
-    }
+    # ALREADY A COMPLETE COMMENT -> UNTOUCHED, whether it is one line or several. The single-line case is
+    # Dave's four hand-written one-liners; the multi-line case arrived with the Pull Request hint on
+    # August 16, 2026, which opens on its marker and closes two lines down. Both are the same rule --
+    # the templates are the spec, so a block that already spells its own markers keeps its exact bytes
+    # rather than being wrapped a second time.
+    $first = ([string]$body[0]).TrimStart()
+    $last  = ([string]$body[$body.Count - 1]).TrimEnd()
+    if ($first.StartsWith('<!--') -and $last.EndsWith('-->')) { return @($body | ForEach-Object { [string]$_ }) }
     $out = @('<!--')
     # An empty guidance line stays EMPTY rather than becoming five spaces: trailing whitespace is
     # invisible in an editor, survives every diff, and is the kind of thing a byte-exact template check
@@ -963,16 +1014,24 @@ function Format-EntrySignificanceSections {
         $tier = [int]$row.Tier
         if ($i -gt 0) { $lines.Add('') }
         $lines.Add((Get-EntryTierSectionMarker -Tier $tier))
-        $lines.Add('')
         # THE GUIDANCE COMMENT STANDS WHERE THE WHY GOES on an unanswered section, and nothing else does --
         # no placeholder line underneath it. A row that already carries a why is a migration or a rewrite of
         # a finished entry, and prefixing somebody's written answer with a form instruction would be noise
         # in exactly the document they just finished, so there the comment is what goes.
+        #
+        # THE BLANK AFTER THE HEADING BELONGS TO THE ANSWER, not to the heading (August 16, 2026). Where the
+        # guidance comment follows, it opens directly under the heading -- the hand-designed template says
+        # so, and a blank line above a comment block reads as a gap somebody left rather than as a form.
+        # Where there is no comment, the blank stays: it is the space the reason is written into.
         $answered = [bool]($row.PSObject.Properties['Why'] -and $row.Why)
         if ($answered) {
+            $lines.Add('')
             foreach ($line in ([string]$row.Why -split '\r?\n')) { $lines.Add($line) }
             $lines.Add('')
-        } elseif ($WithGuidance) {
+        } elseif (-not $WithGuidance) {
+            $lines.Add('')
+        }
+        if ((-not $answered) -and $WithGuidance) {
             # Tier 0 cannot be N/A -- see $script:EntryGuidanceDefaults.TierOptional -- so it gets the
             # block without that paragraph, and every tier above it gets the one that offers the way out.
             $g = Get-EntryGuidance
@@ -1005,7 +1064,14 @@ function Format-EntrySignificanceSections {
         # AS AN HTML COMMENT (Dave, August 6, 2026). It is form text, not the author's answer, and it was
         # the last piece of form that travelled all the way into CHANGELOG.md and the development notes.
         # The fold strips comments, so the writer still sees it and the record never does.
-        if ($routes.ContainsKey($tier)) {
+        #
+        # AND THE HEADING ASKS IT NOW, SO THE COMMENT IS GONE (Dave, August 16, 2026). The section above the
+        # last one is headed 'Higher than tier 0?' -- the routing question, in the place a reader cannot skip,
+        # costing no lines at all. A comment underneath repeating it was the same question twice, and the
+        # form text this file has been steadily taking out of the author's way. $routes is still computed
+        # above and still honoured for a repo that overrides the wording; where it is left at the default the
+        # heading carries it.
+        if ($routes.ContainsKey($tier) -and -not (Test-EntryTierHeadingAsksRoute)) {
             $lines.Add('')
             foreach ($line in (Format-EntryGuidanceComment -Lines @($routes[$tier]))) { $lines.Add($line) }
         }
@@ -1251,6 +1317,11 @@ function Read-EntryTierSections {
     )
     $hashes  = '#' * $script:EntryTierSubLevel
     $headRx  = '^\s*' + $hashes + '\s+' + [regex]::Escape($script:EntryTierSubPrefix) + '\s+(\S+)\s*$'
+    # The audience tier's section is headed with the question rather than with its number since August 16,
+    # 2026. Recognised in EVERY repo, configured or not -- an entry carrying it may have been written
+    # anywhere -- and resolved to a number below, where the repo that has stated no audience tier reports
+    # the heading as unreadable instead of silently dropping the reach it declares.
+    $higherRx = '^\s*' + $hashes + '\s+' + [regex]::Escape($script:EntryTierHigherHeading) + '\s*$'
     $scoreRx = Get-EntryScorePattern
     $range   = Get-EntrySignificanceRange
 
@@ -1260,9 +1331,18 @@ function Read-EntryTierSections {
 
     $i = 0
     while ($i -lt $Lines.Count) {
-        if ($Lines[$i] -notmatch $headRx) { $i++; continue }
-        $raw      = $Lines[$i].Trim()
-        $tierCell = $Matches[1]
+        $isHigher = $false
+        if ($Lines[$i] -match $headRx) {
+            $tierCell = $Matches[1]
+        } elseif ($Lines[$i] -match $higherRx) {
+            $isHigher = $true
+            # Resolved from the repo's own audience tier, not from the document. Where none is stated the
+            # cell is left unreadable on purpose, so the error path below reports it -- the alternative,
+            # guessing a tier, files the change under an audience nobody chose.
+            $audience = Get-EntryAudienceTier
+            $tierCell = if ($null -ne $audience) { [string]$audience } else { $script:EntryTierHigherHeading }
+        } else { $i++; continue }
+        $raw = $Lines[$i].Trim()
         $i++
 
         # The section runs to the next heading of ANY level -- the next tier, the next '###' section, or the
@@ -1286,7 +1366,15 @@ function Read-EntryTierSections {
         }
 
         if ($tierCell -notmatch '^\d+$') {
-            $errs += "significance section '$raw' does not name a tier -- write a whole number from 0 to $(Get-EntryTierMax)."
+            if ($isHigher) {
+                # The heading is well-formed and this repo has nothing to resolve it against. Said out loud
+                # rather than absorbed, because the absorbed version reads as "no tier above 0" -- a claim
+                # about the change, made by a missing setting.
+                $numbered = ('#' * $script:EntryTierSubLevel) + ' ' + $script:EntryTierSubPrefix + ' N'
+                $errs += "significance section '$raw' means this repo's audience tier, and this repo has stated none -- set Get-ReleaseAudienceTier in scripts/repo-config.ps1, or head the section '$numbered' with the tier written out."
+            } else {
+                $errs += "significance section '$raw' does not name a tier -- write a whole number from 0 to $(Get-EntryTierMax)."
+            }
             continue
         }
         $tier = [int]$tierCell
@@ -2167,12 +2255,73 @@ function Get-EntryRetiredSectionHeadings {
     return @($out)
 }
 
+# --- WRITTEN VERSUS RECOGNISED (Dave, August 16, 2026) --------------------------------------------
+#
+# THE MAP ABOVE IS NOW THE RECOGNISED SET, AND THIS IS THE WRITTEN ONE. Four of those six sections are no
+# longer scaffolded: 'Branch title' moved into the 'Pull Request' section (it was never a branch title --
+# open-pr composes the PR title from it, which is what it has always been), 'Branch ID' became the
+# timestamp in the entry's own heading, 'Branch type' is the prefix of the branch that heading already
+# names, and 'Significance' dissolved into 'What does the change...' -- the tier reasons ARE the answer to
+# that question, so a separate heading over them asked it twice.
+#
+# NOTHING IS DELETED FROM THE RECOGNISED SET, and that is the whole safety of this change. CHANGELOG.md,
+# every release document, every consumer's tree and every branch in flight carry all six headings right
+# now, and they meet these scripts through a plugin update rather than by choosing to. A reader that
+# forgot 'Branch title' would publish nameless entries; one that forgot 'Branch type' would file the lot
+# under a catch-all. Recognise both, write one -- the same rule this file already gives the 'Tier: N' line
+# and the retired heading names.
+#
+# SO THE COUNT MOVED AND THE LOOKUP DID NOT. Get-EntrySectionHeadings still answers "which heading does
+# key X have", for every key that ever existed; this answers "which ones does the scaffolder emit", which
+# is what the writer walks and what the lint's entry-shape check holds a document's stated count to.
+$script:EntryWrittenSectionKeys = @('What', 'PullRequest')
+
+# What the TEMPLATE shows where a real entry carries its creation stamp. Its own value rather than a reuse
+# of the 'Branch ID' guidance comment: that one is a hint ABOUT the field and this one stands IN the field,
+# so a template reader sees the shape of the line instead of a sentence where a timestamp goes.
+$script:EntryIdTemplatePlaceholder = '<timestamp of the moment this branch was created>'
+
+function Get-EntryIdTemplatePlaceholder {
+    <# The stamp the template's heading carries in place of a real one. #>
+    return $script:EntryIdTemplatePlaceholder
+}
+
+function Get-EntryWrittenSectionKeys {
+    <# The section keys a WRITER emits, in order. Read by Format-EntryBlock and by the lint's entry-shape
+       check, so the shape a document claims and the shape the scaffolder produces have one source. #>
+    return @($script:EntryWrittenSectionKeys)
+}
+
+# EVERY SECTION THAT HAS EVER LEGITIMATELY OPENED AN ENTRY, newest first. The lint's split-entry rule asks
+# whether a block's first named section is an opener; a block that starts anywhere else has been cut in two
+# by a stray heading at the entry's own level.
+#
+# IT IS A LIST BECAUSE THE OPENER HAS MOVED TWICE, AND EACH MOVE COST THE SAME BUG. When 'Who is this for'
+# was renamed, all 24 pending entries were reported as split. When the dossier form put the title section
+# in front on August 6, 2026, it happened again. It happened a THIRD time on August 16, 2026, the moment
+# 'Branch title' stopped being written: every pending entry in CHANGELOG.md opens with it, and the gate
+# read six correct entries as damaged. Twenty-four false accusations is how a check gets switched off, and
+# this one has now had three chances to earn that.
+#
+# SO THE ANSWER LIVES HERE RATHER THAN IN THE GATE. The gate used to build the list itself, from the
+# current first key plus that key's retired NAMES -- which is right until the first KEY changes, and then
+# silently answers for the wrong section. This states the keys, and the caller adds each one's retired
+# names; a future move means adding one entry here rather than rediscovering the bug.
+$script:EntryOpeningSectionKeys = @('What', 'Description')
+
+function Get-EntryOpeningSectionKeys {
+    <# The section keys an entry may legitimately open with, newest first. See the block above for why
+       this is a list and not Get-EntryFirstSectionKey. #>
+    return @($script:EntryOpeningSectionKeys)
+}
+
 function Get-EntryFirstSectionKey {
-    <# The key of the section an entry must OPEN with ('Description'). Stated once because the lint's
+    <# The key of the section an entry must OPEN with ('What'). Stated once because the lint's
        split-entry rule keys on it: a block whose first named section is not this one has been cut in two by
-       a stray heading at the entry's own level. Read off the order of the map rather than written out, so
-       reordering the sections cannot leave that gate testing the wrong one. #>
-    return @($script:EntrySectionDefaults.Keys)[0]
+       a stray heading at the entry's own level. Read off the WRITTEN order rather than written out, so
+       reordering the sections cannot leave that gate testing the wrong one -- and off the written set
+       rather than the recognised one, because a retired section can no longer be an entry's first. #>
+    return @($script:EntryWrittenSectionKeys)[0]
 }
 
 # The heading levels, stated once. An entry is an H2 and its sections are H3 -- in the entry FILE and in
@@ -2475,6 +2624,47 @@ function Get-EntrySectionAnswer {
     return (Remove-EntryHtmlComments -EntryText $raw).Trim()
 }
 
+function Get-EntryPrTitle {
+    <#
+        Pure: the PR title an entry declares -- the name the change is called by, in the PR, in
+        CHANGELOG.md and in the release documents. '' when the entry states none.
+
+        TWO PLACES, ONE ANSWER, and this function exists because there are now two. Until August 16, 2026
+        the title had a section of its own, headed 'Branch title' (and 'Branch description' before #506);
+        it is the first line of the 'Pull Request' section now, which is where a PR title belongs and where
+        it had effectively always been -- open-pr composed the PR's title from that section under both
+        names. CHANGELOG.md, every release document and every branch in flight carry the old shape, so the
+        old shape is tried FIRST and wins where it is present. Recognise both, write one.
+
+        THE FOLD WRITES UNDERNEATH IT, which is what makes "the first line" a safe rule rather than a
+        fragile one. The title is written at creation; the 'Plugins:' line and the '[PR #N](...) - merged'
+        footer are appended by the fold at the merge, below it. They are skipped by shape anyway -- a
+        folded entry whose author never wrote a title would otherwise report its own PR link as the title,
+        which is the kind of plausible-looking wrong answer this file keeps paying for.
+
+        THE ANSWER, NOT THE BODY: Get-EntrySectionAnswer strips the guidance comments first, so a template
+        or an untouched scaffold reports '' rather than reporting its own hint as the title.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
+
+    $old = Get-EntrySectionAnswer -EntryText $EntryText -Key 'Description'
+    if ($old) {
+        foreach ($line in @($old -split '\r?\n')) { if ($line.Trim()) { return $line.Trim() } }
+    }
+
+    $pr = Get-EntrySectionAnswer -EntryText $EntryText -Key 'PullRequest'
+    if (-not $pr) { return '' }
+    foreach ($line in @($pr -split '\r?\n')) {
+        $t = $line.Trim()
+        if (-not $t) { continue }
+        # The two lines the FOLD adds, never the author's title.
+        if ($t -match '^\[' + [regex]::Escape('PR #') + '\d+\]') { continue }
+        if ($t -match '^Plugins:\s') { continue }
+        return $t
+    }
+    return ''
+}
+
 function Get-ReleaseChangeTypes {
     <#
         The change types the repo's branch table produces -- 'Feat', 'Fix', 'Docs', 'Chore' here. Read from
@@ -2582,10 +2772,42 @@ function Resolve-EntryType {
         return $result
     }
 
-    # Pre-format fallback: the type as a middot field in the heading.
-    $md = [char]0x00B7
     $bodyOutside = Get-EntryTextOutsideFences -EntryText $EntryText
     $headingLine = @($bodyOutside -split '\r?\n' | Where-Object { $_ -match '^#{2,6}\s' })
+
+    # THE BRANCH PREFIX IN THE HEADING, WHICH IS WHERE THE TYPE LIVES SINCE AUGUST 16, 2026. The 'Branch
+    # type' section is no longer written: it held the prefix of the branch the heading beside it already
+    # names, which is one fact in two places -- the shape this file exists to prevent. So the type is read
+    # off '## Branch `feat/x` changelog' instead.
+    #
+    # THIS RUNS BEFORE THE MIDDOT FALLBACK AND AFTER THE SECTION, and that order is the whole compatibility
+    # story. An entry that still declares the section wins on it (every entry in CHANGELOG.md and in every
+    # consumer's tree does); an entry from the pre-dossier format falls through to its heading field. Only a
+    # NEW entry, which has neither, reaches this. Getting the order wrong would not error -- it would file
+    # entries under a type nobody wrote, which is the silent direction.
+    #
+    # Deliberately keyed on the PREFIX rather than on Get-BranchInfo: this lib is loaded standalone by the
+    # fold, branch-info.ps1 is repo-owned and does not travel into the plugin mirror, and a consumer whose
+    # table is unreachable must still get a type off its own entries. Get-ReleaseChangeTypes already falls
+    # back to the canonical four for exactly this reason, and the match below is case-insensitive against
+    # whichever list it returns.
+    if ($headingLine.Count -gt 0 -and $known.Count -gt 0) {
+        if ($headingLine[0] -match '`([^`/]+)/[^`]*`') {
+            $prefix = $Matches[1].Trim()
+            $canonical = @($known | Where-Object {
+                $_ -and ([string]$_).ToLowerInvariant() -eq $prefix.ToLowerInvariant()
+            })
+            if ($canonical.Count -gt 0) {
+                $result.Type = [string]$canonical[0]
+                $result.Declared = $true
+                $result.Raw = $prefix
+                return $result
+            }
+        }
+    }
+
+    # Pre-format fallback: the type as a middot field in the heading.
+    $md = [char]0x00B7
     if ($headingLine.Count -gt 0 -and $known.Count -gt 0) {
         $fields = @(($headingLine[0] -replace '^#+\s+', '') -split "\s*$md\s*")
         # The LAST matching field wins, which resolves an entry whose title IS a type name
@@ -2675,33 +2897,54 @@ function Format-EntryBlock {
     # that carries the guidance comments. Kept as one switch rather than two knobs because those two facts
     # are the same fact -- "this is the reference, not somebody's working file" -- and a caller that set one
     # without the other would produce a file that is neither.
-    if ($Template -and -not $TitleSuffix) { $TitleSuffix = (Get-BranchFileWording).TemplateMarker }
+    # THE HEADING CARRIES THE CREATION STAMP SINCE AUGUST 16, 2026, which is where the 'Branch ID' section
+    # went. The heading already had to name the branch, and a section below it holding one more fact about
+    # that same branch was a section's worth of ceremony for a timestamp. Quoted, and separated by ' - ',
+    # exactly as the hand-designed template spells it.
+    #
+    # THE '(template)' MARKER IS GONE WITH IT, and that is a consequence rather than a second decision:
+    # the suffix slot now holds the stamp, and the template's stamp is the visible placeholder
+    # '<timestamp of the moment this branch was created>' -- which marks the file at least as loudly as
+    # the word did, beside a branch token that is equally obviously not a branch.
+    if ($Template -and -not $Id) { $Id = Get-EntryIdTemplatePlaceholder }
+    if ($Id) { $TitleSuffix = "- '$Id'" }
     # Each line appended on its own statement, NOT as @(<expr>, '') -- the comma operator binds looser than
     # '+', so `@(('#'*2) + ' ' + $Title, '')` concatenates the string with the ARRAY ($Title, '') and joins
     # it with a space. That produced '## A real title ' with a trailing space and no blank line after it,
     # which is well-formed markdown and therefore invisible until a parser expecting the blank line fails.
     # Measured on this function's first run.
     $lines = New-Object System.Collections.Generic.List[string]
-    $lines.Add((Format-BranchFileHeadingLine -Branch $Branch -Title (Get-BranchFileWording).ChangelogTitle `
-        -Level $script:EntryHeadingLevel -Suffix $TitleSuffix))
+    $wording = Get-BranchFileWording
+    $lines.Add((Format-BranchFileHeadingLine -Branch $Branch -Title $wording.ChangelogTitle `
+        -Level $script:EntryHeadingLevel -Suffix $TitleSuffix -Lead ([string]$wording.ChangelogHeadingLead)))
     $lines.Add('')
 
-    Add-EntrySection -Lines $lines -Key 'Description' -Value $Description -WithGuidance:$Template
-    Add-EntrySection -Lines $lines -Key 'Id'          -Value $Id          -WithGuidance:$Template
-    Add-EntrySection -Lines $lines -Key 'Type'        -Value $Type        -WithGuidance:$Template
-    Add-EntrySection -Lines $lines -Key 'What'        -Value $Body        -WithGuidance:$Template
-
-    # Significance carries no guidance of its own: its '#### Tier N' sub-sections each carry theirs, and a
-    # hint above a section whose every part is already annotated is one the reader has to read twice.
-    $lines.Add((Get-EntrySectionHeading -Key 'Significance'))
+    # 'What does the change bring to main?' IS THE SIGNIFICANCE SECTION NOW (Dave, August 16, 2026). The
+    # tier reasons were already the answer to this question -- each one says what the change brings AT ONE
+    # REACH -- so the entry asked it twice: once as a heading with a paragraph under it, and again as a
+    # heading with the same claim broken out per audience. The paragraph went and the tiers moved up.
+    #
+    # $Body still writes, and it is not a leftover: a MIGRATION rendering an entry from the older shape has
+    # a paragraph in hand and nowhere else to put it. The scaffolder passes none, so a fresh entry opens on
+    # its first tier heading exactly as the hand-designed template does.
+    $lines.Add((Get-EntrySectionHeading -Key 'What'))
     $lines.Add('')
+    if ($Body) {
+        foreach ($line in @($Body -split '\r?\n')) { $lines.Add($line) }
+        $lines.Add('')
+    }
     foreach ($line in (Format-EntrySignificanceSections -Rows $ImpactRows -WithGuidance:$Template)) { $lines.Add($line) }
     $lines.Add('')
 
-    # WRITTEN EMPTY AND FILLED BY THE FOLD. The section exists from the start so the form is complete on the
-    # page, but the two facts in it -- the number and the merge date -- do not exist until the merge, and a
-    # hand-written one would be a second copy of something nobody has yet.
-    Add-EntrySection -Lines $lines -Key 'PullRequest' -WithGuidance:$Template
+    # THE PR TITLE LIVES HERE SINCE AUGUST 16, 2026, WHICH IS WHERE IT ALWAYS BELONGED (Dave). The section
+    # was called 'Branch title' and held no branch title: open-pr composes the PR's title from it, the
+    # release documents print it, and #506 already renamed it once for saying the wrong thing. It is the PR
+    # title, so it sits in the PR section -- above the number and the merge date the fold writes underneath.
+    #
+    # STILL WRITTEN EMPTY WHERE THE SCAFFOLDER CALLS. The title arrives from -Title at creation; the other
+    # two facts do not exist until the merge, and a hand-written one would be a second copy of something
+    # nobody has yet.
+    Add-EntrySection -Lines $lines -Key 'PullRequest' -Value $Description -WithGuidance:$Template
     return @($lines.ToArray())
 }
 
@@ -2953,6 +3196,11 @@ $script:BranchFileDefaults = [ordered]@{
     # are the suffix rather than the whole title. Lowercase for that reason.
     ChangelogTitle = 'changelog'
     ProgressTitle  = 'progress'
+    # The word before the backticked branch name in the ENTRY's heading only -- '## Branch `feat/x`
+    # changelog'. The progress file deliberately takes none: its heading was not part of the August 16,
+    # 2026 compaction, and restyling it as a side effect of a shared formatter would move a document
+    # nobody asked about. Empty is a legitimate override; Get-BranchFileDeclaredBranch reads both shapes.
+    ChangelogHeadingLead = 'Branch'
     BranchLabel    = 'Branch'
     StepsHeading   = 'Steps'
     NotesHeading   = 'Where I left off'
@@ -3158,10 +3406,17 @@ function Format-BranchFileHeadingLine {
         [Parameter(Mandatory)][AllowEmptyString()][string]$Branch,
         [Parameter(Mandatory)][string]$Title,
         [int]$Level = 2,
-        [string]$Suffix = ''
+        [string]$Suffix = '',
+        [string]$Lead = ''
     )
+    # $Lead is the word before the backticked branch name -- 'Branch', for the changelog entry's own
+    # heading since August 16, 2026. OPTIONAL, and empty for every other caller, because the progress
+    # file's heading did not change and a shared formatter that silently restyled both would have moved a
+    # file nobody asked about. Get-BranchFileDeclaredBranch reads past it; see the regex there.
     $shown = if ($Branch) { $Branch } else { Get-BranchTrunkName }
-    $line = ('#' * $Level) + ' `' + $shown + '` ' + $Title
+    $line = ('#' * $Level) + ' '
+    if ($Lead) { $line += $Lead + ' ' }
+    $line += '`' + $shown + '` ' + $Title
     if ($Suffix) { $line += ' ' + $Suffix }
     return $line
 }
@@ -3464,7 +3719,13 @@ function Get-BranchFileDeclaredBranch {
     # idempotency test, and a scaffolded H2 file it could not read would come back as '' and be overwritten,
     # taking a step list somebody had been ticking off with it. An H1-only regex was correct for exactly the
     # few hours in which both files opened with one.
-    $headingRx = '^#{1,2}\s+`([^`]+)`'
+    #
+    # AND PAST AN OPTIONAL LEAD WORD (August 16, 2026), because the changelog entry's heading gained one:
+    # '## Branch `feat/x` changelog'. The progress file's did not, so both shapes have to read -- and
+    # getting this wrong is the expensive direction rather than the loud one. A regex that could not see
+    # past 'Branch ' would answer '' for every scaffolded entry, which reads as "still in its reset state"
+    # and hands the next run permission to overwrite a file somebody has been writing in.
+    $headingRx = '^#{1,2}\s+(?:[^`\s]+\s+)?`([^`]+)`'
     $label = (Get-BranchFileWording).BranchLabel
     $lineRx = '^\*\*' + [regex]::Escape([string]$label) + ':\*\*\s*`([^`]+)`\s*$'
 
