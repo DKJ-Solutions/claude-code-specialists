@@ -225,6 +225,21 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # Gate evidence (August 16, 2026): what the gates proved, and against which exact working
+            # state. Mirrored because open-pr.ps1 dot-sources it as a $PSScriptRoot sibling, and the
+            # redundancy it removes -- ship-pr calling open-pr, which re-gates a commit nothing has
+            # touched -- is the consumer's redundancy just as much as this repo's.
+            #
+            # ITS OWN FILE RATHER THAN native-capture-lib.ps1, following park-lib's precedent and
+            # native-capture-lib's own request not to be widened again. NO CONTRACT ROW FOLLOWS:
+            # nothing in it is repo-owned -- it asks git about the tree and writes inside the git
+            # directory, so there is no seam a consumer has to answer.
+            Name    = 'gate-lib'
+            Source  = 'scripts\lib\gate-lib.ps1'
+            Plugin  = 'workflow-davekjohn'
+            LibOnly = $true
+        },
+        @{
             Name    = 'pr-issues-lib'
             Source  = 'scripts\lib\pr-issues-lib.ps1'
             Plugin  = 'workflow-davekjohn'
