@@ -1,6 +1,6 @@
 ## Branch `<prefix>/<short-name>` changelog - '<timestamp of the moment this branch was created>'
 
-### Significance
+### What does the change on this branch bring to main?
 
 #### Tier 0
 <!--
