@@ -666,7 +666,7 @@ Assert-True (-not ($bcFiles -contains 'stray.txt'))    'fold commit: the unrelat
 
 # ---------------------------------------------------------------------------------------------------
 Write-Host "A changelog with no trailing newline does not swallow the entry appended to its end" -ForegroundColor Cyan
-#      Get-ImpactInsertOffset returns the slice's LENGTH for the lowest-ranked entry -- the common case, since
+#      Get-EntryInsertOffset returns the slice's LENGTH for the lowest-ranked entry -- the common case, since
 #      tier 0 sinks to the bottom -- so the insert lands at the very end of the content. Ending on '---' with
 #      nothing after it, that produces '---## <title>' on ONE line: '^## ' stops matching, so the cut never
 #      sees the entry, and the entry FILE is deleted by then. Nothing errors and the markdown stays
@@ -677,15 +677,20 @@ Write-Host "A changelog with no trailing newline does not swallow the entry appe
 #      repaired before its commit, so no commit, PR or fold ever carried it -- the condition is ordinary
 #      editing, and everything below is what proves the loss follows from it.
 #
-#      The seeded entry is tier 1 ON PURPOSE. An equal rank puts the new entry ABOVE its equals, so two tier-0
-#      entries would exercise the insert-before-a-heading path and never reach the end of the list at all.
+#      WHICH FOLD REACHES THE END OF THE LIST CHANGED ON AUGUST 16, 2026, and the scenario had to follow it
+#      rather than be deleted. The end used to be where the LOWEST-ranked entry landed -- the common case,
+#      since tier 0 sank to the bottom -- so a seeded tier-1 entry plus a tier-0 newcomer reproduced it. With
+#      the list newest-first, every entry lands at the top and the only fold that still reaches the end is
+#      the one into a list with NO entries yet. So the damage is applied before the FIRST fold instead of
+#      between two, and the guard it pins is unchanged.
 $dirN = New-FoldFixture -Label 'tail-noeol'
-New-EntryFile -Dir $dirN -Name 'feat-ranked-above.md' -Title 'Ranks above the newcomer' -Rows '| 1 | 3 | a clear improvement |'
-Invoke-Fold -Dir $dirN -Branch 'feat/ranked-above' | Out-Null
-# The editor's damage, reproduced exactly: every trailing line break gone, so the file ends on '---'.
+# The editor's damage, reproduced exactly: every trailing line break gone, so the file ends on its intro
+# with nothing after it -- and the first entry folded in has to land against that.
 $clNpath = Join-Path $dirN 'CHANGELOG.md'
 [System.IO.File]::WriteAllText($clNpath, ([System.IO.File]::ReadAllText($clNpath)).TrimEnd(), $Utf8NoBom)
 Assert-True (-not ([System.IO.File]::ReadAllText($clNpath)).EndsWith("`n")) 'tail no-eol: the fixture really has no trailing newline'
+New-EntryFile -Dir $dirN -Name 'feat-lands-at-end.md' -Title 'Lands against the damaged tail' -Rows '| 1 | 3 | a clear improvement |'
+Invoke-Fold -Dir $dirN -Branch 'feat/lands-at-end' | Out-Null
 New-EntryFile -Dir $dirN -Name 'chore-sinks-to-bottom.md' -Title 'Sinks to the bottom' -Rows '| 0 | - | - |'
 $rN = Invoke-Fold -Dir $dirN -Branch 'chore/sinks-to-bottom'
 $clN = Get-Changelog -Dir $dirN
@@ -696,7 +701,11 @@ Assert-True ($rN.ExitCode -eq 0) 'tail no-eol: exits 0 (an invariant -- the defe
 # THE THREE THAT PIN IT.
 $orderN = @(Get-EntryOrder -Changelog $clN)
 Assert-Equal 2 $orderN.Count 'tail no-eol: the appended entry is still an entry heading, not glued onto the separator'
-Assert-Equal 'Sinks to the bottom' $orderN[1] 'tail no-eol: and it sits at the bottom, below the higher-ranked one'
+# NEWEST FIRST: the second fold leads, and the entry that landed against the damaged tail is still there
+# below it. Both halves matter -- an entry welded onto the separator would drop OUT of this count, which is
+# the silent loss this scenario exists to catch.
+Assert-Equal 'Sinks to the bottom' $orderN[0] 'tail no-eol: the newest entry leads'
+Assert-Equal 'Lands against the damaged tail' $orderN[1] 'tail no-eol: and the one folded against the damaged tail survived, rather than being swallowed'
 # The defect shape itself, asserted directly: a heading welded to the separator above it.
 Assert-True ($clN -notmatch '---##') 'tail no-eol: no separator carries a heading on its own line'
 # THE SECOND INVARIANT: the appended entry block ends in a separator plus a blank line by construction, so

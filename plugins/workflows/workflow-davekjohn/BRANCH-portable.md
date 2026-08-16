@@ -293,8 +293,8 @@ right after the merge:
 
 1. **strips any HTML comments** — the scaffolder writes none, but a branch created before that, or one
    pasted from a template, carries them, and they are the form rather than the answer;
-2. inserts the entry into `CHANGELOG.md` at its ranked position (furthest reach first, highest
-   significance first within a tier), with the PR link and merge date written into `### Pull Request`;
+2. inserts the entry at the **top** of `CHANGELOG.md`'s list — that document is newest-first — with the
+   PR link and merge date written into `### Pull Request`;
 3. **resets both files** to the empty state you see on the trunk;
 4. commits exactly those three paths.
 

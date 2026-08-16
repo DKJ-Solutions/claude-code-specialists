@@ -22,21 +22,25 @@ legacy single-section Get-ChangelogHeading (issue #178) and the '## Pull Request
 There is no heading left to name, so there is no heading left to get wrong: the whole class of failure
 the old "could not find the heading -- stopping" path existed for cannot occur.
 
-WHERE IN that list is decided by the entry's TIER first and its SIGNIFICANCE SCORE second (issue #467),
-and this is the only moment either can be: the cut EMPTIES the pending list, and the release documents
-read what is left in document order without sorting it. So the order this script leaves behind is the
-order the notes and the consumer document inherits -- which is what makes it reproducible across two moments days
-apart with nothing re-estimated in between. Furthest reach at the top, highest score within a tier; an
-equal rank keeps the NEWER entry above its equals, which is exactly what the fold did before ranking
-existed. That ordering is what the three section headings used to communicate visually, kept as an
-ordering rather than as structure. INSERT-ONLY, NEVER A RE-SORT, deliberately: this commit lands directly
-on main, so a bug must be able to misplace at most the one entry being folded rather than scramble a list
-it did not write.
+WHERE IN that list is the TOP, always (Dave, August 16, 2026). CHANGELOG.md is newest-first: the entry
+being folded is the most recently merged one, so it leads, and the document reads as the chronological
+record it is.
 
-Both facts come from the entry's IMPACT TABLE -- one row per tier, the row's second column its
-significance. The highest row is the reach; that row's score is the position. An entry with no table falls
-back to the older 'Tier: N' line and folds unranked, which is correct rather than tolerated: every entry
-written before this format has no score to rank by.
+IT RANKED ON (TIER, SIGNIFICANCE) UNTIL THAT DAY (issue #467), and the argument for it was that the cut
+EMPTIES the pending list, so document order at cut time IS the order the release documents inherit. That
+turned out to hold for exactly one section. Build-ReleaseNotes passes -RankByTier for every tier from 1
+up, and Build-ConsumerNotes always ranks at tier 2 -- both re-rank from the scores themselves and inherit
+nothing. The one place that does inherit is the development notes' TIER 0 section, whose own comment asks
+for "complete and chronological, which is what a record is for" and was quietly getting score-descending
+order instead. So this made that comment true rather than breaking anything.
+
+INSERT-ONLY, NEVER A RE-SORT, deliberately and unchanged: this commit lands directly on main, so a bug
+must be able to misplace at most the one entry being folded rather than scramble a list it did not write.
+
+The TIER and SIGNIFICANCE are still read here, from the entry's own sections -- they are printed on the
+console line and they decide the version bump at the cut. They just no longer decide this position. An
+entry with no declaration falls back to the older 'Tier: N' line, which is correct rather than tolerated:
+every entry written before this format has no score to rank by.
 
 NOTHING IS CONSUMED ANY MORE, AND THAT IS A REVERSAL RATHER THAN AN OMISSION. While the sections existed,
 the HEADING stated the tier, so an entry restating it below was the same fact in two places -- the drift
@@ -458,7 +462,7 @@ foreach ($file in $entryFiles) {
     # line, whatever it ended with before. BOTH insertion paths below need that, and only one of them used
     # to ensure it -- the one that runs when nothing is pending, which is the rarer of the two.
     #
-    # WHAT IT PREVENTS. Get-ImpactInsertOffset returns the slice's LENGTH for the lowest-ranked entry -- the
+    # WHAT IT PREVENTS. Get-EntryInsertOffset returns the slice's LENGTH for the lowest-ranked entry -- the
     # COMMON case, since tier 0 sinks to the bottom of the list -- so the insert lands at the very end of the
     # content. On a document ending in '---' with nothing after it, that produces '---## <title>' on ONE line.
     # That is not a heading any more: '^## ' does not match it, so Split-Changelog does not see the entry, the
@@ -501,7 +505,7 @@ foreach ($file in $entryFiles) {
 
     # THE ENTRY'S OWN HEADING IS BROUGHT TO THE CURRENT LEVEL, whatever level it was written at. An entry
     # file created before August 5, 2026 opens with an H3, and the document it is landing in is a flat list
-    # of H2s -- an H3 in that list is not an entry boundary to any reader of it (Get-ImpactInsertOffset, the
+    # of H2s -- an H3 in that list is not an entry boundary to any reader of it (Get-EntryInsertOffset, the
     # release renderers, a human scanning the file), so it would be absorbed into the block above it and
     # inherit that block's PR link.
     #
@@ -642,13 +646,18 @@ foreach ($file in $entryFiles) {
     # order and sort nothing. That is what makes the ordering reproducible across the fold and the cut
     # without either re-estimating a score.
     #
-    # THE SLICE, AND WHY THE OFFSET IS RELATIVE TO IT: Get-ImpactInsertOffset only ever returns an entry
+    # THE SLICE, AND WHY THE OFFSET IS RELATIVE TO IT: Get-EntryInsertOffset only ever returns an entry
     # boundary or the slice's end, so adding $listStart back cannot land mid-entry. The insert itself is
     # unchanged -- '<entry>\n\n---\n\n' is correct before any entry heading and at the list's end alike,
     # because every folded entry is followed by its own separator AND the tail normalisation above has
     # guaranteed the content ends on a line break. Landing at the end is where that guarantee is load-bearing.
+    #
+    # THE OFFSET IS THE TOP OF THE LIST SINCE AUGUST 16, 2026 (Dave): CHANGELOG.md is newest-first, so the
+    # entry being folded leads. The rank is still PASSED and is now ignored by the callee -- see its
+    # parameter block for why the signature kept it -- because $filed.RankScore and .Tier are still read
+    # here for the console line and by the cut for the version bump.
     $listText = $changelogContent.Substring($listStart)
-    $insertPos = $listStart + (Get-ImpactInsertOffset -SectionText $listText -Score $filed.RankScore -Tier $filed.Tier)
+    $insertPos = $listStart + (Get-EntryInsertOffset -SectionText $listText -Score $filed.RankScore -Tier $filed.Tier)
 
     $entryBlock = "$entryContent$nl$nl---$nl$nl"
     $changelogContent = $changelogContent.Substring(0, $insertPos) + $entryBlock + $changelogContent.Substring($insertPos)

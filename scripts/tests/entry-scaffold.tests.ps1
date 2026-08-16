@@ -448,7 +448,7 @@ Assert-True ($foldText -match 'entry-scaffold-lib\.ps1') 'the fold dot-sources t
 # and the significance in ONE pass, and that resolver falls back to the older 'Tier: N' line itself -- so
 # asserting the old name here would demand the fold reach past its own abstraction.
 Assert-True ($foldText -match 'Resolve-EntryImpact') 'the fold reads the reach and the significance in one pass'
-Assert-True ($foldText -match 'Get-ImpactInsertOffset') 'and places the entry by that rank, so CHANGELOG.md stays ordered'
+Assert-True ($foldText -match 'Get-EntryInsertOffset') 'and places the entry by that rank, so CHANGELOG.md stays ordered'
 # THE FOLD STRIPS NOTHING FROM THE ENTRY ANY MORE, and this is asserted as an ABSENCE because it is a
 # reversal rather than a gap. While the changelog had one section per tier, the heading above an entry stated
 # its reach -- so the entry's own 'Tier: N' line was the same fact twice, and an unscored table was a question
@@ -639,8 +639,10 @@ $tildeList = @(
     '---', '',
     '## #18 Tier 0', '', '| Tier | Significance | Why |', '|---|---|---|', '| 0 | - | - |', ''
 ) -join "`n"
-$tildeOff = Get-ImpactInsertOffset -SectionText $tildeList -Tier 1 -Score 3
-Assert-Equal '## #18 Tier 0' ((($tildeList.Substring($tildeOff)) -split "`r?`n")[0]).Trim() 'tilde: a heading quoted in a ~~~ fence is not an entry boundary either'
+$tildeOff = Get-EntryInsertOffset -SectionText $tildeList -Tier 1 -Score 3
+$tildeTop = ((($tildeList.Substring($tildeOff)) -split "`r?`n")[0]).Trim()
+Assert-Equal '## #20 Tier 2, quoting the format in tilde fences' $tildeTop 'tilde: the insert lands on the real first entry'
+Assert-True ($tildeTop -ne '## #19 A quoted heading') 'tilde: a heading quoted in a ~~~ fence is not an entry boundary either'
 
 # THE SECOND DEFINITION IS GONE. Asserted on absence, like the retired renderers in release-lib's suite:
 # re-adding a per-lib copy is exactly the thing that produced the four-way divergence, and it should turn a
@@ -726,33 +728,37 @@ $section = "`nIntro.`n`n## #10 Top`n`n| Tier | Significance | Why |`n|---|---|--
            "## #11 Mid`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 3 | ok |`n`n---`n`n"
 function Get-InsertLabel {
     param([int]$Score, [int]$Tier = 1)
-    $off = Get-ImpactInsertOffset -SectionText $section -Score $Score -Tier $Tier
+    $off = Get-EntryInsertOffset -SectionText $section -Score $Score -Tier $Tier
     if ($off -ge $section.Length) { return '<end>' }
     return (($section.Substring($off) -split "`r?`n")[0]).Trim()
 }
-Assert-Equal '## #10 Top' (Get-InsertLabel -Score 5) 'insert: a TIE goes above its equal, preserving the newest-first order the list had'
-Assert-Equal '## #10 Top' (Get-InsertLabel -Score 6) 'insert: a higher score leads'
-Assert-Equal '## #11 Mid' (Get-InsertLabel -Score 4) 'insert: a middling score lands between'
-Assert-Equal '<end>'      (Get-InsertLabel -Score 1) 'insert: the lowest score goes last'
-# UNSCORED SINKS TO THE BOTTOM OF ITS TIER, not to the top of it, and the reason is symmetry with the
-# entries it is being ranked against: this function already reads an entry ALREADY in the changelog that
-# declares no score as 0 and sorts it below everything scored at its tier, so a new one has to land in the
-# same place or the same entry would rank differently depending on which side of the fold it was on. It is
-# not buried either -- open-pr reports the missing score and the cut refuses over it by name.
-Assert-Equal '<end>' (Get-InsertLabel -Score 0) 'insert: an unscored entry sinks within its tier -- 0 is the lowest rank, not the absence of one'
-# THE TIER IS THE FIRST KEY, which is what replaced the three section headings. Asserted in both directions,
-# because getting this backwards is the bug that was measured on this function's first run: a repo-internal
-# change leading the document.
-Assert-Equal '## #10 Top' (Get-InsertLabel -Score 1 -Tier 2) 'insert: a further-reaching tier leads even on the LOWEST score'
-Assert-Equal '<end>'      (Get-InsertLabel -Score 5 -Tier 0) 'insert: and tier 0 sinks below tier 1 even on the highest'
-# A DECLARED TIER 0 IS NOT "DECLARED NOTHING". Both are tier 0 with no score here, and both belong at the
-# bottom -- the -Undeclared switch that used to send the second case to the TOP of the list is gone, because
-# in a flat list there is no such thing as an unplaced entry.
-Assert-Equal '<end>'      (Get-InsertLabel -Score 0 -Tier 0) 'insert: an unscored tier-0 entry sinks too, rather than leading the document'
+# NEWEST FIRST SINCE AUGUST 16, 2026 (Dave): the answer is the TOP of the list, for every input. These
+# asserts used to walk a (tier, significance) ranking; they now pin that the rank is IGNORED, which is the
+# claim that can actually regress. Every score and tier the old table ranked differently is swept here, so
+# a ranking creeping back in fails on the first row rather than on an edge case.
+foreach ($case in @(
+    @{ Score = 5; Tier = 1; What = 'the highest score' }
+    @{ Score = 4; Tier = 1; What = 'a middling score, which used to land between the two' }
+    @{ Score = 1; Tier = 1; What = 'the lowest score, which used to go last' }
+    @{ Score = 0; Tier = 1; What = 'an unscored entry, which used to sink within its tier' }
+    @{ Score = 5; Tier = 2; What = 'a further-reaching tier' }
+    @{ Score = 5; Tier = 0; What = 'tier 0 on the highest score, which used to sink below tier 1' }
+    @{ Score = 0; Tier = 0; What = 'a tier-0 entry declaring nothing' }
+)) {
+    Assert-Equal '## #10 Top' (Get-InsertLabel -Score $case.Score -Tier $case.Tier) `
+        "insert: $($case.What) still lands at the top -- the list is a record, not a ranking"
+}
+# AND THE SIGNIFICANCE IS STILL READ, somewhere else, which is what makes ignoring it here safe rather than
+# careless: the release documents rank themselves on it and the version bump follows the highest tier
+# pending. Asserted through the reader those two share, so "the score no longer orders CHANGELOG.md" cannot
+# be mistaken for "the score stopped mattering".
+$stillScored = Resolve-EntryImpact -EntryText "## #12 X`n`n#### Tier 2`n`nwhy`n`n**Score:** 4`n"
+Assert-Equal 2 ([int]$stillScored.Tier) 'insert: the reach is still declared and still read'
+Assert-Equal 4 ([int](Get-EntryImpactScore -Impact $stillScored -Tier 2)) 'and so is the score the release documents rank on'
 # Compared against the fixture's own length rather than a literal: a hard-coded 8 describes this string,
 # not the behaviour, and breaks the moment somebody edits the fixture's intro.
 $emptySection = "`nIntro.`n`n"
-Assert-Equal $emptySection.Length (Get-ImpactInsertOffset -SectionText $emptySection -Score 4 -Tier 1) 'insert: a list with no entries yet appends at its end'
+Assert-Equal $emptySection.Length (Get-EntryInsertOffset -SectionText $emptySection -Score 4 -Tier 1) 'insert: a list with no entries yet appends at its end'
 
 # --- The insert offset is FENCE-AWARE, like every other reader of this format ----------------------
 # MEASURED ON A REAL FOLD (PR #477), in the document PR #476 had just created. That entry quotes an entry
@@ -789,15 +795,20 @@ $fencedList = @(
 ) -join "`n"
 function Get-FencedInsertLabel {
     param([int]$Score, [int]$Tier)
-    $off = Get-ImpactInsertOffset -SectionText $fencedList -Score $Score -Tier $Tier
+    $off = Get-EntryInsertOffset -SectionText $fencedList -Score $Score -Tier $Tier
     if ($off -ge $fencedList.Length) { return '<end>' }
     return (($fencedList.Substring($off) -split "`r?`n")[0]).Trim()
 }
-# The bug, as the assert that would have caught it: a tier-1 entry must land BELOW the tier-2 entry whose
-# body quotes a heading, not above it. Under the plain-regex split this returned '## #20 ...' -- the top.
-Assert-Equal '## #18 Real, tier 0' (Get-FencedInsertLabel -Score 3 -Tier 1) 'insert/fenced: a quoted entry heading is not a boundary, so the tier-2 entry above it is not split into a tier-0 fragment'
-# And the mirror image from the same fixture: a tier-2 entry scoring higher still leads.
-Assert-Equal '## #20 Real, tier 2, and it documents the format' (Get-FencedInsertLabel -Score 5 -Tier 2) 'insert/fenced: a higher-scoring tier-2 entry still leads'
+# THE ASSERT SURVIVES THE RANKING'S REMOVAL, AND IT HAD TO BE RE-AIMED TO DO SO (August 16, 2026). It used
+# to prove fence-awareness through the RANK -- a tier-1 entry landing below the tier-2 entry whose body
+# quotes a heading. With every entry landing at the top, that reasoning is gone and the danger is not: the
+# top must be the REAL first entry, never the heading quoted inside the fence three lines into it. A
+# fence-blind reader would still find a boundary there and split somebody's fenced block down the middle.
+Assert-Equal '## #20 Real, tier 2, and it documents the format' (Get-FencedInsertLabel -Score 3 -Tier 1) 'insert/fenced: the top is the real first entry'
+Assert-Equal '## #20 Real, tier 2, and it documents the format' (Get-FencedInsertLabel -Score 5 -Tier 2) 'insert/fenced: and the rank does not move it'
+# THE ONE THAT NAMES THE DEFECT DIRECTLY: never the quoted heading. This is what the old rank-based assert
+# was really protecting, said without going through the ranking.
+Assert-True ((Get-FencedInsertLabel -Score 3 -Tier 1) -ne '## #19 A quoted heading') 'insert/fenced: and never the heading quoted inside the fence'
 # The quoted table must not be read as the entry's declaration either -- it says tier 0 where the real
 # declaration says tier 2, so a fence-blind read gets BOTH the boundary and the tier wrong.
 $blockImpact = Resolve-EntryImpact -EntryText $fencedList.Substring($fencedList.IndexOf('## #20'))
@@ -805,8 +816,8 @@ Assert-Equal 2 $blockImpact.Tier 'insert/fenced: the entry reads as tier 2 from 
 # CRLF: the offsets are rebuilt from the same split the fence flags come from, so a CRLF document must not
 # be shifted by one byte per line. Asserted by the resulting label rather than the number.
 $crlfList = $fencedList -replace "`n", "`r`n"
-$crlfOff = Get-ImpactInsertOffset -SectionText $crlfList -Score 3 -Tier 1
-Assert-Equal '## #18 Real, tier 0' ((($crlfList.Substring($crlfOff)) -split "`r?`n")[0]).Trim() 'insert/fenced: a CRLF document lands in the same place -- the offsets keep step with the lines'
+$crlfOff = Get-EntryInsertOffset -SectionText $crlfList -Score 3 -Tier 1
+Assert-Equal '## #20 Real, tier 2, and it documents the format' ((($crlfList.Substring($crlfOff)) -split "`r?`n")[0]).Trim() 'insert/fenced: a CRLF document lands in the same place -- the offsets keep step with the lines'
 
 # --- The rubric -----------------------------------------------------------------------------------
 $rubric = @(Get-EntrySignificanceRubric)

@@ -510,8 +510,24 @@ consumer tier joined it.
 2026). `CHANGELOG.md` is an intro followed by a **flat ranked list**: a change *is* the `##`. The three
 `## Tier N - Pull Requests` sections it replaced said exactly one thing — how far each change reaches —
 and the entries now say that themselves, in a form that also carries what the change is worth.
-**What the sections communicated visually is kept as the ordering**: furthest reach first, and within a
-tier the highest significance first.
+**What the sections communicated visually was kept as the ordering** — furthest reach first, highest
+significance within a tier — **until August 16, 2026, when Dave made this list chronological, newest
+first.** The document is a record of what landed, so it reads in the order things landed.
+
+**The ranking looked load-bearing and was not, which is the part worth keeping.** Its whole argument was
+that the cut *empties* this list, so document order at cut time is the order the release documents
+inherit — and that held for exactly one section. `Build-ReleaseNotes` passes `-RankByTier` for every tier
+from 1 up and `Build-ConsumerNotes` always ranks at tier 2, so both re-rank from the scores themselves and
+inherit nothing. The one section that does inherit is the development notes' **tier 0**, whose own comment
+asks for *"complete and chronological, which is what a record is for"* — and which was quietly receiving
+score-descending order instead. So the change made that comment true rather than breaking a guarantee.
+**Before removing a mechanism, check which of its stated consumers actually consume it**; here four of
+five re-derived the answer for themselves, and the fifth wanted the opposite of what it was getting.
+
+The scores are untouched and still decide two things: what the release documents lead with, and the
+version bump. `Get-ImpactInsertOffset` was renamed `Get-EntryInsertOffset` on the same day — a function
+that ignores impact should not be named for it — and still accepts `-Score`/`-Tier`, which it ignores,
+because every consumer's fold passes them today and a removed parameter would throw on the trunk.
 
 **And since August 6, 2026 the entry is the branch's own dossier, folded in as it stands.** The heading
 names the **branch** — `` ## `feat/x` changelog `` — and its `###` sections answer in order.
@@ -822,10 +838,11 @@ instinct behind it is already encoded one level down and correctly: **tier 0 is 
 be `N/A`**, because every change reaches this repo's own developers at least a little. The floor is a
 score of 1 — and band 1 now asks what that 1 buys.
 
-**Who reads it where.** The fold places the entry at its ranked position in `CHANGELOG.md`, and that is
-the *only* moment it can: the cut **empties the list**, so whatever order the fold leaves is
-what the release documents inherit — reproducible across two moments days apart with nothing
-re-estimated. Insert-only, never a re-sort: the fold commit lands directly on `main`, so a bug there
+**Who reads it where.** The fold places the entry at the **top** of `CHANGELOG.md` — newest first since
+August 16, 2026; the ranked position it used to compute is described above, together with why the
+argument for it did not survive being checked. The release documents rank themselves from these same
+scores at cut time, so nothing is lost by this list not being sorted. Insert-only, never a re-sort: the
+fold commit lands directly on `main`, so a bug there
 must be able to misplace at most the one entry being folded rather than scramble a list it did not write. The **consumer** re-read the tier-2 row (its reader is the consumer); the **internal
 note** reads the tier-1 row. **Tier 0 is never ranked** — the development note is the record: complete
 and chronological. The table **survives into the record** because that is the last place each ranking's

@@ -2043,41 +2043,35 @@ function Remove-EntryAdminSections {
     return [regex]::Replace($t, '(\r?\n)\1\1+', '$1$1')
 }
 
-function Get-ImpactInsertOffset {
+function Get-EntryInsertOffset {
     <#
-        Pure: where in a changelog tier SECTION a new entry with $Score belongs -- a character offset into
-        $SectionText, always at an entry boundary ('### ' at line start) or at its very end.
+        Pure: where in CHANGELOG.md's list a newly folded entry belongs -- a character offset into
+        $SectionText, always at an entry boundary ('## ' at line start) or at its very end.
 
-        THE FOLD IS WHAT KEEPS CHANGELOG.md ORDERED, and it has to be, because the cut EMPTIES the tier
-        sections. There is no later moment at which the pending list could be sorted: the release documents
-        read the section in document order, so whatever order the fold leaves behind IS the order the notes
-        and the consumer document inherits. That is also what makes the ordering reproducible across the two moments
-        days apart, with nothing re-estimated -- the numbers are read from the file both times, and the
-        second reader does not sort at all.
+        NEWEST FIRST, FULL STOP (Dave, August 16, 2026). The answer is the TOP of the list: the entry being
+        folded is the most recently merged one, so it leads. The list is a chronological record and reads
+        like one.
 
-        INSERT-ONLY, NEVER A RE-SORT, and that is a safety property rather than an optimisation. This
-        function serves a commit that lands DIRECTLY ON THE MAIN BRANCH under one of this repo's two named
-        exceptions. A re-sort would have the fold rewrite the position of entries it did not write, so a bug
-        could scramble a section; an insert can only ever misplace the one entry being folded, which is
-        visible in the diff and one edit to repair.
+        IT RANKED ON (TIER, SIGNIFICANCE) UNTIL THAT DAY, and the reason that went is worth keeping, because
+        the ranking looked load-bearing and was not. The argument for it was that the cut EMPTIES this list,
+        so document order at cut time IS the order the release documents inherit -- which turned out to be
+        true of exactly one section. Build-ReleaseNotes passes -RankByTier for every tier from 1 up and
+        Build-ConsumerNotes always ranks at tier 2, so both re-rank from the scores themselves and inherit
+        nothing. The one place that does inherit is the development notes' TIER 0 section, whose own comment
+        asks for "complete and chronological, which is what a record is for" -- and which was getting
+        score-descending order instead. So this change makes that comment true rather than breaking it.
+        The significance scores are untouched and still decide the release documents' order and the version
+        bump; they simply stopped deciding this one.
 
-        HIGHEST FIRST, AND A TIE KEEPS THE NEWER ENTRY ON TOP. The list is written newest-first, so equal
-        ranks preserve exactly what the fold did before ranking existed.
+        INSERT-ONLY, NEVER A RE-SORT, and that is unchanged and still a safety property rather than an
+        optimisation. This function serves a commit that lands DIRECTLY ON THE MAIN BRANCH under one of this
+        repo's two named exceptions. A re-sort would have the fold rewrite the position of entries it did
+        not write, so a bug could scramble the list; an insert can only ever misplace the one entry being
+        folded, which is visible in the diff and one edit to repair.
 
-        AN UNSCORED ENTRY ($Score 0 -- a tier-0 entry, one from before the table, or a repo with the ranking
-        off) SINKS TO THE BOTTOM OF ITS OWN TIER, and that is a reversal of what this function did when it
-        was written: it had an early return sending any score of 0 to the top of the section. The reason it
-        had to go is symmetry with the entries it ranks against. The loop below reads an entry ALREADY in the
-        changelog that declares no score as 0 and therefore sorts it below everything scored at its tier -- so
-        the early return meant the SAME entry ranked differently depending on which side of the fold it was
-        on, top while it was being inserted and bottom forever after. 0 is the lowest rank, not the absence of
-        one. Nothing is lost by sinking: open-pr reports a missing score and the cut refuses over it by name.
-
-        RANKED ON (TIER, SIGNIFICANCE) SINCE THE SECTIONS WENT (Dave, August 5, 2026). While CHANGELOG.md had
-        one section per tier, the section answered "how far" and this only had to order within it. There is one
-        flat list now, so the tier is the FIRST key: consumer-facing work leads, repo-internal work sinks, and
-        the significance decides the order inside each tier. That is what the three section headings used to
-        communicate visually, kept as an ordering rather than as structure.
+        $Score and $Tier are still accepted and deliberately ignored. The fold computes both for the console
+        line and for the bump, and dropping them from this signature would only move that call's edit into
+        a script that lands on the trunk -- see the parameter block for the fuller reason.
 
         $EntryPattern is the heading shape an entry starts with -- '(?m)^## ' for the current format. It is a
         parameter rather than a constant because a document mid-migration still holds pre-format '### '
@@ -2085,18 +2079,15 @@ function Get-ImpactInsertOffset {
     #>
     param(
         [Parameter(Mandatory)][AllowEmptyString()][string]$SectionText,
+        # ACCEPTED AND IGNORED SINCE AUGUST 16, 2026. Kept rather than removed because every caller in every
+        # consumer's plugin cache passes them today, and they arrive at the new lib through a plugin update
+        # rather than by choosing to -- a removed parameter would make the fold throw on the trunk, straight
+        # after a merge, which is the worst place this repo has to fail. Same "recognise both" reasoning the
+        # retired section headings get, applied to a signature.
         [int]$Score = 0,
         [int]$Tier = 0,
         [string]$EntryPattern = '(?m)^## '
     )
-    # DECLARING TIER 0 IS NOT THE SAME AS DECLARING NOTHING, and conflating them was a real bug here: an
-    # early return sent everything with tier 0 and no score to the TOP of the list, so a repo-internal change
-    # led the document. There WAS an -Undeclared switch for that second case, returning the top; it is gone,
-    # because in a flat list there is no such thing as an unplaced entry. An entry that declares nothing is
-    # tier 0 -- the documented default and the harmless end -- and the loop below already lands it at the top
-    # of the tier-0 run, which is the newest-first answer without promoting it past work that declared more.
-    # Keeping a switch no caller passes would have preserved the wrong answer for the day somebody reached
-    # for it.
     # FENCE-AWARE, LIKE EVERY OTHER READER OF THIS FORMAT -- and this function was the one that was not.
     # Measured on the fold of PR #477, in the document PR #476 had just created: that entry quotes
     # '## #475 <midDot> ...' inside a ```text fence, as the worked example of the format it introduces. A
@@ -2132,28 +2123,15 @@ function Get-ImpactInsertOffset {
             if ($SectionText.Substring($offset, 1) -eq "`r") { $offset += 2 } else { $offset += 1 }
         }
     }
+    # An empty list appends at the end, which for an empty string is the same position as the top -- stated
+    # as its own case anyway, because a list with a head note and no entries yet is not empty text.
     if ($entryStarts.Count -eq 0) { return $SectionText.Length }
 
-    for ($i = 0; $i -lt $entryStarts.Count; $i++) {
-        $start = $entryStarts[$i]
-        $end = if ($i + 1 -lt $entryStarts.Count) { $entryStarts[$i + 1] } else { $SectionText.Length }
-        $block = $SectionText.Substring($start, $end - $start)
-        $impact = Resolve-EntryImpact -EntryText $block
-        $existingTier = [int]$impact.Tier
-        $existingScore = Get-EntryImpactScore -Impact $impact -Tier $existingTier
-
-        # An entry ALREADY in the changelog that declares no score -- one written before the table existed --
-        # reads as 0 and therefore sorts below everything scored at its tier. Same fail-safe direction as
-        # everywhere else here, and it cannot stop a fold: that entry is already merged, and refusing now
-        # would block an unrelated branch over somebody else's line.
-        #
-        # '-le' on the deciding comparison, not '-lt': an equal rank puts the NEW entry above its equals,
-        # which preserves the newest-first order the list already had. '-lt' would push it below them,
-        # silently reversing that order for every tie -- and ties are the common case on a five-point scale.
-        if ($existingTier -lt $Tier) { return $start }
-        if ($existingTier -eq $Tier -and $existingScore -le $Score) { return $start }
-    }
-    return $SectionText.Length
+    # THE FIRST ENTRY BOUNDARY, which is what "newest first" means as an offset. The fence walk above is
+    # what makes it correct rather than trivially `IndexOf('## ')`: an entry may QUOTE a heading inside a
+    # fence -- the entry introducing this very format does -- and inserting at a quoted heading would split
+    # somebody else's fenced block in two. Measured on the fold of PR #477, back when this function ranked.
+    return $entryStarts[0]
 }
 # --- The entry's own shape: one H2 per change, with named sections ---------------------------------
 #
@@ -2946,15 +2924,16 @@ function Format-EntryBlock {
     # without the other would produce a file that is neither.
     # THE HEADING CARRIES THE CREATION STAMP SINCE AUGUST 16, 2026, which is where the 'Branch ID' section
     # went. The heading already had to name the branch, and a section below it holding one more fact about
-    # that same branch was a section's worth of ceremony for a timestamp. Quoted, and separated by ' - ',
-    # exactly as the hand-designed template spells it.
+    # that same branch was a section's worth of ceremony for a timestamp. Separated by ' - ', and BARE:
+    # it was quoted for the first half of that day, and the quotes said nothing a reader needed -- a
+    # timestamp has no spaces to delimit and is not being cited.
     #
     # THE '(template)' MARKER IS GONE WITH IT, and that is a consequence rather than a second decision:
     # the suffix slot now holds the stamp, and the template's stamp is the visible placeholder
     # '<timestamp of the moment this branch was created>' -- which marks the file at least as loudly as
     # the word did, beside a branch token that is equally obviously not a branch.
     if ($Template -and -not $Id) { $Id = Get-EntryIdTemplatePlaceholder }
-    if ($Id) { $TitleSuffix = "- '$Id'" }
+    if ($Id) { $TitleSuffix = "- $Id" }
     # Each line appended on its own statement, NOT as @(<expr>, '') -- the comma operator binds looser than
     # '+', so `@(('#'*2) + ' ' + $Title, '')` concatenates the string with the ARRAY ($Title, '') and joins
     # it with a space. That produced '## A real title ' with a trailing space and no blank line after it,
