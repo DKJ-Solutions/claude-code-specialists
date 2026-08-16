@@ -181,6 +181,7 @@ list sits at the **end** of the page:
 
 | Version | Date | Type | Title |
 |---|---|---|---|
+| [4.12.0](audience/4.x/4.12.0.md) | 2026-08-16 | Minor | A finding is measured before it is repaired, and a gate records what it proved |
 | [4.11.0](audience/4.x/4.11.0.md) | 2026-08-15 | Minor | A prompt inbox for assignments, and a third of the always-on layer moved off the load path |
 | [4.10.0](audience/4.x/4.10.0.md) | 2026-08-15 | Minor | The Claude App marketplace publishes a chosen subset, and an inbound report's subject is verified before it is routed |
 | [4.9.0](audience/4.x/4.9.0.md) | 2026-08-15 | Minor | the workflow gathers into its own root folder at the consumer, and what the plugin ships is held to what a consumer can actually use |
