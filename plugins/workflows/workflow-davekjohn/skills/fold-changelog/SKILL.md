@@ -152,11 +152,17 @@ to land there instead of wherever `CLAUDE_PROJECT_DIR`/git-root would otherwise 
 2. Clears it afterwards: **`workflow-davekjohn/branch/branch-changelog.md` and `workflow-davekjohn/branch/branch-progress.md` are reset** to
    their empty state, a pre-split root entry file is **removed**.
 
-**Where it lands is decided by the entry's own Significance section**, not by a heading and not by a seam.
-`CHANGELOG.md` is an intro followed by a flat list of `##` entries, and the fold inserts the block at its
-ranked position: **furthest reach first**, and within a tier **highest significance first**. Everything
+**Where it lands is the top of the list.** `CHANGELOG.md` is an intro followed by a flat list of `##`
+entries, **newest first**: the entry being folded is the most recently merged one, so it leads. Everything
 above the first `##` is the intro and is never written into; a document with no entries yet simply gets the
 first one.
+
+**It ranked on the Significance sections until August 16, 2026**, and the argument for that was that the
+cut empties this list, so document order at cut time is what the release documents inherit. That held for
+one section only: the release notes rank themselves from tier 1 up and the consumer document always ranks
+at tier 2, so both read the scores rather than the order. The one section that does inherit is the
+development notes' tier 0 — which asks to be chronological, and was getting score order instead. The
+scores are untouched and still decide both the release documents' order and the version bump.
 
 **Nothing is consumed.** The `Tier: N` line of a pre-format entry, and the Significance sections of a current one,
 both travel into `CHANGELOG.md` intact. That is a change from when the document had one section per tier: the

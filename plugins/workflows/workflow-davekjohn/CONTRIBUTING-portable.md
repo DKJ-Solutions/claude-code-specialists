@@ -171,10 +171,13 @@ their empty state — so the trunk is ready for the next branch and the merged b
 not greet whoever opens it. It commits that directly on the trunk, naming exactly those three paths so
 nothing else in the tree can ride along.
 
-The entry is inserted at **the position its own Significance sections rank it at** — furthest reach first
-and, within a reach, highest significance first. **The fold is the only moment that order can be decided**,
-which is why the Significance sections have to be right before the merge: a release cut empties the list,
-so whatever order the fold leaves is what the release documents inherit. Nothing is re-sorted afterwards.
+The entry is inserted at **the top of the list**: `CHANGELOG.md` is newest-first, a record of what landed
+in the order it landed. Insert-only, never a re-sort — the fold commit goes straight onto the trunk, so a
+bug must be able to misplace at most the entry being folded.
+
+**The Significance sections still have to be right before the merge**, for two other reasons: the release
+documents rank *themselves* on those scores, and the version bump follows the highest tier pending. What
+they no longer decide is this document's order.
 
 Where your repo has a plugin tier — declared by `Get-ReleasePluginTier` — the fold also derives a
 `Plugins:` line from the PR's files, which the release documents read. A repo with no plugins never sees

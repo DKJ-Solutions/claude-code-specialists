@@ -1,4 +1,4 @@
-## Branch `<prefix>/<short-name>` changelog - '<timestamp of the moment this branch was created>'
+## Branch `<prefix>/<short-name>` changelog - <timestamp of the moment this branch was created>
 
 ### What does the change on this branch bring to main?
 

@@ -1,6 +1,6 @@
 # Changelog
 
-Everything merged since the last release, furthest reach first: **one `##` per change**, and under it two
+Everything merged since the last release, **newest first**: **one `##` per change**, and under it two
 named `###` sections answering what a reader arrives with. Entries written before August 16, 2026 carry
 six, and are read exactly as they always were. Every release ever cut is listed in
 [`workflow-davekjohn/releases/README.md`](workflow-davekjohn/releases/README.md) — each with its date, type and title, and a link to what that
@@ -8,95 +8,16 @@ release was worth. How the mechanism works (entry files, the Significance sectio
 [`workflow-davekjohn/CONTRIBUTING.md`](workflow-davekjohn/CONTRIBUTING.md).
 
 Each change declares its own **reach**, and per audience how much it **weighs** there — one `#### Tier N`
-sub-section per tier under *Significance*, each closing with its score. That is what orders this list:
-furthest reach first, and within a tier the most consequential change first. It also decides what may be
-released, because **the bump follows the highest tier pending**: **tier 0 only earns a patch**, **tier 1 or
-higher earns a minor**, and a **major** recaps ten minors. So a changelog holding nothing but tier 0 is a
-patch waiting to be cut, not a release with nobody to announce it to.
+sub-section per tier, each closing with its score. This list does not order on it: it is a record of what
+landed, so it reads in the order things landed. What the declaration decides is what the **release
+documents** lead with — they rank themselves on it — and what may be released at all, because **the bump
+follows the highest tier pending**: **tier 0 only earns a patch**, **tier 1 or higher earns a minor**, and
+a **major** recaps ten minors. So a changelog holding nothing but tier 0 is a patch waiting to be cut, not
+a release with nobody to announce it to.
 
 ---
 
-## `docs/v4-12-0-release-note` changelog
-
-### Branch title
-
-The v4.12.0 release note
-
-### Branch ID
-
-20260816-114831
-
-### Branch type
-
-docs
-
-### What does the change on this branch bring to main?
-
-The one hand-written document for the minor tagged this morning: the consumer section rewritten from
-the cut's draft against the seven writing tests, and the two organisational sections no script can
-generate.
-
-**The item that led *what was still open* for five consecutive releases is closed, and it leads the
-consumer section instead.** The merge re-running the gates the pull request had already proved was
-named without being acted on at `v4.7.0` through `v4.11.0`; `#728` repairs it. So the document's first
-no-action section is the one telling a consumer to stop reaching for `-SkipLint -SkipTests`, which is
-the behaviour change they will actually feel. Test 3 orders by urgency, and a five-release backlog item
-being gone outranks everything else in the release.
-
-**The publication line was read at the target rather than carried forward, and it had moved.**
-`v4.11.0`'s note -- corrected once already -- said colleagues were on 4.10.0. Read live from
-`BWJ-ecommerce/claude-plugins-bwj` at commit `d528567`: the four team plugins are on **4.11.0**,
-published 2026-08-15T15:44:13Z, taken from the `plugin.json` files themselves rather than from the
-publishing commit's own message. That is the habit `#694` established being applied at the first
-opportunity to inherit a wrong line instead.
-
-**And the previous note was checked for a second correction, which it does not need.** `#694`'s
-correction merged at 14:42:11Z and the publication ran at 15:44:13Z -- 62 minutes later -- so that line
-was **true when published and went stale afterwards**, which is the record working rather than a false
-line to repair. `4.11.0.md` is therefore left untouched, and the check is recorded here so the next
-reader does not re-derive it.
-
-**The migration item leads the section for a third release running**, now naming three intervening
-notes rather than two. A consumer updating from 4.8.0 or earlier is no more carried past v4.9.0's two
-actions by 4.12.0 than by 4.10.0 or 4.11.0.
-
-**Fourteen tier-2 entries became six consumer sections plus a short list**, which is the rewrite the
-skill budgets for rather than a trim. Four entries carry no heading of their own: the two decisions
-recorded as decisions, the layer-table re-measurement and the documentation corrections are internal
-craft, and their consumer-facing halves survive as one bullet each under *smaller fixes you may
-notice*. Test 2's line is what removed them -- they describe our effort, not the reader's outcome.
-
-**Step 0a's first pass is a subtotal of 4m 57s to the pushed tag**, against `v4.11.0`'s 5m 25s,
-`v4.10.0`'s 5m 12s, `v4.9.0`'s 5m 36s and `v4.8.0`'s 5m 02s -- the fifth consecutive head inside a
-thirty-nine second band. The cut's test gate ran 43 suites in **158s** against the 218s that had been
-the floor, reported as a single observation rather than a trend: the machine was otherwise idle and the
-suite split from `#730` landed between the two measurements. About two minutes blocked a person, higher
-than recent releases because the release was named by asking rather than by deciding alone -- a choice
-about this release, not a cost of the procedure, and the document says so in those terms.
-
-### Significance
-
-#### Tier 0
-
-The release's own record of what it cost and what it closed, including the first head measurement taken
-after the suite split.
-
-**Score:** 2
-
-#### Tier 2
-
-The one document a consumer reads to decide whether to update -- and this release's headline is a
-behaviour change they act on, since the workaround they have been using is now the wrong reflex.
-
-**Score:** 4
-
-### Pull Request
-
-[PR #732](https://github.com/DaveKJohn/claude-code-specialists/pull/732) · merged 2026-08-16
-
----
-
-## Branch `feat/compact-changelog-entry` changelog - '20260816-163324'
+## Branch `feat/compact-changelog-entry` changelog - 20260816-163324
 
 ### What does the change on this branch bring to main?
 
@@ -201,6 +122,140 @@ it reads keeps its path — but it is a command they type by hand, so they have 
 Plugins: workflow-davekjohn
 
 [PR #737](https://github.com/DaveKJohn/claude-code-specialists/pull/737) · merged 2026-08-16
+
+---
+
+## `docs/gate-record-second-firing` changelog
+
+### Branch title
+
+The gate record's second firing, measured on this repo's own ship
+
+### Branch ID
+
+20260816-151316
+
+### Branch type
+
+docs
+
+### What does the change on this branch bring to main?
+
+The section merged in #735 rested on one firing in the wild (PR #734) plus a bench reconstruction, and said
+so plainly. This branch supplies the second firing and corrects the sentence that claimed only one was
+confirmed.
+
+**The second firing was produced deliberately rather than waited for**, because the chain offers it free:
+`ship-pr` calls `open-pr` internally, so running `open-pr` first and `ship-pr` afterwards *is* the
+split-step case, and the gates had to run before the merge either way. On PR #735's own tree `open-pr` ran
+both gates for real in **198.6s** (43/43 green); `ship-pr` minutes later printed both skip lines against the
+unchanged fingerprint; and the merge landed **15s** after CI went green, against the 264.5s historical
+median for that shape. #734 was 27s — so n=2, on two branches, both in the fast mode.
+
+The 198.6s replaces the ~203s bench estimate as the figure to quote: it is a whole `open-pr` invocation
+measured in the chain rather than a lint number and a suite number added together. The bench figures stay,
+because they are what decompose it.
+
+Two suite readings from that exercise are folded in as well (168s and 183s), moving the post-split band to
+n=12 with a median near 172s. The spread is unchanged at 139.7–195.0s.
+
+One constraint is recorded because it decides the order of operations: `Get-GateFingerprint` hashes HEAD, so
+any further commit voids the evidence and the next run re-gates. Those two readings could be committed to
+the document **or** be followed by a skipping ship, not both on one branch — which is why they arrive here
+rather than in #735. And one limit is stated rather than left for a reader to assume: two firings confirm
+the mechanism but are not a distribution, and since 27s and 15s differ by far more than the 162ms skip
+itself costs, nearly all of that spread is merge work and network. The saving is the gate that did not run.
+
+### Significance
+
+#### Tier 0
+
+Corrects a claim in a just-merged document — "one firing is confirmed" — and replaces the estimated gate
+cost with one measured in the chain. A maintainer reading the section otherwise inherits both.
+
+**Score:** 2
+
+#### Tier 2
+
+N/A — the lens under `.claude/specialists/` is this repo's own layer and is not plugin payload, so nothing
+here reaches a consumer.
+
+**Score:** N/A
+
+### Pull Request
+
+[PR #736](https://github.com/DaveKJohn/claude-code-specialists/pull/736) · merged 2026-08-16
+
+---
+
+## `docs/gate-record-measured` changelog
+
+### Branch title
+
+The gate record's saving, measured on the case it was built for
+
+### Branch ID
+
+20260816-145255
+
+### Branch type
+
+docs
+
+### What does the change on this branch bring to main?
+
+`v4.12.0`'s release note left one item open in its own words: the gate record had not been measured on the
+case it was built for, because that release was shipped in one motion and so never produced the duplicate
+gate run the record exists to absorb. PR #734 was that case. This branch measures it and writes the result
+into [Nolan #25's lens](.claude/specialists/lenses/06-25-extension.md), beside the existing wall-clock
+section.
+
+Both halves of the difference are measured rather than one half and an assumption: the gate `ship-pr` would
+have paid (lint 9.2–10.6s, n=3; 43 suites 139.7–195.0s, median 193.2s, n=6) against the path it paid
+instead (one fingerprint plus one evidence read per gate, 130.9–249.5ms, n=10). **Roughly 203 seconds of
+gate replaced by about a sixth of a second, a ratio near 1,250:1.** A second, independent method agrees:
+#734's CI-green-to-merge gap was 27s against a historical slow-mode median of 264.5s for exactly that
+shape, implying ~237s once the genuine merge-and-fold work is allowed for.
+
+The historical comparator was recounted instead of quoted, and — unlike the four findings before it — it
+**survived**: 187 fast merges at a median of 13s and 78 slow at 264.5s (27.8%) against the docstring's 205
+/ 14s / 83 / 263s / 28.3%, same shape, same void, same interior peak. Recorded as a recount that held,
+since that is the only thing distinguishing it from one that did not.
+
+Three misreadings are closed off explicitly: the 249s-on-28.3% figure is the comparator and not the
+result; the two "skipped" lines are one fingerprint decision printed twice rather than two data points;
+and the six fast merges since the record shipped are consistent with it but are not six firings.
+
+One side finding is kept separate rather than folded in. The four post-split suite runs already recorded
+(142.4 / 145.5 / 170.3 / 169.9s) are the optimistic end of a wider band — combined with the six here and
+`open-pr`'s own 168s on this branch, n=11 spans 139.7–195.0s with a median near 170s, and four of the six
+sat at 193.0–195.0. The post-split improvement is real; the "-25%" headline is the best case rather than
+the typical one. The summary table is corrected accordingly (40 → 43 suites, and the lint row gets a
+number where it said "seconds").
+
+That eleventh reading is quoted rather than dropped, following the precedent the section above set for a
+late arrival — and it is the useful kind, taken by the gate itself rather than by the person arguing for
+the median, landing within two seconds of it.
+
+### Significance
+
+#### Tier 0
+
+Closes a named open item from `v4.12.0`'s release note with a figure the repo can act on, and corrects two
+stale numbers in the wall-clock table that a maintainer would otherwise read as current.
+
+**Score:** 3
+
+#### Tier 2
+
+N/A — the lens under `.claude/specialists/` is this repo's own layer and is not plugin payload, so nothing
+here reaches a consumer.
+
+**Score:** N/A
+
+### Pull Request
+
+[PR #735](https://github.com/DaveKJohn/claude-code-specialists/pull/735) · merged 2026-08-16
 
 ---
 
@@ -351,15 +406,15 @@ A two-line edit to a page a consumer may already have read; nothing they do chan
 
 ---
 
-## `docs/gate-record-measured` changelog
+## `docs/v4-12-0-release-note` changelog
 
 ### Branch title
 
-The gate record's saving, measured on the case it was built for
+The v4.12.0 release note
 
 ### Branch ID
 
-20260816-145255
+20260816-114831
 
 ### Branch type
 
@@ -367,121 +422,64 @@ docs
 
 ### What does the change on this branch bring to main?
 
-`v4.12.0`'s release note left one item open in its own words: the gate record had not been measured on the
-case it was built for, because that release was shipped in one motion and so never produced the duplicate
-gate run the record exists to absorb. PR #734 was that case. This branch measures it and writes the result
-into [Nolan #25's lens](.claude/specialists/lenses/06-25-extension.md), beside the existing wall-clock
-section.
+The one hand-written document for the minor tagged this morning: the consumer section rewritten from
+the cut's draft against the seven writing tests, and the two organisational sections no script can
+generate.
 
-Both halves of the difference are measured rather than one half and an assumption: the gate `ship-pr` would
-have paid (lint 9.2–10.6s, n=3; 43 suites 139.7–195.0s, median 193.2s, n=6) against the path it paid
-instead (one fingerprint plus one evidence read per gate, 130.9–249.5ms, n=10). **Roughly 203 seconds of
-gate replaced by about a sixth of a second, a ratio near 1,250:1.** A second, independent method agrees:
-#734's CI-green-to-merge gap was 27s against a historical slow-mode median of 264.5s for exactly that
-shape, implying ~237s once the genuine merge-and-fold work is allowed for.
+**The item that led *what was still open* for five consecutive releases is closed, and it leads the
+consumer section instead.** The merge re-running the gates the pull request had already proved was
+named without being acted on at `v4.7.0` through `v4.11.0`; `#728` repairs it. So the document's first
+no-action section is the one telling a consumer to stop reaching for `-SkipLint -SkipTests`, which is
+the behaviour change they will actually feel. Test 3 orders by urgency, and a five-release backlog item
+being gone outranks everything else in the release.
 
-The historical comparator was recounted instead of quoted, and — unlike the four findings before it — it
-**survived**: 187 fast merges at a median of 13s and 78 slow at 264.5s (27.8%) against the docstring's 205
-/ 14s / 83 / 263s / 28.3%, same shape, same void, same interior peak. Recorded as a recount that held,
-since that is the only thing distinguishing it from one that did not.
+**The publication line was read at the target rather than carried forward, and it had moved.**
+`v4.11.0`'s note -- corrected once already -- said colleagues were on 4.10.0. Read live from
+`BWJ-ecommerce/claude-plugins-bwj` at commit `d528567`: the four team plugins are on **4.11.0**,
+published 2026-08-15T15:44:13Z, taken from the `plugin.json` files themselves rather than from the
+publishing commit's own message. That is the habit `#694` established being applied at the first
+opportunity to inherit a wrong line instead.
 
-Three misreadings are closed off explicitly: the 249s-on-28.3% figure is the comparator and not the
-result; the two "skipped" lines are one fingerprint decision printed twice rather than two data points;
-and the six fast merges since the record shipped are consistent with it but are not six firings.
+**And the previous note was checked for a second correction, which it does not need.** `#694`'s
+correction merged at 14:42:11Z and the publication ran at 15:44:13Z -- 62 minutes later -- so that line
+was **true when published and went stale afterwards**, which is the record working rather than a false
+line to repair. `4.11.0.md` is therefore left untouched, and the check is recorded here so the next
+reader does not re-derive it.
 
-One side finding is kept separate rather than folded in. The four post-split suite runs already recorded
-(142.4 / 145.5 / 170.3 / 169.9s) are the optimistic end of a wider band — combined with the six here and
-`open-pr`'s own 168s on this branch, n=11 spans 139.7–195.0s with a median near 170s, and four of the six
-sat at 193.0–195.0. The post-split improvement is real; the "-25%" headline is the best case rather than
-the typical one. The summary table is corrected accordingly (40 → 43 suites, and the lint row gets a
-number where it said "seconds").
+**The migration item leads the section for a third release running**, now naming three intervening
+notes rather than two. A consumer updating from 4.8.0 or earlier is no more carried past v4.9.0's two
+actions by 4.12.0 than by 4.10.0 or 4.11.0.
 
-That eleventh reading is quoted rather than dropped, following the precedent the section above set for a
-late arrival — and it is the useful kind, taken by the gate itself rather than by the person arguing for
-the median, landing within two seconds of it.
+**Fourteen tier-2 entries became six consumer sections plus a short list**, which is the rewrite the
+skill budgets for rather than a trim. Four entries carry no heading of their own: the two decisions
+recorded as decisions, the layer-table re-measurement and the documentation corrections are internal
+craft, and their consumer-facing halves survive as one bullet each under *smaller fixes you may
+notice*. Test 2's line is what removed them -- they describe our effort, not the reader's outcome.
 
-### Significance
-
-#### Tier 0
-
-Closes a named open item from `v4.12.0`'s release note with a figure the repo can act on, and corrects two
-stale numbers in the wall-clock table that a maintainer would otherwise read as current.
-
-**Score:** 3
-
-#### Tier 2
-
-N/A — the lens under `.claude/specialists/` is this repo's own layer and is not plugin payload, so nothing
-here reaches a consumer.
-
-**Score:** N/A
-
-### Pull Request
-
-[PR #735](https://github.com/DaveKJohn/claude-code-specialists/pull/735) · merged 2026-08-16
-
----
-
-## `docs/gate-record-second-firing` changelog
-
-### Branch title
-
-The gate record's second firing, measured on this repo's own ship
-
-### Branch ID
-
-20260816-151316
-
-### Branch type
-
-docs
-
-### What does the change on this branch bring to main?
-
-The section merged in #735 rested on one firing in the wild (PR #734) plus a bench reconstruction, and said
-so plainly. This branch supplies the second firing and corrects the sentence that claimed only one was
-confirmed.
-
-**The second firing was produced deliberately rather than waited for**, because the chain offers it free:
-`ship-pr` calls `open-pr` internally, so running `open-pr` first and `ship-pr` afterwards *is* the
-split-step case, and the gates had to run before the merge either way. On PR #735's own tree `open-pr` ran
-both gates for real in **198.6s** (43/43 green); `ship-pr` minutes later printed both skip lines against the
-unchanged fingerprint; and the merge landed **15s** after CI went green, against the 264.5s historical
-median for that shape. #734 was 27s — so n=2, on two branches, both in the fast mode.
-
-The 198.6s replaces the ~203s bench estimate as the figure to quote: it is a whole `open-pr` invocation
-measured in the chain rather than a lint number and a suite number added together. The bench figures stay,
-because they are what decompose it.
-
-Two suite readings from that exercise are folded in as well (168s and 183s), moving the post-split band to
-n=12 with a median near 172s. The spread is unchanged at 139.7–195.0s.
-
-One constraint is recorded because it decides the order of operations: `Get-GateFingerprint` hashes HEAD, so
-any further commit voids the evidence and the next run re-gates. Those two readings could be committed to
-the document **or** be followed by a skipping ship, not both on one branch — which is why they arrive here
-rather than in #735. And one limit is stated rather than left for a reader to assume: two firings confirm
-the mechanism but are not a distribution, and since 27s and 15s differ by far more than the 162ms skip
-itself costs, nearly all of that spread is merge work and network. The saving is the gate that did not run.
+**Step 0a's first pass is a subtotal of 4m 57s to the pushed tag**, against `v4.11.0`'s 5m 25s,
+`v4.10.0`'s 5m 12s, `v4.9.0`'s 5m 36s and `v4.8.0`'s 5m 02s -- the fifth consecutive head inside a
+thirty-nine second band. The cut's test gate ran 43 suites in **158s** against the 218s that had been
+the floor, reported as a single observation rather than a trend: the machine was otherwise idle and the
+suite split from `#730` landed between the two measurements. About two minutes blocked a person, higher
+than recent releases because the release was named by asking rather than by deciding alone -- a choice
+about this release, not a cost of the procedure, and the document says so in those terms.
 
 ### Significance
 
 #### Tier 0
 
-Corrects a claim in a just-merged document — "one firing is confirmed" — and replaces the estimated gate
-cost with one measured in the chain. A maintainer reading the section otherwise inherits both.
+The release's own record of what it cost and what it closed, including the first head measurement taken
+after the suite split.
 
 **Score:** 2
 
 #### Tier 2
 
-N/A — the lens under `.claude/specialists/` is this repo's own layer and is not plugin payload, so nothing
-here reaches a consumer.
+The one document a consumer reads to decide whether to update -- and this release's headline is a
+behaviour change they act on, since the workaround they have been using is now the wrong reflex.
 
-**Score:** N/A
+**Score:** 4
 
 ### Pull Request
 
-[PR #736](https://github.com/DaveKJohn/claude-code-specialists/pull/736) · merged 2026-08-16
-
----
-
+[PR #732](https://github.com/DaveKJohn/claude-code-specialists/pull/732) · merged 2026-08-16
