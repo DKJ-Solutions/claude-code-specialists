@@ -248,6 +248,10 @@ $repo = Get-RepoName
 # the entry the same way) and Update-PrBodySection. Same payload reasoning as the two libs above.
 . (Join-Path $PSScriptRoot '..\lib\pr-body-lib.ps1')
 
+# Gate evidence: what the gates already proved, and against which exact working state. Same
+# not-repo-owned, travels-with-the-payload reasoning as the three libs above.
+. (Join-Path $PSScriptRoot '..\lib\gate-lib.ps1')
+
 # Pre-flight (#86): an unfilled scaffold (repo-config still at VUL-IN) would otherwise only fail
 # further down with an unclear gh error. Stop here with a clear pointer.
 if ($repo -match 'VUL-IN' -or (Get-LintScript) -match 'VUL-IN') {
@@ -632,17 +636,36 @@ Correct the table and run again.
     }
 }
 
+# THE GATES BELOW CONSULT WHAT THEY ALREADY PROVED (August 16, 2026). ship-pr.ps1 calls this script,
+# so a branch opened in one step and shipped in a later one used to run both gates twice on a commit
+# nothing had touched -- measured at 249s of excess on 28.3% of 293 merged PRs, and routed around by
+# hand with -SkipLint -SkipTests on every run. That flag is correct only while the commit is
+# unchanged, and nothing checked that; the repair is to make the unchanged case not need it.
+#
+# The fingerprint is computed ONCE for both gates -- it hashes HEAD plus every dirty and untracked
+# file, so asking twice would hash the same tree twice. $null means git could not answer, and every
+# helper then reports "no evidence", which runs the gates exactly as before.
+$gateFingerprint = Get-GateFingerprint -RepoRoot $repoRoot
+
 # Lint gate: catch invalid manifests/frontmatter/dead links before they land on main via a PR.
 # The lint script is repo-specific (via repo-config); errors block (exit code 1). -SkipLint
 # deliberately skips the gate.
 if (-not $SkipLint) {
     $lintPath = Join-Path $repoRoot (Get-LintScript)
     if (Test-Path $lintPath) {
-        Write-Host "lint gate: integrity check for the PR..." -ForegroundColor Cyan
-        & powershell -NoProfile -ExecutionPolicy Bypass -File $lintPath
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "lint gate found errors - branch not pushed, no PR opened. Fix the errors, or run with -SkipLint to skip the gate."
-            exit 1
+        if (Test-GateEvidence -RepoRoot $repoRoot -Gate 'lint' -Fingerprint $gateFingerprint) {
+            Write-Host "lint gate: already proved against this exact tree -- skipped." -ForegroundColor DarkGray
+        } else {
+            Write-Host "lint gate: integrity check for the PR..." -ForegroundColor Cyan
+            & powershell -NoProfile -ExecutionPolicy Bypass -File $lintPath
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "lint gate found errors - branch not pushed, no PR opened. Fix the errors, or run with -SkipLint to skip the gate."
+                exit 1
+            }
+            # Recorded only on a real pass. -SkipLint records nothing, deliberately: skipping a gate
+            # proves nothing about the tree, and writing evidence there would make the escape valve
+            # silently suppress the NEXT run's gate too.
+            [void](Save-GateEvidence -RepoRoot $repoRoot -Gate 'lint' -Fingerprint $gateFingerprint)
         }
     } else {
         Write-Warning "lint script not found at '$lintPath' - lint gate skipped."
@@ -658,9 +681,14 @@ if (-not $SkipLint) {
 # been two copies of one rule, free to drift. What stays here is the half that is open-pr's own: the
 # escape valve and what a failure costs at THIS point in the chain (nothing pushed, no PR).
 if (-not $SkipTests) {
-    if (-not (Invoke-TestSuiteGate -TestsDir (Join-Path $repoRoot 'scripts\tests') -Context 'the PR')) {
+    if (Test-GateEvidence -RepoRoot $repoRoot -Gate 'tests' -Fingerprint $gateFingerprint) {
+        Write-Host "test gate: all suites already proved against this exact tree -- skipped." -ForegroundColor DarkGray
+    } elseif (-not (Invoke-TestSuiteGate -TestsDir (Join-Path $repoRoot 'scripts\tests') -Context 'the PR')) {
         Write-Error "test gate found failing suites - branch not pushed, no PR opened. Fix the tests, or run with -SkipTests to skip the gate."
         exit 1
+    } else {
+        # Same rule as the lint gate above: recorded only on a real pass, never on -SkipTests.
+        [void](Save-GateEvidence -RepoRoot $repoRoot -Gate 'tests' -Fingerprint $gateFingerprint)
     }
 }
 
