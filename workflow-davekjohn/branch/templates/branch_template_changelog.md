@@ -23,6 +23,7 @@
 **Score:**
 
 ### Pull Request
-<!-- link to the PR in github when branch is merged to main and the date this happened-->
+<!-- the PR title on the first line -- no feat:/fix:/docs: prefix, open-pr puts the branch type in front.
+     link to the PR in github when branch is merged to main and the date this happened-->
 
 
