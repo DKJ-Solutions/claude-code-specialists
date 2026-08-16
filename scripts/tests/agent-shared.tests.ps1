@@ -119,6 +119,13 @@ try {
     Assert-Equal 0 $rb.Code 'build -Check: all shared blocks in sync on the repo'
     $ri = Invoke-Script -Path $Integrity -ScriptArgs @()
     Assert-Equal 0 $ri.Code 'lint gate green on the repo (incl. shared check)'
+    # The findings, on failure only -- same reason as the twin assert in bootstrap-drift.tests.ps1: this
+    # one runs the gate over the LIVE repo, so it can fail from a collision with a concurrent suite, and
+    # 'expected 0, got 1' cannot tell that apart from a real finding in the branch under test.
+    if ($ri.Code -ne 0) {
+        @($ri.Out -split "`r?`n" | Where-Object { $_ -match '^\s*\[' -and $_ -notmatch 'checked \d' } | Select-Object -First 10) |
+            ForEach-Object { Write-Host ("         gate said: " + $_.Trim()) -ForegroundColor DarkYellow }
+    }
 
     # --- 7. THE GENERATOR AND THE GATE WALK THE PERSONAS TOO ----------------------------------------
     # The widening of August 8, 2026. Both halves are tested, because a generator that writes a file the

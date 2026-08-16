@@ -27,7 +27,7 @@
 
     PART (b) -- the lint check. Runs the REAL check-plugin-integrity.ps1 against a throwaway fixture that
     carries a copy of the script plus every lib it dot-sources (the exact pattern
-    check-plugin-integrity.tests.ps1 uses, read before writing this). 'team-alpha', 'workflow-davekjohn'
+    check-plugin-integrity-fixture.ps1 uses, read before writing this). 'team-alpha', 'workflow-davekjohn'
     AND 'workflow-default' are declared, correctly placed, in EVERY scenario: the shared-scripts registry
     (Get-SharedScriptPairs) throws outright -- uncaught, killing the whole gate mid-run -- if the
     marketplace declares ANY plugin but not one that a registered pair names (confirmed the hard way:
@@ -46,7 +46,7 @@
         scenario asserts on filesystem state before/after a run.
       - Part (b): only check 23 is asserted on. The fixture inevitably trips other checks against such a
         minimal tree (a missing RELEASE.md-successor, no agents/, etc.) -- expected noise, exactly as
-        check-plugin-integrity.tests.ps1's own fixture does, and not asserted on here either.
+        the check-plugin-integrity suites' own fixture does, and not asserted on here either.
 
     Pure ASCII (repo convention for .ps1).
 #>
@@ -57,7 +57,7 @@ $Hook     = Join-Path $RepoRoot 'plugins\teams\team-alpha\hooks\workflow-session
 $Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "workflow-exclusivity-test-fixture-$PID"
 
 # --- Part (b) sources: the lint script plus every lib it dot-sources (transitively), the same set
-#     check-plugin-integrity.tests.ps1 copies -- read there before writing this, rather than re-derived.
+#     check-plugin-integrity-fixture.ps1 copies -- read there before writing this, rather than re-derived.
 $IntegritySrc        = Join-Path $RepoRoot 'scripts\lint\check-plugin-integrity.ps1'
 $AgentSharedLibSrc   = Join-Path $RepoRoot 'scripts\lib\agent-shared-lib.ps1'
 $SharedScriptsLibSrc = Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1'
@@ -217,7 +217,7 @@ function Set-LintFixturePlugins {
 }
 
 # Runs the real (fixture-copied) lint script as a child process. Same $ErrorActionPreference relaxation
-# as Invoke-Hook and as check-plugin-integrity.tests.ps1's own Invoke-Integrity, and for the identical
+# as Invoke-Hook and as check-plugin-integrity-fixture.ps1's own Invoke-Integrity, and for the identical
 # reason: a scenario that makes the gate crash must fail its own assertion, not abort the whole suite.
 function Invoke-Integrity {
     $prevEap = $ErrorActionPreference

@@ -534,6 +534,18 @@ try {
     Write-Host "check-plugin-integrity.ps1 -- smoke" -ForegroundColor Cyan
     $li = Invoke-Script -Path $Integrity -ScriptArgs @()
     Assert-Equal 0 $li.Code 'lint gate green on the repo'
+    # AND IT PRINTS WHAT THE GATE SAID WHEN IT IS NOT (August 16, 2026). This assert runs the gate over the
+    # LIVE repo, so it is one of the handful that can fail from a collision with a concurrently running
+    # suite rather than from anything in the branch -- Sylvester's lens names it by name for exactly that.
+    # Measured that day: it failed in one pooled run of 43 suites and passed in the next three, alongside
+    # fix-mojibake's twin assert, and 'expected 0, got 1' was everything either of them said. A failure
+    # that cannot distinguish a real finding from a collision sends the next reader to the wrong place, so
+    # the findings themselves are printed here. Silent on success, deliberately: this is diagnosis, not
+    # coverage.
+    if ($li.Code -ne 0) {
+        @($li.Out -split "`r?`n" | Where-Object { $_ -match '^\s*\[' -and $_ -notmatch 'checked \d' } | Select-Object -First 10) |
+            ForEach-Object { Write-Host ("         gate said: " + $_.Trim()) -ForegroundColor DarkYellow }
+    }
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

@@ -977,7 +977,7 @@ Testing the default (no -RepoRoot) path.
 
 # --- The Skill mapping and Get-ScriptParameterNames (check 18's two inputs) ------------------------------
 # Asserted on the REGISTRY and the PARSER rather than on the gate's output: the gate is exercised by
-# check-plugin-integrity.tests.ps1, while what can rot silently here is an entry point that never declares
+# the four check-plugin-integrity-*.tests.ps1 suites, while what can rot silently here is an entry point that never declares
 # a Skill at all -- which would drop out of the check without any assert noticing.
 Write-Host ""
 Write-Host "Skill mapping + parameter parsing" -ForegroundColor Cyan

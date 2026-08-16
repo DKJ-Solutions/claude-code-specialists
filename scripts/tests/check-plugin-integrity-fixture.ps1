@@ -1,0 +1,219 @@
+<#
+.SYNOPSIS
+    Shared fixture, assert helpers and gate runner for the four check-plugin-integrity suites.
+
+.DESCRIPTION
+    NOT NAMED *.tests.ps1 ON PURPOSE: the test gate globs that pattern, and this file asserts
+    nothing. It is dot-sourced by the four suites that do:
+
+      check-plugin-integrity-links.tests.ps1      checks 4 and 10 -- the scan set and the skill spans
+      check-plugin-integrity-commands.tests.ps1   checks 11 and 12 -- printed commands and queries
+      check-plugin-integrity-entries.tests.ps1    checks 13, 13b, 14-16 -- entries, templates, figures
+      check-plugin-integrity-docs.tests.ps1       checks 18-26 and -SkipCheck -- scripts, docs, manifests
+
+    WHY THERE ARE FOUR, MEASURED (August 16, 2026, issue #714). As one file this suite ran the gate
+    111 times in sequence, took 160s standalone and 196-213s inside the parallel gate -- and the
+    gate's whole wall clock WAS this suite, to a tenth of a second, in four runs out of four. Every
+    other suite finished at 126.9s, after which one process ran alone for another 70-86 seconds with
+    15 of 16 lanes empty. The gate parallelises per FILE, so the only way to give that work the idle
+    lanes is to make it more than one file.
+
+    NOTHING WAS REMOVED TO BUY THE TIME. The four suites carry the same scenarios, in the same order,
+    against the same fixture -- the asserts still sum to the count the single file reported. Narrowing
+    test scope was explicitly refused in #714 and is not what happened here.
+
+    EACH SUITE BUILDS ITS OWN FIXTURE, in its own per-process directory. They run CONCURRENTLY under
+    the gate, so a shared path would have them tearing down each other's tree mid-assert -- the exact
+    failure test-suite-gate.tests.ps1 pins the $PID convention against.
+
+    Pure ASCII (repo convention for .ps1).
+#>
+$ErrorActionPreference = 'Stop'
+
+$RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+$IntegritySrc      = Join-Path $RepoRoot 'scripts\lint\check-plugin-integrity.ps1'
+$AgentSharedLibSrc = Join-Path $RepoRoot 'scripts\lib\agent-shared-lib.ps1'
+$SharedScriptsLibSrc = Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1'
+# Third dot-sourced dependency since #221: check-report-lib.ps1, for the non-counting Write-Coverage
+# line every category closes with. Copied like the other two, so the fixture runs the REAL script.
+$CheckReportLibSrc = Join-Path $RepoRoot 'scripts\lib\check-report-lib.ps1'
+# Fourth and fifth dot-sourced dependencies: release-lib.ps1 and the branch-info.ps1 it dot-sources
+# from its own folder. Both are copied for the same reason as the three above -- the fixture runs the
+# REAL script, so a missing dependency is a broken suite rather than one skipped check. They arrived
+# for check 17 and outlived it: the lint still dot-sources release-lib, so a fixture without it is a
+# suite that cannot start rather than one check fewer.
+$ReleaseLibSrc = Join-Path $RepoRoot 'scripts\lib\release-lib.ps1'
+$BranchInfoSrc = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
+# Sixth, since the tier model (August 5, 2026): release-lib dot-sources entry-scaffold-lib.ps1 for the
+# changelog's tier sections. Copied for the same reason as the five above -- this fixture runs the REAL
+# script, so a missing sibling is a broken suite rather than one skipped check.
+$EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
+# Seventh, since the plugin set became derived (August 9, 2026): plugin-tree-lib.ps1, dot-sourced by
+# release-lib AND by shared-scripts-lib, and read by the lint itself for the published plugin roots.
+# Copied for the same reason as the six above.
+$PluginTreeSrc = Join-Path $RepoRoot 'scripts\lib\plugin-tree-lib.ps1'
+# Eighth, since check 24 (August 10, 2026): pr-body-lib.ps1 holds the recognised placeholder strings and
+# the reference PR template, both dot-sourced by the lint. Copied for the same reason as the seven above.
+$PrBodyLibSrc = Join-Path $RepoRoot 'scripts\lib\pr-body-lib.ps1'
+# Dot-sourced into the RUNNER as well as copied into the fixture: check 13b's scenarios build their
+# template files from Get-BranchTemplates, so the test and the check read the same definition. A fixture
+# written out by hand here would be the very second source of the format that check exists to prevent.
+# Check 24's scenarios do the same with Get-PrTemplateReference, for the same reason.
+. $EntryScaffoldSrc
+. $PrBodyLibSrc
+$script:pass = 0
+$script:fail = 0
+
+function Assert-Equal {
+    param($Expected, $Actual, [string]$Name)
+    if ($Expected -eq $Actual) {
+        $script:pass++; Write-Host "  [PASS] $Name" -ForegroundColor Green
+    } else {
+        $script:fail++; Write-Host "  [FAIL] $Name`n         expected: '$Expected'`n         got:      '$Actual'" -ForegroundColor Red
+    }
+}
+
+function Assert-True {
+    param([bool]$Condition, [string]$Name)
+    if ($Condition) {
+        $script:pass++; Write-Host "  [PASS] $Name" -ForegroundColor Green
+    } else {
+        $script:fail++; Write-Host "  [FAIL] $Name" -ForegroundColor Red
+    }
+}
+
+# THE THREE CHECKS THIS SUITE SKIPS BY DEFAULT, AND WHY THE DEFAULT IS THE FAST ONE. Profiled over this
+# suite's own fixture, agent-def, parse and branch-template were half of every run's work, and this suite
+# runs the gate 110 times to assert one thing at a time -- 98% of its 194s was inside those child
+# processes, and it was the whole test gate's wall clock, three times the next slowest suite. Almost no
+# scenario here is about those three, so almost every run was paying for them.
+#
+# FOUR SCENARIOS PASS -Full, and they are the complete list: the two branch-template scenarios (r13bGood,
+# r13bGone), the [COVERAGE] scenario (which asserts 'agent-def' reports its count), and the
+# frontmatter-bom scenario (which asserts the ABSENCE of an [agent-def] finding -- the one shape that
+# would pass VACUOUSLY under a skip, and therefore the one to be careful about).
+#
+# If you add a scenario that asserts anything about those three checks, pass -Full. A presence assert
+# fails loudly without it; an absence assert does not, which is why this note is here rather than in a
+# commit message.
+$script:SkippedForSpeed = 'agent-def,parse,branch-template'
+
+function Invoke-Integrity {
+    param([string]$FixtureRoot, [switch]$Full)
+    $scriptPath = Join-Path $FixtureRoot 'scripts\lint\check-plugin-integrity.ps1'
+    $skipArgs = if ($Full) { @() } else { @('-SkipCheck', $script:SkippedForSpeed) }
+    # $ErrorActionPreference IS RELAXED AROUND THE CHILD CALL, the same way Invoke-Fold does it in
+    # fold-changelog.tests.ps1. With 'Stop' in force, anything the gate writes to stderr comes back as a
+    # terminating NativeCommandError and kills THIS script -- so a scenario that makes the gate crash
+    # aborts the suite mid-run instead of failing its own assert. Measured while adding the corrupt-
+    # marketplace scenario: the run ended at this line with a raw exception and printed neither a [FAIL]
+    # nor a total, which is a test that discriminates but cannot say why. A gate crashing is exactly the
+    # kind of thing this suite exists to catch, so it has to survive catching it.
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath @skipArgs 2>&1
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+    return [pscustomobject]@{ Code = $code; Out = ($out -join "`n") }
+}
+
+$Utf8NoBom = New-Object System.Text.UTF8Encoding $false
+$deadLink = './this-file-does-not-exist-xyz.md'
+
+# THE ONE PIECE OF SCENARIO STATE TWO SUITES SHARE, and the only reason it is here rather than in a
+# scenario. The commands suite writes this quiet CONTRIBUTING.md for scenario 24 (proving history is
+# excluded); the entries suite restores it before the [COVERAGE] block, which needs a root document
+# that prints no lifecycle command. While the two were one file the second use simply read the first's
+# variable, 500 lines further down. A copy in each file would be free to drift, and the drift would
+# show up as a coverage assert failing in a suite that never wrote the file.
+$s24Contributing = @('# Contributing', '', 'Nothing to run here.')
+
+# The fixture every one of the four suites starts from: a throwaway repo root holding the REAL
+# check-plugin-integrity.ps1 and its dot-sourced libs, a marketplace declaring three plugins, a
+# canonical two-skill skillset with its depth decoy, and the generated PR template. It ends where
+# the first scenario used to begin, so each suite starts from the same canonical state instead of
+# from whatever the previous scenario left behind.
+function New-IntegrityFixture {
+    param([Parameter(Mandatory)][string]$Fixture)
+    if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'scripts\lint') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'scripts\lib') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'connectors') -Force | Out-Null
+    # check 10 fixture: two canonical skills (skill-alpha, skill-beta) plus a DEPTH DECOY -- a
+    # SKILL.md one level deeper (skills/<name>/references/SKILL.md) that must NOT be picked up as a
+    # third canonical skill, exercising the exact-depth binding of check 10's canonical-skillset scan.
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-alpha\references') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-beta') -Force | Out-Null
+
+    # The marketplace: what makes those directories PLUGINS rather than just directories. EVERY plugin
+    # the shared-scripts registry names is declared here, each with a manifest, so checks 1 and 2 pass
+    # cleanly and the registry resolves. See this file's header for why the fixture stopped being
+    # marketplace-less.
+    #
+    # THAT LIST HAS TO GROW WITH THE REGISTRY, and the failure mode when it does not is loud rather than
+    # subtle: Get-SharedScriptPairs throws on a pair naming a plugin the marketplace does not declare,
+    # which kills the gate mid-run and fails a dozen unrelated scenarios. Measured when workflow-default
+    # was added and this list was not. Loud is the design -- a silently dropped pair would be worse --
+    # but it means adding a plugin means adding it here too.
+    New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude-plugin') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\teams\team-alpha\.claude-plugin') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\workflows\workflow-default\.claude-plugin') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\workflows\workflow-davekjohn\.claude-plugin') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude-plugin\marketplace.json'), (@'
+{
+  "name": "fixture-marketplace",
+  "plugins": [
+    { "name": "team-alpha",         "source": "./plugins/teams/team-alpha" },
+    { "name": "workflow-default",   "source": "./plugins/workflows/workflow-default" },
+    { "name": "workflow-davekjohn", "source": "./plugins/workflows/workflow-davekjohn" }
+  ]
+}
+'@), $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-alpha\.claude-plugin\plugin.json'),
+        "{ `"name`": `"team-alpha`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\workflows\workflow-default\.claude-plugin\plugin.json'),
+        "{ `"name`": `"workflow-default`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\workflows\workflow-davekjohn\.claude-plugin\plugin.json'),
+        "{ `"name`": `"workflow-davekjohn`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
+
+    Copy-Item -Path $IntegritySrc -Destination (Join-Path $Fixture 'scripts\lint\check-plugin-integrity.ps1') -Force
+    Copy-Item -Path $AgentSharedLibSrc -Destination (Join-Path $Fixture 'scripts\lib\agent-shared-lib.ps1') -Force
+    Copy-Item -Path $SharedScriptsLibSrc -Destination (Join-Path $Fixture 'scripts\lib\shared-scripts-lib.ps1') -Force
+    Copy-Item -Path $CheckReportLibSrc -Destination (Join-Path $Fixture 'scripts\lib\check-report-lib.ps1') -Force
+    Copy-Item -Path $ReleaseLibSrc -Destination (Join-Path $Fixture 'scripts\lib\release-lib.ps1') -Force
+    Copy-Item -Path $BranchInfoSrc -Destination (Join-Path $Fixture 'scripts\lib\branch-info.ps1') -Force
+    Copy-Item -Path $EntryScaffoldSrc -Destination (Join-Path $Fixture 'scripts\lib\entry-scaffold-lib.ps1') -Force
+    Copy-Item -Path $PluginTreeSrc -Destination (Join-Path $Fixture 'scripts\lib\plugin-tree-lib.ps1') -Force
+    Copy-Item -Path $PrBodyLibSrc -Destination (Join-Path $Fixture 'scripts\lib\pr-body-lib.ps1') -Force
+
+    # The reference PR template check 24 holds, written from the same function the check compares against
+    # -- never typed out here, for the reason stated at the dot-source above.
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\workflows\workflow-davekjohn\templates') -Force | Out-Null
+    [System.IO.File]::WriteAllText(
+        (Join-Path $Fixture 'plugins\workflows\workflow-davekjohn\templates\pull_request_template.md'),
+        (((Get-PrTemplateReference) -join "`n") + "`n"), $Utf8NoBom)
+
+    $skillAlphaMd = "---`nname: skill-alpha`ndescription: Fixture skill alpha.`n---`n`n# Skill Alpha`n"
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-alpha\SKILL.md'), $skillAlphaMd, $Utf8NoBom)
+    $skillBetaMd = "---`nname: skill-beta`ndescription: Fixture skill beta.`n---`n`n# Skill Beta`n"
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-beta\SKILL.md'), $skillBetaMd, $Utf8NoBom)
+    # The depth decoy claims its own name (skill-deep-decoy) in frontmatter -- if check 10 ever
+    # regressed to a looser depth match, that name would silently become a 3rd canonical skill.
+    $skillDeepDecoyMd = "---`nname: skill-deep-decoy`ndescription: Depth decoy -- must not count as a canonical skill.`n---`n`n# Skill Deep Decoy`n"
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-alpha\references\SKILL.md'), $skillDeepDecoyMd, $Utf8NoBom)
+}
+
+# The closing summary, identical in all four suites: one place, so four files cannot drift on how
+# they report a failure.
+function Complete-IntegritySuite {
+    Write-Host ""
+    if ($script:fail -gt 0) {
+        Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "OK: all $($script:pass) asserts passed." -ForegroundColor Green
+    exit 0
+}

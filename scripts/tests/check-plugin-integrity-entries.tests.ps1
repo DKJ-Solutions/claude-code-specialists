@@ -1,0 +1,555 @@
+<#
+.SYNOPSIS
+    check-plugin-integrity.ps1, part 3 of 4: the entry format (check 13), the branch templates held
+    against the scaffolder (13b), the [COVERAGE] contract every category closes with, and the
+    staleness checks on claimed shapes and measured figures.
+
+.DESCRIPTION
+    The fixture, the assert helpers and Invoke-Integrity live in check-plugin-integrity-fixture.ps1,
+    which also records why this suite is four files.
+
+    Several scenarios here pass -Full to Invoke-Integrity, and that is load-bearing: the two
+    branch-template scenarios and the [COVERAGE] scenario assert about the three checks the fixture
+    skips for speed. An ABSENCE assert under a skip would pass vacuously, which is why the skip list
+    is documented beside Invoke-Integrity rather than here.
+
+    Pure ASCII (repo convention for .ps1).
+#>
+$ErrorActionPreference = 'Stop'
+
+. (Join-Path $PSScriptRoot 'check-plugin-integrity-fixture.ps1')
+
+$Fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("check-plugin-integrity-entries-$PID")
+
+try {
+    New-IntegrityFixture -Fixture $Fixture
+
+    # --- Scenario 34: check 13, entry heading levels (this repo's own defect, four times in one day) ---
+    #     An entry body used a sub-heading at the entry's own level, so the two became siblings: after the
+    #     fold CHANGELOG.md carried headings with no PR number, and the release renderer split an entry on
+    #     every one of them, shipping "entries" with no number, no type and no Plugins line. Rendall's lens
+    #     warned about it and the warning did not stop it, which is the whole argument for a gate: the rule
+    #     is exactly checkable.
+    #
+    #     REWRITTEN FOR THE FLAT CHANGELOG (August 5, 2026). An entry is an H2 with three named H3 sections,
+    #     so the forbidden levels moved up by one AND a second, new rule joined them: a heading AT the
+    #     section level that is not one of the declared sections. Both halves are asserted here, and so is
+    #     the case that must stay silent -- the three real section headings, which the pre-flat version of
+    #     this check would have reported as three defects each.
+    $s34Md = [char]0x00B7
+    $s34Sections = @(
+        '### What does this change do?'
+        ''
+        'A body with a correctly demoted sub-heading.'
+        ''
+        '#### Tested'
+        ''
+        'All green.'
+        ''
+        '### Significance'
+        ''
+        '#### Tier 0'
+        ''
+        'Only this repo notices.'
+        ''
+        'Score: 2'
+        ''
+        '### Type of change'
+        ''
+        'Fix'
+    )
+    # --- check 13b: the branch/ templates are held to the scaffolder ------------------------------
+    # The whole reason the templates are allowed to exist: they are generated from the formatters, and
+    # this check is what stops them becoming a second definition of the entry format. Asserted in both
+    # directions -- correct content is silent, a hand-edit is caught -- because a check that only ever
+    # passes is indistinguishable from one that reads nothing.
+    Write-Host 'check 13b -- branch/templates are held to what the scaffolder writes' -ForegroundColor Cyan
+    foreach ($tpl in (Get-BranchTemplates)) {
+        $tplPath = Join-Path $Fixture ($tpl.Path -replace '/', '\')
+        New-Item -ItemType Directory -Path (Split-Path -Parent $tplPath) -Force | Out-Null
+        [System.IO.File]::WriteAllText($tplPath, $tpl.Content, $Utf8NoBom)
+    }
+    $r13bGood = Invoke-Integrity -FixtureRoot $Fixture -Full
+    Assert-True (-not ($r13bGood.Out -match '\[branch-template\].*no longer matches')) 'check 13b: generated templates are silent'
+    Assert-True ($r13bGood.Out -match '\[branch-template\] checked 2') 'check 13b: and both were actually examined -- the pass is not an empty scan'
+
+    $tpl1 = Join-Path $Fixture ((Get-BranchTemplates)[0].Path -replace '/', '\')
+    [System.IO.File]::WriteAllText($tpl1, ((Get-BranchTemplates)[0].Content + "`nSomebody edited this by hand.`n"), $Utf8NoBom)
+    $r13bDrift = Invoke-Integrity -FixtureRoot $Fixture -Full
+    Assert-Equal 1 $r13bDrift.Code 'check 13b: a hand-edited template is an error'
+    Assert-True ($r13bDrift.Out -match 'no longer matches what the scaffolder writes') 'check 13b: and the message says which way the drift runs'
+    Remove-Item -LiteralPath $tpl1 -Force
+    $r13bGone = Invoke-Integrity -FixtureRoot $Fixture -Full
+    Assert-True ($r13bGone.Out -match '\[branch-template\].*is missing') 'check 13b: a deleted template is reported rather than silently passing'
+    [System.IO.File]::WriteAllText($tpl1, (Get-BranchTemplates)[0].Content, $Utf8NoBom)
+
+    # THE CHECK READS THE FIXTURE'S OWN repo-config, and this is a gap the check was BORN with rather than one
+    # the audience seam created (August 12, 2026). The rendered template has always depended on repo-config --
+    # Get-EntryGuidanceOverrides and three sibling wording seams all reach it -- while the gate generated its
+    # expectation with none of them loaded. It agreed with the source repo only because that repo answers none
+    # of the four, so a consumer who translated their entry wording got "no longer matches" against their own
+    # correctly generated file, with advice that would have produced the same file again.
+    #
+    # ASSERTED IN BOTH DIRECTIONS ON ONE FIXTURE, because silence alone is also what a check that stopped
+    # reading would produce -- the same reason check 13b was written in both directions to begin with.
+    $fixCfgDir = Join-Path $Fixture 'scripts'
+    New-Item -ItemType Directory -Path $fixCfgDir -Force | Out-Null
+    $fixCfg = Join-Path $fixCfgDir 'repo-config.ps1'
+    [System.IO.File]::WriteAllText($fixCfg, "function Get-ReleaseAudienceTier { 2 }`n", $Utf8NoBom)
+    # The repo-neutral pair is still on disk from the line above. For a fixture that has now declared an
+    # audience it is WRONG -- it asks about a tier that repo does not publish to -- so the very bytes that
+    # were silent three asserts ago must read as drift.
+    $r13bCfgDrift = Invoke-Integrity -FixtureRoot $Fixture -Full
+    Assert-Equal 1 $r13bCfgDrift.Code 'check 13b: once an audience is stated, the repo-NEUTRAL template is drift'
+    $cfgTemplates = & {
+        . $fixCfg
+        . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
+        Get-BranchTemplates
+    }
+    Assert-True ($cfgTemplates[0].Content -notmatch '(?m)^#### Tier 1$') `
+        'check 13b: a configured generation really does omit the tier that fixture does not publish to'
+    foreach ($tpl in $cfgTemplates) {
+        [System.IO.File]::WriteAllText((Join-Path $Fixture ($tpl.Path -replace '/', '\')), $tpl.Content, $Utf8NoBom)
+    }
+    $r13bCfgGood = Invoke-Integrity -FixtureRoot $Fixture -Full
+    Assert-True (-not ($r13bCfgGood.Out -match '\[branch-template\].*no longer matches')) `
+        "check 13b: and the template generated with the fixture's own answer is silent"
+    # Back to the neutral pair with no config, so nothing after this inherits the fixture's answer.
+    Remove-Item -LiteralPath $fixCfg -Force
+    foreach ($tpl in (Get-BranchTemplates)) {
+        [System.IO.File]::WriteAllText((Join-Path $Fixture ($tpl.Path -replace '/', '\')), $tpl.Content, $Utf8NoBom)
+    }
+
+    Write-Host 'check 13 -- an entry is an H2 with three named H3 sections, and a body heading may be neither' -ForegroundColor Cyan
+    $s34Entry = Join-Path $Fixture 'fix-a-branch-name.md'
+    $s34Good = @('## A fixture entry') + @('') + $s34Sections
+    [System.IO.File]::WriteAllText($s34Entry, (($s34Good -join "`n") + "`n"), $Utf8NoBom)
+    $r34a = Invoke-Integrity -FixtureRoot $Fixture
+    # THE ASSERT THAT MATTERS MOST HERE, because the whole entry format would trip a level-only rule: the
+    # three declared section headings sit at the section level BY DESIGN and must be silent, while the
+    # '####' sub-heading inside one of them is the ordinary accepted case.
+    Assert-True (-not ($r34a.Out -match 'entry-heading.*fix-a-branch-name')) 'scenario 34: the three declared H3 sections plus a "####" sub-heading are accepted'
+    Assert-True ($r34a.Out -match '\[entry-heading\] checked') 'scenario 34: and the entry file WAS examined -- the pass is not an empty scan'
+    Assert-True ($r34a.Out -match '\[entry-heading\].*1 unfolded entry file\(s\)') 'scenario 34: an H2 entry file is RECOGNISED as one -- the detector was H3-only until August 5, 2026, so this check silently judged nothing'
+
+    # Defect one: a heading at the entry's own level inside the body. This is the old '### Tested' defect,
+    # one level up, and now the worse one -- it becomes a separate entry rather than a stray sub-heading.
+    $s34Bad = @($s34Good) -replace '^#### Tested$', '## Tested'
+    [System.IO.File]::WriteAllText($s34Entry, (($s34Bad -join "`n") + "`n"), $Utf8NoBom)
+    $r34b = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34b.Out -match 'entry-heading.*fix-a-branch-name\.md:7') 'scenario 34: an H2 in an entry body is reported, with its line number'
+    Assert-True ($r34b.Out -match 'SEPARATE entry') 'scenario 34: and the message says WHY, by naming the consequence at fold time'
+    Assert-True ($r34b.Out -match 'undeclared tier 0') 'scenario 34: including what the phantom entry declares -- nothing'
+
+    # Defect two, new with the format: a heading at the SECTION level that is not a declared section. The
+    # dangerous version of this is a MISSPELLED section heading, which costs the entry its declaration
+    # silently -- so the fixture uses exactly that rather than an obviously unrelated word.
+    $s34Typo = @($s34Good) -replace '^### Significance$', '### Significanse'
+    [System.IO.File]::WriteAllText($s34Entry, (($s34Typo -join "`n") + "`n"), $Utf8NoBom)
+    $r34c = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34c.Out -match 'entry-heading.*fix-a-branch-name\.md:11') 'scenario 34: a misspelled section heading is reported, with its line'
+    Assert-True ($r34c.Out -match 'not one of them') 'scenario 34: and the message lists the sections that ARE declared'
+    Assert-True ($r34c.Out -match 'loses that declaration') 'scenario 34: naming the silent cost rather than only the rule'
+
+    # Fence-aware: an entry that QUOTES a heading is discussing structure, not creating it -- the
+    # mention-versus-use question this file answers in four other checks, and one this repo's own entry
+    # files do (the entry for this very change quotes the format).
+    $s34Fenced = @(
+        '## A fixture entry'
+        ''
+        '### What does this change do?'
+        ''
+        'The wrong form looks like this:'
+        ''
+        '```markdown'
+        '## Tested'
+        '### Significanse'
+        '```'
+        ''
+        '### Significance'
+        ''
+        '#### Tier 0'
+        ''
+        'Only this repo notices.'
+        ''
+        'Score: 2'
+        ''
+        '### Type of change'
+        ''
+        'Fix'
+    )
+    [System.IO.File]::WriteAllText($s34Entry, (($s34Fenced -join "`n") + "`n"), $Utf8NoBom)
+    $r34d = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r34d.Out -match 'entry-heading.*fix-a-branch-name')) 'scenario 34: both fenced examples are mentions, not uses -- neither level is reported'
+
+    # A PRE-FORMAT entry file, which is not history: an entry file lives only on a branch, so a branch
+    # created before the format changed still carries an H3 heading, and this repo had one parked on the
+    # remote the day the format landed. It must still be RECOGNISED (line 1 is skipped whatever its level,
+    # because the fold promotes it) while its body is judged by the same rules.
+    $s34Legacy = @(
+        '### An older entry ' + $s34Md + ' Fix ' + $s34Md + ' 2026-08-01'
+        ''
+        'Body prose.'
+        ''
+        '## Not allowed here either'
+    )
+    [System.IO.File]::WriteAllText($s34Entry, (($s34Legacy -join "`n") + "`n"), $Utf8NoBom)
+    $r34e = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34e.Out -match '\[entry-heading\].*1 unfolded entry file\(s\)') 'scenario 34: a pre-format H3 entry file is still recognised as an entry file'
+    Assert-True ($r34e.Out -match 'entry-heading.*fix-a-branch-name\.md:5') 'scenario 34: and its body is judged by the same rules'
+    Assert-True (-not ($r34e.Out -match 'fix-a-branch-name\.md:1')) 'scenario 34: while its own H3 heading on line 1 is NOT reported -- that is the entry, and the fold promotes it'
+    Remove-Item -LiteralPath $s34Entry -Force
+
+    # The CHANGELOG half, which is what cut-release actually parses -- and the half that catches damage
+    # arriving through the fold, the one write that happens directly on main past every PR gate.
+    $s34Cl = Join-Path $Fixture 'CHANGELOG.md'
+    $s34ClGood = @(
+        '# Changelog'
+        ''
+        'Everything merged since the last release, furthest reach first.'
+        ''
+        '## #123 ' + $s34Md + ' A real entry'
+        ''
+    ) + $s34Sections + @('')
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClGood -join "`n") + "`n"), $Utf8NoBom)
+    $r34f = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r34f.Out -match 'entry-heading. CHANGELOG')) 'scenario 34: a well-formed flat changelog is silent'
+
+    # A body sub-heading written at the entry's own level, in the middle of a formatted entry. It SPLITS the
+    # entry: the three sections land across two blocks, so the phantom's first section is whichever one
+    # followed it -- never the first. That is the rule, and it is structural rather than a guess about intent.
+    $s34ClStray = @($s34ClGood) -replace '^#### Tested$', '## Tested'
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClStray -join "`n") + "`n"), $Utf8NoBom)
+    $r34g = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34g.Out -match 'entry-heading. CHANGELOG\.md:11') 'scenario 34: a body heading at the entry level is reported, with its line'
+    Assert-True ($r34g.Out -match 'has been SPLIT') 'scenario 34: and the message names what happened to the entry rather than only the rule'
+    Assert-True ($r34g.Out -match "first named section is 'Significance'") 'scenario 34: quoting the section it starts at, which is the evidence'
+
+    # THE FALSE POSITIVE THIS AVOIDS, and it is the reason the rule is not simply "an H2 needs a #NN": the
+    # fold cannot reach gh on a manual merge, and then it writes a legitimate entry with no number and no PR
+    # footer, saying so on the console. Keying on the number would report the fold's own documented output as
+    # a defect.
+    $s34ClNoPr = @($s34ClGood) -replace ('^## #123 ' + [regex]::Escape($s34Md) + ' A real entry$'), '## A real entry with no PR number'
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClNoPr -join "`n") + "`n"), $Utf8NoBom)
+    $r34h = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r34h.Out -match 'entry-heading. CHANGELOG')) 'scenario 34: an entry with no PR number but with its sections is accepted -- the manual-merge fold'
+
+    # A PRE-FORMAT entry, which is the second legitimate shape: no sections at all, the type carried as a
+    # heading field. Every entry this repo folded before August 5, 2026 looks like this, and so does anything
+    # folded from a branch that predates the format -- so reporting it would fire on real history.
+    $s34ClLegacy = @(
+        '# Changelog'
+        ''
+        'Intro.'
+        ''
+        '## #99 ' + $s34Md + ' An entry from before the format ' + $s34Md + ' Fix ' + $s34Md + ' 2026-08-01'
+        ''
+        'Body prose, no named sections.'
+        ''
+        '#### A properly demoted sub-heading'
+        ''
+        'More prose.'
+        ''
+    )
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClLegacy -join "`n") + "`n"), $Utf8NoBom)
+    $r34k = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r34k.Out -match 'entry-heading. CHANGELOG')) 'scenario 34: a pre-format entry declaring its type in the heading is accepted -- no sections required of it'
+
+    # THE PLACEMENT NEITHER RULE CATCHES ALONE, and the reason the check has two: a stray heading directly
+    # BELOW the entry heading keeps all three sections in its own block, so the first rule sees a well-formed
+    # entry. What gives it away is the entry ABOVE it, now sectionless -- and a current-format heading carries
+    # no type field, so the type rule reports that one. The error lands on the real entry rather than on the
+    # stray, which is why the message names both possibilities instead of asserting which it found.
+    $s34ClAbsorbed = @(
+        '# Changelog'
+        ''
+        'Intro.'
+        ''
+        '## #123 ' + $s34Md + ' A real entry'
+        ''
+        '## A sub-heading that swallowed the entry'
+        ''
+    ) + $s34Sections + @('')
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClAbsorbed -join "`n") + "`n"), $Utf8NoBom)
+    $r34l = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34l.Out -match 'entry-heading. CHANGELOG\.md:5') 'scenario 34: a stray heading directly below an entry heading is caught via the entry it emptied'
+    Assert-True ($r34l.Out -match 'declares neither its named sections nor a change type') 'scenario 34: and the message states exactly what is missing'
+    Assert-True ($r34l.Out -match 'absorbed by such a heading directly below it') 'scenario 34: naming the second possibility, since the error lands on the victim rather than the cause'
+
+    # An H1 below the intro, and a stray section-level heading, in one document -- so the assert on the
+    # second one also proves the scan did not stop at the first. The pre-flat check keyed its boundary on a
+    # heading NAME and had to reason carefully about not ending the scan at the very defect it looked for;
+    # the boundary is structural now, so the scan simply runs to the end of the file.
+    $s34ClMixed = @(
+        '# Changelog'
+        ''
+        'Intro.'
+        ''
+        '## #123 ' + $s34Md + ' A real entry'
+        ''
+        '### What does this change do?'
+        ''
+        '# A body heading that climbs above every entry'
+        ''
+        '### Tested'
+        ''
+        '### Type of change'
+        ''
+        'Fix'
+        ''
+    )
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClMixed -join "`n") + "`n"), $Utf8NoBom)
+    $r34i = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34i.Out -match 'entry-heading. CHANGELOG\.md:9') 'scenario 34: an H1 below the intro is reported'
+    Assert-True ($r34i.Out -match 'climbs above every entry') 'scenario 34: and the message names the consequence in the document'
+    Assert-True ($r34i.Out -match 'entry-heading. CHANGELOG\.md:11') 'scenario 34: and the stray section heading AFTER it is still reported -- the scan did not stop'
+
+    # A changelog with no entry at all is the normal state between a release and the next merge: not judged
+    # and not an error. Stated as an assert because "reports nothing" and "found nothing to report" look
+    # identical from the outside, and the coverage line is what distinguishes them.
+    [System.IO.File]::WriteAllText($s34Cl, "# Changelog`n`nNothing merged since the last release.`n", $Utf8NoBom)
+    $r34j = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r34j.Out -match 'entry-heading. CHANGELOG')) 'scenario 34: an entry-less changelog is not an error -- that is the state right after a release'
+    Remove-Item -LiteralPath $s34Cl -Force
+
+    # Leaves the fixture with a history-only mention again, which the coverage block below relies on.
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s24Contributing -join "`n") + "`n"), $Utf8NoBom)
+
+    # --- [COVERAGE]: every category states what it examined, and an empty one says so (issue #221) ---
+    # This fixture is the ideal witness and always has been: it carries no agent def, no manual, no
+    # persona, no plugin manifest and no lens tree, so those categories are GENUINELY empty. Before
+    # #221 the run was therefore green while silently checking nothing in half its categories -- the
+    # docstring above even records that as "expected noise, asserted on nowhere below". It is asserted
+    # on now: a category that finds nothing must say the number out loud.
+    #
+    # Deliberately asserts the ZERO cases (the ones that used to be invisible) AND two non-zero cases,
+    # because a coverage line that always printed "0" would satisfy the first half while being useless.
+    Write-Host "[COVERAGE] every category reports its count, and an empty category is visible" -ForegroundColor Cyan
+    $rc = Invoke-Integrity -FixtureRoot $Fixture -Full
+    foreach ($cat in @('agent-def', 'manual', 'persona', 'specialist', 'shared')) {
+        Assert-True ($rc.Out -match "\[$([regex]::Escape($cat))\] checked 0\b") `
+            "coverage: the genuinely empty category '$cat' reports 'checked 0' instead of staying silent"
+    }
+    Assert-True ($rc.Out -match '\[link-scan/lenses\] checked 0\b') `
+        'coverage: the lens category -- the one a teardown removes -- reports 0 on a repo with no lens tree'
+    Assert-True ($rc.Out -match '\[link-scan/lenses\] checked 0 -- no repo-lens file') `
+        'coverage: the empty lens category also states WHY it is empty, so a reader can tell a teardown from a loss'
+    Assert-True ($rc.Out -match '\[link-scan\] checked [1-9]') `
+        'coverage: a non-empty category reports its real count -- the line is not hardcoded to 0'
+    Assert-True ($rc.Out -match '\[parse\] checked [1-9]') `
+        'coverage: parse counts the .ps1 files it actually parsed (the copied script + its libs)'
+    # Scenario 24 left the fixture with only a history mention, so this category is legitimately empty
+    # here -- and an empty lifecycle scan is exactly the state a reader must not mistake for "the docs
+    # are right", so it states its own reason like the lens category does.
+    Assert-True ($rc.Out -match '\[lifecycle\] checked 0 -- no printed lifecycle command') `
+        'coverage: an empty lifecycle scan says WHY it is empty, so "nothing to enforce" cannot read as "nothing wrong"'
+    # Coverage is context, never a finding: it must not move the exit code or manufacture an error.
+    # Scenario 16 left the fixture with a real finding, so this run legitimately exits 1 -- what is
+    # asserted here is that no coverage line was itself counted as one.
+    Assert-True (-not ($rc.Out -match '(?m)^\s*\[COVERAGE\]')) `
+        'coverage: the token is the category name, not a literal [COVERAGE] tag -- one line per category, no extra noise'
+
+    # --- check 15: a captured output sample must say what it is bound to ----------------------------
+    # The class behind four of test round v11's nine findings. Each case below is one of the two ways
+    # this check can fail badly: missing a real unbound sample, or firing on something that is not one.
+    # The false-positive half is not optional politeness -- a gate that cries wolf gets an opt-out
+    # pasted over every finding and then reports green while asserting nothing.
+    # THE PATH HAS TO BE ONE $consumerDocs ACTUALLY NAMES, and this fixture has now been caught by that
+    # twice. $consumerDocs holds paths rather than bare names, and both checks Test-Path-skip an entry
+    # they cannot find, in silence -- so a fixture writing anywhere else leaves every assertion below
+    # passing over a document the check never opened. First it was the move into plugins/; on
+    # August 14, 2026 the adoption half split off into plugins/ADOPTION.md and the two plumbing pages
+    # went to the repo root (inbound #664), which moved the subject again.
+    #
+    # ADOPTION.md rather than the root INSTALL.md, deliberately: in the real tree it is the page that
+    # carries the captured samples and measured figures these two checks exist for -- the bootstrap's
+    # closing line, the 4+15+2 counts. Pointing the fixture at the document that really holds the
+    # subject is what keeps this suite honest about what it proves.
+    $qsDir = Join-Path $Fixture 'plugins'
+    if (-not (Test-Path -LiteralPath $qsDir)) { New-Item -ItemType Directory -Path $qsDir -Force | Out-Null }
+    $qs = Join-Path $qsDir 'ADOPTION.md'
+    # Fence and box drawing from codepoints, never as literals. The first version wrote the fence
+    # literally and silently produced an opening fence with the language on the NEXT line, so the
+    # "a command block is not examined" case was testing a language-less block and failing for a
+    # reason that had nothing to do with the check. Same discipline as fix-mojibake's ASCII-only
+    # source, and for the same class of reason.
+    #
+    # AND EVERY '$fence + <lang>' BELOW IS PARENTHESISED, which is not style. In PowerShell the comma
+    # binds TIGHTER than '+', so @('a', $fence + 'powershell', 'b') parses as ('a', $fence) +
+    # ('powershell', 'b') -- four elements, and the language lands on its own line. That is what
+    # actually broke the command-block case, twice, while the check under test was correct throughout.
+    $bt    = [string][char]0x60
+    $fence = $bt + $bt + $bt
+    $tree  = 'repo/' + "`n" + [char]0x251C + [char]0x2500 + ' CLAUDE.md'
+
+    # 1. THE FINDING: output quoted with nothing saying what it came from.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'The closing line reads:', '', $fence,
+        'Done: 4 created, 0 already present.', $fence, '', 'Compare it against yours.'
+    ) -join "`n", $Utf8NoBom)
+    $s1 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($s1.Out -match '\[expected-output\].*ADOPTION\.md') `
+        'expected-output: an output sample with no stated binding is reported'
+    Assert-True ($s1.Out -match 'expected-output. checked [1-9]') `
+        'expected-output: and the coverage line counts samples examined, not check runs'
+
+    # 2. BOUND, three ways -- a version, a date, and a hedge. Each must clear it on its own.
+    foreach ($binding in @('Measured on CLI 2.1.220.', 'Measured on 1 August 2026.', 'This varies by repo.')) {
+        [System.IO.File]::WriteAllText($qs, @(
+            '# Quickstart', '', 'The closing line reads:', '', $fence,
+            'Done: 4 created, 0 already present.', $fence, '', $binding
+        ) -join "`n", $Utf8NoBom)
+        $s2 = Invoke-Integrity -FixtureRoot $Fixture
+        Assert-True (-not ($s2.Out -match '\[expected-output\].*ADOPTION\.md')) `
+            "expected-output: a sample bound by '$binding' passes"
+    }
+
+    # 3. A COMMAND IS NOT A SAMPLE. Tagged blocks are things to run; they cannot go stale under a reader
+    #    the way a captured transcript can.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'Run this:', '', ($fence + 'powershell'),
+        'claude plugin install team-alpha@claude-code-specialists --scope project', $fence
+    ) -join "`n", $Utf8NoBom)
+    $s3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($s3.Out -match '\[expected-output\].*ADOPTION\.md')) `
+        'expected-output: a powershell block is a command to run, not examined'
+
+    # 4. A DIAGRAM IS DRAWN, NOT CAPTURED. The check's first real false positive, on the seam diagram in
+    #    the root README.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'The shape is:', '', ($fence + 'text'), $tree, $fence
+    ) -join "`n", $Utf8NoBom)
+    $s4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($s4.Out -match '\[expected-output\].*ADOPTION\.md')) `
+        'expected-output: a box-drawing diagram is not a captured sample'
+
+    # 5. THE OPT-OUT HAS TO NAME A REASON. A bare marker must not silence the check, or the escape hatch
+    #    becomes the way the gate is defeated rather than the way an exception is recorded.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'Reads:', '', $fence, 'Done: 4 created.', $fence, '', '<!-- unbound-sample: -->'
+    ) -join "`n", $Utf8NoBom)
+    $s5 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($s5.Out -match '\[expected-output\].*ADOPTION\.md') `
+        'expected-output: an opt-out marker with no reason does not silence the check'
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'Reads:', '', $fence, 'Done: 4 created.', $fence, '',
+        '<!-- unbound-sample: invented for the test fixture, bound to nothing real -->'
+    ) -join "`n", $Utf8NoBom)
+    $s6 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($s6.Out -match '\[expected-output\].*ADOPTION\.md')) `
+        'expected-output: an opt-out that names a reason does silence it'
+
+    # --- check 16: a measured figure in prose names what it was measured on -------------------------
+    # Check 15's class, one step outside its reach: the same staleness, in running prose where there is
+    # no fence to mark it. Test round v12's #374 and its unfiled twin one section down. The cases below
+    # are again the two ways this fails badly -- missing a real unbound figure, and firing on something
+    # that is not one -- plus the three design decisions that could otherwise erode silently: the window
+    # is bounded, a fence belongs to check 15, and 'measured' is not a binding.
+
+    # 1. THE FINDING: a byte count with nothing saying whose machine it came from.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'After the teardown the file is 288 bytes and holds nothing of ours.'
+    ) -join "`n", $Utf8NoBom)
+    $f1 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($f1.Out -match '\[measured-figure\].*ADOPTION\.md') `
+        'measured-figure: a byte count in prose with no stated binding is reported'
+    Assert-True ($f1.Out -match 'measured-figure. checked [1-9]') `
+        'measured-figure: and the coverage line counts figures examined, not check runs'
+
+    # 2. BOUND, five ways -- a date, a test round, a version, a named profile state, and a hedge. Each
+    #    must clear it on its own, because a writer will reach for whichever one fits the sentence.
+    foreach ($binding in @(
+        'Measured on 1 August 2026.', 'Measured in round v12.', 'Measured on CLI 2.1.220.',
+        'Measured on a virgin profile.', 'The figure varies by platform.'
+    )) {
+        [System.IO.File]::WriteAllText($qs, @(
+            '# Quickstart', '', "After the teardown the file is 288 bytes. $binding"
+        ) -join "`n", $Utf8NoBom)
+        $f2 = Invoke-Integrity -FixtureRoot $Fixture
+        Assert-True (-not ($f2.Out -match '\[measured-figure\].*ADOPTION\.md')) `
+            "measured-figure: a figure bound by '$binding' passes"
+    }
+
+    # 3. THE WINDOW REACHES THE NEIGHBOURING BLOCKS, IN BOTH DIRECTIONS. A table row is bound by the
+    #    paragraph introducing the table (the #339 table) or by the note underneath it saying which
+    #    column came from where (the bracket table). Neither binding sits on the row itself, and a
+    #    line-count window would have to guess how many rows the table has.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'Measured on a virgin profile, 1 August 2026:', '',
+        '| file | size |', '|---|---|', '| settings.json | 288 bytes |'
+    ) -join "`n", $Utf8NoBom)
+    $f3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($f3.Out -match '\[measured-figure\].*ADOPTION\.md')) `
+        'measured-figure: a binding in the paragraph ABOVE a table binds its rows'
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'The sizes:', '',
+        '| file | size |', '|---|---|', '| settings.json | 288 bytes |', '',
+        'The right-hand column is round v12.'
+    ) -join "`n", $Utf8NoBom)
+    $f4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($f4.Out -match '\[measured-figure\].*ADOPTION\.md')) `
+        'measured-figure: a binding in the paragraph BELOW a table binds its rows too'
+
+    # 4. AND IT STOPS THERE. A binding two blocks away does NOT count -- otherwise the gate is satisfied
+    #    by a date in an unrelated subsection, which is how a window quietly becomes section-wide.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'Measured on a virgin profile, 1 August 2026.', '',
+        'An unrelated paragraph sits in between.', '', 'The file is 288 bytes.'
+    ) -join "`n", $Utf8NoBom)
+    $f5 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($f5.Out -match '\[measured-figure\].*ADOPTION\.md') `
+        'measured-figure: a binding two blocks away is out of reach -- the window is bounded'
+
+    # 5. A FENCED FIGURE BELONGS TO CHECK 15. Counting it here would report one sample as two findings,
+    #    and would flag verbatim command output that is deliberately reproduced.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'Measured in round v12, the output reads:', '', ($fence + 'text'),
+        'known_marketplaces.json  288 bytes', $fence
+    ) -join "`n", $Utf8NoBom)
+    $f6 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($f6.Out -match '\[measured-figure\] checked 0') `
+        'measured-figure: a figure inside a fence is check 15''s, and is not counted twice'
+
+    # 6. 'measured' ON ITS OWN IS NOT A BINDING. It says the author saw the number, which was true of
+    #    every finding this check exists for. Same rejection as check 15 makes, and for the same reason.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'The clone is deleted (measured: 288 bytes, gone).'
+    ) -join "`n", $Utf8NoBom)
+    $f7 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($f7.Out -match '\[measured-figure\].*ADOPTION\.md') `
+        'measured-figure: the word ''measured'' alone does not bind a figure'
+
+    # 7. NOT EVERY 'byte' IS A FIGURE. 'byte-identical' is a word, and a check that flagged it would be
+    #    training writers to paste opt-outs over prose. The leading digit is what makes it a measurement.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'The install leaves the file byte-identical, so the diff is empty.'
+    ) -join "`n", $Utf8NoBom)
+    $f8 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($f8.Out -match '\[measured-figure\] checked 0') `
+        'measured-figure: ''byte-identical'' carries no number and is not a figure'
+
+    # 8. THE OPT-OUT HAS TO NAME A REASON, exactly as check 15's does.
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'The file is 288 bytes.', '', '<!-- unbound-figure: -->'
+    ) -join "`n", $Utf8NoBom)
+    $f9 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($f9.Out -match '\[measured-figure\].*ADOPTION\.md') `
+        'measured-figure: an opt-out marker with no reason does not silence the check'
+    [System.IO.File]::WriteAllText($qs, @(
+        '# Quickstart', '', 'The file is 288 bytes.', '',
+        '<!-- unbound-figure: invented for the test fixture, bound to nothing real -->'
+    ) -join "`n", $Utf8NoBom)
+    $f10 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($f10.Out -match '\[measured-figure\].*ADOPTION\.md')) `
+        'measured-figure: an opt-out that names a reason does silence it'
+
+    # RETIRED, AUGUST 8, 2026 -- check 17's scenarios 33-37, with the check itself. They held the four
+    # per-plugin CHANGELOG intros against Build-PluginChangelogIntro, which was the right repair for a
+    # real defect: the intro was write-once, so all four kept naming a retired marketplace. The files
+    # are gone -- a consumer already receives the root CHANGELOG.md through the marketplace clone -- so
+    # there is no second copy left to hold against a generator.
+} finally {
+    if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
+}
+
+Complete-IntegritySuite

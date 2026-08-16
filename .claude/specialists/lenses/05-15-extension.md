@@ -309,6 +309,19 @@ infrastructure.
   cannot be parallelised the way the gate was, because all 86 scenarios mutate **one** fixture directory in
   sequence. `-MaxParallel 1` is the valve, and it is worth reaching for before believing a suite that only
   fails with 30 siblings competing for the disk.
+
+  **THE LAST CLAIM IN THAT PARAGRAPH WAS WRONG, AND IT IS KEPT ABOVE SO THE CORRECTION HAS SOMETHING TO
+  CORRECT** (August 16, 2026, [#714](https://github.com/DaveKJohn/claude-code-specialists/issues/714)).
+  "It cannot be parallelised the way the gate was" reasoned from the wrong unit: the scenarios do all
+  mutate one directory in sequence, but the gate schedules **files**, not scenarios — so the suite could
+  be given the idle lanes by becoming four files, each with its own fixture, without touching the
+  sequence inside any of them. It now is: `check-plugin-integrity-{links,commands,entries,docs}.tests.ps1`
+  over a shared `check-plugin-integrity-fixture.ps1`, same 110 invocations, **~51s across four lanes
+  instead of ~160s in one**, asserts unchanged at 234. By then the paragraph above had been measured
+  again and was worse than it read: the gate's total EQUALLED this suite to a tenth of a second, four runs
+  out of four, with 15 of 16 lanes idle for its last 70-86 seconds. **The generalisation worth keeping:
+  when a gate's cost is one file, ask whether the work has to be one file before asking whether it has to
+  be done.** The convention for the four is in [Tycho #18](04-18-extension.md#the-lint-gate-suite-is-four-files-august-16-2026).
 - **Do not hand-roll a second parallel runner — and re-run a red suite alone before believing its assert.**
   Measured August 12, 2026: a `Start-Job` fan-out over all **31** suites reported **6** failures —
   `agent-shared`, `bootstrap-drift`, `config-blueprint`, `fix-mojibake`, `roster-sync`,

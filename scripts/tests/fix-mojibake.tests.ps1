@@ -271,6 +271,16 @@ function Get-MojibakePaths {
     Assert-True ([int]$mjCov.Groups[1].Value -gt 1) 'and reports how many files it examined, not how many times it ran the tool'
     Assert-True ($lintOut -match 'releases/') 'and its coverage line names the releases/ notes, which were outside the scope until #360-era'
     Assert-True ($lintOut -match 'Summary: 0 error') 'and the repo is clean of mojibake'
+    # The findings, on failure only -- same reason as the twin asserts in bootstrap-drift.tests.ps1 and
+    # agent-shared.tests.ps1: this reads the gate's verdict over the LIVE repo, so it can fail from a
+    # collision with a concurrent suite. Measured August 16, 2026: this assert and bootstrap-drift's failed
+    # together in one pooled run of 43 suites and passed in the next three, and neither said WHAT the gate
+    # had found. Note it fires on any non-zero summary, including one that names no mojibake at all -- that
+    # is the point: the assert reads the whole gate, so its failure has to be readable as such.
+    if ($lintOut -notmatch 'Summary: 0 error') {
+        @($lintOut -split "`r?`n" | Where-Object { $_ -match '^\s*\[' -and $_ -notmatch 'checked \d' } | Select-Object -First 10) |
+            ForEach-Object { Write-Host ("         gate said: " + $_.Trim()) -ForegroundColor DarkYellow }
+    }
 } finally {
     Remove-Item -LiteralPath $Fixture -Recurse -Force -ErrorAction SilentlyContinue
 }
