@@ -27,7 +27,8 @@
       it does not fail to arrive); "where no single document can own both" left *both* dangling; and the
       lens miscounted #731's rejected targets as three-weighed-two-rejected when three were rejected and
       only two of them on reach
-- [ ] Lint + test gates via `open-pr.ps1`
+- [x] Lint + test gates via `open-pr.ps1` — ticked at the moment of invoking it, since the step-list
+      gate runs first and a step naming the command that checks it can never be true beforehand
 
 ### Where I left off
 
