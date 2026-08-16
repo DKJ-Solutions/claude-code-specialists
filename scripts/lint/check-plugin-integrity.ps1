@@ -161,15 +161,19 @@
     Exit code: 0 = no errors. 1 = at least one error (usable as a gate in open-pr.ps1).
 .PARAMETER SkipCheck
     (Optional) coverage categories NOT to run, e.g. -SkipCheck parse,branch-template. FOR THIS GATE'S
-    OWN TEST SUITE, and for nothing else: no gate -- open-pr, cut-release, CI -- passes it, and a guard
+    OWN TEST SUITES, and for nothing else: no gate -- open-pr, cut-release, CI -- passes it, and a guard
     test holds them to that.
 
-    WHY IT EXISTS, MEASURED. check-plugin-integrity.tests.ps1 runs this script 110 times over a fixture,
-    each run a fresh process executing all 26 checks in order to assert one. That suite was 194s, of
-    which 98% was inside those child runs, and it was the test gate's whole wall clock -- three times the
-    next slowest suite, so the gate cost what this one suite cost. Profiled over the fixture, three
-    checks were half of every run: agent-def, parse and branch-template, none of which most scenarios
-    are about.
+    WHY IT EXISTS, MEASURED. The four check-plugin-integrity-*.tests.ps1 suites run this script 110 times
+    over a fixture, each run a fresh process executing all 26 checks in order to assert one. As ONE suite
+    that was 194s, of which 98% was inside those child runs, and it was the test gate's whole wall clock
+    -- three times the next slowest suite, so the gate cost what this one suite cost. Profiled over the
+    fixture, three checks were half of every run: agent-def, parse and branch-template, none of which
+    most scenarios are about.
+
+    THE SKIP CAME FIRST AND THE SPLIT SECOND, and both were needed. Skipping took the suite from 194s to
+    ~160s; splitting it into four files (August 16, 2026, issue #714) took the same 110 runs from 160s in
+    one lane to ~51s across four, because the test gate parallelises per FILE. Neither removed a scenario.
 
     A SKIPPED CHECK IS NEVER REPORTED AS 'checked 0'. This gate deliberately makes an empty scan visible
     -- 'no agent def found' is a finding-shaped statement, because a check that examined nothing must not
@@ -246,11 +250,13 @@ foreach ($s in (@($SkipCheck) -split ',')) {
 }
 function Test-CheckEnabled([string]$Name) { return ($script:SkippedChecks -notcontains $Name) }
 
-# ADDING A DOT-SOURCE HERE MEANS ADDING IT TO TWO TEST FIXTURES TOO -- check-plugin-integrity.tests.ps1
-# and workflow-exclusivity.tests.ps1 both COPY this script into a temp tree and run it for real. A lib
+# ADDING A DOT-SOURCE HERE MEANS ADDING IT TO TWO TEST FIXTURES TOO -- check-plugin-integrity-fixture.ps1
+# (the one the four check-plugin-integrity-*.tests.ps1 suites share) and workflow-exclusivity.tests.ps1
+# both COPY this script into a temp tree and run it for real. A lib
 # they do not copy does not make one check misbehave: the script dies at this line, so every check after
 # it silently never runs. Measured on the day check 24 landed -- the exclusivity suite reported four
-# failures in check 23, a check that change had not touched.
+# failures in check 23, a check that change had not touched. Still TWO fixtures after the split, not five:
+# the four suites build theirs from that one shared function.
 
 function Test-JsonFile {
     param([string]$Path)

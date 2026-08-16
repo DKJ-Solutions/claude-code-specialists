@@ -628,6 +628,25 @@ already carry.
 with the other 39 suites still finishing at 153.2s and 41s of headroom to spare. 19s against a 196–235s
 spread is not a result at n=1 per configuration, and it is not proposed as one.
 
+**IT WAS BUILT THE SAME DAY, AND THE CEILING BELOW WAS ROUGHLY RIGHT** (Dave approved the split;
+`check-plugin-integrity.tests.ps1` is now four suites over one shared fixture builder). Measured in the
+same harness, four post-split runs: **142.4 / 145.5 / 170.3 / 169.9s**, against 196–235s before —
+about **-25%**, and the two 170s runs came with a busier machine and a visibly larger contended sum
+(2,082s against 1,597s), which is the load-sensitivity above showing up again rather than a second
+effect. The four parts run 121.9 / 106.8 / 75.1 / 54.6s in the first of those, so the gate is bounded by
+`-entries` and `roster-sync` together instead of by one file — the 86-second single-lane tail is gone.
+Asserts unchanged at 234 (48 + 42 + 69 + 75), which is the number that makes "nothing was dropped"
+checkable.
+
+**And the honest footnote, because it is the kind of thing that gets left out.** The first post-split
+pooled run had **two red suites** — `bootstrap-drift` and `fix-mojibake`, both on their *live-repo* lint
+assert, both green alone, and both already named in
+[Sylvester #15](05-15-extension.md) as suites that fail under a parallel fan-out. The next three runs
+were clean, and eight lint runs launched alongside the four new suites could not reproduce it. So: not
+diagnosed, not attributed to the split, and not hidden. What did change is that all three of those
+asserts now print what the gate actually reported, because *"expected 0, got 1"* was everything either
+of them said, and that cannot tell a collision from a real finding.
+
 **What a repair would have to be, and its measured ceiling.** The floor for the local gate is that suite:
 160.2s standalone. Split it and the gate becomes bounded by the next chain to finish, which ends at
 **153.2s** — roughly **-25%**, twice per release-with-document, and nothing for CI, whose four lanes make

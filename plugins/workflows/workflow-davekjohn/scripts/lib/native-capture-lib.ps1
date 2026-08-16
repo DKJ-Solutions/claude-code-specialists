@@ -130,6 +130,16 @@ function Invoke-TestSuiteGate {
         critical path all by itself), and also why the spread above is wide where the sequential figure is
         not. A sum averages its own variance out; a maximum does the opposite.
 
+        AND THAT REMAINING HALF WAS THE WHOLE BILL, MEASURED (August 16, 2026, issue #714). At 40 suites the
+        gate's total EQUALLED that one suite to a tenth of a second, four runs out of four: every other
+        suite finished at 126.9s, after which one process ran alone for another 70-86 seconds with 15 of 16
+        lanes empty. A new suite could therefore only lengthen the gate by CONTENDING with it -- which is
+        what the "+40% and diffuse" report in #714 had actually measured. Because this scheduler
+        parallelises per FILE, the repair was to make that work more than one file: it is now four suites
+        sharing one fixture builder, ~51s across four lanes instead of ~160s in one, with no scenario
+        removed. Read before proposing anything about this gate's cost: the lever is the slowest FILE, and
+        splitting it is available where narrowing it is not.
+
         WHY Start-Process AND NOT A JOB. Windows PowerShell 5.1 has no ForEach-Object -Parallel, and
         Start-Job pays for a whole runspace to then spawn the same child process this does directly. What
         parallelism costs here is the console: two dozen suites writing to one screen interleave into an

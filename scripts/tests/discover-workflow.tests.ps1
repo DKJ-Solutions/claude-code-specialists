@@ -12,7 +12,7 @@
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/discover-workflow.tests.ps1
 
     The script calls 'exit', so it runs in a CHILD PROCESS (powershell -File) and $LASTEXITCODE is read
-    back, same as fold-changelog.tests.ps1's Invoke-Fold and check-plugin-integrity.tests.ps1's
+    back, same as fold-changelog.tests.ps1's Invoke-Fold and check-plugin-integrity-fixture.ps1's
     Invoke-Integrity. $ErrorActionPreference is relaxed to 'Continue' around every child call and every
     git call this file makes directly, for the same reason documented there: under 'Stop' a single
     stderr line (git's own CRLF warning included) becomes a terminating NativeCommandError before the

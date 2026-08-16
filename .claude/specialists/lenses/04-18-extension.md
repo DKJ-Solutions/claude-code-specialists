@@ -25,7 +25,8 @@ logic in `release-lib.ps1` (version bump, CHANGELOG transformation, release-note
   dependency-free (no Pester), dot-sources `release-lib.ps1` and asserts the version bump + CHANGELOG
   transformation, exit 1 on the first failure (usable in a CI gate) — and that dependency-free,
   exit-1-on-first-failure style now runs across the suite under `scripts/tests/`, which covers most
-  of what Sylvester's lens lists: the lint gate (`check-plugin-integrity.tests.ps1`), the shared
+  of what Sylvester's lens lists: the lint gate (`check-plugin-integrity-*.tests.ps1`, four of them —
+  see [the split below](#the-lint-gate-suite-is-four-files-august-16-2026)), the shared
   agent-def blocks (`agent-shared.tests.ps1`), the branch/changelog/release chain
   (`branch-info.tests.ps1`, `new-branch.tests.ps1`, `fold-changelog.tests.ps1`,
   `cut-release-guardrail.tests.ps1`, `park-branch.tests.ps1`), the connectors + roster machinery
@@ -55,6 +56,36 @@ logic in `release-lib.ps1` (version bump, CHANGELOG transformation, release-note
   not starting the suite from scratch.
 - He works together with [Sylvester #15](05-15-extension.md) (who owns the scripts) and
   [Victor #19](06-19-extension.md) (who flags a missing test during review).
+
+### The lint-gate suite is four files (August 16, 2026)
+
+`check-plugin-integrity.tests.ps1` is now four suites plus a shared, non-asserting
+[`check-plugin-integrity-fixture.ps1`](../../../scripts/tests/check-plugin-integrity-fixture.ps1):
+`-links` (checks 4 and 10), `-commands` (11 and 12), `-entries` (13, 13b, coverage, the staleness
+checks) and `-docs` (18-26 and `-SkipCheck`).
+
+**Why, measured** ([#714](https://github.com/DaveKJohn/claude-code-specialists/issues/714)): the gate's
+whole wall clock **was** this one suite, to a tenth of a second, in four runs out of four. Every other
+suite finished at 126.9s, after which one process ran on alone for another 70-86 seconds with 15 of 16
+lanes idle. The gate parallelises **per file**, so the only way to hand that work the idle lanes was to
+make it more than one file. The four together run in **~51s**.
+
+**Three rules for working on them, each of which cost something to learn:**
+
+- **The asserts must still sum to 234** — 48 + 42 + 69 + 75 at the split. That number is what makes
+  "nothing was dropped" checkable rather than claimed, and the split was verified on it before the old
+  file was deleted. If you move a scenario between the four, the total is the invariant, not the four.
+- **Each suite builds its own fixture, in its own `$PID`-keyed directory.** They run concurrently under
+  the gate, so a shared path would have them tearing down each other's tree mid-assert — the exact
+  failure `test-suite-gate.tests.ps1` pins the convention against.
+- **Scenario state that two suites share belongs in the fixture lib, not in a second copy.** Exactly one
+  piece qualified (`$s24Contributing`, the quiet root document the coverage block needs), and it was
+  found by parsing each generated file for variables it reads but never assigns — worth re-running as a
+  one-off if you ever move scenarios again, because a split turns shared state into a silent `$null`
+  rather than an error.
+
+**What is NOT the lever here, so nobody re-derives it:** narrowing what the suites check. That was
+explicitly refused in #714 and is not what bought the time; the same 110 gate invocations still run.
 
 In short: the **how** (automated tests, regression guarding) is portable; the **what** (the
 PowerShell scripts as the test surface, and building out a suite once the lint gate warrants it)
