@@ -119,7 +119,8 @@ product: agent defs, manuals, docs, and tooling.
 - **The fifth pattern, measured on this repo's own reports rather than a consumer's: the finding is
   real and its SIZE is wrong.** Written August 15, 2026, after a team-wide review filed 22 issues and
   **three of them turned out to be mis-measured on pickup** — all three mine, all three found only
-  because the repair began with a recount:
+  because the repair began with a recount. **A fourth followed the next day**, from the same review and
+  the same team, and it is added below rather than folded into the count so the growth stays visible:
   - **[#697](https://github.com/DaveKJohn/claude-code-specialists/issues/697)** counted **32** uses of
     the retired name "the workshop repo". The subject — the word *workshop* as a live term — is
     **342**. Repairing to the report was still right, but the remaining 310 are a separate decision,
@@ -134,10 +135,20 @@ product: agent defs, manuals, docs, and tooling.
     falsified by **5** dated references in 3 portable files. The claim names four categories and
     *dates are not among them*: the real count is **2** person names. Repairing to the report would
     have stripped two correct measurements out of Nolan's manual.
+  - **[#714](https://github.com/DaveKJohn/claude-code-specialists/issues/714)**, picked up the next day,
+    August 16, 2026, makes it four — and it is the one where the recount changed the *verdict* rather than
+    the size. It reported the local test gate at **322.5s**, "+40%", growth "diffuse, not one offender".
+    Re-measured five times, four of them in the gate's own pool: **196–235s**, around the baseline it was
+    said to have left, with the whole wall clock being **one suite** to a tenth of a second. Its second
+    count was wrong in the same direction as the three above — "234 asserts" is what that one suite prints
+    for itself, against **4,206** across all forty. The measurement and the corrected direction are in
+    [Nolan #25](06-25-extension.md#the-gates-wall-clock-is-one-suite--re-measured-n5-august-16-2026).
   **What generalises:** a count in a report is whatever the search matched, and the search is chosen by
   whoever noticed the symptom. Here the reporter and the repairer were the same team an hour apart, and
-  it still went wrong three times out of 22 — which is the argument for recounting even when the report
-  is your own, and especially then.
+  it still went wrong **four times out of 22** — which is the argument for recounting even when the report
+  is your own, and especially then. **And a timing is a count too**: #714's headline was a stopwatch
+  reading taken while the machine ran a team-wide review, which is why the re-measure states the machine
+  state and the n beside every figure.
 - **No other-machine reminders.** Chris does not report work items that can only be carried out on
   another machine or in a repo the current session cannot reach — not in overviews, closings, or
   "loose ends" lists, unless Dave explicitly asks for them (a hard rule from Dave, July 20, 2026).
