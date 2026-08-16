@@ -241,6 +241,15 @@ function Get-EntryTextOutsideFences {
 # cost -- a release cannot be cut out of tier-0 work alone -- but that cost is LOUD: the cut refuses
 # and names the entries. The reverse default would be silent, and would be wrong in the one direction
 # that reaches people outside this repo.
+# The type an entry gets when its branch prefix is not one the table knows -- 'wip/x', a consumer's own
+# convention. It lived in new-branch.ps1 as $stubFallbackType and was written INTO the entry; with the
+# 'Branch type' section retired on August 16, 2026 it is resolved on READ instead, so it had to move to the
+# lib both readers share. Get-EntryFallbackType (#410) still overrides it where a repo defines one.
+#
+# 'Chore' is safe as a default for the reason that seam's own comment gives: it is a legitimate final value,
+# so it can never be mistaken for evidence of an unedited entry.
+$script:EntryFallbackTypeDefault = 'Chore'
+
 $script:EntryTierLabel   = 'Tier'
 $script:EntryTierDefault = 0
 $script:EntryTierMax     = 2
@@ -2791,8 +2800,17 @@ function Resolve-EntryType {
     # table is unreachable must still get a type off its own entries. Get-ReleaseChangeTypes already falls
     # back to the canonical four for exactly this reason, and the match below is case-insensitive against
     # whichever list it returns.
-    if ($headingLine.Count -gt 0 -and $known.Count -gt 0) {
-        if ($headingLine[0] -match '`([^`/]+)/[^`]*`') {
+    # ONLY OFF A CHANGELOG HEADING, AND THAT GUARD IS A MEASURED DEFECT RATHER THAN caution. The two branch
+    # files open with the same shape and differ by one word -- '## Branch `feat/x` changelog' against
+    # '## `feat/x` progress' -- so a prefix read off "any heading with a branch in it" reads a STEP LIST as
+    # declaring a type. Test-EntryDeclaresShape ends on this function, so that made every step list an
+    # entry: exactly the confusion the two-file split exists to remove, reintroduced from underneath.
+    # Caught by that suite on the first run. The title word comes from the wording, so a repo that
+    # translated it is matched by its own word rather than by the English one.
+    $clTitle = [string](Get-BranchFileWording).ChangelogTitle
+    if ($headingLine.Count -gt 0 -and $known.Count -gt 0 -and $clTitle) {
+        $branchRx = '`([^`/]+)/[^`]*`\s+' + [regex]::Escape($clTitle) + '\b'
+        if ($headingLine[0] -match $branchRx) {
             $prefix = $Matches[1].Trim()
             $canonical = @($known | Where-Object {
                 $_ -and ([string]$_).ToLowerInvariant() -eq $prefix.ToLowerInvariant()
@@ -2801,6 +2819,35 @@ function Resolve-EntryType {
                 $result.Type = [string]$canonical[0]
                 $result.Declared = $true
                 $result.Raw = $prefix
+                return $result
+            }
+            # AN UNKNOWN PREFIX FALLS BACK TO THE REPO'S OWN ANSWER (#410), and this is where that seam went
+            # when the 'Branch type' section was retired. The scaffolder used to write Get-EntryFallbackType
+            # into that section for a branch whose prefix the table does not know -- 'wip/x', a consumer's
+            # own convention -- and with the section gone the seam would have quietly stopped mattering:
+            # every such entry would reach the release documents with no type at all. It is the READER's
+            # answer now, which also makes it right for entries the scaffolder never touched.
+            #
+            # Declared stays TRUE, exactly as the written section made it: the repo has answered, it simply
+            # answered by rule rather than by prefix. Raw keeps the prefix that was actually on the branch,
+            # so a gate quoting it back names the thing the author typed.
+            # WITH A BUILT-IN DEFAULT, because the seam is optional and this reader must not depend on it.
+            # new-branch.ps1 held exactly this pair -- 'Chore' unless repo-config says otherwise -- and
+            # baked the answer into the file. A reader that only honoured the seam would give a repo
+            # without a repo-config.ps1 no type at all, which is every bare consumer and every fixture:
+            # strictly less than the writer used to manage, and silent about it.
+            $fallback = $script:EntryFallbackTypeDefault
+            if (Get-Command Get-EntryFallbackType -ErrorAction SilentlyContinue) {
+                $v = Get-EntryFallbackType
+                if ($v) { $fallback = [string]$v }
+            }
+            if ($fallback) {
+                $result.Type = [string]$fallback
+                $result.Declared = $true
+                $result.Raw = $prefix
+                if ($repoTypes.Count -gt 0 -and $repoTypes -notcontains $result.Type) {
+                    $result.Error = "'$($result.Type)' is not a change type this repo produces -- use one of: $($repoTypes -join ', ')."
+                }
                 return $result
             }
         }
@@ -3122,6 +3169,23 @@ function Get-EntryScaffoldFindings {
         # ONLY A SECTION THE ENTRY ACTUALLY HAS. An entry written before the dossier form carries no
         # title section at all -- its title WAS the heading -- and reporting the absence would refuse every
         # branch in flight for having been correct under the format of the day. See Test-EntryHasSection.
+        # THE TITLE IS MEASURED WHEREVER IT LIVES (August 16, 2026). It had a section of its own until then,
+        # and the loop below caught an empty one; it is the first line of 'Pull Request' now, and that
+        # section is NOT empty by design any more -- so the old exclusion would have let an untitled entry
+        # through, and open-pr would have opened a PR titled with nothing but its branch type. Asked through
+        # Get-EntryPrTitle, which reads both homes and skips the two lines the fold writes underneath.
+        #
+        # ONLY WHERE THE ENTRY HAS NEITHER TITLE SECTION FILLED. An entry still carrying 'Branch title' is
+        # judged by the loop below, on its own heading, so the author is pointed at the section they
+        # actually have rather than at one their file does not contain.
+        if ((-not (Test-EntryHasSection -EntryText $EntryText -Key 'Description')) -and
+            (Test-EntryHasSection -EntryText $EntryText -Key 'PullRequest') -and
+            (-not (Get-EntryPrTitle -EntryText $EntryText))) {
+            $findings += [pscustomobject]@{
+                Label  = 'an unanswered section'
+                Marker = Get-EntrySectionHeading -Key 'PullRequest'
+            }
+        }
         foreach ($key in @('Description', 'What')) {
             if (-not (Test-EntryHasSection -EntryText $EntryText -Key $key)) { continue }
             if (-not (Get-EntrySectionAnswer -EntryText $EntryText -Key $key)) {

@@ -310,20 +310,23 @@ function Test-EntryDeclaresType {
         case-insensitive because the FILE carries 'feat' while the callers name the canonical 'Feat' -- which
         is exactly the pair Resolve-EntryType reconciles.
 
-        A bare '-match $Type' would pass on the word appearing anywhere in the body, including in the
-        description -- and one of the callers below is the injection test, whose whole subject is that
-        nothing extra ended up in the file. Reading the one section keeps that assert as sharp as it was.
+        AND SINCE AUGUST 16, 2026 THE SECTION IS GONE AND THE HEADING HAS IT AGAIN -- the branch prefix,
+        in the branch the heading has to name anyway, which is where 'Branch type' was copying it from.
+        So this asks Resolve-EntryType, the reader the release documents use: it takes the section where an
+        older entry still has one and the heading otherwise, which is exactly the pair of shapes the
+        callers below span. Still not a bare '-match': one of them is the injection test, whose whole
+        subject is that nothing extra ended up in the file.
     #>
     param([Parameter(Mandatory = $true)][string]$EntryText, [Parameter(Mandatory = $true)][string]$Type)
-    $answer = Get-EntrySectionAnswer -EntryText $EntryText -Key 'Type'
-    return ($answer -and ($answer.Trim().ToLowerInvariant() -eq $Type.ToLowerInvariant()))
+    $resolved = Resolve-EntryType -EntryText $EntryText
+    return ($resolved.Declared -and ([string]$resolved.Type).ToLowerInvariant() -eq $Type.ToLowerInvariant())
 }
 
 function Get-EntryDescription {
-    <# The 'Branch title' section's answer -- where the title given to new-branch lands, and since #506
-       what open-pr composes the PR title from. #>
+    <# The PR title -- the first line of 'Pull Request' since August 16, 2026, and the 'Branch title'
+       section before that. Get-EntryPrTitle knows both, which is what open-pr composes the PR title from. #>
     param([Parameter(Mandatory = $true)][string]$EntryText)
-    return (Get-EntrySectionAnswer -EntryText $EntryText -Key 'Description')
+    return (Get-EntryPrTitle -EntryText $EntryText)
 }
 
 try {
@@ -390,12 +393,16 @@ try {
     # were fields a parser had to pick apart, and both have their own place now -- the date on the fold's
     # closing line, the type in its own section. Asserted as the WHOLE line, which is the stronger claim: it
     # proves nothing was appended, which a prefix match could not.
+    # AND SINCE AUGUST 16, 2026 IT CARRIES THE CREATION STAMP, which is where the 'Branch ID' section went.
+    # Still asserted as the WHOLE line -- the stronger claim, because it proves nothing else was appended.
     $headLine1 = ($entryText1 -split "`r?`n")[0]
-    Assert-Equal '## `feat/my-task` changelog' $headLine1 'entry heading names the branch, whole and at the entry level'
-    Assert-Equal 'First title' (Get-EntryDescription -EntryText $entryText1) 'and the title given to new-branch is the branch description'
-    Assert-True (Test-EntryDeclaresType -EntryText $entryText1 -Type 'Feat') 'and the branch type is stated in its own section'
+    Assert-True ($headLine1 -match '^## Branch `feat/my-task` changelog - ''\d{8}-\d{6}''$') 'entry heading names the branch and stamps its creation, whole and at the entry level'
+    Assert-Equal 'First title' (Get-EntryDescription -EntryText $entryText1) 'and the title given to new-branch is the PR title'
+    Assert-True (Test-EntryDeclaresType -EntryText $entryText1 -Type 'Feat') 'and the branch type is readable -- off the branch the heading names'
+    # NO CALENDAR DATE, which is a different claim from the stamp above it: the stamp is a creation instant
+    # in a machine shape, while a 'yyyy-MM-dd' would read as the landing date the fold owns.
     Assert-True (-not ($headLine1 -match '\d{4}-\d{2}-\d{2}')) 'the scaffold writes NO date -- it would be the branch birth date, not the landing date'
-    Assert-True ((Get-EntrySectionAnswer -EntryText $entryText1 -Key 'Id') -match '^\d{8}-\d{6}$') 'the branch ID is stamped at creation'
+    Assert-True (-not (Test-EntryHasSection -EntryText $entryText1 -Key 'Id')) 'and the section that used to hold the stamp is not written at all'
     # THE SCAFFOLD SAYS WHERE THE REASON GOES, AT THE MOMENT THE FILE COMES INTO EXISTENCE (inbound #596).
     # The working file carries no comments by decision (Dave, August 7, 2026), so this printout is the only
     # place an author who does not open branch/templates/ learns that the text above the score line is the
@@ -413,11 +420,14 @@ try {
     Assert-True (-not ($entryText1 -match [regex]::Escape('**To do / where I left off:**'))) 'the entry has no to-do heading -- that lives in the step list now'
     # THE PROMPT IS A GUIDANCE COMMENT OVER AN EMPTY SECTION, not a visible placeholder -- so what proves the
     # entry is unfinished is that the gate still refuses it, which is the property that actually matters.
-    Assert-Equal '' (Get-EntrySectionAnswer -EntryText $entryText1 -Key 'What') 'the body section is left empty for the author'
-    $whatHeading1 = Get-EntrySectionHeading -Key 'What'
+    # THE BODY IS THE TIER SECTIONS SINCE AUGUST 16, 2026 -- the question is answered per audience rather
+    # than once as prose -- so what is empty on a fresh entry is each tier's REASON, and that is what the
+    # gate names. Asserted through the gate rather than through the section's text, because the section is
+    # no longer empty: it holds the headings the author has to fill in.
+    Assert-True ((Get-EntrySectionAnswer -EntryText $entryText1 -Key 'What') -match '#### ') 'the body section holds the tier sub-sections to answer'
     $gate1 = @(Get-EntryScaffoldFindings -EntryText $entryText1 -Wording (Get-EntryScaffoldWording))
-    Assert-True (@($gate1 | Where-Object { $_.Marker -eq $whatHeading1 }).Count -gt 0) `
-        'and the gate names it, so an unwritten entry cannot reach a PR'
+    Assert-True (@($gate1 | Where-Object { $_.Label -match 'no reason' }).Count -gt 0) `
+        'and the gate names the unanswered tiers, so an unwritten entry cannot reach a PR'
 
     $progressText1 = [System.IO.File]::ReadAllText($progressPath, [System.Text.Encoding]::UTF8)
     Assert-Equal 'feat/my-task' (Get-BranchFileDeclaredBranch -Text $progressText1) 'the step list names the branch it was created on'
@@ -490,8 +500,8 @@ try {
     Assert-Equal $maliciousTitle (Get-EntryDescription -EntryText $entryTextF) 'malicious title: FULLY and unchanged in its section, and nothing appended (no argv splitting)'
     # ...and the heading is untouched by it, which is new ground the split opened: a payload that escaped its
     # section would show up here first.
-    Assert-Equal '## `feat/injection-check` changelog' (($entryTextF -split "`r?`n")[0]) 'malicious title: and the heading still names the branch, nothing more'
-    Assert-True (Test-EntryDeclaresType -EntryText $entryTextF -Type 'Feat') 'malicious title: and the type section is intact rather than absorbing part of the payload'
+    Assert-True ((($entryTextF -split "`r?`n")[0]) -match '^## Branch `feat/injection-check` changelog - ''\d{8}-\d{6}''$') 'malicious title: and the heading still names the branch and its stamp, nothing more'
+    Assert-True (Test-EntryDeclaresType -EntryText $entryTextF -Type 'Feat') 'malicious title: and the type still reads off that heading rather than absorbing part of the payload'
 
     Assert-True (Test-Path -LiteralPath $sentinelPath) "sentinel file 'X' UNTOUCHED -- no 'Remove-Item' executed via a broken argv"
     $sentinelTextF = [System.IO.File]::ReadAllText($sentinelPath, [System.Text.Encoding]::UTF8)
@@ -529,7 +539,10 @@ try {
     Assert-True (Test-Path -LiteralPath $entryPathH) '-Intent: entry file created'
     $entryTextH = [System.IO.File]::ReadAllText($entryPathH, [System.Text.Encoding]::UTF8)
     Assert-True (-not ($entryTextH -match [regex]::Escape($intentText))) '-Intent: the intent does NOT land in the entry -- that text would fold into CHANGELOG.md verbatim'
-    Assert-Equal '' (Get-EntrySectionAnswer -EntryText $entryTextH -Key 'What') '-Intent: the entry body is left empty rather than taking the status'
+    # THE TIER REASONS ARE THE BODY NOW, so "left empty" is measured as "no reason written under any tier"
+    # rather than as an empty section: the section holds the headings the author still has to answer.
+    $intentImpact = Resolve-EntryImpact -EntryText $entryTextH
+    Assert-Equal 0 @($intentImpact.Rows | Where-Object { $_.Why }).Count '-Intent: no tier reason is written for the author -- the status is not an answer'
     Assert-True (@(Get-EntryScaffoldFindings -EntryText $entryTextH -Wording (Get-EntryScaffoldWording)).Count -gt 0) '-Intent: so the gate still refuses the entry until somebody writes what the change does'
 
     $progressPathH = Join-Path $fixtureH ((Get-BranchFilePaths).Progress)
@@ -676,8 +689,25 @@ function Get-EntryFallbackType     { return $script:EntryFallbackType }
                           'TODO: what this change does, for whoever reads CHANGELOG.md later.')) {
         Assert-True (-not ($entryTextK -match [regex]::Escape($absent))) "configured wording: '$absent' is not written into the entry"
     }
-    Assert-True (Test-EntryDeclaresType -EntryText $entryTextK -Type 'Docs') "configured wording: unknown prefix falls back to the repo's own type (Docs), not Chore"
-    Assert-True (-not (Test-EntryDeclaresType -EntryText $entryTextK -Type 'Chore')) 'configured wording: and the built-in English fallback type is NOT used'
+    # READ FROM INSIDE THE FIXTURE, WHICH IS WHERE THE ANSWER LIVES SINCE AUGUST 16, 2026. The type used to
+    # be baked into the entry by the scaffolder, so any process could read it back; with the 'Branch type'
+    # section retired it is resolved from the branch prefix, and an unknown prefix falls to the seam --
+    # which belongs to the repo the entry is IN. Reading it from this process would answer with the source
+    # repo's 'Chore' and prove nothing about the fixture's 'Docs'. Every real reader (the fold, the cut,
+    # open-pr) runs inside that repo, so this child process is what production actually does.
+    $typeProbe = & powershell -NoProfile -ExecutionPolicy Bypass -Command @"
+Set-Location '$fixtureK'
+. '$fixtureK\scripts\repo-config.ps1'
+. '$fixtureK\scripts\lib\branch-info.ps1'
+. '$fixtureK\scripts\lib\entry-scaffold-lib.ps1'
+`$t = Resolve-EntryType -EntryText ([System.IO.File]::ReadAllText('$entryPathK', [System.Text.Encoding]::UTF8))
+Write-Output `$t.Type
+"@
+    $typeK = ([string](@($typeProbe | Where-Object { $_ })[0])).Trim()
+    Assert-Equal 'Docs' $typeK "configured wording: unknown prefix falls back to the repo's own type (Docs), not Chore"
+    # AND THE ENTRY ITSELF STATES NO TYPE, which is the half that makes the read-time answer safe to rely
+    # on: a stale baked-in type could disagree with the seam, and there is now nothing to disagree with.
+    Assert-True (-not (Test-EntryHasSection -EntryText $entryTextK -Key 'Type')) 'configured wording: and the entry states no type of its own for the seam to contradict'
     # LOWERCASE IN THE FILE AND IN THE WARNING, because the section holds the branch PREFIX now and its own
     # hint asks for one. Resolve-EntryType canonicalises, so the entry still reads back as 'Docs'.
     Assert-True (Test-Phrase -Text $rK.Out -Phrase "set to 'docs'") 'configured wording: the unknown-prefix warning names the configured type'
