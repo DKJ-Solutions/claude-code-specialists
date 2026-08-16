@@ -346,7 +346,7 @@ application to profile: what costs time is what runs before work is allowed to l
 | what runs | measured | when it runs |
 |---|---|---|
 | `check-plugin-integrity.ps1` (26 checks) | seconds | before every push, and inside the cut |
-| the 30 test suites (210 asserts) | **205–232s** | inside `cut-release`, inside `open-pr`, and again in CI |
+| the test suites — 30 then, **40** now | **205–232s** then; **196–213s** re-measured at 40 suites, n=4, idle machine ([below](#the-gates-wall-clock-is-one-suite--re-measured-n4-august-16-2026)) | inside `cut-release`, inside `open-pr`, and again in CI |
 | CI `lint-en-tests` | **median 7m 23s**, range 5m 17s–9m 27s over **63** blocking runs (August 11, 2026) | every PR; blocks the merge |
 | a full release, end to end | **28m 03s**, measured at `v4.4.0` (August 11, 2026) — all of it blocking | per release, ~1.6× per day at the August cadence |
 
@@ -587,6 +587,55 @@ only while it says when each one was opened.
 **None of the three is a gate, deliberately.** They are measurements whose answers decide what is worth
 building; a check refusing a release over a missing number would cost every release something in order to
 guard a decision nobody has made yet.
+
+### The gate's wall clock is ONE suite — re-measured, n=4 (August 16, 2026)
+
+[#714](https://github.com/DaveKJohn/claude-code-specialists/issues/714) reported the local gate at
+**322.5s** against the baseline above — *"about +40%"*, with the growth *"diffuse, not one offender"*.
+Re-measured in the gate's own pool (the same `Start-Process` loop, `MaxParallel 16`, 18 cores, all **40**
+suites green, per-suite start offset and duration recorded), the number is lower and the diagnosis
+inverts:
+
+| run | total | `check-plugin-integrity.tests.ps1` inside that run |
+|---|---|---|
+| 1 | 212.97s | 212.82s |
+| 2 | 196.46s | 196.27s |
+| 3 | 199.04s | 198.88s |
+| 4 | 206.69s | 206.54s |
+
+**The total IS that one suite, to a tenth of a second, in every run.** It starts first (alphabetically)
+and it finishes last; every other suite is done by **126.9s**, after which one process runs alone for
+another 70–86 seconds with 15 of 16 lanes empty. Standalone the same suite takes **160.2s**, so roughly
+40s of its in-pool time is contention from its 39 siblings — and that is the *only* way a new suite
+lengthens this gate. The growth is diffuse in origin and **singular in effect**: nothing that fails to
+shorten that one file can shorten the gate.
+
+**The +40% does not reproduce, and that is a finding about the metric, not about the code.** Four idle
+runs land at **196–213s** — inside the 205–232s baseline recorded when there were 30 suites, now with 40.
+#714's 322.5s and the 326s reproduction were both taken on August 15 during the team-wide review, i.e. on
+a machine running many agents at once. Because the wall clock is one single-threaded process, it measures
+what else the machine is doing at least as much as it measures the suites. **State the machine state and
+the n beside this number, or it says nothing** — the same discipline the release figures in this document
+already carry.
+
+**Halving the lanes is inside the noise, so it is not a saving.** `MaxParallel 8` measured **194.3s**,
+with the other 39 suites still finishing at 153.2s and 41s of headroom to spare. 19s against a 196–213s
+spread is not a result at n=1 per configuration, and it is not proposed as one.
+
+**What a repair would have to be, and its measured ceiling.** The floor for the local gate is that suite:
+160.2s standalone. Split it and the gate becomes bounded by the next chain to finish, which ends at
+**153.2s** — roughly **-25%**, twice per release-with-document, and nothing for CI, whose four lanes make
+it a different shape (its median has not moved: 456s, n=34). The suite runs the gate **111 times** over a
+single fixture it mutates scenario by scenario, so a split needs a shared fixture builder and boundaries
+where that fixture is canonical. That is a project rather than an edit, it touches the most load-bearing
+suite in the repo, and it is **proposed, not built** — the decision is Dave's.
+
+**And the assert count in the table above was one suite's, not the gate's.** #714 reported *"38 suites,
+234 asserts"*; **234 is exactly what `check-plugin-integrity.tests.ps1` prints for itself**. Summed over
+all 40 suites' own summary lines the real figure is **4,206**. The row above carried "210 asserts" for
+the same reason and no longer states one — at 30 suites the total was never in the low hundreds either.
+This is [Chris's fifth intake pattern](01-01-extension.md#the-dave-rules) — the finding is real and its
+**size** is wrong — in its fourth instance, and again on a report this team wrote itself.
 
 ### Boundaries with the other roles
 
