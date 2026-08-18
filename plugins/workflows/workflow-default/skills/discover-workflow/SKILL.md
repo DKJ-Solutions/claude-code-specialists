@@ -13,7 +13,7 @@ description: >-
 
 The specialists carry a rule in every agent def: read the repo before proposing anything about process,
 and where the repo is genuinely silent say so rather than importing a convention from elsewhere (see
-[`plugins/agent-shared/repo-way-of-working.md`](../../../../agent-shared/repo-way-of-working.md)). This
+[`plugins/teams/agent-shared/repo-way-of-working.md`](../../../../teams/agent-shared/repo-way-of-working.md)). This
 skill is that rule, run once and written down, so it does not have to be re-derived at the start of every
 session.
 

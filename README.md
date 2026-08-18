@@ -253,13 +253,17 @@ The full picture, top-level folder by folder:
   the workflows under [`plugins/workflows/`](plugins/workflows/) (`workflow-default`,
   `workflow-davekjohn`), each of those two directories carrying its own README for what belongs in it
   and the rules that govern it. One folder per plugin, each carrying
-  `agents/`/`manuals/`/`personas/`/`skills/` plus its own `plugin.json` — and next to them
-  **`agent-shared/`**, the canonical source of the shared agent-def blocks
-  described under
+  `agents/`/`manuals/`/`personas/`/`skills/` plus its own `plugin.json` — and beside the four teams
+  **[`plugins/teams/agent-shared/`](plugins/teams/agent-shared/)**, the canonical source of the shared
+  agent-def blocks described under
   [Shared agent-def blocks](#shared-agent-def-blocks--one-source-for-the-verbatim-boundaries). See
   [Manuals — the split model](#manuals--the-split-model) for the manual/agent-def/persona split.
-  `agent-shared/` belongs here rather than at the root because it is plugin *source*: its generator
-  writes those blocks into plugin agent defs.
+  `agent-shared/` belongs under `plugins/` rather than at the root because it is plugin *source*: its
+  generator writes those blocks into plugin agent defs. It sits under `teams/` rather than one level
+  up because **every** file carrying a shared block is a team's — 30 agent defs and personas across the
+  four teams, none in either workflow — so a level up described a reach it does not have. It is a
+  directory inside a kind directory that is not a plugin, and nothing has to be told so: a script asks
+  the marketplace which plugins exist, and this folder is in no marketplace.
 - **[`connectors/`](connectors/)** — the register of which repos have each plugin installed and whether
   they are in sync (see its own [README](connectors/README.md)). At the root, deliberately **not** under
   `plugins/`: it is maintenance data read by `scripts/sync/check-connectors.ps1`, not payload, and it
@@ -270,7 +274,7 @@ The full picture, top-level folder by folder:
   and where each folder sits, so no other script has to encode the layout), the lint gate + drift
   check, the changelog/PR/release scripts (incl.
   `cut-release.ps1`), the connectors check (`check-connectors.ps1`), the agent-def generator
-  (`build-agent-defs.ps1` — fills in the shared blocks from `plugins/agent-shared/`), and the tests.
+  (`build-agent-defs.ps1` — fills in the shared blocks from `plugins/teams/agent-shared/`), and the tests.
   [`scripts/README.md`](scripts/README.md) is the directory-by-directory map, with the entry points and
   the four gates. A
   mirrored copy for consumers lives inside the plugins — the sync/check scripts in `team-alpha`, the
@@ -454,8 +458,8 @@ agent-def body (always loaded, also for a directly invoked worker subagent), but
 native transclusion in an agent def — what's written there is there, literally. To still maintain
 those blocks in **one place** instead of in every agent def, a **build-and-lint** model applies:
 
-- The canonical text of each shared block lives in `plugins/agent-shared/<name>.md` (a sibling of the
-  plugin folders under `plugins/`).
+- The canonical text of each shared block lives in `plugins/teams/agent-shared/<name>.md` (a sibling of
+  the four team folders — every file carrying a block is a team's).
 - In an agent def the block appears between sentinels:
   `<!-- BEGIN shared:<name> … -->` … `<!-- END shared:<name> -->`. The content really is there (self-contained), but is marked as generated.
 - **Never edit between the sentinels.** Change the source file and run
@@ -473,11 +477,14 @@ those blocks in **one place** instead of in every agent def, a **build-and-lint*
   what did **not** widen with it — the lint's agent-def↔manual coupling still leaves personas alone,
   because that check is about a pairing personas genuinely do not have.
 
-Current blocks — one canonical source file each under `plugins/agent-shared/`, so the directory listing
-is always the up-to-date enumeration: `inbound-behaviour`, `laziness-automation`, `language-behavior`,
-`no-conversation-history`, `no-commit-push-pr`, `repo-way-of-working`, `browser-compatibility`,
-`webcontent-boundary`, `changelog-entry-boundary`, `design-owner-boundary`,
-`storefront-preview-boundary`, and `artifact-publishing-boundary`. This way changing a shared boundary
+Current blocks — one canonical source file each under `plugins/teams/agent-shared/`, so the directory
+listing is always the up-to-date enumeration: `inbound-behaviour`, `laziness-automation`,
+`language-behavior`, `no-conversation-history`, `no-commit-push-pr`, `repo-way-of-working`,
+`lens-optional`, `browser-compatibility`, `webcontent-boundary`, `filecontent-boundary`,
+`changelog-entry-boundary`, `design-owner-boundary`,
+`storefront-preview-boundary`, and `artifact-publishing-boundary` — fourteen. Nothing checks that count
+against the directory, which is how this sentence came to name twelve of them; the directory is the
+authority and this list is a convenience. This way changing a shared boundary
 costs one edit + one build, not a
 manual change in every agent def that carries it.
 
