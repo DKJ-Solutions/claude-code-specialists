@@ -69,6 +69,34 @@ the governance of the entire specialists system live here.
   measured otherwise. These pages are long, heavily cross-referenced, and revised issue by issue,
   which is exactly the shape that accumulates half-updated claims.
 
+- **A doc that describes a lint marker has to fence it, or name the mechanism instead of the syntax.**
+  Check 10 (`[skill-list]`) scans every tracked doc in check 4's set for a bare enumeration marker, and
+  it masks **fenced** code only. That is deliberate and cannot be widened: a real span's own claimed
+  names are single-backtick quoted, so masking inline code would erase the very names the check exists
+  to read. The consequence is the one that keeps catching people — writing *about* the mechanism in
+  running prose, with the opening marker in inline code, reads to the gate as a span opened and never
+  closed, and the branch does not push.
+
+  **It has fired twice in three days, both times on a branch's own two files.** `03bf135`
+  (August 16, 2026) repaired the changelog entry and the step list of `fix/rename-continue-skill-to-handover`;
+  [#745](https://github.com/DaveKJohn/claude-code-specialists/pull/745) hit it again on August 18, in a
+  step list naming the mechanism as the model for a gate somebody should build later. **Why it repeated
+  is worth more than the trap itself:** both times the lesson was written into the step list, and the
+  fold resets that file — so the record was destroyed by the same commit that shipped the repair. A
+  lesson kept in a branch file is a lesson with a merge-shaped expiry date, which is exactly what the
+  repo rule about securing lessons in the docs is guarding against.
+
+  Two ways past it. Show the marker inside a fence, which the scan masks:
+
+  ```text
+  <!-- skills:all --> ... <!-- /skills:all -->
+  ```
+
+  Or, in running prose, name the thing rather than the syntax — *"the lint-checked enumeration spans"*.
+  Both repairs settled on the second, and it reads better anyway. Check 10's own comment states that the
+  fence form is documented as the convention; until this bullet it was not, so the claim is being made
+  true here rather than struck out.
+
 ### Boundaries with the other roles
 
 - Scripts, `.json` manifests (`marketplace.json`/`plugin.json`), and harness config are
