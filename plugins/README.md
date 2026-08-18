@@ -56,13 +56,17 @@ first, and nobody reads both pages in one sitting.
 Both are stated in full where they apply: [`teams/README.md`](teams/README.md) and
 [`workflows/README.md`](workflows/README.md).
 
+**Not everything under a kind directory is a plugin.** The canonical source of the boundary blocks that
+appear verbatim in many agent defs is
+[`teams/agent-shared/`](teams/agent-shared/) — a generator writes those blocks *into* the team folders,
+and it has [its own README](teams/agent-shared/README.md) for the
+never-edit-between-the-sentinels rule and how to add a block. It sits inside `teams/` because every file
+carrying such a block is a team's, and it is held to none of the rules above because it is in no
+marketplace. See
+[Shared agent-def blocks](../README.md#shared-agent-def-blocks--one-source-for-the-verbatim-boundaries).
+
 ## What else is in this directory
 
-- **[`agent-shared/`](agent-shared/)** — the canonical source of the boundary blocks that appear
-  verbatim in several agent defs. Not a plugin: it is the source a generator writes *into* the plugin
-  folders, and it has [its own README](agent-shared/README.md) for the never-edit-between-the-sentinels
-  rule and how to add a block. See also
-  [Shared agent-def blocks](../README.md#shared-agent-def-blocks--one-source-for-the-verbatim-boundaries).
 - **[`INSTALL.md`](../INSTALL.md)** — how to connect your own repo, in a
   [quickstart half](../INSTALL.md#quickstart--the-commands-and-nothing-else) and an
   [adoption half](../INSTALL.md#adoption--how-to-connect-your-repo). It sits here, beside the plugins it

@@ -26,8 +26,9 @@ deduplicates, but which artifacts fall under him here and with which mechanism h
 
 The verbatim-shared blocks run on **build-and-lint** (built July 2026):
 
-- **Source:** `plugins/agent-shared/<name>.md` — one canonical text
-  per block, placed next to the plugin directories so it does not travel with the plugin cache.
+- **Source:** `plugins/teams/agent-shared/<name>.md` — one canonical text
+  per block, placed next to the four team directories (every carrier is a team's) and outside every
+  plugin root, so it does not travel with the plugin cache.
 - **Sentinels:** in an agent def the block sits between `<!-- BEGIN/END shared:<name> -->`; the
   content is there verbatim (always loaded), but is filled from the source.
 - **Generator:** `scripts/agents/build-agent-defs.ps1` fills the blocks; `-Check` reports drift.

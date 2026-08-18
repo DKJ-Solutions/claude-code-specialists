@@ -17,8 +17,8 @@
                                           copied, because it must name exactly the plugins that
                                           travelled (see WHICH PLUGINS below)
         plugins/                          the plugin folders the filtered manifest points at, plus
-                                          agent-shared/ (the source of the generated shared blocks)
-                                          and the README/ADOPTION pages
+                                          teams/agent-shared/ (the source of the generated shared
+                                          blocks) and the README/ADOPTION pages
         README.md, LICENSE, CHANGELOG.md  context for whoever opens the business repo
         .github/ISSUE_TEMPLATE/           the inbound path the docs link to
         .gitignore, .gitattributes        so a clone behaves the same
@@ -37,6 +37,14 @@
     Excluded plugin folders are pruned after the copy and the manifest is rebuilt to match, so the two
     cannot disagree. A kind-directory left with no plugin in it (plugins/workflows/ and its README) is
     removed whole rather than published as a page describing plugins that are not there.
+
+    THAT NOW ALSO GOVERNS agent-shared/, and it is the one behaviour the August 17, 2026 move changed.
+    While that folder sat directly under plugins/ it was in no kind-directory, so it travelled on every
+    publish -- including one carrying no team at all, where the source of the team agent defs' shared
+    blocks is payload about plugins that are not there. Under plugins/teams/ it sits inside the teams
+    kind-directory, so it travels exactly when at least one team does and is pruned with them. Nothing
+    here had to learn that: the pruning asks whether a directory still holds a plugin.json, which is a
+    question about the directory rather than about a list of exceptions.
 
     IT CHECKS BOTH DIRECTIONS. A manifest naming a folder that did not travel was always a hard stop.
     Since #683 the reverse is too: a plugin folder that travels while the manifest never mentions it.

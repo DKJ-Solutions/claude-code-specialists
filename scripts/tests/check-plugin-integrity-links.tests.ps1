@@ -79,7 +79,7 @@ try {
     Write-Host "check 4 coverage -- the payload layers (#481) are IN the scan set" -ForegroundColor Cyan
     $payloadTargets = @(
         @{ Rel = 'plugins\teams\team-alpha\agents\09-99-agent.md';   Label = 'an agent def' },
-        @{ Rel = 'plugins\agent-shared\fixture-block.md';        Label = 'a shared agent-def block' },
+        @{ Rel = 'plugins\teams\agent-shared\fixture-block.md';  Label = 'a shared agent-def block' },
         @{ Rel = '.github\pull_request_template.md';             Label = 'a .github template' },
         @{ Rel = '.claude\rules\fixture-rule.md';                Label = 'a path-scoped rule' }
     )

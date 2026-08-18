@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     The specialists adapt to the repo they land in. That is a rule they carry in every agent def
-    (agent-shared/repo-way-of-working.md), and it asks each of them to read the same handful of places
+    (teams/agent-shared/repo-way-of-working.md), and it asks each of them to read the same handful of places
     at the start of every session: the contribution guide, the CI workflows, the PR template, the branch
     names, the commit subjects, the scripts the repo already has. This script does that reading once and
     records the answer, so a specialist arrives at an answer instead of re-deriving one.

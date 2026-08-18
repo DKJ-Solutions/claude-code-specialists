@@ -1026,6 +1026,11 @@ Assert-Equal 'team-lifehub' $touched[1] 'second plugin name alphabetically'
 # agent-shared/ sits INSIDE it, connectors/ at the ROOT. Both are asserted, so neither half can quietly
 # regress into counting as a plugin. Neither needs excluding by name any more -- a directory that is not
 # in the marketplace is not a plugin, which is what makes the pair of assertions cheap to keep.
+#
+# THIS BLOCK'S LAYOUT IS THE FLAT ONE and is deliberately left that way: $flatRoots is a synthetic fixture
+# for the shape this repo used to have, not a picture of the tree. The live position of agent-shared/ --
+# one level further down, inside plugins/teams/ -- is asserted in the nested block below, which is the
+# one that describes the repo as it is.
 Assert-Equal $false ([bool]($touched -contains 'agent-shared')) 'agent-shared is plugin source, not a plugin'
 Assert-Equal $false ([bool]($touched -contains 'connectors')) 'connectors folder does not count as a plugin'
 Assert-Equal 0 (@(Get-TouchedPlugins -Files @('connectors/life-hub.json') -PluginRoots $flatRoots)).Count 'connectors at the repo root is under no plugin root'
@@ -1056,6 +1061,12 @@ Write-Host "Get-TouchedPlugins -- a nested plugin tree" -ForegroundColor Cyan
 # The layout this repo is moving to: plugins grouped by kind, so a plugin root sits TWO levels down and
 # is no longer named after its parent directory. Asserted before that move happens, which is the whole
 # reason the derivation landed on its own branch first.
+#
+# AND SINCE AUGUST 17, 2026 THE NON-PLUGIN SIBLING IS NESTED TOO. agent-shared/ moved from directly under
+# plugins/ into plugins/teams/, beside the only plugins that consume its blocks -- so the file below is
+# no longer a path that merely fails to reach a plugin root, it is a path that shares a PREFIX with the
+# grouping directory the real plugins sit in. That is the harder case, and it is the one this repo now
+# has: the old '^plugins/([a-z0-9][a-z0-9-]*)/' regex would have read it as a plugin called 'teams'.
 $nestedRoots = @(Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson (@'
 {"plugins": [
   {"name": "team-alpha",         "source": "./plugins/teams/team-alpha"},
@@ -1065,12 +1076,14 @@ $nestedRoots = @(Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson (@'
 $nestedTouched = @(Get-TouchedPlugins -PluginRoots $nestedRoots -Files @(
     'plugins/teams/team-alpha/agents/06-16-agent.md',
     'plugins/workflows/workflow-davekjohn/skills/open-pr/SKILL.md',
-    'plugins/agent-shared/inbound-behaviour.md',
+    'plugins/teams/agent-shared/inbound-behaviour.md',
     'README.md'
 ))
 Assert-Equal 2 $nestedTouched.Count 'a plugin two levels down is found'
 Assert-Equal 'team-alpha' $nestedTouched[0] 'the NAME comes from the marketplace, not from the folder above it'
 Assert-Equal 'workflow-davekjohn' $nestedTouched[1] 'and so does the second'
+Assert-Equal $false ([bool]($nestedTouched -contains 'teams')) 'plugin source nested INSIDE a grouping directory is not read as a plugin named after that directory'
+Assert-Equal 0 (@(Get-TouchedPlugins -PluginRoots $nestedRoots -Files @('plugins/teams/agent-shared/lens-optional.md'))).Count 'agent-shared beside the teams it feeds is still under no plugin root'
 Assert-Equal 0 (@(Get-TouchedPlugins -PluginRoots $nestedRoots -Files @('plugins/teams/README.md'))).Count 'a file in the grouping directory itself belongs to no plugin'
 
 Write-Host "Get-PluginRoots" -ForegroundColor Cyan

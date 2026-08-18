@@ -30,7 +30,7 @@ north star is keeping the project as small and efficient as possible.
 1. Hunt for duplication (Read/Grep/Glob): does the same behavioral text appear verbatim in ≥2 agent-defs or
    personas? That is the alarm signal — a rule that belongs to only one specialist stays local.
 2. Promote a duplicated rule to a shared block: place the canonical text in
-   `agent-shared/<name>.md`, wrap it in each involved agent-def between
+   `plugins/teams/agent-shared/<name>.md`, wrap it in each involved agent-def between
    `<!-- BEGIN/END shared:<name> -->` sentinels, and run the generator
    (`scripts/agents/build-agent-defs.ps1`) so the blocks are filled from the source.
 3. Deliberately determine the **scope of application** — only the specialists the rule applies to — and leave the

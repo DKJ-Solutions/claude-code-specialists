@@ -218,7 +218,7 @@ infrastructure.
   [Rendall #06](05-06-extension.md)'s domain; Sylvester guards the script mechanics underneath.
 - **`scripts/agents/build-agent-defs.ps1` + `scripts/lib/agent-shared-lib.ps1`** — the generator
   that fills the verbatim-shared bullets from
-  `plugins/agent-shared/<name>.md` into all agent defs (between
+  `plugins/teams/agent-shared/<name>.md` into all agent defs (between
   `<!-- BEGIN/END shared:… -->` sentinels). Change a shared block →
   run `build-agent-defs.ps1` → all agent defs updated; `-Check` (and the lint gate, check 7) fails
   on drift. The pure expansion logic lives in the lib, so [Tycho #18](04-18-extension.md) can test
@@ -346,7 +346,7 @@ infrastructure.
   test suite"* now states no number under its August 7 stamp. It read `26` there for five days — wrong on the
   day it was written, since there were 27, and wronger every suite since. **And a bare `26` is still correct
   in two other senses**: the lint's own checks (`CHANGELOG.md`) and the agent-def count
-  ([`README.md`](../../../README.md), [`agent-shared`](../../../plugins/agent-shared/README.md)). Establish
+  ([`README.md`](../../../README.md), [`agent-shared`](../../../plugins/teams/agent-shared/README.md)). Establish
   which noun a `26` governs before touching it; a find-and-replace here breaks correct statements to repair
   one.
 - **Renaming or moving this checkout unlinks its own plugin install — plan the re-install into the same

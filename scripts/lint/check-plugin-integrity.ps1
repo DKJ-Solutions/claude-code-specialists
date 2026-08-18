@@ -33,7 +33,7 @@
          agent defs, every agent def has a valid 'name:' + a corresponding manuals/<g>-<id>-manual.md
          which it also names, and conversely every manual has an agent def (no orphan manual).
       7. shared agent-def blocks: every <!-- BEGIN/END shared:NAME --> region in an agent def still
-         equals its canonical source in agent-shared/<name>.md (see scripts/agents/build-agent-defs.ps1)
+         equals its canonical source in teams/agent-shared/<name>.md (see scripts/agents/build-agent-defs.ps1)
          -- a hand-edit inside the sentinels or a forgotten rebuild is thus caught at the gate.
       8. shared workflow scripts: every plugin mirror of a repo-agnostic script (issue #81) is
          still LF-identical to its root source -- a hand-edit in the mirror or a forgotten
@@ -612,7 +612,7 @@ $linkFiles += (Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-persona.md' -Fi
     Where-Object { $_.FullName -match '\\personas\\' } | Select-Object -ExpandProperty FullName)
 # THE AGENT DEFS, THE SHARED BLOCKS, AND THE TWO CONFIG-ADJACENT DOC LAYERS (#481). Every category above
 # names a shape of file, and four kinds of markdown matched none of them: */agents/*.md (26 files),
-# plugins/agent-shared/*.md (11), .github/**/*.md (2) and .claude/rules/*.md (1). Agent defs are the
+# plugins/teams/agent-shared/*.md (11), .github/**/*.md (2) and .claude/rules/*.md (1). Agent defs are the
 # glaring one -- they are the largest single body of prose this repo ships, they are payload, and their
 # links had never been read by anything. Measured on the day this was added: one genuinely dead link had
 # been sitting in an agent def, plus the location-dependent CLAUDE.md links repaired alongside it.
@@ -621,7 +621,7 @@ $linkFiles += (Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-persona.md' -Fi
 # directory is guarded, for the reason the plugins/ glob is: a consumer has some of these and not others.
 foreach ($payloadSpec in @(
     @{ Dir = 'plugins';        Recurse = $true;  Filter = '*.md'; Match = '\\agents\\' },
-    @{ Dir = 'plugins\agent-shared'; Recurse = $false; Filter = '*.md'; Match = $null },
+    @{ Dir = 'plugins\teams\agent-shared'; Recurse = $false; Filter = '*.md'; Match = $null },
     @{ Dir = '.github';        Recurse = $true;  Filter = '*.md'; Match = $null },
     @{ Dir = '.claude\rules';  Recurse = $false; Filter = '*.md'; Match = $null })) {
     $payloadDir = Join-Path $RepoRoot $payloadSpec.Dir
@@ -2144,8 +2144,12 @@ Write-Coverage -Category 'skill-command' -Checked $skillCmdChecked `
 # failure the check exists to prevent, arriving through the door of a naming choice nobody thought was
 # load-bearing. So an unprefixed name is an error rather than a style note.
 #
-# Anchored on the published set, so a directory under plugins/ that is not a plugin (agent-shared/) is
-# not held to a rule about plugins.
+# ANCHORED ON THE PUBLISHED SET, so a directory that is not a plugin is not held to a rule about
+# plugins. That is what lets plugins/teams/agent-shared/ sit beside the teams it feeds without being
+# read as a team whose name is missing its 'team-' prefix -- it is in no marketplace, so this loop
+# never sees it. Worth knowing before anyone hardens the directory half into a filesystem sweep:
+# 'every directory under plugins/teams/ is named team-*' is a DIFFERENT check from this one, and it
+# would be false the moment it was written.
 $kindChecked = 0
 foreach ($p in $publishedPlugins) {
     $kindChecked++

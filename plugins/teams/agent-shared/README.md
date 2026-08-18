@@ -1,8 +1,19 @@
 # `agent-shared/` — one source for the boundaries that appear verbatim in many agent defs
 
 **This directory is not a plugin.** It is the canonical source of the blocks that a generator writes
-*into* the plugin folders beside it. That is why it sits here, one level above `teams/` and
-`workflows/`: it is plugin **source**, but it ships in no plugin of its own.
+*into* the team folders beside it: it is plugin **source**, but it ships in no plugin of its own.
+
+**Why it sits inside `teams/` rather than one level up, where it lived until August 17, 2026.** Every
+file that carries a shared block is a team's — 30 agent defs and personas across all four teams, and
+**none** in either workflow plugin. A level up said the blocks reach the whole marketplace; they reach
+this directory. Two consequences, only the first of them a behaviour change:
+
+- it now travels to a published marketplace exactly when at least one team does, because
+  `publish-to-business.ps1` prunes a kind-directory once it holds no plugin. Before the move it
+  travelled on every publish, including ones carrying no team at all;
+- nothing had to be told where it went. Scripts ask `.claude-plugin/marketplace.json` which plugins
+  exist, so a directory in no marketplace is not a plugin wherever it sits — including here, sharing a
+  path prefix with the four that are.
 
 ## Why the text is copied at all
 
@@ -21,9 +32,9 @@ source file, one build, and a gate that fails the moment a copy stops matching.
 
 In an agent def or a persona the block sits between
 `<!-- BEGIN shared:<name> … -->` and `<!-- END shared:<name> -->`. To change it: edit the file **here**,
-then run [`scripts/agents/build-agent-defs.ps1`](../../scripts/agents/build-agent-defs.ps1), which
+then run [`scripts/agents/build-agent-defs.ps1`](../../../scripts/agents/build-agent-defs.ps1), which
 rewrites every carrier. Lint check 7 in
-[`check-plugin-integrity.ps1`](../../scripts/lint/check-plugin-integrity.ps1) fails as soon as a marked
+[`check-plugin-integrity.ps1`](../../../scripts/lint/check-plugin-integrity.ps1) fails as soon as a marked
 region deviates from its source — whether from a hand edit or a forgotten rebuild — and
 `build-agent-defs.ps1 -Check` answers the same question without writing.
 
@@ -31,7 +42,7 @@ region deviates from its source — whether from a hand edit or a forgotten rebu
 
 It reads `<!-- BEGIN shared:<name> -- GENERATED, do not edit here -->`, and that wording has one source:
 `Format-SharedBeginSentinel` in
-[`agent-shared-lib.ps1`](../../scripts/lib/agent-shared-lib.ps1). Until August 14, 2026 the expander
+[`agent-shared-lib.ps1`](../../../scripts/lib/agent-shared-lib.ps1). Until August 14, 2026 the expander
 copied the line through unchanged, so the text sat hand-maintained in **178** places with nothing
 holding it — and it said `GENERATED, edit agent-shared/<name>.md`.
 
@@ -133,6 +144,6 @@ alone, because that check is about a pairing personas genuinely do not have.
 
 The DRY judgement about *when* a rule has earned promotion to a shared block — rather than being restated
 in two places that are free to disagree — belongs to
-[Ravi #24](../../.claude/specialists/lenses/06-24-extension.md). The mechanism is described once more,
+[Ravi #24](../../../.claude/specialists/lenses/06-24-extension.md). The mechanism is described once more,
 from the reader's side, in the root README under
-[Shared agent-def blocks](../../README.md#shared-agent-def-blocks--one-source-for-the-verbatim-boundaries).
+[Shared agent-def blocks](../../../README.md#shared-agent-def-blocks--one-source-for-the-verbatim-boundaries).

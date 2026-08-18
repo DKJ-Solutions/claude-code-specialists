@@ -100,9 +100,10 @@ $PluginRoots = @(Get-RepoPluginRoots -RepoRoot $RepoRoot)
 #
 # IT ASKS THE MARKETPLACE INSTEAD OF JOINING A PATH. This used to be Join-Path <plugins root> <name>,
 # which answers "is there a folder with this name" -- a different question, and one that gives the wrong
-# answer in both directions: a folder under plugins/ that is not a published plugin resolved happily
-# (agent-shared/ would have), while a plugin whose folder is not named after it, or does not sit exactly
-# one level down, resolved to nothing.
+# answer in both directions: a folder that is not a published plugin resolved happily (agent-shared/
+# would have -- it sat directly under plugins/ then, and has since moved down beside the teams it
+# feeds), while a plugin whose folder is not named after it, or does not sit exactly one level down,
+# resolved to nothing.
 #
 # WHAT THE SLUG CHECK IS FOR NOW, STATED HONESTLY, because it used to be load-bearing and no longer is.
 # Test-PluginNameSlug exists to gate a value "before it becomes a path segment" (see its own docstring),

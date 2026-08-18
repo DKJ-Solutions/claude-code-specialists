@@ -11,7 +11,7 @@ decides otherwise.
 ## The specialists follow your repo, not this plugin
 
 The Claude Specialists already carry this rule in every agent def, verbatim, via the shared block
-[`plugins/agent-shared/repo-way-of-working.md`](../../agent-shared/repo-way-of-working.md): the repo's own
+[`plugins/teams/agent-shared/repo-way-of-working.md`](../../teams/agent-shared/repo-way-of-working.md): the repo's own
 way of working comes first, and a specialist reads what is already there -- the `CLAUDE.md`, a
 contribution guide, the git history, the CI workflows, the scripts the repo already has -- before it
 proposes anything about process. That rule is *why* `workflow-default` can be this thin: the working

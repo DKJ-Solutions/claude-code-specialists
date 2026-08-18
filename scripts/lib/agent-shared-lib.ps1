@@ -4,7 +4,7 @@
 .DESCRIPTION
     Some bullets under **Boundaries** are word-for-word identical across many agent defs (e.g. the
     inbound rule: 19/19). To maintain them in ONE place instead of in every agent def, they live as
-    the canonical source in plugins/agent-shared/<name>.md and appear
+    the canonical source in plugins/teams/agent-shared/<name>.md and appear
     in an agent def between sentinel comments:
 
         <!-- BEGIN shared:inbound-behaviour -- GENERATED, do not edit here -->
@@ -19,8 +19,8 @@
     replaced the content between the sentinels and copied the BEGIN line through unchanged, so its wording
     sat hand-maintained in 178 places with nothing holding it. It read
     'GENERATED, edit agent-shared/<name>.md' -- a relative path that resolves in THIS repo and nowhere
-    else, because plugins/agent-shared/ sits outside every plugin root and therefore does not travel in the
-    package. Inbound #669 C2 reported that as a dead pointer, which understates it: three lines below it,
+    else, because plugins/teams/agent-shared/ sits outside every plugin root and therefore does not travel in
+    the package. Inbound #669 C2 reported that as a dead pointer, which understates it: three lines below it,
     in the same agent def, the inbound-behaviour block says *"You do not modify the shared core locally"*
     and names the issue route. The pointer instructed a consumer to do what the paragraph it introduces
     forbids.
@@ -30,7 +30,7 @@
     source -- exactly the confusion the inbound route exists to remove. Repointing it at
     DaveKJohn/claude-code-specialists would add 178 references to a personal repo, straight against C4 on
     the same report. And for the one reader who CAN act on it -- a maintainer of this repo -- the pointer
-    is redundant: 'shared:<name>' maps to plugins/agent-shared/<name>.md by construction, which is what
+    is redundant: 'shared:<name>' maps to plugins/teams/agent-shared/<name>.md by construction, which is what
     Get-SharedBlockText does one function up. Measured: dropping it takes those 178 lines from 17,332 to
     13,027 bytes.
 
@@ -44,7 +44,7 @@ Set-StrictMode -Version Latest
 
 function Get-AgentSharedDir {
     param([string]$RepoRoot)
-    return (Join-Path $RepoRoot 'plugins\agent-shared')
+    return (Join-Path $RepoRoot 'plugins\teams\agent-shared')
 }
 
 function Format-SharedBeginSentinel {

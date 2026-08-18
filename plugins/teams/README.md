@@ -60,10 +60,26 @@ where files live — a plugin whose name does not say which kind it is would be 
   and workflow session checks and the sync scripts belong to the core rather than to any domain team;
   `team-shopify` ships one domain skill, and the other two teams are specialists and manuals only.
 
-The verbatim boundary blocks shared across agent defs are **not** in this directory — they live one
-level up in [`../agent-shared/`](../agent-shared/), because they are the source a generator writes
-*into* these folders. See
+## `agent-shared/` — in this directory, and not a team
+
+The verbatim boundary blocks shared across agent defs live in
+[`agent-shared/`](agent-shared/), here beside the teams rather than one level up. It is **not** a
+plugin and never travels as one: it is the source a generator writes *into* these folders. See
 [Shared agent-def blocks](../../README.md#shared-agent-def-blocks--one-source-for-the-verbatim-boundaries).
+
+**Why here and not under `plugins/`, where it sat until August 17, 2026.** Every file that carries a
+shared block is a team agent def or a team persona — 30 of them across all four teams, and **zero** in
+either workflow plugin. So the folder's reach already ended at this directory, and sitting a level up
+described a scope it does not have. Two things follow from the move, one of them a behaviour change:
+
+- **It travels with the teams it feeds.** `publish-to-business.ps1` removes a kind-directory once it
+  holds no plugin, so a publish carrying no team no longer carries the source of those teams' blocks
+  either. Before, it travelled unconditionally.
+- **Nothing had to learn where it went.** Every script that asks which plugins exist reads
+  `.claude-plugin/marketplace.json` through `plugin-tree-lib.ps1`, so a directory that is in no
+  marketplace is not a plugin wherever it sits — including here, sharing a prefix with the four that
+  are. That is also why the `[plugin-kind]` rule below does not read this folder as a team missing its
+  `team-` prefix: it is anchored on the published set, not on a sweep of this directory.
 
 ## Adding a team
 

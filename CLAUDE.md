@@ -180,7 +180,7 @@ July 20, 2026; sharpened July 21 and July 26, 2026.
 
 ### Structure — where everything lives
 
-The full repo layout (`.claude-plugin/`, `plugins/` incl. `agent-shared/`, `connectors/` at the root,
+The full repo layout (`.claude-plugin/`, `plugins/` incl. `teams/agent-shared/`, `connectors/` at the root,
 `scripts/`, `releases/`, `.claude/`, and the root docs + `.github/`) is described in
 [README.md](README.md#repo-layout). Since August 3, 2026 the plugins sit **one** level down in
 `plugins/<plugin>/` instead of two in `claude-code-plugins/claude-specialists/<plugin>/`: that second
@@ -189,6 +189,20 @@ level existed to hold several product families side by side, which the
 **to the root** in the same movement, deliberately — it is the consumer register read by
 `scripts/sync/`, not plugin payload, and must not travel along in the plugin cache. `agent-shared/`
 stayed **inside** `plugins/` for the mirror-image reason: it *is* plugin source.
+
+**And on August 17, 2026 it moved one level further in, to `plugins/teams/agent-shared/`** (Dave). Same
+reasoning, applied one level down: every file carrying a shared block is a team's — 30 agent defs and
+personas across all four teams, none in either workflow — so sitting beside `teams/` and `workflows/`
+claimed a reach the folder does not have. **Nothing in the tooling had to learn the new address**, which
+is the part worth keeping: every script that asks which plugins exist reads `marketplace.json` through
+[`plugin-tree-lib.ps1`](scripts/lib/plugin-tree-lib.ps1), so a directory in no marketplace is not a
+plugin wherever it sits — and the `[plugin-kind]` rule that requires `team-*` under `plugins/teams/` is
+anchored on the published set rather than on a sweep of that directory. Under the previous
+shape this exact folder had to be excluded **by name**, and that exclusion had already gone stale once.
+The one thing that did change is a publish: `agent-shared/` now sits inside the `teams` kind-directory,
+which `publish-to-business.ps1` prunes when it holds no plugin — so it travels with the teams it feeds
+instead of unconditionally. Reader-facing statement in
+[`plugins/teams/README.md`](plugins/teams/README.md).
 
 ### claude-code-specialists's safety implementation
 
