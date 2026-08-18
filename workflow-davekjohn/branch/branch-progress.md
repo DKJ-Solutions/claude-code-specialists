@@ -45,4 +45,4 @@ PR → CI → merge → fold.
 blocks had drifted to twelve names against a directory of fourteen, and nothing checks it. The two missing
 names were added here because the sentence was being repathed anyway, and the sentence now states that the
 directory is the authority. Building the gate that would keep it honest is a separate, scoped job — the
-`<!-- skills:all -->` span mechanism already in `check-plugin-integrity.ps1` is the obvious model for it.
+lint-checked enumeration spans already in `check-plugin-integrity.ps1` are the obvious model for it.
