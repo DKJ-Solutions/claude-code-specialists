@@ -320,6 +320,61 @@ function Get-EntryAskedTiers {
     return @(0, $audience)
 }
 
+# --- WHO EACH AUDIENCE TIER IS, IN ONE PLACE (August 19, 2026) ------------------------------------
+#
+# The heading over the audience tier's section stopped naming a number, so the guidance underneath it is
+# where the reader is told who they are writing for. That needs the tier written out in words, and until now
+# those words existed only inside the routing questions ('...relevant to management and the
+# employer/commissioner?'), which is prose about MOVING to a tier rather than a name for it.
+#
+# WHY THE SENTENCE IS ASSEMBLED RATHER THAN STORED. Storing 'For tier 2 audiences: the subscriber of a
+# service.' as a finished line would make it wrong in every repo whose audience is 1 -- which is the repo the
+# whole knob exists for, and the one that filed #620. The tier resolves per repo, so the sentence has to.
+#
+# THE DEFINITIONS MATCH Get-ReleaseAudienceTier's OWN, deliberately word for word: a consumer answering that
+# knob reads those two descriptions in their repo-config, and meeting a third wording here would leave them
+# deciding which one the scaffolder meant. Overridable through Get-EntryGuidanceOverrides like every other
+# piece of form prose -- a repo that translated its entry template translates this with it.
+# STRING KEYS, AND THAT IS THE BUG THIS FILE ALREADY DOCUMENTS ONE SCREEN DOWN, walked into again here on the
+# first run. An [ordered]@{ 1 = '...' } is an OrderedDictionary whose indexer takes a key OR A POSITIONAL
+# INDEX, and the positional overload wins for an integer -- so $descriptions[2] asks for the THIRD entry of a
+# two-entry map and comes back empty. .Contains(2) says yes and the lookup beside it returns nothing, which
+# is why the template rendered 'For tier 2 audiences.' with the reader's name silently missing. Keyed and
+# looked up as strings, there is no integer for the indexer to misread.
+$script:EntryAudienceDescriptions = [ordered]@{
+    '1' = 'management and the employer/commissioner'
+    '2' = 'the subscriber of a service'
+}
+
+function Get-EntryAudienceDescription {
+    <# Who one audience tier is, in words -- '' for a tier this model has no description for, which keeps the
+       guidance a sentence short rather than a sentence with a hole in it. #>
+    param([Parameter(Mandatory)][int]$Tier)
+    $key = [string]$Tier
+    if ($script:EntryAudienceDescriptions.Contains($key)) { return [string]$script:EntryAudienceDescriptions[$key] }
+    return ''
+}
+
+function Format-EntryAudienceGuidance {
+    <#
+        The audience tier's guidance block with '{0}' resolved to the sentence naming that tier and its
+        reader. A block carrying no '{0}' comes back untouched, which is what makes this safe over an
+        override: a repo that replaced the wording with its own prose gets exactly its own prose.
+
+        NOT -f, AND THAT IS A BUG THIS AVOIDS RATHER THAN A STYLE CHOICE. These lines are form text that
+        legitimately contains braces -- a repo documenting a placeholder, a '{0}' inside an example -- and
+        the format operator throws on an unmatched brace instead of leaving it alone. A plain replace of the
+        one token cannot fail on anybody's prose.
+    #>
+    param(
+        [AllowEmptyCollection()][string[]]$Lines = @(),
+        [Parameter(Mandatory)][int]$Tier
+    )
+    $who = Get-EntryAudienceDescription -Tier $Tier
+    $sentence = if ($who) { "For tier $Tier audiences: $who." } else { "For tier $Tier audiences." }
+    return @($Lines | ForEach-Object { [string]$_ -replace '\{0\}', $sentence })
+}
+
 function Format-EntryTierLine {
     <# The single line an entry carries, e.g. 'Tier: 0'. One formatter, so the writer and the parser
        below cannot disagree about the spacing. #>
@@ -620,8 +675,16 @@ function Get-EntryTierSectionMarker {
         which is as close to one source as a matcher and a writer can get.
     #>
     param([Parameter(Mandatory)][int]$Tier)
-    if ((Test-EntryTierHeadingAsksRoute) -and $Tier -gt 0 -and $Tier -eq (Get-EntryAudienceTier)) {
-        return ('#' * $script:EntryTierSubLevel) + " $($script:EntryTierHigherHeading)"
+    # TIER 0 HAS NO HEADING OF ITS OWN: the question the entry opens with IS its section, so the marker for it
+    # is that '###' heading. The audience tier keeps a '####' sub-heading inside it, retexted rather than
+    # relevelled. A tier that is neither -- a migration rendering tier 1 in a tier-2 repo, or any tier in a
+    # repo that has stated no audience -- still falls through to the numbered sub-heading, which is the shape
+    # those entries were written in and the one their reader knows.
+    if (Test-EntryTierSectionsAreNamed) {
+        if ($Tier -eq 0) { return (Get-EntrySectionHeading -Key 'What') }
+        if ($Tier -eq (Get-EntryAudienceTier)) {
+            return ('#' * $script:EntryTierSubLevel) + " $($script:EntryTierHigherHeading)"
+        }
     }
     return ('#' * $script:EntryTierSubLevel) + " $($script:EntryTierSubPrefix) $Tier"
 }
@@ -640,25 +703,48 @@ function Get-EntryTierSectionMarker {
 # states its one audience tier and the heading means that tier. A repo that has stated NONE gets the
 # numbered headings exactly as before -- there is no single tier for the question to resolve to, and a
 # heading that resolved to nothing would silently read as tier 0 and empty every release. That is what
-# Test-EntryTierHeadingAsksRoute guards, and it is deliberately the conservative direction: an
+# Test-EntryTierSectionsAreNamed guards, and it is deliberately the conservative direction: an
 # unconfigured consumer taking this plugin update sees no change at all.
 #
 # READ ALWAYS, WRITTEN CONDITIONALLY -- the standing rule. Read-EntryTierSections recognises this heading
 # in every repo, configured or not, because an entry carrying it may have been written anywhere and folded
 # here; only the WRITER asks whether this repo has an audience tier to mean by it.
-$script:EntryTierHigherHeading = 'Higher than tier 0?'
+# RETEXTED ON AUGUST 19, 2026, SAME LEVEL, SAME MECHANISM. Everything the block above says still holds -- it
+# resolves to a number on read, it is recognised in every repo and written only where one audience tier is
+# stated. What changed is the words: the heading stopped naming the mechanism ("higher than tier 0") and
+# started naming what is being asked of the author. It stays a '####' sub-heading of the question's section
+# (Dave), so the entry still has two '###' sections and this string is not one of them.
+$script:EntryTierHigherHeading = 'What makes this change extra special'
+
+# THE RETIRED WORDING, RECOGNISED AND NEVER WRITTEN. 'Higher than tier 0?' was written for three days,
+# August 16 to 19, 2026, which is long enough to reach CHANGELOG.md, the branches in flight and -- through a
+# release -- every consumer's tree. A parser that forgot it would read every one of those entries as declaring
+# tier 0 alone, which is the silent direction that empties a release. Recognise both, write one.
+$script:EntryTierHigherRetiredHeadings = @('Higher than tier 0?')
 
 function Get-EntryTierHigherHeading {
-    <# The heading text the audience tier's section carries ('Higher than tier 0?'). Machine-read by the
-       parser, so it is stated once and is deliberately not repo-configurable -- the same class as 'Tier'
-       and 'Score'. A repo that translated it would make its own entries unreadable to its own fold. #>
+    <# The heading text the audience tier's sub-section carries ('What makes this change extra special').
+       Machine-read by the parser, so it is stated once and is deliberately not repo-configurable -- the same
+       class as 'Tier' and 'Score'. A repo that translated it would make its own entries unreadable to its own
+       fold. #>
     return $script:EntryTierHigherHeading
 }
 
-function Test-EntryTierHeadingAsksRoute {
-    <# Does THIS repo write the question as a heading? Only where it has stated one audience tier, which is
-       the tier the heading then means. Where it has not, the numbered headings stay and so does the
-       routing comment -- see the block above for why that fallback is the safe direction. #>
+function Get-EntryTierHigherRetiredHeadings {
+    <# Every heading the audience tier's section has carried and is still recognised under, newest first. A
+       WRITER must never use one. #>
+    return @($script:EntryTierHigherRetiredHeadings)
+}
+
+function Test-EntryTierSectionsAreNamed {
+    <# Does THIS repo write the tiers under headings that NAME THE QUESTION rather than the tier -- the
+       entry's opening section for tier 0, and 'What makes this change extra special' inside it for the
+       audience tier? Only where it has stated one audience tier, which is the tier that second heading then
+       means. Where it has not, the numbered '#### Tier N' sub-headings stay -- tier 0 among them, so it keeps
+       a heading there -- and so does the routing comment between them; see the block above for why that
+       fallback is the safe direction.
+       Called Test-EntryTierHeadingAsksRoute until August 19, 2026, when the same condition came to govern
+       both headings rather than only the audience tier's; the name follows what it decides. #>
     return ($null -ne (Get-EntryAudienceTier))
 }
 
@@ -786,8 +872,14 @@ $script:EntryGuidanceDefaults = [ordered]@{
     # than an oversight. This block sits one screen below that one, so the three sentences about the Score
     # line and the rubric were being read twice on the way down a form whose whole revision was about
     # length. What only this tier needs -- the way out when the change reaches nobody here -- is what stays.
+    # '{0}' IS THE AUDIENCE SENTENCE, resolved per repo by Format-EntryAudienceGuidance (August 19, 2026).
+    # The heading above this block stopped naming a tier number when it became 'What makes this change extra
+    # special', so this line is where the author is told which reader they are writing for -- and it has to
+    # say the repo's own tier rather than list both, because tier 1 and tier 2 are two kinds of audience and
+    # a repo has exactly one. The token used to be a trailing space: the sentence was cut on August 16 and
+    # its space stayed behind, which is the shape that reads as "something was deleted here".
     TierOptional = @(
-        'Why the change matters AT THIS REACH specifically. ',
+        'Why the change matters AT THIS REACH specifically. {0}',
         '',
         'If it has no significance at this reach at all, then explain shortly why and insert N/A in Score.',
         'That reason goes above the Score line too.'
@@ -972,7 +1064,12 @@ function Format-EntrySignificanceSections {
     #>
     param(
         $Rows = @(),
-        [switch]$WithGuidance
+        [switch]$WithGuidance,
+        # Prose that belongs at the TOP of tier 0's section, above whatever that row carries -- a migration's
+        # old free-text paragraph, which in the named shape has no section of its own to go in any more.
+        # Empty for every other caller, and ignored outside the named shape, where Format-EntryBlock still
+        # writes it under the question itself.
+        [AllowEmptyString()][string]$Tier0Preamble = ''
     )
     $w = Get-EntrySignificanceWording
     # EVERY TIER THIS REPO ASKS ABOUT IS WRITTEN, AND EACH IS ANSWERED (Dave, August 7, 2026; narrowed to
@@ -1032,11 +1129,14 @@ function Format-EntrySignificanceSections {
         # guidance comment follows, it opens directly under the heading -- the hand-designed template says
         # so, and a blank line above a comment block reads as a gap somebody left rather than as a form.
         # Where there is no comment, the blank stays: it is the space the reason is written into.
-        $answered = [bool]($row.PSObject.Properties['Why'] -and $row.Why)
+        $preamble = if ($tier -eq 0) { [string]$Tier0Preamble } else { '' }
+        $answered = [bool](($row.PSObject.Properties['Why'] -and $row.Why) -or $preamble)
         if ($answered) {
             $lines.Add('')
-            foreach ($line in ([string]$row.Why -split '\r?\n')) { $lines.Add($line) }
-            $lines.Add('')
+            foreach ($line in @($preamble, [string]$row.Why | Where-Object { $_ })) {
+                foreach ($ln in ($line -split '\r?\n')) { $lines.Add($ln) }
+                $lines.Add('')
+            }
         } elseif (-not $WithGuidance) {
             $lines.Add('')
         }
@@ -1044,7 +1144,7 @@ function Format-EntrySignificanceSections {
             # Tier 0 cannot be N/A -- see $script:EntryGuidanceDefaults.TierOptional -- so it gets the
             # block without that paragraph, and every tier above it gets the one that offers the way out.
             $g = Get-EntryGuidance
-            $block = if ($tier -eq 0) { @($g.Tier) } else { @($g.TierOptional) }
+            $block = if ($tier -eq 0) { @($g.Tier) } else { @(Format-EntryAudienceGuidance -Lines @($g.TierOptional) -Tier $tier) }
             foreach ($line in (Format-EntryGuidanceComment -Lines $block)) { $lines.Add($line) }
             if ($block.Count -gt 0) { $lines.Add('') }
         }
@@ -1080,7 +1180,7 @@ function Format-EntrySignificanceSections {
         # form text this file has been steadily taking out of the author's way. $routes is still computed
         # above and still honoured for a repo that overrides the wording; where it is left at the default the
         # heading carries it.
-        if ($routes.ContainsKey($tier) -and -not (Test-EntryTierHeadingAsksRoute)) {
+        if ($routes.ContainsKey($tier) -and -not (Test-EntryTierSectionsAreNamed)) {
             $lines.Add('')
             foreach ($line in (Format-EntryGuidanceComment -Lines @($routes[$tier]))) { $lines.Add($line) }
         }
@@ -1330,7 +1430,43 @@ function Read-EntryTierSections {
     # 2026. Recognised in EVERY repo, configured or not -- an entry carrying it may have been written
     # anywhere -- and resolved to a number below, where the repo that has stated no audience tier reports
     # the heading as unreadable instead of silently dropping the reach it declares.
-    $higherRx = '^\s*' + $hashes + '\s+' + [regex]::Escape($script:EntryTierHigherHeading) + '\s*$'
+    #
+    # EVERY NAME IT HAS CARRIED, AND A LEVEL RANGE RATHER THAN THE SUB-LEVEL (August 19, 2026). Both wordings
+    # were written at '####' and that is where the current one stays, so the range buys nothing today -- it is
+    # here because this heading was briefly a '###' named section during the same day's work, and an entry
+    # written against that intermediate shape would otherwise read as tier 0 alone. Costs one character in a
+    # regex; the alternative is a silent misread of somebody's finished entry.
+    $higherNames = @(@(Get-EntryTierHigherHeading) + @(Get-EntryTierHigherRetiredHeadings) |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $levelRange = '#{' + $script:EntrySectionLevel + ',' + $script:EntryTierSubLevel + '}'
+    $higherRx = '^\s*' + $levelRange + '\s+(?:' +
+        ((@($higherNames) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|') + ')\s*$'
+    # --- TIER 0 HAS NO HEADING OF ITS OWN ANY MORE, so the ENTRY'S OPENING QUESTION is its heading -------
+    #
+    # Recognised under its current name and every retired one, for the reason every reader in this file is:
+    # 'What does the change on this branch bring to main?' was written until August 19, 2026 and 'What does
+    # this change do?' before that, and both are all over CHANGELOG.md and every consumer's tree.
+    #
+    # AND IT IS ONLY TIER 0 WHERE THE SECTION ACTUALLY CARRIES A SCORE LINE -- the guard below. Without it
+    # this pattern is a silent catastrophe rather than a feature: EVERY entry ever written carries this
+    # heading, including the ones declaring their reach in an impact table or in a 'Tier: N' line. A row
+    # produced from one of those would make Read-EntryTierSections return rows for an entry that has no
+    # sections, Resolve-EntryImpact would report Shape 'sections', and the table and line readers below it
+    # would never run -- so hundreds of entries would read as an unscored tier 0 and every release document
+    # built from them would empty out. The score LABEL is what separates the shapes, and it is the label
+    # rather than a value: a freshly scaffolded entry has '**Score:**' with nothing after it and is still
+    # unmistakably this shape.
+    $zeroNames = @(@((Get-EntrySectionHeadings)['What']) + @(Get-EntrySectionRetiredNames -Key 'What') |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $zeroRx = '^\s*#{' + $script:EntrySectionLevel + '}\s+(?:' +
+        ((@($zeroNames) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|') + ')\s*$'
+    # A NUMBERED SUB-HEADING ANYWHERE IN THE ENTRY MEANS THE OLD SHAPE, and then the question above is just a
+    # question again. This is the discriminator, and it is exact rather than a heuristic: an entry writes its
+    # tiers either as numbered sub-headings or as the two named sections, never as a mix. An entry carrying
+    # both -- a migration, or one documenting this very change outside a fence -- is read as the numbered
+    # shape it IS rather than as the one it describes, which is the same precedence Resolve-EntryImpact
+    # already gives the sections over the table.
+    $hasNumbered = [bool](@($Lines | Where-Object { $_ -match $headRx }).Count)
     $scoreRx = Get-EntryScorePattern
     $range   = Get-EntrySignificanceRange
 
@@ -1341,8 +1477,14 @@ function Read-EntryTierSections {
     $i = 0
     while ($i -lt $Lines.Count) {
         $isHigher = $false
+        $isZero   = $false
         if ($Lines[$i] -match $headRx) {
             $tierCell = $Matches[1]
+        } elseif ((-not $hasNumbered) -and $Lines[$i] -match $zeroRx) {
+            # The entry's opening question IS tier 0's section in the named shape. Confirmed by the score
+            # line below before a row is produced -- see $zeroRx for what that guard prevents.
+            $isZero = $true
+            $tierCell = '0'
         } elseif ($Lines[$i] -match $higherRx) {
             $isHigher = $true
             # Resolved from the repo's own audience tier, not from the document. Where none is stated the
@@ -1373,6 +1515,12 @@ function Read-EntryTierSections {
             else { $belowScoreLines.Add($line) }
             $i++
         }
+
+        # THE GUARD $zeroRx EXISTS FOR. No score label under the opening question means this entry declares
+        # its reach some other way -- an impact table, a 'Tier: N' line, or not at all -- so it is not a
+        # tier-0 section, and saying so here is what lets Resolve-EntryImpact fall through to the reader that
+        # can read it. Silently, and correctly: nothing was declared here to report on.
+        if ($isZero -and $null -eq $scoreCell) { continue }
 
         if ($tierCell -notmatch '^\d+$') {
             if ($isHigher) {
@@ -2200,10 +2348,35 @@ $script:EntrySectionDefaults = [ordered]@{
     Description  = 'Branch title'
     Id           = 'Branch ID'
     Type         = 'Branch type'
-    What         = 'What does the change on this branch bring to main?'
+    What         = 'What does the change on this branch deploy to main?'
     Significance = 'Significance'
     PullRequest  = 'Pull Request'
 }
+
+# --- THE TIERS STOP NAMING THEMSELVES (Dave, August 19, 2026) -------------------------------------
+#
+# The entry used to carry the tiers as '#### Tier 0' and '#### Higher than tier 0?' underneath the question.
+# Two things changed and the LEVELS DID NOT: tier 0 lost its heading altogether -- the question above IS its
+# section now -- and the audience tier's sub-heading reads 'What makes this change extra special'. So an entry
+# is still two '###' sections, and no heading names a tier number.
+#
+# WHY THE NUMBER LEAVES THE DOCUMENT. A tier is a fact about the READER, and the author filling this in is
+# not thinking about a tier -- they are answering whether anybody outside this repo would notice. The number
+# is what the parser needs, and it resolves to one: tier 0 is the question every change answers, and the
+# sub-heading under it means whichever single audience tier the repo has stated. That is the same resolution
+# 'Higher than tier 0?' already did since August 16, 2026; what changes is that the heading stops naming the
+# mechanism and starts naming the thing being asked.
+#
+# 'Significance' STAYS RETIRED, and this is worth saying because the shape invites the opposite reading. The
+# audience tier's heading is a '####' SUB-heading inside the question's section, not a named section of the
+# entry -- so it is Get-EntryTierHigherHeading's business, one screen down, and this map keeps answering only
+# for the sections an entry actually has. It was briefly modelled as a revived 'Significance' section, at
+# '###', which is the shape Dave looked at and asked to nest instead.
+#
+# WRITTEN ONLY WHERE THE REPO HAS STATED AN AUDIENCE TIER -- Test-EntryTierSectionsAreNamed, the same guard
+# and the same conservative direction the audience heading already carried: a consumer who has answered
+# nothing gets the numbered sub-sections exactly as it did yesterday, because a heading with no tier to
+# resolve to would read as tier 0 and empty their release.
 
 # RECOGNISED, NEVER WRITTEN -- the section headings this format has retired. Measured the moment
 # 'Who is this for' became 'Significance': all 24 entries pending in CHANGELOG.md carry the old name, and
@@ -2220,9 +2393,12 @@ $script:EntrySectionDefaults = [ordered]@{
 # WHICH section an old name is the old name OF, or Get-EntrySectionBody -Key 'Type' finds nothing in the
 # hundreds of entries that say 'Type of change'. Both questions are answered from this one map, so a name
 # retired for one reader cannot be forgotten by the other.
+# NEWEST RETIRED NAME FIRST, so a reader scanning this map meets the name it is most likely to find. 'What
+# does the change on this branch bring to main?' was written from August 6 to August 19, 2026 -- which is
+# every entry pending in CHANGELOG.md and every branch in flight, here and in every consumer.
 $script:EntryRetiredSectionNames = [ordered]@{
     Description  = @('Branch description')
-    What         = @('What does this change do?')
+    What         = @('What does the change on this branch bring to main?', 'What does this change do?')
     Significance = @('Who is this for')
     Type         = @('Type of change')
 }
@@ -2261,12 +2437,41 @@ function Get-EntryRetiredSectionHeadings {
 # SO THE COUNT MOVED AND THE LOOKUP DID NOT. Get-EntrySectionHeadings still answers "which heading does
 # key X have", for every key that ever existed; this answers "which ones does the scaffolder emit", which
 # is what the writer walks and what the lint's entry-shape check holds a document's stated count to.
+#
+# STILL TWO AFTER AUGUST 19, 2026, and that is worth a line because that change moved both tier headings. It
+# moved them WITHIN the question's section -- tier 0's heading went away, the audience tier's was renamed --
+# so what a reader meets at '###' is unchanged: the question, and the PR.
 $script:EntryWrittenSectionKeys = @('What', 'PullRequest')
 
 # What the TEMPLATE shows where a real entry carries its creation stamp. Its own value rather than a reuse
 # of the 'Branch ID' guidance comment: that one is a hint ABOUT the field and this one stands IN the field,
 # so a template reader sees the shape of the line instead of a sentence where a timestamp goes.
 $script:EntryIdTemplatePlaceholder = '<timestamp of the moment this branch was created>'
+
+# What stands between the entry's title and its creation stamp: '## Branch `feat/x` changelog <sep> 20260819...'.
+# A MIDDLE DOT SINCE AUGUST 19, 2026 (Dave), where it was a hyphen. The hyphen read as a range or a
+# continuation -- this document's own prose uses ' -- ' as a dash all over -- while the two halves are simply
+# two facts about the same branch, which is the separator's whole job.
+#
+# NOT MACHINE-READ, WHICH IS WHY IT CAN CHANGE AT ALL. Nothing parses the stamp back out of the heading:
+# Get-BranchFileDeclaredBranch reads the backticked branch name and stops, and Test-IsChangelogEntryFile
+# keys on the level and the title word. So no entry already written becomes unreadable, which is not
+# something the section headings beside it could claim.
+#
+# WRITTEN AS A CODE POINT, NOT AS THE CHARACTER, and that is a measured defect rather than fastidiousness.
+# Typed literally it produced a two-character mis-decode in every generated template on the first run: Windows PowerShell 5.1 reads
+# a .ps1 with no BOM as the system ANSI code page, so the two UTF-8 bytes of U+00B7 come back as two CP1252
+# characters. The alternatives were a BOM on a file that two trees hold byte-identical, or this -- and this
+# keeps the whole lib ASCII, which is the property that makes the encoding question not arise at all.
+# It is also the exact damage scripts/maintenance/fix-mojibake.ps1 hunts, and Get-MojibakePaths already
+# covers both this repo's entry files and branch/templates/ -- so the wrong version would have been caught
+# downstream too, one gate later and after it had been copied into somebody's entry.
+$script:EntryIdSeparator = [string][char]0x00B7
+
+function Get-EntryIdSeparator {
+    <# The separator between the entry's title and its creation stamp -- U+00B7 MIDDLE DOT. #>
+    return $script:EntryIdSeparator
+}
 
 function Get-EntryIdTemplatePlaceholder {
     <# The stamp the template's heading carries in place of a real one. #>
@@ -2924,16 +3129,17 @@ function Format-EntryBlock {
     # without the other would produce a file that is neither.
     # THE HEADING CARRIES THE CREATION STAMP SINCE AUGUST 16, 2026, which is where the 'Branch ID' section
     # went. The heading already had to name the branch, and a section below it holding one more fact about
-    # that same branch was a section's worth of ceremony for a timestamp. Separated by ' - ', and BARE:
-    # it was quoted for the first half of that day, and the quotes said nothing a reader needed -- a
-    # timestamp has no spaces to delimit and is not being cited.
+    # that same branch was a section's worth of ceremony for a timestamp. Separated by Get-EntryIdSeparator
+    # -- a middle dot since August 19, 2026, a hyphen before that -- and BARE: it was quoted for the first
+    # half of that first day, and the quotes said nothing a reader needed -- a timestamp has no spaces to
+    # delimit and is not being cited.
     #
     # THE '(template)' MARKER IS GONE WITH IT, and that is a consequence rather than a second decision:
     # the suffix slot now holds the stamp, and the template's stamp is the visible placeholder
     # '<timestamp of the moment this branch was created>' -- which marks the file at least as loudly as
     # the word did, beside a branch token that is equally obviously not a branch.
     if ($Template -and -not $Id) { $Id = Get-EntryIdTemplatePlaceholder }
-    if ($Id) { $TitleSuffix = "- $Id" }
+    if ($Id) { $TitleSuffix = "$($script:EntryIdSeparator) $Id" }
     # Each line appended on its own statement, NOT as @(<expr>, '') -- the comma operator binds looser than
     # '+', so `@(('#'*2) + ' ' + $Title, '')` concatenates the string with the ARRAY ($Title, '') and joins
     # it with a space. That produced '## A real title ' with a trailing space and no blank line after it,
@@ -2953,13 +3159,29 @@ function Format-EntryBlock {
     # $Body still writes, and it is not a leftover: a MIGRATION rendering an entry from the older shape has
     # a paragraph in hand and nowhere else to put it. The scaffolder passes none, so a fresh entry opens on
     # its first tier heading exactly as the hand-designed template does.
-    $lines.Add((Get-EntrySectionHeading -Key 'What'))
-    $lines.Add('')
-    if ($Body) {
-        foreach ($line in @($Body -split '\r?\n')) { $lines.Add($line) }
+    # AND SINCE AUGUST 19, 2026 THE QUESTION IS TIER 0'S OWN HEADING, so the significance formatter writes it
+    # rather than this function -- Get-EntryTierSectionMarker -Tier 0 returns exactly this heading. Emitting
+    # it here as well would put it in the document twice, with the second copy reading as a duplicate tier-0
+    # declaration to the parser. Where the repo has stated no audience tier the old assembly stands: the
+    # question is a heading of its own and the numbered sub-sections sit underneath it.
+    # A MIGRATION'S PARAGRAPH IS HANDED TO THE FORMATTER IN THE NAMED SHAPE rather than written here, so one
+    # function owns the spacing inside a section instead of two guessing at each other's. It becomes the
+    # opening of tier 0's own text, which is what that paragraph always was: the answer to this question,
+    # written before the tiers broke it out per reader.
+    $named = Test-EntryTierSectionsAreNamed
+    $preamble = ''
+    if ($named) {
+        $preamble = $Body
+    } else {
+        $lines.Add((Get-EntrySectionHeading -Key 'What'))
         $lines.Add('')
+        if ($Body) {
+            foreach ($line in @($Body -split '\r?\n')) { $lines.Add($line) }
+            $lines.Add('')
+        }
     }
-    foreach ($line in (Format-EntrySignificanceSections -Rows $ImpactRows -WithGuidance:$Template)) { $lines.Add($line) }
+    foreach ($line in (Format-EntrySignificanceSections -Rows $ImpactRows -WithGuidance:$Template `
+        -Tier0Preamble $preamble)) { $lines.Add($line) }
     $lines.Add('')
 
     # THE PR TITLE LIVES HERE SINCE AUGUST 16, 2026, WHICH IS WHERE IT ALWAYS BELONGED (Dave). The section

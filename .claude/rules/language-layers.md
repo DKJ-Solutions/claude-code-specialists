@@ -54,6 +54,20 @@ discovery — as an earlier pass did for `.github/workflows/ci.yml` — not a qu
   `CHANGELOG.md` itself is now fully English (its intro paragraphs and every `## Releases` reference
   line were translated on July 22, 2026 — Dave's decision). The archived `releases/development/*.md`
   notes stay in their original language, so older ones remain Dutch.
+- **The script layer is ASCII, and a character the script must EMIT is written as a code point.** Measured
+  August 19, 2026, on the branch that gave the changelog entry's heading a middle dot: typed literally into
+  `scripts/lib/entry-scaffold-lib.ps1`, that one character came out of every generated template as `Â·`.
+  Windows PowerShell 5.1 reads a `.ps1` with no BOM as the **system ANSI code page**, so the two UTF-8 bytes
+  of U+00B7 are decoded as two CP1252 characters — and nothing errors, because a mis-decoded string is still
+  a string. The repair is `[char]0x00B7`, not a BOM: the two shared libs are held byte-identical to their
+  plugin mirrors, so an encoding change would have to land in both, and the escape keeps the file free of the
+  question entirely. **The mojibake gate does not cover this** — `Get-MojibakePaths` walks `*.md`, so the
+  damage is only caught one layer downstream, in the generated document, after it has been copied into
+  somebody's entry.
+  Two known non-ASCII spots predate the rule and are **not** cleared by it: the en/em dashes inside the
+  regexes at `scripts/lib/pr-issues-lib.ps1:146-147`. They have the same latent fragility, nothing has
+  reported them, and the fix is the same escape — left alone under the no-pre-emptive-fixes rule rather than
+  swept along with an unrelated change.
 - **Technical identifiers/flags** keep their original form — the scaffold marker `VUL-IN` (used across
   the plugin's scaffold scripts, e.g. `bootstrap.ps1`, `new-branch.ps1`) is one example; Dave's
   explicit decision. The job id **`lint-en-tests`** in [`ci.yml`](../../.github/workflows/ci.yml) is a

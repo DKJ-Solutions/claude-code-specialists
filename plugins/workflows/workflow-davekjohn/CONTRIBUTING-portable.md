@@ -62,9 +62,10 @@ source repo's.
 one go. The entry is one heading with two `###` sections under it:
 
 ```text
-## Branch `<your branch>` changelog - '<stamp>'
+## Branch `<your branch>` changelog · <stamp>
 
-### What does the change on this branch bring to main?
+### What does the change on this branch deploy to main?
+#### What makes this change extra special
 ### Pull Request
 ```
 
@@ -72,9 +73,13 @@ one go. The entry is one heading with two `###` sections under it:
 prefix — and the stamp beside it is the moment the branch was created. A section restating either would be
 one fact in two places.
 
-`What does the change on this branch bring to main?` holds one `#### Tier N` sub-section per reach the
-change claims, each with its reason and its `**Score:**`; that is the description, written once per
-audience rather than once as prose and again per tier.
+**The opening section holds both tiers, and neither names a number.** Tier 0's reason goes directly under the
+question; the audience tier gets `#### What makes this change extra special` inside that same section, and it
+means the one tier your repo has stated in `Get-ReleaseAudienceTier`. Each carries its reason and its
+`**Score:**`; that is the description, written once per audience rather than once as prose and again per tier.
+**A repo that has stated no audience tier gets the older shape instead** — a `#### Tier N` sub-section for
+every tier the model has, tier 0 included — because a heading with no tier to resolve to would read as tier 0
+and empty your release documents.
 
 `Pull Request` opens with **the PR title** — the sentence you gave `-Title`, which `open-pr` puts the
 branch type in front of. The number and the landing date go underneath it, written by the fold from the
@@ -187,8 +192,9 @@ that line.
 
 ## Significance — two questions in one section
 
-Every entry carries a `### Significance` section with a `#### Tier N` sub-section for each reach. **The
-tier says how far the change reaches**, and therefore which release document the entry appears in:
+Every entry answers one reach per block — the opening question for tier 0, `#### What makes this change extra
+special` for your audience tier. **The tier says how far the change reaches**, and therefore which
+release document the entry appears in:
 
 | tier | who notices |
 |---|---|

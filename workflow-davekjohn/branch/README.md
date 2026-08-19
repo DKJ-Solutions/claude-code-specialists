@@ -31,8 +31,10 @@ only this location.
 
 - **The directory's contents here:** [`branch-changelog.md`](branch-changelog.md) ·
   [`branch-progress.md`](branch-progress.md) · the generated references in [`templates/`](templates/).
-- **The audience tier is `2`** (`Get-ReleaseAudienceTier`), so the entry scaffolds `#### Tier 0` and
-  `#### Tier 2` — the worked example in the portable half is this repo's own shape.
+- **The audience tier is `2`** (`Get-ReleaseAudienceTier`), so the entry scaffolds the two questions rather
+  than numbered sub-headings: `### What does the change on this branch deploy to main?` carries tier 0, and
+  `#### What makes this change extra special` inside it carries tier 2 — the worked example in the portable
+  half is this repo's own shape.
 - **The lint gate enforces the convention here**, which a consumer's repo typically cannot: the
   templates are held byte-for-byte to the formatters `new-branch` calls (`Get-BranchTemplates`), the
   entry-shape claims in the portable half are checked against the scaffolder, and the

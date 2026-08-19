@@ -23,10 +23,13 @@ rewrite when copying. Managing branches, PRs, and merges up to and including the
 
 `CHANGELOG.md` (repo root) is an **intro followed by one `##` per change, with no section headings at all**
 (Dave, August 5, 2026). A change *is* the `##`, and since August 6, 2026 its heading names the **branch** —
-`` ## Branch `feat/x` changelog - '<stamp>' `` — with two `###` sections under it since August 16, 2026:
-what the change brings to `main` (one `#### Tier N` sub-section per reach it claims, replacing the impact
-table because not every change has a tier 1 or a tier 2 and a missing row read as an omission) and
-`Pull Request`, which carries the PR title and which the fold completes from the merge. Everything above
+`` ## Branch `feat/x` changelog · <stamp> `` — with two `###` sections under it since August 16, 2026:
+`What does the change on this branch deploy to main?` and `Pull Request`, which carries the PR title and
+which the fold completes from the merge. **The first section holds both tiers, and since August 19, 2026
+neither names itself**: the question is tier 0's own section, and `#### What makes this change extra special`
+under it means whichever single audience tier the repo has stated. They replaced the impact table because not
+every change has a tier 1 or a tier 2 and a missing row read as an omission, and they stopped naming numbers
+because the author filling one in is answering the question, not classifying a reader. Everything above
 the first `##` is the intro, which is the only part a repo writes by hand and the only thing a cut leaves
 standing.
 
@@ -537,9 +540,9 @@ document already said: `Branch ID` is the timestamp the heading now carries, `Br
 of the branch that same heading names, `Significance` was a heading over sub-sections that are themselves
 the answer to the question above it, and `Branch title` was never a branch title — it is the PR title, and
 it moved into the `Pull Request` section where the rest of the PR's facts already live. What remains is
-`What does the change on this branch bring to main?` (one `#### Tier N` sub-section per reach the change
-claims, each closing with `**Score:**`, the second headed `#### Higher than tier 0?` where the repo has
-stated an audience tier) and `Pull Request` — the title, then the `Plugins:` line and the
+`What does the change on this branch deploy to main?` (tier 0's own section, with
+`#### What makes this change extra special` under it for the audience tier, each closing with `**Score:**`)
+and `Pull Request` — the title, then the `Plugins:` line and the
 `[PR #N](…) · merged <date>` footer the **fold** writes underneath it. `Plugins:` stays a plain line,
 because a heading around one fact is more structure than content.
 
@@ -748,17 +751,18 @@ branch prefix, which this repo has measured does not predict impact.
 **reaches**, and therefore which document it appears in. A significance score says how much it
 **weighs** for that document's reader, and therefore **where in it** the entry sits — so the most
 consequential change leads instead of sitting third under whichever heading its branch prefix produced.
-Both are declared under **`### Significance`**, one `#### Tier N` sub-section per reach the model has,
-each carrying why it matters there and then its score:
+Both are declared in the entry's **opening section** — tier 0 directly under the question, and the audience
+tier under `#### What makes this change extra special` inside it — each carrying why it matters there and then
+its score:
 
 ```text
-#### Tier 0
+### What does the change on this branch deploy to main?
 
 The routine version bump stops needing a developer.
 
 **Score:** 4
 
-#### Tier 1
+#### What makes this change extra special
 
 Nobody but this repo's own developers can observe it.
 

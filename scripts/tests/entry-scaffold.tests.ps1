@@ -1420,21 +1420,47 @@ Assert-Equal 2 (Get-EntryTierMax) 'the model still HAS three tiers while a tier-
 # than on a fixed pair -- form text sending an author to a heading that is not in the file.
 function Get-ReleaseAudienceTier { 2 }
 $audienceScaffold = (Format-EntrySignificanceSections -WithGuidance) -join "`n"
-Assert-True ($audienceScaffold -match '(?m)^#### Tier 0$') 'the scaffold writes tier 0'
-# AND THE AUDIENCE TIER IS HEADED WITH THE QUESTION SINCE AUGUST 16, 2026, not with its number. That is
-# what took the routing comment out of the file: the heading asks it, in the one place a reader cannot
-# skip. The number is not written at all -- which is the point, because a template naming 'Tier 2' is only
-# right for a repo whose audience is 2, and this one ships to consumers who may answer 1.
-Assert-True ($audienceScaffold -match ('(?m)^#### ' + [regex]::Escape((Get-EntryTierHigherHeading)) + '$')) 'and the audience tier, headed with the question'
-Assert-True ($audienceScaffold -notmatch '(?m)^#### Tier 1$') 'and NOT the tier this repo does not publish to'
-Assert-True ($audienceScaffold -notmatch '(?m)^#### Tier 2$') 'and not by its number either -- the heading is repo-neutral'
-Assert-Equal 0 ([regex]::Matches($audienceScaffold, 'continue to Tier').Count) 'no routing comment survives: the heading is the question'
+# NEITHER TIER NAMES ITSELF SINCE AUGUST 19, 2026. Tier 0 lost its heading entirely -- the question the entry
+# opens with IS its section -- and the audience tier's '####' sub-heading was retexted to say what is being
+# asked. Levels unchanged, which is the half Dave settled on after looking at the relevelled version: a form
+# naming 'Tier 2' is only right for a repo whose audience is 2, and this one ships to consumers who answer 1.
+Assert-True ($audienceScaffold -match ('(?m)^' + [regex]::Escape((Get-EntrySectionHeading -Key 'What')) + '$')) 'the scaffold writes tier 0 as the entry opening question'
+Assert-True ($audienceScaffold -match ('(?m)^#### ' + [regex]::Escape((Get-EntryTierHigherHeading)) + '$')) 'and the audience tier as a sub-heading inside it'
+Assert-True ($audienceScaffold -notmatch '(?m)^#{3,4} Tier \d+$') 'and no heading names a tier by its number at all'
+foreach ($gone in @(Get-EntryTierHigherRetiredHeadings)) {
+    Assert-True ($audienceScaffold -notmatch [regex]::Escape($gone)) "nor the retired wording '$gone' it replaced"
+}
+Assert-Equal 0 ([regex]::Matches($audienceScaffold, 'continue to Tier').Count) 'no routing comment survives: the headings are the questions'
+# THE GUIDANCE NAMES THIS REPO'S OWN READER, resolved rather than stored. A stored sentence would be wrong in
+# every tier-1 repo -- which is the repo the knob exists for -- so the tier and its description are spliced in
+# per repo. Asserted against the seam, not a literal, so the two cannot drift.
+Assert-True ($audienceScaffold -match [regex]::Escape("For tier 2 audiences: $(Get-EntryAudienceDescription -Tier 2)")) 'the audience guidance names this repo tier and who that tier is'
+Assert-True ($audienceScaffold -notmatch '\{0\}') 'and the placeholder is resolved, not shipped'
 # IT STILL RESOLVES TO A NUMBER, which is the half that would fail silently. A heading the parser cannot
 # place reads as "no tier above 0" -- a claim about the change, made by a heading nobody read.
-$higherRead = Resolve-EntryImpact -EntryText ("## Branch ``feat/a`` changelog - '1'`n`n### What does the change on this branch bring to main?`n`n#### Tier 0`n`nwhy`n`n**Score:** 1`n`n#### " + (Get-EntryTierHigherHeading) + "`n`nreaches them`n`n**Score:** 4`n")
-Assert-Equal 0 @($higherRead.Errors).Count 'the question heading parses without complaint in a repo that has an audience tier'
-Assert-Equal 2 (@($higherRead.Rows | Where-Object { [int]$_.Tier -eq 2 }).Count + 1) 'and resolves to this repo audience tier, so its score is not lost'
+$higherRead = Resolve-EntryImpact -EntryText ("## Branch ``feat/a`` changelog $(Get-EntryIdSeparator) 1`n`n" + (Get-EntrySectionHeading -Key 'What') + "`n`nwhy`n`n**Score:** 1`n`n#### " + (Get-EntryTierHigherHeading) + "`n`nreaches them`n`n**Score:** 4`n")
+Assert-Equal 0 @($higherRead.Errors).Count 'the current shape parses without complaint in a repo that has an audience tier'
+Assert-Equal 2 (@($higherRead.Rows | Where-Object { [int]$_.Tier -eq 2 }).Count + 1) 'and resolve to this repo audience tier, so its score is not lost'
 Assert-Equal 4 ([int](@($higherRead.Rows | Where-Object { [int]$_.Tier -eq 2 })[0].Score)) 'with the score the author actually wrote'
+Assert-Equal 1 ([int](@($higherRead.Rows | Where-Object { [int]$_.Tier -eq 0 })[0].Score)) 'and the opening question reads back as tier 0, not as prose'
+# THE RETIRED SHAPE IS STILL READ, which is the whole safety of the move: every entry in CHANGELOG.md and on
+# every branch in flight carries the sub-headings right now, and they meet this parser through a plugin update.
+# THE RETIRED HEADING COMES OUT OF A SUBEXPRESSION, not out of '+' followed by an index. `"#### " + $a[0]`
+# concatenates the string with the ARRAY first and then indexes the RESULT, so the fixture silently became
+# '#### H' and the entry read as tier 0 -- a green-looking test of nothing. Measured on this assert's first run.
+$retiredHigher = @(Get-EntryTierHigherRetiredHeadings)[0]
+$retiredRead = Resolve-EntryImpact -EntryText ("## Branch ``feat/a`` changelog - '1'`n`n### What does the change on this branch bring to main?`n`n#### Tier 0`n`nwhy`n`n**Score:** 1`n`n#### ${retiredHigher}`n`nreaches them`n`n**Score:** 4`n")
+Assert-Equal 0 @($retiredRead.Errors).Count 'the retired sub-heading shape still parses without complaint'
+Assert-Equal 2 $retiredRead.Tier 'and still resolves the retired question-heading to this repo audience tier'
+# AND THE GUARD THAT MAKES THE OPENING QUESTION SAFE TO MATCH AT ALL. Every entry ever written carries that
+# heading, including the ones declaring their reach in a table or in a 'Tier: N' line -- so without the score
+# label as the discriminator, all of them would read as an unscored tier 0 and every release built from them
+# would empty out. This is the assert that would catch that.
+$tableUnderQuestion = Resolve-EntryImpact -EntryText ("### What does the change on this branch bring to main?`n`nA paragraph.`n`n### Significance`n`n| Tier | Significance | Why |`n|---|---|---|`n| 2 | 4 | consumers notice |`n")
+Assert-Equal 'table' $tableUnderQuestion.Shape 'a table-shaped entry is NOT read as an unscored tier 0 by its opening question'
+Assert-Equal 2 $tableUnderQuestion.Tier 'and keeps the reach its table declares'
+$lineUnderQuestion = Resolve-EntryImpact -EntryText ("### What does this change do?`n`nA paragraph.`n`nTier: 2`n")
+Assert-Equal 'line' $lineUnderQuestion.Shape 'and neither is a line-shaped one'
 
 # THE TOLERANCE, WHICH IS THE LOAD-BEARING HALF OF THE WHOLE CHANGE. Six entries were pending in this repo
 # when the knob landed, each carrying all three tiers under the cumulative model. A gate that started

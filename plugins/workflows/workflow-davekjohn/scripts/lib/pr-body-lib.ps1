@@ -105,7 +105,8 @@ function Get-PrDescription {
 
     if (-not $EntryText) { return '' }
 
-    $whatNames = @('What does the change on this branch bring to main?', 'What does this change do?')
+    $whatNames = @('What does the change on this branch deploy to main?',
+                   'What does the change on this branch bring to main?', 'What does this change do?')
     $endNames  = @('Pull Request')
     if (Get-Command -Name Get-EntrySectionHeadings -ErrorAction SilentlyContinue) {
         $headings = Get-EntrySectionHeadings
@@ -154,8 +155,8 @@ function Get-PrDescription {
     #   in the entry / CHANGELOG.md          in a PR body
     #   ## `fix/x` changelog                 (the PR title, not part of the body)
     #   ### What does the change...          # What does the change...
-    #   ### Significance                     ## Significance
-    #   #### Tier 0                          ### Tier 0
+    #   ### What makes this change...        ## What makes this change...
+    #   #### a sub-heading in a body         ### a sub-heading in a body
     #
     # CHANGELOG.md and the release documents are untouched: this shifts the COPY that goes into the PR,
     # at the one point where that copy is made. The record keeps the levels the fold and the renderers
@@ -469,9 +470,15 @@ function Get-PrTemplateReference {
         difference is what the file is: a contributing guide is read once, while every heading in a PR
         template is repeated in every PR body forever. An empty slot would be a permanent empty section
         in your PR list. Add one when you have something to put in it.
+
+        THE HEADING TRACKS THE ENTRY'S OPENING SECTION, and that is a requirement rather than a matter of
+        taste: Get-PrEntryDescription STRIPS that heading out of the entry text precisely because the
+        template already carries it, so the two drifting apart would put it in every PR body twice. It
+        followed the entry from 'bring' to 'deploy to main?' on August 19, 2026; the old wording is on
+        open-pr's legacy list, which is what keeps a PR opened under it refreshable.
     #>
     return @(
-        '# What does the change on this branch bring to main?',
+        '# What does the change on this branch deploy to main?',
         (Get-PrTemplateCanonicalPlaceholder)
     )
 }
