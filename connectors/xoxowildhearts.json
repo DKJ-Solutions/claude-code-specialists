@@ -1,0 +1,28 @@
+{
+  "repo": "BWJ-ecommerce/xoxowildhearts",
+  "visibility": "private",
+  "localCheckout": "../../davekokbwj/xoxowildhearts",
+  "plugins": [
+    {
+      "id": "team-alpha@claude-code-specialists",
+      "extensions": [
+        "01-01", "02-09", "03-02", "03-07", "04-11", "04-12", "04-13", "04-18",
+        "05-05", "05-06", "05-15", "06-16", "06-17", "06-19", "06-23", "06-24",
+        "06-25", "06-29", "06-30"
+      ]
+    },
+    {
+      "id": "team-shopify@claude-code-specialists",
+      "extensions": [
+        "04-20", "05-21", "05-22"
+      ]
+    },
+    {
+      "id": "team-ecomm@claude-code-specialists",
+      "extensions": [
+        "06-26", "06-27", "06-28"
+      ]
+    }
+  ],
+  "notes": "REGISTERED on 2026-08-20, on inbound #764, and deliberately not before: the consumer's own adoption PR (BWJ-ecommerce/xoxowildhearts#1) merged 2026-08-19 21:33Z, and this register records what a consumer HAS -- claiming a lens early makes check-connectors report 'registered extension(s) missing' and turns the register into a false alarm. Every field was measured against the consumer's own tree rather than taken from the report: 25 lens files under .claude/specialists/lenses/, matching these rosters exactly (19 + 3 + 3), the plugins enabled in .claude/settings.json against the github marketplace source, visibility private, and the local checkout present. 20 of the 25 lenses are still VUL-IN scaffolds -- present as FILES, which is what the roster check measures, and the intended state for a specialist with no work there yet. THE WORKFLOW SLOT IS DELIBERATELY NOT REGISTERED YET, and that is the one field this manifest could not answer without going stale within the day. Their merged main enables workflow-davekjohn; their in-flight branch feat-harness-hardening (ad315a1, 2026-08-20 00:16) switches it to workflow-default, which is the deliberate 'we have not chosen a workflow' slot and imposes nothing. Registering either answer records a state that is about to change, and this check reads the LOCAL checkout -- which sits on that branch -- so whichever one is written here is an [ERROR] half the time. Write the block once that branch has merged, exactly as the lens rule above was applied to the manifest as a whole. That switch also answers half of inbound #763: the standing [ERROR] about a missing workflow-davekjohn/ folder comes from a hook that ships ONLY with workflow-davekjohn, so the way to record 'this repo does not want the folder' already existed, and they used it. THE SECOND SHOPIFY CONSUMER, which is the reason this manifest was asked for rather than merely being owed: the register is where the two diverging can be seen. Three differences, all verified here. It has no CHANGELOG.md at all -- its history is a flat update_log.txt with date headers and no '##' sections. It has not adopted workflow-davekjohn/ (see the slot above). And its lint gate is pinned at --fail-level crash rather than error, which is arithmetic rather than laxity: theme-check reports 1504 pre-existing offences across 171 files (1078 errors, 426 warnings), so a gate at 'error' would be red on arrival and block every PR, while 'crash' still catches theme-check being unable to parse the theme at all."
+}
