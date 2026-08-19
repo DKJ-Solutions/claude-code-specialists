@@ -57,6 +57,22 @@ of the locked subject:
   needs re-establishing rather than inheriting it.
 - **Does anything it names still exist?** A lock written from the outside can name a function, flag or
   file that was inferred rather than read. Grep each one before building on it.
+- **Is the cause it states actually the cause?** A lock is a *summary*, and where it summarises a filed
+  report the report is the source. Open the code the lock points at and read the mechanism before editing
+  it -- and treat a lock's own claim to have checked already (*"confirmed at the code level"*,
+  *"verified, not taken from the report"*) as a claim to test rather than a step it has done for you.
+
+  **Measured, August 19, 2026.** A lock written six minutes earlier named its subject correctly -- an open,
+  still-standing inbound issue -- and stated the cause as a parameter filtering entries out. That parameter
+  only **sorts**; it drops nothing, and the real hardcode sat in a different file from the one the lock
+  routed to. **The report it summarised had named the right line.** So the lock passed all four checks
+  above and was still wrong about the one thing that decides where the fix goes.
+
+  This mode is the hardest of the five to catch, for two reasons worth stating: the lock was **fresh**, so
+  every staleness instinct said to trust it, and its self-certification was the exact sentence that would
+  otherwise have prompted a re-read. Had the pickup not opened the function first, the repair would have
+  landed in the wrong file, left the defect standing, and shipped a code comment citing a mechanism that
+  does not exist -- a defect that reads as authoritative.
 
 **3. Say the disagreement out loud.** Where the lock and the repo differ, the **repo wins** -- and the
 difference is itself worth reporting, not quietly worked around. Naming it is how the requester learns
