@@ -1,13 +1,27 @@
-# `main` progress
-
-
-> **You are on `main`.** Do not work in this file yet -- create a branch first.
-> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
-> of the next person who does create one.
-
-This file carries the step list of the branch you are on. It is written when a branch is created
-and returns to this state after the merge.
+## `docs/v4-14-0-timing-total` progress
 
 ### Steps
 
-_(filled in when a branch is created)_
+#### PLAN
+
+- [x] Read every leg from a timestamp rather than a stopwatch: the release commit, the note commits, the PR's
+      `createdAt`/`mergedAt`, the fold commit, and the Release's `publishedAt`.
+
+#### CREATE
+
+- [x] Replace the head-only timing paragraph with the total and the seven legs.
+- [x] State the head-as-share figure against the three previous releases that recorded one, with each source
+      named, and say plainly that four readings are not a distribution.
+- [x] Name where the extra six minutes went -- all tail, two legs plus one refused command.
+- [x] Rewrite the first open bullet from a promise into a statement, keeping the reason the attachment is not
+      replaced.
+
+#### TEST
+
+- [x] Lint gate (`check-plugin-integrity.ps1`), then the full gates via the ship chain.
+
+### Where I left off
+
+Nothing outstanding. After this merges, the release is closed out: the only remaining item on the checklist is
+the cache-refresh line in the closing report, and publishing to the organisation, which is a separate decision
+nobody has asked for.
