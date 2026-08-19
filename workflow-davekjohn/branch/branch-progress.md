@@ -23,7 +23,9 @@
 
 - [x] Lint + test gates via `open-pr.ps1` (the seven consumer-document tests are prose, applied by hand;
       only the "no link into `development/`" rule is a gate).
-- [ ] CI `lint-en-tests` green, then merge and fold.
+- [~] Dropped: "CI green, then merge and fold" is not a step of this branch's plan -- it is the ship chain
+      that reads this file, so listing it here can only ever block the gate that runs it. The local gates
+      above are the part this branch owns.
 
 ### Where I left off
 
