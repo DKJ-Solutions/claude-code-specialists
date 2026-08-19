@@ -1359,7 +1359,15 @@ $ehSectionLevel = Get-EntrySectionLevel
 $ehSectionNames = @((Get-EntrySectionHeadings).Values) + @(Get-EntryRetiredSectionHeadings)
 # At or above the entry's own level: '#' .. '##' while an entry is an H2.
 $ehTooHighRx = '^#{1,' + $ehEntryLevel + '}\s'
-$ehSectionRx = '^#{' + $ehSectionLevel + '}\s+(.+?)\s*$'
+# AND THE SAME TAIL TOLERANCE THE LIB'S READERS GOT (August 19, 2026) -- this gate is one of them, and it
+# was the one left out. The 'Pull Request' heading carries the merge stamp now, so a folded entry reaches
+# CHANGELOG.md as '### Pull Request <middot> 20260819-171500'. Anchored on a bare '\s*$' the name has to be
+# the whole line, so that heading reads as a section nobody declares and the CHANGELOG.md half below raises
+# [entry-heading] on it -- on the one write that happens directly on main, past every PR gate, inside the
+# required CI check. Every PR after the first fold would have been blocked by the fold of the one before it.
+# THE STAMP IS STRIPPED BEFORE THE COMPARISON, not tolerated inside it: the capture is still only the name,
+# so 'Who is this For' differing by one letter is caught exactly as strictly as it was.
+$ehSectionRx = '^#{' + $ehSectionLevel + '}\s+(.+?)' + (Get-EntrySectionHeadingTail)
 
 function Test-IsDeclaredSectionHeading([string]$Line) {
     # $true when the line is a section heading whose text is one this repo declares. The comparison is

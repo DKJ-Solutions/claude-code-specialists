@@ -223,15 +223,21 @@ On `main` both files sit in an empty **reset state** — a short explanation, an
 branch line saying not to write here until a branch exists. That is what you are looking at if you open
 them on the trunk: the empty state, not a lost entry.
 
-The reset state opens with an `#` (an H1), and that is load-bearing rather than cosmetic. The fold
-recognises an entry by its heading level, and a written entry heading is an `##`. So the trunk's own empty
-file can never be folded as if it were a change, and folding twice is impossible rather than merely
-unlikely. **Both files follow that rule** — H1 while empty, H2 once a branch owns them — so the pair looks
-the same in both states.
+The reset state opens with an `#` (an H1), and for the **deployment** file that is load-bearing rather
+than cosmetic. The fold recognises an entry by its heading level, and a written entry heading is an `##`.
+So the trunk's own empty file can never be folded as if it were a change, and folding twice is impossible
+rather than merely unlikely — `branch-deployment.md` is an H1 while empty and an H2 once a branch owns it.
 
-One consequence, handled where it lands: `branch-cycle.md` now carries the same `##` a changelog entry
-does, so the lint's entry check excludes it **by path**. It is not an entry, and the path is what says so
-— its phase headings and its step marks are only how that shows.
+**`branch-cycle.md` is an H1 in both states**, with its phases as the `##` sections under it. It is a whole
+document rather than a block waiting to be pasted into one: it is opened on its own and never travels, so
+its title is the document's own heading. It loses nothing by not switching level, because nothing folds it
+— what tells its two states apart is the branch **name** in that heading, the trunk's while it is reset and
+yours once it is not, and the reader of that name accepts either level.
+
+One consequence worth knowing, because it used to be the other way round: the lint's entry check excludes
+the cycle file **by path** rather than by inspecting it. The `#` now says on its own that this is no
+changelog entry, but the path is what makes the exclusion true regardless of what anyone writes in the
+file — and that is the reason it was chosen when the file did carry an entry's `##`.
 
 ## Rules
 

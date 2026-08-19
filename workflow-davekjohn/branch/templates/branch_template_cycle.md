@@ -1,4 +1,4 @@
-## `<prefix>/<short-name>` cycle · <timestamp of the moment this branch was created>
+# `<prefix>/<short-name>` cycle · <timestamp of the moment this branch was created>
 
 <!--
      The plan for this branch. Every step must be resolved before the PR: open-pr and
@@ -21,18 +21,18 @@
      refused here: it belongs to the other document.
 -->
 
-### PLAN
+## PLAN
 
-### CREATE
+## CREATE
 
-### TEST
+## TEST
 
-### DEPLOY
+## DEPLOY
 <!--
     Don't do anything here. Just a link to branch-deployment
 -->
 
-### Where I left off
+## Where I left off
 <!--
      For picking this branch up again -- tomorrow, or on another machine after a park.
      What is done, what you were in the middle of, and anything you decided but have

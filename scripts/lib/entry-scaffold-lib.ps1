@@ -393,6 +393,16 @@ function Format-EntryFoldFooter {
         call when the stamp arrived, and the reason is that the alternative was the same fact twice in one
         section: the heading says when it landed, the line says which PR it was.
 
+        WHICH IS WHY $MergedStamp EXISTS, AND WHY IT IS NORMALLY EMPTY. That reasoning holds only while
+        there IS a heading to hold the date, and one shape has none: a PRE-DOSSIER entry, whose title was
+        its heading and which carries no named sections at all. Every branch in flight from before
+        August 6, 2026 is one -- here and in every consumer, who meet this change through a plugin update
+        rather than by choosing to -- and the fold explicitly still folds them. Set-EntryMergeStamp finds
+        nothing to stamp in such an entry and returns it unchanged, silently, so the date would simply be
+        gone: the same entry folded a day earlier always carried one, in the one document whose subject is
+        when things landed. So the caller asks whether the section is there (Test-EntryHasSection) and
+        passes the stamp only when it is not. One fact, one place, wherever that place happens to be.
+
         WHY THE PR'S TIMESTAMP AND NOT THE CLOCK (Dave, August 5, 2026), which is still the rule and now
         lives on the stamp: the date used to be scaffolded into the entry's HEADING when the branch was
         created, making it the branch's birth date rather than the landing date -- wrong by however many
@@ -408,9 +418,12 @@ function Format-EntryFoldFooter {
     #>
     param(
         [Parameter(Mandatory)][int]$Number,
-        [Parameter(Mandatory)][string]$Url
+        [Parameter(Mandatory)][string]$Url,
+        [AllowEmptyString()][string]$MergedStamp = ''
     )
-    return "[PR #$Number]($Url)"
+    $line = "[PR #$Number]($Url)"
+    if ($MergedStamp) { $line += ' ' + $script:EntryIdSeparator + ' merged ' + $MergedStamp }
+    return $line
 }
 
 function Format-EntryMergeStamp {
@@ -2634,6 +2647,31 @@ function Get-EntrySectionLevel {
     return $script:EntrySectionLevel
 }
 
+# THE CYCLE FILE SITS ONE LEVEL SHALLOWER, because it is a whole document rather than a fragment (Dave,
+# August 19, 2026, by hand in the template that is this format's spec). The entry is PASTED INTO
+# CHANGELOG.md and has to arrive at that document's entry level, which is what fixes it at an H2 with H3
+# sections. The cycle file travels nowhere: it is opened on its own, so its title is the document's H1 and
+# its phases are the H2 sections of it. Stated as its own pair rather than derived as 'entry minus one', so
+# a repo that re-levels its changelog does not silently re-level the file beside it.
+#
+# THE H1/H2 DISTINCTION THIS LOOKS LIKE IT BREAKS BELONGS TO THE OTHER FILE. Reset-H1-versus-written-H2 is
+# what stops Test-IsChangelogEntryFile from folding an empty trunk file as a change, and only the entry is
+# ever folded. The cycle file's idempotency test is Get-BranchFileDeclaredBranch, which compares the branch
+# NAME the heading carries and reads both levels -- so a reset and a written cycle file sharing one level
+# costs nothing, and the file now reads as one document in both states.
+$script:BranchCycleHeadingLevel = 1
+$script:BranchCycleSectionLevel = 2
+
+function Get-BranchCycleHeadingLevel {
+    <# The number of '#' the cycle file's own heading carries (1). #>
+    return $script:BranchCycleHeadingLevel
+}
+
+function Get-BranchCycleSectionLevel {
+    <# The number of '#' the cycle file's sections -- the phases and 'Where I left off' -- carry (2). #>
+    return $script:BranchCycleSectionLevel
+}
+
 # --- MOVED DOWN FROM release-lib.ps1: the entry-boundary readers ----------------------------------
 #
 # Get-EntryHeadingPattern and Split-EntryBlocks used to live in release-lib.ps1. They moved here on
@@ -3601,7 +3639,8 @@ $script:BranchFileDefaults = [ordered]@{
     ChangelogHeadingLead = ''
     BranchLabel    = 'Branch'
     # NO StepsHeading ANY MORE (Dave, August 19, 2026). The steps used to sit under their own '### Steps'
-    # heading with the phases as H4s beneath it. The phases ARE the sections now, at H3, and the guidance
+    # heading with the phases as H4s beneath it. The phases ARE the sections now, at the cycle file's own
+    # section level, and the guidance
     # that explained the list stands directly under the file's own heading. The wrapper bought nothing:
     # this file IS the step list, so a heading announcing one wrapped the whole document. The key is gone
     # rather than left pointing at nothing, so a consumer who overrode it gets a script-contract failure
@@ -3609,7 +3648,7 @@ $script:BranchFileDefaults = [ordered]@{
     NotesHeading   = 'Where I left off'
     FirstStep      = 'TODO: the first step of this branch'
     # THE PHASES OF THE STEP LIST (Dave, August 14, 2026; issue #655). A branch moves through a
-    # recognisable arc instead of an ad-hoc list. They are the file's own H3 sections since August 19,
+    # recognisable arc instead of an ad-hoc list. They are the file's own H2 sections since August 19,
     # 2026, where they were H4s under a '### Steps' wrapper -- which changes nothing mechanically:
     # Get-BranchProgressFindings reads lines beginning with a step mark, so a heading of any level is
     # invisible to the gate and the arc is drawn on top of an untouched mechanism.
@@ -3928,10 +3967,15 @@ function Format-BranchFileHeader {
     $trunk = Get-BranchTrunkName
     $shown = if ($Branch) { $Branch } else { $trunk }
     $lines = New-Object System.Collections.Generic.List[string]
-    # THE RESET STATE IS AN H1 AND A WRITTEN FILE IS AN H2, and that difference is load-bearing rather than
-    # cosmetic: Test-IsChangelogEntryFile decides "is there an entry here" on the heading level, so the
-    # trunk's own empty file can never be folded as if it were a change, and folding twice is impossible
-    # rather than merely unlikely. This formatter serves the RESET, hence Level 1.
+    # THE RESET STATE IS AN H1, AND FOR THE ENTRY THAT IS LOAD-BEARING rather than cosmetic:
+    # Test-IsChangelogEntryFile decides "is there an entry here" on the heading level, so a written entry's
+    # H2 folds while the trunk's own empty file never can, and folding twice is impossible rather than
+    # merely unlikely. This formatter serves the RESET, hence Level 1.
+    #
+    # THE CYCLE FILE IS AN H1 IN BOTH STATES SINCE AUGUST 19, 2026, and it loses nothing by that: it is
+    # never folded, so no reader has to tell its two states apart by level. What does tell them apart is
+    # the branch NAME in the heading -- the trunk's for a reset file, the branch's for a written one --
+    # which Get-BranchFileDeclaredBranch reads at either level.
     $lines.Add((Format-BranchFileHeadingLine -Branch $shown -Title $Title -Level 1))
     if ($shown -eq $trunk) {
         $lines.Add('')
@@ -4020,9 +4064,13 @@ function Add-BranchProgressSection {
         spec: tight, in both files. The one block that keeps a blank line above it is the guidance under the
         file's OWN heading, which explains the document rather than a section of it.
 
-        THE HORIZONTAL RULES ARE GONE with the dossier form. They separated five H2 sections; the sections
-        are H3 now and their headings do that work, while a '---' between every pair turned a short file
-        into a ruled form.
+        THE HORIZONTAL RULES ARE GONE with the dossier form. They separated five H2 sections; the headings
+        do that work themselves now, while a '---' between every pair turned a short file into a ruled form.
+
+        THE LEVEL COMES FROM Get-BranchCycleSectionLevel, not from the entry's. The two were the same
+        number until Dave promoted this file's whole structure by hand on August 19, 2026 -- an H1 title
+        over H2 sections, because the cycle file is a document rather than a block waiting to be pasted
+        into one. Sharing the entry's constant would have re-levelled the entry along with it.
     #>
     param(
         [Parameter(Mandatory)]$Lines,
@@ -4030,7 +4078,7 @@ function Add-BranchProgressSection {
         [AllowEmptyCollection()][string[]]$Guidance = @(),
         [AllowEmptyCollection()][string[]]$Body = @()
     )
-    $Lines.Add(('#' * $script:EntrySectionLevel) + ' ' + $Heading)
+    $Lines.Add(('#' * $script:BranchCycleSectionLevel) + ' ' + $Heading)
     $rendered = @(Format-EntryGuidanceComment -Lines $Guidance)
     foreach ($line in $rendered) { $Lines.Add($line) }
     $body = @(@($Body) | Where-Object { $null -ne $_ })
@@ -4090,7 +4138,7 @@ function Format-BranchProgressScaffold {
     $suffix = if ($stamp) { "$($script:EntryIdSeparator) $stamp" } else { '' }
     $lines = New-Object System.Collections.Generic.List[string]
     $lines.Add((Format-BranchFileHeadingLine -Branch $Branch -Title $w.ProgressTitle `
-        -Level $script:EntryHeadingLevel -Suffix $suffix))
+        -Level $script:BranchCycleHeadingLevel -Suffix $suffix))
     $lines.Add('')
 
     # THE GUIDANCE FOR THE LIST STANDS UNDER THE FILE'S OWN HEADING, not under a section of its own. It
@@ -4225,7 +4273,7 @@ function Get-BranchFileDeclaredBranch {
     #
     # The heading wins where both are present: it is the one a writer edits.
     #
-    # BOTH LEVELS, because the reset state is an H1 and a written file is an H2 -- the difference the fold
+    # BOTH LEVELS, because a reset file is an H1 while a written ENTRY is an H2 -- the difference the fold
     # keys on to tell an empty trunk file from an entry. This predicate must read them BOTH: it is the
     # idempotency test, and a scaffolded H2 file it could not read would come back as '' and be overwritten,
     # taking a step list somebody had been ticking off with it. An H1-only regex was correct for exactly the

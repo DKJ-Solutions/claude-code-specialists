@@ -363,6 +363,16 @@ Write-Host "the fold footer (Format-EntryFoldFooter) and the merge stamp beside 
 $footer = Format-EntryFoldFooter -Number 468 -Url 'https://gh.test/pr/468'
 Assert-Equal '[PR #468](https://gh.test/pr/468)' $footer 'the footer carries the PR link, and only that'
 
+# UNLESS THERE IS NO HEADING TO HOLD THE DATE, which is the one case the move above left with nothing.
+# A pre-dossier entry has no named sections at all -- its title WAS its heading -- so Set-EntryMergeStamp
+# finds nothing to stamp and returns the text unchanged, silently. Without this fallback such an entry
+# would land with a PR link and no landing date, in the one document whose subject is when things landed,
+# where the same entry folded a day earlier always carried one. Every branch in flight from before
+# August 6, 2026 is that shape, here and in every consumer.
+$footerLegacy = Format-EntryFoldFooter -Number 468 -Url 'https://gh.test/pr/468' -MergedStamp '20260819-171500'
+Assert-Equal "[PR #468](https://gh.test/pr/468) $md merged 20260819-171500" $footerLegacy 'with no heading to stamp, the line carries the landing moment instead'
+Assert-Equal $footer (Format-EntryFoldFooter -Number 468 -Url 'https://gh.test/pr/468' -MergedStamp '') 'and an empty stamp leaves the line exactly as the normal path writes it -- the date is never in both places'
+
 # THE DATE ITSELF IS STILL THE PR'S RATHER THAN THE CLOCK'S -- the reasoning the line used to carry, now
 # living on the stamp. Same three cases, one heading up.
 $stampOnTime = Format-EntryMergeStamp -MergedAt '2026-08-05T09:14:00Z' -FallbackNow '20990101-000000'
@@ -1160,20 +1170,33 @@ Assert-Equal 0 @(Get-BranchProgressFindings -Text ((Format-BranchProgressReset) 
 Write-Host "the step list follows the SDLC arc (#655)" -ForegroundColor Cyan
 $phases = @((Get-BranchFileWording).StepPhases)
 Assert-Equal 4 $phases.Count 'four phases are configured -- PLAN, CREATE, TEST, DEPLOY'
+# THE LEVEL IS READ, NOT TYPED, and that is the repair rather than a style point: these asserts were
+# pinned on a literal '###' and went red the moment Dave promoted the file's whole structure by hand
+# (August 19, 2026). A test that hardcodes the shape it is measuring reports a deliberate change as a
+# defect, which is exactly the noise that gets a suite skipped.
+$cycleSec = '#{' + (Get-BranchCycleSectionLevel) + '}'
 foreach ($phase in $phases) {
-    Assert-True ($freshScaffold -match "(?m)^#{3}\s+$([regex]::Escape($phase))\s*$") "the scaffold carries a '$phase' heading"
+    Assert-True ($freshScaffold -match "(?m)^$cycleSec\s+$([regex]::Escape($phase))\s*$") "the scaffold carries a '$phase' heading"
 }
+# THE CYCLE FILE IS A DOCUMENT, NOT A BLOCK WAITING TO BE PASTED INTO ONE (Dave, August 19, 2026): its
+# title is an H1 and its phases are the H2 sections under it, one level shallower than the entry beside
+# it. Asserted as a RELATION as well as two numbers, because the numbers are the part a consumer may
+# re-level and the relation is the part that must hold whatever they choose.
+Assert-Equal 1 (Get-BranchCycleHeadingLevel) "the cycle file's own heading is an H1 -- it is opened on its own and never travels"
+Assert-Equal 2 (Get-BranchCycleSectionLevel) 'and its phases are the H2 sections of that document'
+Assert-True ((Get-BranchCycleSectionLevel) -eq ((Get-BranchCycleHeadingLevel) + 1)) 'the sections sit exactly one level under the title'
+Assert-True ((Get-BranchCycleHeadingLevel) -lt (Get-EntryHeadingLevel)) 'and the whole file sits shallower than the entry, which has to arrive at CHANGELOG.md its own level'
 # DEPLOY CARRIES NO STEP, and this is the assert that records why (Dave, August 14, 2026; shown as a
 # heading since August 19). It is not a step but the RESULT -- the deployment entry beside this file, which
 # is the half that travels into CHANGELOG.md at the merge. A DEPLOY checkbox could only be unresolvable,
 # since the list must be clear before open-pr will push, or ticked before it happened. So the heading is a
 # pointer: if somebody scaffolds a step under it, this goes red.
-$deployBlock = if ($freshScaffold -match '(?ms)^###\s+DEPLOY\s*$(.*?)(?=^###\s|\z)') { $Matches[1] } else { '' }
+$deployBlock = if ($freshScaffold -match "(?ms)^$cycleSec\s+DEPLOY\s*`$(.*?)(?=^$cycleSec\s|\z)") { $Matches[1] } else { '' }
 Assert-Equal 0 @(Get-BranchProgressFindings -Text $deployBlock).Count 'DEPLOY is scaffolded with no step of its own'
 
 # The placeholder sits under CREATE, not under PLAN: a fresh branch has just been planned, and a TODO under
 # PLAN would say the opposite.
-$createBlock = if ($freshScaffold -match '(?ms)^###\s+CREATE\s*$(.*?)(?=^###\s|\z)') { $Matches[1] } else { '' }
+$createBlock = if ($freshScaffold -match "(?ms)^$cycleSec\s+CREATE\s*`$(.*?)(?=^$cycleSec\s|\z)") { $Matches[1] } else { '' }
 Assert-True ($createBlock -match [regex]::Escape((Get-BranchFileWording).FirstStep)) 'the scaffolded step sits under CREATE'
 
 # An empty phase is a statement, not a finding -- the same tolerance the absent-plan case gets above.
@@ -1183,7 +1206,7 @@ Assert-Equal 0 @(Get-BranchProgressFindings -Text $emptyPhases).Count 'a phase w
 # The template shows the arc but never a step -- an example whose first line is somebody else's TODO gets
 # copied in, which is the rule the template already lived by before the phases existed.
 $phaseTemplate = ((Format-BranchProgressScaffold -Branch 'x/y' -Template) -join "`n")
-Assert-True ($phaseTemplate -match '(?m)^###\s+PLAN\s*$') 'the template carries the arc'
+Assert-True ($phaseTemplate -match "(?m)^$cycleSec\s+PLAN\s*`$") 'the template carries the arc'
 Assert-Equal 0 @(Get-BranchProgressFindings -Text $phaseTemplate).Count 'and still carries no step of its own'
 
 # Fence-aware, like every reader of this format: this repo's own branch/README.md quotes all three marks
@@ -1221,7 +1244,7 @@ try {
 # by the scaffolder; the landing stamp is the entry's, written by the fold. Neither may appear in the
 # other's document -- that is the whole reason the ID moved out of the entry heading.
 $stampedCycle = ((Format-BranchProgressScaffold -Branch 'feat/x' -Id '20260819-171500') -join "`n")
-Assert-True ((($stampedCycle -split "`n")[0]) -match ('^## `feat/x` cycle ' + [regex]::Escape((Get-EntryIdSeparator)) + ' 20260819-171500$')) 'the cycle heading carries the branch and its creation stamp'
+Assert-True ((($stampedCycle -split "`n")[0]) -match ('^#{' + (Get-BranchCycleHeadingLevel) + '} `feat/x` cycle ' + [regex]::Escape((Get-EntryIdSeparator)) + ' 20260819-171500$')) 'the cycle heading carries the branch and its creation stamp'
 $bareEntry = ((Format-EntryBlock -Branch 'feat/x' -Description 'A title' -Type 'Enhancement') -join "`n")
 Assert-True (-not ($bareEntry -match '\d{8}-\d{6}')) 'and a freshly scaffolded entry carries no stamp anywhere -- the fold has not run'
 
@@ -1245,6 +1268,14 @@ $twice = Set-EntryMergeStamp -EntryText $stamped -Stamp '20260820-090000'
 Assert-True ($twice -match '(?m)^### Pull Request .+ 20260820-090000$') 'a second fold restamps'
 Assert-True (-not ($twice -match '20260819-171500')) 'and does not leave the first stamp behind'
 Assert-Equal $bareEntry (Set-EntryMergeStamp -EntryText $bareEntry -Stamp '') 'an empty stamp changes nothing -- a fold with no PR leaves the heading bare'
+
+# AND THE SHAPE WITH NO SECTION AT ALL, which is the discriminator the fold reads before it decides where
+# to put the date. A pre-dossier entry carried its title AS its heading; the stamp has nowhere to go, and
+# the failure is silent rather than loud -- the text simply comes back unchanged. So the predicate is
+# asserted beside the no-op, because the fold's correctness rests on the pair and not on either alone.
+$preDossier = "### A title $md Feat $md 2026-08-05`n`nTier: 0`n`nSome body text.`n"
+Assert-True (-not (Test-EntryHasSection -EntryText $preDossier -Key 'PullRequest')) 'a pre-dossier entry has no Pull Request section, so the fold knows the heading cannot hold the date'
+Assert-Equal $preDossier (Set-EntryMergeStamp -EntryText $preDossier -Stamp '20260819-171500') 'and the stamp is a silent no-op there -- which is exactly why the closing line has to carry it'
 
 # THE ENTRIES ALREADY WRITTEN SAY 'changelog' IN THEIR HEADING, and every one of them is in CHANGELOG.md
 # right now. The type is read off that word, and Test-EntryDeclaresShape ends on the type -- so a reader

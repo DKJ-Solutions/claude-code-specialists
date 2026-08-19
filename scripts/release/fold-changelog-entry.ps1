@@ -67,7 +67,8 @@ the named entry and is unaffected.
 What the fold adds is exactly what does not exist until the merge, and since August 19, 2026 it is one
 fact per place: the closing line '[PR #NN](url)', and the landing moment stamped on the 'Pull Request'
 section's own heading -- the counterpart of the creation stamp the cycle file carries. That closing line
-held ' <midDot> merged <date>' as well until that day; the heading holds the moment now.
+held ' <midDot> merged <date>' as well until that day; the heading holds the moment now -- except in a
+pre-dossier entry, which has no such heading, and where the line keeps carrying it rather than losing it.
 The ENTRY'S heading is left as its author wrote it --
 the fold used to prepend '#NN <midDot> ' to the title as well, and that is gone (Dave, August 5, 2026).
 Nothing is lost by it: the number is still in the entry, on that closing line, where the url makes it
@@ -618,15 +619,25 @@ foreach ($file in $entryFiles) {
         # August 5, 2026 for the line, August 19, 2026 for the split). Built by Format-EntryFoldFooter in
         # entry-scaffold-lib.ps1 -- the lib that owns the entry FORMAT, so the one place that writes this
         # line is the one place a test can read it.
+        #
+        # THE MOMENT IS READ ONCE AND WRITTEN IN EXACTLY ONE OF TWO PLACES. The 'Pull Request' heading
+        # takes it -- the counterpart of the creation stamp the cycle file's heading carries -- and the
+        # closing line then carries only the link, so one fact stands in one place.
+        #
+        # UNLESS THE ENTRY HAS NO SUCH HEADING, which is a shape this script explicitly still folds rather
+        # than a hypothetical: a pre-dossier entry carried its title AS its heading and has no named
+        # sections at all. Set-EntryMergeStamp finds nothing to stamp there and returns the text unchanged,
+        # silently -- so without this test the date would simply be missing from an entry that carried one
+        # the day before, in the one document whose subject is when things landed. Test-EntryHasSection is
+        # the same reader the emptiness gate uses for "absent versus empty", so the two cannot disagree
+        # about which shape they are looking at.
+        $mergeStamp = Format-EntryMergeStamp -MergedAt ([string]$prs[0].mergedAt) `
+            -FallbackNow (Get-Date -Format 'yyyyMMdd-HHmmss')
+        $stampFitsTheHeading = Test-EntryHasSection -EntryText $entryContent -Key 'PullRequest'
         $entryContent = $entryContent.TrimEnd() + "$nl$nl" + (Format-EntryFoldFooter `
-            -Number $num -Url $prs[0].url)
-
-        # AND THE SECTION'S OWN HEADING TAKES THE MOMENT IT LANDED (Dave, August 19, 2026) -- the
-        # counterpart of the creation stamp the cycle file's heading carries. The line above used to carry
-        # ' <middot> merged <date>' as well; the heading holds the moment now and the line the link, so one
-        # fact stands in one place.
-        $entryContent = Set-EntryMergeStamp -EntryText $entryContent -Stamp (Format-EntryMergeStamp `
-            -MergedAt ([string]$prs[0].mergedAt) -FallbackNow (Get-Date -Format 'yyyyMMdd-HHmmss'))
+            -Number $num -Url $prs[0].url `
+            -MergedStamp $(if ($stampFitsTheHeading) { '' } else { $mergeStamp }))
+        $entryContent = Set-EntryMergeStamp -EntryText $entryContent -Stamp $mergeStamp
     }
     else {
         # No PR: no number, no url -- and no merge date either, deliberately. There is nothing to read a
