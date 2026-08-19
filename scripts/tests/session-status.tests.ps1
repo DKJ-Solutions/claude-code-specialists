@@ -24,8 +24,35 @@
 #>
 $ErrorActionPreference = 'Stop'
 
-$RepoRoot  = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$ScriptSrc = Join-Path $RepoRoot 'scripts\task\session-status.ps1'
+$RepoRoot    = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+$ScriptSrc   = Join-Path $RepoRoot 'scripts\task\session-status.ps1'
+$EntryLibSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
+
+# THE FIXTURE ENTRIES ARE SPELLED BY THE FORMAT ITSELF, not by literals of it, and that is a repair rather
+# than a refinement. This suite pinned '#### Tier 0' in its fixture and 'tier 0 -> 4' in its assert while
+# the entry format moved three times in four days -- August 16, then twice on August 19 -- and it stayed
+# green over a reporter that had gone first partly and then completely blind. A green suite asserting a
+# retired shape is worse than no suite: it certifies the layer it is not looking at.
+. $EntryLibSrc
+$ScoreLabel = Get-EntryScoreLabel
+$NaLabel     = Get-EntryScoreNotApplicable
+
+function Get-EntryMarker {
+    <#
+        One tier's heading exactly as the format WRITES it, for a repo whose audience tier is $Audience --
+        0 meaning it has stated none, which is the shape an unconfigured consumer's entries keep.
+
+        The seam is set per call rather than once, because Get-EntryTierSectionMarker resolves the named
+        headings against Get-ReleaseAudienceTier and this suite needs both of its answers in one run.
+    #>
+    param([Parameter(Mandatory)][int]$Tier, [int]$Audience = 2)
+    if ($Audience -gt 0) {
+        Set-Item -Path Function:Get-ReleaseAudienceTier -Value ([scriptblock]::Create("return $Audience"))
+    } else {
+        Remove-Item -Path Function:Get-ReleaseAudienceTier -ErrorAction SilentlyContinue
+    }
+    return (Get-EntryTierSectionMarker -Tier $Tier)
+}
 
 $script:pass = 0
 $script:fail = 0
@@ -87,7 +114,17 @@ function New-Fixture {
     # -NoteRoot repoints where the release note lives AND writes the repo-config that declares it, so the
     # pair is always consistent -- a fixture that moved the file without stating the seam would prove only
     # that the script cannot find it.
-    param([switch]$Bare, [string]$NoteRoot = 'releases\notes')
+    param(
+        [switch]$Bare,
+        [string]$NoteRoot = 'releases\notes',
+        # THE ENTRY LIBRARY IS PRESENT BY DEFAULT, because that is where it really sits: beside the script,
+        # here in the repo root and in the plugin mirror a consumer runs. -NoEntryLib is the consumer who
+        # has the reporter and not the format, and what that case pins is that the tiers report as UNREAD
+        # rather than as a number nobody declared.
+        [switch]$NoEntryLib,
+        # 0 = this repo has stated no audience tier, so its entries keep the numbered '#### Tier N' headings.
+        [int]$AudienceTier = 2
+    )
     $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("sstat-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
     New-Item -ItemType Directory -Path $dir | Out-Null
     Push-Location $dir
@@ -98,19 +135,42 @@ function New-Fixture {
     git config commit.gpgsign false 2>&1 | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\task') -Force | Out-Null
     Copy-Item $ScriptSrc (Join-Path $dir 'scripts\task\session-status.ps1')
+    if (-not $NoEntryLib) {
+        # AT '..\lib' RELATIVE TO THE SCRIPT, which is the step the script takes and the one a consumer's
+        # plugin mirror reproduces. Placing it anywhere else would prove only that the fixture can hide it.
+        New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\lib') -Force | Out-Null
+        Copy-Item $EntryLibSrc (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')
+    }
     if (-not $Bare) {
+        # THE ENTRY CARRIES BOTH OF ITS TIERS, at DIFFERENT scores on purpose: one assert then proves the
+        # reach is read and not merely the first score, which is the half the retired pattern dropped in
+        # silence for three days. The headings come from the format's own writer, so an entry format that
+        # moves again fails this suite instead of quietly outrunning it.
+        $tierZero = Get-EntryMarker -Tier 0 -Audience $AudienceTier
+        $tierTop  = if ($AudienceTier -gt 0) { Get-EntryMarker -Tier $AudienceTier -Audience $AudienceTier }
+                    else { Get-EntryMarker -Tier 1 -Audience 0 }
         Set-Utf8 (Join-Path $dir 'CHANGELOG.md') @(
             '# Changelog', '', 'Intro paragraph.', '',
-            '## `feat/a-branch` changelog', '', '### Significance', '',
-            '#### Tier 0', '', 'because.', '', '**Score:** 4', ''
+            '## `feat/a-branch` changelog', '',
+            $tierZero, '', 'because.', '', "$ScoreLabel 4", '',
+            $tierTop, '', 'and it reaches further.', '', "$ScoreLabel 3", ''
         )
+        # ONE repo-config, holding whichever seams this fixture actually states. Two separately-written
+        # copies is how a fixture ends up proving that the script cannot find a seam it was never told of.
+        $cfgLines = @()
         if ($NoteRoot -ne 'releases\notes') {
-            New-Item -ItemType Directory -Path (Join-Path $dir 'scripts') -Force | Out-Null
-            Set-Utf8 (Join-Path $dir 'scripts\repo-config.ps1') @(
+            $cfgLines += @(
                 'function Get-ReleaseNoteRoot {',
                 ("    return '" + ($NoteRoot -replace '\\', '/') + "'"),
                 '}'
             )
+        }
+        if ($AudienceTier -gt 0) {
+            $cfgLines += @('function Get-ReleaseAudienceTier {', "    return $AudienceTier", '}')
+        }
+        if ($cfgLines.Count -gt 0) {
+            New-Item -ItemType Directory -Path (Join-Path $dir 'scripts') -Force | Out-Null
+            Set-Utf8 (Join-Path $dir 'scripts\repo-config.ps1') $cfgLines
         }
         New-Item -ItemType Directory -Path (Join-Path $dir "$NoteRoot\1.x") -Force | Out-Null
         # The em dash is what the encoding case turns on -- built from its code point so this .ps1 stays
@@ -237,7 +297,8 @@ try {
 
     Write-Host 'The repo blocks report what the fixture actually contains' -ForegroundColor Cyan
     Assert-True ($r.Flat -match 'feat/a-branch') 'the pending entry is named'
-    Assert-True ($r.Flat -match 'tier 0 -> 4') 'with the tier and score a release decision turns on'
+    Assert-True ($r.Flat -match 'tier 0 -> 4, tier 2 -> 3') `
+        'with BOTH tiers and their scores -- the reach a release decision turns on, not the first score only'
     Assert-True ($r.Flat -match 'v1\.0\.0') 'the last tag is read'
     # A REMOTE-LESS REPO TAKES THE DEGRADE PATH, verified rather than assumed: git ls-remote fails, and
     # under ErrorActionPreference=Stop that surfaces as a terminating error the block catches. This is a
@@ -273,6 +334,51 @@ try {
     $r = Invoke-Status -Fixture $fx
     Assert-True ($r.Flat -match 'feat/parked-elsewhere') 'the parked branch is named'
     Assert-True (-not ($r.Flat -match "Parked branches on origin.*$trunkName\b.*Open issues")) 'and the trunk is not listed as parked'
+
+    Write-Host 'The tiers are read through the shared reader -- every shape, and none' -ForegroundColor Cyan
+    # THE DEFECT THIS REPLACED, written out as the cases that would have caught it. The block carried its own
+    # '#### Tier N' pattern, so it knew exactly one shape and answered the rest with 'tier 0' -- and tier 0 is
+    # not a missing answer. It is an answer, and it is the one that earns a patch rather than a minor.
+    #
+    # 1. THE CURRENT SHAPE, in which no heading names a tier at all: tier 0's section is the entry's opening
+    #    question and the audience tier's is a named sub-heading inside it. The main fixture is written this
+    #    way, and before the repair it printed no tier line whatsoever for it.
+    $r = Invoke-Status -Fixture $fx
+    Assert-True ($r.Flat -match 'tier 2 -> 3') 'the audience tier is read from a heading that names no number'
+    Assert-True (-not ($r.Flat -match 'tier not read')) 'and with the library beside the script nothing degrades'
+
+    # 2. THE NUMBERED FALLBACK, which is every repo that has stated no audience tier -- an unconfigured
+    #    consumer taking this plugin update, and the shape their entries keep on purpose.
+    $numbered = New-Fixture -AudienceTier 0; $fixtures += $numbered
+    $r = Invoke-Status -Fixture $numbered
+    Assert-Equal 0 $r.Code 'a repo with no audience tier: still exits 0'
+    Assert-True ($r.Flat -match 'tier 0 -> 4') 'the numbered tier 0 is read'
+    Assert-True ($r.Flat -match 'tier 1 -> 3') 'and so is the numbered tier above it'
+
+    # 3. NO LIBRARY AT ALL, which is the promise in the script's own header: it REQUIRES none. What is pinned
+    #    is that it says the tiers are unread instead of printing a number it did not read. The silent 0 is
+    #    the single outcome this repair exists to prevent, because it reads as a decided answer.
+    $noLib = New-Fixture -NoEntryLib; $fixtures += $noLib
+    $r = Invoke-Status -Fixture $noLib
+    Assert-Equal 0 $r.Code 'no entry library: still exits 0'
+    Assert-True ($r.Flat -match 'tier not read') 'the absent library is stated'
+    Assert-True (-not ($r.Flat -match 'tier 0 ->')) 'and NO tier number is printed -- a silent 0 would read as a patch'
+    Assert-True ($r.Flat -match 'feat/a-branch') 'while the entry itself is still named'
+
+    # 4. 'N/A' IS NOT A ZERO. A tier stating it reaches nobody and an author who has not answered yet are
+    #    different facts that the release gates treat differently, and the pattern this replaced could render
+    #    neither: it printed whatever token followed the score label, so an N/A tier and a blank one were
+    #    indistinguishable from each other and from a tier that was never there.
+    $na = New-Fixture; $fixtures += $na
+    Set-Utf8 (Join-Path $na 'CHANGELOG.md') @(
+        '# Changelog', '', 'Intro paragraph.', '',
+        '## `feat/na-branch` changelog', '',
+        (Get-EntryMarker -Tier 0), '', 'because.', '', "$ScoreLabel 2", '',
+        (Get-EntryMarker -Tier 2), '', 'and it reaches nobody outside.', '', "$ScoreLabel $NaLabel", ''
+    )
+    $r = Invoke-Status -Fixture $na
+    Assert-True ($r.Flat -match ('tier 0 -> 2, tier 2 -> ' + [regex]::Escape($NaLabel))) `
+        'N/A is printed as N/A, distinct from a score and from an unanswered tier'
 
     Write-Host 'Every optional source degrades to a stated line, not an error' -ForegroundColor Cyan
     # A repo that has adopted none of this workflow: no CHANGELOG, no releases/, no tag, no remote. A

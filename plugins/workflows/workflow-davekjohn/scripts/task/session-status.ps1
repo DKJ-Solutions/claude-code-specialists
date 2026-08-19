@@ -28,10 +28,17 @@
     trusting a handover over the repo -- so the printout keeps them side by side and separately
     labelled.
 
-    NO LIBRARY DEPENDENCIES, ON PURPOSE. It dot-sources nothing and requires no seam function, so it
-    works in a repo that has adopted none of this workflow. Every optional source (gh, tags, the
-    release notes, repo-config) is probed and degrades to a stated line rather than an error: a status
-    command that fails because an optional tool is absent is worse than no status command.
+    NO REQUIRED DEPENDENCIES, ON PURPOSE. It requires no seam function and no library, so it works in
+    a repo that has adopted none of this workflow. Every optional source -- gh, tags, the release
+    notes, repo-config, the source-repo guard and the entry format's own library -- is probed and
+    degrades to a stated line rather than an error: a status command that fails because an optional
+    tool is absent is worse than no status command.
+
+    THIS SAID 'IT DOT-SOURCES NOTHING' UNTIL AUGUST 19, 2026, and that sentence did damage. It had been
+    untrue since the source-repo guard arrived on August 12, and while it stood it was the argument for
+    giving the tier block below a heading pattern of its own instead of the shared reader -- which then
+    missed every heading the entry format grew after it was written. What is load-bearing is that
+    nothing is REQUIRED, not that nothing is loaded.
 
     Dual-context repo root (issue #81): CLAUDE_PROJECT_DIR where a consumer runs the plugin mirror,
     otherwise the git root -- which is what lets the root copy and the mirror stay byte-identical.
@@ -207,28 +214,140 @@ if (-not $gh) {
     }
 }
 
+# --- THE OPTIONAL SEAMS, LOADED ONCE ------------------------------------------------------------
+#
+# Two files this script uses where they exist and does without where they do not: the consumer's
+# repo-config.ps1 (the release-note wording and root, and the audience tier a named tier heading
+# resolves against) and the entry format's own library. Loaded HERE, above the first block that reads
+# either, because two blocks below need repo-config and the reader needs it before it is asked
+# anything -- a named tier heading resolves through Get-ReleaseAudienceTier, so a library loaded
+# without it would report this repo's own entries as unreadable.
+#
+# NEITHER IS REQUIRED, WHICH IS THE PROMISE IN THE HEADER ABOVE. A repo that has adopted none of this
+# workflow still gets a full report; each block that reads one of these degrades to a stated line.
+$script:HaveEntryReader = $false
+try {
+    $cfgPath = Join-Path $repoRoot 'scripts\repo-config.ps1'
+    if (Test-Path -LiteralPath $cfgPath -PathType Leaf) { . $cfgPath }
+} catch { }
+try {
+    # THE SAME RELATIVE STEP new-branch.ps1 TAKES, and that is what makes it right in both contexts:
+    # 'scripts\task' -> 'scripts\lib' in the repo that maintains this file, and the identical step
+    # inside the plugin mirror a consumer runs. Resolving the library through the REPO ROOT instead
+    # would have found it only here, and reported every consumer's tiers as unread.
+    $entryLib = Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1'
+    if (Test-Path -LiteralPath $entryLib -PathType Leaf) {
+        . $entryLib
+        $script:HaveEntryReader = [bool](Get-Command Resolve-EntryImpact -ErrorAction SilentlyContinue)
+    }
+} catch {
+    $script:HaveEntryReader = $false
+}
+
+function Write-EntryTiers {
+    <#
+        Prints one entry's tier declarations, through the shared reader or not at all.
+
+        WHAT IT REFUSES TO DO IS THE POINT: it never prints a tier it did not read. Where the library is
+        absent, the entry declares nothing, or the parse throws, it says so -- because the block this
+        replaced printed 'tier 0' in all three cases, and tier 0 is not a missing answer. It is an
+        answer, and it earns a patch. A reader deciding whether to cut a minor cannot tell the two apart.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$EntryText,
+        [Parameter(Mandatory)][string]$NotApplicable
+    )
+    if (-not $script:HaveEntryReader) {
+        Write-Host '      tier not read -- entry-scaffold-lib.ps1 is not beside this script' -ForegroundColor DarkGray
+        return
+    }
+    $impact = $null
+    try { $impact = Resolve-EntryImpact -EntryText $EntryText } catch { }
+    if (-not $impact) {
+        Write-Host '      tier not read -- the entry could not be parsed' -ForegroundColor DarkGray
+        return
+    }
+    $parts = @()
+    foreach ($row in @($impact.Rows)) {
+        if ($row.Error) { continue }
+        # N/A AND UNANSWERED ARE NAMED, not folded into 'score 0' the way a table's empty cell made them
+        # look. 'N/A' is a tier stating it reaches nobody; a blank score is an author who has not
+        # answered yet, and the release gates treat those two very differently. Only the section shape
+        # carries the property, so it is probed rather than assumed.
+        $score = if ($row.PSObject.Properties['NotApplicable'] -and $row.NotApplicable) {
+            $NotApplicable
+        } elseif ([int]$row.Score -gt 0) {
+            [string][int]$row.Score
+        } else {
+            'unanswered'
+        }
+        $parts += ("tier {0} -> {1}" -f [int]$row.Tier, $score)
+    }
+    if ($parts.Count -gt 0) {
+        Write-Host ("      {0}" -f ($parts -join ', ')) -ForegroundColor DarkGray
+    } elseif ($impact.Declared) {
+        # The pre-table 'Tier: N' line states a reach and carries no per-tier score to list beside it.
+        Write-Host ("      tier {0}" -f [int]$impact.Tier) -ForegroundColor DarkGray
+    } else {
+        Write-Host '      no tier declared' -ForegroundColor DarkGray
+    }
+    # A MALFORMED SECTION IS PRINTED, NOT DROPPED. The reader reports row-level faults instead of
+    # absorbing them precisely so a caller can surface them; swallowing them here would rebuild the
+    # silence this block is a repair for, one layer in.
+    foreach ($err in @($impact.Errors)) {
+        Write-Host ("      unreadable: {0}" -f $err) -ForegroundColor DarkGray
+    }
+}
+
 # --- 5. PENDING CHANGELOG ENTRIES ---------------------------------------------------------------
 #
 # The tiers are printed with the entries because they decide which release documents a cut would
 # produce and which bump the pending work has earned -- the two facts a release decision turns on.
+#
+# THEY ARE READ THROUGH THE SHARED READER, NOT THROUGH A PATTERN OF THIS SCRIPT'S OWN, and the history
+# of the pattern it replaced is the argument. That pattern matched '#### Tier N' and nothing else, so it
+# never knew the audience tier's named heading and from August 16, 2026 reported tier 0 alone --
+# dropping the reach silently. When tier 0 in turn stopped carrying a heading of its own on August 19,
+# the partial blind spot became a total one: no tier at all for an entry written in the shape the
+# scaffolder had just been taught to write. Both failures point the same way, towards a patch.
+#
+# Resolve-EntryImpact reads every shape an entry has ever been written in, and is the same reader the
+# fold ranks on and the release cut groups on. Teaching this block the one heading it was missing would
+# have left the identical defect waiting for the next rename: the reader was what was wrong, not the
+# pattern.
 Write-Section 'Pending changelog entries'
 $changelog = Join-Path $repoRoot 'CHANGELOG.md'
 if (-not (Test-Path -LiteralPath $changelog -PathType Leaf)) {
     Write-Absent 'this repo has no CHANGELOG.md'
 } else {
+    # THE 'N/A' LITERAL COMES FROM THE LIBRARY TOO where the library is there. It is one of the strings
+    # the format states once on purpose, and a second copy here is the drift shape this repair is about.
+    $naLabel = 'N/A'
+    if ($script:HaveEntryReader -and (Get-Command Get-EntryScoreNotApplicable -ErrorAction SilentlyContinue)) {
+        $naLabel = [string](Get-EntryScoreNotApplicable)
+    }
+
+    # ONE '##' BLOCK PER ENTRY, HANDED TO THE READER WHOLE. The line-at-a-time walk this replaced could
+    # not have used the reader at all: tier 0's section is now the entry's opening '###' question, and
+    # the discriminator for it is the score label underneath -- neither is visible one line at a time,
+    # and neither is fence-aware. An entry that QUOTES a tier heading inside a code fence -- the entries
+    # documenting this format do -- is now read as what it is rather than as what it describes.
     $entries = 0
-    $tier    = $null
+    $heading = $null
+    $body    = New-Object 'System.Collections.Generic.List[string]'
     foreach ($line in (Get-Content -LiteralPath $changelog -Encoding UTF8)) {
         if ($line -match '^##\s+(?<h>.+)$') {
+            if ($null -ne $heading) { Write-EntryTiers -EntryText ($body -join "`n") -NotApplicable $naLabel }
             $entries++
-            Write-Host ("  {0}" -f $Matches['h'])
-        } elseif ($line -match '^####\s+Tier\s+(?<t>\d+)') {
-            $tier = $Matches['t']
-        } elseif ($line -match '^\s*(?:\*\*)?Score:(?:\*\*)?\s*(?<s>\S+)' -and $null -ne $tier) {
-            Write-Host ("      tier {0} -> {1}" -f $tier, $Matches['s']) -ForegroundColor DarkGray
-            $tier = $null
+            $heading = $Matches['h']
+            Write-Host ("  {0}" -f $heading)
+            $body.Clear()
+            $body.Add($line)
+        } elseif ($null -ne $heading) {
+            $body.Add($line)
         }
     }
+    if ($null -ne $heading) { Write-EntryTiers -EntryText ($body -join "`n") -NotApplicable $naLabel }
     if ($entries -eq 0) { Write-Host '  none pending -- the list is at its intro' }
     else { Write-Host ("  ({0} entry/entries pending)" -f $entries) }
 }
@@ -245,31 +364,28 @@ try {
 # THE SECTION HEADING IS MATCHED, NOT ASSUMED, and the match is loose on purpose. The literal comes
 # from Get-ReleaseNoteWording where a repo defines it; otherwise any heading saying "still open" is
 # taken, so a repo that reworded the section is not silently reported as having nothing open. A
-# lib dot-source would have given the exact string and would also have made this reporter fail in a
-# repo that has adopted none of the workflow -- which is the wrong trade for a status command.
+# REQUIRED lib dot-source would have given the exact string and would also have made this reporter
+# fail in a repo that has adopted none of the workflow -- which is the wrong trade for a status
+# command. The tier block above loads one OPTIONALLY, which is a different bargain: present, it answers
+# exactly; absent, it says the tiers are unread rather than inventing a number.
 $openHeading = 'still open'
 # WHERE THE NOTES LIVE COMES FROM THE SAME SEAM THE CUT WRITES THEM WITH (inbound #616). This is the
 # reader; cut-release.ps1 is the writer. A seam that reaches only the writer is worse than no seam --
 # the consumer who repoints it would have their notes written to the new root and looked for in the
 # old, and the miss reports as "no release note was found", which reads like a repo that has not cut
-# one yet. Read here the way the wording beside it already is: repo-config directly, in the try that
-# degrades to the default, because this script dot-sources no library in order to produce its ANSWER.
-# (Since August 12, 2026 it does load one, optionally: the source-repo guard, above, which either stops
-# the run outright or contributes nothing to it. The property that matters is unchanged -- a repo
-# carrying neither this seam nor that lib still gets a full report.)
+# one yet. Read here the way the wording beside it already is: from repo-config, which the seam probe
+# above has already loaded where the repo has one, in a try that degrades to the default. The property
+# that matters is unchanged -- a repo carrying neither this seam nor that library still gets a full
+# report.
 $noteRootRel = 'releases/notes'
 try {
-    $cfg = Join-Path $repoRoot 'scripts\repo-config.ps1'
-    if (Test-Path -LiteralPath $cfg -PathType Leaf) {
-        . $cfg
-        if (Get-Command Get-ReleaseNoteWording -ErrorAction SilentlyContinue) {
-            $w = Get-ReleaseNoteWording
-            if ($w -and $w.ContainsKey('SectionOpen') -and $w['SectionOpen']) { $openHeading = [string]$w['SectionOpen'] }
-        }
-        if (Get-Command Get-ReleaseNoteRoot -ErrorAction SilentlyContinue) {
-            $r = Get-ReleaseNoteRoot
-            if ($r) { $noteRootRel = [string]$r }
-        }
+    if (Get-Command Get-ReleaseNoteWording -ErrorAction SilentlyContinue) {
+        $w = Get-ReleaseNoteWording
+        if ($w -and $w.ContainsKey('SectionOpen') -and $w['SectionOpen']) { $openHeading = [string]$w['SectionOpen'] }
+    }
+    if (Get-Command Get-ReleaseNoteRoot -ErrorAction SilentlyContinue) {
+        $r = Get-ReleaseNoteRoot
+        if ($r) { $noteRootRel = [string]$r }
     }
 } catch { }
 
@@ -294,7 +410,7 @@ $newestNote = $null
 #
 # The mtime path is KEPT as the fallback rather than removed, for a consumer whose note documents are
 # not named X.Y.Z: switching the block off for them would be the silent failure this repair is about,
-# one layer along. Nothing here dot-sources a library, so the parse stays inline.
+# one layer along. No library states this naming, so the parse stays inline.
 if (Test-Path -LiteralPath $notesRoot -PathType Container) {
     $allNotes = @(Get-ChildItem -Path $notesRoot -Recurse -Filter '*.md' -File -ErrorAction SilentlyContinue)
     $versioned = @($allNotes | Where-Object { $_.BaseName -match '^\d+\.\d+\.\d+$' })
