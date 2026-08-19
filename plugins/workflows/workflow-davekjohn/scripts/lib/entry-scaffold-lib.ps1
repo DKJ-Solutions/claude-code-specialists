@@ -737,11 +737,12 @@ function Get-EntryTierHigherRetiredHeadings {
 }
 
 function Test-EntryTierSectionsAreNamed {
-    <# Does THIS repo write the tiers as the entry's own named sections -- the question as tier 0's heading
-       and 'What makes this change extra special' as the audience tier's? Only where it has stated one
-       audience tier, which is the tier that second heading then means. Where it has not, the numbered
-       '#### Tier N' sub-headings stay and so does the routing comment between them -- see the block above
-       for why that fallback is the safe direction.
+    <# Does THIS repo write the tiers under headings that NAME THE QUESTION rather than the tier -- the
+       entry's opening section for tier 0, and 'What makes this change extra special' inside it for the
+       audience tier? Only where it has stated one audience tier, which is the tier that second heading then
+       means. Where it has not, the numbered '#### Tier N' sub-headings stay -- tier 0 among them, so it keeps
+       a heading there -- and so does the routing comment between them; see the block above for why that
+       fallback is the safe direction.
        Called Test-EntryTierHeadingAsksRoute until August 19, 2026, when the same condition came to govern
        both headings rather than only the audience tier's; the name follows what it decides. #>
     return ($null -ne (Get-EntryAudienceTier))
