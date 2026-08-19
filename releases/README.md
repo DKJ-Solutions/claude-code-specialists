@@ -70,6 +70,7 @@ list sits at the **end** of the page:
 
 | Version | Date | Type | Title |
 |---|---|---|---|
+| [4.14.0](../workflow-davekjohn/releases/audience/4.x/4.14.0.md) | 2026-08-19 | Minor | The root docs hold without a plugin installed, and the workflow layer sits on top |
 | [4.13.0](../workflow-davekjohn/releases/audience/4.x/4.13.0.md) | 2026-08-16 | Minor | The changelog entry halves, the changelog reads newest first, and /continue becomes /handover |
 | [4.12.0](../workflow-davekjohn/releases/audience/4.x/4.12.0.md) | 2026-08-16 | Minor | A finding is measured before it is repaired, and a gate records what it proved |
 | [4.11.0](../workflow-davekjohn/releases/audience/4.x/4.11.0.md) | 2026-08-15 | Minor | A prompt inbox for assignments, and a third of the always-on layer moved off the load path |

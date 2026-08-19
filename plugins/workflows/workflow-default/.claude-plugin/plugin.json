@@ -2,7 +2,7 @@
   "name": "workflow-default",
   "displayName": "Claude Specialists — the default workflow",
   "description": "The workflow a repo gets when it has not chosen one. It imposes nothing: the specialists follow the conventions the repo already has, and where the repo is silent they say so instead of filling the gap with somebody else's habit. Ships one skill, discover-workflow, which reads what the repo already states — its contribution guide, its CI, its branch names, its commit subjects, the scripts it already has — and records the answer, including which questions the repo does not answer. Enable exactly ONE workflow: two would give the specialists two answers to the same question, with no way to tell which is the repo's. This is the one to keep enabled until a repo deliberately picks another.",
-  "version": "4.13.0",
+  "version": "4.14.0",
   "author": { "name": "DaveKJohn" },
   "keywords": ["specialists", "workflow", "claude-code", "default", "conventions"]
 }
