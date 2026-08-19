@@ -13,7 +13,7 @@ document rather than as the back half of an install manual.
 
 **Why the procedure is what it is** — which step was added when, and what was measured to justify it —
 is not on this page. It lives in the release record:
-[`releases/README.md`](../workflow-davekjohn/releases/README.md) indexes every version with the changes
+[`releases/README.md`](../releases/README.md) indexes every version with the changes
 behind it. This page tells you what to do; that one tells you why it changed.
 
 > **Budget most of the time for the last step.** The bootstrap places the whole seam in seconds. Step 3

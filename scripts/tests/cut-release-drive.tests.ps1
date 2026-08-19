@@ -160,7 +160,7 @@ The maintainers notice it.
 https://github.com/DaveKJohn/claude-code-specialists/pull/1
 "@
 
-    Write-Utf8 (Join-Path $root 'workflow-davekjohn\releases\README.md') @"
+    Write-Utf8 (Join-Path $root 'releases\README.md') @"
 # Releases
 
 A fixture release page.
@@ -242,7 +242,7 @@ try {
     }
 
     # The history table gains its own row -- the cut inserts it, so nobody adds one by hand.
-    $history = Get-Content -LiteralPath (Join-Path $root 'workflow-davekjohn\releases\README.md') -Raw
+    $history = Get-Content -LiteralPath (Join-Path $root 'releases\README.md') -Raw
     Assert-Match '1\.4\.1' $history 'happy path: the release history table gained a row for this version'
 
     # Commit + tag on the trunk, which is the irreversible half of the exception this script runs under.

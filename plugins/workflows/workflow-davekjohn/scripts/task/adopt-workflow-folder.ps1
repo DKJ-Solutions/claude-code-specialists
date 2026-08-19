@@ -267,8 +267,14 @@ if ($Apply) {
 # the shared defaults at the repo root, which is a working state but not the one this folder is for.
 # And one 'copy' seam has a stale copy in every repo that adopted before the folder existed.
 Write-Host ''
-Write-Host 'Next, in scripts/repo-config.ps1 (both are ''decide'' seams -- see adopt-config):' -ForegroundColor Cyan
+Write-Host 'Next, in scripts/repo-config.ps1 (a ''decide'' seam -- see adopt-config):' -ForegroundColor Cyan
 Write-Host "  Get-ReleaseNoteRoot     -> 'workflow-davekjohn/releases/audience'"
-Write-Host "  Get-ReleaseHistoryPath  -> 'workflow-davekjohn/releases/README.md'"
+Write-Host ''
+Write-Host 'Get-ReleaseHistoryPath is deliberately NOT in that list. Leave it at its default,' -ForegroundColor Cyan
+Write-Host "'releases/README.md', which is where the source keeps its own list too since August 19,"
+Write-Host '2026: a repo that has cut releases has a HISTORY whichever tooling cut it, so the list is'
+Write-Host 'the repo''s and does not belong in a folder a teardown removes. The audience notes are the'
+Write-Host 'opposite -- they exist only because the tier model does -- which is why that seam DOES'
+Write-Host 'point in here.'
 Write-Host 'And if your Get-MojibakePaths copy predates August 14, 2026, re-adopt it: the old copy still'
 Write-Host 'names the retired root branch/ location, so the moved files sit outside its coverage.'

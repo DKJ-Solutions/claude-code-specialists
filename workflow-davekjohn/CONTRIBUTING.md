@@ -126,7 +126,7 @@ train.
 The cycle itself — what a release is, the `cut-release.ps1` steps, the three release documents and the
 guardrails — is in
 [Cutting a release](../plugins/workflows/workflow-davekjohn/RELEASES-portable.md#cutting-a-release); the list
-of releases actually cut is on [this repo's own release page](releases/README.md#the-release-list).
+of releases actually cut is on [this repo's own release page](../releases/README.md#the-release-list).
 
 ### Where the rest lives
 

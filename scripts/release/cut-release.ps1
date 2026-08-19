@@ -873,10 +873,11 @@ $shortTitle = if ($Title) { $Title } else { "$typeLabel release" }
 # a string -- which is why the release manager's lens states 'read the seam, never hardcode the root'.
 # AND THE ROW IS COMPUTED RELATIVE TO THE HISTORY FILE'S OWN DIRECTORY (August 14, 2026). This was
 # `-replace '^releases/'`, with a comment conceding that a history root outside releases/ "would need a
-# '../' here, which no repo has yet asked for" -- the workflow folder is that ask: a consumer's history
-# lives at workflow-davekjohn/releases/README.md while the generated development notes stay at the repo
-# root. Get-RelativeLinkPath answers both layouts, and for this repo it produces byte-identical rows to
-# the old strip.
+# '../' here, which no repo has yet asked for" -- the workflow folder was that ask: between August 14 and
+# 19, 2026 this repo's history sat at workflow-davekjohn/releases/README.md while the generated
+# development notes stayed at the repo root. Get-RelativeLinkPath answers both layouts, and for this repo
+# it produces byte-identical rows to the old strip. The history moved back to releases/README.md on
+# August 19 -- the handling stays, because a consumer may still answer the seam with a root elsewhere.
 $historyDirRel = if ($historyRelPath -match '/') { $historyRelPath -replace '/[^/]+$', '' } else { '' }
 $rowTargetRel = if ($cutNote) { "$noteRootRelPath/$notesDirName/$new.md" } else { "releases/development/$notesDirName/$new.md" }
 $versionTarget = Get-RelativeLinkPath -FromDir $historyDirRel -To $rowTargetRel

@@ -69,7 +69,7 @@ discovery — as an earlier pass did for `.github/workflows/ci.yml` — not a qu
   (`connector-sessioncheck.ps1`).
 - **History** — the archived per-release notes under `releases/development/*.md` are this repo's narrow
   exception to the norm and may remain in their original language (older ones are Dutch).
-  `CHANGELOG.md` and the release-history README (now `workflow-davekjohn/releases/README.md`) are themselves fully English (translated July 22, 2026,
+  `CHANGELOG.md` and the release-history README (now `releases/README.md`) are themselves fully English (translated July 22, 2026,
   Dave's decision), so the exception no longer covers them.
 
 Decision by Dave, July 20, 2026 (repo-wide English) — the decision that in turn prompted the

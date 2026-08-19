@@ -25,7 +25,7 @@ keeping its own copies, and enables or disables **per plugin** which teams and w
 | know **how a repo consumes this** | [Consumption](#consumption) · [Versioning](#versioning) |
 | know **where this runs** (Chat / Cowork / Claude Code) | [Where this runs](#where-this-runs-chat-cowork-and-claude-code) |
 | **contribute a change** | [CONTRIBUTING.md](CONTRIBUTING.md) — the standard branch + PR workflow, which holds with no plugin installed; the entry, the fold and the cut are the layer on top, in [`workflow-davekjohn/CONTRIBUTING.md`](workflow-davekjohn/CONTRIBUTING.md) |
-| see **the version history** | [`releases/README.md`](workflow-davekjohn/releases/README.md) |
+| see **the version history** | [`releases/README.md`](releases/README.md) |
 
 Everything below this table is the underlying explanation, and the page is long on purpose: it is the
 architecture record as much as the landing page. **[INSTALL.md](INSTALL.md) holds both
@@ -282,11 +282,12 @@ The full picture, top-level folder by folder:
   [README](plugins/workflows/workflow-davekjohn/scripts/README.md).
 - **`releases/`** — what a cut *generated*: `development/<X>.x/<X.Y.Z>.md` (the complete note per
   version) and `github/<X>.x/<X.Y.Z>.md` (that version's GitHub Release body), described in
-  [`releases/README.md`](releases/README.md), which holds with no plugin installed. The dated **list**
-  of every release, this repo's seam answers and the hand-written note per version are one layer up in
-  [`workflow-davekjohn/releases/README.md`](workflow-davekjohn/releases/README.md) — where the
-  `## Releases` section of `CHANGELOG.md` points — and the cutting process itself travels with the
-  plugin as
+  [`releases/README.md`](releases/README.md) — **which also carries the dated list of every release
+  ever cut**, and holds with no plugin installed. That is where the `## Releases` section of
+  `CHANGELOG.md` points. One layer up, in
+  [`workflow-davekjohn/releases/README.md`](workflow-davekjohn/releases/README.md), sit the things the
+  *workflow* owns: this repo's seam answers, its local decisions, and the hand-written note per version
+  under `audience/`. The cutting process itself travels with the plugin as
   [`RELEASES-portable.md`](plugins/workflows/workflow-davekjohn/RELEASES-portable.md).
 - **`.claude/`** — the repo layer, on the seam described under
   [The seam, specified](#the-seam-specified): `specialists/SPECIALISTS.md` (the inclusion carrying the
@@ -368,7 +369,9 @@ bumped — a merge without a release stays invisible to consumers, and a shared 
 therefore always lands here first, never the other way around. The full mechanics — cutting a
 release, the three release documents, the lint guardrails — are in
 [`RELEASES-portable.md`](plugins/workflows/workflow-davekjohn/RELEASES-portable.md#cutting-a-release),
-with this repo's own answers and release list in [`releases/README.md`](workflow-davekjohn/releases/README.md).
+with this repo's release list in [`releases/README.md`](releases/README.md) and its own answers to the
+workflow in
+[`workflow-davekjohn/releases/README.md`](workflow-davekjohn/releases/README.md).
 
 ## Manuals — the split model
 
@@ -1216,5 +1219,8 @@ which is what [The seam, specified](#the-seam-specified) is for.
   commands.
 - **Disconnecting it again?** [UNINSTALL.md](UNINSTALL.md) is its mirror — the repo teardown and the
   machine-side removal, in the order they have to happen.
-- **Releases** — the full version history and the cutting-a-release mechanics are in
-  [`releases/README.md`](workflow-davekjohn/releases/README.md).
+- **Releases** — the full version history is in [`releases/README.md`](releases/README.md); the
+  cutting-a-release mechanics travel with the workflow plugin as
+  [`RELEASES-portable.md`](plugins/workflows/workflow-davekjohn/RELEASES-portable.md), with this repo's
+  answers to it in
+  [`workflow-davekjohn/releases/README.md`](workflow-davekjohn/releases/README.md).

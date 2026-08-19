@@ -284,7 +284,7 @@ The constitution above, concretely implemented here:
      Deliberately no branch/PR — just like the fold. **A major additionally needs two preparation
      commits ahead of it** (Dave, August 9, 2026), under this same exception and bounded just as
      narrowly: a **major** only, **two paths** only (the new `#### N.x` section in
-     [`releases/README.md`](workflow-davekjohn/releases/README.md) and the assert in
+     [`releases/README.md`](releases/README.md) and the assert in
      [`release-lib.tests.ps1`](scripts/tests/release-lib.tests.ps1) that pins which major it targets),
      and only once a cut has been **explicitly asked for**. Outside a cut, both files take the
      ordinary branch + PR route. **What the exception does *not* cover**: the hand-written release

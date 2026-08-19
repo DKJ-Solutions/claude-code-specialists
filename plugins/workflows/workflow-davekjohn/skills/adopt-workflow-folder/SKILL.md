@@ -55,20 +55,26 @@ own plugin cache instead, so the easy route is to ask for the skill rather than 
 - **A leftover root `branch/` from before the move is yours to remove by hand** -- the scripts read
   only the new location, deliberately without a dual-read fallback.
 
-## After the scaffold: two seams to answer
+## After the scaffold: one seam to answer, and one to leave alone
 
-The release machinery finds the folder through two `decide` seams in your `scripts/repo-config.ps1`
+The release machinery finds the folder through a `decide` seam in your `scripts/repo-config.ps1`
 (the `adopt-config` skill explains the marker):
 
 ```powershell
 Get-ReleaseNoteRoot     -> 'workflow-davekjohn/releases/audience'
-Get-ReleaseHistoryPath  -> 'workflow-davekjohn/releases/README.md'
 ```
 
-Without them the cut keeps writing to the shared defaults at the repo root -- a working state, but not
-the one this folder is for. The generated `releases/development/` and `releases/github/` trees stay at
-the repo root deliberately (Dave, August 14, 2026): they are the machine-written record and the
-publish artefact, not the folder's hand-kept pages.
+**`Get-ReleaseHistoryPath` is deliberately not beside it.** Leave it at its default,
+`releases/README.md`, which is where the source keeps its own release list too (Dave, August 19,
+2026). The test is whether a thing survives this folder being deleted: a repo that has cut releases
+has a **history** whichever tooling cut it, so the list is the repo's and does not belong in a folder
+a teardown removes. A per-reader **note** is the opposite -- it exists only because the tier model
+does -- which is why `Get-ReleaseNoteRoot` does point in here. Both pointed in here between August 14
+and 19; only the list moved back.
+
+The generated `releases/development/` and `releases/github/` trees stay at the repo root for the same
+reason (Dave, August 14, 2026): they are the machine-written record and the publish artefact, not the
+folder's hand-kept pages.
 
 And if your `Get-MojibakePaths` copy predates August 14, 2026, re-adopt it via `adopt-config`: the old
 copy still names the retired root `branch/` location, so the moved files sit outside its coverage --

@@ -1007,10 +1007,15 @@ function Get-RelativeLinkPath {
         WHY IT EXISTS (August 14, 2026). cut-release.ps1 built the history-table row with
         `-replace '^releases/'`, which is correct only while the history README sits directly in
         releases/ -- its own comment said a repo answering the seam with a root outside that directory
-        "would need a '../' here, which no repo has yet asked for". The workflow folder is that ask:
-        a consumer's history lives at workflow-davekjohn/releases/README.md while the generated
-        development notes stay at the repo root. Same class as the v4.6.0 dead-row bug, caught before
-        shipping this time rather than after.
+        "would need a '../' here, which no repo has yet asked for". The workflow folder was that ask:
+        between August 14 and 19, 2026 this repo's own history sat at workflow-davekjohn/releases/README.md
+        while the generated development notes stayed at the repo root. Same class as the v4.6.0 dead-row
+        bug, caught before shipping this time rather than after.
+
+        The source's history moved back to releases/README.md on August 19, so this repo no longer
+        exercises that path -- and the handling stays, deliberately. A consumer may still answer the seam
+        with a root outside releases/, and a correction kept only while it is being used is a correction
+        that breaks the next time somebody needs it.
 
         [System.IO.Path]::GetRelativePath does not exist on the .NET Framework Windows PowerShell 5.1
         runs on -- the same reason cut-release's collision guard keeps repo-relative strings.
