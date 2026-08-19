@@ -280,9 +280,14 @@ The full picture, top-level folder by folder:
   mirrored copy for consumers lives inside the plugins — the sync/check scripts in `team-alpha`, the
   branch/release workflow in `workflow-davekjohn` — see its own
   [README](plugins/workflows/workflow-davekjohn/scripts/README.md).
-- **`releases/`** — the release history: `development/<X>.x/<X.Y.Z>.md` (full notes per version) +
-  `README.md` (overview table + the full cutting-a-release mechanics) — see
-  [`releases/README.md`](workflow-davekjohn/releases/README.md). The `## Releases` section of `CHANGELOG.md` points here.
+- **`releases/`** — what a cut *generated*: `development/<X>.x/<X.Y.Z>.md` (the complete note per
+  version) and `github/<X>.x/<X.Y.Z>.md` (that version's GitHub Release body), described in
+  [`releases/README.md`](releases/README.md), which holds with no plugin installed. The dated **list**
+  of every release, this repo's seam answers and the hand-written note per version are one layer up in
+  [`workflow-davekjohn/releases/README.md`](workflow-davekjohn/releases/README.md) — where the
+  `## Releases` section of `CHANGELOG.md` points — and the cutting process itself travels with the
+  plugin as
+  [`RELEASES-portable.md`](plugins/workflows/workflow-davekjohn/RELEASES-portable.md).
 - **`.claude/`** — the repo layer, on the seam described under
   [The seam, specified](#the-seam-specified): `specialists/SPECIALISTS.md` (the inclusion carrying the
   body import, the lens import and the roster), `specialists/lenses/` (this repo's own repo lenses),
