@@ -324,7 +324,7 @@ above any convenience) is Dave's and carries across the repos he runs, so it sit
 exception, the scripts, and the plugin lint gate) belongs to this repo alone and sits in this slot.
 
 **Neither half is a universal baseline, and the top half least of all.** It names Dave as the
-decision-maker fifteen times and reaches for mechanisms only this repo has — a `plugin.json` version
+decision-maker throughout and reaches for mechanisms only this repo has — a `plugin.json` version
 bump, the release overview's `#### N.x` section, the test pinning which major that overview targets.
 The word *portable* stood in all three of these places until August 19, 2026 and was wrong in each:
 what travels is the shape (a constitution, then a repo slot), not the content. A repo adopting this
@@ -333,8 +333,17 @@ system writes its own owner into the top half rather than inheriting Dave.
 **The word still appears elsewhere in this file and is correct there** — do not sweep it. Those are
 the *plugin* sense: a persona body, a manual, the portable half of a rule. Those files genuinely
 travel to a consumer through a release. What was wrong was applying that word to this repo's
-constitution, which travels nowhere on its own. (No count here on purpose: a tally of a word inside
-the sentence that uses it goes stale on its own next edit.)
+constitution, which travels nowhere on its own.
+
+**Neither sentence above carries a count, and that is the second lesson of the same day.** The
+paragraph first said Dave was named *fifteen* times. That figure came from `grep -c`, which counts
+**lines containing** a string rather than occurrences — and one of those lines was
+`github.com/DaveKJohn/...`, the GitHub org in a URL, which the same measurement separately counted as
+a link to this repo's own issue. The true figure was **14**, and it became 15 the moment this repair
+added a sentence of its own. A tally of a name, written inside the document that carries the name, is
+wrong when typed and wrong again after the next edit. Neither claim needs one: *throughout* and
+*elsewhere in this file* are true without maintenance. Caught by Dave, who read the paragraph and
+counted.
 
 The one line below is the whole specialist surface of this file. Everything about the team — who they
 are, what each covers, how they are routed to — sits behind it, so removing the plugin is removing one

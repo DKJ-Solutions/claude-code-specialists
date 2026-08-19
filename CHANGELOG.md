@@ -25,7 +25,7 @@ a release with nobody to announce it to.
 
 The root `CLAUDE.md` claimed in three places that its top half is *portable* and travels to any repo
 that adopts it. It does not. **Measured above the repo slot: Dave is named as the decision-maker
-fifteen times** (`Never without Dave's explicit permission`, `Dave keeps the wheel in both
+fourteen times** (`Never without Dave's explicit permission`, `Dave keeps the wheel in both
 directions`, `Decision by Dave, July 27, 2026`), one link points at this repo's own issue #388, and
 four lines reach for mechanisms only this repo has — a `plugin.json` version bump, the release
 overview's `#### N.x` section, and the test pinning which major that overview targets, with the
@@ -37,6 +37,13 @@ copying this file to another repo of Dave's means replacing the slot; copying it
 means replacing the decision-maker above it as well. The `### The how ... vs. the what` heading
 follows — *(portable)* / *(repo-specific)* became *(Dave's, across his repos)* / *(this repo only)*.
 Nothing links to that anchor, checked before renaming it.
+
+**Corrected August 19, 2026.** This entry first said *fifteen times*, and the sentence in `CLAUDE.md`
+said the same. The figure came from `grep -c`, which counts **lines containing** a string rather than
+occurrences, and one of those lines was `github.com/DaveKJohn/...` — the GitHub org in a URL, which
+this very entry separately counts as the link to issue #388. The figure for the state described here
+is **fourteen**. Corrected rather than frozen because it was false when written, which is the half of
+the record rule that protects nothing.
 
 **Caught by Dave reading the paragraph, and two of the three were written the same morning.** The
 sentence before this branch read *"the portable way of working of a repo run by the Claude
