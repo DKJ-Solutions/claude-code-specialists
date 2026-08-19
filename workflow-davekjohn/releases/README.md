@@ -11,6 +11,12 @@ local decisions, the measured instances behind the portable rules, and the full 
 cut. The release block in [`CHANGELOG.md`](../../CHANGELOG.md) points here for everything but the current
 version.
 
+**The documents a cut *generates* are not here — they sit at the repo root and have their own page:**
+[`releases/README.md`](../../releases/README.md), covering the complete per-version notes in
+`development/` and the GitHub Release bodies in `github/`. The list below links into them; it does not
+restate what they are. That page holds with no plugin installed, which is why it is the root's and not
+this folder's.
+
 The split is the same one [`CONTRIBUTING.md`](../CONTRIBUTING.md) already uses: the portable half travels
 with the plugin, the local half stays in the repo. Until August 13, 2026 both halves lived on this page
 behind a horizontal rule, and two consumers hand-maintained a 4,154-word verbatim mirror of the top half
