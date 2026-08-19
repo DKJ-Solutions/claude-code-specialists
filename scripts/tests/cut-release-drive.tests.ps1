@@ -88,7 +88,16 @@ function New-CutFixture {
     # Title |'. Getting this wrong is not a loud failure -- the first draft of this fixture used
     # '| Release |' and no list heading, and the cut simply wrote no row and refused nothing, which is
     # exactly the silent shape a suite about this script exists to catch.
-    param([string]$Name, [string]$PluginVersion = '1.4.0', [string]$HistoryMajors = "#### 1.x`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n")
+    # $AudienceTier and $EntryTopTier exist for the tier-1 scenario, and 2/0 keep every earlier caller
+    # byte-identical. They are two parameters rather than one switch because they are two independent
+    # facts -- which audience the repo publishes to, and how far its pending entry reaches -- and the
+    # defect they were added for (#747) is precisely what happens when one is assumed from the other.
+    param(
+        [string]$Name,
+        [string]$PluginVersion = '1.4.0',
+        [string]$HistoryMajors = "#### 1.x`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n",
+        [int]$AudienceTier = 2,
+        [int]$EntryTopTier = 0)
 
     $root = Join-Path $FixtureDir $Name
     if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force }
@@ -98,6 +107,19 @@ function New-CutFixture {
     New-Item -ItemType Directory -Path (Join-Path $root 'scripts\lib') -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\repo-config.ps1')     -Destination (Join-Path $root 'scripts\repo-config.ps1') -Force
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\branch-info.ps1') -Destination (Join-Path $root 'scripts\lib\branch-info.ps1') -Force
+    # THE ONE DELIBERATE DEPARTURE FROM 'VERBATIM', and only when asked for. This repo answers 2, so the
+    # tier-1 path cannot be reached with its seam file unaltered -- which is the whole reason #747 shipped:
+    # every local run of every gate produced a correct document. Patched by targeted replacement rather
+    # than by hand-writing a stand-in config, so the fixture keeps every OTHER answer grounded in the real
+    # file. The assert makes a failed patch loud: a silent no-op would leave this scenario testing tier 2
+    # twice and reporting a pass.
+    if ($AudienceTier -ne 2) {
+        $cfgPath = Join-Path $root 'scripts\repo-config.ps1'
+        $cfg = Get-Content -LiteralPath $cfgPath -Raw
+        $patched = $cfg -replace '(?m)^\$script:ReleaseAudienceTier\s*=\s*2\s*$', "`$script:ReleaseAudienceTier = $AudienceTier"
+        if ($patched -eq $cfg) { throw "fixture: could not repoint ReleaseAudienceTier to $AudienceTier -- the seam literal in repo-config.ps1 changed shape." }
+        Write-Utf8 $cfgPath $patched
+    }
 
     Write-Utf8 (Join-Path $root '.claude-plugin\marketplace.json') @"
 {
@@ -121,7 +143,17 @@ function New-CutFixture {
 "@
     }
 
-    # CHANGELOG: an intro, then one pending entry scored at tier 0 so a patch is what it earns.
+    # CHANGELOG: an intro, then one pending entry scored at tier 0 so a patch is what it earns -- plus a
+    # higher tier's section where the caller asked for one, which is what lets a minor be earned AND gives
+    # the audience section something real to be pre-filled from.
+    $topTierSection = if ($EntryTopTier -gt 0) { @"
+
+#### Tier $EntryTopTier
+
+The reader this repo publishes to notices it.
+
+**Score:** 4
+"@ } else { '' }
     Write-Utf8 (Join-Path $root 'CHANGELOG.md') @"
 # Changelog
 
@@ -154,6 +186,7 @@ A fixture entry, written so this suite has something real to fold.
 The maintainers notice it.
 
 **Score:** 2
+$topTierSection
 
 ### Pull Request
 
@@ -271,6 +304,60 @@ try {
     Assert-Equal '' (Get-GitOut -Root $root3 -GitArgs @('tag','--list')).Trim() 'new major: no tag was created'
     $v4 = (Get-Content -LiteralPath (Join-Path $root3 'plugins\teams\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
     Assert-Equal '1.4.0' $v4 'new major: and no version was bumped -- the refusal leaves the tree untouched'
+
+    # --- 4. The audience section follows the repo's tier, not the literal 2 (inbound #747) ---------
+    # THE DEFECT THIS PINS could not be seen from inside this repo: Get-ReleaseAudienceTier answers 2
+    # here, so every gate and every local cut produced a correct document while a tier-1 consumer's
+    # draft came out with the two sections that cannot be generated and none that said what shipped.
+    # Driven through the real script rather than asserted at the lib, because the hardcode was in the
+    # SELECTION (cut-release.ps1) and not in the renderer -- a lib-level test would have passed
+    # throughout, which is how a suite of 40 files missed this.
+    Write-Host ""
+    Write-Host "cut-release.ps1 -- the audience section is drawn from the repo's own tier" -ForegroundColor Cyan
+    $root4 = New-CutFixture -Name 'tier1' -AudienceTier 1 -EntryTopTier 1
+    $r4 = Invoke-Cut -Root $root4 -Arguments @('-Bump', 'minor', '-NoPush', '-SkipLint', '-SkipTests')
+    Assert-Equal 0 $r4.Code 'tier 1: the minor is earned by the tier-1 entry and the cut succeeds'
+    $note4 = Join-Path $root4 'workflow-davekjohn\releases\audience\1.x\1.5.0.md'
+    Assert-True (Test-Path -LiteralPath $note4) 'tier 1: the hand-written note was drafted'
+    if (Test-Path -LiteralPath $note4) {
+        $n4 = Get-Content -LiteralPath $note4 -Raw
+        # The finding itself: a section that says what changed, at all.
+        Assert-Match '(?m)^## What changed$'  $n4 'tier 1: the draft HAS a section saying what changed -- the whole of #747'
+        Assert-NotMatch '(?m)^## For consumers$' $n4 'tier 1: and it is not the consumer heading, which names the wrong reader here'
+        # PRE-FILLED, not merely asked for. #747 proposed an empty heading on the reasoning that a tier-1
+        # repo has no generatable source; it has the same source a tier-2 repo has, and this is the assert
+        # that would fail if the fix were narrowed back to a bare heading.
+        Assert-Match 'A fixture change' $n4 'tier 1: the section is PRE-FILLED from the tier-1 entry, not left empty'
+        # The two sections that genuinely cannot be generated still arrive, still empty.
+        Assert-Match '(?m)^## What it is worth$'                 $n4 "tier 1: 'what it is worth' still arrives"
+        Assert-Match '(?m)^## What was still open at this release$' $n4 'tier 1: and so does the open section'
+        # #747's second finding: the audience line promised two readers with one section each, in a
+        # document that renders one reader and two sections.
+        Assert-NotMatch 'consumers of this product' $n4 'tier 1: the audience line no longer promises a reader this repo does not publish to'
+        Assert-Match '(?m)^\*\*For whom:\*\* colleagues in the organisation' $n4 'tier 1: it names the reader the repo actually has'
+        # The score is a self-assigned number and must not reach a document that travels outward, at
+        # either tier -- the strip is inherited, so this catches a caller that stopped passing it.
+        Assert-NotMatch '\*\*Score:\*\*' $n4 'tier 1: the self-assigned score is stripped, as at tier 2'
+    }
+
+    # --- 5. And tier 2 is unmoved by the same change -----------------------------------------------
+    # The other half of the claim. A fix that reads a seam is only safe if the answer this repo gives
+    # produces what it produced before, so the tier-2 path is driven with a tier-2 entry and asserted
+    # on the heading the change could most easily have broken.
+    Write-Host ""
+    Write-Host "cut-release.ps1 -- a tier-2 repo's consumer section is unchanged by the same code" -ForegroundColor Cyan
+    $root5 = New-CutFixture -Name 'tier2' -EntryTopTier 2
+    $r5 = Invoke-Cut -Root $root5 -Arguments @('-Bump', 'minor', '-NoPush', '-SkipLint', '-SkipTests')
+    Assert-Equal 0 $r5.Code 'tier 2: the minor is earned by the tier-2 entry and the cut succeeds'
+    $note5 = Join-Path $root5 'workflow-davekjohn\releases\audience\1.x\1.5.0.md'
+    Assert-True (Test-Path -LiteralPath $note5) 'tier 2: the hand-written note was drafted'
+    if (Test-Path -LiteralPath $note5) {
+        $n5 = Get-Content -LiteralPath $note5 -Raw
+        Assert-Match '(?m)^## For consumers$' $n5 'tier 2: the consumer heading is exactly what it always was'
+        Assert-NotMatch '(?m)^## What changed$' $n5 'tier 2: and the tier-1 heading does not leak into it'
+        Assert-Match 'consumers of this product' $n5 'tier 2: its audience line still names both readers'
+        Assert-Match 'A fixture change' $n5 'tier 2: pre-filled from the tier-2 entry, as before'
+    }
 
 } finally {
     if (Test-Path -LiteralPath $FixtureDir) {

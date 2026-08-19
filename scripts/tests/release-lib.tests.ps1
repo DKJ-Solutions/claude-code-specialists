@@ -847,10 +847,15 @@ Assert-NoMatch $draft 'What is different now' "the internal note's 'what is diff
 # passing the switches turns this red rather than publishing branch administration.
 Assert-NoMatch $draft '(?m)^#### Branch ID' 'branch administration does not reach the draft'
 Assert-NoMatch $draft '\*\*Score:\*\* 4' 'and neither does the self-assigned score'
-# NO EMPTY CONSUMER SECTION -- the tier-1-only minor. A named question with nothing under it looks
-# written, which is the finding that retired the previous shape's empty impact heading.
+# NO EMPTY CONSUMER SECTION -- the tier-1-only minor IN A TIER-2 REPO, and that qualifier is the whole
+# lesson of #747. A named question with nothing under it looks written, which is the finding that retired
+# the previous shape's empty impact heading, so this assert is still right about what it covers. What it
+# was read as saying -- that a missing consumer section is always correct -- was never true: in a repo
+# whose audience IS tier 1 the same suppression removed the only section describing the work, at every
+# release rather than at an unlucky one. This assertion passed throughout, which is why it is worth
+# stating out loud that its scope is the tier-2 repo and the tier-1 case is asserted separately below.
 $draftNoTier2 = Build-ReleaseNoteDraft -Entries @() -Version '4.3.0' -Date '2026-08-11' -Type 'Minor'
-Assert-NoMatch $draftNoTier2 '(?m)^## For consumers$' 'no consumer section where no entry reached tier 2'
+Assert-NoMatch $draftNoTier2 '(?m)^## For consumers$' 'a TIER-2 repo gets no consumer section where no entry reached tier 2'
 Assert-Match $draftNoTier2 '(?m)^## What it is worth$' 'while the organisation still gets its sections -- the document is still written'
 Assert-Match $draftNoTier2 '(?m)^## What was still open at this release$' 'both of them'
 # The guidance is an HTML comment, so the writer deletes it rather than working around it -- and the fold's
@@ -865,6 +870,46 @@ Assert-Match $draftW '(?m)^## Voor klanten$' 'an overridden heading is used'
 Assert-Match $draftW '(?m)^## What it is worth$' 'and the headings that were not overridden keep their defaults'
 Assert-Match (Build-ReleaseNoteDraft -Entries @($dossier) -Version '4.3.0' -Date '2026-08-11' -Type 'Minor' -Wording @{ SectionConsumers = '' }) `
     '(?m)^## For consumers$' 'an override that is present but EMPTY is ignored, like every other wording seam here'
+# THE DEFAULT IS 2, so every assert above passes an -AudienceTier nobody wrote. Pinned, because the
+# alternative -- making the parameter mandatory -- would have been a breaking change to a function a
+# consumer's own scripts may call, and because 2 is what the caller hardcoded before the seam was read.
+Assert-Match (Build-ReleaseNoteDraft -Entries @($dossier) -Version '4.3.0' -Date '2026-08-11' -Type 'Minor' -AudienceTier 2) `
+    '(?m)^## For consumers$' 'passing -AudienceTier 2 explicitly is what omitting it already did'
+
+Write-Host "Build-ReleaseNoteDraft at tier 1 (inbound #747 -- the audience the repo actually has)" -ForegroundColor Cyan
+# A tier-1 entry, scored on tier 1: the source a tier-1 repo has and the previous shape never read.
+$dossier1 = $dossier -replace '(?m)^#### Tier 2$', '#### Tier 1'
+$draft1 = Build-ReleaseNoteDraft -Entries @($dossier1) -Version '4.3.0' -Date '2026-08-11' -Type 'Minor' -AudienceTier 1
+Assert-Match   $draft1 '(?m)^## What changed$' 'the audience section is present and names the reader this repo has'
+Assert-NoMatch $draft1 '(?m)^## For consumers$' 'and it is not the consumer heading, which would name the wrong one'
+Assert-Match   $draft1 '(?m)^### A change with a readable name$' 'it is PRE-FILLED from the tier-1 entry -- the half #747 thought impossible'
+Assert-Match   $draft1 '(?m)^## What it is worth$' 'the section a changelog cannot produce still arrives'
+Assert-Match   $draft1 '(?m)^## What was still open at this release$' 'and so does the open section'
+Assert-NoMatch $draft1 '\*\*Score:\*\* 4' 'the self-assigned score is stripped here too'
+Assert-NoMatch $draft1 '(?m)^#### Branch ID' 'and so is the branch administration'
+# #747's SECOND finding: at tier 1 the default audience line was false on both halves -- it promised a
+# reader the repo does not publish to, and one section each in a document rendering two for one reader.
+Assert-NoMatch $draft1 'consumers of this product' 'the audience line no longer promises an audience the repo does not have'
+Assert-Match   $draft1 '(?m)^\*\*For whom:\*\* colleagues in the organisation' 'it names the reader it does have'
+# And the value hint stops asserting it is 'not for the consumer', which at tier 1 would deny the
+# audience the very document they are reading.
+Assert-NoMatch $draft1 'not for the consumer' "the value hint drops a distinction that does not exist at tier 1"
+Assert-Match   $draft1 '<!-- WHAT THIS RELEASE BOUGHT' 'and keeps the part that is true at either tier'
+# The empty gate is unchanged at tier 1 -- an empty heading is still worse than none.
+$draft1None = Build-ReleaseNoteDraft -Entries @() -Version '4.3.0' -Date '2026-08-11' -Type 'Minor' -AudienceTier 1
+Assert-NoMatch $draft1None '(?m)^## What changed$' 'no audience section at tier 1 either, where no entry reached that tier'
+Assert-Match   $draft1None '(?m)^## What it is worth$' 'while the document is still written'
+# RECOGNISE BOTH, WRITE ONE. SectionConsumers/HintConsumers are the retired key names, and this wording
+# comes from a consumer-owned seam -- a repo that named the section under the old key receives the rename
+# through a plugin update rather than by choosing to, so dropping it would silently revert their heading.
+$draft1Alias = Build-ReleaseNoteDraft -Entries @($dossier1) -Version '4.3.0' -Date '2026-08-11' -Type 'Minor' `
+    -AudienceTier 1 -Wording @{ SectionConsumers = 'Wat er is veranderd'; HintConsumers = 'Eigen uitleg.' }
+Assert-Match $draft1Alias '(?m)^## Wat er is veranderd$' 'the retired SectionConsumers key still names the audience section'
+Assert-Match $draft1Alias '<!-- Eigen uitleg\. -->' 'and the retired HintConsumers key still carries its hint'
+$draft1Both = Build-ReleaseNoteDraft -Entries @($dossier1) -Version '4.3.0' -Date '2026-08-11' -Type 'Minor' `
+    -AudienceTier 1 -Wording @{ SectionAudience = 'The current key'; SectionConsumers = 'The retired key' }
+Assert-Match   $draft1Both '(?m)^## The current key$' 'the current key wins where a repo sets both'
+Assert-NoMatch $draft1Both 'The retired key' 'and the retired one does not also appear'
 
 Write-Host "Build-GitHubReleaseBody (generated, every release, every tier)" -ForegroundColor Cyan
 # THE POINT OF GENERATING IT is that the Release page stops depending on which hand-written tier
