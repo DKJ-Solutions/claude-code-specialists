@@ -727,7 +727,16 @@ foreach ($lf in $linkFiles) {
         } else {
             $resolved = Join-Path $dir ($pathPart -replace '/', '\')
             if (-not (Test-Path -LiteralPath $resolved)) {
-                Add-Error "[link] $rel -> dead link '$target' (expected file does not exist)."
+                # Where the resolution base is NOT the file's own directory (the two cases above),
+                # say so in the finding. Without it the message reads as "this path is wrong" while
+                # the path is correct for where the file sits -- and the author's next move is to add
+                # a '../' that breaks the moment the text lands at its destination. Measured on
+                # August 19, 2026: three suites failed on one entry, and the message named neither
+                # the base it used nor why.
+                $baseNote = if ($dir -eq (Split-Path -Parent $lf)) { '' } else {
+                    " This file's links resolve from '$($dir.Replace($RepoRoot, '.'))' rather than from where it sits, because its text lands there."
+                }
+                Add-Error "[link] $rel -> dead link '$target' (expected file does not exist).$baseNote"
                 continue
             }
             $targetFile = $resolved

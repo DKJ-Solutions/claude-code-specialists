@@ -355,9 +355,9 @@ same 30 suites run **three times** per release-with-documents — once in the cu
 CI — so a change that halves the suite saves three times what a single run suggests, and a change that
 skips one run saves a third while proving less. That triple is **deliberate**: the release commit does not
 travel via a PR and therefore meets no CI, which is why the cut runs the suites itself
-([`CLAUDE.md`](../../../CLAUDE.md#claude-code-specialistss-safety-implementation) records that the cut used
-to run the lint alone and was the least-gated commit in the workflow). Do not propose removing it without
-reading that decision.
+([the release lens](05-06-extension.md#why-the-release-commit-takes-no-pull-request) records that the cut
+used to run the lint alone and was the least-gated commit in the workflow). Do not propose removing it
+without reading that decision.
 
 **The blocking/non-blocking split matters more here than the totals.** The release commit's own CI runs
 *after* the push and blocks nobody; the PR's `lint-en-tests` blocks the merge and is the single largest

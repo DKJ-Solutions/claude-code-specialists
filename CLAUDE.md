@@ -1,21 +1,32 @@
 # CLAUDE.md — claude-code-specialists
 
-This file is the operating guide for this repo, which is run by the **Claude Specialists** — a team
-of specialized Claudes under a single Chief of Staff. It is structured like every specialist manual:
-**the portable way of working comes first** (the system and the constitution, valid in every repo
-that works with the Claude Specialists), and **everything specific to this repo comes last**, under
+This file is the operating guide for this repo. **The portable way of working comes first** (the
+constitution and the general practices, valid in any repo that adopts them), and **everything
+specific to this repo comes last**, under
 [`## Specific to this repo (claude-code-specialists)`](#specific-to-this-repo-claude-code-specialists).
+
+**Everything in this file holds on its own**, and that is deliberate. Two plugins layer on top of it
+where they are installed, and nothing below assumes either one is:
+
+- **`workflow-davekjohn`** — the branch, entry and release mechanics, on its own page
+  [`workflow-davekjohn/CLAUDE.md`](workflow-davekjohn/CLAUDE.md).
+- **`team-alpha`** — the specialists, reached through the single `@`-import at the foot of this file.
+
+Uninstall both and this guide still describes how the repo is run: the rules below are the repo's own,
+and where a plugin adds to one, the addition lives in that plugin's layer rather than here. Read a
+statement here as true whether or not anything is installed — if one ever is not, that is a defect in
+this file.
 
 > **This repo is a special case.** See [`README.md`](README.md) for what claude-code-specialists is and
 > [`## Specific to this repo (claude-code-specialists)`](#specific-to-this-repo-claude-code-specialists)
-> below for the team that maintains it.
+> below for how it is maintained.
 
 ---
 
 ## Safety rules
 
 **Constitution — read this first.** These rules are broadly shared and take precedence over any
-convenience; all other working practices live in the specialist manuals. The concrete implementation
+convenience; the craft detail behind them lives in the layers named above. The concrete implementation
 for this repo (the main branch, the lint gate, the fold exception, being public) is in
 [`## Specific to this repo (claude-code-specialists)`](#specific-to-this-repo-claude-code-specialists).
 
@@ -84,11 +95,12 @@ destructive actions above happen only on Dave's explicit request.
 
 ## General working practices
 
-- **Lessons learned are secured in the docs, not just in memory.** If a specialist learns an
+- **Lessons learned are secured in the docs, not just in memory.** If a session learns an
   important lesson or discovers something that must be remembered for next time, it is recorded
-  immediately in the relevant doc(s) — `README.md`, this `CLAUDE.md`, or a manual/agent def
-  — a memory note alone is too noncommittal. (In this repo that is the technical-writer specialist,
-  [Tessa #16](.claude/specialists/lenses/06-16-extension.md).)
+  immediately in the relevant doc(s) — `README.md`, this `CLAUDE.md`, or the layer that owns the rule
+  — a memory note alone is too noncommittal. Which layer that is, and the split when a rule has both
+  a portable and a local half, is settled further down under
+  [the source-is-the-default rule](#claude-code-specialistss-safety-implementation).
 - **A reported finding's *reason* is verified before it is repaired, not just its symptom.** A report
   says both what went wrong and why, and the second half is an inference by someone who was measuring
   the outside. Read the code, the doc, or the output that would have to be true for that explanation
@@ -109,9 +121,9 @@ destructive actions above happen only on Dave's explicit request.
 - **Approval questions are rare, not the norm.** Interrupt Dave only for truly exceptional actions:
   irreversible, outward-facing, or carrying real risk (cutting a release, publishing externally,
   something destructive). All routine work — git, bash, config, branches, commits, tooling/scripts,
-  and passing a specialist's delivery on to the next link in an already agreed chain — is simply
-  executed and reported, not asked about first. When in doubt, a specialist picks a sensible
-  default, executes it, and reports it. This is separate from the PR rule above: a PR always waits
+  and passing a finished deliverable on to the next link in an already agreed chain — is simply
+  executed and reported, not asked about first. When in doubt, pick a sensible default, execute it,
+  and report it. This is separate from the PR rule above: a PR always waits
   for Dave's explicit word — that is the deliberate, explicitly named exception to this rarity
   rule, not a contradiction of it.
 
@@ -119,10 +131,10 @@ destructive actions above happen only on Dave's explicit request.
 
 ## Specific to this repo (claude-code-specialists)
 
-> *Everything above is the portable way of working of a repo run by the Claude Specialists. This
+> *Everything above is the portable way of working and travels to any repo that adopts it. This
 > part is the claude-code-specialists lens: if you copy this system to another repo, this is the part
-> you replace — it doesn't describe that there are specialists and safety rules, but what this repo
-> is, which team works here, and how the constitution is concretely implemented here.*
+> you replace — it doesn't describe *that* there are safety rules, but what this repo is and how the
+> constitution is concretely implemented here.*
 
 `claude-code-specialists` is the **home repo of one product**: the Claude Specialists system, built and
 maintained here by Dave (DaveKJohn), and the **single source of truth** for all shareable subagent
@@ -150,13 +162,13 @@ August 3, 2026; the reader-facing statement is in
 
 **The repo consumes itself.** Via [`.claude/settings.json`](.claude/settings.json) this repo enables
 its own `team-alpha` plugin (the core team), with the `github` marketplace source
-`DaveKJohn/claude-code-specialists` — so the repo points at itself. That way the maintenance team works
-with exactly the product it maintains. One consequence to be aware of: through the `github` source
-the team sees the **last pushed** version of the plugins, not your ongoing branch work — an agent
+`DaveKJohn/claude-code-specialists` — so the repo points at itself. That way work here runs against
+exactly the product it maintains. One consequence to be aware of: through the `github` source a
+session sees the **last pushed** version of the plugins, not your ongoing branch work — an agent
 def you modify on a branch only takes effect after merge + push. A second: being a consumer, this repo
 carries an install record keyed on its **folder path**, so renaming or moving this checkout unlinks the
 plugin without any error — the measured instance and the repair are in
-[Sylvester #15](.claude/specialists/lenses/05-15-extension.md#repo-specific-rules).
+[the system-administration lens](.claude/specialists/lenses/05-15-extension.md#repo-specific-rules).
 
 ### Language
 
@@ -164,7 +176,7 @@ plugin without any error — the measured instance and the repair are in
 output, and script-generated document content. **The session-reply language is separate and follows
 the user.** That second half applies to every turn regardless of which files it touches, which is why
 it lives here rather than in a path-scoped rule. The system-wide norm (and its three exceptions) is in
-[Tessa #16's portable manual](plugins/teams/team-alpha/manuals/06-16-manual.md#what-tessa-covers)
+[the technical writer's portable manual](plugins/teams/team-alpha/manuals/06-16-manual.md#what-tessa-covers)
 under **"Guarding the language convention,"** so it travels to every consuming repo.
 
 **The per-layer detail — which layers are in scope, and the deliberate exceptions (`VUL-IN`,
@@ -232,7 +244,7 @@ The constitution above, concretely implemented here:
   — every entry already written under it still has to validate — it just has no prefix any more. The rule
   had always held and was never enforced; measured on the day it was written down, `chore/` had been used
   12 times. See
-  [Derek #05](.claude/specialists/lenses/05-05-extension.md#classifying-naming-and-creating-a-branch).
+  [the branch-taxonomy lens](.claude/specialists/lenses/05-05-extension.md#classifying-naming-and-creating-a-branch).
 - **The lint and test gates are the safety guard before every PR.**
   [`scripts/lint/check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1) validates the
   manifests (`marketplace.json` + every `plugin.json`) and the agent-def and manual frontmatter,
@@ -241,10 +253,10 @@ The constitution above, concretely implemented here:
   defect three adoption rounds in a row kept producing; after that all test suites run
   (`scripts/tests/*.tests.ps1`), exactly as CI
   does. `open-pr.ps1` runs both gates first; on an error or a failing suite nothing is pushed and
-  no PR is opened (`-SkipLint`/`-SkipTests` are the escape valves). See [Sylvester #15](.claude/specialists/lenses/05-15-extension.md).
+  no PR is opened (`-SkipLint`/`-SkipTests` are the escape valves). See [the system-administration lens](.claude/specialists/lenses/05-15-extension.md).
 
   **Why these checks have the shape they do — and every rule that was measured and DECLINED — is in
-  [Sylvester #15](.claude/specialists/lenses/05-15-extension.md#how-the-gate-checks-got-their-shape-and-the-measurements-behind-them-august-15-2026)**:
+  [the system-administration lens](.claude/specialists/lenses/05-15-extension.md#how-the-gate-checks-got-their-shape-and-the-measurements-behind-them-august-15-2026)**:
   the entry-format count and the four candidate rules behind it, the stale-path check declined at 124
   findings all false, the PR template measured over 60 PRs, and the two repairs it took to reach
   `CHANGELOG.md`'s intro. **Read it before changing any check above** — most of what looks arbitrary
@@ -282,7 +294,7 @@ The constitution above, concretely implemented here:
   below. How the two actually run, which release documents are deliberately *not* covered by the
   second one, and the measurements behind each are in
   [`workflow-davekjohn/CLAUDE.md`](workflow-davekjohn/CLAUDE.md#how-the-two-direct-on-main-exceptions-actually-run)
-  and in [Rendall #06](.claude/specialists/lenses/05-06-extension.md#versioning--releases).
+  and in [the release lens](.claude/specialists/lenses/05-06-extension.md#versioning--releases).
 - **This repo is `public`.** A deliberate choice, so the remote `github` marketplace source can be
   read without gh auth. Consequence: **nothing confidential** belongs here — no personal
   information, credentials, or secrets. The core team's (`team-alpha`) agent defs are therefore
@@ -294,26 +306,23 @@ The constitution above, concretely implemented here:
   learned here — not the lens** (Dave, August 4, 2026). The lens is for what a *consumer* would
   genuinely have to differ on; it is not the convenient place to write something down because it is the
   file already open. Writing a portable rule into the lens leaves the source thinner than the repo that
-  maintains it, and nobody downstream ever receives it. Measured that day: Rendall #06's portable persona
-  was **1,700 bytes** while his repo lens had grown to **26,914** — sixteen times larger, holding the
-  release craft itself rather than anything specific to this repo. **Which layer a rule belongs in, and
-  the split when a rule has both a portable and a local half, is in the
-  [Specialists handbook](.claude/specialists/README.md#where-a-new-rule-goes--the-source-is-the-default-the-lens-is-the-exception)**
+  maintains it, and nobody downstream ever receives it. Measured that day: the release manager's
+  portable persona was **1,700 bytes** while its repo lens had grown to **26,914** — sixteen times
+  larger, holding the release craft itself rather than anything specific to this repo. **Which layer a
+  rule belongs in, and the split when a rule has both a portable and a local half, is in the
+  [specialists handbook](.claude/specialists/README.md#where-a-new-rule-goes--the-source-is-the-default-the-lens-is-the-exception)**
   — including the measured convention that personas and manuals carry no repo-specific detail at all
   while skills carry the evidence behind a procedure.
 
 ### The how (portable) vs. the what (repo-specific)
 
-In short: the **how** (there is a team of specialists under a Chief of Staff, everything via
-branch + PR, lessons learned in the docs, the constitution above any convenience) is portable and
-sits at the top. The **what** (this small maintenance team, the marketplace/plugin structure, the
-language, the concrete `main` branch and fold exception, the scripts, and the plugin lint gate)
-belongs to this repo and sits in this slot.
+In short: the **how** (everything via branch + PR, lessons learned in the docs, the constitution
+above any convenience) is portable and sits at the top. The **what** (the marketplace/plugin
+structure, the language, the concrete `main` branch and fold exception, the scripts, and the plugin
+lint gate) belongs to this repo and sits in this slot.
 
-The orchestrator (Chris) is always loaded along; he refers on demand to the specialists in
-[`.claude/specialists/lenses/`](.claude/specialists/lenses/).
-
-The orchestrator (Chris) is always loaded -- portable body from plugin install and repo lens
-from `.claude/specialists/`; that file carries the body import, the lens import and this repo's roster.
+The one line below is the whole specialist surface of this file. Everything about the team — who they
+are, what each covers, how they are routed to — sits behind it, so removing the plugin is removing one
+import and one directory rather than untangling this document. It is deliberately the last thing here.
 
 @.claude/specialists/SPECIALISTS.md
