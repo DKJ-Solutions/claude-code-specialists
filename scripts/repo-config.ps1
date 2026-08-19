@@ -406,16 +406,21 @@ function Get-ReleaseNotesGrouping {
 # would land in, the inserter that writes that row, and new-internal-note.ps1, which repoints that row's
 # Version cell at the internal note once the note exists. One edit here moves all three.
 #
-# It sat at the DEFAULT, releases/README.md, until August 14, 2026, when the hand-kept release pages
-# moved into workflow-davekjohn/ -- the workflow's own root folder, where everything portable gathers
-# (Dave). The list lived in its own HISTORY.md for one day (August 4, 2026), on the reasoning that one
+# IT IS BACK AT THE DEFAULT, releases/README.md, since August 19, 2026 (Dave), and the round trip is the
+# instructive part. It moved to workflow-davekjohn/ on August 14 with the hand-kept release pages, on the
+# reasoning that everything the workflow owns gathers in the workflow's own folder. That swept up one
+# thing the workflow does NOT own: a repo that has cut releases has a HISTORY, whichever tooling cut it,
+# and an index of files living in releases/ had no business sitting in a plugin folder that a teardown
+# removes. The audience notes stayed behind deliberately -- those exist only BECAUSE the tier model does,
+# so they are the workflow's; the list is not. The list lived in its own HISTORY.md for one day
+# (August 4, 2026), on the reasoning that one
 # page should describe the process and another the outcome. That reasoning was superseded the same day:
 # the pages had since been reorganised portable-half first with everything repo-specific in one named
 # slot, and once that split exists, process-versus-outcome stops earning a file boundary -- the outcome
 # IS repo-specific content, so it is simply the last section of the slot. Merging them also removed four
 # cross-references the two pages needed to introduce each other, and left a consumer with one file to
 # mirror instead of two.
-$script:ReleaseHistoryPath = 'workflow-davekjohn/releases/README.md'
+$script:ReleaseHistoryPath = 'releases/README.md'
 
 function Get-ReleaseHistoryPath {
     <# Repo-root-relative path to the file that lists every release this repo has cut. #>
