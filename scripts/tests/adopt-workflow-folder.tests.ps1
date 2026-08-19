@@ -84,10 +84,10 @@ $ExpectedFiles = @(
     'workflow-davekjohn\CONTRIBUTING.md',
     'workflow-davekjohn\releases\README.md',
     'workflow-davekjohn\releases\audience\.gitkeep',
-    'workflow-davekjohn\branch\branch-changelog.md',
-    'workflow-davekjohn\branch\branch-progress.md',
-    'workflow-davekjohn\branch\templates\branch_template_changelog.md',
-    'workflow-davekjohn\branch\templates\branch_template_progress.md'
+    'workflow-davekjohn\branch\branch-deployment.md',
+    'workflow-davekjohn\branch\branch-cycle.md',
+    'workflow-davekjohn\branch\templates\branch_template_deployment.md',
+    'workflow-davekjohn\branch\templates\branch_template_cycle.md'
 )
 
 try {
@@ -113,7 +113,7 @@ try {
     }
     # The branch files must be the RESET shape the shared formatters write: an H1 (so the fold's own
     # entry test skips them) naming the trunk.
-    $entryText = [System.IO.File]::ReadAllText((Join-Path $c2 'workflow-davekjohn\branch\branch-changelog.md'), [System.Text.Encoding]::UTF8)
+    $entryText = [System.IO.File]::ReadAllText((Join-Path $c2 'workflow-davekjohn\branch\branch-deployment.md'), [System.Text.Encoding]::UTF8)
     Assert-Match '^# ' $entryText '-Apply: the entry is the reset state (H1, not a foldable H2)'
     # The history table header is what cut-release's row insert matches on -- scaffolding it is what
     # makes the first cut in a consumer able to write its row at all.

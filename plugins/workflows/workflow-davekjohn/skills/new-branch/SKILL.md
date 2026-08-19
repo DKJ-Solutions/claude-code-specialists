@@ -1,8 +1,8 @@
 ---
 name: new-branch
 description: >-
-  Create (or idempotently resume) a git branch AND its two files in workflow-davekjohn/branch/ -- the changelog entry
-  and the step list -- in one move, via the shared, centralized new-branch script from the plugin
+  Create (or idempotently resume) a git branch AND its two files in workflow-davekjohn/branch/ -- the cycle file
+  and the deployment entry -- in one move, via the shared, centralized new-branch script from the plugin
   (single source of truth, issue #81), so a consumer does not have to duplicate this script locally.
   Use this whenever a new piece of work starts: a branch is never entry-less -- creating it brings
   both files to life in the same step, instead of a separate later scaffolding step.
@@ -75,8 +75,8 @@ route moved to a page the model is allowed to read.
 
 ```text
 workflow-davekjohn/branch/
-  branch-changelog.md   what the change DOES  -- nothing but the entry, so it pastes into CHANGELOG.md
-  branch-progress.md    what still MUST HAPPEN -- the branch's name, its step list, where you left off
+  branch-cycle.md        what still MUST HAPPEN -- the branch, its stamp, its step list, where you left off
+  branch-deployment.md   what the change DOES   -- nothing but the entry, so it pastes into CHANGELOG.md
 ```
 
 **Fixed names, not one per branch.** Git already tracks these per branch, so two branches in flight
@@ -89,8 +89,8 @@ fold puts them back in that state after the merge.
 whole block before the PR" had to be a written instruction. Two files make it obvious. The entry now
 prompts for what the change does, and nothing else.
 
-**`branch-changelog.md` holds the entry block and nothing around it** — no preamble, no warning. That is
-what makes it pasteable in one go. Its heading names the **branch** (`` ## `feat/x` changelog ``), which is
+**`branch-deployment.md` holds the entry block and nothing around it** — no preamble, no warning. That is
+what makes it pasteable in one go. Its heading names the **branch** (`` ## `feat/x` deployment ``), which is
 also how the fold finds the PR, and the human-readable name of the change is its first section.
 
 **The file is bare** — headings and the space under them. The guidance for each field lives in the copies
@@ -105,18 +105,23 @@ generated: edit one and the next run puts it back.
 Two sections, one of them filled in for you:
 
 ```text
-## Branch `<your branch>` changelog · <stamp>      <- the branch, and the moment it was created
+## `<your branch>` deployment                             <- what this branch delivers to main
 
 ### What does the change on this branch deploy to main?   <- tier 0: a reason and a score
 #### What makes this change extra special                 <- your audience tier: the same, or N/A
-### Pull Request           <- the title you gave -Title; the fold adds the number and the date
+### Pull Request · <stamp>  <- the title you gave -Title; the fold adds the number and the moment it landed
 ```
 
-**Two sections, and the heading carries what three more used to.** `Branch title`, `Branch ID` and
+**Two sections, and the headings carry what three more used to.** `Branch title`, `Branch ID` and
 `Branch type` were sections of their own until August 16, 2026: the title moved into `Pull Request` (which is
-what it always was — `open-pr` composes the PR title from it), the ID became the stamp in the heading, and
-the type is the prefix of the branch that heading already names. All three are still **read** wherever an
+what it always was — `open-pr` composes the PR title from it), the ID became a stamp in a heading, and
+the type is the prefix of the branch the heading already names. All three are still **read** wherever an
 older entry carries them, so nothing already written stops folding.
+
+**The two stamps sit at the two ends of the branch's life** (Dave, August 19, 2026). The creation stamp is
+in `branch-cycle.md`'s heading — the document that is created with the branch and reset with the merge —
+and the landing stamp is on this file's `Pull Request` heading, written by the fold from the PR's own merge
+timestamp. Neither is typed by hand, and neither is in the other's file.
 
 **`Branch title` is what the change is CALLED, everywhere.** Since
 [#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506) `open-pr` composes the PR title as
@@ -276,7 +281,7 @@ entry unreadable to your own fold.
 
 Two optional parameters cover the "start now, continue later (maybe on another device)" case:
 
-- **`-Intent "<what is next / where I left off>"`** -- recorded in **`branch-progress.md`**, under
+- **`-Intent "<what is next / where I left off>"`** -- recorded in **`branch-cycle.md`**, under
   its "where I left off" section. Omit it and that section is simply left empty for you.
   **It deliberately does not touch the entry.** An intent is a status, and the entry's text folds
   verbatim into `CHANGELOG.md` -- this repo measured three released entries that shipped a progress

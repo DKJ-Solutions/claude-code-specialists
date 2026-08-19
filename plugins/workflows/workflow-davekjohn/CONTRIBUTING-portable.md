@@ -35,8 +35,8 @@ Creating the branch writes both of its working files, so **a branch is never ent
 
 | file | subject | lifetime |
 |---|---|---|
-| `workflow-davekjohn/branch/branch-changelog.md` | what the change **does** — the entry that folds into your changelog | folded at the merge, then reset |
-| `workflow-davekjohn/branch/branch-progress.md` | what still **must happen** — the step list, and where you left off | reset at the merge; never folded |
+| `workflow-davekjohn/branch/branch-deployment.md` | what the change **does** — the entry that folds into your changelog | folded at the merge, then reset |
+| `workflow-davekjohn/branch/branch-cycle.md` | what still **must happen** — the step list, and where you left off | reset at the merge; never folded |
 
 **Fixed names, not one per branch.** Git already tracks them per branch, so branches in flight cannot
 collide. On the trunk both sit in an empty **reset state** carrying a warning not to write there until a
@@ -58,20 +58,21 @@ So how many prefixes there are, whether a given one exists, and what your repo r
 questions this page deliberately cannot answer for you — check your own table rather than assuming the
 source repo's.
 
-**`branch-changelog.md` holds the entry block and nothing around it**, so it pastes into your changelog in
+**`branch-deployment.md` holds the entry block and nothing around it**, so it pastes into your changelog in
 one go. The entry is one heading with two `###` sections under it:
 
 ```text
-## Branch `<your branch>` changelog · <stamp>
+## `<your branch>` deployment
 
 ### What does the change on this branch deploy to main?
 #### What makes this change extra special
-### Pull Request
+### Pull Request · <stamp>
 ```
 
-**The heading carries what three sections used to.** It names the branch — so the branch *type* is its
-prefix — and the stamp beside it is the moment the branch was created. A section restating either would be
-one fact in two places.
+**The headings carry what three sections used to.** The `##` names the branch — so the branch *type* is its
+prefix — and the stamp on `Pull Request` is the moment the branch landed, written by the fold. The moment it
+*began* is stamped on `branch-cycle.md`, the file whose life that is. A section restating any of them would
+be one fact in two places.
 
 **The opening section holds both tiers, and neither names a number.** Tier 0's reason goes directly under the
 question; the audience tier gets `#### What makes this change extra special` inside that same section, and it
@@ -170,8 +171,9 @@ worked in.
 
 [`skills/fold-changelog/SKILL.md`](skills/fold-changelog/SKILL.md) · `fold-changelog-entry.ps1`
 
-On the trunk, right after the merge, the fold moves the entry into your changelog, appends the PR link and
-the merge date as its closing line, strips the guidance comments, and **resets both branch files** to
+On the trunk, right after the merge, the fold moves the entry into your changelog, appends the PR link as
+its closing line, stamps the landing moment onto the `Pull Request` heading, strips the guidance comments,
+and **resets both branch files** to
 their empty state — so the trunk is ready for the next branch and the merged branch's ticked-off steps do
 not greet whoever opens it. It commits that directly on the trunk, naming exactly those three paths so
 nothing else in the tree can ride along.

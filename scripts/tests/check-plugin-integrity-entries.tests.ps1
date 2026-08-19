@@ -215,6 +215,35 @@ try {
     $r34f = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($r34f.Out -match 'entry-heading. CHANGELOG')) 'scenario 34: a well-formed flat changelog is silent'
 
+    # AND SO IS A STAMPED 'Pull Request' HEADING, which is what the fold actually writes into this file
+    # (August 19, 2026). This gate compares the whole captured heading text against the declared names, so
+    # while it was anchored on a bare '\s*$' the stamp made a declared section unrecognisable -- and the
+    # error would have landed HERE, on the one write that happens directly on main past every PR gate,
+    # inside the required CI check. Every PR after the first fold would have been blocked by the fold of
+    # the one before it. The scenario is the fold's own output rather than a hand-built line, because that
+    # is the shape nobody would have thought to type.
+    $s34ClStamped = @($s34ClGood) + @(
+        '### Pull Request ' + $s34Md + ' 20260819-171500'
+        ''
+        '[PR #123](https://gh.test/pr/123)'
+        ''
+    )
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClStamped -join "`n") + "`n"), $Utf8NoBom)
+    $r34f2 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r34f2.Out -match 'entry-heading. CHANGELOG')) 'scenario 34: a folded entry whose Pull Request heading carries the landing stamp is accepted'
+    Assert-True ($r34f2.Out -match '\[entry-heading\] checked') 'scenario 34: and the file WAS examined -- the pass is not an empty scan'
+
+    # THE TOLERANCE IS THE STAMP, NOT THE NAME. A misspelling still has to be caught: this is the failure
+    # the exact comparison exists for, and a tail that swallowed anything after the name would have traded
+    # one silent defect for another.
+    $s34ClMisspelled = @($s34ClStamped) -replace '^### Pull Request ', '### Pull request '
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClMisspelled -join "`n") + "`n"), $Utf8NoBom)
+    $r34f3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34f3.Out -match 'entry-heading. CHANGELOG') 'scenario 34: a MISSPELLED section heading is still reported, stamp or no stamp'
+    Assert-True ($r34f3.Out -match "'Pull request'") 'scenario 34: and the message quotes the name without the stamp, which is the part to correct'
+
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClGood -join "`n") + "`n"), $Utf8NoBom)
+
     # A body sub-heading written at the entry's own level, in the middle of a formatted entry. It SPLITS the
     # entry: the three sections land across two blocks, so the phantom's first section is whichever one
     # followed it -- never the first. That is the rule, and it is structural rather than a guess about intent.

@@ -17,7 +17,7 @@ bites only while the workflow is in play does not belong on the always-on path.
 
 - The two files in `branch/` belong to the **current branch**. On the trunk they sit in their reset
   state — never write there until a branch exists (`new-branch` creates one and fills them).
-- `branch/branch-changelog.md` folds **verbatim** into `CHANGELOG.md` at the merge; its step-list
+- `branch/branch-deployment.md` folds **verbatim** into `CHANGELOG.md` at the merge; its step-list
   companion gates the PR and the merge (`- [x]` done, `- [~]` dropped with the reason on the line).
 - `releases/README.md` is the **living index** — the cut inserts its own row, so never add one by hand
   for a release a script will write. Everything under `releases/audience/` is a **published record**:
@@ -75,7 +75,7 @@ exactly those entries through. **Recognise both, write one** — the same rule t
 ### The step-list gate, on the branch's own plan
 
 **Dave, August 6, 2026.** A branch reaches a PR when its own plan is finished, so `open-pr.ps1` refuses
-to push and `ship-pr.ps1` refuses to merge while `branch/branch-progress.md` has an unresolved step.
+to push and `ship-pr.ps1` refuses to merge while `branch/branch-cycle.md` has an unresolved step.
 **Both**, deliberately: the requirement Dave gave is about the *merge*, and `open-pr` has a `-Force` —
 a PR opened through that valve, or by hand on github.com, would otherwise land with an unfinished plan.
 
@@ -102,7 +102,7 @@ folder. What follows is the mechanics and the reasoning behind them.
 
 [`fold-changelog-entry.ps1`](../scripts/release/fold-changelog-entry.ps1) folds the entry into
 `CHANGELOG.md` and clears it, and with `-Commit`/`-Push` makes that commit itself — scope limited to
-`CHANGELOG.md` + the entry + `branch/branch-progress.md`, which the same run resets, and since
+`CHANGELOG.md` + the entry + `branch/branch-cycle.md`, which the same run resets, and since
 August 2, 2026 enforced rather than merely intended: the commit names its paths, so nothing else in
 the tree can ride along.
 

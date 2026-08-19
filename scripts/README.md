@@ -105,7 +105,7 @@ from one another because they overrule different kinds of judgement.
 2. **The test gate** — every `tests/*.tests.ps1` suite.
 3. **The scaffold gate** — refuses an entry still carrying the wording `new-branch.ps1` wrote, or one whose
    description, body or any tier reason is still empty once HTML comments are stripped.
-4. **The step-list gate** — refuses while `workflow-davekjohn/branch/branch-progress.md` has an unresolved step. `ship-pr.ps1`
+4. **The step-list gate** — refuses while `workflow-davekjohn/branch/branch-cycle.md` has an unresolved step. `ship-pr.ps1`
    refuses at the merge for the same reason, and **this one has no `-Force`**: the `- [~]` dropped mark is
    the way past a step that turned out not to be needed.
 

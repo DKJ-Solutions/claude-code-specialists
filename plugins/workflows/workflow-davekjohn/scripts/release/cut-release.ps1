@@ -424,11 +424,11 @@ if ($strayEntries.Count -gt 0) {
 # pending list has just been cleared. The root form announced itself by being a file nobody expected. The
 # branch/ form looks exactly like the reset state at a glance, which is precisely why it needs a gate
 # rather than a reader's attention.
-$cutBranchFiles = Get-BranchFilePaths
-$cutBranchChangelog = Join-Path $repoRoot $cutBranchFiles.Changelog
-if ((Test-Path -LiteralPath $cutBranchChangelog) -and
-    (Test-BranchChangelogIsFilled -Text ([System.IO.File]::ReadAllText($cutBranchChangelog)))) {
-    Write-Error "$($cutBranchFiles.Changelog) still holds an unfolded entry. Fold it first (fold-changelog-entry.ps1); a cut empties CHANGELOG.md, so an entry left here would miss this release and be orphaned afterwards."
+$cutBranchDeploymentRel = Resolve-BranchFilePath -Kind Deployment -RepoRoot $repoRoot
+$cutBranchDeployment = Join-Path $repoRoot $cutBranchDeploymentRel
+if ((Test-Path -LiteralPath $cutBranchDeployment) -and
+    (Test-BranchChangelogIsFilled -Text ([System.IO.File]::ReadAllText($cutBranchDeployment)))) {
+    Write-Error "$cutBranchDeploymentRel still holds an unfolded entry. Fold it first (fold-changelog-entry.ps1); a cut empties CHANGELOG.md, so an entry left here would miss this release and be orphaned afterwards."
     exit 1
 }
 

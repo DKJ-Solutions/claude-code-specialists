@@ -208,7 +208,7 @@ function Get-LiveStage {
 # contract check can name the exact default per knob in its [INFO] line.
 #
 # TWO OF THEM ARE NOW GATE-ONLY (August 6, 2026). Since the branch/ split, new-branch.ps1 writes
-# neither the body heading nor the old to-do placeholder -- branch-progress.md carries the step list, and
+# neither the body heading nor the old to-do placeholder -- branch-cycle.md carries the step list, and
 # the entry's placeholder asks what the change DOES. The body heading stays defined here because it is
 # still a marker open-pr refuses, so a consumer who translated it keeps a gate that recognises their
 # wording rather than only the English one. See $script:EntryScaffoldDefaults in entry-scaffold-lib.ps1.

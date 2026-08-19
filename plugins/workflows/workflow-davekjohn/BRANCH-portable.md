@@ -6,8 +6,8 @@ job each:
 
 | file | subject | who reads it | lifetime |
 |---|---|---|---|
-| `branch-changelog.md` | what the change **does** | whoever reads `CHANGELOG.md` later | folded at the merge, then reset |
-| `branch-progress.md` | what still **must happen** | whoever is working on the branch | reset at the merge; never folded |
+| `branch-deployment.md` | what the change **does** | whoever reads `CHANGELOG.md` later | folded at the merge, then reset |
+| `branch-cycle.md` | what still **must happen** | whoever is working on the branch | reset at the merge; never folded |
 
 Both are written by the shared
 [`scripts/task/new-branch.ps1`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/scripts/task/new-branch.ps1)
@@ -26,8 +26,8 @@ A blank copy of each file also sits in your own `workflow-davekjohn/branch/templ
 
 | template | for |
 |---|---|
-| `workflow-davekjohn/branch/templates/branch_template_changelog.md` | `branch-changelog.md` |
-| `workflow-davekjohn/branch/templates/branch_template_progress.md` | `branch-progress.md` |
+| `workflow-davekjohn/branch/templates/branch_template_cycle.md` | `branch-cycle.md` |
+| `workflow-davekjohn/branch/templates/branch_template_deployment.md` | `branch-deployment.md` |
 
 **They are generated, not maintained.** A template beside a scaffolder that writes the same shape is two
 sources of one format, which is the drift this repo keeps paying for — so their content comes from the
@@ -41,31 +41,31 @@ current — and since the working files became bare, that reference is the only 
 all. Rewriting a drifted copy is what carries a format change into a consumer's reference through the same
 plugin update that carries it into their scripts.
 
-They mark their own heading **`(template)`**, and that is not decoration. A written entry and a template
-now open with the same `##`, which is the signature the fold and the lint use to tell an entry from any
-other markdown — so the marker is what keeps a template from ever being read as somebody's work.
+They name a **placeholder branch** in their heading — `` `<prefix>/<short-name>` `` — and that is not
+decoration. A written entry and a template open with the same `##`, which is the signature the fold and
+the lint use to tell an entry from any other markdown, so something has to keep a template from ever being
+read as somebody's work. That job used to belong to a literal `(template)` marker; the placeholder branch
+does it now, beside a placeholder stamp no real file can carry.
 
-## branch-changelog
+## branch-deployment
 
-`new-branch` already writes this shape into `branch-changelog.md`, so on a fresh branch you are filling
+`new-branch` already writes this shape into `branch-deployment.md`, so on a fresh branch you are filling
 in a form rather than starting from a blank page.
 
-**The file it writes is bare** — the headings, the three fields it fills in itself, and nothing else. The
+**The file it writes is bare** — the headings, the two fields it fills in itself, and nothing else. The
 guidance lives in your `workflow-davekjohn/branch/templates/`, where every field carries an HTML comment saying what a good
 answer looks like. That is what those copies are for: the file you type in is the questions and your
 answers, and the reference is one directory away.
 
-**Three of those fields are filled in for you.** `new-branch` writes the heading, the **Branch ID** (a
-timestamp taken when the branch is created) and the **Branch type** (the prefix of the branch name). What
-is left for you is the description, the body, and the Significance sections.
+**What `new-branch` fills in for you** is the heading and the branch type (the prefix of the branch name).
+What is left for you is the description, the body, and the Significance sections.
 
-They live in **this file only**. They briefly sat at the top of `branch-progress.md` as well, so the pair
-would say whose it is — that was removed, because the same information in two places is free to disagree
-and here it would be visible on every branch. The step list identifies itself by its heading, which is the
-one thing any script reads out of it besides the step marks.
+The **creation stamp is not here** — it is in `branch-cycle.md`'s heading, because that is the document the
+moment belongs to: created with the branch, reset with the merge. This file states what is being
+delivered, and the date a delivery has is the one the fold writes when it lands.
 
-**The heading names the branch, not the change.** That is where the description went: `## `feat/x`
-changelog` is what this file is, and *what changed* is the first section under it. Both branch files carry
+**The heading names the branch, not the change.** That is where the description went: `` ## `feat/x`
+deployment `` is what this file is, and *what changed* is the first section under it. Both branch files carry
 that heading, which is also how the fold finds the branch it needs to look the PR up by.
 
 **That first section is `Branch title`, and it is also the PR title** (Dave, August 7, 2026;
@@ -141,34 +141,36 @@ placeholder anywhere, so `open-pr` measures instead of matching: it names the de
 any tier whose reason is still blank. That catches the untouched entry the placeholders used to catch
 *and* the one whose placeholder was deleted rather than answered.
 
-**The shape itself is in your `workflow-davekjohn/branch/templates/branch_template_changelog.md`** —
+**The shape itself is in your `workflow-davekjohn/branch/templates/branch_template_deployment.md`** —
 field by field, with the guidance for each — so it is deliberately not repeated here. Open that file when
 you want to see the whole form at once.
 
-## branch-progress
+## branch-cycle
 
 The step list is yours. It is never folded and never travels anywhere, so it may hold whatever helps you
 pick the branch back up — notes, links, a scratch list. Two things in it are read by scripts: **the branch
-name in the heading**, which is how the fold finds the PR, and **the step marks under `### Steps`**.
+name in the heading**, which is how the fold finds the PR, and **the step marks** wherever they stand.
 
-It carries **nothing but that** — no description, no ID, no type. Those are the entry's, and repeating them
-here would be one fact in two files. `new-branch` scaffolds one open step, so the gate below has something
-to refuse; the shape is in
-your `workflow-davekjohn/branch/templates/branch_template_progress.md`.
+It carries **no description and no type** — those are the entry's, and repeating them here would be one
+fact in two files. What it does carry beside the branch name is the **creation stamp**: the moment this
+branch began, in the document that begins and ends with it. `new-branch` scaffolds one open step, so the
+gate below has something to refuse; the shape is in
+your `workflow-davekjohn/branch/templates/branch_template_cycle.md`.
 
-### The three phases, and the fourth that is not here
+### The four phases, and why one of them stays empty
 
-`### Steps` is scaffolded with **PLAN**, **CREATE** and **TEST** as headings, so a branch moves through a
-recognisable arc instead of an ad-hoc list. They are headings *inside* the section rather than sections of
-their own, and the gate reads step marks only — so the arc is drawn on top of the mechanism without
-touching it. **A phase with nothing under it is not a finding**: a branch that had nothing to test says so
-by leaving that heading bare, exactly as a branch with no step list at all is permitted.
+The file is scaffolded with **PLAN**, **CREATE**, **TEST** and **DEPLOY** as its headings, so a branch
+moves through a recognisable arc instead of an ad-hoc list. The gate reads step marks only, so a heading of
+any level is invisible to it and the arc is drawn on top of the mechanism without touching it. **A phase
+with nothing under it is not a finding**: a branch that had nothing to test says so by leaving that heading
+bare, exactly as a branch with no step list at all is permitted.
 
-**DEPLOY is the fourth phase and it is deliberately not in this file** (Dave, August 14, 2026,
-[#655](https://github.com/DaveKJohn/claude-code-specialists/issues/655)). It is not a step, it is the
-**result** — and the result is the other document: `branch-changelog.md` is the part that travels, folding
-into `CHANGELOG.md` at the merge while this file is reset. So the arc runs across the pair, three phases
-here and the fourth beside it.
+**DEPLOY takes no steps of its own** (Dave, August 14, 2026,
+[#655](https://github.com/DaveKJohn/claude-code-specialists/issues/655); shown as a heading since
+August 19). It is not a step, it is the **result** — and the result is the other document:
+`branch-deployment.md` is the part that travels, folding into `CHANGELOG.md` at the merge while this file
+is reset. The heading is there to point at it, which is what its guidance says; a checkbox under it could
+only be a lie.
 
 That also explains a rule which otherwise looks arbitrary: a step written for *after* the merge is refused.
 Post-merge is DEPLOY's territory, and DEPLOY is a different file. A DEPLOY checkbox here could only be
@@ -189,7 +191,7 @@ Two files make it obvious. The entry asks what the change does. The step list as
 
 ## Why the names are fixed
 
-`branch-changelog.md` and `branch-progress.md` are the same on every branch, which looks like it should
+`branch-deployment.md` and `branch-cycle.md` are the same on every branch, which looks like it should
 collide the moment two branches exist. It cannot: **git already tracks these files per branch**, so each
 branch carries its own version of the same path and a checkout swaps them. The per-branch filename this
 replaced was solving a problem version control had already solved, and it cost a repo root that filled
@@ -221,15 +223,21 @@ On `main` both files sit in an empty **reset state** — a short explanation, an
 branch line saying not to write here until a branch exists. That is what you are looking at if you open
 them on the trunk: the empty state, not a lost entry.
 
-The reset state opens with an `#` (an H1), and that is load-bearing rather than cosmetic. The fold
-recognises an entry by its heading level, and a written entry heading is an `##`. So the trunk's own empty
-file can never be folded as if it were a change, and folding twice is impossible rather than merely
-unlikely. **Both files follow that rule** — H1 while empty, H2 once a branch owns them — so the pair looks
-the same in both states.
+The reset state opens with an `#` (an H1), and for the **deployment** file that is load-bearing rather
+than cosmetic. The fold recognises an entry by its heading level, and a written entry heading is an `##`.
+So the trunk's own empty file can never be folded as if it were a change, and folding twice is impossible
+rather than merely unlikely — `branch-deployment.md` is an H1 while empty and an H2 once a branch owns it.
 
-One consequence, handled where it lands: `branch-progress.md` now carries the same `##` a changelog entry
-does, so the lint's entry check excludes it **by path**. It is not an entry, and the path is what says so
-— its `### Steps` heading is only how that shows.
+**`branch-cycle.md` is an H1 in both states**, with its phases as the `##` sections under it. It is a whole
+document rather than a block waiting to be pasted into one: it is opened on its own and never travels, so
+its title is the document's own heading. It loses nothing by not switching level, because nothing folds it
+— what tells its two states apart is the branch **name** in that heading, the trunk's while it is reset and
+yours once it is not, and the reader of that name accepts either level.
+
+One consequence worth knowing, because it used to be the other way round: the lint's entry check excludes
+the cycle file **by path** rather than by inspecting it. The `#` now says on its own that this is no
+changelog entry, but the path is what makes the exclusion true regardless of what anyone writes in the
+file — and that is the reason it was chosen when the file did carry an entry's `##`.
 
 ## Rules
 
@@ -237,7 +245,7 @@ does, so the lint's entry check excludes it **by path**. It is not an entry, and
    makes it pasteable into `CHANGELOG.md` in one go, which is its whole reason for existing. Since the
    dossier form the block opens with the branch, and that is what lands in the changelog.
 2. **Links in the entry are written root-relative**, as if the file were already in the repo root —
-   because after the fold it is. Your lint gate, where you have one, checks them from there. Links in `branch-progress.md`
+   because after the fold it is. Your lint gate, where you have one, checks them from there. Links in `branch-cycle.md`
    follow the ordinary nested convention (`../scripts/...`): that file never travels.
 3. **Every step is resolved before the PR.** `open-pr.ps1` and `ship-pr.ps1` both refuse while anything
    is unresolved. Three marks:
@@ -258,12 +266,12 @@ does, so the lint's entry check excludes it **by path**. It is not an entry, and
    uses to explain itself.
 4. **A step still carrying the scaffold's own placeholder is refused, ticked or not.** Ticking the
    scaffolded first step without replacing it reports a plan as finished that was never written. The
-   template shows the Steps section **empty** — an example whose first line is somebody else's TODO gets
+   template shows the phases **empty** -- an example whose first line is somebody else's TODO gets
    copied in — but the file a branch actually gets carries one open step, so the gate has something to
    refuse (Dave, August 6, 2026).
 5. **Work that happens after the merge is not a step.** Opening the PR, waiting for CI, merging, folding,
    publishing a GitHub Release, taking a measurement that only exists once the run is over — none of it
-   belongs under `### Steps`. Put it in **`### Where I left off`**, which is exactly what that section is
+   belongs under a phase heading. Put it in **`### Where I left off`**, which is exactly what that section is
    for.
 
    **Neither mark fits it, and that is the whole argument.** The gate above runs *before* the push, so at
@@ -303,7 +311,7 @@ right after the merge:
 1. **strips any HTML comments** — the scaffolder writes none, but a branch created before that, or one
    pasted from a template, carries them, and they are the form rather than the answer;
 2. inserts the entry at the **top** of `CHANGELOG.md`'s list — that document is newest-first — with the
-   PR link and merge date written into `### Pull Request`;
+   PR link written into `### Pull Request` and the merge moment stamped on its heading;
 3. **resets both files** to the empty state you see on the trunk;
 4. commits exactly those three paths.
 

@@ -1,7 +1,7 @@
 # `workflow-davekjohn/branch/` — the two files a branch works in
 
 Everything a branch needs to carry lives here, split into two files with one job each — the entry
-(`branch-changelog.md`) and the step list (`branch-progress.md`). **The convention is not this repo's
+(`branch-deployment.md`) and the step list (`branch-cycle.md`). **The convention is not this repo's
 own** — it is what the `workflow-davekjohn` plugin does, in every repo that enables it, and it is
 described once, with the plugin:
 
@@ -29,8 +29,8 @@ only this location.
 > plugin. This part is the claude-code-specialists lens: if you adopt the convention in your own repo,
 > this is the section you replace.*
 
-- **The directory's contents here:** [`branch-changelog.md`](branch-changelog.md) ·
-  [`branch-progress.md`](branch-progress.md) · the generated references in [`templates/`](templates/).
+- **The directory's contents here:** [`branch-deployment.md`](branch-deployment.md) ·
+  [`branch-cycle.md`](branch-cycle.md) · the generated references in [`templates/`](templates/).
 - **The audience tier is `2`** (`Get-ReleaseAudienceTier`), so the entry scaffolds the two questions rather
   than numbered sub-headings: `### What does the change on this branch deploy to main?` carries tier 0, and
   `#### What makes this change extra special` inside it carries tier 2 — the worked example in the portable

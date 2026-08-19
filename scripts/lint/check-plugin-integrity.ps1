@@ -704,10 +704,13 @@ foreach ($lf in $linkFiles) {
     # THE STEP LIST IS DELIBERATELY NOT INCLUDED, though it sits in the same directory. It never travels:
     # it is read where it lies and reset in place, so 'where the file sits' IS its destination, and the
     # ordinary '../' convention every other nested document here follows is the correct one for it.
-    $entryRelForLinks = ((Get-BranchFilePaths).Changelog -replace '/', '\')
+    # BOTH NAMES, because a branch created before the August 19, 2026 rename still carries
+    # branch-changelog.md and its links resolve from the same place -- see Resolve-BranchFilePath.
+    $entryRelsForLinks = @((Get-BranchFilePaths).Deployment, (Get-BranchFilePaths).LegacyDeployment) |
+        ForEach-Object { '\' + ($_ -replace '/', '\') }
     if ($lf -match '\\personas\\.*-persona\.md$') {
         $dir = Join-Path $RepoRoot '.claude\extensions'
-    } elseif ($lf.EndsWith('\' + $entryRelForLinks)) {
+    } elseif (@($entryRelsForLinks | Where-Object { $lf.EndsWith($_) }).Count -gt 0) {
         $dir = $RepoRoot
     } else {
         $dir = Split-Path -Parent $lf
@@ -1356,7 +1359,15 @@ $ehSectionLevel = Get-EntrySectionLevel
 $ehSectionNames = @((Get-EntrySectionHeadings).Values) + @(Get-EntryRetiredSectionHeadings)
 # At or above the entry's own level: '#' .. '##' while an entry is an H2.
 $ehTooHighRx = '^#{1,' + $ehEntryLevel + '}\s'
-$ehSectionRx = '^#{' + $ehSectionLevel + '}\s+(.+?)\s*$'
+# AND THE SAME TAIL TOLERANCE THE LIB'S READERS GOT (August 19, 2026) -- this gate is one of them, and it
+# was the one left out. The 'Pull Request' heading carries the merge stamp now, so a folded entry reaches
+# CHANGELOG.md as '### Pull Request <middot> 20260819-171500'. Anchored on a bare '\s*$' the name has to be
+# the whole line, so that heading reads as a section nobody declares and the CHANGELOG.md half below raises
+# [entry-heading] on it -- on the one write that happens directly on main, past every PR gate, inside the
+# required CI check. Every PR after the first fold would have been blocked by the fold of the one before it.
+# THE STAMP IS STRIPPED BEFORE THE COMPARISON, not tolerated inside it: the capture is still only the name,
+# so 'Who is this For' differing by one letter is caught exactly as strictly as it was.
+$ehSectionRx = '^#{' + $ehSectionLevel + '}\s+(.+?)' + (Get-EntrySectionHeadingTail)
 
 function Test-IsDeclaredSectionHeading([string]$Line) {
     # $true when the line is a section heading whose text is one this repo declares. The comparison is
@@ -1374,21 +1385,24 @@ function Test-IsDeclaredSectionHeading([string]$Line) {
 #
 # AND THE STEP LIST IS EXCLUDED BY NAME, which it never had to be before (Dave, August 6, 2026). Both branch
 # files open with an H2 in the dossier form, so the structural test alone -- which is the only thing that
-# tells an entry from a root doc -- now says yes to branch-progress.md as well. It is not an entry: its
-# sections are 'Steps' and 'Where I left off', so every branch would have collected two [entry-heading]
+# tells an entry from a root doc -- now says yes to branch-cycle.md as well. It is not an entry: its
+# sections are the phase headings and 'Where I left off', so every branch would have collected several [entry-heading]
 # errors for a file that is doing exactly what it should. Excluded by PATH rather than by inspecting its
 # headings, because the path is what makes it not an entry; the heading names are just how it shows.
 #
-# The fold needed no such repair: it reaches branch-changelog.md by path and only ever applies the
+# The fold needed no such repair: it reaches branch-deployment.md by path and only ever applies the
 # structural test to loose *.md in the ROOT, where the step list has never lived.
 $entryFilesForHeadings = @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
     Where-Object { Test-IsChangelogEntryFile -Path $_.FullName })
 $branchPathsForHeadings = Get-BranchFilePaths
 $branchDirForHeadings = Join-Path $RepoRoot $branchPathsForHeadings.Directory
-$progressForHeadings = Join-Path $RepoRoot ($branchPathsForHeadings.Progress -replace '/', '\')
+# BOTH NAMES OF THE STEP LIST ARE EXCLUDED: a branch created before the August 19, 2026 rename carries
+# branch-progress.md, and that file is no more an entry than branch-cycle.md is.
+$progressForHeadings = @($branchPathsForHeadings.Cycle, $branchPathsForHeadings.LegacyCycle) |
+    ForEach-Object { Join-Path $RepoRoot ($_ -replace '/', '\') }
 if (Test-Path -LiteralPath $branchDirForHeadings) {
     $entryFilesForHeadings += @(Get-ChildItem -Path $branchDirForHeadings -Filter '*.md' -File |
-        Where-Object { $_.FullName -ne $progressForHeadings } |
+        Where-Object { $progressForHeadings -notcontains $_.FullName } |
         Where-Object { Test-IsChangelogEntryFile -Path $_.FullName })
 }
 foreach ($ef in $entryFilesForHeadings) {
@@ -2029,7 +2043,8 @@ $scFiles = @($linkFiles | Where-Object {
     # Get-BranchFilePaths returns forward slashes while $rel is built from a
     # Windows path, so the two never compared equal and the exclusion did nothing. The step list of the very
     # branch that added this check was then reported for QUOTING a stale count while explaining it.
-    $scBranchFiles = @((Get-BranchFilePaths).Changelog, (Get-BranchFilePaths).Progress) |
+    $scPaths = Get-BranchFilePaths
+    $scBranchFiles = @($scPaths.Cycle, $scPaths.Deployment, $scPaths.LegacyCycle, $scPaths.LegacyDeployment) |
         ForEach-Object { $_ -replace '/', '\' }
     if ($scBranchFiles -contains $rel) { return $false }
     return $true

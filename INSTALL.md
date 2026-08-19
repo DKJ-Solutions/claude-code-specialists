@@ -406,8 +406,8 @@ it was coming.
   warn**, not a refusal, and the entry's type falls back to whatever `Get-EntryFallbackType` says.
 
 **The entry files moved out of your repo root.** A branch used to carry `<branch-name>.md` beside your
-`README.md`; it now carries `workflow-davekjohn/branch/branch-changelog.md` (what the change does) and
-`workflow-davekjohn/branch/branch-progress.md` (what still has to happen), with reference copies under `workflow-davekjohn/branch/templates/`.
+`README.md`; it now carries `workflow-davekjohn/branch/branch-deployment.md` (what the change does) and
+`workflow-davekjohn/branch/branch-cycle.md` (what still has to happen), with reference copies under `workflow-davekjohn/branch/templates/`.
 
 - **Look for a gate keyed on the old name before you use the `new-branch` skill.** The measured case was a
   CI step asserting that `"$(echo "$BRANCH" | tr '/' '-').md"` exists in the repo root — which fails

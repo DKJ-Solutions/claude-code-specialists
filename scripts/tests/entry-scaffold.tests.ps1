@@ -167,15 +167,15 @@ try {
     $ErrorActionPreference = $prevEap
 }
 
-# branch/branch-changelog.md, not feat-round-trip.md in the root: since the branch/ split the writer uses
+# branch/branch-deployment.md, not feat-round-trip.md in the root: since the branch/ split the writer uses
 # fixed paths, and the path it uses comes from the same lib the readers use.
-$writtenEntry = Join-Path $fixture ((Get-BranchFilePaths).Changelog)
+$writtenEntry = Join-Path $fixture ((Get-BranchFilePaths).Deployment)
 Assert-True (Test-Path -LiteralPath $writtenEntry) 'the writer produced an entry file in the fixture'
 
 # THE SECOND FILE, which is the half of the split the entry itself can no longer be asked about: the step
 # list exists, names the branch it was created on, and is a separate document rather than a section of the
 # entry. Asserted on the real writer's output for the same reason the entry is.
-$writtenProgress = Join-Path $fixture ((Get-BranchFilePaths).Progress)
+$writtenProgress = Join-Path $fixture ((Get-BranchFilePaths).Cycle)
 Assert-True (Test-Path -LiteralPath $writtenProgress) 'the writer produced the step list beside it'
 if (Test-Path -LiteralPath $writtenProgress) {
     $progressText = [System.IO.File]::ReadAllText($writtenProgress, [System.Text.Encoding]::UTF8)
@@ -355,22 +355,39 @@ Assert-Equal 'Tier: 2' (Format-EntryTierLine -Tier 2) 'and writes the tier it is
 #     without a PR -- the fold drives a live remote -- so the with-a-PR path, which is the only path
 #     this line has, could not be reached there. Extracting the pure part is the same move (and the
 #     same reason) as Get-ExistingPrRecord in pr-issues-lib.ps1.
-Write-Host "the fold footer (Format-EntryFoldFooter)" -ForegroundColor Cyan
-$footer = Format-EntryFoldFooter -Number 468 -Url 'https://gh.test/pr/468' -MergedAt '2026-08-05T09:14:00Z' -FallbackDate '2099-01-01'
-Assert-Equal "[PR #468](https://gh.test/pr/468) $md merged 2026-08-05" $footer 'the footer carries the PR link and the merge date on one line'
-Assert-True ($footer -notmatch '2099') 'the PR timestamp wins over the fallback -- the clock is not consulted when gh answered'
-# THE CASE THE WHOLE CHANGE IS ABOUT: a fold that runs the day after the merge must still date the
+Write-Host "the fold footer (Format-EntryFoldFooter) and the merge stamp beside it" -ForegroundColor Cyan
+# THE LINE IS THE PR AND NOTHING ELSE SINCE AUGUST 19, 2026 (Dave). It carried ' <middot> merged <date>'
+# from August 5; the date stamps the 'Pull Request' heading now, so the same fact does not stand twice in
+# one section. Asserted as the WHOLE line, which is the claim that proves the date is gone rather than moved
+# within it.
+$footer = Format-EntryFoldFooter -Number 468 -Url 'https://gh.test/pr/468'
+Assert-Equal '[PR #468](https://gh.test/pr/468)' $footer 'the footer carries the PR link, and only that'
+
+# UNLESS THERE IS NO HEADING TO HOLD THE DATE, which is the one case the move above left with nothing.
+# A pre-dossier entry has no named sections at all -- its title WAS its heading -- so Set-EntryMergeStamp
+# finds nothing to stamp and returns the text unchanged, silently. Without this fallback such an entry
+# would land with a PR link and no landing date, in the one document whose subject is when things landed,
+# where the same entry folded a day earlier always carried one. Every branch in flight from before
+# August 6, 2026 is that shape, here and in every consumer.
+$footerLegacy = Format-EntryFoldFooter -Number 468 -Url 'https://gh.test/pr/468' -MergedStamp '20260819-171500'
+Assert-Equal "[PR #468](https://gh.test/pr/468) $md merged 20260819-171500" $footerLegacy 'with no heading to stamp, the line carries the landing moment instead'
+Assert-Equal $footer (Format-EntryFoldFooter -Number 468 -Url 'https://gh.test/pr/468' -MergedStamp '') 'and an empty stamp leaves the line exactly as the normal path writes it -- the date is never in both places'
+
+# THE DATE ITSELF IS STILL THE PR'S RATHER THAN THE CLOCK'S -- the reasoning the line used to carry, now
+# living on the stamp. Same three cases, one heading up.
+$stampOnTime = Format-EntryMergeStamp -MergedAt '2026-08-05T09:14:00Z' -FallbackNow '20990101-000000'
+Assert-True ($stampOnTime -match '^2026080[45]-\d{6}$') 'the stamp is the PR merge moment'
+Assert-True ($stampOnTime -notmatch '2099') 'the PR timestamp wins over the fallback -- the clock is not consulted when gh answered'
+# THE CASE THE WHOLE MECHANISM IS ABOUT: a fold that runs the day after the merge must still date the
 # entry by the merge, not by the run. Measured in this repo -- unfolded entries were once found in the
 # root the morning after they landed.
-$footerLate = Format-EntryFoldFooter -Number 12 -Url 'u' -MergedAt '2026-08-05T23:30:00Z' -FallbackDate '2026-08-07'
-Assert-True ($footerLate -match 'merged 2026-08-0[56]$') 'a late fold still dates the entry by the merge, not by the day it was folded'
+$stampLate = Format-EntryMergeStamp -MergedAt '2026-08-05T23:30:00Z' -FallbackNow '20260807-101500'
+Assert-True ($stampLate -match '^2026080[56]-') 'a late fold still dates the entry by the merge, not by the day it was folded'
 # No timestamp: a PR found but not yet merged, which -Branch mode can reach. Then "now" really is the
-# best available answer, so the fallback is used rather than the line being dropped.
-$footerNone = Format-EntryFoldFooter -Number 5 -Url 'u' -FallbackDate '2026-08-05'
-Assert-Equal "[PR #5](u) $md merged 2026-08-05" $footerNone 'no merge timestamp: the caller-supplied date is used'
-# A malformed timestamp must not turn a completed fold into a failure over a cosmetic line.
-$footerBad = Format-EntryFoldFooter -Number 6 -Url 'u' -MergedAt 'not-a-date' -FallbackDate '2026-08-05'
-Assert-Equal "[PR #6](u) $md merged 2026-08-05" $footerBad 'an unparseable timestamp degrades to the fallback instead of throwing'
+# best available answer, so the fallback is used rather than the stamp being dropped.
+Assert-Equal '20260805-120000' (Format-EntryMergeStamp -FallbackNow '20260805-120000') 'no merge timestamp: the caller-supplied moment is used'
+# A malformed timestamp must not turn a completed fold into a failure over a cosmetic field.
+Assert-Equal '20260805-120000' (Format-EntryMergeStamp -MergedAt 'not-a-date' -FallbackNow '20260805-120000') 'an unparseable timestamp degrades to the fallback instead of throwing'
 
 $entry2 = "### A title $md Feat $md 2026-08-05`n`nTier: 2`n`n**Body heading**`n`nBody text.`n"
 $t2 = Resolve-EntryTier -EntryText $entry2
@@ -1152,35 +1169,124 @@ Assert-Equal 0 @(Get-BranchProgressFindings -Text ((Format-BranchProgressReset) 
 # mechanism. Asserted in that order: the headings are there, AND they change no verdict.
 Write-Host "the step list follows the SDLC arc (#655)" -ForegroundColor Cyan
 $phases = @((Get-BranchFileWording).StepPhases)
-Assert-Equal 3 $phases.Count 'three phases are configured -- PLAN, CREATE, TEST'
+Assert-Equal 4 $phases.Count 'four phases are configured -- PLAN, CREATE, TEST, DEPLOY'
+# THE LEVEL IS READ, NOT TYPED, and that is the repair rather than a style point: these asserts were
+# pinned on a literal '###' and went red the moment Dave promoted the file's whole structure by hand
+# (August 19, 2026). A test that hardcodes the shape it is measuring reports a deliberate change as a
+# defect, which is exactly the noise that gets a suite skipped.
+$cycleSec = '#{' + (Get-BranchCycleSectionLevel) + '}'
 foreach ($phase in $phases) {
-    Assert-True ($freshScaffold -match "(?m)^#{4}\s+$([regex]::Escape($phase))\s*$") "the scaffold carries a '$phase' heading"
+    Assert-True ($freshScaffold -match "(?m)^$cycleSec\s+$([regex]::Escape($phase))\s*$") "the scaffold carries a '$phase' heading"
 }
-# DEPLOY IS ABSENT ON PURPOSE, and this is the assert that records why (Dave, August 14, 2026). It is not a
-# step but the RESULT -- the changelog entry beside this file, which is the half that travels into
-# CHANGELOG.md at the merge. A DEPLOY checkbox could only be unresolvable, since the list must be clear
-# before open-pr will push, or ticked before it happened. If somebody adds one, this goes red.
-Assert-True (-not ($freshScaffold -match '(?im)^#{2,4}\s+DEPLOY')) 'DEPLOY is NOT a phase of the step list -- it is the changelog entry, the other file'
+# THE CYCLE FILE IS A DOCUMENT, NOT A BLOCK WAITING TO BE PASTED INTO ONE (Dave, August 19, 2026): its
+# title is an H1 and its phases are the H2 sections under it, one level shallower than the entry beside
+# it. Asserted as a RELATION as well as two numbers, because the numbers are the part a consumer may
+# re-level and the relation is the part that must hold whatever they choose.
+Assert-Equal 1 (Get-BranchCycleHeadingLevel) "the cycle file's own heading is an H1 -- it is opened on its own and never travels"
+Assert-Equal 2 (Get-BranchCycleSectionLevel) 'and its phases are the H2 sections of that document'
+Assert-True ((Get-BranchCycleSectionLevel) -eq ((Get-BranchCycleHeadingLevel) + 1)) 'the sections sit exactly one level under the title'
+Assert-True ((Get-BranchCycleHeadingLevel) -lt (Get-EntryHeadingLevel)) 'and the whole file sits shallower than the entry, which has to arrive at CHANGELOG.md its own level'
+# DEPLOY CARRIES NO STEP, and this is the assert that records why (Dave, August 14, 2026; shown as a
+# heading since August 19). It is not a step but the RESULT -- the deployment entry beside this file, which
+# is the half that travels into CHANGELOG.md at the merge. A DEPLOY checkbox could only be unresolvable,
+# since the list must be clear before open-pr will push, or ticked before it happened. So the heading is a
+# pointer: if somebody scaffolds a step under it, this goes red.
+$deployBlock = if ($freshScaffold -match "(?ms)^$cycleSec\s+DEPLOY\s*`$(.*?)(?=^$cycleSec\s|\z)") { $Matches[1] } else { '' }
+Assert-Equal 0 @(Get-BranchProgressFindings -Text $deployBlock).Count 'DEPLOY is scaffolded with no step of its own'
 
 # The placeholder sits under CREATE, not under PLAN: a fresh branch has just been planned, and a TODO under
 # PLAN would say the opposite.
-$createBlock = if ($freshScaffold -match '(?ms)^####\s+CREATE\s*$(.*?)(?=^####\s|\z)') { $Matches[1] } else { '' }
+$createBlock = if ($freshScaffold -match "(?ms)^$cycleSec\s+CREATE\s*`$(.*?)(?=^$cycleSec\s|\z)") { $Matches[1] } else { '' }
 Assert-True ($createBlock -match [regex]::Escape((Get-BranchFileWording).FirstStep)) 'the scaffolded step sits under CREATE'
 
 # An empty phase is a statement, not a finding -- the same tolerance the absent-plan case gets above.
-$emptyPhases = "### Steps`n`n#### PLAN`n`n#### CREATE`n`n- [x] did the thing`n`n#### TEST`n"
+$emptyPhases = "### PLAN`n`n### CREATE`n`n- [x] did the thing`n`n### TEST`n"
 Assert-Equal 0 @(Get-BranchProgressFindings -Text $emptyPhases).Count 'a phase with nothing under it is not a finding'
 
 # The template shows the arc but never a step -- an example whose first line is somebody else's TODO gets
 # copied in, which is the rule the template already lived by before the phases existed.
 $phaseTemplate = ((Format-BranchProgressScaffold -Branch 'x/y' -Template) -join "`n")
-Assert-True ($phaseTemplate -match '(?m)^####\s+PLAN\s*$') 'the template carries the arc'
+Assert-True ($phaseTemplate -match "(?m)^$cycleSec\s+PLAN\s*`$") 'the template carries the arc'
 Assert-Equal 0 @(Get-BranchProgressFindings -Text $phaseTemplate).Count 'and still carries no step of its own'
 
 # Fence-aware, like every reader of this format: this repo's own branch/README.md quotes all three marks
 # while teaching them, and a step list may legitimately do the same.
 $quoted = "## Steps`n`n- [x] documented the marks`n`n" + '```text' + "`n- [ ] not done yet`n" + '```' + "`n"
 Assert-Equal 0 @(Get-BranchProgressFindings -Text $quoted).Count 'an open step QUOTED inside a fence is not an open step'
+
+# --- cycle and deployment: the rename, the two stamps, and the dual-read (Dave, August 19, 2026) ---
+Write-Host ""
+Write-Host "the pair is cycle + deployment, and the old names are still read" -ForegroundColor Cyan
+
+$bfp = Get-BranchFilePaths
+Assert-True ($bfp.Cycle.EndsWith('branch-cycle.md')) 'the step list is written as branch-cycle.md'
+Assert-True ($bfp.Deployment.EndsWith('branch-deployment.md')) 'and the entry as branch-deployment.md'
+Assert-True ($bfp.LegacyCycle.EndsWith('branch-progress.md')) 'the pre-rename step list is still named'
+Assert-True ($bfp.LegacyDeployment.EndsWith('branch-changelog.md')) 'and so is the pre-rename entry'
+
+# THE DUAL-READ IS WHAT KEEPS A BRANCH IN FLIGHT WHOLE, so it is measured on a tree rather than asserted
+# about the strings: a repo holding only the old name must resolve to the old name, or its entry is
+# invisible to the fold and its steps to the gate.
+$resolveFx = Join-Path ([System.IO.Path]::GetTempPath()) "branch-file-resolve-$PID"
+if (Test-Path -LiteralPath $resolveFx) { Remove-Item -Recurse -Force -LiteralPath $resolveFx }
+New-Item -ItemType Directory -Path (Join-Path $resolveFx ($bfp.Directory -replace '/', '\')) -Force | Out-Null
+try {
+    Assert-Equal $bfp.Cycle (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'neither file present: the resolver names the CURRENT one, so a writer creates that'
+    [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.LegacyCycle -replace '/', '\')), "# `main` progress`n")
+    Assert-Equal $bfp.LegacyCycle (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'only the old name present: the resolver finds it, so a branch in flight is not stranded'
+    [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.Cycle -replace '/', '\')), "# `main` cycle`n")
+    Assert-Equal $bfp.Cycle (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'both present: the current name wins'
+} finally {
+    Remove-Item -Recurse -Force -LiteralPath $resolveFx -ErrorAction SilentlyContinue
+}
+
+# THE TWO STAMPS SIT AT THE TWO ENDS OF THE BRANCH'S LIFE. The creation stamp is the cycle file's, written
+# by the scaffolder; the landing stamp is the entry's, written by the fold. Neither may appear in the
+# other's document -- that is the whole reason the ID moved out of the entry heading.
+$stampedCycle = ((Format-BranchProgressScaffold -Branch 'feat/x' -Id '20260819-171500') -join "`n")
+Assert-True ((($stampedCycle -split "`n")[0]) -match ('^#{' + (Get-BranchCycleHeadingLevel) + '} `feat/x` cycle ' + [regex]::Escape((Get-EntryIdSeparator)) + ' 20260819-171500$')) 'the cycle heading carries the branch and its creation stamp'
+$bareEntry = ((Format-EntryBlock -Branch 'feat/x' -Description 'A title' -Type 'Enhancement') -join "`n")
+Assert-True (-not ($bareEntry -match '\d{8}-\d{6}')) 'and a freshly scaffolded entry carries no stamp anywhere -- the fold has not run'
+
+$templateCycle = ((Format-BranchProgressScaffold -Branch 'x/y' -Template) -join "`n")
+Assert-True ($templateCycle.Contains((Get-EntryIdTemplatePlaceholder))) 'the cycle template shows the creation stamp as a placeholder'
+$templateEntry = ((Format-EntryBlock -Branch 'x/y' -Template) -join "`n")
+Assert-True ($templateEntry.Contains((Get-EntryMergeStampTemplatePlaceholder))) 'and the deployment template shows the landing stamp as one'
+
+# THE RESTAMP, WHICH IS THE HALF A READER CAN BREAK. A stamped section heading is still the section: if
+# any of the six matchers had kept its bare '\s*$', the entry would report the section as ABSENT -- read
+# by the gates as "not answered yet" and by the fold as nothing to fill.
+$stamped = Set-EntryMergeStamp -EntryText $bareEntry -Stamp '20260819-171500'
+Assert-True ($stamped -match ('(?m)^### Pull Request ' + [regex]::Escape((Get-EntryIdSeparator)) + ' 20260819-171500$')) 'the fold stamps the landing moment onto the Pull Request heading'
+Assert-Equal 'A title' (Get-EntrySectionBody -EntryText $stamped -Key 'PullRequest') 'and the section is still found under its stamped heading'
+Assert-True (Test-EntryHasSection -EntryText $stamped -Key 'PullRequest') 'and still counts as present, so the emptiness gate does not accuse it'
+Assert-True (Test-EntryDeclaresShape -EntryText $stamped) 'and the entry still declares its shape'
+
+# Restamped rather than appended to, so folding twice cannot grow a line of timestamps -- and a heading
+# still carrying the TEMPLATE's placeholder comes out with a real stamp.
+$twice = Set-EntryMergeStamp -EntryText $stamped -Stamp '20260820-090000'
+Assert-True ($twice -match '(?m)^### Pull Request .+ 20260820-090000$') 'a second fold restamps'
+Assert-True (-not ($twice -match '20260819-171500')) 'and does not leave the first stamp behind'
+Assert-Equal $bareEntry (Set-EntryMergeStamp -EntryText $bareEntry -Stamp '') 'an empty stamp changes nothing -- a fold with no PR leaves the heading bare'
+
+# AND THE SHAPE WITH NO SECTION AT ALL, which is the discriminator the fold reads before it decides where
+# to put the date. A pre-dossier entry carried its title AS its heading; the stamp has nowhere to go, and
+# the failure is silent rather than loud -- the text simply comes back unchanged. So the predicate is
+# asserted beside the no-op, because the fold's correctness rests on the pair and not on either alone.
+$preDossier = "### A title $md Feat $md 2026-08-05`n`nTier: 0`n`nSome body text.`n"
+Assert-True (-not (Test-EntryHasSection -EntryText $preDossier -Key 'PullRequest')) 'a pre-dossier entry has no Pull Request section, so the fold knows the heading cannot hold the date'
+Assert-Equal $preDossier (Set-EntryMergeStamp -EntryText $preDossier -Stamp '20260819-171500') 'and the stamp is a silent no-op there -- which is exactly why the closing line has to carry it'
+
+# THE ENTRIES ALREADY WRITTEN SAY 'changelog' IN THEIR HEADING, and every one of them is in CHANGELOG.md
+# right now. The type is read off that word, and Test-EntryDeclaresShape ends on the type -- so a reader
+# that knew only 'deployment' would make the whole existing changelog stop being entries.
+$oldWorded = "## Branch ``feat/x`` changelog`n`n### What does the change on this branch deploy to main?`n`nA reason`n`n**Score:** 2`n"
+$oldWordedType = Resolve-EntryType -EntryText $oldWorded
+Assert-True $oldWordedType.Declared 'an entry headed `changelog` still declares a type off its branch prefix'
+Assert-True (Test-EntryDeclaresShape -EntryText $oldWorded) 'and therefore still reads as an entry'
+Assert-True ((Get-BranchFileRetiredChangelogTitles) -contains 'changelog') 'and the retired title word is registered'
+$oldProgress = "## ``feat/x`` progress`n`n### PLAN`n`n- [x] done`n"
+Assert-True (-not (Test-EntryDeclaresShape -EntryText $oldProgress)) 'while a step list headed `progress` is still not an entry'
 
 # --- 'Branch description' -> 'Branch title' (#506) -------------------------------------------------
 # The rename itself is one line; what needs asserting is that the old name keeps working and that adding

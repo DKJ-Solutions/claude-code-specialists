@@ -71,7 +71,7 @@ carries the type.
 Creating the branch and creating its changelog entry file are no longer two separate manual steps —
 **a branch is never entry-less.** `new-branch.ps1` checks out the branch (idempotently — running it
 again on an existing branch simply resumes it) and writes the branch's two files in `workflow-davekjohn/branch/` in the same
-run: `branch-changelog.md` (the entry) and `branch-progress.md` (the step list). It also writes the
+run: `branch-deployment.md` (the entry) and `branch-cycle.md` (the step list). It also writes the
 reference templates beside them, refreshing one that has drifted. **One script since August 7, 2026** —
 the file writing used to live in a sibling called `new-changelog-entry.ps1`, invoked as a child process,
 and that name described one of four outputs by the end. Mechanism ownership of the entry FORMAT stays with
@@ -106,7 +106,7 @@ table above).
 [#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506) +
 [#505](https://github.com/DaveKJohn/claude-code-specialists/issues/505)). The PR is called
 `<branch-type>: <the entry's Branch title>`, so the prefix mirrors the branch type by construction and the
-words are the ones already in `workflow-davekjohn/branch/branch-changelog.md`. `-Title` is still accepted and ignored, with a
+words are the ones already in `workflow-davekjohn/branch/branch-deployment.md`. `-Title` is still accepted and ignored, with a
 warning naming the title the entry gives.
 
 **That rule used to live in this very paragraph, and was violated five PRs in a row.** It read "the title
@@ -153,7 +153,7 @@ started.
 
 **The PR body fills itself in** via `open-pr.ps1` — simply leave out `-Body`. The script ticks the
 right "Type of change" box (from the branch prefix), fills "What does this change do?" with the
-description from the changelog entry (`workflow-davekjohn/branch/branch-changelog.md`), and ticks the two checklist items
+description from the changelog entry (`workflow-davekjohn/branch/branch-deployment.md`), and ticks the two checklist items
 it can honestly verify ("Changelog entry written" + "Requested by Dave"). The first is judged on the file
 actually **holding** an entry, not on its existing — since the split it exists on `main` too, in its
 reset state, so a self-ticking box keyed on existence would tick for a branch that wrote nothing. Only pass `-Body`
@@ -357,7 +357,7 @@ Derek prefers not to touch the git commands by hand. His toolbox:
 - `scripts/task/new-branch.ps1 -Name <branch-name> [-Title "…"] [-Intent "…"] [-Park]` — create (or
   idempotently resume) the branch and, in the same move, write its two files in `workflow-davekjohn/branch/` by
   calling the shared `new-branch.ps1` as a child step. `-Intent` records where you left
-  off / what is next in **`branch-progress.md`** — deliberately not in the entry, whose text folds
+  off / what is next in **`branch-cycle.md`** — deliberately not in the entry, whose text folds
   verbatim into `CHANGELOG.md`; `-Park` commits **both** files and pushes the branch to `origin` for
   later / another device — **still no PR** (#162). Without `-Park`: no push, no PR — just the branch +
   the two files on disk. See [Step 3 above](#classifying-naming-and-creating-a-branch).

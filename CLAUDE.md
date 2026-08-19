@@ -268,14 +268,14 @@ The constitution above, concretely implemented here:
 - **Two more gates arrive with the workflow plugin**, and both read the branch's own two files: the
   **scaffold gate** refuses to push an entry still carrying the wording `new-branch.ps1` wrote it
   with, and the **step-list gate** refuses to push *and* to merge while
-  `workflow-davekjohn/branch/branch-progress.md` has an unresolved step. Their mechanics, escape
+  `workflow-davekjohn/branch/branch-cycle.md` has an unresolved step. Their mechanics, escape
   valves and the measurements behind them are in
   [`workflow-davekjohn/CLAUDE.md`](workflow-davekjohn/CLAUDE.md#the-two-gates-this-workflow-adds-on-top).
 - **Two deliberate exceptions to "never directly on `main`", each one bounded:**
   1. The **fold commit** after a merge: [`fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)
      folds the entry into `CHANGELOG.md` and clears it, and with `-Commit`/`-Push` makes that commit
      itself. **Bounded to three paths** — `CHANGELOG.md`, the entry, and
-     `workflow-davekjohn/branch/branch-progress.md`, which the same run resets — and the commit names
+     `workflow-davekjohn/branch/branch-cycle.md`, which the same run resets — and the commit names
      them, so nothing else in the tree can ride along. Committing stays opt-in, because it is this
      exception being used.
   2. The **release commit** (only on explicit request): [`cut-release.ps1`](scripts/release/cut-release.ps1)

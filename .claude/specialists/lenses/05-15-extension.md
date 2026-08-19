@@ -647,7 +647,7 @@ subjects is close to nothing to guard; worth revisiting when per-directory READM
 
 **The PR template that caused the collision is itself the change** (Dave, August 9, 2026). It now carries
 one section — the changelog entry — because `open-pr.ps1` composes the body from
-`workflow-davekjohn/branch/branch-changelog.md`, so everything else it asked was already answered four lines lower. Measured
+`workflow-davekjohn/branch/branch-deployment.md`, so everything else it asked was already answered four lines lower. Measured
 over 60 PRs before removing anything: `Type of change` had exactly **one of four** boxes ticked every
 single time, a fact the entry states under `### Branch type` and which the GitHub label takes from
 `Get-BranchInfo` rather than from the tick; of the checklist, `Requested by Dave` and
