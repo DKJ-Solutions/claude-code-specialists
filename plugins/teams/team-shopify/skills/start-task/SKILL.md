@@ -1,29 +1,50 @@
 ---
 name: start-task
-description: Start a new task — creates the git branch and the associated invisible preview theme via scripts/task/start-task.ps1. Invoke manually as "/team-shopify:start-task <prefix>/<short-name>", e.g. /team-shopify:start-task feat/size-chart-popup. Thin wrapper; the branch/theme creation itself stays deterministic in the script.
+description: Start a new task in a Shopify store repo — the git branch plus the matching invisible preview theme. Invoke manually as "/team-shopify:start-task <prefix>/<short-name>", e.g. /team-shopify:start-task feat/size-chart-popup. It drives THIS repo's own start-task script; the team deliberately ships none.
 disable-model-invocation: true
 ---
 
 # start-task — new branch + preview theme
 
-Thin UX wrapper over `scripts/task/start-task.ps1` (in the repo root). The script does the real, **deterministic** work — from `main`, creating a branch `<prefix>/<short-name>` and a preview theme of the same name that is **unpublished**, remembering the theme id in the git config, and printing the preview URLs per market. This skill does not replace the script; it conveniently invokes it with the supplied argument.
+Two things happen at the start of a Shopify task: a branch, and an **unpublished** preview theme of the
+same name to push it to. This page drives both. It does not carry the code for either.
+
+## What this needs from your repo, and why it is not shipped
+
+**`team-shopify` ships no `start-task` script**, and that is a decision rather than an omission. Creating a
+preview theme means the Shopify CLI against one specific store: which markets get a preview URL, where the
+theme id is remembered, and what counts as a safe target are facts about a *store estate*, not about the
+team. So the executing half stays in the repo, conventionally at `scripts/task/start-task.ps1`.
+
+**If your repo has no such script, this skill has nothing to run — say so rather than improvising one.**
+The two steps are then done by hand and your repo's own `CLAUDE.md` is what says how: the branch first, per
+that repo's branch convention, then a `shopify theme push --unpublished` to create the preview. Never
+against a theme whose role is `live`.
 
 ## Argument
 
-The branch name in kebab-case: `<prefix>/<short-name>`, e.g. `feat/size-chart-popup` or `fix/cart-totals`. Valid prefixes are in Derek's branch table (`.claude/manuals/05-05-manual.md`); classify by what changes (among others `feat/`, `fix/`, `style/`, `liquid/`, `gtm/`, `tooling/`, `config/`, `manual/`, `research/`, `extension/`).
+The branch name, in the form **your repo** uses. This page carries no list of prefixes on purpose: a
+taxonomy hardcoded here would contradict whichever one the repo actually has, and it is the repo that
+refuses a bad name. Read it from `CLAUDE.md`, and — in a repo that also runs `workflow-davekjohn` — from
+the seam at `scripts/lib/branch-info.ps1` (`Get-BranchTypes`, `Test-BranchName`), which is where that repo
+states it once for every script that asks. Classify by *what actually changes*.
 
 ## Steps
 
 1. **No argument supplied?** → first ask which branch name is wanted. Do not guess.
-2. **Gatekeepers:** verify that you are on `main` with a clean working tree, and that the pre-task sync has been done this session (the script branches off the current `main`).
-3. **Run the script** via PowerShell — plain, without stderr redirect (the Shopify CLI writes progress to stderr):
+2. **Gatekeepers:** verify you are on the trunk with a clean working tree, and that this session has done
+   its sync. Take the branch convention from the repo, not from memory.
+3. **Run the repo's script**, if it has one — plain, without a stderr redirect (the Shopify CLI writes its
+   progress to stderr):
    ```powershell
    scripts/task/start-task.ps1 -Name "$ARGUMENTS"
    ```
-4. The script **validates the prefix itself** and refuses an invalid name, the `sync/` prefix and `final`. On an error: resolve it per the message, do not invent an alternative.
-5. **On success** the script prints the preview URLs per market — pass them on to the user.
+   No such file? Stop, say that this repo has no start-task script, and offer the by-hand route above.
+4. **A refusal is an answer.** Where the script validates the name, resolve the error it names; do not try
+   another spelling to get past it.
+5. **On success** pass on whatever preview URLs it prints.
 
 ## Boundaries
 
-- Preview action: the theme is `unpublished` and does not touch the live theme.
-- Do not touch `main` or live beyond what the script does.
+- Preview only: the theme is `unpublished` and does not touch the live theme.
+- Do not touch the trunk or live beyond what the script does.
