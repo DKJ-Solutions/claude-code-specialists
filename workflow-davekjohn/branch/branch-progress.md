@@ -1,24 +1,13 @@
-## `docs/handover-transcription` progress
+# `main` progress
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
+
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
 ### Steps
 
-#### PLAN
-
-- [x] Decide which layer owns the lesson: the shipped `/handover` page or the repo lens
-- [x] Portable, per the standing rule -- every repo using `/lock` can produce this failure
-
-#### CREATE
-
-- [x] Add the fifth verify question plus its measurement to `skills/handover/SKILL.md`
-- [x] Keep only a pointer and the one repo-specific note in Chris's lens, rather than the rule twice
-- [~] No mirror rebuild needed -- a skill page is not a shared script, and `build-shared-scripts -Check`
-      confirms the script mirrors are untouched by this branch
-
-#### TEST
-
-- [x] Lint gate, including the dead-link check that reads both edited files
-- [x] The suites that read the skill pages and the lens
-
-### Where I left off
-
-Done; gates green.
+_(filled in when a branch is created)_
