@@ -19,8 +19,10 @@
     function would be needed; that prediction is the one part of it that did not survive reading both
     files, and building on it would have shipped one repo's merge policy to the other.
 
-    Everything else it needs was already repo-owned: Get-RepoName for the `gh --repo` target, and
-    Get-ChangelogHeading, which it never reads itself -- fold-changelog-entry.ps1 does.
+    Everything else it needs was already repo-owned: Get-RepoName for the `gh --repo` target. That
+    sentence used to name Get-ChangelogHeading beside it, "which it never reads itself --
+    fold-changelog-entry.ps1 does". Neither reads it: the seam was retired on August 5, 2026 with the
+    flat changelog (#178), and the fold derives the intro/list boundary from the first entry heading.
 
     Steps, stopping on the first failure (nothing is forced):
       1. open-pr.ps1 [-SkipLint] [-SkipTests] -- runs the local lint + test gate,
@@ -119,7 +121,8 @@
     Passed through to open-pr.ps1: the issue numbers this PR resolves, as a string ('331,332').
     Step 6 verifies them. A string and not an [int[]] for the reason documented on open-pr.ps1's own
     parameter: across `powershell -File` a comma list is cast to one number via the thousands
-    separator ('332,340' -> 332340), silently and without an error.
+    separator ('332,340' -> 332340), silently and without an error. Quote it when calling this script
+    directly, too -- see the same note there for why an unquoted comma list cannot bind at all.
 
 .PARAMETER NoResolves
     Passed through to open-pr.ps1: declare that this PR closes no issue.
@@ -133,7 +136,7 @@
     ./scripts/release/ship-pr.ps1
 
 .EXAMPLE
-    ./scripts/release/ship-pr.ps1 -Resolves 331,332
+    ./scripts/release/ship-pr.ps1 -Resolves '331,332'
 #>
 [CmdletBinding()]
 param(

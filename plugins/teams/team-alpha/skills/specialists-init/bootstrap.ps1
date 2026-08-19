@@ -524,16 +524,6 @@ function Get-LintScript {
     return $script:LintScript
 }
 
-# The CHANGELOG.md section heading fold-changelog folds a merged entry into -- the literal heading
-# line as it appears in the file. Two common shapes: '## Pull Requests' (a merged-PR section with the
-# releases below it) or '## [Unreleased]' (Keep-a-Changelog). Set it to whatever this repo uses; the
-# fold stops with a clear message if the heading is not found (#178).
-$script:ChangelogHeading = '## Pull Requests'
-
-function Get-ChangelogHeading {
-    return $script:ChangelogHeading
-}
-
 # Optional (#177): if this repo has a separate "go live" stage after cutting a release -- e.g. a
 # push to a live deploy target -- describe it here so the cut-release skill's Block 2 (the live push
 # + moving the '<- LIVE' marker) applies. Left empty: most repos (this workshop, life-hub) cut a
