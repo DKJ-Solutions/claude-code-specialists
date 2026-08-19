@@ -56,7 +56,8 @@ accepted, never refused, so no finished dossier became unopenable on the day the
 **`CHANGELOG.md` has no sections to file into** (Dave, August 5, 2026). It is an intro followed by one `##`
 per change, ranked furthest-reach-first and, within a tier, highest-significance-first — so what the three
 `## Tier N - Pull Requests` sections used to say visually is now the ordering, and each entry states its own
-reach in the `### Significance` section it carries, one `#### Tier N` sub-section per reach it claims. The
+reach in its opening section — directly under the question for tier 0, and under
+`#### What makes this change extra special` for the one audience tier the repo has stated. The
 **fold** is the only moment that order can be decided, because the cut empties the list: whatever order it
 leaves is what the release documents inherit, with nothing re-estimated days later.
 
@@ -75,8 +76,8 @@ working axis here — 89 of 95 scored entries carry one — and that number argu
 an artefact of the ladder that required them.
 
 **Where the number comes from: the author of the entry, on the branch.** `new-branch.ps1` writes the
-`#### Tier N` sub-sections this repo asks about with their scores left empty; whoever finishes the branch
-answers each one, with a score or with `N/A` and the reason it reaches nobody there. **The reach is the highest tier carrying a
+blocks this repo asks about with their scores left empty; whoever finishes the branch answers each one, with a
+score or with `N/A` and the reason it reaches nobody there. **The reach is the highest tier carrying a
 number**, so an `N/A` costs a sentence and keeps the reasoning behind a negative claim in the record.
 `open-pr.ps1` refuses an entry whose description, body or any tier's reason is still blank, and
 `fold-changelog-entry.ps1` folds the entry **verbatim** — so the declaration lives in exactly one place, the
@@ -191,9 +192,10 @@ declare its own reach; this document keeps them because it carries all three tie
 place a reader needs them separated.
 
 Each entry arrives whole, exactly as it was folded — its `###` heading naming the **branch**, and beneath it
-the same six `####` sections the scaffolder writes: `Branch title`, `Branch ID`, `Branch type`, `What does
-the change on this branch bring to main?`, `Significance` and `Pull Request`, one heading level deeper than
-in `CHANGELOG.md`. Nothing is rewritten and nothing is cut, which is what "the record" means. There are no
+the same `####` sections the scaffolder wrote on the day it was folded, one heading level deeper than in
+`CHANGELOG.md` — today `What does the change on this branch deploy to main?` and `Pull Request`, and for an
+older entry whichever of the six it was written with.
+Nothing is rewritten and nothing is cut, which is what "the record" means. There are no
 branch-type categories in between — the grouping came from the branch prefix, which this repo measured does
 not predict impact. Tier 0 is in it, unlike in the hand-written note below.
 

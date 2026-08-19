@@ -80,10 +80,19 @@ the branch name already states the type and `open-pr` puts it in front. The sect
 filled in — every change matters to the people who maintain this repo, if only a little. For the audience
 tier the answer may well be *"this reaches nobody here"*, and you say so:
 
-| section | who notices | answer it with |
+| block | who notices | answer it with |
 |---|---|---|
-| `#### Tier 0` | this repo's own developers | a score, always |
-| `#### Tier 2` | a subscriber of the service — **this repo's audience** | a score, or `N/A` if no subscriber would notice |
+| `### What does the change on this branch deploy to main?` | this repo's own developers — **tier 0** | a score, always |
+| `#### What makes this change extra special` | a subscriber of the service — **this repo's audience, tier 2** | a score, or `N/A` if no subscriber would notice |
+
+**Neither heading names a tier, and that is deliberate** (Dave, August 19, 2026). They were `#### Tier 0` and
+`#### Tier 2`: tier 0's heading went away entirely — the question above it is its section — and the audience
+tier's kept its level and changed its words. Two reasons: an author filling one in is answering a question
+rather than classifying a reader, and the second heading **resolves** to whichever audience tier the repo has
+stated, so the form stops naming a number that is only right for repos answering 2. The tiers still exist
+exactly as before; they live in the parser instead of in the prose. **A repo that has stated no audience tier
+keeps the older shape**, a `#### Tier N` sub-section per tier the model has with tier 0 among them, because a
+heading with no tier to resolve to would read as tier 0 and empty its release documents.
 
 **Which of the two audience tiers you get is a repo-level fact, not a per-entry choice** (Dave, August 12,
 2026). Tier 1 (management and the employer/commissioner) and tier 2 (the subscriber of a service) are two
@@ -117,9 +126,9 @@ about is answered before a PR opens.
 - **Nothing may use `##` or `###` inside the body.** A `##` becomes a *separate change* the moment the
   fold pastes this into `CHANGELOG.md` — one that declares no impact, so it reads as tier 0 — and a
   `###` collides with the named sections, truncating whichever one it lands in. Use `####` or
-  bold. Your lint gate checks this where you have one — the source repo's does. Inside
-  `### Significance` the `####` level is structural, so there it
-  is `Tier 0`, `Tier 1` or `Tier 2` and nothing else.
+  bold. Your lint gate checks this where you have one — the source repo's does. Inside the opening section the
+  `####` level is **structural**, so there it is `What makes this change extra special` — or, in a repo that
+  has stated no audience tier, `Tier 0`, `Tier 1` or `Tier 2` — and nothing else.
 - **The `###` section headings are exact.** They are what the parsers look for; a misspelling means the
   entry silently loses that declaration and the gates read nothing.
 - **The score is scaffolded empty**, and that is a question rather than a default. Tier 0 is a harmless

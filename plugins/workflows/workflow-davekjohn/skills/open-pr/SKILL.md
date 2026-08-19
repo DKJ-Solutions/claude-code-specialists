@@ -233,19 +233,18 @@ land with an unfinished plan.
 
 ## The impact gate: how far does this change reach, and how much does it weigh?
 
-The entry also carries a **`### Significance` section** — one `#### Tier N` sub-section per tier the repo asks
-about, each with a reason and a score from 1 to 5. That is **tier 0 plus the single audience tier**
-`Get-ReleaseAudienceTier` names (three sections where a repo has named none), so the example below is a
-tier-2 repo's:
+The entry's **opening section holds the tiers** the repo asks about, each with a reason and a score from 1
+to 5. That is **tier 0 plus the single audience tier** `Get-ReleaseAudienceTier` names — and since
+August 19, 2026 neither heading says so out loud:
 
 ```text
-#### Tier 0
+### What does the change on this branch deploy to main?
 
 The routine version bump stops needing a developer.
 
 **Score:** 4
 
-#### Tier 2
+#### What makes this change extra special
 
 Consumers must re-add the marketplace under its new name.
 
@@ -253,9 +252,11 @@ Consumers must re-add the marketplace under its new name.
 ```
 
 **Tier 0 is in every entry and is the one tier that can never be `N/A`** — every change reaches the people
-maintaining the repo at least a little. This block showed `#### Tier 1` above `#### Tier 2` and no tier 0 at
-all until August 13, 2026, which is a shape the scaffolder writes under no configuration: with an audience
-stated it writes tier 0 and that tier, and with none it writes all of them.
+maintaining the repo at least a little. It answers directly under the opening question; the `####` heading
+inside that section means whichever audience tier the repo stated. A repo that has stated **none** gets the
+older shape instead, a `#### Tier N` sub-section per tier the model has, tier 0 among them. This block
+showed `#### Tier 1` above `#### Tier 2` and no tier 0 at all until August 13, 2026, which is a shape the
+scaffolder writes under no configuration.
 
 The **tier** (`0` = only this repo's own developers notice, `1` = management and the employer/commissioner
 get something out of it, `2` = a subscriber of the service notices it) decides which release documents the

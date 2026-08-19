@@ -396,7 +396,11 @@ try {
     # AND SINCE AUGUST 16, 2026 IT CARRIES THE CREATION STAMP, which is where the 'Branch ID' section went.
     # Still asserted as the WHOLE line -- the stronger claim, because it proves nothing else was appended.
     $headLine1 = ($entryText1 -split "`r?`n")[0]
-    Assert-True ($headLine1 -match '^## Branch `feat/my-task` changelog - \d{8}-\d{6}$') 'entry heading names the branch and stamps its creation, whole and at the entry level'
+    # THE SEPARATOR COMES OFF THE SEAM, not out of a literal. It was ' - ' until August 19, 2026 and is a
+    # middle dot since; a hardcoded one here would fail the next time that answer moves, on a test whose
+    # subject is the branch name and the stamp rather than the punctuation between them.
+    $stampSep = [regex]::Escape((Get-EntryIdSeparator))
+    Assert-True ($headLine1 -match ('^## Branch `feat/my-task` changelog ' + $stampSep + ' \d{8}-\d{6}$')) 'entry heading names the branch and stamps its creation, whole and at the entry level'
     Assert-True (-not ($headLine1 -match "'")) 'and the stamp is bare -- the quotes it carried for half of August 16, 2026 are gone'
     Assert-Equal 'First title' (Get-EntryDescription -EntryText $entryText1) 'and the title given to new-branch is the PR title'
     Assert-True (Test-EntryDeclaresType -EntryText $entryText1 -Type 'Feat') 'and the branch type is readable -- off the branch the heading names'
@@ -501,7 +505,7 @@ try {
     Assert-Equal $maliciousTitle (Get-EntryDescription -EntryText $entryTextF) 'malicious title: FULLY and unchanged in its section, and nothing appended (no argv splitting)'
     # ...and the heading is untouched by it, which is new ground the split opened: a payload that escaped its
     # section would show up here first.
-    Assert-True ((($entryTextF -split "`r?`n")[0]) -match '^## Branch `feat/injection-check` changelog - \d{8}-\d{6}$') 'malicious title: and the heading still names the branch and its stamp, nothing more'
+    Assert-True ((($entryTextF -split "`r?`n")[0]) -match ('^## Branch `feat/injection-check` changelog ' + [regex]::Escape((Get-EntryIdSeparator)) + ' \d{8}-\d{6}$')) 'malicious title: and the heading still names the branch and its stamp, nothing more'
     Assert-True (Test-EntryDeclaresType -EntryText $entryTextF -Type 'Feat') 'malicious title: and the type still reads off that heading rather than absorbing part of the payload'
 
     Assert-True (Test-Path -LiteralPath $sentinelPath) "sentinel file 'X' UNTOUCHED -- no 'Remove-Item' executed via a broken argv"

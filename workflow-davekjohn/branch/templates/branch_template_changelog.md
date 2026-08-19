@@ -1,8 +1,6 @@
-## Branch `<prefix>/<short-name>` changelog - <timestamp of the moment this branch was created>
+## Branch `<prefix>/<short-name>` changelog · <timestamp of the moment this branch was created>
 
-### What does the change on this branch bring to main?
-
-#### Tier 0
+### What does the change on this branch deploy to main?
 <!--
      Why the change matters AT THIS REACH specifically. A reason that would read the
      same under every tier is a sign the tier is wrong. Write it ABOVE the Score line --
@@ -12,9 +10,9 @@
 
 **Score:**
 
-#### Higher than tier 0?
+#### What makes this change extra special
 <!--
-     Why the change matters AT THIS REACH specifically. 
+     Why the change matters AT THIS REACH specifically. For tier 2 audiences: the subscriber of a service.
 
      If it has no significance at this reach at all, then explain shortly why and insert N/A in Score.
      That reason goes above the Score line too.

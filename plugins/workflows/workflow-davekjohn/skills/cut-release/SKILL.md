@@ -168,19 +168,18 @@ a release for a missing timestamp would be ceremony rather than a guard.
      document that travels outward never said what shipped.
    - **`-SkipSignificanceGate`** cuts even though a pending entry that reaches tier 1 or higher has not said
      **how much it weighs** there. Every tier an entry reaches is a document with its own reader, so every
-     one owes a `#### Tier N` sub-section under the entry's `### Significance` — a reason it matters at
-     that reach, plus a significance from 1 to 5 against the rubric. Below is what that looks like in a repo
-     whose audience is **tier 2**; one whose audience is tier 1 gets the same two sections with `#### Tier 1`
-     in the second one's place:
+     one owes its own named section — a reason it matters at that reach, plus a significance from 1 to 5
+     against the rubric. The two sections look the same whichever audience tier the repo answered, the
+     second heading being a question rather than a number:
 
      ```text
-     #### Tier 0
+     ### What does the change on this branch deploy to main?
 
      The routine version bump stops needing a developer.
 
      **Score:** 4
 
-     #### Tier 2
+     #### What makes this change extra special
 
      Consumers must re-add the marketplace under its new name.
 

@@ -794,9 +794,13 @@ if ($existingPr) {
             # heading this repo or a consumer has actually shipped.
             if (-not $refreshed) {
                 # Every heading this repo has published a PR under, newest first. The H2 form of the
-                # current wording is on the list because it was live for a single day -- long enough for
-                # open PRs to carry it, which is the only thing that decides membership here.
+                # 'bring to main?' wording is on the list because it was live for a single day -- long
+                # enough for open PRs to carry it, which is the only thing that decides membership here.
+                # ITS H1 FORM JOINED IT ON AUGUST 19, 2026, when the template followed the entry section to
+                # 'deploy to main?'. That one was live for thirteen days at the level the template actually
+                # carries, so it is the likeliest heading an open PR is sitting under right now.
                 foreach ($legacyHeading in @(
+                    '# What does the change on this branch bring to main?',
                     '## What does the change on this branch bring to main?',
                     '## Changelog entry',
                     '## What does this change do?',

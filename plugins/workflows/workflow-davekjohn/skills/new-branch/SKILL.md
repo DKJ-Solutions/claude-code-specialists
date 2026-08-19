@@ -102,18 +102,21 @@ current format. You get them on your first branch and they stay current through 
 guidance travels with the scripts rather than living only in the repo the scripts came from. They are
 generated: edit one and the next run puts it back.
 
-Six sections, three of them filled in for you:
+Two sections, one of them filled in for you:
 
 ```text
-## `<your branch>` changelog
+## Branch `<your branch>` changelog · <stamp>      <- the branch, and the moment it was created
 
-### Branch title           <- the title you gave -Title; also the PR title
-### Branch ID              <- a timestamp, stamped at creation
-### Branch type            <- the branch prefix
-### What does the change on this branch bring to main?
-### Significance
-### Pull Request           <- filled in by the fold, from the merge
+### What does the change on this branch deploy to main?   <- tier 0: a reason and a score
+#### What makes this change extra special                 <- your audience tier: the same, or N/A
+### Pull Request           <- the title you gave -Title; the fold adds the number and the date
 ```
+
+**Two sections, and the heading carries what three more used to.** `Branch title`, `Branch ID` and
+`Branch type` were sections of their own until August 16, 2026: the title moved into `Pull Request` (which is
+what it always was — `open-pr` composes the PR title from it), the ID became the stamp in the heading, and
+the type is the prefix of the branch that heading already names. All three are still **read** wherever an
+older entry carries them, so nothing already written stops folding.
 
 **`Branch title` is what the change is CALLED, everywhere.** Since
 [#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506) `open-pr` composes the PR title as
@@ -151,23 +154,29 @@ wording, and `open-pr`, `merge` and `fold` are also the subjects of ordinary ste
 recognise the new placeholder"* is real work), so separating them needs an exclusion list. Run the same
 count over your own branches if you want to know whether it bites here too.
 
-## The entry declares its Significance, one section per tier it asks about
+## The entry declares its significance, one section per tier it asks about
 
-Under `### Significance` the entry gets a `#### Tier N` sub-section per tier your repo asks about, each
-waiting for a reason and a score. In a repo whose audience is tier 2 that is these two — which tiers, and
-why it is not three, is the knob further down:
+The entry's first two sections **are** the tiers your repo asks about, each waiting for a reason and a score.
+In a repo whose audience is tier 2 that is these two — which tiers, and why it is not three, is the knob
+further down:
 
 ```text
-#### Tier 0
+### What does the change on this branch deploy to main?
 
 **Score:**
 
-#### Tier 2
+#### What makes this change extra special
 
 **Score:**
 ```
 
-Two questions in one section. **The tier says how far the change reaches**, and therefore which release
+**Neither heading names a tier number** (Dave, August 19, 2026), and both resolve to one when read: the
+opening question is tier 0, and the section beside it means the single audience tier your repo has stated. A
+repo that has stated **none** gets the older shape instead — the question as a plain heading with a
+`#### Tier N` sub-section under it for every tier the model has — because a heading with no tier to resolve
+to would read as tier 0 and empty its release documents.
+
+Two questions, two audiences. **The tier says how far the change reaches**, and therefore which release
 document the entry appears in:
 
 | tier | who notices |
@@ -213,17 +222,17 @@ sections, **81 existed only because a tier-2 section sat above them**, the same 
 second register for a reader who was the same person. A tier your repo does not ask about is still **read**
 wherever an older entry carries one, so nothing already written stops folding.
 
-Below is what a **tier-2** repo's file looks like. A repo that answered `1` gets the same two sections with
-`#### Tier 1` in the second one's place:
+Below is a finished pair. It looks the same whichever audience tier your repo answered — that is the point of
+the second heading being a question rather than a number:
 
 ```text
-#### Tier 0
+### What does the change on this branch deploy to main?
 
 The routine version bump stops needing a developer.
 
 **Score:** 4
 
-#### Tier 2
+#### What makes this change extra special
 
 Consumers must re-add the marketplace under its new name; installs break without it.
 

@@ -1973,6 +1973,11 @@ Write-Coverage -Category 'skill-param' -Checked $skillParamChecked `
 # heading does key X have" for every key that ever existed, retired ones included, so counting its keys
 # would hold a document to a shape the scaffolder stopped producing -- and accuse a correct page of being
 # stale. Get-EntryWrittenSectionKeys is the shape a reader actually meets.
+#
+# AND IT IS DELIBERATELY NOT READ THROUGH repo-config, unlike check 16's own generation one screen up. That
+# was tried on August 19, 2026, while the audience tier's heading was briefly a third '###' section, and
+# reverted with it: the count is a property of the FORMAT rather than of the repo, so pulling two dozen repo
+# functions in here to answer it would be a dependency bought for nothing.
 $scExpected = @(Get-EntryWrittenSectionKeys).Count
 $scLevel = Get-EntrySectionLevel
 $scWords = @{ 'one' = 1; 'two' = 2; 'three' = 3; 'four' = 4; 'five' = 5; 'six' = 6; 'seven' = 7; 'eight' = 8; 'nine' = 9; 'ten' = 10 }

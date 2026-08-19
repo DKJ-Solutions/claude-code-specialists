@@ -1203,7 +1203,7 @@ function Convert-EntryHeadingToTitle {
     # the type and the date are dropped here for being internal administration, and a branch name is the
     # purest example of it. The developer notes and CHANGELOG.md keep the heading, as they keep the others.
     # TWO SHAPES OF BRANCH HEADING, both matched here. It was '`feat/x` changelog' until August 16, 2026 and
-    # is 'Branch `feat/x` changelog - <timestamp>' since -- an optional lead word before the backticks and an
+    # is 'Branch `feat/x` changelog <sep> <timestamp>' since -- an optional lead word before the backticks and an
     # optional trailing stamp after the title. A pattern that knew only the old one would leave every new
     # entry's branch slug standing in the document written for someone outside this repo, which is exactly
     # the publishing defect this rewrite exists to prevent.

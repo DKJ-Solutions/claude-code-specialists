@@ -48,17 +48,15 @@ and in `CHANGELOG.md`, so what a contributor writes is exactly what lands. The f
 comments** on the way and writes the PR line into `### Pull Request`:
 
 ```markdown
-## Branch `feat/short-name` changelog - '20260806-114230'
+## Branch `feat/short-name` changelog · 20260806-114230
 
-### What does the change on this branch bring to main?
-
-#### Tier 0
+### What does the change on this branch deploy to main?
 
 …why it matters at this reach…
 
 **Score:** 2
 
-#### Higher than tier 0?
+#### What makes this change extra special
 
 …or one line saying why it reaches nobody there…
 
@@ -71,10 +69,13 @@ Short strong title
 [PR #123](https://github.com/…/pull/123) · merged 2026-08-06
 ```
 
-One `#### Tier N` sub-section per reach the change claims, lowest first. **Not every change has a tier 1
-or a tier 2** — that is why these are sections rather than the table they replaced, where a missing row
-read as an omission. The second section is headed with the question where the repo has stated one audience
-tier (`Get-ReleaseAudienceTier`), and with that tier's number where it has not.
+**The opening section holds the change's two audiences, lowest first, and neither names a tier number.**
+Tier 0 answers directly under the question; the audience tier answers under
+`#### What makes this change extra special`, which means whichever single tier the repo has stated
+(`Get-ReleaseAudienceTier`). **Not every change reaches that audience** — that is why these are blocks rather
+than the table they replaced, where a missing row read as an omission, and why the second one can answer
+`N/A` with a line saying why. Where a repo has stated no audience tier, each tier the model has gets a
+`#### Tier N` sub-section instead, tier 0 among them, exactly as before.
 
 **It was six sections until August 16, 2026 and is two since** (Dave). The heading absorbed the branch ID
 and, through the branch it names, the type; the PR title moved into the section that already held the PR's
