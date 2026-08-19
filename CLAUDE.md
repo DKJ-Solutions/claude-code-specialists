@@ -1,7 +1,7 @@
 # CLAUDE.md — claude-code-specialists
 
-This file is the operating guide for this repo. **The portable way of working comes first** (the
-constitution and the general practices, valid in any repo that adopts them), and **everything
+This file is the operating guide for this repo. **The rules come first** — the constitution and the
+general practices, which are Dave's and hold across the repos he runs — and **everything
 specific to this repo comes last**, under
 [`## Specific to this repo (claude-code-specialists)`](#specific-to-this-repo-claude-code-specialists).
 
@@ -131,10 +131,12 @@ destructive actions above happen only on Dave's explicit request.
 
 ## Specific to this repo (claude-code-specialists)
 
-> *Everything above is the portable way of working and travels to any repo that adopts it. This
-> part is the claude-code-specialists lens: if you copy this system to another repo, this is the part
-> you replace — it doesn't describe *that* there are safety rules, but what this repo is and how the
-> constitution is concretely implemented here.*
+> *Everything above is how work is run here — the constitution and the general practices. They are
+> **Dave's**, shared across the repos he runs rather than universal: they name him as the
+> decision-maker throughout and carry this repo's own measured instances. This part is the
+> claude-code-specialists lens: not *that* there are safety rules, but what this repo is and how the
+> constitution is concretely implemented here. Copying this file to another repo of Dave's means
+> replacing this part; copying it to somebody else's means replacing the decision-maker above it too.*
 
 `claude-code-specialists` is the **home repo of one product**: the Claude Specialists system, built and
 maintained here by Dave (DaveKJohn), and the **single source of truth** for all shareable subagent
@@ -314,12 +316,25 @@ The constitution above, concretely implemented here:
   — including the measured convention that personas and manuals carry no repo-specific detail at all
   while skills carry the evidence behind a procedure.
 
-### The how (portable) vs. the what (repo-specific)
+### The how (Dave's, across his repos) vs. the what (this repo only)
 
 In short: the **how** (everything via branch + PR, lessons learned in the docs, the constitution
-above any convenience) is portable and sits at the top. The **what** (the marketplace/plugin
-structure, the language, the concrete `main` branch and fold exception, the scripts, and the plugin
-lint gate) belongs to this repo and sits in this slot.
+above any convenience) is Dave's and carries across the repos he runs, so it sits at the top. The
+**what** (the marketplace/plugin structure, the language, the concrete `main` branch and fold
+exception, the scripts, and the plugin lint gate) belongs to this repo alone and sits in this slot.
+
+**Neither half is a universal baseline, and the top half least of all.** It names Dave as the
+decision-maker fifteen times and reaches for mechanisms only this repo has — a `plugin.json` version
+bump, the release overview's `#### N.x` section, the test pinning which major that overview targets.
+The word *portable* stood in all three of these places until August 19, 2026 and was wrong in each:
+what travels is the shape (a constitution, then a repo slot), not the content. A repo adopting this
+system writes its own owner into the top half rather than inheriting Dave.
+
+**The word still appears elsewhere in this file and is correct there** — do not sweep it. Those are
+the *plugin* sense: a persona body, a manual, the portable half of a rule. Those files genuinely
+travel to a consumer through a release. What was wrong was applying that word to this repo's
+constitution, which travels nowhere on its own. (No count here on purpose: a tally of a word inside
+the sentence that uses it goes stale on its own next edit.)
 
 The one line below is the whole specialist surface of this file. Everything about the team — who they
 are, what each covers, how they are routed to — sits behind it, so removing the plugin is removing one
