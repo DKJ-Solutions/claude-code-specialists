@@ -313,6 +313,17 @@
                     },
                     {
                         "lib":  "scripts\\repo-config.ps1",
+                        "function":  "Get-ReleasePageTheme",
+                        "adopt":  "decide",
+                        "adoptWhy":  "a palette is a claim about whose product the page is. Copying the source\u0027s answer paints your page in another brand\u0027s colours and nothing errs -- the same failure mode as Get-ReleasePageTitle, one layer down from the words into the look",
+                        "optional":  true,
+                        "default":  "no overrides -- the page keeps its shipped palette, light and dark",
+                        "returns":  "custom-property overrides for the generated page, as a map of property name to value, e.g. @{ \u0027--accent\u0027 = \u0027#FF4F01\u0027 }. Names are custom properties (\u0027--x\u0027) or the literal \u0027color-scheme\u0027, which is how a brand with no dark variant pins \u0027light\u0027 and keeps its colours on any background. Values are colours and keywords only -- anything carrying braces, semicolons, colons, angle brackets, quotes or comment markers is dropped with a warning naming the key, because the block is written into a \u003cstyle\u003e element where a value is markup rather than text",
+                        "declared":  true,
+                        "text":  "# AND THE PALETTE (inbound #759). Empty on purpose, and it is an answer rather than an omission: this\n# repo\u0027s page keeps the template\u0027s own colours because the template IS this repo\u0027s product. A consumer\n# whose page goes to management and a commissioner has the opposite answer -- theirs has to look like\n# the shop it reports on, which is what the seam exists for.\n#\n# STATED RATHER THAN LEFT TO THE DEFAULT, like Get-LiveStage above: the empty answer is the one a\n# reader is most likely to mistake for \"nobody has looked at this yet\", and check-script-contract can\n# only tell the two apart by the function being there.\n$script:ReleasePageTheme = @{}\n\nfunction Get-ReleasePageTheme {\n    \u003c# Custom-property overrides for the generated page, e.g. @{ \u0027--accent\u0027 = \u0027#FF4F01\u0027 }; an empty\n       map means the shipped palette. \u0027color-scheme\u0027 is accepted as a name, which is how a brand with\n       no dark variant pins \u0027light\u0027. Values are validated, not escaped -- see Format-ReleasePageStyle\n       in build-release-notes-page.ps1 for what passes and why. #\u003e\n    return $script:ReleasePageTheme\n}"
+                    },
+                    {
+                        "lib":  "scripts\\repo-config.ps1",
                         "function":  "Get-InternalNoteWording",
                         "adopt":  "copy",
                         "adoptWhy":  "empty means the English defaults, which is exactly what a consumer gets without the function. Copying puts the (empty) override map in their own file, where a repo whose colleagues read another language fills in the keys it needs",

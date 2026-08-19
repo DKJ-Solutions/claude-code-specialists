@@ -395,6 +395,24 @@ $script:ContractRecords = @(
        Adopt = 'decide'; AdoptWhy = "it names a Cloudflare Worker in somebody's account. Copying the source's answer points your deploy at a worker that is not yours -- and unlike most wrong values here, this one is only discovered at the moment you publish";
        Optional = $true; Default = "'' -- the page is built and hosted nowhere, and -Worker refuses while naming this function";
        Returns = "the name of the Cloudflare Worker that serves the generated page, or '' when this repo hosts it nowhere. The worker serves the page at /notes/<32 hex>, and that path is the ONLY lock on it -- there is no login, so anyone with the link can read. Answer this only where the notes are safe to be read by whoever receives the link, and keep the token file out of version control wherever the repository is public" },
+    # AND THE PALETTE (inbound #759, August 20, 2026). The page ships one visual identity, and a consumer
+    # whose readers are management and a commissioner needs it to look like the product it reports on --
+    # theirs is locked to a storefront's own brand tokens. A local restyle was the alternative and is the
+    # thing to avoid: it forks the shared template's visual language in one repo, and every other consumer
+    # then lacks whatever was learned there.
+    #
+    # 'decide' RATHER THAN 'copy', for the same reason as the title beside it: brand colours are the one
+    # answer that is wrong by definition when inherited. Copying the source's palette paints your page in
+    # somebody else's brand, and nothing errs -- the page simply belongs to the wrong product.
+    #
+    # THE VALUES ARE VALIDATED RATHER THAN ESCAPED, and that is the half worth knowing before extending it:
+    # they land in a <style> element, where escaping a '#' would stop it being a colour while a closing
+    # style tag would end the element. Format-ReleasePageStyle drops anything outside a narrow allowlist,
+    # warns naming the key, and keeps the shipped default -- so a bad value costs a colour, never the page.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleasePageTheme'; Scripts = @('build-release-notes-page');
+       Adopt = 'decide'; AdoptWhy = "a palette is a claim about whose product the page is. Copying the source's answer paints your page in another brand's colours and nothing errs -- the same failure mode as Get-ReleasePageTitle, one layer down from the words into the look";
+       Optional = $true; Default = "no overrides -- the page keeps its shipped palette, light and dark";
+       Returns = "custom-property overrides for the generated page, as a map of property name to value, e.g. @{ '--accent' = '#FF4F01' }. Names are custom properties ('--x') or the literal 'color-scheme', which is how a brand with no dark variant pins 'light' and keeps its colours on any background. Values are colours and keywords only -- anything carrying braces, semicolons, colons, angle brackets, quotes or comment markers is dropped with a warning naming the key, because the block is written into a <style> element where a value is markup rather than text" },
     # STILL DECLARED, AND NOT AS LEGACY TOLERANCE: new-internal-note.ps1 is still shipped for a repo running
     # the two-document flow, and it reads all eleven keys below. Nothing in THIS repo calls it.
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-InternalNoteWording'; Scripts = @('new-internal-note');

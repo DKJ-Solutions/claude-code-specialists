@@ -1,11 +1,27 @@
 <!doctype html>
 <!--
-  The release-notes page template. build-release-notes-page.ps1 fills in four placeholders:
+  The release-notes page template. build-release-notes-page.ps1 fills in five placeholders, each
+  written in the markup below as the name doubled between at-signs:
 
-      @@PAGE_TITLE@@     the page's own name
-      @@PAGE_SUBTITLE@@  one line under it: how many releases the page carries
-      @@BUILD_STAMP@@    the date the page was generated, because it is a SNAPSHOT
-      @@RELEASE_DATA@@   the releases, as JSON, inside a <script type="application/json">
+      PAGE_TITLE     the page's own name
+      PAGE_SUBTITLE  one line under it: how many releases the page carries
+      BUILD_STAMP    the date the page was generated, because it is a SNAPSHOT
+      RELEASE_DATA   the releases, as JSON, inside a <script type="application/json">
+      PAGE_STYLE     the repo's own palette, or nothing -- see Get-ReleasePageTheme
+
+  THE NAMES ARE LISTED WITHOUT THEIR SIGILS ON PURPOSE, and this comment is where the reason belongs
+  because this comment is what it cost. String.Replace hits EVERY occurrence, so a doc comment that
+  spells a placeholder in full is itself filled in: this block used to render with the page's own title
+  standing where it says PAGE_TITLE. Harmless while all four were short strings, and not harmless the
+  moment PAGE_STYLE joined them -- it wrote a whole ':root { ... }' rule, comment and all, inside an
+  HTML comment. Caught by the position assert in release-notes-page.tests.ps1, which measures WHERE
+  the palette lands rather than only that it arrived; the polluted copy sat above the dark-mode block
+  and the assert reads the first occurrence.
+
+  PAGE_STYLE SITS AFTER THE DARK-MODE BLOCK ON PURPOSE, so a repo's own values win over both the light
+  and the dark defaults rather than being overridden by whichever matched last. That is also what lets
+  a brand with no dark variant pin 'color-scheme: light' and keep its colours on any background: the
+  override is later in the cascade than the @media rule it has to beat.
 
   Every placeholder is replaced with a JSON string or with already-escaped text, so nothing a release
   note can contain reaches the markup raw. Measured rather than assumed: Windows PowerShell 5.1's
@@ -52,6 +68,7 @@
       --code-bg: #2a2926;
     }
   }
+@@PAGE_STYLE@@
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
   body {
