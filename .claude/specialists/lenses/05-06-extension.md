@@ -232,8 +232,8 @@ The `releases/` directory (modeled on life-hub):
     a literal, so on the day of the rename it would have found no live tree, checked the archive alone, and
     reported a healthy-looking coverage count. Read the seam. The **shared default** stays `releases/notes`,
     so a consumer who never answered the knob is not silently repointed.
-  - **The two documents below are the archive, and the measurement that merged them is in
-    [`CLAUDE.md`](../../../CLAUDE.md#claude-code-specialistss-safety-implementation).** Short version: both
+  - **The two documents below are the archive, and the measurement that merged them is
+    [further down this page](#the-tier-model-and-the-audience-knob).** Short version: both
     were written at all twelve releases since the internal tier existed, about the same changes, and 38% of
     the internal note was material a consumer-facing section could carry — written twice, in two registers.
     A blended document was refused (62% could not travel, including the whole *what it is worth*); a
