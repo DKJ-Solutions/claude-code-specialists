@@ -738,9 +738,14 @@ function Get-InternalNoteWording {
 #
 # A SEPARATE MAP RATHER THAN AN ALIAS, because the two documents do not share a key set. This one is the
 # ONE hand-written release note (a named section per reader): Title, AudienceLabel, Audience,
-# SectionConsumers, HintConsumers, SectionValue, HintValue, SectionOpen, HintOpen. The four keys above
+# SectionAudience, HintAudience, SectionValue, HintValue, SectionOpen, HintOpen. The four keys above
 # that are missing here -- SkeletonNote, SectionChanged, NoEntries, Unknown -- belong to
 # new-internal-note.ps1, which is still shipped and which nothing here calls.
+#
+# SectionAudience/HintAudience WERE SectionConsumers/HintConsumers until inbound #747, and both old names
+# are still read -- "recognise both, write one". The rename is not cosmetic: that section now follows
+# Get-ReleaseAudienceTier, so in a tier-1 repo it addresses the organisation, and a key whose own name said
+# "consumers" would describe the wrong reader. A repo that overrode the old name keeps its heading.
 #
 # EMPTY HERE, for the same reason as its neighbour: an English repo is already served by the English
 # defaults in the script. Merged over them, so overriding one leaves the rest alone.

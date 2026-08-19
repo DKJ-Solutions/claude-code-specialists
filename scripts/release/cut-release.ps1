@@ -293,6 +293,24 @@ $pluginTier    = Get-SeamValue -Name 'Get-ReleasePluginTier' `
 # document for the very reader it was cut for, and nothing in the run would say so.
 $consumerBumps = @(Get-SeamValue -Name 'Get-ReleaseConsumerBumps', 'Get-ReleaseHighlightsBumps' -Default @())
 
+# AND WHICH TIER'S ENTRIES FILL THAT DOCUMENT'S "what changed" section (inbound #747). The selection
+# below was the literal 2 for its whole life, which in a repo whose audience is tier 1 rendered that
+# section NEVER rather than rarely: its entries declare tier 0 and tier 1, so nothing ever landed in the
+# tier-2 group, and the draft came out carrying only the two sections that cannot be generated. The
+# document read as finished and never said what shipped.
+#
+# NOT A SECOND READER OF THE SEAM. Get-EntryAudienceTier already resolves Get-ReleaseAudienceTier for the
+# scaffolder -- probing rather than requiring, rejecting a value outside the model, and returning $null
+# where the repo has stated none -- and entry-scaffold-lib.ps1 is dot-sourced above. A private copy here
+# is how the two would drift into disagreeing about the same repo's audience.
+#
+# $null FALLS BACK TO 2 BECAUSE 2 IS WHAT THIS FILE HARDCODED, so a repo that has answered nothing keeps
+# producing exactly the document it produced before this line existed -- absent means UNCHANGED, the same
+# reading Get-EntryAudienceTier takes of the same absence. The alternative, treating "stated none" as
+# "select nothing", would empty the section in every consumer the moment they took the plugin update.
+$audienceTier = Get-EntryAudienceTier
+if ($null -eq $audienceTier) { $audienceTier = 2 }
+
 # AND WHERE THAT DOCUMENT GOES, which until now was the one path in this file with no knob (inbound
 # #616, reported from a consumer). Everything around it was already answered per repo -- the folder
 # component by Get-ReleaseNotesGrouping, the release list by Get-ReleaseHistoryPath -- so the file
@@ -771,14 +789,18 @@ $changelogNew = Convert-ChangelogForRelease -Content $changelogRaw
 #
 # THE TWO CONDITIONS SPLIT ACROSS TWO DECISIONS NOW, which is the change. The seam decides whether a
 # document is written AT ALL -- so a patch writes none and the release is announced by the generated body
-# alone. The tier-2 count decides only whether that document gets a CONSUMER SECTION: the organisational
-# half applies to every release the seam names, while a section about work no consumer can see is worse
-# than no section, because it looks written.
+# alone. The audience-entry count decides only whether that document gets its AUDIENCE SECTION: the
+# organisational half applies to every release the seam names, while a section about work the audience
+# cannot see is worse than no section, because it looks written.
 #
 # BEFORE THIS, BOTH CONDITIONS GATED THE WHOLE FILE, so a tier-1-only minor produced no consumer document
 # and an internal note from a second script. The audience of each SECTION follows the tier; whether there
 # is a document follows the bump.
-$tier2Entries = @($tierGroups | Where-Object { [int]$_.Tier -eq 2 } | ForEach-Object { $_.Entries } | Where-Object { $_ })
+#
+# AND WHICH TIER THAT AUDIENCE SECTION DRAWS FROM IS THE REPO'S ANSWER, not the literal 2 (inbound #747).
+# In this repo the answer IS 2, so this call produces exactly the document it produced before -- the
+# change is only visible in a repo that answered 1, where the section existed in no release at all.
+$audienceEntries = @($tierGroups | Where-Object { [int]$_.Tier -eq $audienceTier } | ForEach-Object { $_.Entries } | Where-Object { $_ })
 $cutNote = ($consumerBumps -contains $bumpType)
 $noteRelPath = "$noteRootRelPath/$notesDirName/$new.md"
 if ($cutNote) {
@@ -788,8 +810,9 @@ if ($cutNote) {
     # note root sits inside the workflow folder is one level deeper -- every root-relative link in the
     # note would silently point one directory short. For this repo the derivation produces the default.
     $noteDepth = @($noteRelPath -split '/').Count - 1
-    $noteContent = Build-ReleaseNoteDraft -Entries $tier2Entries -Version $new -Date $today `
-        -Type $typeLabel -Title $Title -Wording $noteWording -LinkPrefix ('../' * $noteDepth)
+    $noteContent = Build-ReleaseNoteDraft -Entries $audienceEntries -Version $new -Date $today `
+        -Type $typeLabel -Title $Title -Wording $noteWording -LinkPrefix ('../' * $noteDepth) `
+        -AudienceTier $audienceTier
 }
 
 # --- Write the release-notes file -------------------------------------------------------------
@@ -945,7 +968,7 @@ if ($cutNote) {
     $noteAbs = Join-Path $repoRoot ($noteRelPath -replace '/', '\')
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $noteAbs) | Out-Null
     Write-Utf8NoBom -Path $noteAbs -Content $noteContent
-    $sectionCount = if ($tier2Entries.Count -gt 0) { 'consumer + organisation sections' } else { 'organisation section only -- no entry reached tier 2' }
+    $sectionCount = if ($audienceEntries.Count -gt 0) { 'audience + organisation sections' } else { "organisation section only -- no entry reached tier $audienceTier" }
     Write-Host "  created: $noteRelPath (draft -- $sectionCount)" -ForegroundColor DarkGray
 }
 
@@ -1000,11 +1023,11 @@ function Write-FollowUpSteps {
     Write-Host ""
     Write-Host "Still to write by hand (via a branch + PR -- this commit is already tagged):" -ForegroundColor Cyan
     Write-Host "  - $noteRelPath"
-    if ($tier2Entries.Count -gt 0) {
-        Write-Host "      the consumer section is a DRAFT (the tier-2 entries, in the words their authors wrote for a reviewer);"
+    if ($audienceEntries.Count -gt 0) {
+        Write-Host "      the audience section is a DRAFT (the tier-$audienceTier entries, in the words their authors wrote for a reviewer);"
         Write-Host "      'what it is worth' and 'what was still open' are empty and cannot be generated."
     } else {
-        Write-Host "      no entry reached tier 2, so it carries the organisation's sections only -- both empty."
+        Write-Host "      no entry reached tier $audienceTier, so it carries the organisation's sections only -- both empty."
     }
 }
 

@@ -189,9 +189,18 @@ Assert-True ($gateBlock.Success -and $firstWrite -gt ($gateBlock.Index + $gateBl
     'the bump gate runs BEFORE any file is written'
 # It reads the changelog per TIER; the flat accessor would give it entries with no tier to judge.
 Assert-True ($cutReleaseText -match 'Get-PullRequestEntriesByTier') 'it reads the pending entries per tier'
-# The consumer document is the tier-2 selection now, not a category guess -- and the two retired seam
-# knobs must not come back with it.
-Assert-True ($cutReleaseText -match 'tier2Entries') 'the consumer document is built from the tier-2 entries'
+# The audience section is a TIER selection, not a category guess -- and the two retired seam knobs must not
+# come back with it.
+#
+# THE TIER IS THE REPO'S OWN ANSWER SINCE INBOUND #747, not the literal 2, so this asserts on the selection
+# variable and separately on the seam being consulted. The previous form matched 'tier2Entries', and it
+# passed for the whole life of the defect: a hardcoded 2 is exactly what it was written to describe. That is
+# the shape worth naming here -- a source-text assert pins the mechanism it was written against, so it goes
+# green on the bug it is closest to rather than red.
+Assert-True ($cutReleaseText -match 'audienceEntries') 'the audience section is built from a tier selection'
+Assert-True ($cutReleaseText -match 'Get-EntryAudienceTier') "and the tier comes from the repo's own seam, not a hardcoded 2"
+Assert-True ($cutReleaseText -match '\$_\.Tier -eq \$audienceTier') 'the selection compares against that resolved tier'
+Assert-True ($cutReleaseText -notmatch '\$_\.Tier -eq 2') 'and no literal tier-2 comparison survives'
 # MATCHED AGAINST CODE ONLY, with comments stripped first. The script explains WHY those knobs were
 # retired, and it names them to do so -- so a plain -notmatch fails on the explanation rather than on a
 # use. That is this repo's own "a matcher satisfied by a mention rather than a use" defect, in reverse:

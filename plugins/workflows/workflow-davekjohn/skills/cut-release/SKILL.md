@@ -150,16 +150,22 @@ a release for a missing timestamp would be ceremony rather than a guard.
      | highest tier pending | bump | what is written |
      |---|---|---|
      | `0` | patch | the development notes + the generated Release body |
-     | `1` | minor | + the hand-written note, organisation sections only |
+     | `1` | minor | + the hand-written note; in a **tier-1** repo these fill its *What changed* section |
      | `2` | minor | + a *For consumers* section in that same note |
 
      A major additionally needs enough minors behind the line. So a refusal usually means the bump is
      wrong, not the gate — the script names the bump the work *does* earn; take that instead.
 
-     **The SECTIONS follow the tier; whether there is a document follows the bump.** A tier-1-only minor
-     gets the note without a consumer section: the version moves for everyone, but nobody outside is handed
-     a section about work they cannot see. Deliberately a separate flag from `-SkipLint`, because it
-     overrules a judgement about **content** rather than skipping a tool.
+     **The SECTIONS follow the tier; whether there is a document follows the bump.** In a tier-2 repo a
+     tier-1-only minor gets the note without a consumer section: the version moves for everyone, but nobody
+     outside is handed a section about work they cannot see. Deliberately a separate flag from `-SkipLint`,
+     because it overrules a judgement about **content** rather than skipping a tool.
+
+     **Read that row by YOUR repo's audience tier, which is the whole of inbound #747.** The audience
+     section draws on the tier `Get-ReleaseAudienceTier` names, so in a tier-1 repo the tier-1 row above is
+     the one that fills it. It used to select a fixed tier 2, which in such a repo is a tier no entry can
+     ever declare — so the section was absent from every release rather than from an unlucky one, and the
+     document that travels outward never said what shipped.
    - **`-SkipSignificanceGate`** cuts even though a pending entry that reaches tier 1 or higher has not said
      **how much it weighs** there. Every tier an entry reaches is a document with its own reader, so every
      one owes a `#### Tier N` sub-section under the entry's `### Significance` — a reason it matters at
@@ -207,14 +213,20 @@ a release for a missing timestamp would be ceremony rather than a guard.
 
    | section | who it is for | how it arrives |
    |---|---|---|
-   | *For consumers* | whoever decides whether to update | **pre-filled** — the tier-2 entries, still in the words their authors wrote for a diff reviewer. Rewrite them against the seven tests below. Absent where no entry reached tier 2. |
+   | the audience section — *For consumers* at tier 2, *What changed* at tier 1 | whoever this repo publishes to | **pre-filled** — the entries at this repo's own audience tier, still in the words their authors wrote for a diff reviewer. Rewrite them against the seven tests below. Absent where no entry reached that tier. |
    | *What it is worth* | the organisation | **empty** — it cannot be generated. Think in time, risk and reduced dependence on a developer. |
    | *What was still open at this release* | the organisation | **empty**. Past tense on purpose: a published document does not move with reality, so a present-tense line goes stale in hours rather than months. |
 
    **A patch writes no document at all**, and the release is announced by the generated body alone. **A
-   minor or major always writes one**, even where nothing reached tier 2 — then it carries the
-   organisation's two sections and no consumer section, because a named question with nothing under it is
+   minor or major always writes one**, even where nothing reached the audience tier — then it carries the
+   organisation's two sections and no audience section, because a named question with nothing under it is
    worse than no question.
+
+   **The first row follows `Get-ReleaseAudienceTier`, not a fixed 2** (inbound #747). A repo asks its entries
+   about tier 0 and its own audience tier only, so in a tier-1 repo the tier-2 group is always empty — which
+   is why selecting on the literal 2 removed that repo's audience section from every release, not from an
+   occasional one. The heading's default follows the same answer, since *For consumers* names the wrong
+   reader in a repo whose audience is the organisation.
 
    **What this replaced, and the measurement that chose it.** There were two hand-written documents — an
    internal note for the organisation and a consumer document — and at every one of the twelve releases

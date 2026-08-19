@@ -32,7 +32,7 @@ and, together with its significance score, where within that section it sits.
 | tier | who notices | where it is written | when |
 |---|---|---|---|
 | **2** | subscribers of the service | the *For consumers* section of `audience/<dir>/<X.Y.Z>.md` | minor/major |
-| **1** | management and the employer/commissioner | the organisation's two sections of that same file | minor/major |
+| **1** | management and the employer/commissioner | the *What changed* section of that same file | minor/major |
 | **0** | only this repo's own developers | `development/<dir>/<X.Y.Z>.md` | every release |
 
 **Tiers 1 and 2 are two KINDS of audience, and this repo has exactly one of them** (Dave, August 12, 2026;
@@ -112,8 +112,10 @@ colleague on this project got something out of earned only a patch — while the
 stakeholders, not to consumers alone. The rule is written as **tier 1 or higher** rather than as "the
 audience tier" on purpose: it then reads correctly in a tier-1 repo and a tier-2 repo alike, without either
 having to translate it. What keeps the looser rule honest is that **the sections follow the tier and not the
-bump**: a minor whose highest pending entry is tier 1 writes the note without its *For consumers* section,
-so nobody outside is handed a section about work they cannot see.
+bump**: in a tier-2 repo, a minor whose highest pending entry is tier 1 writes the note without its
+*For consumers* section, so nobody outside is handed a section about work they cannot see. **In a tier-1 repo
+that same rule reads differently and used to bite** — see
+[The audience tier](#the-audience-tier---the-hand-written-note).
 
 **Why a major counts minors rather than pending work:** a major is a **recap** of the minors before it,
 which is what both of this repo's majors actually were (`v2.0.0` consolidated v1.0–v1.18, `v3.0.0`
@@ -222,14 +224,28 @@ for every bump `Get-ReleaseConsumerBumps` names. Three sections, in this order:
 
 | section | for whom | how it arrives |
 |---|---|---|
-| *For consumers* | whoever decides whether to update | **pre-filled** — the tier-2 entries, still in the words their authors wrote for a diff reviewer. Absent where no entry reached tier 2. |
+| the audience section — *For consumers* at tier 2, *What changed* at tier 1 | whoever your repo publishes to | **pre-filled** — your audience tier's entries, still in the words their authors wrote for a diff reviewer. Absent where no entry reached that tier. |
 | *What it is worth* | the organisation | **empty** — it cannot be generated. Think in time, risk and reduced dependence on a developer. |
 | *What was still open at this release* | the organisation | **empty**, and past tense on purpose: a published document does not move with reality, so a present-tense line goes stale in hours rather than months. |
 
-**A minor with no tier-2 entry gets the note with no *For consumers* section** — which is every minor in a
-repo whose audience is tier 1, and an occasional one here. The organisational two sections belong to every
-bump the seam names — the version moves for everyone, so the organisation's question is always answered —
-while a section about work no consumer can see would be worse than none, because it looks written.
+**The first section is drawn from YOUR audience tier, not from tier 2** — so a tier-1 repo's entries fill it
+exactly as a tier-2 repo's do. A repo asks its entries about tier 0 and its own audience tier only, so that
+tier's entries are the only non-zero ones it has, and reading a fixed 2 discarded all of them.
+
+**A minor with no entry at that tier gets the note without the section**, which is an occasional minor in
+either kind of repo. The organisational two sections belong to every bump the seam names — the version moves
+for everyone, so the organisation's question is always answered — while a section about work the audience
+cannot see would be worse than none, because it looks written.
+
+**That distinction is younger than it looks, and it shipped as a defect first.** Until inbound
+[#747](https://github.com/DaveKJohn/claude-code-specialists/issues/747) the selection was the literal 2, and
+this page described the consequence as intended: *"which is every minor in a repo whose audience is tier 1"*.
+Every minor, not an occasional one — because no entry in such a repo can ever declare tier 2, so the section
+was suppressed always rather than rarely. The one hand-written document that travels outward could be
+finished, attached to a Release and published while never saying what shipped, and no gate objected, because
+a tier-2 repo's own runs all produced a correct document. Measured from a consuming repo against `4.13.0`.
+Worth keeping as a shape rather than as an anecdote: **a rule stated for one seam value, then read as though
+it held for every value.**
 
 **Still a draft to be edited, and the reason never depended on the selection.** Entry bodies are written for
 whoever reviews the diff, even when the change reaches a consumer — so the *For consumers* section's

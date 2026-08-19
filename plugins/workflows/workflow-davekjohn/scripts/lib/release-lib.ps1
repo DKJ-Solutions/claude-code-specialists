@@ -1346,10 +1346,27 @@ function Build-ReleaseNoteDraft {
         worth cannot be derived from a changelog, so those headings arrive empty, with the guidance in an
         HTML comment the writer deletes.
 
-        NO CONSUMER SECTION WHERE NO ENTRY REACHED TIER 2, and that is the tier-1-only minor: the version
-        moves for everyone and nobody outside is handed a section about work they cannot see. A heading with
-        nothing under it is worse than no heading -- measured on the shape this replaces, where an empty
-        named question shipped into every document that travelled outward.
+        NO AUDIENCE SECTION WHERE NO ENTRY REACHED THAT TIER, and that is the tier-1-only minor in a tier-2
+        repo: the version moves for everyone and nobody outside is handed a section about work they cannot
+        see. A heading with nothing under it is worse than no heading -- measured on the shape this replaces,
+        where an empty named question shipped into every document that travelled outward.
+
+        $AudienceTier IS WHICH TIER THAT SECTION IS FOR, and reading it from the repo rather than assuming 2
+        is inbound #747. The gate above is right about an empty section and was aimed at the tier-1-only
+        release in a TIER-2 repo; in a repo whose audience IS tier 1 it read completely differently, because
+        no entry there can ever declare tier 2. The section was suppressed not rarely but always, so the one
+        hand-written document that travels outward could be finished and published while never saying what
+        shipped. Measured from a consumer against 4.13.0.
+
+        THE SECTION IS STILL PRE-FILLED, WHICH THE REPORT DID NOT EXPECT. #747 proposed an empty heading plus
+        a hint, reasoning that a tier-1 repo has no generatable source. It has exactly the same source a
+        tier-2 repo has: its tier-1 entries, which the grouper already returns and which render through these
+        identical switches. So the fix is symmetric rather than special-cased -- the audience section draws on
+        the audience tier's entries, whichever tier that is -- and a tier-1 repo gets the list pre-filled
+        instead of merely asked for. Verified by rendering a synthetic tier-1 changelog before building.
+
+        THE DEFAULT IS 2 SO EVERY EXISTING CALLER IS BYTE-IDENTICAL. This repo answers 2, so its documents do
+        not move; the change is visible only where the answer is 1.
     #>
     param(
         [AllowEmptyCollection()][string[]]$Entries = @(),
@@ -1358,28 +1375,14 @@ function Build-ReleaseNoteDraft {
         [Parameter(Mandatory)][string]$Type,
         [string]$Title = '',
         [hashtable]$Wording = @{},
-        [string]$LinkPrefix = '../../../'
+        [string]$LinkPrefix = '../../../',
+        [int]$AudienceTier = 2
     )
     # Merged over the defaults rather than replacing them, so a repo that renames one heading does not
     # have to restate the rest -- the same contract the note script's wording seam already had.
     $w = @{
         Title             = 'Release notes'
         AudienceLabel     = 'For whom'
-        Audience          = 'consumers of this product, and colleagues in the organisation -- one section each'
-        SectionConsumers  = 'For consumers'
-        HintConsumers     = @(
-            'DRAFT. These are the tier-2 entries, still in the words their authors wrote for someone',
-            'reviewing a diff. Rewrite them for someone deciding whether to update: what they can now do,',
-            'in the second person, most urgent first, and say plainly whether they must act. The seven',
-            'tests are in the cut-release skill. Delete this comment when you are done.'
-        ) -join "`n     "
-        SectionValue      = 'What it is worth'
-        HintValue         = @(
-            'FOR THE ORGANISATION, not for the consumer -- this is the section the consumer half is not',
-            'allowed to contain. The only part that cannot be generated. Think in time, risk and reduced',
-            'dependence on a developer. For example: "changing an amount took five edits in code and can',
-            'now be done by the team itself".'
-        ) -join "`n     "
         SectionOpen       = 'What was still open at this release'
         HintOpen          = @(
             'What was deliberately left, and with whom the next step sits. "Nothing" is also an answer',
@@ -1388,7 +1391,64 @@ function Build-ReleaseNoteDraft {
             'published does not move with reality, so a line here goes stale in hours rather than months.'
         ) -join "`n     "
     }
+    # THREE DEFAULTS FOLLOW THE AUDIENCE TIER, because at tier 1 the tier-2 wording is not merely unhelpful
+    # but false -- and #747's second finding is exactly that. 'consumers of this product, and colleagues in
+    # the organisation -- one section each' promises two readers and one section each in a document that
+    # renders one reader and two sections, and the same function guarantees the promise cannot be kept. A
+    # repo should not have to override a string to stop shipping a sentence its generator knows is untrue.
+    #
+    # SectionValue's hint moves for the same reason. At tier 2 it earns its keep by naming who the section
+    # is NOT for, since the section above it belongs to somebody else; at tier 1 both sections are for the
+    # same reader, so that sentence would deny the audience its own document. What survives the move is the
+    # part that is true at either tier: this is the half a changelog cannot produce.
+    if ($AudienceTier -eq 2) {
+        $w.Audience        = 'consumers of this product, and colleagues in the organisation -- one section each'
+        $w.SectionAudience = 'For consumers'
+        $w.HintAudience    = @(
+            'DRAFT. These are the tier-2 entries, still in the words their authors wrote for someone',
+            'reviewing a diff. Rewrite them for someone deciding whether to update: what they can now do,',
+            'in the second person, most urgent first, and say plainly whether they must act. The seven',
+            'tests are in the cut-release skill. Delete this comment when you are done.'
+        ) -join "`n     "
+        $w.HintValue       = @(
+            'FOR THE ORGANISATION, not for the consumer -- this is the section the consumer half is not',
+            'allowed to contain. The only part that cannot be generated. Think in time, risk and reduced',
+            'dependence on a developer. For example: "changing an amount took five edits in code and can',
+            'now be done by the team itself".'
+        ) -join "`n     "
+    } else {
+        $w.Audience        = 'colleagues in the organisation -- what changed, and what it is worth'
+        $w.SectionAudience = 'What changed'
+        $w.HintAudience    = @(
+            "DRAFT. These are the tier-$AudienceTier entries, still in the words their authors wrote for",
+            'someone reviewing a diff. Rewrite them for the reader who authorises the work: what is now',
+            'possible, most consequential first, and say plainly whether anything is expected of them.',
+            'Delete this comment when you are done.'
+        ) -join "`n     "
+        # 'the changes above' would be a dangling reference in the one state where the section above is
+        # suppressed -- rare at tier 1, since a bump that writes this document needs a tier-1 entry, but
+        # reachable by hand and by a repo that names 'patch' in Get-ReleaseConsumerBumps. Phrased against
+        # the release rather than against a neighbouring section, so it is true either way.
+        $w.HintValue       = @(
+            'WHAT THIS RELEASE BOUGHT, which a list of changes cannot say -- the only part of this document',
+            'that cannot be generated. Think in time, risk and reduced dependence on a developer. For',
+            'example: "changing an amount took five edits in code and can now be done by the team itself".'
+        ) -join "`n     "
+    }
+    $w.SectionValue = 'What it is worth'
     foreach ($k in @($Wording.Keys)) { if ($Wording[$k]) { $w[$k] = $Wording[$k] } }
+    # THE RETIRED KEY NAMES, read second rather than dropped -- the standing "recognise both, write one"
+    # rule, and load-bearing here for the same reason it is on Get-ReleaseConsumerBumps: this wording comes
+    # from a CONSUMER-OWNED seam, so a repo that named the section under the old key receives the rename
+    # through a plugin update rather than by choosing to. Without this, their override would silently stop
+    # being read and the heading would revert to a default they had deliberately replaced.
+    #
+    # The rename itself is not cosmetic. 'SectionConsumers' was accurate while the section could only ever
+    # be a consumer's; at tier 1 a key by that name would hand the organisation a heading whose own
+    # identifier says it is for somebody else, which is the class of false name this repo removes rather
+    # than inherits.
+    if ($Wording['SectionConsumers'] -and -not $Wording['SectionAudience']) { $w.SectionAudience = $Wording['SectionConsumers'] }
+    if ($Wording['HintConsumers']    -and -not $Wording['HintAudience'])    { $w.HintAudience    = $Wording['HintConsumers'] }
 
     $real = @($Entries | Where-Object { $_ -and $_.Trim() })
 
@@ -1407,11 +1467,14 @@ function Build-ReleaseNoteDraft {
         # THE SAME SWITCHES THE CONSUMER DOCUMENT USED, called rather than re-derived: the score orders the
         # section and is then stripped, and the branch administration goes. Entries sit one level deeper
         # than before because they now live under a section heading rather than under the H1.
-        $body = Format-RankedEntries -Entries $linked -EntryLevel 3 -BareTitles -RankByTier 2 `
+        # RANKED ON THE AUDIENCE TIER, not on 2. This is a sort key rather than a filter -- what an entry
+        # is worth to THIS document's reader decides where it sits -- so ranking a tier-1 repo's entries on
+        # a tier they never scored would read every score as absent and collapse the order to arrival.
+        $body = Format-RankedEntries -Entries $linked -EntryLevel 3 -BareTitles -RankByTier $AudienceTier `
             -StripSignificance -StripAdminSections
-        $out.Add("## $($w.SectionConsumers)")
+        $out.Add("## $($w.SectionAudience)")
         $out.Add('')
-        $out.Add("<!-- $($w.HintConsumers) -->")
+        $out.Add("<!-- $($w.HintAudience) -->")
         $out.Add('')
         $out.Add($body)
         $out.Add('')
