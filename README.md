@@ -24,7 +24,7 @@ keeping its own copies, and enables or disables **per plugin** which teams and w
 | know **how a specialist is built** | [Manuals — the split model](#manuals--the-split-model) |
 | know **how a repo consumes this** | [Consumption](#consumption) · [Versioning](#versioning) |
 | know **where this runs** (Chat / Cowork / Claude Code) | [Where this runs](#where-this-runs-chat-cowork-and-claude-code) |
-| **contribute a change** | [CONTRIBUTING.md](CONTRIBUTING.md) — the branch / PR / fold workflow |
+| **contribute a change** | [CONTRIBUTING.md](CONTRIBUTING.md) — the standard branch + PR workflow, which holds with no plugin installed; the entry, the fold and the cut are the layer on top, in [`workflow-davekjohn/CONTRIBUTING.md`](workflow-davekjohn/CONTRIBUTING.md) |
 | see **the version history** | [`releases/README.md`](workflow-davekjohn/releases/README.md) |
 
 Everything below this table is the underlying explanation, and the page is long on purpose: it is the
@@ -1188,10 +1188,19 @@ its own marketplace. See [One product, one repository](#one-product-one-reposito
 
 ## Contributing
 
-Changes to this repo go through a branch + Pull Request to `main`, with a folded changelog entry —
-the branch/entry-file/PR/merge/fold workflow, and how a release is cut on top of it, are described
-in [`CONTRIBUTING.md`](CONTRIBUTING.md). The governance the specialists work under (the safety rules,
-the roster, the routing) is in [`CLAUDE.md`](CLAUDE.md).
+Changes to this repo go through a branch + Pull Request to `main`, and that much holds whether or not
+any plugin is installed — it is [`CONTRIBUTING.md`](CONTRIBUTING.md), the standard workflow, three
+rules long. **The branch dossier, the changelog entry that folds at the merge, the significance model
+and the release cut are the `workflow-davekjohn` layer on top**, and they are described in
+[`workflow-davekjohn/CONTRIBUTING.md`](workflow-davekjohn/CONTRIBUTING.md) — this repo's answers — over
+[`CONTRIBUTING-portable.md`](plugins/workflows/workflow-davekjohn/CONTRIBUTING-portable.md), the half
+that travels with the plugin. Where the two disagree, the plugin's page wins.
+
+The governance is in [`CLAUDE.md`](CLAUDE.md): the safety rules, the two direct-on-`main` exceptions
+and their bounds, and this repo's own gates. **The roster and the routing are not there** — they sit
+behind the one seam line at its foot, in
+[`.claude/specialists/SPECIALISTS.md`](.claude/specialists/SPECIALISTS.md) and the lenses beside it,
+which is what [The seam, specified](#the-seam-specified) is for.
 
 ## Want to know more?
 
