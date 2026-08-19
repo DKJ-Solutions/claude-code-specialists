@@ -115,7 +115,7 @@
     issues as a plain mention (`#332`), GitHub therefore auto-closed nothing, and the manual
     `gh issue close` was skipped three times running -- leaving eight repaired findings OPEN while
     the changelog said they were done. So the decision is now forced rather than remembered:
-      - `-Resolves 331,332` writes a `## Resolved issues` block with one `Closes #<n>` per issue
+      - `-Resolves '331,332'` writes a `## Resolved issues` block with one `Closes #<n>` per issue
         (one per line, because GitHub does not distribute a single keyword over a list -- a comma
         form would close the first and silently leave the rest open);
       - `-NoResolves` declares "this PR closes no issue" and is the deliberate way past the gate;
@@ -157,6 +157,15 @@
     is silent, not an error, so the parameter takes the raw text and
     ConvertTo-IssueNumberList parses it.
 
+    THE QUOTES IN THE EXAMPLES ARE LOAD-BEARING, and they were missing until August 20, 2026 -- three
+    .EXAMPLE lines across this script and ship-pr.ps1 read `-Resolves 331,332` and could not run. Called
+    DIRECTLY from a PowerShell prompt, `331,332` is parsed as an array before binding, and a script FILE
+    with [CmdletBinding()] refuses an array for a [string] parameter: "Cannot process argument
+    transformation on parameter 'Resolves'". (A scriptblock coerces it to '331 332' instead, which is why
+    this is easy to miss when probing the behaviour rather than the file.) So the type choice above does
+    exactly what it was chosen for -- it fails loudly instead of silently -- and the price is that every
+    example has to carry its quotes. The shipped skill pages always did.
+
 .PARAMETER NoResolves
     Declare that this PR closes no issue. The deliberate way past the resolves gate.
 
@@ -190,7 +199,7 @@
     ./scripts/release/open-pr.ps1
 
 .EXAMPLE
-    ./scripts/release/open-pr.ps1 -Resolves 331,332
+    ./scripts/release/open-pr.ps1 -Resolves '331,332'
 #>
 [CmdletBinding()]
 param(

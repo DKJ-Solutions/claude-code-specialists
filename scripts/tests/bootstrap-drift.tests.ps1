@@ -245,13 +245,24 @@ try {
     Assert-True ($rcText -match 'function Get-RepoName') 'repo-config scaffold supplies Get-RepoName'
     # Both halves in one file: the assembly must not drop the roster pair when the workflow half joins.
     Assert-True ($rcText -match 'function Get-RosterPath') 'workflow plugin: the roster half is still there alongside the workflow half'
-    # Get-ChangelogHeading (#178) and Get-LiveStage (#177) both ship a concrete, non-VUL-IN default
-    # (unlike Get-RepoName/Get-LintScript above, which are placeholders every consumer must fill in) --
-    # both are Optional in the script contract, so a consumer that never touches these two lines still
-    # gets a working fallback. Asserted here on the literal default value, not just function presence,
-    # so a future edit that accidentally reintroduces a VUL-IN marker on either line is caught.
-    Assert-True ($rcText -match 'function Get-ChangelogHeading') 'repo-config scaffold supplies Get-ChangelogHeading (#178)'
-    Assert-True ($rcText -match "\`$script:ChangelogHeading = '## Pull Requests'") 'repo-config scaffold defaults ChangelogHeading to a concrete value, not VUL-IN'
+    # Get-LiveStage (#177) ships a concrete, non-VUL-IN default (unlike Get-RepoName/Get-LintScript
+    # above, which are placeholders every consumer must fill in) -- it is Optional in the script
+    # contract, so a consumer that never touches the line still gets a working fallback. Asserted on
+    # the literal default value, not just function presence, so a future edit that accidentally
+    # reintroduces a VUL-IN marker is caught.
+    #
+    # AND Get-ChangelogHeading IS ASSERTED ON ABSENCE (inbound #763, August 20, 2026), where it used to
+    # be asserted on presence beside Get-LiveStage. It was RETIRED on August 5 with the flat changelog
+    # (#178): the contract holds no record for it and nothing reads it. The scaffold kept writing it
+    # anyway, with a comment presenting it as live -- and repo-config.tests.ps1 asserts the SOURCE's own
+    # config must not define it, for the reason that applies just as well one layer out: a config still
+    # answering it hands a value to a mechanism that no longer reads it. So the two asserts contradicted
+    # each other for fifteen days, and a consumer paid for it -- xoxowildhearts, a repo with no
+    # CHANGELOG.md at all, spent nine lines of comment reasoning about which false value was less
+    # harmful. A scaffolded file is written once and never again, which is why the wrong default is
+    # expensive rather than untidy: it cannot be corrected by a later release.
+    Assert-True (-not ($rcText -match 'function Get-ChangelogHeading')) 'repo-config scaffold does NOT supply the retired Get-ChangelogHeading (#178, inbound #763)'
+    Assert-True (-not ($rcText -match 'ChangelogHeading')) 'and not its backing variable or its comment either -- the whole block is gone, not just the function'
     Assert-True ($rcText -match 'function Get-LiveStage') 'repo-config scaffold supplies Get-LiveStage (#177)'
     Assert-True ($rcText -match "\`$script:LiveStage = ''") 'repo-config scaffold defaults LiveStage to empty (no live stage), not VUL-IN'
     $biText = [System.IO.File]::ReadAllText($biScaffold, [System.Text.Encoding]::UTF8)
