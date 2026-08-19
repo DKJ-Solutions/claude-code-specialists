@@ -796,3 +796,21 @@ function Get-ReleasePageWorkerName {
     <# The Cloudflare Worker that serves the generated page; '' = this repo hosts it nowhere. #>
     return $script:ReleasePageWorkerName
 }
+
+# AND THE PALETTE (inbound #759). Empty on purpose, and it is an answer rather than an omission: this
+# repo's page keeps the template's own colours because the template IS this repo's product. A consumer
+# whose page goes to management and a commissioner has the opposite answer -- theirs has to look like
+# the shop it reports on, which is what the seam exists for.
+#
+# STATED RATHER THAN LEFT TO THE DEFAULT, like Get-LiveStage above: the empty answer is the one a
+# reader is most likely to mistake for "nobody has looked at this yet", and check-script-contract can
+# only tell the two apart by the function being there.
+$script:ReleasePageTheme = @{}
+
+function Get-ReleasePageTheme {
+    <# Custom-property overrides for the generated page, e.g. @{ '--accent' = '#FF4F01' }; an empty
+       map means the shipped palette. 'color-scheme' is accepted as a name, which is how a brand with
+       no dark variant pins 'light'. Values are validated, not escaped -- see Format-ReleasePageStyle
+       in build-release-notes-page.ps1 for what passes and why. #>
+    return $script:ReleasePageTheme
+}

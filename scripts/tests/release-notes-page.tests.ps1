@@ -85,7 +85,8 @@ function New-FixtureRepo {
         [string]$Grouping = 'major',
         [string]$WorkerName = '',
         [switch]$OmitTitle,
-        [switch]$NoteWithScriptTag
+        [switch]$NoteWithScriptTag,
+        [string]$ThemeBody = ''
     )
     $root = Join-Path $Fixture "repo-$Label"
     if (Test-Path -LiteralPath $root) { Remove-Item -Recurse -Force -LiteralPath $root }
@@ -99,6 +100,7 @@ function Get-ReleaseNotesGrouping { return '$Grouping' }
 function Get-ReleaseHistoryPath { return 'releases/README.md' }
 function Get-ReleasePageWorkerName { return '$WorkerName' }
 $titleFn
+$(if ($ThemeBody) { "function Get-ReleasePageTheme { $ThemeBody }" } else { '' })
 "@
     Write-FixtureFile (Join-Path $root 'scripts\repo-config.ps1') $config
 
@@ -279,6 +281,66 @@ try {
     $b10 = Invoke-Build -Root $r10
     Assert-Equal 1 $b10.Code 'no history: refuses'
     Assert-Match 'Get-ReleaseHistoryPath' $b10.Out 'no history: the error names the seam that points at it'
+
+    # --- 11. The palette seam (inbound #759) -------------------------------------------------------
+    # WHY THE ASSERTS ARE ABOUT POSITION AND NOT ONLY PRESENCE. The override has to beat the
+    # '@media (prefers-color-scheme: dark)' block, which means being LATER in the stylesheet -- a
+    # palette emitted above it is silently ignored on a dark-mode machine and correct everywhere else,
+    # which is the worst kind of wrong: it works on the developer's screen.
+    Write-Host "build -- the repo's own palette (Get-ReleasePageTheme)" -ForegroundColor Cyan
+    $r11 = New-FixtureRepo -Label 'theme' -ThemeBody "return @{ '--accent' = '#FF4F01'; 'color-scheme' = 'light' }"
+    $b11 = Invoke-Build -Root $r11
+    Assert-Equal 0 $b11.Code 'theme: exit 0'
+    $p11 = Get-PageData -PagePath (Join-Path $r11 'releases\page\release-notes.html')
+    Assert-Match '--accent:\s*#FF4F01;' $p11.Html 'theme: the custom property reaches the page'
+    Assert-Match 'color-scheme:\s*light;' $p11.Html "theme: 'color-scheme' is accepted, which is how a brand with no dark variant says so"
+    Assert-True (-not ($p11.Html -match '@@[A-Z_]+@@')) 'theme: no template placeholder survives'
+    # The position assert: the LAST occurrence of the override must come after the media query.
+    $darkAt  = $p11.Html.IndexOf('prefers-color-scheme: dark')
+    $themeAt = $p11.Html.IndexOf('#FF4F01')
+    Assert-True ($darkAt -ge 0 -and $themeAt -gt $darkAt) 'theme: the palette is written AFTER the dark-mode block, so it wins on a dark machine too'
+    # EXACTLY ONE OVERRIDE BLOCK, which is the assert that names the defect this pair caught: the
+    # template's doc comment used to spell the placeholder in full, String.Replace hit that occurrence
+    # too, and the palette was written twice -- once inside an HTML comment, above the dark-mode block.
+    # The page still rendered correctly, so only position and count could see it.
+    # ANCHORED ON THE LINE START, so the count measures CSS rules and not prose. The unanchored version
+    # counted the comment three lines above this one, which QUOTES ':root { ... }' while explaining the
+    # defect -- the mention-versus-use question this repo's lint has now answered four times, arriving
+    # in a test.
+    Assert-Equal 3 ([regex]::Matches($p11.Html, '(?m)^\s*:root \{').Count) 'theme: three :root blocks -- the two shipped ones plus this palette, written ONCE'
+
+    # NO SEAM, NO BLOCK. The placeholder must vanish rather than leave an empty ':root {}' behind, and
+    # the shipped palette must still be there -- a page whose accent went missing because a repo
+    # declined to override it would be the seam breaking the default it exists to extend.
+    $r11b = New-FixtureRepo -Label 'nopalette'
+    $b11b = Invoke-Build -Root $r11b
+    Assert-Equal 0 $b11b.Code 'no palette: exit 0'
+    $p11c = Get-PageData -PagePath (Join-Path $r11b 'releases\page\release-notes.html')
+    # COUNTED RATHER THAN MATCHED ON THE FUNCTION NAME, which is what the first version of this assert
+    # did and could never pass: the template's own doc comment names the seam, so the string is in every
+    # page whether a repo answered or not. Two ':root {' blocks is the shipped shape -- light, then the
+    # dark override -- and a third is a palette.
+    Assert-Equal 2 ([regex]::Matches($p11c.Html, '(?m)^\s*:root \{').Count) 'no palette: the page carries the two shipped :root blocks and no third'
+    Assert-True (-not ($p11c.Html -match "own palette --")) 'no palette: and no override comment either'
+    Assert-Match '--accent: #b8562f' $p11c.Html 'no palette: the shipped palette is untouched'
+
+    # --- 12. The palette is validated, not escaped ------------------------------------------------
+    # THE VECTOR THIS EXISTS FOR. These values land in a <style> element, so a value carrying a closing
+    # style tag ends the element and everything after it is markup. Escaping is not the remedy here --
+    # an escaped '#' is not a colour -- so the value is dropped, and the page is still built, because a
+    # report about releases must not be stopped by one bad colour.
+    Write-Host "build -- a palette value cannot reach the markup raw" -ForegroundColor Cyan
+    $evil = "return @{ '--accent' = 'red</style><script>alert(1)</script>'; '--ink' = 'blue; }'; 'position' = 'fixed'; '--line' = '#123456' }"
+    $r12 = New-FixtureRepo -Label 'evil' -ThemeBody $evil
+    $b12 = Invoke-Build -Root $r12
+    Assert-Equal 0 $b12.Code 'hostile palette: the page is still generated'
+    $p12 = Get-PageData -PagePath (Join-Path $r12 'releases\page\release-notes.html')
+    Assert-True (-not ($p12.Html -match 'alert\(1\)')) 'hostile palette: the injected script never reaches the page'
+    Assert-True (-not ($p12.Html -match '(?m)^\s*--ink: blue;')) 'hostile palette: a value carrying a brace-escape is dropped'
+    Assert-True (-not ($p12.Html -match '(?m)^\s*position: fixed;')) 'hostile palette: a name that is not a custom property is dropped'
+    Assert-Match '--line:\s*#123456;' $p12.Html 'hostile palette: and the SOUND value in the same map still lands -- one bad key costs one colour'
+    Assert-Match 'Get-ReleasePageTheme' $b12.Out 'hostile palette: each drop is warned about, naming the function'
+    Assert-Match "'--accent'" $b12.Out 'hostile palette: and naming the key, so a silently ignored setting is impossible'
 
 } finally {
     Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue

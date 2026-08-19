@@ -120,6 +120,7 @@ $config = & {
         HistoryPath = 'releases/README.md'
         Title       = ''
         WorkerName  = ''
+        Theme       = $null
     }
     $configPath = Join-Path $args[0] 'scripts\repo-config.ps1'
     if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) { return $answers }
@@ -132,6 +133,7 @@ $config = & {
     if (Get-Command Get-ReleaseHistoryPath     -ErrorAction SilentlyContinue) { $answers.HistoryPath = Get-ReleaseHistoryPath }
     if (Get-Command Get-ReleasePageTitle       -ErrorAction SilentlyContinue) { $answers.Title       = Get-ReleasePageTitle }
     if (Get-Command Get-ReleasePageWorkerName  -ErrorAction SilentlyContinue) { $answers.WorkerName  = Get-ReleasePageWorkerName }
+    if (Get-Command Get-ReleasePageTheme       -ErrorAction SilentlyContinue) { $answers.Theme       = Get-ReleasePageTheme }
     # The page title falls back to the repo's own name rather than to a generic label, so a page
     # built in a repo that never answered still says whose releases it carries.
     if (-not $answers.Title -and (Get-Command Get-RepoName -ErrorAction SilentlyContinue)) {
@@ -229,7 +231,7 @@ $subtitle = "$($releases.Count) release$(if ($releases.Count -ne 1) {'s'}), newe
 $stamp    = (Get-Date).ToString('yyyy-MM-dd')
 
 $template = [System.IO.File]::ReadAllText($templatePath, [System.Text.Encoding]::UTF8)
-foreach ($needle in @('@@PAGE_TITLE@@', '@@PAGE_SUBTITLE@@', '@@BUILD_STAMP@@', '@@RELEASE_DATA@@')) {
+foreach ($needle in @('@@PAGE_TITLE@@', '@@PAGE_SUBTITLE@@', '@@BUILD_STAMP@@', '@@RELEASE_DATA@@', '@@PAGE_STYLE@@')) {
     if ($template -notmatch [regex]::Escape($needle)) { throw "The template no longer carries $needle." }
 }
 
@@ -239,10 +241,71 @@ function ConvertTo-HtmlText {
     return ($Value -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;')
 }
 
+function Format-ReleasePageStyle {
+    <#
+        Pure: the repo's palette as one ':root' block, or '' when the repo answered nothing.
+
+        A SEAM VALUE THAT REACHES A <style> ELEMENT IS NOT LIKE THE OTHER THREE. The text placeholders
+        above are HTML-escaped, which is the whole defence they need. Escaping is exactly wrong here --
+        an escaped '#' is not a colour -- so this validates instead, and it validates because the target
+        is a raw markup context: a value carrying a closing style tag ends the element, and everything
+        after it is markup rather than CSS. That is a script-injection vector, not a broken page. A
+        stray '}' is the milder version and breaks out of the rule into the stylesheet.
+
+        WHAT PASSES, deliberately narrow rather than a blocklist. A NAME is a custom property
+        ('--accent') or the literal 'color-scheme', which is the one standard property a palette has to
+        be able to set: a brand with no dark variant pins 'light' and keeps its colours on any
+        background, and without that the seam could say "these colours" but not "no dark mode" (inbound
+        #759 named exactly that case). A VALUE is hex, a colour function, a keyword or a short list of
+        them -- letters, digits, '#', parentheses, commas, dots, percent, spaces, hyphens. Nothing else:
+        no braces, semicolons, colons, angle brackets, quotes, backslashes, comment markers or 'url('.
+        A repo needing a gradient or a font file is asking for the design pass, not for a wider regex.
+
+        A REJECTION IS A WARNING AND A DROP, never a failure. This page is a report about releases; a
+        malformed colour must not stop it being generated, and the shipped default for that key is a
+        working answer. The warning NAMES the key, because a silently ignored setting is the failure
+        this repo keeps paying for -- a consumer edits a value, sees no change and no error, and
+        concludes the seam does not work.
+    #>
+    param($Theme)
+    if ($null -eq $Theme) { return '' }
+    # A hashtable, an ordered dictionary or a PSCustomObject: whichever shape the repo's function
+    # returned. Probed rather than required, so the seam's own docstring can stay about colours.
+    $pairs = @()
+    if ($Theme -is [System.Collections.IDictionary]) {
+        foreach ($k in $Theme.Keys) { $pairs += ,@("$k", "$($Theme[$k])") }
+    } elseif ($Theme -is [psobject] -and @($Theme.PSObject.Properties).Count -gt 0) {
+        foreach ($p in $Theme.PSObject.Properties) { $pairs += ,@("$($p.Name)", "$($p.Value)") }
+    } else {
+        Write-Warning "Get-ReleasePageTheme returned a $($Theme.GetType().Name), which carries no property/value pairs -- the shipped palette is used."
+        return ''
+    }
+
+    $nameRx  = '^(?:--[A-Za-z0-9][A-Za-z0-9-]*|color-scheme)$'
+    $valueRx = '^[A-Za-z0-9#(),.%\s-]+$'
+    $lines = @()
+    foreach ($pair in $pairs) {
+        $name  = ([string]$pair[0]).Trim()
+        $value = ([string]$pair[1]).Trim()
+        if ($name -notmatch $nameRx) {
+            Write-Warning "Get-ReleasePageTheme: '$name' is not a custom property or 'color-scheme' -- dropped."
+            continue
+        }
+        if (-not $value -or $value -notmatch $valueRx) {
+            Write-Warning "Get-ReleasePageTheme: the value for '$name' is empty or carries a character a stylesheet must not take from a config file -- dropped."
+            continue
+        }
+        $lines += ('    ' + $name + ': ' + $value + ';')
+    }
+    if ($lines.Count -eq 0) { return '' }
+    return (@("  /* This repo's own palette -- Get-ReleasePageTheme. */", '  :root {') + $lines + @('  }')) -join "`n"
+}
+
 $page = $template.
     Replace('@@PAGE_TITLE@@',    (ConvertTo-HtmlText $config.Title)).
     Replace('@@PAGE_SUBTITLE@@', (ConvertTo-HtmlText $subtitle)).
     Replace('@@BUILD_STAMP@@',   (ConvertTo-HtmlText $stamp)).
+    Replace('@@PAGE_STYLE@@',    (Format-ReleasePageStyle -Theme $config.Theme)).
     Replace('@@RELEASE_DATA@@',  $json)
 
 # --- 4. Where the output goes ---------------------------------------------------------------------

@@ -71,14 +71,42 @@ door — and the consequence is that nothing in git remembers your URL, so whoev
 elsewhere. In a **private** repo, commit it: a tracked token is what survives a lost machine, and it is
 already inside a repository only your people can read.
 
-## Hosting it: two seam values, and one of them has a consequence outside your repo
+## Making it yours: three seam values, and one of them has a consequence outside your repo
 
-Both live in your own `scripts/repo-config.ps1`, both optional:
+All three live in your own `scripts/repo-config.ps1`, all three optional:
 
 | function | what it answers | absent |
 |---|---|---|
 | `Get-ReleasePageTitle` | the heading and window title — what the reader should understand the page to be, usually the **product's** name rather than the repository's | falls back to the name half of `Get-RepoName` |
+| `Get-ReleasePageTheme` | the page's colours — custom-property overrides, as a map | no overrides; the page keeps its shipped palette in light and dark |
 | `Get-ReleasePageWorkerName` | the Cloudflare Worker that serves it | `''` — the page is built and hosted nowhere, and `-Worker` refuses while naming this function |
+
+**The palette exists because this page often reports to people outside engineering**, and it then has to
+look like the product it is about rather than like the tool that generated it. Answer it with the
+overrides you want and nothing else:
+
+```powershell
+function Get-ReleasePageTheme {
+    return @{
+        '--accent'     = '#FF4F01'
+        'color-scheme' = 'light'
+    }
+}
+```
+
+Three things to know before you write one:
+
+- **`color-scheme` is accepted as a name**, alongside the `--custom-properties`. That is how a brand with
+  no dark variant says so: pin `light` and the page keeps its colours on any background. Without it the
+  seam could say *these colours* but not *no dark mode*.
+- **The overrides are written after the dark-mode block**, so they beat both the light and the dark
+  defaults. You do not need to restate a colour twice to make it stick.
+- **Values are validated, not escaped**, because they land in a `<style>` element where escaping a `#`
+  would stop it being a colour. Names must be `--something` or `color-scheme`; values may carry letters,
+  digits, `#`, parentheses, commas, dots, percent, spaces and hyphens. Anything else — braces,
+  semicolons, colons, quotes, angle brackets, comment markers, `url(` — is **dropped with a warning
+  naming the key**, and the page is still built. So a typo costs one colour, never the report. A gradient
+  or a web font is outside this seam by design.
 
 **Read this before answering the second one.** The worker serves the page at `/notes/<32 hex>`, and
 **that path is the only lock on it**: there is no login, so anyone with the link can read. The page
