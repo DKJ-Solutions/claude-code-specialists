@@ -42,7 +42,7 @@
 #
 # TWO OF THESE ARE NO LONGER WRITTEN, ONLY RECOGNISED (Dave, August 6, 2026). Until the branch/ split the
 # entry file was also the branch's to-do list, so new-branch.ps1 scaffolded it with a
-# '**To do / where I left off:**' heading over a matching placeholder. branch-progress.md holds that job
+# '**To do / where I left off:**' heading over a matching placeholder. branch-cycle.md holds that job
 # now, and an entry that still asked for a to-do list would re-create the exact confusion the split
 # removes. So the writer stops writing them and the GATE KEEPS REFUSING THEM -- "recognise both, write
 # one", the same rule the tier line gets. This is not politeness towards history: every consumer with a
@@ -384,39 +384,97 @@ function Format-EntryTierLine {
 
 function Format-EntryFoldFooter {
     <#
-        Pure: the closing line the FOLD appends to an entry -- the two facts that do not exist until the
-        merge. '[PR #468](https://...) <middot> merged 2026-08-05'.
+        Pure: the closing line the FOLD appends to an entry -- the clickable PR, which does not exist
+        until the merge. '[PR #468](https://...)'.
 
-        $MergedAt is the PR's own merge timestamp as gh returns it (ISO 8601, UTC). Empty or unparseable
-        -> $FallbackDate is used, which the caller reads off its clock.
+        THE MERGE DATE IS NOT ON THIS LINE ANY MORE (Dave, August 19, 2026). It sat here from August 5,
+        as ' <middot> merged 2026-08-05', and it moved to the 'Pull Request' heading directly above --
+        Set-EntryMergeStamp writes it there, from the same PR field this line's number comes from. Dave's
+        call when the stamp arrived, and the reason is that the alternative was the same fact twice in one
+        section: the heading says when it landed, the line says which PR it was.
 
-        WHY THE PR'S TIMESTAMP AND NOT THE CLOCK (Dave, August 5, 2026). The date used to be scaffolded
-        into the entry's HEADING when the branch was created, making it the branch's birth date rather
-        than the landing date -- wrong by however many days the branch lived, in the one document whose
-        subject is when things landed. Moving it to the fold fixes that; reading it off the PR fixes the
-        remainder, because the fold does not always run seconds after the merge. This repo has measured
-        that gap: unfolded entry files were once found in the repo root the morning after their merge. A
-        clock reading would have dated those a day late, and nothing in the output would have said so.
+        WHY THE PR'S TIMESTAMP AND NOT THE CLOCK (Dave, August 5, 2026), which is still the rule and now
+        lives on the stamp: the date used to be scaffolded into the entry's HEADING when the branch was
+        created, making it the branch's birth date rather than the landing date -- wrong by however many
+        days the branch lived, in the one document whose subject is when things landed. Reading it off the
+        PR fixes the remainder, because the fold does not always run seconds after the merge. This repo has
+        measured that gap: unfolded entry files were once found in the repo root the morning after their
+        merge. See Format-EntryMergeStamp, which carries the fallback that reasoning needs.
 
-        WHY A FUNCTION RATHER THAN THREE LINES IN THE FOLD. The fold drives a live remote, so its own
-        suite deliberately does not depend on a PR existing -- which would have left the one path this
-        change adds untested. Same move, same reason as Get-ExistingPrRecord in pr-issues-lib.ps1: the
+        WHY A FUNCTION RATHER THAN ONE LINE IN THE FOLD. The fold drives a live remote, so its own
+        suite deliberately does not depend on a PR existing -- which would have left this path untested.
+        Same move, same reason as Get-ExistingPrRecord in pr-issues-lib.ps1: the
         part that is a pure function of an API answer becomes one, so it can be asserted without the API.
     #>
     param(
         [Parameter(Mandatory)][int]$Number,
-        [Parameter(Mandatory)][string]$Url,
-        [string]$MergedAt = '',
-        [Parameter(Mandatory)][string]$FallbackDate
+        [Parameter(Mandatory)][string]$Url
     )
-    $md = [char]0x00B7
-    $stamp = $FallbackDate
-    if ($MergedAt) {
-        # try/catch rather than a regex pre-check: gh's field is a timestamp or it is absent, and a
-        # malformed one must not turn a completed fold into a failure over a cosmetic line.
-        try { $stamp = ([datetime]$MergedAt).ToLocalTime().ToString('yyyy-MM-dd') } catch { $stamp = $FallbackDate }
+    return "[PR #$Number]($Url)"
+}
+
+function Format-EntryMergeStamp {
+    <#
+        Pure: the merge moment as it is written into the 'Pull Request' heading -- '20260819-171500'.
+
+        THE SAME SHAPE AS THE BRANCH'S CREATION STAMP, deliberately (Dave, August 19, 2026): the cycle
+        file's heading stamps the moment the branch began and this one the moment it landed, so a reader
+        can subtract them. That is also why it carries the TIME and not only the date, which is what the
+        closing line has always shown alongside the link.
+
+        $MergedAt is gh's own ISO 8601 timestamp; empty or unparseable falls back to $FallbackNow, for the
+        same reason Format-EntryFoldFooter has a fallback -- a cosmetic field must not turn a completed
+        fold into a failure.
+    #>
+    param(
+        [string]$MergedAt = '',
+        [Parameter(Mandatory)][string]$FallbackNow
+    )
+    if (-not $MergedAt) { return $FallbackNow }
+    try { return ([datetime]$MergedAt).ToLocalTime().ToString('yyyyMMdd-HHmmss') } catch { return $FallbackNow }
+}
+
+function Set-EntryMergeStamp {
+    <#
+        Pure: the entry with its 'Pull Request' heading restamped -- '### Pull Request <middot> 20260819-171500'.
+        Unchanged when the stamp is empty, when the entry has no such section, or where the heading sits
+        inside a fence.
+
+        THE FOLD WRITES INTO A HEADING AGAIN, which reverses nothing (August 19, 2026). What was retired on
+        August 5 was the DATE IN THE ENTRY'S OWN HEADING, and it was retired because the scaffolder wrote it
+        at creation -- making it the branch's birth date in the one document whose subject is when things
+        landed. This is a section heading, written by the fold, from the PR's own merge timestamp. Same
+        fact, right source, right moment.
+
+        AN ALREADY-STAMPED HEADING IS RESTAMPED RATHER THAN APPENDED TO, so folding twice cannot grow a
+        line of timestamps -- and so a heading still carrying the TEMPLATE's placeholder (an entry someone
+        pasted from branch/templates/) comes out with a real one.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$EntryText,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Stamp
+    )
+    if (-not $Stamp) { return $EntryText }
+    $names = @(@((Get-EntrySectionHeadings)['PullRequest']) + @(Get-EntrySectionRetiredNames -Key 'PullRequest') |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($names.Count -eq 0) { return $EntryText }
+    $rx = '^#{' + $script:EntrySectionLevel + '}\s+(' +
+        ((@($names) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|') + ')' +
+        (Get-EntrySectionHeadingTail)
+
+    $pair = Get-EntryLineFlagPairs -EntryText $EntryText
+    $parts = $pair.Parts
+    $line = -1
+    for ($i = 0; $i -lt $parts.Count; $i += 2) {
+        $line++
+        if ($pair.Fenced[$line]) { continue }
+        $m = [regex]::Match([string]$parts[$i], $rx)
+        if (-not $m.Success) { continue }
+        $parts[$i] = ('#' * $script:EntrySectionLevel) + ' ' + $m.Groups[1].Value +
+            (Format-EntrySectionHeadingSuffix -Stamp $Stamp)
+        break
     }
-    return "[PR #$Number]($Url) $md merged $stamp"
+    return ($parts -join '')
 }
 
 function Resolve-EntryTier {
@@ -819,7 +877,7 @@ $script:EntryGuidanceDefaults = [ordered]@{
     # defect ships invisibly instead of obviously. Guidance goes in the comment; the prompt stays in view.
     # THE THREE BRANCH FIELDS ARE SHARED BY BOTH FILES, and that is why they live here rather than in
     # Get-BranchFileWording beside the rest of the progress file's prose. The dossier form puts the same
-    # three sections at the top of branch-changelog.md AND branch-progress.md; two copies of the heading
+    # three sections at the top of branch-deployment.md AND branch-cycle.md; two copies of the heading
     # and the hint is the drift shape this repo keeps paying for, and here it would be visible on every
     # branch -- two files, side by side, disagreeing about what to write in the same box.
     #
@@ -2159,7 +2217,8 @@ function Remove-EntryAdminSections {
     if ($names.Count -eq 0) { return $EntryText }
 
     $hashes = '#' * $script:EntrySectionLevel
-    $headRx = '^\s*' + $hashes + '\s+(' + ((@($names | ForEach-Object { [regex]::Escape($_) })) -join '|') + ')\s*$'
+    $headRx = '^\s*' + $hashes + '\s+(' + ((@($names | ForEach-Object { [regex]::Escape($_) })) -join '|') + ')' +
+        (Get-EntrySectionHeadingTail)
     # Any heading at this level or shallower closes the section: the next '###', or the next entry.
     $closeRx = '^\s*#{1,' + $script:EntrySectionLevel + '}\s'
 
@@ -2448,6 +2507,12 @@ $script:EntryWrittenSectionKeys = @('What', 'PullRequest')
 # so a template reader sees the shape of the line instead of a sentence where a timestamp goes.
 $script:EntryIdTemplatePlaceholder = '<timestamp of the moment this branch was created>'
 
+# And its counterpart at the other end of the branch's life (Dave, August 19, 2026): what the template
+# shows beside 'Pull Request', where a folded entry carries the moment it landed. The pair is the point --
+# the cycle file's heading stamps the branch's first moment, this section's heading its last -- and each
+# stamp sits in the document that owns that moment.
+$script:EntryMergeStampTemplatePlaceholder = '<timestamp of the moment this branch was merged>'
+
 # What stands between the entry's title and its creation stamp: '## Branch `feat/x` changelog <sep> 20260819...'.
 # A MIDDLE DOT SINCE AUGUST 19, 2026 (Dave), where it was a hyphen. The hyphen read as a range or a
 # continuation -- this document's own prose uses ' -- ' as a dash all over -- while the two halves are simply
@@ -2468,6 +2533,35 @@ $script:EntryIdTemplatePlaceholder = '<timestamp of the moment this branch was c
 # downstream too, one gate later and after it had been copied into somebody's entry.
 $script:EntryIdSeparator = [string][char]0x00B7
 
+function Get-EntrySectionHeadingTail {
+    <#
+        Pure: the regex tail every section-heading matcher ends with -- what may legitimately follow a
+        section's NAME on its own heading line. Nothing, or the separator and a stamp.
+
+        WHY THIS EXISTS AT ALL (August 19, 2026). Until the 'Pull Request' heading gained the merge stamp,
+        every one of these matchers ended in a bare '\s*$' and the name had to be the whole line. Six
+        readers spread across this lib and the lint would each have had to grow the same exception, and the
+        failure mode of missing one is silent: a section whose heading no longer matches is a section the
+        reader reports as ABSENT, which the gates read as "not answered yet" and the fold as nothing to
+        fill. So the exception is written once and imported six times.
+
+        THE STAMP IS NOT CAPTURED, because nothing reads it back -- exactly what the separator's own note
+        says about the entry heading. This tail is a tolerance, not a parser.
+    #>
+    return '(?:\s+' + [regex]::Escape($script:EntryIdSeparator) + '\s+\S.*?)?\s*$'
+}
+
+function Format-EntrySectionHeadingSuffix {
+    <#
+        Pure: what a stamp looks like appended to a section heading -- ' <sep> <stamp>', or '' for an empty
+        stamp. One formatter, so the writer, the fold's restamp and the tail pattern above cannot disagree
+        about the spacing.
+    #>
+    param([AllowEmptyString()][string]$Stamp = '')
+    if (-not $Stamp) { return '' }
+    return ' ' + $script:EntryIdSeparator + ' ' + $Stamp
+}
+
 function Get-EntryIdSeparator {
     <# The separator between the entry's title and its creation stamp -- U+00B7 MIDDLE DOT. #>
     return $script:EntryIdSeparator
@@ -2476,6 +2570,12 @@ function Get-EntryIdSeparator {
 function Get-EntryIdTemplatePlaceholder {
     <# The stamp the template's heading carries in place of a real one. #>
     return $script:EntryIdTemplatePlaceholder
+}
+
+function Get-EntryMergeStampTemplatePlaceholder {
+    <# The same, for the 'Pull Request' heading: what the template shows where a folded entry carries the
+       moment it landed. #>
+    return $script:EntryMergeStampTemplatePlaceholder
 }
 
 function Get-EntryWrittenSectionKeys {
@@ -2649,7 +2749,7 @@ function Get-PreFlatChangelogRefusal {
         '^## ' it found as the top of the list, which in a pre-flat document is the SECTION heading, and
         inserted the entry above it. Measured in a consumer on 2026-08-09, exit 0 and no warning:
 
-            Folded and reset: branch/branch-changelog.md (tier 1, significance 3 -- placed above 2 existing entries)
+            Folded and reset: branch/branch-deployment.md (tier 1, significance 3 -- placed above 2 existing entries)
             CHANGELOG.md updated.
 
         The "2 existing entries" were their two section headings, and the entry landed outside the section
@@ -2719,10 +2819,17 @@ function Get-EntrySectionHeadings {
 
 function Get-EntrySectionHeading {
     <# One section's full heading line, e.g. '### Branch type'. One formatter, so the writer and the
-       parser cannot disagree about the level or the spacing. #>
-    param([Parameter(Mandatory)][ValidateSet('Description', 'Id', 'Type', 'What', 'Significance', 'PullRequest')][string]$Key)
+       parser cannot disagree about the level or the spacing.
+
+       -Stamp appends ' <sep> <stamp>' -- the merge moment on the 'Pull Request' heading, and the template's
+       placeholder in the same slot. Empty for every other caller and every other section, so the bare
+       heading is still what a marker or a gate compares against. #>
+    param(
+        [Parameter(Mandatory)][ValidateSet('Description', 'Id', 'Type', 'What', 'Significance', 'PullRequest')][string]$Key,
+        [AllowEmptyString()][string]$Stamp = ''
+    )
     $headings = Get-EntrySectionHeadings
-    return ('#' * $script:EntrySectionLevel) + ' ' + $headings[$Key]
+    return ('#' * $script:EntrySectionLevel) + ' ' + $headings[$Key] + (Format-EntrySectionHeadingSuffix -Stamp $Stamp)
 }
 
 function Get-EntrySectionBody {
@@ -2751,7 +2858,8 @@ function Get-EntrySectionBody {
     $body = Get-EntryTextOutsideFences -EntryText $EntryText
     $lines = @($body -split '\r?\n')
     $rx = '^#{' + $script:EntrySectionLevel + '}\s+(?:' +
-        ((@($names) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|') + ')\s*$'
+        ((@($names) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|') + ')' +
+        (Get-EntrySectionHeadingTail)
 
     $from = -1
     for ($i = 0; $i -lt $lines.Count; $i++) {
@@ -2791,7 +2899,8 @@ function Test-EntryHasSection {
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     if ($names.Count -eq 0) { return $false }
     $rx = '(?m)^#{' + $script:EntrySectionLevel + '}\s+(?:' +
-        ((@($names) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|') + ')\s*$'
+        ((@($names) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|') + ')' +
+        (Get-EntrySectionHeadingTail)
     return [bool]([regex]::IsMatch((Get-EntryTextOutsideFences -EntryText $EntryText), $rx))
 }
 
@@ -2990,9 +3099,16 @@ function Resolve-EntryType {
     # entry: exactly the confusion the two-file split exists to remove, reintroduced from underneath.
     # Caught by that suite on the first run. The title word comes from the wording, so a repo that
     # translated it is matched by its own word rather than by the English one.
-    $clTitle = [string](Get-BranchFileWording).ChangelogTitle
-    if ($headingLine.Count -gt 0 -and $known.Count -gt 0 -and $clTitle) {
-        $branchRx = '`([^`/]+)/[^`]*`\s+' + [regex]::Escape($clTitle) + '\b'
+    # AND EVERY WORD THAT TITLE HAS EVER HAD, which is the same "recognise both, write one" rule the
+    # section headings live by. It became 'deployment' on August 19, 2026, and 'changelog' is the word in
+    # the heading of every entry in CHANGELOG.md, in every consumer's tree and on every branch in flight.
+    # Reading only the current word would make all of those declare no type -- and since
+    # Test-EntryDeclaresShape ends on this function, it would make them stop being entries at all.
+    $clTitles = @(@([string](Get-BranchFileWording).ChangelogTitle) + @(Get-BranchFileRetiredChangelogTitles) |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($headingLine.Count -gt 0 -and $known.Count -gt 0 -and $clTitles.Count -gt 0) {
+        $branchRx = '`([^`/]+)/[^`]*`\s+(?:' +
+            ((@($clTitles) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|') + ')\b'
         if ($headingLine[0] -match $branchRx) {
             $prefix = $Matches[1].Trim()
             $canonical = @($known | Where-Object {
@@ -3079,9 +3195,10 @@ function Add-EntrySection {
         [Parameter(Mandatory)]$Lines,
         [Parameter(Mandatory)][string]$Key,
         [AllowEmptyString()][string]$Value = '',
+        [AllowEmptyString()][string]$Stamp = '',
         [switch]$WithGuidance
     )
-    $Lines.Add((Get-EntrySectionHeading -Key $Key))
+    $Lines.Add((Get-EntrySectionHeading -Key $Key -Stamp $Stamp))
     if ($WithGuidance) {
         $all = Get-EntryGuidance
         $guidance = @()
@@ -3100,7 +3217,7 @@ function Format-EntryBlock {
         The whole entry as an array of LINES: the H2 branch heading, then the six H3 sections in order.
 
         THE HEADING NAMES THE BRANCH, NOT THE CHANGE (Dave, August 6, 2026) -- '## `feat/x` changelog', the
-        same heading branch-progress.md carries with its own suffix, because the two files are a matched
+        same heading branch-cycle.md carries with its own suffix, because the two files are a matched
         pair. What the heading used to hold now has a section of its own: 'Branch title'. This whole
         file is still pasted verbatim into CHANGELOG.md at the merge, so that is what lands there; Dave was
         offered a fold that derives a slimmer block instead and declined it, on the record, before this was
@@ -3116,7 +3233,6 @@ function Format-EntryBlock {
     param(
         [AllowEmptyString()][string]$Branch = '',
         [string]$Description = '',
-        [string]$Id = '',
         [string]$Type = '',
         [string]$Body = '',
         $ImpactRows = @(),
@@ -3127,19 +3243,20 @@ function Format-EntryBlock {
     # that carries the guidance comments. Kept as one switch rather than two knobs because those two facts
     # are the same fact -- "this is the reference, not somebody's working file" -- and a caller that set one
     # without the other would produce a file that is neither.
-    # THE HEADING CARRIES THE CREATION STAMP SINCE AUGUST 16, 2026, which is where the 'Branch ID' section
-    # went. The heading already had to name the branch, and a section below it holding one more fact about
-    # that same branch was a section's worth of ceremony for a timestamp. Separated by Get-EntryIdSeparator
-    # -- a middle dot since August 19, 2026, a hyphen before that -- and BARE: it was quoted for the first
-    # half of that first day, and the quotes said nothing a reader needed -- a timestamp has no spaces to
-    # delimit and is not being cited.
+    # THE CREATION STAMP IS NOT IN THIS HEADING ANY MORE (Dave, August 19, 2026). It moved here on
+    # August 16 as the last remnant of the retired 'Branch ID' section, and moved on three days later to
+    # the cycle file, which is the document the stamp is about: created with the branch, reset with the
+    # merge. What this heading carries is the delivery, and the date a delivery has is the merge date the
+    # fold writes into the Pull Request section -- so an entry stating two dates that mean different
+    # things is one confusion fewer.
     #
-    # THE '(template)' MARKER IS GONE WITH IT, and that is a consequence rather than a second decision:
-    # the suffix slot now holds the stamp, and the template's stamp is the visible placeholder
-    # '<timestamp of the moment this branch was created>' -- which marks the file at least as loudly as
-    # the word did, beside a branch token that is equally obviously not a branch.
-    if ($Template -and -not $Id) { $Id = Get-EntryIdTemplatePlaceholder }
-    if ($Id) { $TitleSuffix = "$($script:EntryIdSeparator) $Id" }
+    # THE '(template)' MARKER STAYS GONE, retired with the stamp's arrival and not revived by its
+    # departure: the placeholder branch token '<prefix>/<short-name>' marks the template on its own, and
+    # the reader who needs the word has the file's path.
+    #
+    # -Id IS GONE FROM THIS FUNCTION rather than left accepted and unread, so a caller still passing one
+    # fails loudly instead of watching its stamp vanish. -TitleSuffix stays: it is the MIGRATION path's
+    # way of putting something of its own beside a heading, and it is what the stamp used to fill.
     # Each line appended on its own statement, NOT as @(<expr>, '') -- the comma operator binds looser than
     # '+', so `@(('#'*2) + ' ' + $Title, '')` concatenates the string with the ARRAY ($Title, '') and joins
     # it with a space. That produced '## A real title ' with a trailing space and no blank line after it,
@@ -3187,12 +3304,17 @@ function Format-EntryBlock {
     # THE PR TITLE LIVES HERE SINCE AUGUST 16, 2026, WHICH IS WHERE IT ALWAYS BELONGED (Dave). The section
     # was called 'Branch title' and held no branch title: open-pr composes the PR's title from it, the
     # release documents print it, and #506 already renamed it once for saying the wrong thing. It is the PR
-    # title, so it sits in the PR section -- above the number and the merge date the fold writes underneath.
+    # title, so it sits in the PR section -- above the PR link the fold writes underneath, and below the
+    # landing stamp the fold puts on the heading.
     #
     # STILL WRITTEN EMPTY WHERE THE SCAFFOLDER CALLS. The title arrives from -Title at creation; the other
     # two facts do not exist until the merge, and a hand-written one would be a second copy of something
     # nobody has yet.
-    Add-EntrySection -Lines $lines -Key 'PullRequest' -Value $Description -WithGuidance:$Template
+    # THE MERGE STAMP IS SHOWN ONLY IN THE TEMPLATE, as a placeholder (Dave, August 19, 2026). A real
+    # entry's heading stays bare until the fold restamps it, because that moment does not exist yet -- the
+    # same rule the creation stamp follows on the cycle file, one end of the branch's life later.
+    $prStamp = if ($Template) { Get-EntryMergeStampTemplatePlaceholder } else { '' }
+    Add-EntrySection -Lines $lines -Key 'PullRequest' -Value $Description -Stamp $prStamp -WithGuidance:$Template
     return @($lines.ToArray())
 }
 
@@ -3255,7 +3377,7 @@ function Test-EntryDeclaresShape {
         this format quotes these headings inside a fence, and the entry for this very change does.
 
         THREE OF THE SIX SECTIONS PROVE NOTHING, AND THAT IS NEW (August 6, 2026). The dossier form gave
-        branch-progress.md the same title, 'Branch ID' and 'Branch type' headings the entry
+        branch-cycle.md the same title, 'Branch ID' and 'Branch type' headings the entry
         carries -- deliberately, they are one pair of files -- so a predicate matching ANY named section
         started answering $true for the step list. Measured immediately: the scaffold gate then judged a
         freshly written step list as an unfinished ENTRY and reported its empty description. That is the
@@ -3284,7 +3406,10 @@ function Test-EntryDeclaresShape {
     })
     foreach ($heading in $headings) {
         if (-not $heading) { continue }
-        $rx = '^#{' + $script:EntrySectionLevel + '}\s+' + [regex]::Escape([string]$heading) + '\s*$'
+        # The tolerant tail, because 'Pull Request' carries the merge stamp once the fold has run -- and a
+        # folded entry that stopped declaring its shape would be read as a leftover section heading.
+        $rx = '^#{' + $script:EntrySectionLevel + '}\s+' + [regex]::Escape([string]$heading) +
+            (Get-EntrySectionHeadingTail)
         foreach ($line in $lines) {
             if ($line -match $rx) { return $true }
         }
@@ -3431,8 +3556,8 @@ function Get-EntryScaffoldFindings {
 # after the branch in the repo root, and there are TWO of them because they answer two different
 # questions for two different readers:
 #
-#   branch/branch-changelog.md   what the change DOES     -- for whoever reads CHANGELOG.md later
-#   branch/branch-progress.md    what still MUST HAPPEN   -- for whoever is working on the branch
+#   branch/branch-deployment.md   what the change DOES     -- for whoever reads CHANGELOG.md later
+#   branch/branch-cycle.md    what still MUST HAPPEN   -- for whoever is working on the branch
 #
 # THE SPLIT IS THE POINT. The root entry file did both jobs: new-branch.ps1 scaffolded it with
 # a body heading that literally read '**To do / where I left off:**', and open-pr's scaffold gate
@@ -3447,57 +3572,90 @@ function Get-EntryScaffoldFindings {
 #
 # THE RESET STATE IS WHAT LIVES ON THE TRUNK, and it is load-bearing rather than cosmetic. Both reset
 # files open with an H1, so Test-IsChangelogEntryFile in the fold ignores them exactly as it ignores
-# CONTRIBUTING.md -- while a FILLED branch-changelog.md opens with the entry's own H2 and is folded.
+# CONTRIBUTING.md -- while a FILLED branch-deployment.md opens with the entry's own H2 and is folded.
 # One structural test, no new flag, and the trunk state cannot be mistaken for an unfolded entry.
 #
 # AND THE FILLED CHANGELOG FILE IS NOTHING BUT THE ENTRY BLOCK -- no header, no branch line, no
 # warning. That is deliberate and it is Dave's requirement restated: the file must be copy-pasteable
 # into CHANGELOG.md in one go. Anything wrapped around the entry would have to be stripped by whoever
 # pastes it, which is the manual step the format exists to remove. The branch name therefore lives in
-# branch-progress.md, the file that has room for it.
+# branch-cycle.md, the file that has room for it.
 
 $script:BranchFileDefaults = [ordered]@{
-    # The branch name is prepended to these by Format-BranchFileHeader -- '# `feat/x` progress' -- so they
+    # The branch name is prepended to these by Format-BranchFileHeader -- '# `feat/x` cycle' -- so they
     # are the suffix rather than the whole title. Lowercase for that reason.
-    ChangelogTitle = 'changelog'
-    ProgressTitle  = 'progress'
+    #
+    # 'cycle' AND 'deployment' SINCE AUGUST 19, 2026 (Dave), where they were 'progress' and 'changelog'.
+    # Each file now says what it IS rather than which file it ends up in: one carries the branch through
+    # its cycle -- plan, create, test, and the deploy that belongs to the other document -- and the other
+    # IS the deployment, the part that travels to main. 'changelog' named a destination, which is how the
+    # entry kept being read as a fragment of CHANGELOG.md rather than as the claim this branch makes.
+    # THE FILENAMES MOVED WITH THE WORDS; Get-BranchFilePaths says which old ones are still read.
+    ChangelogTitle = 'deployment'
+    ProgressTitle  = 'cycle'
     # The word before the backticked branch name in the ENTRY's heading only -- '## Branch `feat/x`
-    # changelog'. The progress file deliberately takes none: its heading was not part of the August 16,
-    # 2026 compaction, and restyling it as a side effect of a shared formatter would move a document
-    # nobody asked about. Empty is a legitimate override; Get-BranchFileDeclaredBranch reads both shapes.
-    ChangelogHeadingLead = 'Branch'
+    # changelog'. EMPTY SINCE THE RENAME (Dave, August 19, 2026): the lead word existed to stop
+    # '## `feat/x` changelog' reading as a changelog OF that branch, and '## `feat/x` deployment' says
+    # what it is without help. Kept as a knob rather than deleted -- a repo whose word needs one sets it,
+    # and Get-BranchFileDeclaredBranch reads both shapes.
+    ChangelogHeadingLead = ''
     BranchLabel    = 'Branch'
-    StepsHeading   = 'Steps'
+    # NO StepsHeading ANY MORE (Dave, August 19, 2026). The steps used to sit under their own '### Steps'
+    # heading with the phases as H4s beneath it. The phases ARE the sections now, at H3, and the guidance
+    # that explained the list stands directly under the file's own heading. The wrapper bought nothing:
+    # this file IS the step list, so a heading announcing one wrapped the whole document. The key is gone
+    # rather than left pointing at nothing, so a consumer who overrode it gets a script-contract failure
+    # instead of a silently ignored setting.
     NotesHeading   = 'Where I left off'
     FirstStep      = 'TODO: the first step of this branch'
-    # THE THREE PHASES OF THE STEP LIST (Dave, August 14, 2026; issue #655). A branch moves through a
-    # recognisable arc instead of an ad-hoc list, and these are headings INSIDE '### Steps' rather than
-    # sections of their own: Get-BranchProgressFindings reads lines beginning with a step mark, so a
-    # heading is invisible to the gate and the mechanism is untouched by the arc being drawn on top of it.
+    # THE PHASES OF THE STEP LIST (Dave, August 14, 2026; issue #655). A branch moves through a
+    # recognisable arc instead of an ad-hoc list. They are the file's own H3 sections since August 19,
+    # 2026, where they were H4s under a '### Steps' wrapper -- which changes nothing mechanically:
+    # Get-BranchProgressFindings reads lines beginning with a step mark, so a heading of any level is
+    # invisible to the gate and the arc is drawn on top of an untouched mechanism.
     #
-    # THREE, NOT FOUR, AND THE FOURTH IS THE POINT. The SDLC arc is PLAN / CREATE / TEST & DEPLOY, and
-    # DEPLOY is deliberately absent here -- not because it does not happen, but because it is not a step.
-    # Dave's answer, and it is the one that makes the whole model fit: DEPLOY is the END RESULT, the part
-    # that travels to CHANGELOG.md. So it lives in the OTHER branch file. branch-changelog.md IS the
-    # deploy phase; branch-progress.md carries the three that stay behind and are reset after the merge.
+    # FOUR SINCE THAT SAME DAY, AND THE FOURTH CARRIES NO STEPS. The SDLC arc is PLAN / CREATE / TEST &
+    # DEPLOY, and DEPLOY used to be absent here on the reasoning that it is not a step but the END RESULT
+    # -- the part that travels to CHANGELOG.md, and therefore the other file's whole subject. That reading
+    # still holds; what changed is that the arc now SHOWS the fourth phase and points at where it lives,
+    # instead of leaving a reader to notice an absence. Its guidance (StepPhaseGuidance below) says to write
+    # nothing under it.
     #
-    # That also explains a rule that used to look arbitrary: the step-list gate refuses a step written for
+    # SO THE RULE THAT LOOKED ARBITRARY IS UNCHANGED: the step-list gate still refuses a step written for
     # after the merge. Post-merge is DEPLOY's territory, and DEPLOY is a different document. A DEPLOY
     # checkbox could only be unresolvable (blocking every PR, since the list must be clear before open-pr
-    # will push) or a lie (ticked before it happened).
+    # will push) or a lie (ticked before it happened) -- which is exactly why the heading is a pointer and
+    # not a phase you fill in.
     #
     # AN EMPTY PHASE IS NOT A FINDING. A branch with nothing to test says so by leaving that heading bare,
     # and refusing it would be exactly the ceremony CLAUDE.md warns about for the one-commit typo fix --
     # the same reason a branch with no step list at all is permitted.
-    StepPhases     = @('PLAN', 'CREATE', 'TEST')
+    StepPhases     = @('PLAN', 'CREATE', 'TEST', 'DEPLOY')
     # Which phase the scaffolded first step is written under. CREATE, because that is where a branch's
     # work actually starts once it has been planned -- and because a placeholder under PLAN would read as
     # "you have not thought about this yet", which is the one thing a fresh branch has just done.
     FirstStepPhase = 'CREATE'
-    # The marker the copies under branch/templates/ carry in their heading, so neither a reader nor a gate
-    # can mistake one for a real branch file. Not merely cosmetic: a template opens with the same H2 a
-    # written entry does, which is the signature the fold and the lint key on.
-    TemplateMarker = '(template)'
+    # GUIDANCE PER PHASE, for the phases that need one -- keyed by phase name, rendered in the TEMPLATE
+    # only, like every other guidance block. DEPLOY is the one entry and the reason the map exists: it is
+    # the phase you must NOT fill in, which is a thing the heading alone cannot say.
+    #
+    # Written as a complete comment block, markers and all, so Format-EntryGuidanceComment passes it
+    # through byte-exact -- the same treatment the hand-written one-liners in the entry get, and for the
+    # same reason: this is Dave's own spacing rather than something a rule derives.
+    StepPhaseGuidance = [ordered]@{
+        DEPLOY = @(
+            '<!--',
+            '    Don''t do anything here. Just a link to branch-deployment',
+            '-->'
+        )
+    }
+    # NO TemplateMarker ANY MORE. The copies under branch/templates/ used to mark their heading
+    # '(template)' so neither a reader nor a gate could mistake one for a real branch file. Both templates
+    # now carry the placeholder branch token beside a placeholder stamp
+    # ('<timestamp of the moment this branch was created>'), which marks the file at least as loudly as the
+    # word did -- the entry's heading retired the marker on that reasoning on August 16, 2026, and the
+    # cycle file followed it on August 19 when the stamp moved there. Gone rather than left unread, so an
+    # override fails the script contract instead of doing nothing.
     # THE THREE BRANCH FIELDS ARE NOT HERE. They are sections of the entry now and both files write them
     # from Get-EntrySectionHeadings + Get-EntryGuidance -- see $script:EntryGuidanceDefaults for why one
     # source rather than two. The keys that used to hold them (TitleHeading, IdGuidance, ...) are gone
@@ -3514,14 +3672,14 @@ $script:BranchFileDefaults = [ordered]@{
         'The dropped mark exists so nobody is pushed into ticking a box for work they did',
         'not do. It keeps its line and its reason, which is the half worth reading later.',
         '',
-        'PLAN / CREATE / TEST are the arc, not a quota: a phase with nothing under it is a',
-        'statement that this branch had nothing there. The headings are invisible to the',
-        'gate, which reads step marks only.',
+        'PLAN / CREATE / TEST / DEPLOY are the arc, not a quota: a phase with nothing',
+        'under it is a statement that this branch had nothing there. The headings are',
+        'invisible to the gate, which reads step marks only.',
         '',
-        'DEPLOY is missing on purpose. It is not a step, it is the result -- the changelog',
-        'entry beside this file, which is the part that travels into CHANGELOG.md at the',
-        'merge. That is also why a step written for after the merge is refused here: it',
-        'belongs to the other document.'
+        'DEPLOY takes no steps of its own. It is not a step but the result -- the',
+        'deployment entry beside this file, which is the part that travels into',
+        'CHANGELOG.md at the merge. That is also why a step written for after the merge is',
+        'refused here: it belongs to the other document.'
     )
     NotesGuidance  = @(
         'For picking this branch up again -- tomorrow, or on another machine after a park.',
@@ -3604,12 +3762,71 @@ function Get-BranchFilePaths {
         the parents), and a repo still carrying a root branch/ from before removes it by hand -- Dave's
         call when the move was decided, over a fallback that would have kept two possible locations
         alive in every reader of this function.
+
+        THE FILES ARE branch-cycle.md AND branch-deployment.md SINCE AUGUST 19, 2026 (Dave), where they
+        were branch-progress.md and branch-changelog.md. The names follow the documents' own words -- see
+        ChangelogTitle/ProgressTitle in $script:BranchFileDefaults for why those changed.
+
+        AND THE OLD NAMES ARE STILL READ, which is the opposite call to the directory move above and was
+        made deliberately (Dave, August 19, 2026). The difference is what is in flight: the directory move
+        touched a location a repo could tidy up once, while these two files ARE the working state of every
+        branch that exists right now -- here and in every consumer, who meet this change through a plugin
+        update rather than by choosing to. Refusing to see the old name would strand a half-finished branch
+        with its entry unfolded and its step list unread, which is the silent half-state this repo keeps
+        rediscovering. So: recognise both, write one. Resolve-BranchFilePath is the reader; every WRITER
+        uses Cycle/Deployment and nothing writes a legacy name again.
     #>
     return [pscustomobject]@{
-        Directory = 'workflow-davekjohn/branch'
-        Changelog = 'workflow-davekjohn/branch/branch-changelog.md'
-        Progress  = 'workflow-davekjohn/branch/branch-progress.md'
+        Directory        = 'workflow-davekjohn/branch'
+        Cycle            = 'workflow-davekjohn/branch/branch-cycle.md'
+        Deployment       = 'workflow-davekjohn/branch/branch-deployment.md'
+        LegacyCycle      = 'workflow-davekjohn/branch/branch-progress.md'
+        LegacyDeployment = 'workflow-davekjohn/branch/branch-changelog.md'
     }
+}
+
+function Resolve-BranchFilePath {
+    <#
+        The repo-relative path of one branch file AS IT EXISTS in $RepoRoot: the current name when it is
+        there, the pre-August-19-2026 name when only that one is, and the current name when neither is --
+        so a caller that goes on to WRITE creates the new name and a caller that reads finds the old one.
+
+        THE ONE PLACE THE DUAL-READ LIVES, on purpose. Four scripts and two gates ask where these files
+        are; the fold's own history is what happens when each answers for itself -- root entries and
+        branch/ entries were recognised in two scripts by two different rules until they disagreed. One
+        resolver means a branch created before the rename is either visible to all of them or to none.
+
+        Forward slashes out, like Get-BranchFilePaths, for the same reason: these strings go to git as
+        often as to Join-Path.
+    #>
+    param(
+        [Parameter(Mandatory)][ValidateSet('Cycle', 'Deployment')][string]$Kind,
+        [Parameter(Mandatory)][string]$RepoRoot
+    )
+    $paths   = Get-BranchFilePaths
+    $current = [string]$paths.$Kind
+    $legacy  = [string]$paths."Legacy$Kind"
+    if (Test-Path -LiteralPath (Join-Path $RepoRoot ($current -replace '/', '\'))) { return $current }
+    if (Test-Path -LiteralPath (Join-Path $RepoRoot ($legacy -replace '/', '\')))  { return $legacy }
+    return $current
+}
+
+function Get-BranchFileRetiredChangelogTitles {
+    <#
+        The words the ENTRY's heading has carried before the current one -- 'changelog', retired on
+        August 19, 2026 in favour of 'deployment'.
+
+        NOT A SEAM, deliberately, and not merged into Get-BranchFileWording: a repo may translate the word
+        it WRITES, but this list is the history of the English default, which is what every document
+        already written carries. A consumer who translated 'changelog' has their own old files to read and
+        can add nothing here -- so what this buys them is the same thing it buys this repo: entries written
+        under the previous word keep declaring themselves as entries.
+
+        THE STEP LIST'S OLD WORD IS NOT IN THIS LIST, and that is the whole point of keeping it separate:
+        'progress' beside a branch name means the OTHER file, and admitting it here would make every step
+        list ever written read as an entry -- the confusion the two-file split exists to remove.
+    #>
+    return @('changelog')
 }
 
 function Get-BranchFileWording {
@@ -3756,7 +3973,7 @@ function New-BranchFileLines {
 
 function Format-BranchChangelogReset {
     <#
-        branch/branch-changelog.md in its empty state -- what lives on the trunk, and what the fold
+        branch/branch-deployment.md in its empty state -- what lives on the trunk, and what the fold
         writes back once the entry has landed in CHANGELOG.md.
 
         Opens with an H1 so the fold's own entry test skips it. That is the whole back-pressure: a reset
@@ -3772,9 +3989,14 @@ function Format-BranchChangelogReset {
 
 function Format-BranchProgressReset {
     <#
-        branch/branch-progress.md in its empty state. Same shape as the changelog reset, plus the empty
-        step list -- so the file a reader opens on the trunk already shows them what it will look like
-        once it is theirs.
+        branch/branch-cycle.md in its empty state. Same shape as the deployment reset, plus the note
+        saying the step list arrives with the branch -- so the file a reader opens on the trunk already
+        shows them what it will look like once it is theirs.
+
+        NO '### Steps' HEADING OVER THAT NOTE SINCE AUGUST 19, 2026, because there is no such heading in
+        the written file any more either: the phases are the sections now. The reset state must look like
+        the empty version of what a branch actually gets, and a heading only the trunk copy carried would
+        have been the one line a reader could not find again once the file was theirs.
     #>
     param([string]$Branch = '')
     $w = Get-BranchFileWording
@@ -3782,22 +4004,21 @@ function Format-BranchProgressReset {
     $lines.Add('')
     foreach ($line in @($w.ProgressReset)) { $lines.Add($line) }
     $lines.Add('')
-    $lines.Add(('#' * $script:EntrySectionLevel) + ' ' + $w.StepsHeading)
-    $lines.Add('')
     $lines.Add('_(' + $w.ScaffoldNote + ')_')
     return @($lines.ToArray())
 }
 
 function Add-BranchProgressSection {
     <#
-        Private: one of the progress file's OWN sections -- Steps and Where I left off. Heading, a blank
-        line, the guidance comment, then the body. Appends to the caller's list.
+        Private: one of the cycle file's OWN sections -- a phase heading, or Where I left off. Heading,
+        the guidance comment directly under it, then the body. Appends to the caller's list.
 
-        THE BLANK BEFORE THE COMMENT IS WHAT SEPARATES THESE TWO FROM THE THREE BRANCH FIELDS ABOVE THEM,
-        which sit tight against their heading (Add-EntrySection). That is the template's shape and it reads
-        as one: a one-line hint belongs to its heading, a block of prose stands on its own. Not derived from
-        the line count -- the changelog's 'What' section is a block sitting tight -- so it is stated per call
-        site rather than guessed.
+        THE COMMENT SITS TIGHT AGAINST ITS HEADING, exactly as the entry's sections do (Add-EntrySection).
+        It used to take a blank line first, on the reasoning that a block of prose stands on its own while a
+        one-line hint belongs to its heading -- and the two files then spaced the same construction two
+        different ways. Dave settled it on August 19, 2026 by hand, in the templates that are this format's
+        spec: tight, in both files. The one block that keeps a blank line above it is the guidance under the
+        file's OWN heading, which explains the document rather than a section of it.
 
         THE HORIZONTAL RULES ARE GONE with the dossier form. They separated five H2 sections; the sections
         are H3 now and their headings do that work, while a '---' between every pair turned a short file
@@ -3811,10 +4032,7 @@ function Add-BranchProgressSection {
     )
     $Lines.Add(('#' * $script:EntrySectionLevel) + ' ' + $Heading)
     $rendered = @(Format-EntryGuidanceComment -Lines $Guidance)
-    if ($rendered.Count -gt 0) {
-        $Lines.Add('')
-        foreach ($line in $rendered) { $Lines.Add($line) }
-    }
+    foreach ($line in $rendered) { $Lines.Add($line) }
     $body = @(@($Body) | Where-Object { $null -ne $_ })
     if ($body.Count -gt 0) {
         $Lines.Add('')
@@ -3825,8 +4043,9 @@ function Add-BranchProgressSection {
 
 function Format-BranchProgressScaffold {
     <#
-        branch/branch-progress.md as it is written when a branch is created: the branch's own name, an
-        open first step, and a place to record where you left off.
+        branch/branch-cycle.md as it is written when a branch is created: the branch's own name and
+        creation stamp, the arc it moves through, an open first step, and a place to record where you
+        left off.
 
         THE STEP LIST IS A CHECKBOX LIST because that is the form the requirement was given in -- work
         is ticked off, and the list is done when nothing is open. Since August 6, 2026 that IS a gate:
@@ -3845,24 +4064,44 @@ function Format-BranchProgressScaffold {
         disagree about the same three boxes. **The heading already carries the identifier**, which is also
         the only thing any script reads out of this file besides the step marks.
 
-        So this file is exactly what its name says: the plan, and where you left off.
+        So this file is exactly what its name says: the branch's cycle, and where you left off.
 
-        -Template renders the copy under branch/templates/: it marks its heading '(template)', carries the
-        guidance comments, and omits the scaffolded first step. The step is the one thing the template must
-        NOT show, because a template is read as an example -- and an example whose first line is somebody
-        else's TODO gets copied in.
+        -Id IS THE CREATION STAMP, AND IT LIVES HERE SINCE AUGUST 19, 2026 (Dave). It sat in the entry's
+        heading for three days, where it was the last remnant of the retired 'Branch ID' section. It
+        belongs to the branch rather than to the delivery: this file is created with the branch and reset
+        with the merge, while the entry beside it travels into CHANGELOG.md and is dated there by the
+        merge itself. So the entry heading stopped carrying two dates that mean different things.
+
+        -Template renders the copy under branch/templates/: it carries the guidance comments and omits the
+        scaffolded first step. The step is the one thing the template must NOT show, because a template is
+        read as an example -- and an example whose first line is somebody else's TODO gets copied in. It
+        needs no '(template)' marker: the placeholder branch token and the placeholder stamp beside it say
+        what the file is more loudly than the word did.
     #>
     param(
         [Parameter(Mandatory)][string]$Branch,
         [string]$Intent = '',
+        [string]$Id = '',
         [switch]$Template
     )
     $w = Get-BranchFileWording
-    $suffix = if ($Template) { $w.TemplateMarker } else { '' }
+    $stamp = $Id
+    if ($Template -and -not $stamp) { $stamp = Get-EntryIdTemplatePlaceholder }
+    $suffix = if ($stamp) { "$($script:EntryIdSeparator) $stamp" } else { '' }
     $lines = New-Object System.Collections.Generic.List[string]
     $lines.Add((Format-BranchFileHeadingLine -Branch $Branch -Title $w.ProgressTitle `
         -Level $script:EntryHeadingLevel -Suffix $suffix))
     $lines.Add('')
+
+    # THE GUIDANCE FOR THE LIST STANDS UNDER THE FILE'S OWN HEADING, not under a section of its own. It
+    # explains the whole document -- the marks, the arc, why DEPLOY takes no steps -- and the '### Steps'
+    # heading it used to hang from was a wrapper around everything below it. This is the one guidance block
+    # in either file that keeps a blank line above it, for that reason: it belongs to the file, not to a
+    # heading.
+    if ($Template) {
+        foreach ($line in @(Format-EntryGuidanceComment -Lines $w.StepsGuidance)) { $lines.Add($line) }
+        $lines.Add('')
+    }
 
     # THE SCAFFOLDED STEP STAYS IN THE FILE A BRANCH ACTUALLY GETS (Dave, August 6, 2026), asked and answered
     # when the template dropped it. Without it a fresh branch reaches a PR with no plan at all and the
@@ -3872,26 +4111,28 @@ function Format-BranchProgressScaffold {
     # THE PHASE HEADINGS ARE WRITTEN INTO BOTH THE BRANCH FILE AND THE TEMPLATE (#655). The template shows
     # the arc without showing somebody else's TODO, which is the one thing it must not carry -- so the
     # phases are unconditional here and only the scaffolded step is not.
-    $steps = @()
     $phases = @($w.StepPhases | Where-Object { $_ })
     if ($phases.Count -gt 0) {
-        $stepLevel = ('#' * ($script:EntrySectionLevel + 1)) + ' '
         foreach ($phase in $phases) {
-            if ($steps.Count -gt 0) { $steps += '' }
-            $steps += ($stepLevel + $phase)
+            $phaseBody = @()
             if (-not $Template -and $phase -eq $w.FirstStepPhase) {
-                $steps += ''
-                $steps += ((Get-BranchProgressMarks).Open + $w.FirstStep)
+                $phaseBody = @((Get-BranchProgressMarks).Open + $w.FirstStep)
             }
+            # A phase's own guidance reaches the template only, like every other guidance block. DEPLOY is
+            # the one phase that has any: it is the heading you must not write under.
+            $phaseGuidance = @()
+            if ($Template -and $w.StepPhaseGuidance -and $w.StepPhaseGuidance.Contains($phase)) {
+                $phaseGuidance = @($w.StepPhaseGuidance[$phase])
+            }
+            Add-BranchProgressSection -Lines $lines -Heading $phase -Guidance $phaseGuidance -Body $phaseBody
         }
     } elseif (-not $Template) {
         # No phases configured (a consumer switched them off through the seam): the pre-#655 shape, which
-        # is still exactly what the gate expects.
-        $steps = @((Get-BranchProgressMarks).Open + $w.FirstStep)
+        # is still exactly what the gate expects -- a bare open step under the file's own heading.
+        $lines.Add((Get-BranchProgressMarks).Open + $w.FirstStep)
+        $lines.Add('')
     }
-    $stepsGuidance = if ($Template) { $w.StepsGuidance } else { @() }
     $notesGuidance = if ($Template) { $w.NotesGuidance } else { @() }
-    Add-BranchProgressSection -Lines $lines -Heading $w.StepsHeading -Guidance $stepsGuidance -Body $steps
     $note = if ($Intent) { @($Intent -split '\r?\n') } else { @() }
     Add-BranchProgressSection -Lines $lines -Heading $w.NotesHeading -Guidance $notesGuidance -Body $note
 
@@ -3916,23 +4157,28 @@ function Get-BranchTemplates {
         holds the files on disk to it. The templates are then genuinely a convenience -- something to look
         at and paste from -- without being a second definition of anything.
 
-        BOTH TEMPLATES NAME A PLACEHOLDER BRANCH rather than a real one, because they belong to no branch,
-        and both mark their heading '(template)'. That marker is not decoration: a written entry and a
-        template now open with the same H2, which is the signature Test-IsChangelogEntryFile keys on.
+        BOTH TEMPLATES NAME A PLACEHOLDER BRANCH rather than a real one, because they belong to no branch.
+        That token is also what marks them: neither carries a '(template)' word any more, and the cycle
+        template adds a placeholder stamp beside the token, which no real file can hold.
+
+        CYCLE FIRST, THEN DEPLOYMENT (Dave, August 19, 2026), and the order is the point of the pair. The
+        plan comes before the delivery, so a reader meeting the two for the first time meets them in the
+        order they are written in -- and so does anyone reading the list this returns, which is what
+        new-branch prints and what the lint walks.
 
         THE TRAILING BYTES ARE PART OF THE FILE and are set here rather than left to the join, because the
         lint holds these two to the byte with only CRLF normalised.
 
-        BOTH END WITH A NEWLINE (Dave, August 7, 2026). The progress template ended on its last '-->' with
+        BOTH END WITH A NEWLINE (Dave, August 7, 2026). The cycle template ended on its last '-->' with
         no terminator at all -- an accident of the editor it was designed in, faithfully reproduced here
         while the templates were being treated as the spec, and then repaired on his word. A file without a
         final newline is the one whose next diff shows a line nobody edited, and git says so out loud every
-        time ("\ No newline at end of file"). The changelog template keeps the blank line before its
+        time ("\ No newline at end of file"). The deployment template keeps the blank line before its
         terminator, which is its author's spacing rather than an accident.
     #>
     $nl = "`n"
     $token = $script:BranchTemplateBranchToken
-    # -Template is what carries the guidance comments AND the '(template)' marker -- see Format-EntryBlock.
+    # -Template is what carries the guidance comments -- see Format-EntryBlock.
     # These two calls are the only place in the system that passes it, which is the whole point: the
     # reference lives here, and the file a branch gets is the bare form.
     # RETIRED WITH THE COMMENTED-OUT TIERS (August 7, 2026): Add-TemplateTierPrompt used to splice a
@@ -3940,16 +4186,16 @@ function Get-BranchTemplates {
     # scaffold showed tier 0 alone. All three tiers are real sections in both now -- the answer inside each
     # is the claim, not its presence -- so there is nothing left to splice and the function is gone rather
     # than left standing with no caller.
-    $changelog = Format-EntryBlock -Branch $token -Template
-    $progress  = Format-BranchProgressScaffold -Branch $token -Template
+    $cycle      = Format-BranchProgressScaffold -Branch $token -Template
+    $deployment = Format-EntryBlock -Branch $token -Template
     return @(
         [pscustomobject]@{
-            Path    = "$($script:BranchTemplateDir)/branch_template_changelog.md"
-            Content = (($changelog -join $nl).TrimEnd("`n")) + $nl + $nl + $nl
+            Path    = "$($script:BranchTemplateDir)/branch_template_cycle.md"
+            Content = (($cycle -join $nl).TrimEnd("`n")) + $nl
         },
         [pscustomobject]@{
-            Path    = "$($script:BranchTemplateDir)/branch_template_progress.md"
-            Content = (($progress -join $nl).TrimEnd("`n")) + $nl
+            Path    = "$($script:BranchTemplateDir)/branch_template_deployment.md"
+            Content = (($deployment -join $nl).TrimEnd("`n")) + $nl + $nl + $nl
         }
     )
 }
@@ -4067,7 +4313,7 @@ function Get-BranchProgressFindings {
 
 function Test-BranchChangelogIsFilled {
     <#
-        Pure: does branch/branch-changelog.md hold an actual entry, or is it still (back) in its reset
+        Pure: does branch/branch-deployment.md hold an actual entry, or is it still (back) in its reset
         state? True means there is an entry here -- the file opens with the entry heading level.
 
         THE SAME STRUCTURAL TEST THE FOLD USES, and on purpose: the fold decides "is this an entry" by

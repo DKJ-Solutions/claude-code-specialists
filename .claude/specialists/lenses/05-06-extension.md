@@ -23,7 +23,7 @@ rewrite when copying. Managing branches, PRs, and merges up to and including the
 
 `CHANGELOG.md` (repo root) is an **intro followed by one `##` per change, with no section headings at all**
 (Dave, August 5, 2026). A change *is* the `##`, and since August 6, 2026 its heading names the **branch** —
-`` ## Branch `feat/x` changelog · <stamp> `` — with two `###` sections under it since August 16, 2026:
+`` ## `feat/x` deployment `` — with two `###` sections under it since August 16, 2026:
 `What does the change on this branch deploy to main?` and `Pull Request`, which carries the PR title and
 which the fold completes from the merge. **The first section holds both tiers, and since August 19, 2026
 neither names itself**: the question is tier 0's own section, and `#### What makes this change extra special`
@@ -66,11 +66,11 @@ entries rather than off which section they sit in.
 
 #### How it works
 
-- **`workflow-davekjohn/branch/branch-changelog.md`** — written when the branch is created; contains that branch's single
+- **`workflow-davekjohn/branch/branch-deployment.md`** — written when the branch is created; contains that branch's single
   entry and **nothing around it**, so it pastes into `CHANGELOG.md` in one go. A **fixed** path, the same
   on every branch: git already tracks it per branch, so two branches in flight cannot collide on it, and
   the repo root stops filling up with other people's work.
-- **`workflow-davekjohn/branch/branch-progress.md`** — its companion: the branch's name, its step list, and where you left
+- **`workflow-davekjohn/branch/branch-cycle.md`** — its companion: the branch's name, its step list, and where you left
   off. Never folded. The branch line is what the fold reads back to find the PR, since the file name no
   longer carries it.
 - **Both live on `main` in an empty reset state**, opening with an `#` and carrying a warning not to write
@@ -82,8 +82,8 @@ entries rather than off which section they sit in.
   `-v2`** — without `-Branch` the fold recovers the branch from that file name, and a suffix breaks the
   PR lookup.
 - **After the merge**: `scripts/release/fold-changelog-entry.ps1` reads the entry and inserts it at its
-  **ranked position** in the list — the block as written, with `[PR #NN](url) · merged YYYY-MM-DD` appended
-  as its last line and the heading **untouched**. (It used to prepend `#NN · ` to the heading too; that went
+  **ranked position** in the list — the block as written, with `[PR #NN](url)` appended
+  as its last line, the landing stamp on the `Pull Request` heading, and the ENTRY heading **untouched**. (It used to prepend `#NN · ` to the heading too; that went
   on August 5, 2026 — the number is still in the entry, on that closing line, where the url makes it
   clickable, and the heading is left readable as a sentence.) **Nothing is consumed:** the impact table
   (or a pre-format entry's `Tier: N` line) travels into `CHANGELOG.md` intact, because with no heading above
@@ -94,9 +94,9 @@ entries rather than off which section they sit in.
   entry above it, inheriting that entry's PR link. The
   PR number, url **and merge timestamp** are retrieved via one
   `gh pr list` on the branch name from the entry (only possible after the merge).
-  **The date is the fold's and it sits at the bottom** (Dave, August 5, 2026): the scaffolder runs at
+  **The date is the fold's** (Dave, August 5, 2026): the scaffolder runs at
   branch creation, so a date it wrote was the branch's birth date rather than the landing date. The
-  heading now carries what the author knows, the closing line what only the merge knows — and the date
+  entry carries what the author knows, the fold what only the merge knows -- the moment on the `Pull Request` heading and the link below it — and the date
   comes from the PR's `mergedAt`, not the clock, because a fold does not always run in the same minute as
   its merge (this repo has found entries still unfolded the next morning). The fold also
   automatically derives a **`Plugins:` line** from the PR's files (paths under
@@ -413,7 +413,7 @@ red the moment the section was opened, which is what forced the second commit in
 pair land half-done.
 
 Guardrails: on a clean `main`, no unfolded entry — neither a pre-split file in the root nor a filled
-`workflow-davekjohn/branch/branch-changelog.md`, which is its own check because a filled one looks like the reset state at a
+`workflow-davekjohn/branch/branch-deployment.md`, which is its own check because a filled one looks like the reset state at a
 glance — lint gate green, and the tag must not exist yet. There is deliberately **no release branch and no `release` prefix** — the release
 does not touch the branch workflow. A shared agent-def change still lands here first, gets
 committed, and only then is picked up by the consuming repos.
@@ -533,7 +533,7 @@ that ignores impact should not be named for it — and still accepts `-Score`/`-
 because every consumer's fold passes them today and a removed parameter would throw on the trunk.
 
 **And since August 6, 2026 the entry is the branch's own dossier, folded in as it stands.** The heading
-names the **branch** — `` ## `feat/x` changelog `` — and its `###` sections answer in order.
+names the **branch** — `` ## `feat/x` deployment `` — and its `###` sections answer in order.
 
 **It was six sections until August 16, 2026 and is two since** (Dave). Four of them said something the
 document already said: `Branch ID` is the timestamp the heading now carries, `Branch type` is the prefix
@@ -543,7 +543,7 @@ it moved into the `Pull Request` section where the rest of the PR's facts alread
 `What does the change on this branch deploy to main?` (tier 0's own section, with
 `#### What makes this change extra special` under it for the audience tier, each closing with `**Score:**`)
 and `Pull Request` — the title, then the `Plugins:` line and the
-`[PR #N](…) · merged <date>` footer the **fold** writes underneath it. `Plugins:` stays a plain line,
+`[PR #N](…)` footer the **fold** writes underneath it, with the landing moment stamped on the heading itself. `Plugins:` stays a plain line,
 because a heading around one fact is more structure than content.
 
 **Every one of the six is still READ**, here and in every consumer: `CHANGELOG.md`, the release documents
@@ -931,7 +931,7 @@ release management. Rendall's craft in such a repo is whatever *that* repo's rel
 
 - `scripts/task/new-branch.ps1 [-Title <string>] [-Intent <string>]` — write the branch's
   two files in `workflow-davekjohn/branch/`. `-Intent` records where you left off / what is next in
-  **`branch-progress.md`**, not in the entry (#162): an intent is a status, and the entry's text folds
+  **`branch-cycle.md`**, not in the entry (#162): an intent is a status, and the entry's text folds
   verbatim into `CHANGELOG.md`. Idempotent per file, judged on what each file says it belongs to rather
   than on its existing — both exist on `main` by design. Shared/mirrored to the plugin
   ([issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81)); normally reached

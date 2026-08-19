@@ -284,7 +284,8 @@ Assert-True ($changelogText -notmatch ('(?m)^## #\d+ ' + [regex]::Escape([char]0
 # (the fold's gh call finds nothing by design here), so the assert is on the mechanism rather than a number:
 # the fold writes the number in exactly one place, and that place is the closing line.
 $foldSrcText = [System.IO.File]::ReadAllText($FoldSrc, [System.Text.Encoding]::UTF8)
-Assert-True ($foldSrcText -match 'Format-EntryFoldFooter') 'the closing line is still what carries the PR number and the merge date'
+Assert-True ($foldSrcText -match 'Format-EntryFoldFooter') 'the closing line is still what carries the PR number'
+Assert-True ($foldSrcText -match 'Set-EntryMergeStamp') 'and the merge moment is stamped on the Pull Request heading beside it'
 Assert-True ($foldSrcText -notmatch '\$entryHashes #\$num') 'and the heading prepend is gone from the source, not merely unused'
 
 # ---------------------------------------------------------------------------------------------------
@@ -384,7 +385,7 @@ Write-Host "-Commit on a fold-all run names every entry it folded" -ForegroundCo
 #      "We only ever merge one PR at a time" is true and does not close it. Two entries reach one fold
 #      two ways that have nothing to do with merging twice: a fold-all run (no -Branch) picks up every
 #      legacy root entry, which is the normal state of a consumer that has not migrated to branch/; and
-#      even -Branch mode folds branch/branch-changelog.md AND a legacy <branch>.md together when both
+#      even -Branch mode folds branch/branch-deployment.md AND a legacy <branch>.md together when both
 #      exist.
 $dir11 = New-FoldFixture -Label 'commitplural'
 New-EntryFile -Dir $dir11 -Name 'fix-plural-one.md' -Title 'First of two'
@@ -608,16 +609,16 @@ Write-Host "The branch/ pair: folded from the new path, RESET rather than delete
 $dirBF = New-FoldFixture -Label 'branchfiles'
 $bfPaths = Get-BranchFilePaths
 New-Item -ItemType Directory -Path (Join-Path $dirBF $bfPaths.Directory) -Force | Out-Null
-New-EntryFile -Dir $dirBF -Name $bfPaths.Changelog -Title 'Written in the branch folder' -Rows '| 1 | 4 | the split |'
-[System.IO.File]::WriteAllText((Join-Path $dirBF $bfPaths.Progress),
+New-EntryFile -Dir $dirBF -Name $bfPaths.Deployment -Title 'Written in the branch folder' -Rows '| 1 | 4 | the split |'
+[System.IO.File]::WriteAllText((Join-Path $dirBF $bfPaths.Cycle),
     ((Format-BranchProgressScaffold -Branch 'feat/branch-folder') -join "`n") + "`n", $Utf8NoBom)
 
 $rBF = Invoke-Fold -Dir $dirBF
 Assert-True ($rBF.ExitCode -eq 0) 'branch files: exits 0'
 Assert-True ((Get-Changelog -Dir $dirBF) -match 'Written in the branch folder') 'branch files: the entry landed in CHANGELOG.md'
 
-$bfChangelogPath = Join-Path $dirBF $bfPaths.Changelog
-$bfProgressPath  = Join-Path $dirBF $bfPaths.Progress
+$bfChangelogPath = Join-Path $dirBF $bfPaths.Deployment
+$bfProgressPath  = Join-Path $dirBF $bfPaths.Cycle
 Assert-True (Test-Path -LiteralPath $bfChangelogPath) 'branch files: the entry file still EXISTS -- it is a fixed path the next branch will use'
 $bfChangelogAfter = [System.IO.File]::ReadAllText($bfChangelogPath)
 Assert-True (-not (Test-BranchChangelogIsFilled -Text $bfChangelogAfter)) 'branch files: and it is back in its empty state'
@@ -628,14 +629,14 @@ Assert-True (-not ($bfProgressAfter -match '(?m)^- \[ \] ')) 'branch files: the 
 Assert-Equal 'main' (Get-BranchFileDeclaredBranch -Text $bfProgressAfter) 'branch files: and the reset names the trunk again'
 Assert-True ($rBF.Output -match 'reset') 'branch files: the run says it reset rather than removed, so the reader does not go looking for a deleted file'
 
-Write-Host "A RESET branch-changelog.md is not an entry, and is not folded" -ForegroundColor Cyan
+Write-Host "A RESET branch-deployment.md is not an entry, and is not folded" -ForegroundColor Cyan
 #      The reset state opens with an H1, exactly as CONTRIBUTING.md does. This is what makes a double fold
 #      impossible and what stops the trunk's own empty file being pasted into CHANGELOG.md as a change.
 $dirBR = New-FoldFixture -Label 'branchreset'
 New-Item -ItemType Directory -Path (Join-Path $dirBR $bfPaths.Directory) -Force | Out-Null
-[System.IO.File]::WriteAllText((Join-Path $dirBR $bfPaths.Changelog),
+[System.IO.File]::WriteAllText((Join-Path $dirBR $bfPaths.Deployment),
     ((Format-BranchChangelogReset) -join "`n") + "`n", $Utf8NoBom)
-[System.IO.File]::WriteAllText((Join-Path $dirBR $bfPaths.Progress),
+[System.IO.File]::WriteAllText((Join-Path $dirBR $bfPaths.Cycle),
     ((Format-BranchProgressReset) -join "`n") + "`n", $Utf8NoBom)
 $clBR0 = Get-Changelog -Dir $dirBR
 $rBR = Invoke-Fold -Dir $dirBR
@@ -648,8 +649,8 @@ Write-Host "The fold commit names both branch files" -ForegroundColor Cyan
 #      rewrote it. Leaving either out produces a commit that resets half the pair.
 $dirBC = New-FoldFixture -Label 'branchcommit'
 New-Item -ItemType Directory -Path (Join-Path $dirBC $bfPaths.Directory) -Force | Out-Null
-New-EntryFile -Dir $dirBC -Name $bfPaths.Changelog -Title 'Committed from the branch folder' -Rows '| 1 | 2 | commit scope |'
-[System.IO.File]::WriteAllText((Join-Path $dirBC $bfPaths.Progress),
+New-EntryFile -Dir $dirBC -Name $bfPaths.Deployment -Title 'Committed from the branch folder' -Rows '| 1 | 2 | commit scope |'
+[System.IO.File]::WriteAllText((Join-Path $dirBC $bfPaths.Cycle),
     ((Format-BranchProgressScaffold -Branch 'feat/commit-scope') -join "`n") + "`n", $Utf8NoBom)
 Initialize-FoldGitRepo -Dir $dirBC
 # An unrelated staged file, to prove the enforced scope did not widen along with the path change.
@@ -660,8 +661,8 @@ $rBC = Invoke-Fold -Dir $dirBC -ExtraArgs @('-Commit')
 Assert-True ($rBC.ExitCode -eq 0) 'fold commit: exits 0'
 $bcFiles = @(Invoke-Git -Dir $dirBC -GitArgs @('diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'))
 Assert-True ($bcFiles -contains 'CHANGELOG.md')        'fold commit: CHANGELOG.md is in it'
-Assert-True ($bcFiles -contains $bfPaths.Changelog)    'fold commit: the reset entry file is in it'
-Assert-True ($bcFiles -contains $bfPaths.Progress)     'fold commit: and the reset step list, so the pair lands together'
+Assert-True ($bcFiles -contains $bfPaths.Deployment)    'fold commit: the reset entry file is in it'
+Assert-True ($bcFiles -contains $bfPaths.Cycle)     'fold commit: and the reset step list, so the pair lands together'
 Assert-True (-not ($bcFiles -contains 'stray.txt'))    'fold commit: the unrelated staged file is NOT swept in -- the pathspec scope is unchanged'
 
 # ---------------------------------------------------------------------------------------------------

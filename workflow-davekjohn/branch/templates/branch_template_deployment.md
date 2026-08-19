@@ -1,4 +1,4 @@
-## Branch `<prefix>/<short-name>` changelog · <timestamp of the moment this branch was created>
+## `<prefix>/<short-name>` deployment
 
 ### What does the change on this branch deploy to main?
 <!--
@@ -20,7 +20,7 @@
 
 **Score:**
 
-### Pull Request
+### Pull Request · <timestamp of the moment this branch was merged>
 <!-- the PR title on the first line -- no feat:/fix:/docs: prefix, open-pr puts the branch type in front.
      link to the PR in github when branch is merged to main and the date this happened-->
 

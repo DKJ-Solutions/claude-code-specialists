@@ -34,7 +34,7 @@ for them the line above is the correct one.
 **No title is passed, and that is the change of August 7, 2026 ([#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506)
 + [#505](https://github.com/DaveKJohn/claude-code-specialists/issues/505)).** The PR is called
 `<branch type>: <the entry's Branch title>` — the type off the branch prefix, the words out of
-`workflow-davekjohn/branch/branch-changelog.md`. So the sentence is written **once**, when the branch is created
+`workflow-davekjohn/branch/branch-deployment.md`. So the sentence is written **once**, when the branch is created
 (`new-branch -Title`), and the PR, `CHANGELOG.md` and the release documents cannot disagree about what the
 change is called. It also cannot lose its type prefix, which the five PRs before this change all had.
 
@@ -201,7 +201,7 @@ the script that writes the scaffold read it from the same shared library, so the
 
 ## The step-list gate: is the branch's own plan finished?
 
-A branch carries two files. The entry says what the change does; `workflow-davekjohn/branch/branch-progress.md` says what
+A branch carries two files. The entry says what the change does; `workflow-davekjohn/branch/branch-cycle.md` says what
 still has to happen. **A branch reaches a PR when its own plan is finished**, so this gate refuses to
 push while any step is unresolved. Three marks:
 

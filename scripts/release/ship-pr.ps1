@@ -287,7 +287,7 @@ Write-Host "ship-pr: CI green." -ForegroundColor Green
 #
 # Read from the branch's own checkout, which is where HEAD still is at this point -- step 5 is what moves
 # to main. An absent list is no finding, the same tolerance open-pr.ps1 applies and for the same reason.
-$shipProgressRel  = (Get-BranchFilePaths).Progress
+$shipProgressRel  = Resolve-BranchFilePath -Kind Cycle -RepoRoot $repoRoot
 $shipProgressPath = Join-Path $repoRoot $shipProgressRel
 if (Test-Path -LiteralPath $shipProgressPath) {
     $shipSteps = @(Get-BranchProgressFindings -Text ([System.IO.File]::ReadAllText($shipProgressPath, [System.Text.Encoding]::UTF8)))
@@ -388,7 +388,7 @@ if ($ff.ExitCode -ne 0) { Write-Error "git merge --ff-only of origin/main failed
 # IT IS DECLINED, AND THE DECIDING FACT WAS MEASURED RATHER THAN ARGUED. The pathspec above is not merely
 # weakened by that flow -- git refuses to express it at all:
 #
-#     $ git commit -m "merge: feat/x (#1)" -- CHANGELOG.md branch/branch-changelog.md
+#     $ git commit -m "merge: feat/x (#1)" -- CHANGELOG.md branch/branch-deployment.md
 #     fatal: cannot do a partial commit during a merge.
 #
 # The only commit git will make while MERGE_HEAD exists is a whole-index one, and in the same test it swept

@@ -19,7 +19,7 @@
 
     THE TITLE IS NOT TYPED HERE -- IT IS DERIVED (Dave, #506 + #505, August 7, 2026). A fresh PR is called
     '<branch type>: <the entry's Branch title>': the type off the branch prefix, the words out of
-    branch/branch-changelog.md. So the sentence is written once, at `new-branch -Title`, and the PR, the
+    branch/branch-deployment.md. So the sentence is written once, at `new-branch -Title`, and the PR, the
     changelog and the release documents cannot disagree about what the change is called -- nor can the title
     lose its type prefix, which the last five PRs before this change all had (#499-#503). Get-PrTitle
     composes it; -Title is still accepted and ignored, see that parameter.
@@ -41,7 +41,7 @@
     Auto-fill (if you do NOT supply -Body): the script fills in the template itself as much as
     possible, so the PR never lands on github.com as an empty form:
       1. The template's description placeholder is replaced by the changelog entry
-         (branch/branch-changelog.md, or the pre-split <SafeName>.md in the repo root), which always
+         (branch/branch-deployment.md, or the pre-split <SafeName>.md in the repo root), which always
          exists on the branch. So you never have to type anything twice. What goes in is the entry from
          its 'What does the change...' section onwards -- see Get-PrDescription for why the three
          sections above it and the empty one below it are left out of a PR body but kept in the fold.
@@ -277,7 +277,10 @@ $info = Get-BranchInfo -Branch $branch
 # mid-flight without this gate suddenly finding no entry -- which would not merely warn, it would let a
 # scaffolded entry through, since a gate with nothing to read reports nothing.
 $branchFiles = Get-BranchFilePaths
-$entryPath = Join-Path $repoRoot $branchFiles.Changelog
+# Resolve- rather than Get-, because the file may still carry its pre-August-19-2026 name on a branch
+# that was created before the rename -- exactly the mid-flight cut-over the paragraph above describes,
+# one rename further on.
+$entryPath = Join-Path $repoRoot (Resolve-BranchFilePath -Kind Deployment -RepoRoot $repoRoot)
 if (-not (Test-Path -LiteralPath $entryPath)) {
     $entryPath = Join-Path $repoRoot ($info.SafeName + '.md')
 } elseif (-not (Test-BranchChangelogIsFilled -Text ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)))) {
@@ -506,7 +509,7 @@ if (Test-Path -LiteralPath $entryPath) {
     $entryText = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
     $scaffoldFindings = @(Get-EntryScaffoldFindings -EntryText $entryText -Wording (Get-EntryScaffoldWording))
     if ($scaffoldFindings.Count -gt 0) {
-        # Repo-relative, not the bare leaf. Every branch's entry is now called branch-changelog.md, so a
+        # Repo-relative, not the bare leaf. Every branch's entry is now called branch-deployment.md, so a
         # leaf-only name in the refusal tells the reader nothing about which file to open.
         $entryRel = $entryPath.Substring($repoRoot.Length).TrimStart('\', '/')
         $detail = ($scaffoldFindings | ForEach-Object { "  - $($_.Label): '$($_.Marker)'" }) -join "`n"
@@ -557,9 +560,9 @@ Answer them and run again. Shipping it as it stands is -Force.
     # is the one-commit typo fix, and refusing it would make the mechanism ceremony rather than a tool.
     # What is NOT tolerated is the scaffolded list left as scaffolded -- that branch did run new-branch and
     # then ignored what it wrote.
-    $progressPath = Join-Path $repoRoot (Get-BranchFilePaths).Progress
+    $progressRel  = Resolve-BranchFilePath -Kind Cycle -RepoRoot $repoRoot
+    $progressPath = Join-Path $repoRoot $progressRel
     if (Test-Path -LiteralPath $progressPath) {
-        $progressRel = (Get-BranchFilePaths).Progress
         $stepFindings = @(Get-BranchProgressFindings -Text ([System.IO.File]::ReadAllText($progressPath, [System.Text.Encoding]::UTF8)))
         if ($stepFindings.Count -gt 0) {
             $marks = Get-BranchProgressMarks

@@ -80,7 +80,7 @@ The six steps, stopping on the first failure:
    `gh pr merge ''`. Worth knowing if you are on an older version of the plugin — the symptom is a
    `ship-pr` run that reports no PR number and then fails at the merge with an unhelpful gh error.
 3. **Wait for CI.** See [Why step 3 polls before it watches](#why-step-3-polls-before-it-watches).
-4. **Merge** (`gh pr merge`), but first the **step-list gate again**: `workflow-davekjohn/branch/branch-progress.md` must
+4. **Merge** (`gh pr merge`), but first the **step-list gate again**: `workflow-davekjohn/branch/branch-cycle.md` must
    have nothing unresolved left in it, or the merge does not happen. Not belt-and-braces — the rule is
    about the *merge*, and step 1's copy of it lives in `open-pr.ps1`, which has a `-Force`. A PR opened
    through that valve, by hand on github.com, or days ago and resumed here would otherwise land with an

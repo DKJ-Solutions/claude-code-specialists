@@ -207,7 +207,7 @@ $script:ContractRecords = @(
        Adopt = 'copy'; AdoptWhy = 'as the two above -- the value is the fallback, and having it stated locally is what makes it translatable';
        ViaLib = 'entry-scaffold-lib';
        Optional = $true; Default = 'TODO: what this change does, for whoever reads CHANGELOG.md later.';
-       Returns = 'the placeholder body an entry is scaffolded with -- a prompt for what the change does, since the step list moved to branch/branch-progress.md; open-pr refuses to ship an entry that still carries it' },
+       Returns = 'the placeholder body an entry is scaffolded with -- a prompt for what the change does, since the step list moved to branch/branch-cycle.md; open-pr refuses to ship an entry that still carries it' },
     # The impact table's two knobs (issue #467). Declared for the reason the stub wording above is: neither
     # failure is a crash. A consumer that has adopted tier sections gets the ranking switched ON by that
     # fact alone, and would discover it when a cut refuses; a consumer whose readers are not developers gets

@@ -125,7 +125,7 @@ $folderClaude = @(
     '',
     '- The two files in `branch/` belong to the **current branch**. On the trunk they sit in their reset',
     '  state -- never write there until a branch exists (`new-branch` creates one and fills them).',
-    '- `branch/branch-changelog.md` folds **verbatim** into `CHANGELOG.md` at the merge; its step list',
+    '- `branch/branch-deployment.md` folds **verbatim** into `CHANGELOG.md` at the merge; its step list',
     '  companion gates the PR and the merge (`- [x]` done, `- [~]` dropped with the reason on the line).',
     '- `releases/README.md` lists this repo''s releases; the cut inserts its own row. `releases/audience/`',
     '  is where the cut drafts the hand-written note -- generated development notes live elsewhere.',
@@ -215,8 +215,8 @@ $targets = @(
     # git tracks no empty directory, and the audience root must exist before the first cut writes into
     # it -- the same reason this repo's own releases tree once carried an invisible empty folder.
     @{ Rel = 'workflow-davekjohn/releases/audience/.gitkeep'; Content = '' },
-    @{ Rel = $branchPaths.Changelog; Content = (((Format-BranchChangelogReset) -join $nl) + $nl) },
-    @{ Rel = $branchPaths.Progress;  Content = (((Format-BranchProgressReset) -join $nl) + $nl) },
+    @{ Rel = $branchPaths.Cycle;      Content = (((Format-BranchProgressReset) -join $nl) + $nl) },
+    @{ Rel = $branchPaths.Deployment; Content = (((Format-BranchChangelogReset) -join $nl) + $nl) },
     # The inbox. /prompt places these itself on its first run, so scaffolding them here is a
     # convenience rather than the only route -- and they come from the SAME formatters that run does,
     # so the two writers cannot produce different folders. The tracked pair (README, .gitignore,

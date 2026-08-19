@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-    Creates (or idempotently reuses) a branch and writes the two files it works in: the changelog
-    entry and the step list, plus the reference templates beside them.
+    Creates (or idempotently reuses) a branch and writes the two files it works in: the cycle file and
+    the deployment entry, plus the reference templates beside them.
 
 .DESCRIPTION
     ONE SCRIPT PER CONCEPT (Dave, August 7, 2026). This used to be two: new-branch.ps1 made the
@@ -50,7 +50,7 @@
 
 .PARAMETER Intent
     (Optional) the direction of the branch -- what still needs to happen and where you left off.
-    Recorded in branch-progress.md under "where I left off"; typically given together with -Park when
+    Recorded in branch-cycle.md under "where I left off"; typically given together with -Park when
     parking a branch for later / another device (#162). It deliberately does not touch the entry: an
     intent is a status, and the entry's text folds verbatim into CHANGELOG.md.
 
@@ -234,8 +234,35 @@ $branchId = (Get-Date).ToString('yyyyMMdd-HHmmss')
 # see the block in entry-scaffold-lib.ps1 for why that beats a filename per branch.
 $branchFiles    = Get-BranchFilePaths
 $branchDirPath  = Join-Path $repoRoot $branchFiles.Directory
-$changelogPath  = Join-Path $repoRoot $branchFiles.Changelog
-$progressPath   = Join-Path $repoRoot $branchFiles.Progress
+
+# WHICH NAME THIS RUN WRITES, on a repo that may still hold the pre-August-19-2026 pair. The rule is the
+# narrowest one that keeps a branch in flight whole: the legacy name is used for one reason only -- it
+# already declares THIS branch, so somebody is working in it and a second pair beside it would split their
+# work in half. Every other state writes the current name, including a trunk whose reset files still carry
+# the old ones. Resolve-BranchFilePath is deliberately NOT used here: it answers "where is the file", which
+# is the readers' question, and answering the writer's question with it would keep the old name alive on
+# every branch a consumer creates.
+function Get-BranchFileTargetRel {
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        [Parameter(Mandatory)][string]$Current,
+        [Parameter(Mandatory)][string]$Legacy,
+        [Parameter(Mandatory)][string]$Branch
+    )
+    $legacyPath = Join-Path $RepoRoot ($Legacy -replace '/', '\')
+    if (Test-Path -LiteralPath $legacyPath) {
+        $declared = Get-BranchFileDeclaredBranch -Text ([System.IO.File]::ReadAllText($legacyPath))
+        if ($declared -eq $Branch) { return $Legacy }
+    }
+    return $Current
+}
+
+$deploymentRel  = Get-BranchFileTargetRel -RepoRoot $repoRoot -Current $branchFiles.Deployment `
+    -Legacy $branchFiles.LegacyDeployment -Branch $branch
+$cycleRel       = Get-BranchFileTargetRel -RepoRoot $repoRoot -Current $branchFiles.Cycle `
+    -Legacy $branchFiles.LegacyCycle -Branch $branch
+$deploymentPath = Join-Path $repoRoot $deploymentRel
+$cyclePath      = Join-Path $repoRoot $cycleRel
 
 if (-not (Test-Path -LiteralPath $branchDirPath)) {
     $null = New-Item -ItemType Directory -Path $branchDirPath -Force
@@ -278,8 +305,8 @@ foreach ($tpl in (Get-BranchTemplates)) {
 # rerun on a branch whose entry has been written must still not clobber the step list, and vice versa.
 # The test is what the file SAYS it belongs to rather than whether it exists -- both files exist on the
 # trunk by design, so Test-Path would report every fresh branch as already scaffolded.
-$changelogExisting = if (Test-Path -LiteralPath $changelogPath) { [System.IO.File]::ReadAllText($changelogPath) } else { '' }
-$progressExisting  = if (Test-Path -LiteralPath $progressPath)  { [System.IO.File]::ReadAllText($progressPath)  } else { '' }
+$deploymentExisting = if (Test-Path -LiteralPath $deploymentPath) { [System.IO.File]::ReadAllText($deploymentPath) } else { '' }
+$cycleExisting  = if (Test-Path -LiteralPath $cyclePath)  { [System.IO.File]::ReadAllText($cyclePath)  } else { '' }
 
 # THE TEST IS THE DECLARED OWNER MEASURED AGAINST THIS BRANCH, which is what the comment above has
 # always said it was and what neither half actually asked (inbound #615, reported from a consumer).
@@ -294,10 +321,10 @@ $progressExisting  = if (Test-Path -LiteralPath $progressPath)  { [System.IO.Fil
 # the heading of either file -- '# `main` changelog' on the trunk, '## `feat/x` changelog' once
 # written -- so the same predicate serves both, and Test-BranchChangelogIsFilled is no longer the
 # entry's idempotency test. It still owns the question it is named for, everywhere else.
-$changelogOwner = Get-BranchFileDeclaredBranch -Text $changelogExisting
-$changelogTaken = ($changelogOwner -eq $branch)
-$progressOwner  = Get-BranchFileDeclaredBranch -Text $progressExisting
-$progressTaken  = ($progressOwner -eq $branch)
+$deploymentOwner = Get-BranchFileDeclaredBranch -Text $deploymentExisting
+$deploymentTaken = ($deploymentOwner -eq $branch)
+$cycleOwner  = Get-BranchFileDeclaredBranch -Text $cycleExisting
+$cycleTaken  = ($cycleOwner -eq $branch)
 
 # A FOREIGN OWNER IS OVERWRITTEN, EXCEPT WHERE THE OVERWRITE WOULD BE UNRECOVERABLE -- and that
 # distinction is measured rather than assumed, because this repair is what creates the destructive
@@ -329,12 +356,12 @@ function Test-BranchFileIsDirty {
 # child process this was `exit 0` and the caller read it as success and carried on to -Park; inline, an
 # exit would end the whole run and a park would silently not happen. Saying so and falling through is
 # what it always meant.
-if ($changelogTaken -and $progressTaken) {
+if ($deploymentTaken -and $cycleTaken) {
     Write-Host "Branch files already written for '$branch' - nothing done." -ForegroundColor Yellow
 } else {
     # -Intent DOES NOT LAND IN THE ENTRY (Dave, August 6, 2026). It is "where you left off" -- a status,
     # typically written when parking (#162) -- and with the two files split that is exactly what
-    # branch-progress.md is for. It used to become the entry BODY, which put a progress note in the file
+    # branch-cycle.md is for. It used to become the entry BODY, which put a progress note in the file
     # whose text folds verbatim into CHANGELOG.md: the defect the v3.2.0 measurement found three times.
     # So the entry scaffolds with an empty body, and the gate keeps refusing it until somebody writes
     # what the change does.
@@ -350,7 +377,11 @@ if ($changelogTaken -and $progressTaken) {
     # NO DATE HERE, DELIBERATELY (Dave, August 5, 2026). This runs when the BRANCH is created, so any date
     # it writes is the branch's birth date -- and the changelog records what LANDED when. The date is the
     # fold's to add, from the PR's own merge timestamp, together with the PR number.
-    $entryLines = Format-EntryBlock -Branch $branch -Description $description -Id $branchId `
+    #
+    # AND THE CREATION STAMP GOES TO THE CYCLE FILE, NOT HERE (Dave, August 19, 2026). $branchId is the
+    # branch's birth moment, which is exactly the fact that file is about; the entry states what is being
+    # delivered and takes its date from the merge.
+    $entryLines = Format-EntryBlock -Branch $branch -Description $description `
         -Type $branchType -Body $body
     $template = ($entryLines -join "`n") + "`n"
 
@@ -358,36 +389,39 @@ if ($changelogTaken -and $progressTaken) {
     # A foreign owner is the one state the old test could not distinguish from its own, so it is the one
     # state the output has to say out loud -- kept, replaced or written, the line names the branch the
     # file belonged to.
-    $changelogForeign = ($changelogOwner -and $changelogOwner -ne $trunk -and -not $changelogTaken)
-    $progressForeign  = ($progressOwner  -and $progressOwner  -ne $trunk -and -not $progressTaken)
+    $deploymentForeign = ($deploymentOwner -and $deploymentOwner -ne $trunk -and -not $deploymentTaken)
+    $cycleForeign  = ($cycleOwner  -and $cycleOwner  -ne $trunk -and -not $cycleTaken)
 
-    if ($changelogTaken) {
-        Write-Host "Kept: $($branchFiles.Changelog) (already holds this branch's entry)" -ForegroundColor Yellow
-    } elseif ($changelogForeign -and (Test-BranchFileIsDirty -RepoRoot $repoRoot -RelativePath $branchFiles.Changelog)) {
-        Write-Warning "Kept: $($branchFiles.Changelog) -- it holds UNCOMMITTED work belonging to '$changelogOwner', which exists nowhere else. This branch has no entry of its own yet: commit or discard that work, then rerun this script."
+    # THE CYCLE FILE IS REPORTED FIRST, because that is the order the pair is in: the plan, then what it
+    # delivers (Dave, August 19, 2026). Same order as Get-BranchTemplates returns them in, and as the
+    # -Park commit lists them.
+    if ($cycleTaken) {
+        Write-Host "Kept: $cycleRel (already scaffolded for this branch)" -ForegroundColor Yellow
+    } elseif ($cycleForeign -and (Test-BranchFileIsDirty -RepoRoot $repoRoot -RelativePath $cycleRel)) {
+        Write-Warning "Kept: $cycleRel -- it holds UNCOMMITTED work belonging to '$cycleOwner', which exists nowhere else. This branch has no step list of its own yet: commit or discard that work, then rerun this script."
     } else {
-        [System.IO.File]::WriteAllText($changelogPath, $template, $Utf8NoBom)
-        if ($changelogForeign) {
-            Write-Host "Replaced: $($branchFiles.Changelog) (it held the entry of '$changelogOwner', committed on that branch)" -ForegroundColor Yellow
+        # NO DESCRIPTION HERE. It lives in the entry alone since August 7, 2026 -- the same field in both
+        # files was one fact in two places, free to disagree. The STAMP is this file's own since August 19:
+        # its heading carries the branch and the moment that branch began.
+        $cycleText = ((Format-BranchProgressScaffold -Branch $branch -Intent $Intent -Id $branchId) -join "`n") + "`n"
+        [System.IO.File]::WriteAllText($cyclePath, $cycleText, $Utf8NoBom)
+        if ($cycleForeign) {
+            Write-Host "Replaced: $cycleRel (it held the step list of '$cycleOwner', committed on that branch)" -ForegroundColor Yellow
         } else {
-            Write-Host "Created: $($branchFiles.Changelog)" -ForegroundColor Green
+            Write-Host "Created: $cycleRel" -ForegroundColor Green
         }
     }
 
-    if ($progressTaken) {
-        Write-Host "Kept: $($branchFiles.Progress) (already scaffolded for this branch)" -ForegroundColor Yellow
-    } elseif ($progressForeign -and (Test-BranchFileIsDirty -RepoRoot $repoRoot -RelativePath $branchFiles.Progress)) {
-        Write-Warning "Kept: $($branchFiles.Progress) -- it holds UNCOMMITTED work belonging to '$progressOwner', which exists nowhere else. This branch has no step list of its own yet: commit or discard that work, then rerun this script."
+    if ($deploymentTaken) {
+        Write-Host "Kept: $deploymentRel (already holds this branch's entry)" -ForegroundColor Yellow
+    } elseif ($deploymentForeign -and (Test-BranchFileIsDirty -RepoRoot $repoRoot -RelativePath $deploymentRel)) {
+        Write-Warning "Kept: $deploymentRel -- it holds UNCOMMITTED work belonging to '$deploymentOwner', which exists nowhere else. This branch has no entry of its own yet: commit or discard that work, then rerun this script."
     } else {
-        # NO DESCRIPTION AND NO ID HERE. They live in the entry alone since August 7, 2026 -- the same three
-        # fields in both files was one fact in two places, free to disagree. This file is the plan and where
-        # you left off; its heading carries the branch, the only identifier anything reads out of it.
-        $progressText = ((Format-BranchProgressScaffold -Branch $branch -Intent $Intent) -join "`n") + "`n"
-        [System.IO.File]::WriteAllText($progressPath, $progressText, $Utf8NoBom)
-        if ($progressForeign) {
-            Write-Host "Replaced: $($branchFiles.Progress) (it held the step list of '$progressOwner', committed on that branch)" -ForegroundColor Yellow
+        [System.IO.File]::WriteAllText($deploymentPath, $template, $Utf8NoBom)
+        if ($deploymentForeign) {
+            Write-Host "Replaced: $deploymentRel (it held the entry of '$deploymentOwner', committed on that branch)" -ForegroundColor Yellow
         } else {
-            Write-Host "Created: $($branchFiles.Progress)" -ForegroundColor Green
+            Write-Host "Created: $deploymentRel" -ForegroundColor Green
         }
     }
 
@@ -432,7 +466,7 @@ if ($Park) {
     # of what -Park is for. They are named explicitly rather than swept up, so the commit stays exactly as
     # narrow as it was: this pushes to a branch, but the pathspec discipline is the same everywhere.
     $ok = Invoke-GitPark -RepoRoot $repoRoot -Branch $Name -Scope 'BranchFiles' `
-        -Paths @($branchFiles.Changelog, $branchFiles.Progress)
+        -Paths @($cycleRel, $deploymentRel)
     if (-not $ok) { exit 1 }
 }
 

@@ -4,7 +4,7 @@ description: >-
   Fold a branch's changelog entry into CHANGELOG.md via the shared, centralized fold script from the
   plugin (single source of truth, issue #81) -- so a consumer does not have to duplicate this script
   locally. Use this on main, immediately after merging a branch, to fold the entry
-  (workflow-davekjohn/branch/branch-changelog.md, or a pre-split <branch-name>.md in the repo root) into CHANGELOG.md --
+  (workflow-davekjohn/branch/branch-deployment.md, or a pre-split <branch-name>.md in the repo root) into CHANGELOG.md --
   a flat ranked list with no section headings, where each entry lands at the position its own
   Significance sections rank it at (furthest reach first, highest significance first within a tier) -- and then
   clear it: the branch/ pair is reset to its empty state, a root entry file is removed.
@@ -25,8 +25,8 @@ where a conflict is pure noise, because the two entries never actually disagree.
 writes its **own** entry file, and this skill folds it in after the merge, when the conflict window is
 already closed.
 
-**The entry is `workflow-davekjohn/branch/branch-changelog.md`** — a fixed path, the same on every branch. Git tracks it
-per branch, so branches in flight cannot collide on it. Its companion `workflow-davekjohn/branch/branch-progress.md` is the
+**The entry is `workflow-davekjohn/branch/branch-deployment.md`** — a fixed path, the same on every branch. Git tracks it
+per branch, so branches in flight cannot collide on it. Its companion `workflow-davekjohn/branch/branch-cycle.md` is the
 step list; it is never folded, and it is what the fold reads the branch name back off in order to find
 the PR.
 
@@ -48,7 +48,7 @@ and in `CHANGELOG.md`, so what a contributor writes is exactly what lands. The f
 comments** on the way and writes the PR line into `### Pull Request`:
 
 ```markdown
-## Branch `feat/short-name` changelog · 20260806-114230
+## `feat/short-name` deployment
 
 ### What does the change on this branch deploy to main?
 
@@ -62,11 +62,11 @@ comments** on the way and writes the PR line into `### Pull Request`:
 
 **Score:** N/A
 
-### Pull Request
+### Pull Request · 20260806-114230
 
 Short strong title
 
-[PR #123](https://github.com/…/pull/123) · merged 2026-08-06
+[PR #123](https://github.com/…/pull/123)
 ```
 
 **The opening section holds the change's two audiences, lowest first, and neither names a tier number.**
@@ -84,9 +84,10 @@ other facts; and `Significance` lost a heading that only asked again what the se
 in flight — folds unchanged.
 
 The scaffolder fills in the heading and the PR title. The fold adds what does not exist until the merge,
-and it adds it in **one place**: the **`PR #NN` link and the merge date**, under the entry's own
-`### Pull Request` heading, below the title. The separator is a middot. **The heading is left exactly as
-its author wrote it**, and so is everything else — the fold rewrites nothing but the comments it strips.
+one fact per place: the **`PR #NN` link** as the last line of the entry's own `### Pull Request` section,
+and the **moment it landed** stamped on that section's heading. The separator is a middot in both.
+**The ENTRY heading is left exactly as its author wrote it**, and so is everything else — the fold
+rewrites nothing but the comments it strips.
 
 **The consumer document is the exception, and only for the heading.** Its reader is a consumer, who has no
 branch — so there the heading is replaced by the entry's PR title, exactly as the PR number and
@@ -100,12 +101,18 @@ changed still has one. The fold **promotes the heading to `##`** as it lands, an
 an `###` in a flat list of `##`s is not an entry boundary to any reader of it, so it would otherwise be
 absorbed into the entry above and inherit that entry's PR link.
 
-**The date is the fold's, and it sits at the bottom** (Dave, August 5, 2026). The scaffolder runs when
+**The date is the fold's** (Dave, August 5, 2026). The scaffolder runs when
 the *branch* is created, so any date it wrote was the branch's birth date — a branch opened on Monday and
 merged on Thursday was filed as Monday's work, in the one document whose subject is when things landed.
-So the heading now carries what the author knows (title, type) and the closing line carries what only
-the merge knows. The date comes from the PR's own merge timestamp rather than from the clock, because a
-fold does not always run in the same minute as its merge.
+So the entry carries what the author knows and the fold adds what only the merge knows. It comes
+from the PR's own merge timestamp rather than from the clock, because a fold does not always run in the
+same minute as its merge.
+
+**And since August 19, 2026 it stands on the `Pull Request` heading rather than on the closing line**
+(Dave) — the counterpart of the creation stamp on `branch-cycle.md`'s heading, so the two ends of a
+branch's life are stamped in the documents that own them. The closing line keeps the clickable
+`[PR #N](url)` and nothing else: one fact, one place. An entry folded without a PR gets neither, because
+there is nothing to read either off.
 
 ## The one formatting rule: a body sub-heading is `####`, never `##` or `###`
 
@@ -140,7 +147,7 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/fold-changelo
 lags its own source by however many merges have landed since. A consumer keeps no copy of their own, so
 for them the line above is the correct one.
 
-Without `-Branch` it folds everything it finds: `workflow-davekjohn/branch/branch-changelog.md` if it holds an entry, plus
+Without `-Branch` it folds everything it finds: `workflow-davekjohn/branch/branch-deployment.md` if it holds an entry, plus
 any pre-split entry file in the root. An optional `-RepoRoot <path>`
 overrides which repo root the script writes to — for a consumer that runs the fold from a
 temporary/detached worktree (e.g. a `ship-pr.ps1` that checks out main elsewhere) and wants the fold
@@ -148,9 +155,9 @@ to land there instead of wherever `CLAUDE_PROJECT_DIR`/git-root would otherwise 
 #101); omitted, behavior is unchanged. The script:
 
 1. Folds each entry into `CHANGELOG.md`, with the PR number + link included (retrieved via
-   `gh pr list` — keyed on `-Branch`, or on the name in `branch-progress.md`, or for a pre-split entry
+   `gh pr list` — keyed on `-Branch`, or on the name in `branch-cycle.md`, or for a pre-split entry
    on its file name).
-2. Clears it afterwards: **`workflow-davekjohn/branch/branch-changelog.md` and `workflow-davekjohn/branch/branch-progress.md` are reset** to
+2. Clears it afterwards: **`workflow-davekjohn/branch/branch-deployment.md` and `workflow-davekjohn/branch/branch-cycle.md` are reset** to
    their empty state, a pre-split root entry file is **removed**.
 
 **Where it lands is the top of the list.** `CHANGELOG.md` is an intro followed by a flat list of `##`
@@ -276,7 +283,7 @@ this skill.
 ## Important
 
 - **Run this on main, after the merge** (after the PR has been merged) — then the PR number exists.
-- The script only touches `CHANGELOG.md`, the entries it folds and `workflow-davekjohn/branch/branch-progress.md`; nothing
+- The script only touches `CHANGELOG.md`, the entries it folds and `workflow-davekjohn/branch/branch-cycle.md`; nothing
   else.
 - This script is maintained in the source repo; do not modify it locally in the consumer. A
   change lands first in the source (`scripts/release/fold-changelog-entry.ps1`) and then travels via

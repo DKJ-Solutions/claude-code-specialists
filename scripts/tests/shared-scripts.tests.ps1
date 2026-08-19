@@ -676,7 +676,7 @@ if ($args -contains 'create') {
 - [ ] `docs/` documentation
 
 ## Checklist
-- [ ] Changelog entry written (`branch/branch-changelog.md`)
+- [ ] Changelog entry written (`branch/branch-deployment.md`)
 - [ ] Shared agent defs change here only
 
 ## Explicit approval

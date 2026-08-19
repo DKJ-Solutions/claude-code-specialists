@@ -379,10 +379,10 @@ try {
     Assert-Equal 0 $r1.Code 'valid name: new-branch exit 0'
     $headBranch1 = (& git -C $fixtureBC rev-parse --abbrev-ref HEAD).Trim()
     Assert-Equal 'feat/my-task' $headBranch1 'HEAD is on the new branch'
-    # branch/branch-changelog.md, from the lib rather than written out here: the test must fail if the
+    # branch/branch-deployment.md, from the lib rather than written out here: the test must fail if the
     # writer and the readers stop agreeing about the path, not merely if this literal goes stale.
-    $entryPath    = Join-Path $fixtureBC ((Get-BranchFilePaths).Changelog)
-    $progressPath = Join-Path $fixtureBC ((Get-BranchFilePaths).Progress)
+    $entryPath    = Join-Path $fixtureBC ((Get-BranchFilePaths).Deployment)
+    $progressPath = Join-Path $fixtureBC ((Get-BranchFilePaths).Cycle)
     Assert-True (Test-Path -LiteralPath $entryPath) 'entry file created at the fixed branch/ path'
     Assert-True (Test-Path -LiteralPath $progressPath) 'and the step list beside it -- a branch gets both files or neither'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $fixtureBC 'feat-my-task.md'))) 'nothing is written to the repo root any more'
@@ -393,20 +393,18 @@ try {
     # were fields a parser had to pick apart, and both have their own place now -- the date on the fold's
     # closing line, the type in its own section. Asserted as the WHOLE line, which is the stronger claim: it
     # proves nothing was appended, which a prefix match could not.
-    # AND SINCE AUGUST 16, 2026 IT CARRIES THE CREATION STAMP, which is where the 'Branch ID' section went.
-    # Still asserted as the WHOLE line -- the stronger claim, because it proves nothing else was appended.
+    # AND THE CREATION STAMP LEFT IT AGAIN ON AUGUST 19, 2026, for the cycle file's heading: this document
+    # states what is delivered, and the branch's birth moment belongs to the document that is created and
+    # reset with the branch. Still asserted as the WHOLE line -- the stronger claim, because it proves
+    # nothing at all was appended.
     $headLine1 = ($entryText1 -split "`r?`n")[0]
-    # THE SEPARATOR COMES OFF THE SEAM, not out of a literal. It was ' - ' until August 19, 2026 and is a
-    # middle dot since; a hardcoded one here would fail the next time that answer moves, on a test whose
-    # subject is the branch name and the stamp rather than the punctuation between them.
-    $stampSep = [regex]::Escape((Get-EntryIdSeparator))
-    Assert-True ($headLine1 -match ('^## Branch `feat/my-task` changelog ' + $stampSep + ' \d{8}-\d{6}$')) 'entry heading names the branch and stamps its creation, whole and at the entry level'
-    Assert-True (-not ($headLine1 -match "'")) 'and the stamp is bare -- the quotes it carried for half of August 16, 2026 are gone'
+    Assert-True ($headLine1 -match '^## `feat/my-task` deployment$') 'entry heading names the branch and nothing else, whole and at the entry level'
     Assert-Equal 'First title' (Get-EntryDescription -EntryText $entryText1) 'and the title given to new-branch is the PR title'
     Assert-True (Test-EntryDeclaresType -EntryText $entryText1 -Type 'Feat') 'and the branch type is readable -- off the branch the heading names'
-    # NO CALENDAR DATE, which is a different claim from the stamp above it: the stamp is a creation instant
-    # in a machine shape, while a 'yyyy-MM-dd' would read as the landing date the fold owns.
+    # NO DATE AND NO STAMP, which is the same claim in two shapes: a 'yyyy-MM-dd' would read as the landing
+    # date the fold owns, and a creation instant is the cycle file's, asserted below.
     Assert-True (-not ($headLine1 -match '\d{4}-\d{2}-\d{2}')) 'the scaffold writes NO date -- it would be the branch birth date, not the landing date'
+    Assert-True (-not ($headLine1 -match '\d{8}-\d{6}')) 'and no creation stamp either -- that is the cycle file heading'
     Assert-True (-not (Test-EntryHasSection -EntryText $entryText1 -Key 'Id')) 'and the section that used to hold the stamp is not written at all'
     # THE SCAFFOLD SAYS WHERE THE REASON GOES, AT THE MOMENT THE FILE COMES INTO EXISTENCE (inbound #596).
     # The working file carries no comments by decision (Dave, August 7, 2026), so this printout is the only
@@ -419,7 +417,7 @@ try {
     Assert-True (Test-Phrase -Text $r1.Out -Phrase 'ABOVE') 'the scaffold printout says the reason goes ABOVE the score line'
     Assert-True (Test-Phrase -Text $r1.Out -Phrase 'discarded') 'and says what happens to text below it, which is the half that makes it worth moving'
     Assert-True (Test-Phrase -Text $r1.Out -Phrase (Get-EntryScoreLabel)) 'and names the score label itself, so the reader knows which line is meant'
-    # THE ENTRY NO LONGER CARRIES A TO-DO LIST. That job moved to branch-progress.md with the split, and
+    # THE ENTRY NO LONGER CARRIES A TO-DO LIST. That job moved to branch-cycle.md with the split, and
     # this pair of asserts is what holds the two files to their separate jobs: the file that folds into
     # CHANGELOG.md prompts for what the change DOES, and nothing else.
     Assert-True (-not ($entryText1 -match [regex]::Escape('**To do / where I left off:**'))) 'the entry has no to-do heading -- that lives in the step list now'
@@ -474,7 +472,7 @@ try {
     Assert-True (Test-Phrase -Text $rE.Out -Phrase 'Unknown branch prefix') 'warning about the unknown prefix in the output'
     $headBranchE = (& git -C $fixtureE rev-parse --abbrev-ref HEAD).Trim()
     Assert-Equal 'wip/experiment' $headBranchE 'branch still created and checked out despite unknown prefix'
-    $entryPathE = Join-Path $fixtureE ((Get-BranchFilePaths).Changelog)
+    $entryPathE = Join-Path $fixtureE ((Get-BranchFilePaths).Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathE) 'entry file still created (fallback type)'
     $entryTextE = [System.IO.File]::ReadAllText($entryPathE, [System.Text.Encoding]::UTF8)
     Assert-True (Test-EntryDeclaresType -EntryText $entryTextE -Type 'Chore') 'entry falls back to branch type Chore, in its own section'
@@ -495,7 +493,7 @@ try {
     $rF = Invoke-NewBranchWithAdversarialField -Dir $fixtureF -Name 'feat/injection-check' -Field Title -Value $maliciousTitle
     Assert-Equal 0 $rF.Code 'malicious title: new-branch exit 0'
 
-    $entryPathF = Join-Path $fixtureF ((Get-BranchFilePaths).Changelog)
+    $entryPathF = Join-Path $fixtureF ((Get-BranchFilePaths).Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathF) 'malicious title: entry file created anyway'
     $entryTextF = [System.IO.File]::ReadAllText($entryPathF, [System.Text.Encoding]::UTF8)
     # THE PAYLOAD LANDS IN THE TITLE SECTION SINCE THE DOSSIER FORM -- the title given to new-branch is a
@@ -505,7 +503,7 @@ try {
     Assert-Equal $maliciousTitle (Get-EntryDescription -EntryText $entryTextF) 'malicious title: FULLY and unchanged in its section, and nothing appended (no argv splitting)'
     # ...and the heading is untouched by it, which is new ground the split opened: a payload that escaped its
     # section would show up here first.
-    Assert-True ((($entryTextF -split "`r?`n")[0]) -match ('^## Branch `feat/injection-check` changelog ' + [regex]::Escape((Get-EntryIdSeparator)) + ' \d{8}-\d{6}$')) 'malicious title: and the heading still names the branch and its stamp, nothing more'
+    Assert-True ((($entryTextF -split "`r?`n")[0]) -match '^## `feat/injection-check` deployment$') 'malicious title: and the heading still names the branch, nothing more'
     Assert-True (Test-EntryDeclaresType -EntryText $entryTextF -Type 'Feat') 'malicious title: and the type still reads off that heading rather than absorbing part of the payload'
 
     Assert-True (Test-Path -LiteralPath $sentinelPath) "sentinel file 'X' UNTOUCHED -- no 'Remove-Item' executed via a broken argv"
@@ -532,7 +530,7 @@ try {
 
     # --- (h) -Intent given: recorded in the STEP LIST, not the entry (#162, revised August 6, 2026) --
     # The intent is a status -- "where I left off" -- and since the branch/ split that is exactly what
-    # branch-progress.md is for. It used to become the entry BODY, which put a progress note in the file
+    # branch-cycle.md is for. It used to become the entry BODY, which put a progress note in the file
     # whose text folds verbatim into CHANGELOG.md; that is the shape v3.2.0 measured shipping three times.
     # So the pair of asserts below is deliberately mirrored: present in the step list, absent from the entry.
     Write-Host "new-branch.ps1 -- -Intent recorded in the step list, not the entry" -ForegroundColor Cyan
@@ -540,7 +538,7 @@ try {
     $intentText = 'Skeleton + routing done; next: wire the API client.'
     $rH = Invoke-NewBranch -Dir $fixtureH -Name 'feat/park-intent' -Title 'Parked work' -Intent $intentText
     Assert-Equal 0 $rH.Code '-Intent: new-branch exit 0'
-    $entryPathH = Join-Path $fixtureH ((Get-BranchFilePaths).Changelog)
+    $entryPathH = Join-Path $fixtureH ((Get-BranchFilePaths).Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathH) '-Intent: entry file created'
     $entryTextH = [System.IO.File]::ReadAllText($entryPathH, [System.Text.Encoding]::UTF8)
     Assert-True (-not ($entryTextH -match [regex]::Escape($intentText))) '-Intent: the intent does NOT land in the entry -- that text would fold into CHANGELOG.md verbatim'
@@ -550,7 +548,7 @@ try {
     Assert-Equal 0 @($intentImpact.Rows | Where-Object { $_.Why }).Count '-Intent: no tier reason is written for the author -- the status is not an answer'
     Assert-True (@(Get-EntryScaffoldFindings -EntryText $entryTextH -Wording (Get-EntryScaffoldWording)).Count -gt 0) '-Intent: so the gate still refuses the entry until somebody writes what the change does'
 
-    $progressPathH = Join-Path $fixtureH ((Get-BranchFilePaths).Progress)
+    $progressPathH = Join-Path $fixtureH ((Get-BranchFilePaths).Cycle)
     $progressTextH = [System.IO.File]::ReadAllText($progressPathH, [System.Text.Encoding]::UTF8)
     Assert-True ($progressTextH -match [regex]::Escape($intentText)) '-Intent: the intent is recorded in the step list instead'
     Assert-True (-not ($progressTextH -match 'what has been done so far')) '-Intent: and it replaces that section placeholder rather than sitting beside it'
@@ -596,8 +594,8 @@ try {
     } finally {
         $ErrorActionPreference = $prevEap
     }
-    Assert-True ($parkCommitFiles -contains (Get-BranchFilePaths).Changelog) '-Park: park commit contains the changelog entry'
-    Assert-True ($parkCommitFiles -contains (Get-BranchFilePaths).Progress) '-Park: and the step list -- parking the description without the plan defeats the flag'
+    Assert-True ($parkCommitFiles -contains (Get-BranchFilePaths).Deployment) '-Park: park commit contains the changelog entry'
+    Assert-True ($parkCommitFiles -contains (Get-BranchFilePaths).Cycle) '-Park: and the step list -- parking the description without the plan defeats the flag'
     Assert-True (-not ($parkCommitFiles -contains 'stray.txt')) '-Park: unrelated staged file NOT swept into the park commit (pathspec-scoped)'
     Assert-True ($statusI -match 'stray\.txt') '-Park: unrelated file still left staged for the caller''s own commit'
 
@@ -639,12 +637,12 @@ try {
     $rJ = Invoke-NewBranchWithAdversarialField -Dir $fixtureJ -Name 'feat/intent-injection' -Field Intent -Value $maliciousIntent
     Assert-Equal 0 $rJ.Code 'malicious intent: new-branch exit 0'
 
-    $entryPathJ = Join-Path $fixtureJ ((Get-BranchFilePaths).Changelog)
+    $entryPathJ = Join-Path $fixtureJ ((Get-BranchFilePaths).Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathJ) 'malicious intent: entry file created anyway'
     # ASSERTED ON THE STEP LIST, because that is where an intent lands now. The boundary under test is
     # unchanged -- free text crossing a native process boundary via an env var rather than argv -- only the
     # file it ends up in moved, and asserting on the old one would have quietly stopped testing anything.
-    $progressPathJ = Join-Path $fixtureJ ((Get-BranchFilePaths).Progress)
+    $progressPathJ = Join-Path $fixtureJ ((Get-BranchFilePaths).Cycle)
     $progressTextJ = [System.IO.File]::ReadAllText($progressPathJ, [System.Text.Encoding]::UTF8)
     Assert-True ($progressTextJ.Contains($maliciousIntent)) 'malicious intent: FULLY and unchanged in the step list (no argv splitting)'
     Assert-True (Test-Path -LiteralPath $sentinelPathJ) "sentinel file 'X' UNTOUCHED -- no 'Remove-Item' executed via a broken argv"
@@ -680,7 +678,7 @@ function Get-EntryFallbackType     { return $script:EntryFallbackType }
     # No -Title and no -Intent, and an UNKNOWN prefix -- so all four knobs are exercised at once.
     $rK = Invoke-NewBranch -Dir $fixtureK -Name 'wip/dutch-stub'
     Assert-Equal 0 $rK.Code 'configured wording: new-branch exit 0'
-    $entryPathK = Join-Path $fixtureK ((Get-BranchFilePaths).Changelog)
+    $entryPathK = Join-Path $fixtureK ((Get-BranchFilePaths).Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathK) 'configured wording: entry file created'
     $entryTextK = [System.IO.File]::ReadAllText($entryPathK, [System.Text.Encoding]::UTF8)
     # NONE OF THE THREE PROSE STRINGS IS WRITTEN ANY MORE -- neither the repo's nor the built-in one. The
@@ -728,7 +726,7 @@ Write-Output `$t.Type
 
     $rL = Invoke-NewBranch -Dir $fixtureL -Name 'feat/broken-config'
     Assert-Equal 0 $rL.Code 'broken repo-config: new-branch still exits 0'
-    $entryPathL = Join-Path $fixtureL ((Get-BranchFilePaths).Changelog)
+    $entryPathL = Join-Path $fixtureL ((Get-BranchFilePaths).Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathL) 'broken repo-config: the entry file is still written'
     $entryTextL = [System.IO.File]::ReadAllText($entryPathL, [System.Text.Encoding]::UTF8)
     # The subject here is that the entry is WRITTEN at all despite the broken config -- the placeholders it
@@ -752,8 +750,8 @@ Write-Output `$t.Type
     $fixtureM = New-Fixture -Label 'm'
     $rM1 = Invoke-NewBranch -Dir $fixtureM -Name 'docs/parent' -Title 'The parent branch'
     Assert-Equal 0 $rM1.Code 'stacked: the parent branch is created'
-    $entryPathM    = Join-Path $fixtureM ((Get-BranchFilePaths).Changelog)
-    $progressPathM = Join-Path $fixtureM ((Get-BranchFilePaths).Progress)
+    $entryPathM    = Join-Path $fixtureM ((Get-BranchFilePaths).Deployment)
+    $progressPathM = Join-Path $fixtureM ((Get-BranchFilePaths).Cycle)
     # Committed on the parent, which is the ordinary case: git holds that entry, so replacing it in the
     # child's working tree costs nothing. That is exactly the distinction the write path measures.
     $prevEapM = $ErrorActionPreference
@@ -779,7 +777,7 @@ Write-Output `$t.Type
     $fixtureN = New-Fixture -Label 'n'
     $rN1 = Invoke-NewBranch -Dir $fixtureN -Name 'docs/uncommitted-parent' -Title 'Never committed'
     Assert-Equal 0 $rN1.Code 'stacked/dirty: the parent branch is created'
-    $entryPathN = Join-Path $fixtureN ((Get-BranchFilePaths).Changelog)
+    $entryPathN = Join-Path $fixtureN ((Get-BranchFilePaths).Deployment)
     $entryTextN1 = [System.IO.File]::ReadAllText($entryPathN, [System.Text.Encoding]::UTF8)
 
     $rN2 = Invoke-NewBranch -Dir $fixtureN -Name 'feat/dirty-child' -Title 'Stacked on uncommitted work'

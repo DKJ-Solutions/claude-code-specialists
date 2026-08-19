@@ -2,14 +2,14 @@
 Folds one or more changelog entry files into CHANGELOG.md's flat list of changes, and then clears them.
 
 WHERE THE ENTRY COMES FROM, AND WHY THAT IS TWO PLACES (Dave, August 6, 2026). A branch now carries its
-working files in branch/: branch-changelog.md (the entry) and branch-progress.md (the step list). Entries
+working files in branch/: branch-deployment.md (the entry) and branch-cycle.md (the step list). Entries
 written before that split are a <branch-name>.md in the repo ROOT, and every consumer with a branch in
 flight has one right now -- they receive these scripts through a plugin update rather than by choosing to.
 Both forms are discovered, in both modes: "recognise both, write one".
 
 AND THE TWO ARE CLEARED DIFFERENTLY, which is the one real asymmetry. A root entry is named after its
-branch, so once folded it is deleted. branch/branch-changelog.md is a FIXED path the next branch will use,
-so it is REWRITTEN to its empty state -- together with branch-progress.md, whose ticked-off steps would
+branch, so once folded it is deleted. branch/branch-deployment.md is a FIXED path the next branch will use,
+so it is REWRITTEN to its empty state -- together with branch-cycle.md, whose ticked-off steps would
 otherwise greet the next branch as somebody else's work. The reset opens with an H1, which is also what
 makes it impossible to fold twice.
 
@@ -64,8 +64,11 @@ with its own heading -- an H2 since this change, an H3 before it -- so repo-root
 (CONTRIBUTING.md, SECURITY.md, ...) that open with an H1 are left untouched. -Branch mode targets exactly
 the named entry and is unaffected.
 
-What the fold adds is exactly what does not exist until the merge, and it is now ONE line rather than two
-places: the closing '[PR #NN](url) <midDot> merged <date>'. The heading is left as its author wrote it --
+What the fold adds is exactly what does not exist until the merge, and since August 19, 2026 it is one
+fact per place: the closing line '[PR #NN](url)', and the landing moment stamped on the 'Pull Request'
+section's own heading -- the counterpart of the creation stamp the cycle file carries. That closing line
+held ' <midDot> merged <date>' as well until that day; the heading holds the moment now.
+The ENTRY'S heading is left as its author wrote it --
 the fold used to prepend '#NN <midDot> ' to the title as well, and that is gone (Dave, August 5, 2026).
 Nothing is lost by it: the number is still in the entry, on that closing line, where the url makes it
 clickable rather than merely printed. What the heading gains is being readable as a sentence, and it is the
@@ -82,11 +85,12 @@ PR link. The case is not hypothetical: a branch parked before this change carrie
 will be folded after it. Only the heading's LEVEL changes; its fields (the title, the type, and a date
 where one was scaffolded in) are left exactly as written.
 
-THE DATE MOVED HERE FROM THE SCAFFOLD ON AUGUST 5, 2026 (Dave), and both halves of that were
-deliberate. It is the FOLD's to write, because new-branch.ps1 runs when the branch is created
-and could only ever record the branch's birth date -- wrong by however many days the branch lived, in
-the one document whose subject is when things landed. And it goes at the BOTTOM, because the heading
-carries what the author knows (title, type) while this line carries what only the merge knows.
+THE DATE MOVED HERE FROM THE SCAFFOLD ON AUGUST 5, 2026 (Dave), and that half is unchanged: it is the
+FOLD's to write, because new-branch.ps1 runs when the branch is created and could only ever record the
+branch's birth date -- wrong by however many days the branch lived, in the one document whose subject is
+when things landed. WHERE in the entry it goes changed on August 19, 2026: it stamps the 'Pull Request'
+heading rather than closing the block, so the section's heading says when it landed and its last line says
+which PR it was.
 
 Nothing here parses that date back out, and neither does anything downstream: release-lib reads the
 TYPE off the heading by matching the known branch types rather than by counting fields from the end,
@@ -245,17 +249,24 @@ function Test-IsChangelogEntryFile {
 }
 
 # THE ENTRY NOW ARRIVES IN branch/, AND THE ROOT FORM IS STILL FOLDED (Dave, August 6, 2026). Since the
-# branch/ split, new-branch.ps1 writes branch/branch-changelog.md; every branch created before
+# branch/ split, new-branch.ps1 writes branch/branch-deployment.md; every branch created before
 # that -- here and in every consumer, who get these scripts through a plugin update rather than by
 # choosing to -- carries a root <branch-name>.md instead. Recognising only the new path would leave those
 # entries sitting unfolded in the root, which is precisely the silent half-state this repo keeps
 # rediscovering. So both are discovered, in both modes: "recognise both, write one".
-$branchFiles = Get-BranchFilePaths
-$branchChangelogPath = Join-Path $repoRoot $branchFiles.Changelog
-$branchChangelogFilled = (Test-Path -LiteralPath $branchChangelogPath) -and
-    (Test-BranchChangelogIsFilled -Text ([System.IO.File]::ReadAllText($branchChangelogPath)))
+#
+# WHICH NAME THIS TREE ACTUALLY CARRIES. Since August 19, 2026 the pair is branch-cycle.md /
+# branch-deployment.md; a branch created before that carries branch-progress.md / branch-changelog.md, and
+# the fold is the script that meets those branches at their very last step. Resolve-BranchFilePath answers
+# per file, so a mixed tree folds and resets exactly the files it has -- the same "recognise both, write
+# one" rule the paragraph above states for the root form.
+$branchDeploymentRel = Resolve-BranchFilePath -Kind Deployment -RepoRoot $repoRoot
+$branchCycleRel      = Resolve-BranchFilePath -Kind Cycle -RepoRoot $repoRoot
+$branchDeploymentPath = Join-Path $repoRoot $branchDeploymentRel
+$branchDeploymentFilled = (Test-Path -LiteralPath $branchDeploymentPath) -and
+    (Test-BranchChangelogIsFilled -Text ([System.IO.File]::ReadAllText($branchDeploymentPath)))
 
-# WHICH BRANCH THE branch/ ENTRY BELONGS TO, read from branch-progress.md's own '**Branch:**' line.
+# WHICH BRANCH THE branch/ ENTRY BELONGS TO, read from branch-cycle.md's own '**Branch:**' line.
 #
 # This is the one thing the fixed filename genuinely costs, and the reason the branch line is in the
 # document rather than only in the scaffolder's head. In fold-all mode the branch is what the PR lookup
@@ -267,8 +278,8 @@ $branchChangelogFilled = (Test-Path -LiteralPath $branchChangelogPath) -and
 # READ BEFORE THE LOOP, WHICH IS ALSO BEFORE THE RESET at the end of the run: on main after the merge the
 # progress file still names the branch that was just merged, which is exactly the fact needed here.
 $branchFileOwner = ''
-if ($branchChangelogFilled) {
-    $progressFile = Join-Path $repoRoot $branchFiles.Progress
+if ($branchDeploymentFilled) {
+    $progressFile = Join-Path $repoRoot $branchCycleRel
     if (Test-Path -LiteralPath $progressFile) {
         $declared = Get-BranchFileDeclaredBranch -Text ([System.IO.File]::ReadAllText($progressFile))
         if ($declared -and $declared -ne (Get-BranchTrunkName)) { $branchFileOwner = $declared }
@@ -279,7 +290,7 @@ if ($Branch) {
     # Explicit target: the caller named the branch, so trust it. The legacy root file is named after that
     # branch; the branch/ file is not named after anything, so it qualifies on being filled.
     $entryFiles = @()
-    if ($branchChangelogFilled) { $entryFiles += $branchFiles.Changelog }
+    if ($branchDeploymentFilled) { $entryFiles += $branchDeploymentRel }
     $legacyName = ($Branch -replace '/', '-') + ".md"
     if (Test-Path -LiteralPath (Join-Path $repoRoot $legacyName)) { $entryFiles += $legacyName }
 }
@@ -287,7 +298,7 @@ else {
     # Fold-all: never fold a file that is not an actual changelog entry (structural gate above).
     $reserved = @("CHANGELOG.md", "CLAUDE.md", "README.md")
     $entryFiles = @()
-    if ($branchChangelogFilled) { $entryFiles += $branchFiles.Changelog }
+    if ($branchDeploymentFilled) { $entryFiles += $branchDeploymentRel }
     $entryFiles += @(Get-ChildItem -Path $repoRoot -Filter "*.md" -File |
         Where-Object { $reserved -notcontains $_.Name } |
         Where-Object { Test-IsChangelogEntryFile -Path $_.FullName } |
@@ -309,7 +320,7 @@ $changelogPath = Join-Path $repoRoot "CHANGELOG.md"
 # noise and the most trust. Measured in a consumer on 2026-08-09, one day after they adopted the entry
 # convention:
 #
-#   Folded and reset: branch/branch-changelog.md (tier 1, significance 3 -- placed above 2 existing entries)
+#   Folded and reset: branch/branch-deployment.md (tier 1, significance 3 -- placed above 2 existing entries)
 #   CHANGELOG.md updated.
 #
 # Exit 0, no warning. Their "2 existing entries" were two SECTION headings ('## Pull Requests',
@@ -526,12 +537,12 @@ foreach ($file in $entryFiles) {
     }
     $entryContent = $promoted
 
-    # THE HEADING IS JUST THE TITLE (Dave, August 5, 2026). The fold adds the PR link and the merge date as
-    # the entry's closing line and touches the heading no further -- it used to also prepend '#NN <midDot> '
-    # to the title, and that prepend is gone.
+    # THE HEADING IS JUST THE TITLE (Dave, August 5, 2026). The fold adds the PR link as the entry's
+    # closing line and stamps the merge moment on the 'Pull Request' heading, and touches the ENTRY's
+    # heading no further -- it used to also prepend '#NN <midDot> ' to the title, and that prepend is gone.
     #
     # NOTHING IS LOST, WHICH IS WHY IT COULD GO: the number is still in the entry, on the closing
-    # '[PR #NN](url) <midDot> merged <date>' line, where the url makes it clickable rather than merely
+    # '[PR #NN](url)' line, where the url makes it clickable rather than merely
     # printed. What the heading gains is being readable as a sentence -- it is the one line every reader of
     # the changelog and of all three release documents scans, and it now says what changed and nothing else.
     # The two facts the merge owns already had a home together at the end of the block; the number was the
@@ -548,12 +559,12 @@ foreach ($file in $entryFiles) {
     $midDot = [char]0x00B7
     $branchForPr = $Branch
     if (-not $branchForPr) {
-        if ($file -eq $branchFiles.Changelog) {
-            # From branch-progress.md's branch line -- see $branchFileOwner above for why the file name
+        if ($file -eq $branchDeploymentRel) {
+            # From branch-cycle.md's branch line -- see $branchFileOwner above for why the file name
             # cannot answer this any more.
             $branchForPr = $branchFileOwner
             if (-not $branchForPr) {
-                Write-Host "  $($branchFiles.Progress) names no branch, so there is nothing to look a PR up by. Pass -Branch to get the number and merge date." -ForegroundColor Yellow
+                Write-Host "  $($branchCycleRel) names no branch, so there is nothing to look a PR up by. Pass -Branch to get the number and merge date." -ForegroundColor Yellow
             }
         } else {
             $base = [System.IO.Path]::GetFileNameWithoutExtension($file)
@@ -603,20 +614,25 @@ foreach ($file in $entryFiles) {
             $entryContent = $entryContent.TrimEnd() + "$nl$nl" + ('Plugins: ' + ($touched -join ', '))
         }
 
-        # THE CLOSING LINE CARRIES BOTH FACTS THE MERGE OWNS: which PR this was, and when it landed
-        # (Dave, August 5, 2026). Built by Format-EntryFoldFooter in entry-scaffold-lib.ps1 -- the lib
-        # that owns the entry FORMAT, so the one place that writes this line is the one place a test can
-        # read it. Its header carries the reasoning for reading mergedAt rather than the clock; the clock
-        # is passed in as the fallback because a pure function may not have one of its own.
+        # THE CLOSING LINE CARRIES THE PR ITSELF; THE HEADING ABOVE IT CARRIES WHEN IT LANDED (Dave,
+        # August 5, 2026 for the line, August 19, 2026 for the split). Built by Format-EntryFoldFooter in
+        # entry-scaffold-lib.ps1 -- the lib that owns the entry FORMAT, so the one place that writes this
+        # line is the one place a test can read it.
         $entryContent = $entryContent.TrimEnd() + "$nl$nl" + (Format-EntryFoldFooter `
-            -Number $num -Url $prs[0].url -MergedAt ([string]$prs[0].mergedAt) `
-            -FallbackDate (Get-Date -Format 'yyyy-MM-dd'))
+            -Number $num -Url $prs[0].url)
+
+        # AND THE SECTION'S OWN HEADING TAKES THE MOMENT IT LANDED (Dave, August 19, 2026) -- the
+        # counterpart of the creation stamp the cycle file's heading carries. The line above used to carry
+        # ' <middot> merged <date>' as well; the heading holds the moment now and the line the link, so one
+        # fact stands in one place.
+        $entryContent = Set-EntryMergeStamp -EntryText $entryContent -Stamp (Format-EntryMergeStamp `
+            -MergedAt ([string]$prs[0].mergedAt) -FallbackNow (Get-Date -Format 'yyyyMMdd-HHmmss'))
     }
     else {
         # No PR: no number, no url -- and no merge date either, deliberately. There is nothing to read a
         # landing date off, and inventing one from the clock would put a fact in the changelog that
-        # nothing backs. An entry folded this way simply carries no closing line; its heading is the same
-        # heading it would have had with one, since the fold no longer writes into the heading at all.
+        # nothing backs. An entry folded this way simply carries no closing line and no stamp on its
+        # 'Pull Request' heading: both facts have the same single source, so they are absent together.
         Write-Host "  No PR found for '$branchForPr' - entry without PR number/url or merge date." -ForegroundColor Yellow
     }
 
@@ -666,12 +682,12 @@ foreach ($file in $entryFiles) {
 
     # DISPOSAL DIFFERS BY WHERE THE ENTRY LIVED, and that is the one real asymmetry the split introduces.
     # A legacy root entry is named after its branch, so once folded it has no reason to exist and is
-    # deleted, exactly as before. branch/branch-changelog.md is a FIXED path that every future branch will
+    # deleted, exactly as before. branch/branch-deployment.md is a FIXED path that every future branch will
     # use, so deleting it would leave the trunk missing a file the next `git checkout -b` expects -- and
     # would quietly turn the reset state into "somebody has to recreate this". It is rewritten to its empty
     # state instead, which is also what makes it impossible to fold twice: the reset opens with an H1, and
     # the entry test only accepts the entry heading levels.
-    $isBranchFile = ($file -eq $branchFiles.Changelog)
+    $isBranchFile = ($file -eq $branchDeploymentRel)
     if ($isBranchFile) {
         Write-Utf8NoBom -Path $filePath -Content (((Format-BranchChangelogReset) -join $nl) + $nl)
     } else {
@@ -699,17 +715,17 @@ foreach ($file in $entryFiles) {
 
 Write-Host "CHANGELOG.md updated." -ForegroundColor Green
 
-# THE STEP LIST IS RESET WITH THE ENTRY, and only with it. branch-progress.md is never folded -- nothing
+# THE STEP LIST IS RESET WITH THE ENTRY, and only with it. branch-cycle.md is never folded -- nothing
 # in it belongs in a changelog -- but it is the same branch's file, and leaving a merged branch's ticked-off
 # steps on the trunk would greet the next branch with somebody else's work. The reset is keyed on the entry
 # actually having been folded rather than on the file existing, so a fold-all run that only found legacy
 # root entries leaves it alone: that run belongs to a branch that never had a step list.
 $resetPaths = @()
-if (@($folded | ForEach-Object { $_.File }) -contains $branchFiles.Changelog) {
-    $progressPath = Join-Path $repoRoot $branchFiles.Progress
+if (@($folded | ForEach-Object { $_.File }) -contains $branchDeploymentRel) {
+    $progressPath = Join-Path $repoRoot $branchCycleRel
     Write-Utf8NoBom -Path $progressPath -Content (((Format-BranchProgressReset) -join $nl) + $nl)
-    $resetPaths += $branchFiles.Progress
-    Write-Host "Reset to its empty state: $($branchFiles.Progress)" -ForegroundColor Green
+    $resetPaths += $branchCycleRel
+    Write-Host "Reset to its empty state: $($branchCycleRel)" -ForegroundColor Green
 }
 
 # --- The fold commit ------------------------------------------------------------------------------
