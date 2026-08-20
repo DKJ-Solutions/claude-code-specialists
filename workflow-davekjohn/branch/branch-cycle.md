@@ -1,21 +1,11 @@
-# `docs/v4-15-0-timing-total` cycle · 20260820-092200
+# `main` cycle
 
-## PLAN
 
-- [x] Collect the four remaining legs from commit timestamps and the publish stamp
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
 
-## CREATE
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
-- [x] Replace the frozen-subtotal paragraph with the total and the four legs
-- [x] Add the head percentage against the three earlier timed releases
-- [x] Split the tail by what blocked a person and what ran behind
-
-## TEST
-
-- [x] `check-plugin-integrity.ps1` — 0 errors; all 44 suites, 208 asserts, 0 fail, 174s
-
-## DEPLOY
-
-## Where I left off
-
-Closing the v4.15.0 release: the second timing pass. Everything else in the release has landed.
+_(filled in when a branch is created)_
