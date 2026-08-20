@@ -78,6 +78,16 @@ of the locked subject:
 difference is itself worth reporting, not quietly worked around. Naming it is how the requester learns
 their lock was stale; silently doing something else is how they stop trusting the command.
 
+**And naming it is the whole of it.** A lock that has outlived its session is **spent, not broken** --
+a `/lock` is written once, read once, and then waits to be overwritten by the next one, so being out of
+date is its resting state rather than a defect in it. Report what has changed and carry on; do not
+offer to clear it, do not propose re-locking it, and above all do not carry it into a list of what is
+still open. Measured on this repo, August 20, 2026: a session asked whether anything important was
+still outstanding, swept the tree correctly, and then put "the lock is stale, three of its items are
+done" at the **top** of the answer as the item that most needed action -- inventing work out of the
+mechanism working exactly as designed. The requester's correction is the sentence to keep: *you use it
+once and wait for the next lock.*
+
 **4. Then start.** Read the route the lock named, announce which specialist is acting, and begin.
 
 **5. If nothing is locked**, the script says so. Read the blocks it printed, propose the highest-priority
@@ -90,9 +100,11 @@ subject from what is actually there, and offer to `/lock` it.
   family has measured -- a start briefing arriving three times identically truncated, breaking off
   mid-word, with nothing in the visible list announcing what was missing. A handover is a pointer; the
   repo is the inventory.
-- **It does not delete the lock after reading it.** Re-running is free, a cleared context may need the
-  subject twice, and `/lock` overwrites. A command that consumed its own input would leave a second
-  `/handover` with nothing.
+- **It does not delete the lock after reading it, and it does not ask anyone else to.** Re-running is
+  free, a cleared context may need the subject twice, and `/lock` overwrites. A command that consumed
+  its own input would leave a second `/handover` with nothing -- which is also why a leftover lock is
+  never a chore to hand back to the requester. Overwriting it is `/lock`'s job, on the day there is a
+  next subject.
 - **It does not run the gates.** They cost minutes each, and a resume command that costs minutes gets
   avoided -- at which point it reports nothing at all. It prints the commands so the reader runs
   whichever the work in front of them needs.
