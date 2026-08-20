@@ -70,6 +70,7 @@ list sits at the **end** of the page:
 
 | Version | Date | Type | Title |
 |---|---|---|---|
+| [4.16.0](../workflow-davekjohn/releases/audience/4.x/4.16.0.md) | 2026-08-20 | Minor | The Shopify floor gains the install path it shipped without |
 | [4.15.0](../workflow-davekjohn/releases/audience/4.x/4.15.0.md) | 2026-08-20 | Minor | A two-section branch entry, a live-theme guard for team-shopify, and a release-notes page you can scan |
 | [4.14.0](../workflow-davekjohn/releases/audience/4.x/4.14.0.md) | 2026-08-19 | Minor | The root docs hold without a plugin installed, and the workflow layer sits on top |
 | [4.13.0](../workflow-davekjohn/releases/audience/4.x/4.13.0.md) | 2026-08-16 | Minor | The changelog entry halves, the changelog reads newest first, and /continue becomes /handover |
