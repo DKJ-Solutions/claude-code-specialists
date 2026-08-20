@@ -62,9 +62,17 @@ verify — grouped below as `0a` (acts 1 and 2), `0b` (acts 3 and 4) and `0c` (a
 >
 > **Its step count went from four to three in that split, and the missing one is this skill's own
 > neighbour.** What used to be its Step 1 — enabling and installing — is the plumbing that moved out,
-> because for a reader whose organisation published these plugins to them it has already happened. So
-> if you are cross-reading, expect **three steps** there and **six acts** here for step 0, and note
-> that those six acts are now described on a different page than the three steps.
+> because for a reader whose organisation published these plugins to them it has already happened.
+>
+> **And back to four on August 20, 2026** (inbound
+> [#784](https://github.com/DaveKJohn/claude-code-specialists/issues/784)), when the other plugins' adopt
+> skills became a step of their own. The page had named none of them, describing a one-plugin world while
+> a real install is this skill **plus one adopt step per enabled plugin that owns repo state** — so the
+> reader met the rest of their adoption one session-check `[ERROR]` at a time. So if you are
+> cross-reading, expect **four steps** there and **six acts** here for step 0, and note that those six
+> acts are now described on a different page than the four steps. The root
+> [`INSTALL.md`](../../../../../INSTALL.md#quickstart--the-commands-and-nothing-else) quickstart counts
+> **five**, one more than the adoption page, because it still carries the install itself as its Step 1.
 
 **0a — enable, then restart once.** Verify that the consumer has this in `.claude/settings.json`:
 
