@@ -486,13 +486,18 @@ function Get-SharedScriptPairs {
             # a second definition of the format in every consumer, and both had already drifted, refusing
             # a merge over a missing significance score that Dave placed at the release cut instead.
             #
-            # IT DECLARES NO SKILL, deliberately, which is why there is no Skill field here. Nothing types
-            # this command: a CI workflow runs it. The route to it is documented where a consumer meets it
-            # -- adopt-workflow-folder places the workflow and its skill page explains the gate -- and
-            # check 18 correctly reports it as not covered, exactly as it does for check-script-contract.
+            # IT DECLARES A SKILL, and it was registered without one until the suite refused: every shared
+            # entry point must name a documenting page, and shared-scripts.tests.ps1 asserts exactly that.
+            # The reasoning against was "nothing types this command, a workflow runs it" -- which is true
+            # of the CI route and beside the point for the question a person does ask on a finished branch,
+            # "is my entry written?". A page that answers it before the push is worth more than the
+            # exemption was.
             Name   = 'check-branch-entry'
             Source = 'scripts\lint\check-branch-entry.ps1'
             Plugin = 'workflow-davekjohn'
+            Skill  = 'check-branch-entry'
+            # A fixture root, so the suite can judge scratch trees. A consumer never types it.
+            SkillParamsExempt = @('RootOverride')
         },
         @{
             # The pre-task sync (inbound #787, August 20, 2026). THE HIGHEST-RISK SCRIPT IN A SHOPIFY

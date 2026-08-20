@@ -23,8 +23,11 @@
 
 - [x] `scripts/lint/check-branch-entry.ps1`: the gate, calling the two functions `open-pr` calls and
       adding no rule of its own; the significance is reported, never refused
-- [x] Registered as a mirrored pair with **no** `Skill` field: nothing types this command, a workflow runs
-      it. Check 18 correctly reports it as not covered, exactly as for `check-script-contract`
+- [x] Registered as a mirrored pair, with a skill page. It was registered WITHOUT one first, reasoning
+      that nothing types this command because a workflow runs it -- and `shared-scripts.tests.ps1`
+      refused: every shared entry point must name a documenting page. The suite was right and the
+      reasoning was beside the point, because a person does ask "is my entry written?" on a finished
+      branch. `check-branch-entry/SKILL.md` answers it before the push
 - [x] `Get-EntryGateExemptPrefixes` registered in the script contract (default `sync`) and the blueprint
       regenerated -- 31 records, the new one reported as left at the fallback here, which is honest
 - [x] `.github/workflows/branch-entry.yml` in THIS repo, `pull_request` only. The source stops being the
@@ -52,7 +55,10 @@
 - [x] Smoke-tested against three real states in this repo, including this branch before its entry was
       written -- which the gate correctly refused
 - [x] `check-plugin-integrity.ps1`: 0 errors -- 36 shared-script pairs, 135 parsed files, 286 links
-- [x] `check-script-contract.ps1`: 0 errors, 5 info signals (was 4 -- the new seam)
+- [x] `check-script-contract.ps1`: 0 errors, 6 info signals (was 5 -- the new seam, deliberately left
+      undefined here since this repo runs no mirror branches). Three pinned counts in
+      `script-contract.tests.ps1` moved with it, each keeping its own history line, which is what those
+      assert messages are for
 - [~] A finding recorded rather than repaired, because it is a different subject: `Get-EntryImpactFindings`
       still demands a Tier 1 section when tier 2 is scored, with the message "The ladder is cumulative" --
       a rule the entry model retired on August 12, 2026 (81 of 89 tier-1 sections existed only because a
