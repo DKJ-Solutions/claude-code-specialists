@@ -1,11 +1,26 @@
-# `main` cycle
+# `docs/v4-15-0-release-note` cycle · 20260820-090800
 
+## PLAN
 
-> **You are on `main`.** Do not work in this file yet -- create a branch first.
-> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
-> of the next person who does create one.
+- [x] Read the whole generated draft, all 12 tier-2 entries, before rewriting any of it
+- [x] Verify the v4.14.0 defect did not repeat — the two entries headed `Higher than tier 0?` carry prose
+- [x] Collect the timing legs from commit timestamps rather than estimating them
 
-This file carries the step list of the branch you are on. It is written when a branch is created
-and returns to this state after the merge.
+## CREATE
 
-_(filled in when a branch is created)_
+- [x] Rewrite the audience section: urgency first, second person, action stated or explicitly absent
+- [x] Write *what it is worth* — the guard, the permission-list gap, the four documents naming absent things
+- [x] Write *what was still open* as a snapshot, including the two guard reports the cut does not answer
+- [x] Timing, first pass: clock start, the measured legs, the subtotal to freeze
+
+## TEST
+
+- [x] `check-plugin-integrity.ps1` — 0 errors; `[consumer-tier]` checked 25 docs, no findings
+- [x] All suites — 44 suites, 208 asserts, 0 fail, 148s
+
+## DEPLOY
+
+## Where I left off
+
+The v4.15.0 release document, written and ready to ship. The cut is already tagged and pushed; the GitHub
+Release is published after this merges, and the end-to-end total then lands in its own small edit.
