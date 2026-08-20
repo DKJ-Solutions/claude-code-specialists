@@ -87,7 +87,8 @@ The six steps, stopping on the first failure:
    unfinished plan. Checked against the working copy at this moment rather than trusted from step 1, and
    there is no `-Force` for it: `- [~] dropped -- <why>` is the way past a step that should not be done.
    The three marks are in the `open-pr` skill and in [`BRANCH-portable.md`](../../BRANCH-portable.md).
-   See [The merge method is repo policy](#the-merge-method-is-repo-policy).
+   See [The merge method is repo policy](#the-merge-method-is-repo-policy), and the assumption that gate
+   rests on, below.
 5. **Check out the main branch, fast-forward, and fold** — handed to `fold-changelog-entry.ps1 -Push`,
    which folds the entry, commits it and pushes it. See
    [Why the fold is delegated](#why-the-fold-is-delegated-rather-than-inlined).
@@ -126,6 +127,37 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/ship-pr.ps1" 
 # open the PR only, e.g. to wait for a review
 powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/ship-pr.ps1" -NoResolves -NoMerge
 ```
+
+## The step-list gate reads the WORKING TREE, and one thing breaks that
+
+The gate opens `workflow-davekjohn/branch/branch-cycle.md` **on disk**, and the script says why in its own
+comment: *"Read from the branch's own checkout, which is where HEAD still is at this point -- step 5 is
+what moves to main."* That is correct for the whole life of an ordinary run, and it is an **assumption
+rather than a check**: nothing compares the branch you are standing on against the branch whose PR is
+being merged.
+
+**Measured on August 20, 2026, in the repo these scripts are maintained in.** Two sessions were working in
+one checkout. One had `ship-pr` waiting on CI for its own PR; the other created a branch and started
+editing, which moved `HEAD`. When CI went green, the gate read the *other* branch's freshly scaffolded
+step list, found `- [ ] TODO: the first step of this branch`, and refused the merge — naming a step that
+belonged to nobody's work on that PR. The PR's own list was complete and committed.
+
+**Nothing was damaged, and that is the part to notice rather than to be reassured by.** The refusal was
+safe: CI stayed green, the branch stayed pushed, and re-running from the right branch picked up where it
+left off, exactly as the message says. The same assumption fails the other way too — a tree standing on a
+*finished* branch would let an unfinished one through — and that direction is silent.
+
+**Recognising it costs one line.** If a `ship-pr` run refuses on a step you do not recognise, check
+`git rev-parse --abbrev-ref HEAD` against the PR's head ref before looking for the step. A guard is
+possible — refuse when the two differ — but it is a change on the merge path, and one benign instance is
+not the evidence for making that change. It is written down here instead, which is what the trap actually
+needed.
+
+**The wider rule this belongs to: these scripts assume one working tree per session.** `open-pr`,
+`ship-pr` and the fold all read and move `HEAD`, and none of them claims the tree. There is no lock —
+`/lock` is a note for the next session, not a claim on a checkout. So a second session, or a second
+terminal, in the same folder is outside what any of them can see. Use a second clone or a git worktree if
+two things really do run at once.
 
 ## Why step 3 polls before it watches
 
