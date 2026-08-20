@@ -28,6 +28,14 @@
     that produces the id, and the check keeps reporting until a real id is there. Pass -LiveThemeId to
     have it written answered in one move, which is the route the skill takes.
 
+    THE BLOCK ALSO CARRIES THE PRE-TASK SYNC'S SEAMS since inbound #787 (August 20, 2026), and the same
+    answered-or-commented rule applies to the store domain. sync-main is the higher-risk half of the same
+    problem the guard covers: a live theme has no locking, so work starts by mirroring live into the
+    trunk, and the obvious wholesale implementation overwrites whatever the trunk has done since. Its
+    other three seams are listed in the block with their defaults rather than written out, because those
+    defaults are right for both existing consumers -- what they buy is that nobody has to read the script
+    to find out what is configurable.
+
     THE STARTER CONFIG IS MEASURED RATHER THAN DESIGNED. Both existing Shopify consumers wrote a
     theme-check config independently, before this command existed, and both arrived at the SAME two
     checks over 'extends: nothing' -- Liquid that does not parse and JSON that does not parse. Neither
@@ -62,6 +70,12 @@
     keeps reporting -- see the header for why a stub would be worse than nothing.
     Find it with: shopify theme list --store <your-store>.myshopify.com
 
+.PARAMETER StoreDomain
+    The store the pre-task sync pulls from, e.g. 'your-store.myshopify.com'. Given, Get-ShopifyStoreDomain
+    is written ANSWERED and sync-main works on its first run. Omitted, it is written commented out like
+    the theme id, and sync-main refuses rather than guessing which store to read -- its own -Store
+    parameter gets you through one run.
+
 .PARAMETER RootOverride
     Repo root to operate on, for the test suite. A consumer never types this: the root is resolved
     dual-context like every other shared script.
@@ -69,12 +83,14 @@
 .EXAMPLE
     .\scripts\task\adopt-shopify-floor.ps1
     .\scripts\task\adopt-shopify-floor.ps1 -LiveThemeId 190793613653 -Apply
+    .\scripts\task\adopt-shopify-floor.ps1 -LiveThemeId 190793613653 -StoreDomain my-store.myshopify.com -Apply
 #>
 
 [CmdletBinding()]
 param(
     [switch]$Apply,
     [string]$LiveThemeId = '',
+    [string]$StoreDomain = '',
     [string]$RootOverride = ''
 )
 
@@ -108,8 +124,9 @@ $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 # a documented permissive default -- any marker ENDING IN 'LIVE-PUSH-AUTHORIZED' is accepted, which is
 # what both existing consumers already write -- so it is offered commented out whatever happens, while
 # the id is the one that decides whether rule 3 can fire at all.
-function Get-SeamBlock([string]$Id) {
+function Get-SeamBlock([string]$Id, [string]$StoreDomain) {
     $answered = [bool](([string]$Id).Trim())
+    $storeAnswered = [bool](([string]$StoreDomain).Trim())
     $lines = @(
         '',
         '# --- team-shopify: the live-theme guard''s two seams ----------------------------------------------',
@@ -149,6 +166,49 @@ function Get-SeamBlock([string]$Id) {
         '# (''SWB-...'', ''XOXO-...''). Setting it narrows to your spelling alone.',
         '#',
         '# function Get-ShopifyLivePushMarker { return ''VUL-IN-LIVE-PUSH-AUTHORIZED'' }',
+        '',
+        '# --- team-shopify: the pre-task sync ------------------------------------------------------------',
+        '#',
+        '# For sync-main, which mirrors the live theme into the trunk without letting live overwrite what',
+        '# the trunk has done since. Only the STORE is worth answering on day one; the other three have',
+        '# defaults that are right for both existing Shopify consumers, and they are listed so nobody has to',
+        '# read the script to find out what is configurable.'
+    )
+    if ($storeAnswered) {
+        $lines += @(
+            ('function Get-ShopifyStoreDomain { return ''' + (([string]$StoreDomain).Trim()) + ''' }   # the store the sync pulls from')
+        )
+    }
+    else {
+        $lines += @(
+            '#',
+            '# UNANSWERED, and sync-main refuses rather than guessing which store to pull from -- the same',
+            '# reasoning as the theme id above. Its -Store parameter gets you through one run.',
+            '#',
+            '# function Get-ShopifyStoreDomain { return ''VUL-IN.myshopify.com'' }'
+        )
+    }
+    $lines += @(
+        '',
+        '# The remaining three, with their defaults, all optional:',
+        '#',
+        '#   Get-ShopifySyncReferencePattern   default ''^[Ss]ync''    the --grep pattern that recognises a',
+        '#                                                            previous sync commit. The capital is not',
+        '#                                                            defensive: the two consumers spell it',
+        '#                                                            ''sync:'' and ''Sync '', and a pattern that',
+        '#                                                            matches one aborts on the FIRST run in the',
+        '#                                                            other. Narrow it if your history says so --',
+        '#                                                            but never widen it: the floor is the MOST',
+        '#                                                            RECENT match, so a looser pattern can only',
+        '#                                                            move it forward and protect less.',
+        '#   Get-ShopifySyncBranchPrefix       default ''sync/live-''   the drift branch''s prefix. Yours to set',
+        '#                                                            because it has to line up with whatever',
+        '#                                                            your PR guardrails and CI exempt.',
+        '#   Get-ShopifySyncMerges             default $false        $true opens the PR and merges once CI is',
+        '#                                                            green. The default stops at the push, so',
+        '#                                                            somebody LOOKS at what third parties',
+        '#                                                            changed before it becomes the base of new',
+        '#                                                            branches -- which is the point of the step.',
         ''
     )
     return (($lines -join "`n") + "`n")
@@ -272,7 +332,7 @@ switch ($seamState) {
     default   {
         $how = if (([string]$LiveThemeId).Trim()) { "answered with $(([string]$LiveThemeId).Trim())" } else { 'commented out, so the session check keeps reporting' }
         Write-Host "  [append] $configRel -- the Shopify seam block, $how" -ForegroundColor Green
-        $plan += @{ Rel = $configRel; Mode = 'append'; Content = (Get-SeamBlock $LiveThemeId) }
+        $plan += @{ Rel = $configRel; Mode = 'append'; Content = (Get-SeamBlock $LiveThemeId $StoreDomain) }
     }
 }
 
@@ -300,6 +360,9 @@ if (-not $Apply) {
     Write-Host "  Re-run with -Apply to write the $($plan.Count) item(s) above. Nothing was written."
     if (-not (([string]$LiveThemeId).Trim()) -and $seamState -eq 'append') {
         Write-Host '  Add -LiveThemeId <numeric id> to have the guard armed in the same move.'
+    }
+    if (-not (([string]$StoreDomain).Trim()) -and $seamState -eq 'append') {
+        Write-Host '  Add -StoreDomain <store>.myshopify.com to have the pre-task sync runnable in the same move.'
     }
     exit 0
 }
@@ -332,6 +395,13 @@ if (([string]$LiveThemeId).Trim()) {
 else {
     Write-Host 'The guard still has its id half inert: uncomment Get-ShopifyLiveThemeId with the real id.'
     Write-Host 'The session check will keep saying so until you do, which is the point.'
+}
+if (([string]$StoreDomain).Trim()) {
+    Write-Host 'The pre-task sync (the sync-main skill) can run as it stands: the store is answered.'
+}
+else {
+    Write-Host 'The pre-task sync (the sync-main skill) needs one more answer before it runs: uncomment'
+    Write-Host 'Get-ShopifyStoreDomain with your store. It refuses rather than guessing which store to pull.'
 }
 Write-Host 'Already had a hand-written guard? See "Converging off a hand-written guard" in the'
 Write-Host 'team-shopify README before you keep both -- two PreToolUse hooks fire on every command.'

@@ -478,6 +478,44 @@ function Get-SharedScriptPairs {
             Source  = 'scripts\lib\source-repo-guard-lib.ps1'
             Plugin  = 'team-shopify'
             LibOnly = $true
+        },
+        @{
+            # The pre-task sync (inbound #787, August 20, 2026). THE HIGHEST-RISK SCRIPT IN A SHOPIFY
+            # CONSUMER, and it was written twice by hand before it shipped -- destructively the first
+            # time, in both repos. A live theme has no locking and no merge, so work starts by mirroring
+            # live into the trunk, and the obvious wholesale implementation overwrites whatever the trunk
+            # has done since. One consumer recorded that procedure reverting merged work three times in
+            # one week.
+            #
+            # IT TRAVELS IN team-shopify, like adopt-shopify-floor and for the same reason: the plugin
+            # that owns the live theme owns the step that reads from it. It depends on NEITHER workflow
+            # plugin -- every seam it reads is fetched through Get-Command, so a consumer on
+            # workflow-default gets identical behaviour.
+            Name   = 'sync-main'
+            Source = 'scripts\task\sync-main.ps1'
+            Plugin = 'team-shopify'
+            Skill  = 'sync-main'
+            # A fixture root, so the suite can drive the script against a scratch tree instead of a real
+            # store -- and so the marketplace refusal can be bypassed in a repo that is one. A consumer
+            # never types it, and documenting it would invite someone to.
+            SkillParamsExempt = @('RootOverride')
+        },
+        @{
+            # The sync's two QUERIES, as a lib of their own (inbound #787). The policy is one sentence;
+            # what the risk sits in is when it fires -- where to measure from, and whether a path counts
+            # as touched. A deletion is also a touch, and that is the case the first hand-written
+            # implementation got wrong. Both are testable only if they load without running a sync, which
+            # is the whole reason this is a separate file rather than three functions at the top of
+            # sync-main.ps1.
+            #
+            # DEPENDENCY-FREE, and specifically NOT a reader of repo-config.ps1: the live-theme guard
+            # dot-sources that file on every command inside a catch that returns no live theme id, so
+            # anything it pulls in is a way to silently disarm the guard. The seam answers are read by the
+            # script and passed in.
+            Name    = 'sync-rules'
+            Source  = 'scripts\lib\sync-rules.ps1'
+            Plugin  = 'team-shopify'
+            LibOnly = $true
         }
     )
 
