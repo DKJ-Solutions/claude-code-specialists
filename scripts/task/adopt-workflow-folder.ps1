@@ -19,6 +19,11 @@
           releases/audience/     where the cut drafts the hand-written note (kept by .gitkeep until then)
           branch/                the two branch files in their reset state, plus the generated templates
 
+    AND ONE FILE OUTSIDE IT (inbound #789):
+
+        .github/workflows/branch-entry.yml   the CI gate that holds every PR to carrying a written
+                                             entry, by calling the shipped check-branch-entry.ps1
+
     A PLUGIN INSTALL CANNOT CREATE THIS FOLDER -- an install is a clone into the plugin cache and
     writes nothing into the repo -- so the folder arrives through this command, and
     check-script-contract.ps1 (surfaced by the script-contract session hook) reports at session start
@@ -217,9 +222,72 @@ $promptsReadme = @(
     '<!-- VUL-IN: anything specific to this repo -- who writes here, and what a prompt is expected to say. -->'
 )
 
+# THE ONE FILE THIS COMMAND PLACES OUTSIDE THE FOLDER, and it is deliberate (inbound #789). The branch
+# entry is a convention the plugin ships every reader of, while nothing enforced it: open-pr refuses to
+# push an unwritten entry and ship-pr refuses to merge on an unresolved step, but both are LOCAL, and a
+# branch pushed by hand or a PR opened in the GitHub UI meets neither. Both existing consumers therefore
+# wrote a CI gate from scratch, against the same convention, and both had already drifted from it. So the
+# gate ships as a script and this places the six lines that call it. Precedent for a plugin placing a
+# workflow: adopt-shopify-floor writes .github/workflows/theme-check.yml.
+#
+# IT TRACKS main RATHER THAN A TAG, which is the one choice here worth arguing. A pinned gate keeps
+# enforcing the shape it was pinned at -- and the entry's own path has moved twice already, so a stale pin
+# does not fail loudly, it fails the wrong way: refusing branches that do carry an entry at the current
+# path. Tracking the tip means the gate follows the convention it enforces. A consumer who needs
+# reproducibility over currency pins a tag and accepts owning the bump.
+$entryGateWorkflow = @(
+    '# Every PR into the trunk carries a WRITTEN changelog entry.',
+    '#',
+    '# The check itself is not in this file: it is check-branch-entry.ps1, shipped by the',
+    '# workflow-davekjohn plugin, which calls the same two functions open-pr calls locally. That is the',
+    '# point -- there is one definition of "written" in the system, and this is not a second one. A gate',
+    '# hand-written in shell is a second definition, free to drift from the fold that reads the first.',
+    '#',
+    '# WHY THE HEAD REF IS PASSED EXPLICITLY: a pull_request checkout is a detached merge commit, so',
+    '# ''git rev-parse --abbrev-ref HEAD'' answers ''HEAD'' there. The script refuses rather than guessing.',
+    '#',
+    '# WHY WINDOWS: the shared scripts target Windows PowerShell 5.1, which is what ''shell: powershell'' is.',
+    '#',
+    '# WHICH BRANCHES OWE NOTHING: answer Get-EntryGateExemptPrefixes in scripts/repo-config.ps1. It',
+    '# defaults to ''sync'' -- a mirror branch carries somebody else''s work, so it has nothing to declare.',
+    '#',
+    '# THE PINNED REF is deliberately a moving branch: a pinned gate enforces the shape it was pinned at,',
+    '# and the entry path has moved twice. Pin a tag instead if you would rather own the bump.',
+    'name: Branch entry',
+    '',
+    'permissions:',
+    '  contents: read',
+    '',
+    'on:',
+    '  pull_request:',
+    '    branches: [main]',
+    '',
+    'jobs:',
+    '  branch-entry:',
+    '    runs-on: windows-latest',
+    '    steps:',
+    '      - uses: actions/checkout@v4',
+    '',
+    '      - name: Fetch the shared workflow scripts',
+    '        uses: actions/checkout@v4',
+    '        with:',
+    '          repository: DaveKJohn/claude-code-specialists',
+    '          ref: main',
+    '          path: .workflow-scripts',
+    '',
+    '      - name: Changelog entry written',
+    '        shell: powershell',
+    '        env:',
+    '          CLAUDE_PROJECT_DIR: ${{ github.workspace }}',
+    '        run: |',
+    '          powershell -NoProfile -ExecutionPolicy Bypass -File .workflow-scripts/plugins/workflows/workflow-davekjohn/scripts/lint/check-branch-entry.ps1 -Branch "${{ github.head_ref }}"',
+    '          exit $LASTEXITCODE'
+)
+
 $promptPaths = Get-PromptInboxPaths -RepoRoot $repoRoot
 $branchPaths = Get-BranchFilePaths
 $targets = @(
+    @{ Rel = '.github/workflows/branch-entry.yml'; Content = (($entryGateWorkflow -join $nl) + $nl) },
     @{ Rel = 'workflow-davekjohn/README.md';           Content = (($folderReadme -join $nl) + $nl) },
     @{ Rel = 'workflow-davekjohn/CLAUDE.md';           Content = (($folderClaude -join $nl) + $nl) },
     @{ Rel = 'workflow-davekjohn/CONTRIBUTING.md';     Content = (($folderContributing -join $nl) + $nl) },

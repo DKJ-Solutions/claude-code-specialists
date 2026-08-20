@@ -1,0 +1,70 @@
+---
+name: check-branch-entry
+description: Answer whether this branch carries a WRITTEN changelog entry, the way the CI gate answers it -- so you learn it before the push rather than from a red check. Use it on a branch whose work is finished, when a PR was opened outside open-pr, or when a red "Branch entry" check needs explaining. It adds no rule of its own: it calls the same two functions open-pr calls, and it reports the significance rather than refusing on it, because that refusal belongs to the release cut.
+---
+
+# check-branch-entry -- is the entry written?
+
+```powershell
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/lint/check-branch-entry.ps1"
+```
+
+`${CLAUDE_PLUGIN_ROOT}` resolves **only inside a plugin-owned component** -- that is, when your Claude
+runs this skill. Typing the command by hand in a terminal means spelling out the absolute path to your
+own plugin cache instead, so the easy route is to ask for the skill rather than to copy the line.
+
+**Read-only.** It opens one file and exits 0 or 1. Nothing is written, nothing is pushed.
+
+## What it is for, and why it ships
+
+The branch entry is a convention this plugin ships every reader of, and until August 20, 2026 **nothing
+enforced it**. `open-pr` refuses to push an entry that has not been written, and `ship-pr` refuses to
+merge while a step is unresolved -- but both are **local**, so a branch pushed by hand or a PR opened in
+the GitHub UI meets neither. The convention was enforced by whoever remembered to use the scripts, and a
+convention that enforces nothing rots quietly: the entry is the first thing to fall away once it gets
+busy, and six months later the changelog does not mention half the work.
+
+So this is the same answer as a script, callable from CI. `adopt-workflow-folder` places the workflow that
+calls it (`.github/workflows/branch-entry.yml`), and this skill is for asking the question yourself.
+
+**It adds no rule of its own**, and that is the design rather than modesty. It calls
+`Test-BranchChangelogIsFilled` and `Get-EntryScaffoldFindings` -- the two functions `open-pr` calls -- so
+there is exactly one definition of "written" in the system. Both existing consumers wrote this gate by
+hand in shell before it shipped, which is a second definition in every repo, free to drift from the fold
+that reads the first one; inbound
+[#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789) is the report, and both had
+already drifted.
+
+## What it refuses, and what it deliberately does not
+
+| state | answer |
+|---|---|
+| the entry file is missing | **exit 1** -- the branch declares nothing. `new-branch` is idempotent; run it here. |
+| the entry is in its **reset state** | **exit 1** -- that is what the fold leaves behind after a merge, not an entry. It opens with a first-level heading; a written entry opens with a second-level one. |
+| the entry is **scaffolded but not filled in** | **exit 1**, naming each field still waiting. This is the case a heading test lets through, because the scaffold already writes a heading and a title. |
+| the **significance** is not settled | **exit 0**, with the finding printed and the release cut named as where the refusal lives. |
+| the branch prefix is **exempt** | **exit 0** -- see the seam below. |
+| the branch is the **trunk** | **exit 0**, said out loud: the trunk is where the reset state is the *designed* state. |
+
+**The significance is reported, never refused, and that is the one thing to know before you compare this
+against a gate you wrote yourself.** A score is a judgement about a finished change, and an author who has
+not settled it is not blocked from merging over it -- that refusal sits at the release cut (Dave,
+August 5, 2026). Both hand-written consumer gates refuse it, one of them reasoning that "tier 0 can never
+legitimately stay empty", while this system's own rule reads **TIER 0 OWES NOTHING**: an entry whose score
+lines are blank carries no number, so its reach *is* tier 0, which is a complete answer that owes nothing.
+
+## Parameters
+
+| parameter | what it does |
+|---|---|
+| `-Branch` | the branch to judge. Defaults to the current one. **CI has to pass this**: a `pull_request` checkout is a detached merge commit, so `git rev-parse --abbrev-ref HEAD` answers `HEAD` there, and the script refuses rather than guessing. |
+
+## The seam it reads
+
+| seam | default | what it decides |
+|---|---|---|
+| `Get-EntryGateExemptPrefixes` | `sync` | branch prefixes that owe no entry, without their slash. A mirror or sync branch carries somebody else's work rather than your repo's, so it has nothing to declare -- both existing consumers reached that answer independently. |
+
+**An unknown prefix is not exempt**, deliberately: a typo in a prefix would otherwise skip the gate in
+silence. And the seam **replaces** the default rather than adding to it, so a repo that names its own list
+keeps `sync` only by including it.

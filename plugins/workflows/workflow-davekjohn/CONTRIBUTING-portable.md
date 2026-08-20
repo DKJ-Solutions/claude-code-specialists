@@ -156,6 +156,16 @@ the [`open-pr` skill](skills/open-pr/SKILL.md) is the full account of each:
 - **the resolves gate** — a plain `#123` in a PR body closes nothing on GitHub, so issues a PR resolves are
   passed as `-Resolves` and written as their own `Closes #<n>` lines.
 
+**All four are local, and that is the hole the CI gate closes** (inbound
+[#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789)). A branch pushed by hand, or a PR
+opened in the GitHub UI, meets none of them — so the convention was enforced by whoever remembered to use
+the scripts. `check-branch-entry.ps1` ships for exactly that, and `adopt-workflow-folder` places the six
+lines of workflow that call it. **It re-uses the same two functions**, so there is one definition of
+"written" rather than a second one in every repo's CI: that is not a nicety, and two consumers measured
+what the alternative costs — both wrote a gate in shell, and both refused a merge over a missing
+significance score, which is a refusal this workflow deliberately places at the **release cut** instead.
+The shipped gate reports the significance and merges anyway.
+
 ### 4. Merge
 
 [`skills/ship-pr/SKILL.md`](skills/ship-pr/SKILL.md) · `ship-pr.ps1` — open, wait for CI, merge and fold in
