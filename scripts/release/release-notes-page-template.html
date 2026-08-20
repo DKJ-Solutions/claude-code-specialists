@@ -1,12 +1,13 @@
 <!doctype html>
 <!--
-  The release-notes page template. build-release-notes-page.ps1 fills in five placeholders, each
+  The release-notes page template. build-release-notes-page.ps1 fills in six placeholders, each
   written in the markup below as the name doubled between at-signs:
 
       PAGE_TITLE     the page's own name
       PAGE_SUBTITLE  one line under it: how many releases the page carries
       BUILD_STAMP    the date the page was generated, because it is a SNAPSHOT
       RELEASE_DATA   the releases, as JSON, inside a <script type="application/json">
+      RELEASE_ROWS   the index itself: one <details> per release, built server-side
       PAGE_STYLE     the repo's own palette, or nothing -- see Get-ReleasePageTheme
 
   THE NAMES ARE LISTED WITHOUT THEIR SIGILS ON PURPOSE, and this comment is where the reason belongs
@@ -15,8 +16,26 @@
   standing where it says PAGE_TITLE. Harmless while all four were short strings, and not harmless the
   moment PAGE_STYLE joined them -- it wrote a whole ':root { ... }' rule, comment and all, inside an
   HTML comment. Caught by the position assert in release-notes-page.tests.ps1, which measures WHERE
-  the palette lands rather than only that it arrived; the polluted copy sat above the dark-mode block
-  and the assert reads the first occurrence.
+  the palette lands rather than only that it arrived.
+
+  ONE PAGE, ONE ROW PER RELEASE, ALL OF THEM CLOSED (the design pass, inbound #759). This page used to
+  show ONE release at a time behind a <select> with prev/next buttons. It now shows every release as a
+  collapsed row -- version, live/type chip, title, date -- and the row IS the index. The reasoning is
+  the reader's: somebody opening this wants the shape of a quarter before they want one version, and a
+  picker hides exactly that. Reworked from the hand-edited management edition a consumer had already
+  put through several editorial rounds, offered as reference material on #759.
+
+  EVERY ROW STARTS CLOSED, which was that consumer's own last correction: four expanded notes at the
+  top buried the other thirty-six.
+
+  THE INDEX IS BUILT SERVER-SIDE AND THE BODIES ARE NOT, which is the one deliberate half-measure here.
+  Version, date, type and title all come from the history table, so the whole index is static HTML and
+  reads with JavaScript switched off or broken -- where this page previously rendered nothing at all.
+  The note BODIES are markdown and are still rendered in the browser by the small renderer below, on
+  first open. Rendering them at build time would need a markdown implementation in PowerShell beside
+  the one here, i.e. two renderers for one format; that is a bigger change than a design pass, and the
+  reference edition sidestepped it by being hand-written. Stated rather than hidden: without JavaScript
+  you get the complete index and empty notes, and the <noscript> line says so on the page itself.
 
   PAGE_STYLE SITS AFTER THE DARK-MODE BLOCK ON PURPOSE, so a repo's own values win over both the light
   and the dark defaults rather than being overridden by whichever matched last. That is also what lets
@@ -30,11 +49,6 @@
 
   DELIBERATELY SELF-CONTAINED: no external stylesheet, font or script. The page is served by a
   Cloudflare Worker as one string, and a request to a third party would leak who is reading it.
-
-  NO LITERAL CONTROL CHARACTER LIVES IN THIS FILE. The markdown renderer needs a sentinel that
-  ordinary prose cannot contain; it builds one with String.fromCharCode at runtime instead of
-  carrying the raw byte here, because an invisible character in a template is a defect nobody can
-  see in a diff.
 -->
 <html lang="en">
 <head>
@@ -76,54 +90,123 @@
     background: var(--bg);
     color: var(--ink);
     font: 16px/1.65 ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
   .wrap { max-width: 52rem; margin: 0 auto; padding: 0 1.25rem 5rem; }
 
-  header.masthead { padding: 3rem 0 1.5rem; border-bottom: 1px solid var(--line); }
-  header.masthead h1 { margin: 0; font-size: 1.75rem; letter-spacing: -.02em; line-height: 1.2; }
-  header.masthead p { margin: .5rem 0 0; color: var(--ink-soft); font-size: .95rem; }
-
-  .toolbar {
-    position: sticky; top: 0; z-index: 5;
-    display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
-    padding: .85rem 0; margin-bottom: 1.5rem;
-    background: var(--bg);
-    border-bottom: 1px solid var(--line);
+  /* ---------- masthead ----------
+     A SERIF HEADING OVER A SANS PAGE, and the reason is what this document is: a record somebody
+     reads, not an interface they operate. The old page led with the same sans as its buttons, which
+     read as a tool. There is no web font here (see the doc comment), so this is the platform serif
+     stack -- which is exactly why it can be used at all. */
+  header.masthead { padding: 3.25rem 0 1.5rem; }
+  header.masthead .eyebrow {
+    display: block; margin: 0 0 .6rem;
+    font-size: .68rem; font-weight: 700; letter-spacing: .15em; text-transform: uppercase;
+    color: var(--accent);
   }
-  select, button {
-    font: inherit; color: inherit;
-    background: var(--panel);
-    border: 1px solid var(--line); border-radius: .5rem;
-    padding: .45rem .7rem; cursor: pointer;
+  header.masthead h1 {
+    margin: 0;
+    font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    font-weight: 400; font-size: 2.1rem; line-height: 1.15; letter-spacing: -.01em;
+    text-wrap: balance;
   }
-  select { flex: 1 1 18rem; min-width: 0; max-width: 100%; }
-  button { min-width: 2.5rem; }
-  button:hover:not(:disabled), select:hover { border-color: var(--accent); }
-  button:disabled { opacity: .35; cursor: default; }
-  button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  header.masthead p { margin: .75rem 0 0; color: var(--ink-soft); font-size: .95rem; max-width: 58ch; }
 
-  .meta { display: flex; gap: .4rem; flex-wrap: wrap; margin: 0 0 1.75rem; }
   .chip {
-    font-size: .75rem; letter-spacing: .04em; text-transform: uppercase;
-    padding: .2rem .55rem; border-radius: 999px;
-    background: var(--code-bg); color: var(--ink-soft);
+    display: inline-block;
+    font-size: .68rem; font-weight: 650; letter-spacing: .04em;
+    padding: .12rem .45rem; border-radius: .3rem;
+    border: 1px solid var(--line); color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+    vertical-align: .05em;
   }
-  .chip.accent { background: var(--accent-soft); color: var(--accent); }
+  .chip.accent { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
 
-  article h1 { font-size: 1.55rem; letter-spacing: -.015em; margin: 0 0 .5rem; line-height: 1.25; }
-  article h2 { font-size: 1.2rem; margin: 2.25rem 0 .6rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
-  article h3 { font-size: 1.02rem; margin: 1.75rem 0 .4rem; }
-  article h4 { font-size: .95rem; margin: 1.4rem 0 .35rem; color: var(--ink-soft); }
-  article p { margin: .85rem 0; }
-  article ul, article ol { padding-left: 1.35rem; margin: .85rem 0; }
-  article li { margin: .35rem 0; }
-  article li > p { margin: .35rem 0; }
+  .noscript {
+    margin: 1.75rem 0 0; padding: .8rem 1rem;
+    background: var(--accent-soft); border-left: 3px solid var(--accent);
+    color: var(--ink); font-size: .9rem;
+  }
+  .noscript p { margin: 0; }
+
+  /* ---------- the index ----------
+     THE SHEET IS A PANEL AND THE PAGE BEHIND IT IS NOT, which is what makes a long list read as one
+     document rather than as a wall. */
+  .sheet {
+    margin: 2rem 0 0;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: .75rem;
+    padding: .5rem 1.75rem 1rem;
+  }
+
+  .fold { border-top: 1px solid var(--line); }
+  .fold:first-child { border-top: 0; }
+
+  /* A GRID, SO FOUR FIELDS LINE UP DOWN THE WHOLE LIST: chevron, version, title, date. The chevron is
+     a ::before on the summary, which makes it a grid item in column 1 rather than a floated glyph. */
+  .fold > summary {
+    display: grid;
+    grid-template-columns: 1rem 4.25rem 1fr auto;
+    column-gap: .9rem; row-gap: .15rem;
+    align-items: baseline;
+    padding: .85rem .15rem;
+    cursor: pointer;
+    list-style: none;
+  }
+  .fold > summary::-webkit-details-marker { display: none; }
+
+  .fold > summary::before {
+    content: "";
+    grid-column: 1; grid-row: 1;
+    width: .45rem; height: .45rem;
+    border-right: 1.5px solid var(--ink-faint);
+    border-bottom: 1.5px solid var(--ink-faint);
+    transform: rotate(-45deg);
+    transform-origin: 60% 60%;
+    align-self: center;
+    transition: transform .15s ease;
+  }
+  .fold[open] > summary::before { transform: rotate(45deg); }
+
+  .fold .sv {
+    grid-column: 2; grid-row: 1;
+    font-variant-numeric: tabular-nums; font-weight: 650; font-size: .85rem; color: var(--accent);
+  }
+  .fold .st { grid-column: 3; grid-row: 1; font-size: .95rem; }
+  .fold .sd {
+    grid-column: 4; grid-row: 1;
+    font-size: .8rem; color: var(--ink-faint);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+
+  .fold > summary:hover .st { color: var(--accent); }
+  .fold > summary:hover::before { border-color: var(--accent); }
+  .fold > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: .4rem; }
+
+  /* The open note sits indented under its own row, aligned with the title above it. */
+  .fold article { padding: .25rem 0 1.75rem 5.15rem; }
+  .fold article > :first-child { margin-top: 0; }
+
+  /* ---------- the note itself ---------- */
+  article h1 { font-size: 1.35rem; letter-spacing: -.015em; margin: 0 0 .5rem; line-height: 1.25; }
+  article h2 { font-size: 1.1rem; margin: 1.75rem 0 .5rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+  article h3 { font-size: 1rem; margin: 1.5rem 0 .35rem; }
+  article h4 {
+    font-size: .7rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--accent); margin: 1.5rem 0 .5rem;
+  }
+  article p { margin: .8rem 0; max-width: 66ch; }
+  article ul, article ol { padding-left: 1.35rem; margin: .8rem 0; max-width: 66ch; }
+  article li { margin: .3rem 0; }
+  article li > p { margin: .3rem 0; }
   article a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
   article strong { font-weight: 640; }
-  article hr { border: 0; border-top: 1px solid var(--line); margin: 2rem 0; }
+  article hr { border: 0; border-top: 1px solid var(--line); margin: 1.75rem 0; }
   article blockquote {
-    margin: 1.1rem 0; padding: .1rem 0 .1rem 1rem;
-    border-left: 3px solid var(--line); color: var(--ink-soft);
+    margin: 1rem 0; padding: .1rem 0 .1rem 1rem;
+    border-left: 3px solid var(--line); color: var(--ink-soft); max-width: 66ch;
   }
   article code {
     background: var(--code-bg); border-radius: .3rem; padding: .1em .35em;
@@ -132,23 +215,33 @@
   }
   article pre {
     background: var(--code-bg); border: 1px solid var(--line); border-radius: .6rem;
-    padding: .85rem 1rem; overflow-x: auto; margin: 1.1rem 0;
+    padding: .85rem 1rem; overflow-x: auto; margin: 1rem 0;
   }
   article pre code { background: none; padding: 0; }
-  .table-scroll { overflow-x: auto; margin: 1.1rem 0; }
+  .table-scroll { overflow-x: auto; margin: 1rem 0; }
   article table { border-collapse: collapse; width: 100%; font-size: .92rem; }
   article th, article td { border: 1px solid var(--line); padding: .4rem .6rem; text-align: left; vertical-align: top; }
   article th { background: var(--code-bg); font-weight: 620; }
 
   footer.colophon {
-    margin-top: 3.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line);
+    margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line);
     color: var(--ink-faint); font-size: .82rem;
   }
-  footer.colophon p { margin: .35rem 0; }
+  footer.colophon p { margin: .35rem 0; max-width: 70ch; }
 
-  @media (max-width: 34rem) {
+  /* ---------- narrow ----------
+     TWO ROWS INSTEAD OF FOUR COLUMNS. The title is the longest field, so on a phone it takes the whole
+     second line; the date stays on the first because on this page it carries the ordering. The tap
+     target gets LARGER rather than smaller, which is the point of the reflow. */
+  @media (max-width: 38rem) {
+    .wrap { padding: 0 .9rem 3rem; }
     header.masthead { padding-top: 2rem; }
-    .wrap { padding-bottom: 3rem; }
+    header.masthead h1 { font-size: 1.7rem; }
+    .sheet { padding: .25rem 1rem .75rem; border-radius: .6rem; }
+    .fold > summary { grid-template-columns: 1rem 4.25rem 1fr; padding: .7rem .15rem .85rem; }
+    .fold .sd { grid-column: 3; justify-self: start; }
+    .fold .st { grid-column: 2 / -1; grid-row: 2; }
+    .fold article { padding: .25rem 0 1.4rem 1.9rem; }
   }
 </style>
 </head>
@@ -156,18 +249,22 @@
 <div class="wrap">
 
   <header class="masthead">
+    <span class="eyebrow">Release notes</span>
     <h1>@@PAGE_TITLE@@</h1>
-    <p>@@PAGE_SUBTITLE@@</p>
+    <p>@@PAGE_SUBTITLE@@ Every release is a row; open one to read it.</p>
   </header>
 
-  <nav class="toolbar">
-    <button id="prev" type="button" title="Older release" aria-label="Older release">&larr;</button>
-    <select id="picker" aria-label="Choose a release"></select>
-    <button id="next" type="button" title="Newer release" aria-label="Newer release">&rarr;</button>
-  </nav>
+  <noscript>
+    <div class="noscript">
+      <p>The index below reads without JavaScript &mdash; version, title and date all come from the
+         repository&rsquo;s own release history. The note <em>bodies</em> are rendered in the browser,
+         so with JavaScript off a row opens empty. The repository is the source either way.</p>
+    </div>
+  </noscript>
 
-  <div class="meta" id="meta"></div>
-  <article id="doc"></article>
+  <div class="sheet" id="folds">
+@@RELEASE_ROWS@@
+  </div>
 
   <footer class="colophon">
     <p>Generated from the release notes in the repository on @@BUILD_STAMP@@. This page is a
@@ -350,71 +447,51 @@
   }
 
   // --- the page -------------------------------------------------------------------------------
+  // THE INDEX IS ALREADY ON THE PAGE. Every row was written server-side from the release history, so
+  // there is nothing here that builds structure -- this only fills a note's body the first time its
+  // row is opened. That division is the whole reason the page survives without this script: what is
+  // missing then is prose, not navigation.
 
-  var picker = document.getElementById('picker');
-  var prevBtn = document.getElementById('prev');
-  var nextBtn = document.getElementById('next');
-  var metaEl = document.getElementById('meta');
-  var docEl = document.getElementById('doc');
-  var cache = {};
-  var index = 0;
+  var bodies = {};
+  DATA.releases.forEach(function (r) { bodies[r.version] = r.body; });
 
-  DATA.releases.forEach(function (r, n) {
-    var opt = document.createElement('option');
-    opt.value = String(n);
-    opt.textContent = 'v' + r.version + '  --  ' + r.title + (r.live ? '  [live]' : '');
-    picker.appendChild(opt);
-  });
-
-  function chip(text, cls) {
-    var el = document.createElement('span');
-    el.className = 'chip' + (cls ? ' ' + cls : '');
-    el.textContent = text;
-    return el;
+  // LAZY, AND CACHED BY THE DOM ITSELF. Rendering forty notes at load would be work nobody asked
+  // for; rendering on every toggle would redo it each time a reader closes and reopens a row. The
+  // 'data-rendered' attribute is the cache, which means the cache cannot drift from what is shown.
+  function fill(el) {
+    if (el.getAttribute('data-rendered') === '1') { return; }
+    var version = el.getAttribute('data-version');
+    var md = bodies[version];
+    // A row with no body in the data is a build-time inconsistency rather than a reader's problem:
+    // say so in place instead of leaving an empty panel that looks like a rendering failure.
+    el.innerHTML = md ? renderMd(md) : '<p>This release has no note in the repository.</p>';
+    el.setAttribute('data-rendered', '1');
   }
 
-  function render() {
-    var rel = DATA.releases[index];
-    picker.value = String(index);
-    prevBtn.disabled = index >= DATA.releases.length - 1;   // older sits further down the list
-    nextBtn.disabled = index <= 0;
+  var folds = Array.prototype.slice.call(document.querySelectorAll('details.fold'));
+  folds.forEach(function (fold) {
+    var article = fold.querySelector('article');
+    if (!article) { return; }
+    fold.addEventListener('toggle', function () { if (fold.open) { fill(article); } });
+    // Already open before this script ran -- a deep link, or a browser restoring state.
+    if (fold.open) { fill(article); }
+  });
 
-    metaEl.innerHTML = '';
-    metaEl.appendChild(chip('v' + rel.version, 'accent'));
-    metaEl.appendChild(chip(rel.date));
-    metaEl.appendChild(chip(rel.type));
-    if (rel.live) { metaEl.appendChild(chip('live', 'accent')); }
-
-    if (!cache[rel.version]) { cache[rel.version] = renderMd(rel.body); }
-    docEl.innerHTML = cache[rel.version];
-    if (location.hash !== '#v' + rel.version) {
-      history.replaceState(null, '', '#v' + rel.version);
+  // DEEP LINK: the fragment '#v4.11.0' opens that release and scrolls to it. The id is on the
+  // <details>, so the browser has already scrolled by the time this runs; what it cannot do is open
+  // a closed element, which is the only part left here. An unknown fragment does nothing at all --
+  // the whole index is on the page, so there is no empty state to fall back FROM.
+  function openFromHash() {
+    var raw = (location.hash || '').replace(/^#/, '');
+    if (!raw) { return; }
+    var el = document.getElementById(raw);
+    if (el && el.tagName === 'DETAILS' && !el.open) {
+      el.open = true;
+      el.scrollIntoView({ block: 'start' });
     }
   }
-
-  function step(delta) {
-    var n = index + delta;
-    if (n < 0 || n >= DATA.releases.length) { return; }
-    index = n;
-    render();
-    window.scrollTo(0, 0);
-  }
-
-  picker.addEventListener('change', function () { index = +picker.value; render(); window.scrollTo(0, 0); });
-  prevBtn.addEventListener('click', function () { step(1); });   // older
-  nextBtn.addEventListener('click', function () { step(-1); });  // newer
-  document.addEventListener('keydown', function (e) {
-    if (e.target === picker || e.metaKey || e.ctrlKey || e.altKey) { return; }
-    if (e.key === 'ArrowLeft') { step(1); }
-    if (e.key === 'ArrowRight') { step(-1); }
-  });
-
-  // Deep link: the fragment #v4.11.0 opens that release. An unknown one falls back to the newest
-  // rather than to an empty page.
-  var wanted = (location.hash || '').replace(/^#v/, '');
-  DATA.releases.forEach(function (r, n) { if (r.version === wanted) { index = n; } });
-
-  render();
+  window.addEventListener('hashchange', openFromHash);
+  openFromHash();
 })();
 </script>
 </body>

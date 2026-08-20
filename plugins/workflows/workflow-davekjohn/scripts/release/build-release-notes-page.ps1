@@ -231,7 +231,7 @@ $subtitle = "$($releases.Count) release$(if ($releases.Count -ne 1) {'s'}), newe
 $stamp    = (Get-Date).ToString('yyyy-MM-dd')
 
 $template = [System.IO.File]::ReadAllText($templatePath, [System.Text.Encoding]::UTF8)
-foreach ($needle in @('@@PAGE_TITLE@@', '@@PAGE_SUBTITLE@@', '@@BUILD_STAMP@@', '@@RELEASE_DATA@@', '@@PAGE_STYLE@@')) {
+foreach ($needle in @('@@PAGE_TITLE@@', '@@PAGE_SUBTITLE@@', '@@BUILD_STAMP@@', '@@RELEASE_DATA@@', '@@PAGE_STYLE@@', '@@RELEASE_ROWS@@')) {
     if ($template -notmatch [regex]::Escape($needle)) { throw "The template no longer carries $needle." }
 }
 
@@ -301,11 +301,81 @@ function Format-ReleasePageStyle {
     return (@("  /* This repo's own palette -- Get-ReleasePageTheme. */", '  :root {') + $lines + @('  }')) -join "`n"
 }
 
+function Format-ReleaseDate {
+    <#
+        Pure: the date a reader sees -- '14 Aug 2026' from the table's '2026-08-14'.
+
+        REFORMATTED RATHER THAN PASSED THROUGH, because this page's audience is often not the team: an
+        ISO date is a sorting key and reads as one. Parsed EXACTLY and with the invariant culture, so
+        the output cannot change with the machine that built the page -- and anything that does not
+        parse is passed through untouched rather than guessed at, since a repo may write its history
+        table in a form this script has never seen.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Raw)
+    $value = $Raw.Trim()
+    if (-not $value) { return '' }
+    $parsed = [datetime]::MinValue
+    $ok = [datetime]::TryParseExact($value, 'yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture,
+        [System.Globalization.DateTimeStyles]::None, [ref]$parsed)
+    if (-not $ok) { return $value }
+    return $parsed.ToString('d MMM yyyy', [System.Globalization.CultureInfo]::InvariantCulture)
+}
+
+function Format-ReleaseIndexRows {
+    <#
+        Pure: the index itself -- one collapsed 'details' element per release, as one string.
+
+        BUILT HERE RATHER THAN IN THE BROWSER, and that is the design decision this function carries
+        (inbound #759). Version, date, type and title all come from the history table, so the whole
+        index can be static HTML -- which means it reads with JavaScript off or broken, where this page
+        previously rendered nothing at all. Only the note BODIES still need the renderer in the
+        template, and the noscript block on the page says so rather than leaving a reader to work it
+        out from an empty panel.
+
+        ONE CHIP PER ROW AT MOST: 'live' where the history table marks it, the bump type otherwise,
+        never both. Forty rows carrying two chips each read as a table of metadata rather than as a
+        list of changes, and the version number already says whether a release was major or patch.
+
+        THE ID IS THE DEEP-LINK TARGET and is written 'v4.11.0' verbatim rather than slugified,
+        because it is what the fragment in a link people already hold has to match.
+
+        EVERY FIELD IS ESCAPED. A title comes out of a markdown table in the repository and may
+        legitimately carry an ampersand or a quote; unescaped, one of those ends an attribute or
+        invents an entity. The body is NOT here -- it travels as JSON and is rendered client-side.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyCollection()][array]$Releases)
+
+    $rows = New-Object System.Collections.Generic.List[string]
+    foreach ($r in $Releases) {
+        $id      = 'v' + [string]$r.version
+        $version = ConvertTo-HtmlText ('v' + [string]$r.version)
+        $title   = ConvertTo-HtmlText ([string]$r.title)
+        $date    = ConvertTo-HtmlText (Format-ReleaseDate -Raw ([string]$r.date))
+
+        $chip = ''
+        if ($r.live) {
+            $chip = '<span class="chip accent">live</span> '
+        } elseif ([string]$r.type) {
+            $chip = '<span class="chip">' + (ConvertTo-HtmlText ([string]$r.type)) + '</span> '
+        }
+
+        $rows.Add('    <details class="fold" id="' + (ConvertTo-HtmlText $id) + '">')
+        $rows.Add('      <summary><span class="sv">' + $version + '</span>' +
+                  '<span class="st">' + $chip + $title + '</span>' +
+                  '<span class="sd">' + $date + '</span></summary>')
+        $rows.Add('      <article data-version="' + (ConvertTo-HtmlText ([string]$r.version)) + '"></article>')
+        $rows.Add('    </details>')
+    }
+    if ($rows.Count -eq 0) { return '    <p>No release on this page carries a note yet.</p>' }
+    return ($rows -join "`n")
+}
+
 $page = $template.
     Replace('@@PAGE_TITLE@@',    (ConvertTo-HtmlText $config.Title)).
     Replace('@@PAGE_SUBTITLE@@', (ConvertTo-HtmlText $subtitle)).
     Replace('@@BUILD_STAMP@@',   (ConvertTo-HtmlText $stamp)).
     Replace('@@PAGE_STYLE@@',    (Format-ReleasePageStyle -Theme $config.Theme)).
+    Replace('@@RELEASE_ROWS@@', (Format-ReleaseIndexRows -Releases $releases)).
     Replace('@@RELEASE_DATA@@',  $json)
 
 # --- 4. Where the output goes ---------------------------------------------------------------------
