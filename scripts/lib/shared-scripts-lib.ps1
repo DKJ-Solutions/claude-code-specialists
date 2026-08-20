@@ -447,6 +447,37 @@ function Get-SharedScriptPairs {
             Source  = 'scripts\lib\source-repo-guard-lib.ps1'
             Plugin  = 'workflow-davekjohn'
             LibOnly = $true
+        },
+        @{
+            # The Shopify floor's install path (inbound #769 + #776, August 20, 2026). The guard shipped
+            # in 4.15.0 and started working on its own for two of its three rules; the third needs the
+            # consumer to name the live theme, and NO INSTALL STEP OWNED THAT ANSWER -- an install is a
+            # clone into the plugin cache and writes nothing into a repo. So every refreshed consumer met
+            # a standing [ERROR] and a guard with a known hole in it.
+            #
+            # IT TRAVELS IN team-shopify RATHER THAN IN THE CORE TEAM, and that is the same call issue
+            # #776 argued from both directions: specialists-init is team-alpha's skill, so teaching it the
+            # two Shopify seam functions would give the core team knowledge of an add-on it must not
+            # depend on. The plugin that owns the guard owns the answer to the guard.
+            Name   = 'adopt-shopify-floor'
+            Source = 'scripts\task\adopt-shopify-floor.ps1'
+            Plugin = 'team-shopify'
+            Skill  = 'adopt-shopify-floor'
+            # A fixture root, so the suite can adopt into a scratch tree instead of a real Shopify repo --
+            # and so the marketplace refusal can be bypassed in a repo that is one. A consumer never types
+            # it, and documenting it would invite someone to.
+            SkillParamsExempt = @('RootOverride')
+        },
+        @{
+            # THE GUARD LIB HAS TO REACH team-shopify TOO, now that a shared script travels there. It only
+            # ever fires from inside the copy a reader wrongly ran, so a version that stayed behind in
+            # workflow-davekjohn's mirror could never fire for adopt-shopify-floor. Registered per plugin
+            # rather than per script for the same reason check-report-lib is: the pair names a destination,
+            # and one destination cannot serve two.
+            Name    = 'source-repo-guard-lib'
+            Source  = 'scripts\lib\source-repo-guard-lib.ps1'
+            Plugin  = 'team-shopify'
+            LibOnly = $true
         }
     )
 

@@ -1,7 +1,7 @@
 # `team-shopify` — the Shopify add-on team
 
-Three specialists for a Shopify store repo, one domain skill, and an **operational floor**: the part that
-is not advice.
+Three specialists for a Shopify store repo, two skills, and an **operational floor**: the part that is
+not advice.
 
 | what | who / where |
 |---|---|
@@ -9,8 +9,9 @@ is not advice.
 | **Sandra** 🛍️ `05-21` | Store Manager — read-only admin reconnaissance and the pre-push checklist |
 | **Steven** 🗂️ `05-22` | Configuration Manager — theme estate, cleanup policy, CLI and auth reference |
 | `start-task` | the skill that opens a task: a branch plus its matching unpublished preview theme |
+| `adopt-shopify-floor` | the skill that **places** the floor in your repo: the guard's seam, a starter `.theme-check.yml`, and the CI workflow over it |
 | `hooks/guard-live-theme.ps1` | **the floor** — a `PreToolUse` guard on the live theme |
-| `hooks/shopify-floor-sessioncheck.ps1` | says when that guard is only half armed |
+| `hooks/shopify-floor-sessioncheck.ps1` | says when that guard is only half armed, and when a second one is registered beside it |
 
 Teams stack: this one adds to `team-alpha`, and a commercial store typically enables `team-ecomm` beside
 it. Which store a repo *is* belongs to that repo's lenses, never to this plugin.
@@ -67,12 +68,57 @@ function Get-ShopifyLiveThemeId    { return '190793613653' }   # shopify theme l
 function Get-ShopifyLivePushMarker { return 'SWB-LIVE-PUSH-AUTHORIZED' }
 ```
 
-| function | absent |
+| function | absent — or answered non-numerically, which counts as the same thing |
 |---|---|
 | `Get-ShopifyLiveThemeId` | the **id half of rule 3 cannot fire**: `--allow-live` still blocks, and a push aimed at live *by id* passes. A real hole, so the session check reports it once per session rather than leaving it silent. |
 | `Get-ShopifyLivePushMarker` | any marker **ending in** `LIVE-PUSH-AUTHORIZED` is accepted — which is what both existing consumers already write (`SWB-…`, `XOXO-…`). Setting it **narrows** to your spelling alone. |
 
 The guard reads them on every command, so a change takes effect immediately; nothing needs restarting.
+
+**You do not have to place that block by hand** — the `adopt-shopify-floor` skill writes it, and takes
+the id as a parameter so the guard is armed in the same move. It also places the two items every Shopify
+consumer of this plugin has otherwise written from scratch: a starter `.theme-check.yml` and the CI
+workflow over it.
+
+**A placeholder does not count as an answer, on purpose.** `Get-ShopifyLiveThemeId` returning anything
+non-numeric — a `VUL-IN` left in place, most likely — is read by both the guard and the session check as
+*unanswered*. A theme id is numeric, and the alternative is worse than an absent function: a stub would
+silence the report while leaving the id half exactly as inert as before. That is the shape this README
+warns about two sections down — a hole with a comment on it.
+
+## Converging off a hand-written guard
+
+Read this if your repo wrote its own live-theme guard **before** this plugin shipped one. Both existing
+consumers did, and inbound
+[#777](https://github.com/DaveKJohn/claude-code-specialists/issues/777) is what that cost the second of
+them.
+
+**A plugin refresh does not replace your file. It registers a second hook beside it.** The plugin's guard
+comes in through the plugin's own `hooks/hooks.json`; yours sits in your `.claude/settings.json`. Both are
+live, both fire on every command, and they agree on their verdict — so two hooks block the same command
+twice and nothing looks broken. What made it invisible in practice is worth knowing: that refresh happened
+*inside* one version, so there was no bump to prompt anyone to read a changelog.
+
+The floor session check now says so once per session. The route off it:
+
+1. **Remove your own `PreToolUse` entry** from `.claude/settings.json`, and then your own script. The
+   plugin's guard needs no registration from you — enabling `team-shopify` is the registration.
+2. **Keep your test suite**, pointed at the shipped copy. It is the part of a hand-written guard that
+   does not become redundant, and the shipped guard's own suite lives in the source repo where you
+   cannot run it against your theme.
+3. **Your authorisation marker keeps working.** Any marker *ending in* `LIVE-PUSH-AUTHORIZED` is
+   accepted, so `SWB-LIVE-PUSH-AUTHORIZED` and `XOXO-LIVE-PUSH-AUTHORIZED` both pass unconfigured.
+   Confirm that before you delete anything; set `Get-ShopifyLivePushMarker` only if you want to narrow
+   to your spelling alone.
+
+**Converging is a safety improvement, not housekeeping**, which is why it is written down rather than
+tolerated: the shipped guard matches `Bash|PowerShell` where a hand-written one typically matches `Bash`
+only, and it carries the false-positive lesson below that the first hand-written version had to learn on
+its own. It is a superset in what it catches.
+
+The removal stays **your** keystroke. `adopt-shopify-floor` will not do it: taking a `PreToolUse` entry
+out of somebody's settings is a deletion, and a consumer who ends up with *no* guard because a script
+was confident is worse off than one running two.
 
 ## Mentioning a rule is not performing it
 
@@ -98,7 +144,7 @@ So the matching asks **where** the words sit rather than whether they occur:
   or inside a wrapper is still caught.
 
 **Every one of those exemptions has a counter-case in the suite** (`scripts/tests/guard-live-theme.tests.ps1`
-in the source repo, 51 asserts), because an exemption without one is a hole with a comment on it.
+in the source repo, 69 asserts), because an exemption without one is a hole with a comment on it.
 
 ### The two limits, stated rather than hidden
 

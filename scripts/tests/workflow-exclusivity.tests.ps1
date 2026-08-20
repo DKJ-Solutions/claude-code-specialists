@@ -27,13 +27,20 @@
 
     PART (b) -- the lint check. Runs the REAL check-plugin-integrity.ps1 against a throwaway fixture that
     carries a copy of the script plus every lib it dot-sources (the exact pattern
-    check-plugin-integrity-fixture.ps1 uses, read before writing this). 'team-alpha', 'workflow-davekjohn'
-    AND 'workflow-default' are declared, correctly placed, in EVERY scenario: the shared-scripts registry
-    (Get-SharedScriptPairs) throws outright -- uncaught, killing the whole gate mid-run -- if the
-    marketplace declares ANY plugin but not one that a registered pair names (confirmed the hard way:
-    an early draft of this fixture omitted 'workflow-default', which only 'check-report-lib-default'
-    among two dozen pairs names, and the whole gate died before check 23 ever ran). So those three are
-    the fixed floor every scenario builds on rather than an arbitrary choice.
+    check-plugin-integrity-fixture.ps1 uses, read before writing this). 'team-alpha',
+    'workflow-davekjohn', 'workflow-default' AND 'team-shopify' are declared, correctly placed, in EVERY
+    scenario: the shared-scripts registry (Get-SharedScriptPairs) throws outright -- uncaught, killing the
+    whole gate mid-run -- if the marketplace declares ANY plugin but not one that a registered pair names
+    (confirmed the hard way twice: an early draft of this fixture omitted 'workflow-default', which only
+    'check-report-lib-default' among two dozen pairs names, and on August 20, 2026 'team-shopify' arrived
+    in the registry with 'adopt-shopify-floor' -- both times the gate died before check 23 ever ran). So
+    those four are the fixed floor every scenario builds on rather than an arbitrary choice, and the floor
+    grows whenever the registry gains a Plugin value.
+
+    THE SECOND TIME EXPOSED A HOLE IN THIS SUITE, now closed. Scenarios 8 and 9 caught the dead gate
+    because they expect a finding; scenario 7 expects the ABSENCE of one, so it passed on a gate that had
+    died six checks earlier -- an empty scan reading as a clean bill of health. It now also asserts that
+    the coverage line was printed, which is the only witness that check 23 ran at all.
 
     Test-gaps (honest):
       - Part (a): the settings.local.json layer is built and asserted on in roster-sync.tests.ps1 and
@@ -238,6 +245,12 @@ $WorkflowDavekjohn = @{ Name = 'workflow-davekjohn'; Source = './plugins/workflo
 # pair names 'workflow-default', so it has to be declared -- correctly placed -- alongside the other two
 # in every scenario, or Get-SharedScriptPairs throws before check 23 ever runs.
 $WorkflowDefault   = @{ Name = 'workflow-default';   Source = './plugins/workflows/workflow-default' }
+# And team-shopify, for the identical reason, added August 20, 2026 when 'adopt-shopify-floor' and a
+# second copy of the source-repo guard lib were registered under it. This is the THIRD time the floor has
+# had to grow with the registry (after workflow-default, and after the sibling fixture in
+# check-plugin-integrity-fixture.ps1 the same day) -- so read the paragraph above as a standing rule
+# rather than a note: a new Plugin value in the registry means a line here.
+$TeamShopify       = @{ Name = 'team-shopify';       Source = './plugins/teams/team-shopify' }
 
 try {
     Write-Host "== workflow-exclusivity.tests ==" -ForegroundColor Cyan
@@ -321,17 +334,23 @@ try {
     New-LintFixtureBase
 
     # --- 7. A correctly placed team and a correctly placed workflow -> no [plugin-kind] finding -------
-    Set-LintFixturePlugins -Plugins @($TeamAlpha, $WorkflowDavekjohn, $WorkflowDefault)
+    Set-LintFixturePlugins -Plugins @($TeamAlpha, $WorkflowDavekjohn, $WorkflowDefault, $TeamShopify)
     $r = Invoke-Integrity
     # \[plugin-kind\] ' (with the quote) rather than the bare marker: Write-Coverage always prints a
     # non-counting "[plugin-kind] checked N -- ..." line regardless of findings, and a bare-marker
     # assertion would false-fail against that line even with zero errors -- caught by this scenario
     # itself on the first run.
     Assert-NotMatch "\[plugin-kind\] '" $r.Out '7. correctly placed team + workflow: no [plugin-kind] finding at all'
+    # AND THE CHECK ACTUALLY RAN, which the assertion above cannot tell on its own. Added August 20, 2026
+    # after this scenario PASSED while the gate was dying at check 8 -- a registry pair named a plugin the
+    # fixture floor did not declare, Get-SharedScriptPairs threw, and check 21 never executed. Scenarios
+    # 8 and 9 caught it because they expect a finding; this one reads a dead gate as a clean bill of
+    # health. The coverage line is the only witness, which is why every sibling suite asserts on one.
+    Assert-Match '\[plugin-kind\] checked \d+' $r.Out '7. correctly placed team + workflow: and the check WAS reached -- the pass is not a gate that died upstream'
 
     # --- 8. A 'team-*' plugin whose marketplace source sits under plugins/workflows/ -> reported -------
     $teamBad = @{ Name = 'team-bad'; Source = './plugins/workflows/team-bad' }
-    Set-LintFixturePlugins -Plugins @($TeamAlpha, $WorkflowDavekjohn, $WorkflowDefault, $teamBad)
+    Set-LintFixturePlugins -Plugins @($TeamAlpha, $WorkflowDavekjohn, $WorkflowDefault, $TeamShopify, $teamBad)
     $r = Invoke-Integrity
     Assert-Match "\[plugin-kind\] 'team-bad' is a team by its name but its source is '.*' -- a team belongs under plugins/teams/\." $r.Out "8. misplaced team: 'team-bad' under plugins/workflows/ is reported"
     Assert-NotMatch "\[plugin-kind\] 'team-alpha'" $r.Out '8. misplaced team: the correctly placed team is not also flagged'
@@ -340,7 +359,7 @@ try {
     # --- 9. A plugin named with neither the 'team-' nor the 'workflow-' prefix -> reported, and the ----
     #        message explains WHY the naming half matters (not just that it is wrong).
     $widgetFoo = @{ Name = 'widget-foo'; Source = './plugins/teams/widget-foo' }
-    Set-LintFixturePlugins -Plugins @($TeamAlpha, $WorkflowDavekjohn, $WorkflowDefault, $widgetFoo)
+    Set-LintFixturePlugins -Plugins @($TeamAlpha, $WorkflowDavekjohn, $WorkflowDefault, $TeamShopify, $widgetFoo)
     $r = Invoke-Integrity
     Assert-Match "\[plugin-kind\] 'widget-foo' is neither 'team-\*' nor 'workflow-\*'" $r.Out "9. unprefixed name: 'widget-foo' is reported"
     Assert-Match 'workflow-sessioncheck counts enabled workflows BY THAT PREFIX' $r.Out '9. unprefixed name: the message explains the mechanism the naming half protects'
