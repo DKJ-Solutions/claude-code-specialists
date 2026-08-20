@@ -331,6 +331,55 @@ function Get-ShopifyLivePushMarker { return 'ONLY-THIS-ONE' }
     Assert-True ($c10.Out -match 'second live-theme guard') 'duplicate guard: reported even with no repo-config.ps1 -- the two findings do not gate each other'
     Assert-True (-not ($c10.Out -match 'has not said which theme is live')) 'duplicate guard: while the id finding stays silent there, as it always was'
 
+
+    # --- group 7: the authorised preview-theme delete ---------------------------------------------
+    # Rule 2 became conditional, and every branch of that condition is asserted here. The FIRST case is
+    # the one that matters most: a consumer who never asked for this capability must not receive it on a
+    # plugin update. An unstated seam means unchanged, and unchanged for a delete is 'always denied'.
+    Write-Host "the delete marker -- opt-in, and off until a repo asks" -ForegroundColor Cyan
+
+    # $configured answers the id and nothing else, i.e. every existing consumer.
+    Assert-Equal 2 (Invoke-Guard -Command 'shopify theme delete --theme 999 # ANY-MARKER-AT-ALL' -Root $configured) 'seam unanswered: a delete is refused however the command is decorated -- the capability does not exist'
+    Assert-Equal 2 (Invoke-Guard -Command 'shopify theme delete --theme 999 # THEME-DELETE-AUTHORIZED' -Root $configured) 'seam unanswered: and there is no generic default spelling that works, unlike the push marker'
+
+    # A repo that DOES ask for it.
+    $del = New-FixtureRepo -Label 'del' -ConfigBody @"
+function Get-ShopifyLiveThemeId { return '$LIVE' }
+function Get-ShopifyThemeDeleteMarker { return 'XOXO-THEME-DELETE-AUTHORIZED' }
+"@
+    Assert-Equal 0 (Invoke-Guard -Command 'shopify theme delete --store x.myshopify.com --theme 198933086549 # XOXO-THEME-DELETE-AUTHORIZED' -Root $del) 'seam answered: a spent preview theme with the marker is allowed'
+    Assert-Equal 2 (Invoke-Guard -Command 'shopify theme delete --store x.myshopify.com --theme 198933086549' -Root $del) 'seam answered: the same delete WITHOUT the marker still blocks -- answering the seam does not open deletes generally'
+    Assert-Equal 2 (Invoke-Guard -Command 'shopify theme delete --theme 198933086549 # SOME-OTHER-COMMENT' -Root $del) 'seam answered: an unrelated comment does not authorise'
+    Assert-Equal 0 (Invoke-Guard -Command 'shopify theme delete --theme 1 # xoxo-theme-delete-authorized' -Root $del) 'seam answered: the marker match is case-insensitive, like the push marker'
+
+    # THE ONE NO MARKER REACHES. This is the check that runs before the authorisation path, so its
+    # counter-case is the whole reason the ordering in the hook is not an accident.
+    Assert-Equal 2 (Invoke-Guard -Command "shopify theme delete --theme $LIVE # XOXO-THEME-DELETE-AUTHORIZED" -Root $del) 'the live theme: refused even WITH the marker'
+    Assert-Equal 2 (Invoke-Guard -Command "shopify theme delete --store x.myshopify.com --theme $LIVE" -Root $del) 'the live theme: and without it'
+
+    # ONE MARKER MAY NOT DO TWO JOBS -- neither by being reused across seams, nor by leaking sideways.
+    $same = New-FixtureRepo -Label 'same' -ConfigBody @"
+function Get-ShopifyLiveThemeId { return '$LIVE' }
+function Get-ShopifyLivePushMarker { return 'ONE-MARKER-FOR-BOTH' }
+function Get-ShopifyThemeDeleteMarker { return 'ONE-MARKER-FOR-BOTH' }
+"@
+    Assert-Equal 2 (Invoke-Guard -Command 'shopify theme delete --theme 1 # ONE-MARKER-FOR-BOTH' -Root $same) 'same string for both seams: the delete capability is refused rather than granted -- a routine live-push marker must not double as standing delete authorisation'
+    Assert-Equal 0 (Invoke-Guard -Command "shopify theme push --theme $LIVE --allow-live # ONE-MARKER-FOR-BOTH" -Root $same) 'same string for both seams: while the push it was configured for keeps working'
+
+    # The two markers stay in their own lanes when they are properly distinct.
+    $both = New-FixtureRepo -Label 'both' -ConfigBody @"
+function Get-ShopifyLiveThemeId { return '$LIVE' }
+function Get-ShopifyLivePushMarker { return 'XOXO-LIVE-PUSH-AUTHORIZED' }
+function Get-ShopifyThemeDeleteMarker { return 'XOXO-THEME-DELETE-AUTHORIZED' }
+"@
+    Assert-Equal 2 (Invoke-Guard -Command 'shopify theme delete --theme 1 # XOXO-LIVE-PUSH-AUTHORIZED' -Root $both) 'lanes: the PUSH marker does not authorise a delete'
+    Assert-Equal 2 (Invoke-Guard -Command "shopify theme push --theme $LIVE --allow-live # XOXO-THEME-DELETE-AUTHORIZED" -Root $both) 'lanes: nor the DELETE marker a live push'
+    Assert-Equal 2 (Invoke-Guard -Command 'shopify theme publish --theme 1 # XOXO-THEME-DELETE-AUTHORIZED' -Root $both) 'lanes: and publish stays absolute -- rule 1 has no marker at all'
+
+    # The exemptions and their counter-cases hold for the new branch too.
+    Assert-Equal 0 (Invoke-Guard -Command "cat > CLAUDE.md <<'EOF'${LF}shopify theme delete --theme 1 # XOXO-THEME-DELETE-AUTHORIZED${LF}EOF" -Root $both) 'documenting the authorised delete is still writing, not running'
+    Assert-Equal 2 (Invoke-Guard -Command "cat > notes.md <<'EOF'${LF}harmless${LF}EOF${LF}shopify theme delete --theme $LIVE # XOXO-THEME-DELETE-AUTHORIZED" -Root $both) 'counter-case: a real live-theme delete after a heredoc is still caught'
+    Assert-Equal 0 (Invoke-Guard -Command 'git status && shopify theme delete --theme 42 # XOXO-THEME-DELETE-AUTHORIZED' -Root $both) 'an authorised delete after a harmless command is allowed'
 } finally {
     Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue
 }
