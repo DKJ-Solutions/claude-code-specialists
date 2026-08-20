@@ -1,6 +1,6 @@
 # `team-shopify` — the Shopify add-on team
 
-Three specialists for a Shopify store repo, two skills, and an **operational floor**: the part that is
+Three specialists for a Shopify store repo, three skills, and an **operational floor**: the part that is
 not advice.
 
 | what | who / where |
@@ -9,7 +9,8 @@ not advice.
 | **Sandra** 🛍️ `05-21` | Store Manager — read-only admin reconnaissance and the pre-push checklist |
 | **Steven** 🗂️ `05-22` | Configuration Manager — theme estate, cleanup policy, CLI and auth reference |
 | `start-task` | the skill that opens a task: a branch plus its matching unpublished preview theme |
-| `adopt-shopify-floor` | the skill that **places** the floor in your repo: the guard's seam, a starter `.theme-check.yml`, and the CI workflow over it |
+| `adopt-shopify-floor` | the skill that **places** the floor in your repo: the guard's seams, a starter `.theme-check.yml`, and the CI workflow over it |
+| `sync-main` | the **pre-task sync**: mirror the live theme into the trunk without letting live overwrite what the trunk has done since |
 | `hooks/guard-live-theme.ps1` | **the floor** — a `PreToolUse` guard on the live theme |
 | `hooks/shopify-floor-sessioncheck.ps1` | says when that guard is only half armed, and when a second one is registered beside it |
 
@@ -60,8 +61,8 @@ dangerous. A marker authorises **one** command, visibly, in the transcript.
 
 ## What your repo has to answer
 
-Two optional functions in your own `scripts/repo-config.ps1` — the file `specialists-init` already
-scaffolds:
+Functions in your own `scripts/repo-config.ps1` — the file `specialists-init` already scaffolds. **Two
+belong to the guard**, and one of those is the only one worth answering on day one:
 
 ```powershell
 function Get-ShopifyLiveThemeId    { return '190793613653' }   # shopify theme list names it
@@ -75,10 +76,24 @@ function Get-ShopifyLivePushMarker { return 'SWB-LIVE-PUSH-AUTHORIZED' }
 
 The guard reads them on every command, so a change takes effect immediately; nothing needs restarting.
 
-**You do not have to place that block by hand** — the `adopt-shopify-floor` skill writes it, and takes
-the id as a parameter so the guard is armed in the same move. It also places the two items every Shopify
-consumer of this plugin has otherwise written from scratch: a starter `.theme-check.yml` and the CI
-workflow over it.
+**Five more belong to the pre-task sync** (`sync-main`), and only the store is required beside the theme
+id — the other three have defaults that are right for both existing Shopify consumers:
+
+| function | default | what it decides |
+|---|---|---|
+| `Get-ShopifyStoreDomain` | **required** | the store the sync pulls from. It refuses rather than guessing; the skill's `-Store` gets you through one run. |
+| `Get-ShopifySyncReferencePattern` | `^[Ss]ync` | the `--grep` pattern that recognises a previous sync commit. **Narrow it if your history says so, never widen it:** the floor is the *most recent* match, so a looser pattern can only move it forward and protect fewer files. |
+| `Get-ShopifySyncBranchPrefix` | `sync/live-` | the drift branch's prefix. Yours to set because it has to line up with whatever your PR guardrails and CI exempt. |
+| `Get-ShopifySyncMerges` | `$false` | `$true` opens the PR and merges once CI is green. The default pushes and stops, so somebody *looks* at what third parties changed before it becomes the base of new branches. |
+| `Get-TrunkBranchName` | `main` | the trunk. Not a Shopify seam — the sync simply reads it if your repo has answered it. |
+
+Every one of them is read through `Get-Command`, so **this plugin depends on neither workflow plugin**: a
+repo on `workflow-default`, on `workflow-davekjohn`, or on neither gets identical behaviour.
+
+**You do not have to place any of that by hand** — the `adopt-shopify-floor` skill writes the block, and
+takes the theme id and the store as parameters so both are answered in the same move. It also places the
+two items every Shopify consumer of this plugin has otherwise written from scratch: a starter
+`.theme-check.yml` and the CI workflow over it.
 
 **A placeholder does not count as an answer, on purpose.** `Get-ShopifyLiveThemeId` returning anything
 non-numeric — a `VUL-IN` left in place, most likely — is read by both the guard and the session check as

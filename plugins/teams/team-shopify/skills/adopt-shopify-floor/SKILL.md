@@ -46,6 +46,16 @@ own plugin cache instead, so the easy route is to ask for the skill rather than 
 |---|---|
 | `-Apply` | write the files. Without it the command is a dry run that prints the plan and touches nothing -- the same default `adopt-config` and `adopt-workflow-folder` use. |
 | `-LiveThemeId` | the live theme's **numeric** id. Given, the seam function is written *answered* and the session check goes quiet because the guard is genuinely armed. Omitted, the block is written commented out and the check keeps reporting -- see below for why that is the right way round. Find the id with `shopify theme list --store <your-store>.myshopify.com`; it is the one marked `[live]`. |
+| `-StoreDomain` | the store the **pre-task sync** pulls from, e.g. `your-store.myshopify.com`. Given, `Get-ShopifyStoreDomain` is written *answered* and the [`sync-main`](../sync-main/SKILL.md) skill works on its first run. Omitted, it is written commented out like the theme id, and `sync-main` refuses rather than guessing which store to read. |
+
+**The seam block carries the pre-task sync's answers too** (inbound
+[#787](https://github.com/DaveKJohn/claude-code-specialists/issues/787)). `sync-main` is the higher-risk
+half of the problem the guard covers: a live theme has no locking, so work starts by mirroring live into
+the trunk, and the obvious wholesale implementation overwrites whatever the trunk has done since. Only
+the store is worth answering on day one -- the other three seams
+(`Get-ShopifySyncReferencePattern`, `Get-ShopifySyncBranchPrefix`, `Get-ShopifySyncMerges`) are listed in
+the block with their defaults, which are right for both existing Shopify consumers. Listing them is what
+saves the next reader from having to open the script to learn what is configurable.
 
 ## Why the seam is written as a comment when you do not pass the id
 
