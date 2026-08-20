@@ -431,7 +431,7 @@ if ($deploymentTaken -and $cycleTaken) {
     # mentions the definitions when it blocks you has already let the guess happen.
     if ($impactActive) {
         $range = Get-EntrySignificanceRange
-        Write-Host "  Significance sections written at tier 0. Answer each tier with a score ($($range.Min)-$($range.Max)) or N/A:" -ForegroundColor Cyan
+        Write-Host "  Tier sections written. Answer each tier with a score ($($range.Min)-$($range.Max)) or N/A:" -ForegroundColor Cyan
         Format-EntrySignificanceRubricLines | ForEach-Object { Write-Host $_ -ForegroundColor DarkGray }
         # WHERE the reason goes, by the same argument as the rubric above it (inbound #596): the file leaves
         # one blank line on each side of the score label, so the two places look identical and only the one
