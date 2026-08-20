@@ -23,6 +23,8 @@
 - [x] The integrity fixture's marketplace grows with the registry — the new `team-shopify` pair made
       `Get-SharedScriptPairs` throw inside the synthetic tree and failed 22 unrelated scenarios; the
       fixture's own comment had predicted it. All four integrity suites green: 42 · 75 · 73 · 48
+- [x] `workflow-exclusivity.tests.ps1` — the same fixed floor, one suite over. Its scenario 7 had
+      *passed* on the dead gate, so it now asserts the coverage line too: 24 asserts, 0 fail
 
 ## DEPLOY
 
