@@ -22,6 +22,13 @@ workflow-davekjohn/
   branch/                the two branch files in their reset state, plus the generated templates
 ```
 
+**And one file outside it**, since August 20, 2026 (inbound
+[#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789)):
+
+```text
+.github/workflows/branch-entry.yml   the CI gate that holds every PR to carrying a written entry
+```
+
 ## Run it
 
 ```powershell
@@ -54,6 +61,36 @@ own plugin cache instead, so the easy route is to ask for the skill rather than 
   only its branch dossier lives in the folder there.
 - **A leftover root `branch/` from before the move is yours to remove by hand** -- the scripts read
   only the new location, deliberately without a dual-read fallback.
+
+## The CI gate it places, and the one choice inside it
+
+The branch entry is a convention this plugin ships every reader of, and until August 20, 2026 **nothing
+enforced it**: `open-pr` refuses to push an unwritten entry and `ship-pr` refuses to merge on an
+unresolved step, but both are *local*. A branch pushed by hand, or a PR opened in the GitHub UI, meets
+neither. So both existing consumers wrote a CI gate from scratch against the same convention -- a second
+definition of the format in every repo, free to drift from the fold that reads the first one, and **both
+had already drifted**: each refuses a merge over a missing significance score, which is a refusal this
+workflow deliberately places at the *release cut* instead.
+
+So the gate ships as a script, `check-branch-entry.ps1`, and this command places the six lines that call
+it. It adds no rule of its own -- it calls the same two functions `open-pr` calls -- and it reports the
+significance rather than refusing on it.
+
+**Which branches owe nothing** is a seam: `Get-EntryGateExemptPrefixes` in your `scripts/repo-config.ps1`,
+defaulting to `sync`. A mirror branch carries somebody else's work rather than your repo's, so it has
+nothing to declare -- both consumers reached that answer independently, with nothing recording that it was
+the expected one. An **unknown** prefix is deliberately *not* exempt: a typo would otherwise skip the gate
+in silence.
+
+**The workflow pins `ref: main` rather than a tag, and that is the one choice worth arguing.** A pinned
+gate keeps enforcing the shape it was pinned at -- and the entry's own path has moved twice, so a stale
+pin does not fail loudly, it fails the *wrong way*: refusing branches that do carry an entry at the
+current path. Tracking the tip means the gate follows the convention it enforces. Pin a tag instead if you
+would rather own the bump.
+
+**Making the check *required* is yours.** The file makes it run and report; whether a red gate blocks a
+merge is a branch-protection setting, which is a repo decision rather than something a scaffolder should
+reach into.
 
 ## After the scaffold: one seam to answer, and one to leave alone
 

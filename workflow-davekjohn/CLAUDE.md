@@ -42,11 +42,12 @@ bites only while the workflow is in play does not belong on the always-on path.
   [`CONTRIBUTING.md`](../CONTRIBUTING.md) on conflict**; the root page is the standard workflow that
   holds without the plugin.
 
-## The two gates this workflow adds on top
+## The three gates this workflow adds on top
 
 The repo's own lint and test gates are stated in the [root `CLAUDE.md`](../CLAUDE.md) and run in CI
-whether or not this plugin is installed. The two below arrive **with the workflow**, and both read the
-two files in `branch/`.
+whether or not this plugin is installed. The three below arrive **with the workflow**, and all of them
+read the two files in `branch/`. Two run locally, before the push and before the merge; the third runs in
+CI, and it exists because the first two cannot.
 
 ### The scaffold gate, on the changelog entry itself
 
@@ -91,6 +92,39 @@ The full convention ships with the plugin as
 answers to it stay in [`branch/README.md`](branch/README.md). Since August 14, 2026 (Dave) the
 directory itself sits inside `workflow-davekjohn/`, the workflow's own root folder — the start of
 gathering everything portable in one place at a consumer instead of scattering it through their root.
+
+### The CI gate, because the two above are local
+
+**August 20, 2026** (inbound
+[#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789)). Both gates above live in
+`open-pr` and `ship-pr`, so both are escapable by not using them: a branch pushed by hand, or a PR opened
+in the GitHub UI, meets neither. The convention was therefore enforced by whoever remembered the scripts —
+and a convention that enforces nothing rots quietly, which matters here because `CHANGELOG.md` is the only
+readable answer to "what is merged but not yet released".
+
+[`check-branch-entry.ps1`](../scripts/lint/check-branch-entry.ps1) closes that, and
+[`.github/workflows/branch-entry.yml`](../.github/workflows/branch-entry.yml) is the six lines that call
+it on every PR. **It adds no rule of its own** — it calls the same `Test-BranchChangelogIsFilled` and
+`Get-EntryScaffoldFindings` that `open-pr` calls, so there is one definition of "written" in the system
+rather than a second one in CI.
+
+**Two consumers had already written this gate by hand, and both had drifted from the convention** —
+that is the measurement behind shipping it rather than documenting it. Each refuses a merge over a missing
+significance score, justified in one of them by *"tier 0 can never legitimately stay empty"*, while
+`entry-scaffold-lib.ps1` reads **TIER 0 OWES NOTHING** and Dave placed that refusal at the release cut on
+August 5, 2026, precisely so an author who has not settled a score is not blocked from merging over it. So
+the shipped gate **reports** the significance and names the cut as where the refusal lives. It is simpler
+than the hand-written version, not more complex: `Get-EntryScaffoldFindings` already catches the case those
+gates reached for the score to catch — a freshly scaffolded entry, which carries an H2 and a title and so
+passes any heading test.
+
+**Its own workflow file, not a job in `ci.yml`**, and the trigger is the reason: `ci.yml` also runs on
+`push: branches: [main]`, where the entry sits in its reset state by design after every fold. A job there
+would be red on the trunk after every merge. The script answers the trunk case gracefully as well, but a
+gate should not need that grace to be pointed correctly.
+
+**It is not in the `main` ruleset.** Making a check required is a repo-settings change and therefore
+Dave's, so today it reports on every PR and blocks nothing.
 
 ## How the two direct-on-`main` exceptions actually run
 

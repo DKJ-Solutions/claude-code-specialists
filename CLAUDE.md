@@ -265,12 +265,15 @@ The constitution above, concretely implemented here:
   here was measured there. Moved off this always-on path on August 15, 2026, where it was 9,440 B over
   102 lines: 26% of this document, and the same shape as the release craft moved out the day before.
 
-- **Two more gates arrive with the workflow plugin**, and both read the branch's own two files: the
-  **scaffold gate** refuses to push an entry still carrying the wording `new-branch.ps1` wrote it
-  with, and the **step-list gate** refuses to push *and* to merge while
-  `workflow-davekjohn/branch/branch-cycle.md` has an unresolved step. Their mechanics, escape
-  valves and the measurements behind them are in
-  [`workflow-davekjohn/CLAUDE.md`](workflow-davekjohn/CLAUDE.md#the-two-gates-this-workflow-adds-on-top).
+- **Three more gates arrive with the workflow plugin**, and all of them read the branch's own two files.
+  Two run locally: the **scaffold gate** refuses to push an entry still carrying the wording
+  `new-branch.ps1` wrote it with, and the **step-list gate** refuses to push *and* to merge while
+  `workflow-davekjohn/branch/branch-cycle.md` has an unresolved step. The third runs in **CI**
+  (`.github/workflows/branch-entry.yml` → `check-branch-entry.ps1`) and exists because the first two are
+  escapable by not using the scripts; it re-uses their functions rather than restating the convention, and
+  it reports the significance instead of refusing on it. Their mechanics, escape valves and the
+  measurements behind them are in
+  [`workflow-davekjohn/CLAUDE.md`](workflow-davekjohn/CLAUDE.md#the-three-gates-this-workflow-adds-on-top).
 - **Two deliberate exceptions to "never directly on `main`", each one bounded:**
   1. The **fold commit** after a merge: [`fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)
      folds the entry into `CHANGELOG.md` and clears it, and with `-Commit`/`-Push` makes that commit

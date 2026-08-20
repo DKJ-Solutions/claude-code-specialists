@@ -1,0 +1,39 @@
+# The branch-entry gate: every PR into main carries a WRITTEN changelog entry.
+#
+# WHY A SECOND WORKFLOW AND NOT A JOB IN ci.yml. That one runs on `push: branches: [main]` as well, and
+# on the trunk the entry sits in its empty reset state by design -- the fold puts it back there after
+# every merge. A job of ci.yml would therefore be red on main after every single merge. The trigger is
+# the difference, and a trigger belongs to a workflow rather than to a job.
+#
+# WHY THE HEAD REF IS PASSED EXPLICITLY. A `pull_request` checkout is a detached merge commit, so
+# `git rev-parse --abbrev-ref HEAD` answers 'HEAD' there and the script would have no branch to judge.
+# It refuses rather than guessing, which is why this line is not optional.
+#
+# WINDOWS, LIKE ci.yml, AND FOR THE SAME REASON: the scripts target Windows PowerShell 5.1, so they run
+# under `shell: powershell` (5.1) rather than pwsh.
+#
+# THIS CHECK IS NOT IN THE main RULESET, deliberately. Making a check REQUIRED is a repo-settings change
+# and therefore Dave's, not a script's -- so this reports on every PR and blocks nothing until he says
+# otherwise. The local gates (open-pr refuses to push an unwritten entry, ship-pr refuses to merge with
+# unresolved steps) are what hold today; this closes the hole they cannot: a branch pushed by hand, or a
+# PR opened in the GitHub UI, meets neither of them.
+name: Branch entry
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  branch-entry:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Changelog entry written
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint/check-branch-entry.ps1 -Branch "${{ github.head_ref }}"
+          exit $LASTEXITCODE

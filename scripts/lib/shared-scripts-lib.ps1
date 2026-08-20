@@ -480,6 +480,21 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # The branch-entry CI gate (inbound #789, August 20, 2026). The convention shipped with
+            # nothing enforcing it: open-pr and ship-pr both refuse locally, and a branch pushed by hand
+            # or a PR opened in the GitHub UI meets neither. So both consumers wrote one from scratch --
+            # a second definition of the format in every consumer, and both had already drifted, refusing
+            # a merge over a missing significance score that Dave placed at the release cut instead.
+            #
+            # IT DECLARES NO SKILL, deliberately, which is why there is no Skill field here. Nothing types
+            # this command: a CI workflow runs it. The route to it is documented where a consumer meets it
+            # -- adopt-workflow-folder places the workflow and its skill page explains the gate -- and
+            # check 18 correctly reports it as not covered, exactly as it does for check-script-contract.
+            Name   = 'check-branch-entry'
+            Source = 'scripts\lint\check-branch-entry.ps1'
+            Plugin = 'workflow-davekjohn'
+        },
+        @{
             # The pre-task sync (inbound #787, August 20, 2026). THE HIGHEST-RISK SCRIPT IN A SHOPIFY
             # CONSUMER, and it was written twice by hand before it shipped -- destructively the first
             # time, in both repos. A live theme has no locking and no merge, so work starts by mirroring
