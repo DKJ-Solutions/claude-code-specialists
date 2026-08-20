@@ -103,6 +103,14 @@ $config = & {
 } $repoRoot
 
 $LIVE_ID = ([string]$config.LiveThemeId).Trim()
+# A NON-NUMERIC ANSWER COUNTS AS NO ANSWER, and this is the counter-case to the seam block that
+# adopt-shopify-floor now writes into a consumer's repo-config.ps1. A Shopify theme id is numeric, so
+# anything else is a placeholder somebody left behind -- and accepting one would be worse than an absent
+# function: the SessionStart check reads a non-empty answer as ANSWERED, so a 'VUL-IN' left in place
+# would silence the report while the id half of rule 3 stayed inert. A hole with a comment on it, which
+# is the exact failure this guard's own README warns about. Rejecting it here keeps the two in agreement:
+# unanswered to the guard is unanswered to the check.
+if ($LIVE_ID -and $LIVE_ID -notmatch '^\d+$') { $LIVE_ID = '' }
 # THE DEFAULT MARKER IS A SUFFIX RATHER THAN A FULL STRING, which is what makes this work in both
 # existing consumers without either of them configuring anything: they write
 # 'SWB-LIVE-PUSH-AUTHORIZED' and 'XOXO-LIVE-PUSH-AUTHORIZED', and both end in the default. A repo that

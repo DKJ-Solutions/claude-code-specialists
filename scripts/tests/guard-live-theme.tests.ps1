@@ -26,10 +26,21 @@
          the id half of the live-push rule only exists where the repo answered, the marker default
          accepts what both existing consumers already write, and a configured marker narrows it.
 
+      5. A PLACEHOLDER IS NOT AN ANSWER, and this group is the counter-case for the seam block
+         adopt-shopify-floor writes: a 'VUL-IN' left in place must read as unanswered to the guard AND to
+         the check, or the stub would silence the report while the id half stayed inert. Group 5 is to
+         the seam what group 3 is to the exemptions.
+      6. Two guards doing one job (inbound #777). A consumer who wrote this guard before it shipped now
+         runs both, so the check reports it -- and the three cases that must NOT trip it are asserted
+         beside the one that must: the shipped copy wired by hand, an unrelated PreToolUse hook, and a
+         settings file that does not parse.
+
     Groups 1 to 3 are ported from the reference implementation the reporting consumer offered
     (BWJ-ecommerce/xoxowildhearts, inbound #769), which is where the false-positive lesson was paid
     for. Group 4 and the session-check cases are new here, because the shipped version reads a seam
-    that the single-repo original did not have.
+    that the single-repo original did not have; groups 5 and 6 arrived with the floor's install path
+    (inbound #776 and #777), and the command that places it has its own suite in
+    adopt-shopify-floor.tests.ps1.
 
     Pure ASCII (repo convention for .ps1).
 #>
@@ -241,6 +252,84 @@ function Get-ShopifyLivePushMarker { return 'ONLY-THIS-ONE' }
     $c3 = Invoke-FloorCheck -Root $noConfig
     Assert-Equal 0 $c3.Code 'floor check: exit 0 with no repo-config at all'
     Assert-True (-not ($c3.Out -match '\[ERROR\]')) 'floor check: and silent -- the bootstrap owns that message, not this hook'
+
+    # --- group 5: a PLACEHOLDER is not an answer --------------------------------------------------
+    # THIS IS THE COUNTER-CASE FOR adopt-shopify-floor's SEAM BLOCK. That command writes the block with
+    # a 'VUL-IN' placeholder in it, so "somebody uncommented the line and never filled it in" is a state
+    # a real consumer can reach -- and if a non-empty answer counted, it would silence the report above
+    # while leaving the id half exactly as inert as before. A hole with a comment on it, which is the
+    # failure this plugin's README is built around. Both readers must agree, so both are asserted.
+    Write-Host "a placeholder id -- unanswered to the guard AND to the check" -ForegroundColor Cyan
+    $placeholder = New-FixtureRepo -Label 'placeholder' -ConfigBody "function Get-ShopifyLiveThemeId { return 'VUL-IN' }"
+
+    Assert-Equal 2 (Invoke-Guard -Command 'shopify theme publish --theme 1' -Root $placeholder) 'placeholder id: publish is still refused -- rules 1 and 2 never depended on the seam'
+    Assert-Equal 2 (Invoke-Guard -Command "shopify theme push --theme $LIVE --allow-live" -Root $placeholder) 'placeholder id: an --allow-live push still blocks -- that half is self-declaring'
+    Assert-Equal 0 (Invoke-Guard -Command "shopify theme push --theme $LIVE" -Root $placeholder) 'placeholder id: a push aimed at live BY ID passes, exactly as with no answer at all'
+    # And the one that would be a real regression: the placeholder must not become something the guard
+    # matches on. 'VUL-IN' inside an ordinary command is not an aim at the live theme.
+    Assert-Equal 0 (Invoke-Guard -Command 'shopify theme push --theme 12345 # note: VUL-IN' -Root $placeholder) 'placeholder id: the placeholder text itself is not treated as a theme id'
+
+    $c4 = Invoke-FloorCheck -Root $placeholder
+    Assert-Equal 0 $c4.Code 'floor check: exit 0 on a placeholder answer too'
+    Assert-True ($c4.Out -match '\[ERROR\]') 'floor check: a placeholder is REPORTED -- a non-numeric answer counts as unanswered, so the report is not silenced'
+
+    # --- group 6: two guards doing one job (inbound #777) -----------------------------------------
+    # A repo that wrote its own guard before this one shipped now runs both, because a plugin refresh
+    # registers beside a consumer's file rather than replacing it. The test is precise on purpose: the
+    # plugin registers through its OWN hooks.json, so a PreToolUse command in the consumer's settings
+    # naming this guard is by construction a second one -- unless it reaches into the plugin cache,
+    # which is somebody wiring the shipped copy by hand.
+    Write-Host "the duplicate-guard finding -- and what must NOT trip it" -ForegroundColor Cyan
+    function Set-FixtureSettings {
+        param([string]$Root, [string]$Json, [string]$Rel = '.claude\settings.json')
+        $p = Join-Path $Root $Rel
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $p) | Out-Null
+        [System.IO.File]::WriteAllText($p, $Json, $Utf8NoBom)
+    }
+
+    $dupe = New-FixtureRepo -Label 'dupe' -ConfigBody "function Get-ShopifyLiveThemeId { return '$LIVE' }"
+    Set-FixtureSettings -Root $dupe -Json '{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"powershell -File scripts/maintenance/guard-live-theme.ps1"}]}]}}'
+    $c5 = Invoke-FloorCheck -Root $dupe
+    Assert-Equal 0 $c5.Code 'duplicate guard: exit 0 -- this never blocks a session either'
+    Assert-True ($c5.Out -match '\[ERROR\]') 'duplicate guard: a hand-written guard in the repo settings is reported'
+    Assert-True ($c5.Out -match 'second live-theme guard') 'duplicate guard: and named, so the reader knows which finding this is'
+    Assert-True ($c5.Out -match 'LIVE-PUSH-AUTHORIZED') 'duplicate guard: the report confirms the marker keeps working -- what a converging repo has to know BEFORE deleting its own guard'
+
+    # The shipped copy wired by hand is ONE guard, not two.
+    $viaPlugin = New-FixtureRepo -Label 'viaplugin' -ConfigBody "function Get-ShopifyLiveThemeId { return '$LIVE' }"
+    Set-FixtureSettings -Root $viaPlugin -Json '{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"powershell -File ${CLAUDE_PLUGIN_ROOT}/hooks/guard-live-theme.ps1"}]}]}}'
+    $c6 = Invoke-FloorCheck -Root $viaPlugin
+    Assert-True (-not ($c6.Out -match '\[ERROR\]')) 'duplicate guard: a command reaching the SHIPPED copy is not a second guard'
+
+    # An unrelated PreToolUse hook is not a duplicate either -- the match is on this guard's name.
+    $otherHook = New-FixtureRepo -Label 'otherhook' -ConfigBody "function Get-ShopifyLiveThemeId { return '$LIVE' }"
+    Set-FixtureSettings -Root $otherHook -Json '{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"powershell -File scripts/maintenance/guard-something-else.ps1"}]}]}}'
+    $c7 = Invoke-FloorCheck -Root $otherHook
+    Assert-True (-not ($c7.Out -match '\[ERROR\]')) 'duplicate guard: an unrelated PreToolUse hook is left alone'
+
+    # Unparseable settings must be skipped, not reported: somebody else's broken JSON is somebody
+    # else's message, and a session start must not turn into a complaint about a file we came to read.
+    $badJson = New-FixtureRepo -Label 'badjson' -ConfigBody "function Get-ShopifyLiveThemeId { return '$LIVE' }"
+    Set-FixtureSettings -Root $badJson -Json '{"hooks":{"PreToolUse":[ this is not json'
+    $c8 = Invoke-FloorCheck -Root $badJson
+    Assert-Equal 0 $c8.Code 'duplicate guard: unparseable settings do not break the session start'
+    Assert-True (-not ($c8.Out -match '\[ERROR\]')) 'duplicate guard: and are skipped in silence rather than reported'
+
+    # settings.local.json counts too: it is where a hand-registered hook most often actually lives.
+    $localOnly = New-FixtureRepo -Label 'localonly' -ConfigBody "function Get-ShopifyLiveThemeId { return '$LIVE' }"
+    Set-FixtureSettings -Root $localOnly -Rel '.claude\settings.local.json' -Json '{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"pwsh ./guard-live-theme.ps1"}]}]}}'
+    $c9 = Invoke-FloorCheck -Root $localOnly
+    Assert-True ($c9.Out -match '\[ERROR\]') 'duplicate guard: settings.local.json is read as well'
+    Assert-True ($c9.Out -match 'settings.local.json') 'duplicate guard: and named in the report, so the reader knows which file to edit'
+
+    # BOTH FINDINGS ARE INDEPENDENT, and the earlier no-config exit used to swallow the second one: a
+    # repo can run a hand-written guard without ever having run the bootstrap.
+    $dupeNoConfig = Join-Path $Fixture 'repo-dupe-noconfig'
+    New-Item -ItemType Directory -Force -Path $dupeNoConfig | Out-Null
+    Set-FixtureSettings -Root $dupeNoConfig -Json '{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"powershell -File scripts/maintenance/guard-live-theme.ps1"}]}]}}'
+    $c10 = Invoke-FloorCheck -Root $dupeNoConfig
+    Assert-True ($c10.Out -match 'second live-theme guard') 'duplicate guard: reported even with no repo-config.ps1 -- the two findings do not gate each other'
+    Assert-True (-not ($c10.Out -match 'has not said which theme is live')) 'duplicate guard: while the id finding stays silent there, as it always was'
 
 } finally {
     Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue
