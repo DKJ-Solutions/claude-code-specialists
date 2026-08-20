@@ -38,8 +38,13 @@ does -- it reads from live, writes to git, and stops before the merge. Nothing i
 4. **Pulls the live theme.**
 5. **`git add -A`.** This is a step and not a tidy-up: the Shopify CLI writes each file with the line
    endings **live** holds, live holds both, so files come back reported as modified with **zero changed
-   lines** -- 37 of 712 tracked files, measured in one consumer. Staging costs nothing for exactly those
-   and leaves only real content standing. **Read the drift after this, never off the raw `git status`.**
+   lines** -- 37 of them on one real store theme. Staging costs nothing for exactly those, because there
+   is nothing in them, and it leaves only real content standing. **Read the drift after this, never off
+   the raw `git status`** -- and do not reach for `eol=lf` in `.gitattributes`, which is the obvious fix
+   and makes it permanent. Both halves are in
+   [Steven's manual](../../manuals/05-22-manual.md#the-cli-rewrites-line-endings-and-that-is-a-property-of-the-tool)
+   with the measurements (inbound
+   [#788](https://github.com/DaveKJohn/claude-code-specialists/issues/788)).
 6. **Applies the exclusion rule.** Anything the trunk has touched since the reference point is restored
    to the trunk's version and held out of the sync. It prints what it held back, because that is the half
    a reviewer cannot see from the diff -- the diff shows what came in, not what was kept out.

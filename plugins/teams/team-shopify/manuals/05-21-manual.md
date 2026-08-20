@@ -34,6 +34,14 @@ cover the test goal.
 - **Pre-push checklist** before every push: run `shopify theme list`, confirm the target role is an `unpublished`/`development` theme — **never** the live theme. Only then push.
 - **Never** `shopify theme publish` autonomously. **Never** a `--live` pull outside the explicitly permitted cases (pre-task sync, explicit mirror request, targeted `--only` settings toggle).
 - **Never delete a shared/published theme without confirmation** — with one standing exception: the own preview theme of a branch that just went live, via an exact-name-match script that refuses anything live or not `unpublished`.
+- **Read the drift after a `git add -A`, never off the raw `git status`.** This applies to every pull
+  from live — the pre-task sync and both verification pulls of the live push. The CLI writes each file
+  with the line endings live holds, live holds both, so a pull reports files as modified that nobody
+  modified: measured at 37 files with **zero changed lines** on one real theme. Staging costs nothing
+  for exactly those and leaves only real content standing, which is what the judgement needs. **Do not
+  reach for `eol=lf` in `.gitattributes`** — it is the obvious fix and it makes this permanent. The
+  measurement, and what that file should carry instead, is in
+  [Steven #22](05-22-manual.md#the-cli-rewrites-line-endings-and-that-is-a-property-of-the-tool).
 - **A pull mirrors live verbatim, including existing errors.** A shared live theme is edited by third parties; if a file there is flagged as an error by `shopify theme check`, a sync pull brings it in one-to-one and the CI guardrail can block every PR from that moment on. Treat such a fix as its own, named intervention — don't let it silently ride along on an unrelated feature branch.
 - Theme names must not contain `/` — branch `feat/x` → theme name `feat-x`.
 - The concrete details (the store, the live theme id, the shared theme estate, the markets, and the naming rules) live in the consuming repo's extension.
