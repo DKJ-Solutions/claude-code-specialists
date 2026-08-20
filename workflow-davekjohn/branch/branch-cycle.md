@@ -19,7 +19,10 @@
 
 - [x] `adopt-shopify-floor.tests.ps1` — new, 36 asserts, 0 fail
 - [x] `guard-live-theme.tests.ps1` — groups 5 and 6 added, 69 asserts (from 51), 0 fail
-- [x] `check-plugin-integrity.ps1` — 0 errors (it caught both missing `skills:all` entries first)
+- [x] `check-plugin-integrity.ps1` — 0 errors (it caught both missing skill-list entries first)
+- [x] The integrity fixture's marketplace grows with the registry — the new `team-shopify` pair made
+      `Get-SharedScriptPairs` throw inside the synthetic tree and failed 22 unrelated scenarios; the
+      fixture's own comment had predicted it. All four integrity suites green: 42 · 75 · 73 · 48
 
 ## DEPLOY
 
