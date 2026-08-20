@@ -160,6 +160,7 @@ function New-IntegrityFixture {
     # but it means adding a plugin means adding it here too.
     New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude-plugin') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\teams\team-alpha\.claude-plugin') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\teams\team-shopify\.claude-plugin') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\workflows\workflow-default\.claude-plugin') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\workflows\workflow-davekjohn\.claude-plugin') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude-plugin\marketplace.json'), (@'
@@ -167,6 +168,7 @@ function New-IntegrityFixture {
   "name": "fixture-marketplace",
   "plugins": [
     { "name": "team-alpha",         "source": "./plugins/teams/team-alpha" },
+    { "name": "team-shopify",       "source": "./plugins/teams/team-shopify" },
     { "name": "workflow-default",   "source": "./plugins/workflows/workflow-default" },
     { "name": "workflow-davekjohn", "source": "./plugins/workflows/workflow-davekjohn" }
   ]
@@ -174,6 +176,12 @@ function New-IntegrityFixture {
 '@), $Utf8NoBom)
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-alpha\.claude-plugin\plugin.json'),
         "{ `"name`": `"team-alpha`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
+    # team-shopify joined the registry on August 20, 2026 with adopt-shopify-floor and its copy of the
+    # source-repo guard lib. It is here for exactly the reason the paragraph above gives, and it cost
+    # 22 unrelated failures across this suite's siblings before the list grew with it -- the second
+    # measured instance of that same failure, after workflow-default.
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-shopify\.claude-plugin\plugin.json'),
+        "{ `"name`": `"team-shopify`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\workflows\workflow-default\.claude-plugin\plugin.json'),
         "{ `"name`": `"workflow-default`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\workflows\workflow-davekjohn\.claude-plugin\plugin.json'),
