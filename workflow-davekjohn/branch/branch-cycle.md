@@ -35,7 +35,7 @@
       since this branch adds cross-page references and repoints two stale ones
 - [x] All 45 test suites run locally: 0 failures
 - [~] No new test. The change is prose in four documents; the only machine-read property it touches --
-      the `<!-- skills:all -->` spans and the shipped-skill registry -- is already gated by check 10
+      the generated skill-list spans and the shipped-skill registry -- is already gated by check 10.
 
 ## DEPLOY
 
