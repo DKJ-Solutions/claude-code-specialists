@@ -1,26 +1,11 @@
-# `docs/v4-16-0-timing-total` cycle · 20260820-135606
+# `main` cycle
 
-## PLAN
 
-- [x] Recover every remaining leg from commit, PR and Release timestamps rather than estimating
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
 
-## CREATE
+This file carries the step list of the branch you are on. It is written when a branch is created
+and returns to this state after the merge.
 
-- [x] Add the total and the four legs the first pass could not see
-- [x] Decide how to treat the 58m 53s requester gap — excluded from the total, named beside it, wall
-      clock given once
-- [x] Add the head percentage as a fifth reading, and the v4.15.0 comparison that carries the
-      fixed-cost-per-event claim
-
-## TEST
-
-- [x] Check the arithmetic closes: 7m 36s frozen + 17m 53s tail = 25m 29s, and +58m 53s = 1h 24m 22s
-- [x] Lint + test gates via `open-pr.ps1`
-
-## DEPLOY
-
-See `branch-deployment.md` — that is the part that travels to `main`.
-
-## Where I left off
-
-Both readings added to the merged release note. Ready for the PR.
+_(filled in when a branch is created)_
