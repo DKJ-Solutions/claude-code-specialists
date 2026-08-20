@@ -61,7 +61,7 @@ dangerous. A marker authorises **one** command, visibly, in the transcript.
 
 ## What your repo has to answer
 
-Functions in your own `scripts/repo-config.ps1` — the file `specialists-init` already scaffolds. **Two
+Functions in your own `scripts/repo-config.ps1` — the file `specialists-init` already scaffolds. **Three
 belong to the guard**, and one of those is the only one worth answering on day one:
 
 ```powershell
@@ -73,8 +73,45 @@ function Get-ShopifyLivePushMarker { return 'SWB-LIVE-PUSH-AUTHORIZED' }
 |---|---|
 | `Get-ShopifyLiveThemeId` | the **id half of rule 3 cannot fire**: `--allow-live` still blocks, and a push aimed at live *by id* passes. A real hole, so the session check reports it once per session rather than leaving it silent. |
 | `Get-ShopifyLivePushMarker` | any marker **ending in** `LIVE-PUSH-AUTHORIZED` is accepted — which is what both existing consumers already write (`SWB-…`, `XOXO-…`). Setting it **narrows** to your spelling alone. |
+| `Get-ShopifyThemeDeleteMarker` | **rule 2 stays absolute** — a theme delete is refused and no marker exists that could pass it. That is how the guard behaved before this seam, and an unstated seam has to keep meaning what it meant yesterday. See below. |
 
 The guard reads them on every command, so a change takes effect immediately; nothing needs restarting.
+
+### Letting a session clear away its own spent preview themes
+
+**Opt-in, and off unless you ask for it.** A theme delete is blocked outright by default. A repo whose
+preview themes are created and thrown away by the same workflow can hand that cleanup to a session by
+naming a marker of its own:
+
+```powershell
+function Get-ShopifyThemeDeleteMarker { return 'SWB-THEME-DELETE-AUTHORIZED' }
+```
+
+A delete then needs that exact marker on that exact command — the same shape as the live-push
+authorisation, and for the same reason: it authorises **one** command, visibly, in the transcript.
+
+```sh
+shopify theme delete --store x.myshopify.com --theme 198933086549  # SWB-THEME-DELETE-AUTHORIZED
+```
+
+Three things this deliberately does **not** do:
+
+- **The live theme is refused even with the marker.** That check runs *before* the authorisation path, so
+  no marker reaches past it. Shopify will not delete a published theme either — this is the belt to that
+  braces, and it is the one outcome nothing else in the hook could undo.
+- **It does not open deletes generally.** Answering the seam changes nothing about a delete command that
+  does not carry the marker.
+- **One marker may not do two jobs.** Answer this with the *same* string as `Get-ShopifyLivePushMarker`
+  and the delete capability stays **off**. A live-push marker gets written as a matter of routine — it is
+  in the step list — so accepting it here would turn every documented live push into standing
+  authorisation to delete. It fails safe: the cost of the collision is one word of config, the cost of
+  allowing it is a theme.
+
+**Why the default is not simply "allow anything that is not live".** A real Shopify estate is not just the
+live theme and this week's preview. It carries dated backups, themes named `DO NOT DELETE`, and abandoned
+work from previous agencies — measured on a live store in August 2026: nineteen themes, of which one was
+a current preview. Nothing in a command distinguishes a spent preview from any of the rest, so the marker
+is what makes the deletion deliberate; being merely non-live is not enough.
 
 **Five more belong to the pre-task sync** (`sync-main`), and only the store is required beside the theme
 id — the other three have defaults that are right for both existing Shopify consumers:
