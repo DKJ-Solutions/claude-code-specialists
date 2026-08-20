@@ -342,6 +342,72 @@ try {
     Assert-Match 'Get-ReleasePageTheme' $b12.Out 'hostile palette: each drop is warned about, naming the function'
     Assert-Match "'--accent'" $b12.Out 'hostile palette: and naming the key, so a silently ignored setting is impossible'
 
+    # --- 13. The index is the page, and it is static (the design pass, inbound #759) --------------
+    # THE SUITE SURVIVED THE REDESIGN UNTOUCHED, which is the reason this block exists. Every assert
+    # above reads the DATA -- order, dates, types, the escaping -- so replacing a <select> picker with
+    # a collapsible index changed nothing any of them could see. A design decision no test can fail is
+    # a design decision the next change quietly reverts.
+    Write-Host "build -- the index is one collapsed row per release, built server-side" -ForegroundColor Cyan
+    $r13 = New-FixtureRepo -Label 'index'
+    $b13 = Invoke-Build -Root $r13
+    Assert-Equal 0 $b13.Code 'index: exit 0'
+    $p13 = Get-PageData -PagePath (Join-Path $r13 'releases\page\release-notes.html')
+
+    # ONE ROW PER RELEASE WITH A NOTE, and the fixture has two of the four in its history table.
+    Assert-Equal 2 ([regex]::Matches($p13.Html, '<details class="fold"').Count) 'index: one details row per release carrying a note'
+    Assert-True ($p13.Html -match '<details class="fold" id="v2\.2\.0">') 'index: the id is the version verbatim, which is what a deep link in somebody hands has to match'
+
+    # ALL OF THEM CLOSED. This was the reference edition's own last correction -- four expanded notes
+    # at the top buried the other thirty-six -- so it is asserted rather than left to a default.
+    Assert-Equal 0 ([regex]::Matches($p13.Html, '<details[^>]*\sopen').Count) 'index: every row starts CLOSED'
+
+    # THE ROW IS STATIC HTML, which is the whole point: it reads with JavaScript off. Version, title
+    # and date are in the markup rather than in the data block alone.
+    $summary = ([regex]::Match($p13.Html, '(?s)<details class="fold" id="v2\.2\.0">.*?</summary>')).Value
+    Assert-True ($summary -match '<span class="sv">v2\.2\.0</span>') 'index: the row carries the version as markup'
+    Assert-True ($summary -match 'The live push moved to a new stage') 'index: and the title'
+    Assert-True ($summary -match '<span class="sd">14 Aug 2026</span>') 'index: and the date, REFORMATTED from the table ISO for a reader who is not the team'
+
+    # AT MOST ONE CHIP PER ROW: live where the table marks it, the bump type otherwise, never both.
+    Assert-Equal 1 ([regex]::Matches($summary, '<span class="chip').Count) 'index: exactly one chip on a non-live row'
+    Assert-True ($summary -match '<span class="chip">Minor</span>') 'index: and it is the bump type, since this row is not the live one'
+    $liveRow = ([regex]::Match($p13.Html, '(?s)<details class="fold" id="v2\.0\.0">.*?</summary>')).Value
+    Assert-Equal 1 ([regex]::Matches($liveRow, '<span class="chip').Count) 'index: exactly one chip on the live row too'
+    Assert-True ($liveRow -match '<span class="chip accent">live</span>') 'index: and there it is the live marker, which is the fact a reader scans for'
+
+    # THE BODY IS EMPTY IN THE MARKUP and is filled by the renderer on first open. Asserted because it
+    # is the half-measure this design states out loud: the index survives without JavaScript, the
+    # prose does not.
+    Assert-True ($p13.Html -match '<article data-version="2\.2\.0"></article>') 'index: the note body is an empty article the renderer fills on open'
+    Assert-True ($p13.Html -match '(?s)<noscript>.*?index below reads without JavaScript') 'index: and the page SAYS so, rather than leaving an empty panel to be read as a failure'
+
+    # THE PICKER IS GONE. Named explicitly, because "one release at a time behind a select" is the
+    # thing being replaced and a half-reverted redesign would leave both.
+    # MEASURED WITH THE COMMENTS STRIPPED, because the template's own doc comment names the '<select>'
+    # it replaced -- mention versus use, for the third time in this page's history (the palette block
+    # and the ':root' count were the other two). A check that cannot tell a document discussing a
+    # thing from a document containing it accuses the explanation.
+    $markup13 = [regex]::Replace($p13.Html, '(?s)<!--.*?-->', '')
+    Assert-True (-not ($markup13 -match '<select')) 'index: no picker survives -- the list IS the index'
+    Assert-True (-not ($markup13 -match 'id="picker"')) 'index: nor its controller hook'
+    Assert-True ($p13.Html -match '<select') 'index: while the doc comment DOES still explain what was replaced -- the strip above is the reason this pair can be strict'
+
+    # AND THE DATA BLOCK IS STILL THERE, carrying the bodies. The index being static does not mean the
+    # page stopped needing the notes.
+    Assert-Equal 2 $p13.Data.documentCount 'index: the data block still carries both notes for the renderer'
+
+    # A DATE THE SCRIPT CANNOT PARSE IS PASSED THROUGH rather than guessed at -- a repo may write its
+    # history table in a form this script has never seen, and inventing a date is worse than showing
+    # theirs.
+    $oddDate = New-FixtureRepo -Label 'odddate'
+    $histPath = Join-Path $oddDate 'releases\README.md'
+    $hist = [System.IO.File]::ReadAllText($histPath, [System.Text.Encoding]::UTF8).Replace('2026-08-14', '14 thermidor')
+    [System.IO.File]::WriteAllText($histPath, $hist, $Utf8NoBom)
+    $b13b = Invoke-Build -Root $oddDate
+    Assert-Equal 0 $b13b.Code 'odd date: the build does not fail over a date it cannot parse'
+    $p13b = Get-PageData -PagePath (Join-Path $oddDate 'releases\page\release-notes.html')
+    Assert-True ($p13b.Html -match '<span class="sd">14 thermidor</span>') 'odd date: and shows the repo its own value instead of inventing one'
+
 } finally {
     Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue
 }
