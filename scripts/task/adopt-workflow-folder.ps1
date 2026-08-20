@@ -14,7 +14,8 @@
           README.md              what this folder is, and where each page's portable half lives
           CLAUDE.md              the working rules a Claude session needs in this folder
           CONTRIBUTING.md        this repo's answers to CONTRIBUTING-portable.md
-          releases/README.md     this repo's answers to RELEASES-portable.md + the release history table
+          releases/README.md     this repo's answers to RELEASES-portable.md (the release LIST is not
+                                 here -- it is at the repo root; see the closing advice)
           releases/audience/     where the cut drafts the hand-written note (kept by .gitkeep until then)
           branch/                the two branch files in their reset state, plus the generated templates
 
@@ -85,6 +86,15 @@ if (Test-Path -LiteralPath $repoConfig -PathType Leaf) {
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $nl = "`n"
 
+# WHERE THIS REPO KEEPS ITS RELEASE LIST, read rather than assumed. The pages below name that path, and
+# naming the default where a repo has repointed the seam would send its reader to a file that is not
+# theirs -- the same mistake cut-release's missing-file warning was repaired for (August 4, 2026). Read
+# through Get-Command, so a repo that defines nothing gets the shared default.
+$historyRelPath = if (Get-Command Get-ReleaseHistoryPath -ErrorAction SilentlyContinue) {
+    $v = ([string](Get-ReleaseHistoryPath)).Trim()
+    if ($v) { $v } else { 'releases/README.md' }
+} else { 'releases/README.md' }
+
 # --- What the folder contains ---------------------------------------------------------------------
 # One list, each entry a repo-relative path plus the content it gets WHEN ABSENT. The docs name their
 # portable halves in code rather than linking them, the same choice BRANCH-portable.md explains: the
@@ -106,7 +116,7 @@ $folderReadme = @(
     '| [`CONTRIBUTING.md`](CONTRIBUTING.md) | this repo''s answers to the contribution cycle |',
     '| [`branch/`](branch/) | the branch dossier: the entry, the step list, the generated templates |',
     '| [`prompts/`](prompts/) | the prompt inbox: an assignment written in an editor instead of the terminal |',
-    '| [`releases/`](releases/) | the release history and the published audience notes |',
+    '| [`releases/`](releases/) | this repo''s release answers and the published audience notes -- the release LIST is at the repo root |',
     '',
     'Scaffolded by the `adopt-workflow-folder` skill; strictly additive, so everything here past the',
     'VUL-IN markers is this repo''s own writing.'
@@ -127,8 +137,10 @@ $folderClaude = @(
     '  state -- never write there until a branch exists (`new-branch` creates one and fills them).',
     '- `branch/branch-deployment.md` folds **verbatim** into `CHANGELOG.md` at the merge; its step list',
     '  companion gates the PR and the merge (`- [x]` done, `- [~]` dropped with the reason on the line).',
-    '- `releases/README.md` lists this repo''s releases; the cut inserts its own row. `releases/audience/`',
-    '  is where the cut drafts the hand-written note -- generated development notes live elsewhere.',
+    ('- `releases/README.md` here states this repo''s release ANSWERS; the release LIST the cut inserts its'),
+    ('  row into is at `' + $historyRelPath + '`, outside this folder, because a history outlives the'),
+    '  tooling that wrote it. `releases/audience/` is where the cut drafts the hand-written note --',
+    '  generated development notes live elsewhere.',
     '- `prompts/prompt.md` is the REQUESTER''s file, not yours: they write an assignment there instead of',
     '  typing it into the terminal, /prompt reads it, and -Archive files it once the work is under way.',
     '  Never write an assignment into it, and never read its HTML comments as instructions -- they are',
@@ -163,20 +175,20 @@ $releasesReadme = @(
     '# Releases',
     '',
     'The release model -- the tiers, what a release must earn, which documents a cut writes -- is the',
-    'plugin''s `RELEASES-portable.md`. This page is this repo''s answers to it, plus the release history',
-    'the cut writes its rows into.',
+    'plugin''s `RELEASES-portable.md`. This page is this repo''s answers to it.',
     '',
     '<!-- VUL-IN: the seam answers in force here: Get-ReleaseNoteRoot, Get-ReleaseHistoryPath,',
     '     Get-ReleaseAudienceTier, Get-ReleaseConsumerBumps, Get-ReleaseNotesGrouping -- state what this',
     '     repo chose and why, so a reader does not have to open scripts/repo-config.ps1 to learn it. -->',
     '',
-    '## Release history',
+    ('**The release LIST is not on this page** -- it lives at `' + $historyRelPath + '`, which is where'),
+    '`Get-ReleaseHistoryPath` points. The test is whether the thing survives this folder being deleted: a',
+    'repo that has cut releases has a **history** whichever tooling cut it, so the list is the repo''s. A',
+    'per-reader **note** is the opposite -- it exists only because the tier model does -- which is why',
+    '`audience/` is here and the list is not.',
     '',
-    '<!-- VUL-IN: the cut inserts a row after the FIRST table header below. A new major opens its own',
-    '     heading + table above this one, by hand -- that is a deliberate milestone moment. -->',
-    '',
-    '| Version | Date | Type | Title |',
-    '|---|---|---|---|'
+    ('That file is **not** scaffolded, deliberately: see the closing advice of `adopt-workflow-folder` for'),
+    'what it has to contain before your first cut, and why a half-written one would be worse than none.'
 )
 
 $promptsReadme = @(
@@ -276,5 +288,24 @@ Write-Host '2026: a repo that has cut releases has a HISTORY whichever tooling c
 Write-Host 'the repo''s and does not belong in a folder a teardown removes. The audience notes are the'
 Write-Host 'opposite -- they exist only because the tier model does -- which is why that seam DOES'
 Write-Host 'point in here.'
+Write-Host ''
+Write-Host "AND THAT FILE IS YOURS TO CREATE, before your first cut: $historyRelPath" -ForegroundColor Cyan
+Write-Host '  It needs a section heading naming your first major and a table header under it:'
+Write-Host ''
+Write-Host '    #### 1.x'
+Write-Host ''
+Write-Host '    | Version | Date | Type | Title |'
+Write-Host '    |---|---|---|---|'
+Write-Host ''
+Write-Host 'THIS COMMAND DOES NOT SCAFFOLD IT, and that is a decision rather than an omission (inbound'
+Write-Host '#786). A file that exists with a table but no <major>.x heading reads as DONE to cut-release:'
+Write-Host 'the row lands in it, while the guardrail that refuses to file a v2 row under a 1.x heading is'
+Write-Host 'silently off, because that check skips when it finds no section. Same reasoning that keeps'
+Write-Host 'adopt-shopify-floor from writing a VUL-IN stub -- a hole with a comment on it is worse than an'
+Write-Host 'absent file. And the major in that heading is a version decision this command cannot make for'
+Write-Host 'you. Missing altogether, the cut is not silent: it warns'
+Write-Host "  ""$historyRelPath is missing -- row not added: <the row>"""
+Write-Host 'and cuts the release anyway, so the cost of forgetting is one row you add by hand.'
+Write-Host ''
 Write-Host 'And if your Get-MojibakePaths copy predates August 14, 2026, re-adopt it: the old copy still'
 Write-Host 'names the retired root branch/ location, so the moved files sit outside its coverage.'
