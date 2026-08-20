@@ -52,13 +52,14 @@ does it now, beside a placeholder stamp no real file can carry.
 `new-branch` already writes this shape into `branch-deployment.md`, so on a fresh branch you are filling
 in a form rather than starting from a blank page.
 
-**The file it writes is bare** — the headings, the two fields it fills in itself, and nothing else. The
-guidance lives in your `workflow-davekjohn/branch/templates/`, where every field carries an HTML comment saying what a good
-answer looks like. That is what those copies are for: the file you type in is the questions and your
-answers, and the reference is one directory away.
+**The file it writes is bare** — the section headings, the two answers it can supply itself, and nothing
+else. The guidance lives in your `workflow-davekjohn/branch/templates/`, where every field carries an HTML
+comment saying what a good answer looks like. That is what those copies are for: the file you type in is
+the questions and your answers, and the reference is one directory away.
 
-**What `new-branch` fills in for you** is the heading and the branch type (the prefix of the branch name).
-What is left for you is the description, the body, and the Significance sections.
+**What `new-branch` fills in for you** is the heading — which names the branch, so the type is already
+there in its prefix — and the PR title you gave it at `-Title`. What is left for you is the reason and the
+score under each tier the file carries.
 
 The **creation stamp is not here** — it is in `branch-cycle.md`'s heading, because that is the document the
 moment belongs to: created with the branch, reset with the merge. This file states what is being
@@ -68,15 +69,23 @@ delivered, and the date a delivery has is the one the fold writes when it lands.
 deployment `` is what this file is, and *what changed* is the first section under it. Both branch files carry
 that heading, which is also how the fold finds the branch it needs to look the PR up by.
 
-**That first section is `Branch title`, and it is also the PR title** (Dave, August 7, 2026;
+**The PR title is the first line of the `Pull Request` section** (Dave, August 7, 2026;
 [#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506)). `open-pr` composes the PR title
-as `<branch type>: <this section>` rather than taking one on the command line, so the sentence is written
+as `<branch type>: <that line>` rather than taking one on the command line, so the sentence is written
 once — at `new-branch -Title` — and what the PR is called, what `CHANGELOG.md` says and what the release
 documents carry are the same words by construction. Write it **without** a `feat:`/`fix:`/`docs:` prefix:
-the branch name already states the type and `open-pr` puts it in front. The section was called
-`Branch description` for a day; that name is still read, so a branch created under it folds unharmed.
+the branch name already states the type and `open-pr` puts it in front.
 
-**Two sections are in the file: tier 0, and the one audience tier this repo has.** Tier 0 can always be
+**It used to be a section of its own, and both homes are still read.** `Get-EntryPrTitle` owns that answer:
+a section headed `Branch title` — `Branch description` before it — wins wherever one is present, and
+otherwise the title is the `Pull Request` section's first line, skipping the `Plugins:` line and the
+`[PR #N]` footer that the fold appends underneath it. So `CHANGELOG.md`, every release document and any
+branch still in flight under the older shape fold unharmed. **Ask the seams rather than this page** for
+which sections exist today: `Get-EntryWrittenSectionKeys` is what a writer emits,
+`Get-EntrySectionHeadings` gives each one's heading text, and `Get-EntrySectionRetiredNames` the names that
+are recognised but must never be written again. Recognise both, write one.
+
+**Two tiers are asked about: tier 0, and the one audience tier this repo has.** Tier 0 can always be
 filled in — every change matters to the people who maintain this repo, if only a little. For the audience
 tier the answer may well be *"this reaches nobody here"*, and you say so:
 
@@ -296,7 +305,7 @@ file — and that is the reason it was chosen when the file did carry an entry's
    [`CLAUDE.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/CLAUDE.md#claude-code-specialistss-safety-implementation)).
    The convention is cheap to follow and the failure is self-correcting: write it as a step and the gate
    stops you.
-6. **Fill in the Significance sections before the PR.** How far the change reaches decides which release
+6. **Fill in every tier the entry carries before the PR.** How far the change reaches decides which release
    documents the entry appears in; what it weighs there decides where in each of them it sits — see
    [the contribution cycle](CONTRIBUTING-portable.md#significance--two-questions-in-one-section).
 7. **Never edit `CHANGELOG.md` from a branch.** Every branch would be editing the same region of the
@@ -319,8 +328,8 @@ The branch name it needs for the PR lookup comes from the branch files' own head
 longer carries it, which is why the branch is named in the document rather than only in the scaffolder's
 head.
 
-**What lands in `CHANGELOG.md` is this file as it stands** — the branch heading, the description, the ID,
-the type, the body and the Significance sections. That is a deliberate choice by Dave (August 6, 2026),
+**What lands in `CHANGELOG.md` is this file as it stands** — the branch heading and every section under
+it, answers and all. That is a deliberate choice by Dave (August 6, 2026),
 taken over the alternative he was offered: a fold that reads the dossier and emits a slimmer block. He
 declined it, and the reason holds up — a fold that rewrote the entry would be a *second* definition of the
 entry format living inside the fold, which is the drift this repo has already paid for in the fence
