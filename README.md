@@ -15,7 +15,7 @@ keeping its own copies, and enables or disables **per plugin** which teams and w
 
 | I want to… | Go to |
 |---|---|
-| **connect my own repo — just the commands** | **[INSTALL.md, the quickstart half](INSTALL.md#quickstart--the-commands-and-nothing-else)** — four steps, the commands and nothing else, linking down for every caveat. |
+| **connect my own repo — just the commands** | **[INSTALL.md, the quickstart half](INSTALL.md#quickstart--the-commands-and-nothing-else)** — five steps, the commands and nothing else, linking down for every caveat. |
 | **connect my own repo — and know why** | **[INSTALL.md, the adoption half](INSTALL.md#adoption--how-to-connect-your-repo)** — the full, measurement-backed adoption manual for someone who did not build this, ~47 min (August 6, 2026). Read its *Before you start* section first if the machine is new or has adopted this family before. |
 | **disconnect it again** | [UNINSTALL.md](UNINSTALL.md) — the install page's mirror: the repo teardown and the machine-side removal, in the order they have to happen. |
 | **I already adopted this, under the old plugin names** | [INSTALL.md, migrating from the old plugin names](INSTALL.md#migrating-from-the-old-plugin-names) — a third procedure, neither the quickstart nor first-time adoption: the old ids (`specialists@claude-code-specialists` and its siblings) mapped onto the new teams and workflow. |
@@ -316,7 +316,7 @@ machine-wide `user` install instead, and without the refresh it can serve an *ol
 still report success (see [Versioning](#versioning)). The canonical enable-a-plugin walkthrough (the
 settings snippet, the cache refresh, the per-plugin install, the restart, the install-record
 self-check, running the bootstrap skill) is in
-[INSTALL.md](INSTALL.md#adoption--how-to-connect-your-repo) — four steps, for those who
+[INSTALL.md](INSTALL.md#adoption--how-to-connect-your-repo) — five steps, for those who
 didn't build the system, with its
 [quickstart half](INSTALL.md#quickstart--the-commands-and-nothing-else) as the commands-only
 front door; the way back out is its mirror,
@@ -705,7 +705,7 @@ skill counters `/reload-plugins`/`/reload-skills` print are not reliable evidenc
 ## Adoption: the bootstrap path
 
 > **New here?** The shareable beginner route is
-> [INSTALL.md](INSTALL.md#adoption--how-to-connect-your-repo) — get connected in four
+> [INSTALL.md](INSTALL.md#adoption--how-to-connect-your-repo) — get connected in five
 > steps, for those who didn't build the system, with its
 > [quickstart half](INSTALL.md#quickstart--the-commands-and-nothing-else) as the
 > commands-only front door and [UNINSTALL.md](UNINSTALL.md) as its mirror for the way back out. Below
@@ -804,6 +804,13 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > page that had already announced three steps — while it is in fact the largest step and the one where
   > the system starts being useful. That page was renamed `QUICKSTART.md` → `ADOPTION.md` in the same
   > change, for the matching reason: the label promised a size the content never had.
+  >
+  > **And it moved from three to four on August 20, 2026** (inbound
+  > [#784](https://github.com/DaveKJohn/claude-code-specialists/issues/784)) — running each enabled
+  > plugin's `adopt-*` skill became a step of its own, because a consumer cannot infer a skill's
+  > existence from a plugin's presence and was meeting the rest of their adoption one session-check
+  > `[ERROR]` at a time. The install page's quickstart is **five**, one more, since its Step 1 is the
+  > install this page's step 0 covers.
   >
   > **It was five until August 1, 2026**, when #329 made the first restart an act of its own on all three
   > pages at once. Folding it into act 1 would have kept the number at five, and folding it into another
@@ -1214,7 +1221,7 @@ which is what [The seam, specified](#the-seam-specified) is for.
 ## Want to know more?
 
 - **Connecting your own repo?** Follow
-  [INSTALL.md](INSTALL.md#adoption--how-to-connect-your-repo) — connect in four steps, for those
+  [INSTALL.md](INSTALL.md#adoption--how-to-connect-your-repo) — connect in five steps, for those
   who didn't build the system, or its
   [quickstart half](INSTALL.md#quickstart--the-commands-and-nothing-else) if you only want the
   commands.

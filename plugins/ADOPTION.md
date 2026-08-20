@@ -16,10 +16,10 @@ is not on this page. It lives in the release record:
 [`releases/README.md`](../releases/README.md) indexes every version with the changes
 behind it. This page tells you what to do; that one tells you why it changed.
 
-> **Budget most of the time for the last step.** The bootstrap places the whole seam in seconds. Step 3
-> — writing your roster and filling your lenses — is writing, and on a repo of ordinary size it is
-> closer to half a day than to a command. That is not a warning about this page being slow; it is where
-> the value is.
+> **Budget most of the time for the last step.** The bootstrap places the whole seam in seconds and the
+> adopt skills of step 3 are minutes. Step 4 — writing your roster and filling your lenses — is writing,
+> and on a repo of ordinary size it is closer to half a day than to a command. That is not a warning
+> about this page being slow; it is where the value is.
 
 ## Before you begin
 
@@ -57,15 +57,31 @@ changelog and release method as skills plus scripts (`new-branch`, `open-pr`, `s
 default settings block enables, and it is the one to leave enabled** unless you deliberately want
 `workflow-davekjohn`'s method instead. Two consequences worth knowing before you switch to it:
 
-- **Switching onto it later is a plain enable + re-run of `specialists-init`**, which then adds the
-  config it needs. Nothing has to be undone first.
+- **Switching onto it later is an enable, a *disable*, and a re-run of `specialists-init`** — which then
+  adds the config it needs. **One thing does have to be undone, in the same edit:** set the outgoing
+  workflow to `false` in `.claude/settings.json`. Exactly one workflow may hold the slot, and
+  `team-alpha`'s `workflow-sessioncheck` hook reports `[ERROR] 2 workflows are enabled at once` when two
+  do — because two workflows answer the same questions differently and nothing tells the specialists
+  which answer is yours. **The `[ERROR]` arrives at the *next* session start**, which is one step after
+  the commit that switched: so the wrong state gets committed, pushed and reviewed before anything
+  complains. **Disabling is not uninstalling** — the plugin stays on the machine and switching back is
+  the same one-line edit in reverse.
 - **Enabling it makes your repo owe it two files** — `scripts/repo-config.ps1` (repo name, lint gate)
   and `scripts/lib/branch-info.ps1` (your branch-prefix table). `specialists-init` scaffolds both, and a
-  session check tells you if a function is missing. On `workflow-default` you are asked for neither —
-  it reads your repo instead of asking you to configure it.
+  session check tells you if a function is missing; **answering them is step 3**, below. On
+  `workflow-default` you are asked for neither — it reads your repo instead of asking you to configure
+  it.
+
+> **The first bullet said "Nothing has to be undone first" until August 20, 2026, and it was false**
+> (inbound [#785](https://github.com/DaveKJohn/claude-code-specialists/issues/785)). The check that
+> falsifies it ships in the same marketplace, and both [INSTALL.md](../INSTALL.md) and this page
+> correctly say elsewhere that exactly one workflow may be enabled — the one place describing the
+> *transition* told the reader the opposite. A consumer that followed it literally enabled the new
+> workflow, left the old one at `true`, committed that, and met the standing `[ERROR]` at the restart
+> that was meant to *verify* the adoption.
 
 
-## The three steps
+## The four steps
 
 **Step 1 — run the bootstrap skill.** In the new session, invoke `specialists-init`. It sets up —
 purely additively, without overwriting anything — the **lens-only** persona lenses (including
@@ -133,8 +149,48 @@ those repos write into their own `CLAUDE.md`, not something this plugin ships. U
 step told you to look for `🧭 Chris — intake & routing`, which no bootstrapped repo emits: a
 verification a fresh consumer could not pass, on the step that exists to prove the install worked.
 
-**Step 3 — write the roster and fill the lenses.** This is the step where the system starts being
-useful, and it is by a wide margin the largest one. The two steps above give you a team that knows its craft
+**Step 3 — run the adopt skill of every plugin you enabled.** Step 1 places the seam; it does not answer
+the questions the *other* plugins ask of your repo, and **an install writes nothing into a repo at all** —
+it is a clone into the plugin cache. Every plugin that owns repo state ships its own `adopt-*` skill to
+close that gap, and until you run it, a session check reports what is missing at every session start.
+The set as of this release:
+
+| skill | shipped by | what your repo lacks without it | what reports it |
+|---|---|---|---|
+| `adopt-config` | `workflow-davekjohn` | the seam values that state the shared way of working — step 1 *scaffolds* `scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1`, this answers them | `script-contract-sessioncheck` |
+| `adopt-workflow-folder` | `workflow-davekjohn` | `workflow-davekjohn/` itself — the only location the shared scripts read the branch dossier and the release documents from | `script-contract-sessioncheck` |
+| `adopt-shopify-floor` | `team-shopify` | the live-theme guard's id half, a starter `.theme-check.yml`, and the CI gate that runs it | `shopify-floor-sessioncheck` |
+
+**Enumerate it from your own slash list rather than from this table.** A plugin added after this release
+brings its own adopt skill, and the table cannot know about it; the rule is what does not go stale —
+*every plugin you enabled that owns repo state ships an `adopt-*` skill, and you owe it one run.* Your
+slash list holds exactly the ones your enabled plugins ship, namespaced as `<plugin>:adopt-*`, so it
+answers the question for your repo rather than for the repo this page was written in. `team-alpha` is the
+exception that shows the shape: its adopt skill **is** `specialists-init`, which is step 1.
+
+**All of them are additive and a dry run by default** — each prints exactly what it would do and writes
+nothing until you add `-Apply`, so reading the plan first costs you nothing and none of them can
+overwrite work of yours. Two of the three **append to `scripts/repo-config.ps1` and need it to exist**,
+which is what step 1 placed. And this step is yours whichever channel the plugins arrived on: an adopt
+skill writes into *your repo*, not onto the machine, so a centrally published install does not cover it.
+
+**It is minutes, and it deliberately sits before the largest step.** Doing it now clears the session
+checks that would otherwise sit red through the whole of step 4 — and a reader who cannot tell a standing
+`[ERROR]` from a mistake of their own learns to scroll past the session check, which is the failure this
+family warns about everywhere else: *a check that fires every time is the check nobody reads on the day
+it is right.*
+
+> **This step did not exist until August 20, 2026, and the page named none of these skills** (inbound
+> [#784](https://github.com/DaveKJohn/claude-code-specialists/issues/784)). The consumer that reported it
+> worked through the three steps as written and then spent a second day on follow-up rounds, each one
+> triggered by a session-check `[ERROR]` reporting something this page never mentioned — all of it
+> discoverable up front, none of it discovered up front. The shape was the defect rather than the
+> wording: the page described a one-plugin world, while a real install is `specialists-init` **plus one
+> adopt step per enabled plugin that owns repo state**. A consumer cannot infer a skill's existence from
+> a plugin's presence, so only this page can say it.
+
+**Step 4 — write the roster and fill the lenses.** This is the step where the system starts being
+useful, and it is by a wide margin the largest one. The three steps above give you a team that knows its craft
 and nothing about your repo; the lenses in the seam (`.claude/specialists/lenses/`) are where you say
 what each specialist serves *here*. An unfilled lens does nothing — it is a scaffold with a `VUL-IN`
 slot, not a default.
@@ -153,7 +209,8 @@ Two things reliably surface in this step and are not caused by it, so plan for t
 diagnose them: a `.gitignore` that excludes `.claude/` and therefore the whole seam — check that
 before you write anything, because every gate stays green while your lenses are untracked — and a
 `scripts/repo-config.ps1` older than the current script contract (`Get-RosterPath`,
-`Get-RosterIgnoredIds`), which `scripts/sync/check-script-contract.ps1` reports for you.
+`Get-RosterIgnoredIds`), which `scripts/sync/check-script-contract.ps1` reports for you and step 3's
+`adopt-config` is what answers.
 
 The worker specialists can be invoked directly as `@team-alpha:<name>` from the moment Step 2 is
 done — with an empty lens they simply answer out of their portable playbook.

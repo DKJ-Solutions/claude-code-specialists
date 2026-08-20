@@ -19,7 +19,8 @@
 ## Quickstart — the commands, and nothing else
 
 **This half is the short one.** Two settings keys, five commands (the default now enables and installs
-two plugins, not one), one verification query, two restarts. Every caveat, every measurement and every
+two plugins, not one), one verification query, two restarts, and one adopt run per plugin that owns repo
+state. Every caveat, every measurement and every
 failure mode behind them lives in
 **[Adoption](#adoption--how-to-connect-your-repo)**, the second half of this page — the full manual,
 which this half is the summary of.
@@ -92,7 +93,7 @@ $root = (Get-Location).Path
 
 **One** `project` line per plugin, ending in `payload present`. The count is part of the check.
 Anything else — empty output, two lines for one plugin, `local`, `PAYLOAD MISSING` — is covered in
-[Connecting in four steps](#connecting--the-install-step), in the adoption half below.
+[Connecting in five steps](#connecting--the-install-step), in the adoption half below.
 
 ### Step 2 — run the bootstrap skill
 
@@ -106,13 +107,26 @@ purely additively, in seconds. Check its closing `Done:` line against
 Restart once more and check that Chris takes the floor: the turn **names the specialist the work
 belongs to, and why**, before doing it. Look for that invariant, not for a fixed string.
 
-### Step 4 — write the roster and fill the lenses
+### Step 4 — run the adopt skill of every plugin you enabled
 
-**This is the big one, and it is not optional.** Steps 1–3 give you a team that knows its craft and
+An install writes **nothing** into your repo — it is a clone into the plugin cache — and Step 2 answers
+only what `team-alpha` needs. Every other plugin that owns repo state ships its own `adopt-*` skill:
+`adopt-config` and `adopt-workflow-folder` (`workflow-davekjohn`), `adopt-shopify-floor`
+(`team-shopify`). Your slash list holds exactly the ones your enabled plugins ship, namespaced as
+`<plugin>:adopt-*`, and each is additive and a dry run until you add `-Apply`. Skip this and a session
+check reports what is missing at every session start — which is how a consumer ends up discovering the
+rest of their adoption one `[ERROR]` at a time (inbound
+[#784](https://github.com/DaveKJohn/claude-code-specialists/issues/784)). The full step, with what each
+skill places and what reports it, is
+[step 3 on the adoption page](plugins/ADOPTION.md#the-four-steps).
+
+### Step 5 — write the roster and fill the lenses
+
+**This is the big one, and it is not optional.** Steps 1–4 give you a team that knows its craft and
 nothing about your repo; the lenses in `.claude/specialists/lenses/` are where you say what each
 specialist serves *here*, and an unfilled lens does nothing. Budget writing time, not typing time —
-[Step 4 in the adoption half](#connecting--the-install-step) states the cost and the two things that
-reliably surface while you do it.
+[step 4 on the adoption page](plugins/ADOPTION.md#the-four-steps) states the cost and the two things
+that reliably surface while you do it.
 
 ### Switching workflows
 
@@ -620,7 +634,7 @@ because the counts on this page are load-bearing.
 different answers: the procedure below contains acts an agent structurally cannot perform** (inbound
 [#402](https://github.com/DaveKJohn/claude-code-specialists/issues/402), measured August 3, 2026 during a
 delegated adoption from the instruction *"here is the link, install the plugin"*). Of Step 1's six
-acts an agent can do four; of the four steps it can complete one.
+acts an agent can do four; of the five steps it can complete two.
 
 | Act / step | Agent | Why |
 |---|---|---|
@@ -632,7 +646,8 @@ acts an agent can do four; of the four steps it can complete one.
 | Step 1 act 6 — the `projectPath` verification query | ✅ | Ran verbatim under Windows PowerShell 5.1, no adjustment. |
 | Step 2 — `specialists-init` | ❌ | The skill ships in the plugin only the *next* session loads. |
 | Step 3 — Chris takes the floor | ❌ | Same restart. |
-| Step 4 — roster and lenses | ⚠️ | Possible, but it is authoring about *your* repo — see Step 4. |
+| Step 4 — the adopt skills | ✅ | Skills of plugins the session has already loaded, and a dry run first. |
+| Step 5 — roster and lenses | ⚠️ | Possible, but it is authoring about *your* repo — see Step 5. |
 
 `/reload-plugins` is not a way out, and this page already says so under
 [Staying up to date](#staying-up-to-date) for a different reason: it does not load a skill file that
@@ -911,8 +926,9 @@ is fine.
 > registers the marketplace and writes a complete, correct-looking record — but never fetches the payload.
 > `marketplace update` + `install` are the pair that does.
 
-**Steps 2 to 4 are on their own page now: [ADOPTION.md](plugins/ADOPTION.md).** Running the bootstrap skill,
-verifying that the orchestrator took the floor, and writing your roster and lenses are the same work
+**Steps 2 to 5 are on their own page now: [ADOPTION.md](plugins/ADOPTION.md).** Running the bootstrap skill,
+verifying that the orchestrator took the floor, running each enabled plugin's adopt skill, and writing
+your roster and lenses are the same work
 whether you installed these plugins yourself or your organisation published them to you -- while
 everything above this line is an install, which for many readers has already been done centrally and
 must not be repeated. That is the seam, and inbound
