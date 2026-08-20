@@ -9,7 +9,8 @@
 ## CREATE
 
 - [x] `scripts/task/adopt-shopify-floor.ps1` + its `team-shopify` mirror and registry entry
-- [x] `adopt-shopify-floor/SKILL.md`, and the two `<!-- skills:all -->` spans in the root README
+- [x] `adopt-shopify-floor/SKILL.md`, and the two canonical skill-list spans in the root README
+      (the marker itself is not quoted here: check 10 reads a lone opener as an unclosed span)
 - [x] The guard and the floor session check read a non-numeric id as unanswered
 - [x] The floor session check reports a second `PreToolUse` guard in the consumer's own settings
 - [x] The README's *Converging off a hand-written guard* section
