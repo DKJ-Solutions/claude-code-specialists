@@ -1,6 +1,6 @@
 ---
 name: adopt-workflow-folder
-description: Scaffold the workflow's own root folder -- workflow-davekjohn/ -- in a consuming repo, in one move; the folder docs (README, CLAUDE.md, CONTRIBUTING.md), the releases root with its history table, and the branch dossier in its reset state. Use this when the script-contract session check reports the folder missing, or right after installing the workflow-davekjohn plugin, since an install alone writes nothing into the repo. Strictly additive and dry-run by default; it never overwrites anything.
+description: Scaffold the workflow's own root folder -- workflow-davekjohn/ -- in a consuming repo, in one move; the folder docs (README, CLAUDE.md, CONTRIBUTING.md), the releases root with this repo's release answers, and the branch dossier in its reset state. Use this when the script-contract session check reports the folder missing, or right after installing the workflow-davekjohn plugin, since an install alone writes nothing into the repo. Strictly additive and dry-run by default; it never overwrites anything.
 ---
 
 # adopt-workflow-folder -- one folder for everything portable
@@ -17,7 +17,7 @@ workflow-davekjohn/
   README.md              what this folder is, and where each page's portable half lives
   CLAUDE.md              the working rules a Claude session needs in this folder
   CONTRIBUTING.md        this repo's answers to CONTRIBUTING-portable.md
-  releases/README.md     this repo's answers to RELEASES-portable.md + the release history table
+  releases/README.md     this repo's answers to RELEASES-portable.md (the release LIST is not here)
   releases/audience/     where the cut drafts the hand-written note (a .gitkeep until then)
   branch/                the two branch files in their reset state, plus the generated templates
 ```
@@ -71,6 +71,34 @@ has a **history** whichever tooling cut it, so the list is the repo's and does n
 a teardown removes. A per-reader **note** is the opposite -- it exists only because the tier model
 does -- which is why `Get-ReleaseNoteRoot` does point in here. Both pointed in here between August 14
 and 19; only the list moved back.
+
+**So the page this command scaffolds at `workflow-davekjohn/releases/README.md` carries no history
+table**, and until August 20, 2026 it did -- a `## Release history` heading, a table, and a `VUL-IN`
+promising that the cut would insert its rows there, in the same run whose closing advice told you to
+leave the seam pointing at the repo root. Two statements that cannot both be true, and a consumer who
+followed the advice was left with a table that stays empty forever (inbound
+[#786](https://github.com/DaveKJohn/claude-code-specialists/issues/786)). The page now points at
+whatever `Get-ReleaseHistoryPath` answers instead.
+
+**The file that seam names is yours to create, before your first cut**, and this command deliberately
+does not scaffold it:
+
+```markdown
+#### 1.x
+
+| Version | Date | Type | Title |
+|---|---|---|---|
+```
+
+Two reasons, and the first is the one that matters. A file that exists with a table but **no
+`<major>.x` heading reads as done** to `cut-release`: the row lands in it, while the guardrail that
+refuses to file a `v2` row under a `1.x` heading is silently off, because that check skips when it finds
+no section. That is the same "hole with a comment on it" that keeps `adopt-shopify-floor` from writing a
+`VUL-IN` stub. And the major in that heading is a version decision no scaffolder can make for you.
+
+**Forgetting it is not silent, which is why an instruction is enough here.** With the file missing the
+cut warns `<path> is missing -- row not added: <the row>` and cuts the release anyway, so the cost is
+one row added by hand rather than a broken release.
 
 The generated `releases/development/` and `releases/github/` trees stay at the repo root for the same
 reason (Dave, August 14, 2026): they are the machine-written record and the publish artefact, not the

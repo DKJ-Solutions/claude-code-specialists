@@ -7,7 +7,8 @@
     What is covered, and why these four:
       1. the DRY RUN default writes nothing -- the same contract adopt-config is trusted on;
       2. -Apply places every file the folder promises, with the branch files in the reset shape the
-         shared formatters write and the history table header the cut inserts its row after;
+         shared formatters write -- and the releases page carrying NO history table, since the list
+         belongs at the repo root (inbound #786);
       3. a re-run is additive: a file somebody edited is never overwritten, whatever it says;
       4. a repo that publishes plugins is refused -- the source keeps its docs at its root (Dave,
          August 14, 2026), so the scaffold must not build the layout its owner declined.
@@ -115,10 +116,15 @@ try {
     # entry test skips them) naming the trunk.
     $entryText = [System.IO.File]::ReadAllText((Join-Path $c2 'workflow-davekjohn\branch\branch-deployment.md'), [System.Text.Encoding]::UTF8)
     Assert-Match '^# ' $entryText '-Apply: the entry is the reset state (H1, not a foldable H2)'
-    # The history table header is what cut-release's row insert matches on -- scaffolding it is what
-    # makes the first cut in a consumer able to write its row at all.
+    # THE FOLDER PAGE MUST NOT CARRY A HISTORY TABLE, and this assert is the regression guard on inbound
+    # #786. It did until August 20, 2026: the page was scaffolded with a '## Release history' heading, a
+    # table, and a VUL-IN promising that the cut would insert its rows there -- while this same command's
+    # closing advice told the reader to leave Get-ReleaseHistoryPath at the repo root. Two statements in
+    # one run that cannot both be true, and the consumer who followed the advice got a table that stays
+    # empty forever. The page now points at the seam's answer instead.
     $relText = [System.IO.File]::ReadAllText((Join-Path $c2 'workflow-davekjohn\releases\README.md'), [System.Text.Encoding]::UTF8)
-    Assert-Match '\| Version \| Date \| Type \| Title \|' $relText '-Apply: the release history carries the table header the cut inserts after'
+    Assert-True ($relText -notmatch '\| Version \| Date \| Type \| Title \|') '-Apply: the folder page carries NO history table (the list is not here)'
+    Assert-Match 'releases/README\.md' $relText '-Apply: it names where the list actually lives instead'
     # And the closing block names the two seams only this repo can answer.
     Assert-Match 'Get-ReleaseNoteRoot' $r2.Out '-Apply: the next-steps block names Get-ReleaseNoteRoot'
     Assert-Match 'Get-ReleaseHistoryPath' $r2.Out '-Apply: and Get-ReleaseHistoryPath'
