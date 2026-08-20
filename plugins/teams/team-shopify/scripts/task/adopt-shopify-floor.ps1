@@ -403,5 +403,12 @@ else {
     Write-Host 'The pre-task sync (the sync-main skill) needs one more answer before it runs: uncomment'
     Write-Host 'Get-ShopifyStoreDomain with your store. It refuses rather than guessing which store to pull.'
 }
+Write-Host ''
+Write-Host 'ONE THING TO READ BEFORE YOUR FIRST PULL FROM LIVE: the CLI rewrites line endings, so a pull'
+Write-Host 'reports files as modified that nobody modified -- 37 with zero changed lines on one real'
+Write-Host 'theme. Read the drift after a ''git add -A'', never off the raw git status, and do NOT pin'
+Write-Host 'eol=lf in .gitattributes: that is the obvious fix and it makes the noise permanent. The'
+Write-Host 'measurements are in the team-shopify README, under the git status section.'
+Write-Host ''
 Write-Host 'Already had a hand-written guard? See "Converging off a hand-written guard" in the'
 Write-Host 'team-shopify README before you keep both -- two PreToolUse hooks fire on every command.'

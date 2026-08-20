@@ -101,6 +101,27 @@ non-numeric — a `VUL-IN` left in place, most likely — is read by both the gu
 silence the report while leaving the id half exactly as inert as before. That is the shape this README
 warns about two sections down — a hole with a comment on it.
 
+## The one thing to know before you read a `git status` here
+
+**Every pull from live reports files as modified that nobody modified**, and this team's whole safety
+model rests on reading that output. The CLI writes each file with the line endings **live** holds, live
+holds both, and git checks out according to `core.autocrlf` — two writers, different habits. Measured on
+a real store theme: **37 files** reported as modified with **zero changed lines**.
+
+- **Read the drift after a `git add -A`, never off the raw `git status`.** Staging costs nothing for
+  exactly those files and leaves only real content standing.
+- **Do not pin `eol=lf` in `.gitattributes`.** It is the obvious fix and it makes this **permanent** —
+  the same files come back after every pull, forever, converting the one signal that spots a third
+  party's in-flight edit into standing noise. What that file should carry is `* text=auto` plus explicit
+  `binary` declarations, and nothing else.
+
+Both halves, with the three measurements behind them, are in
+[Steven's manual](manuals/05-22-manual.md#the-cli-rewrites-line-endings-and-that-is-a-property-of-the-tool).
+This is a property of the **CLI**, not of any one store, so any Windows Shopify consumer meets it —
+which is exactly why it is here rather than in a repo lens (inbound
+[#788](https://github.com/DaveKJohn/claude-code-specialists/issues/788), reported by two consumers
+independently, one of which had to invert its own first conclusion).
+
 ## Converging off a hand-written guard
 
 Read this if your repo wrote its own live-theme guard **before** this plugin shipped one. Both existing

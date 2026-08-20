@@ -47,6 +47,42 @@ for who performs the fallback push and under what conditions.
 - **`--live` pull** is only allowed in narrowly defined cases (the pre-task sync, an explicit request from the user to mirror the live version for reference, or a targeted `--only` pull for a live-setting toggle). Never pull `--live` outside those.
 - **Publishing** (makes a theme the live customer theme): `shopify theme publish --store <store>.myshopify.com --theme <ID>`. **Always ask the user first. Never publish autonomously.**
 
+### The CLI rewrites line endings, and that is a property of the tool
+
+**Every pull reports files as modified that nobody has modified.** The CLI writes each file with the
+line endings **live** holds, live holds both LF and CRLF, and git checks files out according to
+`core.autocrlf` — so there are **two writers** on the tree with different habits. Measured on a real
+store theme: a full pull returned **37 files** as CRLF while the index was pure LF, giving 37 entries
+in `git status` with **zero changed lines** in `git diff`. Any Windows Shopify consumer meets this; only
+the size of the number differs.
+
+**Why it is worth a section rather than a footnote.** The whole safety model of this team rests on one
+human judgement, made by reading the drift after a pull: *is this diff mine, or a third party's
+in-flight edit?* That judgement is the only thing standing between a push and somebody else's unsaved
+work — and a verification step that cries wolf every single time is the step nobody reads on the day it
+is right.
+
+**So read the drift after a `git add -A`, never off the raw `git status`.** Staging costs nothing for
+exactly those files, because there is nothing in them: `git diff --cached` comes back empty and the
+entry disappears. What is still listed afterwards is real content from somebody else.
+
+**And the obvious fix makes it permanently worse.** Pinning `eol=lf` in `.gitattributes` is the
+reasonable-looking move and it is the wrong one: measured, those same files then come back as modified
+with zero changed lines after **every** pull, forever — which is precisely the signal the drift read
+uses to spot a third-party edit, converted into permanent noise. `text=auto` alone does not clear them
+either; it is the CLI's rewrite that produces them, not the attributes. What `.gitattributes` should
+carry is `* text=auto` — worth having on its own, since it keeps the **index** pure LF on every machine
+whatever its `core.autocrlf` says — plus explicit `binary` declarations for image, font, video and
+archive types, and nothing else. Declared rather than sniffed, because a mis-detected binary is
+corrupted by EOL conversion. Reported and measured by two consumers independently, inbound
+[#788](https://github.com/DaveKJohn/claude-code-specialists/issues/788); one of them filed the
+`eol=lf` fix as an improvement first and inverted its own conclusion on re-measuring.
+
+**This plugin does not place that file**, deliberately. The measurement says the working *procedure* is
+where the problem is handled, not the attributes — and `* text=auto` dropped into a repo whose index
+already holds CRLF produces a whole-tree renormalisation diff on the next `add`, which is a bad
+surprise to arrive by scaffold. Paste it yourself, once you have looked.
+
 ## Auth & the Shopify connector
 
 **Shopify CLI auth** — if commands fail with an auth error, force re-authentication:
