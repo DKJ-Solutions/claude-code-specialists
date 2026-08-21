@@ -966,11 +966,27 @@ $script:EntryGuidanceDefaults = [ordered]@{
     # say the repo's own tier rather than list both, because tier 1 and tier 2 are two kinds of audience and
     # a repo has exactly one. The token used to be a trailing space: the sentence was cut on August 16 and
     # its space stayed behind, which is the shape that reads as "something was deleted here".
+    # AND IT NOW SAYS THAT 'NOTHING' IS A WHOLE ANSWER (inbound #810, August 21, 2026). The heading above
+    # this block asks what makes the change extra special and names no reader, so an author with nothing to
+    # tell that reader reads it as a general 'anything else notable' slot and fills it anyway. Measured in
+    # the reporting repo, twice in one afternoon: 240 and 192 words under a score of N/A, against 28 to 78
+    # words in the seven neighbouring entries that answered the same tier the same way. So the norm exists
+    # and is followed -- and the only thing contradicting those two pages of text was the N/A underneath
+    # them. Neither the rubric nor the score was wrong; what was missing is that the short answer is the
+    # normal one. THE HEADING IS DELIBERATELY LEFT ALONE: it was retexted three days earlier for a reason
+    # that still holds, and the reporter named this block as the cheaper of the two places.
+    # WHERE THE AUTHOR MEETS THIS TEXT IS THE TEMPLATE, NOT THE ENTRY, which the report had the other way
+    # around -- checked rather than inherited. -WithGuidance has been off for the working file since
+    # August 7, 2026, so this block renders into branch/templates/branch_template_deployment.md, the file
+    # that sits beside the entry to be read from. The layer the report named is right; the file is the
+    # neighbour rather than the entry itself.
     TierOptional = @(
         'Why the change matters AT THIS REACH specifically. {0}',
+        'That reader and nobody else -- what matters only inside this repo is said in the section above.',
         '',
         'If it has no significance at this reach at all, then explain shortly why and insert N/A in Score.',
-        'That reason goes above the Score line too.'
+        'That reason goes above the Score line too, and one or two lines is the whole of it: N/A is a',
+        'complete answer and the common one.'
     )
 }
 
@@ -1330,6 +1346,19 @@ function Get-EntrySignificanceRubric {
         a storefront, and a repo whose consumers are non-technical needs its own wording. The HEADERS stay
         fixed while the rubric moves, which is the right split -- the key is machine-read, the definition
         is editorial.
+
+        WHATEVER A REPO REWORDS, A BAND STAYS A TEST ABOUT THE READER (inbound #810, August 21, 2026).
+        Every built-in level describes something the reader can observe -- "they notice within a day",
+        "noticed the moment they touch that part" -- and that property is the whole reason one change can
+        score differently at each tier at all. The paragraph above invites a rewording and every example it
+        gives is about audience wording, so it read as licence to say anything; it never said what has to
+        survive. The measured override added a clause about the DIFF instead -- "or changes what a customer
+        sees or can do in the storefront" -- which is true or false regardless of who is reading, and it
+        duly produced a 4 at tier 1 for a PreToolUse hook that reader cannot see anywhere. Reword the
+        audience as freely as the repo needs; keep the sentence something the named reader could notice.
+        A CONTRACT CHECK FOR IT WAS CONSIDERED AND NOT BUILT, on the reporter's own reasoning: flagging an
+        override that drops every reader pronoun is a heuristic, and a band can be reader-relative without
+        one ("cosmetic" is). This docstring is the layer that was actually missing.
 
         The override is accepted as a hashtable or ordered dictionary keyed by score, because that is the
         natural way to write one in a config file -- but it is read with GetEnumerator, never the indexer,
