@@ -973,6 +973,51 @@ function Get-OverviewTargetMajor {
     return $sections[$sections.Count - 1].Groups[2].Value
 }
 
+function Get-OverviewLatestVersion {
+    <# The version this repo has RECORDED as its most recent release: the first data row of the first
+       table in the release overview that carries one. $null where the overview has no table, or no
+       table's first row names a version. Pure string in, string out.
+
+       WHY THIS EXISTS. cut-release.ps1 derives the baseline it bumps FROM somewhere else entirely --
+       the lockstep plugin manifests, or failing those the highest 'v*' git tag -- and neither of those
+       is the document that says which release is which. Where one of them disagrees with this table,
+       everything downstream of the baseline is wrong at once and in silence: the '**Type:**' line in the
+       generated notes, the Type cell of this very table, the question the tier gate asks
+       (Test-ReleaseBumpEarned judges a bump type that is not the one being cut), and whether the
+       hand-written consumer document is drafted at all. Reported from a consumer as inbound #802, where
+       a deliberately lagging tag line -- tags left alone while the documents were renumbered -- turned a
+       patch into a 'Minor' in four places and nothing warned.
+
+       ONE STRAY TAG IS ENOUGH, which is why this is not a check for an exotic repo policy: '--sort=-v:refname'
+       takes the highest 'v*' tag in the repo, so a single mistyped 'v99.0.0' makes every later release
+       read as a Major.
+
+       THE FIRST ROW OF A TABLE, for the same reason Get-OverviewTargetMajor reads the last heading
+       before one: that is where the row inserter writes, so this is the row the next cut lands on top
+       of. Reading every row and sorting would be a second, drifting definition of 'newest'.
+
+       IT WALKS ON TO THE NEXT TABLE WHERE THE FIRST IS EMPTY, and that case is not hypothetical -- it is
+       exactly the state a freshly opened major section is in, which is the highest-stakes cut there is.
+       Stopping at the first table would switch this check off precisely there.
+
+       BOTH ROW SHAPES ARE ACCEPTED -- '| [4.17.0](path) |' and a bare '| 4.17.0 |', backticked or not --
+       because the link target is a repo-owned layout decision (this repo's own rows point at three
+       different roots across their history) while the version is the fact being read. #>
+    param([Parameter(Mandatory)][string]$ReadmeContent)
+    foreach ($hm in $script:OverviewTableHeaderRe.Matches($ReadmeContent)) {
+        $after = $ReadmeContent.Substring($hm.Index + $hm.Length)
+        $firstRow = ($after -split "`r?`n", 2)[0]
+        # The first CELL, then the version inside it: the cell may be a link, a backticked literal or
+        # bare, and matching the version anywhere in the row would happily read the Title column of a
+        # row whose version cell is malformed.
+        if ($firstRow -match '^\|([^|]*)\|') {
+            $cell = $Matches[1]
+            if ($cell -match '(\d+\.\d+\.\d+)') { return $Matches[1] }
+        }
+    }
+    return $null
+}
+
 # The audience each tier is named after in a generated document. ONE MAP, so the release notes and any
 # later reader of a tier number agree about what it means.
 #

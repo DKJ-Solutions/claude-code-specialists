@@ -67,13 +67,19 @@
     repo as not adopting and switch the gate off in silence, with nothing erroring.
 
     Steps (all on main):
-      1. Guardrails: clean main, no unfolded entry files in the root, THE BUMP EARNED BY THE PENDING
-         TIERS (the bump follows the highest tier pending -- tier 0 only is a patch, tier 1 or higher
-         earns a minor, a major needs enough minors behind it -- Test-ReleaseBumpEarned; -SkipTierGate
-         overrules), lint gate green, AND all test suites green (-SkipTests overrules).
+      1. Guardrails: clean main, no unfolded entry files in the root, THE BASELINE AGREEING WITH THE
+         RELEASE OVERVIEW'S NEWEST ROW (-Type overrules by stating the type outright), THE BUMP EARNED BY
+         THE PENDING TIERS (the bump follows the highest tier pending -- tier 0 only is a patch, tier 1 or
+         higher earns a minor, a major needs enough minors behind it -- Test-ReleaseBumpEarned;
+         -SkipTierGate overrules), lint gate green, AND all test suites green (-SkipTests overrules).
       2. Determines the current version -- the lockstep value from every
          <plugin>/.claude-plugin/plugin.json where this repo publishes plugins, otherwise the newest
-         vX.Y.Z tag -- then the new version (-Version or -Bump) and the bump type.
+         vX.Y.Z tag -- CROSS-CHECKS IT AGAINST THE NEWEST ROW OF THE RELEASE OVERVIEW and refuses on a
+         disagreement (-Type states the type where the divergence is deliberate), then the new version
+         (-Version or -Bump) and the bump type. Neither the manifests nor the tag line is the document
+         that says which release is which, and a baseline from a different release mislabels this one in
+         four places at once without warning: the notes, the overview row, the tier gate's question, and
+         whether a consumer document is drafted. Inbound #802.
       3. Generates releases/development/<X>.x/<X.Y.Z>.md from the pending entries, grouped by TIER,
          adds a row to releases/README.md, empties CHANGELOG.md down to its intro, and bumps all
          plugin.json's. Within a tier the entries are RANKED BY THEIR OWN SIGNIFICANCE SCORES FROM
@@ -109,6 +115,17 @@
 
 .PARAMETER Bump
     Bump the current version automatically: major | minor | patch. Use this OR -Version.
+
+.PARAMETER Type
+    STATE the bump type instead of having it inferred from the two version numbers, e.g.
+    `-Version 2.39.1 -Type patch`. Belongs with -Version; refused alongside -Bump, which already says the
+    same thing.
+
+    IT EXISTS FOR ONE SITUATION: a repo whose git tag line and whose recorded release numbering have
+    deliberately diverged (tags used for something other than releases, per-component tags in a monorepo,
+    imported history). The baseline guardrail refuses such a cut, because a baseline that is not about
+    this release mislabels it in four places at once and in silence -- and this is the way through, rather
+    than a -Skip switch that would hand back the very label the guardrail caught. Inbound #802.
 
 .PARAMETER Title
     Short description of the release as a whole (1 sentence, optional) -- goes into the notes +
@@ -180,9 +197,12 @@
     DRIVEN END TO END by scripts/tests/cut-release-drive.tests.ps1, against a throwaway `git init` repo
     with no remote: the lockstep bump across every plugin.json, CHANGELOG.md emptied to its intro, the
     development note written at the grouped path carrying the entry the changelog lost, the row inserted
-    into the release history, the commit, the tag pointing at it, and a clean tree afterwards. Plus two
-    refusals, each asserted to leave the tree untouched: a bump the pending entries have not earned, and
-    a new major whose section does not exist yet.
+    into the release history, the commit, the tag pointing at it, and a clean tree afterwards. Plus three
+    refusals, each asserted to leave the tree untouched: a bump the pending entries have not earned, a
+    new major whose section does not exist yet, and a baseline that disagrees with the release overview's
+    newest row -- that last one paired with the -Type run that gets through it, asserting the LABEL that
+    comes out rather than only the exit code, because a bypass producing the wrong label would pass a
+    refusal test and still be the defect.
 
     STILL NOT COVERED, and deliberately: the push (every driven run passes -NoPush, because a suite must
     not be able to reach a remote), and the hand-written documents downstream of the cut, which are prose
@@ -194,6 +214,7 @@
 param(
     [string]$Version,
     [ValidateSet('major', 'minor', 'patch')][string]$Bump,
+    [ValidateSet('major', 'minor', 'patch')][string]$Type,
     [string]$Title = '',
     [string]$SummaryFile = '',
     [switch]$NoPush,
@@ -454,20 +475,30 @@ if ($pluginTier) {
     $manifestContents = @{}
     foreach ($p in $manifests) { $manifestContents[$p.Name] = (Get-Content -Path $p.ManifestPath -Raw -Encoding UTF8) }
     $current = Get-LockstepVersion -ManifestContents $manifestContents
+    # WHERE THE BASELINE CAME FROM, carried along as prose. The cross-check below refuses on a
+    # disagreement between this number and the recorded release numbering, and a refusal that names only
+    # the two numbers leaves the reader to work out which of them this script read and which it did not.
+    $currentSource = 'the lockstep version in every plugin.json'
 } else {
     $latestTag = @(git tag --list 'v*' --sort=-v:refname) | Select-Object -First 1
     if ($latestTag) {
         $current = ($latestTag -replace '^v', '')
+        $currentSource = "the highest 'v*' git tag ($latestTag)"
     } elseif ($Version) {
         # First release in a repo with neither manifests nor tags: -Version says what it is, and
         # 0.0.0 exists only so the bump-type label below has something to compare against.
         $current = '0.0.0'
+        $currentSource = 'neither a plugin manifest nor a v* tag -- this is a first release'
     } else {
         Write-Error "This repo publishes no plugins (Get-ReleasePluginTier is false) and carries no vX.Y.Z tag, so there is no current version to bump from. Pass -Version <X.Y.Z> for the first release."
         exit 1
     }
 }
 
+# -Type STATES what -Bump would already have said, so together they are two answers to one question --
+# and where they disagree there is no reading of the command line that is obviously right. Refused rather
+# than resolved by precedence, which is the same call the -Version/-Bump pair makes one line down.
+if ($Type -and $Bump) { Write-Error "-Type states the bump type and -Bump already does -- use one. -Type belongs with -Version."; exit 1 }
 if ($Version) {
     if ($Version -notmatch '^\d+\.\d+\.\d+$') { Write-Error "-Version must have the form X.Y.Z (e.g. 1.0.0)."; exit 1 }
     $new = $Version
@@ -479,7 +510,62 @@ if ($Version) {
 }
 if ($new -eq $current) { Write-Error "New version ($new) equals the current one -- nothing to bump."; exit 1 }
 
-$bumpType = Get-BumpType -From $current -To $new
+# --- The release overview, read once ------------------------------------------------------------
+# READ HERE, AHEAD OF THE FIRST GATE, for the reason the changelog read below gives: TWO guardrails
+# need this file -- the baseline cross-check directly under this, and the new-major section check
+# further down -- and a gate that runs after the first write is not a gate. One read, one snapshot, so
+# the two cannot end up judging different versions of the same document.
+$relReadmePath = Join-Path $repoRoot ($historyRelPath -replace '/', '\')
+$historyContent = if (Test-Path -LiteralPath $relReadmePath) {
+    Get-Content -LiteralPath $relReadmePath -Raw -Encoding UTF8
+} else { $null }
+
+# --- Guardrail: the baseline agrees with the RECORDED release numbering (inbound #802) -----------
+# The baseline above is read from the manifests or the tag line. NEITHER IS THE DOCUMENT THAT SAYS WHICH
+# RELEASE IS WHICH, and until August 21, 2026 nothing compared the two. Where they disagree, the number
+# being cut can still be right while everything derived from the baseline is wrong at once and in
+# silence: the '**Type:**' line in the notes, the Type cell of the overview row, the question the tier
+# gate asks, and whether the hand-written consumer document is drafted at all.
+#
+# IT REFUSES ON BOTH ROUTES IN, WHICH GOES FURTHER THAN THE REPORT ASKED FOR (it proposed refusing only
+# where -Version was passed). The reason is that -Bump is the worse of the two, not the safer one: with
+# -Version the author has named the number and only its LABEL is wrong, while -Bump computes the number
+# FROM the baseline, so a wrong baseline produces a version that belongs to a different release
+# altogether. The reporting consumer met exactly that -- '-Bump minor' off a lagging tag proposed 2.14.0
+# when the documents stood at 2.39.0 -- and was saved by an unrelated refusal further down, which is luck
+# rather than a guard.
+#
+# -Type IS THE WAY THROUGH, and deliberately not a -Skip switch. A bypass would hand back the same wrong
+# label the check exists to catch; stating the type produces a correct release from a repo whose tag line
+# and numbering genuinely diverge. That is the report's own third option, taken as the escape valve for
+# its first.
+$recordedVersion = if ($historyContent) { Get-OverviewLatestVersion -ReadmeContent $historyContent } else { $null }
+if ($recordedVersion -and $recordedVersion -ne $current -and -not $Type) {
+    Write-Error @"
+The baseline this release would be measured from does not match the one $historyRelPath records.
+
+  baseline read here : $current   (from $currentSource)
+  newest recorded    : $recordedVersion   (the first row of the release overview)
+
+Nothing was written. Cutting from the wrong baseline does not necessarily produce the wrong version
+NUMBER -- it produces the wrong bump TYPE, in four places at once and without a warning: the notes, the
+overview row, the tier gate's judgement, and whether a consumer document is drafted.
+
+Either close the disagreement -- tag the recorded release, or correct the overview's newest row,
+whichever of the two is actually behind -- or state the type instead of having it inferred:
+
+  -Version <X.Y.Z> -Type <major|minor|patch>
+
+Use the second form where the divergence is deliberate (tags used for something other than releases,
+per-component tags, imported history). It says what this release is rather than guessing it from a
+number that is not about this release at all.
+"@
+    exit 1
+}
+
+# THE TYPE IS STATED WHERE -Type SAYS SO, and inferred from the two numbers otherwise. Get-BumpType is a
+# pure SemVer comparison and was never the defect -- the baseline it was being fed was.
+$bumpType = if ($Type) { $Type } else { Get-BumpType -From $current -To $new }
 $typeLabel = @{ major = 'Major'; minor = 'Minor'; patch = 'Patch' }[$bumpType]
 $tagName = "v$new"
 if ((git tag --list $tagName)) { Write-Error "Tag $tagName already exists."; exit 1 }
@@ -620,10 +706,12 @@ about content, while -SkipLint skips a tool.
 # overview table IS that history -- so one answer serves both. Two hardcoded copies would be two places
 # that have to keep agreeing, and the day they stop, the changelog points at one file while the row
 # lands in another.
+#
+# IT READS THE SNAPSHOT TAKEN AT THE BASELINE CROSS-CHECK rather than opening the file a second time
+# (August 21, 2026, with inbound #802). Two reads of one document meant two answers were possible to the
+# question of what it says, and the two guardrails that ask it sit on either side of the tier gate.
 $newMajor = ($new -split '\.')[0]
-$relReadmePath = Join-Path $repoRoot ($historyRelPath -replace '/', '\')
-if (Test-Path -LiteralPath $relReadmePath) {
-    $historyContent = Get-Content -LiteralPath $relReadmePath -Raw -Encoding UTF8
+if ($historyContent) {
     $targetMajor = Get-OverviewTargetMajor -ReadmeContent $historyContent
     if ($null -ne $targetMajor -and $targetMajor -ne $newMajor) {
         # The heading is QUOTED BACK AT THE LEVEL THE DOCUMENT USES, not at a level this script assumes.
@@ -880,7 +968,6 @@ Write-Host "  created: $bodyRelPath (the GitHub Release body -- generated, no ed
 # manually first (a deliberate milestone moment), after which its table becomes the insertion target.
 # Same seam as the guardrail above, so the file this row lands in and the file the changelog points at
 # cannot drift apart.
-$relReadme = Join-Path $repoRoot ($historyRelPath -replace '/', '\')
 $shortTitle = if ($Title) { $Title } else { "$typeLabel release" }
 # THE VERSION CELL POINTS AT THE MOST READABLE DOCUMENT THIS RELEASE HAS, and the cut can finally write
 # that itself. It used to always name the development notes, with new-internal-note.ps1 repointing the cell
@@ -905,15 +992,15 @@ $historyDirRel = if ($historyRelPath -match '/') { $historyRelPath -replace '/[^
 $rowTargetRel = if ($cutNote) { "$noteRootRelPath/$notesDirName/$new.md" } else { "releases/development/$notesDirName/$new.md" }
 $versionTarget = Get-RelativeLinkPath -FromDir $historyDirRel -To $rowTargetRel
 $newRow = "| [$new]($versionTarget) | $today | $typeLabel | $shortTitle |"
-if (Test-Path $relReadme) {
-    $rm = Get-Content -Path $relReadme -Raw -Encoding UTF8
+if (Test-Path -LiteralPath $relReadmePath) {
+    $rm = Get-Content -LiteralPath $relReadmePath -Raw -Encoding UTF8
     $rmNl = if ($rm.Contains("`r`n")) { "`r`n" } else { "`n" }
     $headerRe = [regex]"(?m)^\| Version \| Date \| Type \| Title \|\r?\n\|[-| ]+\|\r?\n"
     $hm = $headerRe.Match($rm)
     if ($hm.Success) {
         $at = $hm.Index + $hm.Length
         $rm = $rm.Substring(0, $at) + $newRow + $rmNl + $rm.Substring($at)
-        Write-Utf8NoBom -Path $relReadme -Content $rm
+        Write-Utf8NoBom -Path $relReadmePath -Content $rm
         Write-Host "  updated: $historyRelPath" -ForegroundColor DarkGray
     } else {
         Write-Warning "Overview table not found in $historyRelPath -- add the row manually: $newRow"
@@ -1099,7 +1186,11 @@ if ($tag.ExitCode -ne 0) { Write-Error "git tag failed."; exit 1 }
 
 if ($NoPush) {
     Write-Host ""
-    Write-Host "Release v$new recorded locally on main (commit + tag $tagName), not pushed." -ForegroundColor Green
+    # THE TWO NUMBERS THE WHOLE LABELLING HANGS ON, ON THIS PATH TOO (inbound #802, August 21, 2026). The
+    # push path below has always closed with '($current -> $new, $typeLabel)'; this branch exits before it
+    # and printed neither. So the flag whose entire purpose is inspecting a release before it is public was
+    # the one path that concealed the baseline -- and a wrong baseline is visible in nothing else.
+    Write-Host "Release v$new recorded locally on main ($current -> $new, $typeLabel; commit + tag $tagName), not pushed." -ForegroundColor Green
     Write-Host "Push it yourself when ready:" -ForegroundColor Cyan
     Write-Host "  git push origin main; git push origin $tagName"
     Write-FollowUpSteps

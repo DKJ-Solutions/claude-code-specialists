@@ -283,6 +283,12 @@ try {
     Assert-Match 'v1\.4\.1' (Get-GitOut -Root $root -GitArgs @('log','-1','--pretty=%D')) 'happy path: and it points at the commit the cut just made'
     Assert-Equal '' (Get-GitOut -Root $root -GitArgs @('status','--porcelain')).Trim() 'happy path: the tree is clean afterwards -- everything written was committed'
 
+    # THE TWO NUMBERS THE LABELLING HANGS ON, on the -NoPush path (inbound #802). The push path has always
+    # closed with them; this branch exits before it and printed neither -- so the flag whose entire purpose
+    # is inspecting a release before it is public was the one path that concealed the baseline.
+    Assert-Match '1\.4\.0 -> 1\.4\.1' $r.Out '-NoPush: the closing line names the baseline and the new version'
+    Assert-Match 'Patch' $r.Out '-NoPush: and the bump type it derived from them'
+
     # --- 2. The bump gate: tier 0 alone does not earn a minor -------------------------------------
     Write-Host ""
     Write-Host "cut-release.ps1 -- a bump that the pending entries have not earned is refused" -ForegroundColor Cyan
@@ -358,6 +364,52 @@ try {
         Assert-Match 'consumers of this product' $n5 'tier 2: its audience line still names both readers'
         Assert-Match 'A fixture change' $n5 'tier 2: pre-filled from the tier-2 entry, as before'
     }
+
+    # --- 6. The baseline cross-check: a history that records a different release refuses (#802) -----
+    # THE FAILURE THIS PINS IS SILENT, and that is the whole reason it is driven rather than asserted on
+    # the source text. Where the baseline and the recorded numbering disagree, the cut still succeeds and
+    # still writes a plausible release -- with the wrong bump TYPE in the notes, in the overview row, in
+    # the question the tier gate answered, and in whether a consumer document was drafted at all. The
+    # reporting consumer got a 'Minor' patch and found out by reading the files afterwards.
+    #
+    # The fixture's history normally carries an EMPTY table, so every scenario above leaves this check
+    # dormant -- which is also why they are unaffected by it. Here it gets a row, and a row that names a
+    # release the manifests have never heard of.
+    Write-Host ""
+    Write-Host "cut-release.ps1 -- a baseline that disagrees with the recorded release numbering refuses" -ForegroundColor Cyan
+    $recordedHistory = "#### 1.x`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n| [1.9.9](development/1.x/1.9.9.md) | 2026-08-20 | Patch | Recorded, but untagged and unbumped |`n"
+    $root6 = New-CutFixture -Name 'baseline' -HistoryMajors $recordedHistory
+    $r6 = Invoke-Cut -Root $root6 -Arguments @('-Bump', 'patch', '-NoPush', '-SkipLint', '-SkipTests')
+    Assert-True ($r6.Code -ne 0) 'baseline: refused with a non-zero exit'
+    # BOTH NUMBERS IN THE MESSAGE, because the point of the refusal is telling the reader WHICH of the two
+    # is behind -- a refusal naming one of them leaves exactly the question that caused the defect.
+    Assert-Match '1\.4\.0' $r6.Out 'baseline: the message names the baseline it read'
+    Assert-Match '1\.9\.9' $r6.Out 'baseline: and the version the overview records'
+    $v6 = (Get-Content -LiteralPath (Join-Path $root6 'plugins\teams\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
+    Assert-Equal '1.4.0' $v6 'baseline: nothing was written -- the check runs with the other guardrails, before the first write'
+    Assert-Equal '' (Get-GitOut -Root $root6 -GitArgs @('tag','--list')).Trim() 'baseline: and no tag was created'
+
+    # --- 7. -Type is the way through, and it produces a CORRECT release ----------------------------
+    # A -Skip switch would have handed back the very label the check caught. This asserts the other half:
+    # the escape valve exists, and what comes out the other side is labelled the way the author stated
+    # rather than the way the disagreement implied. Off a 1.9.9 baseline, inference would have called
+    # 1.4.1 a Minor (the minor component moved DOWN, so Get-BumpType reads the highest changed field);
+    # -Type patch is what makes it a Patch.
+    Write-Host ""
+    Write-Host "cut-release.ps1 -- -Type states the bump type where the divergence is deliberate" -ForegroundColor Cyan
+    $root7 = New-CutFixture -Name 'statedtype' -HistoryMajors $recordedHistory
+    $r7 = Invoke-Cut -Root $root7 -Arguments @('-Version', '1.4.1', '-Type', 'patch', '-NoPush', '-SkipLint', '-SkipTests')
+    Assert-Equal 0 $r7.Code 'stated type: the cut runs'
+    $note7 = Join-Path $root7 'releases\development\1.x\1.4.1.md'
+    Assert-True (Test-Path -LiteralPath $note7) 'stated type: the development note was written'
+    if (Test-Path -LiteralPath $note7) {
+        Assert-Match '(?m)^\*\*Type:\*\*\s*Patch' (Get-Content -LiteralPath $note7 -Raw) 'stated type: and it is labelled Patch -- the type the author stated, not the one the baseline implied'
+    }
+    Assert-Match '(?m)^\|\s*\[?1\.4\.1[^|]*\|[^|]*\|\s*Patch\s*\|' (Get-Content -LiteralPath (Join-Path $root7 'releases\README.md') -Raw) 'stated type: the overview row carries the same label'
+    # -Type and -Bump are two answers to one question, and the refusal is the same call the -Version/-Bump
+    # pair already makes.
+    $r8 = Invoke-Cut -Root $root7 -Arguments @('-Bump', 'patch', '-Type', 'patch', '-NoPush', '-SkipLint', '-SkipTests')
+    Assert-True ($r8.Code -ne 0) '-Type alongside -Bump is refused rather than resolved by precedence'
 
 } finally {
     if (Test-Path -LiteralPath $FixtureDir) {

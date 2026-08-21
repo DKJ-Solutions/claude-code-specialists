@@ -1262,6 +1262,38 @@ if (Test-Path -LiteralPath $liveReadme) {
     Assert-Equal '4' (Get-OverviewTargetMajor -ReadmeContent (Get-Content -LiteralPath $liveReadme -Raw -Encoding UTF8)) "this repo's own overview now targets 4.x -- a 4.0.0 cut lands under its own major, and a 3.x cut would be refused"
 }
 
+Write-Host "Get-OverviewLatestVersion -- the release the overview RECORDS as newest (inbound #802)" -ForegroundColor Cyan
+# The baseline cut-release bumps from is read from the manifests or the tag line; this is the number the
+# overview says the last release was. Where the two disagree the version can still be right while the
+# TYPE is wrong in four places at once and in silence -- so the function that makes the comparison
+# possible is pinned here.
+Assert-Equal '2.16.0' (Get-OverviewLatestVersion -ReadmeContent $twoSections) 'the first row of the TOP table, not the newest row anywhere in the file'
+Assert-Equal '1.18.0' (Get-OverviewLatestVersion -ReadmeContent ($twoSections -replace '(?s)^.*?### 1\.x', '### 1.x')) 'and with the 2.x section removed it reads the 1.x one -- same rule, one table down'
+# THE EMPTY-TOP-TABLE CASE IS THE ONE THAT MATTERS, because it is not exotic: it is exactly the state a
+# freshly opened major section is in, which is the highest-stakes cut there is. Stopping at the first
+# table would switch the guardrail off precisely there.
+Assert-Equal '2.16.0' (Get-OverviewLatestVersion -ReadmeContent $withThree) 'an empty 3.x table on top does not blind it -- it walks on to the 2.x row'
+# Both row shapes, because the link target is a repo-owned layout decision while the version is the fact.
+Assert-Equal '5.1.2' (Get-OverviewLatestVersion -ReadmeContent "### 5.x`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n| 5.1.2 | 2026-08-21 | Patch | Bare, unlinked |`n") 'a bare version cell is read'
+Assert-Equal '5.1.2' (Get-OverviewLatestVersion -ReadmeContent "### 5.x`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n| ``5.1.2`` | 2026-08-21 | Patch | Backticked |`n") 'a backticked version cell is read'
+Assert-Equal $null (Get-OverviewLatestVersion -ReadmeContent "# Empty`n`nNo table at all.") 'no table -> $null, so the guardrail stays silent rather than guessing'
+Assert-Equal $null (Get-OverviewLatestVersion -ReadmeContent "| Version | Date | Type | Title |`n|---|---|---|---|`n") 'a header with no rows under it -> $null (a brand-new overview is not a disagreement)'
+# The version is read from the FIRST CELL, not from anywhere in the row: a malformed version cell must
+# come back as "nothing recorded" rather than as whatever number the Title column happens to carry.
+Assert-Equal $null (Get-OverviewLatestVersion -ReadmeContent "| Version | Date | Type | Title |`n|---|---|---|---|`n| (pending) | 2026-08-21 | Patch | see 1.2.3 for the last one |`n") 'a version-less first cell is not rescued by a number later in the row'
+
+# THE LIVE INVARIANT, and unlike the pin above it maintains itself: this repo's overview and its lockstep
+# manifests must name the same release. That is precisely what the new guardrail refuses a cut over, so
+# asserting it here means the repo cannot drift into the state that would block its own next release
+# without a suite saying so first. No number is written down, so no cut has to come back and edit this.
+if (Test-Path -LiteralPath $liveReadme) {
+    $liveLatest = Get-OverviewLatestVersion -ReadmeContent (Get-Content -LiteralPath $liveReadme -Raw -Encoding UTF8)
+    $liveManifests = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot '..\..\plugins') -Recurse -Filter 'plugin.json' -File |
+        ForEach-Object { if ((Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8) -match '"version"\s*:\s*"([^"]+)"') { $Matches[1] } } | Sort-Object -Unique)
+    Assert-Equal 1 $liveManifests.Count 'the plugin manifests are in lockstep on one version (which is what makes a single baseline meaningful)'
+    Assert-Equal $liveManifests[0] $liveLatest "the overview's newest row and the lockstep manifest version name the same release -- the disagreement inbound #802 reported would refuse a cut here"
+}
+
 Write-Host "Test-ReleaseBumpEarned -- the bump has to be earned" -ForegroundColor Cyan
 function New-TierGroup {
     <# A pending-tier group as Get-PullRequestEntriesByTier returns one, Declared field included. #>
