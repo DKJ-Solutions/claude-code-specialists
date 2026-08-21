@@ -395,6 +395,11 @@ if ($deploymentTaken -and $cycleTaken) {
     # THE CYCLE FILE IS REPORTED FIRST, because that is the order the pair is in: the plan, then what it
     # delivers (Dave, August 19, 2026). Same order as Get-BranchTemplates returns them in, and as the
     # -Park commit lists them.
+    # Set by whichever of the two branches below actually writes a file, so the re-read note after them is
+    # printed only when there is something to have gone stale -- a run that KEPT both files changed nothing
+    # a session was tracking, and a note there would be advice about a thing that did not happen.
+    $branchFileWritten = $false
+
     if ($cycleTaken) {
         Write-Host "Kept: $cycleRel (already scaffolded for this branch)" -ForegroundColor Yellow
     } elseif ($cycleForeign -and (Test-BranchFileIsDirty -RepoRoot $repoRoot -RelativePath $cycleRel)) {
@@ -405,6 +410,7 @@ if ($deploymentTaken -and $cycleTaken) {
         # its heading carries the branch and the moment that branch began.
         $cycleText = ((Format-BranchProgressScaffold -Branch $branch -Intent $Intent -Id $branchId) -join "`n") + "`n"
         [System.IO.File]::WriteAllText($cyclePath, $cycleText, $Utf8NoBom)
+        $branchFileWritten = $true
         if ($cycleForeign) {
             Write-Host "Replaced: $cycleRel (it held the step list of '$cycleOwner', committed on that branch)" -ForegroundColor Yellow
         } else {
@@ -418,12 +424,20 @@ if ($deploymentTaken -and $cycleTaken) {
         Write-Warning "Kept: $deploymentRel -- it holds UNCOMMITTED work belonging to '$deploymentOwner', which exists nowhere else. This branch has no entry of its own yet: commit or discard that work, then rerun this script."
     } else {
         [System.IO.File]::WriteAllText($deploymentPath, $template, $Utf8NoBom)
+        $branchFileWritten = $true
         if ($deploymentForeign) {
             Write-Host "Replaced: $deploymentRel (it held the entry of '$deploymentOwner', committed on that branch)" -ForegroundColor Yellow
         } else {
             Write-Host "Created: $deploymentRel" -ForegroundColor Green
         }
     }
+
+    # SAID WHERE IT HAPPENS (inbound #817). The lines above name the two paths a session is about to edit
+    # and, until now, never mentioned that its own view of them had just been replaced. One line here turns
+    # a refused write further on into a known next step, in the one place a reader is already looking at
+    # exactly those files. Wording in Get-BranchFilesRereadNote, shared with the fold, which resets the same
+    # pair at the other end of the cycle.
+    if ($branchFileWritten) { Write-Host (Get-BranchFilesRereadNote) -ForegroundColor DarkGray }
 
     # The rubric, printed at the moment the entry comes into existence. The scores are filled in later, by
     # whoever finishes the branch -- so this is not a prompt to act on now; it is the scale being stated

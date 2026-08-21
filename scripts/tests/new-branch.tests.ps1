@@ -417,6 +417,13 @@ try {
     Assert-True (Test-Phrase -Text $r1.Out -Phrase 'ABOVE') 'the scaffold printout says the reason goes ABOVE the score line'
     Assert-True (Test-Phrase -Text $r1.Out -Phrase 'discarded') 'and says what happens to text below it, which is the half that makes it worth moving'
     Assert-True (Test-Phrase -Text $r1.Out -Phrase (Get-EntryScoreLabel)) 'and names the score label itself, so the reader knows which line is meant'
+    # inbound #817: THE RUN THAT REWRITES THE PAIR SAYS SO. A session whose editor had these two files open
+    # has just had its tracked view replaced, and its next write is refused as stale until it reads again --
+    # twice per cycle, on the only two files a script and a session write alternately. Asserted through the
+    # shared function so a rewording cannot drift the test, plus one phrase assert so the LINE still has to
+    # mean re-reading rather than merely be whatever that function returns.
+    Assert-True (Test-Phrase -Text $r1.Out -Phrase (Get-BranchFilesRereadNote)) 'the run that wrote the pair prints the re-read note'
+    Assert-True (Test-Phrase -Text $r1.Out -Phrase 're-read') 'and that note actually tells the reader to re-read them'
     # THE ENTRY NO LONGER CARRIES A TO-DO LIST. That job moved to branch-cycle.md with the split, and
     # this pair of asserts is what holds the two files to their separate jobs: the file that folds into
     # CHANGELOG.md prompts for what the change DOES, and nothing else.
@@ -442,6 +449,10 @@ try {
     Assert-Equal 0 $r2.Code 'idempotent second run: exit 0'
     Assert-True (Test-Phrase -Text $r2.Out -Phrase 'already existed') 'second run reports the branch already existed (checkout, not -b)'
     Assert-True (Test-Phrase -Text $r2.Out -Phrase 'already written') 'second run reports the branch files were already written'
+    # AND IT DOES NOT REPEAT THE RE-READ NOTE, because this run wrote neither file: advice about a staleness
+    # that did not happen is noise, and worse, it would train a reader to ignore the line on the run where
+    # it is true (inbound #817).
+    Assert-True (-not (Test-Phrase -Text $r2.Out -Phrase (Get-BranchFilesRereadNote))) 'a run that KEPT both files prints no re-read note -- nothing went stale'
     $headBranch2 = (& git -C $fixtureBC rev-parse --abbrev-ref HEAD).Trim()
     Assert-Equal 'feat/my-task' $headBranch2 'HEAD stays on the same branch after the second run'
     $entryText2 = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)

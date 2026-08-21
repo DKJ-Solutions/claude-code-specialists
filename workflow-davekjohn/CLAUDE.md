@@ -19,6 +19,12 @@ bites only while the workflow is in play does not belong on the always-on path.
   state — never write there until a branch exists (`new-branch` creates one and fills them).
 - `branch/branch-deployment.md` folds **verbatim** into `CHANGELOG.md` at the merge; its step-list
   companion gates the PR and the merge (`- [x]` done, `- [~]` dropped with the reason on the line).
+- **Re-read both after a script has touched them.** `new-branch` writes the pair and the fold resets it,
+  so they are the only two files here rewritten out of band — twice per cycle — and an editor tracking
+  what it last read refuses the next write until it has read again. One read fixes it, nothing is lost,
+  and both scripts now say so where they print the paths. The portable statement, with the measurement,
+  is in
+  [`BRANCH-portable.md`](../plugins/workflows/workflow-davekjohn/BRANCH-portable.md#both-files-are-rewritten-under-you-twice-per-cycle).
 - `releases/README.md` is the **living index** — the cut inserts its own row, so never add one by hand
   for a release a script will write. Everything under `releases/audience/` is a **published record**:
   links may be repointed when a target moves, prose is never rewritten.

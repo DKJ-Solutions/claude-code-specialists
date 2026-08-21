@@ -264,6 +264,25 @@ the cycle file **by path** rather than by inspecting it. The `#` now says on its
 changelog entry, but the path is what makes the exclusion true regardless of what anyone writes in the
 file — and that is the reason it was chosen when the file did carry an entry's `##`.
 
+## Both files are rewritten under you, twice per cycle
+
+`new-branch` writes the pair when the branch is created, and the fold resets both after the merge. Those
+are **two out-of-band write events per branch cycle**, and they are the only ones of their kind in a repo:
+no other file is written alternately by a script and by whoever is editing it.
+
+So **read both files again whenever a script has just touched them**, before your next edit. An editor that
+tracks what it last read refuses the write otherwise — *"file has been modified since read"* — and the
+refusal lands on the **first** write after the script, which in practice means the second and later
+branches of one sitting rather than the first. Nothing is lost and nothing is broken: one read re-syncs it
+and the write goes through. Measured over three full cycles in a single session: two refused writes, three
+stale notices, nothing clobbered. What it costs, if you are not expecting it, is a line that reads as a
+failing tool.
+
+Both scripts say so where they print those paths, which is the half that reaches whoever ran them; this
+page is the half that reaches whoever did not. **The guard itself is not a defect and is not something a
+repo can or should switch off** — it is what stops an edit silently overwriting an out-of-band change
+nobody saw, and these two files are exactly the ones where out-of-band changes are routine.
+
 ## Rules
 
 1. **The entry holds the entry block and nothing around it** — no preamble, no warning. That is what

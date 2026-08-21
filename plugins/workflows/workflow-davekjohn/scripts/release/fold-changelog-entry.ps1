@@ -739,6 +739,15 @@ if (@($folded | ForEach-Object { $_.File }) -contains $branchDeploymentRel) {
     Write-Host "Reset to its empty state: $($branchCycleRel)" -ForegroundColor Green
 }
 
+# SAID WHERE IT HAPPENS (inbound #817). This is the second of the two out-of-band write events per branch
+# cycle, and the one that costs a session its tracked view of BOTH files at once -- the entry was rewritten
+# to its reset state above, the step list just now. Printed only when a fold actually reset something, and
+# gated on the branch entry rather than on $resetPaths so a legacy root entry (removed, not reset) does not
+# get advice about a file it never had. Wording shared with new-branch.ps1, the other event.
+if (@($folded | ForEach-Object { $_.File }) -contains $branchDeploymentRel) {
+    Write-Host (Get-BranchFilesRereadNote) -ForegroundColor DarkGray
+}
+
 # --- The fold commit ------------------------------------------------------------------------------
 # WHY THIS IS IN THE SCRIPT AT ALL. The fold has always ended with a hand-typed commit, and on
 # August 2, 2026 that happened four times in one session -- the exact "noticed once, automated the
