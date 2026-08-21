@@ -18,14 +18,21 @@ disable-model-invocation: true
 
 Inbound [issue #177](https://github.com/DaveKJohn/claude-code-specialists/issues/177) (source:
 `DaveKJohn/djcylow-react`) asked for `cut-release.ps1` as a shared skill, on the assumption that a
-shareable version of it exists. It does not: this workshop's own
-`scripts/release/cut-release.ps1` is 284 lines of marketplace-specific machinery (it reads
+shareable version of it existed. **At the time it did not** — the paragraph below is the finding as it
+stood then, and the section under it says what has changed since. The source repo's own
+`scripts/release/cut-release.ps1` was 284 lines of marketplace-specific machinery (it reads
 `.claude-plugin/marketplace.json` as the source of truth for what a plugin is, bumps every
 `plugin.json` in lockstep; it also wrote per-plugin `CHANGELOG.md` sections and `RELEASE.md` cards
-until those were retired on August 8, 2026) and
-dot-sources `scripts/lib/release-lib.ps1`, which is deliberately not mirrored into the plugin
-(workshop-specific tooling). Mirroring it as-is would have handed a fresh consumer a script that
-stops on its very first line (`.claude-plugin/marketplace.json is missing`).
+until those were retired on August 8, 2026) and dot-sourced `scripts/lib/release-lib.ps1`, which was
+not mirrored into the plugin either. Mirroring it as-it-was would have handed a fresh consumer a
+script that stops on its very first line (`.claude-plugin/marketplace.json is missing`).
+
+**Both are mirrored now, and the tense above was wrong until August 21, 2026** — reported from a
+consumer as the footnote to inbound
+[#802](https://github.com/DaveKJohn/claude-code-specialists/issues/802), which read `Get-BumpType` at
+`scripts/lib/release-lib.ps1:136` **in its own install cache** while this page said the file was
+deliberately absent from it. A page that talks a reader out of looking where the answer is costs more
+than one that says nothing.
 
 **This skill is not that mirror.** It is the recommendation that came out of that finding: codify the
 *procedure* — the closing steps every release shares, regardless of what cut the version bump itself
@@ -129,13 +136,27 @@ a release for a missing timestamp would be ceremony rather than a guard.
    Cutting a release through it would run the previous release's cut.
 
    Give it **either** `-Bump` **or** `-Version <X.Y.Z>` when you want to name the number yourself.
-   `-SummaryFile` turns it into a milestone (see below). Four escape valves:
+   `-SummaryFile` turns it into a milestone (see below). Five escape valves:
 
    - **`-NoPush` — inspect before publishing, and use it when anything is unusual.** The script otherwise
      commits, tags **and pushes** in one motion. With `-NoPush` it stops after the commit and tag and
      prints the two push commands for you, which is the moment to read the generated notes. That is not
      optional caution: an entry body's stray `##` is read as a change of its own, and this is the only step
-     where a human sees the assembled artifact before it is public.
+     where a human sees the assembled artifact before it is public. **Its closing line names the baseline
+     too** (`1.4.0 -> 1.4.1, Patch`) — it did not until August 21, 2026, so the flag whose whole purpose is
+     reading a release before it is public was the one path that hid the number every label hangs on
+     (inbound [#802](https://github.com/DaveKJohn/claude-code-specialists/issues/802)).
+   - **`-Type <major|minor|patch>` — state the bump type instead of letting it be inferred.** Belongs with
+     `-Version`; refused alongside `-Bump`, which says the same thing already. **You need it in exactly one
+     situation**: a repo whose git tag line and whose recorded release numbering have deliberately
+     diverged — tags used for something other than releases, per-component tags in a monorepo, imported
+     history. The cut refuses such a release rather than cutting it, because a baseline that belongs to a
+     different release mislabels this one in four places at once and in silence: the notes, the overview
+     row, the question the tier gate answers, and whether the hand-written consumer document is drafted at
+     all. **It is deliberately not a `-Skip` switch** — a bypass would hand back the very label the check
+     caught, while stating the type produces a correct release. Reported from a consumer as
+     [#802](https://github.com/DaveKJohn/claude-code-specialists/issues/802), where a single stray `v*` tag
+     is enough to trigger the same thing with no policy decision by anyone.
    - **`-SkipLint`** skips the integrity gate that otherwise runs first. It exists for a genuinely broken
      gate, not for a hurry — the gate is what stops a release refusing to cut halfway through.
    - **`-SkipTests`** skips the test suites, which run right after the lint and before anything is
