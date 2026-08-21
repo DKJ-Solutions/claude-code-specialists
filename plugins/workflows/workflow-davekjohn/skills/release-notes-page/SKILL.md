@@ -71,14 +71,15 @@ door — and the consequence is that nothing in git remembers your URL, so whoev
 elsewhere. In a **private** repo, commit it: a tracked token is what survives a lost machine, and it is
 already inside a repository only your people can read.
 
-## Making it yours: three seam values, and one of them has a consequence outside your repo
+## Making it yours: four seam values, and one of them has a consequence outside your repo
 
-All three live in your own `scripts/repo-config.ps1`, all three optional:
+All four live in your own `scripts/repo-config.ps1`, all four optional:
 
 | function | what it answers | absent |
 |---|---|---|
 | `Get-ReleasePageTitle` | the heading and window title — what the reader should understand the page to be, usually the **product's** name rather than the repository's | falls back to the name half of `Get-RepoName` |
 | `Get-ReleasePageTheme` | the page's colours — custom-property overrides, as a map | no overrides; the page keeps its shipped palette in light and dark |
+| `Get-ReleasePageMasthead` | your own wordmark(s), above the title | no marks; the masthead is the eyebrow, the title and the subtitle |
 | `Get-ReleasePageWorkerName` | the Cloudflare Worker that serves it | `''` — the page is built and hosted nowhere, and `-Worker` refuses while naming this function |
 
 **The palette exists because this page often reports to people outside engineering**, and it then has to
@@ -108,7 +109,39 @@ Three things to know before you write one:
   naming the key**, and the page is still built. So a typo costs one colour, never the report. A gradient
   or a web font is outside this seam by design.
 
-**Read this before answering the second one.** The worker serves the page at `/notes/<32 hex>`, and
+### The masthead marks
+
+`Get-ReleasePageMasthead` puts your own wordmark(s) above the title. It exists because a consumer whose
+hand-edited page was replaced by this one lost the imagery it carried, and restyling the template in one
+repo would fork the core's visual identity while leaving every other consumer without it.
+
+```powershell
+function Get-ReleasePageMasthead {
+    return @(
+        @{ Src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0i...'; Alt = 'Acme UK' },
+        @{ Src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0i...'; Alt = 'Acme NL' }
+    )
+}
+```
+
+A bare `data:` string is accepted too, for the one-mark case. Four things to know:
+
+- **Data-URIs only, and base64 only.** The page is deliberately self-contained — a request to a third
+  party would leak who is reading it — so a URL is dropped with a named warning rather than fetched. A raw
+  `data:image/svg+xml,<svg ...>` is refused for a second reason: that payload is markup inside an
+  attribute, and not having to reason about whether the escaping is complete beats escaping it.
+- **Three ceilings, all enforced with a warning and never with a build failure:** at most **two** marks,
+  **32 KB** per mark, **64 KB** in total, measured as the length of the data URI, which is what the reader
+  actually pays. A bad or oversized value costs that image and nothing else — the page is a reading copy
+  of documents that are already correct, so refusing to build it over a logo would be the wrong trade.
+- **Two, not five.** The cap is a measurement rather than a technical bound: the consumer this came from
+  tried five and cut back to two, because five read as a page about the brands rather than about the
+  releases.
+- **`Alt` defaults to empty**, which is the correct answer for a mark beside a title that already names
+  the product: an empty alt tells a screen reader the image is decorative, and inventing text would make
+  it read the same fact twice. Pass `Alt` where the mark says something the title does not.
+
+**Read this before answering the last one.** The worker serves the page at `/notes/<32 hex>`, and
 **that path is the only lock on it**: there is no login, so anyone with the link can read. The page
 carries `noindex` in both the response header and the meta tag, because a link nobody can guess is
 worth nothing once a crawler has published it. Answer this only where the notes are safe in the hands

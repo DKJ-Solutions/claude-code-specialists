@@ -324,6 +324,17 @@
                     },
                     {
                         "lib":  "scripts\\repo-config.ps1",
+                        "function":  "Get-ReleasePageMasthead",
+                        "adopt":  "decide",
+                        "adoptWhy":  "a wordmark is a claim about whose product the page is, so copying the source\u0027s answer puts another brand\u0027s mark on your page -- the same reasoning as Get-ReleasePageTitle and Get-ReleasePageTheme, one step further into the look",
+                        "optional":  true,
+                        "default":  "no marks -- the masthead is the eyebrow, the title and the subtitle, as shipped",
+                        "returns":  "one or more inline images for the masthead, above the page title: a \u0027data:image/\u003ctype\u003e;base64,\u003cpayload\u003e\u0027 string, or a map with Src and Alt, or a list of either. DATA-URIs ONLY, and base64 only: the page is deliberately self-contained (a request to a third party leaks who is reading it) and a raw svg payload would be markup inside an attribute. Three documented ceilings, each enforced with a warning rather than a build failure -- at most 2 marks (measured: a consumer tried five and cut back to two, because five read as a page about the brands rather than about the releases), 32 KB per mark and 64 KB in total. Alt defaults to empty, which is correct for a mark beside a title that already names the repo",
+                        "declared":  false,
+                        "text":  ""
+                    },
+                    {
+                        "lib":  "scripts\\repo-config.ps1",
                         "function":  "Get-ReleasePageTheme",
                         "adopt":  "decide",
                         "adoptWhy":  "a palette is a claim about whose product the page is. Copying the source\u0027s answer paints your page in another brand\u0027s colours and nothing errs -- the same failure mode as Get-ReleasePageTitle, one layer down from the words into the look",
