@@ -521,12 +521,13 @@ function Get-SharedScriptPairs {
             SkillParamsExempt = @('RootOverride')
         },
         @{
-            # The sync's two QUERIES, as a lib of their own (inbound #787). The policy is one sentence;
-            # what the risk sits in is when it fires -- where to measure from, and whether a path counts
-            # as touched. A deletion is also a touch, and that is the case the first hand-written
-            # implementation got wrong. Both are testable only if they load without running a sync, which
-            # is the whole reason this is a separate file rather than three functions at the top of
-            # sync-main.ps1.
+            # The sync's QUERIES, as a lib of their own (inbound #787). The policy is one sentence; what
+            # the risk sits in is when it fires -- whether a path has ever held live's bytes (inbound
+            # #807, which is what decides now), whether a line-ending difference is a difference at all,
+            # and where to measure a both-sides-moved conflict from. A deletion is also a touch, and that
+            # is the case BOTH hand-written implementations got wrong. Every one of them is testable only
+            # if it loads without running a sync, which is the whole reason this is a separate file rather
+            # than a handful of functions at the top of sync-main.ps1.
             #
             # DEPENDENCY-FREE, and specifically NOT a reader of repo-config.ps1: the live-theme guard
             # dot-sources that file on every command inside a catch that returns no live theme id, so
