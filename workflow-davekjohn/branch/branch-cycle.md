@@ -24,7 +24,9 @@ from the report, so what ships is the measured code and not a paraphrase of it.
 - [x] `start-task` rewritten: it opens the branch and no longer creates a theme. Not in #805's scope, but
       the two pages would otherwise contradict each other -- one telling you to create a theme at branch
       time while the other creates it lazily
-- [x] The plugin manifest description and the two `<!-- skills:all -->` spans in `README.md`
+- [x] The plugin manifest description and the two `skills:all` spans in `README.md` (written without the
+      comment markers here on purpose -- the lint reads a literal opening marker in any scanned document
+      as an unclosed span, and refused this file until it was rephrased)
 
 ## TEST
 
