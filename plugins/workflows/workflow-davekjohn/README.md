@@ -62,6 +62,13 @@ the heading is what made the gap look like a decision. A partial list of an enum
 none: a reader who finds four of their skills undocumented here cannot tell which of the two documents is
 wrong.
 
+**It happened again, and the shape is worth naming: dropping the count did not stop the drift, it only
+made it quieter.** `check-branch-entry` shipped without a row and stayed missing until August 21, 2026,
+when `prune-merged` was added and the set was recounted — 13 rows against 14 directories. Nothing here is
+machine-checked: the source repo's own README carries marked skill spans that its lint gate holds to the
+canonical set, and this table carries none, so the only thing keeping it true is that whoever adds a skill
+counts the rows. **Count when you add one.**
+
 | skill | when |
 |---|---|
 | [`adopt-workflow-folder`](skills/adopt-workflow-folder/SKILL.md) | right after installing — scaffolds `workflow-davekjohn/`, the one folder in your root where everything portable gathers (an install alone writes nothing into your repo) |
@@ -72,6 +79,8 @@ wrong.
 | [`open-pr`](skills/open-pr/SKILL.md) | the work is committed — runs the four gates, pushes, opens the PR with the title and body composed from the entry |
 | [`ship-pr`](skills/ship-pr/SKILL.md) | open → wait for CI → merge → fold, in one motion |
 | [`fold-changelog`](skills/fold-changelog/SKILL.md) | the fold on its own, after a merge done by hand |
+| [`check-branch-entry`](skills/check-branch-entry/SKILL.md) | the CI gate on the branch dossier — the same two checks `open-pr` runs, where a hand-pushed branch cannot escape them |
+| [`prune-merged`](skills/prune-merged/SKILL.md) | merged branches have piled up in the clone — reaps the local ones it can prove are merged, and leaves every other one alone |
 | [`cut-release`](skills/cut-release/SKILL.md) | the release: the bump, the notes, the tag, and the closing steps the script does not automate |
 | [`release-notes-page`](skills/release-notes-page/SKILL.md) | after a release — builds the hand-written notes into one browsable page for the reader they are written for, and optionally the Cloudflare Worker that hosts it |
 | [`lock`](skills/lock/SKILL.md) | closing a session — records where the work stands before a context clear |
