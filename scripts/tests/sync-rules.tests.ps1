@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Regression tests for scripts/lib/sync-rules.ps1 -- the two queries team-shopify's pre-task sync is
-    built on (inbound #787).
+    built on (inbound #787, extended with the merged-sync-branch case from inbound #801).
 
 .DESCRIPTION
     Dependency-free: no Pester needed, only PowerShell and git.
@@ -145,6 +145,45 @@ try {
     Push-Location -LiteralPath $two
     try {
         Assert-Equal $second (Get-SyncReferencePoint).Ref 'ref/two: the MOST RECENT sync commit is the floor'
+    } finally { Pop-Location }
+
+    # A MERGED SYNC BRANCH, WHICH IS THE WORST CASE THIS SUITE HOLDS (inbound #801). '--grep' matches any
+    # LINE of a message, and a merge commit carries the merged commit's subject in its body -- so the
+    # merge matches the pattern, and right after a sync PR lands that merge is HEAD. A floor on HEAD makes
+    # Test-MainTouchedSince answer $false for every path and the exclusion rule keeps NOTHING back, while
+    # printing a reference point as though all were well. Both halves are asserted: that the shipped
+    # lookup skips the merge, AND that a lookup without --no-merges genuinely picks it -- so the flag
+    # cannot be tidied away later as a style choice.
+    $merged = New-GitTree -Label 'merged'
+    Add-Commit -Dir $merged -Message 'initial' -Write @{ 'a.txt' = 'a1' } | Out-Null
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $trunkName = ([string](& git -C $merged rev-parse --abbrev-ref HEAD)).Trim()
+        & git -C $merged checkout -q -b 'sync/live-2026-08-20' | Out-Null
+    } finally { $ErrorActionPreference = $prevEap }
+    $syncOnBranch = Add-Commit -Dir $merged -Message 'sync: mirror in-flight third-party edits from live (2 file(s))' -Write @{ 'b.txt' = 'b1' }
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & git -C $merged checkout -q $trunkName | Out-Null
+        # Two -m flags: the first is the subject, the second the body -- the shape gh writes for a merge.
+        & git -C $merged merge --no-ff -q 'sync/live-2026-08-20' `
+            -m 'merge: sync/live-2026-08-20 (#27)' `
+            -m 'sync: mirror in-flight third-party edits from live (2 file(s))' | Out-Null
+        $mergeSha = ([string](& git -C $merged rev-parse HEAD)).Trim()
+    } finally { $ErrorActionPreference = $prevEap }
+
+    Push-Location -LiteralPath $merged
+    try {
+        Assert-True ($mergeSha -ne $syncOnBranch) 'ref/merged: the merge commit really is HEAD (fixture sanity)'
+        Assert-Equal $syncOnBranch (Get-SyncReferencePoint).Ref 'ref/merged: the floor is the SYNC commit, not the merge that brought it in'
+
+        # The regression half. Without --no-merges this same lookup answers with the merge, i.e. HEAD --
+        # which is the failure measured in the consumer, not a hypothetical.
+        $unrepaired = Invoke-SyncGitQuiet log -1 --format=%H "--grep=$(Get-SyncDefaultReferencePattern)" 'HEAD' |
+            Where-Object { $_ } | Select-Object -First 1
+        Assert-Equal $mergeSha ([string]$unrepaired).Trim() 'ref/merged: WITHOUT --no-merges the lookup does pick the merge, so the flag is load-bearing'
     } finally { Pop-Location }
 
     # No sync commit, but a tag: a wider window, and worth reporting as such.
