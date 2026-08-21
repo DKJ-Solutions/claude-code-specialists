@@ -24,7 +24,10 @@
          for a sync branch carries the sync commit's subject in its BODY, so the pattern matched the
          MERGE and the floor landed on HEAD. With the floor at HEAD nothing counts as touched-since and
          the rule passed every file straight through -- the exact no-floor failure it exists to prevent,
-         arriving as a GREEN run. Repaired with '--no-merges' in Get-SyncReferencePoint (inbound #801).
+         arriving as a GREEN run. Repaired in Get-SyncReferencePoint in two steps: '--no-merges' first
+         (inbound #801), and then -- because that removes only the MERGE commits, while any ordinary
+         commit whose body opens a line with 'sync' still won -- by matching the pattern against the
+         commit SUBJECT rather than through '--grep' at all (inbound #819).
       2. Deeper, and not fixable by repairing the floor: nothing pushes the trunk TO live except the
          per-file release step, and a deletion cannot be pushed that way at all -- so the trunk's changes
          are permanently invisible to live and sink below the floor as soon as one more sync commit

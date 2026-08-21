@@ -160,8 +160,10 @@ try {
     # merge matches the pattern, and right after a sync PR lands that merge is HEAD. A floor on HEAD makes
     # Test-MainTouchedSince answer $false for every path and the exclusion rule keeps NOTHING back, while
     # printing a reference point as though all were well. Both halves are asserted: that the shipped
-    # lookup skips the merge, AND that a lookup without --no-merges genuinely picks it -- so the flag
-    # cannot be tidied away later as a style choice.
+    # lookup skips the merge, AND that the old '--grep' lookup genuinely picks it -- so that shape
+    # cannot come back later as a cheaper equivalent. What EXCLUDES the merge changed with #819: the
+    # subject-anchored lookup does it, because a merge's own subject is 'merge:'. See ref/chatty below
+    # for the case '--no-merges' never reached.
     $merged = New-GitTree -Label 'merged'
     Add-Commit -Dir $merged -Message 'initial' -Write @{ 'a.txt' = 'a1' } | Out-Null
     $prevEap = $ErrorActionPreference
@@ -187,11 +189,51 @@ try {
         Assert-True ($mergeSha -ne $syncOnBranch) 'ref/merged: the merge commit really is HEAD (fixture sanity)'
         Assert-Equal $syncOnBranch (Get-SyncReferencePoint).Ref 'ref/merged: the floor is the SYNC commit, not the merge that brought it in'
 
-        # The regression half. Without --no-merges this same lookup answers with the merge, i.e. HEAD --
-        # which is the failure measured in the consumer, not a hypothetical.
+        # The regression half, and note WHAT it now protects (#819). It used to be labelled "so the
+        # flag is load-bearing", which was true of the '--grep' lookup and is no longer the reason
+        # this fixture passes: the subject-anchored lookup excludes the merge because its SUBJECT is
+        # 'merge:', with or without the flag. Kept and relabelled rather than deleted, because the
+        # thing it actually pins survives the change -- the '--grep' shape is measurably wrong here,
+        # so nobody can restore it as a cheaper equivalent.
         $unrepaired = Invoke-SyncGitQuiet log -1 --format=%H "--grep=$(Get-SyncDefaultReferencePattern)" 'HEAD' |
             Where-Object { $_ } | Select-Object -First 1
-        Assert-Equal $mergeSha ([string]$unrepaired).Trim() 'ref/merged: WITHOUT --no-merges the lookup does pick the merge, so the flag is load-bearing'
+        Assert-Equal $mergeSha ([string]$unrepaired).Trim() 'ref/merged: the OLD --grep shape picks the merge, so it cannot come back'
+    } finally { Pop-Location }
+
+    # AN ORDINARY COMMIT THAT MERELY TALKS ABOUT A SYNC (inbound #819). This is the case '--no-merges'
+    # does not reach and had no coverage: one parent, subject 'fix:', and a BODY line opening with
+    # 'sync'. '--grep' is line-oriented over the whole message, so the old lookup made it the floor --
+    # newer than the real sync, which means fewer files protected and merged trunk work overwritten by
+    # live, on a run that reports a reference point and looks green. Measured in the consumer that had
+    # already taken the '--no-merges' repair: floor..HEAD went from 13 commits to 5.
+    $chatty = New-GitTree -Label 'chatty'
+    Add-Commit -Dir $chatty -Message 'initial' -Write @{ 'a.txt' = 'a1' } | Out-Null
+    $realSync = Add-Commit -Dir $chatty -Message 'sync: live theme drift 2026-08-21' -Write @{ 'b.txt' = 'b1' }
+    $chattyFix = Add-Commit -Dir $chatty -Write @{ 'c.txt' = 'c1' } -Message @'
+fix: a sync PR states what a third party did, renames included
+
+sync-main.tests.ps1 goes from 20 to 32 asserts. One earns its place twice: the
+'@
+
+    Push-Location -LiteralPath $chatty
+    try {
+        Assert-True ($chattyFix -ne $realSync) 'ref/chatty: the talkative commit is newer than the real sync (fixture sanity)'
+        Assert-Equal $realSync (Get-SyncReferencePoint).Ref 'ref/chatty: the floor is the real sync, not the fix: commit that mentions one in its body'
+        Assert-Equal 'sync'    (Get-SyncReferencePoint).Kind 'ref/chatty: and it is still reported as a sync floor'
+
+        # The regression half, and the one that shows '--no-merges' was never enough: it is passed here
+        # and changes nothing, because this commit has exactly one parent.
+        $unrepaired = Invoke-SyncGitQuiet log -1 --no-merges --format=%H "--grep=$(Get-SyncDefaultReferencePattern)" 'HEAD' |
+            Where-Object { $_ } | Select-Object -First 1
+        Assert-Equal $chattyFix ([string]$unrepaired).Trim() 'ref/chatty: WITH --no-merges the --grep lookup still picks the body line, so the flag was necessary and not sufficient'
+    } finally { Pop-Location }
+
+    # The seam still narrows, on the SUBJECT now. The pattern reaches exactly as far as it always did;
+    # only where it is applied changed, and a consumer that narrows it must still get $null rather than
+    # a quietly wider match.
+    Push-Location -LiteralPath $chatty
+    try {
+        Assert-True ($null -eq (Get-SyncReferencePoint -Pattern '^Sync ')) 'ref/chatty: a narrowed pattern that no SUBJECT matches answers $null, not the body line'
     } finally { Pop-Location }
 
     # No sync commit, but a tag: a wider window, and worth reporting as such.

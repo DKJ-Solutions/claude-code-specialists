@@ -63,11 +63,13 @@ function Get-SyncDefaultReferencePattern {
         and a repo whose history says something else narrows it through the seam rather than by editing
         this file.
 
-        AND THE SEAM CANNOT NARROW AWAY A MERGE COMMIT, WHICH IS WHY THAT ONE IS HANDLED IN THE LOOKUP
+        AND THE SEAM CANNOT NARROW AWAY A BODY LINE, WHICH IS WHY THAT ONE IS HANDLED IN THE LOOKUP
         ITSELF. '--grep' is line-oriented over the whole message, so no pattern can distinguish "the
-        subject starts with sync" from "a body line starts with sync" -- and a merge commit carries the
-        merged commit's subject in its body. Get-SyncReferencePoint passes '--no-merges' for that;
-        see its own note.
+        subject starts with sync" from "a body line starts with sync" -- and any commit that merely
+        DISCUSSES a sync, a merge commit carrying the merged subject in its body included, matches.
+        No looseness the seam can remove is involved: '^sync' alone picks the same wrong commit.
+        So Get-SyncReferencePoint does not use '--grep' at all -- it reads the subject as its own
+        field and applies this pattern to that. See its own note for the measurement.
     #>
     return '^[Ss]ync'
 }
@@ -104,22 +106,59 @@ function Get-SyncReferencePoint {
         So the merge matches the pattern. Right after a sync PR lands that merge is HEAD, the floor
         becomes HEAD, Test-MainTouchedSince answers $false for every path, and the rule keeps NOTHING
         back -- with 'Reference point: <sha> (the previous sync commit)' printed above it. The seam
-        cannot help: no --grep pattern separates a subject from a body line, and --no-merges does.
+        cannot help: no --grep pattern separates a subject from a body line.
 
         Measured in a consumer on 2026-08-21 (inbound #801): the next sync was about to delete 41 lines
         of translations across two locale files, revert two '| raw' removals, and resurrect 23 locale
         files a commit had deliberately dropped -- 31 files over three merged PRs. Skipping merges can
         only move the floor BACKWARD, onto the sync commit the merge brought in, and backward is the
         protective direction; the regression suite pins both halves.
+
+        BUT '--no-merges' IS NECESSARY AND NOT SUFFICIENT, AND THIS DOCSTRING USED TO CLAIM OTHERWISE.
+        It said '--no-merges' separates a subject from a body line. It does not -- it removes merge
+        commits and nothing else. An ORDINARY single-parent commit whose body happens to open a line
+        with 'sync' still matches '--grep' and still becomes the floor, and a commit message that
+        merely DISCUSSES the sync script is enough to do it. Inbound #819 measured it in the consumer
+        that had just taken the '--no-merges' repair: the floor landed on a 'fix:' commit whose body
+        line read 'sync-main.tests.ps1 goes from 20 to 32 asserts', 48 minutes newer than the real
+        previous sync -- 5 commits in floor..HEAD instead of 13, so eight commits of trunk work read
+        as untouched and were about to be overwritten by live. Same green run, same failure mode; the
+        flag had narrowed the hole rather than closed it. Of the three false positives in that repo's
+        history, '--no-merges' caught one.
+
+        Re-measured in THIS repo the same day, where it is starker: the source repo has ZERO commits
+        with a sync subject -- it runs no live-theme sync -- and the '--grep' lookup still answered a
+        commit, subject 'fix: the Shopify pre-task sync decides by content provenance...', six such
+        false positives in 2,012 commits. The truthful answer here is 'no sync commit, fall through to
+        the tag', which is what the subject-anchored lookup now gives.
+
+        SO THE PATTERN IS MATCHED AGAINST THE SUBJECT FIELD, AND '--grep' IS GONE. '--no-merges' stays:
+        a merge's own subject is 'merge:' while its body carries the sync subject, so it is already
+        excluded by the anchoring -- keeping the flag costs nothing and keeps the intent legible.
+        The seam is untouched: Get-SyncDefaultReferencePattern and the -Pattern parameter mean exactly
+        what they did; only WHERE the pattern is applied changed.
+
+        AND THE PREFILTER WAS DELIBERATELY NOT KEPT, though it would have been correct. Every subject
+        is a line of its own message, so '--grep=$Pattern' is a strict superset of the subject match
+        and could have narrowed the scan first. It would also make correctness depend on git's POSIX
+        basic regex and .NET's engine agreeing about a pattern a CONSUMER supplies through the seam --
+        a pattern .NET matches and git's BRE does not would be filtered out before the subject was ever
+        read, and the failure would be a floor that is silently too recent. Measured here at 2,012
+        commits: the full subject scan costs 94 ms against the old query's 48 ms. 46 ms is not worth a
+        second regex engine in the correctness path.
     #>
     param(
         [string]$Ref = 'HEAD',
         [string]$Pattern = (Get-SyncDefaultReferencePattern)
     )
 
-    $sync = Invoke-SyncGitQuiet log -1 --no-merges --format=%H "--grep=$Pattern" $Ref |
-        Where-Object { $_ } | Select-Object -First 1
-    if ($sync) { return @{ Ref = [string]$sync; Kind = 'sync' } }
+    # The pattern is applied to the SUBJECT FIELD, not through '--grep'. See the note above: '--grep'
+    # is line-oriented over the whole message, so the match has to happen outside it. Reading the
+    # subject as its own field is the only way to ask the question the rule actually means.
+    $sync = Invoke-SyncGitQuiet log --no-merges '--format=%H%x09%s' $Ref |
+        Where-Object { $_ -and (($_ -split "`t", 2)[1] -match $Pattern) } |
+        Select-Object -First 1
+    if ($sync) { return @{ Ref = [string]($sync -split "`t", 2)[0]; Kind = 'sync' } }
 
     $tag = Invoke-SyncGitQuiet describe --tags --abbrev=0 $Ref |
         Where-Object { $_ } | Select-Object -First 1

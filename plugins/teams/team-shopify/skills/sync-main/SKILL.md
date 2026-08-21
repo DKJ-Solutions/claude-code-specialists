@@ -137,12 +137,25 @@ live theme (<store>)` since May 2026 -- capital S, no colon. A pattern that matc
 in the other, falls through to the tag lookup, finds nothing there either in a repo with no tags, and
 **aborts on the first run**. `^[Ss]ync` is exactly the two spellings in use and nothing wider.
 
-**And no pattern can fix the merge-commit case, which is why that one is handled in the lookup itself.**
-`--grep` matches any *line* of a message, and a merge commit carries the merged commit's subject in its
-body -- so right after a sync PR lands, the merge matches and the floor becomes `HEAD`. The lookup passes
-`--no-merges` for that (inbound
-[#801](https://github.com/DaveKJohn/claude-code-specialists/issues/801)), and the suite pins both halves
-so the flag cannot be tidied away as a style choice.
+**And no pattern can fix a body line, which is why that one is handled in the lookup itself.** `--grep`
+matches any *line* of a message, so it cannot tell "the subject starts with sync" from "a body line
+starts with sync". A merge commit carries the merged commit's subject in its body, so right after a sync
+PR lands the merge matches and the floor becomes `HEAD`; the lookup took `--no-merges` for that (inbound
+[#801](https://github.com/DaveKJohn/claude-code-specialists/issues/801)).
+
+**That flag was necessary and not sufficient, and the lookup no longer uses `--grep` at all** (inbound
+[#819](https://github.com/DaveKJohn/claude-code-specialists/issues/819)). `--no-merges` removes merge
+commits and nothing else, so an *ordinary* single-parent commit whose body happens to open a line with
+`sync` still became the floor -- a commit message that merely **discusses** the sync script was enough.
+Measured in a consumer that had already taken the `--no-merges` repair: the floor landed 48 minutes too
+late, on a `fix:` commit, and `floor..HEAD` fell from 13 commits to 5 -- eight commits of trunk work
+reading as untouched and about to be overwritten by live, on a run reporting a reference point and
+looking green. So the pattern is now matched against the commit **subject**, read as its own field.
+
+Nothing about the seam changed: `Get-SyncDefaultReferencePattern` and the pattern you pass still mean
+exactly what they did, and still narrow. `--no-merges` stays because a merge's own subject is `merge:`
+and keeping the flag makes the intent legible. The suite pins the true positive, the merge, the body
+line, and both old shapes, so neither can come back as a cheaper equivalent.
 
 **Which directories are compared is not a seam**, deliberately: the set is defined by the platform
 (`assets`, `blocks`, `config`, `layout`, `locales`, `sections`, `snippets`, `templates`), not by your repo.
