@@ -38,16 +38,29 @@ $script:fail = 0
 
 function Get-FlatOutput {
     <#
-        Captured child output, newlines removed, so a phrase assert cannot fail on a line break the
-        behaviour under test does not decide. A native child's stderr captured with 2>&1 arrives as a
-        NativeCommandError, which PowerShell renders with a 'powershell.exe : ' prefix and WRAPS at the
-        host width -- so the wrap point moves with the console width and with the length of the
-        fixture's temp path, neither of which this script decides. Removed rather than collapsed to a
-        space: a mid-word break leaves 'dirt' + 'y working tree' and a space between them matches
-        nothing. Same reasoning as park-branch.tests.ps1 and shared-scripts.tests.ps1.
+        Captured child output as ONE line: every record read as text, then joined with nothing between.
+        A native child's stderr captured with 2>&1 arrives as a NativeCommandError per stderr LINE, and
+        the child has already WRAPPED its message at its own host width -- a point that moves with the
+        console width and with the length of the fixture's temp path, neither of which this script
+        decides. So a phrase assert must survive a break anywhere.
+
+        Read as text rather than rendered with Out-String, which is the part that used to break it:
+        Out-String FORMATS each of those records for display, and the decoration it adds ('At <file>:<line>
+        char:<n>', the '+ CategoryInfo' block, '+ FullyQualifiedErrorId : NativeCommandError') lands
+        BETWEEN the two halves of a wrapped sentence. Removing newlines cannot bridge that -- there is now
+        a paragraph of PowerShell in the gap, not a line break. Measured on prune-merged's no-trunk
+        refusal, which is long enough to wrap mid-phrase on a developer machine while staying whole in
+        CI: green there, red here, for a script that was correct in both places.
+
+        Joined with '' rather than a space because the wrap is a HARD break at a column, so the halves
+        reconstruct exactly ('dirt' + 'y working tree'); a space between them would match nothing.
+        park-branch.tests.ps1, shared-scripts.tests.ps1, new-branch.tests.ps1,
+        find-specialist-mentions.tests.ps1 and session-status.tests.ps1 carry the older copy of this
+        helper. They are green, so they are deliberately left alone rather than repaired pre-emptively --
+        the risk is named in this release's entry.
     #>
     param($Captured)
-    return (($Captured | Out-String) -replace "`r?`n", '')
+    return (($Captured | ForEach-Object { [string]$_ }) -join '')
 }
 
 function Assert-Equal {
