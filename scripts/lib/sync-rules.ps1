@@ -1,14 +1,20 @@
 <#
 .SYNOPSIS
-    The two pure queries the Shopify pre-task sync is built on: where to measure from, and who wins a
-    file.
+    The pure rules the Shopify pre-task sync is built on: where to measure from, whose content a
+    path has held, and who wins a file.
 
 .DESCRIPTION
     Separated from scripts/task/sync-main.ps1 on purpose, and it is not tidiness. The risk in a sync is
-    not the policy -- "the trunk wins what the trunk touched" is one sentence -- it is the two QUERIES
-    that decide when the policy fires. Both are testable only if they can be loaded without running a
-    sync, so they live here and scripts/tests/sync-rules.tests.ps1 exercises them against a fixture
-    repository.
+    not the policy -- it is one sentence either way -- it is the QUERIES that decide when the policy
+    fires. Every one of them is testable only if it can be loaded without running a sync, so they live
+    here and scripts/tests/sync-rules.tests.ps1 exercises them against a fixture repository.
+
+    THE POLICY CHANGED ON AUGUST 21, 2026 (inbound #807) AND THIS FILE IS IN TWO HALVES BECAUSE OF IT.
+    The first half is the TIME window -- Get-SyncReferencePoint and Test-MainTouchedSince -- which used to
+    decide who won a file and now only escalates a both-sides-changed case to a human. The second half,
+    under "THE CONTENT RULE" below, is what decides now. Read that banner first: it says why a floor
+    cannot answer the question the rule is asking, which is the reason the first half was demoted rather
+    than repaired.
 
     DEPENDENCY-FREE, AND DELIBERATELY NOT A READER OF scripts/repo-config.ps1. That file is read by
     team-shopify's live-theme guard on EVERY command, inside a 'try { . $configPath } catch { return
@@ -164,4 +170,234 @@ function Test-MainTouchedSince {
     $logArgs = @('log', '--oneline', "$Since..HEAD", '--', $Path)
     $touched = Invoke-SyncGitQuiet @logArgs | Where-Object { $_ }
     return [bool]$touched
+}
+
+# ----------------------------------------------------------------------------------------------------
+# THE CONTENT RULE (inbound #807, August 21, 2026). What decides who wins a file, in place of the clock.
+#
+# WHY THE TIME WINDOW HAD TO GO, and it is not an off-by-one. The question the exclusion rule wants
+# answered is "is the trunk's version newer than live's". A floor cannot answer it, because nothing
+# pushes the trunk TO live except the per-file release step ('--only'), and a deletion cannot be pushed
+# that way at all -- so the trunk's changes are permanently invisible to live and sink below the floor as
+# soon as one more sync commit lands. After that, every future sync tries to overwrite them again,
+# forever. In a repo that has adopted the changelog model this is not an edge case: "merged but not live
+# yet" is a DESIGNED state, and every pending entry names work a wholesale sync would revert.
+#
+# THE RULE THAT REPLACED IT. Has this path ever held live's content in the trunk's own history? Then the
+# trunk wins. Otherwise live wins -- and if the trunk also changed it, nobody wins and a human looks.
+#
+# THE FLOOR SURVIVES, DEMOTED. Its only remaining job is to notice that live's content is foreign AND the
+# trunk changed the same path recently -- both sides moved -- and refuse. A wrong floor then costs an
+# extra conflict report rather than silent data loss, which is a far better failure mode for the piece of
+# this that is hardest to get right.
+# ----------------------------------------------------------------------------------------------------
+
+function Get-GitRawBlobId {
+    <#
+    .SYNOPSIS
+        git's own object id for a byte stream: SHA1('blob ' + length + NUL + bytes).
+
+    .DESCRIPTION
+        PURELY AN OPTIMISATION, AND WHAT IT BUYS IS PROCESS COUNT. The sync has to decide which of live's
+        several hundred files differ from the trunk at all. Through 'git cat-file' that is one process per
+        file, and on Windows that is the difference between a second and well over a minute -- slow enough
+        that somebody starts skipping the step, which is how the sync got dangerous in the first place.
+
+        So the comparison runs in two stages. Stage one is this function against 'git ls-tree -r HEAD',
+        entirely in .NET with no subprocess: identical ids mean identical files, which is true of most of
+        the tree. Only the remainder -- the genuinely changed files PLUS the ones differing in CR bytes
+        alone -- pays for the CR-normalised comparison.
+
+        It has to agree with 'git hash-object --no-filters' exactly, or stage one would report files as
+        unchanged that are not, which is the worst failure shape here: a silent skip. The suite asserts it
+        against real git output rather than against itself.
+    #>
+    param([Parameter(Mandatory = $true)][AllowEmptyCollection()][byte[]]$Bytes)
+
+    $header = [System.Text.Encoding]::ASCII.GetBytes("blob $($Bytes.Length)" + [char]0)
+    $buf = New-Object byte[] ($header.Length + $Bytes.Length)
+    [System.Array]::Copy($header, 0, $buf, 0, $header.Length)
+    if ($Bytes.Length -gt 0) { [System.Array]::Copy($Bytes, 0, $buf, $header.Length, $Bytes.Length) }
+    $sha = [System.Security.Cryptography.SHA1]::Create()
+    try {
+        return ([System.BitConverter]::ToString($sha.ComputeHash($buf)) -replace '-', '').ToLower()
+    } finally { $sha.Dispose() }
+}
+
+function Get-CrStrippedBytes {
+    <#
+    .SYNOPSIS
+        The same byte stream with every CR (0x0D) removed, so CRLF and LF hash alike.
+
+    .DESCRIPTION
+        WITHOUT THIS THE CONTENT RULE MISFIRES, AND IT MISFIRES IN THE LOSING DIRECTION. The Shopify CLI
+        writes each file with the line endings LIVE holds, live holds both, and a git index is typically
+        all-LF: measured at 37 of 712 files in one consumer, coming back differing in nothing but CR
+        bytes. Compared raw, those 37 look like content live has that the trunk has never held -- which is
+        the definition of third-party drift under this rule -- so the sync would capture 37 files of pure
+        noise and overwrite the trunk with every one.
+
+        The wholesale version handled the same problem by staging everything ('git add -A' collapses it),
+        which works only because it then compares through the index. This comparison happens out of tree,
+        so it normalises explicitly.
+
+        BYTES, NOT TEXT: theme assets include binaries (fonts, images), and a text read in Windows
+        PowerShell 5.1 mangles every byte above 0x7F. Stripping CR from a binary is harmless here because
+        BOTH sides are stripped, so equal binaries still compare equal.
+    #>
+    param([Parameter(Mandatory = $true)][AllowEmptyCollection()][byte[]]$Bytes)
+
+    $out = New-Object System.Collections.Generic.List[byte]
+    foreach ($b in $Bytes) { if ($b -ne 13) { $out.Add($b) } }
+    # THE LEADING ',' IS LOAD-BEARING. PowerShell unwraps a zero-length array on return, so a file whose
+    # content is empty (or is nothing but CR bytes) came back as $null and the next call failed its
+    # Mandatory bind. Found by the consumer's suite, which then compared $null to $null and reported a
+    # PASS -- a vacuous green, which is worse than the error it was hiding. Both cases are asserted
+    # against git's real empty-blob id here, so a wrong answer cannot agree with itself.
+    return ,$out.ToArray()
+}
+
+function Get-GitStoredBlobId {
+    <#
+    .SYNOPSIS
+        git's stored object id for <rev>:<path>, or '' when that path does not exist at that rev.
+
+    .DESCRIPTION
+        WHY THIS READS AN ID AND NOT THE BYTES, which is a repair rather than a preference. The consumer's
+        first version of this lib read content with 'git cat-file blob <rev>:<path> > $tmp' and read the
+        file back, and its own comment claimed the temp file avoided PowerShell's text decoding. It does
+        the opposite: '>' in PowerShell IS the pipeline, so it decodes the native command's stdout to text
+        and re-encodes it on write, mangling high bytes and rewriting line endings. Every blob it returned
+        was corrupt, so the provenance check answered $false for content that WAS ours -- which sends a
+        file to take-live and overwrites the trunk. Its test suite caught it; reading the code did not,
+        because the comment read as though the problem had been handled.
+
+        An object id is ASCII hex, so there is nothing for a text decode to damage. And git has already
+        done the hashing, so this is cheaper than reading content ever was.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Rev,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    $id = Invoke-SyncGitQuiet rev-parse "$($Rev):$($Path)" | Where-Object { $_ } | Select-Object -First 1
+    if (-not $id) { return '' }
+    $id = ([string]$id).Trim()
+    if ($id -notmatch '^[0-9a-f]{40}$') { return '' }
+    return $id
+}
+
+function Test-LiveContentIsOurs {
+    <#
+    .SYNOPSIS
+        Has this path EVER held live's exact content in this branch's history? The query the rule turns on.
+
+    .DESCRIPTION
+        If live's bytes are bytes THIS REPO has held for that path before, live is holding an older version
+        of our own file and the trunk has moved on: the trunk wins, and it does not matter how long ago it
+        moved. If live's bytes appear nowhere in our history for that path, somebody outside this repo
+        wrote them, and that is the drift the sync exists to capture.
+
+        MEASURED BOTH WAYS IN A CONSUMER BEFORE IT WAS BUILT (2026-08-21, inbound #807), which is the only
+        reason to trust it. A rule that is safe by capturing nothing is useless, so the false-negative half
+        matters more than the headline:
+
+          * Against live that day: 31 differing files, ALL 31 content that repo has held. The rule captures
+            zero, correctly -- there was no third-party drift, only the trunk having moved forward. The
+            time rule captured all 31 and was about to revert three merged PRs.
+          * Replayed over every 'from live' commit in that repo's history: 10 of 11 real third-party drift
+            files come back foreign and are captured. The 11th reverted a single trailing blank line, so
+            dropping it is harmless rather than a loss.
+
+        COST: one 'git rev-parse' per commit that touched the path, until a match. Bounded by that path's
+        own history, which in a theme repo is single digits.
+
+        '--follow' IS DELIBERATELY NOT USED. It would chase renames and could match content out of a
+        DIFFERENT path's history, making live's copy of file B read as ours because file A once held those
+        bytes. Under-matching here is safe (the file reads as foreign, so a human sees it); over-matching
+        is not.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][byte[]]$LiveBytes,
+        [string]$Ref = 'HEAD'
+    )
+
+    # TWO CANDIDATE IDS, AND BOTH ARE NEEDED. The comparison is against git's STORED object ids, which are
+    # text and therefore safe to read (see Get-GitStoredBlobId). Where the index is all-LF a stored blob's
+    # id is the id of its LF content, and live's CR-stripped bytes hash to the same thing when the text is
+    # the same -- that is the CRLF case, and it is the common one. But all-LF is a measured property of a
+    # repo rather than a guarantee, so the RAW id is compared too: if some blob ever went in with CRLF
+    # intact, the raw form matches it. Neither matching means the file reads as foreign and a human sees
+    # it, which is the safe direction and the reason this compares fewer forms than full normalisation.
+    $rawId      = Get-GitRawBlobId -Bytes $LiveBytes
+    $strippedId = Get-GitRawBlobId -Bytes (Get-CrStrippedBytes -Bytes $LiveBytes)
+
+    # ARRAY PLUS SPLATTING FOR THE '--', the pitfall this file's header names, and here it was not
+    # theoretical. Written inline as 'log --format=%H $Ref -- $Path' the '--' never reaches git, so git
+    # reads the path as a revision. For a path still in HEAD it disambiguates and the bug is invisible;
+    # for a path the trunk has DELETED it errors to stderr, Invoke-SyncGitQuiet swallows it, and the
+    # function sees no history and answers "foreign" -- restoring live's copy over a deliberate deletion.
+    # Measured in the consumer: 23 deleted locale files about to be resurrected. The 'A' case is the one
+    # that needs the '--', and the 'A' case is where getting it wrong undoes a deliberate deletion.
+    $logArgs = @('log', '--format=%H', $Ref, '--', $Path)
+    $commits = @(Invoke-SyncGitQuiet @logArgs | Where-Object { $_ })
+    foreach ($c in $commits) {
+        $stored = Get-GitStoredBlobId -Rev "$c" -Path $Path
+        if (-not $stored) { continue }
+        if ($stored -eq $rawId -or $stored -eq $strippedId) { return $true }
+    }
+    return $false
+}
+
+function Get-SyncFileVerdict {
+    <#
+    .SYNOPSIS
+        What happens to one differing path: 'keep-trunk', 'take-live' or 'conflict'.
+
+    .DESCRIPTION
+        The whole decision as one pure function, so the suite can walk every cell instead of trusting a
+        read-through of the loop that calls it.
+
+        Status is measured against the trunk: 'M' both sides have it and differ, 'A' live has it and the
+        trunk does not, 'D' the trunk has it and live does not.
+
+                                          live content is OURS          live content is FOREIGN
+          M  both have it, differs        keep-trunk                    take-live, or conflict *
+          A  only live has it             keep-trunk (no resurrection)  take-live
+          D  only the trunk has it        keep-trunk (never delete)     keep-trunk (never delete)
+
+        * the only place the floor is still consulted, and it can only ever escalate to a human: live's
+          content is foreign AND the trunk has changed this path since the floor, so BOTH sides moved.
+          Taking either would lose the other, so nothing is decided -- the caller refuses and reports.
+          This is why a wrong floor now costs extra conflict reports instead of silent data loss.
+
+        WHY 'D' IS UNCONDITIONAL. A path the trunk has and live does not is either a file the trunk added
+        that was never pushed, or a file a third party deleted on live. The first must be kept, the second
+        is indistinguishable from it, and "delete it here too" is the irreversible option. So the sync
+        NEVER deletes; it reports. That is a deliberate narrowing of the wholesale rule, which deleted
+        such a file whenever it happened to sit below the floor.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet('M', 'A', 'D')][string]$Status,
+        [Parameter(Mandatory = $true)][bool]$LiveContentIsOurs,
+        [bool]$MainTouchedSinceFloor = $false
+    )
+
+    if ($Status -eq 'D') {
+        return [pscustomobject]@{ Action = 'keep-trunk'; Reason = 'only the trunk has this file; a sync never deletes' }
+    }
+
+    if ($LiveContentIsOurs) {
+        if ($Status -eq 'A') {
+            return [pscustomobject]@{ Action = 'keep-trunk'; Reason = 'the trunk deleted this file and live holds our old copy, so it is not resurrected' }
+        }
+        return [pscustomobject]@{ Action = 'keep-trunk'; Reason = 'live holds a version this repo has had before; the trunk has moved on since' }
+    }
+
+    if ($Status -eq 'M' -and $MainTouchedSinceFloor) {
+        return [pscustomobject]@{ Action = 'conflict'; Reason = 'live has foreign content AND the trunk changed this path since the last sync -- both sides moved, so neither is taken' }
+    }
+
+    return [pscustomobject]@{ Action = 'take-live'; Reason = 'content this repo has never held for this path: a third party wrote it on live' }
 }

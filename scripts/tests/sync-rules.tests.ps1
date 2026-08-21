@@ -1,20 +1,28 @@
 <#
 .SYNOPSIS
-    Regression tests for scripts/lib/sync-rules.ps1 -- the two queries team-shopify's pre-task sync is
-    built on (inbound #787, extended with the merged-sync-branch case from inbound #801).
+    Regression tests for scripts/lib/sync-rules.ps1 -- the queries team-shopify's pre-task sync is built
+    on (inbound #787, extended with the merged-sync-branch case from #801 and the content rule from #807).
 
 .DESCRIPTION
     Dependency-free: no Pester needed, only PowerShell and git.
 
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/sync-rules.tests.ps1
 
-    WHY THESE TWO FUNCTIONS HAVE A SUITE AND THE SYNC ITSELF DOES NOT. The policy is one sentence -- the
-    trunk wins what the trunk touched -- and it is not where the risk is. The risk is in the two QUERIES
-    that decide when it fires, and both fail SILENTLY and in the losing direction:
+    WHY THESE FUNCTIONS HAVE A SUITE AND THE SYNC ITSELF HAS A SMALLER ONE. The policy is one sentence
+    either way, and it is not where the risk is. The risk is in the QUERIES that decide when it fires, and
+    every one of them fails SILENTLY and in the losing direction:
 
-      * Get-SyncReferencePoint answering with a commit that is too RECENT protects fewer files, and
-        answering $null while the caller carries on protects none at all.
-      * Test-MainTouchedSince answering $false for a path the trunk has touched hands that file to live.
+      * Test-LiveContentIsOurs answering $false for content that IS ours sends the file to take-live, which
+        overwrites the trunk. This is the one that decides who wins a file since inbound #807.
+      * Get-GitRawBlobId disagreeing with git by one byte reports a changed file as UNCHANGED -- the drift
+        is then never seen at all, which is the worst shape here.
+      * Get-CrStrippedBytes regressing makes every line-ending-only difference read as third-party drift,
+        so the sync captures pure noise and overwrites the trunk with all of it.
+      * Get-SyncReferencePoint answering with a commit that is too RECENT, or $null while the caller
+        carries on, no longer loses files by itself -- it costs the both-sides-moved check, which is the
+        only thing the floor still decides.
+      * Test-MainTouchedSince answering $false where the trunk has moved turns a conflict into a
+        take-live.
 
     THE DELETION CASE IS THE HEADLINE, and it is here because the first hand-written implementation of
     this rule got it wrong: a deletion is also a touch, so a file the trunk REMOVED must answer $true, or
@@ -238,6 +246,150 @@ try {
         # The floor itself is exclusive: the sync commit is not "since the sync commit".
         Assert-True (-not (Test-MainTouchedSince -Since $floor -Path 'floor.txt')) 'rule/floor: the reference commit''s own change is not counted as later work'
     } finally { Pop-Location }
+    # --- The blob id, against git itself ------------------------------------------------------------
+    # The comparison's fast path trusts Get-GitRawBlobId against 'git ls-tree'. If it disagreed with git,
+    # files would be reported as UNCHANGED that are not -- a silent skip, which is the worst failure shape
+    # here: the drift is simply never seen. '--no-filters' is the comparison that holds, because a machine
+    # with core.autocrlf on would have plain 'git hash-object' normalise line endings first.
+    Write-Host ''
+    Write-Host 'Get-GitRawBlobId'
+
+    $blob = New-GitTree -Label 'blob'
+    $bytes = [System.Text.Encoding]::ASCII.GetBytes("hello`nworld`n")
+    [System.IO.File]::WriteAllBytes((Join-Path $blob 'blob.txt'), $bytes)
+    [System.IO.File]::WriteAllBytes((Join-Path $blob 'empty.txt'), (New-Object byte[] 0))
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $gitId    = ([string](& git -C $blob hash-object --no-filters 'blob.txt'  | Select-Object -First 1)).Trim()
+        $gitEmpty = ([string](& git -C $blob hash-object --no-filters 'empty.txt' | Select-Object -First 1)).Trim()
+    } finally { $ErrorActionPreference = $prevEap }
+    Assert-Equal $gitId    (Get-GitRawBlobId -Bytes $bytes)               'blob/text: matches git hash-object --no-filters'
+    Assert-Equal $gitEmpty (Get-GitRawBlobId -Bytes (New-Object byte[] 0)) 'blob/empty: and agrees on the empty blob'
+
+    # --- CR stripping -------------------------------------------------------------------------------
+    # Asserted through the SAME composition the script uses, Get-GitRawBlobId(Get-CrStrippedBytes(x)),
+    # rather than through a helper that exists only to be tested. If this regresses, every file that comes
+    # back from live differing only in CR bytes reads as "content the trunk has never held" -- which is the
+    # definition of third-party drift under the content rule -- so the sync captures pure noise and
+    # overwrites the trunk with all of it. Measured at 37 of 712 files in one consumer.
+    Write-Host ''
+    Write-Host 'Get-CrStrippedBytes'
+
+    $lf   = [System.Text.Encoding]::ASCII.GetBytes("a`nb`nc")
+    $crlf = [System.Text.Encoding]::ASCII.GetBytes("a`r`nb`r`nc")
+    $diff = [System.Text.Encoding]::ASCII.GetBytes("a`nb`nd")
+    $idLf   = Get-GitRawBlobId -Bytes (Get-CrStrippedBytes -Bytes $lf)
+    $idCrlf = Get-GitRawBlobId -Bytes (Get-CrStrippedBytes -Bytes $crlf)
+    $idDiff = Get-GitRawBlobId -Bytes (Get-CrStrippedBytes -Bytes $diff)
+    Assert-Equal $idLf $idCrlf 'cr/same: CRLF and LF of the same text give the same id'
+    Assert-True ($idLf -ne $idDiff) 'cr/diff: genuinely different text still gives a different id'
+
+    # A byte above 0x7F must survive: theme assets include binaries, and a text-mode read in Windows
+    # PowerShell 5.1 mangles every one of them.
+    $hi1 = Get-GitRawBlobId -Bytes (Get-CrStrippedBytes -Bytes ([byte[]](0x41, 0xE9, 0x42)))
+    $hi2 = Get-GitRawBlobId -Bytes (Get-CrStrippedBytes -Bytes ([byte[]](0x41, 0xEA, 0x42)))
+    Assert-True ($hi1 -ne $hi2) 'cr/high: bytes above 0x7F are not folded together'
+
+    # A lone CR is STRIPPED rather than converted, so 'a<CR>b' and 'ab' collide. Asserted rather than left
+    # implicit: it is the one place this normalisation is lossier than a real CRLF->LF conversion, and the
+    # consequence is a file reading as OURS when it is not quite -- harmless for theme text, where the
+    # alternative (a real conversion) would change binary bytes, which is worse.
+    Assert-Equal (Get-GitRawBlobId -Bytes (Get-CrStrippedBytes -Bytes ([System.Text.Encoding]::ASCII.GetBytes('ab')))) `
+                 (Get-GitRawBlobId -Bytes (Get-CrStrippedBytes -Bytes ([System.Text.Encoding]::ASCII.GetBytes("a`rb")))) `
+                 'cr/lone: a lone CR is stripped, not converted (known and accepted)'
+
+    # THE EMPTY CASE, ASSERTED AGAINST A KNOWN VALUE RATHER THAN AGAINST ITSELF. This is how the consumer's
+    # suite hid a real bug: Get-CrStrippedBytes returned $null for an empty stream (PowerShell unwraps a
+    # zero-length array), the hash threw on its Mandatory bind, and the assert then compared $null to $null
+    # and printed a PASS -- a vacuous green, worse than the error it hid. e69de29... is git's empty blob, so
+    # a wrong answer now fails instead of agreeing with itself.
+    Assert-Equal 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391' `
+        (Get-GitRawBlobId -Bytes (Get-CrStrippedBytes -Bytes (New-Object byte[] 0))) `
+        'cr/empty: an empty stream is git''s empty blob, not $null'
+    Assert-Equal 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391' `
+        (Get-GitRawBlobId -Bytes (Get-CrStrippedBytes -Bytes ([byte[]](13, 13, 13)))) `
+        'cr/all-cr: content that is nothing but CR bytes normalises to the empty blob'
+
+    # --- Provenance: the query the rule turns on ----------------------------------------------------
+    # The fixture is the production case in miniature: the trunk changed a file and never pushed it to
+    # live, so live still holds the trunk's OLD content, and a later sync commit has buried the change
+    # below the floor. The time rule loses it from that moment on, forever; content must not.
+    Write-Host ''
+    Write-Host 'Test-LiveContentIsOurs'
+
+    $prov = New-GitTree -Label 'prov'
+    Add-Commit -Dir $prov -Message 'sync: the first floor' -Write @{ 'sections/section.liquid' = 'live still has this'; 'sections/two-line.liquid' = "line one`nline two" } | Out-Null
+    $oldBytes = [System.IO.File]::ReadAllBytes((Join-Path $prov 'sections\section.liquid'))
+    Add-Commit -Dir $prov -Message 'fix: the trunk fixes it, not pushed to live' -Write @{ 'sections/section.liquid' = 'the trunk fixed this' } | Out-Null
+    # ... and then a later sync, which is what puts the fix below any floor.
+    Add-Commit -Dir $prov -Message 'sync: a later sync that buries the fix' -Write @{ 'sections/other.liquid' = 'o1' } | Out-Null
+
+    Push-Location -LiteralPath $prov
+    try {
+        Assert-True (Test-LiveContentIsOurs -Path 'sections/section.liquid' -LiveBytes $oldBytes) `
+            'prov/ours: live''s older copy of OUR file is recognised as ours'
+        # THE POINT OF THE WHOLE CHANGE. The time rule has already lost this file, and the content rule
+        # still protects it. If these two ever agree here, the floor has moved and the fixture is wrong.
+        $floorNow = (Get-SyncReferencePoint).Ref
+        Assert-True (-not (Test-MainTouchedSince -Since $floorNow -Path 'sections/section.liquid')) `
+            'prov/buried: while the TIME rule has already lost it -- which is why content decides'
+
+        $foreign = [System.Text.Encoding]::ASCII.GetBytes('a third party wrote this on live')
+        Assert-True (-not (Test-LiveContentIsOurs -Path 'sections/section.liquid' -LiveBytes $foreign)) `
+            'prov/foreign: content this repo has never held is foreign'
+        # THE SAME TEXT WITH CRLF ENDINGS IS STILL OURS: the line-ending case reaching the real rule, and
+        # it needs a file with an INTERNAL newline to be the case it claims to be. The first version of
+        # this assert used the single-line file above and appended CRLF to it -- which CR-strips to that
+        # line plus a trailing LF, content the repo has genuinely never held. It failed, correctly, and is
+        # written down because a "fixed" version of it would have been the code loosening instead.
+        Assert-True (Test-LiveContentIsOurs -Path 'sections/two-line.liquid' -LiveBytes ([System.Text.Encoding]::ASCII.GetBytes("line one`r`nline two"))) `
+            'prov/crlf: our content with CRLF endings is still ours'
+        # Provenance is per PATH: another file having held those bytes must not make this one ours.
+        Assert-True (-not (Test-LiveContentIsOurs -Path 'sections/never-here.liquid' -LiveBytes $oldBytes)) `
+            'prov/other-path: a path that never existed holds nothing of ours'
+    } finally { Pop-Location }
+
+    # THE 'A' CASE -- A PATH THE TRUNK DELETED, which is where this query failed for real in the consumer.
+    # Written inline, the '--' before the pathspec never reaches git: for a path still in HEAD git
+    # disambiguates and the bug is invisible, but for a DELETED path it reads the path as a revision, fails
+    # to stderr, and the quiet wrapper swallows it -- so the answer came back "foreign" and live's copy
+    # would have been written over a deliberate deletion. Measured there: 23 dropped locale files about to
+    # be resurrected. This is that case in a fixture.
+    Add-Commit -Dir $prov -Message 'feat: a locale the store does not publish' -Write @{ 'locales/dropped.json' = 'a locale nobody publishes' } | Out-Null
+    $droppedBytes = [System.IO.File]::ReadAllBytes((Join-Path $prov 'locales\dropped.json'))
+    Add-Commit -Dir $prov -Message 'feat: drop the locales the store does not publish' -Delete @('locales/dropped.json') | Out-Null
+
+    Push-Location -LiteralPath $prov
+    try {
+        $stillOurs = Test-LiveContentIsOurs -Path 'locales/dropped.json' -LiveBytes $droppedBytes
+        Assert-True $stillOurs 'prov/deleted: a path the trunk DELETED is still recognised as ours (the ''--'' case)'
+        Assert-Equal 'keep-trunk' (Get-SyncFileVerdict -Status 'A' -LiveContentIsOurs $stillOurs).Action `
+            'prov/deleted: and the verdict for it is keep-trunk, not resurrection'
+    } finally { Pop-Location }
+
+    # --- The verdict table, every cell --------------------------------------------------------------
+    Write-Host ''
+    Write-Host 'Get-SyncFileVerdict'
+
+    Assert-Equal 'keep-trunk' (Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $true).Action  'verdict/M+ours: the trunk has moved on, so it wins'
+    Assert-Equal 'take-live'  (Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false).Action 'verdict/M+foreign: a third party''s edit to an untouched path is taken'
+    Assert-Equal 'conflict'   (Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false -MainTouchedSinceFloor $true).Action 'verdict/M+both: both sides moved, so neither is taken'
+    Assert-Equal 'keep-trunk' (Get-SyncFileVerdict -Status 'A' -LiveContentIsOurs $true).Action  'verdict/A+ours: a deliberate deletion is not undone'
+    Assert-Equal 'take-live'  (Get-SyncFileVerdict -Status 'A' -LiveContentIsOurs $false).Action 'verdict/A+foreign: a file only live has and we never held is taken'
+    # 'A' has no conflict cell: the trunk does not have the file, so there is no trunk-side change to lose.
+    Assert-Equal 'take-live'  (Get-SyncFileVerdict -Status 'A' -LiveContentIsOurs $false -MainTouchedSinceFloor $true).Action 'verdict/A+both: still take-live -- there is no trunk copy to lose'
+    # 'D' is unconditional in every combination: a sync never deletes.
+    Assert-Equal 'keep-trunk' (Get-SyncFileVerdict -Status 'D' -LiveContentIsOurs $true).Action  'verdict/D+ours: a sync never deletes'
+    Assert-Equal 'keep-trunk' (Get-SyncFileVerdict -Status 'D' -LiveContentIsOurs $false).Action 'verdict/D+foreign: nor when live''s side is foreign'
+    Assert-Equal 'keep-trunk' (Get-SyncFileVerdict -Status 'D' -LiveContentIsOurs $false -MainTouchedSinceFloor $true).Action 'verdict/D+both: nor when the trunk moved too'
+
+    # A verdict always carries a reason: it is printed into the PR body, and a blank one there reads as
+    # "nothing was held back" -- the one thing the exclusion list exists to contradict.
+    Assert-True ([string](Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $true).Reason -ne '')  'verdict/reason: keep-trunk carries a reason'
+    Assert-True ([string](Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false).Reason -ne '') 'verdict/reason: take-live carries a reason'
+    Assert-True ([string](Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false -MainTouchedSinceFloor $true).Reason -ne '') 'verdict/reason: and so does a conflict'
+
 }
 finally {
     foreach ($d in $script:trees) {
