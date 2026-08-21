@@ -173,6 +173,25 @@ Measured in the consumer this was ported from: once wrangler has created a deplo
 API-side upload only creates **inactive versions** — with no error, while the live page stays the old
 one.
 
+**And fetch twice, because that check has a false negative of its own** (measured August 21, 2026, on the
+`v4.18.0` redeploy in the source repo). Seconds after a `wrangler deploy` that reported success, the URL
+answered **HTTP 200 with the old body** — 265 KB against the 352 KB just built, carrying none of the new
+release's rows. A second request with `Cache-Control: no-cache` and a throwaway query string came back
+**byte-identical to the built file**, and three plain fetches after that agreed. Nothing was wrong with the
+deploy; the first read was a cached response.
+
+That matters because of what the paragraph above tells you to conclude from exactly this observation. A
+reader following it in good faith sees the old bytes, believes the documented silent-inactive-version
+failure has just happened, and reaches for a second deploy — or worse, for `-InitToken`, on the theory that
+the route is wrong. **So the check is: fetch, and if the bytes are stale, fetch again cache-busted before
+believing it.** Compare against the built file with `cmp` rather than by eye — the honest question is
+whether the served body *is* the file you built, and a size that merely looks plausible is how a
+half-updated page passes.
+
+**The ordering is the whole lesson: a stale read and a failed deploy are indistinguishable from one
+request.** Both give a 200 and old content, and only one of them is a problem — so a single fetch cannot
+tell you which you have, in either direction.
+
 ## It is a snapshot, not a mirror
 
 The page is built from the files as they are at that moment and does not move with them. After a
