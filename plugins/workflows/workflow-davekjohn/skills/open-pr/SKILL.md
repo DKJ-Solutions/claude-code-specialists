@@ -61,6 +61,9 @@ The script:
    [The scaffold gate](#the-scaffold-gate-has-the-entry-actually-been-written) below. On the same read of
    the same file it also runs the **impact gate** and prints the reach and significance it read. See
    [The impact gate](#the-impact-gate-how-far-does-this-change-reach-and-how-much-does-it-weigh) below.
+   And the **link gate**: a relative link in the entry must resolve from the **repo root**, because that
+   is where the entry's text lands. See
+   [The link gate](#the-link-gate-do-the-entrys-links-survive-the-fold) below.
    Then the **step-list gate**: the branch's own plan must be finished. See
    [The step-list gate](#the-step-list-gate-is-the-branchs-own-plan-finished) below.
 4. Runs the **repo's own lint gate** (via `Get-LintScript` from `repo-config`) and then **all
@@ -198,6 +201,43 @@ the script that writes the scaffold read it from the same shared library, so the
 - **`-Force` ships anyway** (a warning instead of a block), for the rare entry that legitimately quotes
   the wording outside a fence. Deliberately separate from `-SkipLint`/`-SkipTests`: those skip a tool,
   this overrules a judgement about content.
+
+## The link gate: do the entry's links survive the fold?
+
+The entry is written in `workflow-davekjohn/branch/branch-deployment.md` — two directories down — and the
+fold copies its text **verbatim** into `CHANGELOG.md` at the repo root. So a relative link in it has to be
+written **root-relative**, which means it looks wrong in the file you are editing and only becomes right
+after it moves:
+
+```markdown
+See [the lib](scripts/lib/release-lib.ps1).          <- correct: resolves at the destination
+See [the lib](../../scripts/lib/release-lib.ps1).    <- resolves HERE, dead once it lands
+```
+
+This gate refuses to push while a relative link in the entry does not resolve from the root, and it prints
+the **root-relative form** rather than only the dead one. That second half is the point: a finding that says
+only *"does not exist"* sends the author to add another `../`, which breaks a link that was right.
+
+- **Only relative targets are judged.** `http(s):`, `mailto:`, a pure `#anchor` and an absolute `/path`
+  are not resolved against a directory, so the move cannot break them.
+- **Code and comments are excluded** — fenced blocks, inline backticks and HTML comments alike. Measured
+  on the source repo's own entry file: across its last 80 revisions a scan without the *inline* exclusion
+  produces exactly one finding, and it is false — `` `[PR #N](url)` `` in an entry explaining what the
+  fold writes.
+- **The anchor is dropped**, so `file.md#section` is judged as `file.md`. Whether the heading exists is a
+  different question, and your own linter is the one that answers it.
+- **Not `-Force`-able**, like the impact gate: `-Force` exists for text somebody legitimately wrote, and
+  there is no legitimate dead link. The fix the message spells out is a one-line edit.
+- **Refused here and not at the fold**, which is where inbound
+  [#806](https://github.com/DaveKJohn/claude-code-specialists/issues/806) asked for it. A defect decidable
+  before the merge is caught while the branch is still the only thing affected; refusing an
+  already-merged branch's fold would leave an unfolded entry on the trunk with `main` looking finished. A
+  fold-time *rewrite* is declined for a second reason — the fold copies the entry verbatim on purpose, and
+  an author whose link is silently corrected writes the same link again into the next document, where
+  nothing corrects it.
+
+The convention is also stated in the guidance above the section you type the body into, so it arrives
+before the gate does: see `workflow-davekjohn/branch/templates/`.
 
 ## The step-list gate: is the branch's own plan finished?
 

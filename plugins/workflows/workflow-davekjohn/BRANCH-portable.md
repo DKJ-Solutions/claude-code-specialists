@@ -69,6 +69,22 @@ delivered, and the date a delivery has is the one the fold writes when it lands.
 deployment `` is what this file is, and *what changed* is the first section under it. Both branch files carry
 that heading, which is also how the fold finds the branch it needs to look the PR up by.
 
+**A relative link in this file resolves from the REPO ROOT, not from this directory.** The fold copies this
+text verbatim into `CHANGELOG.md` at the root, two directories up — so the link has to be written for where
+it *lands*, which means it looks wrong in the file you are editing and only becomes right after it moves:
+
+```markdown
+See [the lib](scripts/lib/release-lib.ps1).          <- correct: resolves at the destination
+See [the lib](../../scripts/lib/release-lib.ps1).    <- resolves HERE, dead once it lands
+```
+
+The instinct produces the second form, and until August 21, 2026 nothing said otherwise: a consumer merged
+two `../../scripts/...` links that landed at the root pointing outside the repo, with every gate green
+(inbound [#806](https://github.com/DaveKJohn/claude-code-specialists/issues/806)). `open-pr`'s **link gate**
+refuses it now and prints the root-relative form, so the correction is one edit rather than a guess — and
+`branch-cycle.md` is deliberately **not** subject to it: that file never travels, so the ordinary `../`
+convention is the right one there.
+
 **The PR title is the first line of the `Pull Request` section** (Dave, August 7, 2026;
 [#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506)). `open-pr` composes the PR title
 as `<branch type>: <that line>` rather than taking one on the command line, so the sentence is written

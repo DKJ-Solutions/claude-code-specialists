@@ -1594,6 +1594,63 @@ Remove-Item function:Get-ReleaseAudienceTier
 Assert-Equal $null (Get-EntryAudienceTier) 'the seam is removed again, so nothing after this inherits it'
 
 Write-Host ""
+Write-Host "Get-EntryLinkTargets / Get-EntryLinkFindings -- the entry's links resolve at the DESTINATION (inbound #806)" -ForegroundColor Cyan
+# The entry is written two directories down and folded verbatim into CHANGELOG.md at the repo root, so a
+# relative link in it has to be root-relative -- which means it looks wrong in the file being edited and
+# only becomes right after it moves. A consumer merged two '../../scripts/...' links that landed at the
+# root pointing outside the repo, with every gate green.
+$linkEntry = @(
+    '## `fix/x` deployment', '',
+    '### What does the change on this branch deploy to main?', '',
+    'See [the lib](scripts/lib/release-lib.ps1) and [the gate](../../scripts/lint/check-plugin-integrity.ps1).',
+    'Also [upstream](https://example.com/x), [an anchor](#somewhere) and [absolute](/etc/x).', '',
+    '**Score:** 3', ''
+) -join "`n"
+$targets = @(Get-EntryLinkTargets -EntryText $linkEntry)
+Assert-Equal 2 $targets.Count 'only the two RELATIVE targets are read -- http, a pure anchor and an absolute path cannot be broken by the move'
+Assert-True ($targets -contains 'scripts/lib/release-lib.ps1') 'the root-relative one is read'
+Assert-True ($targets -contains '../../scripts/lint/check-plugin-integrity.ps1') 'and the branch-relative one, as written'
+
+# THE ANCHOR AND THE TITLE ARE DROPPED: whether a heading exists is a different question with a different
+# answer, and the repo's own link lint already asks it. This function answers only "is there a file there".
+$anchored = '[a](scripts/lib/release-lib.ps1#get-bumptype) and [b](CHANGELOG.md "The changelog")'
+$anchorTargets = @(Get-EntryLinkTargets -EntryText $anchored)
+Assert-True ($anchorTargets -contains 'scripts/lib/release-lib.ps1') 'an anchor is stripped from the target'
+Assert-True ($anchorTargets -contains 'CHANGELOG.md') 'and so is a link title'
+
+# CODE AND COMMENTS ARE EXCLUDED, and this is the half that was MEASURED rather than assumed. Over the last
+# 80 revisions of this repo's own entry file a naive scan produces exactly ONE finding, and it is false:
+# '[PR #N](url)' inside INLINE backticks, in an entry explaining what the fold writes. So fences alone are
+# not enough -- which is why all three strippers are here, matching the repo's own link lint.
+$quoting = @(
+    'Prose mentioning `[PR #N](url)` inline.', '',
+    '```markdown', '- **[`scripts/x.ps1`](../../scripts/x.ps1)** an example', '```', '',
+    '<!-- link to the PR in github: [PR #NN](url) - merged <date> -->', ''
+) -join "`n"
+Assert-Equal 0 (@(Get-EntryLinkTargets -EntryText $quoting)).Count 'a link quoted in inline code, in a fence, or in an html comment is illustration and is not read'
+
+# The findings themselves, resolved against a real tree: this repo's own root.
+$repoRootForLinks = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+$findings = @(Get-EntryLinkFindings -EntryText $linkEntry -RepoRoot $repoRootForLinks)
+Assert-Equal 1 $findings.Count 'the root-relative link resolves and is not reported; the branch-relative one is'
+Assert-Equal '../../scripts/lint/check-plugin-integrity.ps1' $findings[0].Target 'the finding names the link AS WRITTEN, which is what the author has to find in their file'
+# THE SUGGESTION IS THE POINT, not decoration. A finding that only says "does not exist" sends the author to
+# add another '../' -- the repo's own link lint had to learn the same lesson on August 19, 2026.
+Assert-Equal 'scripts/lint/check-plugin-integrity.ps1' $findings[0].Suggested 'and it names the root-relative form, because the naive repair is to add another ../'
+# A target that resolves from NEITHER base is a typo, and a typo gets no guess.
+$typo = '[x](scripts/lint/no-such-file.ps1)'
+$typoFindings = @(Get-EntryLinkFindings -EntryText $typo -RepoRoot $repoRootForLinks)
+Assert-Equal 1 $typoFindings.Count 'a path that resolves from nowhere is still reported'
+Assert-Equal '' $typoFindings[0].Suggested 'but no repair is suggested for it -- there is nothing to compute one from'
+Assert-Equal 0 (@(Get-EntryLinkFindings -EntryText '[ok](CHANGELOG.md) and [ok2](README.md)' -RepoRoot $repoRootForLinks)).Count 'an entry whose links are all root-relative passes'
+
+# THE GUIDANCE SAYS SO BEFORE THE GATE REFUSES, which is the half that reaches the author while they are
+# still writing. It sits in the 'Tier' block because that is the one rendered above the section the body
+# goes in -- 'What' is not rendered by the two-section entry at all, so a line there would be invisible.
+Assert-True ([string]((Get-EntryGuidance).Tier -join ' ') -match 'FROM THE REPO ROOT') 'the first section''s guidance states the root-relative convention'
+Assert-True ((@(Get-BranchTemplates) | Where-Object { $_.Path -match 'deployment' } | ForEach-Object { $_.Content }) -match 'FROM THE REPO ROOT') 'and it reaches the generated template, which is what a consumer reads'
+
+Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
     exit 1

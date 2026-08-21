@@ -930,11 +930,28 @@ $script:EntryGuidanceDefaults = [ordered]@{
     # entry-scaffold-lib.ps1 line by line. The gate names the misplacement now; this is the half that gets
     # said BEFORE the author writes rather than after, which is the same argument new-branch already makes
     # for printing the rubric at scaffold time.
+    # AND THE LINK CONVENTION, which is the one field-level rule that CANNOT be derived from the file in
+    # front of you (inbound #806). This text folds verbatim into CHANGELOG.md at the repo ROOT, two
+    # directories up, so a relative link has to be written root-relative -- it therefore looks wrong here
+    # and only becomes right after it moves. Nothing said so, and the natural instinct produced the broken
+    # form: a consumer merged two '../../scripts/...' links that landed at the root pointing outside the
+    # repo, with every gate green. Said HERE and not only in the gate that refuses it, for the same reason
+    # the line above says 'ABOVE the Score line' -- guidance that arrives before the author writes is worth
+    # more than a refusal afterwards.
+    #
+    # IN THIS BLOCK AND NOT IN 'What', which is where it went first and would have been invisible: the
+    # two-section entry renders 'Tier' above the section the body is written in, and 'What' is no longer
+    # rendered by that shape at all. Nor in 'TierOptional', which is the SECOND section's block -- one
+    # sentence, above the field the links actually appear in.
     Tier = @(
         'Why the change matters AT THIS REACH specifically. A reason that would read the',
         'same under every tier is a sign the tier is wrong. Write it ABOVE the Score line --',
         'everything below that line is discarded. Then Score: 1-5 against the rubric',
-        'new-branch printed when it wrote this file.'
+        'new-branch printed when it wrote this file.',
+        '',
+        'Relative links resolve FROM THE REPO ROOT, not from this directory: this text is',
+        'folded verbatim into CHANGELOG.md at the root. So write scripts/x.ps1, never',
+        '../../scripts/x.ps1 -- the second reads correctly here and is dead once it lands.'
     )
     # TIER 0 IS THE ONE TIER THAT IS ALWAYS REACHED -- every change matters to the people maintaining this
     # repo, if only a little -- so it is the only one with no N/A to offer. Tiers 1 and 2 get the extra
@@ -3464,6 +3481,125 @@ function Test-EntryDeclaresShape {
         }
     }
     return [bool](Resolve-EntryType -EntryText $EntryText).Declared
+}
+
+# --- The entry's links, held against the destination its text lands at ---------------------------
+#
+# WHY THIS IS A QUESTION AT ALL. The entry is written two directories down, in
+# workflow-davekjohn/branch/branch-deployment.md, and the fold moves its text VERBATIM into
+# CHANGELOG.md at the repo root. So a relative link in it has to be written root-relative -- which
+# means it looks wrong in the file the author is typing in and only becomes right after it moves. The
+# natural instinct produces the broken form, and nothing said so: reported from a consumer as inbound
+# #806, where two links reading '../../scripts/...' landed at the root pointing outside the repo, with
+# every gate green because their linter validated them where the file sat.
+#
+# THE REPORT'S REASON WAS WRONG, AND THAT CHANGED THE REPAIR. It argued that "a consumer-side linter
+# structurally cannot [check this] -- it runs before the move", and proposed the fold as the only place
+# that knows both paths. This repo's own lint has resolved the entry's links from the repo root since
+# August 6, 2026 (check-plugin-integrity.ps1, the $entryRelsForLinks branch), and even names the base in
+# its finding so the author does not "repair" a correct link by adding a '../'. So a linter can. What the
+# reporting consumer lacked was not a mechanism but the RULE -- their linter is their own -- and a rule
+# is what a plugin can ship.
+#
+# HENCE open-pr AND NOT THE FOLD, which is the opposite of what #806 asked for and the reason is the
+# fold's own doctrine: a defect decidable before the merge is refused while the branch is still the only
+# thing affected, because refusing an already-merged branch's fold leaves the silent half-state this repo
+# has measured -- an unfolded entry on the trunk with main looking finished. The fold says exactly that
+# about a missing significance score, in the same words, and this is the same kind of fault.
+# A fold-time REWRITE was the report's preferred option and is declined for a second reason: the fold
+# copies the entry verbatim on purpose (its own comment reads NOTHING IS STRIPPED FROM THE ENTRY HERE),
+# and an author whose link is silently corrected writes the same link again into the next document --
+# a release note, a PR body -- where nothing corrects it.
+
+function Get-EntryLinkTargets {
+    <#
+        Pure: the relative markdown link targets in an entry, as written -- an array of strings, deduped,
+        in the order they appear. External (http/https/mailto), pure-anchor ('#x') and absolute ('/x')
+        targets are left out, because none of them is resolved against a directory and so none of them can
+        be broken by the text moving.
+
+        CODE AND COMMENTS ARE EXCLUDED, and this is the half that was measured rather than assumed. Over
+        the last 80 revisions of this repo's own entry file a naive scan produces exactly ONE finding, and
+        it is a false one: '`[PR #N](url)' inside INLINE backticks, in an entry explaining what the fold
+        writes. So fences alone are not enough -- the repo's own link lint strips fenced code, inline code
+        AND html comments, and its comment names this very '[PR #NN](url)' case as the finding that forced
+        the third exclusion. One rule, three strippers, same set.
+
+        THE ANCHOR IS DROPPED AND THE TITLE WITH IT: 'file.md#section' is judged as 'file.md', and
+        'file.md "Title"' as 'file.md'. Whether the anchor exists is a different question with a different
+        answer, and it is one the repo's own lint already asks; this function answers only "is there a file
+        there at all", which is the question the move can change.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
+    $scan = Get-EntryTextOutsideFences -EntryText $EntryText
+    # Inline code spans, matching a run of backticks with the same run closing it, so '``a`b``' is one span
+    # rather than two. Non-greedy, and (?s) because a span may legitimately wrap a line in prose.
+    $scan = [regex]::Replace($scan, '(?s)(`+).*?\1', '')
+    # HTML comments last: the guidance blocks the scaffolder writes are comments, and one of them shows the
+    # fold's closing line. Stripped AFTER the code passes, so a comment inside a fence costs nothing.
+    $scan = [regex]::Replace($scan, '(?s)<!--.*?-->', '')
+
+    $targets = New-Object System.Collections.Generic.List[string]
+    foreach ($m in [regex]::Matches($scan, '\[(?:[^\]]*)\]\(([^)]+)\)')) {
+        $target = $m.Groups[1].Value.Trim()
+        # A markdown link may carry a title after the path: ](path "Title"). The path is the first field.
+        $target = (($target -split '\s+', 2)[0]).Trim()
+        if (-not $target) { continue }
+        if ($target -match '^(https?:|mailto:|#|/)') { continue }
+        # The anchor is a question about the target's contents, not about where the target is.
+        $target = ($target -split '#', 2)[0]
+        if (-not $target) { continue }
+        if (-not $targets.Contains($target)) { $targets.Add($target) }
+    }
+    return @($targets)
+}
+
+function Get-EntryLinkFindings {
+    <#
+        The entry's relative links that do not resolve from -RepoRoot -- an array of objects with Target
+        (as written) and Suggested (the same link rewritten root-relative, or '' where that cannot be
+        worked out). Empty array means every relative link in the entry will still point somewhere once
+        the text sits in CHANGELOG.md.
+
+        -RepoRoot RATHER THAN THE ENTRY'S OWN DIRECTORY, and that IS the check: the destination is the
+        root, so the root is the base. A link validated where the file sits is the failure this exists to
+        catch, not the check itself.
+
+        IT SUGGESTS THE REPAIR because the finding alone points the wrong way. An author told '../../scripts/x
+        does not exist' reaches for another '../', which is how a correct link gets broken -- the repo's own
+        link lint had to learn the same lesson on August 19, 2026 and now names the base it resolved from.
+        The suggestion is only offered where the '../'-relative reading DOES resolve, i.e. where the author
+        wrote a link that is right for the file in front of them; a target that resolves from neither base is
+        simply a typo and gets no guess.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$EntryText,
+        [Parameter(Mandatory)][string]$RepoRoot,
+        # Where the entry file itself sits, repo-root-relative -- used ONLY to work out the suggestion.
+        # Defaults to the branch directory this format uses, so a caller that has no reason to care does
+        # not have to supply it.
+        [string]$EntryDirRel = ''
+    )
+    if (-not $EntryDirRel) { $EntryDirRel = (Get-BranchFilePaths).Directory }
+    $findings = @()
+    foreach ($target in (Get-EntryLinkTargets -EntryText $EntryText)) {
+        $fromRoot = Join-Path $RepoRoot ($target -replace '/', '\')
+        if (Test-Path -LiteralPath $fromRoot) { continue }
+        # Does it resolve from where the file SITS? Then the author wrote a link that is right in front of
+        # them and wrong at the destination, which is the whole reported failure -- and the root-relative
+        # form of it is computable, so it is named instead of left to be worked out.
+        $suggested = ''
+        $fromEntry = Join-Path (Join-Path $RepoRoot ($EntryDirRel -replace '/', '\')) ($target -replace '/', '\')
+        if (Test-Path -LiteralPath $fromEntry) {
+            $full = (Resolve-Path -LiteralPath $fromEntry).Path
+            $rootFull = (Resolve-Path -LiteralPath $RepoRoot).Path
+            if ($full.StartsWith($rootFull, [System.StringComparison]::OrdinalIgnoreCase)) {
+                $suggested = $full.Substring($rootFull.Length).TrimStart('\', '/') -replace '\\', '/'
+            }
+        }
+        $findings += [pscustomobject]@{ Target = $target; Suggested = $suggested }
+    }
+    return @($findings)
 }
 
 function Get-EntryScaffoldFindings {

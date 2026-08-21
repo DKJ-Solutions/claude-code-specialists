@@ -101,6 +101,18 @@
     text somebody legitimately wrote, and there is no legitimate 'Tier: 5'. The resolved tier is printed
     either way, so an entry still sitting at the default says so before the PR rather than at the cut.
 
+    Link gate (inbound #806): a relative link in the entry must resolve FROM THE REPO ROOT, because that
+    is where the entry's text lands -- it is folded verbatim into CHANGELOG.md, two directories up from the
+    file the author is editing. So a link that is correct in front of you is dead the moment it moves, and
+    the natural instinct produces exactly that: a consumer merged two '../../scripts/...' links that landed
+    at the root pointing outside the repo, with every gate green because their linter validated them where
+    the file sat. Refused HERE and not in the fold, which is where the report asked for it: a defect
+    decidable before the merge is caught while the branch is still the only thing affected, whereas
+    refusing an already-merged branch's fold leaves an unfolded entry on the trunk with main looking
+    finished. The message names the root-relative form rather than only the dead one, because a finding
+    that says "does not exist" sends the author to add another '../'. Not -Force-able, as with the tier
+    gate: there is no legitimate dead link, and the fix the message spells out is one line.
+
     Lint gate (guardrail for main): before the push, scripts/lint/check-plugin-integrity.ps1 runs.
     If that finds errors (invalid marketplace/plugin manifests, missing agent-def frontmatter,
     dead links), the branch is NOT pushed and NO PR is opened. Use -SkipLint to deliberately skip
@@ -652,6 +664,43 @@ Correct the table and run again.
             $shown = @($impact.Rows | Where-Object { [int]$_.Score -gt 0 } | ForEach-Object { "tier $($_.Tier): $($_.Score)" })
             Write-Host "  significance -- $($shown -join ', ')" -ForegroundColor DarkGray
         }
+    }
+
+    # Link gate: the entry's relative links have to resolve from the REPO ROOT, because that is where its
+    # text lands (inbound #806). The entry is written two directories down and folded verbatim into
+    # CHANGELOG.md at the root, so a link that is right in the file being typed in is dead the moment it
+    # moves -- and the natural instinct produces exactly that form.
+    #
+    # HERE RATHER THAN IN THE FOLD, which is where #806 asked for it, and the reason is the fold's own
+    # doctrine on the same kind of fault: a defect decidable BEFORE the merge is refused while the branch is
+    # still the only thing affected, because refusing an already-merged branch's fold leaves an unfolded
+    # entry on the trunk with main looking finished -- the silent half-state this repo has measured. The
+    # fold says that in those words about a missing significance score. A fold-time REWRITE is declined for
+    # a second reason: the fold copies the entry verbatim on purpose, and an author whose link is silently
+    # corrected writes the same link again into the next document, where nothing corrects it.
+    #
+    # NOT -Force-able, for the same reason as the impact gate above: -Force exists for text somebody
+    # legitimately wrote, and there is no legitimate dead link. Getting past this is a one-line edit the
+    # message spells out, not a judgement call -- which is what makes the absence of an escape valve fair.
+    $linkFindings = @(Get-EntryLinkFindings -EntryText $entryText -RepoRoot $repoRoot)
+    if ($linkFindings.Count -gt 0) {
+        $detail = ($linkFindings | ForEach-Object {
+            if ($_.Suggested) { "  $($_.Target)  ->  write it as: $($_.Suggested)" }
+            else { "  $($_.Target)  (resolves from nowhere -- check the path)" }
+        }) -join "`n"
+        Write-Error @"
+link gate: $(Split-Path $entryPath -Leaf) carries relative link(s) that will be dead once the entry is folded - nothing pushed, no PR opened.
+
+$detail
+
+The entry's text is copied VERBATIM into CHANGELOG.md at the repo root, so its relative links have to
+resolve FROM THE ROOT - not from workflow-davekjohn/branch/, where the file you are editing sits. A link
+that looks right in front of you is the failure this catches, so do not add another '../': drop the '../'
+prefixes instead and write the path as it reads from the root.
+
+Correct the link(s) and run again.
+"@
+        exit 1
     }
 }
 
