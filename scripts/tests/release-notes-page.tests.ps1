@@ -94,7 +94,8 @@ function New-FixtureRepo {
         [switch]$UniformType,
         [switch]$WithPatchNote,
         [switch]$PlainNote,
-        [switch]$TitleLineDrifted
+        [switch]$TitleLineDrifted,
+        [switch]$NoLiveMarker
     )
     $root = Join-Path $Fixture "repo-$Label"
     if (Test-Path -LiteralPath $root) { Remove-Item -Recurse -Force -LiteralPath $root }
@@ -124,7 +125,7 @@ $(if ($MastheadBody) { "function Get-ReleasePageMasthead { $MastheadBody }" } el
 |---|---|---|---|
 | [2.2.0](audience/2.x/2.2.0.md) | 2026-08-14 | Minor | The live push moved to a new stage |
 | [$(if ($WithPatchNote) { '2.1.1' } else { '2.1.0' })](audience/2.x/$(if ($WithPatchNote) { '2.1.1' } else { '2.1.0' }).md) | 2026-08-12 | $(if ($UniformType) { 'Minor' } else { 'Patch' }) | A release with no note |
-| [2.0.0](audience/2.x/2.0.0.md) <- **LIVE** | 2026-08-10 | $(if ($UniformType) { 'Minor' } else { 'Major' }) | The first one |
+| [2.0.0](audience/2.x/2.0.0.md)$(if ($NoLiveMarker) { '' } else { ' <- **LIVE**' }) | 2026-08-10 | $(if ($UniformType) { 'Minor' } else { 'Major' }) | The first one |
 
 #### 1.x
 
@@ -527,7 +528,32 @@ try {
     $b16b = Invoke-Build -Root $r16b
     Assert-Equal 0 $b16b.Code 'chip/lopsided: exit 0'
     $p16b = Get-PageData -PagePath (Join-Path $r16b 'releases\page\release-notes.html')
-    Assert-Equal 1 ([regex]::Matches($p16b.Html, 'class="chip sc">(?!live)').Count) 'chip/lopsided: exactly ONE type chip on a page with two types, not one per row'
+    Assert-Equal 1 ([regex]::Matches($p16b.Html, 'class="chip sc">').Count) 'chip/lopsided: exactly ONE type chip on a page with two types, not one per row'
+
+    # --- 16b. LIVE falls back to the newest release ------------------------------------------------
+    # THE MARKER STILL WINS. In the fixtures above the table marks 2.0.0, which is NOT the newest, and that
+    # is the case the marker exists for: a Shopify repo's live theme is genuinely not always the latest cut.
+    Write-Host "row -- the LIVE label, marked or derived" -ForegroundColor Cyan
+    $markedRow = ([regex]::Match($p14.Html, '(?s)<details class="fold" id="v2\.0\.0">.*?</summary>')).Value
+    $newestRow = ([regex]::Match($p14.Html, '(?s)<details class="fold" id="v2\.2\.0">.*?</summary>')).Value
+    Assert-Match 'chip accent sc">LIVE<' $markedRow 'live/marked: the row the table marks carries it'
+    # ON THE CHIP MARKUP, not on the word: PowerShell's -notmatch is case-INSENSITIVE, and this row's own
+    # title is 'The live push moved to a new stage'. The first version of this assert failed for that
+    # reason and not because the page was wrong.
+    Assert-True ($newestRow -notmatch 'chip accent') 'live/marked: and the NEWEST row does not, because the table says otherwise'
+
+    # WHERE THE TABLE MARKS NOTHING, the newest release carries it -- derived, because a marker has to be
+    # moved by hand at every cut in a file the cut itself writes into, so it is right on the day it is set
+    # and silently wrong at the next release.
+    $r16c = New-FixtureRepo -Label 'nolive' -NoLiveMarker
+    $b16c = Invoke-Build -Root $r16c
+    Assert-Equal 0 $b16c.Code 'live/derived: exit 0'
+    $p16c = Get-PageData -PagePath (Join-Path $r16c 'releases\page\release-notes.html')
+    $newestRowC = ([regex]::Match($p16c.Html, '(?s)<details class="fold" id="v2\.2\.0">.*?</summary>')).Value
+    $olderRowC  = ([regex]::Match($p16c.Html, '(?s)<details class="fold" id="v2\.0\.0">.*?</summary>')).Value
+    Assert-Match 'chip accent sc">LIVE<' $newestRowC 'live/derived: an unmarked table puts it on the newest release'
+    Assert-True ($olderRowC -notmatch 'chip accent') 'live/derived: and on that one only'
+    Assert-Equal 1 ([regex]::Matches($p16c.Html, 'chip accent sc">LIVE<').Count) 'live/derived: exactly one row carries it'
     # THE LIVE CHIP IS NEVER SUPPRESSED. It marks one row out of forty, which is the definition of a
     # field that is worth its space -- and it is the row a reader looks at first.
     Assert-Match 'class="chip accent sc">live<' $p16.Html 'chip/uniform: the live chip stays'
@@ -601,6 +627,9 @@ try {
     # and that it is conditional, since an unconditional jump would move a row that is already in view.
     Assert-Match 'getBoundingClientRect\(\)\.top < 0' $p14.Html 'close: closing scrolls back to the row -- and only when the row has left the viewport'
     Assert-Match "scrollIntoView\(\{ block: 'start' \}\)" $p14.Html 'close: to the top of that row, which is where it was opened'
+    # The note's breathing room sits on the ARTICLE, not on its first paragraph's margin, so it does not
+    # depend on whether a note opens with a paragraph, a heading or a list.
+    Assert-Match '\.fold article \{ padding: 1\.1rem' $p14.Html 'article: an opened note has room above its first block'
 
 } finally {
     Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue

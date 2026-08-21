@@ -175,10 +175,13 @@
      version now starts at the left edge and the article indent below matches the title column exactly. */
   .fold > summary {
     display: grid;
-    /* 6.5rem, not 4.25: the version reads 'Version 2.39' rather than 'v2.39' since August 21, 2026 --
-       the page's reader is management, for whom a lone 'v' is a convention they have no reason to know.
-       Stated here rather than left to 'auto' so the note's indent below can match it exactly. */
-    grid-template-columns: 6.5rem 1fr auto auto;
+    /* THE VERSION COLUMN HUGS ITS CONTENT (Dave, August 21, 2026). It was a stated 4.25rem, then 6.5rem
+       once the label became 'Version 2.39' instead of 'v2.39' -- and a number that has to be raised
+       whenever the label gets longer is a number that will one day be too small, silently, with the
+       version wrapping or colliding on a page management reads. 'auto' is one track shared by every row,
+       so the column is still as straight down the list as a fixed width made it; it is simply as wide as
+       the widest label rather than as wide as somebody guessed. */
+    grid-template-columns: auto 1fr auto auto;
     column-gap: .9rem; row-gap: .15rem;
     align-items: baseline;
     padding: .85rem .15rem;
@@ -231,9 +234,17 @@
     box-shadow: 0 1px 0 var(--line);
   }
 
-  /* The open note sits indented under its own row, aligned with the title above it: the version column
-     plus one gap, which is what the trailing chevron leaves. */
-  .fold article { padding: .25rem 0 1.75rem 7.4rem; }
+  /* THE NOTE STARTS AT THE ROW'S OWN LEFT EDGE, at both widths. It used to be indented to line up with
+     the title column, and there is no title column any more -- and once the version column hugs its
+     content there is no fixed number left to line up WITH either. A stated indent would be a third
+     magic value tracking the first two. What says the note belongs to the row above it is the sticky
+     summary and the rule between rows, not 7.4rem of blank space.
+
+     THE TOP PADDING IS THE NOTE'S OWN BREATHING ROOM (Dave, August 21, 2026), and it lives on the article
+     rather than on the first paragraph's margin: the first element of a note is a paragraph today, and can
+     just as well be a heading or a list, so putting the space here means it does not depend on which. The
+     first child's own margin is still reset, because otherwise the two would add up. */
+  .fold article { padding: 1.1rem 0 1.75rem .15rem; }
   .fold article > :first-child { margin-top: 0; }
 
   /* ---------- the note itself ---------- */
@@ -295,8 +306,8 @@
        smaller number (Dave, August 21, 2026): the masthead's own bottom padding is already the separation,
        and on a phone every rem above the first row is one the list does not get. */
     .sheet { margin: 0; padding: .25rem 1rem .75rem; border-radius: .6rem; }
-    /* No leading gutter left to align to, so the note starts where the version does. */
-    .fold article { padding: .25rem 0 1.4rem .15rem; }
+    .fold article { padding: 1rem 0 1.4rem .15rem; }
+    header.masthead .marks { margin-bottom: .9rem; }
   }
 </style>
 </head>

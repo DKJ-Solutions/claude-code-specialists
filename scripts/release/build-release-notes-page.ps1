@@ -301,6 +301,32 @@ function Get-ReleaseDominantType {
     return [string]$ranked[0].Name
 }
 
+function Get-ReleaseLiveFallbackVersion {
+    <#
+        Pure: the version that should carry the LIVE label when the history table marks none, or '' when
+        it marks one.
+
+        THE MARKER STAYS AUTHORITATIVE, and this is only what happens in its absence (Dave, August 21,
+        2026). A row carrying '**LIVE**' is a deliberate statement, and it has to keep winning: in a
+        Shopify repo the live theme is genuinely not always the newest release, which is the whole reason
+        that marker exists rather than being derived.
+
+        WHERE NOTHING IS MARKED, THE NEWEST RELEASE IS IT. The table is newest-first -- this script already
+        depends on that for the whole index -- so it is the first row. Derived rather than marked because a
+        marker has to be MOVED at every cut, by hand, in a file the cut itself writes into: the label would
+        be right on the day it was set and wrong at the next release, silently, on a page management reads.
+        Deriving it costs no maintenance and cannot go stale.
+
+        THE COST, STATED: a repo whose live version is genuinely older and which has simply never marked it
+        now gets a label that is wrong, where before it got none. That is the trade this fallback makes, and
+        the override is the thing it defers to -- mark the row and the derivation stops.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyCollection()][array]$Releases)
+    if ($Releases.Count -eq 0) { return '' }
+    if (@($Releases | Where-Object { $_.live }).Count -gt 0) { return '' }
+    return [string]$Releases[0].version
+}
+
 function Test-ReleaseVersionTrimmable {
     <#
         Pure: does EVERY release on this page end in '.0', so the third digit says nothing?
@@ -598,8 +624,8 @@ function Format-ReleaseIndexRows {
         template, and the noscript block on the page says so rather than leaving a reader to work it
         out from an empty panel.
 
-        ONE CHIP PER ROW AT MOST: 'live' where the history table marks it, the bump type otherwise,
-        never both. Forty rows carrying two chips each read as a table of metadata rather than as a
+        ONE CHIP PER ROW AT MOST: 'LIVE' where the history table marks it -- or, where it marks nothing,
+        on the newest release -- and the bump type otherwise, never both. Forty rows carrying two chips each read as a table of metadata rather than as a
         list of changes, and the version number already says whether a release was major or patch.
 
         AND THE TYPE CHIP ONLY WHERE IT SAYS SOMETHING (inbound #811). -DominantType is the caller's
@@ -624,6 +650,7 @@ function Format-ReleaseIndexRows {
     param(
         [Parameter(Mandatory)][AllowEmptyCollection()][array]$Releases,
         [AllowEmptyString()][string]$DominantType = '',
+        [AllowEmptyString()][string]$LiveFallbackVersion = '',
         [bool]$TrimVersion = $false
     )
 
@@ -636,9 +663,11 @@ function Format-ReleaseIndexRows {
 
         $chipClass = ''
         $chipText  = ''
-        if ($r.live) {
+        # The marker where the table carries one, the newest release where it carries none -- see
+        # Get-ReleaseLiveFallbackVersion for why the second half is derived and what it defers to.
+        if ($r.live -or ($LiveFallbackVersion -and ([string]$r.version) -eq $LiveFallbackVersion)) {
             $chipClass = 'chip accent'
-            $chipText  = 'live'
+            $chipText  = 'LIVE'
         } elseif (([string]$r.type).Trim() -and ([string]$r.type).Trim() -ne $DominantType) {
             $chipClass = 'chip'
             $chipText  = ConvertTo-HtmlText ([string]$r.type)
@@ -664,7 +693,8 @@ function Format-ReleaseIndexRows {
 # carries information here at all, and whether every version on this page ends in '.0'. Both are
 # properties of the SET, so neither can be decided inside the row loop -- and both are read off the data
 # instead of a seam, which is what makes them right for a consumer whose bump policy differs or changes.
-$dominantType = Get-ReleaseDominantType      -Releases $releases
+$dominantType = Get-ReleaseDominantType           -Releases $releases
+$liveFallback = Get-ReleaseLiveFallbackVersion -Releases $releases
 $trimVersion  = Test-ReleaseVersionTrimmable -Releases $releases
 
 $masthead = Format-ReleaseMastheadMarks -Marks $config.Masthead
@@ -676,7 +706,7 @@ $page = $template.
     Replace('@@PAGE_MASTHEAD@@', $masthead.Html).
     Replace('@@BUILD_STAMP@@',   (ConvertTo-HtmlText $stamp)).
     Replace('@@PAGE_STYLE@@',    (Format-ReleasePageStyle -Theme $config.Theme)).
-    Replace('@@RELEASE_ROWS@@', (Format-ReleaseIndexRows -Releases $releases -DominantType $dominantType -TrimVersion $trimVersion)).
+    Replace('@@RELEASE_ROWS@@', (Format-ReleaseIndexRows -Releases $releases -DominantType $dominantType -LiveFallbackVersion $liveFallback -TrimVersion $trimVersion)).
     Replace('@@RELEASE_DATA@@',  $json)
 
 # --- 4. Where the output goes ---------------------------------------------------------------------
