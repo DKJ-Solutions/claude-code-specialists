@@ -536,6 +536,46 @@ function Get-SharedScriptPairs {
             Source  = 'scripts\lib\sync-rules.ps1'
             Plugin  = 'team-shopify'
             LibOnly = $true
+        },
+        @{
+            # The preview push (inbound #805, August 21, 2026). IT TRAVELS IN team-shopify for the same
+            # reason sync-main does: the plugin that owns the live theme owns the estate around it. It
+            # depends on NEITHER workflow plugin -- every seam it reads, the branch-name flattening
+            # included, is fetched through Get-Command.
+            #
+            # THE CASE FOR SHARING IT WAS MADE BY THE FAILURE. A consumer's own copy built its create call
+            # as '--unpublished --theme-name <name>'; there is no --theme-name flag in the Shopify CLI, and
+            # the call failed the FIRST time anybody needed a preview theme created -- the path had been
+            # written the day before and no branch had wanted one in between. Nothing was wrong with the
+            # reasoning; the code had simply never run, and a per-consumer copy means every consumer gets
+            # to discover that independently.
+            #
+            # start-task DELIBERATELY REMAINS UNSHIPPED, and that is not inconsistent with this. Its page
+            # declines to ship a script because creating a preview theme was bound up with the store
+            # estate -- and lazy creation is what separated the two: the branch step no longer touches a
+            # theme at all, so what is left to share is a push, which is the same call everywhere.
+            Name   = 'push-preview'
+            Source = 'scripts\task\push-preview.ps1'
+            Plugin = 'team-shopify'
+            Skill  = 'push-preview'
+            # A fixture root, as for sync-main: a consumer never types it, and documenting it would invite
+            # someone to.
+            SkillParamsExempt = @('RootOverride')
+        },
+        @{
+            # The preview push's ARGUMENT LISTS and the two readers of the CLI's own output, as a lib of
+            # its own (inbound #805) -- for the same reason sync-rules is one: they are the only halves
+            # that can be judged without a store, a network or a theme, and they are exactly the halves
+            # that were wrong. The flag whitelist earned its place on its first run in the consumer, by
+            # refusing the lib's own call because '--unpublished' had been left out of the list.
+            #
+            # THE WHITELIST ANSWERS 'IS THIS A REAL CLI FLAG', NEVER 'MAY THIS REPO USE IT' -- so it admits
+            # --allow-live. Refusing a live push is the guard hook's job, and a validator answering both
+            # questions would give two different answers to the same one.
+            Name    = 'preview-theme'
+            Source  = 'scripts\lib\preview-theme.ps1'
+            Plugin  = 'team-shopify'
+            LibOnly = $true
         }
     )
 

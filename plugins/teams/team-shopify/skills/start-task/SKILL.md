@@ -1,25 +1,36 @@
 ---
 name: start-task
-description: Start a new task in a Shopify store repo — the git branch plus the matching invisible preview theme. Invoke manually as "/team-shopify:start-task <prefix>/<short-name>", e.g. /team-shopify:start-task feat/size-chart-popup. It drives THIS repo's own start-task script; the team deliberately ships none.
+description: Start a new task in a Shopify store repo — the git branch. Invoke manually as "/team-shopify:start-task <prefix>/<short-name>", e.g. /team-shopify:start-task feat/size-chart-popup. It drives THIS repo's own start-task script; the team deliberately ships none. The preview theme is NOT created here: push-preview creates it on the first push, so a branch that never needed one leaves none behind.
 disable-model-invocation: true
 ---
 
-# start-task — new branch + preview theme
+# start-task — the branch that opens a Shopify task
 
-Two things happen at the start of a Shopify task: a branch, and an **unpublished** preview theme of the
-same name to push it to. This page drives both. It does not carry the code for either.
+**The preview theme is no longer part of this step.** It used to be: a branch and an unpublished theme of
+the same name were created together. Since inbound
+[#805](https://github.com/DaveKJohn/claude-code-specialists/issues/805) the theme comes into existence on
+the **first push** instead — [`push-preview`](../push-preview/SKILL.md) creates it — so a docs or tooling
+branch that could never touch a theme file no longer leaves an unused theme behind on a store with a hard
+ceiling of 20 themes. Measured on the day the rule was made: of 12 real branch previews on one store, **6
+belonged to branches that never needed one**.
+
+> A preview theme is a consequence of *"I want to show this"*, not of *"I am starting work"*.
+
+So this page opens the branch, and nothing else. When a change is ready to be looked at, ask for
+`push-preview`.
 
 ## What this needs from your repo, and why it is not shipped
 
-**`team-shopify` ships no `start-task` script**, and that is a decision rather than an omission. Creating a
-preview theme means the Shopify CLI against one specific store: which markets get a preview URL, where the
-theme id is remembered, and what counts as a safe target are facts about a *store estate*, not about the
-team. So the executing half stays in the repo, conventionally at `scripts/task/start-task.ps1`.
+**`team-shopify` ships no `start-task` script**, and that is a decision rather than an omission — though a
+narrower one than it used to be. What made the step unshareable was the preview theme, and that half has
+now moved out into `push-preview`, which the team *does* ship. What is left is a branch, and a branch is
+whatever your repo's own convention says it is: `workflow-davekjohn` consumers have `new-branch`, others
+have their own script, conventionally at `scripts/task/start-task.ps1`.
 
 **If your repo has no such script, this skill has nothing to run — say so rather than improvising one.**
-The two steps are then done by hand and your repo's own `CLAUDE.md` is what says how: the branch first, per
-that repo's branch convention, then a `shopify theme push --unpublished` to create the preview. Never
-against a theme whose role is `live`.
+The branch is then made by hand, per that repo's branch convention as its own `CLAUDE.md` states it. Do
+**not** create a preview theme at this point: that is `push-preview`'s job, and doing it here by hand is
+exactly the estate this split cleaned up.
 
 ## Argument
 
@@ -42,9 +53,12 @@ states it once for every script that asks. Classify by *what actually changes*.
    No such file? Stop, say that this repo has no start-task script, and offer the by-hand route above.
 4. **A refusal is an answer.** Where the script validates the name, resolve the error it names; do not try
    another spelling to get past it.
-5. **On success** pass on whatever preview URLs it prints.
+5. **On success** say the branch is open — and **do not create a preview theme.** A repo whose own
+   `start-task` script still creates one prints its URLs; pass those on, and note that
+   [`push-preview`](../push-preview/SKILL.md) makes that half of the script redundant.
 
 ## Boundaries
 
-- Preview only: the theme is `unpublished` and does not touch the live theme.
+- **The theme estate is not touched here.** Nothing is created, published or deleted; the preview theme
+  arrives with the first `push-preview`, unpublished by definition.
 - Do not touch the trunk or live beyond what the script does.
