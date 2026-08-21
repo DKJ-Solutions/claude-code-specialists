@@ -4217,6 +4217,33 @@ function Format-BranchProgressReset {
     return @($lines.ToArray())
 }
 
+function Get-BranchFilesRereadNote {
+    <#
+        The one line a script prints after it has written or reset the two branch files: whoever had them
+        open has to read them again before their next write.
+
+        WHY THIS EXISTS (inbound #817, August 21, 2026). These two files are the only ones in a repo that a
+        script and a session write ALTERNATELY, twice per branch cycle -- new-branch.ps1 creates them, the
+        session writes the entry and the step list, fold-changelog-entry.ps1 resets both after the merge.
+        Every one of those script writes invalidates whatever the session had tracked, so the editor's
+        staleness guard refuses the next write until the file is read again. Measured in one session over
+        three full cycles: 2 refused writes, 3 stale notices, 0 cases of anything actually lost. The
+        refusal lands on the FIRST write after a script touched the file, which in practice means the
+        second and later branches of a session rather than the first.
+
+        AND WHAT IT DELIBERATELY DOES NOT DO. The refusal itself is the harness's, and it is correct: it is
+        what stops a session overwriting an out-of-band change it never saw. Nothing in this tree, no seam
+        and no hook can change when it fires, and a repo-side "fix" that suppressed it would be removing a
+        working safety check to tidy up a log line. So the subject here is legibility, not correctness --
+        the recovery was always automatic and cost one read; what it cost was reading as a broken tool in
+        the one place a reader is already looking at those exact paths.
+
+        ONE SOURCE BECAUSE TWO SCRIPTS PRINT IT. The doc half of the same report is in BRANCH-portable.md,
+        which reaches the session that did NOT run the script; these are not alternatives.
+    #>
+    return 'Note: rewritten just now -- re-read these before editing them, or the next write is refused as stale.'
+}
+
 function Add-BranchProgressSection {
     <#
         Private: one of the cycle file's OWN sections -- a phase heading, or Where I left off. Heading,

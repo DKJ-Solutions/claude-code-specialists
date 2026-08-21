@@ -628,6 +628,9 @@ $bfProgressAfter = [System.IO.File]::ReadAllText($bfProgressPath)
 Assert-True (-not ($bfProgressAfter -match '(?m)^- \[ \] ')) 'branch files: the step list is reset too -- a merged branch does not hand its ticked boxes to the next one'
 Assert-Equal 'main' (Get-BranchFileDeclaredBranch -Text $bfProgressAfter) 'branch files: and the reset names the trunk again'
 Assert-True ($rBF.Output -match 'reset') 'branch files: the run says it reset rather than removed, so the reader does not go looking for a deleted file'
+# inbound #817: the fold is the SECOND of the two out-of-band write events per cycle, and the one that
+# replaces both files at once -- so it says so, in the same shared wording new-branch uses at the other end.
+Assert-True ($rBF.Output -match [regex]::Escape((Get-BranchFilesRereadNote))) 'branch files: and it prints the re-read note -- a session tracking the pair has just gone stale on both'
 
 Write-Host "A RESET branch-deployment.md is not an entry, and is not folded" -ForegroundColor Cyan
 #      The reset state opens with an H1, exactly as CONTRIBUTING.md does. This is what makes a double fold
@@ -643,6 +646,7 @@ $rBR = Invoke-Fold -Dir $dirBR
 Assert-True ($rBR.ExitCode -eq 0) 'reset pair: exits 0 -- nothing to fold is not an error'
 Assert-True ($rBR.Output -match 'No entry files found') 'reset pair: and it says there was nothing to fold'
 Assert-True ((Get-Changelog -Dir $dirBR) -eq $clBR0) 'reset pair: CHANGELOG.md is byte-identical'
+Assert-True (-not ($rBR.Output -match [regex]::Escape((Get-BranchFilesRereadNote)))) 'reset pair: and NO re-read note -- this run rewrote nothing, so nothing went stale (inbound #817)'
 
 Write-Host "The fold commit names both branch files" -ForegroundColor Cyan
 #      The entry is modified rather than deleted now, and the step list rides along because this run
