@@ -8,7 +8,8 @@ not advice.
 | **Liam** 💧 `04-20` | Liquid Developer — features and fixes in the theme code, plus `assets/` and `locales/` |
 | **Sandra** 🛍️ `05-21` | Store Manager — read-only admin reconnaissance and the pre-push checklist |
 | **Steven** 🗂️ `05-22` | Configuration Manager — theme estate, cleanup policy, CLI and auth reference |
-| `start-task` | the skill that opens a task: a branch plus its matching unpublished preview theme |
+| `start-task` | the skill that opens a task: the branch. The preview theme is no longer part of it — see `push-preview` |
+| `push-preview` | the skill that pushes the current branch to its own **unpublished** preview theme, creating that theme on the first push rather than at branch creation |
 | `adopt-shopify-floor` | the skill that **places** the floor in your repo: the guard's seams, a starter `.theme-check.yml`, and the CI workflow over it |
 | `sync-main` | the **pre-task sync**: mirror the live theme into the trunk without letting live overwrite what the trunk has done since |
 | `hooks/guard-live-theme.ps1` | **the floor** — a `PreToolUse` guard on the live theme |
@@ -124,8 +125,33 @@ id — the other three have defaults that are right for both existing Shopify co
 | `Get-ShopifySyncMerges` | `$false` | `$true` opens the PR and merges once CI is green. The default pushes and stops, so somebody *looks* at what third parties changed before it becomes the base of new branches. |
 | `Get-TrunkBranchName` | `main` | the trunk. Not a Shopify seam — the sync simply reads it if your repo has answered it. |
 
+**And one more belongs to the preview push** (`push-preview`), which otherwise reuses the store domain,
+the live theme id and the trunk from the two tables above:
+
+| function | default | what it decides |
+|---|---|---|
+| `Get-ShopifyPreviewUrls` | one URL on the store's own domain | the preview URL(s) printed after a push. Answer it in a **multi-market** store to get one per market or locale. |
+
+**That one is a seam because the market table genuinely is per-store, and the rest of the job is not.** One
+consumer runs a single domain with locale-prefixed paths (`/`, `/en`, `/de`, `/nl-gb`, …); another runs five
+separate domains. A shipped table would have produced four domains that do not exist. What *is* shared is
+that a preview link needs `_ab=0&_fd=0&_sc=1` to survive the first internal click — without them the
+preview holds only through the cookie, and you are then looking at **live** while believing you are looking
+at the preview. A consumer lost a whole review to that. The built-in single URL carries them; a seam answer
+has to carry them itself.
+
+**`Get-ShopifyLiveThemeId` is recommended rather than required here**, unlike for `sync-main`, and the
+difference is which direction the risk runs. `sync-main` reads *from* live, so not knowing which theme is
+live means it cannot work at all. `push-preview` pushes to an *unpublished* theme and wants the live id
+only for a belt-and-braces refusal — and the guard hook blocks a live-aimed push whether or not the script
+recognised the target. So an unanswered seam costs one of two independent refusals, and the script says so
+out loud instead of blocking a preview.
+
 Every one of them is read through `Get-Command`, so **this plugin depends on neither workflow plugin**: a
-repo on `workflow-default`, on `workflow-davekjohn`, or on neither gets identical behaviour.
+repo on `workflow-default`, on `workflow-davekjohn`, or on neither gets identical behaviour. That includes
+the branch-name flattening `push-preview` needs — Shopify rejects a theme name containing `/`, so the
+branch name is taken from `Get-BranchInfo`'s `SafeName` where the repo has it and falls back to replacing
+`/` with `-`, which is the same answer.
 
 **You do not have to place any of that by hand** — the `adopt-shopify-floor` skill writes the block, and
 takes the theme id and the store as parameters so both are answered in the same move. It also places the
