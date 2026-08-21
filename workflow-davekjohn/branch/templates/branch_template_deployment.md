@@ -17,9 +17,11 @@
 #### What makes this change extra special
 <!--
      Why the change matters AT THIS REACH specifically. For tier 2 audiences: the subscriber of a service.
+     That reader and nobody else -- what matters only inside this repo is said in the section above.
 
      If it has no significance at this reach at all, then explain shortly why and insert N/A in Score.
-     That reason goes above the Score line too.
+     That reason goes above the Score line too, and one or two lines is the whole of it: N/A is a
+     complete answer and the common one.
 -->
 
 **Score:**
