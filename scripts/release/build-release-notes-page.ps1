@@ -826,5 +826,7 @@ Write-Host "  worker   : $workerPath ($([math]::Round((Get-Item -LiteralPath $wo
 Write-Host ""
 Write-Host "  Next:  cd `"$pageDir`"  &&  npx wrangler deploy" -ForegroundColor Cyan
 Write-Host "  Then verify the BYTES the URL serves, not the deploy command's output -- once wrangler has" -ForegroundColor DarkGray
-Write-Host "  deployed a worker, an API upload only creates inactive versions, silently." -ForegroundColor DarkGray
+Write-Host "  deployed a worker, an API upload only creates inactive versions, silently. Fetch TWICE: a" -ForegroundColor DarkGray
+Write-Host "  read seconds after a good deploy can still be a cached 200 with the old body, which looks" -ForegroundColor DarkGray
+Write-Host "  exactly like that failure. Compare the second, cache-busted read against this file." -ForegroundColor DarkGray
 exit 0
