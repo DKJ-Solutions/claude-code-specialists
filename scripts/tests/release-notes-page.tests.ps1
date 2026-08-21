@@ -86,7 +86,16 @@ function New-FixtureRepo {
         [string]$WorkerName = '',
         [switch]$OmitTitle,
         [switch]$NoteWithScriptTag,
-        [string]$ThemeBody = ''
+        [string]$ThemeBody = '',
+        [string]$MastheadBody = '',
+        # The three shapes the second pass (inbound #811, #813, #816) has to be measured against, each
+        # of which is a property of the SET rather than of one row: a page whose type never varies, a
+        # page carrying a real patch note, and a note that does not open the way the generator writes.
+        [switch]$UniformType,
+        [switch]$WithPatchNote,
+        [switch]$PlainNote,
+        [switch]$TitleLineDrifted,
+        [switch]$NoLiveMarker
     )
     $root = Join-Path $Fixture "repo-$Label"
     if (Test-Path -LiteralPath $root) { Remove-Item -Recurse -Force -LiteralPath $root }
@@ -101,6 +110,7 @@ function Get-ReleaseHistoryPath { return 'releases/README.md' }
 function Get-ReleasePageWorkerName { return '$WorkerName' }
 $titleFn
 $(if ($ThemeBody) { "function Get-ReleasePageTheme { $ThemeBody }" } else { '' })
+$(if ($MastheadBody) { "function Get-ReleasePageMasthead { $MastheadBody }" } else { '' })
 "@
     Write-FixtureFile (Join-Path $root 'scripts\repo-config.ps1') $config
 
@@ -114,8 +124,8 @@ $(if ($ThemeBody) { "function Get-ReleasePageTheme { $ThemeBody }" } else { '' }
 | Version | Date | Type | Title |
 |---|---|---|---|
 | [2.2.0](audience/2.x/2.2.0.md) | 2026-08-14 | Minor | The live push moved to a new stage |
-| [2.1.0](audience/2.x/2.1.0.md) | 2026-08-12 | Patch | A release with no note |
-| [2.0.0](audience/2.x/2.0.0.md) <- **LIVE** | 2026-08-10 | Major | The first one |
+| [$(if ($WithPatchNote) { '2.1.1' } else { '2.1.0' })](audience/2.x/$(if ($WithPatchNote) { '2.1.1' } else { '2.1.0' }).md) | 2026-08-12 | $(if ($UniformType) { 'Minor' } else { 'Patch' }) | A release with no note |
+| [2.0.0](audience/2.x/2.0.0.md)$(if ($NoLiveMarker) { '' } else { ' <- **LIVE**' }) | 2026-08-10 | $(if ($UniformType) { 'Minor' } else { 'Major' }) | The first one |
 
 #### 1.x
 
@@ -127,8 +137,27 @@ $(if ($ThemeBody) { "function Get-ReleasePageTheme { $ThemeBody }" } else { '' }
 
     $folder = { param($v) if ($Grouping -eq 'minor') { ($v.Split('.')[0..1] -join '.') } else { "$($v.Split('.')[0]).x" } }
     $extra = if ($NoteWithScriptTag) { "`n`nA literal closing script tag follows: </script> and the page must survive it." } else { '' }
-    foreach ($v in @('2.2.0', '2.0.0')) {
-        Write-FixtureFile (Join-Path $root "releases\audience\$(& $folder $v)\$v.md") "# Release notes v$v`n`n**Date:** x`n`nBody of $v.$extra"
+    # 2.1.1, not 2.1.0: the point of this variant is a version whose third digit is NOT zero, and a
+    # x.y.0 would be trimmed exactly like the others.
+    $noteVersions = if ($WithPatchNote) { @('2.2.0', '2.1.1', '2.0.0') } else { @('2.2.0', '2.0.0') }
+    # The titles exactly as the history table above states them: the suppression matches on equality, so a
+    # fixture that paraphrased them would assert the opposite of what it claims.
+    $titles = @{ '2.2.0' = 'The live push moved to a new stage'; '2.1.1' = 'A release with no note'; '2.0.0' = 'The first one' }
+    foreach ($v in $noteVersions) {
+        # The generator's own shape: an H1 naming the version, then bold labels, then the body. -PlainNote
+        # writes a note that opens some other way, which is the case the suppression must NOT touch.
+        # THE TITLE LINE IS PART OF THE SHAPE, and the fixture has to carry it or the suppression of it is
+        # asserted against a note that never had one. The generator writes the release title as a bare
+        # paragraph under the metadata block, verbatim from the same table the row is built from.
+        $noteTitle = $titles[$v]
+        $note = if ($PlainNote) {
+            "Body of $v.$extra"
+        } elseif ($TitleLineDrifted) {
+            "# Release notes v$v`n`n**Date:** x  `n**Type:** Minor  `n**For whom:** the organisation`n`nA title somebody edited by hand`n`nBody of $v.$extra"
+        } else {
+            "# Release notes v$v`n`n**Date:** x  `n**Type:** Minor  `n**For whom:** the organisation`n`n$noteTitle`n`nBody of $v.$extra"
+        }
+        Write-FixtureFile (Join-Path $root "releases\audience\$(& $folder $v)\$v.md") $note
     }
     return $root
 }
@@ -169,7 +198,12 @@ try {
     Assert-Equal '2026-08-14' $p1.Data.releases[0].date 'basic: the date comes from the table'
     Assert-Equal 'Major' $p1.Data.releases[1].type 'basic: the type comes from the table'
     Assert-Match 'Body of 2\.2\.0' $p1.Data.releases[0].body 'basic: the note body travels into the page'
-    Assert-Match 'Fixture Product' $p1.Html 'basic: Get-ReleasePageTitle is the page title'
+    # THE SEAM IS THE EYEBROW AND HALF THE WINDOW TITLE; the heading is the template's own words (Dave,
+    # August 21, 2026). It was the other way round for a day, and a repo whose title said what the page
+    # was then printed those words twice -- which is what this repo's own answer did.
+    Assert-Match '<span class="eyebrow">Fixture Product</span>' $p1.Html 'basic: Get-ReleasePageTitle is the eyebrow -- whose releases these are'
+    Assert-Match '<h1>Release notes</h1>' $p1.Html 'basic: and the heading says what the document is, from the template'
+    Assert-Match '<title>Fixture Product &middot; release notes</title>' $p1.Html 'basic: the window title joins them, where a tab has no duplication to make'
     Assert-True (-not ($p1.Html -match '@@[A-Z_]+@@')) 'basic: no template placeholder survives'
 
     # --- 2. The live marker, case-sensitively -----------------------------------------------------
@@ -223,7 +257,7 @@ try {
     $b6 = Invoke-Build -Root $r6
     Assert-Equal 0 $b6.Code 'title fallback: exit 0'
     $p6 = Get-PageData -PagePath (Join-Path $r6 'releases\page\release-notes.html')
-    Assert-Match '<title>fixture-repo</title>' $p6.Html 'title fallback: the name half of Get-RepoName, not the owner/name pair'
+    Assert-Match '<title>fixture-repo &middot; release notes</title>' $p6.Html 'title fallback: the name half of Get-RepoName, not the owner/name pair'
 
     # --- 7. The path token is an input ------------------------------------------------------------
     Write-Host "worker -- the path token is never invented" -ForegroundColor Cyan
@@ -364,16 +398,25 @@ try {
     # THE ROW IS STATIC HTML, which is the whole point: it reads with JavaScript off. Version, title
     # and date are in the markup rather than in the data block alone.
     $summary = ([regex]::Match($p13.Html, '(?s)<details class="fold" id="v2\.2\.0">.*?</summary>')).Value
-    Assert-True ($summary -match '<span class="sv">v2\.2\.0</span>') 'index: the row carries the version as markup'
-    Assert-True ($summary -match 'The live push moved to a new stage') 'index: and the title'
+    Assert-True ($summary -match '<span class="sv">Version 2\.2</span>') 'index: the row carries the version as markup'
+    # THE TITLE IS THE ROW'S ACCESSIBLE NAME, not visible text (Dave, August 21, 2026): a summary of a
+    # version and a date is thin for anyone navigating by control, and the title is the one string that
+    # says what the row is -- so it rides on the element, where it costs no width.
+    Assert-True ($summary -match 'title="The live push moved to a new stage"') 'index: and the title, as the row''s accessible name'
+    Assert-True ($summary -notmatch '<span class="st"') 'index: but no longer as visible text in the summary'
     Assert-True ($summary -match '<span class="sd">14 Aug 2026</span>') 'index: and the date, REFORMATTED from the table ISO for a reader who is not the team'
 
-    # AT MOST ONE CHIP PER ROW: live where the table marks it, the bump type otherwise, never both.
-    Assert-Equal 1 ([regex]::Matches($summary, '<span class="chip').Count) 'index: exactly one chip on a non-live row'
-    Assert-True ($summary -match '<span class="chip">Minor</span>') 'index: and it is the bump type, since this row is not the live one'
+    # AT MOST ONE CHIP PER ROW: live where the table marks it, the bump type otherwise, never both. Since
+    # inbound #811 that one chip is written as TWO spans and the CSS shows exactly one of them -- the
+    # desktop copy inline before the title, the narrow copy in its own cell on row 1 -- so the count here
+    # is two per row rather than one. What has not changed is the rule the count was written for: the two
+    # spans always carry the SAME text, so no row ever states both a type and a live marker.
+    Assert-Equal 1 ([regex]::Matches($summary, '<span class="chip').Count) 'index: one chip on a non-live row'
+    Assert-True ($summary -match '<span class="chip sc">Minor</span>') 'index: and it is the bump type, since this row is not the live one'
     $liveRow = ([regex]::Match($p13.Html, '(?s)<details class="fold" id="v2\.0\.0">.*?</summary>')).Value
-    Assert-Equal 1 ([regex]::Matches($liveRow, '<span class="chip').Count) 'index: exactly one chip on the live row too'
-    Assert-True ($liveRow -match '<span class="chip accent">live</span>') 'index: and there it is the live marker, which is the fact a reader scans for'
+    Assert-Equal 1 ([regex]::Matches($liveRow, '<span class="chip').Count) 'index: one chip on the live row too'
+    Assert-True ($liveRow -match '<span class="chip accent sc">live</span>') 'index: and there it is the live marker, which is the fact a reader scans for'
+    Assert-True ($liveRow -notmatch '>Major<') 'index: the live row states live and NOT its type -- one chip, one fact'
 
     # THE BODY IS EMPTY IN THE MARKUP and is filled by the renderer on first open. Asserted because it
     # is the half-measure this design states out loud: the index survives without JavaScript, the
@@ -407,6 +450,194 @@ try {
     Assert-Equal 0 $b13b.Code 'odd date: the build does not fail over a date it cannot parse'
     $p13b = Get-PageData -PagePath (Join-Path $oddDate 'releases\page\release-notes.html')
     Assert-True ($p13b.Html -match '<span class="sd">14 thermidor</span>') 'odd date: and shows the repo its own value instead of inventing one'
+
+
+    # --- 14. The note stops restating the row it is inside (inbound #816) --------------------------
+    # THE SUPPRESSION IS SERVER-SIDE, so it is measurable here rather than only in a browser -- and it
+    # reaches the notes ALREADY published, which are records and are not rewritten.
+    Write-Host "row -- the note no longer repeats the version, the date and the type" -ForegroundColor Cyan
+    $r14 = New-FixtureRepo -Label 'metadata'
+    $b14 = Invoke-Build -Root $r14
+    Assert-Equal 0 $b14.Code 'metadata: exit 0'
+    $p14 = Get-PageData -PagePath (Join-Path $r14 'releases\page\release-notes.html')
+    $body14 = [string]$p14.Data.releases[0].body
+    Assert-True ($body14 -notmatch '# Release notes') 'metadata: the H1 that names the version is gone -- the row above says it'
+    Assert-True ($body14 -notmatch '\*\*Date:\*\*')   'metadata: and the date, which the row shows in a readable format'
+    Assert-True ($body14 -notmatch '\*\*Type:\*\*')   'metadata: and the type'
+    Assert-True ($body14 -notmatch '\*\*For whom:\*\*') 'metadata: and the constant sentence telling the reader who they are'
+    # AND THE TITLE LINE, which is the row's own title verbatim. Reported by Dave reading the built page:
+    # with the metadata block gone, an opened note began by repeating the sentence in the row he had just
+    # clicked. This branch's entry had recorded it as a risk nobody had raised -- and then somebody did.
+    # THE TITLE LINE STAYS IN THE NOTE, and the duplication was removed from the other side instead: the
+    # summary no longer shows it, so the note is the one place it is read. That answer replaced suppressing
+    # it here, which had been the first repair of the same complaint.
+    Assert-Match '^The live push moved to a new stage' $body14 'title: the note opens on its own title, which the row no longer displays'
+    Assert-Match 'Body of 2\.2\.0' $body14 'metadata: and what the note actually says follows it'
+
+    # MATCHED ON EQUALITY WITH THE TABLE'S TITLE, never on 'the first paragraph'. Where a hand edit has
+    # moved the two apart the line stays: prose the page cannot prove is a duplicate is prose it leaves.
+    $r14c = New-FixtureRepo -Label 'titledrift' -TitleLineDrifted
+    $b14c = Invoke-Build -Root $r14c
+    Assert-Equal 0 $b14c.Code 'title/drift: exit 0'
+    $p14c = Get-PageData -PagePath (Join-Path $r14c 'releases\page\release-notes.html')
+    Assert-Match 'A title somebody edited by hand' ([string]$p14c.Data.releases[0].body) 'title/drift: a title line that differs from the table is kept'
+
+    # CONSERVATIVE BY CONSTRUCTION: a note that does not open with an H1 naming its own version is left
+    # exactly as it is. Matching bold labels near the top of any document would eventually eat a line
+    # somebody wrote on purpose.
+    $r14b = New-FixtureRepo -Label 'plainnote' -PlainNote
+    $b14b = Invoke-Build -Root $r14b
+    Assert-Equal 0 $b14b.Code 'metadata/plain: exit 0'
+    $p14b = Get-PageData -PagePath (Join-Path $r14b 'releases\page\release-notes.html')
+    Assert-Match 'Body of 2\.2\.0' ([string]$p14b.Data.releases[0].body) 'metadata/plain: a note opening some other way is untouched'
+
+    # --- 15. The version label and the id are allowed to differ (inbound #813) --------------------
+    # A patch never gets a hand-written note, so every version this page can display ends in '.0' and
+    # the third digit is a constant. The LABEL drops it; the ID never does, because the id is the target
+    # of links people already hold and changing it would 404 them all while the build reported success.
+    Write-Host "row -- the third digit goes from the label and stays in the id" -ForegroundColor Cyan
+    Assert-Match 'id="v2\.2\.0"' $p14.Html 'version: the id keeps the full semver'
+    Assert-Match '<span class="sv">Version 2\.2</span>' $p14.Html 'version: the label drops a trailing .0 when every release has one, and reads ''Version'' rather than a lone v'
+    Assert-Match 'id="v2\.0\.0"' $p14.Html 'version: including the release whose minor is itself 0'
+
+    # AND NOT WHERE A RELEASE GENUINELY CARRIES A THIRD DIGIT. Get-ReleaseConsumerBumps is
+    # consumer-overridable, so a repo that writes a note for a patch needs all three -- which is why this
+    # is derived from the data rather than hardcoded or read off a seam.
+    $r15 = New-FixtureRepo -Label 'withpatch' -WithPatchNote
+    $b15 = Invoke-Build -Root $r15
+    Assert-Equal 0 $b15.Code 'version/patch: exit 0'
+    $p15 = Get-PageData -PagePath (Join-Path $r15 'releases\page\release-notes.html')
+    Assert-Match '<span class="sv">Version 2\.1\.1</span>' $p15.Html 'version/patch: one release off the pattern keeps the third digit on ALL of them'
+    Assert-True ($p15.Html -notmatch '<span class="sv">Version 2\.2</span>') 'version/patch: so nothing is trimmed here'
+
+    # --- 16. The type chip only where the type varies (inbound #811, ask 1) -----------------------
+    Write-Host "row -- the type chip earns its space or is not there" -ForegroundColor Cyan
+    # THE CHIP MARKS WHAT IS UNUSUAL. In this fixture the two noted releases are one Minor and one Major,
+    # so the mode is decided by name and 'Major' wins the tie -- which means the Minor row is the one that
+    # differs from the page's ordinary type and keeps its chip.
+    Assert-Match 'class="chip sc">Minor<' $p14.Html 'chip: a row whose type differs from the page''s ordinary one keeps it'
+    # ONE SPAN, not two. It had to be written twice while the title held the middle column; taking the
+    # title out of the summary retired that, so no copy is hidden by CSS and no row pays for another
+    # row's track.
+    Assert-Equal 0 ([regex]::Matches($p14.Html, 'sc-wide|sc-narrow').Count) 'chip: one span, not a shown copy and a hidden one'
+
+    $r16 = New-FixtureRepo -Label 'uniform' -UniformType
+    $b16 = Invoke-Build -Root $r16
+    Assert-Equal 0 $b16.Code 'chip/uniform: exit 0'
+    $p16 = Get-PageData -PagePath (Join-Path $r16 'releases\page\release-notes.html')
+    Assert-True ($p16.Html -notmatch 'class="chip sc">Minor<') 'chip/uniform: a type every row shares carries no information and is not rendered'
+    # THE TEST THAT WAS BUILT FIRST AND FIXED NOTHING, pinned so it cannot come back: 'is there more than
+    # one distinct type' answers YES on a page of 38 Minor and 1 Baseline, so every one of those 38 chips
+    # would have stayed. The dominant-type rule suppresses them and keeps the one that differs.
+    $r16b = New-FixtureRepo -Label 'lopsided'
+    $b16b = Invoke-Build -Root $r16b
+    Assert-Equal 0 $b16b.Code 'chip/lopsided: exit 0'
+    $p16b = Get-PageData -PagePath (Join-Path $r16b 'releases\page\release-notes.html')
+    Assert-Equal 1 ([regex]::Matches($p16b.Html, 'class="chip sc">').Count) 'chip/lopsided: exactly ONE type chip on a page with two types, not one per row'
+
+    # --- 16b. LIVE falls back to the newest release ------------------------------------------------
+    # THE MARKER STILL WINS. In the fixtures above the table marks 2.0.0, which is NOT the newest, and that
+    # is the case the marker exists for: a Shopify repo's live theme is genuinely not always the latest cut.
+    Write-Host "row -- the LIVE label, marked or derived" -ForegroundColor Cyan
+    $markedRow = ([regex]::Match($p14.Html, '(?s)<details class="fold" id="v2\.0\.0">.*?</summary>')).Value
+    $newestRow = ([regex]::Match($p14.Html, '(?s)<details class="fold" id="v2\.2\.0">.*?</summary>')).Value
+    Assert-Match 'chip accent sc">LIVE<' $markedRow 'live/marked: the row the table marks carries it'
+    # ON THE CHIP MARKUP, not on the word: PowerShell's -notmatch is case-INSENSITIVE, and this row's own
+    # title is 'The live push moved to a new stage'. The first version of this assert failed for that
+    # reason and not because the page was wrong.
+    Assert-True ($newestRow -notmatch 'chip accent') 'live/marked: and the NEWEST row does not, because the table says otherwise'
+
+    # WHERE THE TABLE MARKS NOTHING, the newest release carries it -- derived, because a marker has to be
+    # moved by hand at every cut in a file the cut itself writes into, so it is right on the day it is set
+    # and silently wrong at the next release.
+    $r16c = New-FixtureRepo -Label 'nolive' -NoLiveMarker
+    $b16c = Invoke-Build -Root $r16c
+    Assert-Equal 0 $b16c.Code 'live/derived: exit 0'
+    $p16c = Get-PageData -PagePath (Join-Path $r16c 'releases\page\release-notes.html')
+    $newestRowC = ([regex]::Match($p16c.Html, '(?s)<details class="fold" id="v2\.2\.0">.*?</summary>')).Value
+    $olderRowC  = ([regex]::Match($p16c.Html, '(?s)<details class="fold" id="v2\.0\.0">.*?</summary>')).Value
+    Assert-Match 'chip accent sc">LIVE<' $newestRowC 'live/derived: an unmarked table puts it on the newest release'
+    Assert-True ($olderRowC -notmatch 'chip accent') 'live/derived: and on that one only'
+    Assert-Equal 1 ([regex]::Matches($p16c.Html, 'chip accent sc">LIVE<').Count) 'live/derived: exactly one row carries it'
+    # THE LIVE CHIP IS NEVER SUPPRESSED. It marks one row out of forty, which is the definition of a
+    # field that is worth its space -- and it is the row a reader looks at first.
+    Assert-Match 'class="chip accent sc">live<' $p16.Html 'chip/uniform: the live chip stays'
+
+    # --- 17. The masthead marks (inbound #809) ----------------------------------------------------
+    # A one-pixel transparent GIF: the smallest thing that is genuinely a base64 data image, so the test
+    # measures the seam rather than an image library.
+    Write-Host "masthead -- a consumer's own wordmark, and every way of getting it wrong" -ForegroundColor Cyan
+    $pixel = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+    $r17 = New-FixtureRepo -Label 'masthead' -MastheadBody "return @(@{ Src = '$pixel'; Alt = 'Fixture UK' })"
+    $b17 = Invoke-Build -Root $r17
+    Assert-Equal 0 $b17.Code 'masthead: exit 0'
+    $p17 = Get-PageData -PagePath (Join-Path $r17 'releases\page\release-notes.html')
+    Assert-Match '<div class="marks">' $p17.Html 'masthead: the marks block is written'
+    Assert-Match 'alt="Fixture UK"' $p17.Html 'masthead: with the alt text the seam gave'
+    Assert-True ($p17.Html.IndexOf('<div class="marks">') -lt $p17.Html.IndexOf('<h1>')) 'masthead: above the title, which is where a wordmark belongs'
+
+    # UNANSWERED IS THE DEFAULT AND WRITES NOTHING.
+    Assert-True ($p14.Html -notmatch '<div class="marks">') 'masthead: a repo that has not answered gets no marks block at all'
+
+    # A URL IS NOT AN INLINE IMAGE. The page is self-contained because a request to a third party leaks
+    # who is reading it, so a URL is dropped with a named warning rather than fetched.
+    $r17b = New-FixtureRepo -Label 'mastheadurl' -MastheadBody "return 'https://example.invalid/logo.svg'"
+    $b17b = Invoke-Build -Root $r17b
+    Assert-Equal 0 $b17b.Code 'masthead/url: a bad value costs the image, never the build'
+    Assert-Match 'Get-ReleasePageMasthead' $b17b.Out 'masthead/url: and the warning names the seam'
+    $p17b = Get-PageData -PagePath (Join-Path $r17b 'releases\page\release-notes.html')
+    Assert-True ($p17b.Html -notmatch '<div class="marks">') 'masthead/url: nothing is written'
+    Assert-True ($p17b.Html -notmatch 'example\.invalid') 'masthead/url: and the URL never reaches the page'
+
+    # A RAW SVG PAYLOAD IS MARKUP INSIDE AN ATTRIBUTE, so base64 is required rather than escaped.
+    $r17c = New-FixtureRepo -Label 'mastheadsvg' -MastheadBody "return 'data:image/svg+xml,<svg xmlns=`"http://www.w3.org/2000/svg`"></svg>'"
+    $b17c = Invoke-Build -Root $r17c
+    Assert-Equal 0 $b17c.Code 'masthead/rawsvg: still builds'
+    $p17c = Get-PageData -PagePath (Join-Path $r17c 'releases\page\release-notes.html')
+    Assert-True ($p17c.Html -notmatch '<div class="marks">') 'masthead/rawsvg: a non-base64 payload is refused'
+
+    # THE CAP IS TWO, and it is a measurement rather than a technical bound: a consumer tried five and
+    # cut back, because five read as a page about the brands rather than about the releases.
+    $r17d = New-FixtureRepo -Label 'mastheadmany' -MastheadBody "return @('$pixel', '$pixel', '$pixel')"
+    $b17d = Invoke-Build -Root $r17d
+    Assert-Equal 0 $b17d.Code 'masthead/cap: still builds'
+    $p17d = Get-PageData -PagePath (Join-Path $r17d 'releases\page\release-notes.html')
+    Assert-Equal 2 ([regex]::Matches($p17d.Html, '<img src="data:image/gif').Count) 'masthead/cap: the third mark is dropped'
+    Assert-Match 'more than 2 mark' $b17d.Out 'masthead/cap: and the warning says which cap was hit'
+    # A BARE STRING IS ACCEPTED, which is the one-mark case, and its alt is empty on purpose: a mark
+    # beside a title that already names the product is decorative.
+    Assert-Match 'alt=""' $p17d.Html 'masthead/bare: a bare data: string works, with an empty alt'
+
+    # OVER THE PER-MARK CEILING: skipped, named, and the page is still built.
+    $fat = 'data:image/gif;base64,' + ('A' * 40000)
+    $r17e = New-FixtureRepo -Label 'mastheadfat' -MastheadBody "return '$fat'"
+    $b17e = Invoke-Build -Root $r17e
+    Assert-Equal 0 $b17e.Code 'masthead/size: still builds'
+    Assert-Match 'ceiling per mark' $b17e.Out 'masthead/size: the warning names the ceiling it hit'
+    $p17e = Get-PageData -PagePath (Join-Path $r17e 'releases\page\release-notes.html')
+    Assert-True ($p17e.Html -notmatch '<div class="marks">') 'masthead/size: and the oversized mark is not written'
+
+    # --- 18. The chevron is trailing, and reserves nothing ahead of the text (#811, asks 2 and 3) --
+    # A CSS assert, like the palette-position one above, because the layout claims in the issue are about
+    # WHERE things are rather than that they exist. The gutter was 1.9rem on a 390px phone -- 9.4% of the
+    # usable text width -- and the narrow query kept it.
+    Write-Host "row -- the chevron moved to the trailing edge" -ForegroundColor Cyan
+    Assert-Match '\.fold > summary::after' $p14.Html 'chevron: it is an ::after, so the grid puts it in the last column'
+    Assert-True ($p14.Html -notmatch '\.fold > summary::before') 'chevron: and no longer a ::before reserving a column ahead of the version'
+    Assert-Match '\.fold\[open\] > summary \{\s*\r?\n?\s*position: sticky' $p14.Html 'sticky: an open row keeps its own summary in reach, which is the only control that closes it'
+    # ON THE ABSENCE OF THE OLD VALUE, not on the new one: the margin is gone from the base rule rather
+    # than overridden in the narrow query, so there is no single-line declaration left to match. The
+    # masthead's own bottom padding is the separation.
+    Assert-True ($p14.Html -notmatch 'margin: 2rem 0 0') 'sheet: the 2rem of air above the list is gone at every width'
+    # THE OTHER HALF OF THE STICKY SUMMARY: closing a note puts the reader back on the row they opened,
+    # instead of leaving them wherever the text they were reading used to be. Asserted as content because
+    # the behaviour itself needs a browser -- what can be measured here is that the handler is on the page
+    # and that it is conditional, since an unconditional jump would move a row that is already in view.
+    Assert-Match 'getBoundingClientRect\(\)\.top < 0' $p14.Html 'close: closing scrolls back to the row -- and only when the row has left the viewport'
+    Assert-Match "scrollIntoView\(\{ block: 'start' \}\)" $p14.Html 'close: to the top of that row, which is where it was opened'
+    # The note's breathing room sits on the ARTICLE, not on its first paragraph's margin, so it does not
+    # depend on whether a note opens with a paragraph, a heading or a list.
+    Assert-Match '\.fold article \{ padding: 1\.1rem' $p14.Html 'article: an opened note has room above its first block'
 
 } finally {
     Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue

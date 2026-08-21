@@ -767,7 +767,11 @@ function Get-ReleaseNoteWording {
 # THE PAGE'S OWN NAME. It is what a reader sees in the tab and at the top, so it is the repo's to
 # say rather than the script's. Without it the script falls back to the name half of Get-RepoName,
 # which is a real answer -- 'claude-code-specialists' -- and simply not the one to send anybody.
-$script:ReleasePageTitle = 'Claude Specialists -- release notes'
+# THE PRODUCT'S NAME AND NOTHING ELSE. It read 'Claude Specialists -- release notes' until August 21,
+# 2026, which put those words on the page twice. This answer is the masthead's EYEBROW and half the window
+# title; the heading itself is the template's own 'Release notes'. What the page IS belongs to the
+# template, whose releases it carries belongs here.
+$script:ReleasePageTitle = 'Claude Specialists'
 
 function Get-ReleasePageTitle {
     <# The heading and window title of the generated release-notes page. #>

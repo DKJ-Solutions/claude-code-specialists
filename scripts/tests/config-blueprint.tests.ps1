@@ -208,13 +208,14 @@ foreach ($rec in @($bp.records | Where-Object { $_.declared -and $_.text })) {
     }
 }
 
-# The source leaves four contract functions at the built-in fallback: the two impact-table seams,
-# Get-TestCommands since inbound #644 (this repo's suites are all PowerShell), and
-# Get-EntryGateExemptPrefixes since inbound #789 (this repo runs no mirror branches, so 'sync' being the
-# default IS its answer). Recorded as declared=false with no text rather than dropped, because "this repo
-# does not state it either" is an answer -- and the honest one to hand a consumer.
+# The source leaves five contract functions at the built-in fallback: the two impact-table seams,
+# Get-TestCommands since inbound #644 (this repo's suites are all PowerShell), Get-EntryGateExemptPrefixes
+# since inbound #789 (this repo runs no mirror branches, so 'sync' being the default IS its answer), and
+# Get-ReleasePageMasthead since inbound #809 (this repo has no wordmark to put on its page). Recorded as
+# declared=false with no text rather than dropped, because "this repo does not state it either" is an
+# answer -- and the honest one to hand a consumer.
 $undeclared = @($bp.records | Where-Object { -not $_.declared })
-Assert-Equal 4 $undeclared.Count 'the four functions the source itself leaves at the fallback are recorded, not dropped'
+Assert-Equal 5 $undeclared.Count 'the five functions the source itself leaves at the fallback are recorded, not dropped'
 foreach ($rec in $undeclared) {
     Assert-Equal '' $rec.text "$($rec.function): an undeclared record carries no text to copy"
 }
