@@ -594,7 +594,7 @@ try {
     Assert-Match '\.fold > summary::after' $p14.Html 'chevron: it is an ::after, so the grid puts it in the last column'
     Assert-True ($p14.Html -notmatch '\.fold > summary::before') 'chevron: and no longer a ::before reserving a column ahead of the version'
     Assert-Match '\.fold\[open\] > summary \{\s*\r?\n?\s*position: sticky' $p14.Html 'sticky: an open row keeps its own summary in reach, which is the only control that closes it'
-    Assert-Match '\.sheet \{ margin: 1\.1rem' $p14.Html 'sheet: the top margin shrinks on a phone with everything else around it'
+    Assert-Match '\.sheet \{ margin: 0;' $p14.Html 'sheet: the top margin goes on a phone -- the masthead''s own padding is the separation'
     # THE OTHER HALF OF THE STICKY SUMMARY: closing a note puts the reader back on the row they opened,
     # instead of leaving them wherever the text they were reading used to be. Asserted as content because
     # the behaviour itself needs a browser -- what can be measured here is that the handler is on the page
