@@ -249,8 +249,18 @@ closing step -- not something to remember per repo or per time:
 
 - **Remote** -- a well-configured repo deletes the head branch automatically on merge (the GitHub
   setting *"Automatically delete head branches"*, `deleteBranchOnMerge: true`; see the
-  `specialists-init` setup checklist). Nothing to do by hand.
-- **Local** -- GitHub never touches your own clone, so finish on `main` after the fold with:
+  `specialists-init` setup checklist). Nothing to do by hand. **`ship-pr` now tells you when that
+  setting is off**, right after the merge that left a branch behind, with the one-line `gh api` command
+  to switch it on -- because being named in a setup checklist read once at init turned out not to reach
+  anybody ([#815](https://github.com/DaveKJohn/claude-code-specialists/issues/815)).
+- **Local** -- GitHub never touches your own clone, and since
+  [#815](https://github.com/DaveKJohn/claude-code-specialists/issues/815) this is a script rather than
+  two commands to remember: the [`prune-merged`](../prune-merged/SKILL.md) skill. It fast-forwards the
+  trunk, drops stale remote-tracking refs, and deletes only the local branches whose merge it can
+  **prove** -- an ancestor of the trunk, or a branch whose PR is merged. Anything else, including a
+  parked branch, is kept and reported. `-DryRun` looks first.
+
+  By hand, if you would rather, it is these two on `main` after the fold:
 
   ```powershell
   git fetch --prune            # drop stale remote-tracking refs (origin/<merged-branch>, ...)
@@ -258,7 +268,9 @@ closing step -- not something to remember per repo or per time:
   ```
 
   `git fetch --prune` matters even when the remote branch was auto-deleted: the stale
-  remote-tracking refs otherwise pile up in the local clone until pruned.
+  remote-tracking refs otherwise pile up in the local clone until pruned. And note what it does *not*
+  prove -- it only drops refs for branches **already gone** from the remote, so a clean local list is no
+  evidence at all that the remote is clean. That is `git ls-remote --heads origin`.
 
 ## Requirements in the consumer
 

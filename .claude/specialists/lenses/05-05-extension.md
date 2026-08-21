@@ -289,11 +289,20 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   mechanisms, neither actually in force. Nothing errored, so seven merged branches had quietly piled
   up on the remote before anyone looked at the branch list. Note that `ship-pr.ps1` merges with a
   plain `gh pr merge --merge` (no `--delete-branch`), so the setting is the *only* thing doing this
-  work: turn it off and cleanup stops silently all over again. Then tidy the local clone as the
-  fixed closing step with `git fetch --prune` + `git branch -d <branch>` — and be aware that pruning
+  work: turn it off and cleanup stops silently all over again. **Since August 21, 2026 `ship-pr.ps1`
+  reads that setting after the merge and says so when it is off**, with the `gh api` command — inbound
+  [#815](https://github.com/DaveKJohn/claude-code-specialists/issues/815), whose reason turned out to be
+  the interesting half: it reported the setting as undocumented, and it is named in **three** places in
+  the plugins, one with a paste-ready command. All three are setup checklists read once at init. The gap
+  was reach, not documentation, so the repair is a read at the moment it is true rather than a fourth
+  document. Then tidy the local clone — **`scripts/task/prune-merged.ps1` since the same day**, which
+  fast-forwards the trunk, prunes stale refs, and deletes only what it can prove is merged (ancestor of
+  the trunk, or a merged PR; `-DryRun` looks first). By hand it is `git fetch --prune` +
+  `git branch -d <branch>` — and be aware that pruning
   only drops tracking refs for branches *already* gone from the remote, so a clean local list is no
   evidence at all that the remote is clean. Verifying means `git ls-remote --heads origin`. See the
-  portable rule (and what each command is for) in the `fold-changelog` skill (#163).
+  portable rule (and what each command is for) in the `fold-changelog` skill (#163) and the
+  `prune-merged` skill.
 - **Deleting a *remote* branch stays a manual action for Dave — deliberately, don't propose
   otherwise.** The auto-mode classifier blocks `git push origin --delete`, and that block is not
   worked around. Dave weighed adding a permission for it on July 27, 2026 and declined, for a reason
@@ -303,6 +312,11 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   the ones whose loss is unrecoverable, so the permission would carry all of the risk and almost
   none of the benefit. Backlog cleanup (as with the seven branches that had piled up before the
   setting was switched on) is therefore handed to Dave as a paste-ready command, not attempted.
+  **`prune-merged.ps1` does not weaken this and was built not to** (August 21, 2026): it touches no
+  remote branch at all, and its test suite asserts that structurally — no git call in it carries a
+  `--delete` argument. Its local deletions are the mirror image of the declined permission: every one
+  requires positive proof of a merge, so the set it can reach is exactly the set the permission could
+  *not* have reached safely.
 - **A parked branch can be silently overtaken, and exactly one command shows it exists.** The mechanism,
   the pick-up check and the measurement are in the **portable** `park` skill, which is where a consumer
   meets this too — a parked branch has no PR by design, so `git ls-remote --heads origin` is the only

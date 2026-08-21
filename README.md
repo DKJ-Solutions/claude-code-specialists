@@ -549,7 +549,7 @@ SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-con
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `fix-mojibake`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `adopt-shopify-floor`,
 `cut-release`, `adopt-config`, `adopt-workflow-folder`, `discover-workflow`, `lock`, `handover`,
-`prompt`, `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`,
+`prompt`, `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `prune-merged`,
 `orchestrator`)<!-- /skills:all -->
 remain available there.
 
@@ -633,11 +633,12 @@ typo there would quietly exclude the plugin it meant to keep and report success.
 <!-- skills:all -->Most skills in claude-code-specialists today (`fold-changelog`, `open-pr`, `ship-pr`,
 `new-branch`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`, `sync-roster`,
 `start-task`, `adopt-config`, `adopt-workflow-folder`, `adopt-shopify-floor`, `discover-workflow`,
-`lock`, `handover`, `prompt`, `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`) are a thin wrapper around a script — procedural
+`lock`, `handover`, `prompt`, `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`,
+`prune-merged`) are a thin wrapper around a script — procedural
 **mechanism** (branch, PR, ship, fold, bootstrap, teardown, roster-sync, encoding repair, reading a
 repo's own conventions, placing an add-on team's operational floor, pushing a branch to its own preview
 theme, the standing before and after a context clear, the assignment written in an editor rather than the
-terminal, and the reading copy of the release notes).
+terminal, the reading copy of the release notes, and reaping the local branches a merge left behind).
 `lock` and `handover` are the first pair to wrap **one** script
 between them — they run the same reporter and differ only in what they do with the answer, which is why
 the shared-scripts registry names a script's documenting page rather than its callers. `cut-release`

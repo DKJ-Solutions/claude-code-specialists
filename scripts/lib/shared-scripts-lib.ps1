@@ -117,6 +117,15 @@ function Get-SharedScriptPairs {
             Skill  = 'park'
         },
         @{
+            # CENTRALIZED FROM TWO CONSUMER COPIES (inbound #815, August 21, 2026) -- the #81 argument
+            # again: a mechanism several repos need, living as a hand-written copy in each, is a
+            # mechanism that will drift. Nothing in the plugin deleted a branch anywhere before this.
+            Name   = 'prune-merged'
+            Source = 'scripts\task\prune-merged.ps1'
+            Plugin = 'workflow-davekjohn'
+            Skill  = 'prune-merged'
+        },
+        @{
             # TWO SKILLS READ THIS ONE SCRIPT, and Skill is a single field on purpose -- it answers "which
             # page documents this script's SURFACE", not "who calls it". /lock and /handover run the same
             # reporter and differ only in what they do with the answer, so the parameter surface is

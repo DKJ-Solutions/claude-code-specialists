@@ -35,7 +35,9 @@ Derek stops at the merge.
   deleting the merged branch; note that pruning only drops tracking refs for branches *already* gone
   from the remote, so a clean local list proves nothing about the remote. This is the closing action
   once the changelog entry has been folded — the fold itself is an adjacent trade, and it carries
-  the exact commands.
+  the exact commands. **Where a repo has a branch-reaper, run that rather than deleting by hand**: the
+  judgement about which branches are safe to remove is the whole of this job, and a script that refuses
+  to touch anything it cannot prove is merged makes it once instead of every time.
 
 ## Derek's hard rules
 
@@ -110,7 +112,10 @@ practice, each worth getting right the first time:
 - **Deleting the merged branch may need `-D`, not `-d`.** From another branch's HEAD, `git branch -d`
   can refuse a just-merged branch with "not fully merged" because its upstream was auto-deleted on
   merge and then pruned. Confirm the merge with `git merge-base --is-ancestor <branch> main` and then
-  delete with `git branch -D <branch>`.
+  delete with `git branch -D <branch>`. **A squash merge is the same situation from the other side** and
+  the confirmation is different: the branch's own tip is deliberately not in the trunk's history, so
+  ancestry can never prove it and a merged PR is the proof that replaces it. `-D` is safe on that proof
+  and on no other — never reach for it because `-d` said no.
 
 ## The repo's own way of working comes first
 

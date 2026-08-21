@@ -421,3 +421,30 @@ if ($LASTEXITCODE -ne 0) { Write-Error "fold-changelog-entry failed -- the fold 
 if ($LASTEXITCODE -ne 0) { Write-Warning "the issue-closing check reported a problem -- verify by hand with: gh issue list --repo $repo --state open" }
 
 Write-Host "Done: PR #$pr shipped -- opened, CI green, merged, folded on main." -ForegroundColor Green
+
+# --- Step 7: the remote branch, if nothing on GitHub is reaping it --------------------------------
+# WHY THIS IS A READ AND NOT A FLAG (inbound #815, August 21, 2026). The merge above deliberately does
+# NOT pass --delete-branch. The repo setting covers EVERY merge route -- this script, the web UI, another
+# machine, another tool -- while the flag covers only the path it is passed on, and two mechanisms for one
+# job is precisely the shape that let seven merged branches pile up in July 2026: two documents each named
+# a different one and neither was in force. The flag also deletes the LOCAL branch, and on July 16, 2026
+# it was measured leaving the checkout ON the merged branch, with the fold then running there.
+#
+# SO WHAT WAS ACTUALLY MISSING WAS REACH, NOT DOCUMENTATION. Measured on pickup: the setting is named in
+# three places in the plugins, one with a paste-ready command -- and all three are setup checklists, read
+# once at init, with nothing ever asking again. The reporting consumer had both plugins installed, the
+# setting off, and 18 merged branches standing. This says it at the one moment it is true and cheap to
+# fix: right after a merge that left a branch behind.
+#
+# NEVER FAILS THE SHIP, and stays quiet when the answer is yes. The merge has already happened; an
+# unreachable gh, an older gh without the field, or a token without repo-read scope are all reasons to say
+# nothing rather than to raise an alarm about somebody's tidiness.
+$dbomRes = Invoke-NativeCapture -FilePath 'gh' -Arguments @('api', "repos/$repo", '--jq', '.delete_branch_on_merge')
+if ($dbomRes.ExitCode -eq 0) {
+    $dbom = (($dbomRes.Output | Out-String) -replace '\s', '')
+    if ($dbom -eq 'false') {
+        Write-Host "Note: '$repo' does not delete head branches on merge, so '$branch' is still on the remote. Switch it on once with:" -ForegroundColor Yellow
+        Write-Host "  gh api -X PATCH repos/$repo -F delete_branch_on_merge=true" -ForegroundColor Yellow
+        Write-Host "  (the local clone is a separate half -- scripts\task\prune-merged.ps1 reaps that, and deletes nothing it cannot prove is merged)" -ForegroundColor DarkGray
+    }
+}
