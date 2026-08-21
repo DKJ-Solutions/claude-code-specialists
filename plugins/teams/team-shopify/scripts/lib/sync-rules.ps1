@@ -25,6 +25,12 @@
 # and 'git log' over a path that has never existed writes to stderr while being a perfectly ordinary
 # "no" answer. So the preference is lowered for the duration of the call rather than the caller having
 # to wrap every query in a try.
+#
+# PASS A PATHSPEC BY SPLATTING AN ARRAY, NEVER BY WRITING '--' INLINE. A bare '--' typed into a native
+# call does not reach git, so the pathspec behind it is read as a revision. For a path still in HEAD git
+# disambiguates and the bug is invisible; for a path the trunk has DELETED it errors to stderr, which
+# this wrapper swallows by design -- so the caller gets a silent $null and the losing answer.
+# Test-MainTouchedSince already builds its arguments as an array for exactly this reason (inbound #801).
 function Invoke-SyncGitQuiet {
     $ErrorActionPreference = 'Continue'
     git @args 2>$null
@@ -50,6 +56,12 @@ function Get-SyncDefaultReferencePattern {
         direction that loses work. This pattern is exactly the two spellings in use and nothing else,
         and a repo whose history says something else narrows it through the seam rather than by editing
         this file.
+
+        AND THE SEAM CANNOT NARROW AWAY A MERGE COMMIT, WHICH IS WHY THAT ONE IS HANDLED IN THE LOOKUP
+        ITSELF. '--grep' is line-oriented over the whole message, so no pattern can distinguish "the
+        subject starts with sync" from "a body line starts with sync" -- and a merge commit carries the
+        merged commit's subject in its body. Get-SyncReferencePoint passes '--no-merges' for that;
+        see its own note.
     #>
     return '^[Ss]ync'
 }
@@ -73,13 +85,33 @@ function Get-SyncReferencePoint {
         default to "sync everything". Without a floor every file looks untouched by the trunk and the
         exclusion rule silently passes everything through -- which is precisely the failure it exists to
         stop, arriving as a green run.
+
+        '--no-merges' IS LOAD-BEARING, NOT TIDINESS, and it is the repair for the worst version of that
+        same failure -- the one that arrives green while a floor IS reported. '--grep' matches any line
+        of a commit message, and a sync branch merged with a merge commit carries the sync commit's own
+        subject in its BODY:
+
+            merge: sync/live-2026-08-20 (#27)
+
+            sync: mirror the overlay in sections/media-with-text.liquid from live into main
+
+        So the merge matches the pattern. Right after a sync PR lands that merge is HEAD, the floor
+        becomes HEAD, Test-MainTouchedSince answers $false for every path, and the rule keeps NOTHING
+        back -- with 'Reference point: <sha> (the previous sync commit)' printed above it. The seam
+        cannot help: no --grep pattern separates a subject from a body line, and --no-merges does.
+
+        Measured in a consumer on 2026-08-21 (inbound #801): the next sync was about to delete 41 lines
+        of translations across two locale files, revert two '| raw' removals, and resurrect 23 locale
+        files a commit had deliberately dropped -- 31 files over three merged PRs. Skipping merges can
+        only move the floor BACKWARD, onto the sync commit the merge brought in, and backward is the
+        protective direction; the regression suite pins both halves.
     #>
     param(
         [string]$Ref = 'HEAD',
         [string]$Pattern = (Get-SyncDefaultReferencePattern)
     )
 
-    $sync = Invoke-SyncGitQuiet log -1 --format=%H "--grep=$Pattern" $Ref |
+    $sync = Invoke-SyncGitQuiet log -1 --no-merges --format=%H "--grep=$Pattern" $Ref |
         Where-Object { $_ } | Select-Object -First 1
     if ($sync) { return @{ Ref = [string]$sync; Kind = 'sync' } }
 
