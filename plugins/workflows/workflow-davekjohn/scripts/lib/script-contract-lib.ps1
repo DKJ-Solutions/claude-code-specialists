@@ -390,7 +390,7 @@ $script:ContractRecords = @(
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleasePageTitle'; Scripts = @('build-release-notes-page');
        Adopt = 'decide'; AdoptWhy = "it is the name a reader sees at the top of a page about THIS repo's releases. Copying the source's answer puts another product's name on your page, and nothing errs -- the page simply lies politely";
        Optional = $true; Default = "the name half of Get-RepoName, or 'Release notes' where that is absent too";
-       Returns = "the heading and window title of the generated release-notes page -- what the reader should understand the page to be, which is usually the product's name rather than the repository's" },
+       Returns = "WHOSE releases the generated page carries -- the product's name, rather than the repository's and rather than what the page is. It is the masthead's eyebrow and half the window title; the heading itself is the template's own 'Release notes', so a title repeating those words would print them twice" },
     # AND THE HOSTING HALF, WHICH IS THE ONE WITH A CONSEQUENCE OUTSIDE THE REPO. Empty is the default
     # BECAUSE it is the honest state for a repo that has not set up a worker: the page half runs on its
     # own and only -Worker refuses, naming this function. A non-empty value asserts that a Cloudflare

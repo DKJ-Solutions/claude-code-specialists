@@ -116,7 +116,7 @@ This repo's answers:
 
 | | |
 |---|---|
-| `Get-ReleasePageTitle` | `Claude Specialists` — the **product's** name, not the repository's and not what the page is. Without it the fallback would head the page `claude-code-specialists`, which is a true answer and not one to send anybody. It carried `-- release notes` until 2026-08-21, which printed those words twice: the masthead's eyebrow already says them |
+| `Get-ReleasePageTitle` | `Claude Specialists` — the **product's** name, not the repository's and not what the page is. It is the masthead eyebrow and half the window title; the heading is the template's own *Release notes*. Without it the fallback would head the page `claude-code-specialists`, which is a true answer and not one to send anybody. It carried `-- release notes` until 2026-08-21, which printed those words twice |
 | `Get-ReleasePageWorkerName` | `ccs-release-notes` |
 | where the output lands | `workflow-davekjohn/releases/page/`, derived from `Get-ReleaseNoteRoot` rather than configured — the note root already says where this repo keeps its release documents |
 | what is committed | **nothing from that directory.** The page and the worker are derivatives of the tracked documents, and a 400 KB file changing every release would dirty the tree `cut-release.ps1` refuses to run on |

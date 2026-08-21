@@ -768,9 +768,9 @@ function Get-ReleaseNoteWording {
 # say rather than the script's. Without it the script falls back to the name half of Get-RepoName,
 # which is a real answer -- 'claude-code-specialists' -- and simply not the one to send anybody.
 # THE PRODUCT'S NAME AND NOTHING ELSE. It read 'Claude Specialists -- release notes' until August 21,
-# 2026, which put the words 'release notes' on the page twice: the template's masthead already carries them
-# as its eyebrow, directly above this heading. What the page IS belongs to the template; whose releases it
-# carries belongs here.
+# 2026, which put those words on the page twice. This answer is the masthead's EYEBROW and half the window
+# title; the heading itself is the template's own 'Release notes'. What the page IS belongs to the
+# template, whose releases it carries belongs here.
 $script:ReleasePageTitle = 'Claude Specialists'
 
 function Get-ReleasePageTitle {

@@ -3,7 +3,7 @@
   The release-notes page template. build-release-notes-page.ps1 fills in six placeholders, each
   written in the markup below as the name doubled between at-signs:
 
-      PAGE_TITLE     the page's own name
+      PAGE_TITLE     whose releases these are -- the product's name, in the eyebrow and the window title
       PAGE_SUBTITLE  one line under it: how many releases the page carries
       PAGE_MASTHEAD  the repo's own wordmark(s) above the title, or nothing -- Get-ReleasePageMasthead
       BUILD_STAMP    the date the page was generated, because it is a SNAPSHOT
@@ -61,6 +61,13 @@
   ConvertTo-Json escapes the angle brackets into their JSON unicode form, so a note containing a
   closing script tag cannot end this block early. The script asserts it anyway -- see its header.
 
+  THE PRODUCT IS THE EYEBROW AND 'RELEASE NOTES' IS THE HEADING, not the other way round (Dave,
+  August 21, 2026). It read the other way for a day, with the product name as the h1 over a hardcoded
+  'Release notes' eyebrow -- and a repo whose title said what the page was then printed those words twice.
+  This way round each says one thing: the small line says whose releases these are, the large one says
+  what the document is, and the window title is the two of them joined, where there is no duplication to
+  make because a tab shows one line.
+
   DELIBERATELY SELF-CONTAINED: no external stylesheet, font or script. The page is served by a
   Cloudflare Worker as one string, and a request to a third party would leak who is reading it.
 -->
@@ -69,7 +76,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>@@PAGE_TITLE@@</title>
+<title>@@PAGE_TITLE@@ &middot; release notes</title>
 <style>
   :root {
     color-scheme: light dark;
@@ -156,7 +163,12 @@
      THE SHEET IS A PANEL AND THE PAGE BEHIND IT IS NOT, which is what makes a long list read as one
      document rather than as a wall. */
   .sheet {
-    margin: 2rem 0 0;
+    /* NO TOP MARGIN AT ALL (Dave, August 21, 2026). It was 2rem, over the masthead's own 1.5rem of bottom
+       padding -- 3.5rem of air above a list, at every width, since the narrow query reduced the padding
+       around it and never this. #811 asked for the margin to become responsive; the answer it settled on
+       is that the masthead's own padding is the separation and the margin was never doing anything the
+       page needed. Removing it beats shrinking it: one value fewer to keep in step with the other. */
+    margin: 0;
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: .75rem;
@@ -300,12 +312,9 @@
     header.masthead h1 { font-size: 1.7rem; }
     header.masthead .marks img { height: 1.35rem; }
     .fold > summary { padding: .7rem .15rem .85rem; }
-    /* THE MARGIN MOVES WITH THE PADDING (ask 6), and its absence was the one plain bug in that list.
-       Everything else here shrank on a phone while this 2rem did not, so the gap between the masthead and
-       the first row was identical at 390px and at 1400px: 3.5rem of air above a list. Zero rather than a
-       smaller number (Dave, August 21, 2026): the masthead's own bottom padding is already the separation,
-       and on a phone every rem above the first row is one the list does not get. */
-    .sheet { margin: 0; padding: .25rem 1rem .75rem; border-radius: .6rem; }
+    /* No margin override here any more: the base rule is 0, so there is nothing left to shrink. What
+       remains is the padding, which is the part a phone genuinely wants smaller. */
+    .sheet { padding: .25rem 1rem .75rem; border-radius: .6rem; }
     .fold article { padding: 1rem 0 1.4rem .15rem; }
     header.masthead .marks { margin-bottom: .9rem; }
   }
@@ -315,9 +324,9 @@
 <div class="wrap">
 
   <header class="masthead">
-    <span class="eyebrow">Release notes</span>
+    <span class="eyebrow">@@PAGE_TITLE@@</span>
 @@PAGE_MASTHEAD@@
-    <h1>@@PAGE_TITLE@@</h1>
+    <h1>Release notes</h1>
     <p>@@PAGE_SUBTITLE@@ Every release is a row; open one to read it.</p>
   </header>
 

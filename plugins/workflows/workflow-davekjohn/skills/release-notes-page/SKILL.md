@@ -77,7 +77,7 @@ All four live in your own `scripts/repo-config.ps1`, all four optional:
 
 | function | what it answers | absent |
 |---|---|---|
-| `Get-ReleasePageTitle` | the heading and window title — the **product's** name, rather than the repository's and rather than what the page is. The masthead's eyebrow already reads *Release notes* directly above this heading, so a title that repeats it prints the same words twice; the source repo's own answer did exactly that until it was read on the built page | falls back to the name half of `Get-RepoName` |
+| `Get-ReleasePageTitle` | **whose** releases the page carries — the product's name, rather than the repository's and rather than what the page is. It is the masthead's eyebrow and half the window title; the heading is the template's own *Release notes*, so a title repeating those words prints them twice. The source repo's own answer did exactly that until it was read on the built page | falls back to the name half of `Get-RepoName` |
 | `Get-ReleasePageTheme` | the page's colours — custom-property overrides, as a map | no overrides; the page keeps its shipped palette in light and dark |
 | `Get-ReleasePageMasthead` | your own wordmark(s), above the title | no marks; the masthead is the eyebrow, the title and the subtitle |
 | `Get-ReleasePageWorkerName` | the Cloudflare Worker that serves it | `''` — the page is built and hosted nowhere, and `-Worker` refuses while naming this function |

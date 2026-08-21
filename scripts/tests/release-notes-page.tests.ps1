@@ -198,7 +198,12 @@ try {
     Assert-Equal '2026-08-14' $p1.Data.releases[0].date 'basic: the date comes from the table'
     Assert-Equal 'Major' $p1.Data.releases[1].type 'basic: the type comes from the table'
     Assert-Match 'Body of 2\.2\.0' $p1.Data.releases[0].body 'basic: the note body travels into the page'
-    Assert-Match 'Fixture Product' $p1.Html 'basic: Get-ReleasePageTitle is the page title'
+    # THE SEAM IS THE EYEBROW AND HALF THE WINDOW TITLE; the heading is the template's own words (Dave,
+    # August 21, 2026). It was the other way round for a day, and a repo whose title said what the page
+    # was then printed those words twice -- which is what this repo's own answer did.
+    Assert-Match '<span class="eyebrow">Fixture Product</span>' $p1.Html 'basic: Get-ReleasePageTitle is the eyebrow -- whose releases these are'
+    Assert-Match '<h1>Release notes</h1>' $p1.Html 'basic: and the heading says what the document is, from the template'
+    Assert-Match '<title>Fixture Product &middot; release notes</title>' $p1.Html 'basic: the window title joins them, where a tab has no duplication to make'
     Assert-True (-not ($p1.Html -match '@@[A-Z_]+@@')) 'basic: no template placeholder survives'
 
     # --- 2. The live marker, case-sensitively -----------------------------------------------------
@@ -252,7 +257,7 @@ try {
     $b6 = Invoke-Build -Root $r6
     Assert-Equal 0 $b6.Code 'title fallback: exit 0'
     $p6 = Get-PageData -PagePath (Join-Path $r6 'releases\page\release-notes.html')
-    Assert-Match '<title>fixture-repo</title>' $p6.Html 'title fallback: the name half of Get-RepoName, not the owner/name pair'
+    Assert-Match '<title>fixture-repo &middot; release notes</title>' $p6.Html 'title fallback: the name half of Get-RepoName, not the owner/name pair'
 
     # --- 7. The path token is an input ------------------------------------------------------------
     Write-Host "worker -- the path token is never invented" -ForegroundColor Cyan
@@ -620,7 +625,10 @@ try {
     Assert-Match '\.fold > summary::after' $p14.Html 'chevron: it is an ::after, so the grid puts it in the last column'
     Assert-True ($p14.Html -notmatch '\.fold > summary::before') 'chevron: and no longer a ::before reserving a column ahead of the version'
     Assert-Match '\.fold\[open\] > summary \{\s*\r?\n?\s*position: sticky' $p14.Html 'sticky: an open row keeps its own summary in reach, which is the only control that closes it'
-    Assert-Match '\.sheet \{ margin: 0;' $p14.Html 'sheet: the top margin goes on a phone -- the masthead''s own padding is the separation'
+    # ON THE ABSENCE OF THE OLD VALUE, not on the new one: the margin is gone from the base rule rather
+    # than overridden in the narrow query, so there is no single-line declaration left to match. The
+    # masthead's own bottom padding is the separation.
+    Assert-True ($p14.Html -notmatch 'margin: 2rem 0 0') 'sheet: the 2rem of air above the list is gone at every width'
     # THE OTHER HALF OF THE STICKY SUMMARY: closing a note puts the reader back on the row they opened,
     # instead of leaving them wherever the text they were reading used to be. Asserted as content because
     # the behaviour itself needs a browser -- what can be measured here is that the handler is on the page
