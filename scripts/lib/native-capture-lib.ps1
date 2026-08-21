@@ -157,6 +157,20 @@ function Invoke-TestSuiteGate {
         false red there reads like a regression in the branch under test. Passing PowerShell's own location
         reproduces precisely what '& powershell -File' handed the child before.
 
+        ONE CONSOLE, AND THAT IS SHARED STATE BETWEEN SUITES (inbound #821, August 21, 2026). -NoNewWindow
+        means every child attaches to THIS console, so anything a suite does to the console rather than to
+        itself is done to all of them. The measured case is [Console]::OutputEncoding, whose setter is
+        SetConsoleOutputCP: one suite held it at UTF-8 for its whole run, and while that window was open
+        every concurrently scheduled suite decoded native output as UTF-8 too. A second suite's accented-path
+        assert was therefore GREEN under the gate and RED on its own, on the same commit -- and the bug it
+        was correctly reporting (a git path decoded with the inherited code page) read as a test quirk for
+        as long as nobody ran it alone. Reproduced deterministically by starting the two 1.2s apart.
+        The rule that follows: a suite green under the gate and red standalone is reporting a real defect
+        until proven otherwise, because the gate is the run with the shared state in it. Isolating the
+        console per suite is possible (its own hidden console instead of -NoNewWindow) and is NOT done here:
+        it changes how all 50 children are created, for a hazard whose one known instance is now scoped to
+        a few lines inside the suite that needs it. Named rather than fixed, deliberately.
+
         Returns $true when every suite exited 0, $false when any did not, and $true with a warning when
         there is nothing to run -- an empty or missing directory is a repo without suites, not a failure.
     #>

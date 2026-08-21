@@ -288,6 +288,38 @@ sync-main.tests.ps1 goes from 20 to 32 asserts. One earns its place twice: the
         # The floor itself is exclusive: the sync commit is not "since the sync commit".
         Assert-True (-not (Test-MainTouchedSince -Since $floor -Path 'floor.txt')) 'rule/floor: the reference commit''s own change is not counted as later work'
     } finally { Pop-Location }
+    # --- The quoted path, decoded off the wire ------------------------------------------------------
+    # WHY THESE ARE UNIT ASSERTS AND NOT AN INTEGRATION CASE (inbound #821). The bug they pin is that a
+    # git-reported path used to be decoded with whatever console code page the RUN inherited -- so the
+    # answer depended on the environment, and sync-main.tests.ps1's own accented-path case was red
+    # standalone and green under the gate on the same commit, because a sibling suite had flipped the
+    # console to UTF-8 for the duration. An integration assert cannot pin the property without mutating
+    # that same shared state, which is the thing being repaired. A pure function can: it never touches a
+    # console, so if these hold, they hold everywhere.
+    #
+    # The escaped form below is exactly what git 2.54 prints for 'sections/cafe.liquid' with an accent,
+    # captured rather than composed.
+    Write-Host ''
+    Write-Host 'Convert-GitQuotedPath'
+
+    $accented = 'sections/caf' + [char]0x00E9 + '.liquid'
+    Assert-Equal $accented (Convert-GitQuotedPath -Path '"sections/caf\303\251.liquid"') 'quoted/octal: the UTF-8 escape pair decodes back to the character'
+    Assert-Equal 'sections/plain.liquid' (Convert-GitQuotedPath -Path 'sections/plain.liquid') 'unquoted: an ordinary ASCII path passes through untouched -- git quotes only when it must'
+    Assert-Equal 'a b/c.liquid' (Convert-GitQuotedPath -Path 'a b/c.liquid') 'unquoted/space: a space is not a reason for git to quote, and not a reason to touch the string'
+    Assert-Equal 'say "hi".liquid' (Convert-GitQuotedPath -Path '"say \"hi\".liquid"') 'quoted/quote: an escaped quote is one quote, not a terminator'
+    Assert-Equal 'back\slash.liquid' (Convert-GitQuotedPath -Path '"back\\slash.liquid"') 'quoted/backslash: an escaped backslash is one backslash'
+    Assert-Equal "tab`there.liquid" (Convert-GitQuotedPath -Path '"tab\there.liquid"') 'quoted/control: the C escapes git uses are decoded too'
+    # A LONE BACKSLASH IS KEPT, NOT SWALLOWED. git escapes what it means, so a backslash before anything
+    # it does not escape is a literal one -- and dropping it would silently shorten a Windows-shaped path,
+    # which is the failure shape this whole area keeps producing: a wrong answer that still looks like one.
+    Assert-Equal 'keep\me.liquid' (Convert-GitQuotedPath -Path '"keep\me.liquid"') 'quoted/unknown escape: the backslash is kept literally rather than guessed at'
+    Assert-Equal '' (Convert-GitQuotedPath -Path '') 'empty: no path is not an error'
+    Assert-Equal '"' (Convert-GitQuotedPath -Path '"') 'one quote: too short to be a quoted path, so it is not treated as one'
+    # THE POINT OF THE WHOLE EXERCISE, stated as an assert: the escaped form is pure ASCII, which is what
+    # makes the answer independent of the decoder. If a change ever put a high byte back on the wire, this
+    # is the line that says so.
+    Assert-True (@([int[]][char[]]'"sections/caf\303\251.liquid' | Where-Object { $_ -gt 0x7F }).Count -eq 0) 'wire: the quoted form carries no byte above 0x7F, which is why no code page can change the answer'
+
     # --- The blob id, against git itself ------------------------------------------------------------
     # The comparison's fast path trusts Get-GitRawBlobId against 'git ls-tree'. If it disagreed with git,
     # files would be reported as UNCHANGED that are not -- a silent skip, which is the worst failure shape

@@ -77,6 +77,28 @@ the safety net underneath.
   **re-run the repaired test under the condition that broke it** — deliberately load the machine — rather
   than concluding from one green local run that a load-sensitive assertion is now load-insensitive.
 
+- **A suite that changes PROCESS-WIDE or MACHINE-WIDE state changes it for every suite running beside
+  it — and a green under the runner beats no red at all only if the runner is not the thing being
+  contaminated.** Most test isolation goes right by accident, because most fixtures are files in their own
+  temp directory. The exceptions are the things a test reaches for when a fixture is not enough: an
+  environment variable, the working directory, a global config, and above all the **console** — on Windows,
+  setting the output encoding is `SetConsoleOutputCP`, which is a property of the console the whole test
+  runner shares, not of the process that set it. Measured on this system: one suite held the console at
+  UTF-8 for its full run, and a *different* suite's assertion about a non-ASCII filename was green under
+  the runner and red on its own, on the same commit. The defect it was correctly reporting — production
+  code decoding data with whatever code page the run inherited — read as a test quirk for as long as
+  nobody ran that suite alone. Two rules come out of it, and the second is the one that saves the time:
+  **scope any such mutation to the narrowest block that needs it and restore it in a `finally`**; and
+  **a suite that passes under the runner and fails standalone is reporting a real defect until proven
+  otherwise**, because the runner is the run with the shared state in it. The instinct is the opposite —
+  the runner is what CI trusts, so its answer feels authoritative — and that instinct is what buys the
+  bug another month.
+- **Where a mutation cannot be avoided, prefer a property the environment cannot reach.** The repair for
+  the case above was not a better encoding setting; it was making the data ASCII on the wire and decoding
+  it in a pure function, which no console can influence and which a unit test can pin without touching
+  shared state at all. An integration assertion that can only be written by mutating the very state under
+  suspicion is a sign the subject belongs in a pure function first.
+
 ## Tycho is lazy
 
 If a test pattern repeats (the same kind of fixture, mock, or input-validation scenario), it deserves

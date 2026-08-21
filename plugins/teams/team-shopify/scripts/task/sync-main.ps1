@@ -334,24 +334,37 @@ try {
     # in git 2.36 and this script has no reason to require it: the default line is
     # '<mode> SP <type> SP <oid> TAB <path>', and the tab is what makes a path with spaces safe to split.
     #
-    # 'core.quotePath=false' IS LOAD-BEARING AND IT FAILS IN THE LOSING DIRECTION. git's default is to
-    # quote any path with a byte above 0x7F -- 'assets/cafe.js' with an accent comes out as
+    # A PATH WITH A HIGH BYTE FAILS IN THE LOSING DIRECTION, so how it is read off git matters. git's
+    # default is to quote any path with a byte above 0x7F -- 'assets/cafe.js' with an accent comes out as
     # '"assets/caf\303\251.js"', measured against git 2.54 -- and that string matches no key the mirror
-    # walk produces. The trunk's copy would then read as a path live does not have (kept, correctly) while
-    # live's identical file read as one the trunk has never held: foreign, taken, and the trunk's version
-    # overwritten. One flag, and it cannot make any other answer worse. The same flag goes on
-    # 'check-ignore', whose output is a path for the same reason.
+    # walk produces. The trunk's copy then reads as a path live does not have (kept, correctly) while
+    # live's identical file reads as one the trunk has never held: foreign, taken, and the trunk's version
+    # overwritten.
+    #
+    # 'core.quotePath=false' WAS THE FIRST REPAIR AND IT WAS HALF OF ONE (inbound #821, August 21, 2026).
+    # It makes git emit the raw UTF-8 bytes instead -- and PowerShell decodes those with
+    # [Console]::OutputEncoding, i.e. with whatever console code page the run inherited. On cp850, the
+    # default OEM console here, they decode to two wrong characters and the comparison lands in exactly
+    # the failure above. The flag fixed the quoting and moved the same bug into the decoder, where it is
+    # invisible: the answer depended on who launched the run.
+    #
+    # SO QUOTING IS FORCED **ON** AND THE ESCAPES ARE UNPACKED HERE. Quoted, the wire is pure ASCII, where
+    # every candidate code page agrees -- Convert-GitQuotedPath (sync-rules.ps1) turns the escapes back
+    # into bytes and reads them as UTF-8 once, so no environment can reach the answer. 'true' rather than
+    # git's default, because a repo may set core.quotepath in its own config and would otherwise put the
+    # decoder back in charge. The same treatment goes on 'check-ignore', whose output is a path for the
+    # same reason.
     Write-Host ''
     Write-Host "[5/6] comparing live against $trunk ..." -ForegroundColor Yellow
 
     $headBlobs = @{}
-    foreach ($line in (& git -c core.quotePath=false ls-tree -r HEAD)) {
+    foreach ($line in (& git -c core.quotePath=true ls-tree -r HEAD)) {
         if (-not $line) { continue }
         $tab = $line.IndexOf("`t")
         if ($tab -lt 0) { continue }
         $meta = ($line.Substring(0, $tab) -split '\s+')
         if ($meta.Count -lt 3) { continue }
-        $headBlobs[$line.Substring($tab + 1)] = $meta[2]
+        $headBlobs[(Convert-GitQuotedPath -Path $line.Substring($tab + 1))] = $meta[2]
     }
 
     $mirrorPaths = @{}
@@ -381,8 +394,10 @@ try {
     for ($i = 0; $i -lt $allPaths.Count; $i += 200) {
         $batch = @($allPaths[$i..([Math]::Min($i + 199, $allPaths.Count - 1))])
         if ($batch.Count -eq 0) { continue }
-        foreach ($hit in @(Invoke-SyncGitQuiet @(@('-c', 'core.quotePath=false', 'check-ignore', '--') + $batch))) {
-            if ($hit) { $ignored[([string]$hit).Trim()] = $true }
+        # Quoted on the wire and unpacked here, the same way ls-tree is read above and for the same
+        # reason -- a raw high byte would be decoded by the inherited console code page (inbound #821).
+        foreach ($hit in @(Invoke-SyncGitQuiet @(@('-c', 'core.quotePath=true', 'check-ignore', '--') + $batch))) {
+            if ($hit) { $ignored[(Convert-GitQuotedPath -Path ([string]$hit).Trim())] = $true }
         }
     }
     if ($ignored.Count -gt 0) { Write-Host "      $($ignored.Count) of them are gitignored here and are left alone" }
