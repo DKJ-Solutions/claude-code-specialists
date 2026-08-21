@@ -68,6 +68,25 @@ discovery — as an earlier pass did for `.github/workflows/ci.yml` — not a qu
   regexes at `scripts/lib/pr-issues-lib.ps1:146-147`. They have the same latent fragility, nothing has
   reported them, and the fix is the same escape — left alone under the no-pre-emptive-fixes rule rather than
   swept along with an unrelated change.
+- **And the mirror-image rule for READING: a native command's output that is DATA is not decoded with the
+  console code page.** Measured August 21, 2026 (inbound
+  [#821](https://github.com/DaveKJohn/claude-code-specialists/issues/821)). The bullet above is about a
+  character a script must *emit*; this one is about a byte a script must *understand*. Windows PowerShell
+  5.1 decodes a native child's stdout with `[Console]::OutputEncoding`, i.e. with whatever console code
+  page the run inherited — cp850 here, cp1252 elsewhere, cp65001 in a UTF-8 terminal. For a progress line
+  that is a display problem. For a **path**, an id, or anything the script then compares, it is a wrong
+  **answer**: `sync-main.ps1` asked git for paths with `core.quotePath=false` (raw UTF-8 bytes on the
+  wire), so a theme file with an accent in its name decoded to two wrong characters, matched nothing on the
+  other side, and reached the exact "foreign, taken, trunk overwritten" failure that flag had been added to
+  prevent. The repair is to **hold the wire to ASCII and decode it yourself** — `core.quotePath=true` plus
+  `Convert-GitQuotedPath` — because every candidate code page agrees below 0x80. Forcing the flag rather
+  than relying on git's default is part of it: a repo may set `core.quotepath` in its own config.
+  **Two things to know before touching this class again.** Never repair it by setting
+  `[Console]::OutputEncoding`: that setter is `SetConsoleOutputCP`, console-**wide**, and the test gate
+  runs every suite on one shared console — which is precisely how this bug stayed invisible, a sibling
+  suite holding UTF-8 turning the failing assert green under the gate while it was red on its own. And a
+  suite that is green under the gate and red standalone is reporting a **real** defect until proven
+  otherwise; the gate is the run with the shared state in it.
 - **Technical identifiers/flags** keep their original form — the scaffold marker `VUL-IN` (used across
   the plugin's scaffold scripts, e.g. `bootstrap.ps1`, `new-branch.ps1`) is one example; Dave's
   explicit decision. The job id **`lint-en-tests`** in [`ci.yml`](../../.github/workflows/ci.yml) is a

@@ -248,13 +248,6 @@ function Invoke-Status {
     }
 }
 
-# The parent decodes the child's stdout with this encoding. Set to UTF-8 so the encoding case measures
-# the SCRIPT's file read rather than a second, unrelated decoding step introduced by the harness.
-$prevOut = [Console]::OutputEncoding
-try {
-    [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
-} catch { }
-
 $fixtures = @()
 try {
     Write-Host 'No topic locked' -ForegroundColor Cyan
@@ -280,15 +273,39 @@ try {
     # THE MEASURED BUG THIS PINS: PowerShell 5.1's Get-Content reads a BOM-less file in the system ANSI
     # codepage, so an em dash came back as three mojibake characters -- caught on this script's first run
     # against a real release note. Asserted on the note's section because that is the text a reader acts on.
-    $dash = [string][char]0x2014
-    $r = Invoke-Status -Fixture $fx
-    Assert-True ($r.Flat -match 'the widget refactor') 'the still-open section is printed'
-    Assert-True ($r.Flat.Contains($dash)) "and its em dash survives the read -- the mojibake regression"
-    # The mangled form's FIRST character (U+00E2), built from its code point for the same reason the em
-    # dash is: typing the mojibake literally into a pure-ASCII .ps1 is how the first draft of this file
-    # broke its own parser. The fixture contains no legitimate U+00E2, so its presence can only be a
-    # misdecoded lead byte.
-    Assert-True (-not $r.Flat.Contains([string][char]0x00E2)) 'and the misdecoded lead byte does not appear'
+    #
+    # THE PARENT MUST DECODE THE CHILD AS UTF-8 FOR THIS ONE CASE, and the only lever for that is
+    # [Console]::OutputEncoding -- whose setter is SetConsoleOutputCP, i.e. CONSOLE-WIDE rather than
+    # per-process. Under the test gate every suite shares one console (Start-Process -NoNewWindow), so
+    # while this is held, EVERY concurrently running suite decodes native output as UTF-8 too.
+    #
+    # THAT IS NOT THEORETICAL AND IT COST A REAL BUG ITS VISIBILITY (inbound #821, August 21, 2026). It
+    # used to be set for the WHOLE of this suite -- 274 lines, from before the first fixture to the outer
+    # finally -- and sync-main.tests.ps1's accented-path assert was red standalone and green under the gate
+    # on the same commit, because it happened to run inside this window. The bug it was correctly reporting
+    # (a git path decoded with the inherited console code page) then read as a test quirk for as long as
+    # nobody ran that suite on its own. Reproduced deterministically: sync-main alone failed; sync-main
+    # started 1.2s after this suite passed.
+    #
+    # SO THE WINDOW IS THE TWO ASSERTS THAT NEED IT AND NOTHING ELSE. That REDUCES the hazard rather than
+    # removing it -- said plainly, because the honest fix is per-process console isolation and that is a
+    # harness rewrite this repair does not carry. Never widen this scope: if another case needs UTF-8,
+    # give it its own narrow window.
+    $prevOut = [Console]::OutputEncoding
+    try {
+        try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }
+        $dash = [string][char]0x2014
+        $r = Invoke-Status -Fixture $fx
+        Assert-True ($r.Flat -match 'the widget refactor') 'the still-open section is printed'
+        Assert-True ($r.Flat.Contains($dash)) "and its em dash survives the read -- the mojibake regression"
+        # The mangled form's FIRST character (U+00E2), built from its code point for the same reason the em
+        # dash is: typing the mojibake literally into a pure-ASCII .ps1 is how the first draft of this file
+        # broke its own parser. The fixture contains no legitimate U+00E2, so its presence can only be a
+        # misdecoded lead byte.
+        Assert-True (-not $r.Flat.Contains([string][char]0x00E2)) 'and the misdecoded lead byte does not appear'
+    } finally {
+        try { [Console]::OutputEncoding = $prevOut } catch { }
+    }
 
     Write-Host 'Only the still-open section is printed, and it stops at the next heading' -ForegroundColor Cyan
     Assert-True ($r.Flat -match 'the second open thing') 'every line of the section is printed, not just the first'
@@ -524,7 +541,8 @@ try {
     Assert-True ($r.Flat -match 'feat/a-branch') 'including the pending entry itself, so the report really continued'
 }
 finally {
-    try { [Console]::OutputEncoding = $prevOut } catch { }
+    # NO CONSOLE RESTORE HERE ANY MORE -- the one case that changes it restores it itself, in its own
+    # finally, a few lines wide. See the block above the mojibake asserts for why the window is narrow.
     foreach ($d in $fixtures) {
         if ($d -and (Test-Path -LiteralPath $d)) {
             Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue

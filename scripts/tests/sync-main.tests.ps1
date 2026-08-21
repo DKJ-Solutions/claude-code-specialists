@@ -231,11 +231,18 @@ try {
     Write-Host ''
     Write-Host 'the content rule, driven through the script'
     $live = New-Consumer -Label 'live' -ThemeId '123456' -StoreDomain 'a-store.myshopify.com'
-    # THE ACCENTED PATH IS A PIN, NOT DECORATION. git quotes any path with a byte above 0x7F by default --
-    # 'assets/cafe.js' with an accent comes out of ls-tree as '"assets/caf\303\251.js"' -- and that string
-    # matches nothing the mirror walk produces. The trunk's copy would then read as a path live does not
-    # have while live's IDENTICAL file read as content the trunk has never held: foreign, taken, trunk
-    # overwritten. The name is built from a code point because this layer is ASCII (repo convention), which
+    # THE ACCENTED PATH IS A PIN, NOT DECORATION, AND IT HAS CAUGHT THE SAME BUG TWICE. A path with a byte
+    # above 0x7F has to survive the trip from git into a hashtable key, and both failures put it there in a
+    # form the mirror walk never produces -- after which the trunk's copy reads as a path live does not
+    # have while live's IDENTICAL file reads as content the trunk has never held: foreign, taken, trunk
+    # overwritten.
+    #   1. git's default QUOTING -- '"assets/caf\303\251.js"' -- fixed by core.quotePath=false;
+    #   2. which put raw UTF-8 bytes on the wire, decoded by the inherited console code page (inbound #821):
+    #      right in a UTF-8 terminal, wrong on cp850, so the answer depended on who launched the run.
+    # Now the wire is quoted ON PURPOSE and Convert-GitQuotedPath unpacks it, so this case is green at
+    # cp850, cp1252 and cp65001 alike -- measured, because for one commit it was green under the test gate
+    # and red standalone, and the gate was the run that was wrong.
+    # The name is built from a code point because this layer is ASCII (repo convention), which
     # is the same reason the scaffolder writes its middle dot as [char]0x00B7.
     $accented = 'sections/caf' + [char]0x00E9 + '.liquid'
     $floorFiles = @{
