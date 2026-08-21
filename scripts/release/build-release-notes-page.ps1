@@ -263,9 +263,10 @@ function Format-ReleaseMastheadMarks {
     return @{ Html = $html; Warnings = @($warnings) }
 }
 
-function Test-ReleaseTypeVaries {
+function Get-ReleaseDominantType {
     <#
-        Pure: does the bump type carry information on THIS page?
+        Pure: the bump type that is ORDINARY on this page -- the most common one, or '' where the table
+        names no type at all. Every row carrying it renders no type chip; every row that differs does.
 
         MEASURED IN A CONSUMER, WHICH IS WHY THIS IS DERIVED AND NOT A SEAM (inbound #811, ask 1). On a
         page of 40 releases the type chip read 'Minor' 38 times, 'Baseline' once, and was ABSENT on the
@@ -273,15 +274,31 @@ function Test-ReleaseTypeVaries {
         cell, so the newest release never showed its type at all. A field that is either constant or
         missing is not a field.
 
-        BUT A REPO WITH A REAL MIX GETS INFORMATION FROM IT, so 'delete the chip' would be the wrong
-        general answer. Reading the data is better than reading a seam here: it needs no configuration,
-        it is right for a consumer that changes its bump policy later, and it cannot go stale.
+        AND 'IS THERE MORE THAN ONE VALUE' IS THE WRONG TEST, which is written down here because it was
+        built first and shipped nothing. That page has TWO distinct types, so a variance test answers
+        'varies' and leaves all 39 chips exactly where they were -- satisfying the report's wording while
+        fixing nothing it measured. The report's own figure was 38 of 40, not 'two values'. Caught by Dave
+        reading the built page and asking why the label was still there.
 
-        The 'live' chip is unaffected -- it marks one row and is always worth its space.
+        SO THE CHIP MARKS WHAT IS UNUSUAL, which is the rule the 'live' chip already follows: its absence
+        says 'not live', and the absence of a type chip now says 'the usual kind for this page'. One row
+        in forty carrying 'Baseline' keeps its chip and tells a reader something; thirty-nine rows
+        agreeing with each other do not. A page whose types are genuinely mixed still labels everything
+        off the mode, so nothing is hidden from the consumer who gets information from this field.
+
+        A repo whose every release is the same type therefore renders no type chip at all -- correct,
+        and the version number already says whether a release was major or patch.
+
+        TIES ARE BROKEN BY NAME so the page is reproducible: two types at equal counts is a genuinely
+        mixed page, where labelling one half and not the other still reads as 'these are the unusual
+        ones'. Reading the data rather than a seam needs no configuration, is right for a consumer that
+        changes its bump policy later, and cannot go stale.
     #>
     param([Parameter(Mandatory)][AllowEmptyCollection()][array]$Releases)
-    $types = @($Releases | ForEach-Object { ([string]$_.type).Trim() } | Where-Object { $_ } | Sort-Object -Unique)
-    return ($types.Count -gt 1)
+    $types = @($Releases | ForEach-Object { ([string]$_.type).Trim() } | Where-Object { $_ })
+    if ($types.Count -eq 0) { return '' }
+    $ranked = @($types | Group-Object | Sort-Object -Property @{ Expression = 'Count'; Descending = $true }, @{ Expression = 'Name'; Descending = $false })
+    return [string]$ranked[0].Name
 }
 
 function Test-ReleaseVersionTrimmable {
@@ -313,16 +330,26 @@ function Test-ReleaseVersionTrimmable {
 
 function Format-ReleaseVersionLabel {
     <#
-        Pure: the version as a reader sees it -- 'v2.39.0', or 'v2.39' where the page's third digit is a
-        constant. See Test-ReleaseVersionTrimmable for why, and for why the id keeps the full number.
+        Pure: the version as a reader sees it -- 'Version 2.39.0', or 'Version 2.39' where the page's third
+        digit is a constant. See Test-ReleaseVersionTrimmable for why, and for why the id keeps the full
+        number.
+
+        'Version 2.39' RATHER THAN 'v2.39' (Dave, August 21, 2026, reading the built page). The short form
+        is developer shorthand, and this page's reader is management and the commissioner -- for whom a
+        lone 'v' is a convention they have no reason to know. It costs width in the one column that had
+        just been narrowed, which is why the column it sits in is a stated number in the template rather
+        than something the label can outgrow silently.
+
+        THE ID IS UNAFFECTED and stays 'v2.39.0': it is the target of links people already hold, and it is
+        a fragment rather than something a reader is asked to read.
     #>
     param(
         [Parameter(Mandatory)][AllowEmptyString()][string]$Version,
         [bool]$Trim = $false
     )
     $v = $Version.Trim()
-    if ($Trim -and $v -match '^(\d+\.\d+)\.0$') { return 'v' + $Matches[1] }
-    return 'v' + $v
+    if ($Trim -and $v -match '^(\d+\.\d+)\.0$') { return 'Version ' + $Matches[1] }
+    return 'Version ' + $v
 }
 
 function Remove-NoteMetadataHeader {
@@ -362,7 +389,8 @@ function Remove-NoteMetadataHeader {
     #>
     param(
         [Parameter(Mandatory)][AllowEmptyString()][string]$Body,
-        [Parameter(Mandatory)][AllowEmptyString()][string]$Version
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Version,
+        [AllowEmptyString()][string]$Title = ''
     )
 
     if (-not $Body) { return $Body }
@@ -379,6 +407,15 @@ function Remove-NoteMetadataHeader {
     while ($i -lt $lines.Count -and $lines[$i] -match '^\*\*[^*]+:\*\*') { $i++ }
     while ($i -lt $lines.Count -and -not $lines[$i].Trim()) { $i++ }
 
+    # THE TITLE LINE STAYS, and this parameter is the record of a decision that went both ways in one
+    # afternoon. With the metadata block gone the note opened by repeating the sentence in the row above
+    # it, so the line was suppressed here; the answer Dave settled on instead was to take the TITLE out of
+    # the summary and leave it in the note, which removes the same duplication from the other side and
+    # keeps the sentence where somebody reads it. -Title is still taken, because it is what a future
+    # caller would need to suppress it again and because the row now carries the title only as an
+    # accessible name -- so the two are no longer the same claim on the page.
+
+    if ($i -ge $lines.Count) { return '' }
     return (($lines[$i..($lines.Count - 1)]) -join "`n")
 }
 
@@ -421,7 +458,8 @@ foreach ($line in [System.IO.File]::ReadAllLines($historyPath, [System.Text.Enco
     # THE ROW ABOVE THE NOTE ALREADY SAYS THE VERSION, THE DATE AND THE TYPE, so the note's own opening
     # block is dropped HERE rather than in the browser -- server-side, testable in PowerShell, and it
     # leaves the document in the repository untouched. See Remove-NoteMetadataHeader.
-    $body = Remove-NoteMetadataHeader -Body ([System.IO.File]::ReadAllText($notePath, [System.Text.Encoding]::UTF8)) -Version $version
+    $body = Remove-NoteMetadataHeader -Body ([System.IO.File]::ReadAllText($notePath, [System.Text.Encoding]::UTF8)) `
+        -Version $version -Title $m.Groups['title'].Value
 
     $releases.Add([ordered]@{
         version = $version
@@ -564,14 +602,16 @@ function Format-ReleaseIndexRows {
         never both. Forty rows carrying two chips each read as a table of metadata rather than as a
         list of changes, and the version number already says whether a release was major or patch.
 
-        AND THE TYPE CHIP ONLY WHERE THE TYPE VARIES (inbound #811). -ShowType is the caller's answer
-        from Test-ReleaseTypeVaries, which reads the data rather than a seam: on a page whose every
-        release is a minor the chip carried one bit across forty rows, and was missing from the newest
-        row entirely because 'live' takes the same cell. The 'live' chip is never suppressed.
+        AND THE TYPE CHIP ONLY WHERE IT SAYS SOMETHING (inbound #811). -DominantType is the caller's
+        answer from Get-ReleaseDominantType: a row whose type IS the page's ordinary one renders no chip,
+        a row that differs does. Read that function for why 'more than one value' was measured and
+        rejected as the test. The 'live' chip is never suppressed.
 
-        THE CHIP IS WRITTEN TWICE, sc-wide and sc-narrow, and the CSS shows exactly one of them. The
-        template's own comment carries the reasoning: a grid cannot move an inline child of one cell into
-        another, and giving the chip a column would make all forty rows pay for a track one row uses.
+        THE TITLE IS NOT IN THE SUMMARY (Dave, August 21, 2026, reading the built page). The row is the
+        version, the date, a chip where it says something, and the chevron; the release title lives in the
+        note, which is where he asked for it. That also retired the two-span chip trick this function
+        carried for one afternoon -- with no title cell to nest in, the chip is one span sitting in the
+        flexible column, so no row pays for a track another row uses and no copy is hidden by CSS.
 
         THE ID IS THE DEEP-LINK TARGET and is written 'v4.11.0' verbatim rather than slugified,
         because it is what the fragment in a link people already hold has to match. The visible LABEL may
@@ -583,7 +623,7 @@ function Format-ReleaseIndexRows {
     #>
     param(
         [Parameter(Mandatory)][AllowEmptyCollection()][array]$Releases,
-        [bool]$ShowType = $true,
+        [AllowEmptyString()][string]$DominantType = '',
         [bool]$TrimVersion = $false
     )
 
@@ -599,17 +639,20 @@ function Format-ReleaseIndexRows {
         if ($r.live) {
             $chipClass = 'chip accent'
             $chipText  = 'live'
-        } elseif ($ShowType -and [string]$r.type) {
+        } elseif (([string]$r.type).Trim() -and ([string]$r.type).Trim() -ne $DominantType) {
             $chipClass = 'chip'
             $chipText  = ConvertTo-HtmlText ([string]$r.type)
         }
-        $wide   = if ($chipText) { '<span class="' + $chipClass + ' sc-wide">' + $chipText + '</span> ' } else { '' }
-        $narrow = if ($chipText) { '<span class="' + $chipClass + ' sc-narrow">' + $chipText + '</span>' } else { '' }
+        $chip = if ($chipText) { '<span class="' + $chipClass + ' sc">' + $chipText + '</span>' } else { '' }
 
+        # THE TITLE TRAVELS AS THE ROW'S ACCESSIBLE NAME, not as visible text. A summary reading only
+        # 'Version 2.39' and a date is thin for anyone navigating by control rather than by eye, and the
+        # title is the one string that says what the row is -- so it goes on the element as a title
+        # attribute, where it costs no width and is still announced and shown on hover.
         $rows.Add('    <details class="fold" id="' + (ConvertTo-HtmlText $id) + '">')
-        $rows.Add('      <summary><span class="sv">' + $version + '</span>' +
-                  '<span class="st">' + $wide + $title + '</span>' +
-                  '<span class="sd">' + $date + '</span>' + $narrow + '</summary>')
+        $rows.Add('      <summary title="' + $title + '"><span class="sv">' + $version + '</span>' +
+                  $chip +
+                  '<span class="sd">' + $date + '</span></summary>')
         $rows.Add('      <article data-version="' + (ConvertTo-HtmlText ([string]$r.version)) + '"></article>')
         $rows.Add('    </details>')
     }
@@ -621,8 +664,8 @@ function Format-ReleaseIndexRows {
 # carries information here at all, and whether every version on this page ends in '.0'. Both are
 # properties of the SET, so neither can be decided inside the row loop -- and both are read off the data
 # instead of a seam, which is what makes them right for a consumer whose bump policy differs or changes.
-$showType    = Test-ReleaseTypeVaries       -Releases $releases
-$trimVersion = Test-ReleaseVersionTrimmable -Releases $releases
+$dominantType = Get-ReleaseDominantType      -Releases $releases
+$trimVersion  = Test-ReleaseVersionTrimmable -Releases $releases
 
 $masthead = Format-ReleaseMastheadMarks -Marks $config.Masthead
 foreach ($w in $masthead.Warnings) { Write-Warning $w }
@@ -633,7 +676,7 @@ $page = $template.
     Replace('@@PAGE_MASTHEAD@@', $masthead.Html).
     Replace('@@BUILD_STAMP@@',   (ConvertTo-HtmlText $stamp)).
     Replace('@@PAGE_STYLE@@',    (Format-ReleasePageStyle -Theme $config.Theme)).
-    Replace('@@RELEASE_ROWS@@', (Format-ReleaseIndexRows -Releases $releases -ShowType $showType -TrimVersion $trimVersion)).
+    Replace('@@RELEASE_ROWS@@', (Format-ReleaseIndexRows -Releases $releases -DominantType $dominantType -TrimVersion $trimVersion)).
     Replace('@@RELEASE_DATA@@',  $json)
 
 # --- 4. Where the output goes ---------------------------------------------------------------------

@@ -172,7 +172,7 @@ a release for a missing timestamp would be ceremony rather than a guard.
      |---|---|---|
      | `0` | patch | the development notes + the generated Release body |
      | `1` | minor | + the hand-written note; in a **tier-1** repo these fill its *What changed* section |
-     | `2` | minor | + a *For consumers* section in that same note |
+     | `2` | minor | + an audience section in that same note, written for the consumer |
 
      A major additionally needs enough minors behind the line. So a refusal usually means the bump is
      wrong, not the gate — the script names the bump the work *does* earn; take that instead.
@@ -233,7 +233,7 @@ a release for a missing timestamp would be ceremony rather than a guard.
 
    | section | who it is for | how it arrives |
    |---|---|---|
-   | the audience section — *For consumers* at tier 2, *What changed* at tier 1 | whoever this repo publishes to | **pre-filled** — the entries at this repo's own audience tier, still in the words their authors wrote for a diff reviewer. Rewrite them against the seven tests below. Absent where no entry reached that tier. |
+   | the audience section — *What changed*, at either tier | whoever this repo publishes to | **pre-filled** — the entries at this repo's own audience tier, still in the words their authors wrote for a diff reviewer. Rewrite them against the seven tests below. Absent where no entry reached that tier. |
    | *What it is worth* | the organisation | **empty** — it cannot be generated. Think in time, risk and reduced dependence on a developer. |
    | *What was still open at this release* | the organisation | **empty**. Past tense on purpose: a published document does not move with reality, so a present-tense line goes stale in hours rather than months. |
 
@@ -245,8 +245,15 @@ a release for a missing timestamp would be ceremony rather than a guard.
    **The first row follows `Get-ReleaseAudienceTier`, not a fixed 2** (inbound #747). A repo asks its entries
    about tier 0 and its own audience tier only, so in a tier-1 repo the tier-2 group is always empty — which
    is why selecting on the literal 2 removed that repo's audience section from every release, not from an
-   occasional one. The heading's default follows the same answer, since *For consumers* names the wrong
-   reader in a repo whose audience is the organisation.
+   occasional one.
+
+   **The heading no longer follows it, and that finished the same repair rather than undoing it** (Dave,
+   August 21, 2026). The tier-2 default was *For consumers*, which #747 correctly found names the wrong
+   reader in a tier-1 repo — and then reading a built page showed it names nothing useful in a tier-2 one
+   either: the consumer holding the document does not need to be told it is for them. Both tiers now write
+   *What changed*, so the only heading that names a reader is the one below it, which exists precisely to
+   mark the half the audience section may not contain. **Notes already published keep the heading they were
+   written with**: they are records, and the page renders them as they are.
 
    **What this replaced, and the measurement that chose it.** There were two hand-written documents — an
    internal note for the organisation and a consumer document — and at every one of the twelve releases

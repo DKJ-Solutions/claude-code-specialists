@@ -1428,6 +1428,18 @@ function Build-ReleaseNoteDraft {
     $w = @{
         Title             = 'Release notes'
         AudienceLabel     = 'For whom'
+        # 'WHAT CHANGED' AT BOTH TIERS, and the tier-2 default used to be 'For consumers' (Dave,
+        # August 21, 2026, reading the built release-notes page). A heading that names the reader tells
+        # that reader nothing they do not already know -- they are the one holding the document -- while
+        # the section BELOW it does carry a reader in its name, because that one is deliberately the half
+        # the consumer's section may not contain. So the pair now reads 'what changed' then 'what it is
+        # worth, to the organisation', and only the heading that separates two readers names one.
+        #
+        # THIS DOES NOT REVERT #747, it completes it: that finding was that 'For consumers' names the
+        # WRONG reader at tier 1, which is why the key became tier-dependent. Both tiers answering the
+        # same thing is what lets it stop being tier-dependent at all -- the branch below keeps the two
+        # keys that genuinely differ.
+        SectionAudience   = 'What changed'
         SectionOpen       = 'What was still open at this release'
         HintOpen          = @(
             'What was deliberately left, and with whom the next step sits. "Nothing" is also an answer',
@@ -1448,7 +1460,6 @@ function Build-ReleaseNoteDraft {
     # part that is true at either tier: this is the half a changelog cannot produce.
     if ($AudienceTier -eq 2) {
         $w.Audience        = 'consumers of this product, and colleagues in the organisation -- one section each'
-        $w.SectionAudience = 'For consumers'
         $w.HintAudience    = @(
             'DRAFT. These are the tier-2 entries, still in the words their authors wrote for someone',
             'reviewing a diff. Rewrite them for someone deciding whether to update: what they can now do,',
@@ -1463,7 +1474,6 @@ function Build-ReleaseNoteDraft {
         ) -join "`n     "
     } else {
         $w.Audience        = 'colleagues in the organisation -- what changed, and what it is worth'
-        $w.SectionAudience = 'What changed'
         $w.HintAudience    = @(
             "DRAFT. These are the tier-$AudienceTier entries, still in the words their authors wrote for",
             'someone reviewing a diff. Rewrite them for the reader who authorises the work: what is now',

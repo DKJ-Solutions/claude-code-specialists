@@ -835,7 +835,8 @@ Assert-Match $draft '(?m)^# Release notes v4\.3\.0 ' 'the header names the versi
 Assert-Match $draft '\*\*Date:\*\* 2026-08-11' 'and carries the date'
 Assert-Match $draft '(?m)^\*\*For whom:\*\* .*consumers.*colleagues' 'the audience line names BOTH readers, since the document has two'
 Assert-Match $draft '(?m)^A release title sentence$' 'the title line is included'
-Assert-Match $draft '(?m)^## For consumers$' 'the consumer section is present when an entry reached tier 2'
+Assert-Match $draft '(?m)^## What changed$' 'the audience section is present when an entry reached tier 2'
+Assert-NoMatch $draft '(?m)^## For ' 'and it does not name its own reader -- the section below is the one that names a reader'
 Assert-Match $draft '(?m)^### A change with a readable name$' 'its entries sit one level DEEPER than before -- they are under a section now, not under the H1'
 Assert-Match $draft '(?m)^## What it is worth$' "the organisation's value section is present"
 Assert-Match $draft '(?m)^## What was still open at this release$' 'and its open section'
@@ -855,7 +856,7 @@ Assert-NoMatch $draft '\*\*Score:\*\* 4' 'and neither does the self-assigned sco
 # release rather than at an unlucky one. This assertion passed throughout, which is why it is worth
 # stating out loud that its scope is the tier-2 repo and the tier-1 case is asserted separately below.
 $draftNoTier2 = Build-ReleaseNoteDraft -Entries @() -Version '4.3.0' -Date '2026-08-11' -Type 'Minor'
-Assert-NoMatch $draftNoTier2 '(?m)^## For consumers$' 'a TIER-2 repo gets no consumer section where no entry reached tier 2'
+Assert-NoMatch $draftNoTier2 '(?m)^## What changed$' 'a TIER-2 repo gets no audience section where no entry reached tier 2'
 Assert-Match $draftNoTier2 '(?m)^## What it is worth$' 'while the organisation still gets its sections -- the document is still written'
 Assert-Match $draftNoTier2 '(?m)^## What was still open at this release$' 'both of them'
 # The guidance is an HTML comment, so the writer deletes it rather than working around it -- and the fold's
@@ -869,19 +870,19 @@ $draftW = Build-ReleaseNoteDraft -Entries @($dossier) -Version '4.3.0' -Date '20
 Assert-Match $draftW '(?m)^## Voor klanten$' 'an overridden heading is used'
 Assert-Match $draftW '(?m)^## What it is worth$' 'and the headings that were not overridden keep their defaults'
 Assert-Match (Build-ReleaseNoteDraft -Entries @($dossier) -Version '4.3.0' -Date '2026-08-11' -Type 'Minor' -Wording @{ SectionConsumers = '' }) `
-    '(?m)^## For consumers$' 'an override that is present but EMPTY is ignored, like every other wording seam here'
+    '(?m)^## What changed$' 'an override that is present but EMPTY is ignored, like every other wording seam here'
 # THE DEFAULT IS 2, so every assert above passes an -AudienceTier nobody wrote. Pinned, because the
 # alternative -- making the parameter mandatory -- would have been a breaking change to a function a
 # consumer's own scripts may call, and because 2 is what the caller hardcoded before the seam was read.
 Assert-Match (Build-ReleaseNoteDraft -Entries @($dossier) -Version '4.3.0' -Date '2026-08-11' -Type 'Minor' -AudienceTier 2) `
-    '(?m)^## For consumers$' 'passing -AudienceTier 2 explicitly is what omitting it already did'
+    '(?m)^## What changed$' 'passing -AudienceTier 2 explicitly is what omitting it already did'
 
 Write-Host "Build-ReleaseNoteDraft at tier 1 (inbound #747 -- the audience the repo actually has)" -ForegroundColor Cyan
 # A tier-1 entry, scored on tier 1: the source a tier-1 repo has and the previous shape never read.
 $dossier1 = $dossier -replace '(?m)^#### Tier 2$', '#### Tier 1'
 $draft1 = Build-ReleaseNoteDraft -Entries @($dossier1) -Version '4.3.0' -Date '2026-08-11' -Type 'Minor' -AudienceTier 1
-Assert-Match   $draft1 '(?m)^## What changed$' 'the audience section is present and names the reader this repo has'
-Assert-NoMatch $draft1 '(?m)^## For consumers$' 'and it is not the consumer heading, which would name the wrong one'
+Assert-Match   $draft1 '(?m)^## What changed$' 'the audience section is present -- the SAME heading tier 2 gets, since neither names a reader'
+Assert-NoMatch $draft1 '(?m)^## For consumers$' 'and the retired consumer heading does not come back at either tier'
 Assert-Match   $draft1 '(?m)^### A change with a readable name$' 'it is PRE-FILLED from the tier-1 entry -- the half #747 thought impossible'
 Assert-Match   $draft1 '(?m)^## What it is worth$' 'the section a changelog cannot produce still arrives'
 Assert-Match   $draft1 '(?m)^## What was still open at this release$' 'and so does the open section'

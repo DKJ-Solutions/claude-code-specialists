@@ -329,7 +329,10 @@ try {
         $n4 = Get-Content -LiteralPath $note4 -Raw
         # The finding itself: a section that says what changed, at all.
         Assert-Match '(?m)^## What changed$'  $n4 'tier 1: the draft HAS a section saying what changed -- the whole of #747'
-        Assert-NotMatch '(?m)^## For consumers$' $n4 'tier 1: and it is not the consumer heading, which names the wrong reader here'
+        # NO HEADING NAMES ITS OWN READER, at either tier (Dave, August 21, 2026). 'For consumers' told the
+        # consumer something they already knew; the section BELOW still names a reader, because that one is
+        # deliberately the half the audience section may not contain.
+        Assert-NotMatch '(?m)^## For ' $n4 'tier 1: and no section heading names its own reader'
         # PRE-FILLED, not merely asked for. #747 proposed an empty heading on the reasoning that a tier-1
         # repo has no generatable source; it has the same source a tier-2 repo has, and this is the assert
         # that would fail if the fix were narrowed back to a bare heading.
@@ -359,8 +362,8 @@ try {
     Assert-True (Test-Path -LiteralPath $note5) 'tier 2: the hand-written note was drafted'
     if (Test-Path -LiteralPath $note5) {
         $n5 = Get-Content -LiteralPath $note5 -Raw
-        Assert-Match '(?m)^## For consumers$' $n5 'tier 2: the consumer heading is exactly what it always was'
-        Assert-NotMatch '(?m)^## What changed$' $n5 'tier 2: and the tier-1 heading does not leak into it'
+        Assert-Match '(?m)^## What changed$' $n5 'tier 2: the audience section says what it holds, not who it is for'
+        Assert-NotMatch '(?m)^## For consumers$' $n5 'tier 2: and the retired heading does not come back'
         Assert-Match 'consumers of this product' $n5 'tier 2: its audience line still names both readers'
         Assert-Match 'A fixture change' $n5 'tier 2: pre-filled from the tier-2 entry, as before'
     }

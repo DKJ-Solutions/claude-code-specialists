@@ -175,7 +175,10 @@
      version now starts at the left edge and the article indent below matches the title column exactly. */
   .fold > summary {
     display: grid;
-    grid-template-columns: 4.25rem 1fr auto auto;
+    /* 6.5rem, not 4.25: the version reads 'Version 2.39' rather than 'v2.39' since August 21, 2026 --
+       the page's reader is management, for whom a lone 'v' is a convention they have no reason to know.
+       Stated here rather than left to 'auto' so the note's indent below can match it exactly. */
+    grid-template-columns: 6.5rem 1fr auto auto;
     column-gap: .9rem; row-gap: .15rem;
     align-items: baseline;
     padding: .85rem .15rem;
@@ -201,22 +204,18 @@
     grid-column: 1; grid-row: 1;
     font-variant-numeric: tabular-nums; font-weight: 650; font-size: .85rem; color: var(--accent);
   }
-  .fold .st { grid-column: 2; grid-row: 1; font-size: .95rem; }
   .fold .sd {
     grid-column: 3; grid-row: 1;
     font-size: .8rem; color: var(--ink-faint);
     font-variant-numeric: tabular-nums; white-space: nowrap;
   }
-  /* THE CHIP IS RENDERED TWICE AND ONE COPY IS ALWAYS display:none, which is a deliberate trade rather
-     than an oversight. A grid cannot move an inline child of one cell into another, and giving the chip
-     a column of its own would make all forty rows pay for a track that one row uses -- the very cost
-     ask 3 is about. So the desktop copy sits inline before the title, where it costs nothing, and the
-     narrow copy is its own cell on row 1, hard right, which is the shape that was asked for. A
-     display:none element is not announced by a screen reader either, so nothing is read twice. */
-  .fold .sc-wide { display: inline-block; }
-  .fold .sc-narrow { display: none; }
+  /* THE CHIP SITS IN THE FLEXIBLE COLUMN, hard against the version, which is what lets it cost nothing on
+     the rows that do not have one: no track of its own, so no row pays a gap for another row's chip. It
+     had to be written twice while the title held column 2 -- a grid cannot move an inline child of one
+     cell into another -- and taking the title out of the summary retired that. */
+  .fold .sc { grid-column: 2; grid-row: 1; justify-self: start; }
 
-  .fold > summary:hover .st { color: var(--accent); }
+  .fold > summary:hover .sv { color: var(--ink); }
   .fold > summary:hover::after { border-color: var(--accent); }
   .fold > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: .4rem; }
 
@@ -234,7 +233,7 @@
 
   /* The open note sits indented under its own row, aligned with the title above it: the version column
      plus one gap, which is what the trailing chevron leaves. */
-  .fold article { padding: .25rem 0 1.75rem 5.15rem; }
+  .fold article { padding: .25rem 0 1.75rem 7.4rem; }
   .fold article > :first-child { margin-top: 0; }
 
   /* ---------- the note itself ---------- */
@@ -278,30 +277,22 @@
   footer.colophon p { margin: .35rem 0; max-width: 70ch; }
 
   /* ---------- narrow ----------
-     THREE ROWS, AND THE PHONE IS WHERE THE SHAPE WAS ASKED FOR (inbound #811, asks 4 and 5): row 1 the
-     version with its chip pushed hard right, row 2 the title across the full width, row 3 the date. The
-     title is the field that actually differs from row to row, so it gets the line.
-
-     DESKTOP KEEPS ONE LINE, deliberately, and that half is a judgement rather than a request. Three
-     lines over forty releases is a materially taller index, and a 52rem measure is not short of room --
-     the reader who benefits from the reflow is the one holding a phone, which is how a commissioner
-     opens a link that arrives in a message. */
+     ONE LINE AT EVERY WIDTH, which is what taking the title out of the summary bought (Dave,
+     August 21, 2026). The three-row reflow that #811 asked for existed because the title was the longest
+     field and needed a line of its own on a phone; with the title in the note instead, the whole row is a
+     version, a date and at most one chip -- about 16rem of the 20rem a 390px phone has, so it fits
+     without reflowing at all. What stays here is the spacing: less padding, a smaller masthead, and the
+     sheet margin that used not to move. */
   @media (max-width: 38rem) {
     .wrap { padding: 0 .9rem 3rem; }
     header.masthead { padding-top: 2rem; }
     header.masthead h1 { font-size: 1.7rem; }
     header.masthead .marks img { height: 1.35rem; }
+    .fold > summary { padding: .7rem .15rem .85rem; }
     /* THE MARGIN MOVES WITH THE PADDING (ask 6), and its absence was the one plain bug in that list.
        Everything else here shrank on a phone while this 2rem did not, so the gap between the masthead
        and the first row was identical at 390px and at 1400px: 3.5rem of air above a list. */
     .sheet { margin: 1.1rem 0 0; padding: .25rem 1rem .75rem; border-radius: .6rem; }
-    .fold > summary { grid-template-columns: auto 1fr auto auto; padding: .7rem .15rem .85rem; }
-    .fold .sv { grid-column: 1; grid-row: 1; }
-    .fold .sc-wide { display: none; }
-    .fold .sc-narrow { display: inline-block; grid-column: 3; grid-row: 1; justify-self: end; }
-    .fold > summary::after { grid-column: 4; grid-row: 1; }
-    .fold .st { grid-column: 1 / -1; grid-row: 2; }
-    .fold .sd { grid-column: 1 / -1; grid-row: 3; justify-self: start; }
     /* No leading gutter left to align to, so the note starts where the version does. */
     .fold article { padding: .25rem 0 1.4rem .15rem; }
   }
@@ -535,7 +526,20 @@
   folds.forEach(function (fold) {
     var article = fold.querySelector('article');
     if (!article) { return; }
-    fold.addEventListener('toggle', function () { if (fold.open) { fill(article); } });
+    fold.addEventListener('toggle', function () {
+      if (fold.open) { fill(article); return; }
+      // CLOSING PUTS THE READER BACK ON THE ROW THEY OPENED. Without this, reading to the end of a note
+      // and closing it leaves the viewport wherever the text used to be -- the document has just got a
+      // screen or six shorter, so the reader lands in the middle of the index with no idea which row was
+      // theirs and has to scroll back up hunting for it. Reported by Dave, and it is the other half of the
+      // sticky summary: that gives them a way to close it, this says where closing leaves them.
+      //
+      // ONLY WHEN THE ROW HAS SCROLLED OFF THE TOP. Closing a row that is already in view moves nothing,
+      // because a jump the reader did not ask for is its own annoyance. Instant rather than smooth: this
+      // is restoring a position, not travelling to a new one, and an animation here reads as the page
+      // moving on its own.
+      if (fold.getBoundingClientRect().top < 0) { fold.scrollIntoView({ block: 'start' }); }
+    });
     // Already open before this script ran -- a deep link, or a browser restoring state.
     if (fold.open) { fill(article); }
   });
@@ -548,11 +552,10 @@
     var raw = (location.hash || '').replace(/^#/, '');
     if (!raw) { return; }
     var el = document.getElementById(raw);
-    // THE ID KEEPS THE FULL SEMVER, THE LABEL MAY NOT (inbound #813). Where every release on the page
-    // ends in '.0' the visible version reads 'v2.39', so a reader who types what they see, or copies it
-    // out of the page, arrives with a fragment two characters short of the id. The id itself is never
-    // trimmed -- every link anyone already holds has to keep working -- so this is the one place that
-    // accepts both spellings.
+    // THE ID KEEPS THE FULL SEMVER, THE LABEL DOES NOT (inbound #813). Where every release on the page
+    // ends in '.0' the visible version reads 'Version 2.39', so a fragment somebody assembles from what
+    // the page shows is two characters short of the id. The id itself is never trimmed -- every link
+    // anyone already holds has to keep working -- so this is the one place that accepts both spellings.
     if (!el && /^v\d+\.\d+$/.test(raw)) { el = document.getElementById(raw + '.0'); }
     if (el && el.tagName === 'DETAILS' && !el.open) {
       el.open = true;
