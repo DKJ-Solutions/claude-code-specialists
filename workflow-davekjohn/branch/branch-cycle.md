@@ -50,7 +50,9 @@
 
 ## DEPLOY
 
-- [ ] PR, CI, merge, fold. Default route -- no visible result, nothing irreversible, so it does not wait.
+- [x] PR, CI, merge, fold. Default route -- no visible result, nothing irreversible, so it does not wait.
+      `-Resolves 819`. The first `ship-pr` run was refused by the step-list gate for this very line, which
+      is the gate working: a branch reaches a PR when its own plan is finished, and nothing was pushed.
 
 ## Where I left off
 
