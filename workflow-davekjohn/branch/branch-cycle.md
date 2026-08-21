@@ -28,12 +28,16 @@
 - [x] `scripts/tests/sync-rules.tests.ps1`: 46 asserts. The blob id against `git hash-object --no-filters`,
       the CR-stripping traps against git's real empty-blob id, provenance including the deleted-path `--`
       case, and every cell of the verdict table.
-- [x] `scripts/tests/sync-main.tests.ps1`: 31 asserts, driven through the script against a mirror. The
+- [x] `scripts/tests/sync-main.tests.ps1`: 32 asserts, driven through the script against a mirror. The
       `ours/buried` case is the headline; the gitignore filter is what proves the argument form is in use.
 - [x] One assert failed and was wrong rather than the code: the CRLF case appended CRLF to a file stored
       without a trailing newline, so it CR-stripped to content the repo has never held. Repaired with a
       two-line fixture, and the reason is written into the test so a later reader does not "fix" it by
       loosening the rule.
+- [x] A correctness risk found while writing the comparison rather than reported: git quotes any path with
+      a byte above 0x7F, which would have made an accented theme filename read as live-only and taken.
+      `core.quotePath=false` on both path queries, pinned by an assert that was verified to FAIL with the
+      flag removed.
 - [x] `build-shared-scripts.ps1`, then the lint gate: 0 errors over 22 checks.
 
 ## DEPLOY

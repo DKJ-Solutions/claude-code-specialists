@@ -231,11 +231,20 @@ try {
     Write-Host ''
     Write-Host 'the content rule, driven through the script'
     $live = New-Consumer -Label 'live' -ThemeId '123456' -StoreDomain 'a-store.myshopify.com'
-    Add-FixtureCommit -Dir $live -Message 'sync: the first floor' -Write @{
+    # THE ACCENTED PATH IS A PIN, NOT DECORATION. git quotes any path with a byte above 0x7F by default --
+    # 'assets/cafe.js' with an accent comes out of ls-tree as '"assets/caf\303\251.js"' -- and that string
+    # matches nothing the mirror walk produces. The trunk's copy would then read as a path live does not
+    # have while live's IDENTICAL file read as content the trunk has never held: foreign, taken, trunk
+    # overwritten. The name is built from a code point because this layer is ASCII (repo convention), which
+    # is the same reason the scaffolder writes its middle dot as [char]0x00B7.
+    $accented = 'sections/caf' + [char]0x00E9 + '.liquid'
+    $floorFiles = @{
         'sections/editor.liquid'  = 'e1'
         'sections/dropped.liquid' = 'was here once'
         'sections/crlf.liquid'    = "a`nb"
     }
+    $floorFiles[$accented] = 'an accented filename, identical on both sides'
+    Add-FixtureCommit -Dir $live -Message 'sync: the first floor' -Write $floorFiles
     # Trunk work: one file changed, one deleted, one added that live has never seen.
     Add-FixtureCommit -Dir $live -Message 'fix: the trunk changes a file' -Write @{ 'sections/theme.liquid' = 'trunk-v2' }
     Add-FixtureCommit -Dir $live -Message 'chore: the trunk drops a file'  -Delete @('sections/dropped.liquid')
@@ -257,6 +266,7 @@ try {
         'sections/crlf.liquid'      = "a`r`nb"
         'sections/unrelated.liquid' = 'u1'
     }
+    Set-FixtureFile -Root $liveMirror -Rel $accented -Value 'an accented filename, identical on both sides'
 
     $r = Invoke-Sync -Dir $live -Mirror $liveMirror
     Assert-True ($r.Out -match 'sections/theme\.liquid\s+live holds a version this repo has had before') 'ours/buried: live''s older copy of OUR file is held back, though the floor no longer covers it'
@@ -265,6 +275,7 @@ try {
     Assert-True ($r.Out -match 'sections/editor\.liquid\s+content this repo has never held') 'foreign/changed: a third party''s edit to an untouched file is taken'
     Assert-True ($r.Out -match 'sections/brand-new\.liquid\s+content this repo has never held') 'foreign/added: a file only live has and we never held is taken'
     Assert-True ($r.Out -notmatch 'sections/crlf\.liquid') 'crlf: a line-ending-only difference is not a difference at all'
+    Assert-True ($r.Out -notmatch 'caf') 'quotepath: a path with a non-ASCII byte is compared, not read as a new file'
     Assert-True ($r.Out -match 'drift on 2 file\(s\)') 'take: exactly the two foreign files go into the sync'
     # THE MIRROR MODEL'S OWN GUARANTEE: a held-back file is never written, so it cannot be damaged by a
     # rule that got it wrong or by a failure halfway. The wholesale version overwrote first and restored

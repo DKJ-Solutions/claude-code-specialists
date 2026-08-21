@@ -330,11 +330,19 @@ try {
     # 'ls-tree -r HEAD' IS READ IN ITS DEFAULT FORMAT, not through '--format'. The format option arrived
     # in git 2.36 and this script has no reason to require it: the default line is
     # '<mode> SP <type> SP <oid> TAB <path>', and the tab is what makes a path with spaces safe to split.
+    #
+    # 'core.quotePath=false' IS LOAD-BEARING AND IT FAILS IN THE LOSING DIRECTION. git's default is to
+    # quote any path with a byte above 0x7F -- 'assets/cafe.js' with an accent comes out as
+    # '"assets/caf\303\251.js"', measured against git 2.54 -- and that string matches no key the mirror
+    # walk produces. The trunk's copy would then read as a path live does not have (kept, correctly) while
+    # live's identical file read as one the trunk has never held: foreign, taken, and the trunk's version
+    # overwritten. One flag, and it cannot make any other answer worse. The same flag goes on
+    # 'check-ignore', whose output is a path for the same reason.
     Write-Host ''
     Write-Host "[5/6] comparing live against $trunk ..." -ForegroundColor Yellow
 
     $headBlobs = @{}
-    foreach ($line in (& git ls-tree -r HEAD)) {
+    foreach ($line in (& git -c core.quotePath=false ls-tree -r HEAD)) {
         if (-not $line) { continue }
         $tab = $line.IndexOf("`t")
         if ($tab -lt 0) { continue }
@@ -370,7 +378,7 @@ try {
     for ($i = 0; $i -lt $allPaths.Count; $i += 200) {
         $batch = @($allPaths[$i..([Math]::Min($i + 199, $allPaths.Count - 1))])
         if ($batch.Count -eq 0) { continue }
-        foreach ($hit in @(Invoke-SyncGitQuiet @(@('check-ignore', '--') + $batch))) {
+        foreach ($hit in @(Invoke-SyncGitQuiet @(@('-c', 'core.quotePath=false', 'check-ignore', '--') + $batch))) {
             if ($hit) { $ignored[([string]$hit).Trim()] = $true }
         }
     }

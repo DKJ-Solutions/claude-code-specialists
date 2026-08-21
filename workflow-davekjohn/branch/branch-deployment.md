@@ -48,7 +48,14 @@ pipeline to a native executable's stdin here and has no `<` redirect. The batche
 ships, with a test that proves it. `git ls-tree --format` was the second: it needs git 2.36, and the
 default output carries the same fields behind a tab, so this reads the default.
 
-The two suites grew from 24 to **77 asserts** together. The headline case is `ours/buried`, which is the
+**A third came out of writing the comparison rather than out of the report**, and it fails in the losing
+direction: git quotes any path holding a byte above `0x7F`, so an accented theme filename arrives from
+`ls-tree` as `"assets/caf\303\251.js"` and matches nothing the mirror walk produces. The trunk's copy would
+read as a path live does not have while live's *identical* file read as content the trunk has never held --
+foreign, taken, trunk overwritten. `core.quotePath=false` on both path queries fixes it, and the assert
+that pins it was checked the only way worth checking: with the flag removed again, where it fails.
+
+The two suites grew from 24 to **78 asserts** together. The headline case is `ours/buried`, which is the
 whole change in one fixture: the trunk fixed a file, a later sync commit buried the fix below the floor,
 and live still holds the trunk's old copy. It asserts both halves -- that the content rule holds the file
 back, *and* that the time rule has already lost it -- so the fixture cannot rot into agreeing with itself.
