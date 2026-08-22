@@ -183,6 +183,42 @@ function Get-SharedScriptPairs {
             # ask for it. With this, check 18 covers every shared entry point except check-script-contract,
             # whose empty Skill is a statement rather than a gap.
             Skill  = 'fix-mojibake'
+            # -Check is this script's documented report-only mode ("change nothing, exit 1 if any file
+            # would change"), so it can be timed without repairing anything.
+            MeasureArgs = @('-Check')
+        },
+        @{
+            # What a skill COSTS and how fast the script behind it runs. It drives `claude plugin
+            # details` (the count_tokens API) rather than counting anything itself, so the figure it
+            # reports is the authoritative one and not a second, disagreeing estimate.
+            #
+            # IT TRAVELS IN workflow-davekjohn, and the alternative was cheaper: a repo-level skill
+            # would cost every consumer nothing, since only the repo that AUTHORS skills ever runs
+            # this. Dave chose the plugin on August 22, 2026 -- the standing portable-first rule for
+            # ways of working, against a precisely known ~200 always-on tokens, and against
+            # .claude/skills/ being a pattern no gate here scans.
+            #
+            # NO MeasureArgs, deliberately, and it is the one entry where that is worth a sentence:
+            # a plain run shells out to `claude plugin details` once per enabled plugin, so timing it
+            # would measure the CLI and the network rather than this script. It is also the only
+            # registered script that could time itself, which is a good enough reason on its own.
+            Name   = 'measure-skill'
+            Source = 'scripts\maintenance\measure-skill.ps1'
+            Plugin = 'workflow-davekjohn'
+            Skill  = 'measure-skill'
+            # A fixture root, so the suite can drive the script against a scratch tree. A consumer
+            # never types it, and documenting it would invite someone to.
+            SkillParamsExempt = @('RootOverride')
+        },
+        @{
+            # measure-skill's parsing and formatting half. It is a lib for one reason: the parse reads a
+            # human-formatted table whose shape the CLI owns, and a parser that cannot be tested without
+            # shelling out to `claude` is one nobody pins. Pinned by
+            # scripts/tests/measure-skill.tests.ps1 against captured output.
+            Name    = 'measure-skill-lib'
+            Source  = 'scripts\lib\measure-skill-lib.ps1'
+            Plugin  = 'workflow-davekjohn'
+            LibOnly = $true
         },
         @{
             Name    = 'check-report-lib'
@@ -507,6 +543,9 @@ function Get-SharedScriptPairs {
             Skill  = 'check-branch-entry'
             # A fixture root, so the suite can judge scratch trees. A consumer never types it.
             SkillParamsExempt = @('RootOverride')
+            # Timeable with no arguments: this script reads the branch dossier and reports. Verified
+            # rather than assumed from its check- prefix -- it contains no write of any kind.
+            MeasureArgs = @()
         },
         @{
             # The pre-task sync (inbound #787, August 20, 2026). THE HIGHEST-RISK SCRIPT IN A SHOPIFY
@@ -660,6 +699,25 @@ function Get-SharedScriptPairs {
             # tells those two apart rather than treating both as nothing to do.
             Skill      = if ($p.ContainsKey('Skill')) { [string]$p.Skill } else { $null }
             SkillParamsExempt = if ($p.ContainsKey('SkillParamsExempt')) { [string[]]$p.SkillParamsExempt } else { @() }
+            # HOW THIS SCRIPT MAY BE INVOKED HARMLESSLY, for measure-skill.ps1's wall-clock pass. Three
+            # states, and the middle one is why this is $null rather than @() when absent: $null means
+            # "no read-only invocation is declared, so it is NEVER RUN to be timed", while @() means
+            # "declared safe with no arguments at all" (a check-* script that writes nothing). Same
+            # $null-vs-empty distinction Skill above already makes, for the same reason -- a
+            # not-applicable and a declared-none are different answers.
+            #
+            # It lives HERE, beside the registration, rather than in a table inside measure-skill.ps1:
+            # a second hand-written list is one a newly shared script falls out of silently, which is
+            # the accumulation shape of #275/#331 that LibOnly and Skill above were both moved here to
+            # escape. And the safety is the whole point -- timing cut-release by running it would cut a
+            # release, so the default of "not declared" must mean "not executed".
+            # DECLARED-ness is its own boolean, and it has to be: an `if` expression returning @()
+            # unrolls to nothing, so the property below would be $null for BOTH "not declared" and
+            # "declared safe with no arguments" -- collapsing exactly the distinction this key exists
+            # to make. Measured the first time it ran: check-branch-entry, declared with @(), was
+            # reported as undeclared and skipped. Same reasoning as LibOnly being normalized to [bool].
+            MeasureDeclared = [bool]$p.ContainsKey('MeasureArgs')
+            MeasureArgs = if ($p.ContainsKey('MeasureArgs')) { [string[]]$p.MeasureArgs } else { $null }
         }
     }
 }
