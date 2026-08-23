@@ -25,14 +25,15 @@
 
 ## TEST
 
-- [x] `check-plugin-integrity.ps1` green
-- [ ] All suites in `scripts/tests/` green
+- [x] `check-plugin-integrity.ps1` green — 0 findings
+- [x] All 52 suites in `scripts/tests/` green
 
 ## DEPLOY
 
-- [ ] Open the PR, wait for `lint-en-tests`, merge, fold
-
 ## Where I left off
+
+Still to run once this is pushed: the PR, the `lint-en-tests` check, the merge and the fold. Not a
+step, because the gate reads this list before the push and neither mark would be honest yet.
 
 The historical statements are deliberately left standing where they are records rather than rules:
 `RELEASES-portable.md`'s "the body used to be a hand-written document merged via its own branch + PR"
