@@ -22,6 +22,37 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `docs/verify-a-constraint-before-obeying-it-v1` · 20260823-214823
+
+Twice in one session this repo's own tooling was treated as forbidden when it was not: a skill carrying
+`disable-model-invocation` was read as a permission gate, and a branch sat waiting on a merge while
+`worktree-lane.ps1` existed to build alongside it. Both are the same mistake -- a constraint assumed rather
+than read -- and the rule that dissolves the first one was already written, in `new-branch/SKILL.md`, which
+a session reads only by invoking that skill. The rule now sits in the shared block every specialist
+carries, generalised past skills to any inferred limit.
+
+**Score:** 4
+
+### What makes this deploy extra special
+
+Every consumer's specialists carry this block, and the flag it names is on 17 skills across the two
+workflows -- so the reading that declines usable tooling is available in every repo that installs them, not
+just here. The general form matters more than the example: a refusal arrives phrased as authority, while a
+capability nobody looked for announces nothing at all, and only one of those two failures is visible
+afterwards.
+
+**Score:** 4
+
+### Pull Request
+
+A refusal is not policy: verify a constraint against the repo before it becomes a decision
+
+Plugins: team-alpha, team-ecomm, team-lifehub, team-shopify
+
+[PR #843](https://github.com/DaveKJohn/claude-code-specialists/pull/843)
+
+---
+
 ## DEPLOY: `docs/exit-code-read-through-a-pipeline-v1` · 20260823-205818
 
 Trap 6 landed here yesterday and was mis-read twice inside the same session that wrote it -- both times
