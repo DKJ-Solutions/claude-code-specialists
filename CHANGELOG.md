@@ -22,6 +22,38 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `docs/powershell-trap-six-and-sed-escape-v1` · 20260823-203210
+
+Both traps were measured here, in this repo's own tooling, during the PR #840 chain run: a background
+probe of `Invoke-TestSuiteGate` that reported `GATE OK = ` and exit 0 against every suite in the repo
+while the call inside had failed to resolve, and a `sed` substitution meant to write two dash escapes
+into a `scripts/lib/` regex that instead wrote a wrong-but-ASCII literal past the very check (`[script-ascii]`)
+that same run built to catch this class in the source. Anyone here who probes a gate as a background
+command, or reaches for a non-PowerShell tool to repair a `.ps1` file, is exactly who repeats this.
+
+**Score:** 4
+
+### What makes this deploy extra special
+
+This reaches every consumer's system-administration specialist: the portable manual travels through
+the plugin cache, and the trap section is the one place that craft lives. Two of the seven traps are the
+difference between believing a gate ran and knowing it did not, which is worth more than the ordinary
+addition to a list. It stops short of a 4, though: a reader only meets either trap when they next write
+their own probe or reach for a non-PowerShell substitution on a `.ps1` file — nothing about how they work
+changes before that moment, and for most sessions that moment is not this week.
+
+**Score:** 3
+
+### Pull Request
+
+A sixth PowerShell trap, and a seventh one step out in the repair tooling: the sed escape that mangles the ASCII repair
+
+Plugins: team-alpha
+
+[PR #841](https://github.com/DaveKJohn/claude-code-specialists/pull/841)
+
+---
+
 ## DEPLOY: `feat/script-layer-ascii-gate-v1` · 20260823-184655
 
 The rule that the script layer is ASCII now has a gate. `[script-ascii]` — check 27 in
