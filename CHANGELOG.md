@@ -22,6 +22,38 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `feat/open-questions-become-issues-v1` · 20260823-233212
+
+A session that finds a bug, a stale doc or a decision that is not its own used to end by handing that
+list back, so the owner had to answer everything before they could close a finished session and clear its
+context. Every specialist now files those findings as issues in the repo being worked in and finishes the
+assignment instead, naming what it parked. The rule reaches all 30 carriers, the four personas included,
+which is the half that matters here: they are the ones who close a session out.
+
+**Score:** 4
+
+### What makes this deploy extra special
+
+This changes what every consumer's specialists do at the end of a turn, in the direction the owner asked
+for: fewer interruptions, nothing lost. It is deliberately gated on there being a repository and a
+reachable tracker -- in a chat session with no checkout there is nothing to file to, and the rule says to
+check that rather than assume it, and never to report an issue as filed where it could not be. It also
+carries a bar, because a specialist that opens an issue per stray thought is worse than one that mentions
+it in a sentence: search first, one subject each, say what was measured and what was inferred, and never
+file instead of asking when the question genuinely blocks.
+
+**Score:** 4
+
+### Pull Request
+
+Every specialist files the loose ends as issues instead of handing them back
+
+Plugins: team-alpha, team-ecomm, team-lifehub, team-shopify
+
+[PR #847](https://github.com/DaveKJohn/claude-code-specialists/pull/847)
+
+---
+
 ## DEPLOY: `docs/trim-branch-doc-steps-guidance-v1` · 20260823-220025
 
 Every branch document here was born carrying 40 lines of guidance the author had already read -- half the
