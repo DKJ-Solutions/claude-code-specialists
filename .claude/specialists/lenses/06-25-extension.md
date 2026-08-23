@@ -345,7 +345,7 @@ application to profile: what costs time is what runs before work is allowed to l
 
 | what runs | measured | when it runs |
 |---|---|---|
-| `check-plugin-integrity.ps1` (26 checks) | **9.2–10.6s**, n=3, idle machine ([below](#the-gate-records-saving-measured-on-the-case-it-was-built-for-august-16-2026)) | before every push, and inside the cut |
+| `check-plugin-integrity.ps1` (**27** checks; 26 when measured) | **9.2–10.6s**, n=3, idle machine ([below](#the-gate-records-saving-measured-on-the-case-it-was-built-for-august-16-2026)) | before every push, and inside the cut |
 | the test suites — 30 then, **43** now | **205–232s** then; **196–235s** at 40 suites, n=5 ([below](#the-gates-wall-clock-is-one-suite--re-measured-n5-august-16-2026)); **139.7–195.0s, median ~170s** at 43 post-split, n=11, idle machine ([below](#the-gate-records-saving-measured-on-the-case-it-was-built-for-august-16-2026)) | inside `cut-release`, inside `open-pr`, and again in CI |
 | CI `lint-en-tests` | **median 8m 01s**, range 5m 06s–10m 06s (p90 9m 39s) over **65** blocking runs (August 23, 2026); was **median 7m 23s** over 63 on August 11 | every PR; blocks the merge |
 | a full release, end to end | **28m 03s**, measured at `v4.4.0` (August 11, 2026) — all of it blocking | per release, ~1.6× per day at the August cadence |

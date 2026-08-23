@@ -27,7 +27,7 @@ joke at its own expense.
 |---|---|
 | always-on + on-invoke tokens, per skill, with a baseline delta | **this skill**, pass 1 |
 | wall-clock of the script behind a skill | **this skill**, pass 2 — read-only invocations only |
-| frontmatter, dead links, parameter coverage, printed install commands | `check-plugin-integrity.ps1` — 26 checks. Not duplicated here: two verdicts on one subject is worse than one. |
+| frontmatter, dead links, parameter coverage, printed install commands | `check-plugin-integrity.ps1` — 27 checks. Not duplicated here: two verdicts on one subject is worse than one. |
 | whether the skill actually WORKS — does it fire, does it beat no-skill | `claude plugin eval`. Designed for, not built. See [Pass 3](#pass-3--effectiveness-designed-not-built) below. |
 
 **It computes no token count of its own, deliberately.** Pass 1 parses `claude plugin details`, whose

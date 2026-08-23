@@ -157,6 +157,13 @@
          skill of eleven missing from the agent's skill listing. The subject is the BOM and NOT "must have
          frontmatter": this repo deliberately tolerates a skill page without a 'name:' line, so demanding
          the block would be this gate inventing a policy the repo declined.
+     27. the script layer is pure ASCII -- every .ps1 check 5 parses, held to the rule
+         .claude/rules/language-layers.md has stated since August 19, 2026 and nothing enforced. Windows
+         PowerShell 5.1 reads a BOM-less .ps1 as the system ANSI code page, so a literal non-ASCII
+         character decodes as two CP1252 characters, silently, and reaches whatever the script EMITS --
+         measured on a middot in entry-scaffold-lib.ps1 that came out wrong in every generated changelog
+         template. Check 14 sees that damage one layer downstream, in the generated markdown; this sees
+         the literal upstream. A BOM is deliberately NOT a finding: on a .ps1 it is the fix.
 
     Exit code: 0 = no errors. 1 = at least one error (usable as a gate in open-pr.ps1).
 .PARAMETER SkipCheck
@@ -165,7 +172,7 @@
     test holds them to that.
 
     WHY IT EXISTS, MEASURED. The four check-plugin-integrity-*.tests.ps1 suites run this script 110 times
-    over a fixture, each run a fresh process executing all 26 checks in order to assert one. As ONE suite
+    over a fixture, each run a fresh process executing all 27 checks in order to assert one. As ONE suite
     that was 194s, of which 98% was inside those child runs, and it was the test gate's whole wall clock
     -- three times the next slowest suite, so the gate cost what this one suite cost. Profiled over the
     fixture, three checks were half of every run: agent-def, parse and branch-template, none of which
@@ -767,27 +774,61 @@ foreach ($lf in $linkFiles) {
 # --- 5. PowerShell scripts must parse -----------------------------------------------------------------
 # Catches syntax errors before they land on main. The pure logic of a script can be tested
 # separately, but a parse error in the orchestration itself would only break at execution time --
-# this check pulls that forward, to the PR gate. Scanned: scripts/**/*.ps1 AND the scripts a plugin
-# carries -- <plugin>/skills/**/*.ps1 (e.g. specialists-init's bootstrap) and
-# <plugin>/scripts/**/*.ps1 (the shared SSOT home, issue #81). Made unique so a path that hits both
-# filters is not parsed twice.
+# this check pulls that forward, to the PR gate. Scanned: scripts/**/*.ps1 AND everything a plugin
+# carries -- <plugin>/skills/**/*.ps1 (e.g. specialists-init's bootstrap), <plugin>/scripts/**/*.ps1
+# (the shared SSOT home, issue #81) and, since August 23, 2026, <plugin>/hooks/**/*.ps1. Made unique so
+# a path that hits two filters is not parsed twice.
 #
 # The plugin-scripts half is anchored on the plugins root rather than matched as a path segment (#405).
 # 'plugins' is not a distinctive name: it is also the leaf of .claude/plugins/, so a segment match would
 # widen this check to anything a consumer's plugin layer happens to carry. The old segment name
 # ('claude-code-plugins') was unique enough to get away with it; this one is not.
-# THE GATHER IS INSIDE THE SKIP HERE, unlike agent-def's: $psScripts is read by nothing after this
-# block, so collecting it when the check is off would be work for an answer nobody reads.
-$psScripts = @()
-if (Test-CheckEnabled 'parse') {
+# THE SET IS GATHERED ONCE AND CACHED, and it stopped being check 5's private business on
+# August 23, 2026. Until then the gather sat inside the skip below, on the sound reasoning that
+# $psScripts was read by nothing afterwards. Check 27 now reads the same set for a different property
+# of the same files, so there are two callers -- and two checks over one set must not each decide for
+# themselves what the set IS, which is the second-definition drift this gate exists to catch elsewhere.
+#
+# CACHED RATHER THAN CALLED TWICE, because the second glob is a -Recurse over the whole repo root. Two
+# walks would double the most expensive part of the cheapest check, and the lazy field keeps the
+# original saving intact: with both checks off, the walk never happens at all.
+#
+# THE HOOKS WERE MISSING FROM IT, and that was measured on the same day rather than reasoned about: 158
+# .ps1 files are tracked here and this set held 151, the seven absentees being every plugin-carried
+# plugins/<kind>/<plugin>/hooks/*.ps1. So a parse error in a SessionStart hook -- the five that speak on
+# every session start in this repo among them -- was not seen by this gate at all, and a hook that does
+# not parse does not announce itself: the harness reports the failure and the session continues without
+# whatever the hook was there to say. They are named in .claude/rules/language-layers.md as part of the
+# script layer for exactly that reason, so check 27 below could not have been pointed at that layer while
+# they were out. Widening it fixes both checks at once, which is the argument for one set over two.
+$script:PsScriptFileCache = $null
+function Get-PsScriptFiles {
+    if ($null -ne $script:PsScriptFileCache) { return $script:PsScriptFileCache }
     $pluginsRoot = Join-Path $RepoRoot 'plugins'
-    $psScripts += (Get-ChildItem -Path (Join-Path $RepoRoot 'scripts') -Recurse -Filter '*.ps1' -File)
-    $psScripts += (Get-ChildItem -Path $RepoRoot -Recurse -Filter '*.ps1' -File |
+    $found = @()
+    # THE Test-Path IS NEW WITH THE SECOND CALLER, and it is not decoration. Under
+    # $ErrorActionPreference = 'Stop' a Get-ChildItem on a missing directory ENDS THE RUN, and while this
+    # gather sat inside check 5's skip that could only happen in a tree where 'parse' was enabled. Check
+    # 27 reads the same set unconditionally, so without this line a tree with no scripts/ directory would
+    # take the whole gate down instead of reporting a coverage of zero -- and a gate that dies is worse
+    # than one reporting zero, which is the argument check 8's guarded read already rests on.
+    $scriptsDir = Join-Path $RepoRoot 'scripts'
+    if (Test-Path -LiteralPath $scriptsDir -PathType Container) {
+        $found += (Get-ChildItem -Path $scriptsDir -Recurse -Filter '*.ps1' -File)
+    }
+    $found += (Get-ChildItem -Path $RepoRoot -Recurse -Filter '*.ps1' -File |
         Where-Object {
             $_.FullName -match '\\skills\\' -or
-            ($_.FullName.StartsWith($pluginsRoot + '\') -and $_.FullName -match '\\scripts\\')
+            ($_.FullName.StartsWith($pluginsRoot + '\') -and
+                ($_.FullName -match '\\scripts\\' -or $_.FullName -match '\\hooks\\'))
         })
-    $psScripts = @($psScripts | Sort-Object -Property FullName -Unique)
+    $script:PsScriptFileCache = @($found | Sort-Object -Property FullName -Unique)
+    return $script:PsScriptFileCache
+}
+
+$psScripts = @()
+if (Test-CheckEnabled 'parse') {
+    $psScripts = @(Get-PsScriptFiles)
     $psScripts | ForEach-Object {
         $parseErrors = $null
         [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$parseErrors) | Out-Null
@@ -2484,6 +2525,65 @@ foreach ($fmPath in $fmDocs) {
 }
 Write-Coverage -Category 'frontmatter-bom' -Checked $bomChecked `
     -Note "the first three bytes of every frontmatter-bearing shipped document (agent defs, manuals, personas, and the skill pages a plugin REGISTERS), held against a UTF-8 byte-order mark. Read as bytes because ReadAllText strips a BOM before any other check here can see it -- which is how adopt-config/SKILL.md shipped one in 4.1.0 and silently failed to register (#581). The subject is the BOM and not the presence of frontmatter: this repo deliberately tolerates a skill page without a 'name:' line. Measured at introduction: 69 documents across all four sets, 0 findings once that one BOM was stripped, 0 exemptions"
+
+# --- 27. the script layer is pure ASCII ------------------------------------------------------------------
+# THE RULE ALREADY EXISTED AND NOTHING ENFORCED IT. .claude/rules/language-layers.md has said "the script
+# layer is ASCII, and a character the script must EMIT is written as a code point" since August 19, 2026,
+# and every .ps1 in this tree closes its own docstring with "Pure ASCII (repo convention for .ps1)". A
+# convention held up by whoever remembers it is the shape this repo keeps paying for; this is the check.
+#
+# THE MEASURED DAMAGE, and it is not a style complaint. Windows PowerShell 5.1 reads a BOM-less .ps1 as
+# the SYSTEM ANSI CODE PAGE, so the two UTF-8 bytes of a middot (U+00B7) are decoded as two CP1252
+# characters -- and nothing errors, because a mis-decoded string is still a string. On August 19, 2026 a
+# middot typed literally into scripts/lib/entry-scaffold-lib.ps1 came out of EVERY generated changelog
+# template as two wrong characters, and it reached the author's entry before anyone saw it. The repair is
+# the code point ([char]0x00B7), not a BOM: the shared libs are held byte-identical to their plugin
+# mirrors by check 8, so an encoding change would have to land in both, while an escape keeps the file
+# out of the question entirely.
+#
+# WHY THIS AND NOT THE MOJIBAKE CHECK ABOVE. Check 14 hunts damage that has ALREADY happened, and its set
+# (Get-MojibakePaths) is markdown -- so it sees the mangled character one layer downstream, in the
+# generated document, after it has been copied into somebody's entry. This check sees the literal upstream,
+# in the source that will emit it, which is the only place a repair is cheap.
+#
+# THE SUBJECT IS THE CHARACTER, NOT THE ENCODING. A BOM is deliberately NOT a finding here: on a .ps1 it
+# is the one thing that makes 5.1 read the file correctly, so flagging it would push authors toward the
+# defect. ReadAllText strips it before the scan for that reason, and check 26 owns the documents where a
+# BOM does break something. Invalid UTF-8 is caught anyway -- it decodes to U+FFFD, which is non-ASCII.
+#
+# BORN GREEN, MEASURED BEFORE IT WAS WRITTEN: 158 tracked .ps1 files, all of them inside this set once
+# the plugin hooks were added to it, and exactly two carrying a non-ASCII character --
+# scripts/lib/pr-issues-lib.ps1 and its plugin mirror, two lines each, a deliberate en/em dash inside a
+# regex character class. Both were repaired on this branch (composed from [char] code points) rather than
+# exempted, and no exemption list exists. A check needing one on its first run is the shape this repo has
+# scar tissue from; check 26 was born green on the same reasoning.
+$asciiScripts = @(Get-PsScriptFiles)
+$nonAscii = [regex]'[^\x00-\x7F]'
+foreach ($sf in $asciiScripts) {
+    $srcText = [System.IO.File]::ReadAllText($sf.FullName, [System.Text.Encoding]::UTF8)
+    $first = $nonAscii.Match($srcText)
+    if (-not $first.Success) { continue }
+    $rel = $sf.FullName.Replace($RepoRoot, '.')
+    # The line number is counted only for a file that already failed, so the scan itself stays a single
+    # .NET regex pass over the text instead of a per-byte loop in PowerShell. That matters because this
+    # runs over every .ps1 in the tree on every PR, and once more per scenario inside this gate's own
+    # fixture suites -- which is where a hundred-odd extra passes over a few megabytes would show up.
+    $lineNo = ($srcText.Substring(0, $first.Index) -split "`n").Count
+    $total = $nonAscii.Matches($srcText).Count
+    $cp = '0x{0:X4}' -f [int][char]$first.Value
+    Add-Error ("[script-ascii] $rel`:$lineNo carries a non-ASCII character (U+$($cp.Substring(2)))" +
+        "$(if ($total -gt 1) { ", $total in the file" }). Windows PowerShell 5.1 reads a BOM-less .ps1 as the" +
+        " system ANSI code page, so this character decodes as two CP1252 characters -- silently, because a" +
+        " mis-decoded string is still a string. Write it as a code point instead ([char]$cp), which is what" +
+        " .claude/rules/language-layers.md requires of the script layer. Do NOT add a BOM: the shared libs" +
+        " are held byte-identical to their plugin mirrors, so the encoding would have to change in both.")
+}
+Write-Coverage -Category 'script-ascii' -Checked $asciiScripts.Count `
+    -Note $(if ($asciiScripts.Count -eq 0) {
+        'no .ps1 found under scripts/ or in any plugin -- a literal non-ASCII character anywhere in the script layer could not have been seen'
+    } else {
+        "every .ps1 check 5 parses, held to the ASCII rule .claude/rules/language-layers.md states for the script layer. A literal non-ASCII character in a BOM-less .ps1 is decoded by Windows PowerShell 5.1 as two CP1252 characters, silently, and reaches whatever the script EMITS -- measured on a middot in entry-scaffold-lib.ps1 that came out wrong in every generated changelog template (August 19, 2026). A BOM is deliberately not a finding: on a .ps1 it is the fix, not the defect, and check 26 owns the files where one breaks something. Born green: 2 findings at introduction across all 158 tracked .ps1 files, both repaired rather than exempted, 0 exemptions"
+    })
 
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {

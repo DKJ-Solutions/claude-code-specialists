@@ -94,6 +94,22 @@ Assert-Set @()  (Get-IssueMentions -Text 'see pull request #341 for the shape') 
 Assert-Set @()  (Get-IssueMentions -Text '[PR #343](https://github.com/o/r/pull/343)')  'a /pull/ link is not an issue mention'
 Assert-Set @(332) (Get-IssueMentions -Text 'PR #341 fixed #332')                        'a real mention alongside a PR reference still counts'
 
+# THE EN AND EM DASH RANGES, which nothing exercised until August 23, 2026. The dash class in
+# Get-IssueMentions has carried all three characters since it was written, and only the ASCII hyphen
+# was ever asserted -- so the two typographic dashes were live, unmeasured behaviour. That became
+# load-bearing the day the class stopped being a literal and started being composed from code points
+# ($dashes, for the repo's ASCII rule on .ps1): a composition that silently produced the wrong two
+# characters would still match every hyphen assert above and change nothing a suite could see.
+# A range written with a real en dash is not exotic -- it is what a word processor and most editors
+# produce from '#341-#343' on their own, so a changelog entry pasted from anywhere reaches this path.
+# Built from code points here too, for the same reason the lib is.
+$enDash = [char]0x2013
+$emDash = [char]0x2014
+Assert-Set @()    (Get-IssueMentions -Text "as PRs #341$enDash#343 showed")   'PRs #341<en dash>#343 RANGE form excluded'
+Assert-Set @()    (Get-IssueMentions -Text "as PRs #341$emDash#343 showed")   'PRs #341<em dash>#343 RANGE form excluded'
+Assert-Set @()    (Get-IssueMentions -Text "PR #341$enDash#343 covered it")   'singular PR + en-dash RANGE -> excluded (unambiguous)'
+Assert-Set @(332) (Get-IssueMentions -Text "PRs #341$enDash#343 each left #332 open") 'the en-dash range scrub stops at the list, #332 still found'
+
 # --- Three false negatives found in review, each of which defeated the gate silently --------------
 # 1. A slash-separated list. The lookbehind used to exclude '#N' after '/', so only the first number
 #    in '#334/#329/#335' survived -- on a branch whose entry lists issues that way, the gate would

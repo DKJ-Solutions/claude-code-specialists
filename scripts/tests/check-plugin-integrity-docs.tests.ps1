@@ -500,6 +500,76 @@ try {
         'frontmatter-bom: a progressive-disclosure references/SKILL.md is out of scope -- nothing registers it'
     [System.IO.File]::WriteAllBytes($bomDecoy, $bomDecoyGood)
 
+    # --- check 27: the script layer is pure ASCII -----------------------------------------------------
+    # 71-77. The rule is older than the check: .claude/rules/language-layers.md has required a code point
+    #        for any non-ASCII character in a .ps1 since August 19, 2026, after a middot typed literally
+    #        into entry-scaffold-lib.ps1 came out of every generated changelog template as two wrong
+    #        characters. Windows PowerShell 5.1 reads a BOM-less .ps1 as the system ANSI code page, so the
+    #        damage is a WRONG ANSWER rather than a failure -- a mis-decoded string is still a string.
+    #        The scenarios below pin three things separately: that it fires, that the escaped form does
+    #        NOT, and that a BOM does not either.
+    Write-Host '  check 27: the script layer is pure ASCII' -ForegroundColor DarkCyan
+    $asciiProbe = Join-Path $Fixture 'scripts\task\ascii-probe.ps1'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $asciiProbe) -Force | Out-Null
+    $asciiCleanBody = "# A probe script. Pure ASCII (repo convention for .ps1).`nWrite-Host 'probe'`n"
+
+    # 71. The measured defect in the exact shape it shipped: the middot, typed as itself.
+    [System.IO.File]::WriteAllText($asciiProbe, ($asciiCleanBody + '$sep = ' + "'" + [char]0x00B7 + "'`n"), $Utf8NoBom)
+    $sa1 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($sa1.Out -match '\[script-ascii\].*ascii-probe\.ps1:3') `
+        'script-ascii: a literal non-ASCII character is reported, with the file and the line'
+    Assert-True ($sa1.Out -match 'U\+00B7') `
+        'script-ascii: and the finding names the code point, which is the one thing an editor will not show'
+    Assert-True ($sa1.Out -match '\[char\]0x00B7') `
+        'script-ascii: and it hands over the remedy in the form the rule asks for'
+    Assert-True ($sa1.Code -ne 0) `
+        'script-ascii: and it fails the gate -- the character reaches whatever the script emits'
+
+    # 72. THE ESCAPED FORM IS THE POINT OF THE CHECK, so it must be silent. Without this assert the check
+    #     could be satisfied by deleting the character rather than by writing it correctly, and the
+    #     finding's own advice would be untested.
+    [System.IO.File]::WriteAllText($asciiProbe, ($asciiCleanBody + '$sep = [char]0x00B7' + "`n"), $Utf8NoBom)
+    $sa2 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($sa2.Out -match '\[script-ascii\].*ascii-probe')) `
+        'script-ascii: the code-point form is not a finding -- that is the repair the message asks for'
+    Assert-True ($sa2.Out -match '\[script-ascii\] checked [1-9]') `
+        'script-ascii: and the pass is not an empty scan'
+
+    # 73. A BOM IS DELIBERATELY NOT A FINDING, and this is the assert that keeps it that way. On a .ps1 a
+    #     BOM is what makes 5.1 read the file correctly, so accusing it would push an author toward the
+    #     very defect. Check 26 owns the documents where a BOM does break something, and that check reads
+    #     BYTES precisely because this one reads text.
+    $bomProbeBytes = @([byte]0xEF, [byte]0xBB, [byte]0xBF) + [System.IO.File]::ReadAllBytes($asciiProbe)
+    [System.IO.File]::WriteAllBytes($asciiProbe, $bomProbeBytes)
+    $sa3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($sa3.Out -match '\[script-ascii\].*ascii-probe')) `
+        'script-ascii: a BOM on a .ps1 is not a finding -- there it is the fix, not the defect'
+    Remove-Item -LiteralPath $asciiProbe -Force
+
+    # 74-75. THE PLUGIN HOOKS ARE IN THE SET, and they were not until August 23, 2026: this gate held 151
+    #        of the 158 tracked .ps1 files, the seven absentees being every plugins/<kind>/<plugin>/hooks
+    #        script. Both halves are asserted, because widening the set fixed TWO checks: the ASCII rule
+    #        names that layer explicitly, and a SessionStart hook that does not parse fails silently --
+    #        the harness reports it and the session simply continues without what the hook was there to
+    #        say. A parse error there was invisible to this gate for as long as the hooks were out.
+    $hookProbe = Join-Path $Fixture 'plugins\teams\team-alpha\hooks\probe-sessioncheck.ps1'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $hookProbe) -Force | Out-Null
+    [System.IO.File]::WriteAllText($hookProbe, ($asciiCleanBody + '$sep = ' + "'" + [char]0x00B7 + "'`n"), $Utf8NoBom)
+    $sa4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($sa4.Out -match '\[script-ascii\].*probe-sessioncheck\.ps1') `
+        'script-ascii: a plugin HOOK is in scope -- language-layers.md names that layer'
+
+    # 75. The same widening, proven on check 5: a hook that does not parse is now reported. -Full, because
+    #     the fixture skips 'parse' for speed and an absence-or-presence assert under a skip proves
+    #     nothing either way.
+    [System.IO.File]::WriteAllText($hookProbe, "function Broken( {`n", $Utf8NoBom)
+    $sa5 = Invoke-Integrity -FixtureRoot $Fixture -Full
+    Assert-True ($sa5.Out -match '\[parse\].*probe-sessioncheck\.ps1') `
+        'parse: a plugin hook that does not parse is reported -- the set widened for check 27 fixed this too'
+    Remove-Item -LiteralPath $hookProbe -Force
+    Assert-True ((Invoke-Integrity -FixtureRoot $Fixture).Out -notmatch '\[script-ascii\] \.') `
+        'script-ascii: the fixture is clean again once both probes are gone'
+
     # --- Scenario 55: A MARKETPLACE THAT DOES NOT PARSE STILL LEAVES A REPORTING GATE ----------------
     # 55. The lint reads the plugin set from marketplace.json now, and the whole point of doing that
     #     inside a swallowing try/catch is that the file it reads can be broken. Measured while this was

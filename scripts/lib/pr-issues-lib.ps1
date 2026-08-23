@@ -143,8 +143,19 @@ function Get-IssueMentions {
     # After a singular head it is not: in 'PR #341 and #332' nothing marks #332 as a PR, and
     # swallowing it made a real open issue invisible to the gate (found in review). A dash range or
     # 'to'/'through' IS unambiguous, so that continuation is scrubbed after either head.
-    $scrubbed = [regex]::Replace($scrubbed, '(?i)\b(pull\s*requests|PRs)\s*(#\s*\d+)(\s*(?:[-–—,]|and|to|through)\s*#\s*\d+)+', ' ')
-    $scrubbed = [regex]::Replace($scrubbed, '(?i)\b(pull\s*requests?|PRs?)\s*(#\s*\d+)(\s*(?:[-–—]|to|through)\s*#\s*\d+)+', ' ')
+    #
+    # THE DASH CLASS IS COMPOSED FROM CODE POINTS, so this source stays pure ASCII. That is the repo's
+    # rule for the script layer, not a style choice: Windows PowerShell 5.1 reads a BOM-less .ps1 as the
+    # system ANSI code page, so a literal U+2013 written here decodes as TWO CP1252 characters -- and it
+    # does so silently, because a mis-decoded string is still a string. Inside a character class that
+    # does not throw, it WIDENS the class, which is a wrong answer rather than a failure. These two
+    # patterns are therefore double-quoted so the composed variable interpolates; neither carries a '$'
+    # of its own, so nothing else does. check-plugin-integrity's [script-ascii] check holds every .ps1
+    # in the tree to this, and scripts/tests/pr-issues.tests.ps1 exercises both dashes so a silent
+    # regression in this composition cannot pass the gate.
+    $dashes = '-' + [char]0x2013 + [char]0x2014
+    $scrubbed = [regex]::Replace($scrubbed, "(?i)\b(pull\s*requests|PRs)\s*(#\s*\d+)(\s*(?:[$dashes,]|and|to|through)\s*#\s*\d+)+", ' ')
+    $scrubbed = [regex]::Replace($scrubbed, "(?i)\b(pull\s*requests?|PRs?)\s*(#\s*\d+)(\s*(?:[$dashes]|to|through)\s*#\s*\d+)+", ' ')
     $scrubbed = [regex]::Replace($scrubbed, '(?i)\bpull\s*requests?\s*#\s*\d+', ' ')
     $scrubbed = [regex]::Replace($scrubbed, '(?i)\bPRs?\s*#\s*\d+', ' ')
     $scrubbed = [regex]::Replace($scrubbed, '(?i)/pull/\d+', ' ')

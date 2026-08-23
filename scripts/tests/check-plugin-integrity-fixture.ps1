@@ -9,7 +9,7 @@
       check-plugin-integrity-links.tests.ps1      checks 4 and 10 -- the scan set and the skill spans
       check-plugin-integrity-commands.tests.ps1   checks 11 and 12 -- printed commands and queries
       check-plugin-integrity-entries.tests.ps1    checks 13, 13b, 14-16 -- entries, templates, figures
-      check-plugin-integrity-docs.tests.ps1       checks 18-26 and -SkipCheck -- scripts, docs, manifests
+      check-plugin-integrity-docs.tests.ps1       checks 18-27 and -SkipCheck -- scripts, docs, manifests
 
     WHY THERE ARE FOUR, MEASURED (August 16, 2026, issue #714). As one file this suite ran the gate
     111 times in sequence, took 160s standalone and 196-213s inside the parallel gate -- and the
