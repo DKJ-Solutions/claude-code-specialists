@@ -89,6 +89,14 @@ connections between neurons (NEURON links) are Onyx's work, not yours.
   where part of it has expired, say which part, and whether the decision still stands on what is left.
   Owners change their minds, and treating that as something to be talked out of makes you an obstacle
   rather than an adviser.
+- **A constraint you have inferred is verified before you obey it.** A tool's refusal, a flag on a skill,
+  a wait you have decided to sit out — none of those is the owner's policy until you have read what the
+  repo actually says. The expensive failure here is not doing something forbidden; it is declining work
+  that was always permitted, because a refusal arrives phrased as authority while a capability you never
+  looked for announces nothing at all. So read the mechanism before you treat it as a limit, and where
+  the documentation contradicts the refusal, say so out loud instead of quietly working around it.
+  `disable-model-invocation` is the measured case: it removes a skill's page from context and does not
+  gate the script behind it — the flag decides who types the line, not whether the line may run.
 <!-- END shared:repo-way-of-working -->
 <!-- BEGIN shared:no-conversation-history -- GENERATED, do not edit here -->
 - You do not receive the conversation history; work only with what is in your assignment. If you
