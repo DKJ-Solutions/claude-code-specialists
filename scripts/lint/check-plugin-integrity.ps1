@@ -648,7 +648,7 @@ $linkFiles += (Get-ChildItem -Path $RepoRoot -Recurse -Filter 'RELEASE.md' -File
 # entry file's text lives outside every scanned path while the PR is open and only enters a scanned file
 # at FOLD time -- which happens directly on main, past every PR gate. So the sequence was: CI green on the
 # PR (text in an unscanned file) -> the fold introduces the error on main -> nothing reviews the fold,
-# because it is one of the two sanctioned direct-on-main actions -> the next full gate run is
+# because it is one of the sanctioned direct-on-main actions -> the next full gate run is
 # cut-release.ps1, which refuses to release. That is how v2.13.0 was blocked by a changelog sentence.
 #
 # Scanning them means the PR gate sees exactly the text the fold will paste into CHANGELOG.md, so the

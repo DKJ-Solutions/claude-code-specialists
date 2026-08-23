@@ -54,20 +54,20 @@ tooling — but it has to be *before*, because a baseline cannot be captured aft
 duration in the release document's organisational section, beside whatever else that release cost.
 
 **THE DOCUMENT CANNOT TIME ITS OWN PUBLICATION, so the instruction is split in two** (measured August 11,
-2026, on the first release that followed this step). The release note is frozen for its own pull request at
-step 4, and the Release is published at step 5 — so at the moment you write the timing section, three legs
-are still running *on the file you are writing*: its CI gate, its merge, and the publish. Asking for the
-total there asks for a number that does not exist yet, and the failure mode is obvious the moment it is
-named: whoever writes it fills the gap with an estimate, in a section whose whole purpose is that the figure
-was measured.
+2026, on the first release that followed this step). The release note is frozen for its own commit at
+step 4, and the Release is published at step 5 — so at the moment you write the timing section, legs are
+still running *on the file you are writing*: its push, whatever CI that push starts, and the publish.
+Asking for the total there asks for a number that does not exist yet, and the failure mode is obvious the
+moment it is named: whoever writes it fills the gap with an estimate, in a section whose whole purpose is
+that the figure was measured.
 
 So write it in two passes, and expect the second one:
 
 - **at step 4, in the document**: the clock start, the legs you have already measured from timestamps, the
   subtotal to freeze, and which of them blocked a person. This is the half that cannot be recovered later;
-- **after step 5, in the document again** — the total, added in its own small pull request once the number
-  exists, plus the three legs the first pass could not see. It is a two-line edit on a merged file and the
-  ordinary branch + PR route carries it.
+- **after step 5, in the document again** — the total, added once the number exists, plus the legs the
+  first pass could not see. It is a two-line edit on the same file, and step 4's exception carries it:
+  the second pass is part of writing the release notes, not a change of its own.
 
 **Do not "solve" this by publishing the Release earlier**, which is the first thing that suggests itself. It
 would put the publish before the attachments exist, which is what step 5's ordering is for; the tail of a
@@ -77,7 +77,9 @@ what a release costs.
 
 **The measured instance:** at `v4.4.0` the frozen subtotal was 9m 42s of a run that came to **28m 03s**, so
 the three unmeasurable legs were **two thirds of the release**. A document carrying only the first pass is
-not slightly incomplete; it is missing most of the answer.
+not slightly incomplete; it is missing most of the answer. **That figure was measured while the note still
+went via a PR**, so a review leg and a merge leg sat in it that step 4 no longer has — expect the tail to
+be shorter now, and re-measure rather than reasoning about how much shorter.
 
 **Why this is step zero and not a nice-to-have.** A release is the most-repeated expensive procedure a repo
 has, so it is the one whose duration is worth knowing — and it is measured in **minutes**, which nothing
@@ -229,7 +231,7 @@ a release for a missing timestamp would be ceremony rather than a guard.
    names this bump in `Get-ReleaseConsumerBumps`, `cut-release.ps1` has already drafted the note under
    `Get-ReleaseNoteRoot` — `<note root>/<dir>/<X.Y.Z>.md`, which is `releases/notes/` unless the repo
    repointed it (the source repo uses `releases/audience/`). There is nothing to invoke — the follow-up is
-   an **edit**, and it goes via a branch + PR like any other change (step 4).
+   an **edit**, and it is committed straight onto `main` under the release-notes exception (step 4).
 
    | section | who it is for | how it arrives |
    |---|---|---|
@@ -331,14 +333,35 @@ a release for a missing timestamp would be ceremony rather than a guard.
    illustration from a leak. **If you adopt this list, adopt the measurement with it**: run the seven over
    your own last few consumer documents before deciding which one your repo can afford to automate.
 
-4. **Ship the edited document via a branch + PR.** The cut drafted it and then committed and tagged in the
-   same motion, so what the tag holds is the draft; the written version lands afterwards and is not one of
-   the two named direct-on-`main` exceptions. Use the normal `new-branch` → `ship-pr` route.
+4. **Commit the edited document directly on `main`** (Dave, August 23, 2026). No branch, no PR: this is the
+   **third** direct-on-`main` exception, and it exists so that a cut runs in one place from end to end —
+   fold the changelog, bump the version, write the release notes.
 
-   **The tag holding a draft is not new and is worth stating plainly**: it held an unpublishable consumer
-   draft before this, so "the release commit is purely generated artefacts" was already only half true. What
-   changed is that the draft now also carries two empty headings — and what that bought is one artefact, one
-   editing pass, and an overview row the cut can point at the right document first time.
+   ```powershell
+   git add <note root>/<dir>/<X.Y.Z>.md
+   git commit -m "release: vX.Y.Z release notes"
+   git push origin main
+   ```
+
+   **Bounded, because an exception is only safe while it stays the size it was granted at.** It covers the
+   hand-written release documents **of a cut that was actually asked for**, and nothing else: the note under
+   `Get-ReleaseNoteRoot`, plus `releases/internal/<dir>/<X.Y.Z>.md` where a repo still runs the
+   two-document flow. Name those paths in the commit so nothing else in the tree rides along. Outside a cut
+   there is nothing for the exception to be part of, and a later edit to an already-published note is an
+   ordinary change on the ordinary route.
+
+   **This reverses the August 4, 2026 answer, and the argument that answer rested on is the reason the
+   bounds above are written out.** The route used to be `new-branch` → `ship-pr`, chosen over the wider
+   version — "the release *and* its written notes" — on the grounds that widening an exception is what had
+   to be repaired in `ship-pr.ps1` two days earlier. That reasoning still holds; what changed is the
+   judgement about which size is right. A release is **one** procedure, and running it across two routes
+   left the trunk carrying a tagged release whose own notes were still in review.
+
+   **Two things the change does not touch.** The tag still holds the *draft* — the cut commits and tags in
+   one motion, so the written version lands in the commit after the tag either way, and dropping the PR
+   moves where the editing happens rather than what `vX.Y.Z` points at. And the gates are not skipped by
+   being off a branch: run the repo's lint and test gates before this commit, exactly as `open-pr` would
+   have run them for you.
 
 5. **Publish the GitHub Release — still after step 4, and the reason has changed.** The body no longer
    comes from step 4, so publishing early would no longer publish a body that does not exist. What it
@@ -648,7 +671,7 @@ owes this text. Write it there, and the cut carries it outward for you.
 - **And inside Block 1 the GitHub Release is last, which was a correction and has now outlived its
   original reason** (August 4, 2026; revisited August 10, 2026). It used to be step 2, directly after the
   tag, because its body was a file `cut-release.ps1` had already generated. When the body became the
-  internal note — a document step 2 only *starts* and step 4 merges — publishing from step 2 would have
+  internal note — a document step 2 only *starts* and step 4 lands — publishing from step 2 would have
   published a body that did not exist yet, and a checklist meant to impose itself has to be walkable in
   order. The body is generated again now, so that particular impossibility is gone; the step stays last
   because the **attachments** are what step 4 produces. Worth keeping in this form rather than rewritten:

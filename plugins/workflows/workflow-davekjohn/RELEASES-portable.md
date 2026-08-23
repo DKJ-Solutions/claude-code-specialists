@@ -276,11 +276,23 @@ choosing one, and deleting a working entry point is a breaking change.
 
 ### Where the hand-written note lands
 
-**It goes through a branch + PR.** `cut-release.ps1` commits and tags in one motion, so by the time you edit
-the note draft, the release commit is already tagged. It is not one of the two named direct-on-`main`
-exceptions, so it travels the normal reviewed route. The alternative — widening the release exception to
-cover the written note as well — was offered and declined: an exception is only safe while it stays the size
-it was granted at.
+**It is committed straight onto `main`** (Dave, August 23, 2026). `cut-release.ps1` commits and tags in one
+motion, so by the time you edit the note draft, the release commit is already tagged — and the written
+version lands in the commit after it. This is the **third** named direct-on-`main` exception, and it exists
+so that a cut runs in one place from end to end: fold the changelog, bump the version, write the release
+notes.
+
+**Bounded, and that bound is the whole of it:** the hand-written documents of a cut that was actually asked
+for — the note under `Get-ReleaseNoteRoot`, plus `internal/<dir>/<X.Y.Z>.md` where a repo still runs the
+two-document flow — named in the commit so nothing else in the tree rides along. Outside a cut there is
+nothing for the exception to be part of, and a later edit to an already-published note takes the ordinary
+route. Being off a branch skips `open-pr`, not the gates: run the lint and the suites before this commit.
+
+**This reverses the earlier answer, in which the note travelled the normal reviewed route.** The wider
+version was offered and declined then, on the reasoning that an exception is only safe while it stays the
+size it was granted at — **which is why the paragraph above spells the paths out**. That argument holds; the
+judgement that changed is which size is right. A release is one procedure, and splitting it across two
+routes left the trunk carrying a tagged release whose own notes were still in review.
 
 ### Once it has landed it is a published record — and that protects only what was true
 
@@ -354,7 +366,7 @@ they all get the same version number (**lockstep, repo-wide**). `cut-release.ps1
 the full notes here in
 `development/`, and a reference to them in the repo's own `CHANGELOG.md`. A release is cut **only on the
 owner's explicit request** and deliberately does **not** go through a branch + PR: like the fold commit, the
-release commit is a permitted direct-on-`main` action (the second exception to "everything via branch + PR"
+release commit is a permitted direct-on-`main` action (the second of three exceptions to "everything via branch + PR"
 — see [the contribution cycle](CONTRIBUTING-portable.md#releases--a-different-cycle)).
 
 In one motion, on a clean `main`:
@@ -403,8 +415,8 @@ pointer line names a document nobody can download yet.
 
 **And it needs no separate approval** (Dave, August 5, 2026). Cutting the release is the act that is asked
 for; publishing its Release is the last step of that same procedure, so stopping to ask there is a rubber
-stamp. Once a cut has been requested, the whole run goes through in one motion — generate, ship the
-hand-written note, publish. **The boundaries that remain are the live stage (Block 2 of the checklist)
+stamp. Once a cut has been requested, the whole run goes through in one motion — generate, commit the
+hand-written note on `main`, publish. **The boundaries that remain are the live stage (Block 2 of the checklist)
 and, in a marketplace source, the business publication (Block 3)** — different acts with different
 audiences, and this approval covers Block 1. A repo wanting a different boundary states that in its own
 lens rather than softening this paragraph.

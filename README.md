@@ -1216,7 +1216,7 @@ and the release cut are the `workflow-davekjohn` layer on top**, and they are de
 [`CONTRIBUTING-portable.md`](plugins/workflows/workflow-davekjohn/CONTRIBUTING-portable.md), the half
 that travels with the plugin. Where the two disagree, the plugin's page wins.
 
-The governance is in [`CLAUDE.md`](CLAUDE.md): the safety rules, the two direct-on-`main` exceptions
+The governance is in [`CLAUDE.md`](CLAUDE.md): the safety rules, the three direct-on-`main` exceptions
 and their bounds, and this repo's own gates. **The roster and the routing are not there** — they sit
 behind the one seam line at its foot, in
 [`.claude/specialists/SPECIALISTS.md`](.claude/specialists/SPECIALISTS.md) and the lenses beside it,
