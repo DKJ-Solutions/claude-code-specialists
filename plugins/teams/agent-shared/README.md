@@ -18,10 +18,10 @@ this directory. Two consequences, only the first of them a behaviour change:
 ## Why the text is copied at all
 
 A number of bullets under **Boundaries** are word-for-word identical across many agent defs — the inbound
-rule and the automation-first rule across **all 26**, the repo's-way-of-working rule across all 26 plus
-the four personas. Such governance belongs *in* the agent-def body, because that body is always loaded,
-including for a worker subagent somebody invoked directly. But Claude Code has no transclusion in an agent
-def: what is written there is there, literally.
+rule and the automation-first rule across **all 26**, the repo's-way-of-working rule and the
+findings-become-issues rule across all 26 plus the four personas. Such governance belongs *in* the
+agent-def body, because that body is always loaded, including for a worker subagent somebody invoked
+directly. But Claude Code has no transclusion in an agent def: what is written there is there, literally.
 
 So the text really is duplicated on disk, and the duplication is made safe by being **generated**. One
 source file, one build, and a gate that fails the moment a copy stops matching.
@@ -73,7 +73,7 @@ copy editor's context.
 
 | block | roughly who carries it |
 |---|---|
-| `repo-way-of-working` · `inbound-behaviour` · `laziness-automation` | everyone — these are the family's constitution |
+| `repo-way-of-working` · `findings-become-issues` · `inbound-behaviour` · `laziness-automation` | everyone — these are the family's constitution |
 | `language-behavior` | everyone who writes anything |
 | `filecontent-boundary` · `lens-optional` | every agent def, all 26; no persona — see below |
 | `no-conversation-history` · `no-commit-push-pr` | the specialists who deliver material rather than land it |

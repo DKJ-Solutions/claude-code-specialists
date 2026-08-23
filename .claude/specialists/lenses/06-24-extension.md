@@ -37,7 +37,9 @@ The verbatim-shared blocks run on **build-and-lint** (built July 2026):
 
 Current shared blocks, sourced one file each under `agent-shared/`, fall into four tiers by how far
 each one reaches: **universal** — `inbound-behaviour` and `laziness-automation` (every agent def
-carries both); **near-universal** — `language-behavior` (every agent def except 03-07/Rebecca, who
+carries both), plus `repo-way-of-working` and `findings-become-issues`, which are the only two that
+reach the four personas as well, so 30 carriers rather than 26; **near-universal** —
+`language-behavior` (every agent def except 03-07/Rebecca, who
 keeps a local variant with a source-quoting nuance, deliberately not shared); a **middle tier** —
 `no-conversation-history` and `no-commit-push-pr`, each reaching a meaningful share of agent defs,
 comfortably wider than the narrow tier below but well short of near-universal; and a **narrowly
