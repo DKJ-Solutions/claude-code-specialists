@@ -1572,11 +1572,18 @@ Assert-True ($audienceScaffold -notmatch '(?m)^#{3,4} Tier \d+$') 'and no headin
 foreach ($gone in @(Get-EntryTierHigherRetiredHeadings)) {
     Assert-True ($audienceScaffold -notmatch [regex]::Escape($gone)) "nor the retired wording '$gone' it replaced"
 }
+# NEITHER TIER NAMES ITSELF SINCE AUGUST 19, 2026, AND TIER 0 HAS NO HEADING AT ALL SINCE AUGUST 23.
 Assert-Equal 0 ([regex]::Matches($audienceScaffold, 'continue to Tier').Count) 'no routing comment survives: the headings are the questions'
 # THE GUIDANCE NAMES THIS REPO'S OWN READER, resolved rather than stored. A stored sentence would be wrong in
 # every tier-1 repo -- which is the repo the knob exists for -- so the tier and its description are spliced in
 # per repo. Asserted against the seam, not a literal, so the two cannot drift.
-Assert-True ($audienceScaffold -match [regex]::Escape("For tier 2 audiences: $(Get-EntryAudienceDescription -Tier 2)")) 'the audience guidance names this repo tier and who that tier is'
+#
+# READ FROM THE CYCLE DOCUMENT SINCE AUGUST 23, 2026, NOT FROM THE ENTRY SECTIONS (Dave). The sentence used to
+# sit in the TierOptional comment under the second tier's heading; that block is empty now, because nothing
+# inside the DEPLOY section may be a comment. The sentence itself was the one line naming WHO the audience
+# tier is -- in a tier-1 consumer the only such line anywhere -- so it was hoisted into the visible block and
+# the seam is read there instead. This assert follows it rather than being dropped with the block.
+Assert-True (((Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260823-000000') -join "`n") -match [regex]::Escape("For tier 2 audiences: $(Get-EntryAudienceDescription -Tier 2)")) 'the audience guidance names this repo tier and who that tier is'
 Assert-True ($audienceScaffold -notmatch '\{0\}') 'and the placeholder is resolved, not shipped'
 # IT STILL RESOLVES TO A NUMBER, which is the half that would fail silently. A heading the parser cannot
 # place reads as "no tier above 0" -- a claim about the change, made by a heading nobody read.
@@ -1686,9 +1693,12 @@ Assert-Equal '' $typoFindings[0].Suggested 'but no repair is suggested for it --
 Assert-Equal 0 (@(Get-EntryLinkFindings -EntryText '[ok](CHANGELOG.md) and [ok2](README.md)' -RepoRoot $repoRootForLinks)).Count 'an entry whose links are all root-relative passes'
 
 # THE GUIDANCE SAYS SO BEFORE THE GATE REFUSES, which is the half that reaches the author while they are
-# still writing. It sits in the 'Tier' block because that is the one rendered above the section the body
-# goes in -- 'What' is not rendered by the two-section entry at all, so a line there would be invisible.
-Assert-True ([string]((Get-EntryGuidance).Tier -join ' ') -match 'FROM THE REPO ROOT') 'the first section''s guidance states the root-relative convention'
+# still writing. IT MOVED TO 'StepsGuidance' ON AUGUST 23, 2026 (Dave): no comment may stand inside the
+# DEPLOY section, because that section is what travels into CHANGELOG.md, so the 'Tier' block is empty and
+# the rules with a SILENT failure mode were hoisted into the visible block above the phases. Asserted
+# against that block by name rather than against 'some guidance somewhere', so a future move has to come
+# back through this line.
+Assert-True ([string]((Get-BranchFileWording).StepsGuidance -join ' ') -match 'FROM THE REPO ROOT') 'the visible block states the root-relative convention'
 # AND IT REACHES THE FILE A BRANCH ACTUALLY GETS, which is where it did NOT reach until August 23, 2026:
 # the guidance rendered into branch/templates/ and the working file was bare. That is what inbound #810
 # measured, and this is the assert that keeps it repaired.
