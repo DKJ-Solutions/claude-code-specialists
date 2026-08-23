@@ -331,6 +331,29 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   on two machines** (push/pull races), and **a fresh `git pull` before every new branch and before
   every fold**. The fold collision point itself is [Rendall #06](05-06-extension.md#lifecycle)'s
   part of this lesson.
+- **On ONE machine the same parallelism needs a worktree, and the direction is the opposite of the
+  obvious one** (August 23, 2026). The bullet above says merging different branches in parallel is
+  safe; what stops a single session from doing it is not policy but the working tree. `ship-pr.ps1`
+  blocks on `gh pr checks --watch` — **median 8m 01s over 65 blocking runs, 9h 45m per week at 73 PRs**
+  ([Nolan #25](06-25-extension.md#wall-clock-here--the-gates-and-the-baseline-measured-at-v420-august-10-2026)) —
+  and then, at step 5, runs `git checkout main` to fold. Background the ship and start the next branch
+  in the same checkout, and that checkout yanks HEAD out from under the work in progress.
+  **Shipping from a worktree instead fails harder**, and this was probed rather than reasoned about:
+  git refuses one branch in two worktrees (`fatal: 'main' is already used by worktree at ...`), and
+  that refusal lands *after* the merge — landing you in the exact half-state `ship-pr.ps1` warns about
+  at that line, where the PR is merged, the entry is unfolded, and every gate stays green until a
+  release trips over it. So the rule runs the other way around: **the worktree is where you build, the
+  primary checkout is where you ship.** One shipping lane, N building lanes.
+  `worktree-lane.ps1` (`-Name` to open, `-HandBack` to release the branch again) does both ends and
+  never touches the primary's HEAD when opening; the portable half, the measurement, and the declined
+  one-line alternative to `ship-pr.ps1` are in the
+  [`worktree-lane` skill](../../../plugins/workflows/workflow-davekjohn/skills/worktree-lane/SKILL.md).
+  Two things learned building it that are easy to rediscover the expensive way: pointing
+  `CLAUDE_PROJECT_DIR` at another tree **breaks the source-repo guard**, correctly — that variable says
+  which repo the session is on, and the tree one call writes to is `-RepoRoot`'s job (the #101
+  precedent, now on `new-branch.ps1` too) — and **`git worktree remove` is not atomic**: on a
+  Permission-denied it had already emptied the tree and deregistered the worktree, so a non-zero exit
+  there is not evidence that nothing happened.
 - **`main` moves under a long branch, and the green gate you ran proves nothing about the merged
   result.** The bullet above is about the *fold* and about two machines; this is the same collision
   arriving one step earlier, at the *branch*, and it bites hardest on the work that takes longest —

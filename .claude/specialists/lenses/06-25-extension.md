@@ -347,7 +347,7 @@ application to profile: what costs time is what runs before work is allowed to l
 |---|---|---|
 | `check-plugin-integrity.ps1` (26 checks) | **9.2–10.6s**, n=3, idle machine ([below](#the-gate-records-saving-measured-on-the-case-it-was-built-for-august-16-2026)) | before every push, and inside the cut |
 | the test suites — 30 then, **43** now | **205–232s** then; **196–235s** at 40 suites, n=5 ([below](#the-gates-wall-clock-is-one-suite--re-measured-n5-august-16-2026)); **139.7–195.0s, median ~170s** at 43 post-split, n=11, idle machine ([below](#the-gate-records-saving-measured-on-the-case-it-was-built-for-august-16-2026)) | inside `cut-release`, inside `open-pr`, and again in CI |
-| CI `lint-en-tests` | **median 7m 23s**, range 5m 17s–9m 27s over **63** blocking runs (August 11, 2026) | every PR; blocks the merge |
+| CI `lint-en-tests` | **median 8m 01s**, range 5m 06s–10m 06s (p90 9m 39s) over **65** blocking runs (August 23, 2026); was **median 7m 23s** over 63 on August 11 | every PR; blocks the merge |
 | a full release, end to end | **28m 03s**, measured at `v4.4.0` (August 11, 2026) — all of it blocking | per release, ~1.6× per day at the August cadence |
 
 **Apply the count-the-invocations rule before proposing anything here, because this repo trips it.** The
@@ -362,6 +362,34 @@ without reading that decision.
 **The blocking/non-blocking split matters more here than the totals.** The release commit's own CI runs
 *after* the push and blocks nobody; the PR's `lint-en-tests` blocks the merge and is the single largest
 thing a person waits on. A proposal that shortens the first is worth close to nothing.
+
+**And that single largest thing was priced per WEEK on August 23, 2026, which is a bigger number than the
+per-run figure suggests.** 73 PRs merged in seven days, so at the re-measured median the blocking leg alone
+is **9h 45m per week**. The 135 `push` runs in the same window (median 8m 05s, indistinguishable from the
+blocking leg) block nobody and are deliberately not in that total. Three CI runs happen per branch — the PR
+check, the merge push, the fold push — and exactly one of them is a cost under the rule above.
+
+**Two things that number does NOT show, and both belong beside it.** First, how much of those 9h 45m
+actually held a person up is **not in the repo**: it depends on whether the ship ran in the foreground, and
+no git or gh timestamp records that. Treat it as the ceiling of any saving, never as the saving. Second, the
+frequency lever was checked here rather than assumed available — median PR size over that window was **5
+changed files and 201 added lines**, with 26 of 73 touching three files or fewer. That is not
+over-splitting, so combining PRs would mean combining unrelated work into one branch, which the
+entry-per-branch model pays for in traceability. The lever exists; it is not free, and it is not this
+lens's to spend.
+
+**The repair that was chosen instead converts the cost rather than shrinking it** — `worktree-lane.ps1`,
+which lets a branch be built in its own worktree while another ships, moving that time from blocking to
+non-blocking without touching a gate. Note which rule that satisfies: it is not a faster gate and it proves
+exactly as much. The alternative on the table was a one-line change to `ship-pr.ps1`; it was measured as
+saving two commands per lane and **nothing in wall-clock**, and declined on that trade rather than
+overlooked. The mechanics are in
+[Derek's branch hygiene](05-05-extension.md#branch--repo-hygiene).
+
+**The median also drifted up between the two measurements** — 7m 23s (n=63, August 11) to 8m 01s (n=65,
+August 23), **+38s, +8.6% in twelve days** — and the table row now carries both. Nothing was proposed about
+it: one re-measurement is a data point, not a trend, and the honest next step is a third reading rather than
+a hunt for a cause. Worth knowing before quoting the row from memory.
 
 **The frequency lever was live in this repo, was counted, and was DECLINED** (Dave, August 11, 2026).
 Batching entries per cut would have been a real reduction needing no code at all; the counterweight is that

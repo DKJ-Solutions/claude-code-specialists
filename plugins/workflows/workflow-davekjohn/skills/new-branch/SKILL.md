@@ -307,6 +307,18 @@ Two optional parameters cover the "start now, continue later (maybe on another d
 - **`-Park`** -- after creating the branch + entry, commits the entry (the intent carrier) and
   pushes the branch to `origin` with `git push -u`. **This opens no PR.** Push is not a PR: parking
   makes the branch reachable from another device, while the PR rule stays intact and separate.
+- **`-RepoRoot "<path>"`** -- create the branch and its two files in a tree **other** than the one you
+  are standing in. You almost certainly do not type this: it exists for the `worktree-lane` skill, which
+  opens a branch inside a lane worktree. Same parameter, same name and same reasoning as
+  `fold-changelog-entry.ps1` has carried since
+  [#101](https://github.com/DaveKJohn/claude-code-specialists/issues/101). Omitted (the normal case):
+  unchanged behaviour -- `${CLAUDE_PROJECT_DIR}`, else the git root.
+
+  **Do not reach for `${CLAUDE_PROJECT_DIR}` instead.** That was tried first and the source-repo guard
+  refused it, correctly: the guard resolves *"which repo is being operated on"* from that same variable,
+  so pointing it at another tree makes this script look like a released copy run from outside the repo
+  it maintains. The env var answers which repo the session is working on; `-RepoRoot` answers which tree
+  one call writes to.
 
 ```powershell
 powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/task/new-branch.ps1" `
