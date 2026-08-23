@@ -22,6 +22,74 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `feat/development-cycle-v1` · 20260823-145052
+
+A branch carries one document again. `workflow-davekjohn/branch/` is gone, and everything a branch needs
+is `workflow-davekjohn/development-cycle.md`: `## PLAN` / `## CREATE` / `## TEST` carry the steps, and the
+fourth phase, `` ## DEPLOY: `<branch>` ``, **is** the changelog entry that folds into `CHANGELOG.md` at the
+merge.
+
+**The split was right about the problem and wrong about the shape.** One file used to do both jobs and
+shipped three of v3.2.0's twenty-one entries with a to-do heading still in them; two files fixed that and
+meant the plan a branch is working through and the claim it will make were never on one screen. What makes
+the merge safe is that the separation is now **structural** rather than a written instruction: the entry is
+a named section with the branch in its heading, so
+[`Split-DevelopmentCycle`](scripts/lib/entry-scaffold-lib.ps1) is the one place that finds the boundary —
+the fold takes that section, the step gate counts only above it, and the scaffold gate reads only inside
+it. Nothing does two jobs at once, so nothing has to be replaced before the PR.
+
+Three things came along because the merge forced them, and each is the kind of change that fails silently
+if it is got wrong:
+
+- **The reset test is the branch NAME, not the heading level.** Two files could open with an `#` while
+  empty and an `##` once written; one document cannot, because its `#` is its title in both states. So
+  `Test-BranchChangelogIsFilled` reads the name — the trunk's means nothing pending — which is also what
+  makes folding twice impossible.
+- **`Resolve-BranchFilePath` resolves on content, not existence.** Every rename before this one could use
+  `Test-Path`, because the new name did not exist until something wrote it. This one lands on the trunk in
+  its reset state, so every branch in flight *has* the new file, empty, beside the pair holding its real
+  work. Resolving on existence would have handed those branches an empty document and called their entry
+  missing — the stranded half-finished branch the dual-read exists to prevent.
+- **The tier sub-heading level depends on the shape being written.** In the named shape tier 0 has no
+  heading and the audience tier is the entry's first inner heading, at `###`. In the numbered shape the
+  tiers are sub-sections *of* the entry's opening question and must stay at `####`. Measured: a fixture
+  stating no audience tier went from four scaffold findings to five, the fifth being the opening question
+  its own tiers had just orphaned. So a repo that has stated no audience tier gets the document it had
+  yesterday, byte for byte.
+
+**And the guidance came back into the file, which is what let `branch/templates/` go.** Inbound
+[#810](https://github.com/DaveKJohn/claude-code-specialists/issues/810) measured what the bare working file
+cost — an author met the form in the neighbouring file or not at all — and the fold already stripped HTML
+comments, so nothing had to be built for it. The reference and the file you write in are the same page now,
+and the copy on the trunk is what the lint holds to the formatter.
+
+**Score:** 5
+
+### What makes this deploy extra special
+
+Anyone running this workflow works in one file instead of two, and the difference lands the first time
+they open a branch: the plan they are working through and the paragraph they have to write are on one
+screen. The reference copy beside it is gone and nothing is poorer for it — the guidance is in the document,
+which is where inbound #810 said it should have been.
+
+Two changes are visible without being asked for. A branch name now ends in `-v1`, completed by
+`new-branch` rather than demanded, so a second cycle on the same subject is a deliberately typed `-v2`
+instead of a name arguing about whether it is final. And a branch already open keeps working: the resolver
+reads whichever file names your branch, so a plugin update mid-branch strands nothing and there is no
+migration to run.
+
+**Score:** 4
+
+### Pull Request
+
+The branch folder becomes one development cycle
+
+Plugins: team-shopify, workflow-davekjohn
+
+[PR #836](https://github.com/DaveKJohn/claude-code-specialists/pull/836)
+
+---
+
 ## `docs/release-notes-on-main` deployment
 
 ### What does the change on this branch deploy to main?
