@@ -22,6 +22,37 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `docs/trim-branch-doc-steps-guidance-v1` · 20260823-220025
+
+Every branch document here was born carrying 40 lines of guidance the author had already read -- half the
+file -- restating rules that live in three other places. It is a blockquote of 17 visible lines now, the
+DEPLOY section carries no comment at all, and a fresh document is 35 lines instead of 87. The part that
+matters for this repo is the DEPLOY section being spotless: it is the text that travels verbatim into
+`CHANGELOG.md`, and every entry written from here on is read out of that file.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+A consumer meets this on their next plugin update, on every branch they open, and it changes what the
+document in front of them looks like -- so they notice without being told. Two things were deliberately
+kept rather than swept: the rules with a silent failure mode (text below the Score line is discarded; a
+relative link in the entry resolves from the repo root, which inbound #806 measured as a consumer merging
+two dead links with every gate green) and the per-repo sentence naming who their audience tier is, which in
+a tier-1 repo is the only line that names their reader anywhere.
+
+**Score:** 3
+
+### Pull Request
+
+The branch document stops restating the rules it already links
+
+Plugins: workflow-davekjohn
+
+[PR #844](https://github.com/DaveKJohn/claude-code-specialists/pull/844)
+
+---
+
 ## DEPLOY: `docs/verify-a-constraint-before-obeying-it-v1` · 20260823-214823
 
 Twice in one session this repo's own tooling was treated as forbidden when it was not: a skill carrying
