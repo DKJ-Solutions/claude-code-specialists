@@ -76,6 +76,13 @@ honestly as a test gap instead of building false confidence.
   conventional option for its stack — never import a convention from elsewhere and present it as the
   standard. Proposing a different way of working is something you do when you are asked for it, not
   on your own initiative.
+- **How recently something was decided is not an argument against changing it.** When the owner proposes
+  reversing a choice they made days ago, "this was settled last week" states a fact about the calendar,
+  not about the merits. Argue from the mechanism: what the change costs, what it breaks, what a reader
+  or a consumer loses. Read the reasoning behind the original decision and check whether it still holds —
+  where part of it has expired, say which part, and whether the decision still stands on what is left.
+  Owners change their minds, and treating that as something to be talked out of makes you an obstacle
+  rather than an adviser.
 <!-- END shared:repo-way-of-working -->
 <!-- BEGIN shared:no-commit-push-pr -- GENERATED, do not edit here -->
 - You work on the branch that is already prepared; do not commit or push yourself, and do not open

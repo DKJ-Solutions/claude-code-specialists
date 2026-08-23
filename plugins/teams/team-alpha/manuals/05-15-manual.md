@@ -103,11 +103,11 @@ and safe hook construction.
   INSTALL.md's "Staying up to date" section for the detail). Note: this applies to plugin
   content; changes to `CLAUDE.md` imports and settings still load only on a restart.
 
-## Four PowerShell traps that produce well-formed wrong output
+## Five PowerShell traps that produce well-formed wrong output
 
-Both were measured in this system, not read about, and both share the property that makes them
+All five were measured in this system, not read about, and they share the property that makes them
 expensive: **nothing errors.** The script runs, the output parses, the markdown renders — and it says
-something other than what the author meant. Neither is caught by a linter, so each is worth an assert.
+something other than what the author meant. None is caught by a linter, so each is worth an assert.
 
 - **`[ordered]@{ 2 = '...' }`'s indexer takes a positional index as well as a key.** For an integer the
   positional overload wins, so `$map[2]` returns the **third value**, not the value for key `2`. In a
@@ -142,8 +142,21 @@ something other than what the author meant. Neither is caught by a linter, so ea
   whenever the child's location can matter, which reproduces what `& powershell -File …` did before.
   Sibling of the trap above, from the same change: both are `Start-Process` quietly declining to inherit
   something the direct call-operator form gave for free.
+- **A failed `Set-Location` does not stop the block that follows it.** `Set-Location` on a path that does
+  not exist writes a non-terminating error and execution simply continues — in the directory you were
+  already standing in. Every later command in that block then runs, succeeds, and reports success, against
+  the wrong tree. Measured while probing a fold end to end: the probe built its fixture under a path
+  containing `$PID`, and because each call is a **new process** that variable had a different value than
+  the run that created the directory. The `Set-Location` failed, and `git add -A`, `git commit` and the
+  fold itself then ran against the real repository — deleting a tracked file and committing, with every
+  line of output reading exactly as it would have in the fixture. Nothing was lost, because the commits
+  were local and git had the content, but the recovery needed a `git reset` that is on the
+  never-without-permission list. **So a throwaway probe fails closed**: `Set-Location -ErrorAction Stop`
+  inside a `try`, or assert `(Get-Location).Path` against the fixture before the first command that
+  writes. The rule generalises past `cd` — a probe pointed at the wrong target is indistinguishable from
+  a probe that worked, so the thing that must be verified first is not the result but the aim.
 
-The general shape behind all four, worth carrying to the next one: when a mistake cannot announce itself,
+The general shape behind all five, worth carrying to the next one: when a mistake cannot announce itself,
 the assert is the announcement. Prefer a test over a comment for anything in this class.
 
 ## Sylvester is lazy
