@@ -22,6 +22,67 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `feat/script-layer-ascii-gate-v1` · 20260823-184655
+
+The rule that the script layer is ASCII now has a gate. `[script-ascii]` — check 27 in
+[`check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1) — holds every `.ps1` in the tree
+to it and reports the file, the line, the code point, and the `[char]0x..` form to write instead.
+[`.claude/rules/language-layers.md`](.claude/rules/language-layers.md) has required that since
+August 19, 2026, after a middot typed literally into `scripts/lib/entry-scaffold-lib.ps1` came out of
+every generated changelog template as two wrong characters. Nothing enforced it, and the reason it
+needed its own check rather than an extension of the mojibake one is where the two look: `[mojibake]`
+walks markdown, so it sees the mangled character **downstream**, in the generated document, after it has
+been copied into somebody's entry. This one sees the literal upstream, in the source that will emit it.
+
+A BOM is deliberately **not** a finding. On a `.ps1` a BOM is what makes Windows PowerShell 5.1 read the
+file correctly, so accusing it would push an author toward the very defect; check 26 owns the documents
+where a BOM does break something, and it reads bytes precisely because this check reads text.
+
+**Measuring the set found a second defect, in a check nobody was looking at.** The `.ps1` set check 5
+parses held **151** of this repo's 158 tracked scripts, and the seven absentees were every
+`plugins/<kind>/<plugin>/hooks/*.ps1` — so a parse error in a SessionStart hook, the five that speak at
+every session start here among them, was not seen by the PR gate at all. A hook that does not parse does
+not announce itself: the harness reports it and the session simply continues without whatever the hook
+was there to say. The set is one cached definition now, read by both checks and widened to those hooks,
+which repairs check 5 in the same edit — and the alternative, letting each check decide for itself what
+the set is, is the second-definition drift this gate exists to catch elsewhere.
+
+The check is **born green**, which cost one repair rather than an exemption list: the two literal en/em
+dashes in `scripts/lib/pr-issues-lib.ps1`'s regexes — the only non-ASCII characters in all 158 files —
+are composed from `[char]` code points now. `.claude/rules/language-layers.md` had named those two lines
+as deliberately unrepaired under the no-pre-emptive-fixes rule, and that is not being overruled: the rule
+says a risk that has not bitten is written down rather than built against, this one had bitten in the
+middot, and what it forbade was sweeping the lines along with an *unrelated* change. The change that
+enforces the rule they break is the related one. Repairing them also exposed a live test gap —
+[`pr-issues.tests.ps1`](scripts/tests/pr-issues.tests.ps1) asserted the ASCII hyphen range and neither
+typographic dash, so a composition producing the wrong two characters would have passed every existing
+assert. It asserts both now.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+Almost nothing, and the honest reason is where the gate lives. `check-plugin-integrity.ps1` is repo-owned
+— a consumer names their own through `Get-LintScript` — so this check does not travel, and a consumer's
+own script layer is not held to the ASCII rule by it. What does reach them is the shared mirror
+`pr-issues-lib.ps1`, whose dash class is composed rather than typed: identical behaviour, now covered by
+two dash asserts it did not have, so nothing to run and nothing to migrate. Worth one line rather than
+none because the *failure* is theirs too — a literal typographic character in any `.ps1` they write is
+decoded by Windows PowerShell 5.1 as two CP1252 characters, silently, and reaches whatever that script
+emits.
+
+**Score:** 1
+
+### Pull Request
+
+A lint check holds the script layer to ASCII
+
+Plugins: workflow-davekjohn
+
+[PR #840](https://github.com/DaveKJohn/claude-code-specialists/pull/840)
+
+---
+
 ## DEPLOY: `docs/probe-and-recency-lessons-v1` · 20260823-175516
 
 Two rules learned while making the development cycle branch-lifetime, written into the layer that travels.
