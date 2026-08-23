@@ -22,6 +22,49 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `feat/cycle-file-branch-lifetime-v1` · 20260823-165431
+
+The branch's own document now exists only while a branch is open. `new-branch` creates it, the fold
+**removes** it instead of rewriting it to an empty state, and between branches the trunk carries no copy at
+all — so `workflow-davekjohn/` holds its three pages and its two directories and nothing else. What the
+empty copy was really for, letting a reader see the whole form at once, moves to
+`plugins/workflows/workflow-davekjohn/DEVELOPMENT-CYCLE-portable.md`, which reaches a consumer with every
+plugin update rather than being scaffolded once and frozen.
+
+Three things follow. `adopt-workflow-folder` places one file fewer, so a consumer is no longer handed a
+document their own first fold deletes. `Format-DevelopmentCycleReset` is retired — an alias with no writer
+left — while the state it produced is still recognised, because a branch cut before today is carrying one.
+And `check-plugin-integrity`'s `[branch-template]` check is inverted: it held the trunk copy to the
+formatter byte-for-byte, and now asserts that no document declaring the trunk survives a fold anywhere in
+the tree, which also catches the leftover a consumer updating from an older plugin has until their next
+fold clears it.
+
+`Resolve-BranchFilePath` deliberately keeps its declared-branch test rather than reverting to the plain
+existence test that is now available again. Every branch cut before this change is carrying the trunk's old
+empty copy beside its real work, here and in every consumer, and existence alone would hand each of them
+the empty document. That simplification is available on the day those branches are gone, and not before.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+A consumer's fold changes behaviour without them choosing it, and their trunk loses a file that has been
+there since they adopted the folder. Nothing breaks and no migration is needed — the stale empty copy their
+last fold wrote is removed by their next one — but the folder they read to learn the convention looks
+different the first time they open it after the update, which is worth knowing before it surprises them.
+
+**Score:** 3
+
+### Pull Request
+
+The development cycle exists only while a branch is open
+
+Plugins: workflow-davekjohn
+
+[PR #838](https://github.com/DaveKJohn/claude-code-specialists/pull/838)
+
+---
+
 ## DEPLOY: `docs/development-cycle-answers-v1` · 20260823-150916
 
 `workflow-davekjohn/CONTRIBUTING.md` now states what this repo's answers make of the development cycle,
