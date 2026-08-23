@@ -54,6 +54,11 @@
     parking a branch for later / another device (#162). It deliberately does not touch the entry: an
     intent is a status, and the entry's text folds verbatim into CHANGELOG.md.
 
+.PARAMETER RepoRoot
+    (Optional) the tree to create the branch and its two files in, when that is NOT the tree you are
+    standing in. Used by worktree-lane.ps1 to open a branch inside a lane worktree. Omitted (the
+    normal case): unchanged behaviour -- CLAUDE_PROJECT_DIR, else the git root.
+
 .PARAMETER Park
     (Optional switch) after creating the branch + its files, commit BOTH branch files and push the
     branch to origin with `git push -u` -- NO PR. Both, because the step list is the half that says
@@ -72,6 +77,17 @@ param(
     [Parameter(Mandatory = $true)][string]$Name,
     [string]$Title = "",
     [string]$Intent = "",
+    # Explicit override of the repo root, for a caller that creates the branch in a tree OTHER than
+    # the one it is standing in -- worktree-lane.ps1 opening a lane is the case this exists for. Same
+    # parameter, same reasoning and same name as fold-changelog-entry.ps1 has carried since #101.
+    #
+    # Deliberately a parameter rather than the caller setting CLAUDE_PROJECT_DIR to the target tree:
+    # that was tried first and the source-repo guard refused it, correctly. The guard resolves the repo
+    # being operated on from CLAUDE_PROJECT_DIR, so pointing that at the lane made THIS file -- sitting
+    # in the primary checkout -- look like a released copy run from outside the repo it maintains. The
+    # env var answers "which repo is the session working on"; this parameter answers "which tree does
+    # this one call write to", and they are not the same question.
+    [string]$RepoRoot,
     [switch]$Park
 )
 
@@ -86,7 +102,13 @@ if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCo
 # supplies its repo root; in the workshop root (or outside a session) it falls back to the git
 # root. This way the SAME file works in both locations, and the root copy and the plugin mirror
 # stay byte-identical (guarded by the shared-scripts drift lint).
-$repoRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
+# -RepoRoot, when supplied, wins over both -- see the param comment above. Note: PowerShell variable
+# names are case-insensitive, so $RepoRoot (the param) and $repoRoot (used below) are the same
+# variable; the guard below only computes the dual-context fallback when it is still empty. Same shape
+# as fold-changelog-entry.ps1, deliberately, so the two read alike.
+if (-not $repoRoot) {
+    $repoRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
+}
 
 # Pre-flight (#86): this script relies ONLY on scripts\lib\branch-info.ps1 in the consumer's repo
 # root (no gh, and repo-config is optional below). If that is missing -- typically on a clean
