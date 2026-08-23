@@ -1010,10 +1010,9 @@ $script:EntryGuidanceDefaults = [ordered]@{
     # author writes here at creation, the second what the fold writes underneath at the merge -- one hint per
     # fact, in the order the two arrive. Written as complete comment lines for the reason the four above are:
     # this is Dave's own spacing, and the document he hand-merged on August 23, 2026 is the spec.
-    PullRequest = @(
-        '<!-- the PR title on the first line -- no feat:/fix:/docs: prefix, open-pr puts the branch type in front.',
-        '     link to the PR in github when branch is merged to main and the date this happened-->'
-    )
+    # EMPTY SINCE AUGUST 23, 2026 (Dave): no comment may stand inside the DEPLOY section, which is the
+    # part that travels into CHANGELOG.md. The PR-title rule moved into the visible block above.
+    PullRequest = @()
     What = @(
         'What the change DOES, for someone reading CHANGELOG.md months from now --',
         'not a report of what you did on the branch. Name what is different afterwards,',
@@ -1039,16 +1038,9 @@ $script:EntryGuidanceDefaults = [ordered]@{
     # two-section entry renders 'Tier' above the section the body is written in, and 'What' is no longer
     # rendered by that shape at all. Nor in 'TierOptional', which is the SECOND section's block -- one
     # sentence, above the field the links actually appear in.
-    Tier = @(
-        'Why the deploy matters AT THIS REACH specifically. A reason that would read the',
-        'same under every tier is a sign the tier is wrong. Write it ABOVE the Score line --',
-        'everything below that line is discarded. Then Score: 1-5 against the rubric',
-        'new-branch printed when it wrote this file.',
-        '',
-        'Relative links resolve FROM THE REPO ROOT, not from this directory: this text is',
-        'folded verbatim into CHANGELOG.md at the root. So write scripts/x.ps1, never',
-        '../../scripts/x.ps1 -- the second reads correctly here and is dead once it lands.'
-    )
+    # EMPTY SINCE AUGUST 23, 2026 (Dave), same reason as PullRequest above. The two rules with a SILENT
+    # failure mode -- the Score line and the root-relative link -- were hoisted into StepsGuidance.
+    Tier = @()
     # TIER 0 IS THE ONE TIER THAT IS ALWAYS REACHED -- every change matters to the people maintaining this
     # repo, if only a little -- so it is the only one with no N/A to offer. Tiers 1 and 2 get the extra
     # paragraph, which is why this is a second block rather than a longer version of the one above.
@@ -1078,14 +1070,9 @@ $script:EntryGuidanceDefaults = [ordered]@{
     # AND THAT IS REPAIRED AS OF AUGUST 23, 2026: guidance is unconditional, so this block renders into the
     # document a branch is actually handed. The report named the right layer and the wrong file; both are now
     # the same file.
-    TierOptional = @(
-        'Why the deploy matters AT THIS REACH specifically. {0}',
-        'That reader and nobody else -- what matters only inside this repo is said in the section above.',
-        '',
-        'If it has no significance at this reach at all, then explain shortly why and insert N/A in Score.',
-        'That reason goes above the Score line too, and one or two lines is the whole of it: N/A is a',
-        'complete answer and the common one.'
-    )
+    # EMPTY SINCE AUGUST 23, 2026 (Dave), same reason. Format-EntryAudienceGuidance returns @() on empty
+    # input, so the {0} audience seam simply has nothing to fill in and no caller changes.
+    TierOptional = @()
 }
 
 function Get-EntryGuidance {
@@ -1355,8 +1342,13 @@ function Format-EntrySignificanceSections {
             $g = Get-EntryGuidance
             $block = if ($tier -eq 0) { @($g.Tier) } else { @(Format-EntryAudienceGuidance -Lines @($g.TierOptional) -Tier $tier) }
             foreach ($line in (Format-EntryGuidanceComment -Lines $block)) { $lines.Add($line) }
-            if ($block.Count -gt 0) { $lines.Add('') }
         }
+        # THE BLANK BELONGS TO A HEADING THIS LOOP WROTE, SINCE AUGUST 23, 2026. It used to ride on the
+        # guidance block, which is empty now. Tier 0 has no marker of its own -- Format-EntryBlock wrote
+        # '## DEPLOY: `<branch>`' AND the blank under it -- so adding one here gave that section two, the
+        # shape the comment below calls "something was deleted here". Every tier above it writes its own
+        # heading and therefore owns the blank that follows it.
+        if ($marker) { $lines.Add('') }
         # An unanswered section in a WORKING file is the heading, one blank line, and the score label -- the
         # blank is where the reason goes. Not two blanks: the guidance used to occupy that space, and leaving
         # its surrounding whitespace behind is the shape that reads as "something was deleted here".
@@ -4070,25 +4062,47 @@ $script:BranchFileDefaults = [ordered]@{
     # source rather than two. The keys that used to hold them (TitleHeading, IdGuidance, ...) are gone
     # rather than left pointing at nothing, so a consumer overriding one gets a script-contract failure
     # instead of a silently ignored setting.
+    # VISIBLE MARKDOWN, NOT A COMMENT, SINCE AUGUST 23, 2026 (Dave): comments belong in the template, and
+    # the instantiated document should not restate them. So this block is a blockquote the reader actually
+    # sees, and the three guidance blocks inside the DEPLOY section are EMPTY rather than moved here.
+    #
+    # WHY EMPTY AND NOT VISIBLE DOWN THERE, which was the first design and would have broken the gate:
+    # Get-EntryScaffoldFindings strips comments and THEN measures emptiness, so guidance that is a comment
+    # cannot be mistaken for an answer. Visible boilerplate inside a tier section would read as an answer,
+    # and a tier nobody filled in would reach CHANGELOG.md blank with the gate reporting success -- this
+    # repo's worst failure mode for a guard. Removing the blocks keeps that measure honest; hoisting the
+    # rules that have a SILENT failure mode up here keeps them in front of the author.
+    #
+    # THE TWO THAT EARNED THE HOIST are the Score line (text below it is discarded without a word) and the
+    # root-relative link (inbound #806: a consumer merged two '../../scripts/...' links that landed at the
+    # root pointing outside the repo, with every gate green). The field PROMPTS did not come along -- a
+    # heading plus the rubric new-branch prints is enough, and the portable page carries the long form.
+    #
+    # IT SITS ABOVE THE DEPLOY SECTION, which is what makes it safe: the fold takes that section and
+    # nothing else, so none of this reaches CHANGELOG.md. Verified twice on August 23, 2026, when a filled
+    # PLAN/CREATE/TEST reached neither entry.
+    #
+    # THE POINTER NAMES THE PAGE AND NOT A PATH, deliberately. That page ships with the plugin and is NOT
+    # scaffolded into a consumer's tree, so a repo-relative link would resolve here and be dead in every
+    # consumer -- the 'right owner, wrong reach' failure inbound #731 already cost this workflow once.
     StepsGuidance  = @(
-        'The plan for this branch. Every step must be resolved before the PR: open-pr and',
-        'ship-pr both refuse while anything is still "- [ ]", and there is no -Force.',
-        '',
-        '  - [ ] not done yet',
-        '  - [x] done',
-        '  - [~] dropped -- why it turned out not to be needed',
-        '',
-        'The dropped mark exists so nobody is pushed into ticking a box for work they did',
-        'not do. It keeps its line and its reason, which is the half worth reading later.',
-        '',
-        'PLAN / CREATE / TEST / DEPLOY are the arc, not a quota: a phase with nothing',
-        'under it is a statement that this branch had nothing there. The headings are',
-        'invisible to the gate, which reads step marks only.',
-        '',
-        'DEPLOY takes no steps of its own. It is not a step but the result -- the',
-        'section at the foot of this file, which is the part that travels verbatim into',
-        'CHANGELOG.md at the merge. So a step written for after the merge is refused',
-        'here: what happens after the merge is what DEPLOY describes, not a box to tick.'
+        '> **How this file is read.** A step is `- [ ]` until it is resolved -- `- [x]` done, or',
+        '> `- [~]` dropped with the reason, which exists so nobody ticks a box for work they did not do.',
+        '> open-pr and ship-pr both refuse while one is still open, and there is no `-Force`.',
+        '>',
+        '> **DEPLOY takes no steps of its own.** It is the result, and the one part of this file that',
+        '> travels verbatim into `CHANGELOG.md` at the merge. In each tier, write the reason',
+        '> ABOVE the Score line -- anything below it is discarded.',
+        '>',
+        '> Relative links in that text resolve FROM THE REPO ROOT, not from this directory:',
+        '> write `scripts/x.ps1`, never `../../scripts/x.ps1`.',
+        '>',
+        '> {0} That reader and nobody else -- what matters only',
+        '> inside this repo belongs under the first `**Score:**`. If the change reaches that reader',
+        '> not at all, N/A is a complete answer and the common one.',
+        '>',
+        '> The phase arc, the marks and the whole form: `DEVELOPMENT-CYCLE-portable.md`, which ships',
+        '> with this workflow.'
     )
 
     # THE OPENING SENTENCE OF THE TRUNK WARNING, AND IT IS A SEAM BECAUSE IT WAS THE ONE FRAGMENT THAT WAS
@@ -4588,7 +4602,27 @@ function Format-DevelopmentCycle {
     # explains the whole document -- the marks, the arc, why DEPLOY takes no steps -- and the '### Steps'
     # heading it used to hang from was a wrapper around everything below it. This is the one guidance block
     # in the file that keeps a blank line above it, for that reason: it belongs to the file, not to a heading.
-    foreach ($line in @(Format-EntryGuidanceComment -Lines $w.StepsGuidance)) { $lines.Add($line) }
+    # EMITTED AS-IS, NOT WRAPPED IN A COMMENT (Dave, August 23, 2026). The block is visible markdown now --
+    # see StepsGuidance for why the DEPLOY-section blocks went empty instead of coming along -- so it must
+    # NOT go through Format-EntryGuidanceComment, whose whole job is to add the markers this block must not
+    # have. A consumer override is emitted the same way, so a repo that translated it keeps its own prose.
+    # THE AUDIENCE SENTENCE COMES ALONG, RESOLVED PER REPO (Dave, August 23, 2026). It used to live in the
+    # TierOptional comment under the second tier's heading; that block is empty now, and dropping the sentence
+    # with it would have cost the one line that names WHO this repo's audience tier is -- per repo, which is
+    # the whole point of the seam. In a tier-1 consumer it is the only place their reader is named at all.
+    #
+    # SO THE SEAM STAYS ALIVE and is read here instead: the '{0}' line in StepsGuidance goes through
+    # Format-EntryAudienceGuidance exactly as it did below, so a consumer's own Get-ReleaseAudienceDescription
+    # still answers it and nothing about that contract changed. A repo that asks about NO audience tier gets
+    # the line removed rather than a dangling '{0}' -- Get-EntryAudienceTier returns $null there, and a
+    # placeholder nobody can fill is worse than a sentence nobody needs.
+    $audienceTier = Get-EntryAudienceTier
+    $stepsBlock = if ($null -ne $audienceTier) {
+        @(Format-EntryAudienceGuidance -Lines @($w.StepsGuidance) -Tier $audienceTier)
+    } else {
+        @(@($w.StepsGuidance) | Where-Object { [string]$_ -notmatch '\{0\}' })
+    }
+    foreach ($line in @($stepsBlock | Where-Object { $null -ne $_ })) { $lines.Add([string]$line) }
     $lines.Add('')
 
     if ($Intent) {
