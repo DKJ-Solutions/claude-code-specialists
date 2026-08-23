@@ -254,13 +254,48 @@ if ($HandBack) {
         exit 1
     }
 
-    # Step 3: no --force. If git has a reason to refuse beyond the two checks above, its reason wins.
+    # Step 3a: step out of the lane first. On Windows the process's working directory holds an open
+    # handle on that directory, so removing the lane you are STANDING IN fails with
+    # "error: failed to delete '<lane>': Permission denied" -- and standing in the lane is the normal
+    # case, since finishing the work there is the whole point. Measured on the first run of this path.
+    #
+    # This is the one place this script mutates the caller's location, against the convention
+    # park-branch.ps1 states ("does not mutate the caller's cwd"). Deliberate on two grounds: the
+    # directory the caller is in is about to stop existing, and the primary is exactly where they need
+    # to be next. Doing it before the removal rather than after also means a failed removal leaves them
+    # somewhere that still exists.
+    $here = (Get-Location).ProviderPath.TrimEnd('\', '/')
+    if ($here -ieq $laneRoot -or $here.StartsWith($laneRoot + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
+        Write-Host "Stepping out of the lane into the primary checkout first." -ForegroundColor DarkGray
+        Set-Location -LiteralPath $primaryRoot
+    }
+
+    # Step 3b: no --force. If git has a reason to refuse beyond the checks above, its reason wins.
     Write-Host "Removing lane: $laneRoot" -ForegroundColor Cyan
     $rm = Invoke-NativeCapture -FilePath 'git' -Arguments @('worktree', 'remove', $laneRoot)
     $rm.Output | ForEach-Object { Write-Host $_ }
     if ($rm.ExitCode -ne 0) {
-        Write-Error "git worktree remove failed -- nothing was changed. Branch '$laneBranch' is untouched."
-        exit 1
+        # A NON-ZERO EXIT HERE DOES NOT MEAN NOTHING HAPPENED, and the first version of this script
+        # said it did. `git worktree remove` is not atomic: measured on the Permission-denied case
+        # above, it had already emptied the tree AND deregistered the worktree, and failed only on
+        # deleting the now-empty directory. Reporting "nothing was changed" there would send someone
+        # looking for a lane that is, for every purpose except one empty folder, already gone. So ask
+        # git what it actually thinks now rather than inferring from the exit code.
+        $after = Invoke-NativeCapture -FilePath 'git' -Arguments @('worktree', 'list', '--porcelain')
+        $stillRegistered = $false
+        if ($after.ExitCode -eq 0) {
+            $stillRegistered = [bool](
+                $after.Output |
+                    Where-Object { $_ -match '^worktree\s+(.+)$' } |
+                    Where-Object { (Resolve-LanePath (($_ -replace '^worktree\s+', '').Trim())) -ieq $laneRoot }
+            )
+        }
+        if ($stillRegistered) {
+            Write-Error "git worktree remove failed and the lane is still registered -- nothing was changed. Branch '$laneBranch' is untouched. If git reported 'Permission denied', another program still has that directory open (a second terminal, an editor, a file explorer)."
+            exit 1
+        }
+        Write-Host "git could not delete the directory itself, but the lane is already deregistered and empty -- continuing." -ForegroundColor Yellow
+        Write-Host "  Remove the leftover folder when whatever holds it open has let go: $laneRoot" -ForegroundColor Yellow
     }
 
     # Step 4. If this fails the lane is already gone, which is worth saying out loud: no work is lost
