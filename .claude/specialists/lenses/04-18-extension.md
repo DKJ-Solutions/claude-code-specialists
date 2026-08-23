@@ -62,7 +62,7 @@ logic in `release-lib.ps1` (version bump, CHANGELOG transformation, release-note
 `check-plugin-integrity.tests.ps1` is now four suites plus a shared, non-asserting
 [`check-plugin-integrity-fixture.ps1`](../../../scripts/tests/check-plugin-integrity-fixture.ps1):
 `-links` (checks 4 and 10), `-commands` (11 and 12), `-entries` (13, 13b, coverage, the staleness
-checks) and `-docs` (18-26 and `-SkipCheck`).
+checks) and `-docs` (18-27 and `-SkipCheck`).
 
 **Why, measured** ([#714](https://github.com/DaveKJohn/claude-code-specialists/issues/714)): the gate's
 whole wall clock **was** this one suite, to a tenth of a second, in four runs out of four. Every other

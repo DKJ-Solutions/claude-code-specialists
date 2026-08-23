@@ -64,10 +64,21 @@ discovery — as an earlier pass did for `.github/workflows/ci.yml` — not a qu
   question entirely. **The mojibake gate does not cover this** — `Get-MojibakePaths` walks `*.md`, so the
   damage is only caught one layer downstream, in the generated document, after it has been copied into
   somebody's entry.
-  Two known non-ASCII spots predate the rule and are **not** cleared by it: the en/em dashes inside the
-  regexes at `scripts/lib/pr-issues-lib.ps1:146-147`. They have the same latent fragility, nothing has
-  reported them, and the fix is the same escape — left alone under the no-pre-emptive-fixes rule rather than
-  swept along with an unrelated change.
+  **Since August 23, 2026 the rule has its own gate**: check 27 (`[script-ascii]`) in
+  [`check-plugin-integrity.ps1`](../../scripts/lint/check-plugin-integrity.ps1) holds every `.ps1` in the
+  tree to it, upstream of the generated document, and names the code point and the `[char]0x..` form in the
+  finding. A BOM is deliberately **not** a finding there: on a `.ps1` a BOM is the fix rather than the
+  defect, and check 26 owns the documents where one breaks something.
+  The two non-ASCII spots this section used to name as deliberately unrepaired — the en/em dashes inside the
+  regexes in `scripts/lib/pr-issues-lib.ps1` — were repaired in the same movement, because a gate born
+  needing an exemption list is the shape this repo has scar tissue from. That is **not** the no-pre-emptive-fixes rule
+  being overruled: it says a risk that has not bitten is written down rather than built against, and this
+  one had bitten, in the middot above. What it forbade was sweeping those two lines along with an
+  *unrelated* change, and the change that enforces the rule they break is the related one. The class is
+  closed at both ends: the dash class is now composed from `[char]` code points, and
+  [`pr-issues.tests.ps1`](../../scripts/tests/pr-issues.tests.ps1) exercises both dashes, which nothing had
+  done — until then only the ASCII hyphen was asserted, so a composition producing the wrong two characters
+  would have passed every existing assert.
 - **And the mirror-image rule for READING: a native command's output that is DATA is not decoded with the
   console code page.** Measured August 21, 2026 (inbound
   [#821](https://github.com/DaveKJohn/claude-code-specialists/issues/821)). The bullet above is about a
