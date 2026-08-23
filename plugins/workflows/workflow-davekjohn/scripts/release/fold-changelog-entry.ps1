@@ -13,11 +13,14 @@ branch/ split carries a <branch-name>.md in the repo ROOT. All of them exist rig
 consumer, and they receive these scripts through a plugin update rather than by choosing to. Recognise
 every one, write one.
 
-AND THEY ARE CLEARED DIFFERENTLY, which is the one real asymmetry. A root entry is named after its branch,
-so once folded it is deleted. development-cycle.md is a FIXED path the next branch will use, so it is
-REWRITTEN to its empty state -- one write, which resets the step list along with the entry because they are
-sections of the same document. What makes a second fold impossible is the branch NAME in that reset
-heading: it declares the trunk, and Test-BranchChangelogIsFilled reads that as nothing pending.
+AND THEY ARE ALL CLEARED THE SAME WAY: a folded entry's file is DELETED. That was briefly untrue. A root
+entry is named after its branch and has never survived its fold, while development-cycle.md is a FIXED path,
+and rewriting it to an empty state was how the trunk kept a document the next branch could expect to find.
+Since August 23, 2026 (Dave) the document is branch-lifetime -- new-branch creates it, this script removes
+it, and between branches the trunk carries none. Removing it clears the step list with the entry, because
+they are sections of one file. What makes a second fold impossible is simply that there is nothing left to
+fold; the branch-NAME test that used to do that job still runs upstream, in Resolve-BranchFilePath, for
+branches cut before the change that are still carrying a trunk-declaring copy.
 
 THERE ARE NO SECTIONS ANY MORE (Dave, August 5, 2026). CHANGELOG.md used to carry one
 '## Tier N - Pull Requests' section per tier, and the fold's first job was to pick one from a repo-owned
@@ -266,8 +269,9 @@ function Test-IsChangelogEntryFile {
 # carries branch-cycle.md / branch-deployment.md, and one created before August 19, 2026 carries
 # branch-progress.md / branch-changelog.md. The fold is the script that meets those branches at their very
 # last step. Resolve-BranchFilePath answers per kind and resolves on WHICH FILE DECLARES THIS BRANCH rather
-# than on existence -- which it has to, because the trunk's reset copy of the new file exists on every branch
-# that has merged main since. So a mixed tree folds and resets exactly the files it has, which is the same
+# than on existence -- which it has to, because a branch cut before August 23, 2026 that has merged main is
+# carrying the trunk's reset copy of the new file beside the pair holding its real work. So a mixed tree
+# folds and clears exactly the files it has, which is the same
 # "recognise both, write one" rule the paragraph above states for the root form.
 $branchDeploymentRel = Resolve-BranchFilePath -Kind Deployment -RepoRoot $repoRoot
 $branchCycleRel      = Resolve-BranchFilePath -Kind Cycle -RepoRoot $repoRoot
@@ -284,7 +288,7 @@ $branchDeploymentFilled = (Test-Path -LiteralPath $branchDeploymentPath) -and
 # no PR, and folded the entry with neither number nor merge date -- silently, since a missing PR is a
 # legitimate outcome the script already prints and moves past.
 #
-# READ BEFORE THE LOOP, WHICH IS ALSO BEFORE THE RESET at the end of the run: on main after the merge the
+# READ BEFORE THE LOOP, WHICH IS ALSO BEFORE THE REMOVAL in it: on main after the merge the
 # progress file still names the branch that was just merged, which is exactly the fact needed here.
 $branchFileOwner = ''
 if ($branchDeploymentFilled) {
@@ -329,7 +333,7 @@ $changelogPath = Join-Path $repoRoot "CHANGELOG.md"
 # noise and the most trust. Measured in a consumer on 2026-08-09, one day after they adopted the entry
 # convention:
 #
-#   Folded and reset: workflow-davekjohn/development-cycle.md (tier 1, significance 3 -- placed above 2 existing entries)
+#   Folded and removed: workflow-davekjohn/development-cycle.md (tier 1, significance 3 -- placed above 2 existing entries)
 #   CHANGELOG.md updated.
 #
 # Exit 0, no warning. Their "2 existing entries" were two SECTION headings ('## Pull Requests',
@@ -338,7 +342,7 @@ $changelogPath = Join-Path $repoRoot "CHANGELOG.md"
 # file afterwards, which is precisely what nobody does after a green fold.
 #
 # SO IT REFUSES, AND IT REFUSES HERE: in the pre-pass, before the first entry is written and before any
-# entry file is reset or deleted. A fold-all run writes one entry at a time, so finding this on the third
+# entry file is deleted. A fold-all run writes one entry at a time, so finding this on the third
 # file would leave the first two folded into the wrong place with their sources already gone.
 #
 # NO -Force, AND THAT IS DELIBERATE. Every other refusal in this workflow that overrules a judgement about
@@ -366,7 +370,7 @@ if ($preFlat) {
     Write-Host "Nothing was folded -- CHANGELOG.md is not the flat list this script writes into:" -ForegroundColor Red
     Write-Host "  $preFlat" -ForegroundColor Red
     Write-Host ""
-    Write-Host "  Your entry is untouched: $($entryFiles -join ', '). Either migrate CHANGELOG.md as described above and run this again, or paste the entry under your own section by hand and reset the file." -ForegroundColor Yellow
+    Write-Host "  Your entry is untouched: $($entryFiles -join ', '). Either migrate CHANGELOG.md as described above and run this again, or paste the entry under your own section by hand and delete the file." -ForegroundColor Yellow
     exit 1
 }
 
@@ -713,32 +717,25 @@ foreach ($file in $entryFiles) {
 
     Write-Utf8NoBom -Path $changelogPath -Content $changelogContent
 
-    # DISPOSAL DIFFERS BY WHERE THE ENTRY LIVED, and that is the one real asymmetry the fixed path
-    # introduces. A legacy ROOT entry is named after its branch, so once folded it has no reason to exist and
-    # is deleted, exactly as before. development-cycle.md is a FIXED path that every future branch will use,
-    # so deleting it would leave the trunk missing a file the next `git checkout -b` expects -- and would
-    # quietly turn the reset state into "somebody has to recreate this". It is rewritten to its empty state
-    # instead.
+    # DISPOSAL IS THE SAME FOR EVERY ENTRY AGAIN (Dave, August 23, 2026): a folded entry's file is deleted.
+    # It was briefly asymmetric. A legacy ROOT entry is named after its branch, so once folded it has no
+    # reason to exist -- while development-cycle.md is a FIXED path, and rewriting it to an empty state was
+    # how the trunk kept a file the next `git checkout -b` could expect to find. The document is
+    # branch-lifetime now: new-branch creates it, this line removes it, and the trunk carries no copy at all.
+    # So there is nothing for the next branch to inherit and nothing for a reader to mistake for work.
     #
-    # WHICH IS ALSO WHAT MAKES IT IMPOSSIBLE TO FOLD TWICE, and the reason for that changed with the merge.
-    # It used to be the heading LEVEL: a reset file opened with an H1 and only the entry levels were folded.
-    # One document cannot use that test -- its H1 is its title in both states -- so the guard is the branch
-    # NAME instead: the reset declares the trunk, and Test-BranchChangelogIsFilled reads it as unfilled.
-    # Written out here because a reader arriving at this line wants to know what stops a second fold, and the
-    # old answer is visible in the file while the new one is not.
-    $isBranchFile = ($file -eq $branchDeploymentRel)
-    if ($isBranchFile) {
-        Write-Utf8NoBom -Path $filePath -Content (((Format-DevelopmentCycleReset) -join $nl) + $nl)
-    } else {
-        Remove-Item -Path $filePath -Force
-    }
+    # WHAT STOPS A SECOND FOLD, since a reader arriving here wants to know. Until this change it was the
+    # branch NAME in the rewritten file -- the reset declared the trunk, and Test-BranchChangelogIsFilled
+    # read that as unfilled -- and before the merge it was the heading LEVEL. It is neither now: the file is
+    # gone, so a second run finds nothing to fold. The name test still earns its place upstream in
+    # Resolve-BranchFilePath, for branches cut before this change that are carrying a trunk-declaring copy.
+    Remove-Item -Path $filePath -Force
     $rankNote = if ($filed.RankScore -gt 0) { ", significance $($filed.RankScore)" } else { ', unranked' }
     # WHERE it landed, not just that it landed. With the sections gone there is no heading name to report,
     # and "folded" alone would say nothing about the one thing this script decides -- so the position in the
     # list is printed instead, which is also what makes a misplacement visible without opening the file.
     $aheadOf = @([regex]::Matches($changelogContent.Substring($insertPos + $entryBlock.Length), '(?m)^' + $entryHashes + ' ')).Count
-    $disposal = if ($isBranchFile) { 'reset' } else { 'removed' }
-    Write-Host "Folded and ${disposal}: $file (tier $($filed.Tier)$rankNote -- placed above $aheadOf existing $(if ($aheadOf -eq 1) { 'entry' } else { 'entries' }))" -ForegroundColor Green
+    Write-Host "Folded and removed: $file (tier $($filed.Tier)$rankNote -- placed above $aheadOf existing $(if ($aheadOf -eq 1) { 'entry' } else { 'entries' }))" -ForegroundColor Green
     # Captured per iteration rather than read back afterwards. $num in particular survives from one loop
     # pass to the next, so an entry whose PR lookup found nothing would otherwise inherit the previous
     # entry's number -- into a commit message, where a wrong PR reference is worse than none.
@@ -754,34 +751,33 @@ foreach ($file in $entryFiles) {
 
 Write-Host "CHANGELOG.md updated." -ForegroundColor Green
 
-# THE STEP LIST IS RESET WITH THE ENTRY, and since August 23, 2026 that happens in the SAME WRITE. The two
-# were separate files: the entry was reset in the loop above and the step list here, keyed on the entry
+# THE STEP LIST GOES WITH THE ENTRY, and since August 23, 2026 that needs no write at all. The two were
+# separate files: the entry was cleared in the loop above and the step list here, keyed on the entry
 # actually having been folded so that a fold-all run finding only legacy root entries left it alone. One
-# document means the reset above already replaced both halves -- Format-DevelopmentCycleReset writes the
-# whole file -- so there is nothing left to do for a merged branch.
+# document means the loop above already removed both halves -- they are sections of the same file.
 #
 # WHAT STAYS IS THE LEGACY CASE, and it is the reason this block did not simply disappear. A branch created
 # before the merge has its step list in branch-cycle.md, a DIFFERENT file from the entry that was just
 # folded, and leaving a merged branch's ticked-off steps on the trunk would greet the next branch with
-# somebody else's work. So this resets it only when it genuinely is a separate file -- and then to today's
-# document, at today's path, which is also how such a branch's tree finishes the migration.
-$resetPaths = @()
+# somebody else's work. It used to be rewritten to today's empty document; it is DELETED now, for the same
+# reason the entry is -- the trunk carries no branch document between branches, and a legacy path is the
+# last place that should be the exception.
+$removedPaths = @()
 if ((@($folded | ForEach-Object { $_.File }) -contains $branchDeploymentRel) -and
     ($branchCycleRel -ne $branchDeploymentRel)) {
     $progressPath = Join-Path $repoRoot $branchCycleRel
-    Write-Utf8NoBom -Path $progressPath -Content (((Format-DevelopmentCycleReset) -join $nl) + $nl)
-    $resetPaths += $branchCycleRel
-    Write-Host "Reset to its empty state: $($branchCycleRel)" -ForegroundColor Green
+    if (Test-Path -LiteralPath $progressPath) {
+        Remove-Item -Path $progressPath -Force
+        $removedPaths += $branchCycleRel
+        Write-Host "Removed: $($branchCycleRel)" -ForegroundColor Green
+    }
 }
 
-# SAID WHERE IT HAPPENS (inbound #817). This is the second of the two out-of-band write events per branch
-# cycle, and the one that costs a session its tracked view of BOTH files at once -- the entry was rewritten
-# to its reset state above, the step list just now. Printed only when a fold actually reset something, and
-# gated on the branch entry rather than on $resetPaths so a legacy root entry (removed, not reset) does not
-# get advice about a file it never had. Wording shared with new-branch.ps1, the other event.
-if (@($folded | ForEach-Object { $_.File }) -contains $branchDeploymentRel) {
-    Write-Host (Get-BranchFilesRereadNote) -ForegroundColor DarkGray
-}
+# THE RE-READ NOTE IS NOT PRINTED HERE ANY MORE (August 23, 2026), and dropping it is the point rather than
+# an oversight. Inbound #817 measured that this script's out-of-band WRITE cost a session its tracked view
+# of the branch document, so both writers said so where they printed the path. This script no longer writes
+# that document -- it removes it -- and "re-read this before your next write" is advice about a file that is
+# gone. new-branch.ps1 still prints it, which is the moment it is true: the file exists again there.
 
 # --- The fold commit ------------------------------------------------------------------------------
 # WHY THIS IS IN THE SCRIPT AT ALL. The fold has always ended with a hand-typed commit, and on
@@ -842,13 +838,13 @@ if ($Commit) {
     # worst possible moment for an avoidable error. Read from the index rather than from disk, because by
     # now the file is gone from disk and still in the index, which is exactly the state that needs
     # recording.
-    # THE PROGRESS FILE RIDES ALONG, because this run rewrote it. It is not an entry and was not folded,
-    # but leaving it out would produce a commit that resets half the pair -- the changelog file empty on
-    # main and the step list still showing the merged branch's ticked boxes. Named explicitly rather than
-    # swept up, so the enforced scope stays exactly as small as it was: CHANGELOG.md, the entries, and the
-    # one file the fold itself reset.
+    # THE LEGACY STEP LIST RIDES ALONG, because this run removed it. It is not an entry and was not folded,
+    # but leaving it out would produce a commit that clears half the pair -- the entry gone from main and the
+    # step list still showing the merged branch's ticked boxes. Named explicitly rather than swept up, so the
+    # enforced scope stays exactly as small as it was: CHANGELOG.md, the entries, and the one file the fold
+    # itself removed beside them.
     $entryPaths = @($folded | ForEach-Object { $_.File })
-    $writtenPaths = @($entryPaths) + @($resetPaths | Where-Object { $entryPaths -notcontains $_ })
+    $writtenPaths = @($entryPaths) + @($removedPaths | Where-Object { $entryPaths -notcontains $_ })
     $lsFiles = Invoke-NativeCapture -FilePath 'git' -Arguments (@('ls-files', '--') + $writtenPaths)
     # git reports its own paths with forward slashes; the entry names are plain file names in the repo
     # root, so normalising both sides costs nothing and removes the one way this could silently drop a
@@ -857,10 +853,10 @@ if ($Commit) {
     $paths = @('CHANGELOG.md') + @($writtenPaths | Where-Object { $tracked -contains ($_ -replace '/', '\') })
     $untracked = @($writtenPaths | Where-Object { $tracked -notcontains ($_ -replace '/', '\') })
     if ($untracked.Count -gt 0) {
-        # Deliberately not "deleted": since the split, an untracked path here may have been reset rather
-        # than removed, and a message that names the wrong disposal sends the reader looking for a file
-        # that is still on disk.
-        Write-Host "  (not in the commit, because git never tracked them: $($untracked -join ', ') -- the fold handled them on disk all the same.)" -ForegroundColor DarkYellow
+        # Every disposal is a deletion again, so this can name it. The hedge here dated from the split, when
+        # an untracked path might have been reset rather than removed, and naming the wrong one sent the
+        # reader looking for a file that was still on disk.
+        Write-Host "  (not in the commit, because git never tracked them: $($untracked -join ', ') -- the fold deleted them from disk all the same.)" -ForegroundColor DarkYellow
     }
     $commitRun = Invoke-NativeCapture -FilePath 'git' -Arguments (@('commit', '-m', $message, '--') + $paths)
     if ($commitRun.ExitCode -ne 0) {

@@ -116,10 +116,10 @@ $trunk = if (Get-Command Get-TrunkBranchName -ErrorAction SilentlyContinue) {
 } else { 'main' }
 
 if ($Branch -eq $trunk) {
-    # The trunk is where the fold RESETS the entry, so judging it would report the reset state as a
-    # defect on every push. Said out loud rather than silently passing: a gate that answers 0 for a
-    # reason it does not name is a gate somebody will point at the trunk and believe.
-    Write-Host "[OK] '$Branch' is the trunk, where the fold leaves the entry in its reset state by design."
+    # The trunk is where the fold REMOVES the document, so judging it would report the trunk's own normal
+    # state as a defect on every push. Said out loud rather than silently passing: a gate that answers 0 for
+    # a reason it does not name is a gate somebody will point at the trunk and believe.
+    Write-Host "[OK] '$Branch' is the trunk, where the fold removes the document by design."
     Write-Host '     Nothing to judge here -- point this at a branch, or run it on pull_request only.'
     exit 0
 }

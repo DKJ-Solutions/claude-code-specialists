@@ -78,7 +78,7 @@ a test, reached by one of these rather than run directly.
 | [`task/adopt-config.ps1`](task/adopt-config.ps1) | reads the config blueprint and places or proposes each seam answer | `adopt-config` |
 | [`release/open-pr.ps1`](release/open-pr.ps1) | the four gates, the push and the PR; the body and title come from the entry | `open-pr` |
 | [`release/ship-pr.ps1`](release/ship-pr.ps1) | open → wait for CI → merge → fold, in one motion | `ship-pr` |
-| [`release/fold-changelog-entry.ps1`](release/fold-changelog-entry.ps1) | folds the entry into `CHANGELOG.md` at its ranked position and resets both branch files | `fold-changelog` |
+| [`release/fold-changelog-entry.ps1`](release/fold-changelog-entry.ps1) | folds the entry into `CHANGELOG.md` at its ranked position and removes the branch document | `fold-changelog` |
 | [`release/cut-release.ps1`](release/cut-release.ps1) | the lockstep version bump, the release notes and the tag — **only on Dave's explicit request** | `cut-release` |
 | [`release/new-internal-note.ps1`](release/new-internal-note.ps1) | the tier-1 note's skeleton; needs the development notes, so it runs *after* the cut | `cut-release` |
 | [`release/build-release-notes-page.ps1`](release/build-release-notes-page.ps1) | builds the hand-written notes into one browsable page, and with `-Worker` the Cloudflare Worker that serves it — it publishes nothing | `release-notes-page` |

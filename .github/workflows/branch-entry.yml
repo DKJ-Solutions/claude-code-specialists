@@ -1,9 +1,9 @@
 # The branch-entry gate: every PR into main carries a WRITTEN changelog entry.
 #
-# WHY A SECOND WORKFLOW AND NOT A JOB IN ci.yml. That one runs on `push: branches: [main]` as well, and
-# on the trunk the entry sits in its empty reset state by design -- the fold puts it back there after
-# every merge. A job of ci.yml would therefore be red on main after every single merge. The trigger is
-# the difference, and a trigger belongs to a workflow rather than to a job.
+# WHY A SECOND WORKFLOW AND NOT A JOB IN ci.yml. That one runs on `push: branches: [main]` as well, and on
+# the trunk there is no branch document at all -- it exists for the lifetime of a branch, and the fold
+# removes it at the merge. A job of ci.yml would therefore be red on main after every single merge. The
+# trigger is the difference, and a trigger belongs to a workflow rather than to a job.
 #
 # WHY THE HEAD REF IS PASSED EXPLICITLY. A `pull_request` checkout is a detached merge commit, so
 # `git rev-parse --abbrev-ref HEAD` answers 'HEAD' there and the script would have no branch to judge.

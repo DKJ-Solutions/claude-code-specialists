@@ -242,8 +242,8 @@ is the point, not a tidy-up.
 This step used to run its own `git add -A` plus `git commit`. `git add -A` stages the **whole tree**, so
 anything else modified or already staged rode along into a commit that lands **directly on the main
 branch** under one of the two named exceptions to "never commit directly". The fold script instead
-commits with an explicit pathspec — the changelog, the entries it actually folded, and the step list it
-reset — and nothing else can enter however messy the tree is.
+commits with an explicit pathspec — the changelog, the entries it actually folded, and any legacy step list
+it removed beside them — and nothing else can enter however messy the tree is.
 
 **An exception is only safe while it stays the size it was granted at.** The workshop's own governance
 doc had stated since August 2, 2026 that the fold commit "names its paths, so nothing else in the tree

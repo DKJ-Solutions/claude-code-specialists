@@ -280,10 +280,12 @@ The constitution above, concretely implemented here:
   1. The **fold commit** after a merge: [`fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)
      folds the entry into `CHANGELOG.md` and clears it, and with `-Commit`/`-Push` makes that commit
      itself. **Bounded to two paths** — `CHANGELOG.md` and
-     `workflow-davekjohn/development-cycle.md`, which the same run resets — and the commit names
+     `workflow-davekjohn/development-cycle.md`, which the same run **removes** — and the commit names
      them, so nothing else in the tree can ride along. It was three until August 23, 2026, when the
      entry and the step list became sections of one document: the bound narrowed with the tree rather
-     than being relaxed. Committing stays opt-in, because it is this exception being used.
+     than being relaxed. Later that day the second path stopped being a rewrite and became a deletion —
+     the document exists only while a branch is open — which narrows what the exception does without
+     changing what it may touch. Committing stays opt-in, because it is this exception being used.
   2. The **release commit** (only on explicit request): [`cut-release.ps1`](scripts/release/cut-release.ps1)
      bumps all plugin versions in lockstep, generates the release notes in `releases/development/`,
      **empties `CHANGELOG.md` down to its intro**, commits that on `main`, and tags `vX.Y.Z`.

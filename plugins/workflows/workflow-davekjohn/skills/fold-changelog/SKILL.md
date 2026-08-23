@@ -8,7 +8,7 @@ description: >-
   <branch-name>.md in the repo root) into CHANGELOG.md --
   a flat ranked list with no section headings, where each entry lands at the position its own
   Significance sections rank it at (furthest reach first, highest significance first within a tier) -- and then
-  clear it: the development cycle is reset to its empty state, a root entry file is removed.
+  clear it: every folded entry's file is deleted, the development cycle included, so the trunk carries no branch document between branches.
 disable-model-invocation: true
 ---
 
@@ -36,10 +36,12 @@ heading down and leaves the plan where it is — publishing somebody's ticked ch
 description is exactly what that boundary prevents. Older shapes still fold whole: a `branch/` pair, and a
 pre-split root entry file, are entries from their first line and have no boundary to find.
 
-**Both are cleared by the fold, and neither is deleted.** They are rewritten to their empty **reset
-state** — the state that lives on the trunk, opening with an H1 and carrying a warning not to write there
-until a branch exists. That H1 is load-bearing: it is what stops the trunk's own empty file being folded
-as if it were a change, and it is why folding twice is impossible rather than merely unlikely.
+**Every one of them is deleted, and none is rewritten** (Dave, August 23, 2026). The document exists for
+the lifetime of a branch: `new-branch` creates it and the fold removes it, so between branches the trunk
+carries no branch document at all. It used to be rewritten to an empty **reset state** instead — opening
+with an H1 and carrying a warning not to write there — and that H1 was load-bearing, because it stopped the
+trunk's own empty file being folded as if it were a change. Nothing has to do that job now: a second fold
+finds no file.
 
 **A pre-split entry still folds.** Before August 6, 2026 the entry was a `<branch-name>.md` in the repo
 root — branch `feat/new-plugin` → `feat-new-plugin.md` — and any branch created before that date still
@@ -165,9 +167,9 @@ to land there instead of wherever `CLAUDE_PROJECT_DIR`/git-root would otherwise 
 1. Folds each entry into `CHANGELOG.md`, with the PR number + link included (retrieved via
    `gh pr list` — keyed on `-Branch`, or on the name in the document's heading, or for a pre-split entry
    on its file name).
-2. Clears it afterwards: **`workflow-davekjohn/development-cycle.md` is reset** to its empty state in one
-   write, which clears the plan along with the entry; a pre-split root entry file is **removed**, and an
-   older `branch/` step list is reset at today's path.
+2. Clears it afterwards: **`workflow-davekjohn/development-cycle.md` is removed** — one deletion, which
+   clears the plan along with the entry since they are sections of one file. A pre-split root entry file is
+   removed as it always was, and an older `branch/` step list is removed beside it.
 
 **Where it lands is the top of the list.** `CHANGELOG.md` is an intro followed by a flat list of `##`
 entries, **newest first**: the entry being folded is the most recently merged one, so it leads. Everything
@@ -232,7 +234,7 @@ its own governance exception, while `chore` said only "housekeeping", and `fold:
 fold read as a pair. **Nothing parses this subject**, so every `chore: fold ...` in your existing log
 stays exactly as valid as it was and there is nothing to migrate.
 
-**The commit names its paths**, so `CHANGELOG.md`, the entries it folded and the step list it reset are
+**The commit names its paths**, so `CHANGELOG.md`, the entries it folded and any legacy step list it removed are
 the only things that can land in it however messy the working tree is. That scope limit is the point rather than tidiness: where this
 commit runs under a "never commit directly to main, except the fold" exception, an unscoped
 `git add -A` would let anything else in the tree ride along under that exception. It is enforced by git
@@ -305,7 +307,7 @@ this skill.
 
 - **Run this on main, after the merge** (after the PR has been merged) — then the PR number exists.
 - The script only touches `CHANGELOG.md` and the entries it folds -- which since the merge is one file
-  fewer, because the step list is a section of the document it already resets; nothing else.
+  fewer, because the step list is a section of the document it already removes; nothing else.
 - This script is maintained in the source repo; do not modify it locally in the consumer. A
   change lands first in the source (`scripts/release/fold-changelog-entry.ps1`) and then travels via
   a release to the plugin mirror — guarded by the shared-scripts drift lint.

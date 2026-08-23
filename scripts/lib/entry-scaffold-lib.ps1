@@ -4162,6 +4162,17 @@ function Get-BranchFilePaths {
         -- see Get-BranchFileWording -- because that is language, and language is the thing #410
         established a repo owns.
 
+        IT EXISTS FOR THE LIFETIME OF A BRANCH AND NO LONGER (Dave, August 23, 2026). new-branch creates it,
+        the fold REMOVES it, and the trunk carries no copy -- so the workflow's folder holds its three pages
+        and its two directories on the trunk, and this file appears only while there is work to describe. It
+        used to be rewritten to an empty state instead, which put a permanent placeholder in the one folder a
+        consumer reads to learn the convention.
+
+        WHAT THAT COSTS IS THE REFERENCE COPY, and it is paid elsewhere on purpose. The empty document on the
+        trunk was also the thing a reader opened to see the whole form at once; the portable page
+        DEVELOPMENT-CYCLE-portable.md is what carries that now, and unlike a file scaffolded into a consumer
+        once it travels with every plugin update.
+
         UNDER workflow-davekjohn/ SINCE AUGUST 14, 2026 (Dave): everything portable about the workflow
         gathers in that one root folder instead of scattering through the consumer's root. The 'branch/'
         subdirectory under it is gone with the merge -- a directory holding one file is a directory
@@ -4205,14 +4216,21 @@ function Resolve-BranchFilePath {
         entries were recognised in two scripts by two different rules until they disagreed. One resolver
         means a branch created before the merge is either visible to all of them or to none.
 
-        EXISTENCE IS NOT THE TEST ANY MORE, AND THAT IS THE WHOLE POINT OF THIS REVISION (August 23, 2026).
+        EXISTENCE IS NOT THE TEST, AND THE REASON OUTLIVED THE THING THAT CAUSED IT (August 23, 2026).
         Every rename before this one could resolve on Test-Path, because the new name did not exist until
-        something wrote it. This one does: development-cycle.md lands on the trunk in its reset state, so
-        the moment a branch in flight merges the trunk it HAS the new file -- empty -- beside the pair that
-        holds its real work. Resolving on existence would hand every one of those branches an empty document
+        something wrote it. development-cycle.md broke that: it landed on the trunk in its reset state, so
+        the moment a branch in flight merged the trunk it HAD the new file -- empty -- beside the pair that
+        held its real work. Resolving on existence would hand every one of those branches an empty document
         and call their entry missing, which is precisely the stranded half-finished branch the dual-read
         exists to prevent. So the test is which file DECLARES this branch: Get-BranchFileDeclaredBranch reads
         the name out of the heading, and a file naming the trunk is a reset file whatever its path.
+
+        THE TRUNK COPY IS GONE AND THE TEST STAYS, which is the deliberate half. Later the same day the
+        document became branch-lifetime -- created by new-branch, REMOVED by the fold -- so a fresh checkout
+        of the trunk carries nothing and Test-Path would discriminate again. Reverting to it would still be
+        wrong: every branch cut before that change is carrying a trunk-declaring copy right now, here and in
+        every consumer, and they meet this through a plugin update rather than by choosing to. The
+        simplification is available on the day those branches are gone, and not before.
 
         THE ORDER IS NEW FIRST, THEN NEWEST-LEGACY, THEN OLDEST, and the fallback at the end is today's file
         -- so a fresh repo, a repo mid-adoption and a repo with nothing written all send a writer to the same
@@ -4422,29 +4440,22 @@ function Format-BranchFileHeader {
 # agreement with. Removed rather than left standing unread, which is this file's own rule about a helper
 # whose last caller has gone.
 
-function Format-DevelopmentCycleReset {
-    <#
-        workflow-davekjohn/development-cycle.md in its empty state -- what lives on the trunk, and what the
-        fold writes back once the DEPLOY section has landed in CHANGELOG.md.
+# --- RETIRED, AUGUST 23, 2026: Format-DevelopmentCycleReset ---------------------------------------
+#
+# It was an alias for Format-DevelopmentCycle with no branch, and it had three callers that each meant
+# "the empty state that lives on the trunk": the fold wrote it back after folding, adopt-workflow-folder
+# placed it, and this repo's lint held the trunk copy to it byte-for-byte.
+#
+# THERE IS NO TRUNK COPY ANY MORE (Dave, August 23, 2026). The document exists for the lifetime of a
+# branch and no longer: new-branch creates it, the fold REMOVES it. So all three callers are gone -- the
+# fold deletes instead of rewriting, the adopter places one file fewer, and the lint asserts absence
+# instead of equality. A formatter alias with no writer left is the helper this file's own rule removes.
+#
+# THE STATE IT PRODUCED IS NOT RETIRED WITH IT, and that distinction is the one worth keeping. A branch
+# created before this change still carries a trunk-declaring document, so Get-BranchFileDeclaredBranch
+# must go on recognising one and Resolve-BranchFilePath must go on skipping it. What went is the name and
+# its writers; a caller that needs such a document for a fixture calls Format-DevelopmentCycle -Branch ''.
 
-        IT IS THE WHOLE DOCUMENT, NOT A NOTE ABOUT ONE (Dave, August 23, 2026). The two files it replaces
-        each had a reset state that was a heading and two sentences of prose explaining what would appear
-        there later. This one is the document itself -- the guidance, the three phases, the DEPLOY section --
-        with the TRUNK's name in its heading instead of a branch's. A reader on the trunk sees exactly the
-        file they are about to be given, empty, which is what those two sentences were trying to describe.
-
-        SO THERE IS NO SEPARATE RESET FORMATTER, only this alias for one: Format-DevelopmentCycle with no
-        branch. Kept as its own name because three callers say "reset" rather than "scaffold" -- the fold,
-        the folder adopter and this repo's lint -- and reading their intent off the call is worth one
-        function.
-
-        HOW A RESET IS TOLD FROM A WRITTEN FILE is the branch NAME in the heading, read by
-        Get-BranchFileDeclaredBranch, not the heading LEVEL. The level test is what the old pair used, and it
-        could not survive the merge: one document cannot open with an H1 when it is empty and an H2 when it is
-        not, because the H1 is its title and the H2 is a section of it.
-    #>
-    return @(Format-DevelopmentCycle -Branch '')
-}
 function Get-BranchFilesRereadNote {
     <#
         The one line a script prints after it has written or reset the two branch files: whoever had them

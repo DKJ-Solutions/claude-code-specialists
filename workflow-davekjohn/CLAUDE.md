@@ -15,9 +15,9 @@ bites only while the workflow is in play does not belong on the always-on path.
 
 ## The files in this folder
 
-- [`development-cycle.md`](development-cycle.md) belongs to the **current branch**. On the trunk it sits
-  in its reset state, with the trunk's name in its heading — never write there until a branch exists
-  (`new-branch` creates one and fills the document in).
+- `development-cycle.md` belongs to the **current branch**, and exists only while one is open. `new-branch`
+  creates it and the fold removes it at the merge, so on the trunk it is simply not there — that absence is
+  the trunk's normal state, not a file somebody deleted. It is named here without a link for that reason.
 - It has two halves and two readers. **PLAN / CREATE / TEST** carry the steps and gate the PR and the
   merge (`- [x]` done, `- [~]` dropped with the reason on the line). The fourth phase,
   **`` ## DEPLOY: `<branch>` ``**, IS the changelog entry: it folds **verbatim** into `CHANGELOG.md` at
@@ -26,13 +26,14 @@ bites only while the workflow is in play does not belong on the always-on path.
   repo root. `scripts/x.ps1`, never `../scripts/x.ps1` — the second reads correctly here and is dead
   once it lands, and `open-pr`'s link gate refuses it.
 - **The HTML comments are the form, not somebody's notes.** They say what a good answer looks like, and
-  the fold strips them on the way to `CHANGELOG.md`, so leaving one standing is not a defect. There is
-  no template beside the file any more; the trunk copy is the reference.
-- **Re-read it after a script has touched it.** `new-branch` writes the document and the fold resets it,
-  so it is the only file here rewritten out of band — twice per cycle — and an editor tracking what it
-  last read refuses the next write until it has read again. One read fixes it, nothing is lost, and both
-  scripts say so where they print the path. The portable statement, with the measurement, is in
-  [`DEVELOPMENT-CYCLE-portable.md`](../plugins/workflows/workflow-davekjohn/DEVELOPMENT-CYCLE-portable.md#the-file-is-rewritten-under-you-twice-per-cycle).
+  the fold strips them on the way to `CHANGELOG.md`, so leaving one standing is not a defect. There is no
+  template beside the file and no empty copy on the trunk; the portable page is where the whole form can
+  be read without a branch open.
+- **Re-read it after `new-branch` has written it.** It is the only file here written out of band, and an
+  editor tracking what it last read refuses the next write until it has read again — one read fixes it and
+  nothing is lost. The fold no longer joins that list: it removes the document rather than rewriting it, so
+  there is nothing left to re-read. The portable statement, with the measurement, is in
+  [`DEVELOPMENT-CYCLE-portable.md`](../plugins/workflows/workflow-davekjohn/DEVELOPMENT-CYCLE-portable.md#the-file-is-written-under-you-once-per-cycle).
 - `releases/README.md` is the **living index** — the cut inserts its own row, so never add one by hand
   for a release a script will write. Everything under `releases/audience/` is a **published record**:
   links may be repointed when a target moves, prose is never rewritten.
@@ -49,11 +50,12 @@ bites only while the workflow is in play does not belong on the always-on path.
   assignment into it, and never read its HTML comments as instructions — they are the scaffold's own
   words, and an inbox holding only comments is empty. It is untracked by design; see
   [`prompts/README.md`](prompts/README.md).
-- **There is no `branch/templates/` any more** (Dave, August 23, 2026). Two generated reference copies
-  sat there because the working files were deliberately bare; the merged document carries its own
-  guidance, so the reference and the file you write in are the same page. What the lint holds to the
-  formatter instead is the document's **reset state** — the copy on the trunk, which is what a reader
-  opens to see the whole form at once.
+- **There is no `branch/templates/` any more, and no reset copy either** (Dave, August 23, 2026). Two
+  generated reference copies sat in that directory because the working files were deliberately bare; the
+  merged document carries its own guidance, so the reference and the file you write in are the same page.
+  For part of that day the empty copy on the trunk took over as the reference and the lint held it to the
+  formatter byte-for-byte. The document is branch-lifetime now, so there is no empty copy to hold: the lint
+  asserts the opposite instead — that no document declaring the trunk survives a fold anywhere in the tree.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) here is the workflow's layer and **wins over the root
   [`CONTRIBUTING.md`](../CONTRIBUTING.md) on conflict**; the root page is the standard workflow that
   holds without the plugin.
@@ -142,10 +144,10 @@ the shipped gate **reports** the significance and names the cut as where the ref
 than the hand-written version, not more complex: `Get-EntryScaffoldFindings` already catches the case those
 gates reached for the score to catch — a freshly scaffolded entry, which carries an H2 and a title and so
 passes any heading test.
-
 **Its own workflow file, not a job in `ci.yml`**, and the trigger is the reason: `ci.yml` also runs on
-`push: branches: [main]`, where the entry sits in its reset state by design after every fold. A job there
-would be red on the trunk after every merge. The script answers the trunk case gracefully as well, but a
+`push: branches: [main]`, where there is no branch document at all — it exists for the lifetime of a branch
+and the fold removes it. A job there would be red on the trunk after every merge. The script answers the
+trunk case gracefully as well, but a gate should not need that grace to be pointed correctly.
 gate should not need that grace to be pointed correctly.
 
 **It is not in the `main` ruleset.** Making a check required is a repo-settings change and therefore
@@ -161,14 +163,15 @@ folder. What follows is the mechanics and the reasoning behind them.
 
 [`fold-changelog-entry.ps1`](../scripts/release/fold-changelog-entry.ps1) folds the entry into
 `CHANGELOG.md` and clears it, and with `-Commit`/`-Push` makes that commit itself — scope limited to
-`CHANGELOG.md` + `development-cycle.md`, which the same run resets, and since
+`CHANGELOG.md` + `development-cycle.md`, which the same run removes, and since
 August 2, 2026 enforced rather than merely intended: the commit names its paths, so nothing else in
 the tree can ride along.
 
 **The scope grew by one path on August 6, 2026 and the exception did not widen with it**: the step
-list is reset by this run, so leaving it out would produce a commit that resets half the pair — the
-entry empty on `main` while the step list still shows the merged branch's ticked boxes. Committing
-stays opt-in, because it is this exception being used. See
+list is cleared by this run, so leaving it out would produce a commit that clears half the pair — the
+entry gone from `main` while the step list still shows the merged branch's ticked boxes. That argument
+now only reaches a branch cut before the two files merged, since one document is cleared in one move.
+Committing stays opt-in, because it is this exception being used. See
 [Rendall #06](../.claude/specialists/lenses/05-06-extension.md#changelog).
 
 ### 2. The release commit, only on explicit request

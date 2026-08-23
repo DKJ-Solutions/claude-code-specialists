@@ -1,6 +1,6 @@
 ---
 name: adopt-workflow-folder
-description: Scaffold the workflow's own root folder -- workflow-davekjohn/ -- in a consuming repo, in one move; the folder docs (README, CLAUDE.md, CONTRIBUTING.md), the releases root with this repo's release answers, and the branch dossier in its reset state. Use this when the script-contract session check reports the folder missing, or right after installing the workflow-davekjohn plugin, since an install alone writes nothing into the repo. Strictly additive and dry-run by default; it never overwrites anything.
+description: Scaffold the workflow's own root folder -- workflow-davekjohn/ -- in a consuming repo, in one move; the folder docs (README, CLAUDE.md, CONTRIBUTING.md), the releases root with this repo's release answers, and no branch dossier, since that document lives only while a branch is open. Use this when the script-contract session check reports the folder missing, or right after installing the workflow-davekjohn plugin, since an install alone writes nothing into the repo. Strictly additive and dry-run by default; it never overwrites anything.
 ---
 
 # adopt-workflow-folder -- one folder for everything portable
@@ -19,7 +19,7 @@ workflow-davekjohn/
   CONTRIBUTING.md        this repo's answers to CONTRIBUTING-portable.md
   releases/README.md     this repo's answers to RELEASES-portable.md (the release LIST is not here)
   releases/audience/     where the cut drafts the hand-written note (a .gitkeep until then)
-  branch/                the two branch files in their reset state, plus the generated templates
+  (development-cycle.md is NOT placed -- it lives only while a branch is open)
 ```
 
 **And one file outside it**, since August 20, 2026 (inbound

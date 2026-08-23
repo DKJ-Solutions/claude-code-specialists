@@ -84,8 +84,7 @@ $ExpectedFiles = @(
     'workflow-davekjohn\CLAUDE.md',
     'workflow-davekjohn\CONTRIBUTING.md',
     'workflow-davekjohn\releases\README.md',
-    'workflow-davekjohn\releases\audience\.gitkeep',
-    'workflow-davekjohn\development-cycle.md'
+    'workflow-davekjohn\releases\audience\.gitkeep'
 )
 
 try {
@@ -109,11 +108,12 @@ try {
     foreach ($rel in $ExpectedFiles) {
         Assert-True (Test-Path -LiteralPath (Join-Path $c2 $rel) -PathType Leaf) "-Apply: $rel exists"
     }
-    # The branch document must be the RESET shape the shared formatter writes: its own H1 naming the TRUNK,
-    # which is what the fold reads as "nothing pending" -- the heading level cannot answer that any more,
-    # because one document opens with an H1 in both states.
-    $entryText = [System.IO.File]::ReadAllText((Join-Path $c2 'workflow-davekjohn\development-cycle.md'), [System.Text.Encoding]::UTF8)
-    Assert-Match '^# ' $entryText '-Apply: the document is the reset state'
+    # THE BRANCH DOCUMENT IS NOT PLACED, and that is this adopter's half of the lifetime rule (Dave,
+    # August 23, 2026). It used to be written here in its reset state, so a consumer's first look at the
+    # folder was also their reference. The document exists only while a branch is open now, so placing one
+    # would hand them a file their own first fold deletes -- the only entry in this list that is not
+    # permanently theirs.
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'workflow-davekjohn\development-cycle.md'))) '-Apply: the branch document is NOT placed -- it lives only while a branch is open'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'workflow-davekjohn\branch'))) '-Apply: and no branch/ directory is placed any more'
     # THE FOLDER PAGE MUST NOT CARRY A HISTORY TABLE, and this assert is the regression guard on inbound
     # #786. It did until August 20, 2026: the page was scaffolded with a '## Release history' heading, a

@@ -40,11 +40,11 @@ already drifted.
 | state | answer |
 |---|---|
 | the entry file is missing | **exit 1** -- the branch declares nothing. `new-branch` is idempotent; run it here. |
-| the entry is in its **reset state** | **exit 1** -- that is what the fold leaves behind after a merge, not an entry. It opens with a first-level heading; a written entry opens with a second-level one. |
+| the document **declares the trunk** | **exit 1** -- an empty document left behind by a fold that ran under the older behaviour, not an entry. Told apart by the branch NAME in the heading, not by its level. |
 | the entry is **scaffolded but not filled in** | **exit 1**, naming each field still waiting. This is the case a heading test lets through, because the scaffold already writes a heading and a title. |
 | the **significance** is not settled | **exit 0**, with the finding printed and the release cut named as where the refusal lives. |
 | the branch prefix is **exempt** | **exit 0** -- see the seam below. |
-| the branch is the **trunk** | **exit 0**, said out loud: the trunk is where the reset state is the *designed* state. |
+| the branch is the **trunk** | **exit 0**, said out loud: the trunk is where having no document at all is the *designed* state. |
 
 **The significance is reported, never refused, and that is the one thing to know before you compare this
 against a gate you wrote yourself.** A score is a judgement about a finished change, and an author who has

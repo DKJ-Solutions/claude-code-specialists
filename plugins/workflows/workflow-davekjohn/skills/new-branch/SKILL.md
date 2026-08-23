@@ -84,9 +84,11 @@ workflow-davekjohn/development-cycle.md
 ```
 
 **A fixed name, not one per branch.** Git already tracks this file per branch, so two branches in flight
-cannot collide on it and the repo root stops filling up with other people's work. On the trunk it sits in
-an empty **reset state**, with the trunk's name in its heading and a warning saying not to write there
-until a branch exists; the fold puts it back in that state after the merge.
+cannot collide on it and the repo root stops filling up with other people's work. **And it exists only
+while a branch is open** (Dave, August 23, 2026): this script creates it, the fold removes it at the merge,
+so on the trunk there is no copy at all. It used to be rewritten to an empty state carrying a warning not
+to write there; that placeholder is gone, and `DEVELOPMENT-CYCLE-portable.md` is where the whole form can
+be read without a branch open.
 
 **Why one file and not two** (Dave, August 23, 2026). The two jobs are genuinely different, and for two
 weeks they were two files — but the plan a branch is working through and the claim it will make were then
@@ -128,7 +130,7 @@ older entry carries them, so nothing already written stops folding.
 
 **The two stamps sit at the two ends of the branch's life** (Dave, August 19, 2026; both on their own
 heading since August 23). The creation stamp is on the document's own `#` heading — created with the
-branch, reset with the merge — and the landing stamp is on the `## DEPLOY:` heading, written by the fold
+branch, removed with the merge — and the landing stamp is on the `## DEPLOY:` heading, written by the fold
 from the PR's own merge timestamp. Neither is typed by hand.
 
 **`Branch title` is what the change is CALLED, everywhere.** Since
@@ -162,7 +164,7 @@ door.
 
 Measured in the source repo across the 105 branches that have carried a step list: **17** wrote a
 post-merge step, **4** were blocked by it, and **14** ticked it in advance — provably in advance, since
-the fold *resets* this file at the merge. One branch is in both counts: it hit the gate on
+the fold clears this file at the merge. One branch is in both counts: it hit the gate on
 `- [ ] Lint + tests green, then PR + merge + fold`, and its next commit changed nothing but that box to
 `- [x]`. **No gate enforces this and none should**: a check would have to spot a post-merge step by its
 wording, and `open-pr`, `merge` and `fold` are also the subjects of ordinary steps (*"`open-pr.ps1`:

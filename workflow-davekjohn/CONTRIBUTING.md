@@ -72,13 +72,13 @@ refusal on `final` in [`branch-info.ps1`](../scripts/lib/branch-info.ps1) is the
 end: a name claiming to be the last word is a prediction, and the number is the honest form.
 
 **The lint gate holds the document's shape here, which a consumer's repo typically cannot.** Three checks
-in [`check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1) do it: the **reset state** is
-held byte-for-byte to `Format-DevelopmentCycleReset`, so the copy on the trunk cannot drift from what a
-branch is handed; the **entry-shape** claims in prose are held against the section count the scaffolder
-writes; and the **heading-level** rules are enforced against the DEPLOY section, read out of the document
-with its line offset so a finding names the line you can find. In a consumer none of that runs — the
-plugin ships no `scripts/lint/` — so there, the document is the only statement of its own shape. That is
-also why the guidance lives inside it.
+in [`check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1) do it: **no document declaring
+the trunk survives a fold** anywhere in the tree, which is what replaced holding an empty copy byte-for-byte
+to the formatter once that copy stopped existing; the **entry-shape** claims in prose are held against the
+section count the scaffolder writes; and the **heading-level** rules are enforced against the DEPLOY section,
+read out of the document with its line offset so a finding names the line you can find. In a consumer none
+of that runs — the plugin ships no `scripts/lint/` — so there, the document is the only statement of its own
+shape. That is also why the guidance lives inside it.
 
 ### The prefixes, and why there are three
 

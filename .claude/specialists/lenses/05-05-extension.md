@@ -161,9 +161,9 @@ started.
 right "Type of change" box (from the branch prefix), fills "What does this change do?" with the
 description from the changelog entry (the DEPLOY section of `workflow-davekjohn/development-cycle.md`), and ticks the two checklist items
 it can honestly verify ("Changelog entry written" + "Requested by Dave"). The first is judged on the file
-actually **holding** an entry, not on its existing — since the split it exists on `main` too, in its
-reset state, so a self-ticking box keyed on existence would tick for a branch that wrote nothing. Only pass `-Body`
-if you want to override the auto-fill; do that via `--body-file`, never inline — see
+actually **holding** an entry, not on its existing — a branch cut before August 23, 2026 carries the trunk's
+old empty copy, so a self-ticking box keyed on existence would tick for a branch that wrote nothing. Only
+pass `-Body` if you want to override the auto-fill; do that via `--body-file`, never inline — see
 [the quoting lesson](#the-quoting-lesson-where-it-was-measured).
 
 ### Merging to main

@@ -17,7 +17,7 @@
           releases/README.md     this repo's answers to RELEASES-portable.md (the release LIST is not
                                  here -- it is at the repo root; see the closing advice)
           releases/audience/     where the cut drafts the hand-written note (kept by .gitkeep until then)
-          development-cycle.md   the branch's own document in its reset state -- the plan and the entry
+          (development-cycle.md is NOT placed -- it lives only while a branch is open)
 
     AND ONE FILE OUTSIDE IT (inbound #789):
 
@@ -123,7 +123,7 @@ $folderReadme = @(
     '|---|---|',
     '| [`CLAUDE.md`](CLAUDE.md) | the working rules a Claude session needs in this folder |',
     '| [`CONTRIBUTING.md`](CONTRIBUTING.md) | this repo''s answers to the contribution cycle |',
-    '| [`development-cycle.md`](development-cycle.md) | the branch''s own document: its plan, and the DEPLOY section that folds into the changelog |',
+    '| `development-cycle.md` | the branch''s own document, present only while a branch is open: its plan, and the DEPLOY section that folds into the changelog |',
     '| [`prompts/`](prompts/) | the prompt inbox: an assignment written in an editor instead of the terminal |',
     '| [`releases/`](releases/) | this repo''s release answers and the published audience notes -- the release LIST is at the repo root |',
     '',
@@ -142,9 +142,9 @@ $folderClaude = @(
     '',
     'The rules a session needs in this folder:',
     '',
-    '- `development-cycle.md` belongs to the **current branch**. On the trunk it sits in its reset state,',
-    '  with the trunk''s name in its heading -- never write there until a branch exists (`new-branch`',
-    '  creates one and fills the document in).',
+    '- `development-cycle.md` belongs to the **current branch**, and exists only while one is open.',
+    '  `new-branch` creates it, the fold removes it at the merge, so the trunk carries no copy -- if you',
+    '  are looking at this folder and the file is not there, that is the trunk in its normal state.',
     '- It has two halves and they are read by different things. **PLAN / CREATE / TEST** carry the steps,',
     '  and they gate the PR and the merge (`- [x]` done, `- [~]` dropped with the reason on the line).',
     '  The fourth phase, **`## `<branch>` DEPLOY`**, IS the changelog entry: it folds **verbatim** into',
@@ -293,7 +293,6 @@ $entryGateWorkflow = @(
 )
 
 $promptPaths = Get-PromptInboxPaths -RepoRoot $repoRoot
-$branchPaths = Get-BranchFilePaths
 $targets = @(
     @{ Rel = '.github/workflows/branch-entry.yml'; Content = (($entryGateWorkflow -join $nl) + $nl) },
     @{ Rel = 'workflow-davekjohn/README.md';           Content = (($folderReadme -join $nl) + $nl) },
@@ -303,10 +302,13 @@ $targets = @(
     # git tracks no empty directory, and the audience root must exist before the first cut writes into
     # it -- the same reason this repo's own releases tree once carried an invisible empty folder.
     @{ Rel = 'workflow-davekjohn/releases/audience/.gitkeep'; Content = '' },
-    # ONE DOCUMENT SINCE AUGUST 23, 2026, where this placed a pair. Its reset state is the whole file --
-    # guidance, phases and DEPLOY section -- with the trunk's name in the heading, so a consumer's very
-    # first look at it is also their reference for what a branch gets.
-    @{ Rel = $branchPaths.File; Content = (((Format-DevelopmentCycleReset) -join $nl) + $nl) },
+    # NO development-cycle.md, AND THAT IS THE ADOPTION'S HALF OF THE LIFETIME RULE (Dave, August 23, 2026).
+    # This placed the document in its reset state so a consumer's first look at the folder was also their
+    # reference for what a branch gets. The document is branch-lifetime now -- new-branch creates it, the
+    # fold removes it -- so placing one here would put a file on their trunk that their own first fold then
+    # deletes, and it would be the only thing in this list that is not permanently theirs. What it used to
+    # buy, a reader seeing the whole form at once, is DEVELOPMENT-CYCLE-portable.md's job; that page travels
+    # with every plugin update, which a file scaffolded once never does.
     # The inbox. /prompt places these itself on its first run, so scaffolding them here is a
     # convenience rather than the only route -- and they come from the SAME formatters that run does,
     # so the two writers cannot produce different folders. The tracked pair (README, .gitignore,
