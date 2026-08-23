@@ -111,6 +111,15 @@ function Get-SharedScriptPairs {
             Skill  = 'new-branch'
         },
         @{
+            # Shared for the same reason new-branch is: the `git checkout main` collision that makes a
+            # lane necessary is a property of ship-pr.ps1, which every consumer of this workflow runs.
+            # A repo-local copy would be a copy of the answer to a shared problem.
+            Name   = 'worktree-lane'
+            Source = 'scripts\task\worktree-lane.ps1'
+            Plugin = 'workflow-davekjohn'
+            Skill  = 'worktree-lane'
+        },
+        @{
             Name   = 'park-branch'
             Source = 'scripts\task\park-branch.ps1'
             Plugin = 'workflow-davekjohn'
