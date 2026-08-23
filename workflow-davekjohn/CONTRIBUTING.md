@@ -3,7 +3,7 @@
 This page sits **on top of** the repo's own [`CONTRIBUTING.md`](../CONTRIBUTING.md), which describes the
 standard workflow that holds before any plugin is consulted. **Where the two disagree, this page wins**
 (Dave, August 14, 2026): the standard page stays meaningful in a repo without the plugin, and everything
-the `workflow-davekjohn` plugin owns — the branch dossier, the folded changelog entry, the significance
+the `workflow-davekjohn` plugin owns — the development cycle, the folded changelog entry, the significance
 model, the release cycle — is stated here, in the folder that travels with it.
 
 Changes to this repo go through a branch + Pull Request to `main`, with a folded changelog entry. **That
@@ -37,7 +37,9 @@ to adopt this page and measured why it could not be done.
 | your lint gate | [`scripts/lint/check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1) | `Get-LintScript` |
 | your branch prefixes | `feat/` · `fix/` · `docs/` — and **no `chore/`** | [`scripts/lib/branch-info.ps1`](../scripts/lib/branch-info.ps1) |
 | the type an unknown prefix falls back to | `Chore` | `Get-EntryFallbackType` |
+| your audience tier | **2** — a service, not a product | `Get-ReleaseAudienceTier` |
 | your entry's section headings | the English defaults — nothing is overridden | *(no override defined)* |
+| the wording inside the development cycle | the English defaults | `Get-BranchFileWordingOverrides` *(none)* |
 | your significance rubric | the shared default, 1–5 | *(no override defined)* |
 | your permanent root docs | `CHANGELOG` · `CLAUDE` · `README` · `LICENSE` · `CONTRIBUTING` · `SECURITY` | `Get-ReservedRootMd` |
 | your merge method | `merge` — a merge commit, not a squash | `Get-PrMergeMethod` |
@@ -48,6 +50,35 @@ to adopt this page and measured why it could not be done.
 All of them live in [`scripts/repo-config.ps1`](../scripts/repo-config.ps1) except the prefix table, which is
 its own repo-owned lib. Where the table above says *no override defined*, this repo deliberately runs on
 the shared default — that is an answer, not an omission.
+
+### The development cycle — what this repo's answers make of it
+
+The document itself, its two halves and every rule about them are in
+[`DEVELOPMENT-CYCLE-portable.md`](../plugins/workflows/workflow-davekjohn/DEVELOPMENT-CYCLE-portable.md).
+Three of this repo's answers change what a contributor here actually sees in it, so they are stated here
+rather than left to be worked out from the seam table above.
+
+**The audience tier is `2`, so the entry asks two questions rather than four.** Tier 0 needs no heading —
+the `` ## DEPLOY: `<branch>` `` line is its section, and its answer goes directly underneath — and the one
+audience tier gets `### What makes this deploy extra special`. Both sit at the entry's own section level,
+beside `### Pull Request`. A repo that has stated *no* audience tier gets the older shape instead, a
+`#### Tier N` sub-section per tier the model has, nested one level deeper; that is the shape the portable
+half describes as the fallback, and it is not what you will see here.
+
+**Every branch name carries a version, and `new-branch` completes it.** `docs/thing` becomes
+`docs/thing-v1`; a second cycle on the same subject is `docs/thing-v2`, typed deliberately rather than
+guessed — a rerun of `new-branch` resumes the branch it named rather than opening the next one. The
+refusal on `final` in [`branch-info.ps1`](../scripts/lib/branch-info.ps1) is the same rule from the other
+end: a name claiming to be the last word is a prediction, and the number is the honest form.
+
+**The lint gate holds the document's shape here, which a consumer's repo typically cannot.** Three checks
+in [`check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1) do it: the **reset state** is
+held byte-for-byte to `Format-DevelopmentCycleReset`, so the copy on the trunk cannot drift from what a
+branch is handed; the **entry-shape** claims in prose are held against the section count the scaffolder
+writes; and the **heading-level** rules are enforced against the DEPLOY section, read out of the document
+with its line offset so a finding names the line you can find. In a consumer none of that runs — the
+plugin ships no `scripts/lint/` — so there, the document is the only statement of its own shape. That is
+also why the guidance lives inside it.
 
 ### The prefixes, and why there are three
 
@@ -133,7 +164,11 @@ of releases actually cut is on [this repo's own release page](../releases/README
 
 - The document a branch works in, and the three step marks:
   [`DEVELOPMENT-CYCLE-portable.md`](../plugins/workflows/workflow-davekjohn/DEVELOPMENT-CYCLE-portable.md).
-  This repo keeps no local half of it — see [`CLAUDE.md`](CLAUDE.md) here for why, and for the answers
-  that page used to hold.
+  **This repo keeps no local half of it**, which is the one place the split above is not followed, and
+  deliberately: that page was `branch/README.md`, and once the two branch files merged its prose would have
+  had to be reproduced byte-for-byte by a *portable* formatter inside every branch's own document —
+  repo-specific prose generated by a portable formatter cannot be right. Its answers are split between
+  [the section above](#the-development-cycle--what-this-repos-answers-make-of-it) and the file rules in
+  [`CLAUDE.md`](CLAUDE.md) here.
 - The pending changelog entries, ranked: [`CHANGELOG.md`](../CHANGELOG.md).
 - Which specialist owns which kind of change: [`CLAUDE.md`](../CLAUDE.md) and the roster it imports.
