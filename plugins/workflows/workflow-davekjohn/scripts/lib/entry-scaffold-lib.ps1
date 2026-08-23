@@ -4870,12 +4870,32 @@ function Test-BranchChangelogIsFilled {
         Keeping the two apart is what lets a refusal say WHICH of the two is wrong -- "there is no entry
         here" and "the entry is still the scaffold" send an author to different places.
 
-        A LEGACY FILE ANSWERS THE SAME WAY. branch-deployment.md and branch-changelog.md carry their branch
-        in the heading too (Get-BranchFileDeclaredBranch reads H1 and H2 alike), so a branch created before
-        the merge is read correctly by this predicate without a second rule for it.
+        AND THE OLD LEVEL TEST IS STILL ONE OF THE TWO ANSWERS, which is a repair rather than politeness --
+        caught by shared-scripts.tests.ps1 when the name test was the ONLY one. A PRE-SPLIT ROOT ENTRY
+        (`feat-x.md`, from before August 6, 2026) opens with its own TITLE as an H2 and names no branch
+        anywhere, so the name test reads it as empty. Every consumer with such a file still has one, and the
+        consequences are the silent kind: open-pr would leave the changelog checklist item unticked, and the
+        release cut -- whose guard is "no unfolded entry anywhere" -- would cut a release straight over it.
+        So: filled if the first non-blank line is AT an entry level, OR if the document names a branch other
+        than the trunk. Each shape is answered by the test that can see it.
+
+        THE TWO CANNOT DISAGREE ON A SHAPE THAT MATTERS. The merged document opens with an H1 in both states,
+        so only the name test speaks for it. A legacy pair or a root entry opens with an entry-level heading
+        once written and an H1 while reset, so only the level test needs to speak for those -- and where both
+        speak, they agree.
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
     $declared = Get-BranchFileDeclaredBranch -Text $Text
-    if (-not $declared) { return $false }
-    return ($declared -ne (Get-BranchTrunkName))
+    if ($declared -and $declared -ne (Get-BranchTrunkName)) { return $true }
+
+    # The level test, unchanged from before August 23, 2026: both levels are accepted because an entry
+    # written before the flat format is still an entry.
+    $entryLevel  = Get-EntryHeadingLevel
+    $legacyLevel = $entryLevel + 1
+    $rx = '^#{' + $entryLevel + ',' + $legacyLevel + '}\s'
+    foreach ($line in ($Text -split '\r?\n')) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        return ($line -match $rx)
+    }
+    return $false
 }

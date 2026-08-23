@@ -62,7 +62,13 @@ function Set-Entry {
         [Parameter(Mandatory = $true)][string]$Dir,
         [Parameter(Mandatory = $true)][AllowEmptyString()][string[]]$Lines
     )
-    $target = Join-Path $Dir 'workflow-davekjohn\branch\branch-deployment.md'
+    # THE PRIMARY PATH, from the seam rather than typed out (August 23, 2026). It wrote the pre-merge
+    # branch/branch-deployment.md, which the resolver still reads -- so this suite kept passing while
+    # asserting nothing about the path every branch actually gets. Taking it from Get-BranchFilePaths is
+    # what makes a future move show up here instead of quietly falling through to a legacy read.
+    $target = Join-Path $Dir ((Get-BranchFilePaths).File -replace '/', '\')
+    $dir = Split-Path -Parent $target
+    if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
     [System.IO.File]::WriteAllText($target, (($Lines -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding($false)))
 }
 
