@@ -85,10 +85,7 @@ $ExpectedFiles = @(
     'workflow-davekjohn\CONTRIBUTING.md',
     'workflow-davekjohn\releases\README.md',
     'workflow-davekjohn\releases\audience\.gitkeep',
-    'workflow-davekjohn\branch\branch-deployment.md',
-    'workflow-davekjohn\branch\branch-cycle.md',
-    'workflow-davekjohn\branch\templates\branch_template_deployment.md',
-    'workflow-davekjohn\branch\templates\branch_template_cycle.md'
+    'workflow-davekjohn\development-cycle.md'
 )
 
 try {
@@ -112,10 +109,12 @@ try {
     foreach ($rel in $ExpectedFiles) {
         Assert-True (Test-Path -LiteralPath (Join-Path $c2 $rel) -PathType Leaf) "-Apply: $rel exists"
     }
-    # The branch files must be the RESET shape the shared formatters write: an H1 (so the fold's own
-    # entry test skips them) naming the trunk.
-    $entryText = [System.IO.File]::ReadAllText((Join-Path $c2 'workflow-davekjohn\branch\branch-deployment.md'), [System.Text.Encoding]::UTF8)
-    Assert-Match '^# ' $entryText '-Apply: the entry is the reset state (H1, not a foldable H2)'
+    # The branch document must be the RESET shape the shared formatter writes: its own H1 naming the TRUNK,
+    # which is what the fold reads as "nothing pending" -- the heading level cannot answer that any more,
+    # because one document opens with an H1 in both states.
+    $entryText = [System.IO.File]::ReadAllText((Join-Path $c2 'workflow-davekjohn\development-cycle.md'), [System.Text.Encoding]::UTF8)
+    Assert-Match '^# ' $entryText '-Apply: the document is the reset state'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'workflow-davekjohn\branch'))) '-Apply: and no branch/ directory is placed any more'
     # THE FOLDER PAGE MUST NOT CARRY A HISTORY TABLE, and this assert is the regression guard on inbound
     # #786. It did until August 20, 2026: the page was scaffolded with a '## Release history' heading, a
     # table, and a VUL-IN promising that the cut would insert its rows there -- while this same command's

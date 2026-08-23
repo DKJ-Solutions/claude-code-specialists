@@ -72,7 +72,7 @@ intact, entirely superseded — and nothing anywhere reported it. It was found t
 remote heads while cleaning up an unrelated merge.
 
 So before executing a line of a parked plan, **measure it against the main branch**, however detailed and
-current `workflow-davekjohn/branch/branch-cycle.md` reads. A plan that reads as current is not evidence that it is. The cheap checks
+current `workflow-davekjohn/development-cycle.md` reads. A plan that reads as current is not evidence that it is. The cheap checks
 first:
 
 ```powershell

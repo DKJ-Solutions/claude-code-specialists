@@ -12,7 +12,8 @@
     mirror 4.5.0:
 
       * new-branch scaffolded the retired three-tier ladder instead of Tier 0 + the repo's audience tier,
-        and rewrote branch/templates/branch_template_changelog.md back into the pre-audience shape;
+        and rewrote branch/templates/branch_template_changelog.md -- a file the merged development cycle retired --
+        back into the pre-audience shape;
       * session-status reported no release note under releases/notes/ and printed an EMPTY
         "what the last release left open" block;
       * and a third instance was produced by the session that built this guard, on its own first command.

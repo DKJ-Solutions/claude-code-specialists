@@ -9,7 +9,7 @@
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/branch-entry-gate.tests.ps1
 
     THE ENTRY STATES COME FROM THE REAL FORMATTERS, NEVER FROM A LITERAL IN THIS FILE. Format-EntryBlock
-    with empty fields IS the scaffolded state and Format-BranchChangelogReset IS the reset state, so a
+    with empty fields IS the scaffolded state and Format-DevelopmentCycleReset IS the reset state, so a
     change to either shape reaches these cases automatically. A fixture written by hand would be a third
     definition of the format, in the file whose whole job is to prove there are not two -- and it would go
     stale exactly when the gate did, hiding the failure instead of catching it.
@@ -62,7 +62,13 @@ function Set-Entry {
         [Parameter(Mandatory = $true)][string]$Dir,
         [Parameter(Mandatory = $true)][AllowEmptyString()][string[]]$Lines
     )
-    $target = Join-Path $Dir 'workflow-davekjohn\branch\branch-deployment.md'
+    # THE PRIMARY PATH, from the seam rather than typed out (August 23, 2026). It wrote the pre-merge
+    # branch/branch-deployment.md, which the resolver still reads -- so this suite kept passing while
+    # asserting nothing about the path every branch actually gets. Taking it from Get-BranchFilePaths is
+    # what makes a future move show up here instead of quietly falling through to a legacy read.
+    $target = Join-Path $Dir ((Get-BranchFilePaths).File -replace '/', '\')
+    $dir = Split-Path -Parent $target
+    if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
     [System.IO.File]::WriteAllText($target, (($Lines -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding($false)))
 }
 
@@ -81,7 +87,7 @@ try {
     Write-Host 'the exemptions'
 
     $c = New-Consumer -Label 'exempt'
-    Set-Entry -Dir $c -Lines (Format-BranchChangelogReset -Branch 'main')
+    Set-Entry -Dir $c -Lines (Format-DevelopmentCycleReset)
 
     $r = Invoke-Gate -Dir $c -Branch 'sync/live-2026-08-20'
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'exempt prefix') 'exempt/default: a sync branch owes no entry, even with the entry in its reset state'
@@ -95,7 +101,7 @@ try {
 
     # The seam narrows and widens it, and the source declares no exemption of its own.
     $c2 = New-Consumer -Label 'seam' -RepoConfig "function Get-EntryGateExemptPrefixes { return @('mirror','vendor') }"
-    Set-Entry -Dir $c2 -Lines (Format-BranchChangelogReset -Branch 'main')
+    Set-Entry -Dir $c2 -Lines (Format-DevelopmentCycleReset)
     $r = Invoke-Gate -Dir $c2 -Branch 'mirror/upstream'
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'exempt prefix') 'exempt/seam: the seam answer replaces the default'
     $r = Invoke-Gate -Dir $c2 -Branch 'sync/live-2026-08-20'
@@ -110,7 +116,7 @@ try {
     Assert-True ($r.Code -eq 1 -and $r.Out -match 'does not exist') 'missing: no entry file at all refuses, and names new-branch'
 
     $reset = New-Consumer -Label 'reset'
-    Set-Entry -Dir $reset -Lines (Format-BranchChangelogReset -Branch 'main')
+    Set-Entry -Dir $reset -Lines (Format-DevelopmentCycleReset)
     $r = Invoke-Gate -Dir $reset -Branch 'feat/thing'
     Assert-True ($r.Code -eq 1 -and $r.Out -match 'reset state') 'reset: the state the fold leaves behind is not an entry'
 

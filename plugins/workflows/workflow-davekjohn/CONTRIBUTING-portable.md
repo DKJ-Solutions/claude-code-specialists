@@ -1,6 +1,6 @@
 # The contribution cycle — the portable half
 
-This is the cycle the `workflow-davekjohn` scripts run: a branch, its two files in `workflow-davekjohn/branch/`, a Pull
+This is the cycle the `workflow-davekjohn` scripts run: a branch, its `workflow-davekjohn/development-cycle.md`, a Pull
 Request that has to get past its gates, a merge, and a fold. **It is written to be read in any repo that
 enables this plugin**, which is why it names the *seam* wherever a repo owns the answer, rather than stating
 one repo's answer as the rule.
@@ -31,20 +31,20 @@ second source; [`scripts/README.md`](scripts/README.md) says why that is the one
 
 [`skills/new-branch/SKILL.md`](skills/new-branch/SKILL.md) · `new-branch.ps1`
 
-Creating the branch writes both of its working files, so **a branch is never entry-less**:
+Creating the branch writes its working document, so **a branch is never entry-less**. It has two halves
+with two different readers:
 
-| file | subject | lifetime |
+| half of `workflow-davekjohn/development-cycle.md` | subject | lifetime |
 |---|---|---|
-| `workflow-davekjohn/branch/branch-deployment.md` | what the change **does** — the entry that folds into your changelog | folded at the merge, then reset |
-| `workflow-davekjohn/branch/branch-cycle.md` | what still **must happen** — the step list, and where you left off | reset at the merge; never folded |
+| `## PLAN` · `## CREATE` · `## TEST` | what still **must happen** — the step list | reset at the merge; never folded |
+| `` ## DEPLOY: `<branch>` `` | what the change **does** — the entry that folds into your changelog | folded at the merge, then reset |
 
-**Fixed names, not one per branch.** Git already tracks them per branch, so branches in flight cannot
-collide. On the trunk both sit in an empty **reset state** carrying a warning not to write there until a
-branch exists — that state opens with an `#`, which is exactly what stops the fold mistaking it for an
-entry. The full convention is spelled out in [`BRANCH-portable.md`](BRANCH-portable.md), which travels
-with this plugin; your repo's own `workflow-davekjohn/branch/README.md` holds its answers to it, and
-`new-branch` keeps reference copies in `workflow-davekjohn/branch/templates/`, refreshing one that has drifted
-from the current format.
+**A fixed name, not one per branch.** Git already tracks it per branch, so branches in flight cannot
+collide. On the trunk it sits in an empty **reset state** carrying a warning not to write there until a
+branch exists — what tells that state apart is the **trunk's name in its heading**, which is what stops the
+fold mistaking it for an entry. The full convention is spelled out in
+[`DEVELOPMENT-CYCLE-portable.md`](DEVELOPMENT-CYCLE-portable.md), which travels with this plugin; the
+guidance for every field is inside the document itself, so there is no reference copy to keep current.
 
 **The branch name is validated by your own lib, not by the plugin.** `new-branch` calls
 `Test-BranchName` out of `scripts/lib/branch-info.ps1`, which lives in **your** repo — so which prefixes
@@ -58,24 +58,23 @@ So how many prefixes there are, whether a given one exists, and what your repo r
 questions this page deliberately cannot answer for you — check your own table rather than assuming the
 source repo's.
 
-**`branch-deployment.md` holds the entry block and nothing around it**, so it pastes into your changelog in
+**The DEPLOY section holds the entry block and nothing around it**, so it pastes into your changelog in
 one go. The entry is one heading with two `###` sections under it:
 
 ```text
-## `<your branch>` deployment
+## DEPLOY: `<your branch>` · <stamp>
 
-### What does the change on this branch deploy to main?
-#### What makes this change extra special
-### Pull Request · <stamp>
+### What makes this deploy extra special
+### Pull Request
 ```
 
 **The headings carry what three sections used to.** The `##` names the branch — so the branch *type* is its
-prefix — and the stamp on `Pull Request` is the moment the branch landed, written by the fold. The moment it
-*began* is stamped on `branch-cycle.md`, the file whose life that is. A section restating any of them would
-be one fact in two places.
+prefix — and the stamp on that same heading is the moment the branch landed, written by the fold. The moment
+it *began* is stamped on the document's own `#` heading. A section restating any of them would be one fact
+in two places.
 
-**The opening section holds both tiers, and neither names a number.** Tier 0's reason goes directly under the
-question; the audience tier gets `#### What makes this change extra special` inside that same section, and it
+**The entry holds both tiers, and neither names a number.** Tier 0's reason goes directly under the DEPLOY
+heading — that heading IS its section; the audience tier gets `### What makes this deploy extra special`, and it
 means the one tier your repo has stated in `Get-ReleaseAudienceTier`. Each carries its reason and its
 `**Score:**`; that is the description, written once per audience rather than once as prose and again per tier.
 **A repo that has stated no audience tier gets the older shape instead** — a `#### Tier N` sub-section for
@@ -98,8 +97,8 @@ that is the seam doing its job — compare against your own file, not against th
 the exception: it is a machine-read key that the writer, the PR gate and the fold all match on literally,
 so it is never translated.
 
-**The file is bare** — headings and the space under them. The guidance for each field lives in
-`workflow-davekjohn/branch/templates/`, which is what those copies are for.
+**The guidance is in the document** — an HTML comment over every field, saying what a good answer looks
+like. The fold strips comments on the way to your changelog, so leaving one standing is not a defect.
 
 ### 2. Work, and keep the plan current
 
@@ -224,7 +223,7 @@ most consequential change leads instead of sitting wherever its branch prefix ha
 
 **Score it against the rubric your repo declares**, in `Get-EntrySignificanceRubricLevels`. You do not have
 to go looking for it: `new-branch` prints the rubric when it writes the file, and the guidance in
-`workflow-davekjohn/branch/templates/` points back at that printout. The bands are anchored on purpose — an unanchored ordinal
+the document points back at that printout. The bands are anchored on purpose — an unanchored ordinal
 scale invites false precision, and the anchors are what make the number a measurement rather than a mood.
 **The `Why` above each score is the lasting half**: the rubric says which band, the `Why` says why *this*
 change is in it, and that is the only part a reader a year later can use.

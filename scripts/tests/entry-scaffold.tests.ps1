@@ -158,7 +158,7 @@ try {
     Push-Location $fixture
     try {
         $env:CLAUDE_PROJECT_DIR = $fixture
-        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'scripts\task\new-branch.ps1') -Name 'feat/round-trip' 2>$null | Out-Null
+        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'scripts\task\new-branch.ps1') -Name 'feat/round-trip-v1' 2>$null | Out-Null
     } finally {
         Remove-Item Env:\CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue
         Pop-Location
@@ -167,66 +167,71 @@ try {
     $ErrorActionPreference = $prevEap
 }
 
-# branch/branch-deployment.md, not feat-round-trip.md in the root: since the branch/ split the writer uses
-# fixed paths, and the path it uses comes from the same lib the readers use.
-$writtenEntry = Join-Path $fixture ((Get-BranchFilePaths).Deployment)
-Assert-True (Test-Path -LiteralPath $writtenEntry) 'the writer produced an entry file in the fixture'
+# ONE DOCUMENT, at a fixed path: workflow-davekjohn/development-cycle.md, not feat-round-trip-v1.md in the
+# root and not a pair under branch/. The path comes from the same lib the readers use.
+$writtenDoc = Join-Path $fixture ((Get-BranchFilePaths).File)
+Assert-True (Test-Path -LiteralPath $writtenDoc) 'the writer produced the development cycle in the fixture'
+# BOTH HALVES ANSWER SEPARATELY, which is the claim the merge has to keep. Split-DevelopmentCycle is what
+# every reader in the system uses to find the boundary, so asserting through it is asserting the contract
+# rather than a shape this test invented.
+$docText  = if (Test-Path -LiteralPath $writtenDoc) { [System.IO.File]::ReadAllText($writtenDoc, [System.Text.Encoding]::UTF8) } else { '' }
+$docSplit = Split-DevelopmentCycle -Text $docText
+Assert-Equal $true $docSplit.Found 'the document carries a DEPLOY section, so the fold has a boundary to split on'
+Assert-Equal 'feat/round-trip-v1' (Get-BranchFileDeclaredBranch -Text $docText) 'the document names the branch it belongs to -- the fold reads this back to find the PR'
+Assert-True ($docSplit.Head -match '(?m)^- \[ \] ') 'the step half opens its list with an unticked item'
+# THE STEP HALF IS NOT AN ENTRY, and asserting it through the gate's own reader is the point: the scaffold
+# gate must never be handed the plan. Before the merge this was a separate FILE and the assert was free;
+# now it is a section, and the thing being proven is that the split holds.
+Assert-Equal 0 @(Get-EntryScaffoldFindings -EntryText $docSplit.Head -Wording (Get-EntryScaffoldWording)).Count 'the step half carries no entry-scaffold markers -- it is not an entry and must not be judged as one'
+# AND A CHECKBOX INSIDE THE ENTRY IS NOT A STEP. The gate reads the head, so an entry describing work in
+# checkbox shape cannot hold up a PR -- the one regression the merge could introduce that no other assert
+# here would see.
+$stepsBefore = @(Get-BranchProgressFindings -Text $docText).Count
+$withProse   = $docText -replace '(?m)^\*\*Score:\*\*$', "- [ ] a sentence in the entry's prose`r`n`r`n**Score:**"
+Assert-Equal $stepsBefore @(Get-BranchProgressFindings -Text $withProse).Count 'a checkbox written into the entry is prose, and the step gate does not count it'
 
-# THE SECOND FILE, which is the half of the split the entry itself can no longer be asked about: the step
-# list exists, names the branch it was created on, and is a separate document rather than a section of the
-# entry. Asserted on the real writer's output for the same reason the entry is.
-$writtenProgress = Join-Path $fixture ((Get-BranchFilePaths).Cycle)
-Assert-True (Test-Path -LiteralPath $writtenProgress) 'the writer produced the step list beside it'
-if (Test-Path -LiteralPath $writtenProgress) {
-    $progressText = [System.IO.File]::ReadAllText($writtenProgress, [System.Text.Encoding]::UTF8)
-    Assert-Equal 'feat/round-trip' (Get-BranchFileDeclaredBranch -Text $progressText) 'the step list names the branch it belongs to -- the fold reads this back to find the PR'
-    Assert-True ($progressText -match '(?m)^- \[ \] ') 'and it opens its list with an unticked item'
-    Assert-Equal 0 @(Get-EntryScaffoldFindings -EntryText $progressText -Wording (Get-EntryScaffoldWording)).Count 'the step list carries no entry-scaffold markers -- it is not an entry and must not be judged as one'
-}
-
-# --- THE TEMPLATES ARE WRITTEN INTO THE REPO THE WRITER RUNS IN ------------------------------------
+# --- NOTHING IS GENERATED BESIDE THE DOCUMENT ANY MORE --------------------------------------------
 # THE FIXTURE IS A CONSUMER, and that is the whole point of asserting it here. It holds the shared scripts
-# and nothing else -- no lint, no hand-written templates -- which is exactly what a consuming repo has.
+# and nothing else -- no lint, no hand-written references -- which is exactly what a consuming repo has.
 #
-# THE REGRESSION THIS PINS. Until August 7, 2026 nothing created branch/templates/ anywhere: they existed
-# in the source repo because they were written by hand there, and the check that holds them to
-# Get-BranchTemplates is repo-owned. When the working files became bare, the source repo's guidance moved
-# to those templates and a consumer's went away entirely -- their only remaining description of the form
-# was the skill page. Found by asking whether "see the templates" resolves in a consumer repo.
-foreach ($tpl in (Get-BranchTemplates)) {
-    $tplPath = Join-Path $fixture ($tpl.Path -replace '/', '\')
-    Assert-True (Test-Path -LiteralPath $tplPath) "the writer created $($tpl.Path) -- a consumer has no other source for the guidance"
-    if (Test-Path -LiteralPath $tplPath) {
-        $onDisk = ([System.IO.File]::ReadAllText($tplPath, [System.Text.Encoding]::UTF8)) -replace "`r`n", "`n"
-        Assert-Equal ($tpl.Content -replace "`r`n", "`n") $onDisk "and $($tpl.Path) is exactly what the formatters produce"
-    }
-}
+# WHAT THIS BLOCK USED TO PIN, AND WHY IT IS THE OPPOSITE ASSERT NOW. Until August 7, 2026 nothing created
+# branch/templates/ anywhere: they existed in the source repo because they were written by hand there, and
+# the check holding them to Get-BranchTemplates is repo-owned. When the working files became bare, the
+# source repo's guidance moved to those templates and a consumer's went away entirely -- so new-branch was
+# made to write and refresh them. Inbound #810 is what the arrangement still cost: the guidance was in the
+# file NEXT TO the one you write in. The merged document carries its own, so the reference is gone and this
+# assert is that it stays gone -- a directory nobody maintains is a directory that drifts.
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $fixture 'workflow-davekjohn\branch'))) 'the writer creates no branch/ directory -- the document carries its own guidance'
 
-# REFRESHED, NOT MERELY CREATED. A template that has drifted -- a consumer carrying last release's copy --
-# is rewritten, which is what carries a format change into their reference through the same plugin update
-# that carries it into their scripts. Without this they would be correct on the day branch/ appeared and
-# stale from the next release on, which is the drift the whole mechanism exists to prevent.
-$driftTpl = Join-Path $fixture ((Get-BranchTemplates)[0].Path -replace '/', '\')
-[System.IO.File]::WriteAllText($driftTpl, "stale content from an older release`n", (New-Object System.Text.UTF8Encoding $false))
+# AND THE GUIDANCE IS IN THE FILE A BRANCH ACTUALLY GETS, which is the half #810 reported. Asserted on one
+# of the blocks the report named rather than on "some comment exists": a document that kept the headings and
+# lost the hints would pass a laxer test.
+Assert-True ($docText -match 'ABOVE the Score line') 'the branch document carries the field guidance itself'
+Assert-True ($docText -match 'FROM THE REPO ROOT') 'including the link convention, which cannot be derived from the file in front of you'
+
+# A RERUN CHANGES NOTHING, which is what idempotency means once there is no reference copy to refresh. The
+# author's own document must survive it untouched -- byte for byte, because a rerun that "helpfully"
+# rewrote the shape would take somebody's written entry with it.
+$beforeRerun = $docText
 $prevEap2 = $ErrorActionPreference
 try {
     $ErrorActionPreference = 'Continue'
     Push-Location $fixture
     try {
         $env:CLAUDE_PROJECT_DIR = $fixture
-        # Same branch again: new-branch is idempotent, so this is the rerun that has to refresh the drifted
-        # template while leaving the entry and the step list exactly as the author left them.
-        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'scripts\task\new-branch.ps1') -Name 'feat/round-trip' 2>$null | Out-Null
+        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'scripts\task\new-branch.ps1') -Name 'feat/round-trip-v1' 2>$null | Out-Null
     } finally {
         Remove-Item Env:\CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue
         Pop-Location
     }
 } finally { $ErrorActionPreference = $prevEap2 }
-$refreshed = ([System.IO.File]::ReadAllText($driftTpl, [System.Text.Encoding]::UTF8)) -replace "`r`n", "`n"
-Assert-Equal ((Get-BranchTemplates)[0].Content -replace "`r`n", "`n") $refreshed 'a drifted template is rewritten, so a format change reaches a consumer reference too'
+Assert-Equal $beforeRerun ([System.IO.File]::ReadAllText($writtenDoc, [System.Text.Encoding]::UTF8)) 'a rerun on the same branch leaves the document exactly as it was'
 
-if (Test-Path -LiteralPath $writtenEntry) {
-    $text = [System.IO.File]::ReadAllText($writtenEntry, [System.Text.Encoding]::UTF8)
+if ($docSplit.Found) {
+    # THE ENTRY HALF, through the splitter every reader uses. Handed the whole document these asserts would
+    # measure the plan too -- the scaffold findings would count the guidance in the head, and the "opens with
+    # its own heading" assert would see the document's H1.
+    $text = [string]$docSplit.Entry
     $roundTrip = @(Get-EntryScaffoldFindings -EntryText $text -Wording (Get-EntryScaffoldWording))
     Assert-True ($roundTrip.Count -gt 0) 'the matcher sees the writer output as scaffolded -- writer and guard share one source'
     # THREE FINDINGS, AND NONE OF THEM IS A STRING. The dossier form writes no visible placeholder at all --
@@ -262,7 +267,7 @@ if (Test-Path -LiteralPath $writtenEntry) {
     # THE HEADING NAMES THE BRANCH, not the change (Dave, August 6, 2026). Asserted against the reader that
     # has to get it back out: the fold looks the PR up by this name, so writer and reader agreeing about the
     # backticks is the whole contract.
-    Assert-Equal 'feat/round-trip' (Get-BranchFileDeclaredBranch -Text $text) 'the entry heading names the branch, and reads back as it'
+    Assert-Equal 'feat/round-trip-v1' (Get-BranchFileDeclaredBranch -Text $text) 'the entry heading names the branch, and reads back as it'
     # THE WRITTEN KEYS, NOT EVERY RECOGNISED ONE (August 16, 2026). Get-EntrySectionHeadings answers for the
     # four retired keys too -- that is what keeps the entries already in CHANGELOG.md readable -- so walking
     # it here would demand headings the scaffolder deliberately stopped writing.
@@ -1141,7 +1146,7 @@ Assert-Equal 'still the scaffolded step' $stubFindings[0].Label 'and it is named
 
 # ...and an UNticked one is reported once, not twice -- it is open, which is the more actionable of the
 # two labels and the one that tells the author what to do.
-$freshScaffold = ((Format-BranchProgressScaffold -Branch 'feat/fresh') -join "`n")
+$freshScaffold = ((Format-DevelopmentCycle -Branch 'feat/fresh') -join "`n")
 
 # THE STEP LIST CARRIES THE PLAN AND NOTHING ELSE (Dave, August 7, 2026). Description, ID and type briefly
 # sat at the top of BOTH branch files so the pair would say whose it is; they were removed from this one,
@@ -1161,7 +1166,7 @@ Assert-Equal 'still open' $freshFindings[0].Label 'and the open label wins, beca
 
 # The reset state carries NO steps, so a branch made by hand rather than by new-branch is not refused --
 # the one-commit typo fix. Deliberate tolerance, asserted so it cannot be tightened by accident.
-Assert-Equal 0 @(Get-BranchProgressFindings -Text ((Format-BranchProgressReset) -join "`n")).Count 'the reset state has nothing to resolve -- an absent plan is not a refusal'
+Assert-Equal 0 @(Get-BranchProgressFindings -Text ((Format-DevelopmentCycleReset) -join "`n")).Count 'the reset state has nothing to resolve -- an absent plan is not a refusal'
 
 # --- The SDLC arc (#655) ------------------------------------------------------------------------------
 # THE PHASES ARE DRAWN ON TOP OF THE GATE, NEVER INTO IT. Get-BranchProgressFindings reads step marks, so a
@@ -1169,12 +1174,17 @@ Assert-Equal 0 @(Get-BranchProgressFindings -Text ((Format-BranchProgressReset) 
 # mechanism. Asserted in that order: the headings are there, AND they change no verdict.
 Write-Host "the step list follows the SDLC arc (#655)" -ForegroundColor Cyan
 $phases = @((Get-BranchFileWording).StepPhases)
-Assert-Equal 4 $phases.Count 'four phases are configured -- PLAN, CREATE, TEST, DEPLOY'
+# THREE IN THE SEAM, FOUR IN THE DOCUMENT (August 23, 2026). DEPLOY left this list when the entry became
+# that phase: it is written by Format-EntryBlock, which owns what goes in it, rather than by the step
+# formatter. So the arc is unchanged and the assert follows where each heading is produced.
+Assert-Equal 3 $phases.Count 'three step phases are configured -- PLAN, CREATE, TEST'
+
 # THE LEVEL IS READ, NOT TYPED, and that is the repair rather than a style point: these asserts were
 # pinned on a literal '###' and went red the moment Dave promoted the file's whole structure by hand
 # (August 19, 2026). A test that hardcodes the shape it is measuring reports a deliberate change as a
 # defect, which is exactly the noise that gets a suite skipped.
 $cycleSec = '#{' + (Get-BranchCycleSectionLevel) + '}'
+Assert-True (((Format-DevelopmentCycle -Branch 'feat/arc-v1') -join "`n") -match "(?m)^$cycleSec\s+DEPLOY:") 'and the document carries DEPLOY as its fourth, written by the entry formatter'
 foreach ($phase in $phases) {
     Assert-True ($freshScaffold -match "(?m)^$cycleSec\s+$([regex]::Escape($phase))\s*$") "the scaffold carries a '$phase' heading"
 }
@@ -1203,39 +1213,54 @@ Assert-True ($createBlock -match [regex]::Escape((Get-BranchFileWording).FirstSt
 $emptyPhases = "### PLAN`n`n### CREATE`n`n- [x] did the thing`n`n### TEST`n"
 Assert-Equal 0 @(Get-BranchProgressFindings -Text $emptyPhases).Count 'a phase with nothing under it is not a finding'
 
-# The template shows the arc but never a step -- an example whose first line is somebody else's TODO gets
-# copied in, which is the rule the template already lived by before the phases existed.
-$phaseTemplate = ((Format-BranchProgressScaffold -Branch 'x/y' -Template) -join "`n")
-Assert-True ($phaseTemplate -match "(?m)^$cycleSec\s+PLAN\s*`$") 'the template carries the arc'
+# THE REFERENCE COPY IS THE TRUNK STATE NOW, and it shows the arc but never a step -- an example whose
+# first line is somebody else's TODO gets copied in, which is the rule the retired template lived by. A
+# BRANCH's document does carry one open step, which is what gives the gate something to refuse; the two
+# are asserted against each other rather than separately.
+$phaseTemplate = ((Format-DevelopmentCycleReset) -join "`n")
+Assert-True ($phaseTemplate -match "(?m)^$cycleSec\s+PLAN\s*`$") 'the reference copy carries the arc'
 Assert-Equal 0 @(Get-BranchProgressFindings -Text $phaseTemplate).Count 'and still carries no step of its own'
+Assert-Equal 1 @(Get-BranchProgressFindings -Text ((Format-DevelopmentCycle -Branch 'x/y-v1') -join "`n")).Count 'while the file a branch gets carries exactly one, so the gate has something to refuse'
 
 # Fence-aware, like every reader of this format: this repo's own branch/README.md quotes all three marks
 # while teaching them, and a step list may legitimately do the same.
 $quoted = "## Steps`n`n- [x] documented the marks`n`n" + '```text' + "`n- [ ] not done yet`n" + '```' + "`n"
 Assert-Equal 0 @(Get-BranchProgressFindings -Text $quoted).Count 'an open step QUOTED inside a fence is not an open step'
 
-# --- cycle and deployment: the rename, the two stamps, and the dual-read (Dave, August 19, 2026) ---
+# --- one document, and every older name still read (Dave, August 23, 2026) -------------------------
 Write-Host ""
-Write-Host "the pair is cycle + deployment, and the old names are still read" -ForegroundColor Cyan
+Write-Host "one development cycle, and the old names are still read" -ForegroundColor Cyan
 
 $bfp = Get-BranchFilePaths
-Assert-True ($bfp.Cycle.EndsWith('branch-cycle.md')) 'the step list is written as branch-cycle.md'
-Assert-True ($bfp.Deployment.EndsWith('branch-deployment.md')) 'and the entry as branch-deployment.md'
-Assert-True ($bfp.LegacyCycle.EndsWith('branch-progress.md')) 'the pre-rename step list is still named'
-Assert-True ($bfp.LegacyDeployment.EndsWith('branch-changelog.md')) 'and so is the pre-rename entry'
+Assert-True ($bfp.File.EndsWith('development-cycle.md')) 'the branch document is development-cycle.md'
+Assert-Equal $bfp.File $bfp.Cycle 'and both halves answer the same path -- the names are kept so a gate can say WHICH half it read'
+Assert-Equal $bfp.File $bfp.Deployment 'the entry half too'
+Assert-True ($bfp.LegacyCycle.EndsWith('branch-cycle.md')) 'the pre-merge step list is still named'
+Assert-True ($bfp.LegacyDeployment.EndsWith('branch-deployment.md')) 'and so is the pre-merge entry'
+Assert-True ($bfp.OlderCycle.EndsWith('branch-progress.md')) 'and the name before that'
+Assert-True ($bfp.OlderDeployment.EndsWith('branch-changelog.md')) 'and its entry counterpart'
 
 # THE DUAL-READ IS WHAT KEEPS A BRANCH IN FLIGHT WHOLE, so it is measured on a tree rather than asserted
-# about the strings: a repo holding only the old name must resolve to the old name, or its entry is
-# invisible to the fold and its steps to the gate.
+# about the strings: a repo holding only an old name must resolve to that name, or its entry is invisible
+# to the fold and its steps to the gate.
+#
+# AND EXISTENCE IS NOT THE TEST ANY MORE, which is the case this block had to gain (August 23, 2026). The
+# new file lands on the TRUNK in its reset state, so a branch created before the merge has it -- empty --
+# beside the pair holding its real work. A resolver keyed on Test-Path would hand that branch the empty
+# document and call its entry missing. So the scenario below is the one that would have gone wrong:
+# both present, and the OLD one is the one that names this branch.
 $resolveFx = Join-Path ([System.IO.Path]::GetTempPath()) "branch-file-resolve-$PID"
 if (Test-Path -LiteralPath $resolveFx) { Remove-Item -Recurse -Force -LiteralPath $resolveFx }
 New-Item -ItemType Directory -Path (Join-Path $resolveFx ($bfp.Directory -replace '/', '\')) -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $resolveFx 'workflow-davekjohn\branch') -Force | Out-Null
 try {
-    Assert-Equal $bfp.Cycle (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'neither file present: the resolver names the CURRENT one, so a writer creates that'
-    [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.LegacyCycle -replace '/', '\')), "# `main` progress`n")
-    Assert-Equal $bfp.LegacyCycle (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'only the old name present: the resolver finds it, so a branch in flight is not stranded'
-    [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.Cycle -replace '/', '\')), "# `main` cycle`n")
-    Assert-Equal $bfp.Cycle (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'both present: the current name wins'
+    Assert-Equal $bfp.File (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'nothing present: the resolver names the CURRENT one, so a writer creates that'
+    [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.LegacyCycle -replace '/', '\')), "# ``feat/in-flight`` cycle`n")
+    Assert-Equal $bfp.LegacyCycle (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'only the old name present, and it names a branch: the resolver finds it, so a branch in flight is not stranded'
+    [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.File -replace '/', '\')), "# Development cycle: ``main``$([char]0x00B7)`n")
+    Assert-Equal $bfp.LegacyCycle (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'both present and the NEW one is the trunk reset: the old one still wins, because it is the one holding work'
+    [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.File -replace '/', '\')), "# Development cycle: ``feat/mine``$([char]0x00B7)`n")
+    Assert-Equal $bfp.File (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'both naming a branch: the current name wins'
 } finally {
     Remove-Item -Recurse -Force -LiteralPath $resolveFx -ErrorAction SilentlyContinue
 }
@@ -1243,29 +1268,36 @@ try {
 # THE TWO STAMPS SIT AT THE TWO ENDS OF THE BRANCH'S LIFE. The creation stamp is the cycle file's, written
 # by the scaffolder; the landing stamp is the entry's, written by the fold. Neither may appear in the
 # other's document -- that is the whole reason the ID moved out of the entry heading.
-$stampedCycle = ((Format-BranchProgressScaffold -Branch 'feat/x' -Id '20260819-171500') -join "`n")
-Assert-True ((($stampedCycle -split "`n")[0]) -match ('^#{' + (Get-BranchCycleHeadingLevel) + '} `feat/x` cycle ' + [regex]::Escape((Get-EntryIdSeparator)) + ' 20260819-171500$')) 'the cycle heading carries the branch and its creation stamp'
-$bareEntry = ((Format-EntryBlock -Branch 'feat/x' -Description 'A title' -Type 'Enhancement') -join "`n")
+$stampedCycle = ((Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260819-171500') -join "`n")
+Assert-True ((($stampedCycle -split "`n")[0]) -match ('^#{' + (Get-BranchCycleHeadingLevel) + '} Development cycle: `feat/x-v1` ' + [regex]::Escape((Get-EntryIdSeparator)) + ' 20260819-171500$')) 'the document heading carries its title, the branch and the creation stamp'
+$bareEntry = ((Format-EntryBlock -Branch 'feat/x-v1' -Description 'A title' -Type 'Enhancement') -join "`n")
 Assert-True (-not ($bareEntry -match '\d{8}-\d{6}')) 'and a freshly scaffolded entry carries no stamp anywhere -- the fold has not run'
 
-$templateCycle = ((Format-BranchProgressScaffold -Branch 'x/y' -Template) -join "`n")
-Assert-True ($templateCycle.Contains((Get-EntryIdTemplatePlaceholder))) 'the cycle template shows the creation stamp as a placeholder'
-$templateEntry = ((Format-EntryBlock -Branch 'x/y' -Template) -join "`n")
-Assert-True ($templateEntry.Contains((Get-EntryMergeStampTemplatePlaceholder))) 'and the deployment template shows the landing stamp as one'
+# THE REFERENCE COPY SHOWS BOTH STAMPS AS PLACEHOLDERS, which is what separates it from a branch's file now
+# that the guidance is unconditional: it is the only difference left, and it is the honest one -- neither
+# moment exists for the trunk.
+$templateCycle = ((Format-DevelopmentCycleReset) -join "`n")
+Assert-True ($templateCycle.Contains((Get-EntryIdTemplatePlaceholder))) 'the reference copy shows the creation stamp as a placeholder'
+Assert-True ($templateCycle.Contains((Get-EntryMergeStampTemplatePlaceholder))) 'and the landing stamp as one'
 
 # THE RESTAMP, WHICH IS THE HALF A READER CAN BREAK. A stamped section heading is still the section: if
 # any of the six matchers had kept its bare '\s*$', the entry would report the section as ABSENT -- read
 # by the gates as "not answered yet" and by the fold as nothing to fill.
 $stamped = Set-EntryMergeStamp -EntryText $bareEntry -Stamp '20260819-171500'
-Assert-True ($stamped -match ('(?m)^### Pull Request ' + [regex]::Escape((Get-EntryIdSeparator)) + ' 20260819-171500$')) 'the fold stamps the landing moment onto the Pull Request heading'
-Assert-Equal 'A title' (Get-EntrySectionBody -EntryText $stamped -Key 'PullRequest') 'and the section is still found under its stamped heading'
+Assert-True ($stamped -match ('(?m)^## DEPLOY: `feat/x-v1` ' + [regex]::Escape((Get-EntryIdSeparator)) + ' 20260819-171500$')) 'the fold stamps the landing moment onto the entry''s own heading'
+Assert-True (-not ($stamped -match '(?m)^### Pull Request .+\d{8}-\d{6}')) 'and not onto the Pull Request heading, where it sat for four days'
+# Get-EntrySectionAnswer, not -Body: the guidance comment is unconditional since August 23, 2026, so the
+# RAW body opens with the form. The answer reader strips it, which is what open-pr composes the PR title
+# from -- asserted here because that is the reader whose mistake would ship an HTML comment as a PR title.
+Assert-Equal 'A title' (Get-EntrySectionAnswer -EntryText $stamped -Key 'PullRequest') 'and the section is still found under its stamped heading'
+Assert-Equal 'A title' (Get-EntryPrTitle -EntryText $stamped) 'and the PR title reads past the guidance rather than out of it'
 Assert-True (Test-EntryHasSection -EntryText $stamped -Key 'PullRequest') 'and still counts as present, so the emptiness gate does not accuse it'
 Assert-True (Test-EntryDeclaresShape -EntryText $stamped) 'and the entry still declares its shape'
 
 # Restamped rather than appended to, so folding twice cannot grow a line of timestamps -- and a heading
 # still carrying the TEMPLATE's placeholder comes out with a real stamp.
 $twice = Set-EntryMergeStamp -EntryText $stamped -Stamp '20260820-090000'
-Assert-True ($twice -match '(?m)^### Pull Request .+ 20260820-090000$') 'a second fold restamps'
+Assert-True ($twice -match '(?m)^## DEPLOY: .+ 20260820-090000$') 'a second fold restamps'
 Assert-True (-not ($twice -match '20260819-171500')) 'and does not leave the first stamp behind'
 Assert-Equal $bareEntry (Set-EntryMergeStamp -EntryText $bareEntry -Stamp '') 'an empty stamp changes nothing -- a fold with no PR leaves the heading bare'
 
@@ -1339,7 +1371,7 @@ Assert-True (Test-EntryDeclaresShape -EntryText $preDossier) 'a pre-dossier entr
 # Their only way out was forking new-branch.ps1, the duplication #410 had just removed.
 Write-Host ""
 Write-Host "the trunk warning: its lead is wording, not formatter output" -ForegroundColor Cyan
-$defaultReset = (Format-BranchChangelogReset) -join "`n"
+$defaultReset = (Format-DevelopmentCycleReset) -join "`n"
 Assert-True ($defaultReset -match '(?m)^> \*\*You are on `main`\.\*\* Do not work in this file yet') 'default: the lead is unchanged, on one line with the first warning line'
 
 # The override, injected the way the seam is reached in a real repo: repo-config.ps1 defines the function
@@ -1351,7 +1383,7 @@ function Get-BranchFileWordingOverrides {
         TrunkWarning     = @('Schrijf hier nog niet -- maak eerst een branch.', 'De tweede regel.')
     }
 }
-$dutchReset = (Format-BranchChangelogReset) -join "`n"
+$dutchReset = (Format-DevelopmentCycleReset) -join "`n"
 Assert-True ($dutchReset -match '(?m)^> LET OP: je zit op `main`\. Schrijf hier nog niet') 'override: the lead is the consumer''s sentence, with the trunk name in the position THEY chose'
 # SCOPED TO THE WARNING BLOCK, and the first version of this assert was not -- it read the whole document
 # for 'You are on' and went red on the reset prose ('the changelog entry of the branch you are on'), which
@@ -1368,7 +1400,7 @@ Remove-Item -Path Function:\Get-BranchFileWordingOverrides
 function Get-BranchFileWordingOverrides { return @{ TrunkWarningLead = 'Pas op {let op} op `{0}`:' } }
 $braceReset = ''
 $threw = $false
-try { $braceReset = (Format-BranchChangelogReset) -join "`n" } catch { $threw = $true }
+try { $braceReset = (Format-DevelopmentCycleReset) -join "`n" } catch { $threw = $true }
 Assert-Equal $false $threw 'brace: a lead carrying a literal brace does not throw'
 Assert-True ($braceReset -match [regex]::Escape('Pas op {let op} op `main`:')) 'brace: the brace is passed through verbatim and the placeholder still resolves'
 Remove-Item -Path Function:\Get-BranchFileWordingOverrides
@@ -1380,12 +1412,12 @@ Remove-Item -Path Function:\Get-BranchFileWordingOverrides
 # established it is not. The formatter's own guard against a dangling '> ' is therefore unreachable through
 # the seam and stays as a guard on the DEFAULT being non-empty, which is worth having either way.
 function Get-BranchFileWordingOverrides { return @{ TrunkWarningLead = '' } }
-$noLead = (Format-BranchChangelogReset) -join "`n"
+$noLead = (Format-DevelopmentCycleReset) -join "`n"
 Assert-Equal $defaultReset $noLead 'empty lead: an empty override is ignored -- the default sentence stands, as for every other key'
 Remove-Item -Path Function:\Get-BranchFileWordingOverrides
 # The default is back, so nothing below inherits an override. Asserted rather than assumed: a leaked
 # override would make every later assert read a document no repo produces.
-Assert-Equal $defaultReset ((Format-BranchChangelogReset) -join "`n") 'teardown: the default reset is restored once the seam function is gone'
+Assert-Equal $defaultReset ((Format-DevelopmentCycleReset) -join "`n") 'teardown: the default reset is restored once the seam function is gone'
 
 Write-Host ""
 Write-Host "Remove-EntryAdminSections" -ForegroundColor Cyan
@@ -1526,12 +1558,16 @@ Assert-Equal 2 (Get-EntryTierMax) 'the model still HAS three tiers while a tier-
 # than on a fixed pair -- form text sending an author to a heading that is not in the file.
 function Get-ReleaseAudienceTier { 2 }
 $audienceScaffold = (Format-EntrySignificanceSections -WithGuidance) -join "`n"
-# NEITHER TIER NAMES ITSELF SINCE AUGUST 19, 2026. Tier 0 lost its heading entirely -- the question the entry
-# opens with IS its section -- and the audience tier's '####' sub-heading was retexted to say what is being
-# asked. Levels unchanged, which is the half Dave settled on after looking at the relevelled version: a form
-# naming 'Tier 2' is only right for a repo whose audience is 2, and this one ships to consumers who answer 1.
-Assert-True ($audienceScaffold -match ('(?m)^' + [regex]::Escape((Get-EntrySectionHeading -Key 'What')) + '$')) 'the scaffold writes tier 0 as the entry opening question'
-Assert-True ($audienceScaffold -match ('(?m)^#### ' + [regex]::Escape((Get-EntryTierHigherHeading)) + '$')) 'and the audience tier as a sub-heading inside it'
+# NEITHER TIER NAMES ITSELF SINCE AUGUST 19, 2026, AND TIER 0 HAS NO HEADING AT ALL SINCE AUGUST 23. The
+# question that headed it went away when the entry became the development cycle's DEPLOY section: that
+# heading is now tier 0's section, one level up, and the audience tier's heading moved up with it -- an H3
+# beside 'Pull Request' rather than an H4 nested under a question that no longer exists. What is unchanged
+# is that no heading names a tier by number: a form saying 'Tier 2' is only right for a repo whose audience
+# is 2, and this one ships to consumers who answer 1.
+Assert-True ($audienceScaffold -notmatch ('(?m)^#+ ' + [regex]::Escape((Get-EntrySectionHeading -Key 'What')) + '$')) 'tier 0 gets no heading of its own -- the entry heading above it is its section'
+Assert-Equal '' (Get-EntryTierSectionMarker -Tier 0) 'and the marker says so, so a writer cannot emit one'
+Assert-True ($audienceScaffold -match ('(?m)^#{' + (Get-EntryTierSubLevel) + '} ' + [regex]::Escape((Get-EntryTierHigherHeading)) + '$')) 'and the audience tier is the entry''s first inner heading'
+Assert-Equal 3 (Get-EntryTierSubLevel) 'which is the entry''s own section level in the named shape'
 Assert-True ($audienceScaffold -notmatch '(?m)^#{3,4} Tier \d+$') 'and no heading names a tier by its number at all'
 foreach ($gone in @(Get-EntryTierHigherRetiredHeadings)) {
     Assert-True ($audienceScaffold -notmatch [regex]::Escape($gone)) "nor the retired wording '$gone' it replaced"
@@ -1544,7 +1580,9 @@ Assert-True ($audienceScaffold -match [regex]::Escape("For tier 2 audiences: $(G
 Assert-True ($audienceScaffold -notmatch '\{0\}') 'and the placeholder is resolved, not shipped'
 # IT STILL RESOLVES TO A NUMBER, which is the half that would fail silently. A heading the parser cannot
 # place reads as "no tier above 0" -- a claim about the change, made by a heading nobody read.
-$higherRead = Resolve-EntryImpact -EntryText ("## Branch ``feat/a`` changelog $(Get-EntryIdSeparator) 1`n`n" + (Get-EntrySectionHeading -Key 'What') + "`n`nwhy`n`n**Score:** 1`n`n#### " + (Get-EntryTierHigherHeading) + "`n`nreaches them`n`n**Score:** 4`n")
+# TODAY'S SHAPE: the entry heading IS tier 0's section, and the audience tier is an H3 under it. Built from
+# the seams rather than typed, so a level change cannot leave this assert testing yesterday.
+$higherRead = Resolve-EntryImpact -EntryText ("## DEPLOY: ``feat/a`` $(Get-EntryIdSeparator) 1`n`nwhy`n`n**Score:** 1`n`n" + ('#' * (Get-EntryTierSubLevel)) + ' ' + (Get-EntryTierHigherHeading) + "`n`nreaches them`n`n**Score:** 4`n")
 Assert-Equal 0 @($higherRead.Errors).Count 'the current shape parses without complaint in a repo that has an audience tier'
 Assert-Equal 2 (@($higherRead.Rows | Where-Object { [int]$_.Tier -eq 2 }).Count + 1) 'and resolve to this repo audience tier, so its score is not lost'
 Assert-Equal 4 ([int](@($higherRead.Rows | Where-Object { [int]$_.Tier -eq 2 })[0].Score)) 'with the score the author actually wrote'
@@ -1599,17 +1637,20 @@ Write-Host "Get-EntryLinkTargets / Get-EntryLinkFindings -- the entry's links re
 # relative link in it has to be root-relative -- which means it looks wrong in the file being edited and
 # only becomes right after it moves. A consumer merged two '../../scripts/...' links that landed at the
 # root pointing outside the repo, with every gate green.
+# ONE '../' SINCE AUGUST 23, 2026, not two: the document sits directly in workflow-davekjohn/ rather than in
+# a branch/ subdirectory of it, so the wrong-but-resolving form an author naturally writes is one level
+# shallower. The depth comes from the seam (Get-BranchFilePaths.Directory), which is what the suggester
+# reads -- so this fixture is the depth the suggester will actually try.
 $linkEntry = @(
-    '## `fix/x` deployment', '',
-    '### What does the change on this branch deploy to main?', '',
-    'See [the lib](scripts/lib/release-lib.ps1) and [the gate](../../scripts/lint/check-plugin-integrity.ps1).',
+    '## DEPLOY: `fix/x-v1`', '',
+    'See [the lib](scripts/lib/release-lib.ps1) and [the gate](../scripts/lint/check-plugin-integrity.ps1).',
     'Also [upstream](https://example.com/x), [an anchor](#somewhere) and [absolute](/etc/x).', '',
     '**Score:** 3', ''
 ) -join "`n"
 $targets = @(Get-EntryLinkTargets -EntryText $linkEntry)
 Assert-Equal 2 $targets.Count 'only the two RELATIVE targets are read -- http, a pure anchor and an absolute path cannot be broken by the move'
 Assert-True ($targets -contains 'scripts/lib/release-lib.ps1') 'the root-relative one is read'
-Assert-True ($targets -contains '../../scripts/lint/check-plugin-integrity.ps1') 'and the branch-relative one, as written'
+Assert-True ($targets -contains '../scripts/lint/check-plugin-integrity.ps1') 'and the branch-relative one, as written'
 
 # THE ANCHOR AND THE TITLE ARE DROPPED: whether a heading exists is a different question with a different
 # answer, and the repo's own link lint already asks it. This function answers only "is there a file there".
@@ -1633,7 +1674,7 @@ Assert-Equal 0 (@(Get-EntryLinkTargets -EntryText $quoting)).Count 'a link quote
 $repoRootForLinks = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $findings = @(Get-EntryLinkFindings -EntryText $linkEntry -RepoRoot $repoRootForLinks)
 Assert-Equal 1 $findings.Count 'the root-relative link resolves and is not reported; the branch-relative one is'
-Assert-Equal '../../scripts/lint/check-plugin-integrity.ps1' $findings[0].Target 'the finding names the link AS WRITTEN, which is what the author has to find in their file'
+Assert-Equal '../scripts/lint/check-plugin-integrity.ps1' $findings[0].Target 'the finding names the link AS WRITTEN, which is what the author has to find in their file'
 # THE SUGGESTION IS THE POINT, not decoration. A finding that only says "does not exist" sends the author to
 # add another '../' -- the repo's own link lint had to learn the same lesson on August 19, 2026.
 Assert-Equal 'scripts/lint/check-plugin-integrity.ps1' $findings[0].Suggested 'and it names the root-relative form, because the naive repair is to add another ../'
@@ -1648,7 +1689,10 @@ Assert-Equal 0 (@(Get-EntryLinkFindings -EntryText '[ok](CHANGELOG.md) and [ok2]
 # still writing. It sits in the 'Tier' block because that is the one rendered above the section the body
 # goes in -- 'What' is not rendered by the two-section entry at all, so a line there would be invisible.
 Assert-True ([string]((Get-EntryGuidance).Tier -join ' ') -match 'FROM THE REPO ROOT') 'the first section''s guidance states the root-relative convention'
-Assert-True ((@(Get-BranchTemplates) | Where-Object { $_.Path -match 'deployment' } | ForEach-Object { $_.Content }) -match 'FROM THE REPO ROOT') 'and it reaches the generated template, which is what a consumer reads'
+# AND IT REACHES THE FILE A BRANCH ACTUALLY GETS, which is where it did NOT reach until August 23, 2026:
+# the guidance rendered into branch/templates/ and the working file was bare. That is what inbound #810
+# measured, and this is the assert that keeps it repaired.
+Assert-True (((Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260823-000000') -join "`n") -match 'FROM THE REPO ROOT') 'and it reaches the document a branch is handed, not a reference beside it'
 
 Write-Host ""
 if ($script:fail -gt 0) {

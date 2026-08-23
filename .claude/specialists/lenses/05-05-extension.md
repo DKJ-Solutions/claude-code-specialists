@@ -58,7 +58,12 @@ Edge cases — classify by **what actually changes**, not which files happen to 
   capability (even when docs come with it — the docs follow the capability).
 - Unknown prefix → label `question` (to be classified later).
 
-**Never "final" in a branch name** — use `-v2`, `-v3`, etc. for a second attempt.
+**Every branch name ends in `-v<N>`** (Dave, August 23, 2026), and `new-branch` completes one that does
+not: `feat/thing` becomes `feat/thing-v1`. A second development cycle on the same subject keeps the name
+and bumps the number — typed deliberately as `-v2`, never guessed, because a scan for the lowest free
+version would turn every rerun of `new-branch` into a new branch and that script is documented idempotent.
+**Never "final" in a branch name** — that is the same rule from the other end: `Test-BranchName` refuses it
+because a name claiming to be the last word is a prediction, and the version number is the honest form.
 
 **Step 3 — create the branch (its changelog entry comes along in the same move):**
 ```sh
@@ -70,9 +75,10 @@ carries the type.
 
 Creating the branch and creating its changelog entry file are no longer two separate manual steps —
 **a branch is never entry-less.** `new-branch.ps1` checks out the branch (idempotently — running it
-again on an existing branch simply resumes it) and writes the branch's two files in `workflow-davekjohn/branch/` in the same
-run: `branch-deployment.md` (the entry) and `branch-cycle.md` (the step list). It also writes the
-reference templates beside them, refreshing one that has drifted. **One script since August 7, 2026** —
+again on an existing branch simply resumes it) and writes `workflow-davekjohn/development-cycle.md` in the
+same run — one document holding both jobs: the step phases, and the `## DEPLOY:` section that is the entry.
+It also **completes the version suffix**, appending `-v1` to a name that carries none, so a second cycle on
+the same subject is a deliberately typed `-v2`. **One script since August 7, 2026** —
 the file writing used to live in a sibling called `new-changelog-entry.ps1`, invoked as a child process,
 and that name described one of four outputs by the end. Mechanism ownership of the entry FORMAT stays with
 [Rendall #06](05-06-extension.md#changelog); Derek's `new-branch` is what writes it at the moment the
@@ -106,7 +112,7 @@ table above).
 [#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506) +
 [#505](https://github.com/DaveKJohn/claude-code-specialists/issues/505)). The PR is called
 `<branch-type>: <the entry's Branch title>`, so the prefix mirrors the branch type by construction and the
-words are the ones already in `workflow-davekjohn/branch/branch-deployment.md`. `-Title` is still accepted and ignored, with a
+words are the ones already in the DEPLOY section of `workflow-davekjohn/development-cycle.md`. `-Title` is still accepted and ignored, with a
 warning naming the title the entry gives.
 
 **That rule used to live in this very paragraph, and was violated five PRs in a row.** It read "the title
@@ -153,7 +159,7 @@ started.
 
 **The PR body fills itself in** via `open-pr.ps1` — simply leave out `-Body`. The script ticks the
 right "Type of change" box (from the branch prefix), fills "What does this change do?" with the
-description from the changelog entry (`workflow-davekjohn/branch/branch-deployment.md`), and ticks the two checklist items
+description from the changelog entry (the DEPLOY section of `workflow-davekjohn/development-cycle.md`), and ticks the two checklist items
 it can honestly verify ("Changelog entry written" + "Requested by Dave"). The first is judged on the file
 actually **holding** an entry, not on its existing — since the split it exists on `main` too, in its
 reset state, so a self-ticking box keyed on existence would tick for a branch that wrote nothing. Only pass `-Body`
@@ -282,7 +288,9 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   [the safety rules](../../../CLAUDE.md#never-directly-on-the-main-branch--via-branch--pr) — a
   visible result, or irreversible/outward-facing work — stop and wait for Dave's word first. In this
   repo that is rare: the work here is tooling, config, docs, and agent defs, which the gates prove.
-- **Never "final" in a branch name.** Use `-v2`, `-v3`, etc. for a second attempt.
+- **Every name ends in `-v<N>`**, completed by `new-branch` when absent. A second cycle on the same subject
+  is `-v2`, typed by hand.
+- **Never "final" in a branch name.** The version suffix is what to use instead — see above.
 - After a merge the remote branch is removed by the repo's **`deleteBranchOnMerge` setting**,
   switched on July 27, 2026. Until then it was **off** while this lens claimed the cleanup came from
   `gh pr merge --delete-branch` and Derek's persona claimed it came from the setting — two different
@@ -392,12 +400,12 @@ entitled to its own. Do not read a consumer without these scripts as misconfigur
 Derek prefers not to touch the git commands by hand. His toolbox:
 
 - `scripts/task/new-branch.ps1 -Name <branch-name> [-Title "…"] [-Intent "…"] [-Park]` — create (or
-  idempotently resume) the branch and, in the same move, write its two files in `workflow-davekjohn/branch/` by
-  calling the shared `new-branch.ps1` as a child step. `-Intent` records where you left
-  off / what is next in **`branch-cycle.md`** — deliberately not in the entry, whose text folds
-  verbatim into `CHANGELOG.md`; `-Park` commits **both** files and pushes the branch to `origin` for
-  later / another device — **still no PR** (#162). Without `-Park`: no push, no PR — just the branch +
-  the two files on disk. See [Step 3 above](#classifying-naming-and-creating-a-branch).
+  idempotently resume) the branch and, in the same move, write its `workflow-davekjohn/development-cycle.md`.
+  `-Intent` records where you left off / what is next **at the top of that document, above the phases** —
+  deliberately not in the DEPLOY section, whose text folds verbatim into `CHANGELOG.md`; `-Park` commits
+  that one file and pushes the branch to `origin` for later / another device — **still no PR** (#162).
+  Without `-Park`: no push, no PR — just the branch + the document on disk. See
+  [Step 3 above](#classifying-naming-and-creating-a-branch).
 - `scripts/task/park-branch.ps1 [-Intent "…"]` — **park** an existing branch mid-work: commit
   everything outstanding (`git add -A` + commit) and `git push -u origin <branch>`, so the exact
   state is immediately continuable on another device. Refuses on `main`, opens **no PR**, and does

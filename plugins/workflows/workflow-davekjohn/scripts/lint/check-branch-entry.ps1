@@ -163,13 +163,24 @@ if (-not (Test-Path -LiteralPath $entryPath)) {
     exit 1
 }
 
-$entryText = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
+# THE DEPLOY SECTION, NOT THE WHOLE DOCUMENT. The entry is a section of development-cycle.md since
+# August 23, 2026, and every reader below is entry-shaped -- handed the plan as well, the scaffold check
+# would accuse the step list of being an unfinished entry. Get-DevelopmentCycleEntryText hands back the
+# whole text for a legacy file that IS an entry, so a branch created before the merge is read as it was.
+$fileText  = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
+$entryText = Get-DevelopmentCycleEntryText -Text $fileText
 
-if (-not (Test-BranchChangelogIsFilled -Text $entryText)) {
+# "IS THIS THE RESET STATE" IS A QUESTION ABOUT THE DOCUMENT, NOT ABOUT THE SECTION -- and asking it of the
+# section is a measured defect rather than a hypothetical. A reset document's DEPLOY section opens with its
+# own '##', so the level half of Test-BranchChangelogIsFilled reads it as an entry: the gate then fell
+# through to the scaffold check and refused a reset file with "has not been written yet" instead of "still
+# in its reset state". Correct verdict, wrong reason, and the wrong reason sends the reader to write in a
+# file they should not be writing in at all. Caught by branch-entry-gate.tests.ps1.
+if (-not (Test-BranchChangelogIsFilled -Text $fileText)) {
     Write-Host "[ERROR] '$entryRel' is still in its empty reset state, so this branch has no entry." -ForegroundColor Red
-    Write-Host '        The reset state is what the fold leaves behind after a merge; it opens with a'
-    Write-Host '        first-level heading, and a written entry opens with a second-level one. Run the'
-    Write-Host '        new-branch skill on this branch and write what the change does.'
+    Write-Host '        The reset state is what the fold leaves behind after a merge; its heading names the'
+    Write-Host '        TRUNK, and a written one names your branch. Run the new-branch skill on this branch'
+    Write-Host '        and write what the change does.'
     exit 1
 }
 

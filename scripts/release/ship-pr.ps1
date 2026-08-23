@@ -391,7 +391,7 @@ if ($ff.ExitCode -ne 0) { Write-Error "git merge --ff-only of origin/main failed
 # IT IS DECLINED, AND THE DECIDING FACT WAS MEASURED RATHER THAN ARGUED. The pathspec above is not merely
 # weakened by that flow -- git refuses to express it at all:
 #
-#     $ git commit -m "merge: feat/x (#1)" -- CHANGELOG.md branch/branch-deployment.md
+#     $ git commit -m "merge: feat/x (#1)" -- CHANGELOG.md workflow-davekjohn/development-cycle.md
 #     fatal: cannot do a partial commit during a merge.
 #
 # The only commit git will make while MERGE_HEAD exists is a whole-index one, and in the same test it swept

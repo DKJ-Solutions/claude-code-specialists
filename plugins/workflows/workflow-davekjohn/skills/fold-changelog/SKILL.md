@@ -4,10 +4,11 @@ description: >-
   Fold a branch's changelog entry into CHANGELOG.md via the shared, centralized fold script from the
   plugin (single source of truth, issue #81) -- so a consumer does not have to duplicate this script
   locally. Use this on main, immediately after merging a branch, to fold the entry
-  (workflow-davekjohn/branch/branch-deployment.md, or a pre-split <branch-name>.md in the repo root) into CHANGELOG.md --
+  (the DEPLOY section of workflow-davekjohn/development-cycle.md, or an older branch/ pair, or a pre-split
+  <branch-name>.md in the repo root) into CHANGELOG.md --
   a flat ranked list with no section headings, where each entry lands at the position its own
   Significance sections rank it at (furthest reach first, highest significance first within a tier) -- and then
-  clear it: the branch/ pair is reset to its empty state, a root entry file is removed.
+  clear it: the development cycle is reset to its empty state, a root entry file is removed.
 disable-model-invocation: true
 ---
 
@@ -25,10 +26,15 @@ where a conflict is pure noise, because the two entries never actually disagree.
 writes its **own** entry file, and this skill folds it in after the merge, when the conflict window is
 already closed.
 
-**The entry is `workflow-davekjohn/branch/branch-deployment.md`** — a fixed path, the same on every branch. Git tracks it
-per branch, so branches in flight cannot collide on it. Its companion `workflow-davekjohn/branch/branch-cycle.md` is the
-step list; it is never folded, and it is what the fold reads the branch name back off in order to find
-the PR.
+**The entry is the DEPLOY section of `workflow-davekjohn/development-cycle.md`** — a fixed path, the same on
+every branch. Git tracks it per branch, so branches in flight cannot collide on it. The phases above that
+section are the step list; they are never folded, and the document's own heading is what the fold reads the
+branch name back off in order to find the PR.
+
+**Which means the fold splits before it folds** (August 23, 2026). It takes the section from the DEPLOY
+heading down and leaves the plan where it is — publishing somebody's ticked checkboxes as a change
+description is exactly what that boundary prevents. Older shapes still fold whole: a `branch/` pair, and a
+pre-split root entry file, are entries from their first line and have no boundary to find.
 
 **Both are cleared by the fold, and neither is deleted.** They are rewritten to their empty **reset
 state** — the state that lives on the trunk, opening with an H1 and carrying a warning not to write there
@@ -108,9 +114,11 @@ So the entry carries what the author knows and the fold adds what only the merge
 from the PR's own merge timestamp rather than from the clock, because a fold does not always run in the
 same minute as its merge.
 
-**And since August 19, 2026 it stands on the `Pull Request` heading rather than on the closing line**
-(Dave) — the counterpart of the creation stamp on `branch-cycle.md`'s heading, so the two ends of a
-branch's life are stamped in the documents that own them. The closing line keeps the clickable
+**And since August 23, 2026 it stands on the `## DEPLOY:` heading** (Dave), where it stood on the
+`Pull Request` heading for four days and on the closing line before that. It is the date the change
+*landed*, and that is the line saying *what* landed — the counterpart of the creation stamp on the
+document's own `#` heading, so the two ends of a branch's life are stamped where they belong. Both are
+read back: an entry carrying the stamp on `Pull Request` still parses. The closing line keeps the clickable
 `[PR #N](url)` and nothing else: one fact, one place. An entry folded without a PR gets neither, because
 there is nothing to read either off.
 
@@ -147,7 +155,7 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/fold-changelo
 lags its own source by however many merges have landed since. A consumer keeps no copy of their own, so
 for them the line above is the correct one.
 
-Without `-Branch` it folds everything it finds: `workflow-davekjohn/branch/branch-deployment.md` if it holds an entry, plus
+Without `-Branch` it folds everything it finds: `workflow-davekjohn/development-cycle.md` if it holds an entry, plus
 any pre-split entry file in the root. An optional `-RepoRoot <path>`
 overrides which repo root the script writes to — for a consumer that runs the fold from a
 temporary/detached worktree (e.g. a `ship-pr.ps1` that checks out main elsewhere) and wants the fold
@@ -155,10 +163,11 @@ to land there instead of wherever `CLAUDE_PROJECT_DIR`/git-root would otherwise 
 #101); omitted, behavior is unchanged. The script:
 
 1. Folds each entry into `CHANGELOG.md`, with the PR number + link included (retrieved via
-   `gh pr list` — keyed on `-Branch`, or on the name in `branch-cycle.md`, or for a pre-split entry
+   `gh pr list` — keyed on `-Branch`, or on the name in the document's heading, or for a pre-split entry
    on its file name).
-2. Clears it afterwards: **`workflow-davekjohn/branch/branch-deployment.md` and `workflow-davekjohn/branch/branch-cycle.md` are reset** to
-   their empty state, a pre-split root entry file is **removed**.
+2. Clears it afterwards: **`workflow-davekjohn/development-cycle.md` is reset** to its empty state in one
+   write, which clears the plan along with the entry; a pre-split root entry file is **removed**, and an
+   older `branch/` step list is reset at today's path.
 
 **Where it lands is the top of the list.** `CHANGELOG.md` is an intro followed by a flat list of `##`
 entries, **newest first**: the entry being folded is the most recently merged one, so it leads. Everything
@@ -295,8 +304,8 @@ this skill.
 ## Important
 
 - **Run this on main, after the merge** (after the PR has been merged) — then the PR number exists.
-- The script only touches `CHANGELOG.md`, the entries it folds and `workflow-davekjohn/branch/branch-cycle.md`; nothing
-  else.
+- The script only touches `CHANGELOG.md` and the entries it folds -- which since the merge is one file
+  fewer, because the step list is a section of the document it already resets; nothing else.
 - This script is maintained in the source repo; do not modify it locally in the consumer. A
   change lands first in the source (`scripts/release/fold-changelog-entry.ps1`) and then travels via
   a release to the plugin mirror — guarded by the shared-scripts drift lint.

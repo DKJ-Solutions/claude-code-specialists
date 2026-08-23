@@ -34,7 +34,7 @@ says out loud.
 
 The full reasoning — the tier model, why the fold rewrites nothing, what a release must earn — ships with
 this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release workflow and
-[`BRANCH-portable.md`](BRANCH-portable.md) for the two branch files, beside
+[`DEVELOPMENT-CYCLE-portable.md`](DEVELOPMENT-CYCLE-portable.md) for the branch's own document, beside
 [`CONTRIBUTING-portable.md`](CONTRIBUTING-portable.md) for the cycle that connects them.
 
 ## What is in this folder
@@ -43,7 +43,7 @@ this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release work
 |---|---|
 | [`CONTRIBUTING-portable.md`](CONTRIBUTING-portable.md) | the contribution cycle in prose, seam-named — the human-facing half, meant to be read alongside your own repo's answers |
 | [`RELEASES-portable.md`](RELEASES-portable.md) | the release workflow: the tier model, what a release must earn, the release documents, and how one is cut — your own `workflow-davekjohn/releases/README.md` holds your answers and your release list |
-| [`BRANCH-portable.md`](BRANCH-portable.md) | the two files a branch works in: the dossier form, the three step marks, the reset state, and what the fold does at the merge |
+| [`DEVELOPMENT-CYCLE-portable.md`](DEVELOPMENT-CYCLE-portable.md) | the document a branch works in: its two halves, the dossier form, the three step marks, the version suffix, the reset state, and what the fold does at the merge |
 | [`TICKETWORK-portable.md`](TICKETWORK-portable.md) | the rules for the layer *before* a branch, in a repo whose work arrives from somebody else's tracker: whether a request can be built as written, and how the answer is recorded. Rules and reasoning only — no template and no script, deliberately |
 | [`skills/`](skills/) | the thirteen skills a specialist invokes — this is where most of the workflow lives |
 | [`scripts/`](scripts/) | the scripts and libs those skills run, mirrored from the source repo's own `scripts/`. **Never edit a file there** — see [its README](scripts/README.md) |
@@ -73,7 +73,7 @@ counts the rows. **Count when you add one.**
 |---|---|
 | [`adopt-workflow-folder`](skills/adopt-workflow-folder/SKILL.md) | right after installing — scaffolds `workflow-davekjohn/`, the one folder in your root where everything portable gathers (an install alone writes nothing into your repo) |
 | [`adopt-config`](skills/adopt-config/SKILL.md) | first-time setup — reads the blueprint, places what states the shared way of working, proposes the rest |
-| [`new-branch`](skills/new-branch/SKILL.md) | starting any piece of work — creates the branch and both `workflow-davekjohn/branch/` files in one move |
+| [`new-branch`](skills/new-branch/SKILL.md) | starting any piece of work — creates the branch and its `workflow-davekjohn/development-cycle.md` in one move |
 | [`prompt`](skills/prompt/SKILL.md) | the assignment written in an editor instead of the terminal — reads `workflow-davekjohn/prompts/prompt.md` and takes it through the ordinary intake |
 | [`park`](skills/park/SKILL.md) | handing an unfinished branch to another machine: push, no PR |
 | [`open-pr`](skills/open-pr/SKILL.md) | the work is committed — runs the four gates, pushes, opens the PR with the title and body composed from the entry |

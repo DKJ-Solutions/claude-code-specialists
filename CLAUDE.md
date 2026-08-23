@@ -265,10 +265,10 @@ The constitution above, concretely implemented here:
   here was measured there. Moved off this always-on path on August 15, 2026, where it was 9,440 B over
   102 lines: 26% of this document, and the same shape as the release craft moved out the day before.
 
-- **Three more gates arrive with the workflow plugin**, and all of them read the branch's own two files.
+- **Three more gates arrive with the workflow plugin**, and all of them read the branch's own document.
   Two run locally: the **scaffold gate** refuses to push an entry still carrying the wording
   `new-branch.ps1` wrote it with, and the **step-list gate** refuses to push *and* to merge while
-  `workflow-davekjohn/branch/branch-cycle.md` has an unresolved step. The third runs in **CI**
+  `workflow-davekjohn/development-cycle.md` has an unresolved step above its DEPLOY heading. The third runs in **CI**
   (`.github/workflows/branch-entry.yml` → `check-branch-entry.ps1`) and exists because the first two are
   escapable by not using the scripts; it re-uses their functions rather than restating the convention, and
   it reports the significance instead of refusing on it. Their mechanics, escape valves and the
@@ -279,10 +279,11 @@ The constitution above, concretely implemented here:
   and that is why they are the three (Dave, August 23, 2026):
   1. The **fold commit** after a merge: [`fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)
      folds the entry into `CHANGELOG.md` and clears it, and with `-Commit`/`-Push` makes that commit
-     itself. **Bounded to three paths** — `CHANGELOG.md`, the entry, and
-     `workflow-davekjohn/branch/branch-cycle.md`, which the same run resets — and the commit names
-     them, so nothing else in the tree can ride along. Committing stays opt-in, because it is this
-     exception being used.
+     itself. **Bounded to two paths** — `CHANGELOG.md` and
+     `workflow-davekjohn/development-cycle.md`, which the same run resets — and the commit names
+     them, so nothing else in the tree can ride along. It was three until August 23, 2026, when the
+     entry and the step list became sections of one document: the bound narrowed with the tree rather
+     than being relaxed. Committing stays opt-in, because it is this exception being used.
   2. The **release commit** (only on explicit request): [`cut-release.ps1`](scripts/release/cut-release.ps1)
      bumps all plugin versions in lockstep, generates the release notes in `releases/development/`,
      **empties `CHANGELOG.md` down to its intro**, commits that on `main`, and tags `vX.Y.Z`.

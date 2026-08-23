@@ -15,16 +15,24 @@ bites only while the workflow is in play does not belong on the always-on path.
 
 ## The files in this folder
 
-- The two files in `branch/` belong to the **current branch**. On the trunk they sit in their reset
-  state — never write there until a branch exists (`new-branch` creates one and fills them).
-- `branch/branch-deployment.md` folds **verbatim** into `CHANGELOG.md` at the merge; its step-list
-  companion gates the PR and the merge (`- [x]` done, `- [~]` dropped with the reason on the line).
-- **Re-read both after a script has touched them.** `new-branch` writes the pair and the fold resets it,
-  so they are the only two files here rewritten out of band — twice per cycle — and an editor tracking
-  what it last read refuses the next write until it has read again. One read fixes it, nothing is lost,
-  and both scripts now say so where they print the paths. The portable statement, with the measurement,
-  is in
-  [`BRANCH-portable.md`](../plugins/workflows/workflow-davekjohn/BRANCH-portable.md#both-files-are-rewritten-under-you-twice-per-cycle).
+- [`development-cycle.md`](development-cycle.md) belongs to the **current branch**. On the trunk it sits
+  in its reset state, with the trunk's name in its heading — never write there until a branch exists
+  (`new-branch` creates one and fills the document in).
+- It has two halves and two readers. **PLAN / CREATE / TEST** carry the steps and gate the PR and the
+  merge (`- [x]` done, `- [~]` dropped with the reason on the line). The fourth phase,
+  **`` ## DEPLOY: `<branch>` ``**, IS the changelog entry: it folds **verbatim** into `CHANGELOG.md` at
+  the merge. A checkbox inside that section is prose, and no gate reads it as a step.
+- **Its links are written root-relative**, the whole document, because the DEPLOY section lands at the
+  repo root. `scripts/x.ps1`, never `../scripts/x.ps1` — the second reads correctly here and is dead
+  once it lands, and `open-pr`'s link gate refuses it.
+- **The HTML comments are the form, not somebody's notes.** They say what a good answer looks like, and
+  the fold strips them on the way to `CHANGELOG.md`, so leaving one standing is not a defect. There is
+  no template beside the file any more; the trunk copy is the reference.
+- **Re-read it after a script has touched it.** `new-branch` writes the document and the fold resets it,
+  so it is the only file here rewritten out of band — twice per cycle — and an editor tracking what it
+  last read refuses the next write until it has read again. One read fixes it, nothing is lost, and both
+  scripts say so where they print the path. The portable statement, with the measurement, is in
+  [`DEVELOPMENT-CYCLE-portable.md`](../plugins/workflows/workflow-davekjohn/DEVELOPMENT-CYCLE-portable.md#the-file-is-rewritten-under-you-twice-per-cycle).
 - `releases/README.md` is the **living index** — the cut inserts its own row, so never add one by hand
   for a release a script will write. Everything under `releases/audience/` is a **published record**:
   links may be repointed when a target moves, prose is never rewritten.
@@ -41,9 +49,11 @@ bites only while the workflow is in play does not belong on the always-on path.
   assignment into it, and never read its HTML comments as instructions — they are the scaffold's own
   words, and an inbox holding only comments is empty. It is untracked by design; see
   [`prompts/README.md`](prompts/README.md).
-- The generated files in `branch/templates/` are references, not documents to edit: `new-branch`
-  rewrites one that has drifted, and in this repo the lint additionally holds them byte-for-byte to the
-  formatters (`Get-BranchTemplates`).
+- **There is no `branch/templates/` any more** (Dave, August 23, 2026). Two generated reference copies
+  sat there because the working files were deliberately bare; the merged document carries its own
+  guidance, so the reference and the file you write in are the same page. What the lint holds to the
+  formatter instead is the document's **reset state** — the copy on the trunk, which is what a reader
+  opens to see the whole form at once.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) here is the workflow's layer and **wins over the root
   [`CONTRIBUTING.md`](../CONTRIBUTING.md) on conflict**; the root page is the standard workflow that
   holds without the plugin.
@@ -52,7 +62,7 @@ bites only while the workflow is in play does not belong on the always-on path.
 
 The repo's own lint and test gates are stated in the [root `CLAUDE.md`](../CLAUDE.md) and run in CI
 whether or not this plugin is installed. The three below arrive **with the workflow**, and all of them
-read the two files in `branch/`. Two run locally, before the push and before the merge; the third runs in
+read `development-cycle.md`. Two run locally, before the push and before the merge; the third runs in
 CI, and it exists because the first two cannot.
 
 ### The scaffold gate, on the changelog entry itself
@@ -72,7 +82,7 @@ it and the gate that refuses it — a copy in each would make the gate silently 
 writer changed.
 
 **Two of those three strings are now recognised without being written** (August 6, 2026). The
-`branch/` split moved the step list into its own file, so the entry is no longer scaffolded with a
+`branch/` split moved the step list out of the entry, so the entry is no longer scaffolded with a
 to-do heading over a to-do placeholder — its placeholder asks what the change *does*. The gate keeps
 refusing the retired wording, and that is not politeness towards history: every branch in flight,
 here and in every consumer, carries an entry with those strings right now, and consumers receive the
@@ -82,7 +92,8 @@ exactly those entries through. **Recognise both, write one** — the same rule t
 ### The step-list gate, on the branch's own plan
 
 **Dave, August 6, 2026.** A branch reaches a PR when its own plan is finished, so `open-pr.ps1` refuses
-to push and `ship-pr.ps1` refuses to merge while `branch/branch-cycle.md` has an unresolved step.
+to push and `ship-pr.ps1` refuses to merge while the step half of `development-cycle.md` has an
+unresolved step.
 **Both**, deliberately: the requirement Dave gave is about the *merge*, and `open-pr` has a `-Force` —
 a PR opened through that valve, or by hand on github.com, would otherwise land with an unfinished plan.
 
@@ -94,8 +105,12 @@ gate that then says success is worse than no gate. **A branch with no step list 
 refused**: that is the one-commit typo fix, and refusing it would make the mechanism ceremony.
 
 The full convention ships with the plugin as
-[`BRANCH-portable.md`](../plugins/workflows/workflow-davekjohn/BRANCH-portable.md); this repo's own
-answers to it stay in [`branch/README.md`](branch/README.md). Since August 14, 2026 (Dave) the
+[`DEVELOPMENT-CYCLE-portable.md`](../plugins/workflows/workflow-davekjohn/DEVELOPMENT-CYCLE-portable.md).
+**This repo keeps no local half of it any more** (Dave, August 23, 2026): the page that held this repo's
+answers was `branch/README.md`, and when the two files merged, its prose would have had to be reproduced
+byte-for-byte by the scaffolder inside every branch's own document. Repo-specific prose generated by a
+portable formatter cannot be right, so the answers moved to the pages that already own them — this one and
+[`CONTRIBUTING.md`](CONTRIBUTING.md). Since August 14, 2026 (Dave) the
 directory itself sits inside `workflow-davekjohn/`, the workflow's own root folder — the start of
 gathering everything portable in one place at a consumer instead of scattering it through their root.
 
@@ -142,7 +157,7 @@ folder. What follows is the mechanics and the reasoning behind them.
 
 [`fold-changelog-entry.ps1`](../scripts/release/fold-changelog-entry.ps1) folds the entry into
 `CHANGELOG.md` and clears it, and with `-Commit`/`-Push` makes that commit itself — scope limited to
-`CHANGELOG.md` + the entry + `branch/branch-cycle.md`, which the same run resets, and since
+`CHANGELOG.md` + `development-cycle.md`, which the same run resets, and since
 August 2, 2026 enforced rather than merely intended: the commit names its paths, so nothing else in
 the tree can ride along.
 

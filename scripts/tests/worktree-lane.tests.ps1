@@ -180,14 +180,15 @@ try {
     $laneA = Join-Path "$fa-lanes" 'feat--lane-a'
     Assert-True (Test-Path -LiteralPath $laneA -PathType Container) "open: lane directory created"
     Assert-Equal 2 (Get-WorktreeCount -Dir $fa) "open: git registers exactly two worktrees"
-    Assert-True (Test-BranchExists -Dir $fa -Name 'feat/lane-a') "open: branch created"
-    Assert-Equal 'feat/lane-a' (Get-HeadBranch -Dir $laneA) "open: the LANE is on the new branch"
+    # WITH THE VERSION SUFFIX new-branch COMPLETES (August 23, 2026): the lane opens whatever branch the
+    # shared scaffolder decides on, so this asserts through it rather than around it.
+    Assert-True (Test-BranchExists -Dir $fa -Name 'feat/lane-a-v1') "open: branch created"
+    Assert-Equal 'feat/lane-a-v1' (Get-HeadBranch -Dir $laneA) "open: the LANE is on the new branch"
     Assert-Equal 'main' (Get-HeadBranch -Dir $fa) "open: the PRIMARY still sits on main (the load-bearing guarantee)"
     # The -RepoRoot delegation: the dossier belongs to the lane, and the primary must not have gained
     # a copy. Asserting only the first half would pass for a script that wrote into both.
-    Assert-True (Test-Path -LiteralPath (Join-Path $laneA 'workflow-davekjohn\branch\branch-cycle.md')) "open: cycle file written in the lane"
-    Assert-True (Test-Path -LiteralPath (Join-Path $laneA 'workflow-davekjohn\branch\branch-deployment.md')) "open: entry written in the lane"
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fa 'workflow-davekjohn\branch\branch-cycle.md'))) "open: primary did NOT gain a cycle file"
+    Assert-True (Test-Path -LiteralPath (Join-Path $laneA 'workflow-davekjohn\development-cycle.md')) "open: the development cycle is written in the lane"
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fa 'workflow-davekjohn\development-cycle.md'))) "open: the primary did NOT gain one"
 
     # --- (b) A refused branch name rolls the lane back completely -----------------------------------
     Write-Host "worktree-lane.ps1 -- rolls back when new-branch refuses the name" -ForegroundColor Cyan
@@ -242,9 +243,9 @@ try {
     $rF = Invoke-WorktreeLane -Dir $fd -From $laneD -Arguments @('-HandBack')
     Assert-Equal 0 $rF.Code "hand back: exit 0"
     Assert-Equal 1 (Get-WorktreeCount -Dir $fd) "hand back: the lane is deregistered"
-    Assert-Equal 'feat/lane-d' (Get-HeadBranch -Dir $fd) "hand back: the branch is checked out in the primary"
+    Assert-Equal 'feat/lane-d-v1' (Get-HeadBranch -Dir $fd) "hand back: the branch is checked out in the primary"
     Assert-True ($rF.Out -match 'ship-pr') "hand back: names the next step"
-    Assert-True (Test-BranchExists -Dir $fd -Name 'feat/lane-d') "hand back: the branch itself survives"
+    Assert-True (Test-BranchExists -Dir $fd -Name 'feat/lane-d-v1') "hand back: the branch itself survives"
 
     # --- (g) HandBack refuses when the target is the primary --------------------------------------
     Write-Host "worktree-lane.ps1 -HandBack -- refuses to hand back the primary" -ForegroundColor Cyan

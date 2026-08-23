@@ -565,10 +565,11 @@ if (Test-Path -LiteralPath $pluginsRootDir) {
 # reasons -- which is the actual lesson about this scan set: a file leaves it by MOVING, and nothing
 # reports that it has.
 #
-# THE FOLDER IS DERIVED FROM THE SEAM rather than spelled out: the parent of the branch directory IS the
-# workflow folder, so scanning it covers branch/ (templates included -- prose somebody pastes from, so a
-# dead link there is copied forward into every branch), releases/ and whatever docs the folder gains.
-$workflowDirForLinks = Join-Path $RepoRoot (Split-Path -Parent ((Get-BranchFilePaths).Directory -replace '/', '\'))
+# THE FOLDER IS THE SEAM'S OWN Directory, and it stopped needing a Split-Path on August 23, 2026: the branch
+# document sits directly in the workflow folder now, where it used to sit in a branch/ subdirectory of it. So
+# the seam answers with the folder itself, and scanning it covers the branch document, releases/ and whatever
+# docs the folder gains.
+$workflowDirForLinks = Join-Path $RepoRoot ((Get-BranchFilePaths).Directory -replace '/', '\')
 if (Test-Path -LiteralPath $workflowDirForLinks) {
     $linkFiles += @(Get-ChildItem -Path $workflowDirForLinks -Recurse -Filter '*.md' -File |
         Select-Object -ExpandProperty FullName)
@@ -704,9 +705,16 @@ foreach ($lf in $linkFiles) {
     # THE STEP LIST IS DELIBERATELY NOT INCLUDED, though it sits in the same directory. It never travels:
     # it is read where it lies and reset in place, so 'where the file sits' IS its destination, and the
     # ordinary '../' convention every other nested document here follows is the correct one for it.
-    # BOTH NAMES, because a branch created before the August 19, 2026 rename still carries
-    # branch-changelog.md and its links resolve from the same place -- see Resolve-BranchFilePath.
-    $entryRelsForLinks = @((Get-BranchFilePaths).Deployment, (Get-BranchFilePaths).LegacyDeployment) |
+    # EVERY NAME, because a branch created before the merge still carries the pair and their links resolve
+    # from the same place -- see Resolve-BranchFilePath.
+    #
+    # AND IT IS THE WHOLE DOCUMENT, NOT ONLY ITS DEPLOY SECTION (August 23, 2026). Strictly, the entry's text
+    # is what folds to the root; the plan above it stays where it is. One rule for one file is the honest
+    # simplification: the head is guidance comments and phase headings, which carry no links at all in the
+    # scaffold, and an author who does write one in a step means the same repo-root path the section below
+    # asks for. Two bases inside one document would be a rule nobody could apply while writing.
+    $entryRelsForLinks = @((Get-BranchFilePaths).File, (Get-BranchFilePaths).LegacyDeployment,
+        (Get-BranchFilePaths).OlderDeployment) |
         ForEach-Object { '\' + ($_ -replace '/', '\') }
     if ($lf -match '\\personas\\.*-persona\.md$') {
         $dir = Join-Path $RepoRoot '.claude\extensions'
@@ -1171,7 +1179,14 @@ $lifecycleFiles = @($linkFiles | Where-Object {
     # SEPARATORS NORMALISED before the escape, the lesson check 20 already paid for: the seam answers with
     # forward slashes while $rel is built from a Windows path, and an exclusion that compares the two raw
     # matches nothing -- silently, since these files rarely carry the commands this check judges.
-    if ($rel -match ('^' + [regex]::Escape(((Get-BranchFilePaths).Directory -replace '/', '\')) + '\\')) { return $false }
+    # THE BRANCH DOCUMENT, NOT THE WHOLE WORKFLOW FOLDER (August 23, 2026). This used to exclude everything
+    # under the branch directory, which WAS only branch files; the seam's Directory is the workflow folder
+    # itself now, so the same expression would wave through the folder's README, CLAUDE.md and
+    # CONTRIBUTING.md -- three documents that print lifecycle commands and are exactly what this check is for.
+    $lcBranchDoc = @((Get-BranchFilePaths).File, (Get-BranchFilePaths).LegacyCycle,
+        (Get-BranchFilePaths).LegacyDeployment, (Get-BranchFilePaths).OlderCycle,
+        (Get-BranchFilePaths).OlderDeployment) | ForEach-Object { $_ -replace '/', '\' }
+    if ($lcBranchDoc -contains $rel) { return $false }
     return $true
 })
 
@@ -1357,6 +1372,13 @@ $ehSectionLevel = Get-EntrySectionLevel
 # least true. Measured when 'Who is this for' became 'Significance': 24 pending entries in this repo's
 # own CHANGELOG.md, all accused at once, which is how a check gets switched off rather than heeded.
 $ehSectionNames = @((Get-EntrySectionHeadings).Values) + @(Get-EntryRetiredSectionHeadings)
+# AND THE AUDIENCE TIER'S HEADING, which became one of these on August 23, 2026 by moving up a level. It is
+# not a named SECTION of the entry -- Get-EntrySectionHeadings deliberately does not list it, because it is
+# the tier writer's business -- but it now sits at the section level, so a check that only knew the named set
+# would report every single entry for a heading the scaffolder itself writes. Both wordings, for the reason
+# every reader here takes both: entries carrying the previous one are all over CHANGELOG.md.
+$ehSectionNames += @(Get-EntryTierHigherHeading) + @(Get-EntryTierHigherRetiredHeadings)
+$ehSectionNames = @($ehSectionNames | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 # At or above the entry's own level: '#' .. '##' while an entry is an H2.
 $ehTooHighRx = '^#{1,' + $ehEntryLevel + '}\s'
 # AND THE SAME TAIL TOLERANCE THE LIB'S READERS GOT (August 19, 2026) -- this gate is one of them, and it
@@ -1383,40 +1405,56 @@ function Test-IsDeclaredSectionHeading([string]$Line) {
 # file" is a legitimate state between merges. A check that goes quiet for the right-looking reason is worse
 # than one that errors. Both locations are walked, for the same "recognise both" reason the fold walks both.
 #
-# AND THE STEP LIST IS EXCLUDED BY NAME, which it never had to be before (Dave, August 6, 2026). Both branch
-# files open with an H2 in the dossier form, so the structural test alone -- which is the only thing that
-# tells an entry from a root doc -- now says yes to branch-cycle.md as well. It is not an entry: its
-# sections are the phase headings and 'Where I left off', so every branch would have collected several [entry-heading]
-# errors for a file that is doing exactly what it should. Excluded by PATH rather than by inspecting its
-# headings, because the path is what makes it not an entry; the heading names are just how it shows.
+# AND THE ENTRY IS A SECTION OF A DOCUMENT, NOT A DOCUMENT (August 23, 2026). Both branch files used to open
+# with an H2, so the structural test -- the only thing that tells an entry from a root doc -- said yes to the
+# step list too, and it had to be excluded by PATH. development-cycle.md opens with an H1, so that test now
+# says no to the WHOLE file, which would have quietly dropped every branch entry out of this check rather
+# than merely mis-reporting it. The exclusion is gone and the entry is read out of the document instead --
+# Split-DevelopmentCycle, the same boundary the fold and the two gates use.
 #
-# The fold needed no such repair: it reaches branch-deployment.md by path and only ever applies the
-# structural test to loose *.md in the ROOT, where the step list has never lived.
-$entryFilesForHeadings = @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
-    Where-Object { Test-IsChangelogEntryFile -Path $_.FullName })
-$branchPathsForHeadings = Get-BranchFilePaths
-$branchDirForHeadings = Join-Path $RepoRoot $branchPathsForHeadings.Directory
-# BOTH NAMES OF THE STEP LIST ARE EXCLUDED: a branch created before the August 19, 2026 rename carries
-# branch-progress.md, and that file is no more an entry than branch-cycle.md is.
-$progressForHeadings = @($branchPathsForHeadings.Cycle, $branchPathsForHeadings.LegacyCycle) |
-    ForEach-Object { Join-Path $RepoRoot ($_ -replace '/', '\') }
-if (Test-Path -LiteralPath $branchDirForHeadings) {
-    $entryFilesForHeadings += @(Get-ChildItem -Path $branchDirForHeadings -Filter '*.md' -File |
-        Where-Object { $progressForHeadings -notcontains $_.FullName } |
-        Where-Object { Test-IsChangelogEntryFile -Path $_.FullName })
+# WITH ITS LINE OFFSET, because this check prints line numbers. A finding reported against the entry's own
+# first line, in a file where the entry starts forty lines down, is a finding the reader cannot find.
+#
+# The fold needed no such repair: it reaches the document by path and only ever applies the structural test
+# to loose *.md in the ROOT, where a step list has never lived.
+$entryTextsForHeadings = @()
+foreach ($ef in @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
+        Where-Object { Test-IsChangelogEntryFile -Path $_.FullName })) {
+    $entryTextsForHeadings += [pscustomobject]@{
+        Rel    = $ef.FullName.Substring($RepoRoot.Length).TrimStart('\', '/')
+        Text   = [System.IO.File]::ReadAllText($ef.FullName, [System.Text.Encoding]::UTF8)
+        Offset = 0
+    }
 }
-foreach ($ef in $entryFilesForHeadings) {
+# THE BRANCH DOCUMENT, AND ONLY WHILE IT HOLDS AN ENTRY. In its reset state the DEPLOY section is the empty
+# form, which has nothing to say about heading structure; check 13b is what holds that state to its shape.
+# Every older name is read as well, because a branch created before the merge still has to be checked --
+# Resolve-BranchFilePath picks the one that declares this branch.
+$branchDocForHeadings = Resolve-BranchFilePath -Kind Deployment -RepoRoot $RepoRoot
+$branchDocPathForHeadings = Join-Path $RepoRoot ($branchDocForHeadings -replace '/', '\')
+if (Test-Path -LiteralPath $branchDocPathForHeadings) {
+    $bdText = [System.IO.File]::ReadAllText($branchDocPathForHeadings, [System.Text.Encoding]::UTF8)
+    if (Test-BranchChangelogIsFilled -Text $bdText) {
+        $bdSplit = Split-DevelopmentCycle -Text $bdText
+        $entryTextsForHeadings += [pscustomobject]@{
+            Rel    = $branchDocForHeadings -replace '/', '\'
+            Text   = $(if ($bdSplit.Found) { $bdSplit.Entry } else { $bdText })
+            Offset = $(if ($bdSplit.Found) { $bdSplit.Index } else { 0 })
+        }
+    }
+}
+foreach ($ef in $entryTextsForHeadings) {
     $ehChecked++
-    $rel = $ef.FullName.Substring($RepoRoot.Length).TrimStart('\', '/')
-    $masked = Get-FenceMaskedText -Text ([System.IO.File]::ReadAllText($ef.FullName, [System.Text.Encoding]::UTF8))
+    $rel = $ef.Rel
+    $masked = Get-FenceMaskedText -Text $ef.Text
     $ehLines = $masked -split "`r?`n"
     for ($i = 1; $i -lt $ehLines.Count; $i++) {
         $line = $ehLines[$i]
         if ($line -match $ehTooHighRx) {
             $lvl = ($line -replace '^(#+).*$', '$1')
-            Add-Error "[entry-heading] ${rel}:$($i + 1): a '$lvl ' heading in an entry body, at or above the entry's own level. An entry heading is an H$ehEntryLevel, so an H$ehEntryLevel here becomes a SEPARATE entry the moment the fold pastes this file into CHANGELOG.md -- one that declares no impact and therefore reads as an undeclared tier 0 -- and an H1 climbs above every entry in the document. Use '$('#' * ($ehSectionLevel + 1)) ' or bold instead."
+            Add-Error "[entry-heading] ${rel}:$($ef.Offset + $i + 1): a '$lvl ' heading in an entry body, at or above the entry's own level. An entry heading is an H$ehEntryLevel, so an H$ehEntryLevel here becomes a SEPARATE entry the moment the fold pastes this section into CHANGELOG.md -- one that declares no impact and therefore reads as an undeclared tier 0 -- and an H1 climbs above every entry in the document. Use '$('#' * ($ehSectionLevel + 1)) ' or bold instead."
         } elseif (($line -match $ehSectionRx) -and -not (Test-IsDeclaredSectionHeading $line)) {
-            Add-Error "[entry-heading] ${rel}:$($i + 1): '$($Matches[1])' is at the level of the entry's named sections but is not one of them ($($ehSectionNames -join ', ')). A section ends at the next heading of this level or above, so this truncates whichever section it sits in -- and if it is a misspelling of a real section heading, the entry silently loses that declaration and the tier/significance gates read nothing. Use '$('#' * ($ehSectionLevel + 1)) ' for a sub-heading, or correct the spelling."
+            Add-Error "[entry-heading] ${rel}:$($ef.Offset + $i + 1): '$($Matches[1])' is at the level of the entry's named sections but is not one of them ($($ehSectionNames -join ', ')). A section ends at the next heading of this level or above, so this truncates whichever section it sits in -- and if it is a misspelling of a real section heading, the entry silently loses that declaration and the tier/significance gates read nothing. Use '$('#' * ($ehSectionLevel + 1)) ' for a sub-heading, or correct the spelling."
         }
     }
 }
@@ -1526,30 +1564,35 @@ if (Test-Path -LiteralPath $clForHeadings) {
 }
 
 Write-Coverage -Category 'entry-heading' -Checked $ehChecked `
-    -Note $(if ($entryFilesForHeadings.Count -eq 0) { 'no unfolded entry in branch/ or the root, so only CHANGELOG.md was judged -- normal between merges' } else { "$($entryFilesForHeadings.Count) unfolded entry file(s) plus CHANGELOG.md" })
-
-# --- 13b. the branch/ templates still match what the scaffolder writes -------------------------------------
-# A template beside a scaffolder that writes the same shape is TWO SOURCES OF ONE FORMAT. This repo has paid
+    -Note $(if ($entryTextsForHeadings.Count -eq 0) { 'no unfolded entry in the branch document or the root, so only CHANGELOG.md was judged -- normal between merges' } else { "$($entryTextsForHeadings.Count) unfolded entry(ies) plus CHANGELOG.md" })
+# --- 13b. the branch document's RESET state still matches what the scaffolder writes -----------------------
+# A reference beside a scaffolder that writes the same shape is TWO SOURCES OF ONE FORMAT. This repo has paid
 # for that shape repeatedly -- the scaffold wording, the fence readers, the tier sections -- and the entry
-# format changed THREE TIMES on the day these templates were added, so a hand-maintained copy would have gone
-# stale before it was committed.
+# format changed THREE TIMES on the day the branch templates were added, so a hand-maintained copy would have
+# gone stale before it was committed.
 #
-# The templates are therefore generated from the same formatters new-branch.ps1 calls, and this holds
-# the files on disk to Get-BranchTemplates. Compared with line endings normalised: whether the working copy
-# checked out CRLF is not a property of the format.
+# WHAT IS BEING HELD CHANGED ON AUGUST 23, 2026, AND THE ARGUMENT DID NOT. This used to hold two files under
+# branch/templates/ to Get-BranchTemplates. Those templates existed because the working files deliberately
+# carried no guidance; the merged development-cycle.md carries its own, so the reference and the file you
+# write in are the same document -- and what is left to hold is its RESET state, the copy that sits on the
+# trunk. A hand-edit there is exactly the drift the templates could suffer, in the one file that is now both
+# the form and the example.
+#
+# ONLY WHILE IT IS IN THAT STATE, which is the one real difference. On a branch this file holds somebody's
+# work and there is nothing to compare it to, so the check reports that instead of asserting -- the same
+# conservative direction every reader of this format takes. Test-BranchChangelogIsFilled is what tells the two
+# apart, so this gate and the fold cannot disagree about which state they are looking at.
 $btChecked = 0
 $btMissing = 0
-# Get-BranchTemplates RENDERS both templates from the formatters, which is what costs here rather than
-# the comparison -- so the call is inside the skip along with everything it feeds.
 if (Test-CheckEnabled 'branch-template') {
     # GENERATED WITH THE REPO'S OWN CONFIG LOADED, and that is a repair of a gap this check was born with
-    # rather than a concession to a new seam (August 12, 2026). The template's content has ALWAYS depended on
+    # rather than a concession to a new seam (August 12, 2026). The content has ALWAYS depended on
     # scripts/repo-config.ps1 -- Get-EntryGuidanceOverrides, Get-EntrySectionHeadingOverrides,
     # Get-EntrySignificanceWordingOverrides and Get-BranchFileWordingOverrides all reach the rendered file --
     # while this gate generated it with none of them loaded. It agreed with the disk only because THIS repo
     # answers none of those four, so the neutral generation and the configured one happened to be identical.
     # The consequence was already live for somebody else: a consumer who translated their entry wording had
-    # this check report drift against their own correctly generated template, with the advice "regenerate it",
+    # this check report drift against their own correctly generated file, with the advice "regenerate it",
     # which would produce the same file again. Get-ReleaseAudienceTier is simply the first of these seams this
     # repo answers, so it is what made the gap visible.
     #
@@ -1558,30 +1601,42 @@ if (Test-CheckEnabled 'branch-template') {
     # that owns it -- and pulling two dozen repo functions into the whole lint to serve one check is how a gate
     # acquires a dependency nobody meant to give it. A repo without the file (a fresh consumer mid-bootstrap)
     # falls through to the neutral generation, which is what it had before.
-    $btTemplates = & {
+    $btExpectation = & {
         $btCfg = Join-Path $RepoRoot 'scripts\repo-config.ps1'
         if (Test-Path -LiteralPath $btCfg) { . $btCfg }
         . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
-        Get-BranchTemplates
-    }
-    foreach ($tpl in $btTemplates) {
-        $btChecked++
-        $tplPath = Join-Path $RepoRoot ($tpl.Path -replace '/', '\')
-        if (-not (Test-Path -LiteralPath $tplPath)) {
-            $btMissing++
-            Add-Error "[branch-template] $($tpl.Path) is missing. It is generated from the same formatters the scaffolder uses -- see Get-BranchTemplates in scripts/lib/entry-scaffold-lib.ps1."
-            continue
+        $btRel  = (Get-BranchFilePaths).File
+        $btFull = Join-Path $RepoRoot ($btRel -replace '/', '\')
+        $btOnDisk = if (Test-Path -LiteralPath $btFull) {
+            [System.IO.File]::ReadAllText($btFull, [System.Text.Encoding]::UTF8)
+        } else { $null }
+        [pscustomobject]@{
+            Rel      = $btRel
+            OnDisk   = $btOnDisk
+            OnBranch = $(if ($null -ne $btOnDisk) { Test-BranchChangelogIsFilled -Text $btOnDisk } else { $false })
+            Expected = (((Format-DevelopmentCycleReset) -join "`n") + "`n")
         }
-        $onDisk   = ([System.IO.File]::ReadAllText($tplPath, [System.Text.Encoding]::UTF8)) -replace "`r`n", "`n"
-        $expected = $tpl.Content -replace "`r`n", "`n"
+    }
+    $btChecked = 1
+    if ($null -eq $btExpectation.OnDisk) {
+        $btMissing = 1
+        Add-Error "[branch-template] $($btExpectation.Rel) is missing. It is the branch's own document, and its reset state is generated from the formatter the scaffolder uses -- see Format-DevelopmentCycleReset in scripts/lib/entry-scaffold-lib.ps1."
+    } elseif ($btExpectation.OnBranch) {
+        $btChecked = 0
+        Write-Skip "branch-template -- $($btExpectation.Rel) holds this branch's work, so its shape is not asserted. It is held to the formatter only in its reset state, on the trunk."
+    } else {
+        $onDisk   = $btExpectation.OnDisk -replace "`r`n", "`n"
+        $expected = $btExpectation.Expected -replace "`r`n", "`n"
         if ($onDisk -ne $expected) {
-            Add-Error "[branch-template] $($tpl.Path) no longer matches what the scaffolder writes. It is a copy-paste convenience, not a second definition of the format -- regenerate it from Get-BranchTemplates rather than editing it by hand."
+            Add-Error "[branch-template] $($btExpectation.Rel) is in its reset state but no longer matches what the scaffolder writes. The reset state is generated, not maintained -- change the format in the formatters and let it follow, rather than editing this file by hand."
         }
     }
-    Write-Coverage -Category 'branch-template' -Checked $btChecked `
-        -Note $(if ($btMissing -gt 0) { "$btMissing missing" } else { 'held against the formatters the scaffolder calls, so the template cannot drift from the file a branch actually gets' })
+    if ($btChecked -gt 0) {
+        Write-Coverage -Category 'branch-template' -Checked $btChecked `
+            -Note $(if ($btMissing -gt 0) { 'missing' } else { 'the reset state held to the formatter the scaffolder calls, so the trunk copy cannot drift from the file a branch actually gets' })
+    }
 } else {
-    Write-Skip 'branch-template -- not run (-SkipCheck). Nothing is asserted about the branch/ templates in this run.'
+    Write-Skip 'branch-template -- not run (-SkipCheck). Nothing is asserted about the branch document''s reset state in this run.'
 }
 
 # --- 14. mojibake: a double-encoded character is a silent content change -----------------------------------
@@ -1950,9 +2005,10 @@ Write-Coverage -Category 'skill-param' -Checked $skillParamChecked `
 # read by hand -- and it was, before this was written.
 #
 # History is excluded exactly as checks 11 and 12 exclude it: CHANGELOG.md's ENTRIES and the per-plugin
-# copies, the release notes, RELEASE.md, and the branch working files, which are history in the making.
-# workflow-davekjohn/branch/README.md is deliberately NOT excluded -- it is a document ABOUT the shape,
-# which is precisely this check's subject.
+# copies, the release notes, RELEASE.md, and the branch's own document, which is history in the making.
+# workflow-davekjohn/CLAUDE.md and CONTRIBUTING.md are deliberately NOT excluded -- they are documents ABOUT
+# the shape, which is precisely this check's subject. The page that used to carry that role,
+# branch/README.md, went with the merge on August 23, 2026; its answers moved into those two.
 #
 # AND NEITHER IS CHANGELOG.md'S INTRO (August 8, 2026). It went out with the rest of that file on the history
 # grounds above, and this repo had already written down why that reasoning does not reach the intro:
@@ -2036,15 +2092,16 @@ $scFiles = @($linkFiles | Where-Object {
     # The moved release pages are the same history at their workflow-folder address (August 14, 2026).
     if ($rel -match '^workflow-davekjohn\\releases\\') { return $false }
     if (($rel -notmatch '\\') -and (Test-IsChangelogEntryFile -Path $_)) { return $false }
-    # The two branch working files only -- NOT the whole directory. The entry is history in the making and
-    # the step list is a scratch pad; the branch README is the convention itself and is checked.
+    # The branch's own document only -- NOT the whole folder. It is history in the making above and a scratch
+    # pad below; the folder's own pages are the convention itself and are checked.
     #
     # SEPARATORS ARE NORMALISED, and leaving that out was caught by this check on its first run:
     # Get-BranchFilePaths returns forward slashes while $rel is built from a
     # Windows path, so the two never compared equal and the exclusion did nothing. The step list of the very
     # branch that added this check was then reported for QUOTING a stale count while explaining it.
     $scPaths = Get-BranchFilePaths
-    $scBranchFiles = @($scPaths.Cycle, $scPaths.Deployment, $scPaths.LegacyCycle, $scPaths.LegacyDeployment) |
+    $scBranchFiles = @($scPaths.File, $scPaths.LegacyCycle, $scPaths.LegacyDeployment,
+        $scPaths.OlderCycle, $scPaths.OlderDeployment) |
         ForEach-Object { $_ -replace '/', '\' }
     if ($scBranchFiles -contains $rel) { return $false }
     return $true
@@ -2210,7 +2267,7 @@ Write-Coverage -Category 'plugin-kind' -Checked $kindChecked `
 #   * The SHIPPED REFERENCE is held byte for byte to Get-PrTemplateReference. It is not a document anybody
 #     edits -- it is the answer this family hands a consumer, and a reference whose placeholder open-pr
 #     would walk past is worse than no reference at all, because it arrives looking authoritative. Same
-#     reasoning as check 13b for branch/templates/ and check 21 for the config blueprint.
+#     reasoning as check 13b for the branch document's reset state and check 21 for the config blueprint.
 #   * THIS REPO'S OWN .github/pull_request_template.md is held only to the contract: a first heading, and a
 #     placeholder line the matcher recognises. Deliberately weaker, because that file is genuinely
 #     repo-owned -- the day it grows a section this repo needs, a byte-for-byte rule would refuse a correct

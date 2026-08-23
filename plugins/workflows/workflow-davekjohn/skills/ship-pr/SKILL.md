@@ -80,13 +80,14 @@ The six steps, stopping on the first failure:
    `gh pr merge ''`. Worth knowing if you are on an older version of the plugin — the symptom is a
    `ship-pr` run that reports no PR number and then fails at the merge with an unhelpful gh error.
 3. **Wait for CI.** See [Why step 3 polls before it watches](#why-step-3-polls-before-it-watches).
-4. **Merge** (`gh pr merge`), but first the **step-list gate again**: `workflow-davekjohn/branch/branch-cycle.md` must
-   have nothing unresolved left in it, or the merge does not happen. Not belt-and-braces — the rule is
+4. **Merge** (`gh pr merge`), but first the **step-list gate again**: the phases above the DEPLOY heading in
+   `workflow-davekjohn/development-cycle.md` must
+   have nothing unresolved left in them, or the merge does not happen. Not belt-and-braces — the rule is
    about the *merge*, and step 1's copy of it lives in `open-pr.ps1`, which has a `-Force`. A PR opened
    through that valve, by hand on github.com, or days ago and resumed here would otherwise land with an
    unfinished plan. Checked against the working copy at this moment rather than trusted from step 1, and
    there is no `-Force` for it: `- [~] dropped -- <why>` is the way past a step that should not be done.
-   The three marks are in the `open-pr` skill and in [`BRANCH-portable.md`](../../BRANCH-portable.md).
+   The three marks are in the `open-pr` skill and in [`DEVELOPMENT-CYCLE-portable.md`](../../DEVELOPMENT-CYCLE-portable.md).
    See [The merge method is repo policy](#the-merge-method-is-repo-policy), and the assumption that gate
    rests on, below.
 5. **Check out the main branch, fast-forward, and fold** — handed to `fold-changelog-entry.ps1 -Push`,
@@ -130,7 +131,7 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/ship-pr.ps1" 
 
 ## The step-list gate reads the WORKING TREE, and one thing breaks that
 
-The gate opens `workflow-davekjohn/branch/branch-cycle.md` **on disk**, and the script says why in its own
+The gate opens `workflow-davekjohn/development-cycle.md` **on disk**, and the script says why in its own
 comment: *"Read from the branch's own checkout, which is where HEAD still is at this point -- step 5 is
 what moves to main."* That is correct for the whole life of an ordinary run, and it is an **assumption
 rather than a check**: nothing compares the branch you are standing on against the branch whose PR is

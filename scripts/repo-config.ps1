@@ -270,8 +270,9 @@ function Get-MojibakePaths {
     # under this folder since August 14, 2026). The entry is the single highest-value file in this set:
     # its text is pasted verbatim into CHANGELOG.md and from there into the release notes, so a mis-decode
     # caught anywhere later has already been copied twice.
-    # -Recurse covers branch/templates/ (pasted into a real entry, so a mis-decode there is copied forward
-    # into every branch that uses them) and, in a consumer, the folder's scaffolded docs.
+    # -Recurse covers the folder's other pages -- the release notes under releases/audience/ and, in a
+    # consumer, the scaffolded docs. It also covered branch/templates/ until the merged development cycle
+    # retired that directory on August 23, 2026.
     $workflowDir = Join-Path $RepoRoot 'workflow-davekjohn'
     if (Test-Path -LiteralPath $workflowDir) {
         $paths += @(Get-ChildItem -LiteralPath $workflowDir -Recurse -Filter '*.md' -File |
