@@ -103,11 +103,13 @@ and safe hook construction.
   INSTALL.md's "Staying up to date" section for the detail). Note: this applies to plugin
   content; changes to `CLAUDE.md` imports and settings still load only on a restart.
 
-## Five PowerShell traps that produce well-formed wrong output
+## Seven PowerShell traps that produce well-formed wrong output
 
-All five were measured in this system, not read about, and they share the property that makes them
+All seven were measured in this system, not read about, and they share the property that makes them
 expensive: **nothing errors.** The script runs, the output parses, the markdown renders — and it says
 something other than what the author meant. None is caught by a linter, so each is worth an assert.
+Six are PowerShell's own; the seventh is the same class one layer out, in the tooling you reach for
+to repair a PowerShell file.
 
 - **`[ordered]@{ 2 = '...' }`'s indexer takes a positional index as well as a key.** For an integer the
   positional overload wins, so `$map[2]` returns the **third value**, not the value for key `2`. In a
@@ -155,8 +157,34 @@ something other than what the author meant. None is caught by a linter, so each 
   inside a `try`, or assert `(Get-Location).Path` against the fixture before the first command that
   writes. The rule generalises past `cd` — a probe pointed at the wrong target is indistinguishable from
   a probe that worked, so the thing that must be verified first is not the result but the aim.
+- **A failed call inside a block does not stop the block, and the process still exits 0.** `Invoke-TestSuiteGate`
+  does not live in `gate-lib.ps1` — it moved to `native-capture-lib.ps1`, and `gate-lib.ps1` even carries
+  a comment saying so — so dot-sourcing the wrong file and calling it throws a `CommandNotFoundException`,
+  the block **continues past it**, the unset result variable stays `$null`, the final line prints its
+  interpolation with an empty value, and the process still **exits 0**. Measured running the test gate as
+  a background command: the exit code came back green in a tenth of a second, against every suite in the
+  repo, and nothing announced that the call inside had failed. An exit code is not a verdict on what ran
+  inside the block — so fail closed (`$ErrorActionPreference = 'Stop'` for the block, or an explicit
+  `exit 1` on the failure path) and **assert on the returned value, not the exit code**: `$ok` being
+  `$null` instead of `$true` was the thing that was knowable here. A gate that reports green
+  implausibly fast has not run. Sibling of the trap above, from the same class of failure: there the
+  script itself was lied to about its aim; here the reader being lied to is the *outer* observer — CI, a
+  background task, a SessionStart hook — reading only the exit code the script hands back.
+- **A `sed` substitution meant to write a code-point escape can silently write the wrong literal instead.**
+  GNU `sed`'s replacement syntax treats `\u` as "uppercase the next character," not as a code-point escape —
+  so `sed -i 's/\[-–—,\]/[-\u2013\u2014,]/'` consumed the backslash before each escape and wrote the literal
+  `[-20132014,]` into the `.ps1` file: a character class of the hyphen, the digits 0 through 4, and a
+  comma — valid PowerShell, valid regex, completely wrong answer. Measured on GNU sed 4.9, reproduced
+  exactly. What makes this belong beside the six traps above rather than merely near them: the very check
+  that catches this class of mistake **in the source** — the script-layer ASCII gate — cannot catch it
+  **here**, because the mangled output is itself pure ASCII. The defect was in the tool performing the
+  repair the gate asks for, not in anything the gate reads afterward. **Compose the character from
+  `[char]0x..` in PowerShell** — the repo's own idiom already does this
+  (`'-' + [char]0x2013 + [char]0x2014`) — and where a non-PowerShell tool must write the escape, read the
+  written line back and check the code points rather than trusting the substitution. No gate can stand in
+  for that read-back, because a mangled repair passes an ASCII check by construction.
 
-The general shape behind all five, worth carrying to the next one: when a mistake cannot announce itself,
+The general shape behind all seven, worth carrying to the next one: when a mistake cannot announce itself,
 the assert is the announcement. Prefer a test over a comment for anything in this class.
 
 ## Sylvester is lazy
