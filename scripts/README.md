@@ -30,7 +30,8 @@ page prints `${CLAUDE_PLUGIN_ROOT}/scripts/…`, because that is the only path t
 — and the harness expands it to your own cache **before you read the page**, so the command in front of
 you looks authoritative and points at a release. That mirror was missing two seams this repo had already
 adopted. `new-branch` scaffolded the retired three-tier ladder instead of this repo's `Tier 0` + `Tier 2`,
-and rewrote `branch/templates/branch_template_changelog.md` back into the pre-audience shape;
+and rewrote `branch/templates/branch_template_changelog.md` — a file the merged development cycle
+retired — back into the pre-audience shape;
 `session-status` reported no release note under `releases/notes/` and therefore printed an **empty** "what
 the last release left open" block. Neither errored, because the mirror contains no
 `Get-ReleaseAudienceTier` and no `Get-ReleaseNoteRoot` at all, so each silently used its pre-seam default.
@@ -43,7 +44,7 @@ cache holds a release and this directory is by definition ahead of it between re
 | directory | what lives there |
 |---|---|
 | [`lib/`](lib/) | the shared helpers every other directory dot-sources — no standalone entry points |
-| [`task/`](task/) | starting and parking work: the branch and its two `workflow-davekjohn/branch/` files |
+| [`task/`](task/) | starting and parking work: the branch and its `workflow-davekjohn/development-cycle.md` |
 | [`release/`](release/) | moving work to the trunk and beyond: the PR, the merge, the fold, the cut |
 | [`lint/`](lint/) | the gates that run before a PR and in CI |
 | [`sync/`](sync/) | keeping the generated artefacts and the connected repos honest |
@@ -72,7 +73,7 @@ a test, reached by one of these rather than run directly.
 
 | script | what it does | skill |
 |---|---|---|
-| [`task/new-branch.ps1`](task/new-branch.ps1) | creates the branch **and** both `workflow-davekjohn/branch/` files plus the reference templates, in one move — a branch is never entry-less | `new-branch` |
+| [`task/new-branch.ps1`](task/new-branch.ps1) | creates the branch **and** its `workflow-davekjohn/development-cycle.md`, in one move — a branch is never entry-less | `new-branch` |
 | [`task/park-branch.ps1`](task/park-branch.ps1) | commits outstanding work and pushes, with no PR — for handing a branch to another machine | `park` |
 | [`task/adopt-config.ps1`](task/adopt-config.ps1) | reads the config blueprint and places or proposes each seam answer | `adopt-config` |
 | [`release/open-pr.ps1`](release/open-pr.ps1) | the four gates, the push and the PR; the body and title come from the entry | `open-pr` |
@@ -105,7 +106,7 @@ from one another because they overrule different kinds of judgement.
 2. **The test gate** — every `tests/*.tests.ps1` suite.
 3. **The scaffold gate** — refuses an entry still carrying the wording `new-branch.ps1` wrote, or one whose
    description, body or any tier reason is still empty once HTML comments are stripped.
-4. **The step-list gate** — refuses while `workflow-davekjohn/branch/branch-cycle.md` has an unresolved step. `ship-pr.ps1`
+4. **The step-list gate** — refuses while `workflow-davekjohn/development-cycle.md` has an unresolved step above its DEPLOY heading. `ship-pr.ps1`
    refuses at the merge for the same reason, and **this one has no `-Force`**: the `- [~]` dropped mark is
    the way past a step that turned out not to be needed.
 

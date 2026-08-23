@@ -600,7 +600,8 @@ than a clear-out** (Dave, August 7, 2026;
 [#508](https://github.com/DaveKJohn/claude-code-specialists/issues/508)). Two of those descriptions were
 measured stale during a sweep that was looking for exactly that, one of them consumer-facing. The
 alternative — deleting the shape from every document and pointing at
-[`workflow-davekjohn/branch/templates/`](workflow-davekjohn/branch/templates/) — was weighed and declined: the prose costs every reader on
+the generated reference under `workflow-davekjohn/branch/templates/`, a directory the merged development
+cycle has since retired — was weighed and declined: the prose costs every reader on
 every read, while a check costs nothing per read. **What is checked is the section COUNT, not the
 section names**, and that was settled by measuring four candidate rules against the tree rather than by
 argument. A name-matching rule produced **six** findings on the tree, **all six false**: `What does this
@@ -647,7 +648,7 @@ subjects is close to nothing to guard; worth revisiting when per-directory READM
 
 **The PR template that caused the collision is itself the change** (Dave, August 9, 2026). It now carries
 one section — the changelog entry — because `open-pr.ps1` composes the body from
-`workflow-davekjohn/branch/branch-deployment.md`, so everything else it asked was already answered four lines lower. Measured
+the DEPLOY section of `workflow-davekjohn/development-cycle.md`, so everything else it asked was already answered four lines lower. Measured
 over 60 PRs before removing anything: `Type of change` had exactly **one of four** boxes ticked every
 single time, a fact the entry states under `### Branch type` and which the GitHub label takes from
 `Get-BranchInfo` rather than from the tick; of the checklist, `Requested by Dave` and

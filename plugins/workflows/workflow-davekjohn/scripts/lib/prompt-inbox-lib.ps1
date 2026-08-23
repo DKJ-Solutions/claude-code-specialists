@@ -90,7 +90,8 @@ function Format-PromptTemplateReference {
     <# The TRACKED reference beside the untracked inbox. It exists because prompt.md is gitignored: a
        fresh checkout would otherwise contain no evidence that the mechanism is there, and the first
        thing the script does on a repo without an inbox is write this content into prompt.md. Same
-       relationship as branch/templates/ has to the two branch files. #>
+       relationship branch/templates/ had to the two branch files until those merged into one document
+       that carries its own guidance -- so this is now the workflow's only generated reference copy. #>
     return @(
         '# The prompt inbox -- the reset state, for reference',
         '',

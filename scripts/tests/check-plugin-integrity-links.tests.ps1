@@ -504,7 +504,7 @@ try {
     # doc must never be counted as one: the fixture root holds CONTRIBUTING.md and CHANGELOG.md beside
     # the single entry file, so the count is the discriminator, and it would catch the entry rule
     # degrading into "any root .md" just as the old NOTES.md assertion did.
-    Assert-True ($r16.Out -match '\[entry-heading\].*1 unfolded entry file\(s\)') 'scenario 16: exactly ONE root file is read as an entry -- a permanent root doc is scanned but never judged as one'
+    Assert-True ($r16.Out -match '\[entry-heading\].*1 unfolded entry\(ies\)') 'scenario 16: exactly ONE root file is read as an entry -- a permanent root doc is scanned but never judged as one'
 
     # And once the fold has taken it away, it simply drops out of the set again -- no stale reference,
     # no error about a file that no longer exists.

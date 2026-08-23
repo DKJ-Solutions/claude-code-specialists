@@ -52,9 +52,10 @@ own plugin cache instead, so the easy route is to ask for the skill rather than 
 
 - **Strictly additive, never overwrites.** Every file that already exists is left exactly as it is,
   whatever it contains -- so a re-run finds nothing to do, and everything you wrote past the `VUL-IN`
-  markers is yours. The one later writer is `new-branch`'s own refresh-on-drift, which keeps the
-  generated `branch/templates/` current; this command only creates them when absent.
-- **The branch files come from the shared formatters** -- the same ones `new-branch` and the fold
+  markers is yours. **Nothing is ever rewritten**, which is new since August 23, 2026: `new-branch` used
+  to refresh the generated `branch/templates/` on drift, and the merged development cycle carries its own
+  guidance, so there is no reference beside it left to keep current.
+- **The branch document comes from the shared formatter** -- the same one `new-branch` and the fold
   call -- so the scaffold cannot write a shape of its own.
 - **Refused in a repo that publishes plugins** (`.claude-plugin/marketplace.json` present). The source
   repo of this workflow keeps its `CONTRIBUTING.md` and `releases/` at its root by its own decision;

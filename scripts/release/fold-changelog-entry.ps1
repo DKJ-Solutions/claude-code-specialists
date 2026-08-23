@@ -1,17 +1,23 @@
 <#
 Folds one or more changelog entry files into CHANGELOG.md's flat list of changes, and then clears them.
 
-WHERE THE ENTRY COMES FROM, AND WHY THAT IS TWO PLACES (Dave, August 6, 2026). A branch now carries its
-working files in branch/: branch-deployment.md (the entry) and branch-cycle.md (the step list). Entries
-written before that split are a <branch-name>.md in the repo ROOT, and every consumer with a branch in
-flight has one right now -- they receive these scripts through a plugin update rather than by choosing to.
-Both forms are discovered, in both modes: "recognise both, write one".
+WHERE THE ENTRY COMES FROM (Dave, August 6, 2026; one file since August 23, 2026). A branch carries its
+whole working state in workflow-davekjohn/development-cycle.md, and the ENTRY is a section of it: the
+fourth phase, '## `<branch>` DEPLOY'. Split-DevelopmentCycle is what finds the boundary, so this script
+holds no second definition of where an entry begins.
 
-AND THE TWO ARE CLEARED DIFFERENTLY, which is the one real asymmetry. A root entry is named after its
-branch, so once folded it is deleted. branch/branch-deployment.md is a FIXED path the next branch will use,
-so it is REWRITTEN to its empty state -- together with branch-cycle.md, whose ticked-off steps would
-otherwise greet the next branch as somebody else's work. The reset opens with an H1, which is also what
-makes it impossible to fold twice.
+AND EVERY OLDER FORM IS STILL FOLDED, which is not politeness towards history. A branch created before the
+merge carries the pair branch/branch-deployment.md + branch/branch-cycle.md; one created before
+August 19, 2026 carries branch/branch-changelog.md + branch/branch-progress.md; one created before the
+branch/ split carries a <branch-name>.md in the repo ROOT. All of them exist right now, here and in every
+consumer, and they receive these scripts through a plugin update rather than by choosing to. Recognise
+every one, write one.
+
+AND THEY ARE CLEARED DIFFERENTLY, which is the one real asymmetry. A root entry is named after its branch,
+so once folded it is deleted. development-cycle.md is a FIXED path the next branch will use, so it is
+REWRITTEN to its empty state -- one write, which resets the step list along with the entry because they are
+sections of the same document. What makes a second fold impossible is the branch NAME in that reset
+heading: it declares the trunk, and Test-BranchChangelogIsFilled reads that as nothing pending.
 
 THERE ARE NO SECTIONS ANY MORE (Dave, August 5, 2026). CHANGELOG.md used to carry one
 '## Tier N - Pull Requests' section per tier, and the fold's first job was to pick one from a repo-owned
@@ -249,30 +255,32 @@ function Test-IsChangelogEntryFile {
     return $false
 }
 
-# THE ENTRY NOW ARRIVES IN branch/, AND THE ROOT FORM IS STILL FOLDED (Dave, August 6, 2026). Since the
-# branch/ split, new-branch.ps1 writes branch/branch-deployment.md; every branch created before
-# that -- here and in every consumer, who get these scripts through a plugin update rather than by
-# choosing to -- carries a root <branch-name>.md instead. Recognising only the new path would leave those
-# entries sitting unfolded in the root, which is precisely the silent half-state this repo keeps
-# rediscovering. So both are discovered, in both modes: "recognise both, write one".
+# THE ENTRY ARRIVES IN workflow-davekjohn/, AND THE ROOT FORM IS STILL FOLDED (Dave, August 6, 2026).
+# new-branch.ps1 writes development-cycle.md; every branch created before the branch/ split -- here and in
+# every consumer, who get these scripts through a plugin update rather than by choosing to -- carries a root
+# <branch-name>.md instead. Recognising only the new path would leave those entries sitting unfolded in the
+# root, which is precisely the silent half-state this repo keeps rediscovering. So both are discovered, in
+# both modes: "recognise both, write one".
 #
-# WHICH NAME THIS TREE ACTUALLY CARRIES. Since August 19, 2026 the pair is branch-cycle.md /
-# branch-deployment.md; a branch created before that carries branch-progress.md / branch-changelog.md, and
-# the fold is the script that meets those branches at their very last step. Resolve-BranchFilePath answers
-# per file, so a mixed tree folds and resets exactly the files it has -- the same "recognise both, write
-# one" rule the paragraph above states for the root form.
+# WHICH NAME THIS TREE ACTUALLY CARRIES. Since August 23, 2026 it is one file; a branch created before that
+# carries branch-cycle.md / branch-deployment.md, and one created before August 19, 2026 carries
+# branch-progress.md / branch-changelog.md. The fold is the script that meets those branches at their very
+# last step. Resolve-BranchFilePath answers per kind and resolves on WHICH FILE DECLARES THIS BRANCH rather
+# than on existence -- which it has to, because the trunk's reset copy of the new file exists on every branch
+# that has merged main since. So a mixed tree folds and resets exactly the files it has, which is the same
+# "recognise both, write one" rule the paragraph above states for the root form.
 $branchDeploymentRel = Resolve-BranchFilePath -Kind Deployment -RepoRoot $repoRoot
 $branchCycleRel      = Resolve-BranchFilePath -Kind Cycle -RepoRoot $repoRoot
 $branchDeploymentPath = Join-Path $repoRoot $branchDeploymentRel
 $branchDeploymentFilled = (Test-Path -LiteralPath $branchDeploymentPath) -and
     (Test-BranchChangelogIsFilled -Text ([System.IO.File]::ReadAllText($branchDeploymentPath)))
 
-# WHICH BRANCH THE branch/ ENTRY BELONGS TO, read from branch-cycle.md's own '**Branch:**' line.
+# WHICH BRANCH THE ENTRY BELONGS TO, read from the development cycle's own heading.
 #
 # This is the one thing the fixed filename genuinely costs, and the reason the branch line is in the
 # document rather than only in the scaffolder's head. In fold-all mode the branch is what the PR lookup
 # keys on, and it used to be recovered from the entry's file NAME (feat-x.md -> feat/x). A fixed name
-# carries no branch, so 'branch-changelog' would have been read as the branch 'branch/changelog', found
+# carries no branch, so 'development-cycle' would have been read as the branch 'development/cycle', found
 # no PR, and folded the entry with neither number nor merge date -- silently, since a missing PR is a
 # legitimate outcome the script already prints and moves past.
 #
@@ -289,7 +297,7 @@ if ($branchDeploymentFilled) {
 
 if ($Branch) {
     # Explicit target: the caller named the branch, so trust it. The legacy root file is named after that
-    # branch; the branch/ file is not named after anything, so it qualifies on being filled.
+    # branch; the development cycle is not named after anything, so it qualifies on being filled.
     $entryFiles = @()
     if ($branchDeploymentFilled) { $entryFiles += $branchDeploymentRel }
     $legacyName = ($Branch -replace '/', '-') + ".md"
@@ -321,7 +329,7 @@ $changelogPath = Join-Path $repoRoot "CHANGELOG.md"
 # noise and the most trust. Measured in a consumer on 2026-08-09, one day after they adopted the entry
 # convention:
 #
-#   Folded and reset: branch/branch-deployment.md (tier 1, significance 3 -- placed above 2 existing entries)
+#   Folded and reset: workflow-davekjohn/development-cycle.md (tier 1, significance 3 -- placed above 2 existing entries)
 #   CHANGELOG.md updated.
 #
 # Exit 0, no warning. Their "2 existing entries" were two SECTION headings ('## Pull Requests',
@@ -447,7 +455,21 @@ foreach ($file in $entryFiles) {
         continue
     }
 
-    $entryContent = (Get-Content -Path $filePath -Raw -Encoding UTF8).TrimEnd()
+    $fileContent = (Get-Content -Path $filePath -Raw -Encoding UTF8).TrimEnd()
+
+    # THE ENTRY IS A SECTION OF THE FILE, NOT THE FILE (August 23, 2026). Until the merge this script read a
+    # document that was nothing but the entry, so the whole file was the block to fold. development-cycle.md
+    # holds the branch's plan above its entry, and folding the plan into CHANGELOG.md would publish somebody's
+    # ticked checkboxes as a change description.
+    #
+    # Split-DevelopmentCycle owns where the boundary is, so the fold does not carry a second definition of it
+    # -- the same reason the entry FORMAT lives in one formatter that this script never reimplements.
+    #
+    # A LEGACY FILE HAS NO BOUNDARY TO FIND, and the splitter says so rather than guessing:
+    # branch-deployment.md IS an entry from its first line, so Found is false and the whole text is what
+    # folds. That keeps a branch created before the merge folding exactly as it always did.
+    $split = Split-DevelopmentCycle -Text $fileContent
+    $entryContent = if ($split.Found) { $split.Entry } else { $fileContent }
     $changelogContent = Get-Content -Path $changelogPath -Raw -Encoding UTF8
 
     $usesCRLF = $changelogContent.Contains("`r`n")
@@ -561,7 +583,7 @@ foreach ($file in $entryFiles) {
     $branchForPr = $Branch
     if (-not $branchForPr) {
         if ($file -eq $branchDeploymentRel) {
-            # From branch-cycle.md's branch line -- see $branchFileOwner above for why the file name
+            # From the development cycle's own heading -- see $branchFileOwner above for why the file name
             # cannot answer this any more.
             $branchForPr = $branchFileOwner
             if (-not $branchForPr) {
@@ -691,16 +713,22 @@ foreach ($file in $entryFiles) {
 
     Write-Utf8NoBom -Path $changelogPath -Content $changelogContent
 
-    # DISPOSAL DIFFERS BY WHERE THE ENTRY LIVED, and that is the one real asymmetry the split introduces.
-    # A legacy root entry is named after its branch, so once folded it has no reason to exist and is
-    # deleted, exactly as before. branch/branch-deployment.md is a FIXED path that every future branch will
-    # use, so deleting it would leave the trunk missing a file the next `git checkout -b` expects -- and
-    # would quietly turn the reset state into "somebody has to recreate this". It is rewritten to its empty
-    # state instead, which is also what makes it impossible to fold twice: the reset opens with an H1, and
-    # the entry test only accepts the entry heading levels.
+    # DISPOSAL DIFFERS BY WHERE THE ENTRY LIVED, and that is the one real asymmetry the fixed path
+    # introduces. A legacy ROOT entry is named after its branch, so once folded it has no reason to exist and
+    # is deleted, exactly as before. development-cycle.md is a FIXED path that every future branch will use,
+    # so deleting it would leave the trunk missing a file the next `git checkout -b` expects -- and would
+    # quietly turn the reset state into "somebody has to recreate this". It is rewritten to its empty state
+    # instead.
+    #
+    # WHICH IS ALSO WHAT MAKES IT IMPOSSIBLE TO FOLD TWICE, and the reason for that changed with the merge.
+    # It used to be the heading LEVEL: a reset file opened with an H1 and only the entry levels were folded.
+    # One document cannot use that test -- its H1 is its title in both states -- so the guard is the branch
+    # NAME instead: the reset declares the trunk, and Test-BranchChangelogIsFilled reads it as unfilled.
+    # Written out here because a reader arriving at this line wants to know what stops a second fold, and the
+    # old answer is visible in the file while the new one is not.
     $isBranchFile = ($file -eq $branchDeploymentRel)
     if ($isBranchFile) {
-        Write-Utf8NoBom -Path $filePath -Content (((Format-BranchChangelogReset) -join $nl) + $nl)
+        Write-Utf8NoBom -Path $filePath -Content (((Format-DevelopmentCycleReset) -join $nl) + $nl)
     } else {
         Remove-Item -Path $filePath -Force
     }
@@ -726,15 +754,22 @@ foreach ($file in $entryFiles) {
 
 Write-Host "CHANGELOG.md updated." -ForegroundColor Green
 
-# THE STEP LIST IS RESET WITH THE ENTRY, and only with it. branch-cycle.md is never folded -- nothing
-# in it belongs in a changelog -- but it is the same branch's file, and leaving a merged branch's ticked-off
-# steps on the trunk would greet the next branch with somebody else's work. The reset is keyed on the entry
-# actually having been folded rather than on the file existing, so a fold-all run that only found legacy
-# root entries leaves it alone: that run belongs to a branch that never had a step list.
+# THE STEP LIST IS RESET WITH THE ENTRY, and since August 23, 2026 that happens in the SAME WRITE. The two
+# were separate files: the entry was reset in the loop above and the step list here, keyed on the entry
+# actually having been folded so that a fold-all run finding only legacy root entries left it alone. One
+# document means the reset above already replaced both halves -- Format-DevelopmentCycleReset writes the
+# whole file -- so there is nothing left to do for a merged branch.
+#
+# WHAT STAYS IS THE LEGACY CASE, and it is the reason this block did not simply disappear. A branch created
+# before the merge has its step list in branch-cycle.md, a DIFFERENT file from the entry that was just
+# folded, and leaving a merged branch's ticked-off steps on the trunk would greet the next branch with
+# somebody else's work. So this resets it only when it genuinely is a separate file -- and then to today's
+# document, at today's path, which is also how such a branch's tree finishes the migration.
 $resetPaths = @()
-if (@($folded | ForEach-Object { $_.File }) -contains $branchDeploymentRel) {
+if ((@($folded | ForEach-Object { $_.File }) -contains $branchDeploymentRel) -and
+    ($branchCycleRel -ne $branchDeploymentRel)) {
     $progressPath = Join-Path $repoRoot $branchCycleRel
-    Write-Utf8NoBom -Path $progressPath -Content (((Format-BranchProgressReset) -join $nl) + $nl)
+    Write-Utf8NoBom -Path $progressPath -Content (((Format-DevelopmentCycleReset) -join $nl) + $nl)
     $resetPaths += $branchCycleRel
     Write-Host "Reset to its empty state: $($branchCycleRel)" -ForegroundColor Green
 }

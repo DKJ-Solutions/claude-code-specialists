@@ -1,11 +1,12 @@
 ---
 name: new-branch
 description: >-
-  Create (or idempotently resume) a git branch AND its two files in workflow-davekjohn/branch/ -- the cycle file
-  and the deployment entry -- in one move, via the shared, centralized new-branch script from the plugin
+  Create (or idempotently resume) a git branch AND its development cycle document --
+  workflow-davekjohn/development-cycle.md, the branch's plan and the DEPLOY section that becomes its
+  changelog entry -- in one move, via the shared, centralized new-branch script from the plugin
   (single source of truth, issue #81), so a consumer does not have to duplicate this script locally.
-  Use this whenever a new piece of work starts: a branch is never entry-less -- creating it brings
-  both files to life in the same step, instead of a separate later scaffolding step.
+  Use this whenever a new piece of work starts: a branch is never entry-less -- creating it brings that
+  document to life in the same step, instead of a separate later scaffolding step.
 ---
 
 # new-branch -- the shared branch+entry creator for consumers
@@ -31,13 +32,15 @@ The script:
 
 1. Validates the branch name via the shared SSOT helper `Test-BranchName`
    (`scripts/lib/branch-info.ps1`) -- hard-rejects an empty name, `main`, or a name containing
-   `final`; soft-warns (but proceeds) on an unknown prefix.
+   `final`; soft-warns (but proceeds) on an unknown prefix. It also **completes the version suffix**: a
+   name with no `-v<N>` gets the lowest free one, checked against the branches that exist locally and on
+   the remote, so a second cycle on the same subject becomes `-v2` rather than colliding.
 2. Creates the branch (`git checkout -b`), or checks it out if it already exists -- **idempotent**:
    running it again on the same branch simply resumes it instead of failing.
-3. Immediately writes that branch's **two files in `workflow-davekjohn/branch/`** by calling the shared
-   `new-branch.ps1` as a child step (own script, own mirror) -- so the branch and its files
-   come into existence in a single step. Idempotent **per file**: a file that already belongs to this
-   branch is left exactly as it is.
+3. Immediately writes that branch's **`workflow-davekjohn/development-cycle.md`** -- so the branch and its
+   document come into existence in a single step. Idempotent: a document that already belongs to this
+   branch is left exactly as it is, and one belonging to somebody else is replaced with its owner named,
+   unless it holds uncommitted work, which is kept and reported instead.
 
 ## The rest of the chain — the commands, written here because they are readable here
 
@@ -71,36 +74,41 @@ was not. Reported from a consumer as
 [#731](https://github.com/DaveKJohn/claude-code-specialists/issues/731). **No flag changed**; the
 route moved to a page the model is allowed to read.
 
-## The two files, and why there are two
+## The document, and its two halves
 
 ```text
-workflow-davekjohn/branch/
-  branch-cycle.md        what still MUST HAPPEN -- the branch, its stamp, its step list, where you left off
-  branch-deployment.md   what the change DOES   -- nothing but the entry, so it pastes into CHANGELOG.md
+workflow-davekjohn/development-cycle.md
+  # Development cycle: `feat/x-v1` * <creation stamp>
+  ## PLAN / ## CREATE / ## TEST      what still MUST HAPPEN -- the step list, gated before the PR
+  ## DEPLOY: `feat/x-v1`            what the change DOES   -- folded verbatim into CHANGELOG.md
 ```
 
-**Fixed names, not one per branch.** Git already tracks these per branch, so two branches in flight
-cannot collide on them and the repo root stops filling up with other people's work. On the trunk both
-sit in an empty **reset state**, with a warning saying not to write there until a branch exists; the
-fold puts them back in that state after the merge.
+**A fixed name, not one per branch.** Git already tracks this file per branch, so two branches in flight
+cannot collide on it and the repo root stops filling up with other people's work. On the trunk it sits in
+an empty **reset state**, with the trunk's name in its heading and a warning saying not to write there
+until a branch exists; the fold puts it back in that state after the merge.
 
-**Why the split earns its keep.** One file used to do both jobs — it was scaffolded with a
-`**To do / where I left off:**` heading *and* folded verbatim into `CHANGELOG.md`, so "replace this
-whole block before the PR" had to be a written instruction. Two files make it obvious. The entry now
-prompts for what the change does, and nothing else.
+**Why one file and not two** (Dave, August 23, 2026). The two jobs are genuinely different, and for two
+weeks they were two files — but the plan a branch is working through and the claim it will make were then
+never on one screen. An author who has just ticked the last box is now looking at the paragraph they have
+to write next. What makes that safe is that the separation is structural rather than a written
+instruction: the entry is a NAMED SECTION with the branch in its heading, so the fold takes that section,
+the step gate counts only above it, and the scaffold gate reads only inside it.
 
-**`branch-deployment.md` holds the entry block and nothing around it** — no preamble, no warning. That is
-what makes it pasteable in one go. Its heading names the **branch** (`` ## `feat/x` deployment ``), which is
-also how the fold finds the PR, and the human-readable name of the change is its first section.
+**The DEPLOY section holds the entry block and nothing around it** — no preamble, no warning. That is what
+makes it pasteable in one go. Its heading names the **branch** (`` ## DEPLOY: `feat/x-v1` ``), which is also
+how the fold finds the PR.
 
-**The file is bare** — headings and the space under them. The guidance for each field lives in the copies
-under `workflow-davekjohn/branch/templates/`, which is what those copies are for: the file you type in is the questions and
-your answers, and the reference is one directory away.
+**The guidance is in the document.** Every field carries an HTML comment saying what a good answer looks
+like, and the fold strips comments on the way to `CHANGELOG.md` — so leaving one standing is not a defect.
+There is no reference copy beside the file any more; the trunk's own copy is the reference.
 
-**`new-branch` writes those templates into your repo too**, and rewrites one that has drifted from the
-current format. You get them on your first branch and they stay current through plugin updates, so the
-guidance travels with the scripts rather than living only in the repo the scripts came from. They are
-generated: edit one and the next run puts it back.
+**`new-branch` wrote two reference copies into your repo until August 23, 2026**, under
+`workflow-davekjohn/branch/templates/`, and refreshed one that had drifted. That existed because the file
+a branch got was deliberately bare, and inbound
+[#810](https://github.com/DaveKJohn/claude-code-specialists/issues/810) is what it cost: an author met the
+guidance in the neighbouring file or not at all. Nothing is generated beside the document now — the
+guidance travels inside it, through the same plugin update that carries the scripts.
 
 Two sections, one of them filled in for you:
 
@@ -118,10 +126,10 @@ what it always was — `open-pr` composes the PR title from it), the ID became a
 the type is the prefix of the branch the heading already names. All three are still **read** wherever an
 older entry carries them, so nothing already written stops folding.
 
-**The two stamps sit at the two ends of the branch's life** (Dave, August 19, 2026). The creation stamp is
-in `branch-cycle.md`'s heading — the document that is created with the branch and reset with the merge —
-and the landing stamp is on this file's `Pull Request` heading, written by the fold from the PR's own merge
-timestamp. Neither is typed by hand, and neither is in the other's file.
+**The two stamps sit at the two ends of the branch's life** (Dave, August 19, 2026; both on their own
+heading since August 23). The creation stamp is on the document's own `#` heading — created with the
+branch, reset with the merge — and the landing stamp is on the `## DEPLOY:` heading, written by the fold
+from the PR's own merge timestamp. Neither is typed by hand.
 
 **`Branch title` is what the change is CALLED, everywhere.** Since
 [#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506) `open-pr` composes the PR title as
@@ -139,11 +147,13 @@ untouched entry *and* one whose prompt was deleted rather than answered.
 while anything is still `- [ ]`. Resolve each step as `- [x]` done or `- [~]` dropped, with the reason
 kept on the line — that third mark exists so nobody is ever pushed into ticking a box for work they did
 not do. There is no `-Force`. Full convention and reasoning: the `open-pr` skill, and
-[`BRANCH-portable.md`](../../BRANCH-portable.md), which travels with this plugin.
+[`DEVELOPMENT-CYCLE-portable.md`](../../DEVELOPMENT-CYCLE-portable.md), which travels with this plugin.
 
 **So work that happens AFTER the merge is not a step** — opening the PR, waiting for CI, merging, folding,
-publishing a Release, any measurement that only exists once the run is over. Put it under
-`### Where I left off`, which is what that section is for. The reason is the gate's own timing rather than
+publishing a Release, any measurement that only exists once the run is over. It is what the DEPLOY section
+**describes**, in prose, once it has happened -- there is no step for it and no section to park it in
+(`### Where I left off` was retired with the merge, on the ground that an unticked box already says where
+you left off). The reason is the gate's own timing rather than
 a matter of taste: it reads the list *before* the push, so a post-merge step cannot be done yet, and
 **neither mark fits** — `- [x]` reports work that has not happened, `- [~]` claims the step turned out not
 to be needed when it is needed and merely comes later. The only way past the gate is to tick a box for
@@ -281,9 +291,11 @@ entry unreadable to your own fold.
 
 Two optional parameters cover the "start now, continue later (maybe on another device)" case:
 
-- **`-Intent "<what is next / where I left off>"`** -- recorded in **`branch-cycle.md`**, under
-  its "where I left off" section. Omit it and that section is simply left empty for you.
-  **It deliberately does not touch the entry.** An intent is a status, and the entry's text folds
+- **`-Intent "<what is next / where I left off>"`** -- recorded at the **top of the document**, above the
+  phases. Omit it and nothing is written there. It kept its place and lost its heading when
+  `### Where I left off` went: the marks say where you stopped, and this is for what you decided and have
+  not written down anywhere else yet.
+  **It deliberately does not touch the DEPLOY section.** An intent is a status, and that section's text folds
   verbatim into `CHANGELOG.md` -- this repo measured three released entries that shipped a progress
   note that way. The entry's body is left empty, and the PR gate keeps refusing it until somebody
   writes what the change does.
@@ -307,7 +319,7 @@ Two optional parameters cover the "start now, continue later (maybe on another d
 - **`-Park`** -- after creating the branch + entry, commits the entry (the intent carrier) and
   pushes the branch to `origin` with `git push -u`. **This opens no PR.** Push is not a PR: parking
   makes the branch reachable from another device, while the PR rule stays intact and separate.
-- **`-RepoRoot "<path>"`** -- create the branch and its two files in a tree **other** than the one you
+- **`-RepoRoot "<path>"`** -- create the branch and its document in a tree **other** than the one you
   are standing in. You almost certainly do not type this: it exists for the `worktree-lane` skill, which
   opens a branch inside a lane worktree. Same parameter, same name and same reasoning as
   `fold-changelog-entry.ps1` has carried since

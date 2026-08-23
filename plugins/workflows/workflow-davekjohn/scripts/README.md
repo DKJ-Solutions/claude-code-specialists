@@ -43,7 +43,7 @@ before adding the next one.*
 
 | Script | What it is | Skill |
 |---|---|---|
-| `task/new-branch.ps1` | creates the branch AND writes both `workflow-davekjohn/branch/` files plus the reference templates, in one move — a branch is never entry-less | [`new-branch`](../skills/new-branch/SKILL.md) |
+| `task/new-branch.ps1` | creates the branch AND writes its `workflow-davekjohn/development-cycle.md`, in one move — a branch is never entry-less | [`new-branch`](../skills/new-branch/SKILL.md) |
 | `task/park-branch.ps1` | commits all outstanding work + `git push -u` — no PR, no live action | [`park`](../skills/park/SKILL.md) |
 | `task/adopt-config.ps1` | reads the config blueprint and places or proposes each seam answer | [`adopt-config`](../skills/adopt-config/SKILL.md) |
 | `task/adopt-workflow-folder.ps1` | scaffolds `workflow-davekjohn/` — the folder docs, the releases root, the branch dossier and the prompt inbox | [`adopt-workflow-folder`](../skills/adopt-workflow-folder/SKILL.md) |

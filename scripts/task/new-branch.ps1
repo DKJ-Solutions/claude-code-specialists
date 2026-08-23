@@ -50,20 +50,20 @@
 
 .PARAMETER Intent
     (Optional) the direction of the branch -- what still needs to happen and where you left off.
-    Recorded in branch-cycle.md under "where I left off"; typically given together with -Park when
-    parking a branch for later / another device (#162). It deliberately does not touch the entry: an
-    intent is a status, and the entry's text folds verbatim into CHANGELOG.md.
+    Recorded at the top of development-cycle.md, above the phases; typically given together with -Park
+    when parking a branch for later / another device (#162). It deliberately does not touch the DEPLOY
+    section: an intent is a status, and that section's text folds verbatim into CHANGELOG.md.
 
 .PARAMETER RepoRoot
-    (Optional) the tree to create the branch and its two files in, when that is NOT the tree you are
+    (Optional) the tree to create the branch and its document in, when that is NOT the tree you are
     standing in. Used by worktree-lane.ps1 to open a branch inside a lane worktree. Omitted (the
     normal case): unchanged behaviour -- CLAUDE_PROJECT_DIR, else the git root.
 
 .PARAMETER Park
-    (Optional switch) after creating the branch + its files, commit BOTH branch files and push the
-    branch to origin with `git push -u` -- NO PR. Both, because the step list is the half that says
-    what was still in flight, and parking exists precisely to hand that over. Push is not a PR:
-    parking makes the branch reachable from another device while the PR rule stays intact and
+    (Optional switch) after creating the branch + its document, commit development-cycle.md and push the
+    branch to origin with `git push -u` -- NO PR. The whole document, because the plan still in flight is
+    what parking exists to hand over, and it is a section of the same file as the entry. Push is not a
+    PR: parking makes the branch reachable from another device while the PR rule stays intact and
     separate. Default (no -Park): purely local, nothing committed or pushed.
 
 .EXAMPLE
@@ -146,11 +146,15 @@ if (Test-Path -LiteralPath $configPath) {
             $v = Get-EntryFallbackType; if ($v) { $stubFallbackType = $v }
         }
     } catch {
-        Write-Warning "scripts\repo-config.ps1 could not be loaded ($($_.Exception.Message)) -- writing the branch files with the built-in default wording."
+        Write-Warning "scripts\repo-config.ps1 could not be loaded ($($_.Exception.Message)) -- writing the development cycle with the built-in default wording."
     }
 }
 
-# Validation via the shared SSOT helper -- no inline repetition of the hard-reject rules.
+
+# Validation via the shared SSOT helper -- no inline repetition of the hard-reject rules. It runs on the name
+# AS GIVEN, before the version suffix below is completed, and that order is a measured requirement rather
+# than tidiness: completing first turns '-Name main' into 'main-v1', which every hard reject then waves
+# through. Caught by this script's own suite on the first run.
 $check = Test-BranchName -Branch $Name
 if (-not $check.IsValid) {
     Write-Error "new-branch cannot run -- invalid branch name '$Name': $($check.Reason)"
@@ -169,6 +173,32 @@ $trunk = Get-BranchTrunkName
 if ($Name -eq $trunk) {
     Write-Host "'$Name' is the trunk - create a branch instead." -ForegroundColor Red
     exit 1
+}
+
+# --- THE VERSION SUFFIX, COMPLETED HERE RATHER THAN DEMANDED (Dave, August 23, 2026) ---------------
+#
+# A branch name ends in '-v<N>', and a second development cycle on the same subject keeps the name and bumps
+# the number. The rule was already half-written in branch-info.ps1: 'final' is refused there BECAUSE a
+# version suffix is the honest way to say "another round of this", and Dave's answer when asked for the
+# remedy was '-v2'. This makes it the starting point instead of the way out.
+#
+# IT APPENDS '-v1' AND NOTHING ELSE -- it does NOT look for the lowest free number, and that restraint is
+# the whole design. new-branch is documented idempotent: running it again on the same subject RESUMES that
+# branch, which is what the new-branch skill relies on and what the -Park flow needs. A version scan would
+# turn every rerun into a new branch -- measured on this script's own suite, where the second run landed on
+# '-v2' and the assert that HEAD had not moved failed. So a bump is a DECISION somebody states by typing
+# '-v2', which is also exactly how Dave's own sentence reads.
+#
+# AN EXPLICIT '-vN' IS LEFT EXACTLY AS GIVEN, for the same reason: a number somebody typed is a statement.
+#
+# WHY IT IS NOT A REFUSAL IN Test-BranchName, which is where a rule like this usually goes. Two reasons:
+# branch-info.ps1 is REPO-OWNED and does not travel, so enforcing there states the rule to this repo alone
+# while this script is the shared one; and a hard refusal breaks every branch in flight, here and in three
+# consumers, which meet this convention through a plugin update rather than by choosing to.
+if ($Name -notmatch '-v\d+$') {
+    $completed = "$Name-v1"
+    Write-Host "Branch name completed: '$Name' -> '$completed' (a development cycle carries its version; a second cycle on the same subject is '-v2', typed deliberately)." -ForegroundColor Cyan
+    $Name = $completed
 }
 
 # Note: Test-BranchName above only catches the explicitly named hard rejects (empty/'main'/
@@ -250,103 +280,79 @@ if (-not $branchType) {
 # hypothetical in a repo whose whole workflow is "notice it once, script it the second time".
 $branchId = (Get-Date).ToString('yyyyMMdd-HHmmss')
 
-# THE BRANCH FILES LIVE IN workflow-davekjohn/branch/, NOT IN THE REPO ROOT UNDER THE BRANCH'S NAME
-# (Dave, August 6, 2026; moved under the workflow's own root folder August 14, 2026).
-# Two fixed paths, and git's own per-branch tracking is what keeps two branches from colliding on them --
+# THE BRANCH'S WORKING DOCUMENT LIVES AT workflow-davekjohn/development-cycle.md, NOT IN THE REPO ROOT
+# UNDER THE BRANCH'S NAME (Dave, August 6, 2026; moved under the workflow's own root folder August 14,
+# 2026; merged from two files into one on August 23, 2026).
+# One fixed path, and git's own per-branch tracking is what keeps two branches from colliding on it --
 # see the block in entry-scaffold-lib.ps1 for why that beats a filename per branch.
 $branchFiles    = Get-BranchFilePaths
 $branchDirPath  = Join-Path $repoRoot $branchFiles.Directory
 
-# WHICH NAME THIS RUN WRITES, on a repo that may still hold the pre-August-19-2026 pair. The rule is the
-# narrowest one that keeps a branch in flight whole: the legacy name is used for one reason only -- it
-# already declares THIS branch, so somebody is working in it and a second pair beside it would split their
-# work in half. Every other state writes the current name, including a trunk whose reset files still carry
-# the old ones. Resolve-BranchFilePath is deliberately NOT used here: it answers "where is the file", which
-# is the readers' question, and answering the writer's question with it would keep the old name alive on
-# every branch a consumer creates.
+# WHICH NAME THIS RUN WRITES, on a repo that may still hold a pre-August-23-2026 pair. The rule is the
+# narrowest one that keeps a branch in flight whole: an old name is used for one reason only -- it already
+# declares THIS branch, so somebody is working in it and a new document beside it would split their work in
+# half. Every other state writes the current name, including a trunk whose reset files still carry the old
+# ones. Resolve-BranchFilePath is deliberately NOT used here: it answers "where is the file", which is the
+# readers' question, and answering the writer's question with it would keep an old name alive on every
+# branch a consumer creates.
+#
+# THE STEP LIST AND THE ENTRY WERE TWO FILES, so there are two old names to recognise rather than one. A
+# branch created before the merge has both, each declaring it; whichever is found first is where this run
+# keeps writing, because a rerun that moved half of somebody's work to the new file would be the split it is
+# trying to avoid.
 function Get-BranchFileTargetRel {
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
         [Parameter(Mandatory)][string]$Current,
-        [Parameter(Mandatory)][string]$Legacy,
+        [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$Legacy,
         [Parameter(Mandatory)][string]$Branch
     )
-    $legacyPath = Join-Path $RepoRoot ($Legacy -replace '/', '\')
-    if (Test-Path -LiteralPath $legacyPath) {
-        $declared = Get-BranchFileDeclaredBranch -Text ([System.IO.File]::ReadAllText($legacyPath))
-        if ($declared -eq $Branch) { return $Legacy }
+    foreach ($rel in @($Legacy)) {
+        if (-not $rel) { continue }
+        $path = Join-Path $RepoRoot ($rel -replace '/', '\')
+        if (-not (Test-Path -LiteralPath $path)) { continue }
+        $declared = Get-BranchFileDeclaredBranch -Text ([System.IO.File]::ReadAllText($path))
+        if ($declared -eq $Branch) { return $rel }
     }
     return $Current
 }
 
-$deploymentRel  = Get-BranchFileTargetRel -RepoRoot $repoRoot -Current $branchFiles.Deployment `
-    -Legacy $branchFiles.LegacyDeployment -Branch $branch
-$cycleRel       = Get-BranchFileTargetRel -RepoRoot $repoRoot -Current $branchFiles.Cycle `
-    -Legacy $branchFiles.LegacyCycle -Branch $branch
-$deploymentPath = Join-Path $repoRoot $deploymentRel
-$cyclePath      = Join-Path $repoRoot $cycleRel
+$cycleRel  = Get-BranchFileTargetRel -RepoRoot $repoRoot -Current $branchFiles.File `
+    -Legacy @($branchFiles.LegacyCycle, $branchFiles.OlderCycle) -Branch $branch
+$cyclePath = Join-Path $repoRoot ($cycleRel -replace '/', '\')
 
 if (-not (Test-Path -LiteralPath $branchDirPath)) {
     $null = New-Item -ItemType Directory -Path $branchDirPath -Force
 }
 
-# THE TEMPLATES ARE WRITTEN HERE, AND FOR A CONSUMER THIS IS THE ONLY THING THAT WRITES THEM (August 7,
-# 2026). They are the reference copy of both branch files, with the guidance comment on every field --
-# and since the working files became bare, they are the ONLY place that guidance exists.
+# NOTHING WRITES A TEMPLATE ANY MORE (August 23, 2026), and the reason it can stop is that the working
+# document carries the guidance itself. branch/templates/ existed because the file a branch got was
+# deliberately bare: the comments explaining every field lived in a reference copy beside it, which this
+# script had to create and refresh in every consumer. Inbound #810 is what that arrangement cost -- an
+# author met the guidance in the neighbouring file or not at all. The comments are in the document now, the
+# fold strips them on the way to CHANGELOG.md, and a reference nobody has to keep in sync is one fewer thing
+# that can drift.
+# IDEMPOTENCY IS ONE QUESTION NOW, and that is the merge's quietest simplification. It used to be two --
+# per file, because the entry and the step list could legitimately be out of step, so a rerun on a branch
+# whose entry was written still had to leave the step list alone. One document cannot be half-written by
+# this script: either it declares this branch or it does not.
 #
-# THE REGRESSION THIS REPAIRS, MEASURED RATHER THAN SUPPOSED. Until then nothing created branch/templates/
-# anywhere: they exist in the source repo because they were written by hand there, and the lint that holds
-# them to Get-BranchTemplates is repo-owned -- the plugin ships no scripts/lint/ at all, so no
-# consumer has ever had it. When the working files stopped carrying guidance in v3.7.0, the source repo's
-# guidance moved to branch/templates/ and a consumer's simply went away. Found by asking whether "see the
-# templates" resolves in a consumer repo instead of assuming it does.
+# THE TEST IS THE DECLARED OWNER MEASURED AGAINST THIS BRANCH (inbound #615, reported from a consumer).
+# "Is the entry filled" and "is the owner not the trunk" are BOTH true for any branch stacked on one whose
+# entry has not been folded yet -- so the file was skipped, and the skip was printed under the NEW branch's
+# name. The branch silently started out claiming the previous branch's work as its own: nothing failed, and
+# the one line it printed said the opposite of what had happened.
 #
-# REWRITTEN WHENEVER THEY DIFFER, not merely created when absent, and that follows the rule the templates
-# already carry: they are GENERATED, not maintained -- editing one by hand is an error the source repo's
-# lint reports. Refreshing them on every run is what carries a format change into a consumer's reference
-# through the same plugin update that carries it into their scripts.
-#
-# Silent when nothing changes, so a rerun says only what it did.
-foreach ($tpl in (Get-BranchTemplates)) {
-    $tplPath = Join-Path $repoRoot ($tpl.Path -replace '/', '\')
-    $tplDir  = Split-Path -Parent $tplPath
-    if (-not (Test-Path -LiteralPath $tplDir)) { $null = New-Item -ItemType Directory -Path $tplDir -Force }
-    $existing = if (Test-Path -LiteralPath $tplPath) { [System.IO.File]::ReadAllText($tplPath) } else { $null }
-    # Line endings normalised for the COMPARISON only -- whether the working copy checked out CRLF is not
-    # a difference in the format, and reporting it as one would rewrite the file on every single run.
-    if ($null -eq $existing) {
-        [System.IO.File]::WriteAllText($tplPath, $tpl.Content, $Utf8NoBom)
-        Write-Host "Created: $($tpl.Path) (the reference copy, with the guidance for every field)" -ForegroundColor Green
-    } elseif (($existing -replace "`r`n", "`n") -ne ($tpl.Content -replace "`r`n", "`n")) {
-        [System.IO.File]::WriteAllText($tplPath, $tpl.Content, $Utf8NoBom)
-        Write-Host "Refreshed: $($tpl.Path) (generated, not maintained - it had drifted from the format)" -ForegroundColor Yellow
-    }
-}
-
-# IDEMPOTENCY IS PER FILE, not one check for both, because the two can legitimately be out of step: a
-# rerun on a branch whose entry has been written must still not clobber the step list, and vice versa.
-# The test is what the file SAYS it belongs to rather than whether it exists -- both files exist on the
-# trunk by design, so Test-Path would report every fresh branch as already scaffolded.
-$deploymentExisting = if (Test-Path -LiteralPath $deploymentPath) { [System.IO.File]::ReadAllText($deploymentPath) } else { '' }
-$cycleExisting  = if (Test-Path -LiteralPath $cyclePath)  { [System.IO.File]::ReadAllText($cyclePath)  } else { '' }
-
-# THE TEST IS THE DECLARED OWNER MEASURED AGAINST THIS BRANCH, which is what the comment above has
-# always said it was and what neither half actually asked (inbound #615, reported from a consumer).
-# "Is the entry filled" and "is the owner not the trunk" are BOTH true for any branch stacked on one
-# whose entry has not been folded yet -- so both files were skipped, and the skip was printed under the
-# NEW branch's name. The branch silently started out claiming the previous branch's work as its own:
-# nothing failed, and the one line it printed said the opposite of what had happened.
-#
-# One comparison answers all three states, which is why it replaces both tests. The trunk's reset state
-# declares the trunk (write), a rerun on this branch declares this branch (keep), and a foreign owner
-# declares somebody else (write, and say whose file was replaced). Get-BranchFileDeclaredBranch reads
-# the heading of either file -- '# `main` changelog' on the trunk, '## `feat/x` changelog' once
-# written -- so the same predicate serves both, and Test-BranchChangelogIsFilled is no longer the
-# entry's idempotency test. It still owns the question it is named for, everywhere else.
-$deploymentOwner = Get-BranchFileDeclaredBranch -Text $deploymentExisting
-$deploymentTaken = ($deploymentOwner -eq $branch)
-$cycleOwner  = Get-BranchFileDeclaredBranch -Text $cycleExisting
-$cycleTaken  = ($cycleOwner -eq $branch)
+# One comparison answers all three states. The trunk's reset state declares the trunk (write), a rerun on
+# this branch declares this branch (keep), and a foreign owner declares somebody else (write, and say whose
+# file was replaced). Get-BranchFileDeclaredBranch reads the heading at either level -- '# `main`
+# development cycle' on the trunk, '# `feat/x-v1` development cycle' once written, and an old
+# '## `feat/x` deployment' on a branch created before the merge -- so the same predicate serves every
+# state, and Test-BranchChangelogIsFilled is not the idempotency test. It still owns the question it is
+# named for, everywhere else.
+$cycleExisting = if (Test-Path -LiteralPath $cyclePath) { [System.IO.File]::ReadAllText($cyclePath) } else { '' }
+$cycleOwner    = Get-BranchFileDeclaredBranch -Text $cycleExisting
+$cycleTaken    = ($cycleOwner -eq $branch)
 
 # A FOREIGN OWNER IS OVERWRITTEN, EXCEPT WHERE THE OVERWRITE WOULD BE UNRECOVERABLE -- and that
 # distinction is measured rather than assumed, because this repair is what creates the destructive
@@ -374,19 +380,19 @@ function Test-BranchFileIsDirty {
     return [bool]($porcelain | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
 
-# BOTH ALREADY WRITTEN IS A SKIP, NOT A STOP, and that is the one exit the merge had to convert. As a
-# child process this was `exit 0` and the caller read it as success and carried on to -Park; inline, an
-# exit would end the whole run and a park would silently not happen. Saying so and falling through is
-# what it always meant.
-if ($deploymentTaken -and $cycleTaken) {
-    Write-Host "Branch files already written for '$branch' - nothing done." -ForegroundColor Yellow
+# ALREADY WRITTEN IS A SKIP, NOT A STOP, and that is the one exit the merge had to convert. As a child
+# process this was `exit 0` and the caller read it as success and carried on to -Park; inline, an exit would
+# end the whole run and a park would silently not happen. Saying so and falling through is what it always
+# meant.
+if ($cycleTaken) {
+    Write-Host "Development cycle already written for '$branch' - nothing done." -ForegroundColor Yellow
+    $branchFileWritten = $false
 } else {
-    # -Intent DOES NOT LAND IN THE ENTRY (Dave, August 6, 2026). It is "where you left off" -- a status,
-    # typically written when parking (#162) -- and with the two files split that is exactly what
-    # branch-cycle.md is for. It used to become the entry BODY, which put a progress note in the file
-    # whose text folds verbatim into CHANGELOG.md: the defect the v3.2.0 measurement found three times.
-    # So the entry scaffolds with an empty body, and the gate keeps refusing it until somebody writes
-    # what the change does.
+    # -Intent IS THE PARKING NOTE AND IT DOES NOT LAND IN THE ENTRY (Dave, August 6, 2026). It is a status,
+    # typically written when parking (#162), and it used to become the entry BODY -- which put a progress
+    # note in the text that folds verbatim into CHANGELOG.md, the defect the v3.2.0 measurement found three
+    # times. It goes to the top of the document instead, above the phases; the entry scaffolds with an empty
+    # body and the gate keeps refusing it until somebody writes what the change does.
     $body = ''
 
     # THE SECTION SHAPE IS THE SHAPE, ALWAYS -- the ranking's on/off switch does not change it. An earlier
@@ -396,69 +402,44 @@ if ($deploymentTaken -and $cycleTaken) {
     # so the switch governs only the GATES, which is the thing a repo was ever opting out of.
     $impactActive = Test-EntrySignificanceActive
 
-    # NO DATE HERE, DELIBERATELY (Dave, August 5, 2026). This runs when the BRANCH is created, so any date
-    # it writes is the branch's birth date -- and the changelog records what LANDED when. The date is the
-    # fold's to add, from the PR's own merge timestamp, together with the PR number.
-    #
-    # AND THE CREATION STAMP GOES TO THE CYCLE FILE, NOT HERE (Dave, August 19, 2026). $branchId is the
-    # branch's birth moment, which is exactly the fact that file is about; the entry states what is being
-    # delivered and takes its date from the merge.
-    $entryLines = Format-EntryBlock -Branch $branch -Description $description `
-        -Type $branchType -Body $body
-    $template = ($entryLines -join "`n") + "`n"
+    # A FOREIGN OWNER IS OVERWRITTEN, EXCEPT WHERE THE OVERWRITE WOULD BE UNRECOVERABLE -- and that
+    # distinction is measured rather than assumed, because this repair is what creates the destructive path.
+    # Before it, a foreign file was kept; after it, it is written over. In the ordinary stacked case that
+    # costs nothing: the other branch's document is committed on that branch, so git still holds it. What git
+    # does not hold is a document edited and never committed -- `git checkout -b` carries those edits into the
+    # new branch, and there they exist in exactly one place. So a dirty foreign file is left alone and said
+    # out loud instead, which still repairs the defect that was reported: the failure there was the SILENCE
+    # and the wrong name, not the keeping.
+    $cycleForeign = ($cycleOwner -and $cycleOwner -ne $trunk -and -not $cycleTaken)
 
-    # WHOSE FILE THIS WAS IS NAMED IN EVERY OUTCOME, and that is the reported defect's actual repair.
-    # A foreign owner is the one state the old test could not distinguish from its own, so it is the one
-    # state the output has to say out loud -- kept, replaced or written, the line names the branch the
-    # file belonged to.
-    $deploymentForeign = ($deploymentOwner -and $deploymentOwner -ne $trunk -and -not $deploymentTaken)
-    $cycleForeign  = ($cycleOwner  -and $cycleOwner  -ne $trunk -and -not $cycleTaken)
-
-    # THE CYCLE FILE IS REPORTED FIRST, because that is the order the pair is in: the plan, then what it
-    # delivers (Dave, August 19, 2026). Same order as Get-BranchTemplates returns them in, and as the
-    # -Park commit lists them.
-    # Set by whichever of the two branches below actually writes a file, so the re-read note after them is
-    # printed only when there is something to have gone stale -- a run that KEPT both files changed nothing
-    # a session was tracking, and a note there would be advice about a thing that did not happen.
-    $branchFileWritten = $false
-
-    if ($cycleTaken) {
-        Write-Host "Kept: $cycleRel (already scaffolded for this branch)" -ForegroundColor Yellow
-    } elseif ($cycleForeign -and (Test-BranchFileIsDirty -RepoRoot $repoRoot -RelativePath $cycleRel)) {
-        Write-Warning "Kept: $cycleRel -- it holds UNCOMMITTED work belonging to '$cycleOwner', which exists nowhere else. This branch has no step list of its own yet: commit or discard that work, then rerun this script."
+    if ($cycleForeign -and (Test-BranchFileIsDirty -RepoRoot $repoRoot -RelativePath $cycleRel)) {
+        Write-Warning "Kept: $cycleRel -- it holds UNCOMMITTED work belonging to '$cycleOwner', which exists nowhere else. This branch has no development cycle of its own yet: commit or discard that work, then rerun this script."
+        $branchFileWritten = $false
     } else {
-        # NO DESCRIPTION HERE. It lives in the entry alone since August 7, 2026 -- the same field in both
-        # files was one fact in two places, free to disagree. The STAMP is this file's own since August 19:
-        # its heading carries the branch and the moment that branch began.
-        $cycleText = ((Format-BranchProgressScaffold -Branch $branch -Intent $Intent -Id $branchId) -join "`n") + "`n"
+        # NO DATE IN THE ENTRY, DELIBERATELY (Dave, August 5, 2026). This runs when the BRANCH is created, so
+        # any date it writes is the branch's birth date -- and the changelog records what LANDED when. The
+        # entry's date is the fold's to add, from the PR's own merge timestamp, together with the PR number.
+        # The CREATION stamp does belong here: it is the document's own heading, and this document is created
+        # with the branch and reset with the merge.
+        $cycleText = ((Format-DevelopmentCycle -Branch $branch -Intent $Intent -Id $branchId `
+            -Description $description -Type $branchType -Body $body) -join "`n") + "`n"
         [System.IO.File]::WriteAllText($cyclePath, $cycleText, $Utf8NoBom)
         $branchFileWritten = $true
+        # WHOSE FILE THIS WAS IS NAMED IN EVERY OUTCOME, and that is the reported defect's actual repair. A
+        # foreign owner is the one state the old test could not distinguish from its own, so it is the one
+        # state the output has to say out loud.
         if ($cycleForeign) {
-            Write-Host "Replaced: $cycleRel (it held the step list of '$cycleOwner', committed on that branch)" -ForegroundColor Yellow
+            Write-Host "Replaced: $cycleRel (it held the development cycle of '$cycleOwner', committed on that branch)" -ForegroundColor Yellow
         } else {
             Write-Host "Created: $cycleRel" -ForegroundColor Green
         }
     }
 
-    if ($deploymentTaken) {
-        Write-Host "Kept: $deploymentRel (already holds this branch's entry)" -ForegroundColor Yellow
-    } elseif ($deploymentForeign -and (Test-BranchFileIsDirty -RepoRoot $repoRoot -RelativePath $deploymentRel)) {
-        Write-Warning "Kept: $deploymentRel -- it holds UNCOMMITTED work belonging to '$deploymentOwner', which exists nowhere else. This branch has no entry of its own yet: commit or discard that work, then rerun this script."
-    } else {
-        [System.IO.File]::WriteAllText($deploymentPath, $template, $Utf8NoBom)
-        $branchFileWritten = $true
-        if ($deploymentForeign) {
-            Write-Host "Replaced: $deploymentRel (it held the entry of '$deploymentOwner', committed on that branch)" -ForegroundColor Yellow
-        } else {
-            Write-Host "Created: $deploymentRel" -ForegroundColor Green
-        }
-    }
-
-    # SAID WHERE IT HAPPENS (inbound #817). The lines above name the two paths a session is about to edit
-    # and, until now, never mentioned that its own view of them had just been replaced. One line here turns
-    # a refused write further on into a known next step, in the one place a reader is already looking at
-    # exactly those files. Wording in Get-BranchFilesRereadNote, shared with the fold, which resets the same
-    # pair at the other end of the cycle.
+    # SAID WHERE IT HAPPENS (inbound #817). The line above names the path a session is about to edit and,
+    # until now, never mentioned that its own view of it had just been replaced. One line here turns a
+    # refused write further on into a known next step, in the one place a reader is already looking at
+    # exactly that file. Wording in Get-BranchFilesRereadNote, shared with the fold, which resets the same
+    # document at the other end of the cycle.
     if ($branchFileWritten) { Write-Host (Get-BranchFilesRereadNote) -ForegroundColor DarkGray }
 
     # The rubric, printed at the moment the entry comes into existence. The scores are filled in later, by
@@ -478,7 +459,7 @@ if ($deploymentTaken -and $cycleTaken) {
 }
 
 # -Park (opt-in): make the freshly created branch reachable from another device by committing its
-# branch files (the entry plus the step list carrying the intent) and pushing them -- NO PR. Push != PR:
+# development cycle (the plan, the intent and the entry, in one document) and pushing it -- NO PR. Push != PR:
 # the PR rule stays intact and separate (see the .PARAMETER Park note). git writes progress to stderr,
 # which under EAP=Stop would die as a terminating NativeCommandError before the exit-code check even on
 # exit 0 (the #107 pitfall) -- so every git call goes through the shared Invoke-NativeCapture
@@ -496,13 +477,13 @@ if ($Park) {
     # too, and the shared function owns both.
     . (Join-Path $PSScriptRoot '..\lib\park-lib.ps1')
 
-    # BOTH branch files, since the branch/ split (Dave, August 6, 2026). Parking exists to make work
-    # reachable from another device, and the step list is the half that says what was still in flight --
-    # parking the entry alone would push the description and leave the plan behind, which is the opposite
-    # of what -Park is for. They are named explicitly rather than swept up, so the commit stays exactly as
-    # narrow as it was: this pushes to a branch, but the pathspec discipline is the same everywhere.
+    # THE ONE DOCUMENT, since the merge (Dave, August 23, 2026). Parking exists to make work reachable from
+    # another device, and both halves of what a reader needs -- the plan still in flight and the claim being
+    # made -- are sections of this file now, so the pair that used to be listed here is one path. Named
+    # explicitly rather than swept up, so the commit stays exactly as narrow as it was: this pushes to a
+    # branch, but the pathspec discipline is the same everywhere.
     $ok = Invoke-GitPark -RepoRoot $repoRoot -Branch $Name -Scope 'BranchFiles' `
-        -Paths @($cycleRel, $deploymentRel)
+        -Paths @($cycleRel)
     if (-not $ok) { exit 1 }
 }
 

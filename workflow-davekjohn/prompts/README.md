@@ -44,8 +44,9 @@ the inbox with a single command and no edit to a file they already own.
   holding only comments counts as empty — nothing is announced, nothing is picked up, and the comments
   are never read as instructions.
 - **`prompt.md` is created when absent and never overwritten**, whatever it holds. The one file
-  `/prompt` may rewrite is the generated template, on drift — the same exception `new-branch` makes for
-  `branch/templates/`.
+  `/prompt` may rewrite is the generated template, on drift. **It is now the only such exception in the
+  workflow**: `new-branch` made the same one for the two reference copies under `branch/templates/`
+  until August 23, 2026, and those are gone with the merge that removed them.
 - **Archive only once the work is genuinely under way.** A session that loses its context between the
   read and the start would find an empty inbox and no record of what was asked — and the archive, being
   untracked, is not something a colleague can recover from the repo.

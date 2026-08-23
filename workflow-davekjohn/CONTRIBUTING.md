@@ -12,7 +12,7 @@ enables it, and it is described once, with the plugin:
 
 📄 **[The contribution cycle — the portable half](../plugins/workflows/workflow-davekjohn/CONTRIBUTING-portable.md)**
 
-Read that first. It covers the five steps, the two files a branch works in, the gates on the PR, and the
+Read that first. It covers the five steps, the document a branch works in, the gates on the PR, and the
 Significance model — naming the *seam* wherever a repo owns the answer instead of asserting one repo's
 answer as the rule. **This page is this repo's set of answers to it**, and nothing more.
 
@@ -131,8 +131,9 @@ of releases actually cut is on [this repo's own release page](../releases/README
 
 ### Where the rest lives
 
-- The two files a branch works in, and the three step marks:
-  [`BRANCH-portable.md`](../plugins/workflows/workflow-davekjohn/BRANCH-portable.md), with this repo's own
-  answers in [`workflow-davekjohn/branch/README.md`](branch/README.md).
+- The document a branch works in, and the three step marks:
+  [`DEVELOPMENT-CYCLE-portable.md`](../plugins/workflows/workflow-davekjohn/DEVELOPMENT-CYCLE-portable.md).
+  This repo keeps no local half of it — see [`CLAUDE.md`](CLAUDE.md) here for why, and for the answers
+  that page used to hold.
 - The pending changelog entries, ranked: [`CHANGELOG.md`](../CHANGELOG.md).
 - Which specialist owns which kind of change: [`CLAUDE.md`](../CLAUDE.md) and the roster it imports.

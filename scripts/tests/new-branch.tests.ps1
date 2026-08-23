@@ -378,7 +378,9 @@ try {
     $r1 = Invoke-NewBranch -Dir $fixtureBC -Name 'feat/my-task' -Title 'First title'
     Assert-Equal 0 $r1.Code 'valid name: new-branch exit 0'
     $headBranch1 = (& git -C $fixtureBC rev-parse --abbrev-ref HEAD).Trim()
-    Assert-Equal 'feat/my-task' $headBranch1 'HEAD is on the new branch'
+    # WITH THE VERSION SUFFIX new-branch COMPLETES (August 23, 2026). '-v1' is appended when the name
+    # carries none, so a second cycle on the same subject is '-v2' -- typed deliberately, never guessed.
+    Assert-Equal 'feat/my-task-v1' $headBranch1 'HEAD is on the new branch, with its version completed'
     # branch/branch-deployment.md, from the lib rather than written out here: the test must fail if the
     # writer and the readers stop agreeing about the path, not merely if this literal goes stale.
     $entryPath    = Join-Path $fixtureBC ((Get-BranchFilePaths).Deployment)
@@ -386,8 +388,16 @@ try {
     Assert-True (Test-Path -LiteralPath $entryPath) 'entry file created at the fixed branch/ path'
     Assert-True (Test-Path -LiteralPath $progressPath) 'and the step list beside it -- a branch gets both files or neither'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $fixtureBC 'feat-my-task.md'))) 'nothing is written to the repo root any more'
-    $entryText1 = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
-    Assert-True ($entryText1 -match [regex]::Escape('First title')) 'entry heading contains the given title'
+    # THE DOCUMENT, AND THEN ITS ENTRY HALF. Since the merge the file opens with its own '#' title and the
+    # entry is the '## DEPLOY:' section inside it -- so the asserts below that are ABOUT THE ENTRY are made
+    # on the split, through the same reader the fold and both gates use. Handed the whole document they would
+    # be measuring the plan: the first line would be the document's title, and the type would read off a
+    # heading that deliberately is not a changelog heading.
+    $docText1  = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
+    $docSplit1 = Split-DevelopmentCycle -Text $docText1
+    Assert-Equal $true $docSplit1.Found 'the document carries a DEPLOY section for the fold to split on'
+    $entryText1 = [string]$docSplit1.Entry
+    Assert-True ($docText1 -match [regex]::Escape('First title')) 'the document contains the given title'
     # THE HEADING IS NOW THE TITLE AND NOTHING ELSE (August 5, 2026), at the entry level rather than one
     # deeper. It carried a scaffolded date until that morning, then the type until later the same day; both
     # were fields a parser had to pick apart, and both have their own place now -- the date on the fold's
@@ -398,7 +408,7 @@ try {
     # reset with the branch. Still asserted as the WHOLE line -- the stronger claim, because it proves
     # nothing at all was appended.
     $headLine1 = ($entryText1 -split "`r?`n")[0]
-    Assert-True ($headLine1 -match '^## `feat/my-task` deployment$') 'entry heading names the branch and nothing else, whole and at the entry level'
+    Assert-True ($headLine1 -match '^## DEPLOY: `feat/my-task-v1`$') 'entry heading names its title and the branch, whole and at the entry level'
     Assert-Equal 'First title' (Get-EntryDescription -EntryText $entryText1) 'and the title given to new-branch is the PR title'
     Assert-True (Test-EntryDeclaresType -EntryText $entryText1 -Type 'Feat') 'and the branch type is readable -- off the branch the heading names'
     # NO DATE AND NO STAMP, which is the same claim in two shapes: a 'yyyy-MM-dd' would read as the landing
@@ -440,7 +450,7 @@ try {
         'and the gate names the unanswered tiers, so an unwritten entry cannot reach a PR'
 
     $progressText1 = [System.IO.File]::ReadAllText($progressPath, [System.Text.Encoding]::UTF8)
-    Assert-Equal 'feat/my-task' (Get-BranchFileDeclaredBranch -Text $progressText1) 'the step list names the branch it was created on'
+    Assert-Equal 'feat/my-task-v1' (Get-BranchFileDeclaredBranch -Text $progressText1) 'the step list names the branch it was created on'
     Assert-True ($progressText1 -match '(?m)^- \[ \] ') 'and carries an unticked first step'
     Assert-True (-not ($progressText1 -match '(?m)^## Steps\s*$\s*_\(')) 'it is the scaffolded shape, not the reset placeholder'
 
@@ -454,9 +464,13 @@ try {
     # it is true (inbound #817).
     Assert-True (-not (Test-Phrase -Text $r2.Out -Phrase (Get-BranchFilesRereadNote))) 'a run that KEPT both files prints no re-read note -- nothing went stale'
     $headBranch2 = (& git -C $fixtureBC rev-parse --abbrev-ref HEAD).Trim()
-    Assert-Equal 'feat/my-task' $headBranch2 'HEAD stays on the same branch after the second run'
-    $entryText2 = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
-    Assert-Equal $entryText1 $entryText2 'entry content unchanged -- no overwrite, second title ignored'
+    # AND THE RERUN RESUMES IT RATHER THAN BUMPING, which is the property the completion had to be built
+    # around: a scan for the lowest FREE version would make every rerun a new branch, and new-branch is
+    # documented idempotent. Measured here on the first draft, which landed the second run on '-v2'.
+    Assert-Equal 'feat/my-task-v1' $headBranch2 'HEAD stays on the same branch after the second run'
+    # THE WHOLE DOCUMENT, byte for byte, which is the stronger claim now that the plan and the entry are one
+    # file: a rerun that rewrote the shape would take somebody's ticked steps with it.
+    Assert-Equal $docText1 ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)) 'document unchanged -- no overwrite, second title ignored'
     # THE ONE THAT WOULD HURT MOST: a rerun must not wipe a step list somebody has been ticking off. The
     # branch files are a fixed path, so "does it exist" can no longer be the idempotency test -- this proves
     # the replacement (what the file says it belongs to) actually holds.
@@ -464,8 +478,12 @@ try {
     Assert-Equal $progressText1 $progressText2 'step list unchanged -- a rerun does not clobber work in progress'
     $rootMd = @(Get-ChildItem -LiteralPath $fixtureBC -Filter '*.md' -File | Where-Object { $_.Name -ne 'README.md' })
     Assert-Equal 0 $rootMd.Count 'the repo root stays clean -- no entry file lands there at all'
-    $branchDirFiles = @(Get-ChildItem -LiteralPath (Join-Path $fixtureBC 'workflow-davekjohn\branch') -Filter '*.md' -File)
-    Assert-Equal 2 $branchDirFiles.Count 'exactly the two branch files, no duplicate per branch'
+    # ONE DOCUMENT, AND NO branch/ DIRECTORY AT ALL. The second half is the assert that would catch a
+    # scaffolder still writing the retired pair beside the new file -- which would leave two entries for one
+    # branch, the exact half-state the merge removes.
+    $wfDirFiles = @(Get-ChildItem -LiteralPath (Join-Path $fixtureBC 'workflow-davekjohn') -Filter '*.md' -File)
+    Assert-Equal 1 $wfDirFiles.Count 'exactly one branch document, no duplicate per branch'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fixtureBC 'workflow-davekjohn\branch'))) 'and no branch/ directory is created any more'
 
     Write-Host "new-branch.ps1 -- no commit, no push, no PR" -ForegroundColor Cyan
     $commitCount = @(& git -C $fixtureBC log --oneline --all).Count
@@ -482,10 +500,12 @@ try {
     Assert-Equal 0 $rE.Code 'unknown prefix: new-branch exit 0 (soft warn)'
     Assert-True (Test-Phrase -Text $rE.Out -Phrase 'Unknown branch prefix') 'warning about the unknown prefix in the output'
     $headBranchE = (& git -C $fixtureE rev-parse --abbrev-ref HEAD).Trim()
-    Assert-Equal 'wip/experiment' $headBranchE 'branch still created and checked out despite unknown prefix'
+    Assert-Equal 'wip/experiment-v1' $headBranchE 'branch still created and checked out despite unknown prefix'
     $entryPathE = Join-Path $fixtureE ((Get-BranchFilePaths).Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathE) 'entry file still created (fallback type)'
-    $entryTextE = [System.IO.File]::ReadAllText($entryPathE, [System.Text.Encoding]::UTF8)
+    # The ENTRY half of the document -- see the split at the first fixture for why every entry-shaped
+    # reader is handed that rather than the whole file.
+    $entryTextE = Get-DevelopmentCycleEntryText -Text ([System.IO.File]::ReadAllText($entryPathE, [System.Text.Encoding]::UTF8))
     Assert-True (Test-EntryDeclaresType -EntryText $entryTextE -Type 'Chore') 'entry falls back to branch type Chore, in its own section'
 
     # --- (f) Regression: a malicious -Title (quotes + backslashes) must no longer break the argv
@@ -506,7 +526,9 @@ try {
 
     $entryPathF = Join-Path $fixtureF ((Get-BranchFilePaths).Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathF) 'malicious title: entry file created anyway'
-    $entryTextF = [System.IO.File]::ReadAllText($entryPathF, [System.Text.Encoding]::UTF8)
+    # The ENTRY half of the document -- see the split at the first fixture for why every entry-shaped
+    # reader is handed that rather than the whole file.
+    $entryTextF = Get-DevelopmentCycleEntryText -Text ([System.IO.File]::ReadAllText($entryPathF, [System.Text.Encoding]::UTF8))
     # THE PAYLOAD LANDS IN THE TITLE SECTION SINCE THE DOSSIER FORM -- the title given to new-branch is a
     # section now, not the heading. The assert follows it there and keeps its shape: an EXACT compare of the
     # whole section answer, which proves nothing was appended or lost at a broken argv boundary. A prefix
@@ -514,7 +536,7 @@ try {
     Assert-Equal $maliciousTitle (Get-EntryDescription -EntryText $entryTextF) 'malicious title: FULLY and unchanged in its section, and nothing appended (no argv splitting)'
     # ...and the heading is untouched by it, which is new ground the split opened: a payload that escaped its
     # section would show up here first.
-    Assert-True ((($entryTextF -split "`r?`n")[0]) -match '^## `feat/injection-check` deployment$') 'malicious title: and the heading still names the branch, nothing more'
+    Assert-True ((($entryTextF -split "`r?`n")[0]) -match '^## DEPLOY: `feat/injection-check-v1`$') 'malicious title: and the heading still names the branch, nothing more'
     Assert-True (Test-EntryDeclaresType -EntryText $entryTextF -Type 'Feat') 'malicious title: and the type still reads off that heading rather than absorbing part of the payload'
 
     Assert-True (Test-Path -LiteralPath $sentinelPath) "sentinel file 'X' UNTOUCHED -- no 'Remove-Item' executed via a broken argv"
@@ -551,7 +573,9 @@ try {
     Assert-Equal 0 $rH.Code '-Intent: new-branch exit 0'
     $entryPathH = Join-Path $fixtureH ((Get-BranchFilePaths).Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathH) '-Intent: entry file created'
-    $entryTextH = [System.IO.File]::ReadAllText($entryPathH, [System.Text.Encoding]::UTF8)
+    # The ENTRY half of the document -- see the split at the first fixture for why every entry-shaped
+    # reader is handed that rather than the whole file.
+    $entryTextH = Get-DevelopmentCycleEntryText -Text ([System.IO.File]::ReadAllText($entryPathH, [System.Text.Encoding]::UTF8))
     Assert-True (-not ($entryTextH -match [regex]::Escape($intentText))) '-Intent: the intent does NOT land in the entry -- that text would fold into CHANGELOG.md verbatim'
     # THE TIER REASONS ARE THE BODY NOW, so "left empty" is measured as "no reason written under any tier"
     # rather than as an empty section: the section holds the headings the author still has to answer.
@@ -611,7 +635,7 @@ try {
     Assert-True ($statusI -match 'stray\.txt') '-Park: unrelated file still left staged for the caller''s own commit'
 
     # pushed: the branch ref exists on the bare origin, and upstream tracking is set
-    & git -C $bareRemote rev-parse --verify --quiet 'refs/heads/feat/parked-branch' | Out-Null
+    & git -C $bareRemote rev-parse --verify --quiet 'refs/heads/feat/parked-branch-v1' | Out-Null
     Assert-True ($LASTEXITCODE -eq 0) '-Park: branch ref present on origin (pushed)'
     $prevEap = $ErrorActionPreference
     try {
@@ -620,7 +644,7 @@ try {
     } finally {
         $ErrorActionPreference = $prevEap
     }
-    Assert-Equal 'origin/feat/parked-branch' $upstream '-Park: upstream tracking set to origin/<branch>'
+    Assert-Equal 'origin/feat/parked-branch-v1' $upstream '-Park: upstream tracking set to origin/<branch>'
 
     # THE SUBJECT NAMES THE NARROWER SCOPE (#507), and this is the half of the pair that proves the two
     # are told apart: park-branch's suite asserts the same thing for 'everything outstanding'. Both wrote
@@ -633,7 +657,7 @@ try {
         $parkMsgI = ((& git -C $fixtureI log -1 --pretty=%B 2>$null) | Out-String)
     } finally { $ErrorActionPreference = $prevEap }
     $parkScopes = Get-GitParkScopes
-    Assert-True ($parkMsgI -match [regex]::Escape('park: feat/parked-branch')) '-Park: the commit carries the park subject'
+    Assert-True ($parkMsgI -match [regex]::Escape('park: feat/parked-branch-v1')) '-Park: the commit carries the park subject'
     Assert-True ($parkMsgI -match [regex]::Escape($parkScopes['BranchFiles'])) '-Park: and names the branch-files scope it actually committed'
     Assert-True (-not ($parkMsgI -match [regex]::Escape($parkScopes['Everything']))) '-Park: and does not claim to have saved everything outstanding'
 
@@ -714,7 +738,7 @@ Set-Location '$fixtureK'
 . '$fixtureK\scripts\repo-config.ps1'
 . '$fixtureK\scripts\lib\branch-info.ps1'
 . '$fixtureK\scripts\lib\entry-scaffold-lib.ps1'
-`$t = Resolve-EntryType -EntryText ([System.IO.File]::ReadAllText('$entryPathK', [System.Text.Encoding]::UTF8))
+`$t = Resolve-EntryType -EntryText (Get-DevelopmentCycleEntryText -Text ([System.IO.File]::ReadAllText('$entryPathK', [System.Text.Encoding]::UTF8)))
 Write-Output `$t.Type
 "@
     $typeK = ([string](@($typeProbe | Where-Object { $_ })[0])).Trim()
@@ -745,7 +769,7 @@ Write-Output `$t.Type
     # structure: the built-in section headings are there, which is what proves the built-in defaults were
     # used rather than nothing.
     Assert-True ($entryTextL -match ('(?m)^' + [regex]::Escape((Get-EntrySectionHeading -Key 'What')) + '$')) 'broken repo-config: falls back to the built-in section wording'
-    Assert-True (Test-EntryDeclaresType -EntryText $entryTextL -Type 'Feat') 'broken repo-config: and the branch type is still stated'
+    Assert-True (Test-EntryDeclaresType -EntryText (Get-DevelopmentCycleEntryText -Text $entryTextL) -Type 'Feat') 'broken repo-config: and the branch type is still stated'
     Assert-True (Test-Phrase -Text $rL.Out -Phrase 'could not be loaded') 'broken repo-config: says so out loud instead of failing silently'
 
     # --- (m) A BRANCH STACKED ON AN UNFOLDED ONE (inbound #615) ------------------------------------
@@ -776,9 +800,8 @@ Write-Output `$t.Type
     Assert-Equal 0 $rM2.Code 'stacked: the child branch is created'
     $entryTextM    = [System.IO.File]::ReadAllText($entryPathM,    [System.Text.Encoding]::UTF8)
     $progressTextM = [System.IO.File]::ReadAllText($progressPathM, [System.Text.Encoding]::UTF8)
-    Assert-Equal 'feat/child' (Get-BranchFileDeclaredBranch -Text $entryTextM)    'stacked: the entry declares the CHILD branch, not the parent'
-    Assert-Equal 'feat/child' (Get-BranchFileDeclaredBranch -Text $progressTextM) 'stacked: the step list declares the CHILD branch, not the parent'
-    Assert-True (Test-Phrase -Text $rM2.Out -Phrase "'docs/parent'") 'stacked: the output names the branch whose files were replaced'
+    Assert-Equal 'feat/child-v1' (Get-BranchFileDeclaredBranch -Text $entryTextM)    'stacked: the document declares the CHILD branch, not the parent'
+    Assert-True (Test-Phrase -Text $rM2.Out -Phrase "'docs/parent-v1'") 'stacked: the output names the branch whose document was replaced'
     Assert-True (-not (Test-Phrase -Text $rM2.Out -Phrase 'already written')) 'stacked: and does NOT report the files as already written for this branch'
 
     # And the half that must not be overwritten: an entry that was never committed exists in exactly one
@@ -796,7 +819,7 @@ Write-Output `$t.Type
     $entryTextN2 = [System.IO.File]::ReadAllText($entryPathN, [System.Text.Encoding]::UTF8)
     Assert-Equal $entryTextN1 $entryTextN2 'stacked/dirty: the uncommitted entry is left exactly as it was'
     Assert-True (Test-Phrase -Text $rN2.Out -Phrase 'UNCOMMITTED') 'stacked/dirty: the output says the work is uncommitted'
-    Assert-True (Test-Phrase -Text $rN2.Out -Phrase "'docs/uncommitted-parent'") 'stacked/dirty: and names whose work it is'
+    Assert-True (Test-Phrase -Text $rN2.Out -Phrase "'docs/uncommitted-parent-v1'") 'stacked/dirty: and names whose work it is'
 } finally {
     foreach ($f in $script:fixtures) {
         if (Test-Path -LiteralPath $f) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }

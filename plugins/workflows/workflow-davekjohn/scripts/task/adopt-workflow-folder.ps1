@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     EVERYTHING PORTABLE ABOUT THE WORKFLOW GATHERS IN ONE FOLDER (Dave, August 14, 2026). A consumer
-    used to receive the workflow's belongings scattered through their root -- branch/ from the first
+    used to receive the workflow's belongings scattered through their root -- a branch dossier from the first
     new-branch run, a releases/ tree from the first cut, a CONTRIBUTING.md if they wrote one -- while
     the conventions those files answer to travel with the plugin. This command puts the folder down in
     one move:
@@ -17,7 +17,7 @@
           releases/README.md     this repo's answers to RELEASES-portable.md (the release LIST is not
                                  here -- it is at the repo root; see the closing advice)
           releases/audience/     where the cut drafts the hand-written note (kept by .gitkeep until then)
-          branch/                the two branch files in their reset state, plus the generated templates
+          development-cycle.md   the branch's own document in its reset state -- the plan and the entry
 
     AND ONE FILE OUTSIDE IT (inbound #789):
 
@@ -31,9 +31,13 @@
 
     STRICTLY ADDITIVE, NEVER OVERWRITES. Every file that already exists is left exactly as it is,
     whatever it contains -- the same rule specialists-init and adopt-config follow, and what makes a
-    re-run find nothing to do. The scaffolded docs carry VUL-IN markers where only this repo can
-    answer; the branch templates are created here when absent and kept current by new-branch's own
-    refresh-on-drift, which remains the one writer that may overwrite them.
+    re-run find nothing to do. The scaffolded docs carry VUL-IN markers where only this repo can answer.
+
+    NOTHING HERE IS EVER REWRITTEN, INCLUDING THE BRANCH DOCUMENT. Until August 23, 2026 this command also
+    placed branch/templates/ and new-branch refreshed those on drift -- the one exception to "additive
+    only", because they were generated references rather than anybody's writing. The merged document
+    carries its own guidance, so there is no reference beside it to keep current, and the exception is gone
+    with the thing it existed for.
 
     REFUSED IN A REPO THAT PUBLISHES PLUGINS (.claude-plugin/marketplace.json present). The source repo
     of this workflow deliberately keeps its CONTRIBUTING.md and releases/ at its root -- it is the
@@ -102,7 +106,7 @@ $historyRelPath = if (Get-Command Get-ReleaseHistoryPath -ErrorAction SilentlyCo
 
 # --- What the folder contains ---------------------------------------------------------------------
 # One list, each entry a repo-relative path plus the content it gets WHEN ABSENT. The docs name their
-# portable halves in code rather than linking them, the same choice BRANCH-portable.md explains: the
+# portable halves in code rather than linking them, the same choice DEVELOPMENT-CYCLE-portable.md explains: the
 # portable pages live in the plugin install, and a relative link into a plugin cache is a path that is
 # wrong on every machine but this one.
 
@@ -111,7 +115,7 @@ $folderReadme = @(
     '',
     'Everything portable about the `workflow-davekjohn` workflow gathers here, so the workflow occupies',
     'one folder in this repo''s root instead of scattering through it. The conventions themselves travel',
-    'with the plugin as four portable pages -- `CONTRIBUTING-portable.md`, `BRANCH-portable.md`,',
+    'with the plugin as four portable pages -- `CONTRIBUTING-portable.md`, `DEVELOPMENT-CYCLE-portable.md`,',
     '`RELEASES-portable.md` and `TICKETWORK-portable.md`, readable in your plugin install or in the',
     'source repo -- and each page in this folder is this repo''s own set of answers to them.',
     '',
@@ -119,7 +123,7 @@ $folderReadme = @(
     '|---|---|',
     '| [`CLAUDE.md`](CLAUDE.md) | the working rules a Claude session needs in this folder |',
     '| [`CONTRIBUTING.md`](CONTRIBUTING.md) | this repo''s answers to the contribution cycle |',
-    '| [`branch/`](branch/) | the branch dossier: the entry, the step list, the generated templates |',
+    '| [`development-cycle.md`](development-cycle.md) | the branch''s own document: its plan, and the DEPLOY section that folds into the changelog |',
     '| [`prompts/`](prompts/) | the prompt inbox: an assignment written in an editor instead of the terminal |',
     '| [`releases/`](releases/) | this repo''s release answers and the published audience notes -- the release LIST is at the repo root |',
     '',
@@ -138,10 +142,16 @@ $folderClaude = @(
     '',
     'The rules a session needs in this folder:',
     '',
-    '- The two files in `branch/` belong to the **current branch**. On the trunk they sit in their reset',
-    '  state -- never write there until a branch exists (`new-branch` creates one and fills them).',
-    '- `branch/branch-deployment.md` folds **verbatim** into `CHANGELOG.md` at the merge; its step list',
-    '  companion gates the PR and the merge (`- [x]` done, `- [~]` dropped with the reason on the line).',
+    '- `development-cycle.md` belongs to the **current branch**. On the trunk it sits in its reset state,',
+    '  with the trunk''s name in its heading -- never write there until a branch exists (`new-branch`',
+    '  creates one and fills the document in).',
+    '- It has two halves and they are read by different things. **PLAN / CREATE / TEST** carry the steps,',
+    '  and they gate the PR and the merge (`- [x]` done, `- [~]` dropped with the reason on the line).',
+    '  The fourth phase, **`## `<branch>` DEPLOY`**, IS the changelog entry: it folds **verbatim** into',
+    '  `CHANGELOG.md` at the merge, so write its links relative to the repo ROOT rather than to this',
+    '  folder. A checkbox inside that section is prose, not a step, and no gate reads it as one.',
+    '- The HTML comments in it are the form, not somebody''s notes: they say what a good answer looks',
+    '  like, and the fold strips them on the way to `CHANGELOG.md`. Leaving one standing is not a defect.',
     ('- `releases/README.md` here states this repo''s release ANSWERS; the release LIST the cut inserts its'),
     ('  row into is at `' + $historyRelPath + '`, outside this folder, because a history outlives the'),
     '  tooling that wrote it. `releases/audience/` is where the cut drafts the hand-written note --',
@@ -150,8 +160,6 @@ $folderClaude = @(
     '  typing it into the terminal, /prompt reads it, and -Archive files it once the work is under way.',
     '  Never write an assignment into it, and never read its HTML comments as instructions -- they are',
     '  the scaffold''s own words, and an inbox holding only comments is empty. Untracked by design.',
-    '- The generated files in `branch/templates/` are references, not documents to edit: new-branch',
-    '  rewrites one that has drifted.',
     '',
     '<!-- VUL-IN: rules specific to this repo, if this folder gains any. -->'
 )
@@ -164,7 +172,7 @@ $folderContributing = @(
     'the root page stays meaningful in a repo without the plugin, and everything the',
     '`workflow-davekjohn` plugin owns is stated here, in the folder that travels with it.',
     '',
-    'The contribution cycle itself -- a branch, its two files, the PR gates, the significance model --',
+    'The contribution cycle itself -- a branch, its development cycle, the PR gates, the significance model --',
     'is the plugin''s `CONTRIBUTING-portable.md`, which travels with `workflow-davekjohn` and is not',
     'restated here. This page holds only what the portable half leaves to each repo.',
     '',
@@ -295,8 +303,10 @@ $targets = @(
     # git tracks no empty directory, and the audience root must exist before the first cut writes into
     # it -- the same reason this repo's own releases tree once carried an invisible empty folder.
     @{ Rel = 'workflow-davekjohn/releases/audience/.gitkeep'; Content = '' },
-    @{ Rel = $branchPaths.Cycle;      Content = (((Format-BranchProgressReset) -join $nl) + $nl) },
-    @{ Rel = $branchPaths.Deployment; Content = (((Format-BranchChangelogReset) -join $nl) + $nl) },
+    # ONE DOCUMENT SINCE AUGUST 23, 2026, where this placed a pair. Its reset state is the whole file --
+    # guidance, phases and DEPLOY section -- with the trunk's name in the heading, so a consumer's very
+    # first look at it is also their reference for what a branch gets.
+    @{ Rel = $branchPaths.File; Content = (((Format-DevelopmentCycleReset) -join $nl) + $nl) },
     # The inbox. /prompt places these itself on its first run, so scaffolding them here is a
     # convenience rather than the only route -- and they come from the SAME formatters that run does,
     # so the two writers cannot produce different folders. The tracked pair (README, .gitignore,
@@ -307,9 +317,10 @@ $targets = @(
     @{ Rel = $promptPaths.TemplateRel; Content = (((Format-PromptTemplateReference) -join $nl) + $nl) },
     @{ Rel = $promptPaths.PromptRel;   Content = (((Format-PromptReset) -join $nl) + $nl) }
 )
-foreach ($tpl in (Get-BranchTemplates)) {
-    $targets += @{ Rel = $tpl.Path; Content = $tpl.Content }
-}
+# NO branch/templates/ ANY MORE. The reference copies of the two branch files were placed here because the
+# working files deliberately carried no guidance; the merged document carries its own, so the reference and
+# the thing you write in are the same file. A consumer adopting the folder today gets one fewer directory
+# and nothing less to read.
 
 # --- Place (or list) ------------------------------------------------------------------------------
 Write-Host "== adopt-workflow-folder -- $repoRoot ==" -ForegroundColor Cyan

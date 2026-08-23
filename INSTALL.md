@@ -419,20 +419,25 @@ it was coming.
 - One difference to expect: a branch prefix your own table does not know (`dependabot/…`) is a **soft
   warn**, not a refusal, and the entry's type falls back to whatever `Get-EntryFallbackType` says.
 
-**The entry files moved out of your repo root.** A branch used to carry `<branch-name>.md` beside your
-`README.md`; it now carries `workflow-davekjohn/branch/branch-deployment.md` (what the change does) and
-`workflow-davekjohn/branch/branch-cycle.md` (what still has to happen), with reference copies under `workflow-davekjohn/branch/templates/`.
+**The branch's own file moved out of your repo root.** A branch used to carry `<branch-name>.md` beside
+your `README.md`; it now carries one `workflow-davekjohn/development-cycle.md`, which holds both jobs as
+sections — `## PLAN` / `## CREATE` / `## TEST` for what still has to happen, and
+`` ## DEPLOY: `<branch>` `` for what the change does. It was a pair under `workflow-davekjohn/branch/`
+between August 6 and August 23, 2026, with reference copies under `branch/templates/`; both are gone, and
+the guidance those copies held is inside the document.
 
 - **Look for a gate keyed on the old name before you use the `new-branch` skill.** The measured case was a
   CI step asserting that `"$(echo "$BRANCH" | tr '/' '-').md"` exists in the repo root — which fails
   **after** the work is done rather than before it starts. Nothing but reading both files together would
   have warned you.
 - **Your branches already in flight are safe.** The fold, the PR gate and the lint all still recognise a
-  root `<branch>.md` — "recognise both, write one" — so nothing has to be migrated in a hurry. It is the
-  *gate* that has to learn the new location, not the entries.
-- `workflow-davekjohn/branch/templates/` is written into your repo and rewritten whenever it drifts from the current format.
-  That is deliberate (it is the only place the guidance exists for you to read), and it is not something you
-  have to maintain.
+  root `<branch>.md` **and** either `branch/` pair — "recognise every one, write one" — so nothing has to be
+  migrated in a hurry. It is the *gate* that has to learn the new location, not the entries. The resolver
+  reads which file NAMES your branch rather than which one exists, which is what keeps a half-finished
+  branch whole after the trunk gains the new document.
+- **Nothing is generated beside the document any more.** `branch/templates/` was written into your repo and
+  refreshed on drift, because the file you typed in was deliberately bare. The merged document carries its
+  own guidance, so there is one fewer directory and nothing left for you to keep current.
 
 **And one seam function in your `scripts/repo-config.ps1` may now be dead code.** `Get-ChangelogHeading`
 named the `##` section a folded entry was filed under; `CHANGELOG.md` has no section headings any more — it

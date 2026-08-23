@@ -163,7 +163,11 @@ if (-not (Test-Path -LiteralPath $entryPath)) {
     exit 1
 }
 
-$entryText = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
+# THE DEPLOY SECTION, NOT THE WHOLE DOCUMENT. The entry is a section of development-cycle.md since
+# August 23, 2026, and every reader below is entry-shaped -- handed the plan as well, the scaffold check
+# would accuse the step list of being an unfinished entry. Get-DevelopmentCycleEntryText hands back the
+# whole text for a legacy file that IS an entry, so a branch created before the merge is read as it was.
+$entryText = Get-DevelopmentCycleEntryText -Text ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8))
 
 if (-not (Test-BranchChangelogIsFilled -Text $entryText)) {
     Write-Host "[ERROR] '$entryRel' is still in its empty reset state, so this branch has no entry." -ForegroundColor Red
