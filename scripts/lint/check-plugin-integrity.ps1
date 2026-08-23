@@ -1500,6 +1500,16 @@ if (Test-Path -LiteralPath $clForHeadings) {
         foreach ($ehKey in (Get-EntryOpeningSectionKeys)) {
             $ehOpeners += @($ehHeadings[$ehKey]) + @(Get-EntrySectionRetiredNames -Key $ehKey)
         }
+        # AND A FOURTH TIME, ON AUGUST 23, 2026 -- not a rename this time but a LEVEL MOVE, which is why the
+        # three repairs above did not cover it. Tier 0 lost its heading when the entry became the development
+        # cycle's DEPLOY section, and the audience tier's heading moved up to the section level to take its
+        # place. So the first named section an entry has is now 'What makes this deploy extra special', and
+        # this repo's own freshly folded entry was reported as split the moment it landed on main.
+        #
+        # ADDED BESIDE THE KEYED LIST RATHER THAN INTO IT, because it is not a section KEY: the tier writer
+        # owns that heading, deliberately, and Get-EntrySectionHeadings does not answer for it. Both wordings,
+        # like everywhere else that reads it -- every entry already in CHANGELOG.md carries the previous one.
+        $ehOpeners += @(Get-EntryTierHigherHeading) + @(Get-EntryTierHigherRetiredHeadings)
         $ehOpeners = @($ehOpeners | Where-Object { $_ })
         $ehWhatHeading = $ehOpeners[0]
 
