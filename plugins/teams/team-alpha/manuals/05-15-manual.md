@@ -170,12 +170,12 @@ to repair a PowerShell file.
   implausibly fast has not run. Sibling of the trap above, from the same class of failure: there the
   script itself was lied to about its aim; here the reader being lied to is the *outer* observer — CI, a
   background task, a SessionStart hook — reading only the exit code the script hands back. The same
-  mis-read is available to whoever is checking: measured twice in the session that wrote this bullet, a
-  shell reading `$?` after a pipeline gets the *last* command's status, so `powershell -File fail.ps1 | tail`
-  reports 0 for a script that exited 3 — and the second time it briefly convinced the reader that a correct
-  remedy was broken. Read `${PIPESTATUS[0]}`, or do not pipe the thing whose exit code you are about to
-  judge. One rule in two languages, which is why it is a clause here rather than a trap of its own: the exit
-  code you read is not the exit code you meant.
+  mis-read is available to whoever is checking: measured while judging a gate's result from a shell, where
+  `$?` after a pipeline gets the *last* command's status by default, so `powershell -File fail.ps1 | tail`
+  reports 0 for a script that exited 3. It manufactures a failure as readily as it hides one — a remedy
+  that works reads as broken when the check judging it was reading the wrong process. Read bash's
+  `${PIPESTATUS[0]}`, or do not pipe the thing whose exit code you are about to judge. One rule in two
+  languages: the exit code you read is not the exit code you meant.
 - **A `sed` substitution meant to write a code-point escape can silently write the wrong literal instead.**
   GNU `sed`'s replacement syntax treats `\u` as "uppercase the next character," not as a code-point escape —
   so `sed -i 's/\[-–—,\]/[-\u2013\u2014,]/'` consumed the backslash before each escape and wrote the literal
