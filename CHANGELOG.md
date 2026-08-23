@@ -22,6 +22,46 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `docs/probe-and-recency-lessons-v1` · 20260823-175516
+
+Two rules learned while making the development cycle branch-lifetime, written into the layer that travels.
+
+Sylvester's manual gains a fifth PowerShell trap: **a failed `Set-Location` does not stop the block that
+follows it.** It writes a non-terminating error, execution continues in the directory you were already
+standing in, and every later command succeeds against the wrong tree while its output reads exactly as it
+would have been right. Measured here, expensively: a probe whose fixture path contained `$PID` — a value
+that differs between processes — ran a fold against this repository instead of its fixture, deleting a
+tracked file and committing. The remedy is that a throwaway probe fails closed, and it generalises past
+`cd`: a probe pointed at the wrong target is indistinguishable from one that worked, so what has to be
+verified first is the aim rather than the result.
+
+The shared `repo-way-of-working` block, carried by 30 agent defs and personas across all four teams, gains
+a second bullet: **how recently something was decided is not an argument against changing it.** Its
+existing bullet already ends on "proposing a different way of working is something you do when you are
+asked for it"; this is what to do when the owner does ask. Argue from mechanism, read whether the original
+reasoning still holds, name the part that has expired — and do not treat an owner changing their mind as
+something to be talked out of.
+
+**Score:** 2
+
+### What makes this deploy extra special
+
+Every consumer's agents get the second rule, since it ships in a block all four teams carry. It changes
+how a specialist argues rather than what any script does, so nothing to run and nothing to migrate — but a
+consumer who has noticed their specialists pushing back on reversals will find that stops.
+
+**Score:** 2
+
+### Pull Request
+
+Two lessons: a probe that fails closed, and the age of a decision
+
+Plugins: team-alpha, team-ecomm, team-lifehub, team-shopify
+
+[PR #839](https://github.com/DaveKJohn/claude-code-specialists/pull/839)
+
+---
+
 ## DEPLOY: `feat/cycle-file-branch-lifetime-v1` · 20260823-165431
 
 The branch's own document now exists only while a branch is open. `new-branch` creates it, the fold
