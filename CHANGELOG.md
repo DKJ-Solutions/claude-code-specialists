@@ -22,6 +22,35 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `docs/exit-code-read-through-a-pipeline-v1` · 20260823-205818
+
+Trap 6 landed here yesterday and was mis-read twice inside the same session that wrote it -- both times
+by reading `$?` after piping a PowerShell run through `tail`, which reports the pipe's last command and
+not the run. The second time it argued that a correct remedy was broken, which is the expensive shape:
+the mis-read does not merely hide a failure, it manufactures one. Anyone here who judges a gate, a suite
+or a probe from a shell is who repeats it, which in this repo is every chain run.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+A consumer's system-administration specialist gets trap 6 through the plugin, so without this they
+inherit the half about an exit code that lies and not the half about reading it through a pipe. It is a
+clause rather than a new trap, though, landing in a bullet they may already have read -- a smaller thing
+than either trap that shipped yesterday.
+
+**Score:** 2
+
+### Pull Request
+
+The exit code you read is not the exit code you meant: trap 6 generalised to whoever is checking
+
+Plugins: team-alpha
+
+[PR #842](https://github.com/DaveKJohn/claude-code-specialists/pull/842)
+
+---
+
 ## DEPLOY: `docs/powershell-trap-six-and-sed-escape-v1` · 20260823-203210
 
 Both traps were measured here, in this repo's own tooling, during the PR #840 chain run: a background
