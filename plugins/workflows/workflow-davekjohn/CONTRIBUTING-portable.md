@@ -36,13 +36,15 @@ with two different readers:
 
 | half of `workflow-davekjohn/development-cycle.md` | subject | lifetime |
 |---|---|---|
-| `## PLAN` · `## CREATE` · `## TEST` | what still **must happen** — the step list | reset at the merge; never folded |
-| `` ## DEPLOY: `<branch>` `` | what the change **does** — the entry that folds into your changelog | folded at the merge, then reset |
+| `## PLAN` · `## CREATE` · `## TEST` | what still **must happen** — the step list | removed at the merge; never folded |
+| `` ## DEPLOY: `<branch>` `` | what the change **does** — the entry that folds into your changelog | folded at the merge, then removed with the rest |
 
 **A fixed name, not one per branch.** Git already tracks it per branch, so branches in flight cannot
-collide. On the trunk it sits in an empty **reset state** carrying a warning not to write there until a
-branch exists — what tells that state apart is the **trunk's name in its heading**, which is what stops the
-fold mistaking it for an entry. The full convention is spelled out in
+collide. **And it exists only while a branch is open**: `new-branch` creates it, the fold removes it at the
+merge, so on the trunk there is no copy. It used to sit there in an empty state carrying a warning not to
+write in it; a repo updating from an older plugin still has that copy until its next fold clears it, and
+what marks it is the **trunk's name in its heading**, which is what stops the fold mistaking it for an
+entry. The full convention is spelled out in
 [`DEVELOPMENT-CYCLE-portable.md`](DEVELOPMENT-CYCLE-portable.md), which travels with this plugin; the
 guidance for every field is inside the document itself, so there is no reference copy to keep current.
 
@@ -182,10 +184,9 @@ worked in.
 
 On the trunk, right after the merge, the fold moves the entry into your changelog, appends the PR link as
 its closing line, stamps the landing moment onto the `Pull Request` heading, strips the guidance comments,
-and **resets both branch files** to
-their empty state — so the trunk is ready for the next branch and the merged branch's ticked-off steps do
-not greet whoever opens it. It commits that directly on the trunk, naming exactly those three paths so
-nothing else in the tree can ride along.
+and **removes the branch document** — so the trunk is ready for the next branch and the merged branch's
+ticked-off steps do not greet whoever opens it. It commits that directly on the trunk, naming exactly those
+paths so nothing else in the tree can ride along.
 
 The entry is inserted at **the top of the list**: `CHANGELOG.md` is newest-first, a record of what landed
 in the order it landed. Insert-only, never a re-sort — the fold commit goes straight onto the trunk, so a

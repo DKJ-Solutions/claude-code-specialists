@@ -6,8 +6,8 @@ different readers, and they are sections of one document rather than two files:
 
 | half | subject | who reads it | lifetime |
 |---|---|---|---|
-| `## PLAN` · `## CREATE` · `## TEST` | what still **must happen** | whoever is working on the branch | reset at the merge; never folded |
-| ``## DEPLOY: `<branch>` `` | what the change **does** | whoever reads `CHANGELOG.md` later | folded at the merge, then reset |
+| `## PLAN` · `## CREATE` · `## TEST` | what still **must happen** | whoever is working on the branch | removed at the merge; never folded |
+| ``## DEPLOY: `<branch>` `` | what the change **does** | whoever reads `CHANGELOG.md` later | folded at the merge, then removed with the rest |
 
 It is written by the shared
 [`scripts/task/new-branch.ps1`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/scripts/task/new-branch.ps1)
@@ -30,9 +30,12 @@ whose own hint said the short answer was the normal one. **The guidance is in th
 fold strips HTML comments on the way to `CHANGELOG.md` — so leaving a block standing is not a defect, and
 nobody has to remember to delete one.
 
-**Which makes the copy on your trunk the reference.** It is the same document, with the trunk's name in its
-heading, a warning under it, no scaffolded step, and placeholder text where the two stamps go. Open it when
-you want to see the whole form at once.
+**Which makes this page the reference.** The document exists only while a branch is open — `new-branch`
+creates it, the fold removes it at the merge — so on the trunk there is no copy to open and read. Until
+August 23, 2026 there was: the file was rewritten to an empty state and that copy was what you looked at to
+see the whole form at once. It is this page that carries that now, and the swap is deliberate rather than a
+loss. A file scaffolded into your repo is written once and never again, so it cannot be improved after you
+adopt it; this page reaches you with every plugin update.
 
 ## The heading
 
@@ -50,9 +53,11 @@ The suffix is the **creation stamp** — the moment this branch began, in the do
 with it.
 
 **The branch name in the heading is machine-read.** It is how the fold finds the PR to look up, and how
-`new-branch` decides whether this document is already somebody's: a heading naming the **trunk** is the
-reset state and may be written over, any other name is a branch's work and is not. Every shape the heading
-has ever had is read; only today's is written.
+`new-branch` decides whether this document is already somebody's: any name other than the trunk's is a
+branch's work and is not written over. A heading naming the **trunk** is the empty state and may be
+overwritten — that state is no longer produced, since the fold removes the document rather than emptying
+it, but a repo updating from an older plugin has one on its trunk until its next fold clears it, so it is
+still recognised. Every shape the heading has ever had is read; only today's is written.
 
 ### The version suffix
 
@@ -100,7 +105,7 @@ that heading bare, exactly as a branch with no step list at all is permitted.
 **DEPLOY takes no steps of its own** (Dave, August 14, 2026,
 [#655](https://github.com/DaveKJohn/claude-code-specialists/issues/655)). It is not a step, it is the
 **result** — the part that travels, folding into `CHANGELOG.md` at the merge while the rest of the document
-is reset. A checkbox under it could only be a lie.
+goes with it. A checkbox under it could only be a lie.
 
 That also explains a rule which otherwise looks arbitrary: a step written for *after* the merge is refused.
 Post-merge is DEPLOY's territory, and DEPLOY is a description rather than a checklist. A DEPLOY checkbox
@@ -264,17 +269,22 @@ problem version control had already solved, and it cost a repo root that filled 
 in-flight work.
 
 **`<branchname>-changelog.md` was weighed and declined** (Dave, August 6, 2026), so this is a decision
-rather than an oversight. Three things speak against it, and the first is decisive:
+rather than an oversight. Two things speak against it today, and a third that has since expired is kept below:
 
-1. **The reset state would be impossible.** The warning you see on the trunk exists because the file exists
-   there. Unique names mean nothing is on `main` at all — no reference, no warning, and nothing standing
-   between the fold and a file it must not treat as a change. That was a requirement, not a nicety.
-2. **It reinstates the derived filename, which was a trap.** The system this replaced had a written rule
+1. **It reinstates the derived filename, which was a trap.** The system this replaced had a written rule
    forbidding a `-v2` suffix, because the fold looked the entry up by the exact branch name and a suffix
    broke the match *and* the cleanup that followed it. Today the fold reads the branch from the document's
    own heading — a fact stated in the document instead of guessed from a filename. The version suffix is
    now the *convention* rather than the thing that breaks it.
-3. **It solves a collision that does not happen**, per the paragraph above.
+2. **It solves a collision that does not happen**, per the paragraph above.
+
+**The third argument has since expired, and it is left here rather than quietly dropped**, because it was
+the decisive one at the time. It ran: unique names would make the reset state impossible, since the warning
+on the trunk exists only because the file exists there — no file, no reference, no warning, and nothing
+standing between the fold and a file it must not treat as a change. On August 23, 2026 (Dave) the document
+became branch-lifetime and the trunk stopped carrying a copy at all, so that is now simply what happens.
+The decision still stands on the two arguments above; a reader meeting it should know it stands on two
+rather than three.
 
 **The one real case for unique names, kept here on purpose:** if you take `main` in during the window
 between another branch's merge and its fold, that branch's entry is briefly on `main` and conflicts with
@@ -283,25 +293,36 @@ yours. The conflict is visible and the resolution is trivial — keep yours; the
 pre-empted.** If it ever actually bites, the cheap repair is a merge strategy for the file in
 `.gitattributes`, not renaming the mechanism.
 
-## The reset state, and the warning on the trunk
+## On the trunk there is no file at all
 
-On `main` the file sits in its **reset state**: the same document, with the trunk's name in its heading, a
-warning under it saying not to write here until a branch exists, no scaffolded step, and placeholder text
-where the two stamps go. That is what you are looking at if you open it on the trunk — the empty state, not
-a lost entry.
+**The document exists for the lifetime of a branch and no longer** (Dave, August 23, 2026). `new-branch`
+creates it, the fold removes it at the merge, and between branches your workflow folder holds its pages and
+its directories and nothing else. So if you open that folder on the trunk and the document is not there,
+that is the trunk in its normal state rather than something somebody deleted.
 
-**How a reset is told from a written file is the branch NAME, not the heading level**, and that changed with
-the merge. The two files it replaces each opened with an `#` while empty and the entry with an `##` once
-written, so one look at the first line answered it. One document cannot use that test: its `#` is its title
-in both states, and the `##` below it is a section of it. So the test is the name — the trunk's while it is
-reset, yours once it is not — which is also what makes folding twice impossible, because a reset document
-declares the trunk and reads as nothing pending.
+Until that day it was rewritten to a **reset state** instead: the same document, with the trunk's name in
+its heading, a warning under it saying not to write here until a branch exists, no scaffolded step, and
+placeholder text where the two stamps go. It was retired because an empty placeholder is a permanent
+resident of the one folder a repo reads to learn the convention, and because this page is the better home
+for what that copy was really for — seeing the whole form at once.
 
-## The file is rewritten under you, twice per cycle
+**A repo updating from an older plugin still has one**, written by its last fold under the old behaviour.
+Nothing has to be done about it: the next fold removes it. Everything below that describes recognising a
+trunk-declaring document is about exactly that case.
 
-`new-branch` writes it when the branch is created, and the fold resets it after the merge. Those are **two
-out-of-band write events per branch cycle**, and they are the only ones of their kind in a repo: no other
-file is written alternately by a script and by whoever is editing it.
+**How such a document is told from a written one is the branch NAME, not the heading level**, and that
+changed with the merge. The two files it replaces each opened with an `#` while empty and the entry with an
+`##` once written, so one look at the first line answered it. One document cannot use that test: its `#` is
+its title in both states, and the `##` below it is a section of it. So the test is the name — the trunk's
+while the document is empty, yours once it is not. It used to be what made folding twice impossible; the
+fold removes the file now, so a second run simply finds nothing.
+
+## The file is written under you, once per cycle
+
+`new-branch` writes it when the branch is created. That is an **out-of-band write event**, and it is the
+only one of its kind in a repo: no other file is written alternately by a script and by whoever is editing
+it. It was two until August 23, 2026 — the fold used to rewrite the file after the merge, and now removes
+it, so there is nothing left to re-read at that end of the cycle.
 
 So **read it again whenever a script has just touched it**, before your next edit. An editor that tracks
 what it last read refuses the write otherwise — *"file has been modified since read"* — and the refusal
@@ -356,7 +377,7 @@ this is exactly the file where out-of-band changes are routine.
 
    **Measured across the 105 branches that have carried a step list** (August 13, 2026): **17** wrote a
    post-merge step. **4** left it open, where it blocked the PR. **14** ticked it in advance — provably in
-   advance, because the fold *resets* this file at the merge, so a ticked PR step can only have been
+   advance, because the fold clears this file at the merge, so a ticked PR step can only have been
    written before the push existed. And one branch is in both counts:
    `docs/check-20-and-inbound-catch-up` hit the gate on `- [ ] Lint + tests green, then PR + merge + fold`
    and the next commit changed nothing but that box to `- [x]`. Two other branches reached the right answer
@@ -385,8 +406,8 @@ run on `main` right after the merge:
 2. **strips any HTML comments** — the guidance is the form rather than the answer;
 3. inserts the entry at the **top** of `CHANGELOG.md`'s list — that document is newest-first — with the
    PR link written into `### Pull Request` and the merge moment stamped on the DEPLOY heading;
-4. **resets the document** to the empty state you see on the trunk — one write, which clears the plan along
-   with the entry because they are sections of the same file;
+4. **removes the document** — one deletion, which clears the plan along
+   with the entry because they are sections of the same file, and leaves the trunk without a copy;
 5. commits exactly those two paths.
 
 The branch name it needs for the PR lookup comes from the document's own heading — the file name does not

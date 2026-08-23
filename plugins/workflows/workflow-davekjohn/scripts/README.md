@@ -52,7 +52,7 @@ before adding the next one.*
 | `release/open-pr.ps1` | the gates, the push and the PR; lint gate via `Get-LintScript` in `repo-config` | [`open-pr`](../skills/open-pr/SKILL.md) |
 | `release/ship-pr.ps1` | open → wait for CI → merge → fold, in one motion | [`ship-pr`](../skills/ship-pr/SKILL.md) |
 | `release/verify-resolved-issues.ps1` | checks that a merged PR closed what it declared | [`ship-pr`](../skills/ship-pr/SKILL.md) |
-| `release/fold-changelog-entry.ps1` | folds the entry into `CHANGELOG.md` at the top of the list and resets both branch files | [`fold-changelog`](../skills/fold-changelog/SKILL.md) |
+| `release/fold-changelog-entry.ps1` | folds the entry into `CHANGELOG.md` at the top of the list and removes the branch document | [`fold-changelog`](../skills/fold-changelog/SKILL.md) |
 | `release/cut-release.ps1` | the lockstep version bump, the release notes and the tag | [`cut-release`](../skills/cut-release/SKILL.md) |
 | `release/new-internal-note.ps1` | the tier-1 note's skeleton, which needs the development notes as input | [`cut-release`](../skills/cut-release/SKILL.md) |
 | `release/build-release-notes-page.ps1` | builds the hand-written notes into one browsable page, and with `-Worker` the Cloudflare Worker that serves it — it publishes nothing | [`release-notes-page`](../skills/release-notes-page/SKILL.md) |

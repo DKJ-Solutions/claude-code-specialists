@@ -1575,43 +1575,36 @@ if (Test-Path -LiteralPath $clForHeadings) {
 
 Write-Coverage -Category 'entry-heading' -Checked $ehChecked `
     -Note $(if ($entryTextsForHeadings.Count -eq 0) { 'no unfolded entry in the branch document or the root, so only CHANGELOG.md was judged -- normal between merges' } else { "$($entryTextsForHeadings.Count) unfolded entry(ies) plus CHANGELOG.md" })
-# --- 13b. the branch document's RESET state still matches what the scaffolder writes -----------------------
-# A reference beside a scaffolder that writes the same shape is TWO SOURCES OF ONE FORMAT. This repo has paid
-# for that shape repeatedly -- the scaffold wording, the fence readers, the tier sections -- and the entry
-# format changed THREE TIMES on the day the branch templates were added, so a hand-maintained copy would have
-# gone stale before it was committed.
+# --- 13b. no branch document is left behind between branches -----------------------------------------------
+# THE CHECK WAS INVERTED ON AUGUST 23, 2026 (Dave), AND THE THING IT PROTECTS DID NOT CHANGE. It used to hold
+# the trunk's copy of development-cycle.md to the formatter byte-for-byte: a reference beside a scaffolder
+# that writes the same shape is TWO SOURCES OF ONE FORMAT, which this repo has paid for repeatedly -- the
+# scaffold wording, the fence readers, the tier sections. Before that it held two files under
+# branch/templates/ for the same reason.
 #
-# WHAT IS BEING HELD CHANGED ON AUGUST 23, 2026, AND THE ARGUMENT DID NOT. This used to hold two files under
-# branch/templates/ to Get-BranchTemplates. Those templates existed because the working files deliberately
-# carried no guidance; the merged development-cycle.md carries its own, so the reference and the file you
-# write in are the same document -- and what is left to hold is its RESET state, the copy that sits on the
-# trunk. A hand-edit there is exactly the drift the templates could suffer, in the one file that is now both
-# the form and the example.
+# THERE IS NO TRUNK COPY TO HOLD ANY MORE. The document exists for the lifetime of a branch: new-branch
+# creates it, the fold removes it. So the drift this check existed to catch cannot happen -- a hand-edit to
+# a reset copy needs a reset copy -- and what is worth asserting instead is the invariant that replaced it:
+# NO DOCUMENT ANYWHERE DECLARES THE TRUNK. Absent is the trunk's normal state, a file naming this branch is
+# work in progress, and a file naming the trunk is a leftover the fold should have taken.
 #
-# ONLY WHILE IT IS IN THAT STATE, which is the one real difference. On a branch this file holds somebody's
-# work and there is nothing to compare it to, so the check reports that instead of asserting -- the same
-# conservative direction every reader of this format takes. Test-BranchChangelogIsFilled is what tells the two
-# apart, so this gate and the fold cannot disagree about which state they are looking at.
+# WHICH IS ALSO THE ONE STATE A CONSUMER CAN REACH BY DOING NOTHING WRONG, and the reason this reports the
+# path rather than a shape. A repo updating from an older plugin has a trunk copy the previous fold wrote;
+# their next fold removes it. Here, on the repo that owns the format, one should never survive a run.
+#
+# NO SHAPE IS ASSERTED, deliberately, and that is the cost of the inversion stated out loud. While a reset
+# state existed there was one moment when the file was known-empty and could be compared to the formatter;
+# a branch's file holds somebody's work and never can be. The scaffold gate and the step-list gate read the
+# file's CONTENT on the way to the PR, so what is lost is the byte-comparison, not the coverage.
 $btChecked = 0
-$btMissing = 0
+$btStale = 0
 if (Test-CheckEnabled 'branch-template') {
-    # GENERATED WITH THE REPO'S OWN CONFIG LOADED, and that is a repair of a gap this check was born with
-    # rather than a concession to a new seam (August 12, 2026). The content has ALWAYS depended on
-    # scripts/repo-config.ps1 -- Get-EntryGuidanceOverrides, Get-EntrySectionHeadingOverrides,
-    # Get-EntrySignificanceWordingOverrides and Get-BranchFileWordingOverrides all reach the rendered file --
-    # while this gate generated it with none of them loaded. It agreed with the disk only because THIS repo
-    # answers none of those four, so the neutral generation and the configured one happened to be identical.
-    # The consequence was already live for somebody else: a consumer who translated their entry wording had
-    # this check report drift against their own correctly generated file, with the advice "regenerate it",
-    # which would produce the same file again. Get-ReleaseAudienceTier is simply the first of these seams this
-    # repo answers, so it is what made the gap visible.
-    #
     # DOT-SOURCED INSIDE A SCRIPTBLOCK rather than at the top of the gate, deliberately. repo-config is not
     # loaded in this process anywhere else -- the one other check needing a repo-owned value spawns the script
     # that owns it -- and pulling two dozen repo functions into the whole lint to serve one check is how a gate
-    # acquires a dependency nobody meant to give it. A repo without the file (a fresh consumer mid-bootstrap)
-    # falls through to the neutral generation, which is what it had before.
-    $btExpectation = & {
+    # acquires a dependency nobody meant to give it. It is still dot-sourced now that no content is generated
+    # here, because Get-BranchTrunkName reads a repo seam and answering it wrong would flip this check's verdict.
+    $btState = & {
         $btCfg = Join-Path $RepoRoot 'scripts\repo-config.ps1'
         if (Test-Path -LiteralPath $btCfg) { . $btCfg }
         . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
@@ -1622,31 +1615,25 @@ if (Test-CheckEnabled 'branch-template') {
         } else { $null }
         [pscustomobject]@{
             Rel      = $btRel
-            OnDisk   = $btOnDisk
-            OnBranch = $(if ($null -ne $btOnDisk) { Test-BranchChangelogIsFilled -Text $btOnDisk } else { $false })
-            Expected = (((Format-DevelopmentCycleReset) -join "`n") + "`n")
+            Present  = ($null -ne $btOnDisk)
+            Declared = $(if ($null -ne $btOnDisk) { Get-BranchFileDeclaredBranch -Text $btOnDisk } else { '' })
+            Trunk    = (Get-BranchTrunkName)
         }
     }
     $btChecked = 1
-    if ($null -eq $btExpectation.OnDisk) {
-        $btMissing = 1
-        Add-Error "[branch-template] $($btExpectation.Rel) is missing. It is the branch's own document, and its reset state is generated from the formatter the scaffolder uses -- see Format-DevelopmentCycleReset in scripts/lib/entry-scaffold-lib.ps1."
-    } elseif ($btExpectation.OnBranch) {
-        $btChecked = 0
-        Write-Skip "branch-template -- $($btExpectation.Rel) holds this branch's work, so its shape is not asserted. It is held to the formatter only in its reset state, on the trunk."
-    } else {
-        $onDisk   = $btExpectation.OnDisk -replace "`r`n", "`n"
-        $expected = $btExpectation.Expected -replace "`r`n", "`n"
-        if ($onDisk -ne $expected) {
-            Add-Error "[branch-template] $($btExpectation.Rel) is in its reset state but no longer matches what the scaffolder writes. The reset state is generated, not maintained -- change the format in the formatters and let it follow, rather than editing this file by hand."
+    if ($btState.Present) {
+        if (-not $btState.Declared) {
+            $btStale = 1
+            Add-Error "[branch-template] $($btState.Rel) exists but declares no branch in its heading. Every reader of this document -- the fold, the two local gates and the CI gate -- identifies a branch's work by that name, so a document without one belongs to nobody. Let new-branch.ps1 write it rather than creating it by hand."
+        } elseif ($btState.Declared -eq $btState.Trunk) {
+            $btStale = 1
+            Add-Error "[branch-template] $($btState.Rel) names the trunk ('$($btState.Trunk)'), which is the empty state this repo no longer keeps. The document lives only while a branch is open -- new-branch.ps1 creates it and fold-changelog-entry.ps1 removes it -- so a trunk-declaring copy is a leftover from a fold that ran under the old behaviour. Delete it."
         }
     }
-    if ($btChecked -gt 0) {
-        Write-Coverage -Category 'branch-template' -Checked $btChecked `
-            -Note $(if ($btMissing -gt 0) { 'missing' } else { 'the reset state held to the formatter the scaffolder calls, so the trunk copy cannot drift from the file a branch actually gets' })
-    }
+    Write-Coverage -Category 'branch-template' -Checked $btChecked `
+        -Note $(if ($btStale -gt 0) { 'a document declaring the trunk was found where none should exist' } elseif ($btState.Present) { "present and declaring '$($btState.Declared)', which is a branch in progress" } else { 'absent, which is the trunk between branches' })
 } else {
-    Write-Skip 'branch-template -- not run (-SkipCheck). Nothing is asserted about the branch document''s reset state in this run.'
+    Write-Skip 'branch-template -- not run (-SkipCheck). Nothing is asserted about whether a branch document is left behind in this run.'
 }
 
 # --- 14. mojibake: a double-encoded character is a silent content change -----------------------------------

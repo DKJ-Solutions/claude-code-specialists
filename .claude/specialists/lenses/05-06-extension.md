@@ -75,10 +75,11 @@ entries rather than off which section they sit in.
 - **The fold takes that section, not the file** (August 23, 2026). It splits at the DEPLOY heading and
   leaves the plan where it is; publishing somebody's ticked checkboxes as a change description is exactly
   what that boundary prevents.
-- **It lives on `main` in an empty reset state**, with the **trunk's name in its heading** and a warning not
-  to write there until a branch exists. That NAME is load-bearing, and it replaced the heading level: one
-  document opens with an `#` in both states, so the level cannot say whether anybody has been working here
-  while the name can.
+- **It exists only while a branch is open** (Dave, August 23, 2026). `new-branch` creates it and the fold
+  removes it at the merge, so on `main` there is no copy. It used to be rewritten to an empty state carrying
+  the **trunk's name in its heading**; that name is still load-bearing wherever such a copy survives, and it
+  replaced the heading level because one document opens with an `#` in both states, so the level cannot say
+  whether anybody has been working here while the name can.
 - **Every older shape still folds.** A `branch/` pair from before the merge, a `branch-changelog.md` pair
   from before August 19, and a pre-split `<branch-name>.md` in the root — branch `feat/new-plugin` →
   `feat-new-plugin.md`. The resolver picks whichever file NAMES this branch, so the trunk's copy of the new

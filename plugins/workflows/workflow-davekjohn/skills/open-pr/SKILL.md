@@ -261,8 +261,8 @@ its reason on the page, which is the half worth reading later.
 - **A step still carrying the scaffold's placeholder is refused, ticked or not.** Ticking the
   scaffolded first step without replacing it reports a plan as finished that was never written — the
   same shape the scaffold gate above was measured on, one file over.
-- **No step list at all is not a finding.** A branch created by hand rather than by `new-branch` has the
-  trunk's empty reset state, which holds no steps. That is the one-commit typo fix; refusing it would
+- **No step list at all is not a finding.** A branch created by hand rather than by `new-branch` has no
+  document at all, and so no steps. That is the one-commit typo fix; refusing it would
   make the mechanism ceremony rather than a tool.
 - **Fenced code is excluded**, so a step list that quotes the convention is not accused of following it.
 - **There is no `-Force`**, deliberately, unlike the scaffold gate. `-Force` exists for text somebody

@@ -1166,7 +1166,7 @@ Assert-Equal 'still open' $freshFindings[0].Label 'and the open label wins, beca
 
 # The reset state carries NO steps, so a branch made by hand rather than by new-branch is not refused --
 # the one-commit typo fix. Deliberate tolerance, asserted so it cannot be tightened by accident.
-Assert-Equal 0 @(Get-BranchProgressFindings -Text ((Format-DevelopmentCycleReset) -join "`n")).Count 'the reset state has nothing to resolve -- an absent plan is not a refusal'
+Assert-Equal 0 @(Get-BranchProgressFindings -Text ((Format-DevelopmentCycle -Branch '') -join "`n")).Count 'the reset state has nothing to resolve -- an absent plan is not a refusal'
 
 # --- The SDLC arc (#655) ------------------------------------------------------------------------------
 # THE PHASES ARE DRAWN ON TOP OF THE GATE, NEVER INTO IT. Get-BranchProgressFindings reads step marks, so a
@@ -1217,7 +1217,7 @@ Assert-Equal 0 @(Get-BranchProgressFindings -Text $emptyPhases).Count 'a phase w
 # first line is somebody else's TODO gets copied in, which is the rule the retired template lived by. A
 # BRANCH's document does carry one open step, which is what gives the gate something to refuse; the two
 # are asserted against each other rather than separately.
-$phaseTemplate = ((Format-DevelopmentCycleReset) -join "`n")
+$phaseTemplate = ((Format-DevelopmentCycle -Branch '') -join "`n")
 Assert-True ($phaseTemplate -match "(?m)^$cycleSec\s+PLAN\s*`$") 'the reference copy carries the arc'
 Assert-Equal 0 @(Get-BranchProgressFindings -Text $phaseTemplate).Count 'and still carries no step of its own'
 Assert-Equal 1 @(Get-BranchProgressFindings -Text ((Format-DevelopmentCycle -Branch 'x/y-v1') -join "`n")).Count 'while the file a branch gets carries exactly one, so the gate has something to refuse'
@@ -1276,7 +1276,7 @@ Assert-True (-not ($bareEntry -match '\d{8}-\d{6}')) 'and a freshly scaffolded e
 # THE REFERENCE COPY SHOWS BOTH STAMPS AS PLACEHOLDERS, which is what separates it from a branch's file now
 # that the guidance is unconditional: it is the only difference left, and it is the honest one -- neither
 # moment exists for the trunk.
-$templateCycle = ((Format-DevelopmentCycleReset) -join "`n")
+$templateCycle = ((Format-DevelopmentCycle -Branch '') -join "`n")
 Assert-True ($templateCycle.Contains((Get-EntryIdTemplatePlaceholder))) 'the reference copy shows the creation stamp as a placeholder'
 Assert-True ($templateCycle.Contains((Get-EntryMergeStampTemplatePlaceholder))) 'and the landing stamp as one'
 
@@ -1371,7 +1371,7 @@ Assert-True (Test-EntryDeclaresShape -EntryText $preDossier) 'a pre-dossier entr
 # Their only way out was forking new-branch.ps1, the duplication #410 had just removed.
 Write-Host ""
 Write-Host "the trunk warning: its lead is wording, not formatter output" -ForegroundColor Cyan
-$defaultReset = (Format-DevelopmentCycleReset) -join "`n"
+$defaultReset = (Format-DevelopmentCycle -Branch '') -join "`n"
 Assert-True ($defaultReset -match '(?m)^> \*\*You are on `main`\.\*\* Do not work in this file yet') 'default: the lead is unchanged, on one line with the first warning line'
 
 # The override, injected the way the seam is reached in a real repo: repo-config.ps1 defines the function
@@ -1383,7 +1383,7 @@ function Get-BranchFileWordingOverrides {
         TrunkWarning     = @('Schrijf hier nog niet -- maak eerst een branch.', 'De tweede regel.')
     }
 }
-$dutchReset = (Format-DevelopmentCycleReset) -join "`n"
+$dutchReset = (Format-DevelopmentCycle -Branch '') -join "`n"
 Assert-True ($dutchReset -match '(?m)^> LET OP: je zit op `main`\. Schrijf hier nog niet') 'override: the lead is the consumer''s sentence, with the trunk name in the position THEY chose'
 # SCOPED TO THE WARNING BLOCK, and the first version of this assert was not -- it read the whole document
 # for 'You are on' and went red on the reset prose ('the changelog entry of the branch you are on'), which
@@ -1400,7 +1400,7 @@ Remove-Item -Path Function:\Get-BranchFileWordingOverrides
 function Get-BranchFileWordingOverrides { return @{ TrunkWarningLead = 'Pas op {let op} op `{0}`:' } }
 $braceReset = ''
 $threw = $false
-try { $braceReset = (Format-DevelopmentCycleReset) -join "`n" } catch { $threw = $true }
+try { $braceReset = (Format-DevelopmentCycle -Branch '') -join "`n" } catch { $threw = $true }
 Assert-Equal $false $threw 'brace: a lead carrying a literal brace does not throw'
 Assert-True ($braceReset -match [regex]::Escape('Pas op {let op} op `main`:')) 'brace: the brace is passed through verbatim and the placeholder still resolves'
 Remove-Item -Path Function:\Get-BranchFileWordingOverrides
@@ -1412,12 +1412,12 @@ Remove-Item -Path Function:\Get-BranchFileWordingOverrides
 # established it is not. The formatter's own guard against a dangling '> ' is therefore unreachable through
 # the seam and stays as a guard on the DEFAULT being non-empty, which is worth having either way.
 function Get-BranchFileWordingOverrides { return @{ TrunkWarningLead = '' } }
-$noLead = (Format-DevelopmentCycleReset) -join "`n"
+$noLead = (Format-DevelopmentCycle -Branch '') -join "`n"
 Assert-Equal $defaultReset $noLead 'empty lead: an empty override is ignored -- the default sentence stands, as for every other key'
 Remove-Item -Path Function:\Get-BranchFileWordingOverrides
 # The default is back, so nothing below inherits an override. Asserted rather than assumed: a leaked
 # override would make every later assert read a document no repo produces.
-Assert-Equal $defaultReset ((Format-DevelopmentCycleReset) -join "`n") 'teardown: the default reset is restored once the seam function is gone'
+Assert-Equal $defaultReset ((Format-DevelopmentCycle -Branch '') -join "`n") 'teardown: the default reset is restored once the seam function is gone'
 
 Write-Host ""
 Write-Host "Remove-EntryAdminSections" -ForegroundColor Cyan

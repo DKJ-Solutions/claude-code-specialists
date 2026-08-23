@@ -7,10 +7,10 @@
     Dependency-free: no Pester needed, only PowerShell and git.
 
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/branch-entry-gate.tests.ps1
-
     THE ENTRY STATES COME FROM THE REAL FORMATTERS, NEVER FROM A LITERAL IN THIS FILE. Format-EntryBlock
-    with empty fields IS the scaffolded state and Format-DevelopmentCycleReset IS the reset state, so a
-    change to either shape reaches these cases automatically. A fixture written by hand would be a third
+    with empty fields IS the scaffolded state, and Format-DevelopmentCycle with no branch IS the empty,
+    trunk-declaring state a repo updating from an older plugin still has on its trunk -- so a change to
+    either shape reaches these cases automatically. A fixture written by hand would be a third
     definition of the format, in the file whose whole job is to prove there are not two -- and it would go
     stale exactly when the gate did, hiding the failure instead of catching it.
 
@@ -87,7 +87,7 @@ try {
     Write-Host 'the exemptions'
 
     $c = New-Consumer -Label 'exempt'
-    Set-Entry -Dir $c -Lines (Format-DevelopmentCycleReset)
+    Set-Entry -Dir $c -Lines (Format-DevelopmentCycle -Branch '')
 
     $r = Invoke-Gate -Dir $c -Branch 'sync/live-2026-08-20'
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'exempt prefix') 'exempt/default: a sync branch owes no entry, even with the entry in its reset state'
@@ -101,7 +101,7 @@ try {
 
     # The seam narrows and widens it, and the source declares no exemption of its own.
     $c2 = New-Consumer -Label 'seam' -RepoConfig "function Get-EntryGateExemptPrefixes { return @('mirror','vendor') }"
-    Set-Entry -Dir $c2 -Lines (Format-DevelopmentCycleReset)
+    Set-Entry -Dir $c2 -Lines (Format-DevelopmentCycle -Branch '')
     $r = Invoke-Gate -Dir $c2 -Branch 'mirror/upstream'
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'exempt prefix') 'exempt/seam: the seam answer replaces the default'
     $r = Invoke-Gate -Dir $c2 -Branch 'sync/live-2026-08-20'
@@ -116,7 +116,7 @@ try {
     Assert-True ($r.Code -eq 1 -and $r.Out -match 'does not exist') 'missing: no entry file at all refuses, and names new-branch'
 
     $reset = New-Consumer -Label 'reset'
-    Set-Entry -Dir $reset -Lines (Format-DevelopmentCycleReset)
+    Set-Entry -Dir $reset -Lines (Format-DevelopmentCycle -Branch '')
     $r = Invoke-Gate -Dir $reset -Branch 'feat/thing'
     Assert-True ($r.Code -eq 1 -and $r.Out -match 'reset state') 'reset: the state the fold leaves behind is not an entry'
 

@@ -602,11 +602,14 @@ Assert-True ($clF -match 'the real one')            'fenced: the REAL declaratio
 Assert-True ($clF -match 'quoted, not declared')    'fenced: and the quoted table survives inside its fence'
 Assert-True ($rF.Output -notmatch 'no significance') 'fenced: the real row was read, so nothing is reported missing'
 
-Write-Host "The branch/ pair: folded from the new path, RESET rather than deleted" -ForegroundColor Cyan
-#      The split (Dave, August 6, 2026). Two things have to hold that did not exist before: the entry is
-#      found at a fixed path instead of one named after the branch, and clearing it means rewriting it to
-#      its empty state -- deleting it would leave the trunk missing a file the next branch expects.
-# ONE DOCUMENT SINCE AUGUST 23, 2026, and writing it through the real formatter is the point: the fold has
+Write-Host "The branch document: folded from the fixed path, then REMOVED" -ForegroundColor Cyan
+#      The split (Dave, August 6, 2026) made the entry findable at a fixed path instead of one named after
+#      the branch. Clearing it then meant rewriting it to an empty state, because deleting it would have left
+#      the trunk missing a file the next branch expected.
+# THAT SECOND HALF WAS REVERSED ON AUGUST 23, 2026 (Dave): the document exists for the lifetime of a branch,
+# so the fold DELETES it and the trunk carries no copy between branches. What the fixed path still buys is
+# unchanged -- two branches in flight cannot collide, and the repo root does not fill with other people's work.
+# ONE DOCUMENT SINCE THE SAME DAY, and writing it through the real formatter is the point: the fold has
 # to find the entry as a SECTION of the branch's plan rather than as a file of its own. Writing an entry
 # file and then a cycle file to the same path -- which is what this fixture did the moment the two paths
 # became one -- silently left only the second, and the fold then correctly found nothing to fold.
@@ -624,18 +627,13 @@ Assert-True ((Get-Changelog -Dir $dirBF) -match 'Written in the branch folder') 
 
 $bfChangelogPath = Join-Path $dirBF $bfPaths.Deployment
 $bfProgressPath  = Join-Path $dirBF $bfPaths.Cycle
-Assert-True (Test-Path -LiteralPath $bfChangelogPath) 'branch files: the entry file still EXISTS -- it is a fixed path the next branch will use'
-$bfChangelogAfter = [System.IO.File]::ReadAllText($bfChangelogPath)
-Assert-True (-not (Test-BranchChangelogIsFilled -Text $bfChangelogAfter)) 'branch files: and it is back in its empty state'
-Assert-True (-not ($bfChangelogAfter -match 'Written in the branch folder')) 'branch files: with the folded entry gone from it, not merely appended to'
-
-$bfProgressAfter = [System.IO.File]::ReadAllText($bfProgressPath)
-Assert-True (-not ($bfProgressAfter -match '(?m)^- \[ \] ')) 'branch files: the step list is reset too -- a merged branch does not hand its ticked boxes to the next one'
-Assert-Equal 'main' (Get-BranchFileDeclaredBranch -Text $bfProgressAfter) 'branch files: and the reset names the trunk again'
-Assert-True ($rBF.Output -match 'reset') 'branch files: the run says it reset rather than removed, so the reader does not go looking for a deleted file'
-# inbound #817: the fold is the SECOND of the two out-of-band write events per cycle, and the one that
-# replaces both files at once -- so it says so, in the same shared wording new-branch uses at the other end.
-Assert-True ($rBF.Output -match [regex]::Escape((Get-BranchFilesRereadNote))) 'branch files: and it prints the re-read note -- a session tracking the pair has just gone stale on both'
+Assert-True (-not (Test-Path -LiteralPath $bfChangelogPath)) 'branch files: the document is GONE -- it lives only while a branch is open'
+Assert-True (-not (Test-Path -LiteralPath $bfProgressPath)) 'branch files: which takes the step list with it, since they are sections of one file'
+Assert-True ($rBF.Output -match 'Folded and removed') 'branch files: the run says it removed the file, so the reader is not sent looking for a reset copy'
+Assert-True (-not ($rBF.Output -match 'reset')) 'branch files: and never says reset -- that word describes the behaviour this replaced'
+# inbound #817: the fold used to be the SECOND of two out-of-band write events per cycle and said so. It
+# writes nothing now, so there is nothing left to re-read and the note belongs to new-branch alone.
+Assert-True (-not ($rBF.Output -match [regex]::Escape((Get-BranchFilesRereadNote)))) 'branch files: and NO re-read note -- the document is gone, so there is nothing to read again'
 
 Write-Host "A RESET branch-deployment.md is not an entry, and is not folded" -ForegroundColor Cyan
 #      The reset state opens with an H1, exactly as CONTRIBUTING.md does. This is what makes a double fold
@@ -643,9 +641,9 @@ Write-Host "A RESET branch-deployment.md is not an entry, and is not folded" -Fo
 $dirBR = New-FoldFixture -Label 'branchreset'
 New-Item -ItemType Directory -Path (Join-Path $dirBR $bfPaths.Directory) -Force | Out-Null
 [System.IO.File]::WriteAllText((Join-Path $dirBR $bfPaths.Deployment),
-    ((Format-DevelopmentCycleReset) -join "`n") + "`n", $Utf8NoBom)
+    ((Format-DevelopmentCycle -Branch '') -join "`n") + "`n", $Utf8NoBom)
 [System.IO.File]::WriteAllText((Join-Path $dirBR $bfPaths.Cycle),
-    ((Format-DevelopmentCycleReset) -join "`n") + "`n", $Utf8NoBom)
+    ((Format-DevelopmentCycle -Branch '') -join "`n") + "`n", $Utf8NoBom)
 $clBR0 = Get-Changelog -Dir $dirBR
 $rBR = Invoke-Fold -Dir $dirBR
 Assert-True ($rBR.ExitCode -eq 0) 'reset pair: exits 0 -- nothing to fold is not an error'
