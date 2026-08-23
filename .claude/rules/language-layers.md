@@ -79,6 +79,15 @@ discovery — as an earlier pass did for `.github/workflows/ci.yml` — not a qu
   [`pr-issues.tests.ps1`](../../scripts/tests/pr-issues.tests.ps1) exercises both dashes, which nothing had
   done — until then only the ASCII hyphen was asserted, so a composition producing the wrong two characters
   would have passed every existing assert.
+  **The gate holds the source to ASCII; it cannot vouch for the composition.** A repair tool that mangles
+  an escape can still hand back pure ASCII, so check 27 passes the wrong answer along with the right one.
+  Measured August 23, 2026: a GNU `sed` substitution meant to write those same two dash escapes hit `sed`'s
+  own `\u` ("uppercase the next character") reading of the replacement and wrote the literal `[-20132014,]`
+  instead — ASCII, and wrong. The mechanism is in
+  [the system-administration manual's trap section](../../plugins/teams/team-alpha/manuals/05-15-manual.md#seven-powershell-traps-that-produce-well-formed-wrong-output);
+  the consequence here is the same as above — compose the escape with
+  `'-' + [char]0x2013 + [char]0x2014` rather than a non-PowerShell substitution, and where such a tool must
+  write one anyway, read the written line back by code point before trusting it.
 - **And the mirror-image rule for READING: a native command's output that is DATA is not decoded with the
   console code page.** Measured August 21, 2026 (inbound
   [#821](https://github.com/DaveKJohn/claude-code-specialists/issues/821)). The bullet above is about a
