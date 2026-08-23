@@ -22,6 +22,47 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `docs/development-cycle-answers-v1` · 20260823-150916
+
+`workflow-davekjohn/CONTRIBUTING.md` now states what this repo's answers make of the development cycle,
+which nothing did. The merge that retired `branch/README.md` claimed its answers had moved into this
+folder's two pages; only the **file rules** actually arrived, in `CLAUDE.md`. The **seam answers** — the
+ones that decide what a contributor here sees in the document — went nowhere, and the seam table did not
+even list `Get-ReleaseAudienceTier`, the single most consequential answer for the entry's shape.
+
+The new section says three things a reader cannot derive from the portable half: that the audience tier
+is `2`, so the entry asks two questions and both sit at the section level while a repo answering nothing
+gets the `#### Tier N` fallback instead; that `new-branch` completes a `-v1` and a bump is typed rather
+than guessed; and that the lint holds the document's shape here in three ways a consumer's repo cannot,
+which is also why the guidance lives inside the document rather than beside it.
+
+**And the split-entry rule was refusing this repo's own changelog.** Tier 0 lost its heading in that
+merge, so an entry's first named section is now `What makes this deploy extra special` — and the gate,
+which asks whether an entry starts at its first section, read the freshly folded entry as one that had
+been cut in two by a stray heading. That is the **fourth** time a change to the entry's headings has made
+correct entries read as split, and the first that was a level move rather than a rename: the three
+repairs already recorded above that check all key on names. Found by running the lint on `main` straight
+after the fold, which is the only moment it could have been seen.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+Nothing here reaches a subscriber of the service. The repaired page is this repo's own answer sheet, and
+the lint that was refusing its changelog runs nowhere else — the plugin ships no `scripts/lint/`. The one
+part that does travel, the entry's heading shape, was already correct in the payload; what was wrong was
+this repo's gate reading it.
+
+**Score:** N/A
+
+### Pull Request
+
+The development cycle's repo answers land in CONTRIBUTING.md
+
+[PR #837](https://github.com/DaveKJohn/claude-code-specialists/pull/837)
+
+---
+
 ## DEPLOY: `feat/development-cycle-v1` · 20260823-145052
 
 A branch carries one document again. `workflow-davekjohn/branch/` is gone, and everything a branch needs

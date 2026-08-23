@@ -1,4 +1,9 @@
-# Development cycle: `docs/development-cycle-answers-v1` · 20260823-145333
+# Development cycle: `main` · <timestamp of the moment this branch was created>
+
+
+> **You are on `main`.** Do not work in this file yet -- create a branch first.
+> Anything written here on the trunk belongs to no branch, will not be folded, and is in the way
+> of the next person who does create one.
 
 <!--
      The plan for this branch. Every step must be resolved before the PR: open-pr and
@@ -23,24 +28,11 @@
 
 ## PLAN
 
-- [x] Dave read the merged `CONTRIBUTING.md` and found the hole: the page names the development cycle only
-      in a footnote, and none of this repo's answers about it landed anywhere.
-
 ## CREATE
-
-- [x] `CONTRIBUTING.md`: a section stating what this repo's answers make of the document — the audience
-      tier and the headings that follow from it, the version suffix, and which of the shape's rules the
-      lint enforces here.
-- [x] The seam table gained `Get-ReleaseAudienceTier` and `Get-BranchFileWordingOverrides`.
-- [x] `CLAUDE.md` now says WHICH half of the retired page went where, instead of naming both pages.
-- [x] The split-entry rule accepts the audience tier's heading as an opener — it became the entry's first
-      named section when tier 0 lost its own.
 
 ## TEST
 
-- [x] The lint gate is green, which it was not: the entry folded an hour ago was reported as split.
-
-## DEPLOY: `docs/development-cycle-answers-v1`
+## DEPLOY: `main` · <timestamp of the moment this branch was merged>
 
 <!--
      Why the deploy matters AT THIS REACH specifically. A reason that would read the
@@ -53,27 +45,7 @@
      ../../scripts/x.ps1 -- the second reads correctly here and is dead once it lands.
 -->
 
-`workflow-davekjohn/CONTRIBUTING.md` now states what this repo's answers make of the development cycle,
-which nothing did. The merge that retired `branch/README.md` claimed its answers had moved into this
-folder's two pages; only the **file rules** actually arrived, in `CLAUDE.md`. The **seam answers** — the
-ones that decide what a contributor here sees in the document — went nowhere, and the seam table did not
-even list `Get-ReleaseAudienceTier`, the single most consequential answer for the entry's shape.
-
-The new section says three things a reader cannot derive from the portable half: that the audience tier
-is `2`, so the entry asks two questions and both sit at the section level while a repo answering nothing
-gets the `#### Tier N` fallback instead; that `new-branch` completes a `-v1` and a bump is typed rather
-than guessed; and that the lint holds the document's shape here in three ways a consumer's repo cannot,
-which is also why the guidance lives inside the document rather than beside it.
-
-**And the split-entry rule was refusing this repo's own changelog.** Tier 0 lost its heading in that
-merge, so an entry's first named section is now `What makes this deploy extra special` — and the gate,
-which asks whether an entry starts at its first section, read the freshly folded entry as one that had
-been cut in two by a stray heading. That is the **fourth** time a change to the entry's headings has made
-correct entries read as split, and the first that was a level move rather than a rename: the three
-repairs already recorded above that check all key on names. Found by running the lint on `main` straight
-after the fold, which is the only moment it could have been seen.
-
-**Score:** 3
+**Score:**
 
 ### What makes this deploy extra special
 <!--
@@ -85,16 +57,9 @@ after the fold, which is the only moment it could have been seen.
      complete answer and the common one.
 -->
 
-Nothing here reaches a subscriber of the service. The repaired page is this repo's own answer sheet, and
-the lint that was refusing its changelog runs nowhere else — the plugin ships no `scripts/lint/`. The one
-part that does travel, the entry's heading shape, was already correct in the payload; what was wrong was
-this repo's gate reading it.
-
-**Score:** N/A
+**Score:**
 
 ### Pull Request
 <!-- the PR title on the first line -- no feat:/fix:/docs: prefix, open-pr puts the branch type in front.
      link to the PR in github when branch is merged to main and the date this happened-->
-
-The development cycle's repo answers land in CONTRIBUTING.md
 
