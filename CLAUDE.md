@@ -40,8 +40,8 @@ for this repo (the main branch, the lint gate, the fold exception, being public)
   only on explicit request. **The closing steps of a cut that was asked for are covered by that
   request**, including **publishing the GitHub Release**: the version bump and the tag are the
   irreversible act, and once they are authorised, stopping again at the last step of the same
-  checklist is a rubber stamp. So "cut a release" runs through: generate, ship the hand-written
-  documents via their PR, publish. Where a repo has a separate **live stage**, that block is not part
+  checklist is a rubber stamp. So "cut a release" runs through: generate, commit the hand-written
+  documents on `main`, publish. Where a repo has a separate **live stage**, that block is not part
   of this — a Release document describes a version, a live push changes what customers see. Decision
   by Dave, August 5, 2026; the release manager's own statement of it is in his portable body.
 
@@ -86,10 +86,10 @@ checkpoint, in practice it was a rubber stamp — so it is only a checkpoint now
 buys something. Decision by Dave, July 27, 2026.
 
 On the main branch a few narrowly defined, deliberate exceptions to "never commit directly" exist —
-the **fold commit** after a merge and the **release commit** (on explicit request) — and a
-**lint gate** serves as the safety guard before every PR. Exactly which exceptions apply here and
-how they are implemented (scripts, scope) is described in the repo slot. A release and the
-destructive actions above happen only on Dave's explicit request.
+the **fold commit** after a merge, the **release commit** and the **release-notes commit** (both on
+explicit request) — and a **lint gate** serves as the safety guard before every PR. Exactly which
+exceptions apply here and how they are implemented (scripts, scope) is described in the repo slot. A
+release and the destructive actions above happen only on Dave's explicit request.
 
 ---
 
@@ -274,7 +274,9 @@ The constitution above, concretely implemented here:
   it reports the significance instead of refusing on it. Their mechanics, escape valves and the
   measurements behind them are in
   [`workflow-davekjohn/CLAUDE.md`](workflow-davekjohn/CLAUDE.md#the-three-gates-this-workflow-adds-on-top).
-- **Two deliberate exceptions to "never directly on `main`", each one bounded:**
+- **Three deliberate exceptions to "never directly on `main`", each one bounded.** Together they are
+  one procedure read end to end — **fold the changelog, bump the version, write the release notes** —
+  and that is why they are the three (Dave, August 23, 2026):
   1. The **fold commit** after a merge: [`fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)
      folds the entry into `CHANGELOG.md` and clears it, and with `-Commit`/`-Push` makes that commit
      itself. **Bounded to three paths** — `CHANGELOG.md`, the entry, and
@@ -290,15 +292,25 @@ The constitution above, concretely implemented here:
      [`releases/README.md`](releases/README.md) and the assert in
      [`release-lib.tests.ps1`](scripts/tests/release-lib.tests.ps1) that pins which major it targets),
      and only once a cut has been **explicitly asked for**. Outside a cut, both files take the
-     ordinary branch + PR route. **What the exception does *not* cover**: the hand-written release
-     documents — the consumer-document edit and the internal note — land **via a branch + PR**, not
-     under it (Dave, August 4, 2026, declining the wider version he was offered).
+     ordinary branch + PR route.
+  3. The **release-notes commit** (Dave, August 23, 2026): the hand-written release documents — the
+     audience note the cut drafted, and the internal note where a repo still runs the two-document
+     flow — are committed straight onto `main` in the commit after the tag. **Bounded to the
+     hand-written documents of a cut that was actually asked for**: the note under
+     `Get-ReleaseNoteRoot` and `releases/internal/<dir>/<X.Y.Z>.md`, named in the commit, and nothing
+     else. Outside a cut there is nothing for it to be part of, and a later edit to an
+     already-published note is an ordinary change on the ordinary route. **This reverses the
+     August 4, 2026 answer**, which sent those documents through a branch + PR; the reason for the
+     reversal is that a release is one procedure, and running it across two routes left the trunk
+     carrying a tagged release whose own notes were still in review.
 
   **An exception is only safe while it stays the size it was granted at** — the lesson `ship-pr.ps1`
-  cost on August 2, 2026, and the reason both bounds are stated here rather than left to the layer
-  below. How the two actually run, which release documents are deliberately *not* covered by the
-  second one, and the measurements behind each are in
-  [`workflow-davekjohn/CLAUDE.md`](workflow-davekjohn/CLAUDE.md#how-the-two-direct-on-main-exceptions-actually-run)
+  cost on August 2, 2026, and the reason every bound above is stated here rather than left to the
+  layer below. **That argument is what the August 4 answer rested on, and it survives the reversal
+  intact**: widening was refused then and the bounds are written out now for exactly the same reason.
+  What changed is the judgement about which size is right, not the rule about stating it. How the
+  three actually run and the measurements behind each are in
+  [`workflow-davekjohn/CLAUDE.md`](workflow-davekjohn/CLAUDE.md#how-the-three-direct-on-main-exceptions-actually-run)
   and in [the release lens](.claude/specialists/lenses/05-06-extension.md#versioning--releases).
 - **This repo is `public`.** A deliberate choice, so the remote `github` marketplace source can be
   read without gh auth. Consequence: **nothing confidential** belongs here — no personal

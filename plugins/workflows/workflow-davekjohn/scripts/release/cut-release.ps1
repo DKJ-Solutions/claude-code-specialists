@@ -21,9 +21,16 @@
     to that page, and a cut leaves this document at its intro.
 
     A release deliberately does NOT run via a branch + PR. Like the fold commit, the release
-    commit is an allowed direct-on-main action (the second exception to "everything via branch +
-    PR" -- see the safety rules). The script therefore runs on main itself and is started ONLY at
-    Dave's explicit request.
+    commit is an allowed direct-on-main action (the second of three exceptions to "everything via
+    branch + PR" -- see the safety rules). The script therefore runs on main itself and is started
+    ONLY at Dave's explicit request.
+
+    THE THIRD EXCEPTION IS THE ONE THAT FOLLOWS THIS SCRIPT (Dave, August 23, 2026): the
+    hand-written release notes are committed straight onto main too, so a cut runs in one place from
+    end to end -- fold the changelog, bump the version, write the release notes. It reverses the
+    August 4, 2026 answer, which sent those documents through a branch + PR, and it is bounded the
+    same way the other two are: the hand-written documents of a cut that was asked for, and nothing
+    else in the tree.
 
     SHARED, WITH THE REPO'S OWN ANSWERS IN THE SEAM (issue #417). This script is mirrored into the
     plugin, so a consumer runs it rather than forking it. Everything that legitimately differs per
@@ -107,7 +114,8 @@
          the documents it deliberately did NOT write: the consumer draft still needs editing, and the
          internal summary (the third tier, for colleagues and management, at EVERY release including a
          patch) has its own script -- new-internal-note.ps1, which needs the notes step 3 just produced.
-         Both are hand-written and both land via a branch + PR, because this commit is already tagged.
+         Both are hand-written and both are committed straight onto main, in the commit after this
+         one -- the third direct-on-main exception, so the whole cut stays on the trunk.
       5. Pushes main + the tag (unless -NoPush).
 
 .PARAMETER Version
@@ -1108,7 +1116,7 @@ function Write-FollowUpSteps {
 
     if (-not $cutNote) { return }
     Write-Host ""
-    Write-Host "Still to write by hand (via a branch + PR -- this commit is already tagged):" -ForegroundColor Cyan
+    Write-Host "Still to write by hand (commit it straight onto main -- the release-notes exception):" -ForegroundColor Cyan
     Write-Host "  - $noteRelPath"
     if ($audienceEntries.Count -gt 0) {
         Write-Host "      the audience section is a DRAFT (the tier-$audienceTier entries, in the words their authors wrote for a reviewer);"

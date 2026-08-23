@@ -5,8 +5,8 @@ of the repo's own [`CLAUDE.md`](../CLAUDE.md)** — the same split
 [`CONTRIBUTING.md`](CONTRIBUTING.md) already makes over the root
 [`CONTRIBUTING.md`](../CONTRIBUTING.md), applied to the operating guide. The root page states what
 holds in this repo whether or not the plugin is installed: never directly on `main`, branch + PR, CI
-green, and the two direct-on-`main` exceptions together with their bounds. **This page carries the
-workflow's own mechanics** — the gates it adds on top, how those two exceptions actually run, and the
+green, and the three direct-on-`main` exceptions together with their bounds. **This page carries the
+workflow's own mechanics** — the gates it adds on top, how those three exceptions actually run, and the
 measurements behind them. Where the two disagree, this page wins.
 
 The split is worth what it costs for the reason the root page gives for the two moves before it: the
@@ -132,9 +132,9 @@ gate should not need that grace to be pointed correctly.
 **It is not in the `main` ruleset.** Making a check required is a repo-settings change and therefore
 Dave's, so today it reports on every PR and blocks nothing.
 
-## How the two direct-on-`main` exceptions actually run
+## How the three direct-on-`main` exceptions actually run
 
-The root page states **that** the two exceptions exist and **what bounds them**; that half is
+The root page states **that** the three exceptions exist and **what bounds them**; that half is
 governance and stays there, because a session has to know the bound whether or not it ever opens this
 folder. What follows is the mechanics and the reasoning behind them.
 
@@ -182,21 +182,32 @@ the always-on path on August 15, 2026, where it was 41,168 B and 32% of everythi
 word of work. **Read it before changing any rule above**: most of what looks arbitrary here was
 measured there.
 
-### Who writes what, around a cut
+### 3. The release-notes commit, after the tag
 
-`cut-release.ps1` generates the development notes and the consumer **draft**, then names the two
+`cut-release.ps1` generates the development notes and the consumer **draft**, then names the
 documents it deliberately did not write. The internal note has its own script
 ([`new-internal-note.ps1`](../scripts/release/new-internal-note.ps1)), which needs the development
-notes as input and so can only run *after* the cut. Both the consumer-document edit and the internal
-note are hand-written and land **via a branch + PR** — the release commit is already tagged by then,
-and neither is one of the two named direct-on-`main` exceptions.
+notes as input and so can only run *after* the cut. Both are hand-written, and since
+**August 23, 2026 (Dave)** both are committed **straight onto `main`** in the commit after the tag —
+the third exception, bounded to those documents and to a cut that was actually asked for.
 
-**Confirmed by Dave, August 4, 2026**, over the alternative he was offered: widening the release
-exception to cover "the release *and* its written notes". He declined it, and the reasoning is the one
-that already carries the bounds on the root page — an exception is only safe while it stays the size
-it was granted at, which is what had to be repaired in `ship-pr.ps1` on August 2, 2026. The route also
-has a measured instance behind it now rather than only an argument:
+**This reverses the August 4, 2026 answer, and the reversal is worth reading with what it reverses.**
+That day Dave was offered the wider version — the release exception covering "the release *and* its
+written notes" — and declined it, on the reasoning that already carries the bounds on the root page:
+an exception is only safe while it stays the size it was granted at, which is what had to be repaired
+in `ship-pr.ps1` two days earlier. **That argument was not overturned; it is why the third exception
+arrives with its paths written out.** What changed is the judgement about which size is right. A
+release is one procedure, and running it across two routes left the trunk holding a tagged release
+whose own notes were still in review — visible in the artefact rather than only in the process,
+because `CHANGELOG.md` is empty from the cut onward and the document that replaces it is elsewhere.
+
+**The measured instance behind the old route stays true and stays here**, because it is what a future
+reader will reach for if the question reopens:
 [PR #432](https://github.com/DaveKJohn/claude-code-specialists/pull/432) shipped `v3.2.0`'s internal
-note this way, gates green and entry folded, with nothing about being post-tag causing friction.
-Recorded because until that date this was an **assumption** stated as a rule: the question had been
-put twice without an answer, and the answer-shaped text went into the docs anyway.
+note through a branch + PR, gates green and entry folded, with nothing about being post-tag causing
+friction. So the PR route was never *failing* — it was working and split in two, which is a different
+complaint and the one that decided it.
+
+**What does not change with the route.** The tag still holds the *draft*: the cut commits and tags in
+one motion, so the written version lands in the following commit either way. And the gates still run —
+being off a branch skips `open-pr`, not the lint and the suites.

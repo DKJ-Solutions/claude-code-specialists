@@ -97,10 +97,11 @@ and work that is **irreversible or outward-facing** (a release, a version bump, 
 publishing beyond the normal PR flow). The full statement is in
 [the safety rules](../CLAUDE.md#never-directly-on-the-main-branch--via-branch--pr).
 
-### The two direct-on-`main` exceptions
+### The three direct-on-`main` exceptions
 
-Both are named, narrow, and nothing else may use them: the **fold commit** after a merge, and the
-**release commit** on explicit request. Their exact scope is in
+All three are named, narrow, and nothing else may use them: the **fold commit** after a merge, the
+**release commit** on explicit request, and the **release-notes commit** that follows it. Their exact
+scope is in
 [the safety rules](../CLAUDE.md#never-directly-on-the-main-branch--via-branch--pr).
 
 ### The bump — this repo runs the shared floor, unchanged

@@ -329,18 +329,27 @@ though their version number moved.
 `-SkipTierGate` overrules it and should be a conversation, not a habit: the refusal names the bump the
 pending work *does* earn, and taking that is nearly always the right move.
 
-**Rendall's two hand-written documents land via a branch + PR, not on the release commit** (confirmed by
-Dave, August 4, 2026). Both the edited consumer draft and the filled-in internal note are written
+**Rendall's hand-written documents are committed straight onto `main`, in the commit after the tag**
+(Dave, August 23, 2026). Both the edited consumer draft and the filled-in internal note are written
 *after* the cut — `cut-release.ps1` commits and tags in one motion, and `new-internal-note.ps1` needs the
-development notes as its input — so by the time either exists, the tag is already set. Neither is one of
-the two named direct-on-`main` exceptions, so Rendall ships them the ordinary way: `new-branch` →
-`ship-pr`. The alternative Dave was offered and declined was widening the release exception to cover "the
-release *and* its written notes"; the reason for declining is the same one that forced the
-August 2, 2026 repair of `ship-pr.ps1` — an exception is only safe while it stays the size it was granted
-at. `v3.2.0`'s internal note is the worked instance
-([PR #432](https://github.com/DaveKJohn/claude-code-specialists/pull/432)): gates green, entry folded,
-nothing about being post-tag causing friction. **Worth knowing why this is written down at all:** until
-that date the route was an *assumption* presented as a rule in `CLAUDE.md`,
+development notes as its input — so by the time either exists, the tag is already set. That commit is the
+**third** named direct-on-`main` exception, bounded to those documents and to a cut that was actually
+asked for: name the paths in the commit, and run the lint and the suites first, because being off a branch
+skips `open-pr` and not the gates.
+
+**This reversed the August 4, 2026 answer, and both halves of that day are worth keeping.** Dave was
+offered the wider version then — the release exception covering "the release *and* its written notes" —
+and declined it, on the reasoning that forced the August 2, 2026 repair of `ship-pr.ps1`: an exception is
+only safe while it stays the size it was granted at. **That reasoning was not overturned**; it is why the
+bound above is spelled out rather than assumed. What changed is the judgement about which size is right —
+a release is one procedure, and running it across two routes left the trunk holding a tagged release whose
+own notes were still in review. The old route's worked instance stands as a record and is why nobody should
+reopen this as a *failure* of the PR route: `v3.2.0`'s internal note shipped that way
+([PR #432](https://github.com/DaveKJohn/claude-code-specialists/pull/432)) with gates green, entry folded,
+and nothing about being post-tag causing friction.
+
+**Worth knowing why any of this is written down at all:** until August 4, 2026 the route was an
+*assumption* presented as a rule in `CLAUDE.md`,
 [`releases/README.md`](../../../releases/README.md) and the `cut-release` skill — asked twice, unanswered,
 and written in anyway. This lens, the one place Rendall would actually look, was the one that never said it.
 
@@ -363,8 +372,8 @@ earlier; step 5's ordering exists for the attachments and the skill refuses it e
 
 A release is cut **only at Dave's explicit request** (a version bump falls under the
 [safety rules](../../../CLAUDE.md#safety-rules)) and deliberately does **not go via a branch + PR**. Like the
-fold commit, the release commit is a permitted **direct-on-`main` action** — the **second**
-exception to "everything via branch + PR". `cut-release.ps1` therefore runs on `main` itself and
+fold commit, the release commit is a permitted **direct-on-`main` action** — the **second of three**
+exceptions to "everything via branch + PR". `cut-release.ps1` therefore runs on `main` itself and
 does everything in one motion:
 
 `cut-release.ps1 (-Version <X.Y.Z> | -Bump <major|minor|patch>) [-Title "…"] [-SummaryFile <path>]` on
@@ -438,8 +447,9 @@ applied is the one this repo wrote for itself on July 28, 2026 and then used onc
 **What stayed behind is the operative half, and the split is the thing to preserve**: `CLAUDE.md` keeps
 that the release commit is a direct-on-`main` exception, that it runs **only on explicit request**, the
 **bound** on it (a major only, those two paths only, only once a cut has been asked for), that a **major
-needs two commits ahead of it**, and that the hand-written documents land **via a branch + PR** rather than
-under the exception. Everything below explains *why* those rules are what they are. **If a rule ever
+needs two commits ahead of it**, and — since August 23, 2026 — that the hand-written documents land on
+`main` too, under a **third** exception bounded to them. Everything below explains *why* those rules are
+what they are. **If a rule ever
 reads as arbitrary at the point of use, its reasoning is here** -- and if you are about to change one of
 them, read this first: most of it records an alternative that was weighed and declined, several after
 measurement.
