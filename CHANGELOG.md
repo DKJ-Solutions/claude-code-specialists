@@ -22,6 +22,43 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `fix/a-lane-can-run-its-own-gates-v1` · 20260824-115314
+
+A lane exists so a branch can be built while another one ships -- and until now it could be built in but
+not **checked** in. The source-repo guard resolves the repo from `CLAUDE_PROJECT_DIR`, which still names
+the primary checkout, so every lane path read as a released snapshot and every gate run from a lane was
+refused. Worse, it was refused in the wrong words: the lint gate has its sub-script's exit code and no
+finding to attribute it to, so it reported *"the mojibake gate could not complete"* -- an encoding problem
+in a tree that had none. So a lane-built branch was verified for the first time by CI, after the push,
+which is the wait lanes exist to remove.
+
+The guard now accepts a script inside a **worktree of the same repository**, compared on
+`git rev-parse --git-common-dir`: a linked worktree shares one `.git` with the primary, while a separate
+clone answers with its own -- so the plugin cache mirror this guard exists for is still refused, and that
+pair is asserted together on a real repo. Check 25 quotes the child's first line and names a refusal when
+it is one, and `worktree-lane.ps1` now says in its closing output that the gates run there.
+
+**Score:** 4
+
+### What makes this deploy extra special
+
+Every consumer that opens a lane gets the same repair, and it removes a trap rather than adding a feature:
+the previous behaviour did not just refuse, it reported the wrong subject, which is the shape that costs a
+reader an afternoon. Nothing about the guard's reach is widened -- a released copy is refused exactly as
+before, proved by an assert that runs against a real clone rather than a fixture.
+
+**Score:** 3
+
+### Pull Request
+
+A lane can run this repo's own gates
+
+Plugins: team-shopify, workflow-davekjohn
+
+[PR #864](https://github.com/DaveKJohn/claude-code-specialists/pull/864)
+
+---
+
 ## DEPLOY: `feat/close-out-has-three-shapes-v1` · 20260824-111818
 
 Step 6 told Chris to summarise *what else might be possible*, and that clause is what produced replies
