@@ -25,6 +25,54 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `docs/the-26-manuals-name-the-hook-too-v1` · 20260824-220722
+
+**A specialist who never reads the word *hook* will never propose one.** The shared block has
+distinguished three forms of automation since #877 -- a hook runs unasked, a script is invoked, and
+every script lives in a skill -- but each of the 26 manuals still carried its own hand-written "is
+lazy" section naming a script as the only answer. Measured before the work: `hook` appeared in the
+lazy section of **0 of 26**. It now appears in all 26.
+
+**Not a sweep, and the count says why.** 159 insertions against 14 deletions, and the 14 are rewrapped
+opening lines rather than removed craft. Each section states the distinction in that specialist's own
+terms: Tycho's suite is green because nobody looked, Ravi's duplication does not announce itself,
+Onyx's orphan node is by definition the one nobody is watching, Sean's rejected product costs money
+for every day it goes unnoticed. Sylvester got the hook named as **his own craft** -- every other
+specialist who concludes "this must happen whether or not anyone remembers" is describing a file that
+is his.
+
+**Two manuals say plainly that a hook is the wrong form for them.** Marlowe judges whether a
+conclusion survives contact with reality and Auden writes the argument; there is no event a harness
+can fire on that means "somebody is about to believe this". #878 asked for the distinction in each
+craft's terms *or* for it to be left alone where the existing text was already right -- saying which
+of the three forms does not apply is the same answer, written down instead of left to the reader.
+
+Derek's lens is deliberately untouched: it lists which scripts exist in this repo and states no rule
+about form, so a sweep on its heading would have rewritten a correct paragraph. #878 flagged that, and
+reading the section confirmed it.
+
+**Score:** 2
+
+### What makes this PR extra special
+
+The manuals travel with the plugin, so this lands in every consuming repo at the next release. What
+changes there is which automation gets proposed at all: the class of work that pays most -- a check
+nobody invokes, because the failure it catches is silent by nature -- was the class no manual had
+vocabulary for. A specialist that reaches for a script where a hook was needed builds something that
+works exactly as long as somebody remembers to run it.
+
+**Score:** 3
+
+### Pull Request
+
+Every specialist's manual names the hook, not just the script
+
+Plugins: team-alpha, team-ecomm, team-lifehub, team-shopify
+
+[PR #880](https://github.com/DaveKJohn/claude-code-specialists/pull/880)
+
+---
+
 ## DEPLOY: `docs/correct-a-pending-entry-in-place-v1` · 20260824-213518
 
 **A folded entry is not history until a release is cut, and until then a later branch can make it
