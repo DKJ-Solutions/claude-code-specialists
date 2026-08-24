@@ -733,12 +733,14 @@ the release.
 is the part of this branch worth more than the total. That pass had one data point -- the repair's pull request,
 where the required `lint-en-tests` took 8m 37s against `claude-review`'s 3m 02s -- and concluded the ordering
 had reversed from v4.17.0. This note's own pull request says the opposite: `claude-review` **14m 05s** against
-`lint-en-tests`'s **9m 58s**. Across three readings the tally is **two to one** for the non-required check
-governing the wait, so the direction of the evidence is the same as v4.17.0's after all, and the even split the
-first pass implied was an artefact of measuring once. The unstable quantity turns out to be `claude-review`'s
-own duration -- 3m 02s and 14m 05s on two pull requests forty minutes apart -- rather than the ordering, which
-is a different question from the one that was being asked. Still named and not repaired: a check whose runtime
-varies fourfold is the thing to understand before changing what a merge waits on.
+`lint-en-tests`'s **9m 58s**. Across three readings that made the tally **two to one** for the non-required
+check governing the wait, so the direction of the evidence looked like v4.17.0's after all, and the even split
+the first pass implied was an artefact of measuring once. The unstable quantity turns out to be
+`claude-review`'s own duration -- 3m 02s and 14m 05s on two pull requests forty minutes apart -- rather than the
+ordering, which is a different question from the one that was being asked. **That tally is itself superseded**:
+over n=100 the non-required check governs the wait **23%** of the time, not 67%, and the correction landed on
+`docs/merge-wait-23-percent-n100-v1`
+([#831](https://github.com/DaveKJohn/claude-code-specialists/issues/831)).
 
 The note's open section also gains the standing line that the attachment carries the frozen subtotal only and
 is deliberately not swapped -- extended this time to say that the same second pass corrected a reading, so a
