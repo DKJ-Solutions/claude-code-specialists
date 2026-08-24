@@ -22,6 +22,33 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `docs/merge-wait-23-percent-n100-v1` · 20260824-092122
+
+A measurement published in v4.18.0's release note said the tally was **two to one** for the non-required
+check governing `ship-pr`'s merge wait. Over the population -- n=100 paired pull-request runs -- it is
+**23 of 100**, and the median cost of that wait is **0s**. Both paragraphs now carry the population figure
+and name the n=3 that produced the error, so a reader sees the sample size rather than only the corrected
+number. The same claim was also sitting in a changelog entry that has not been cut yet; left alone it
+would have reached the next release's documents as current, so it is marked superseded there too. The
+copy attached to the GitHub Release is deliberately not swapped.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+N/A -- the corrected figure is this repo's own CI timing. Nothing a subscriber of a service does changes
+because of it.
+
+**Score:** N/A
+
+### Pull Request
+
+The merge-wait figure is corrected to 23% over n=100
+
+[PR #848](https://github.com/DaveKJohn/claude-code-specialists/pull/848)
+
+---
+
 ## DEPLOY: `feat/open-questions-become-issues-v1` · 20260823-233212
 
 A session that finds a bug, a stale doc or a decision that is not its own used to end by handing that
