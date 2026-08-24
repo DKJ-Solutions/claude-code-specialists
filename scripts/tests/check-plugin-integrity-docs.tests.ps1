@@ -277,7 +277,8 @@ try {
     #        away from a recognised placeholder matched nothing, and TWELVE of their sixty merged PRs
     #        carried no description at all. Both halves are asserted, because they are held to different
     #        strengths on purpose -- the shipped reference byte for byte, the repo's own template only to
-    #        the contract.
+    #        the contract. That contract is ONE promise since issue #865: a placeholder line the matcher
+    #        recognises. Scenario 57 is where the retired half is written down.
     Write-Host "  check 24: the PR template's two promises" -ForegroundColor DarkCyan
     $prtRefFixture = Join-Path $Fixture 'plugins\workflows\workflow-davekjohn\templates\pull_request_template.md'
     $prtOwnFixture = Join-Path $Fixture '.github\pull_request_template.md'
@@ -293,13 +294,21 @@ try {
     Assert-True ($p1.Out -match [regex]::Escape((Get-PrTemplateCanonicalPlaceholder))) `
         'pr-template: and the finding prints the strings that WOULD be recognised, so the repair is one paste'
 
-    # 57. A template with no heading at all: -RefreshBody has nothing to target and degrades to a warning
-    #     on every run, which reads like a decision rather than a loss.
+    # 57. A TEMPLATE WITH NO HEADING IS CORRECT SINCE AUGUST 24, 2026 (issue #865), and this scenario is
+    #     inverted rather than deleted. It used to assert the opposite: a heading was part of the contract,
+    #     because -RefreshBody replaced the description under the template's first one and a template with
+    #     none degraded to a warning on every run. That switch now reads the PLACEHOLDER's position
+    #     instead -- headings above it are the description's, headings below it bound it, and where the
+    #     placeholder comes first the description is the body's leading section. So the shape this repo
+    #     ships is exactly the shape the old assert refused, which is why the scenario has to change with
+    #     the rule rather than be relaxed around it.
     [System.IO.File]::WriteAllText($prtOwnFixture,
         ((Get-PrTemplateCanonicalPlaceholder) + "`n"), $Utf8NoBom)
     $p2 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True ($p2.Out -match '\[pr-template\].*carries no heading') `
-        'pr-template: a template without a heading is reported'
+    Assert-True (-not ($p2.Out -match '\[pr-template\] \.github')) `
+        'pr-template: a heading-less template is not a finding -- it is the shape open-pr''s leading path expects'
+    Assert-True ($p2.Out -match '\[pr-template\] checked 2') `
+        'pr-template: and it was still examined rather than skipped into silence'
 
     # 58. The recognised placeholder clears it -- including a LEGACY one, because a consumer template
     #     carrying the Dutch string is correct and must not be accused of anything.

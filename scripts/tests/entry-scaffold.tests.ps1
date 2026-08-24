@@ -1596,13 +1596,18 @@ Assert-Equal 4 ([int](@($higherRead.Rows | Where-Object { [int]$_.Tier -eq 2 })[
 Assert-Equal 1 ([int](@($higherRead.Rows | Where-Object { [int]$_.Tier -eq 0 })[0].Score)) 'and the opening question reads back as tier 0, not as prose'
 # THE RETIRED SHAPE IS STILL READ, which is the whole safety of the move: every entry in CHANGELOG.md and on
 # every branch in flight carries the sub-headings right now, and they meet this parser through a plugin update.
-# THE RETIRED HEADING COMES OUT OF A SUBEXPRESSION, not out of '+' followed by an index. `"#### " + $a[0]`
-# concatenates the string with the ARRAY first and then indexes the RESULT, so the fixture silently became
-# '#### H' and the entry read as tier 0 -- a green-looking test of nothing. Measured on this assert's first run.
-$retiredHigher = @(Get-EntryTierHigherRetiredHeadings)[0]
-$retiredRead = Resolve-EntryImpact -EntryText ("## Branch ``feat/a`` changelog - '1'`n`n### What does the change on this branch bring to main?`n`n#### Tier 0`n`nwhy`n`n**Score:** 1`n`n#### ${retiredHigher}`n`nreaches them`n`n**Score:** 4`n")
-Assert-Equal 0 @($retiredRead.Errors).Count 'the retired sub-heading shape still parses without complaint'
-Assert-Equal 2 $retiredRead.Tier 'and still resolves the retired question-heading to this repo audience tier'
+# EVERY RETIRED WORDING, NOT JUST THE NEWEST. This read [0] until August 24, 2026, which asserted only the
+# most recently retired one -- so the day a fourth wording was added (issue #865) the list grew and the
+# assert kept measuring exactly one member of it. The list only ever grows, and each entry on it exists
+# because entries carrying that wording are pending SOMEWHERE; a loop is the only shape that keeps saying so.
+foreach ($retiredHigher in @(Get-EntryTierHigherRetiredHeadings)) {
+    # THE RETIRED HEADING COMES OUT OF A VARIABLE, not out of '+' followed by an index. `"#### " + $a[0]`
+    # concatenates the string with the ARRAY first and then indexes the RESULT, so the fixture silently
+    # became '#### H' and the entry read as tier 0 -- a green-looking test of nothing.
+    $retiredRead = Resolve-EntryImpact -EntryText ("## Branch ``feat/a`` changelog - '1'`n`n### What does the change on this branch bring to main?`n`n#### Tier 0`n`nwhy`n`n**Score:** 1`n`n#### ${retiredHigher}`n`nreaches them`n`n**Score:** 4`n")
+    Assert-Equal 0 @($retiredRead.Errors).Count "the retired sub-heading '$retiredHigher' still parses without complaint"
+    Assert-Equal 2 $retiredRead.Tier "and '$retiredHigher' still resolves to this repo audience tier"
+}
 # AND THE GUARD THAT MAKES THE OPENING QUESTION SAFE TO MATCH AT ALL. Every entry ever written carries that
 # heading, including the ones declaring their reach in a table or in a 'Tier: N' line -- so without the score
 # label as the discriminator, all of them would read as an unscored tier 0 and every release built from them

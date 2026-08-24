@@ -299,7 +299,7 @@ answer may well be *"this reaches nobody here"*, and you say so:
 | block | who notices | answer it with |
 |---|---|---|
 | the DEPLOY section's own opening text | this repo's own developers — **tier 0** | a score, always |
-| `### What makes this deploy extra special` | a subscriber of the service — **this repo's audience, tier 2** | a score, or `N/A` if no subscriber would notice |
+| `### What makes this PR extra special` | a subscriber of the service — **this repo's audience, tier 2** | a score, or `N/A` if no subscriber would notice |
 
 **Tier 0 has no heading of its own**, and the DEPLOY heading is its section (Dave, August 23, 2026). It was
 `#### Tier 0`, then a `###` question of its own; the question went away when the entry became a section of

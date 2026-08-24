@@ -875,20 +875,32 @@ function Get-EntryTierSectionLabel {
 # stated. What changed is the words: the heading stopped naming the mechanism ("higher than tier 0") and
 # started naming what is being asked of the author. It stays a '####' sub-heading of the question's section
 # (Dave), so the entry still has two '###' sections and this string is not one of them.
-$script:EntryTierHigherHeading = 'What makes this deploy extra special'
+# RETEXTED AGAIN ON AUGUST 24, 2026 (Dave, issue #865): 'deploy' became 'PR'. The same issue removed the PR
+# template's heading, so the document the section travels into is read as the PR it opens rather than as the
+# deploy it describes, and the heading follows the reader. NAMED HERE BECAUSE IT IS NOT ONLY A PR: this
+# section also lands in CHANGELOG.md and in the release documents, where nobody is looking at a PR. That
+# tension is real and one word wide; Dave asked for this wording explicitly, and this comment is where the
+# next person to reopen the question finds out that it was not overlooked.
+$script:EntryTierHigherHeading = 'What makes this PR extra special'
 
 # THE RETIRED WORDING, RECOGNISED AND NEVER WRITTEN. 'Higher than tier 0?' was written for three days,
 # August 16 to 19, 2026, which is long enough to reach CHANGELOG.md, the branches in flight and -- through a
 # release -- every consumer's tree. A parser that forgot it would read every one of those entries as declaring
-# tier 0 alone, which is the silent direction that empties a release. Recognise both, write one.
+# tier 0 alone, which is the silent direction that empties a release. Recognise all, write one.
 # 'What makes this change extra special' JOINED IT ON AUGUST 23, 2026 (Dave), when the entry became the
 # development cycle's DEPLOY section: the document says 'deploy' throughout, so the heading asks about the
 # deploy rather than about the change. It was written from August 19 to 23, 2026 -- which is every entry
 # pending in CHANGELOG.md and every branch in flight, here and in every consumer.
-$script:EntryTierHigherRetiredHeadings = @('What makes this change extra special', 'Higher than tier 0?')
+# 'What makes this deploy extra special' JOINED IT ON AUGUST 24, 2026 (Dave, issue #865) after ONE DAY, which
+# is the shortest life any of these has had and changes nothing about the rule: a single day is enough for a
+# branch to be in flight, and CHANGELOG.md was still holding entries written under it at the moment it was
+# retired. The list only grows -- a wording leaves the writer, never the reader.
+$script:EntryTierHigherRetiredHeadings = @('What makes this deploy extra special',
+                                           'What makes this change extra special', 'Higher than tier 0?')
 
 function Get-EntryTierHigherHeading {
-    <# The heading text the audience tier's sub-section carries ('What makes this change extra special').
+    <# The heading text the audience tier's sub-section carries. Deliberately not quoted here: the wording has
+       been retexted three times and a docstring restating it goes stale silently -- read the constant above.
        Machine-read by the parser, so it is stated once and is deliberately not repo-configurable -- the same
        class as 'Tier' and 'Score'. A repo that translated it would make its own entries unreadable to its own
        fold. #>
@@ -903,7 +915,7 @@ function Get-EntryTierHigherRetiredHeadings {
 
 function Test-EntryTierSectionsAreNamed {
     <# Does THIS repo write the tiers under headings that NAME THE QUESTION rather than the tier -- the
-       entry's opening section for tier 0, and 'What makes this change extra special' inside it for the
+       entry's opening section for tier 0, and Get-EntryTierHigherHeading's wording inside it for the
        audience tier? Only where it has stated one audience tier, which is the tier that second heading then
        means. Where it has not, the numbered '#### Tier N' sub-headings stay -- tier 0 among them, so it keeps
        a heading there -- and so does the routing comment between them; see the block above for why that
@@ -1049,8 +1061,8 @@ $script:EntryGuidanceDefaults = [ordered]@{
     # line and the rubric were being read twice on the way down a form whose whole revision was about
     # length. What only this tier needs -- the way out when the change reaches nobody here -- is what stays.
     # '{0}' IS THE AUDIENCE SENTENCE, resolved per repo by Format-EntryAudienceGuidance (August 19, 2026).
-    # The heading above this block stopped naming a tier number when it became 'What makes this change extra
-    # special', so this line is where the author is told which reader they are writing for -- and it has to
+    # The heading above this block stopped naming a tier number when it started naming what is being asked,
+    # so this line is where the author is told which reader they are writing for -- and it has to
     # say the repo's own tier rather than list both, because tier 1 and tier 2 are two kinds of audience and
     # a repo has exactly one. The token used to be a trailing space: the sentence was cut on August 16 and
     # its space stayed behind, which is the shape that reads as "something was deleted here".
@@ -2614,8 +2626,10 @@ $script:EntrySectionDefaults = [ordered]@{
 #
 # The entry used to carry the tiers as '#### Tier 0' and '#### Higher than tier 0?' underneath the question.
 # Two things changed and the LEVELS DID NOT: tier 0 lost its heading altogether -- the question above IS its
-# section now -- and the audience tier's sub-heading reads 'What makes this change extra special'. So an entry
-# is still two '###' sections, and no heading names a tier number.
+# section now -- and the audience tier's sub-heading asks what is being asked of the author instead. So an
+# entry is still two '###' sections, and no heading names a tier number. The wording of that sub-heading is
+# NOT quoted here on purpose: it has been retexted twice since this block was written, and this block is
+# about the shape rather than the words. Get-EntryTierHigherHeading holds the live one.
 #
 # WHY THE NUMBER LEAVES THE DOCUMENT. A tier is a fact about the READER, and the author filling this in is
 # not thinking about a tier -- they are answering whether anybody outside this repo would notice. The number

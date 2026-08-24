@@ -143,9 +143,10 @@
          otherwise would never be counted and could be enabled alongside another in silence.
      24. the PR template keeps the two promises open-pr makes about it: the shipped reference under
          plugins/workflows/workflow-davekjohn/templates/ byte for byte against Get-PrTemplateReference,
-         and THIS repo's own .github/pull_request_template.md only to the contract (a first heading, plus
-         one placeholder line the matcher recognises). Deliberately weaker for the second, which is
-         genuinely repo-owned: a byte rule would refuse a correct change the day it grows a section.
+         and THIS repo's own .github/pull_request_template.md only to the contract (one placeholder line
+         the matcher recognises). Deliberately weaker for the second, which is genuinely repo-owned: a
+         byte rule would refuse a correct change the day it grows a section. A heading is no longer part
+         of that contract -- see the block at the check for why open-pr stopped needing one.
      25. the consumer document does not send its reader into a tier written for somebody else -- a link
          from releases/consumer/ into the development (tier 0) or internal (tier 1) tree. LINK TARGETS
          only; a tier named in prose is check 4's declined-path territory. Two neighbouring rules (a
@@ -2318,11 +2319,18 @@ Write-Coverage -Category 'plugin-kind' -Checked $kindChecked `
 #     edits -- it is the answer this family hands a consumer, and a reference whose placeholder open-pr
 #     would walk past is worse than no reference at all, because it arrives looking authoritative. Same
 #     reasoning as check 13b for the branch document's reset state and check 21 for the config blueprint.
-#   * THIS REPO'S OWN .github/pull_request_template.md is held only to the contract: a first heading, and a
-#     placeholder line the matcher recognises. Deliberately weaker, because that file is genuinely
-#     repo-owned -- the day it grows a section this repo needs, a byte-for-byte rule would refuse a correct
-#     change and the gate would be edited to allow it, which is how a check gets switched off rather than
-#     heeded.
+#   * THIS REPO'S OWN .github/pull_request_template.md is held only to the contract: a placeholder line
+#     the matcher recognises. Deliberately weaker, because that file is genuinely repo-owned -- the day it
+#     grows a section this repo needs, a byte-for-byte rule would refuse a correct change and the gate
+#     would be edited to allow it, which is how a check gets switched off rather than heeded.
+#
+# THE CONTRACT LOST ITS SECOND HALF ON AUGUST 24, 2026 (issue #865), and the reason is that open-pr stopped
+# needing it. It also required A FIRST HEADING, because -RefreshBody replaced the description under the
+# template's first heading and a template with none would have degraded to a warning on every run. Since
+# #865 that switch reads the PLACEHOLDER's position instead: headings above it are the description's,
+# headings below it are the form's boundaries, and where the placeholder comes first the description is the
+# body's leading section. So a heading-less template is a supported shape, and this check refusing one
+# would now refuse the template this repo actually ships.
 #
 # A CONSUMER'S TEMPLATE IS NOT CHECKED BY ANYTHING, and that is stated rather than left as a gap: this gate
 # runs in this repo. What travels to them is the warning in open-pr and the shipped reference to diff
@@ -2352,9 +2360,6 @@ if (-not (Test-Path -LiteralPath $prtOwnPath)) {
 } else {
     $prtChecked++
     $prtOwnLines = @(Get-Content -LiteralPath $prtOwnPath -Encoding UTF8)
-    if (-not ($prtOwnLines | Where-Object { $_ -match '^#{1,6}\s+\S' })) {
-        Add-Error "[pr-template] $prtOwnRel carries no heading. open-pr's -RefreshBody replaces the description under the FIRST heading of this file, at any level, so without one that switch degrades to a warning and silently stops refreshing anything."
-    }
     $prtKnown = @(Get-PrDescriptionPlaceholderDefaults)
     if (-not ($prtOwnLines | Where-Object { $prtKnown -contains $_ })) {
         Add-Error ("[pr-template] $prtOwnRel carries no placeholder line open-pr recognises, so every PR opened from it gets NO description. The comparison is whole-line and exact; one of these must appear verbatim:`n    " +
@@ -2363,7 +2368,7 @@ if (-not (Test-Path -LiteralPath $prtOwnPath)) {
     }
 }
 Write-Coverage -Category 'pr-template' -Checked $prtChecked `
-    -Note $(if ($prtNote) { $prtNote } else { "the shipped reference held byte for byte to Get-PrTemplateReference, and this repo's own template held to the contract open-pr relies on -- a first heading and a placeholder the matcher recognises. Two strengths on purpose: the reference is an answer we hand out, the repo's own template is a file its owner edits" })
+    -Note $(if ($prtNote) { $prtNote } else { "the shipped reference held byte for byte to Get-PrTemplateReference, and this repo's own template held to the contract open-pr relies on -- a placeholder line the matcher recognises. Two strengths on purpose: the reference is an answer we hand out, the repo's own template is a file its owner edits" })
 
 # --- 25. the consumer document does not send its reader into a tier written for somebody else -------------
 # WHAT THIS IS FOR, and it is measured rather than imagined (August 10, 2026). The tier model gives each

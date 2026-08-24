@@ -259,6 +259,60 @@ Assert-Equal 0 @(Get-LostBodyHeadings -Before '' -After '').Count 'two empty bod
 Assert-Equal 0 @(Get-LostBodyHeadings -Before 'no headings at all' -After '').Count 'a body with no headings cannot lose one'
 Assert-Equal 1 @(Get-LostBodyHeadings -Before "## Only`ntext" -After '').Count 'and losing everything is still one lost heading, not a crash'
 
+# --- The LEADING section: a body whose description has no heading (issue #865) ---------------------
+#
+# WHAT THIS IS FOR. The PR template lost its H1 on August 24, 2026, because the DEPLOY section it
+# mirrored had stopped naming its own answer the day before. -RefreshBody anchored on that heading, so
+# without this shape the switch degrades to its warning branch on every run -- the whole feature lost and
+# reported as "the description was left as it is", which reads like a decision rather than a miss. That
+# degradation is the one this suite has caught twice before (the '^##' pattern in August 2026, then the
+# missing boundary in #598), so it is asserted directly rather than left to open-pr.
+Write-Host ""
+Write-Host "Update-PrBodySection -- the leading section, for a template with no heading" -ForegroundColor Cyan
+
+# NO FORM HEADINGS AT ALL: the leading section is the whole body. That is this repo's own template, and
+# it is byte-identical in effect to what the H1 anchor did, since nothing followed it.
+$leadChanged = $false
+$leadOut = Update-PrBodySection -Body "old description`nover two lines" -Heading '' -Content 'the new answer' -Changed ([ref]$leadChanged)
+Assert-True $leadChanged 'a heading-less body is rewritable, which is the whole point of the shape'
+Assert-Equal 'the new answer' $leadOut 'and with no form heading the leading section is the entire body'
+
+# A FORM HEADING STILL BOUNDS IT, passed in exactly as open-pr passes the template's own later headings.
+# This is the half that #598 was filed about, arrived at from the other side: the level rule cannot help
+# here at all, because nothing is shallower than no heading.
+$boundChanged = $false
+$boundOut = Update-PrBodySection -Body "old description`n`n## Checklist`n- [ ] a box" -Heading '' `
+    -Content 'the new answer' -StopAtHeading @('## Checklist') -Changed ([ref]$boundChanged)
+Assert-True $boundChanged 'the leading section is rewritten with a form section below it'
+Assert-True ($boundOut -match '(?m)^the new answer$')     'and the description is replaced'
+Assert-True ($boundOut -match '(?m)^## Checklist$')       'while the form heading survives'
+Assert-True ($boundOut -match '(?m)^- \[ \] a box$')      'and so does what a reviewer answered under it'
+Assert-True (-not ($boundOut -match 'old description'))   'and the old description is gone rather than left above it'
+
+# NO HEADING IS WRITTEN BACK. The description carries its own sections (the significance sub-heading is
+# one), and inventing a heading over them would put a level in the body that no document asked for.
+Assert-True (-not ($boundOut -match '(?m)^#{1,6}\s+the new answer')) 'no heading line is invented over the leading section'
+
+# A LEGACY BODY NEEDS NO LEGACY STRING, which is the reasoning behind open-pr adding none for #865: an
+# old H1 sits inside the leading section, so it is replaced along with everything else.
+$legacyLead = $false
+$legacyOut = Update-PrBodySection -Body "# What does the change on this branch deploy to main?`n`nold text" `
+    -Heading '' -Content 'the new answer' -Changed ([ref]$legacyLead)
+Assert-True $legacyLead 'a PR opened under the retired H1 is still refreshable'
+Assert-True (-not ($legacyOut -match 'deploy to main')) 'and the retired heading goes with the text it introduced'
+
+# THE GUARDS STILL HOLD IN THIS MODE, both of them, because this is the path that runs straight into a
+# live 'gh pr edit'. Empty content is a no-op rather than an instruction to clear the body -- the
+# August 4, 2026 measurement -- and an empty body has nothing to rewrite.
+$noopChanged = $true
+Assert-Equal 'keep me' (Update-PrBodySection -Body 'keep me' -Heading '' -Content '' -Changed ([ref]$noopChanged)) 'empty content leaves a heading-less body alone'
+Assert-True (-not $noopChanged) 'and reports no change, so no pr edit is sent'
+Assert-Equal '' (Update-PrBodySection -Body '' -Heading '' -Content 'anything') 'an empty body is returned as it is'
+
+# AND A NON-EMPTY HEADING WITH NO '#' IS STILL REFUSED. That is a caller mistake rather than the leading
+# section, and conflating the two would make every typo silently rewrite the top of the body.
+Assert-Equal "text`nmore" (Update-PrBodySection -Body "text`nmore" -Heading 'not a heading' -Content 'new') 'a heading with no hash is still refused rather than read as leading'
+
 # --- Get-PrTitle: the PR title is composed, not typed (#506 + #505) -------------------------------
 # The whole point of the change is that these two facts cannot drift apart, so the asserts are about
 # COMPOSITION and about the shapes that would produce a nameless or malformed PR.
@@ -387,7 +441,7 @@ The opening argument, which is the substance a reviewer decides on.
 
 **Score:** 3
 
-### What makes this deploy extra special
+### What makes this PR extra special
 
 The tier-2 answer.
 
@@ -401,7 +455,7 @@ $mergedDesc = Get-PrDescription -EntryText $merged
 Assert-True ($mergedDesc -match 'The opening argument')      'the merged format keeps the entry opening text -- the defect #853 reported'
 Assert-True ($mergedDesc -match 'The tier-2 answer')         'and the significance section, which is what a reviewer is deciding about'
 Assert-True (-not ($mergedDesc -match 'The PR title line'))  'and still stops at the Pull Request section, which the fold fills'
-Assert-True ($mergedDesc -match '(?m)^## What makes this deploy extra special$') 'sections are still promoted one level for a body of its own'
+Assert-True ($mergedDesc -match '(?m)^## What makes this PR extra special$') 'sections are still promoted one level for a body of its own'
 Assert-True (-not ($mergedDesc -match 'DEPLOY:'))            'the heading itself is not carried -- GitHub prints the title above the body'
 Assert-True ($mergedDesc.Length -gt (Get-EntryDescription -EntryText $merged).Length) 'and it carries MORE than the fallback would have, which is the whole finding'
 
@@ -484,18 +538,31 @@ Assert-True ($placeholderLines.Count -ge 1) 'the template carries at least one c
 $matched = @($placeholderLines | Where-Object { @(Get-PrDescriptionPlaceholderDefaults) -contains $_.Trim() })
 Assert-True ($matched.Count -ge 1) 'open-pr recognises the template placeholder verbatim -- otherwise every PR body loses its description, silently'
 
-# And the description heading open-pr reads (the template's first heading, AT ANY LEVEL) must actually
-# be there, since -RefreshBody has nothing to target without it. The pattern is level-agnostic on
-# purpose: it read '^##' until this repo's template was promoted to H1, at which point open-pr found
-# nothing and would have degraded to "the description was left as it is" on every run -- a silent loss
-# of the whole feature, worded as a decision. This assert is what would have caught that.
-$firstHeading = @($templateLinesForTest | Where-Object { $_ -match '^#{1,6}\s+\S' }) | Select-Object -First 1
-Assert-True ([bool]$firstHeading) 'the template has a heading for the description to live under'
+# WHERE THE DESCRIPTION LIVES IS DECIDED BY THE PLACEHOLDER'S POSITION, NOT BY THE FIRST HEADING
+# (issue #865). Until August 24, 2026 this asserted that the template HAD a heading, because -RefreshBody
+# replaced the description under the first one and a template with none degraded to "the description was
+# left as it is" on every run -- a silent loss of the whole feature, worded as a decision. That heading is
+# gone: the DEPLOY section it mirrored stopped naming its own answer, so the description is the body's
+# LEADING section here. The assert is therefore inverted rather than deleted -- this template must have no
+# heading ABOVE its placeholder, which is what makes the leading path the one open-pr takes.
+$tplPlaceholderAt = -1
+$tplHeadingAboveAt = -1
+for ($i = 0; $i -lt $templateLinesForTest.Count; $i++) {
+    if ($tplPlaceholderAt -lt 0 -and (@(Get-PrDescriptionPlaceholderDefaults) -contains $templateLinesForTest[$i].Trim())) { $tplPlaceholderAt = $i }
+    if ($tplPlaceholderAt -lt 0 -and $tplHeadingAboveAt -lt 0 -and $templateLinesForTest[$i] -match '^#{1,6}\s+\S') { $tplHeadingAboveAt = $i }
+}
+Assert-True ($tplPlaceholderAt -ge 0)   'the placeholder is found by the same whole-line comparison open-pr uses'
+Assert-True ($tplHeadingAboveAt -lt 0)  'and no heading sits above it, so this template hands open-pr the leading-section path'
 # KEYED ON THE PATTERN, NOT ON HOW THE LINES ARE ENUMERATED. This asserted the whole
 # "Where-Object { $_ -match ... }" expression until inbound #598 made the read fence-aware and multi-heading,
 # at which point a correct change failed a test that was watching the wrapper instead of the rule. The rule
 # is that the level is not fixed; the loop around it is open-pr's business.
-Assert-True ($openPrText -match "'\^#\{1,6\}\\s\+\\S'") 'and open-pr looks for it at any level, not just H2'
+Assert-True ($openPrText -match "'\^#\{1,6\}\\s\+\\S'") 'and open-pr looks for a heading at any level, not just H2'
+# AND THAT IT SPLITS THEM ON THE PLACEHOLDER. Two variables carry the answer -- what sits above it is the
+# description's heading, what sits below it is the form's boundary -- and a refactor that dropped either
+# would put the description back under whatever heading came first, which for a heading-less template
+# means overwriting the form's own first section on every refresh.
+Assert-True ($openPrText -match '\$tplSeenPlaceholder') 'and it decides the split on where the placeholder sits'
 # THE SECOND HALF OF THE SAME READ (inbound #598): the headings AFTER the first are the description's
 # boundary, and open-pr must pass them on. Without this the H1 description has no boundary at all and every
 # later section is replaced along with it -- which is exactly what shipped.
@@ -537,10 +604,14 @@ Assert-True ($known -contains $canonical) `
 $reference = @(Get-PrTemplateReference)
 Assert-True (@($reference | Where-Object { $known -contains $_ }).Count -eq 1) `
     'the reference template carries exactly one recognised placeholder line -- the defect #573 reported was a template carrying none'
-Assert-True (@($reference | Where-Object { $_ -match '^#{1,6}\s+\S' }).Count -ge 1) `
-    'the reference template carries a heading, which is what -RefreshBody replaces the description under'
-Assert-True ($reference[0] -match '^#{1,6}\s+\S') `
-    'and that heading is the FIRST line, because open-pr takes the first heading it finds'
+# AND IT CARRIES NO HEADING (issue #865). The reference is the answer this family hands a consumer, and
+# the shape it hands out has to be the shape open-pr's leading path expects: a placeholder with nothing
+# above it. Asserted in the negative on purpose -- the two asserts this replaces required a heading, which
+# is exactly the contract #865 retired, so leaving them would have made the gate refuse the shipped answer.
+Assert-True (@($reference | Where-Object { $_ -match '^#{1,6}\s+\S' }).Count -eq 0) `
+    'the reference template carries no heading -- the description is the body leading section'
+Assert-True ($reference[0] -eq (Get-PrTemplateCanonicalPlaceholder)) `
+    'and its first line is the placeholder itself, so nothing precedes the description'
 
 # The shipped file on disk, not just the function: a reference nobody can copy is not a reference. The
 # lint gate holds these byte for byte; this asserts the file exists at the path the docs send people to.

@@ -324,6 +324,18 @@ function Update-PrBodySection {
         mechanism will contain a '##' inside a fence. Not hypothetical: this repo's own entry for this
         feature does.
 
+        AN EMPTY -Heading ADDRESSES THE BODY'S LEADING SECTION (issue #865), which is what a PR template
+        that carries no heading produces: the description starts at the top of the body and no heading
+        line is written back. The level rule cannot apply there -- a section with no heading has no level
+        to compare another against -- so -StopAtHeading is the ONLY boundary, and where the form carries
+        none the leading section is the whole body. That is the right answer rather than a fallback: a
+        template with no headings has nothing below the description to protect.
+
+        AND IT IS WHY A LEGACY BODY NEEDS NO LEGACY HEADING HERE. A PR opened while the template still
+        led with an H1 keeps that heading in its published body -- above the first form heading, so the
+        leading section covers it and it is replaced along with everything else. The caller's legacy list
+        is for the other case, a template that still HAS a heading.
+
         Returns the body UNCHANGED and reports it via -Changed when the heading is absent or the content
         already matches, so a caller can skip the API call entirely rather than publishing a no-op edit.
 
@@ -333,6 +345,7 @@ function Update-PrBodySection {
     .PARAMETER Heading
         The literal heading line, e.g. '## What does this change do?'. Matched at the start of a line,
         whole-line, so a heading quoted mid-sentence elsewhere in the body cannot be mistaken for it.
+        EMPTY means the leading section -- everything from the top of the body to the first boundary.
 
     .PARAMETER Content
         The replacement content for that section, without the heading.
@@ -349,7 +362,10 @@ function Update-PrBodySection {
     #>
     param(
         [string]$Body,
-        [Parameter(Mandatory)][string]$Heading,
+        # AllowEmptyString, because empty is a MEANING here and not a missing argument: it addresses the
+        # body's leading section. Mandatory alone refuses '' for a [string], which is what made a
+        # heading-less PR template unrefreshable before issue #865.
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Heading,
         [string]$Content,
         [string[]]$StopAtHeading = @(),
         [ref]$Changed
@@ -369,15 +385,24 @@ function Update-PrBodySection {
     $nl = if ($Body.Contains("`r`n")) { "`r`n" } else { "`n" }
     $lines = $Body -split "\r?\n"
 
-    # The heading's own level, so the boundary search knows what counts as "the next section".
+    # THE LEADING SECTION has no heading line and therefore no level. $start stays at -1, which the
+    # boundary search below reads as "begin at line 0" and the reassembly reads as "nothing before it",
+    # both of which they already did for a heading on the first line.
+    $leading = [string]::IsNullOrWhiteSpace($Heading)
+
+    # The heading's own level, so the boundary search knows what counts as "the next section". A level of
+    # 0 makes the level rule below unsatisfiable -- no heading has fewer than one '#' -- which is exactly
+    # the leading section's rule: -StopAtHeading is its only boundary.
     $level = ([regex]::Match($Heading, '^(#+)')).Groups[1].Value.Length
-    if ($level -eq 0) { return $Body }
+    if (-not $leading -and $level -eq 0) { return $Body }
 
     $start = -1
-    for ($i = 0; $i -lt $lines.Count; $i++) {
-        if ($lines[$i].TrimEnd() -eq $Heading.TrimEnd()) { $start = $i; break }
+    if (-not $leading) {
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($lines[$i].TrimEnd() -eq $Heading.TrimEnd()) { $start = $i; break }
+        }
+        if ($start -lt 0) { return $Body }
     }
-    if ($start -lt 0) { return $Body }
 
     # Where the section ends: the EARLIEST of two boundaries, ignoring anything inside a fence --
     #   1. the next heading at $level or shallower (the original rule, right for a nested description);
@@ -399,7 +424,11 @@ function Update-PrBodySection {
     $before = if ($start -gt 0) { $lines[0..($start - 1)] } else { @() }
     $after  = if ($end -lt $lines.Count) { $lines[$end..($lines.Count - 1)] } else { @() }
 
-    $middle = @($Heading.TrimEnd())
+    # BUILT WITH @() AND +=, NOT `$middle = if (...) {...}`. An if-statement's value is unwrapped, so the
+    # one-heading branch would assign a [string] and every += below it would CONCATENATE rather than append
+    # -- well-formed output, wrong document. Caught by this file's own suite.
+    $middle = @()
+    if (-not $leading) { $middle += $Heading.TrimEnd() }
     if ($Content) { $middle += ($Content.Trim() -split "\r?\n") }
     # One blank line before the next section, and only when there IS a next section.
     if ($after.Count -gt 0) { $middle += '' }
@@ -507,13 +536,26 @@ function Get-PrTemplateReference {
         The canonical PR-template body this family ships as a reference, as an array of lines.
 
     .DESCRIPTION
-        TWO LINES, AND THE SECOND ONE IS THE CONTRACT. Everything open-pr.ps1 needs from a PR template
-        is here: a first heading (any level -- that is the one -RefreshBody replaces the description
-        under) and a placeholder line the matcher recognises. The placeholder is taken from
-        Get-PrTemplateCanonicalPlaceholder rather than written out, so the reference cannot ship a line
-        the matcher would walk past.
+        ONE LINE, AND IT IS THE WHOLE CONTRACT. Everything open-pr.ps1 needs from a PR template is a
+        placeholder line the matcher recognises, taken from Get-PrTemplateCanonicalPlaceholder rather
+        than written out, so the reference cannot ship a line the matcher would walk past.
 
-        WHY IT IS ONLY TWO LINES, kept here because the next repo to ask should re-run the measurement
+        IT WAS TWO LINES UNTIL AUGUST 24, 2026, and the first was a heading -- 'What does the change on
+        this branch deploy to main?', the question the entry's opening section used to carry. It went
+        with issue #865: since August 23 the DEPLOY section names that answer with no heading of its
+        own (the text sits straight under '## DEPLOY: <branch>'), so a template still asking the
+        question was the last place in the system doing so, and every PR body opened here led with a
+        heading whose own document had dropped it.
+
+        WHAT THE HEADING WAS LOAD-BEARING FOR, because deleting it was not enough on its own:
+        -RefreshBody replaced the description under the template's FIRST heading, so a template with
+        none would have degraded to its warning branch on every run -- the whole switch lost, reported
+        as "the description was left as it is", which reads like a decision. Update-PrBodySection
+        therefore learned the LEADING section: no heading, start at the top of the body, and take the
+        boundary from the form's own later headings alone. That is the shape a template like this one
+        produces, and it is what open-pr now hands it.
+
+        WHY IT IS SO SHORT, kept here because the next repo to ask should re-run the measurement
         rather than inherit the answer. This family's template carried a "Type of change" block and a
         six-item checklist until August 9, 2026. Measured over 60 PRs before anything was removed:
         "Type of change" had exactly one of four boxes ticked every single time -- a fact the entry
@@ -530,16 +572,16 @@ function Get-PrTemplateReference {
         NO '## Specific to this repo' SLOT IS PRE-WRITTEN, unlike CONTRIBUTING-portable.md, and the
         difference is what the file is: a contributing guide is read once, while every heading in a PR
         template is repeated in every PR body forever. An empty slot would be a permanent empty section
-        in your PR list. Add one when you have something to put in it.
+        in your PR list. Add one when you have something to put in it -- BELOW the placeholder, where
+        open-pr reads it as the form's own and hands it to Update-PrBodySection as the boundary the
+        description stops at. A heading ABOVE the placeholder means the opposite: that the description
+        lives under it, and open-pr anchors there instead.
 
-        THE HEADING TRACKS THE ENTRY'S OPENING SECTION, and that is a requirement rather than a matter of
-        taste: Get-PrEntryDescription STRIPS that heading out of the entry text precisely because the
-        template already carries it, so the two drifting apart would put it in every PR body twice. It
-        followed the entry from 'bring' to 'deploy to main?' on August 19, 2026; the old wording is on
-        open-pr's legacy list, which is what keeps a PR opened under it refreshable.
+        SO A REPO MAY STILL LEAD WITH A HEADING, and nothing here refuses one: such a template gets
+        exactly the behaviour it had before. What changed is that the absence of one is now a shape
+        rather than a failure.
     #>
     return @(
-        '# What does the change on this branch deploy to main?',
         (Get-PrTemplateCanonicalPlaceholder)
     )
 }
