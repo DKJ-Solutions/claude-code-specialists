@@ -517,7 +517,7 @@ this is exactly the file where out-of-band changes are routine.
 6. **Fill in every tier the DEPLOY section carries once TEST is resolved, and before the PR.** How far the
    change reaches decides which release documents the entry appears in; what it weighs there decides where
    in each of them it sits — see
-   [the contribution cycle](CONTRIBUTING-portable.md#significance--two-questions-in-one-section).
+   [the contribution cycle](CONTRIBUTING-portable.md#significance--two-questions-one-per-reach).
 
    **The lower bound is the half that was missing** (Dave, August 24, 2026,
    [#867](https://github.com/DaveKJohn/claude-code-specialists/issues/867)). This rule named only *before

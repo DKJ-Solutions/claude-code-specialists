@@ -23,11 +23,12 @@ rewrite when copying. Managing branches, PRs, and merges up to and including the
 
 `CHANGELOG.md` (repo root) is an **intro followed by one `##` per change, with no section headings at all**
 (Dave, August 5, 2026). A change *is* the `##`, and since August 6, 2026 its heading names the **branch** —
-`` ## `feat/x` deployment `` — with two `###` sections under it since August 16, 2026:
-`What does the change on this branch deploy to main?` and `Pull Request`, which carries the PR title and
-which the fold completes from the merge. **The first section holds both tiers, and since August 19, 2026
-neither names itself**: the question is tier 0's own section, and `#### What makes this change extra special`
-under it means whichever single audience tier the repo has stated. They replaced the impact table because not
+`` ## DEPLOY: `feat/x` `` — with two `###` sections under it since August 16, 2026:
+`What makes this PR extra special` and `Pull Request`, which carries the PR title and which the fold
+completes from the merge. **The entry holds both tiers, and since August 19, 2026 neither names itself**:
+tier 0 answers directly under the DEPLOY heading, under no heading of its own, and
+`### What makes this PR extra special` beside it means whichever single audience tier the repo has
+stated. They replaced the impact table because not
 every change has a tier 1 or a tier 2 and a missing row read as an omission, and they stopped naming numbers
 because the author filling one in is answering the question, not classifying a reader. Everything above
 the first `##` is the intro, which is the only part a repo writes by hand and the only thing a cut leaves
@@ -551,17 +552,17 @@ that ignores impact should not be named for it — and still accepts `-Score`/`-
 because every consumer's fold passes them today and a removed parameter would throw on the trunk.
 
 **And since August 6, 2026 the entry is the branch's own dossier, folded in as it stands.** The heading
-names the **branch** — `` ## `feat/x` deployment `` — and its `###` sections answer in order.
+names the **branch** — `` ## DEPLOY: `feat/x` `` — and its `###` sections answer in order.
 
 **It was six sections until August 16, 2026 and is two since** (Dave). Four of them said something the
 document already said: `Branch ID` is the timestamp the heading now carries, `Branch type` is the prefix
 of the branch that same heading names, `Significance` was a heading over sub-sections that are themselves
 the answer to the question above it, and `Branch title` was never a branch title — it is the PR title, and
 it moved into the `Pull Request` section where the rest of the PR's facts already live. What remains is
-`What does the change on this branch deploy to main?` (tier 0's own section, with
-`#### What makes this change extra special` under it for the audience tier, each closing with `**Score:**`)
+the DEPLOY heading's own text (tier 0's answer, under no heading of its own, with
+`### What makes this PR extra special` beside it for the audience tier, each closing with `**Score:**`)
 and `Pull Request` — the title, then the `Plugins:` line and the
-`[PR #N](…)` footer the **fold** writes underneath it, with the landing moment stamped on the heading itself. `Plugins:` stays a plain line,
+`[PR #N](…)` footer the **fold** writes underneath it, with the landing moment stamped on the `## DEPLOY:` heading. `Plugins:` stays a plain line,
 because a heading around one fact is more structure than content.
 
 **Every one of the six is still READ**, here and in every consumer: `CHANGELOG.md`, the release documents
@@ -769,18 +770,18 @@ branch prefix, which this repo has measured does not predict impact.
 **reaches**, and therefore which document it appears in. A significance score says how much it
 **weighs** for that document's reader, and therefore **where in it** the entry sits — so the most
 consequential change leads instead of sitting third under whichever heading its branch prefix produced.
-Both are declared in the entry's **opening section** — tier 0 directly under the question, and the audience
-tier under `#### What makes this change extra special` inside it — each carrying why it matters there and then
+Both are declared in the entry's **DEPLOY section** — tier 0 directly under its heading, and the audience
+tier under `### What makes this PR extra special` beside it — each carrying why it matters there and then
 its score:
 
 ```text
-### What does the change on this branch deploy to main?
+## DEPLOY: `feat/x`
 
 The routine version bump stops needing a developer.
 
 **Score:** 4
 
-#### What makes this change extra special
+### What makes this PR extra special
 
 Nobody but this repo's own developers can observe it.
 

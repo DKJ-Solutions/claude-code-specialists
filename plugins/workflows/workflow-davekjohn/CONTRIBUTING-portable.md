@@ -202,10 +202,10 @@ that line.
 
 ---
 
-## Significance — two questions in one section
+## Significance — two questions, one per reach
 
-Every entry answers one reach per block — the opening question for tier 0, `#### What makes this change extra
-special` for your audience tier. **The tier says how far the change reaches**, and therefore which
+Every entry answers one reach per block — the DEPLOY heading's own text for tier 0, `### What makes this PR
+extra special` for your audience tier. **The tier says how far the change reaches**, and therefore which
 release document the entry appears in:
 
 | tier | who notices |
