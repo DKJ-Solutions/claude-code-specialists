@@ -22,6 +22,56 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `fix/deploy-is-written-once-test-is-green-v1` · 20260824-140733
+
+The development cycle's own **Rules** said one thing about when the DEPLOY section is written: *"Fill in
+every tier the DEPLOY section carries **before the PR**."* That is an upper bound with no lower one, so the
+whole entry could legitimately be composed on day one — and an entry written while steps above it are still
+open states an **intention**, not a result. Nothing holds it against what landed: the step gate splits the
+document at that heading and counts only above it, so what folds into `CHANGELOG.md` is whatever was
+written before the work was finished, however the work then turned out.
+
+Rule 6 gains its lower bound — *once TEST is resolved, and before the PR* — and the arc section gains the
+reason, beside the sentence that already said a branch *reaches* DEPLOY once it has verified itself. Those
+two words are the whole confusion: reaching that phase and writing its section are not the same act, and
+only the second one survives a suite that turns something up. The measured instance is the branch that
+merged an hour before this one (PR #868): PLAN 6/6 and CREATE 4/4 ticked, **TEST three steps open** — and
+those three written as results rather than as checks — with DEPLOY complete and both tiers scored.
+
+**One field is deliberately excepted, and checking that saved the rule from being wrong.** `-Title` writes
+into the DEPLOY section at creation (`scripts/task/new-branch.ps1`, `$description = $Title`), because
+`open-pr` composes the PR title from it rather than taking one on the command line — typed once, so it
+cannot disagree with itself. A blanket *"write DEPLOY last"* would have contradicted the tooling on the
+day it shipped. What waits for TEST is the entry's prose and its tier scores, which are claims about what
+the change *did*.
+
+**And no gate enforces it, on purpose.** The gates run once, at the push, and at that moment a finished
+branch legitimately has a full DEPLOY and a resolved TEST — "too early" is an ordering in time, visible
+only in the commit history. So this lands where the failure is: rule 6, the arc, and the guidance
+blockquote every branch document carries, which is the one text that reaches a writer at the moment of
+writing.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+The guidance block is scaffolded into **every** development cycle document the workflow creates, so a
+consuming repo does not have to read the portable page to meet the rule — it arrives in the file they are
+already writing in, the first time they open a branch after the update. And this branch is its own first
+test: TEST was resolved and only then was this section written.
+
+**Score:** 3
+
+### Pull Request
+
+DEPLOY is written once TEST is resolved, not before
+
+Plugins: workflow-davekjohn
+
+[PR #869](https://github.com/DaveKJohn/claude-code-specialists/pull/869)
+
+---
+
 ## DEPLOY: `feat/filing-a-finding-needs-no-permission-v1` · 20260824-134524
 
 The shared block every specialist carries already said a finding becomes an issue rather than a question
