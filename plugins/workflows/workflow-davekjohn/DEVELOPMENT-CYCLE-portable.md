@@ -120,6 +120,31 @@ later reader can use. Raised in the source repo as
 was deciding two open questions and verifying seven reported claims against the tree, and whose PLAN and
 TEST were both empty.
 
+**TEST is where the branch verifies ITSELF, and that is the phase's whole job.** Give Claude a check it
+can run — a suite, a gate, a build, a rendered result to compare — and the session changes character: it
+becomes one you can walk away from instead of one you have to watch. The development cycle names *when* and
+*where* that happens, because a check with no place in the arc gets run when someone remembers to. **A
+branch reaches DEPLOY once it has verified itself here**, and TEST is the phase that says what was run and
+what came back.
+
+**So `- [~]` means "no SUITE", never "no verification".** Those are two different sentences and only the
+first one is ever true of a finished branch. A dropped step still names the check that *was* run and what
+it reported — *"no suite: the lint gate and 36 existing suites cover this, all green"* — because that is
+what a later reader, and any evaluator judging whether this branch is done, can actually use. A TEST phase
+whose content is only *"nothing to test"* is an assertion, not a verification; nothing was checked, and the
+document says so in a way that reads as though something had been.
+
+**Two shapes are honest and neither is a suite.** Running the gates and reporting the outcome is a
+verification. So is a check the phase cannot make automatic — a rendered page compared by eye, an output
+read against what it should say — as long as the phase records that it was run and what it showed. What is
+*not* a verification is a prediction: a step ticked because the change looks correct. That is the failure
+[rule 3](#rules) already names from the other side, met here at the phase that exists to prevent it.
+
+**Where the cycle is driven by [a goal condition](#driving-the-cycle-to-its-end-a-goal-condition), this is
+the half the evaluator can see.** That evaluator judges from what the session has surfaced and runs nothing
+of its own, so a check whose result lands in the transcript is what lets the condition resolve at all — and
+a TEST phase that only claims to be done leaves it nothing to read.
+
 **DEPLOY takes no steps of its own** (Dave, August 14, 2026,
 [#655](https://github.com/DaveKJohn/claude-code-specialists/issues/655)). It is not a step, it is the
 **result** — the part that travels, folding into `CHANGELOG.md` at the merge while the rest of the document
