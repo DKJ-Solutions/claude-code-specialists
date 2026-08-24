@@ -127,6 +127,13 @@ becomes one you can walk away from instead of one you have to watch. The develop
 branch reaches DEPLOY once it has verified itself here**, and TEST is the phase that says what was run and
 what came back.
 
+**And "reaches DEPLOY" means WRITES it, which is not the same as arriving at it.** The two read alike and
+only one survives a failing suite: an entry composed while TEST is still open says what the branch was
+*going* to do, and every gate that runs at the push reads the step marks rather than the prose — so nothing
+compares the two. Then the suite turns something up, the change grows a commit, and the entry that folds
+into `CHANGELOG.md` still describes the version that did not ship. Write the section once TEST is resolved;
+[rule 6](#rules) carries the timing and the one field that is deliberately excepted from it.
+
 **So `- [~]` means "no SUITE", never "no verification".** Those are two different sentences and only the
 first one is ever true of a finished branch. A dropped step still names the check that *was* run and what
 it reported — *"no suite: the lint gate and 36 existing suites cover this, all green"* — because that is
@@ -507,9 +514,25 @@ this is exactly the file where out-of-band changes are routine.
    [`CLAUDE.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/CLAUDE.md#claude-code-specialistss-safety-implementation)).
    The convention is cheap to follow and the failure is self-correcting: write it as a step and the gate
    stops you.
-6. **Fill in every tier the DEPLOY section carries before the PR.** How far the change reaches decides which
-   release documents the entry appears in; what it weighs there decides where in each of them it sits — see
+6. **Fill in every tier the DEPLOY section carries once TEST is resolved, and before the PR.** How far the
+   change reaches decides which release documents the entry appears in; what it weighs there decides where
+   in each of them it sits — see
    [the contribution cycle](CONTRIBUTING-portable.md#significance--two-questions-in-one-section).
+
+   **The lower bound is the half that was missing** (Dave, August 24, 2026,
+   [#867](https://github.com/DaveKJohn/claude-code-specialists/issues/867)). This rule named only *before
+   the PR*, which permits the whole section on day one — and a DEPLOY written while steps above it are
+   still open states an **intention**, not a result. Nothing holds it against what landed: the step gate
+   splits the document at that heading and counts only above it, so what folds into `CHANGELOG.md` is
+   whatever was written before the work was finished. The measured instance is the branch that ran
+   immediately before the issue was filed: PLAN and CREATE fully ticked, **TEST three steps open** — and
+   those steps written as results rather than as checks — with DEPLOY complete and both tiers scored.
+
+   **One field of the section is the deliberate exception, and it is not a loophole:** the PR title, which
+   `new-branch -Title` writes at creation. `open-pr` composes the PR title from it rather than taking one
+   on the command line, so it is typed once and cannot disagree with itself — and unlike the entry prose,
+   it is genuinely known before the work starts. What waits for TEST is the entry's own text and its tier
+   scores, which are claims about what the change *did*.
 7. **Never edit `CHANGELOG.md` from a branch.** Every branch would be editing the same region of the
    same file; that is the merge conflict this document exists to avoid.
 
