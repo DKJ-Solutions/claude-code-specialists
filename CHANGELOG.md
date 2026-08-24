@@ -22,6 +22,40 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `docs/plan-phase-explore-then-goal-v1` · 20260824-104821
+
+The PLAN phase now says how it is entered and how the cycle is driven to its end. Exploration happens in
+**plan mode**, where Claude reads and proposes but cannot edit, and the sequence is spelled out because
+getting it wrong stalls step one on its own scaffold: `new-branch` writes a file, so the plan has to be
+approved before the branch exists. Then the cycle is driven by a `/goal` condition rather than by prompting
+it forward turn by turn -- written so this document's own gates prove it, because the evaluator runs no
+commands and reads no files. The three endings are separated on purpose: **Met** continues into DEPLOY,
+**Impossible** parks the branch and turns the blocker into its own issue, and a **stall** means nothing
+about the work at all -- the goal is still set and the harness is waiting for a prompt. Reading a stall as
+a blocker would park a branch over a loop that simply went quiet. The phases hold unchanged without any of
+it: `/goal` is part of the hooks system and is unavailable in an untrusted folder.
+
+**Score:** 4
+
+### What makes this deploy extra special
+
+Every consumer of this workflow gets a documented answer to "how do I actually run a cycle", which the page
+did not carry: it described the form and left the driving to whoever was at the keyboard. It reaches them
+through a plugin update, and it deliberately adds no requirement -- a repo without hooks available runs the
+same cycle it ran yesterday.
+
+**Score:** 3
+
+### Pull Request
+
+The PLAN phase explores before it plans, and a goal condition drives the cycle
+
+Plugins: workflow-davekjohn
+
+[PR #859](https://github.com/DaveKJohn/claude-code-specialists/pull/859)
+
+---
+
 ## DEPLOY: `fix/pr-body-keeps-the-deploy-opening-v1` · 20260824-103401
 
 Since the development cycle became one document, every PR body has silently lost the entry's opening text
