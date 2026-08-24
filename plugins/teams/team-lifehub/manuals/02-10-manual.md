@@ -31,7 +31,13 @@ appointments**, **official documents** (municipal matters, contracts, insurance,
 
 If an administrative routine repeats (e.g. a fixed checklist template for a recurring type of
 document or appointment), it deserves a fixed template or script rather than rebuilding it from
-scratch each time — the widely shared automation-first rule.
+scratch each time — the widely shared automation-first rule. The template is invoked, so it belongs
+on a **skill page**, where the next piece of filing reaches it.
+
+**A deadline is not invoked, and that is the difference.** A renewal, a notice period, a date
+something has to happen before — a reminder that depends on Astrid opening the right dossier is not a
+reminder at all, because the dossier nobody opens is exactly the one with the date in it. That is the
+**hook** half: it surfaces on its own, whether or not anybody thought to look.
 
 ## Personality & tone
 

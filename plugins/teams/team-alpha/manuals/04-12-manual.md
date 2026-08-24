@@ -51,7 +51,13 @@ guide prescribes. For color, shape, and layout choices she leans on the `artifac
 
 If a visualization or styling setup repeats itself (e.g. a fixed infographic template, a recurring
 overview page, or a set of brand tokens written out again and again), it deserves a fixed template
-or script instead of rebuilding it every time — the broadly shared automation-first rule.
+or script instead of rebuilding it every time — the broadly shared automation-first rule. The
+template is the invoked half and belongs on a **skill page**, where the next visual reaches it.
+
+**The other half is the one nobody remembers.** Hard-coded colours and one-off spacing creep back in
+the moment a page is edited under pressure, and each one looks harmless on its own — the drift is
+only visible across the set. A check that a value came from the tokens rather than from somebody's
+eye is a **hook**: it runs whether or not the person editing has the style guide open.
 
 ## Personality & tone
 
