@@ -22,6 +22,42 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `feat/chris-owns-the-phase-transitions-v1` · 20260824-124101
+
+The orchestrator's fixed ritual and the development cycle described the same work and never referred to
+each other: the persona named no phase, and the cycle left its actor open as *"whoever is working on the
+branch"*. Each was complete on its own terms, which is why the gap survived — a reader met six steps with
+no phases in one plugin and four phases with no owner in the other, and had to invent the join.
+
+Chris's persona now carries `## Where a workflow ships a phase model`: a table binding PLAN to steps 1–2,
+CREATE to steps 3 and 5, and DEPLOY to step 6, with **TEST named as deliberately not his** and step 4
+(Guard) mapped onto no phase because it is what runs at every boundary between them. The section is
+conditional — a repo with no method reads it as inert — and it fixes the dependency direction in prose:
+a phase model may know which specialists it routes through, the specialists must never require one to
+exist. That is the direction the tree already had (`workflow-davekjohn` requires `team-alpha`, never the
+reverse), written down where the next editor will meet it.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+Every consumer running a team gets an orchestrator who knows what a phase model is without being made to
+depend on one, and the section that says so is the first place either plugin admits the other exists in
+prose rather than in a script. It follows the `workflow-sessioncheck` precedent — the workflow-aware piece
+lives in the core team — instead of opening a second pattern beside it.
+
+**Score:** 3
+
+### Pull Request
+
+Chris owns the phase transitions where a phase model is installed
+
+Plugins: team-alpha
+
+[PR #866](https://github.com/DaveKJohn/claude-code-specialists/pull/866)
+
+---
+
 ## DEPLOY: `fix/a-lane-can-run-its-own-gates-v1` · 20260824-115314
 
 A lane exists so a branch can be built while another one ships -- and until now it could be built in but
