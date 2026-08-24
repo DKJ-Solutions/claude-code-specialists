@@ -66,7 +66,7 @@ one go. The entry is one heading with two `###` sections under it:
 ```text
 ## DEPLOY: `<your branch>` · <stamp>
 
-### What makes this deploy extra special
+### What makes this PR extra special
 ### Pull Request
 ```
 
@@ -76,7 +76,7 @@ it *began* is stamped on the document's own `#` heading. A section restating any
 in two places.
 
 **The entry holds both tiers, and neither names a number.** Tier 0's reason goes directly under the DEPLOY
-heading — that heading IS its section; the audience tier gets `### What makes this deploy extra special`, and it
+heading — that heading IS its section; the audience tier gets `### What makes this PR extra special`, and it
 means the one tier your repo has stated in `Get-ReleaseAudienceTier`. Each carries its reason and its
 `**Score:**`; that is the description, written once per audience rather than once as prose and again per tier.
 **A repo that has stated no audience tier gets the older shape instead** — a `#### Tier N` sub-section for

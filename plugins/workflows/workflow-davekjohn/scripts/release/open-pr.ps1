@@ -776,6 +776,30 @@ $push = Invoke-NativeCapture -FilePath 'git' -Arguments @('push', '-u', 'origin'
 $push.Output | ForEach-Object { Write-Host $_ }
 if ($push.ExitCode -ne 0) { Write-Error "git push failed."; exit 1 }
 
+# --- Which template lines are the description placeholder ------------------------------------------
+# #101: the description placeholder(s) are overridable via an optional repo-config function, so a
+# consumer with its own PR template text does not need a wrapper. Guard via Get-Command so a
+# repo-config.ps1 that does not define it (this repo's own, and every existing consumer) keeps exactly
+# today's behavior. Which of the two sources the list came from is kept for the warning further down:
+# "your repo-config answered this" and "the built-in list answered this" send the reader to different
+# files, and that is the first thing they need in order to repair it.
+#
+# RESOLVED HERE, ABOVE BOTH PATHS, since issue #865. It used to sit inside the create path, which was
+# enough while only that path needed it -- but -RefreshBody now has to know where the placeholder sits
+# in order to tell a description heading from a form heading (see below), and a second copy of this
+# resolution is how this repo's accumulation bugs start.
+$descPlaceholderSource = 'the built-in list'
+$descPlaceholders = if (Get-Command -Name Get-PrDescriptionPlaceholder -ErrorAction SilentlyContinue) {
+    $descPlaceholderSource = 'Get-PrDescriptionPlaceholder in scripts/repo-config.ps1'
+    @(Get-PrDescriptionPlaceholder)
+} else {
+    # RECOGNISE SIX, WRITE ONE (#538) -- the list itself moved to pr-body-lib.ps1 on August 10, 2026
+    # (#573). It was three literals inside this script, which meant nothing outside it could read them:
+    # the reference template the plugin now ships could not be held against the list that has to
+    # recognise it, and that gap IS the defect #573 reported.
+    @(Get-PrDescriptionPlaceholderDefaults)
+}
+
 # --- Already open? Then the push was the update, and there is nothing to create -------------------
 # Exits 0 on purpose: this is a SUCCESSFUL outcome, and ship-pr.ps1 reads that exit code to decide
 # whether to go on to the CI watch and the merge. Returning non-zero here (or letting the duplicate
@@ -808,11 +832,20 @@ if ($existingPr) {
     }
 
     if ($RefreshBody) {
-        # The heading that carries the description is the FIRST heading of the PR template -- the one the
-        # placeholder sits under, so the template answers this instead of a new repo-config seam a
-        # consumer would have to set. If the template is missing or has no such heading there is nothing
-        # to refresh, and that is a warning rather than a failure: the branch is pushed and the PR is
-        # open, which is the outcome the caller asked for.
+        # THE DESCRIPTION IS THE SECTION THE PLACEHOLDER SITS IN, and the template says which that is.
+        # A heading ABOVE the placeholder is the description's own -- Update-PrBodySection replaces the
+        # content under it. Every heading BELOW the placeholder belongs to the form and is a boundary the
+        # description must stop at. Where the placeholder comes before any heading there is no
+        # description heading at all: the description is the body's LEADING section, and every heading in
+        # the template is a boundary.
+        #
+        # WHY THE PLACEHOLDER DECIDES IT AND NOT "the first heading" (issue #865). Until August 24, 2026
+        # this repo's template opened with an H1 and the two answers agreed, so the first heading was
+        # taken as the description's. That H1 went with #865 -- the DEPLOY section it mirrored stopped
+        # naming its own answer on August 23 -- and under the new shape "the first heading" is wrong in
+        # the one direction that matters: in a template of "<placeholder>" + "## Checklist", it would
+        # name the checklist as the description and overwrite it on every refresh. The placeholder's
+        # position was always the real rule; it was simply never the one being read.
         #
         # ANY LEVEL, not '## ' (August 9, 2026). This matched two hashes exactly, from a time when every
         # template started at H2. The moment this repo's template was promoted to H1 that pattern found
@@ -825,25 +858,43 @@ if ($existingPr) {
         # -- Update-PrBodySection stops at "the same level or shallower", nothing is shallower than an H1,
         # and every '##' section below it was replaced along with the description. A consumer lost the one
         # section its template is still kept for, on every run, reported as a successful description edit.
+        # The leading section has the mirror-image problem and the same answer: nothing is shallower than
+        # no heading either, so -StopAtHeading is its ONLY boundary.
         #
         # Fence-aware, like every other reader of markdown here: a template explaining its own shape can
         # quote a heading inside a fence, and that is a quotation rather than a section.
         $descHeading = ''
         $templateStops = @()
         $templateForHeading = Join-Path $repoRoot ".github\pull_request_template.md"
-        if (Test-Path -LiteralPath $templateForHeading) {
+        $templateFound = Test-Path -LiteralPath $templateForHeading
+        if ($templateFound) {
             $tplFence = $false
-            $tplHeadings = @(Get-Content -LiteralPath $templateForHeading -Encoding UTF8 | ForEach-Object {
-                if ($_ -match '^\s*(```|~~~)') { $tplFence = -not $tplFence; return }
-                if (-not $tplFence -and $_ -match '^#{1,6}\s+\S') { $_.TrimEnd() }
-            })
-            if ($tplHeadings.Count -gt 0) {
-                $descHeading = $tplHeadings[0]
-                if ($tplHeadings.Count -gt 1) { $templateStops = @($tplHeadings[1..($tplHeadings.Count - 1)]) }
+            $tplSeenPlaceholder = $false
+            $tplAbove = @()
+            $tplBelow = @()
+            foreach ($tplLine in @(Get-Content -LiteralPath $templateForHeading -Encoding UTF8)) {
+                if ($tplLine -match '^\s*(```|~~~)') { $tplFence = -not $tplFence; continue }
+                if ($tplFence) { continue }
+                if ($descPlaceholders -contains $tplLine) { $tplSeenPlaceholder = $true; continue }
+                if ($tplLine -match '^#{1,6}\s+\S') {
+                    if ($tplSeenPlaceholder) { $tplBelow += $tplLine.TrimEnd() } else { $tplAbove += $tplLine.TrimEnd() }
+                }
             }
+            # THE LAST heading above the placeholder, not the first: with several, the placeholder sits
+            # under the nearest one. The ones before it are the form's too, and they are already
+            # protected -- Update-PrBodySection starts at the heading it is given, so nothing above it is
+            # touched. A template with no placeholder at all leaves $tplAbove holding every heading, and
+            # the last of those is still the closest thing to a description section there is; the create
+            # path's warning is what tells the reader the placeholder is missing.
+            if ($tplAbove.Count -gt 0) { $descHeading = $tplAbove[$tplAbove.Count - 1] }
+            $templateStops = @($tplBelow)
         }
-        if (-not $descHeading) {
-            Write-Warning "-RefreshBody: no heading found in .github/pull_request_template.md - the description was left as it is."
+        if (-not $templateFound) {
+            # A MISSING template is not the same as a heading-less one, and it keeps today's answer: with
+            # no template there is no form, no boundary and no evidence about what the body's shape is
+            # meant to be, so nothing is rewritten. The branch is pushed and the PR is open, which is the
+            # outcome the caller asked for -- a warning rather than a failure.
+            Write-Warning "-RefreshBody: .github/pull_request_template.md was not found - the description was left as it is."
         } elseif (-not $entryDescription) {
             # The resolved path, not a name rebuilt from the branch: which of the two forms was actually
             # read is the first thing the reader needs in order to open the right file.
@@ -862,7 +913,12 @@ if ($existingPr) {
             # Only tried when the first attempt changed nothing, so a body carrying the current heading is
             # never searched for a legacy one, and a genuine no-op still reports as a no-op. Each is a
             # heading this repo or a consumer has actually shipped.
-            if (-not $refreshed) {
+            #
+            # NOT REACHED WHERE THE TEMPLATE CARRIES NO HEADING, and it does not need to be: the leading
+            # section starts at the top of the body, so a legacy heading sitting there is inside what was
+            # replaced rather than something to search for. That is why #865 added no string to this list
+            # even though it retired one -- the shape it retired is covered by the shape that replaced it.
+            if (-not $refreshed -and $descHeading) {
                 # Every heading this repo has published a PR under, newest first. The H2 form of the
                 # 'bring to main?' wording is on the list because it was live for a single day -- long
                 # enough for open PRs to carry it, which is the only thing that decides membership here.
@@ -885,7 +941,7 @@ if ($existingPr) {
             }
 
             if ($refreshed) {
-                $edits += "the description under '$($descHeading.Trim())'"
+                $edits += if ($descHeading) { "the description under '$($descHeading.Trim())'" } else { 'the description (the body leads with it)' }
             } else {
                 Write-Host "-RefreshBody: the PR description already matches the entry - nothing sent." -ForegroundColor DarkGray
             }
@@ -993,24 +1049,9 @@ if (-not $Body) {
         $entryExists = (Test-Path -LiteralPath $entryPath) -and
             (Test-BranchChangelogIsFilled -Text ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)))
 
-        # #101: the description placeholder(s) and the approval-checklist pattern are overridable
-        # via optional repo-config functions, so a consumer with its own PR template text does not
-        # need a wrapper. Guard via Get-Command so a repo-config.ps1 that does not define these
-        # (the workshop's own, and every existing consumer) keeps exactly today's behavior.
-        # Which of the two sources the list came from, kept for the warning below: "your repo-config
-        # answered this" and "the built-in list answered this" send the reader to different files, and
-        # that is the first thing they need in order to repair it.
-        $descPlaceholderSource = 'the built-in list'
-        $descPlaceholders = if (Get-Command -Name Get-PrDescriptionPlaceholder -ErrorAction SilentlyContinue) {
-            $descPlaceholderSource = 'Get-PrDescriptionPlaceholder in scripts/repo-config.ps1'
-            @(Get-PrDescriptionPlaceholder)
-        } else {
-            # RECOGNISE THREE, WRITE ONE (#538) -- the list itself moved to pr-body-lib.ps1 on
-            # August 10, 2026 (#573). It was three literals right here, which meant nothing outside this
-            # script could read them: the reference template the plugin now ships could not be held
-            # against the list that has to recognise it, and that gap IS the defect #573 reported.
-            @(Get-PrDescriptionPlaceholderDefaults)
-        }
+        # $descPlaceholders / $descPlaceholderSource are resolved once above both paths -- see the block
+        # before the "Already open?" branch. #101's approval pattern is still resolved here, because only
+        # this path ticks boxes.
         $approvalPattern = if (Get-Command -Name Get-PrApprovalPattern -ErrorAction SilentlyContinue) {
             Get-PrApprovalPattern
         } else {

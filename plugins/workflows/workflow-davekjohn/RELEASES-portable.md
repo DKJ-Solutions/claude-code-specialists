@@ -56,8 +56,8 @@ accepted, never refused, so no finished dossier became unopenable on the day the
 **`CHANGELOG.md` has no sections to file into** (Dave, August 5, 2026). It is an intro followed by one `##`
 per change, ranked furthest-reach-first and, within a tier, highest-significance-first — so what the three
 `## Tier N - Pull Requests` sections used to say visually is now the ordering, and each entry states its own
-reach in its opening section — directly under the question for tier 0, and under
-`#### What makes this change extra special` for the one audience tier the repo has stated. The
+reach in its opening section — directly under the DEPLOY heading for tier 0, and under
+`### What makes this PR extra special` for the one audience tier the repo has stated. The
 **fold** is the only moment that order can be decided, because the cut empties the list: whatever order it
 leaves is what the release documents inherit, with nothing re-estimated days later.
 
@@ -193,8 +193,9 @@ place a reader needs them separated.
 
 Each entry arrives whole, exactly as it was folded — its `###` heading naming the **branch**, and beneath it
 the same `####` sections the scaffolder wrote on the day it was folded, one heading level deeper than in
-`CHANGELOG.md` — today `What does the change on this branch deploy to main?` and `Pull Request`, and for an
-older entry whichever of the six it was written with.
+`CHANGELOG.md` — today `What makes this PR extra special` and `Pull Request`, with tier 0's answer sitting
+directly under the entry's own heading and carrying none of its own, and for an older entry whichever
+wording it was written with.
 Nothing is rewritten and nothing is cut, which is what "the record" means. There are no
 branch-type categories in between — the grouping came from the branch prefix, which this repo measured does
 not predict impact. Tier 0 is in it, unlike in the hand-written note below.
