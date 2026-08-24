@@ -102,6 +102,24 @@ heading of any level is invisible to it and the arc is drawn on top of the mecha
 **A phase with nothing under it is not a finding**: a branch that had nothing to test says so by leaving
 that heading bare, exactly as a branch with no step list at all is permitted.
 
+**But an empty phase is a statement, and on a branch whose work *was* judgement that statement is
+false.** Verifying a report, choosing between two designs, establishing that a claim still holds —
+none of it produces an artefact until the writing starts, so the arc offers it no home and the path of
+least resistance is to record only the writing, which is the least interesting half. **Those are PLAN
+steps**, written like any other: `- [x] Verify the claim still stands: <what you read, and what it
+said>`. A branch whose PLAN is empty because nobody wrote the plan down reads exactly like one that
+arrived needing no plan, and no gate can tell those apart — which is why this is a convention for
+whoever is writing rather than a check on them.
+
+**And TEST answers with a reason rather than with nothing.** Where no automated test was added, `- [~]`
+is what says so: *no suite, and here is why* — the existing gates already cover it, the surface does not
+lend itself to one, the change is prose. Leaving the heading bare stays permitted and stays no finding;
+it is simply the weaker of the two answers wherever there **was** a reason, and the reason is the half a
+later reader can use. Raised in the source repo as
+[#846](https://github.com/DaveKJohn/claude-code-specialists/issues/846), on a branch whose defining work
+was deciding two open questions and verifying seven reported claims against the tree, and whose PLAN and
+TEST were both empty.
+
 **DEPLOY takes no steps of its own** (Dave, August 14, 2026,
 [#655](https://github.com/DaveKJohn/claude-code-specialists/issues/655)). It is not a step, it is the
 **result** — the part that travels, folding into `CHANGELOG.md` at the merge while the rest of the document
