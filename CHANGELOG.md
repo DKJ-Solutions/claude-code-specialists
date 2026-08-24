@@ -22,6 +22,40 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `feat/ship-pr-names-the-governing-check-v1` · 20260824-094425
+
+`ship-pr` waits for every check a PR has, and used to say nothing about which one had held it up -- so the
+only way to learn it was the Actions page, afterwards. That invisibility is how two observations, both out
+of the tail, became a policy question about whether to wait on non-required checks at all. Measured over
+n=100 paired runs the non-required check governs 23% of the time at a median cost of 0s, so the wait is
+unchanged and the run now reports it: which check finished last, its own duration, whether the repo's
+ruleset requires it, and how much later it finished than the last required check. It still names no check
+of its own -- the ordering comes from the payload and 'required' from `gh pr checks --required` -- so it
+says nothing about a consumer's CI that it cannot read there. Best-effort by design: an unreadable payload
+costs one line of detail and can never turn a green run red.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+Every consumer running `ship-pr` gets the same line, and for them it is worth more than it is here: they
+have never had a figure for what their own merge wait is made of, and this is the one that produces it
+without asking them to measure anything. It is also what has to exist before the bigger question --
+whether to merge on the required check alone -- can be asked honestly, since that trade was declined
+precisely because nobody could say yet whether the long reviews are the large diffs.
+
+**Score:** 3
+
+### Pull Request
+
+ship-pr says which check governed the merge wait, and for how long
+
+Plugins: workflow-davekjohn
+
+[PR #850](https://github.com/DaveKJohn/claude-code-specialists/pull/850)
+
+---
+
 ## DEPLOY: `docs/merge-wait-23-percent-n100-v1` · 20260824-092122
 
 A measurement published in v4.18.0's release note said the tally was **two to one** for the non-required
