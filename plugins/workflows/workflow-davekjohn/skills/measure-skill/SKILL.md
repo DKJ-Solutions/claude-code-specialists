@@ -6,7 +6,8 @@ description: >-
   against a stored baseline, and the wall-clock of the script it drives. Use it before adding a
   skill, when a plugin's session cost has grown, or to find which skills are carrying that cost. It
   drives `claude plugin details` rather than estimating from file sizes, so the figure is the
-  authoritative one; it is read-only by default and is not a gate.
+  authoritative one; it is read-only by default and is not a gate. It also covers the always-on
+  document path -- `CLAUDE.md` plus everything it `@`-imports -- measured per document and per section.
 ---
 
 # measure-skill — what a skill costs, before somebody asks
@@ -27,6 +28,7 @@ joke at its own expense.
 |---|---|
 | always-on + on-invoke tokens, per skill, with a baseline delta | **this skill**, pass 1 |
 | wall-clock of the script behind a skill | **this skill**, pass 2 — read-only invocations only |
+| the always-on **document** path — `CLAUDE.md` plus its `@`-imports, per document and per section | **this skill**, via [`measure-always-on.ps1`](#the-second-script-on-this-page--the-always-on-document-path) — a different subject: what the repo's own instruction documents cost, not what the plugins cost |
 | frontmatter, dead links, parameter coverage, printed install commands | `check-plugin-integrity.ps1` — 27 checks. Not duplicated here: two verdicts on one subject is worse than one. |
 | whether the skill actually WORKS — does it fire, does it beat no-skill | `claude plugin eval`. Designed for, not built. See [Pass 3](#pass-3--effectiveness-designed-not-built) below. |
 
@@ -154,3 +156,70 @@ without either, the script reads and prints. The baseline is **committable**: to
 API rather than from the machine that ran the script, so the file means the same thing everywhere.
 Pass-2 timings are machine-dependent and are deliberately **not** stored — a median that travelled to
 another machine would be a figure nobody could reproduce.
+
+---
+
+## The second script on this page — the always-on document path
+
+**`measure-always-on.ps1` measures what a session pays before a single assignment is given:**
+`CLAUDE.md` plus everything it `@`-imports, per document and per section. It is a different subject
+from pass 1 above — that one prices what the **plugins** cost, this one prices what the repo's **own
+instruction documents** cost.
+
+**It sits on this page rather than on one of its own, and that is the rule rather than a shortcut.**
+Only a skill's *description* is paid by every session, so a second page would have charged every
+consumer for a tool most of them run once — while the subject (session cost), the owner (the
+performance specialist) and the honesty rule below are already this page's. **Which skill, not
+whether** ([#875](https://github.com/DaveKJohn/claude-code-specialists/issues/875)).
+
+Run it from the root of the repo you want measured:
+
+```powershell
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/maintenance/measure-always-on.ps1"
+```
+
+**In the source repo, run its own copy instead** — `scripts/maintenance/measure-always-on.ps1` — for
+the same reason as pass 1: the plugin cache holds the last *released* mirror.
+
+**Bytes are a measurement, tokens are an estimate, and the output says which is which every time.**
+No API prices a document: `count_tokens` prices the subject pass 1 reports, which is why *do not
+estimate from file sizes* governs there and not here. Here an estimate is the only answer available,
+so the factor is calibrated rather than guessed and lives in `measure-context-lib.ps1` with its
+calibration attached — it was inherited unexamined at 3.70 through three hand measurements and was
+~19% too generous, so every figure derived from it was under-stated while looking precise.
+
+**It reaches no verdict about what should move, and it is not a gate.** It always exits 0. The two
+things it can find that really are defects are printed loudly and adjudicated by nobody here: an
+`@`-import that does not resolve costs a session that whole document while nothing errors, and
+sections that fail to sum to their file mean this script's arithmetic is wrong rather than the repo.
+
+**It reports the copy that LOADS.** Where a document is imported from the marketplace clone rather
+than from the tree, the report names both and prints the difference — that gap is queued cost
+arriving at the next plugin update, not noise to smooth away.
+
+### Parameters
+
+| parameter | what it does |
+|---|---|
+| `-RepoRoot <path>` | The repo to measure. Default: `CLAUDE_PROJECT_DIR` in a consumer, otherwise the git root of the working directory. |
+| `-Root <path>` | The root document of the path. Default: `CLAUDE.md` in that repo root. |
+| `-Depth <1-6>` | The deepest heading level that still opens a section of its own. Default `3`. Both useful readings happen at different depths: shallow tells you one section is most of the file, deep tells you which sub-item inside it is. |
+| `-Top <n>` | How many sections to list per document. Default `8`; `0` lists all of them. |
+| `-Documents` | Skip the section breakdown and print only the per-document table. |
+
+### Examples
+
+```powershell
+# What does this repo's instruction path cost, per document and per section?
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/maintenance/measure-always-on.ps1"
+
+# Every section, read deep -- which sub-item is carrying the document
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/maintenance/measure-always-on.ps1" -Depth 4 -Top 0
+
+# The per-document table only, no section breakdown
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/maintenance/measure-always-on.ps1" -Documents
+```
+
+**It writes nothing, ever** — no baseline and no `-OutFile`, deliberately. A cost baseline means the
+same thing on every machine because the numbers come from an API; these numbers are about the tree
+that was just read, and the tree is already in git.

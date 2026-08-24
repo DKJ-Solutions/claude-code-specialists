@@ -45,7 +45,8 @@ Decided in the source repo, and therefore binding for every repo working with th
 
 The release work runs on scripts, not on handwork: recurring steps (scaffolding an entry,
 folding, cutting a release) belong in a script with fixed guardrails instead of doing them manually
-every time — the broadly shared automation-first rule.
+every time — each of them reached through its own skill page, which is what makes a guardrail usable
+in a repo that did not write it. The broadly shared automation-first rule.
 
 ## The repo's own way of working comes first
 

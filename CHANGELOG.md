@@ -68,10 +68,19 @@ measurement script.
 
 ### What makes this PR extra special
 
-N/A — this reaches no consumer. The script is deliberately repo-local: it is not registered in the
-shared-scripts mirror and carries no skill page, so nothing about it ships. That is the point rather than an
-omission — the argument for building this instead of the skill #861 asked for was precisely that consumers do
-not have this repo's condition, and putting the tool in the plugin anyway would have contradicted it.
+N/A — what this PR itself deployed reaches no consumer: the script landed repo-local, registered in no
+mirror and carrying no skill page.
+
+**The reason this section originally gave is withdrawn, and the withdrawal belongs here rather than in a
+later entry.** It said the repo-local placement was "the point rather than an omission", because consumers
+do not have this repo's condition. That argument was #861's, and #861 was about a **skill** — a new
+always-on description, paid by every session in every consumer whether it fires or not. Mirroring
+deterministic code under a description that already exists is a different act and costs a consumer nothing
+per session, which is what the entry for
+[#875](https://github.com/DaveKJohn/claude-code-specialists/issues/875) does — pending in this same
+changelog, so a reader meets both in one document. Correcting it here rather than superseding it there is
+the whole point: the claim has not shipped, and a release note carrying both would have contradicted itself
+in the same breath.
 
 **Score:** N/A
 
