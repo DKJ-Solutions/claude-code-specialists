@@ -25,6 +25,74 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `feat/the-pr-starts-with-its-answer-v1` · 20260824-150017
+
+**A PR body now opens with the answer instead of with a question the document stopped asking.** The PR
+template's `# What does the change on this branch deploy to main?` is gone, and the audience tier's
+heading reads `What makes this PR extra special`. Both come from
+[#865](https://github.com/DaveKJohn/claude-code-specialists/issues/865), and both are the same
+correction: on August 23 the entry became the DEPLOY section of `workflow-davekjohn/development-cycle.md`
+and tier 0's answer lost its heading — the text sits straight under `## DEPLOY:` — so the template was
+the last place in the system still asking a question nothing else asked.
+
+**The header was load-bearing, and that is the whole change.** `-RefreshBody` replaced the description
+under the template's first heading; a template with none would have degraded to its warning branch on
+every run — the switch silently lost, reported as *"the description was left as it is"*, which reads like
+a decision. `Update-PrBodySection` therefore learned the **leading section**: an empty `-Heading` starts
+at the top of the body, writes no heading line back, and takes its boundary from `-StopAtHeading` alone,
+since nothing is shallower than no heading. That is the mirror image of inbound #598, where nothing was
+shallower than an H1.
+
+**And `open-pr` stopped reading "the first heading" at all — it reads where the PLACEHOLDER sits.**
+Headings above it are the description's, headings below it are the form's boundaries, and a placeholder
+that comes first means the leading section. That was always the real rule; it was simply never the one
+being read, and under a heading-less template the old shortcut is wrong in the direction that costs
+something: in a template of `<placeholder>` + `## Checklist` it would have named the checklist as the
+description and overwritten it on every refresh.
+
+**No legacy heading was added anywhere, and that was measured rather than assumed.** A PR opened under
+the retired H1 keeps it in its published body, above the first form heading — so the leading section
+covers it and it is replaced along with everything else. Lint check 24's contract lost its second half
+for the same reason: a heading-less template is now the shape `open-pr` expects, so a gate refusing one
+would refuse the template this repo ships.
+
+**The rename uses the mechanism already there — recognise every wording, write one.**
+`What makes this deploy extra special` joins the retired list after **one day**, the shortest life any of
+the four has had, which changes nothing: a single day is enough for a branch to be in flight, and
+`CHANGELOG.md` was still holding entries written under it. Every wording is still read, so nothing
+pending stops folding. The suite that guarded this asserted only `[0]` of that list, so it had been
+measuring exactly one member while the list grew; it loops now.
+
+**Named because the issue does not name it:** this heading also lands in `CHANGELOG.md` and in the
+release documents, where nobody is looking at a PR. Dave asked for this wording explicitly and the
+reasoning is recorded beside the constant, so the next person to reopen the question learns it was not
+overlooked.
+
+**Score:** 3
+
+### What makes this PR extra special
+
+A consumer's own `.github/pull_request_template.md` is **their** file and nothing here rewrites it, so
+nothing breaks on the update and there is no migration. What arrives is a choice: the shipped reference
+under `${CLAUDE_PLUGIN_ROOT}/templates/` is now one line, so a consumer who diffs against it can drop
+their own header and get a PR body that leads with the answer. Two things arrive whether or not they do —
+`new-branch` writes the new audience-tier heading, and their gate stops requiring a template heading. A
+template that keeps its heading behaves exactly as before, and one that keeps its own sections is still
+bounded by them; what is new is that a heading below the placeholder is now read as the form's rather
+than as the description's, which is a repair for anyone whose template had two headings above it.
+
+**Score:** 3
+
+### Pull Request
+
+A PR body starts with its answer, and its second section names the PR
+
+Plugins: workflow-davekjohn
+
+[PR #871](https://github.com/DaveKJohn/claude-code-specialists/pull/871)
+
+---
+
 ## DEPLOY: `fix/deploy-is-written-once-test-is-green-v1` · 20260824-140733
 
 The development cycle's own **Rules** said one thing about when the DEPLOY section is written: *"Fill in
