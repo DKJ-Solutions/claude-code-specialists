@@ -28,9 +28,16 @@
     harness that relocates them, and answers itself correctly for a consumer -- who has no copy, and is
     therefore never refused. Three conditions, all of which must hold:
 
-      1. the running script sits OUTSIDE the repo root. Its own in-repo mirror under plugins/*/scripts/
-         is deliberately allowed: lint check 8 holds that byte-identical to the source, so running it is
-         not the staleness this guard is about;
+      1. the running script sits OUTSIDE the repo root, AND outside every worktree of the same
+         repository. Its own in-repo mirror under plugins/*/scripts/ is deliberately allowed: lint check 8
+         holds that byte-identical to the source, so running it is not the staleness this guard is about.
+         A LINKED WORKTREE is allowed for a different reason (#851, August 24, 2026): it is the same
+         repository -- same objects, same refs, one shared .git -- so its scripts/ is the tree the person
+         is working in, not a released snapshot. Lanes (scripts/task/worktree-lane.ps1) live outside the
+         repo root on purpose, so without this every gate run from a lane was refused -- and reported as
+         an encoding failure, because the lint gate sees only the sub-script's exit code. Compared on
+         `git rev-parse --git-common-dir`, which a separate CLONE answers differently, so the plugin cache
+         is still refused;
       2. the repo publishes plugins at all -- it has a .claude-plugin/marketplace.json. This is the
          condition that keeps a consumer out of it. A consumer who happens to carry an abandoned vendored
          copy under scripts/ would otherwise be refused on the strength of a file they no longer use;
@@ -56,6 +63,7 @@
 
     Supplies:
       - Resolve-GuardRepoRoot  -- the repo being operated on: CLAUDE_PROJECT_DIR, else the git root.
+      - Get-GuardGitCommonDir  -- the .git a repository shares with all its worktrees: its identity.
       - Get-OwnCopyPath        -- the repo-relative path to run instead, or $null when all is well.
       - Assert-OwnCopy         -- the same question as a gate: prints the refusal and exits 1.
 #>
@@ -80,6 +88,43 @@ function Resolve-GuardRepoRoot {
         }
     } catch { }
     return $null
+}
+
+function Get-GuardGitCommonDir {
+    <#
+        The .git directory SHARED by a repository and all of its worktrees, absolute, or $null when the
+        path is not in a git repository (or git is not installed).
+
+        THIS IS THE IDENTITY OF A REPOSITORY, which is the question condition 1b below has to answer. A
+        linked worktree has its own working directory and its own HEAD, but `--git-common-dir` resolves
+        to the ONE .git the whole repository shares -- so two paths in the same repository return the same
+        answer, and two separate CLONES of the same GitHub repo return different ones. Measured on
+        2026-08-24, git 2.54.0.windows.1:
+
+          primary checkout   -> .../claude-code-specialists/.git
+          lane worktree      -> .../claude-code-specialists/.git     (same -- it is the same repository)
+          plugin cache clone -> .../marketplaces/claude-code-specialists/.git   (different -- a clone)
+
+        That third line is the one that matters: the guard must keep firing on the released mirror, and a
+        clone is not a worktree. `--path-format=absolute` is asked for explicitly because the default is
+        relative to the current directory, which would make two equal answers compare as unequal.
+
+        Returns $null rather than throwing, and a $null on either side of the comparison means "cannot
+        tell" -- which the caller reads as "not the same repository", keeping the guard's answer exactly
+        what it was before this existed.
+    #>
+    param([Parameter(Mandatory)][string]$Path)
+
+    if (-not $Path) { return $null }
+    try {
+        $out = & git -C $Path rev-parse --path-format=absolute --git-common-dir 2>$null
+        if ($LASTEXITCODE -ne 0 -or -not $out) { return $null }
+        $dir = ([string]$out).Trim()
+        if (-not $dir) { return $null }
+        return $dir.Replace('/', [System.IO.Path]::DirectorySeparatorChar).TrimEnd('\', '/')
+    } catch {
+        return $null
+    }
 }
 
 function Get-OwnCopyPath {
@@ -113,6 +158,40 @@ function Get-OwnCopyPath {
 
     # 1. Inside the repo -- including its own plugins/*/scripts/ mirror, which check 8 holds identical.
     if ($scriptFull.StartsWith($rootFull, [System.StringComparison]::OrdinalIgnoreCase)) { return $null }
+
+    # 1b. OR inside a WORKTREE of the same repository, which is the same answer arrived at the long way
+    #     (#851). A lane opened by scripts/task/worktree-lane.ps1 lives OUTSIDE the repo root on purpose
+    #     -- a worktree inside the tree would be walked by the lint gate's link scan and by the suites --
+    #     so condition 1 above cannot see it, and CLAUDE_PROJECT_DIR still names the primary checkout.
+    #     Every gate run from a lane was therefore refused as a released snapshot.
+    #
+    #     WHAT THAT COST, measured 2026-08-24 on two lanes: the lint gate reported
+    #     '[mojibake] ... exited 1 without naming a file -- the mojibake gate could not complete', which
+    #     reads as an encoding problem in the tree. The guard's own explanation was reachable only by
+    #     running the sub-script by hand. So a lane -- whose whole purpose is to be a place you can build
+    #     AND CHECK while another branch ships -- could be verified for the first time only by CI, after
+    #     the push, which is the wait lanes exist to stop paying.
+    #
+    #     A WORKTREE IS NOT A SNAPSHOT, and that is why this belongs here rather than in a caller. The
+    #     staleness this guard exists to refuse is a RELEASED copy: a separate clone whose scripts/ lags
+    #     this tree by however many merges have landed. A linked worktree is the same repository -- same
+    #     objects, same refs, one shared .git -- and its scripts/ is whatever its own branch has checked
+    #     out, which is exactly the tree the person is working in.
+    #
+    #     Compared on `--git-common-dir` rather than by enumerating `git worktree list`: that is the
+    #     canonical identity of a repository, it is two calls instead of a parse, and a CLONE of the same
+    #     GitHub repo answers differently -- so the plugin cache is still refused. Both sides must answer,
+    #     because a $null means "cannot tell", and a guard that cannot tell must not stop refusing.
+    $scriptDir = [System.IO.Path]::GetDirectoryName($scriptFull)
+    if ($scriptDir) {
+        $hereCommon = Get-GuardGitCommonDir -Path $scriptDir
+        if ($hereCommon) {
+            $rootCommon = Get-GuardGitCommonDir -Path $RepoRoot
+            if ($rootCommon -and $hereCommon.Equals($rootCommon, [System.StringComparison]::OrdinalIgnoreCase)) {
+                return $null
+            }
+        }
+    }
 
     # 2. Only a repo that publishes plugins can be the repo a shared script is maintained in. This is the
     #    condition that leaves every consumer alone.
