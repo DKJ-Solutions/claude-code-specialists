@@ -137,6 +137,79 @@ describes work in that shape, and this page's own rules below show all three mar
 The phase names come from the wording seam, so a repo can rename them; supplying an empty list switches
 them off and restores the plain step list.
 
+### Before the plan: explore first, then plan
+
+**Read before you write, and let the harness hold you to it.** Jumping straight to code produces code that
+solves the wrong problem, and the PLAN phase is where that is prevented rather than detected. So the work
+before the plan happens in **plan mode**: Claude reads files, runs commands to explore, and proposes a
+plan, but does not edit anything — edits stay blocked until the plan is approved. Enter it with `Shift+Tab`
+or by prefixing one prompt with `/plan`; a whole session can start there with
+`claude --permission-mode plan`, and a repo can make it the default with `"defaultMode": "plan"` in
+`.claude/settings.json`. Approving the plan is what leaves plan mode, so the transition out of exploring is
+a deliberate act rather than a drift.
+
+**The order matters, and getting it wrong stalls step one on its own scaffold.** `new-branch` *writes a
+file* — the development cycle document — so it cannot run while plan mode is still blocking edits. The
+sequence is therefore:
+
+1. **Explore in plan mode.** Read the code, the docs and the history that bear on the assignment. Answer
+   the questions the assignment raises. Change nothing.
+2. **Propose the plan and have it approved.** That approval is what exits plan mode.
+3. **`new-branch`.** Now the branch and this document come into being.
+4. **Write the PLAN steps** — from what the exploration established, not from what it guessed.
+
+**Which is also why the PLAN phase has steps at all.** What exploration produces is exactly what
+[the phase guidance above](#the-four-phases-and-why-one-of-them-takes-no-steps) asks for: verifications
+and decisions, each written as a step with what it read and what that said. A branch that explored first
+and recorded nothing has thrown away the only part of that work a later reader can use.
+
+### Driving the cycle to its end: a goal condition
+
+**A development cycle has a verifiable end state, which is exactly what `/goal` is for.** Set the
+condition once and Claude keeps working toward it without being prompted each step: after every turn a
+small fast model judges the condition and, while it does not hold, another turn starts instead of control
+coming back to you. One goal is active per session, setting it starts a turn immediately, `/goal` on its
+own shows the state, and `/goal clear` removes it.
+
+**Write the condition so this document's own gates prove it.** The evaluator **runs no commands and reads
+no files** — it judges only what Claude has already surfaced in the conversation. So a condition must be
+something Claude's own output demonstrates, and for a branch that is the gate output the phases already
+depend on:
+
+```text
+/goal every step above the DEPLOY heading in workflow-davekjohn/development-cycle.md is resolved
+and open-pr reports the lint and test gates green, or stop after 20 turns
+```
+
+The turn clause is not decoration: a goal with no bound can run a long way on a wrong premise, and Claude
+reports progress against that clause each turn for the evaluator to judge.
+
+**A goal ends in one of three ways, and only one of them means the branch is blocked.** Reading them as one
+is the mistake worth naming, because two of them look alike from the outside:
+
+| how it ends | what the harness does | what the branch does |
+|---|---|---|
+| **Met** | clears the goal, records it achieved | continue into DEPLOY — the cycle is finished |
+| **Impossible** | clears the goal, records it failed **with a reason** | **park the branch, and the blocker becomes its own issue on its own cycle** |
+| **A stall** — no tool use for several turns | stops the loop, warns, hands control back with **the goal still set**; evaluation resumes on your next prompt | nothing. This is not a verdict about the work |
+
+**So a stall is not a reason to park anything.** The goal is still standing and the harness is waiting for
+a prompt; treating it as a blocker throws away a branch over a loop that simply went quiet. Only the
+**Impossible** verdict is the harness saying the condition can never be satisfied — and that is the moment
+the branch is parked and a new issue is filed, so the blocker gets a cycle of its own instead of holding
+this one open. That is the same shape a session's own close-out uses for an unexpected blocker.
+
+**Two more endings belong to the environment rather than to the work.** An error you have to fix —
+authentication, an exhausted balance, a context overflow auto-compaction could not clear, an unavailable
+model — clears the goal with a warning naming the cause; fix it and set the goal again. And **background
+work defers evaluation**: while a subagent or a background shell command is still running, that turn is not
+judged at all, which matters in any repo that ships from the background — the goal is waiting, not stalled.
+
+**The cycle does not depend on any of this, and that is deliberate.** `/goal` is part of the hooks system,
+so it is unavailable in a folder that has not been trusted and in a session with hooks disabled. Every
+phase, every mark and every gate on this page holds exactly as it does without it. What a goal adds is that
+nobody has to prompt the cycle forward turn by turn — a strong default, not a requirement.
+
 ## The DEPLOY section — the changelog entry
 
 ```markdown
