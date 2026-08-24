@@ -41,6 +41,17 @@ function Get-EntryDescription {
         deeper headings in its own prose, and treating a later one as the boundary would silently cut the
         description short -- returning something plausible rather than failing, which is the worst shape.
 
+        THIS IS A PRE-MERGED-FORMAT READER, AND ITS HEURISTIC IS WHY. The rule above holds only while the
+        entry's own heading IS an H3. In the merged development-cycle format the heading is an H2
+        (`## DEPLOY: ...`), so the first '### ' line is a section INSIDE the body and this function returns
+        the tail from there -- which is exactly the plausible-rather-than-failing shape the paragraph above
+        warns about, arrived at from the other direction (inbound
+        https://github.com/DaveKJohn/claude-code-specialists/issues/853). It is not repaired here on
+        purpose: Get-PrDescription now recognises that heading itself, so the merged format never reaches
+        this fallback, and widening this function would change what a pre-dossier entry returns -- the one
+        shape it exists for. If you find yourself needing it for a newer format, that is a sign the caller
+        should be reading the heading, not that this heuristic should grow.
+
         Returns '' when there is no heading, or nothing after it. The caller decides what that means:
         open-pr.ps1 leaves the placeholder in place rather than writing an empty description.
     #>
@@ -81,11 +92,27 @@ function Get-PrDescription {
         the author saying how far the change reaches and what it is worth to each audience, which is
         exactly what a reviewer is deciding about.
 
-        RETURNS '' WHEN THE 'What' SECTION IS ABSENT, and the caller falls back to Get-EntryDescription.
-        That is the whole back-compat story: a pre-dossier entry has no such section (its description sat
-        straight under the heading), and every consumer with a branch in flight is in that position --
-        they reach this code through a plugin update rather than by choosing to. Returning '' rather than
-        guessing keeps the old path exactly as it was.
+        TWO SHAPES START THE ANSWER, and the second one is why this function no longer bails out when the
+        'What' section is missing. In the merged development-cycle format (August 23, 2026) the entry has
+        no 'What' heading at all: its opening text -- the tier-0 body, the substance -- sits directly under
+        the DEPLOY heading. So this reads that heading as the start, via
+        Get-DevelopmentCycleEntryPattern, which is the same matcher the fold and both gates use.
+
+        WHAT THAT REPAIRS, measured in a consumer and reproduced here (inbound
+        https://github.com/DaveKJohn/claude-code-specialists/issues/853): returning '' sent the caller to
+        Get-EntryDescription, whose contract is "everything after the entry's compact '### ' heading". That
+        was right while the entry's own heading WAS an H3. Under the merged format the first '### ' line is
+        a section INSIDE the body -- 'What makes this deploy extra special' -- so the fallback returned the
+        tail from there: about a quarter of the entry, with the opening argument silently gone. The fold was
+        unaffected (CHANGELOG.md received the entry complete), so nothing was lost permanently; what was
+        lost is the review moment, in a body that looked complete and passed every gate.
+
+        RETURNS '' ONLY WHEN NEITHER SHAPE IS PRESENT, and the caller still falls back to
+        Get-EntryDescription there. That is the remaining back-compat story and it is unchanged: a
+        pre-dossier entry has no 'What' section and no DEPLOY heading either (its description sat straight
+        under an H3 heading), and a consumer with such a branch in flight reaches this code through a
+        plugin update rather than by choosing to. Returning '' rather than guessing keeps that path exactly
+        as it was.
 
         FENCE-AWARE, like every reader of this format: an entry documenting the entry format quotes these
         headings inside a fence, and the entry for this very change does. A fenced '### Significance'
@@ -119,31 +146,62 @@ function Get-PrDescription {
     }
     $whatNames = @($whatNames | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     $endNames  = @($endNames  | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-    if ($whatNames.Count -eq 0) { return '' }
 
     $toPattern = {
         param($names)
         '^#{2,4}\s+(?:' + ((@($names) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|') + ')\s*$'
     }
-    $whatRx = & $toPattern $whatNames
+    $whatRx = if ($whatNames.Count -gt 0) { & $toPattern $whatNames } else { $null }
     $endRx  = if ($endNames.Count -gt 0) { & $toPattern $endNames } else { $null }
 
+    # The merged format's start line, from the one matcher that owns it -- Get-DevelopmentCycleEntryPattern,
+    # the same one the fold and both gates use, so a repo that translated the title word is read by its own.
+    #
+    # Probed with Get-Command and backed by a local default, exactly as the heading names above are and for
+    # the same reason: this file is dot-sourced ON ITS OWN by its suite, so a required call would make the
+    # suite fail on a function it deliberately does not load. The default is not a second definition of the
+    # rule -- it is the same two shapes with the same English words that lib ships, and a repo that renamed
+    # the title reaches this code with the lib loaded, which is where its own answer comes from.
+    $deployRx = if (Get-Command -Name Get-DevelopmentCycleEntryPattern -ErrorAction SilentlyContinue) {
+        Get-DevelopmentCycleEntryPattern
+    } else {
+        # Today's shape leads with the title and a colon; every entry written before August 23, 2026 puts
+        # the branch first and the title last. Both are matched, and 'changelog' is in the list because
+        # entries carrying it exist in every consumer right now.
+        '(?:^#{2}\s+(?:[^`]*\s)?(?:DEPLOY|deployment|changelog):\s*`[^`]+`)' +
+        '|(?:^#{2}\s+(?:[^`\s]+\s+)?`[^`]+`\s+(?:DEPLOY|deployment|changelog)\s*$)'
+    }
+    if (-not $whatRx -and -not $deployRx) { return '' }
+
+    # ONE fence-aware pass, then choose -- rather than a scan per shape. Both candidates are collected
+    # because the 'What' heading WINS where both are present: an entry in the merged format that still
+    # carries a 'What' section is a hand-edited or transitional one, and its author's heading is a better
+    # answer than a heading the scaffolder wrote. The end boundary is the first 'Pull Request' heading
+    # AFTER the chosen start, which is why it cannot be resolved in the same pass.
     $lines = $EntryText -split "\r?\n"
-    $start = -1
-    $end = $lines.Count
+    $whatAt = -1
+    $deployAt = -1
     $inFence = $false
     for ($i = 0; $i -lt $lines.Count; $i++) {
         if ($lines[$i] -match '^\s*(```|~~~)') { $inFence = -not $inFence; continue }
         if ($inFence) { continue }
         $line = $lines[$i].TrimEnd()
-        if ($start -lt 0) {
-            if ($line -match $whatRx) { $start = $i }
-            continue
-        }
-        if ($endRx -and $line -match $endRx) { $end = $i; break }
+        if ($whatAt -lt 0 -and $whatRx -and $line -match $whatRx) { $whatAt = $i }
+        if ($deployAt -lt 0 -and $deployRx -and $line -match $deployRx) { $deployAt = $i }
+        if ($whatAt -ge 0) { break }
+    }
+    $start = if ($whatAt -ge 0) { $whatAt } else { $deployAt }
+    if ($start -lt 0) { return '' }
+
+    $end = $lines.Count
+    $inFence = $false
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '^\s*(```|~~~)') { $inFence = -not $inFence; continue }
+        if ($inFence -or $i -le $start) { continue }
+        if ($endRx -and $lines[$i].TrimEnd() -match $endRx) { $end = $i; break }
     }
 
-    if ($start -lt 0 -or ($start + 1) -ge $end) { return '' }
+    if (($start + 1) -ge $end) { return '' }
     $slice = @($lines[($start + 1)..($end - 1)])
 
     # PROMOTED ONE LEVEL (Dave, August 9, 2026). In the entry file the sections are H3 and the tiers H4,
