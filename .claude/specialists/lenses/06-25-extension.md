@@ -841,6 +841,68 @@ population, not cited from one run.* The 33-fold spread above is why: any single
 tendency. That is also Chris's fifth intake pattern — the finding is real and its **size** is wrong —
 in its fifth instance, and again on a report this team wrote itself.
 
+### The always-on figure is now regenerable, and what that closed (August 24, 2026)
+
+**Every table above was produced by hand**, and this section is where that stops. `wc -c` had been typed
+against this path four times — July 28, August 14, August 15 and August 24 — and the notes above record
+the consequence three separate times in their own words: *a measurement in a document that nothing
+regenerates goes stale silently*. It did, in the most expensive way available: **the 3.70 factor was
+inherited unexamined through three re-measurements** and was ~19% too generous, so every derived token
+figure was under-stated while looking precise.
+
+[`scripts/maintenance/measure-always-on.ps1`](../../../scripts/maintenance/measure-always-on.ps1) now
+answers it, with [`measure-context-lib.ps1`](../../../scripts/lib/measure-context-lib.ps1) underneath. It
+walks `CLAUDE.md`'s `@`-imports and reports per document and per section. **Re-run it rather than citing
+the number below.** As of that day:
+
+| always-on document | bytes |
+|---|---|
+| `CLAUDE.md` | 29,044 |
+| Chris's repo lens | 18,056 |
+| Chris's persona — **the marketplace copy, which is what loads** | 16,585 |
+| `SPECIALISTS.md` | 8,005 |
+| **total** | **71,690 B, ~22,978 estimated tokens** |
+
+**Four things it does that a hand-count kept getting wrong**, each one a rule from this lens turned into
+code rather than remembered:
+
+- **The factor lives in the lib with its provenance** — 3.12, n=10, min 2.95, max 3.23, calibrated
+  August 15 — so it can no longer be inherited by copying a table.
+- **The byte column is labelled a measurement and the token column an estimate, in the output.** `do not
+  estimate from file sizes` is about the subject the count_tokens API prices; **it does not price
+  documents**, so here an estimate is the only answer available and the honest move is to label it every
+  time. The plugin listings stay `measure-skill`'s, and the report says so rather than absorbing them.
+- **It resolves the load path.** The persona that loads is the marketplace clone: 16,585 B against 21,860
+  in the tree, so **5,275 B is queued cost arriving at the next plugin update** — named, not smoothed.
+- **The sections must sum to the file, or no table is printed.** A plausible wrong share is worse than a
+  refusal, which is `measure-skill`'s own parse-check reasoning applied to arithmetic.
+
+**And the growth has not stopped, it has moved.** Since August 15 `CLAUDE.md` fell 44,254 B while the
+**portable persona grew 5,534 B**, with the 5,275 above still queued. So the lever this lens has named
+three times — move the evidence, keep the decision — redirects where growth lands rather than ending it,
+exactly as the August 15 counter-argument said. The layer it has moved into is the one that reaches every
+consumer.
+
+### The boundary this measurement replaced a skill for (August 24, 2026)
+
+Issue [#861](https://github.com/DaveKJohn/claude-code-specialists/issues/861) asked for a portable
+`prune-claude` skill that would judge an instruction document block by block. It was argued down and Dave
+accepted the verdict, and the reason belongs in this lens because it is a **cost** argument:
+
+**A rule shipped portable costs a consumer nothing until it applies. A skill costs every consumer session
+its description, whether it ever fires or not.** So `portable-first` — the standing default for a way of
+working — does **not** extend to tooling that carries a per-session cost. There the test comes first: do
+consumers actually have the condition it treats? Here they do not. `CLAUDE.md` is large in this repo
+because this is the *source* that records every decision about the system; a consumer's is not. The
+precedent that had it right is `triage-inbound`: **repo-local, and a net relocation** — 94 lines moved
+*out* of an always-on lens — rather than net-new cost in three repos.
+
+Two more of this role's own rules were broken while making that recommendation, and both are worth
+naming because they are cheap to apply and were skipped: **the firing frequency was never asked for**
+(`measure-skill` leaves that column blank on the rule that a guessed frequency is worse than a blank
+one — but for *whether to build a thing at all*, frequency is the deciding figure), and **the thing being
+proposed would have broken the rule it existed to teach**.
+
 ### Boundaries with the other roles
 
 - A duplication finding is still a duplication first: Nolan may flag the token cost, but the dedup
