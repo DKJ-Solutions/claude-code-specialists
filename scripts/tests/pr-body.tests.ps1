@@ -374,6 +374,81 @@ Assert-Equal '' (Get-PrDescription -EntryText '') 'empty in, empty out -- no thr
 $retired = "## ``fix/z`` changelog`n`n### What does this change do?`n`nOld-style answer.`n"
 Assert-True ((Get-PrDescription -EntryText $retired) -match 'Old-style answer') 'the retired section name is still recognised'
 
+# THE MERGED FORMAT: the entry's opening text sits under the DEPLOY heading with no 'What' section at
+# all, so the DEPLOY heading IS the start of the answer (inbound #853). Before this, the function
+# returned '' here and the caller fell back to Get-EntryDescription -- whose "first '### '" heuristic
+# lands INSIDE the body under this shape and returned about a quarter of it, opening argument gone,
+# in a PR body that looked complete and passed every gate. So the assert that matters is not only that
+# the opening survives, but that it beats what the fallback would have produced.
+$merged = @"
+## DEPLOY: ``fix/thing-v1`` * 20260824-101500
+
+The opening argument, which is the substance a reviewer decides on.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+The tier-2 answer.
+
+**Score:** 2
+
+### Pull Request
+
+The PR title line
+"@
+$mergedDesc = Get-PrDescription -EntryText $merged
+Assert-True ($mergedDesc -match 'The opening argument')      'the merged format keeps the entry opening text -- the defect #853 reported'
+Assert-True ($mergedDesc -match 'The tier-2 answer')         'and the significance section, which is what a reviewer is deciding about'
+Assert-True (-not ($mergedDesc -match 'The PR title line'))  'and still stops at the Pull Request section, which the fold fills'
+Assert-True ($mergedDesc -match '(?m)^## What makes this deploy extra special$') 'sections are still promoted one level for a body of its own'
+Assert-True (-not ($mergedDesc -match 'DEPLOY:'))            'the heading itself is not carried -- GitHub prints the title above the body'
+Assert-True ($mergedDesc.Length -gt (Get-EntryDescription -EntryText $merged).Length) 'and it carries MORE than the fallback would have, which is the whole finding'
+
+# The legacy DEPLOY shape -- branch first, title last -- is matched by the same pattern, so a consumer
+# with a branch in flight under the previous heading gets the repair too rather than the old tail.
+$legacyDeploy = @"
+## ``fix/legacy-v1`` DEPLOY
+
+Legacy-shaped opening text.
+
+### What makes this deploy extra special
+
+Tier two.
+
+### Pull Request
+"@
+Assert-True ((Get-PrDescription -EntryText $legacyDeploy) -match 'Legacy-shaped opening text') 'the previous DEPLOY heading shape starts the answer too'
+
+# WHERE BOTH SHAPES ARE PRESENT the author's own 'What' heading wins, because a merged-format entry
+# still carrying that section is hand-edited or transitional -- and the heading a person wrote is a
+# better answer than the one the scaffolder did.
+$both = @"
+## DEPLOY: ``fix/both-v1`` * 20260824-101500
+
+Scaffolded opening, not the author's answer.
+
+### What does the change on this branch deploy to main?
+
+The author's own answer.
+"@
+$bothDesc = Get-PrDescription -EntryText $both
+Assert-True ($bothDesc -match "The author's own answer")            'a What section present in a merged entry still wins'
+Assert-True (-not ($bothDesc -match 'Scaffolded opening'))          'and the text above it is not swept in'
+
+# A DEPLOY heading inside a FENCE is a quote, not the start of the answer -- this very entry format is
+# documented by entries that quote it, and firing there would return the explanation as the description.
+$fencedDeploy = @"
+### What does the change on this branch deploy to main?
+
+Real answer.
+
+``````markdown
+## DEPLOY: ``fix/quoted-v1`` * 20260824-101500
+``````
+"@
+Assert-True ((Get-PrDescription -EntryText $fencedDeploy) -match 'Real answer') 'a fenced DEPLOY heading is a quote and does not start the answer'
+
 # --- The template and open-pr must agree on the description placeholder (#538) ----------------------
 #
 # THE ONE COUPLING IN THIS MECHANISM THAT FAILS SILENTLY. open-pr fills the PR body by replacing a
@@ -478,6 +553,28 @@ if (Test-Path -LiteralPath $refOnDisk) {
         'and its contents are what Get-PrTemplateReference says they are'
 }
 
+
+# --- The local DEPLOY default and the real matcher must not drift apart ---------------------------
+# Get-PrDescription reads the DEPLOY heading through Get-DevelopmentCycleEntryPattern when the scaffold
+# lib is loaded, and through a local default when it is not -- which is the state this suite runs in, on
+# purpose. Two readers of one rule is how this repo's accumulation bugs start, so the two are held
+# against each other here rather than trusted to stay equal.
+#
+# LOADED LAST, deliberately: dot-sourcing the scaffold lib replaces the heading-name defaults this whole
+# file has been asserting against, so doing it earlier would change what every assert above measures.
+Write-Host ""
+Write-Host "the DEPLOY default agrees with the real matcher" -ForegroundColor Cyan
+
+$defaultMerged = Get-PrDescription -EntryText $merged
+$defaultLegacy = Get-PrDescription -EntryText $legacyDeploy
+$defaultFenced = Get-PrDescription -EntryText $fencedDeploy
+
+. (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
+Assert-True ($null -ne (Get-Command -Name Get-DevelopmentCycleEntryPattern -ErrorAction SilentlyContinue)) `
+    'the real matcher is reachable once the scaffold lib is loaded'
+Assert-Equal $defaultMerged (Get-PrDescription -EntryText $merged)       'the two readers agree on today DEPLOY shape'
+Assert-Equal $defaultLegacy (Get-PrDescription -EntryText $legacyDeploy) 'and on the previous one'
+Assert-Equal $defaultFenced (Get-PrDescription -EntryText $fencedDeploy) 'and on a fenced quote of it, which neither may fire on'
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
