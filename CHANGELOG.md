@@ -22,6 +22,39 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `docs/test-phase-is-the-verification-v1` · 20260824-110245
+
+The page said what TEST *may* leave out; it did not say what the phase is *for*. It does now: TEST is where
+a branch verifies itself, and a branch reaches DEPLOY once it has -- with the check named and its outcome
+recorded, because a check with no place in the arc gets run when somebody remembers to. The sharpening that
+does the work is separating two sentences that were reading as one: `- [~]` means **no suite**, never **no
+verification**. A dropped step still names what was run and what came back, so a TEST phase whose whole
+content is *"nothing to test"* is recognisable as an assertion rather than a verification. Two shapes are
+honest and neither is a suite -- running the gates and reporting the outcome, and a check the phase cannot
+automate as long as it records that it ran. One is not: a step ticked because the change looks correct,
+which is the failure rule 3 already names from the other side.
+
+**Score:** 4
+
+### What makes this deploy extra special
+
+This is the difference between a session somebody watches and one they can walk away from, and it reaches
+every consumer of the workflow through a plugin update. It adds no gate and forbids nothing that was
+allowed: a bare TEST heading is still permitted and still no finding. What changes is that the phase now
+states its own purpose, so the weaker answer is recognisable as the weaker answer.
+
+**Score:** 3
+
+### Pull Request
+
+The TEST phase is where the branch is verified, and it names the check that was run
+
+Plugins: workflow-davekjohn
+
+[PR #860](https://github.com/DaveKJohn/claude-code-specialists/pull/860)
+
+---
+
 ## DEPLOY: `docs/plan-phase-explore-then-goal-v1` · 20260824-104821
 
 The PLAN phase now says how it is entered and how the cycle is driven to its end. Exploration happens in
