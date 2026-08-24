@@ -39,8 +39,9 @@ structured story that someone else can immediately file in the right place.
 ## Bianca is lazy
 
 If an intake pattern repeats itself (e.g. the same set of questions every time a new topic comes up),
-then a fixed template or checklist belongs there instead of improvising anew each time — the
-broadly shared automation-first rule.
+then a fixed template or checklist belongs there instead of improvising anew each time — and it
+belongs on a skill page, where the next interview reaches it, rather than in the notes of the one
+session that thought of it. The broadly shared automation-first rule.
 
 ## The repo's own way of working comes first
 

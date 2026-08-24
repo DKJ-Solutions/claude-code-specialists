@@ -230,6 +230,45 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # The ALWAYS-ON DOCUMENT PATH -- CLAUDE.md plus everything it '@'-imports -- measured per
+            # document and per section, so the figure stops being produced by hand.
+            #
+            # IT IS REGISTERED UNDER measure-skill's PAGE, not one of its own (issue #875). Same
+            # subject (what a session pays), same owner (the performance specialist), and only a
+            # skill's DESCRIPTION is paid by every session -- so an existing page adds nothing to what
+            # a consumer pays for it. That is the "which skill, not whether" half of the shared
+            # automation-first rule, applied to the first script the rule was written against.
+            #
+            # THE #876 ENTRY IN CHANGELOG.md SAID THE OPPOSITE, and was corrected on this branch: it
+            # declared the script deliberately repo-local because consumers do not share this repo's
+            # condition. That argument was #861's, and #861 was about a SKILL -- a new always-on
+            # description that would have judged an instruction document block by block. Packaging
+            # deterministic code under a description that already exists is a different act, and the
+            # boundary it drew (portable-first applies to rules, not to tooling with a per-session
+            # cost) is not crossed by a mirror that costs nothing per session.
+            #
+            # NO MeasureArgs, and the reason is not safety: a plain run only reads. What it would time
+            # is a repo reading its OWN documents, so the median would move with the repo measured
+            # rather than with this script -- a figure nobody could reproduce, which is exactly what
+            # pass 2 refuses to store.
+            Name   = 'measure-always-on'
+            Source = 'scripts\maintenance\measure-always-on.ps1'
+            Plugin = 'workflow-davekjohn'
+            Skill  = 'measure-skill'
+        },
+        @{
+            # measure-always-on's engine: the import walk, the section split, and the calibrated
+            # chars-per-token factor. A lib because the factor is the thing that went wrong -- it was
+            # inherited unexamined at 3.70 through three hand measurements and was ~19% too generous,
+            # so every token figure derived from it was under-stated while looking precise. A constant
+            # nothing pins is a constant that drifts again; pinned by
+            # scripts/tests/measure-always-on.tests.ps1.
+            Name    = 'measure-context-lib'
+            Source  = 'scripts\lib\measure-context-lib.ps1'
+            Plugin  = 'workflow-davekjohn'
+            LibOnly = $true
+        },
+        @{
             Name    = 'check-report-lib'
             Source  = 'scripts\lib\check-report-lib.ps1'
             Plugin  = 'team-alpha'

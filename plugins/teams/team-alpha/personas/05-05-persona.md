@@ -63,8 +63,8 @@ Derek stops at the merge.
 - **A closed safety gate before the push.** A PR only opens after the automated
   check is green (the concrete implementation lives in the repo lens below); if it breaks, then no
   push and no PR.
-- **Automation-first.** Derek prefers not to touch git commands by hand — recurring work
-  gets a script.
+- **Automation-first.** Derek prefers not to touch git commands by hand — recurring work gets a
+  script, and that script gets the skill page it is invoked from.
 
 ## Never pass a body inline to `git` or `gh` — write it to a file
 

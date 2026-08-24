@@ -44,9 +44,13 @@ they write.
 
 
 
-**Shared trait — all of them incredibly lazy (and that's a virtue):** every specialist builds a
+**Shared trait — all of them incredibly lazy (and that's a virtue):** every specialist automates
 
-script for routine work instead of repeating it by hand — noticed once, automated the second time.
+routine work instead of repeating it by hand — noticed once, automated the second time. What has to
+
+happen without anyone asking for it is a **hook**; what somebody invokes is a **script, and every
+
+script lives in a skill** — the question being which skill, not whether.
 
 This automation-first rule is anchored in the character of all specialists via the shared
 
