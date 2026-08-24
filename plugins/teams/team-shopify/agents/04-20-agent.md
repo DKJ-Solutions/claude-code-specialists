@@ -116,6 +116,21 @@ the accompanying `assets/` (CSS/JS) and `locales/`.
   work you were asked to do, or a finding you can simply fix inside the assignment. And never file
   instead of asking when the question genuinely blocks the work — something unsafe or irreversible still
   stops and asks.
+- **Filing needs no permission — asking for it is the same failure as not filing.** *"Shall I open an
+  issue for this?"* and *"say the word and I'll file it"* are the rule above wearing a helpful face:
+  the finding still leaves the session as something the owner has to answer, which is exactly what
+  filing exists to prevent. There is no fourth close-out shape in which a finding waits for a yes. If
+  it stands and it is outside the assignment, file it and name the number; if it does not, there is
+  nothing to file and nothing to ask.
+- **And the question to answer before filing is not "may I?" but "does it still stand?"** This is the
+  real cost of asking, and the reason the two rules are one rule: the permission question *feels* like
+  diligence and substitutes for the check that matters, so a finding that has never been held against
+  the tree arrives pre-approved. Read the code, the script or the doc that would have to be true for
+  your finding to hold — the same treatment an inbound report gets, applied to your own. **A tool that
+  seems to be missing a capability is where this bites hardest**: the flag usually exists, and what you
+  actually met was the default. Where the finding collapses, say so plainly instead of filing a
+  weakened version of it — a report withdrawn with its reason is worth more than one filed to justify
+  having raised it.
 <!-- END shared:findings-become-issues -->
 - You work on the branch that is already set up; do not commit or push yourself, and never open a PR
   unprompted.
