@@ -22,6 +22,76 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `docs/plan-phase-explore-then-goal-v1` · 20260824-104821
+
+The PLAN phase now says how it is entered and how the cycle is driven to its end. Exploration happens in
+**plan mode**, where Claude reads and proposes but cannot edit, and the sequence is spelled out because
+getting it wrong stalls step one on its own scaffold: `new-branch` writes a file, so the plan has to be
+approved before the branch exists. Then the cycle is driven by a `/goal` condition rather than by prompting
+it forward turn by turn -- written so this document's own gates prove it, because the evaluator runs no
+commands and reads no files. The three endings are separated on purpose: **Met** continues into DEPLOY,
+**Impossible** parks the branch and turns the blocker into its own issue, and a **stall** means nothing
+about the work at all -- the goal is still set and the harness is waiting for a prompt. Reading a stall as
+a blocker would park a branch over a loop that simply went quiet. The phases hold unchanged without any of
+it: `/goal` is part of the hooks system and is unavailable in an untrusted folder.
+
+**Score:** 4
+
+### What makes this deploy extra special
+
+Every consumer of this workflow gets a documented answer to "how do I actually run a cycle", which the page
+did not carry: it described the form and left the driving to whoever was at the keyboard. It reaches them
+through a plugin update, and it deliberately adds no requirement -- a repo without hooks available runs the
+same cycle it ran yesterday.
+
+**Score:** 3
+
+### Pull Request
+
+The PLAN phase explores before it plans, and a goal condition drives the cycle
+
+Plugins: workflow-davekjohn
+
+[PR #859](https://github.com/DaveKJohn/claude-code-specialists/pull/859)
+
+---
+
+## DEPLOY: `fix/pr-body-keeps-the-deploy-opening-v1` · 20260824-103401
+
+Since the development cycle became one document, every PR body has silently lost the entry's opening text
+-- the substance a reviewer decides on. `Get-PrDescription` looks for a `What` heading, the merged format
+has none (its body sits directly under `## DEPLOY:`), so the caller fell back to `Get-EntryDescription`,
+whose "the first `### ` line is the entry heading" rule was written when the heading really was an H3.
+Under the merged format that first `###` is a section inside the body, so the fallback returned the tail
+from there: measured at 0 chars from one function and ~24% of the entry from the other, in a body that had
+a heading, a filled-in significance section and a green CI. `Get-PrDescription` now recognises the DEPLOY
+heading itself, through the same matcher the fold and both gates use, and a `What` section still wins
+where an author wrote one. **The fold was never affected** -- `CHANGELOG.md` received every entry complete
+-- so nothing is lost in the record; what is restored is the review moment.
+
+**Score:** 4
+
+### What makes this deploy extra special
+
+This was reported by a consumer, on the first PR they opened under the merged format, and it reaches every
+other consumer the same way it reached them: through a plugin update, with no action on their side. Their
+report is also the reason it was found at all -- the failure is silent and the body looks complete, so the
+gates could not have caught it. Two things go back to them with the close: the repair sits one function
+further along than the report proposed, and the repro snippet names a `Resolve-PluginScript` that exists
+nowhere in the tree, so it would not run as written.
+
+**Score:** 4
+
+### Pull Request
+
+The PR body carries the entry's opening text again
+
+Plugins: workflow-davekjohn
+
+[PR #858](https://github.com/DaveKJohn/claude-code-specialists/pull/858)
+
+---
+
 ## DEPLOY: `docs/verification-is-a-plan-step-v1` · 20260824-101405
 
 A branch whose real work is judgement -- verifying a report, choosing between two designs, establishing
