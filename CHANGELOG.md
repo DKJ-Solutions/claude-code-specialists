@@ -22,6 +22,36 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `docs/cache-follows-refresh-not-push-v1` · 20260824-095933
+
+`CLAUDE.md` promised that a session here sees the **last pushed** version of the plugins. It does not: a
+session reads the local marketplace clone, and that clone advances on `claude plugin marketplace update`
+rather than on a push. Measured on August 23, 2026, after four PRs had merged and pushed, the clone still
+stood on the previous day's commit while `/plugin` reported nothing to do and `check-connectors.ps1`
+reported `[OK] machine record is on the source version` -- both compare version strings, and between two
+releases the version is unchanged by definition, so a clone any number of commits behind `main` is
+indistinguishable from a current one. The sentence now names the refresh and says that no version check
+can tell you otherwise between releases. **Detection is deliberately left alone**, with the reasoning in
+the lens: comparing commits would report a gap on every consumer between cuts, where following the
+releases is the intended contract.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+N/A -- both halves are about how this repo consumes its own plugin. A consumer's clone following the
+releases is the intended contract for them, and nothing in their workflow changes.
+
+**Score:** N/A
+
+### Pull Request
+
+The plugin cache follows a marketplace refresh, not a push
+
+[PR #852](https://github.com/DaveKJohn/claude-code-specialists/pull/852)
+
+---
+
 ## DEPLOY: `feat/ship-pr-names-the-governing-check-v1` · 20260824-094425
 
 `ship-pr` waits for every check a PR has, and used to say nothing about which one had held it up -- so the
