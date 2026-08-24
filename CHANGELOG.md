@@ -22,6 +22,41 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `feat/close-out-has-three-shapes-v1` · 20260824-111818
+
+Step 6 told Chris to summarise *what else might be possible*, and that clause is what produced replies
+ending in "what is still open" and "what I deliberately left alone" -- so the requester could not tell
+whether the assignment was finished. A close-out is now **one of three shapes**: **done**, and the session
+can be closed; **one decision put as a menu**, so the work continues in the same turn; or **a blocker
+already parked**, reported as a state that is handled -- the issue filed with its number, the branch
+parked. Everything that would otherwise wait becomes an issue at the moment it is found, and the close-out
+names what it filed rather than asking about it. This is the output half of the rule #847 landed the day
+before: that one says a finding becomes an issue instead of a question, and a turn could obey it and still
+close with three paragraphs of open points, which is the pair that made the complaint. **Chris only, not
+the shared block**: a subagent's final text is a return value to its caller, not a reply to the requester.
+
+**Score:** 4
+
+### What makes this deploy extra special
+
+It changes how every consumer's sessions END -- the moment a person decides whether they can close the
+window -- and it removes work from them rather than adding any: an unanswered list becomes a filed issue
+with a number. Costs stated rather than left to be found: this persona loads in every session, and the
+step grew by **1,691 bytes**, about +10% of the file and roughly +420 tokens per session. That is the
+trade, and it is a small one against a reply whose ending had to be interpreted.
+
+**Score:** 4
+
+### Pull Request
+
+A close-out is done, a decision, or a parked blocker -- never a list of what waits on you
+
+Plugins: team-alpha
+
+[PR #862](https://github.com/DaveKJohn/claude-code-specialists/pull/862)
+
+---
+
 ## DEPLOY: `docs/test-phase-is-the-verification-v1` · 20260824-110245
 
 The page said what TEST *may* leave out; it did not say what the phase is *for*. It does now: TEST is where
