@@ -62,10 +62,12 @@
 
 ## TEST
 
-- [ ] `check-plugin-integrity.ps1`: 0 errors, with check `[shared]` walking all 30 carriers and
-      reporting no drift.
-- [ ] All 52 suites green.
-- [ ] The diff touches the source plus exactly the 30 generated carriers, and nothing else.
+- [x] `check-plugin-integrity.ps1`: **0 errors**, and check `[shared] checked 30` walked every carrier —
+      agent defs and personas both — reporting no drift against the source block.
+- [x] **All 52 suites green**, 1,739 assertions, 242s (`Invoke-TestSuiteGate`, the same gate `open-pr` runs).
+- [x] The diff is **1 source block + exactly the 30 generated carriers**. It carries a 32nd file the step
+      did not name: `workflow-davekjohn/development-cycle.md`, this document — which is on every branch by
+      construction and is removed again at the fold, so it never reaches the tree the step was about.
 
 ## DEPLOY: `feat/filing-a-finding-needs-no-permission-v1`
 
