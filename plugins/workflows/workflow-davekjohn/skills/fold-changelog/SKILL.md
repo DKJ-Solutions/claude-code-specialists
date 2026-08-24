@@ -251,6 +251,34 @@ flag; trust the check.
 still folding, which then lands twice. So `git pull` first, then fold your own branch by name. If your
 fold push is rejected because you are behind origin, that is harmless: pull and retry.
 
+## When your branch contradicts an entry that is already folded but not yet released
+
+An entry sits in `CHANGELOG.md` from the moment it is folded until the next release cut. In that window
+it is **not history** — it is a claim waiting to be published, and the branch you are on right now can
+be the thing that makes it false.
+
+**Correct it in place. Do not supersede it in your own entry.** Both entries reach the reader in the
+same release document, so a "this was reversed the next day" paragraph three entries down publishes the
+contradiction rather than resolving it — and if your entry ranks above the stale one, the reader meets
+the correction before the claim it corrects.
+
+**The measured instance**
+([#876](https://github.com/DaveKJohn/claude-code-specialists/pull/876) →
+[#875](https://github.com/DaveKJohn/claude-code-specialists/issues/875), August 24, 2026): an entry
+declared its new script *"deliberately repo-local… nothing about it ships. That is the point rather than
+an omission."* The next branch, within the day, registered that script in the plugin. The false half was
+never the description of what shipped — it was the **principle** the section had reached for. That is
+the half to withdraw, and where a section's factual answer still stands (there, an audience score of
+`N/A` for a change that genuinely reached nobody) it stays as it is.
+
+Two limits worth keeping straight:
+
+- **Only while it is pending.** Once a release is cut, that entry is what a version said at the time
+  and a later edit is a rewrite of the record. Then a new entry *is* the right instrument.
+- **The withdrawal is signed, not silent.** Say what the section originally claimed and why it is being
+  withdrawn. A quietly edited entry teaches its next reader nothing, and the reasoning that went wrong
+  is usually more reusable than the sentence that carried it.
+
 ## Closing step: branch cleanup (#163)
 
 The fold is the **last step of the PR chain**, so branch cleanup belongs here as its fixed
