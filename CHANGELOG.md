@@ -22,6 +22,42 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `fix/pr-body-keeps-the-deploy-opening-v1` · 20260824-103401
+
+Since the development cycle became one document, every PR body has silently lost the entry's opening text
+-- the substance a reviewer decides on. `Get-PrDescription` looks for a `What` heading, the merged format
+has none (its body sits directly under `## DEPLOY:`), so the caller fell back to `Get-EntryDescription`,
+whose "the first `### ` line is the entry heading" rule was written when the heading really was an H3.
+Under the merged format that first `###` is a section inside the body, so the fallback returned the tail
+from there: measured at 0 chars from one function and ~24% of the entry from the other, in a body that had
+a heading, a filled-in significance section and a green CI. `Get-PrDescription` now recognises the DEPLOY
+heading itself, through the same matcher the fold and both gates use, and a `What` section still wins
+where an author wrote one. **The fold was never affected** -- `CHANGELOG.md` received every entry complete
+-- so nothing is lost in the record; what is restored is the review moment.
+
+**Score:** 4
+
+### What makes this deploy extra special
+
+This was reported by a consumer, on the first PR they opened under the merged format, and it reaches every
+other consumer the same way it reached them: through a plugin update, with no action on their side. Their
+report is also the reason it was found at all -- the failure is silent and the body looks complete, so the
+gates could not have caught it. Two things go back to them with the close: the repair sits one function
+further along than the report proposed, and the repro snippet names a `Resolve-PluginScript` that exists
+nowhere in the tree, so it would not run as written.
+
+**Score:** 4
+
+### Pull Request
+
+The PR body carries the entry's opening text again
+
+Plugins: workflow-davekjohn
+
+[PR #858](https://github.com/DaveKJohn/claude-code-specialists/pull/858)
+
+---
+
 ## DEPLOY: `docs/verification-is-a-plan-step-v1` · 20260824-101405
 
 A branch whose real work is judgement -- verifying a report, choosing between two designs, establishing
