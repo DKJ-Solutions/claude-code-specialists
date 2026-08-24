@@ -353,6 +353,93 @@ Assert-Set  @(123, 456) (Get-ClosedIssueNumbers -Text $appended) 'the missing is
 Assert-Equal $appended (Add-ResolvesBlock -Body $appended -Issues @(123, 456)) 'appending twice changes nothing'
 Assert-Equal $one.body (Add-ResolvesBlock -Body $one.body -Issues @(123)) 'nothing to add leaves the body identical (no pr edit call)'
 
+
+# --- Get-CheckWaitReport: which check governed the merge wait (issue #831) ------------------------
+# The SELECTION is what a suite can reach; the gh call is not. So every assert here is about the
+# payload -> line mapping, and the shapes that must NOT produce a line are asserted as loudly as the
+# ones that must: a fabricated ordering is worse than a missing one, which is the whole reason #831
+# exists -- it was opened because two readings from a sample of three had been quoted as a tendency.
+Write-Host ""
+Write-Host "Get-CheckWaitReport -- which check governed the wait" -ForegroundColor Cyan
+
+Assert-Equal '0s'      (Format-CheckDuration -Seconds 0)    'duration: zero reads as 0s -- the median answer here, not an unmeasured one'
+Assert-Equal '59s'     (Format-CheckDuration -Seconds 59)   'duration: below a minute stays in seconds'
+Assert-Equal '1m 00s'  (Format-CheckDuration -Seconds 60)   'duration: a whole minute pads the seconds'
+Assert-Equal '9m 08s'  (Format-CheckDuration -Seconds 548)  'duration: seconds are zero-padded so a column lines up'
+Assert-Equal '14m 05s' (Format-CheckDuration -Seconds 845)  'duration: matches the shape the release notes already use'
+Assert-Equal ''        (Format-CheckDuration -Seconds -1)   'duration: unmeasured returns empty, so a caller can concatenate'
+
+# Both timestamp shapes must land on the same answer: 5.1's ConvertFrom-Json hands back a [datetime],
+# other editions can hand back the string. A reader of only one of them would mis-order on the other.
+$asText = ConvertTo-CheckTimestamp -Value '2026-08-24T09:14:05Z'
+$asDate = ConvertTo-CheckTimestamp -Value ([datetime]::Parse('2026-08-24T09:14:05Z').ToUniversalTime())
+Assert-Equal $asDate.Ticks $asText.Ticks 'timestamp: a string and an already-parsed [datetime] agree'
+Assert-True ($null -eq (ConvertTo-CheckTimestamp -Value $null)) 'timestamp: absent is $null, not the epoch'
+Assert-True ($null -eq (ConvertTo-CheckTimestamp -Value ''))    'timestamp: empty is $null'
+Assert-True ($null -eq (ConvertTo-CheckTimestamp -Value 'soon')) 'timestamp: unreadable is $null rather than a throw'
+
+$twoChecks = @'
+[
+  {"name":"lint-en-tests","startedAt":"2026-08-24T09:00:00Z","completedAt":"2026-08-24T09:09:58Z"},
+  {"name":"claude-review","startedAt":"2026-08-24T09:00:00Z","completedAt":"2026-08-24T09:14:05Z"}
+]
+'@
+$requiredOnly = '[{"name":"lint-en-tests"}]'
+
+$line = Get-CheckWaitReport -ChecksJson $twoChecks -RequiredNamesJson $requiredOnly -WaitedSeconds 845
+Assert-True ($line -like "*'claude-review' finished last*")        'the check that finished LAST is the one named as governing'
+Assert-True ($line -like '*NOT required*')                         'and it is labelled against the ruleset, never against a hardcoded name'
+Assert-True ($line -like '*14m 05s*')                              'its own duration is reported'
+Assert-True ($line -like '*4m 07s after the last required check*') 'the excess over the last required check is what this run actually paid'
+Assert-True ($line -like '*waited 14m 05s*')                       'the wall-clock the script itself spent is stated separately'
+
+# The ordinary case, and the one nobody could see before: the required check governs and the
+# non-required one finished long ago. Measured at 77 of 100 runs -- so this is the line that must not
+# invent a cost out of an ordering it does not have.
+$requiredGoverns = @'
+[
+  {"name":"lint-en-tests","startedAt":"2026-08-24T09:00:00Z","completedAt":"2026-08-24T09:08:37Z"},
+  {"name":"claude-review","startedAt":"2026-08-24T09:00:00Z","completedAt":"2026-08-24T09:03:02Z"}
+]
+'@
+$line2 = Get-CheckWaitReport -ChecksJson $requiredGoverns -RequiredNamesJson $requiredOnly -WaitedSeconds 517
+Assert-True ($line2 -like "*'lint-en-tests' finished last*") 'the required check governing is reported as plainly as the other way round'
+Assert-True ($line2 -like '*, required*')                    'and labelled required'
+Assert-True (-not ($line2 -like '*after the last required check*')) 'no excess is stated when the required check governed -- there is none'
+
+# Without the required set the line still says which check governed, and says NOTHING about required.
+$line3 = Get-CheckWaitReport -ChecksJson $twoChecks -WaitedSeconds 845
+Assert-True ($line3 -like "*'claude-review' finished last*") 'an unknown ruleset does not cost the reader the ordering'
+Assert-True (-not ($line3 -like '*required*'))               'but an unknown answer is left unstated rather than guessed'
+
+# A ruleset payload that does not parse must behave exactly as an absent one, never as "not required".
+$line4 = Get-CheckWaitReport -ChecksJson $twoChecks -RequiredNamesJson 'not json at all' -WaitedSeconds 845
+Assert-True (-not ($line4 -like '*required*')) 'an unparseable ruleset payload degrades to silence, not to a wrong label'
+
+# Unmeasured wall-clock is omitted rather than printed as zero -- 0s is a real, common answer here.
+$line5 = Get-CheckWaitReport -ChecksJson $twoChecks -RequiredNamesJson $requiredOnly
+Assert-True (-not ($line5 -like '*waited*'))                 'an unmeasured wait is left out, so it cannot be read as 0s'
+Assert-True ($line5 -like "*'claude-review' finished last*") 'while the ordering is still reported'
+
+# Every shape that cannot answer the question returns $null, so the caller prints its own fallback.
+Assert-True ($null -eq (Get-CheckWaitReport -ChecksJson ''))     'empty payload: no line'
+Assert-True ($null -eq (Get-CheckWaitReport -ChecksJson '   '))  'whitespace payload: no line'
+Assert-True ($null -eq (Get-CheckWaitReport -ChecksJson '[]'))   'empty list: no line -- the 5.1 array trap that bit Get-ExistingPrRecord'
+Assert-True ($null -eq (Get-CheckWaitReport -ChecksJson 'nope')) 'unparseable payload: no line'
+Assert-True ($null -eq (Get-CheckWaitReport -ChecksJson '[{"name":"x"}]')) 'a check with no completedAt cannot have finished last'
+Assert-True ($null -eq (Get-CheckWaitReport -ChecksJson '[{"completedAt":"2026-08-24T09:00:00Z"}]')) 'a nameless record cannot be named'
+
+# A check with no startedAt still finished, and still governed. Report the ordering, not a duration.
+$noStart = '[{"name":"claude-review","completedAt":"2026-08-24T09:14:05Z"}]'
+$line6 = Get-CheckWaitReport -ChecksJson $noStart -WaitedSeconds 845
+Assert-True ($line6 -like "*'claude-review' finished last*") 'a missing startedAt does not cost the ordering'
+Assert-True ($line6 -like '*duration unknown*')              'and the duration says so instead of being computed from nothing'
+
+# A single check is the common shape in a repo with one workflow, and it governs by definition.
+$onlyOne = '[{"name":"lint-en-tests","startedAt":"2026-08-24T09:00:00Z","completedAt":"2026-08-24T09:09:58Z"}]'
+$line7 = Get-CheckWaitReport -ChecksJson $onlyOne -RequiredNamesJson $requiredOnly -WaitedSeconds 598
+Assert-True ($line7 -like "*'lint-en-tests' finished last*") 'one check governs its own wait -- Sort-Object over a single item still answers'
+Assert-True ($line7 -like '*, required*')                    'and is still labelled from the ruleset'
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red

@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-    Helpers for the issue-closing contract of a Pull Request (the -Resolves gate in open-pr.ps1).
+    Helpers for what a Pull Request's own machinery has to read: the issue-closing contract (the
+    -Resolves gate in open-pr.ps1) and the check ordering behind ship-pr.ps1's merge wait.
 
 .DESCRIPTION
     Dot-source this file:
@@ -13,12 +14,18 @@
     findings sat OPEN while the changelog said they were done. The instance was cleaned up by hand;
     this lib is the class being closed (Dave's standing rule: build the gate, not just the fixes).
 
+    The second group (Get-CheckWaitReport and its two helpers) arrived for the same reason from the
+    other end: ship-pr.ps1 drives `gh pr checks --watch` against a live remote, and issue #831 asked
+    for the wait to SAY which check governed it. The query cannot be tested and the selection can, so
+    the selection lives here -- see that function's own header for the measurement behind it.
+
     Everything here is a PURE function of its input -- no git, no gh, no filesystem -- so the suite
     (scripts/tests/pr-issues.tests.ps1) can assert the whole decision table without a live remote.
-    The one part that cannot be pure (asking GitHub which issues are still open) stays in the caller.
+    The parts that cannot be pure (asking GitHub which issues are still open, and asking it for the
+    check timestamps) stay in the callers.
 
     Shared with the plugin mirror (registered in scripts/lib/shared-scripts-lib.ps1), because
-    open-pr.ps1 is itself mirrored and dot-sources this file.
+    open-pr.ps1 and ship-pr.ps1 are both mirrored and dot-source this file.
 
     No Set-StrictMode here: dot-sourcing would change the strict mode of the calling script.
     Pure ASCII (repo convention for .ps1).
@@ -448,4 +455,171 @@ function Get-ResolvesDecision {
         Blocked    = @()
         Undeclared = @()
     }
+}
+
+function Format-CheckDuration {
+    <#
+    .SYNOPSIS
+        A whole number of seconds as 'Xm YYs', or 'Ys' below a minute. '' for a negative input.
+
+    .DESCRIPTION
+        The shape every duration in this repo's release notes and measurements is already written in
+        ('8m 37s', '14m 05s'), so a wait this script reports can be read next to those without anyone
+        converting units. Seconds are zero-padded above a minute for the same reason: '9m 8s' and
+        '9m 58s' do not line up in a column, '9m 08s' and '9m 58s' do.
+
+        A negative input returns '' rather than a nonsense string, so a caller with nothing measured
+        can concatenate unconditionally instead of branching. Zero returns '0s', because 0s is a real
+        and (per issue #831) the MEDIAN answer here -- an empty string there would read as unmeasured.
+    #>
+    param([int]$Seconds)
+
+    if ($Seconds -lt 0) { return '' }
+    if ($Seconds -lt 60) { return "${Seconds}s" }
+    return ('{0}m {1:d2}s' -f [int][math]::Floor($Seconds / 60), ($Seconds % 60))
+}
+
+function ConvertTo-CheckTimestamp {
+    <#
+    .SYNOPSIS
+        One gh timestamp field as a UTC [datetime], or $null when it is absent or unreadable.
+
+    .DESCRIPTION
+        Deliberately accepts BOTH shapes, because which one arrives depends on the edition rather than
+        on the payload: Windows PowerShell 5.1's ConvertFrom-Json converts an ISO-8601 string to a
+        [datetime] on its own, while other editions can hand the string straight through. A caller that
+        assumed either one would work on one machine and mis-read the ordering on the next -- and a
+        mis-read ordering is exactly the defect the caller exists to correct.
+
+        Parsed with InvariantCulture and AdjustToUniversal, so two checks are compared on the same clock
+        regardless of the machine's locale. Returns $null rather than throwing: an unreadable timestamp
+        means this record cannot take part in the ordering, which the caller handles.
+    #>
+    param($Value)
+
+    if ($null -eq $Value) { return $null }
+    if ($Value -is [datetime]) { return $Value.ToUniversalTime() }
+
+    $text = [string]$Value
+    if (-not $text.Trim()) { return $null }
+    try {
+        return [datetime]::Parse(
+            $text,
+            [System.Globalization.CultureInfo]::InvariantCulture,
+            [System.Globalization.DateTimeStyles]::AdjustToUniversal)
+    } catch {
+        return $null
+    }
+}
+
+function Get-CheckWaitReport {
+    <#
+    .SYNOPSIS
+        One line saying WHICH check governed a PR's merge wait and for how long, from a
+        `gh pr checks --json` payload. $null when the payload cannot answer that.
+
+    .DESCRIPTION
+        ship-pr.ps1 waits for every check a PR has and reads the exit code. That is deliberate and does
+        not change here -- but it made the wait invisible: a run printed gh's own table and nothing
+        about the ordering, so learning which check had held it up meant opening the Actions page
+        afterwards. Measured over n=100 paired runs in the source repo (issue #831), the non-required
+        check governs the wait 23% of the time at a median cost of 0s -- a different answer from the one
+        two individual observations had suggested, and the reason those two became a policy question at
+        all is that nobody could see the ordinary case. This report is the ordinary case, printed.
+
+        THE SELECTION IS THE PART THAT NEEDS A TEST, not the query -- the same split as
+        Get-ExistingPrRecord above, for the same reason: the caller drives a live remote and no suite
+        can reach it, while this can.
+
+        IT NAMES NO CHECK OF ITS OWN. The governing check is whichever one finished LAST in the payload,
+        and 'required' comes from `gh pr checks --required`, i.e. from the repo's own ruleset. A
+        hardcoded name here would be a claim about a consumer's CI that this script cannot keep, which
+        is what the step-3 comment in ship-pr.ps1 has said since it was written.
+
+        Degrades to $null rather than guessing: empty or unparseable JSON, no record carrying a name, or
+        no record with a readable completedAt. Without -RequiredNamesJson the line omits the
+        required/not-required label entirely, because an unknown answer stated either way is worse than
+        an unstated one.
+
+    .PARAMETER ChecksJson
+        `gh pr checks <pr> --json name,startedAt,completedAt` output (state/bucket may ride along).
+
+    .PARAMETER RequiredNamesJson
+        `gh pr checks <pr> --required --json name` output. Optional.
+
+    .PARAMETER WaitedSeconds
+        The wall-clock this script itself spent on step 3. Negative means unmeasured, and is then left
+        out of the line rather than reported as zero.
+    #>
+    param(
+        [string]$ChecksJson,
+        [string]$RequiredNamesJson = '',
+        [int]$WaitedSeconds = -1
+    )
+
+    if (-not $ChecksJson -or -not $ChecksJson.Trim()) { return $null }
+
+    try { $parsed = $ChecksJson | ConvertFrom-Json } catch { return $null }
+
+    # Assign first, wrap second -- 5.1 hands a parsed JSON array to the pipeline as ONE object.
+    $records = @(@($parsed) | Where-Object { $_ -and $_.name })
+    if ($records.Count -eq 0) { return $null }
+
+    $finished = @()
+    foreach ($r in $records) {
+        $done = ConvertTo-CheckTimestamp -Value $r.completedAt
+        if ($null -eq $done) { continue }
+
+        $ran = -1
+        $began = ConvertTo-CheckTimestamp -Value $r.startedAt
+        if ($null -ne $began) {
+            $ran = [int][math]::Round(($done - $began).TotalSeconds)
+            if ($ran -lt 0) { $ran = -1 }
+        }
+        $finished += [pscustomobject]@{ Name = [string]$r.name; Completed = $done; Ran = $ran }
+    }
+    if ($finished.Count -eq 0) { return $null }
+
+    $governing = @($finished | Sort-Object -Property Completed -Descending)[0]
+
+    $required = @()
+    if ($RequiredNamesJson -and $RequiredNamesJson.Trim()) {
+        try {
+            $required = @(@($RequiredNamesJson | ConvertFrom-Json) |
+                Where-Object { $_ -and $_.name } |
+                ForEach-Object { [string]$_.name })
+        } catch {
+            $required = @()
+        }
+    }
+
+    $parts = @()
+    if ($WaitedSeconds -ge 0) { $parts += "waited $(Format-CheckDuration -Seconds $WaitedSeconds)" }
+
+    $label = ''
+    $isRequired = $false
+    if ($required.Count -gt 0) {
+        $isRequired = $required -contains $governing.Name
+        $label = if ($isRequired) { ', required' } else { ', NOT required' }
+    }
+
+    $ran = if ($governing.Ran -ge 0) { Format-CheckDuration -Seconds $governing.Ran } else { 'duration unknown' }
+    $parts += "'$($governing.Name)' finished last and governed the merge ($ran$label)"
+
+    # What waiting on a non-required check actually cost on THIS run: the gap between it and the last
+    # required check to finish. Stated only when both halves are known -- a figure assembled from a
+    # guess is the defect this whole report exists to correct.
+    if ($required.Count -gt 0 -and -not $isRequired) {
+        $lastRequired = @($finished |
+            Where-Object { $required -contains $_.Name } |
+            Sort-Object -Property Completed -Descending)
+        if ($lastRequired.Count -gt 0) {
+            $excess = [int][math]::Round(($governing.Completed - $lastRequired[0].Completed).TotalSeconds)
+            if ($excess -gt 0) {
+                $parts += "$(Format-CheckDuration -Seconds $excess) after the last required check ('$($lastRequired[0].Name)')"
+            }
+        }
+    }
+
+    return ($parts -join '; ')
 }
