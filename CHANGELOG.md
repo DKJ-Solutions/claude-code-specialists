@@ -25,6 +25,47 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `docs/correct-a-pending-entry-in-place-v1` · 20260824-213518
+
+**A folded entry is not history until a release is cut, and until then a later branch can make it
+false.** Nothing said what to do about that, so the answer got worked out on the spot: correct it **in
+place**, do not supersede it in the new entry. Both entries reach the reader in the same release
+document, so a "reversed the next day" paragraph three entries down publishes the contradiction instead
+of resolving it -- and where the new entry ranks higher, the reader meets the correction before the
+claim it corrects.
+
+**The measured instance is in the page, because the reasoning is the reusable half.** #876's entry
+declared its new script *"deliberately repo-local... nothing about it ships. That is the point rather
+than an omission"*, and #875's branch registered that script in the plugin within the day. What was
+false was never the description of what shipped -- it was the **principle** the section reached for,
+which is why the correction withdraws that and leaves the section's factual answer (an audience score
+of `N/A`, correct for a change that genuinely reached nobody) exactly where it was.
+
+Two limits are stated with it: the rule holds **only while the entry is pending**, since after a cut an
+edit is a rewrite of the record and a new entry is then the right instrument; and the withdrawal is
+**signed rather than silent**, because a quietly edited entry teaches its next reader nothing.
+
+**Score:** 2
+
+### What makes this PR extra special
+
+Every consumer running this workflow folds entries into a `CHANGELOG.md` that sits pending for as long
+as the gap between merges and cuts -- which in a repo that cuts monthly is most of the month. The page
+they read to learn folding now answers a question that only comes up in that window, and answers it
+before the day it comes up rather than after.
+
+**Score:** 2
+
+### Pull Request
+
+A pending changelog entry your branch contradicts is corrected in place
+
+Plugins: workflow-davekjohn
+
+[PR #879](https://github.com/DaveKJohn/claude-code-specialists/pull/879)
+
+---
+
 ## DEPLOY: `feat/every-script-lives-in-a-skill-v1` · 20260824-212203
 
 **The automation-first rule now says what to build, not merely that something should be built.** It said
