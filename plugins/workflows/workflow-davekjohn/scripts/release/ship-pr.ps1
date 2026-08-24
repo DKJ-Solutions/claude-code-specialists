@@ -50,6 +50,9 @@
          the empty string, so the script would have run `gh pr merge ''`. See the comment at step 2.
       3. Wait for the required CI check to finish (gh pr checks <pr> --watch). Branch protection on
          main blocks the merge until it is green; if a check FAILS, this stops WITHOUT merging.
+         Once green, print WHICH check governed the wait and for how long (#831) -- whichever finished
+         last, labelled against the repo's own ruleset. Best-effort: unreadable, and the run says only
+         how long it waited. The wait itself is unchanged; see the comment at the step.
       4. Merge (gh pr merge <pr> --<method>, from Get-PrMergeMethod; 'merge' by default), with the
          merge commit's subject set to 'merge: <branch> (#NN)' so every line in the graph starts with
          a type. No --admin: the CI gate is never bypassed.
@@ -255,6 +258,16 @@ Write-Host "ship-pr: PR #$pr opened for '$branch'." -ForegroundColor Green
 # First poll (on the TEXT, not the exit code) until at least one check is registered, then --watch it.
 # Deliberately does NOT name a check: this step watches whatever checks the PR has and reads the exit
 # code, so naming one here would be a claim about the consumer's CI that this script cannot keep.
+#
+# WHAT IT DOES SAY, once the watch is over, is which check actually held it up (#831). The wait used to
+# be invisible -- the run printed gh's own table and nothing about the ordering, so learning which check
+# governed meant opening the Actions page afterwards. That invisibility is how two observations, both
+# out of the tail, became a policy question about whether to wait on non-required checks at all.
+# Measured over n=100 paired runs in this repo, the non-required check governs 23% of the time at a
+# median cost of 0s, so THE WAIT IS LEFT EXACTLY AS IT IS and made legible instead (Dave,
+# August 24, 2026). The report still names no check of its own: the governing one is whichever finished
+# last, and 'required' comes from the repo's own ruleset via `gh pr checks --required`.
+$waitBegan = Get-Date
 Write-Host "ship-pr: waiting for the CI check(s) on PR #$pr..." -ForegroundColor Cyan
 $maxWaitSec = 180
 $waited = 0
@@ -278,6 +291,34 @@ if ($checks.ExitCode -ne 0) {
     exit 1
 }
 Write-Host "ship-pr: CI green." -ForegroundColor Green
+
+# The two reads below happen AFTER the merge decision above, never before it, and both are
+# best-effort. Two reasons, and they are the same reason twice: a run that is about to stop must not
+# spend gh calls on a line nobody will read, and an unreadable payload must not be able to turn a
+# green run red. So a failure here costs the reader one line of detail and nothing else.
+$waitedSec = [int][math]::Round(((Get-Date) - $waitBegan).TotalSeconds)
+$waitReport = $null
+try {
+    $checkFacts = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
+        'pr', 'checks', "$pr", '--json', 'name,startedAt,completedAt', '--repo', $repo)
+    if ($checkFacts.ExitCode -eq 0) {
+        # `--required` exits non-zero on a repo whose ruleset requires nothing, which is a legitimate
+        # state and not an error: the label is then simply omitted rather than guessed.
+        $requiredFacts = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
+            'pr', 'checks', "$pr", '--required', '--json', 'name', '--repo', $repo)
+        $requiredJson = if ($requiredFacts.ExitCode -eq 0) { $requiredFacts.Output -join "`n" } else { '' }
+
+        $waitReport = Get-CheckWaitReport -ChecksJson ($checkFacts.Output -join "`n") `
+            -RequiredNamesJson $requiredJson -WaitedSeconds $waitedSec
+    }
+} catch {
+    $waitReport = $null
+}
+if ($waitReport) {
+    Write-Host "  $waitReport" -ForegroundColor DarkGray
+} else {
+    Write-Host "  waited $(Format-CheckDuration -Seconds $waitedSec) -- which check governed could not be read" -ForegroundColor DarkGray
+}
 
 # --- Step 4: merge (no --admin: never bypass the CI gate) ----------------------------------------
 #

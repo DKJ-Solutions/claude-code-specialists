@@ -790,6 +790,57 @@ that spread is merge-and-fold work and network, not the record — which is the 
 third, fourth and fifth firing would move the figure very little. **Do not extrapolate a per-merge saving
 from these two gaps**; the saving is the gate that did not run, and that number is 198.6s.
 
+### The merge wait, measured over its population — n=100 (August 21/22, 2026)
+
+`ship-pr.ps1` waits for **every** check a PR has rather than for the one the `main` ruleset requires.
+Whether that costs anything was written down twice from tiny samples, both times by this role, and both
+times wrong in the same direction — first at n=1, then at n=3, the second quoted in a **published**
+release note as *"two to one"* for the non-required check governing the wait. Population: **n=100** paired
+pull-request runs, 2026-08-14 to 2026-08-21, read from the Actions history rather than from a stopwatch.
+
+| check | median | p90 | max | spread |
+|---|---|---|---|---|
+| `lint-en-tests` (**required**) | 7m 46s | 9m 17s | 10m 06s | tight |
+| `claude-review` (not required) | **2m 47s** | 14m 10s | 23m 23s | **33-fold** |
+
+**Which check governs the merge wait: CI on 77 of 100, `claude-review` on 23.** What waiting on the
+non-required check actually costs, per pull request:
+
+| | |
+|---|---|
+| median extra wait | **0s** |
+| mean | 80s |
+| p90 | 5m 00s |
+| worst case | 16m 05s |
+| total over 100 PRs | 2h 13m — **14.5%** of all merge wait |
+
+In roughly three quarters of pull requests the review has already finished before CI, so the wait costs
+nothing at all. The entire cost sits in a tail of **23** runs, median excess there 4m 46s. **The tail is
+not growing**: oldest 20 median 177s against newest 20 median 186s — inherent variance, not a regression.
+
+**The decision was A plus B: leave the wait alone, make it legible** (Dave, August 24, 2026,
+[#831](https://github.com/DaveKJohn/claude-code-specialists/issues/831)). `ship-pr` now prints which check
+finished last and governed the merge, its duration, whether the repo's own ruleset requires it, and — when
+a non-required check governed — how much later it finished than the last required one. The selection is a
+pure function in [`pr-issues-lib.ps1`](../../../scripts/lib/pr-issues-lib.ps1) with its own asserts, because
+the `gh` call around it cannot be covered by a suite.
+
+**Option C — merging on the required check alone — was on the table with both sides quantified and was
+DECLINED.** It buys median 0s, p90 5m, worst case 16m 05s, and costs the guarantee that a review has been
+seen before the merge. That is a trade of coverage for time rather than a saving, so it was never Nolan's
+to take (see the boundary below), and it was put up as a trade rather than as an improvement.
+
+**What was deliberately NOT measured, and why it matters to C.** Whether the long reviews are the **large
+diffs**. If they are, C removes the wait precisely where the review has most to say — the worst available
+place to make that trade. B produces exactly the data needed to answer it, which is the argument for
+having done B first. Re-ask C when that question has an answer, not before.
+
+**The lesson this role broke twice in one release.** *A cost that varies per run is counted over its
+population, not cited from one run.* The 33-fold spread above is why: any single reading of
+`claude-review` is almost uninformative, and two readings that both came out of the tail read as a
+tendency. That is also Chris's fifth intake pattern — the finding is real and its **size** is wrong —
+in its fifth instance, and again on a report this team wrote itself.
+
 ### Boundaries with the other roles
 
 - A duplication finding is still a duplication first: Nolan may flag the token cost, but the dedup
