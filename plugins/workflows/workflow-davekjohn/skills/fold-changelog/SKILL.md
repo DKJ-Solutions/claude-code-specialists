@@ -56,30 +56,28 @@ and in `CHANGELOG.md`, so what a contributor writes is exactly what lands. The f
 comments** on the way and writes the PR line into `### Pull Request`:
 
 ```markdown
-## `feat/short-name` deployment
-
-### What does the change on this branch deploy to main?
+## DEPLOY: `feat/short-name` · 20260806-114230
 
 …why it matters at this reach…
 
 **Score:** 2
 
-#### What makes this change extra special
+### What makes this PR extra special
 
 …or one line saying why it reaches nobody there…
 
 **Score:** N/A
 
-### Pull Request · 20260806-114230
+### Pull Request
 
 Short strong title
 
 [PR #123](https://github.com/…/pull/123)
 ```
 
-**The opening section holds the change's two audiences, lowest first, and neither names a tier number.**
-Tier 0 answers directly under the question; the audience tier answers under
-`#### What makes this change extra special`, which means whichever single tier the repo has stated
+**The entry opens with the change's two audiences, lowest first, and neither names a tier number.**
+Tier 0 answers directly under the DEPLOY heading; the audience tier answers under
+`### What makes this PR extra special`, which means whichever single tier the repo has stated
 (`Get-ReleaseAudienceTier`). **Not every change reaches that audience** — that is why these are blocks rather
 than the table they replaced, where a missing row read as an omission, and why the second one can answer
 `N/A` with a line saying why. Where a repo has stated no audience tier, each tier the model has gets a

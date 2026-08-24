@@ -115,10 +115,9 @@ guidance travels inside it, through the same plugin update that carries the scri
 Two sections, one of them filled in for you:
 
 ```text
-## `<your branch>` deployment                             <- what this branch delivers to main
-
-### What does the change on this branch deploy to main?   <- tier 0: a reason and a score
-#### What makes this change extra special                 <- your audience tier: the same, or N/A
+## DEPLOY: `<your branch>`                      <- what this branch delivers to main
+                                                <- tier 0 answers HERE, under no heading of its own
+### What makes this PR extra special            <- your audience tier: the same, or N/A
 ### Pull Request · <stamp>  <- the title you gave -Title; the fold adds the number and the moment it landed
 ```
 
@@ -173,25 +172,25 @@ count over your own branches if you want to know whether it bites here too.
 
 ## The entry declares its significance, one section per tier it asks about
 
-The entry's first two sections **are** the tiers your repo asks about, each waiting for a reason and a score.
-In a repo whose audience is tier 2 that is these two — which tiers, and why it is not three, is the knob
-further down:
+The DEPLOY section's own text and the section beside it **are** the tiers your repo asks about, each
+waiting for a reason and a score. In a repo whose audience is tier 2 that is these two — which tiers, and
+why it is not three, is the knob further down:
 
 ```text
-### What does the change on this branch deploy to main?
+## DEPLOY: `<your branch>`
 
 **Score:**
 
-#### What makes this change extra special
+### What makes this PR extra special
 
 **Score:**
 ```
 
-**Neither heading names a tier number** (Dave, August 19, 2026), and both resolve to one when read: the
-opening question is tier 0, and the section beside it means the single audience tier your repo has stated. A
-repo that has stated **none** gets the older shape instead — the question as a plain heading with a
-`#### Tier N` sub-section under it for every tier the model has — because a heading with no tier to resolve
-to would read as tier 0 and empty its release documents.
+**Neither tier names a number** (Dave, August 19, 2026), and both resolve to one when read: the DEPLOY
+heading's own text is tier 0, and the section beside it means the single audience tier your repo has
+stated. A repo that has stated **none** gets the older shape instead — a plain question as a heading with a
+`#### Tier N` sub-section under it for every tier the model has, tier 0 among them — because a heading with
+no tier to resolve to would read as tier 0 and empty its release documents.
 
 Two questions, two audiences. **The tier says how far the change reaches**, and therefore which release
 document the entry appears in:
@@ -243,13 +242,13 @@ Below is a finished pair. It looks the same whichever audience tier your repo an
 the second heading being a question rather than a number:
 
 ```text
-### What does the change on this branch deploy to main?
+## DEPLOY: `<your branch>`
 
 The routine version bump stops needing a developer.
 
 **Score:** 4
 
-#### What makes this change extra special
+### What makes this PR extra special
 
 Consumers must re-add the marketplace under its new name; installs break without it.
 
