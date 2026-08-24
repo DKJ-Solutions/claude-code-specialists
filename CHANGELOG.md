@@ -22,6 +22,44 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `feat/filing-a-finding-needs-no-permission-v1` · 20260824-134524
+
+The shared block every specialist carries already said a finding becomes an issue rather than a question
+at the end of the turn. It did not say that **asking permission to file is the same failure** — and that
+gap is not theoretical: this branch exists because a session closed out with *"say the word and I'll file
+it"*, which reads as courtesy and leaves the owner holding exactly the decision filing exists to remove.
+
+The block now names the offer form outright, and adds the half nothing in the tree stated: **the question
+to answer before filing is not "may I?" but "does it still stand?"** The permission question feels like
+diligence and displaces the check that matters, so a finding that has never been held against the tree
+arrives pre-approved. The measured instance is the one that produced this branch — the finding was that
+`open-pr` writes a PR body with no closing reference, and it was false three times over: `-Resolves` and
+`-NoResolves` both exist, the gate reads the branch's own document and blocks only where it names an open
+issue, and the reason it stayed silent was that the author never cited the number. Approval would have
+filed a defect nobody has. The block therefore also says what to do when a finding collapses: withdraw it
+with its reason, rather than file a weakened version to justify having raised it.
+
+**Score:** 4
+
+### What makes this deploy extra special
+
+It reaches **30 agent defs and personas across all four teams** through the shared-block generator, so
+every specialist a consumer runs gets it at once rather than the orchestrator alone. And it closes a gap
+in a guardrail rather than adding a preference: the rule it extends was already there and already
+escapable through the one phrasing that sounds like good manners.
+
+**Score:** 3
+
+### Pull Request
+
+Filing a finding needs no permission, and verifying it is the step that does
+
+Plugins: team-alpha, team-ecomm, team-lifehub, team-shopify
+
+[PR #868](https://github.com/DaveKJohn/claude-code-specialists/pull/868)
+
+---
+
 ## DEPLOY: `feat/chris-owns-the-phase-transitions-v1` · 20260824-124101
 
 The orchestrator's fixed ritual and the development cycle described the same work and never referred to
