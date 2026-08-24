@@ -164,6 +164,72 @@ try {
     Assert-True ($out -cmatch 'REFUSED: this repo maintains') 'it says it refused, in its own words'
     Assert-True ($out -match 'run this: scripts.task.session-status\.ps1') 'and names the copy to run instead'
     Assert-True (-not ($out -match 'What the last release left open')) 'and it stopped BEFORE doing any of its work'
+
+    Write-Host 'A WORKTREE of the repo is NOT refused, and a CLONE still is (#851)' -ForegroundColor Cyan
+    # REAL GIT HERE, not a directory fixture. The whole question is what `git rev-parse
+    # --git-common-dir` answers, and a fabricated tree cannot answer it -- asserting against a stub
+    # would test the stub. The pair matters more than either half: a worktree must be allowed AND a
+    # separate clone must still be refused, because the second is the released mirror this guard exists
+    # for, and a fix that let both through would remove the guard while looking like it narrowed it.
+    #
+    # EVERY git CALL GOES THROUGH Invoke-NativeCapture, and that is not tidiness. git writes progress to
+    # stderr, which under this file's $ErrorActionPreference = 'Stop' becomes a TERMINATING error even
+    # when git exits 0 -- the #96/#97/#107 pitfall the repo has paid for three times. Writing these
+    # asserts the obvious way reproduced it immediately: `git worktree add` printed 'Preparing worktree'
+    # and the suite died on a successful command.
+    . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
+    $git = {
+        param([string[]]$Arguments)
+        Invoke-NativeCapture -FilePath 'git' -Arguments $Arguments
+    }
+
+    $gitOk = (& $git @('--version')).ExitCode -eq 0
+    if (-not $gitOk) {
+        # Announced rather than silently skipped: a suite that needs git to prove a git rule must say when
+        # it could not, or a green run means something different from what the reader thinks.
+        Write-Host '  [SKIP] git is not available -- the worktree asserts did not run' -ForegroundColor Yellow
+    } else {
+        $gitSrc = New-Tree -Label 'gitsrc' -Publishes -Local; $fixtures += $gitSrc
+        & $git @('-C', $gitSrc, 'init', '--quiet')                            | Out-Null
+        & $git @('-C', $gitSrc, 'config', 'user.email', 'suite@example.invalid') | Out-Null
+        & $git @('-C', $gitSrc, 'config', 'user.name', 'Suite')               | Out-Null
+        & $git @('-C', $gitSrc, 'config', 'commit.gpgsign', 'false')          | Out-Null
+        & $git @('-C', $gitSrc, 'add', '-A')                                  | Out-Null
+        & $git @('-C', $gitSrc, 'commit', '--quiet', '-m', 'fixture')         | Out-Null
+
+        # The lane lives OUTSIDE the repo root, exactly as worktree-lane.ps1 places it -- a worktree
+        # inside the tree would be walked by the lint gate's link scan and by the suites.
+        $lane = Join-Path ([System.IO.Path]::GetTempPath()) ("guard-lane-" + [System.Guid]::NewGuid().ToString('N').Substring(0, 8))
+        $fixtures += $lane
+        & $git @('-C', $gitSrc, 'worktree', 'add', '--detach', $lane) | Out-Null
+        $laneScript = Join-Path $lane 'scripts\task\session-status.ps1'
+
+        Assert-True (Test-Path -LiteralPath $laneScript) 'the worktree carries the committed script'
+        Assert-Equal $null (Get-OwnCopyPath -ScriptPath $laneScript -RepoRoot $gitSrc) `
+            'a script in a WORKTREE of the repo is allowed -- it is the same repository, not a snapshot'
+
+        # And the half that must not have changed: a separate clone of the same repo is a different
+        # repository, answers with its own --git-common-dir, and is still refused.
+        $clone = Join-Path ([System.IO.Path]::GetTempPath()) ("guard-clone-" + [System.Guid]::NewGuid().ToString('N').Substring(0, 8))
+        $fixtures += $clone
+        & $git @('clone', '--quiet', $gitSrc, $clone) | Out-Null
+        $cloneScript = Join-Path $clone 'scripts\task\session-status.ps1'
+        Assert-True (Test-Path -LiteralPath $cloneScript) 'the clone carries the script too -- the two shapes are indistinguishable on disk'
+        Assert-Equal 'scripts\task\session-status.ps1' (Get-OwnCopyPath -ScriptPath $cloneScript -RepoRoot $gitSrc) `
+            'a CLONE is still refused -- which is the released mirror this guard exists for'
+
+        # The identity helper on its own terms, so a failure above can be told apart from a failure here.
+        Assert-Equal (Get-GuardGitCommonDir -Path $gitSrc) (Get-GuardGitCommonDir -Path $lane) `
+            'the repo and its worktree report the same shared .git'
+        Assert-True ((Get-GuardGitCommonDir -Path $clone) -ne (Get-GuardGitCommonDir -Path $gitSrc)) `
+            'and a clone reports a different one'
+        Assert-Equal $null (Get-GuardGitCommonDir -Path $cache) `
+            'a path in no git repository answers $null, which reads as "cannot tell" and keeps the guard refusing'
+
+        # Leave no worktree registered behind: the fixture directory is deleted in the finally block, and a
+        # stale registration would make later `git worktree` calls in the fixture repo complain.
+        & $git @('-C', $gitSrc, 'worktree', 'remove', '--force', $lane) | Out-Null
+    }
 }
 finally {
     foreach ($d in $fixtures) {

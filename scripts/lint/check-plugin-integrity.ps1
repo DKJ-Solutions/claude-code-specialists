@@ -1721,7 +1721,19 @@ if (Test-Path -LiteralPath $mjScript) {
             Add-Error ("[mojibake] " + ($line -replace '^\s*\[mojibake\]\s*', '') + " -- a UTF-8 character was read as ANSI and written back, so the file's text changed without any error. In an entry heading the separator IS the field delimiter, so cut-release.ps1 stops being able to read the entry type. Repair with scripts/maintenance/fix-mojibake.ps1; avoid it by never reading a non-ASCII file with bare Get-Content.")
         }
         if (@($mjOut | Where-Object { $_ -match '\[mojibake\]' }).Count -eq 0) {
-            Add-Error "[mojibake] scripts/maintenance/fix-mojibake.ps1 -Check exited $mjCode without naming a file -- the mojibake gate could not complete, so nothing is asserted about encoding."
+            # NAME WHAT THE CHILD SAID, not only its exit code (#851). A non-zero exit with no [mojibake]
+            # line means the sub-script never got to READ anything, and the likeliest cause has nothing to
+            # do with encoding: the source-repo guard refusing the copy that was invoked. Measured
+            # 2026-08-24, when this line reported 'the mojibake gate could not complete' for two lanes
+            # whose trees were both clean -- a finding about the wrong subject, whose real explanation was
+            # reachable only by running the sub-script by hand. The exit code alone cannot tell them apart,
+            # so the child's own first line is quoted and a refusal is named when it is one.
+            $mjWhy = @($mjOut | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 1)
+            $mjSaid = if ($mjWhy) { " It said: '$(([string]$mjWhy[0]).Trim())'" } else { ' It printed nothing.' }
+            $mjHint = if (@($mjOut | Where-Object { $_ -match 'REFUSED:' }).Count -gt 0) {
+                ' The sub-script REFUSED to run, so this is not about encoding: the copy invoked is not the one the repo being checked maintains. Run the gate from that repo, or from a worktree of it.'
+            } else { '' }
+            Add-Error ("[mojibake] scripts/maintenance/fix-mojibake.ps1 -Check exited $mjCode without naming a file -- the mojibake gate could not complete, so nothing is asserted about encoding." + $mjHint + $mjSaid)
         }
     }
 } else {

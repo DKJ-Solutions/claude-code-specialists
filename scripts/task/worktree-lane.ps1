@@ -418,6 +418,13 @@ Write-Host "Lane open: '$Name'" -ForegroundColor Green
 Write-Host "  $lanePath"
 Write-Host ""
 Write-Host "Build there; the primary checkout stays free to ship." -ForegroundColor Cyan
+# THE GATES RUN THERE TOO, and saying so is the point (#851). Until August 24, 2026 they did not: the
+# source-repo guard read every lane path as a released copy, so a gate run from a lane was refused --
+# and the lint gate reported it as an encoding failure, because it sees only its sub-script's exit code.
+# A lane that could be built in but not checked in gave back the wait it exists to remove, since CI was
+# then the first thing to see the branch. Stated in the output rather than only in the guard, because
+# this is the line a person reads before they try it.
+Write-Host "The gates run there as well -- a lane is this repository, not a released copy." -ForegroundColor DarkGray
 Write-Host "When it is ready:  ./scripts/task/worktree-lane.ps1 -HandBack" -ForegroundColor Cyan
 Write-Host "                   (from the lane, then ship-pr from the primary)"
 exit 0
