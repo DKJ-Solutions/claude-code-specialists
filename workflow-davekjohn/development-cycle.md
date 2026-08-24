@@ -43,8 +43,11 @@ State that a branch reaches DEPLOY only once it has verified itself in TEST, and
 ## TEST
 
 - [x] The lint gate on this branch: `check-plugin-integrity.ps1`, 0 errors -- the check that matters
-      here, since the change is prose and what could break is a dead anchor. The `#rules` cross-reference
-      this text adds resolves.
+      here, since the change is prose and what could break is a dead anchor. Both cross-references this
+      text adds resolve: `#rules`, and the goal-condition section after the branch was synced on `main`.
+- [x] Re-run after that sync, because the first run predated the section the second anchor points at:
+      the branch was built in a lane based on `origin/main` before the PLAN-phase change landed, so the
+      link would have been dead in the tree the gate had then. 0 errors again.
 - [~] No suite: nothing executable changed, and a test asserting the wording of guidance would break on
       every legitimate rewrite of it. Named rather than left blank, which is the rule this branch writes.
 

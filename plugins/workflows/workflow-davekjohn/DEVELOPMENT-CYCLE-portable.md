@@ -140,9 +140,10 @@ read against what it should say — as long as the phase records that it was run
 *not* a verification is a prediction: a step ticked because the change looks correct. That is the failure
 [rule 3](#rules) already names from the other side, met here at the phase that exists to prevent it.
 
-**Where the cycle is driven by a goal condition, this is the half the evaluator can see.** An evaluator
-judges from what the session has surfaced, so a check whose result lands in the transcript is what lets the
-condition resolve at all — and a TEST phase that only claims to be done leaves it nothing to read.
+**Where the cycle is driven by [a goal condition](#driving-the-cycle-to-its-end-a-goal-condition), this is
+the half the evaluator can see.** That evaluator judges from what the session has surfaced and runs nothing
+of its own, so a check whose result lands in the transcript is what lets the condition resolve at all — and
+a TEST phase that only claims to be done leaves it nothing to read.
 
 **DEPLOY takes no steps of its own** (Dave, August 14, 2026,
 [#655](https://github.com/DaveKJohn/claude-code-specialists/issues/655)). It is not a step, it is the
