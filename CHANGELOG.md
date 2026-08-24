@@ -25,6 +25,76 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `feat/every-script-lives-in-a-skill-v1` · 20260824-212203
+
+**The automation-first rule now says what to build, not merely that something should be built.** It said
+"an existing script/tool" three times and named neither skills nor hooks -- and a search of all fifteen
+shared blocks for the word *hook* returns **zero hits in every one of them**, while 7 hook scripts ship
+across three plugins and this repo runs five SessionStart hooks of its own. As it now reads: what has to
+happen without anyone asking for it is a **hook**, because the harness runs it and nobody has to
+remember; what somebody invokes is a **script, and every script lives in a skill** -- the question being
+*which* skill, not whether. From
+[#875](https://github.com/DaveKJohn/claude-code-specialists/issues/875).
+
+**The shared block does not reach the personas, and that is where repairing only the block would have
+gone wrong.** All 26 copies sit under `agents/`; the four main-loop specialists carry a hand-written
+"is lazy" section instead, and the orchestrator's loads in every session. So the block, the four personas
+and `SPECIALISTS.md` moved together -- each persona in its own words, because a sweep would have
+flattened what each one says about its own craft. The 29 manuals are out of scope for the same reason,
+not as a backlog item.
+
+**And the rule was applied to the first script written after it.**
+`scripts/maintenance/measure-always-on.ps1` (merged the day before, #876) is now registered in the
+shared-scripts mirror under the **existing** `measure-skill` page rather than one of its own: same
+subject, same owner, and only a skill's *description* is paid by every session -- so an existing page is
+the cheap answer to "which skill", and "whether" was never the question. Two things had to change before
+it could travel, both found by reading it rather than by a gate: it resolved its repo root from
+`git rev-parse` alone, and it dot-sourced its lib from the **repo root**, so in a consumer the mirror
+would have looked for `scripts/lib/measure-context-lib.ps1` inside the repo being measured, which has no
+such file. It is dual-context and `$PSScriptRoot`-relative now, and was run from a foreign working
+directory to prove it.
+
+**The entry #876 left pending said the opposite, and it is withdrawn where it stands.** It declared the
+script deliberately repo-local -- *"nothing about it ships. That is the point rather than an omission"* --
+as a principle rather than as a description of that branch. It has not been released and both entries
+reach a reader in the same document, so correcting it in place was the only form that does not publish a
+contradiction. The reasoning it borrowed was #861's, and #861 was about a **skill**: a new always-on
+description. Packaging deterministic code under a description that already exists is a different act.
+
+**The cost is stated rather than claimed to be zero.** The skill's description gained one sentence --
+132 bytes, an estimated ~42 tokens at the calibrated factor -- so this page's always-on price rises by
+that much in every consumer that has the workflow plugin. An estimate, because the authoritative figure
+comes from `claude plugin details` against the marketplace clone, and the clone advances on a release
+rather than on this merge. That is what discoverability costs, and it is the right trade: a script
+documented on a page whose description never names its subject is a script the skill will not fire for.
+
+**Score:** 3
+
+### What makes this PR extra special
+
+**Consumers get the measurement, and a page that tells them it exists.** `measure-always-on.ps1` arrives
+in `workflow-davekjohn`: what *their* always-on document path costs -- `CLAUDE.md` plus everything it
+`@`-imports -- per document and per section, including which documents load from the marketplace clone
+rather than from their own tree and how much cost that gap has queued up for their next plugin update.
+Until now that number came from `wc -c` typed by hand, in the one repo that had the script.
+
+**And every specialist they run stops naming a script as the answer.** 26 agent defs and four personas
+now distinguish the three forms, so a consumer's specialist proposes a hook for what must happen unasked
+and an existing skill page for what somebody invokes -- instead of proposing a script for both and
+leaving it undiscoverable in a `scripts/` directory.
+
+**Score:** 3
+
+### Pull Request
+
+Every script lives in a skill, and what must happen unasked is a hook
+
+Plugins: team-alpha, team-ecomm, team-lifehub, team-shopify, workflow-davekjohn
+
+[PR #877](https://github.com/DaveKJohn/claude-code-specialists/pull/877)
+
+---
+
 ## DEPLOY: `feat/measure-the-always-on-document-path-v1` · 20260824-171032
 
 **The always-on document path can now be measured by running something instead of by typing `wc -c`.**
