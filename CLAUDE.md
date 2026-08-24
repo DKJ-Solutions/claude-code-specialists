@@ -165,11 +165,13 @@ August 3, 2026; the reader-facing statement is in
 **The repo consumes itself.** Via [`.claude/settings.json`](.claude/settings.json) this repo enables
 its own `team-alpha` plugin (the core team), with the `github` marketplace source
 `DaveKJohn/claude-code-specialists` — so the repo points at itself. That way work here runs against
-exactly the product it maintains. One consequence to be aware of: through the `github` source a
-session sees the **last pushed** version of the plugins, not your ongoing branch work — an agent
-def you modify on a branch only takes effect after merge + push. A second: being a consumer, this repo
-carries an install record keyed on its **folder path**, so renaming or moving this checkout unlinks the
-plugin without any error — the measured instance and the repair are in
+exactly the product it maintains. One consequence to be aware of: a session reads the plugins from the
+**local marketplace clone**, and that clone advances on a `claude plugin marketplace update` — **not on
+a push**. So an agent def you modify on a branch takes effect after merge, push *and* that refresh, and
+between two releases **no version check can tell you the clone is behind**. A second: being a consumer,
+this repo carries an install record keyed on its **folder path**, so renaming or moving this checkout
+unlinks the plugin without any error. Both measured instances, and why detection is deliberately left
+alone, are in
 [the system-administration lens](.claude/specialists/lenses/05-15-extension.md#repo-specific-rules).
 
 ### Language

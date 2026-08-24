@@ -363,6 +363,36 @@ infrastructure.
   other two ways a record goes missing, and why that leftover is not a stray duplicate are in the
   family's [INSTALL.md](../../../INSTALL.md#staying-up-to-date);
   don't restate them here.
+- **The marketplace clone follows a REFRESH, not a push — and no version check can tell you it is
+  behind.** A session here reads the plugins from the local marketplace clone, which advances only on
+  `claude plugin marketplace update claude-code-specialists`. Measured August 23, 2026
+  ([#845](https://github.com/DaveKJohn/claude-code-specialists/issues/845)): after four PRs merged and
+  pushed, the clone still stood on the previous day's `3e46b3de` while `main` was at `86f1a6c8` — the
+  cached manual missing a section added that morning, the cached shared block missing a rule added that
+  afternoon — and **every check reported OK**. `/plugin` had nothing to do, and
+  [`check-connectors.ps1`](../../../scripts/sync/check-connectors.ps1) reported `[OK] machine record is
+  on the source version (v4.18.0)`. Both compare **version strings**, and between two releases the
+  version is unchanged by definition, so a clone any number of commits behind `main` is
+  indistinguishable from a current one. This is the failure check 11 in
+  [`check-plugin-integrity.ps1`](../../../scripts/lint/check-plugin-integrity.ps1) already names in its
+  own comment — *"a stale cache reports success with a plausible version number"* — reaching the source
+  repo rather than a consumer. The repair is that one refresh, which moved the clone immediately.
+
+  **Detection is deliberately left as it is, and that is the answer rather than a postponement**
+  (Dave, August 24, 2026). Having `check-connectors.ps1` compare **commits** instead of versions was on
+  the table and was declined on mechanism: its version verdicts are per **consumer checkout**, and a
+  consumer's clone is *supposed* to follow the releases rather than `main`, so between two cuts a commit
+  comparison would report a gap on every consumer where nothing is wrong — the same shape as the
+  stale-path check this repo declined at 124 findings all false. Nothing was damaged here either: a
+  session read payload a few hours older than `main` carried, which for content merged the same day is
+  the ordinary state. What was wrong was the **expectation** — [`CLAUDE.md`](../../../CLAUDE.md) promised
+  the "last pushed" version — and that sentence is what the repair changed.
+
+  **The measurement check 11's comment relies on has never reached this boundary, so don't lean on it
+  again without re-measuring.** It records, correctly and with a date, that a bare project-scoped
+  `update` advanced the clone during the run (July 31, 2026, CLI 2.1.220, 3.0.3 → 3.0.4) — taken while
+  the **version number was changing**. Identical version, new content, nothing moved is the untested
+  case, and it is the one that bit.
 - **Always read `$LASTEXITCODE` before you pipe a native command through a cmdlet.** A construct like
   `& git … | Select-Object -First 1` cuts the upstream (git) short as soon as the first item is in;
   if the process has not yet exited cleanly at that point, it ends with a non-zero exit code —
