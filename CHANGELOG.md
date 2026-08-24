@@ -22,6 +22,36 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `docs/verification-is-a-plan-step-v1` · 20260824-101405
+
+A branch whose real work is judgement -- verifying a report, choosing between two designs, establishing
+that a claim still holds -- produces no artefact until the writing starts, so the phase arc offered it no
+home and the path of least resistance was to record only the writing. The portable page now says those
+are PLAN steps and shows the shape, and says that where no automated test was added `- [~]` answers with
+the reason rather than leaving TEST blank. Both stay conventions: a bare heading is still permitted and
+still no finding, because no gate can tell a branch that had nothing to plan from one that never wrote
+its plan down. What changes is that the weaker of the two answers is now named as such.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+Every consumer of this workflow scaffolds the same document, and this reaches them the way all guidance
+on that page does -- through a plugin update rather than through a file written once at adoption. It
+costs them nothing at scaffold time: the page is the reference, not the template.
+
+**Score:** 2
+
+### Pull Request
+
+Verifying and deciding are PLAN steps, and TEST answers with a reason
+
+Plugins: workflow-davekjohn
+
+[PR #856](https://github.com/DaveKJohn/claude-code-specialists/pull/856)
+
+---
+
 ## DEPLOY: `docs/cache-follows-refresh-not-push-v1` · 20260824-095933
 
 `CLAUDE.md` promised that a session here sees the **last pushed** version of the plugins. It does not: a
