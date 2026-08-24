@@ -25,6 +25,64 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `feat/measure-the-always-on-document-path-v1` · 20260824-171032
+
+**The always-on document path can now be measured by running something instead of by typing `wc -c`.**
+`scripts/maintenance/measure-always-on.ps1` walks `CLAUDE.md` and everything it `@`-imports, and reports
+each document and each section by bytes, share and estimated tokens.
+
+That figure had been hand-produced four times (July 28, August 14, August 15 and August 24, 2026), and the
+performance lens records the cost of that three separate times in its own words: *a measurement in a
+document that nothing regenerates goes stale silently*. It did, in the most expensive way available — the
+conversion factor was inherited unexamined at 3.70 through three re-measurements and was ~19% too
+generous, so every token figure derived from it was under-stated while looking precise. The factor now
+lives in `scripts/lib/measure-context-lib.ps1` with its calibration attached, where it cannot be inherited
+by copying a table.
+
+Four properties are enforced rather than remembered, each one a rule this repo already had:
+
+- **Bytes are labelled a measurement and tokens an estimate, in the output itself.** `do not estimate from
+  file sizes` governs the subject the `count_tokens` API prices; it does not price documents, so here an
+  estimate is the only answer available and the honest move is to say so every time. The plugin listings
+  stay `measure-skill`'s and the report says so instead of absorbing them.
+- **The copy that LOADS is the copy reported.** The orchestrator persona is imported from the marketplace
+  clone, so the report names it and prints the tree counterpart beside it — today 16,585 B loaded against
+  21,860 B in the tree, i.e. 5,275 B of queued cost arriving at the next plugin update.
+- **The sections must sum to the file or no table is printed**, because a plausible wrong share is worse
+  than a refusal.
+- **A dead `@`-import is reported rather than skipped.** It costs a session the whole document and nothing
+  errors; no gate covers that class yet, which is now filed as #874.
+
+It reaches **no verdict** about what should move, deliberately. That is the outcome of #861, where a skill
+that would have judged an instruction document block by block was argued down and the verdict accepted: the
+judgement is one already-written sentence, while a portable skill would have put always-on cost into three
+consumer repos that do not share this repo's condition. The boundary that came out of it — `portable-first`
+applies to rules, not to tooling that carries a per-session cost — is recorded in the performance lens.
+
+Also on this branch, both found on its own route: `scripts/README.md` was missing a row for
+`maintenance/measure-skill.ps1` in the table whose own preamble says everything unlisted is "a lib, a
+generator or a test", and its `maintenance/` description ("one-off repairs run by hand") covered neither
+measurement script.
+
+**Score:** 3
+
+### What makes this PR extra special
+
+N/A — this reaches no consumer. The script is deliberately repo-local: it is not registered in the
+shared-scripts mirror and carries no skill page, so nothing about it ships. That is the point rather than an
+omission — the argument for building this instead of the skill #861 asked for was precisely that consumers do
+not have this repo's condition, and putting the tool in the plugin anyway would have contradicted it.
+
+**Score:** N/A
+
+### Pull Request
+
+The always-on document path is measured by a script instead of by hand
+
+[PR #876](https://github.com/DaveKJohn/claude-code-specialists/pull/876)
+
+---
+
 ## DEPLOY: `docs/entry-shape-examples-follow-the-merged-document-v1` · 20260824-153800
 
 **The pages that teach the entry format now teach the one the scaffolder writes.** On August 23, 2026 the
