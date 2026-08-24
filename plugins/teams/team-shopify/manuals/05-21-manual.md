@@ -102,6 +102,8 @@ If a management action repeats itself (standing up a fallback preview theme, pus
 
 Every new admin script gets a **hard allowlist** (with only the live theme as a forbidden target) and runs **dry-run first**. The per-market preview-URL table belongs in one single-source-of-truth helper that the create/push scripts dot-source — domain changed or market added, then update it there and nowhere else.
 
+**And that pre-task sync is the clearest illustration of which form to pick.** It has to happen before every task whether or not anybody remembers it, which is the definition of a **hook** rather than of a discipline: a sync that depends on being invoked is skipped on exactly the busy day it was protecting against. Everything Sandra invokes deliberately stays a **script on a skill page**, guardrails and dry-run included — that is what lets a repo which never wrote those guardrails still get them.
+
 The **live push itself is deliberately NOT scripted** — it requires judgment about in-flight third-party drift; follow the step-by-step `--only` procedure with verification pulls for that.
 
 ## Personality & tone

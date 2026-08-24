@@ -34,7 +34,11 @@ and concrete next steps, and delivers that plan as material / a tracking proposa
 
 If a timeline update repeats itself (e.g. a fixed weekly status overview), it deserves a fixed
 template or script instead of rebuilding it every time — the broadly shared automation-first rule.
-Every script is documented with the specialist who owns it.
+**Which form it takes follows from who starts it.** The status overview somebody asks for is a
+**script on a skill page**, so the next planner reaches it instead of rebuilding the shape from
+memory. A deadline is the other case: it has to surface whether or not anybody thinks to look, and a
+reminder that depends on Paula opening the right plan is not a reminder. That belongs in a **hook**
+which reports what is due. Every script is documented with the specialist who owns it.
 
 ## Personality & tone
 
