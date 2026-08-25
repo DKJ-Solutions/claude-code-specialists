@@ -25,6 +25,38 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `fix/remove-prompt-inbox-v1` · 20260825-155219
+
+Removed the prompt-inbox mechanism entirely (issue #882, Dave): the `workflow-davekjohn/prompts/`
+folder, the `prompt` skill, its two scripts (`prompt-inbox.ps1` + `prompt-inbox-lib.ps1`, root and
+plugin mirror), the `prompt-sessioncheck` SessionStart hook, and every doc that named any of it — the
+plugin's own README and scripts README, this repo's `workflow-davekjohn/CLAUDE.md` and
+`workflow-davekjohn/README.md`, the root README's two skill-list spans, `SPECIALISTS.md`,
+`connectors/README.md`, and a stale cost baseline. No replacement: Dave now hands assignments over as
+GitHub issues instead.
+
+Tier 1 — this repo's own contributors notice one fewer skill and, once merged, one fewer SessionStart
+hook line; nothing in how a branch, PR or release works changes.
+
+**Score:** 3
+
+### What makes this PR extra special
+
+N/A — nothing here reaches a service subscriber; the prompt inbox was a workflow-authoring convenience
+inside this repo and its consumers, never anything an end user of a published product could see.
+
+**Score:** N/A
+
+### Pull Request
+
+Remove the prompt inbox from workflow-davekjohn
+
+Plugins: workflow-davekjohn
+
+[PR #889](https://github.com/DaveKJohn/claude-code-specialists/pull/889)
+
+---
+
 ## DEPLOY: `fix/release-notes-at-the-changelogs-own-level-v1` · 20260825-125958
 
 **The generated developer release notes now render at `CHANGELOG.md`'s own heading levels.** Entries sit at
