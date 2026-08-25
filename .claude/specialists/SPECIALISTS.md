@@ -68,10 +68,10 @@ routes; every specialist executes according to the shared safety rules and their
 
 
 
-**Where this actually runs.** This roster is a set of Claude Code subagents plus five informational
+**Where this actually runs.** This roster is a set of Claude Code subagents plus four informational
 
 SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`,
-`workflow-sessioncheck`, `prompt-sessioncheck`);
+`workflow-sessioncheck`);
 
 both run in Claude Code and in Cowork, but not in a plain Claude.ai Chat session (there they show up
 

@@ -46,9 +46,8 @@ before adding the next one.*
 | `task/new-branch.ps1` | creates the branch AND writes its `workflow-davekjohn/development-cycle.md`, in one move — a branch is never entry-less | [`new-branch`](../skills/new-branch/SKILL.md) |
 | `task/park-branch.ps1` | commits all outstanding work + `git push -u` — no PR, no live action | [`park`](../skills/park/SKILL.md) |
 | `task/adopt-config.ps1` | reads the config blueprint and places or proposes each seam answer | [`adopt-config`](../skills/adopt-config/SKILL.md) |
-| `task/adopt-workflow-folder.ps1` | scaffolds `workflow-davekjohn/` — the folder docs, the releases root, the branch dossier and the prompt inbox | [`adopt-workflow-folder`](../skills/adopt-workflow-folder/SKILL.md) |
+| `task/adopt-workflow-folder.ps1` | scaffolds `workflow-davekjohn/` — the folder docs, the releases root and the branch dossier | [`adopt-workflow-folder`](../skills/adopt-workflow-folder/SKILL.md) |
 | `task/session-status.ps1` | reports the locked topic and the repo's own answer beside it | [`lock`](../skills/lock/SKILL.md) · [`handover`](../skills/handover/SKILL.md) |
-| `task/prompt-inbox.ps1` | reads the assignment written into `workflow-davekjohn/prompts/prompt.md`, and archives it on `-Archive` | [`prompt`](../skills/prompt/SKILL.md) |
 | `release/open-pr.ps1` | the gates, the push and the PR; lint gate via `Get-LintScript` in `repo-config` | [`open-pr`](../skills/open-pr/SKILL.md) |
 | `release/ship-pr.ps1` | open → wait for CI → merge → fold, in one motion | [`ship-pr`](../skills/ship-pr/SKILL.md) |
 | `release/verify-resolved-issues.ps1` | checks that a merged PR closed what it declared | [`ship-pr`](../skills/ship-pr/SKILL.md) |
@@ -66,7 +65,6 @@ before adding the next one.*
 | `lib/pr-body-lib.ps1` | composes and refreshes the PR body from the entry | none — dot-sourced lib |
 | `lib/pr-issues-lib.ps1` | reads the issues a PR declares it closes | none — dot-sourced lib |
 | `lib/park-lib.ps1` | `Invoke-GitPark` — the one stage/commit/push behind both parking entry points | none — dot-sourced lib |
-| `lib/prompt-inbox-lib.ps1` | where the prompt inbox lives, its reset state, and the structural test for whether an assignment is waiting — read by the script, the session hook and the folder scaffold | none — dot-sourced lib |
 | `lib/source-repo-guard-lib.ps1` | `Assert-OwnCopy` — refuses a released copy running in the repo that maintains it | none — dot-sourced lib |
 | `lib/native-capture-lib.ps1` | `Invoke-NativeCapture`, the stderr-safe native-command wrapper | none — dot-sourced lib |
 | `lib/check-report-lib.ps1` | the `[OK]`/`[INFO]`/`[ERROR]` report helper | none — dot-sourced lib |
