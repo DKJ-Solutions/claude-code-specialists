@@ -25,6 +25,58 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `fix/the-deploy-section-is-locked-at-the-pr-v1` · 20260825-234507
+
+The DEPLOY section is now **one text in all four places it lands** -- the branch's own
+`development-cycle.md`, the PR body, `CHANGELOG.md`, and the developer release notes -- and it is **fixed
+at the moment the PR opens**. `ship-pr` refuses to merge when the document has since diverged from what
+the PR published, and the branch-entry check in CI refuses the same thing for a PR merged from the GitHub
+UI. Neither has a `-Force`, like the step-list gate beside them. What that closes is a window that used to
+shut invisibly: an edit made after the review landed in the changelog and from there in the release notes
+having been seen by nobody, and because the fold *removes* the document at the merge, the place a reviewer
+would compare the two was the one place it no longer existed.
+
+Two changes had to happen for that to be checkable at all, and both are reversals recorded rather than
+quietly made. The heading says **`What makes this deploy extra special`** again -- `deploy` was written
+August 23, `PR` replaced it August 24 ([#865](https://github.com/DaveKJohn/claude-code-specialists/issues/865)),
+and #884 puts it back, because two of the section's four readers are not looking at a PR and the two that
+come last are the ones a release is read from. And `Get-PrDescription` now carries the `## DEPLOY:` heading
+**verbatim**, promoting nothing, which reverses the August 9, 2026 heading promotion **on today's shape
+only**: while body and document were two renderings of one section, a comparison would have had to
+reproduce the transform to make sense of them. The legacy `What does the change...` path keeps promoting,
+because there the H2 genuinely stays behind, and consumers have such branches in flight.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+A consumer meets three things at their next plugin update. Their PR bodies start carrying the
+`## DEPLOY:` heading and the section's own levels, instead of a level-shifted copy with the heading
+dropped -- so a PR body and the changelog entry it becomes now read as the same document. Their scaffolder
+writes `deploy` rather than `PR`, and every wording it has ever written is still **read**, so branches in
+flight fold unharmed. And a merge is refused where it used to go through: edit the DEPLOY section after
+opening the PR and `ship-pr` stops, naming the first line the PR body does not have, with two ways out --
+put it back, or republish deliberately with `open-pr.ps1 -RefreshBody` so the change is reviewable where
+the review happens.
+
+The one action a consumer may have to take is a permission line: reading a PR body needs
+`pull-requests: read` on the branch-entry workflow, on top of the `contents: read` it has today. Without
+it the lock reports that it could not read the body and merges anyway -- deliberately, because `gh`
+failing says something about the token rather than about the section -- so nothing breaks, it simply does
+not fire.
+
+**Score:** 4
+
+### Pull Request
+
+The DEPLOY section is locked once the PR opens, and says deploy everywhere
+
+Plugins: workflow-davekjohn
+
+[PR #895](https://github.com/DaveKJohn/claude-code-specialists/pull/895)
+
+---
+
 ## DEPLOY: `docs/development-portable-rename-v1` · 20260825-222427
 
 Renamed `DEVELOPMENT-CYCLE-portable.md` to `DEVELOPMENT-portable.md` and repointed every reference
