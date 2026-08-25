@@ -62,6 +62,11 @@ own plugin cache instead, so the easy route is to ask for the skill rather than 
   only its branch dossier lives in the folder there.
 - **A leftover root `branch/` from before the move is yours to remove by hand** -- the scripts read
   only the new location, deliberately without a dual-read fallback.
+- **The folder itself is permanent** (issue #885). No command in this plugin removes
+  `workflow-davekjohn/`, and no future teardown may -- uninstalling the plugin takes the plugin, not the
+  record that belongs to your repo. `development-cycle.md` is the one file inside it that does not share
+  that lifetime: it exists only while a branch is open, which is a precision on the rule rather than an
+  exception to it.
 
 ## The CI gate it places, and the one choice inside it
 
@@ -102,13 +107,19 @@ The release machinery finds the folder through a `decide` seam in your `scripts/
 Get-ReleaseNoteRoot     -> 'workflow-davekjohn/releases/audience'
 ```
 
-**`Get-ReleaseHistoryPath` is deliberately not beside it.** Leave it at its default,
-`releases/README.md`, which is where the source keeps its own release list too (Dave, August 19,
-2026). The test is whether a thing survives this folder being deleted: a repo that has cut releases
-has a **history** whichever tooling cut it, so the list is the repo's and does not belong in a folder
-a teardown removes. A per-reader **note** is the opposite -- it exists only because the tier model
-does -- which is why `Get-ReleaseNoteRoot` does point in here. Both pointed in here between August 14
-and 19; only the list moved back.
+**`Get-ReleaseHistoryPath` is isolated by default now too** (issue #885, group E, reversing the
+August 19, 2026 answer below). That answer kept the list at the repo root on a durability argument:
+a repo that has cut releases has a **history** whichever tooling cut it, so it should not live in a
+folder a teardown could remove. #885 also settled that `workflow-davekjohn/` is **permanent** -- see
+[the rules above](#the-rules-it-works-under) -- which answers that same durability worry the other way:
+the folder is now the safer place for the list, not the riskier one. So a fresh consumer gets
+`workflow-davekjohn/releases/history.md` without configuring anything, the same computed-default
+treatment `Get-ChangelogPath` already gets. **A repo that adopted before August 25, 2026 keeps its
+existing list at the root**: the computed default only isolates a *consumer*, and re-adopting an
+existing one starts a *second* list here rather than moving the first one under it silently -- repoint
+the seam back to your root file if you would rather keep one list. `Get-ReleaseNoteRoot` still needs its
+own explicit seam line below, for the separate reason its own contract record gives: it already has real
+consumers relying on its literal fallback, which the three roots and the history path never had.
 
 **So the page this command scaffolds at `workflow-davekjohn/releases/README.md` carries no history
 table**, and until August 20, 2026 it did -- a `## Release history` heading, a table, and a `VUL-IN`

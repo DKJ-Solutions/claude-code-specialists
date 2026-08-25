@@ -221,7 +221,7 @@ try {
     # next to it is the workshop's too, not the fixture's. Its Get-BranchTypes is therefore genuinely not
     # the one this consumer wrote, which is exactly the answer a real consumer needs and exactly what a
     # walk over leaf NAMES would have got wrong.
-    Assert-Match 'Summary: 0 error\(s\), 7 info signal\(s\)' $r.Out 'happy path: [SCOPE] is non-counting (0 errors; the five deliberately-undefined seams -- the two impact-table ones, Get-TestCommands since inbound #644, Get-EntryGateExemptPrefixes since inbound #789, and Get-ReleasePageMasthead since inbound #809 -- plus two reachability signals: neither fold-changelog-entry nor new-internal-note can see this consumer''s Get-BranchTypes, which is the ordinary state for a repo that has not chained branch-info.ps1 into its repo-config)'
+    Assert-Match 'Summary: 0 error\(s\), 11 info signal\(s\)' $r.Out 'happy path: [SCOPE] is non-counting (0 errors; the five deliberately-undefined seams -- the two impact-table ones, Get-TestCommands since inbound #644, Get-EntryGateExemptPrefixes since inbound #789, and Get-ReleasePageMasthead since inbound #809 -- plus two reachability signals: neither fold-changelog-entry nor new-internal-note can see this consumer''s Get-BranchTypes, which is the ordinary state for a repo that has not chained branch-info.ps1 into its repo-config -- plus the four optional seams issue #885 added (Get-ChangelogPath, Get-ReleaseDevelopmentNotesRoot, Get-ReleaseGithubNotesRoot, Get-ReleaseInternalNotesRoot), each with a computed default this fixture does not define)'
 
     # --- 1b. The workflow folder is missing -> its own [ERROR], naming the scaffold skill ----------
     #     (August 14, 2026.) A plugin install writes nothing into a consumer's repo, so this line is
@@ -371,7 +371,10 @@ try {
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
     Assert-Equal 0 $r.Code 'optional absent: exit-code 0 (a fallback exists, so not a breach)'
     Assert-NotMatch '\[ERROR\]' $r.Out 'optional absent: no error'
-    Assert-Match "\[INFO\].*'Get-ReleaseHistoryPath' missing from scripts\\repo-config\.ps1.*used by: cut-release, new-internal-note.*optional.*falls back to 'releases/README\.md'" $r.Out 'optional absent: INFO names the function, both callers and the fallback'
+    # THE FALLBACK TEXT ITSELF CHANGED (issue #885): the literal 'releases/README.md' became the short
+    # computed-default description Get-ReleasePluginTier already set the precedent for, since the real
+    # default now differs between a source repo and a consumer.
+    Assert-Match "\[INFO\].*'Get-ReleaseHistoryPath' missing from scripts\\repo-config\.ps1.*used by: cut-release, new-internal-note.*optional.*falls back to 'releases/README\.md \(source\) or workflow-davekjohn/releases/history\.md \(consumer\), computed'" $r.Out 'optional absent: INFO names the function, both callers and the fallback'
 
     # --- 6d. Get-LiveStage: absent -> [INFO] naming the empty-string fallback, exit 0 (issue #177) ----
     #     Mirrors test 6c above (Get-ChangelogHeading, issue #178): Get-LiveStage is Optional in the
@@ -413,7 +416,7 @@ try {
     Assert-Match ("\[INFO\].*'Get-EntryBodyHeading' missing.*falls back to '" + [regex]::Escape('**To do / where I left off:**') + "'") $r.Out 'stub wording absent: INFO for Get-EntryBodyHeading quotes the literal default heading'
     Assert-Match "\[INFO\].*'Get-EntryFallbackType' missing.*falls back to 'Chore'" $r.Out 'stub wording absent: INFO for Get-EntryFallbackType names the Chore default'
     $infoCount6e = @([regex]::Matches($r.Out, '\[INFO\]')).Count
-    Assert-Equal 11 $infoCount6e 'stub wording absent: exactly eleven [INFO] lines -- one per stripped knob, plus the five seams this repo deliberately never defines (the two impact-table ones, Get-TestCommands since inbound #644, Get-EntryGateExemptPrefixes since inbound #789 -- this repo runs no mirror branches, so its default IS its answer -- and Get-ReleasePageMasthead since inbound #809, this repo having no wordmark) and the two reachability signals on Get-BranchTypes, and nothing else downgraded along with them. Was eight until the flat changelog retired the superseded Get-ChangelogHeading and Get-ChangelogReleaseWording records, then six until inbound #580 added a record whose seam a consumer leaves unreachable, then eight until #644, then nine until #789, then ten until #809'
+    Assert-Equal 15 $infoCount6e 'stub wording absent: exactly fifteen [INFO] lines -- one per stripped knob, plus the five seams this repo deliberately never defines (the two impact-table ones, Get-TestCommands since inbound #644, Get-EntryGateExemptPrefixes since inbound #789 -- this repo runs no mirror branches, so its default IS its answer -- and Get-ReleasePageMasthead since inbound #809, this repo having no wordmark), the two reachability signals on Get-BranchTypes, and the four optional seams issue #885 added (Get-ChangelogPath, Get-ReleaseDevelopmentNotesRoot, Get-ReleaseGithubNotesRoot, Get-ReleaseInternalNotesRoot), and nothing else downgraded along with them. Was eight until the flat changelog retired the superseded Get-ChangelogHeading and Get-ChangelogReleaseWording records, then six until inbound #580 added a record whose seam a consumer leaves unreachable, then eight until #644, then nine until #789, then ten until #809, then eleven until #885'
 
     # --- 6f. NO CONTRACT RECORD MAY SPELL A REPORT MARKER IN ITS OWN TEXT --------------------------
     #     Measured while adding the tier records: a Returns line that mentioned the info marker made the
@@ -736,7 +739,7 @@ function Get-RosterIgnoredIds { return @() }
     Assert-Equal 0 $r.Code 'skip-reachability: exit-code 0'
     Assert-NotMatch 'NOT IN SCOPE' $r.Out 'skip-reachability: no reachability findings are produced'
     Assert-Match "\[OK\]\s+'Get-BranchTypes' present in" $r.Out 'skip-reachability: the presence half is untouched'
-    Assert-Match 'Summary: 0 error\(s\), 5 info signal\(s\)' $r.Out 'skip-reachability: only the five deliberately-undefined seams remain -- the switch drops the reachability half and nothing else'
+    Assert-Match 'Summary: 0 error\(s\), 9 info signal\(s\)' $r.Out 'skip-reachability: only the deliberately-undefined seams remain (five original plus the four issue #885 added) -- the switch drops the reachability half and nothing else'
 
     $fixtureConfig = Join-Path $c 'scripts\repo-config.ps1'
     [System.IO.File]::AppendAllText($fixtureConfig, "`r`n. (Join-Path `$PSScriptRoot 'lib\branch-info.ps1')`r`n")

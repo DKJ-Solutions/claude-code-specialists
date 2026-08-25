@@ -90,6 +90,10 @@ if (Test-Path -LiteralPath $repoConfig -PathType Leaf) {
     try { . $repoConfig } catch { Write-Warning "scripts/repo-config.ps1 failed to load ($($_.Exception.Message)) -- the built-in wording is used." }
 }
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
+# Get-SeamValue + the computed defaults (issue #885): this scaffold reads the SAME seam definitions the
+# cut, the fold and session-status now read, so the paths this folder's own docs name can never disagree
+# with where the workflow actually reads and writes.
+. (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $nl = "`n"
@@ -97,11 +101,22 @@ $nl = "`n"
 # WHERE THIS REPO KEEPS ITS RELEASE LIST, read rather than assumed. The pages below name that path, and
 # naming the default where a repo has repointed the seam would send its reader to a file that is not
 # theirs -- the same mistake cut-release's missing-file warning was repaired for (August 4, 2026). Read
-# through Get-Command, so a repo that defines nothing gets the shared default.
-$historyRelPath = if (Get-Command Get-ReleaseHistoryPath -ErrorAction SilentlyContinue) {
-    $v = ([string](Get-ReleaseHistoryPath)).Trim()
-    if ($v) { $v } else { 'releases/README.md' }
-} else { 'releases/README.md' }
+# through the shared seam reader, so a repo that defines nothing gets the same computed default the cut
+# itself would fall back to -- 'releases/README.md' cannot be assumed here any more (issue #885, group E):
+# this script already refused above for a repo that publishes plugins, so every caller reaching this line
+# is a consumer, and the computed default for a consumer is now inside this very folder.
+#
+# history.md, NOT README.md -- 'workflow-davekjohn/releases/README.md' is ALREADY this folder's seam-ANSWERS
+# page (the $releasesReadme target below). The list and the answers are two different kinds of document in
+# this repo's own root (README.md holds the answers, root releases/README.md holds the list) purely because
+# they sit at different directory levels; folded into the SAME directory they need different names, or the
+# scaffold below would be asked to write two documents to one path.
+$historyRelPath = Get-SeamValue -Name 'Get-ReleaseHistoryPath' -Default (Get-DefaultReleaseHistoryPath -RepoRoot $repoRoot)
+Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $historyRelPath -SeamName 'Get-ReleaseHistoryPath'
+# WHERE THIS REPO KEEPS ITS CHANGELOG (issue #885, group A). Same reasoning: the scaffold below has to
+# name the same path the cut/fold/session-status seam resolves to, not a literal that can drift from it.
+$changelogRel = Get-SeamValue -Name 'Get-ChangelogPath' -Default (Get-DefaultChangelogPath -RepoRoot $repoRoot)
+Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $changelogRel -SeamName 'Get-ChangelogPath'
 
 # --- What the folder contains ---------------------------------------------------------------------
 # One list, each entry a repo-relative path plus the content it gets WHEN ABSENT. The docs name their
@@ -114,16 +129,19 @@ $folderReadme = @(
     '',
     'Everything portable about the `workflow-davekjohn` workflow gathers here, so the workflow occupies',
     'one folder in this repo''s root instead of scattering through it. The conventions themselves travel',
-    'with the plugin as four portable pages -- `CONTRIBUTING-portable.md`, `DEVELOPMENT-CYCLE-portable.md`,',
-    '`RELEASES-portable.md` and `TICKETWORK-portable.md`, readable in your plugin install or in the',
-    'source repo -- and each page in this folder is this repo''s own set of answers to them.',
+    'with the plugin as portable pages, readable in your plugin install or in the source repo. Three are',
+    'unconditional -- `CONTRIBUTING-portable.md`, `DEVELOPMENT-CYCLE-portable.md` and',
+    '`RELEASES-portable.md` -- and each page in this folder is this repo''s own set of answers to one of',
+    'them. A fourth, `TICKETWORK-portable.md`, applies only where work arrives from somebody else''s',
+    'tracker; skip it if yours does not.',
     '',
     '| here | what it holds |',
     '|---|---|',
     '| [`CLAUDE.md`](CLAUDE.md) | the working rules a Claude session needs in this folder |',
     '| [`CONTRIBUTING.md`](CONTRIBUTING.md) | this repo''s answers to the contribution cycle |',
     '| `development-cycle.md` | the branch''s own document, present only while a branch is open: its plan, and the DEPLOY section that folds into the changelog |',
-    '| [`releases/`](releases/) | this repo''s release answers and the published audience notes -- the release LIST is at the repo root |',
+    '| [`CHANGELOG.md`](CHANGELOG.md) | this folder''s own pending-changes list, isolated from any changelog you already keep at your repo root |',
+    '| [`releases/`](releases/) | this repo''s release answers, the release LIST and the published audience notes |',
     '',
     'Scaffolded by the `adopt-workflow-folder` skill; strictly additive, so everything here past the',
     'VUL-IN markers is this repo''s own writing.'
@@ -150,10 +168,14 @@ $folderClaude = @(
     '  folder. A checkbox inside that section is prose, not a step, and no gate reads it as one.',
     '- The HTML comments in it are the form, not somebody''s notes: they say what a good answer looks',
     '  like, and the fold strips them on the way to `CHANGELOG.md`. Leaving one standing is not a defect.',
-    ('- `releases/README.md` here states this repo''s release ANSWERS; the release LIST the cut inserts its'),
-    ('  row into is at `' + $historyRelPath + '`, outside this folder, because a history outlives the'),
-    '  tooling that wrote it. `releases/audience/` is where the cut drafts the hand-written note --',
-    '  generated development notes live elsewhere.',
+    ('- **`CHANGELOG.md` here is this folder''s own** -- isolated from any `CHANGELOG.md` you already keep'),
+    '  at your repo root, which this workflow never reads and never writes. A change may end up recorded',
+    '  in both, in each one''s own shape; that duplication is accepted rather than resolved, so the',
+    '  plugin never has to guess at the shape of a file it does not own.',
+    ('- `releases/README.md` here states this repo''s release ANSWERS, and IS the release LIST the cut'),
+    ('  inserts its row into (at `' + $historyRelPath + '`) -- a history that stays with the repo that cut'),
+    '  it. `releases/audience/` is where the cut drafts the hand-written note; `releases/development/`,',
+    '  `releases/github/` and `releases/internal/` hold the generated documents.',
     '',
     '<!-- VUL-IN: rules specific to this repo, if this folder gains any. -->'
 )
@@ -188,11 +210,12 @@ $releasesReadme = @(
     '     Get-ReleaseAudienceTier, Get-ReleaseConsumerBumps, Get-ReleaseNotesGrouping -- state what this',
     '     repo chose and why, so a reader does not have to open scripts/repo-config.ps1 to learn it. -->',
     '',
-    ('**The release LIST is not on this page** -- it lives at `' + $historyRelPath + '`, which is where'),
-    '`Get-ReleaseHistoryPath` points. The test is whether the thing survives this folder being deleted: a',
-    'repo that has cut releases has a **history** whichever tooling cut it, so the list is the repo''s. A',
-    'per-reader **note** is the opposite -- it exists only because the tier model does -- which is why',
-    '`audience/` is here and the list is not.',
+    ('**The release LIST is not on THIS page** -- it lives beside it, at `' + $historyRelPath + '`,'),
+    'which is where `Get-ReleaseHistoryPath` points. Two different documents even though both are now',
+    'inside this folder: this page is your hand-written ANSWERS to the seam (prose, decisions), rewritten',
+    'only by you; the list is machine-appended, one row per release, and never touched by hand except to',
+    'start it. Kept apart for the same reason `releases/README.md` and this page are apart in the source',
+    'repo -- a document somebody edits and a document a script owns should never share a path.',
     '',
     ('That file is **not** scaffolded, deliberately: see the closing advice of `adopt-workflow-folder` for'),
     'what it has to contain before your first cut, and why a half-written one would be worse than none.'
@@ -260,12 +283,39 @@ $entryGateWorkflow = @(
     '          exit $LASTEXITCODE'
 )
 
+# CHANGELOG.md (issue #885, group A): this folder's own pending-changes list, isolated from any
+# CHANGELOG.md the consumer already keeps at their root -- the workflow never reads or writes that one
+# again. Deliberately GENERIC prose rather than this repo's own evolved intro (which cites this repo's
+# own dates and links): a fresh consumer gets the shape the mechanism actually requires, nothing this
+# repo has accumulated. The release-list link is relative to THIS file's own location (inside the
+# folder), computed from $historyRelPath rather than assumed, because a repo that repointed the seam
+# outside the folder needs '../' where one that left it alone needs none.
+$historyRelFromFolder = if ($historyRelPath -like 'workflow-davekjohn/*') {
+    $historyRelPath.Substring('workflow-davekjohn/'.Length)
+} else {
+    "../$historyRelPath"
+}
+$changelogIntro = @(
+    '# Changelog',
+    '',
+    'Everything merged since the last release, newest first: one `##` per change, and under it the',
+    'sections your own `CONTRIBUTING.md` names for your audience tier. The mechanism itself -- the',
+    'branch document a change is written in, the fold that moves it here, and what the release cut does',
+    'with this list -- is the plugin''s `CONTRIBUTING-portable.md`, which travels with `workflow-davekjohn`',
+    'and is not restated here.',
+    '',
+    ('This file is emptied down to this intro at every release; what was in it moves into that'),
+    ('release''s own documents instead. See [`' + $historyRelPath + '`](' + $historyRelFromFolder + ')'),
+    'for the list of releases actually cut.'
+)
+
 $targets = @(
     @{ Rel = '.github/workflows/branch-entry.yml'; Content = (($entryGateWorkflow -join $nl) + $nl) },
     @{ Rel = 'workflow-davekjohn/README.md';           Content = (($folderReadme -join $nl) + $nl) },
     @{ Rel = 'workflow-davekjohn/CLAUDE.md';           Content = (($folderClaude -join $nl) + $nl) },
     @{ Rel = 'workflow-davekjohn/CONTRIBUTING.md';     Content = (($folderContributing -join $nl) + $nl) },
     @{ Rel = 'workflow-davekjohn/releases/README.md';  Content = (($releasesReadme -join $nl) + $nl) },
+    @{ Rel = $changelogRel;                            Content = (($changelogIntro -join $nl) + $nl) },
     # git tracks no empty directory, and the audience root must exist before the first cut writes into
     # it -- the same reason this repo's own releases tree once carried an invisible empty folder.
     @{ Rel = 'workflow-davekjohn/releases/audience/.gitkeep'; Content = '' }
@@ -314,19 +364,38 @@ if ($Apply) {
 }
 
 # --- What only this repo can answer, said out loud rather than left to be discovered ---------------
-# Two 'decide' seams point the release machinery at the folder; without them the cut keeps writing to
-# the shared defaults at the repo root, which is a working state but not the one this folder is for.
-# And one 'copy' seam has a stale copy in every repo that adopted before the folder existed.
+# One 'decide' seam points the release machinery at the folder; without it the cut keeps writing hand-
+# written notes to the shared default at the repo root, which is a working state but not the one this
+# folder is for. And one 'copy' seam has a stale copy in every repo that adopted before the folder
+# existed.
+
+# RE-ADOPTION MIGRATION NOTE (issue #885): the one transition this run cannot do for you, because it
+# is prose in somebody else's file. Same shape as this repo's own releases/README.md migration advice
+# ("if it carries a release list from before this split, move that list").
+if (Test-Path -LiteralPath (Join-Path $repoRoot 'CHANGELOG.md') -PathType Leaf) {
+    Write-Host ''
+    Write-Host 'YOUR ROOT CHANGELOG.md EXISTS, so read this before your next merge:' -ForegroundColor Yellow
+    Write-Host "  Any entry PENDING there right now (not yet released) will NOT be picked up by the next"
+    Write-Host "  fold or cut -- both now read $changelogRel instead. Carry a genuinely pending entry over"
+    Write-Host "  by hand, or it ships in neither list."
+}
+
 Write-Host ''
 Write-Host 'Next, in scripts/repo-config.ps1 (a ''decide'' seam -- see adopt-config):' -ForegroundColor Cyan
 Write-Host "  Get-ReleaseNoteRoot     -> 'workflow-davekjohn/releases/audience'"
 Write-Host ''
-Write-Host 'Get-ReleaseHistoryPath is deliberately NOT in that list. Leave it at its default,' -ForegroundColor Cyan
-Write-Host "'releases/README.md', which is where the source keeps its own list too since August 19,"
-Write-Host '2026: a repo that has cut releases has a HISTORY whichever tooling cut it, so the list is'
-Write-Host 'the repo''s and does not belong in a folder a teardown removes. The audience notes are the'
-Write-Host 'opposite -- they exist only because the tier model does -- which is why that seam DOES'
-Write-Host 'point in here.'
+Write-Host 'DELIBERATELY NOT IN THAT LIST: its own contract record explains why the shared DEFAULT stays' -ForegroundColor DarkGray
+Write-Host '''releases/notes'' rather than moving with the folder -- a repo that answers nothing must keep' -ForegroundColor DarkGray
+Write-Host 'meaning what it meant yesterday, and only the repo can say whether its notes already live' -ForegroundColor DarkGray
+Write-Host 'somewhere else. The line above is how THIS run isolates a fresh adoption: written explicitly,' -ForegroundColor DarkGray
+Write-Host 'once, rather than by a default that would move under an existing consumer''s feet.' -ForegroundColor DarkGray
+Write-Host ''
+Write-Host "Get-ReleaseHistoryPath IS ALREADY ISOLATED BY DEFAULT NOW (issue #885): $historyRelPath." -ForegroundColor Cyan
+Write-Host 'RE-ADOPTING AN EXISTING CONSUMER, READ THIS: your next cut starts a NEW list here, beside' -ForegroundColor Yellow
+Write-Host 'whatever history already sits at your root releases/README.md -- the same duplication-accepted' -ForegroundColor Yellow
+Write-Host 'trade the changelog seam makes, deliberately (Dave, August 25, 2026): rather two lists than any' -ForegroundColor Yellow
+Write-Host 'chance of writing into a file this workflow does not own. Repoint the seam back to your existing' -ForegroundColor Yellow
+Write-Host 'root file instead if you would rather keep one list.' -ForegroundColor Yellow
 Write-Host ''
 Write-Host "AND THAT FILE IS YOURS TO CREATE, before your first cut: $historyRelPath" -ForegroundColor Cyan
 Write-Host '  It needs a section heading naming your first major and a table header under it:'

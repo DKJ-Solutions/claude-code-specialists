@@ -318,6 +318,16 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # Get-SeamValue + Get-DefaultChangelogPath (issue #885, group A): the one definition
+            # cut-release.ps1, new-internal-note.ps1, fold-changelog-entry.ps1 and session-status.ps1
+            # all read an optional repo-config seam through now, where two of them used to carry their
+            # own private copy of the function and two more probed inline instead of calling either.
+            Name    = 'seam-lib'
+            Source  = 'scripts\lib\seam-lib.ps1'
+            Plugin  = 'workflow-davekjohn'
+            LibOnly = $true
+        },
+        @{
             # Gate evidence (August 16, 2026): what the gates proved, and against which exact working
             # state. Mirrored because open-pr.ps1 dot-sources it as a $PSScriptRoot sibling, and the
             # redundancy it removes -- ship-pr calling open-pr, which re-gates a commit nothing has

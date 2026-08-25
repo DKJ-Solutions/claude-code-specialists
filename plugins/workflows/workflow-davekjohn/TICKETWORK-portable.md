@@ -205,12 +205,6 @@ that reads as sound: the outgoing message goes to colleagues, and those colleagu
 requester there will ever be. One answer per repo is the shape that fails here, and it fails silently:
 nothing is wrong until the first request arrives from somebody who cannot read the message.
 
-**And one thing to check before you adopt this**, in the same spirit as the note at the end of
-[`CONTRIBUTING-portable.md`](CONTRIBUTING-portable.md#one-thing-to-do-before-you-adopt-a-root-contributingmd):
-if your ticket files live in the repo root as `*.md`, they will look like unfolded changelog entries to the
-release cut. Put them in a directory, or add them to your `Get-ReservedRootMd`. A directory is the better
-answer — it costs nothing and needs no configuration.
-
 ## What deliberately is not here
 
 **No template file, and no scaffolding script.** Both were offered and declined for now. A template fixes

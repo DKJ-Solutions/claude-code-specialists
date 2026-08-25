@@ -230,6 +230,19 @@ try {
     $cfgPath = Join-Path $repoRoot 'scripts\repo-config.ps1'
     if (Test-Path -LiteralPath $cfgPath -PathType Leaf) { . $cfgPath }
 } catch { }
+# Get-SeamValue + Get-DefaultChangelogPath (issue #885, group A): the pending-entries block below used
+# to hard-code 'CHANGELOG.md' where cut-release.ps1 and fold-changelog-entry.ps1 now read the same seam
+# through the same shared definition. GUARDED, same as entry-scaffold-lib.ps1 below: a repo (or test
+# fixture) that has not adopted this far still gets a full report, and the pending-entries block falls
+# back to the flat 'CHANGELOG.md' literal when Get-SeamValue is unavailable.
+$script:HaveSeamReader = $false
+try {
+    $seamLib = Join-Path $PSScriptRoot '..\lib\seam-lib.ps1'
+    if (Test-Path -LiteralPath $seamLib -PathType Leaf) {
+        . $seamLib
+        $script:HaveSeamReader = [bool](Get-Command Get-SeamValue -ErrorAction SilentlyContinue)
+    }
+} catch { $script:HaveSeamReader = $false }
 try {
     # THE SAME RELATIVE STEP new-branch.ps1 TAKES, and that is what makes it right in both contexts:
     # 'scripts\task' -> 'scripts\lib' in the repo that maintains this file, and the identical step
@@ -316,9 +329,14 @@ function Write-EntryTiers {
 # have left the identical defect waiting for the next rename: the reader was what was wrong, not the
 # pattern.
 Write-Section 'Pending changelog entries'
-$changelog = Join-Path $repoRoot 'CHANGELOG.md'
+$changelogRel = if ($script:HaveSeamReader) {
+    Get-SeamValue -Name 'Get-ChangelogPath' -Default (Get-DefaultChangelogPath -RepoRoot $repoRoot)
+} else {
+    'CHANGELOG.md'
+}
+$changelog = Join-Path $repoRoot $changelogRel
 if (-not (Test-Path -LiteralPath $changelog -PathType Leaf)) {
-    Write-Absent 'this repo has no CHANGELOG.md'
+    Write-Absent "no $changelogRel"
 } else {
     # THE 'N/A' LITERAL COMES FROM THE LIBRARY TOO where the library is there. It is one of the strings
     # the format states once on purpose, and a second copy here is the drift shape this repair is about.
