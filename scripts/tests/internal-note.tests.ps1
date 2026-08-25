@@ -88,6 +88,18 @@ function New-Fixture {
     # for the plugin set (August 9, 2026), so it is a sibling of a sibling and the fixture owes it too.
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\plugin-tree-lib.ps1') `
         -Destination (Join-Path $dir 'scripts\lib\plugin-tree-lib.ps1') -Force
+    # seam-lib.ps1 (issue #885, group A/E): the script now dot-sources this unconditionally, the same way
+    # it already does for release-lib.ps1 and its own siblings above -- a missing copy must fail loudly
+    # here, not silently in someone's release.
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1') `
+        -Destination (Join-Path $dir 'scripts\lib\seam-lib.ps1') -Force
+    # .claude-plugin/marketplace.json (issue #885): this fixture places its notes at the ROOT
+    # releases/development/ and releases/internal/ and every assertion below expects them there.
+    # Get-DefaultReleaseDevelopmentNotesRoot / Get-DefaultReleaseInternalNotesRoot test exactly this
+    # file's presence, so without it the fixture reads as a consumer and the script looks for its
+    # notes inside a workflow-davekjohn/ this fixture does not have.
+    New-Item -ItemType Directory -Path (Join-Path $dir '.claude-plugin') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $dir '.claude-plugin\marketplace.json'), '{}', $Utf8NoBom)
     if ($null -ne $NotesContent) {
         $notesPath = Join-Path $dir "releases\development\$NotesDir\$Version.md"
         New-Item -ItemType Directory -Path (Split-Path -Parent $notesPath) -Force | Out-Null

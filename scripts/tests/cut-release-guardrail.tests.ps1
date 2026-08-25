@@ -1,20 +1,22 @@
 <#
 .SYNOPSIS
-    Drift guard for cut-release.ps1's stray-entry allowlist ($reservedRootMd).
+    Drift guard for cut-release.ps1's stray-entry detection (issue #885, group D).
 
 .DESCRIPTION
     cut-release.ps1 refuses to cut a release while an "unfolded changelog entry file" sits in the
-    repo root. It recognises an entry by exclusion: every root *.md that is NOT in the $reservedRootMd
-    allowlist is treated as an entry. That is deliberately catch-all (so an entry with an unknown
-    branch prefix is never missed), but it means every PERMANENT root doc (README, CONTRIBUTING,
-    SECURITY, ...) must be listed in the allowlist -- otherwise a release falsely refuses to cut the
-    moment such a doc is added. That drift once blocked a real release (CONTRIBUTING.md/SECURITY.md
-    were added to the root but not to the allowlist).
+    repo root. UNTIL AUGUST 25, 2026 it recognised an entry by exclusion: every root *.md that was NOT
+    in the $reservedRootMd allowlist was treated as an entry, which meant every PERMANENT root doc
+    (README, CONTRIBUTING, SECURITY, ...) had to be listed there too -- and that drift blocked a real
+    release three times (#165; CONTRIBUTING.md/SECURITY.md in #405 with QUICKSTART.md/UNINSTALL.md;
+    ADOPTION.md in #408).
 
-    This test catches that drift automatically: every TRACKED root *.md that is not a branch-prefixed
-    changelog entry (feat-/fix-/docs-/chore-*.md) must appear in cut-release.ps1's $reservedRootMd.
-    Reads the allowlist straight out of the script text (cut-release.ps1 runs its guardrails on load,
-    so it cannot be dot-sourced) and compares it against the actual tracked root docs via git.
+    IT NOW RECOGNISES AN ENTRY BY CONTENT: a root *.md (not on $reservedRootMd, which survives as a
+    manual override) is stray only if Test-BranchChangelogIsFilled says so -- the same predicate the
+    branch's own live document is held to, true only for text that declares a non-trunk branch or opens
+    with an entry-level heading (## or ###). A consumer's own permanent doc, which opens with a plain #
+    title, never matches, so it needs no listing at all. This test asserts the mechanism (source-text,
+    since cut-release.ps1 runs its guardrails on load and cannot be dot-sourced) and then proves it
+    against this repo's own tracked root docs, for real, via the actual predicate.
 
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/cut-release-guardrail.tests.ps1
 
@@ -24,6 +26,8 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot       = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $CutReleasePath = Join-Path $RepoRoot 'scripts\release\cut-release.ps1'
+$SeamLibPath    = Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1'
+$EntryScaffoldLibPath = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 
 $script:pass = 0
 $script:fail = 0
@@ -37,40 +41,56 @@ function Assert-True {
     }
 }
 
-Write-Host "cut-release.ps1 -- reserved-root-md allowlist covers every permanent root doc" -ForegroundColor Cyan
+Write-Host "cut-release.ps1 -- stray-entry detection reads content, not just the override list" -ForegroundColor Cyan
 
-# 1. The allowlist that will ACTUALLY be in force, which is the seam where a repo defines one and the
-#    script's literal only where it does not.
-#
-#    THIS USED TO PARSE THE LITERAL ONLY, and that made it assert about the wrong list (August 14, 2026).
-#    `cut-release.ps1` reads `Get-ReservedRootMd` through `Get-SeamValue` and falls back to the literal;
-#    this repo defines that seam, so the literal is exactly the value that does NOT protect its release.
-#    Measured when INSTALL.md and UNINSTALL.md moved to the root under inbound #664: they were added to
-#    the seam, the release was safe, and this assert failed anyway -- naming two files that were covered.
-#    The repair is not to add them to the literal: that default is the PORTABLE one, and a consumer's
-#    root has neither file. A default carrying this repo's documents would be this repo's specifics
-#    shipped as everyone's.
 $cutReleaseText = [System.IO.File]::ReadAllText($CutReleasePath, [System.Text.Encoding]::UTF8)
+$seamLibText    = [System.IO.File]::ReadAllText($SeamLibPath, [System.Text.Encoding]::UTF8)
+
+# 1. WIRING: the check must actually call the content predicate, not just filter by name. Source-text
+#    assert for the same reason as everywhere else in this file -- the script cannot be dot-sourced.
+$strayBlock = [regex]::Match($cutReleaseText, '(?ms)\$strayEntries\s*=.*?^if \(\$strayEntries\.Count')
+Assert-True $strayBlock.Success 'found the $strayEntries construction in cut-release.ps1'
+Assert-True ($strayBlock.Success -and $strayBlock.Value -match 'Test-BranchChangelogIsFilled') `
+    'stray-entry detection calls Test-BranchChangelogIsFilled -- content, not name-exclusion alone'
+Assert-True ($strayBlock.Success -and $strayBlock.Value -match '\$reservedRootMd\s+-notcontains') `
+    'the override list is still consulted first, as a manual exemption'
+Assert-True ($cutReleaseText.Contains('lib\entry-scaffold-lib.ps1')) `
+    'and cut-release.ps1 dot-sources the lib that predicate lives in'
+
+# 2. The fallback literal still parses, so the override mechanism itself has not silently broken.
 $m = [regex]::Match($cutReleaseText, '\$reservedRootMd\s*=\s*@\(Get-SeamValue[^@]*@\(([^)]*)\)')
 if (-not $m.Success) { $m = [regex]::Match($cutReleaseText, '\$reservedRootMd\s*=\s*@\(([^)]*)\)') }
 Assert-True $m.Success 'found the $reservedRootMd fallback literal in cut-release.ps1'
 $fallback = @([regex]::Matches($m.Groups[1].Value, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
 Assert-True ($fallback.Count -gt 0) 'fallback literal parsed to at least one entry'
 
+# The EFFECTIVE override list -- the seam where this repo defines one, the fallback literal where it
+# does not -- because $reservedRootMd in the real script is this value, not the bare fallback.
 $repoConfig = Join-Path $RepoRoot 'scripts\repo-config.ps1'
 $allowlist = $fallback
-$fromSeam = $false
 if (Test-Path -LiteralPath $repoConfig) {
     . $repoConfig
     if (Get-Command -Name 'Get-ReservedRootMd' -ErrorAction SilentlyContinue) {
         $allowlist = @(Get-ReservedRootMd)
-        $fromSeam = $true
     }
 }
-Assert-True ($allowlist.Count -gt 0) 'the effective allowlist has at least one entry'
-Assert-True $fromSeam 'this repo answers Get-ReservedRootMd, so the seam is what is being checked'
+Assert-True ($allowlist.Count -gt 0) 'the effective override list has at least one entry'
 
-# 2. Tracked root *.md files (no directory separator = repo root), excluding branch-prefixed entries.
+# 3. PROVE THE PREDICATE AGAINST THIS REPO'S OWN TRACKED ROOT DOCS -- for real, not by name, and
+#    through the SAME two-step filter the script itself applies (override list first, content check
+#    only for what survives it). This is what replaces the old "every permanent doc must be listed"
+#    assertion: a doc that is NOT on the override list no longer needs to be added there, it needs to
+#    not LOOK like an entry -- and this checks that every such doc this repo actually has genuinely does
+#    not, so this repo's own next release is not the one that finds out the hard way.
+#
+#    CHANGELOG.md ITSELF IS THE WORKED CASE FOR WHY THE OVERRIDE STEP CANNOT BE SKIPPED: read on its
+#    own, outside that filter, it fails the content check -- it IS a concatenation of pending entries,
+#    each opening with its own '## DEPLOY: `<branch>`' heading and naming that branch, which is exactly
+#    the shape Test-BranchChangelogIsFilled exists to recognise. It is correct that CHANGELOG.md reads
+#    as "full of entries"; it is also on $reservedRootMd unconditionally, so the real script never runs
+#    the content check on it at all. Measured while writing this test: omitting the override step here
+#    made this assert fail on exactly that file, for exactly that reason.
+. $EntryScaffoldLibPath
 $prevEap = $ErrorActionPreference
 try {
     $ErrorActionPreference = 'Continue'
@@ -79,15 +99,32 @@ try {
     $ErrorActionPreference = $prevEap
 }
 $rootMd = @($tracked | Where-Object { $_ -and ($_ -notmatch '/') })
-# A branch changelog entry file is named after its branch: <prefix>-<name>.md with a known prefix.
+# A branch changelog entry file is named after its branch: <prefix>-<name>.md with a known prefix --
+# excluded here not because the content check can't see it (it can, and should), but because a file of
+# that shape genuinely IS meant to be read as an entry, so it belongs in the positive-case test below
+# instead of the negative one here.
 $entryPattern = '^(feat|fix|docs|chore)-.*\.md$'
 $permanentDocs = @($rootMd | Where-Object { $_ -notmatch $entryPattern })
 Assert-True ($permanentDocs.Count -gt 0) 'found tracked permanent root docs to check'
+$scanned = @($permanentDocs | Where-Object { $allowlist -notcontains $_ })
+Assert-True ($scanned.Count -lt $permanentDocs.Count) `
+    'at least one tracked root doc (CHANGELOG.md) is override-exempted rather than content-scanned'
+$falsePositives = @($scanned | Where-Object {
+    $text = [System.IO.File]::ReadAllText((Join-Path $RepoRoot $_), [System.Text.Encoding]::UTF8)
+    Test-BranchChangelogIsFilled -Text $text
+})
+Assert-True ($falsePositives.Count -eq 0) `
+    "no content-scanned root doc reads as a stray entry (false positives: $($falsePositives -join ', '))"
 
-# 3. Every permanent root doc must be covered by the allowlist -- otherwise a release would falsely
-#    flag it as an unfolded entry and refuse to cut.
-$uncovered = @($permanentDocs | Where-Object { $allowlist -notcontains $_ })
-Assert-True ($uncovered.Count -eq 0) "every permanent root doc is in `$reservedRootMd (uncovered: $($uncovered -join ', '))"
+# 4. THE POSITIVE CASE: a genuine legacy root entry -- opens with its own title as an H2, names no
+#    branch -- must still be caught, or the inversion traded a false-positive bug for a false-negative
+#    one. This is exactly the pre-split shape entry-scaffold-lib.ps1's own docstring describes.
+$legacyEntryText = "## feat: something a branch once did`n`nSome body text.`n"
+Assert-True (Test-BranchChangelogIsFilled -Text $legacyEntryText) `
+    'a legacy pre-split root entry (H2 title, no declared branch) still reads as stray'
+$normalDocText = "# Just a Title`n`nSome body text that is not an entry.`n"
+Assert-True (-not (Test-BranchChangelogIsFilled -Text $normalDocText)) `
+    'and an ordinary document (H1 title) does not'
 
 Write-Host "cut-release.ps1 -- every planned file is checked before the first one is written" -ForegroundColor Cyan
 # WHY THIS IS A TEXT ASSERT AND NOT A BEHAVIOUR ONE: cut-release.ps1 runs its guardrails on load (it
@@ -120,8 +157,16 @@ Assert-True ($plannedBlock.Success -and $plannedBlock.Value -match 'bodyRelPath'
 # literal, so a grouping change (<X>.x -> <X.Y>) does not turn this red for a reason it is not about. It
 # used to be written into releases/development/ with a '-github-body' suffix: the one generated document
 # that IS published, sitting in the directory whose whole job is the record nobody publishes.
-Assert-True ($cutReleaseText -match '(?m)^\$bodyRelPath\s*=\s*"releases/github/') `
-    'the generated body is written into releases/github/'
+#
+# SEAMED SINCE ISSUE #885, GROUP E: the literal 'releases/github/' is gone from this assignment, replaced
+# by $githubNotesRootRelPath, whose own computed default (Get-DefaultReleaseGithubNotesRoot, in
+# seam-lib.ps1) is 'releases/github' for the source. Asserted in two parts so a regression in either half
+# is attributable: the assignment reads the seam variable, and that variable's default really is the old
+# literal for a repo that answers nothing.
+Assert-True ($cutReleaseText -match '(?m)^\$bodyRelPath\s*=\s*"\$githubNotesRootRelPath/') `
+    'the generated body is written from the seamed github-notes root'
+Assert-True ($seamLibText -match "return 'releases/github'") `
+    "and that seam's computed default for the source repo is still releases/github"
 # THE NEGATIVE HALF IS SCOPED TO THE ASSIGNMENT, and that is not fussiness -- the WHY comment three lines
 # above the assignment quotes the retired filename, so a check over the whole script text would fail on the
 # sentence explaining the move. Assert on the line that decides, not on the file that mentions.
@@ -232,8 +277,14 @@ $newIdx = $cutReleaseCode.IndexOf('Get-ReleaseConsumerBumps')
 $oldIdx = $cutReleaseCode.IndexOf('Get-ReleaseHighlightsBumps')
 Assert-True ($newIdx -ge 0 -and $oldIdx -gt $newIdx) 'the current name is tried before the retired one'
 # And the reader itself must accept more than one name, or the pair above is two arguments to a parameter
-# that only ever looks at the first.
-Assert-True ($cutReleaseText -match '\[string\[\]\]\$Name') 'Get-SeamValue takes a LIST of names, so a renamed seam can be read under both'
+# that only ever looks at the first. Get-SeamValue ITSELF MOVED OUT OF THIS FILE (issue #885, group A) into
+# seam-lib.ps1, so the signature is asserted there now -- plus that this file actually reads through it
+# rather than carrying a private copy again.
+Assert-True ($seamLibText -match '\[string\[\]\]\$Name') 'Get-SeamValue takes a LIST of names, so a renamed seam can be read under both'
+Assert-True ($cutReleaseText -notmatch '(?m)^function Get-SeamValue') `
+    'cut-release.ps1 no longer carries its own private copy of Get-SeamValue'
+Assert-True ($cutReleaseText.Contains('lib\seam-lib.ps1')) `
+    'and dot-sources the shared one instead'
 
 # WHERE THE NOTE GOES IS A SEAM TOO (inbound #616), and this assert exists because the knob above was
 # unanswerable without it: for a repo whose hand-written notes live elsewhere, naming the bumps pointed

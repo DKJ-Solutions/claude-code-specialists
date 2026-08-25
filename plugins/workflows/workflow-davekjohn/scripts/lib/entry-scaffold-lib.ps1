@@ -877,13 +877,30 @@ function Get-EntryTierSectionLabel {
 # (Dave), so the entry still has two '###' sections and this string is not one of them.
 # RETEXTED AGAIN ON AUGUST 24, 2026 (Dave, issue #865): 'deploy' became 'PR'. The same issue removed the PR
 # template's heading, so the document the section travels into is read as the PR it opens rather than as the
-# deploy it describes, and the heading follows the reader. NAMED HERE BECAUSE IT IS NOT ONLY A PR: this
-# section also lands in CHANGELOG.md and in the release documents, where nobody is looking at a PR. That
-# tension is real and one word wide; Dave asked for this wording explicitly, and this comment is where the
-# next person to reopen the question finds out that it was not overlooked.
-$script:EntryTierHigherHeading = 'What makes this PR extra special'
+# deploy it describes, and the heading followed the reader.
+# REVERSED ON AUGUST 25, 2026 (Dave, issue #884), AFTER ONE DAY, AND THIS TIME THE REASON IS THE SECTION'S
+# WHOLE JOURNEY RATHER THAN ITS FIRST STOP. #865 optimised for the reader of the document the section opens.
+# But the section travels four times -- development-cycle.md -> the PR body -> CHANGELOG.md -> the developer
+# release notes -- and #865's own comment named that tension itself, one word wide, and shipped anyway. Two
+# of those four readers are not looking at a PR, and the two that come last are the ones a release is read
+# from. #884 asks for one thing in all four places, so the wording follows the SECTION rather than any one
+# of its readers, and 'deploy' is the only word that is true at every stop.
+#
+# RECENCY WAS NOT THE ARGUMENT, IN EITHER DIRECTION. #865's reasoning was reread before this was reversed,
+# and the half of it that holds is kept: it removed the PR template's heading, so the section stands on its
+# own wherever it lands, and that is what makes carrying its own '## DEPLOY:' heading into the PR body
+# possible at all (see Get-PrDescription). What it got wrong is which reader the wording serves.
+#
+# THE COST OF A ONE-DAY WORDING IS PAID BY THE READER LIST BELOW, NOT BY THE WRITER. 'PR' was written from
+# August 24 to 25, 2026 -- one day, which is long enough for a branch to be in flight here and in every
+# consumer, and CHANGELOG.md was holding entries written under it at the moment it was retired. That is now
+# twice this heading has been retired after a single day, which is an argument for the recognise-all rule
+# rather than against reversing: a reversal costs two lines below and nothing anywhere else, because the
+# READERS are the union of this constant and that list. The list itself is not append-only -- this reversal
+# is the first time a member has left it, and the block below is where that case is worked out.
+$script:EntryTierHigherHeading = 'What makes this deploy extra special'
 
-# THE RETIRED WORDING, RECOGNISED AND NEVER WRITTEN. 'Higher than tier 0?' was written for three days,
+# THE RETIRED WORDINGS, RECOGNISED AND NEVER WRITTEN. 'Higher than tier 0?' was written for three days,
 # August 16 to 19, 2026, which is long enough to reach CHANGELOG.md, the branches in flight and -- through a
 # release -- every consumer's tree. A parser that forgot it would read every one of those entries as declaring
 # tier 0 alone, which is the silent direction that empties a release. Recognise all, write one.
@@ -891,16 +908,31 @@ $script:EntryTierHigherHeading = 'What makes this PR extra special'
 # development cycle's DEPLOY section: the document says 'deploy' throughout, so the heading asks about the
 # deploy rather than about the change. It was written from August 19 to 23, 2026 -- which is every entry
 # pending in CHANGELOG.md and every branch in flight, here and in every consumer.
-# 'What makes this deploy extra special' JOINED IT ON AUGUST 24, 2026 (Dave, issue #865) after ONE DAY, which
-# is the shortest life any of these has had and changes nothing about the rule: a single day is enough for a
-# branch to be in flight, and CHANGELOG.md was still holding entries written under it at the moment it was
-# retired. The list only grows -- a wording leaves the writer, never the reader.
-$script:EntryTierHigherRetiredHeadings = @('What makes this deploy extra special',
+# 'What makes this PR extra special' JOINED IT ON AUGUST 25, 2026 (Dave, issue #884) after ONE DAY -- the
+# shortest life any of these has had, and the second one-day wording in a row. It is written from August 24
+# to 25, 2026, which is long enough for a branch to be in flight here and in every consumer, and
+# CHANGELOG.md was holding entries under it at the moment it was retired.
+#
+# AND ON THE SAME DAY 'What makes this deploy extra special' LEFT THIS LIST, which is the first time a
+# wording has come back, and the one case worth writing down because getting it wrong is silent in both
+# directions. THIS LIST MEANS "NEVER WRITTEN", so a heading that is written again cannot stay on it: the
+# scaffold would then emit a string its own suite asserts is absent (entry-scaffold.tests.ps1 loops this
+# array against the scaffold), and the invariant that makes the list safe to trust would be gone.
+#
+# NOTHING STOPS BEING READ BY LEAVING, and that is why removing it is not the mistake it looks like. Every
+# reader unions the WRITTEN heading with this list -- Read-EntryTierSections here, and both entry checks in
+# check-plugin-integrity.ps1 -- so an entry written under 'deploy' between August 23 and 24 is recognised by
+# the written constant above rather than by this array. The rule is unchanged and now runs in both
+# directions: a wording leaves the WRITER and never the READER, and a wording that returns to the writer
+# leaves this list without ever leaving the reader.
+$script:EntryTierHigherRetiredHeadings = @('What makes this PR extra special',
                                            'What makes this change extra special', 'Higher than tier 0?')
 
 function Get-EntryTierHigherHeading {
     <# The heading text the audience tier's sub-section carries. Deliberately not quoted here: the wording has
-       been retexted three times and a docstring restating it goes stale silently -- read the constant above.
+       been retexted repeatedly and a docstring restating it goes stale silently. A COUNT OF HOW OFTEN GOES
+       STALE JUST AS SILENTLY, which is why this sentence carries none -- read the constant above, where each
+       retext is dated.
        Machine-read by the parser, so it is stated once and is deliberately not repo-configurable -- the same
        class as 'Tier' and 'Score'. A repo that translated it would make its own entries unreadable to its own
        fold. #>
@@ -2628,7 +2660,7 @@ $script:EntrySectionDefaults = [ordered]@{
 # Two things changed and the LEVELS DID NOT: tier 0 lost its heading altogether -- the question above IS its
 # section now -- and the audience tier's sub-heading asks what is being asked of the author instead. So an
 # entry is still two '###' sections, and no heading names a tier number. The wording of that sub-heading is
-# NOT quoted here on purpose: it has been retexted twice since this block was written, and this block is
+# NOT quoted here on purpose: it has been retexted repeatedly since this block was written, and this block is
 # about the shape rather than the words. Get-EntryTierHigherHeading holds the live one.
 #
 # WHY THE NUMBER LEAVES THE DOCUMENT. A tier is a fact about the READER, and the author filling this in is
@@ -4119,7 +4151,7 @@ $script:BranchFileDefaults = [ordered]@{
         '> inside this repo belongs under the first `**Score:**`. If the change reaches that reader',
         '> not at all, N/A is a complete answer and the common one.',
         '>',
-        '> The phase arc, the marks and the whole form: `DEVELOPMENT-CYCLE-portable.md`, which ships',
+        '> The phase arc, the marks and the whole form: `DEVELOPMENT-portable.md`, which ships',
         '> with this workflow.'
     )
 
@@ -4202,7 +4234,7 @@ function Get-BranchFilePaths {
 
         WHAT THAT COSTS IS THE REFERENCE COPY, and it is paid elsewhere on purpose. The empty document on the
         trunk was also the thing a reader opened to see the whole form at once; the portable page
-        DEVELOPMENT-CYCLE-portable.md is what carries that now, and unlike a file scaffolded into a consumer
+        DEVELOPMENT-portable.md is what carries that now, and unlike a file scaffolded into a consumer
         once it travels with every plugin update.
 
         UNDER workflow-davekjohn/ SINCE AUGUST 14, 2026 (Dave): everything portable about the workflow
@@ -4509,7 +4541,7 @@ function Get-BranchFilesRereadNote {
         the recovery was always automatic and cost one read; what it cost was reading as a broken tool in
         the one place a reader is already looking at those exact paths.
 
-        ONE SOURCE BECAUSE TWO SCRIPTS PRINT IT. The doc half of the same report is in DEVELOPMENT-CYCLE-portable.md,
+        ONE SOURCE BECAUSE TWO SCRIPTS PRINT IT. The doc half of the same report is in DEVELOPMENT-portable.md,
         which reaches the session that did NOT run the script; these are not alternatives.
     #>
     return 'Note: rewritten just now -- re-read these before editing them, or the next write is refused as stale.'

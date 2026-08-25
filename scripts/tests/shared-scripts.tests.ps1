@@ -921,17 +921,29 @@ Decoy body.
 Testing the default (no -RepoRoot) path.
 '@
 
+    # .claude-plugin/marketplace.json (issue #885): these three fixtures put CHANGELOG.md at ROOT and
+    # assert on it there -- Get-DefaultChangelogPath tests exactly this file's presence, so without it
+    # each fixture reads as a CONSUMER and the fold isolates into a workflow-davekjohn/ that does not
+    # exist here, which is a different failure than the one this scenario is about.
+    function New-FoldMarketplaceStub {
+        param([Parameter(Mandatory)][string]$Dir)
+        New-Item -ItemType Directory -Path (Join-Path $Dir '.claude-plugin') -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $Dir '.claude-plugin\marketplace.json'), '{}', $Utf8NoBomTest)
+    }
+
     # Scenario C: -RepoRoot wins over the ambient CLAUDE_PROJECT_DIR (a decoy tree) -- the decoy
     # tree's CHANGELOG.md and entry file must come out byte-identical, unfolded/unremoved.
     New-Item -ItemType Directory -Path (Join-Path $foldTarget 'scripts') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $foldTarget 'CHANGELOG.md'), $changelogSkeleton, $Utf8NoBomTest)
     [System.IO.File]::WriteAllText((Join-Path $foldTarget 'scripts\repo-config.ps1'), $rcMinimal, $Utf8NoBomTest)
     [System.IO.File]::WriteAllText((Join-Path $foldTarget 'chore-fold-reporoot-test.md'), $targetEntryContent, $Utf8NoBomTest)
+    New-FoldMarketplaceStub -Dir $foldTarget
 
     New-Item -ItemType Directory -Path (Join-Path $foldDecoy 'scripts') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $foldDecoy 'CHANGELOG.md'), $decoyChangelog, $Utf8NoBomTest)
     [System.IO.File]::WriteAllText((Join-Path $foldDecoy 'scripts\repo-config.ps1'), $rcMinimal, $Utf8NoBomTest)
     [System.IO.File]::WriteAllText((Join-Path $foldDecoy 'chore-fold-reporoot-test.md'), $decoyEntryContent, $Utf8NoBomTest)
+    New-FoldMarketplaceStub -Dir $foldDecoy
 
     $env:CLAUDE_PROJECT_DIR = $foldDecoy  # ambient context -- -RepoRoot must win over this
     (& powershell -NoProfile -ExecutionPolicy Bypass -File $foldSrc -Branch $foldBranch -RepoRoot $foldTarget 2>&1 | Out-String) | Out-Null
@@ -952,6 +964,7 @@ Testing the default (no -RepoRoot) path.
     [System.IO.File]::WriteAllText((Join-Path $foldDefault 'CHANGELOG.md'), $changelogSkeleton, $Utf8NoBomTest)
     [System.IO.File]::WriteAllText((Join-Path $foldDefault 'scripts\repo-config.ps1'), $rcMinimal, $Utf8NoBomTest)
     [System.IO.File]::WriteAllText((Join-Path $foldDefault 'chore-fold-reporoot-test.md'), $defaultEntryContent, $Utf8NoBomTest)
+    New-FoldMarketplaceStub -Dir $foldDefault
     $env:CLAUDE_PROJECT_DIR = $foldDefault
     (& powershell -NoProfile -ExecutionPolicy Bypass -File $foldSrc -Branch $foldBranch 2>&1 | Out-String) | Out-Null
     $defCode = $LASTEXITCODE

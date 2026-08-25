@@ -54,13 +54,13 @@ the shared default — that is an answer, not an omission.
 ### The development cycle — what this repo's answers make of it
 
 The document itself, its two halves and every rule about them are in
-[`DEVELOPMENT-CYCLE-portable.md`](../plugins/workflows/workflow-davekjohn/DEVELOPMENT-CYCLE-portable.md).
+[`DEVELOPMENT-portable.md`](../plugins/workflows/workflow-davekjohn/DEVELOPMENT-portable.md).
 Three of this repo's answers change what a contributor here actually sees in it, so they are stated here
 rather than left to be worked out from the seam table above.
 
 **The audience tier is `2`, so the entry asks two questions rather than four.** Tier 0 needs no heading —
 the `` ## DEPLOY: `<branch>` `` line is its section, and its answer goes directly underneath — and the one
-audience tier gets `### What makes this PR extra special`. Both sit at the entry's own section level,
+audience tier gets `### What makes this deploy extra special`. Both sit at the entry's own section level,
 beside `### Pull Request`. A repo that has stated *no* audience tier gets the older shape instead, a
 `#### Tier N` sub-section per tier the model has, nested one level deeper; that is the shape the portable
 half describes as the fallback, and it is not what you will see here.
@@ -163,7 +163,7 @@ of releases actually cut is on [this repo's own release page](../releases/README
 ### Where the rest lives
 
 - The document a branch works in, and the three step marks:
-  [`DEVELOPMENT-CYCLE-portable.md`](../plugins/workflows/workflow-davekjohn/DEVELOPMENT-CYCLE-portable.md).
+  [`DEVELOPMENT-portable.md`](../plugins/workflows/workflow-davekjohn/DEVELOPMENT-portable.md).
   **This repo keeps no local half of it**, which is the one place the split above is not followed, and
   deliberately: that page was `branch/README.md`, and once the two branch files merged its prose would have
   had to be reproduced byte-for-byte by a *portable* formatter inside every branch's own document —

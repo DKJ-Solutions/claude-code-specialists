@@ -72,7 +72,8 @@ function Get-EntryDescription {
 function Get-PrDescription {
     <#
     .SYNOPSIS
-        What a PR body should carry from an entry: the answer onwards, without the entry's front matter.
+        What a PR body should carry from an entry: on today's shape the DEPLOY section verbatim, heading and
+        all; on the older shape the answer onwards, without the entry's front matter.
 
     .DESCRIPTION
         THE PR BODY IS NOT THE WHOLE DOSSIER (Dave, August 9, 2026). Get-EntryDescription returns
@@ -97,6 +98,14 @@ function Get-PrDescription {
         no 'What' heading at all: its opening text -- the tier-0 body, the substance -- sits directly under
         the DEPLOY heading. So this reads that heading as the start, via
         Get-DevelopmentCycleEntryPattern, which is the same matcher the fold and both gates use.
+
+        SO ON TODAY'S SHAPE THE RETURN IS THE SECTION ITSELF, HEADING INCLUDED AND NOTHING PROMOTED
+        (Dave, issue #884, August 25, 2026). The DEPLOY section must be one thing in all four places it
+        lands -- this document, the PR body, CHANGELOG.md, the release notes -- and locked once the PR
+        opens, which is what Test-DeployLock checks. Dropping its heading and shifting the rest produced a
+        rendering rather than a copy, and two renderings cannot be compared without first agreeing on the
+        transform. The legacy path below still promotes, because there the H2 really does stay behind; the
+        reasoning for both sits at the two branches in the body.
 
         WHAT THAT REPAIRS, measured in a consumer and reproduced here (inbound
         https://github.com/DaveKJohn/claude-code-specialists/issues/853): returning '' sent the caller to
@@ -202,19 +211,64 @@ function Get-PrDescription {
     }
 
     if (($start + 1) -ge $end) { return '' }
-    $slice = @($lines[($start + 1)..($end - 1)])
 
-    # PROMOTED ONE LEVEL (Dave, August 9, 2026). In the entry file the sections are H3 and the tiers H4,
-    # because the entry itself is an H2 -- it is one block among many in CHANGELOG.md. A PR body is not:
-    # it is a document of its own, whose own title is the heading GitHub prints above it. Carrying the
-    # entry's levels across left the body starting at H2 with tiers at H4, which reads as a fragment of
-    # something larger, and it is:
+    # THE DEPLOY HEADING TRAVELS WITH ITS SECTION, AND THAT PATH PROMOTES NOTHING (Dave, issue #884,
+    # August 25, 2026). Which of the two shapes started the answer decides both questions at once, so they
+    # are answered together here rather than as two independent flags.
+    #
+    # ON TODAY'S SHAPE the start line IS '## DEPLOY: `<branch>`', and it is included. #884's requirement is
+    # that the section is ONE THING in all four places it lands -- development-cycle.md, the PR body,
+    # CHANGELOG.md, the release notes -- and is locked once the PR opens. A copy that drops its own heading
+    # and shifts every remaining one is not that thing: it is a rendering of it, and two renderings cannot
+    # be compared without agreeing on the transform first. Carried verbatim, the PR body IS the section, so
+    # Test-DeployLock below is string equality rather than a normalising diff.
+    #
+    # WHICH REVERSES THE PROMOTION OF AUGUST 9, 2026, ON THIS PATH ONLY, and the reason that promotion
+    # existed is the reason it can go. It read:
+    #
+    #   in the entry / CHANGELOG.md          in a PR body
+    #   ## `fix/x` changelog                 (the PR title, not part of the body)
+    #   ### What does the change...          # What does the change...
+    #   ### What makes this change...        ## What makes this change...
+    #
+    # -- the entry's sections are H3 because the entry is an H2 block inside CHANGELOG.md, while a PR body
+    # is a document of its own, and carrying H3s across left it reading as a fragment of something larger.
+    # That was right while the H2 stayed behind. It no longer does, so the body has its own title again and
+    # the levels below it are already correct: promoting now would push the DEPLOY heading to H1 and flatten
+    # its sections into it.
+    #
+    # THE LEGACY PATH KEEPS THE PROMOTION, unchanged, because its argument is untouched: an entry found by
+    # its 'What does the change...' heading has no H2 to carry, so its H3s really would arrive as a
+    # fragment. Consumers have such branches in flight right now and meet this code through a plugin update
+    # rather than by choosing to.
+    #
+    # CHANGELOG.md AND THE RELEASE DOCUMENTS ARE UNTOUCHED, exactly as the August 9 note said of itself:
+    # this shifts the COPY that goes into the PR, at the one point where that copy is made.
+    $carriesHeading = ($whatAt -lt 0)
+    $slice = if ($carriesHeading) {
+        @($lines[$start..($end - 1)])
+    } else {
+        @($lines[($start + 1)..($end - 1)])
+    }
+    if ($carriesHeading) { return ((@($slice)) -join "`n").Trim() }
+
+    # PROMOTED ONE LEVEL, ON THE LEGACY PATH ONLY (Dave, August 9, 2026; scoped to this path by #884 on
+    # August 25). Reached only when the answer started at a 'What does the change...' heading -- the block
+    # above returns before here whenever the DEPLOY heading was the start, and explains why. In an entry of
+    # that older shape the sections are H3 and the tiers H4, because the entry itself is an H2 -- one block
+    # among many in CHANGELOG.md. A PR body is not: it is a document of its own, whose own title is the
+    # heading GitHub prints above it. Carrying those levels across left the body starting at H2 with tiers
+    # at H4, which reads as a fragment of something larger, and it is:
     #
     #   in the entry / CHANGELOG.md          in a PR body
     #   ## `fix/x` changelog                 (the PR title, not part of the body)
     #   ### What does the change...          # What does the change...
     #   ### What makes this change...        ## What makes this change...
     #   #### a sub-heading in a body         ### a sub-heading in a body
+    #
+    # THAT ARGUMENT STILL HOLDS HERE, AND ONLY HERE, because on this path the H2 genuinely stays behind:
+    # the 'What' heading is a section INSIDE the entry, so there is no title to carry and something has to
+    # supply one. Today's shape has its own, which is what let #884 drop the transform there.
     #
     # CHANGELOG.md and the release documents are untouched: this shifts the COPY that goes into the PR,
     # at the one point where that copy is made. The record keeps the levels the fold and the renderers
@@ -481,6 +535,101 @@ function Get-LostBodyHeadings {
     return @(@(& $headings $Before) | Where-Object { $kept -notcontains $_ })
 }
 
+function Test-DeployLock {
+    <#
+    .SYNOPSIS
+        Does the open PR body still carry the DEPLOY section this document would produce?
+
+    .DESCRIPTION
+        THE LOCK (Dave, issue #884, August 25, 2026). The DEPLOY section travels four times --
+        development-cycle.md -> the PR body -> CHANGELOG.md -> the developer release notes -- and it has to
+        be the same thing at every stop. So it is fixed at the moment the PR opens: after that the document
+        may not diverge from what the PR published, because the PR is what reviewers approved and
+        CHANGELOG.md is what the fold will take.
+
+        THE PR IS THE RECORDED COPY, WHICH IS WHY THIS NEEDS NO STATE. Three mechanisms were weighed
+        (Dave chose the first): compare against the open PR; stamp a fingerprint into the document; or
+        silently re-sync at merge time. The second adds an artefact to the file the fold consumes and has to
+        be stripped again on the way out. The third refuses nothing, so it is not a lock. The first stores
+        nothing at all -- open-pr already published the section, and reading it back is the comparison.
+
+        WHY THIS IS CONTAINMENT AND NOT EQUALITY. A repo's PR template may wrap the section (this repo's is
+        a single placeholder comment, so the body IS the section; a consumer's need not be), and open-pr
+        splices the description into that template. So the question is whether the body still CONTAINS the
+        section, not whether it equals it. That is only checkable at all because Get-PrDescription now
+        carries the section verbatim -- while it promoted headings, body and document were two renderings
+        and this comparison would have had to reproduce the transform to make it.
+
+        NORMALISED ON THE TWO THINGS A ROUND TRIP THROUGH GITHUB CHANGES AND NOTHING ELSE: line endings
+        (a body fetched with `gh pr view --json body` comes back CRLF) and trailing whitespace per line.
+        Deliberately NOT normalised: case, blank lines between paragraphs, punctuation, heading levels. Each
+        of those is a real edit to a section that is supposed to be closed, and a comparison that forgave
+        them would report a lock it is not holding.
+
+        NOT APPLICABLE IS A THIRD ANSWER, not a failure. An entry with no DEPLOY heading is the pre-August
+        23 shape, which has no section to lock -- every consumer has such branches in flight and meets this
+        code through a plugin update rather than by choosing to. An empty PR body is the same answer for the
+        opposite reason: there is nothing published to hold the document against yet. Both come back
+        Applicable = $false, and the gates treat that as no finding -- the same tolerance the step-list gate
+        gives a branch with no step list.
+
+        Pure: it reads no file, runs no gh, and returns a record rather than writing or exiting. The gate
+        script and ship-pr both call it, so there is one definition of "diverged" rather than two.
+
+        RETURNS a PSCustomObject:
+          Applicable  $false when there is nothing to compare (see above); the callers stop there
+          Locked      $true when the body still carries the section
+          Heading     the section's own heading line, for the message
+          FirstDrift  the first document line the body does not have at that point, or '' -- the one line
+                      an author needs in order to find the edit
+    #>
+    param(
+        [AllowEmptyString()][string]$EntryText,
+        [AllowEmptyString()][string]$PrBody
+    )
+
+    $na = [PSCustomObject]@{ Applicable = $false; Locked = $true; Heading = ''; FirstDrift = '' }
+
+    if ([string]::IsNullOrWhiteSpace($EntryText) -or [string]::IsNullOrWhiteSpace($PrBody)) { return $na }
+
+    # THE EXPECTED SECTION COMES OUT OF THE FUNCTION THAT WROTE IT, never out of a second slicer here. A
+    # copy of that slicing would be free to disagree with what open-pr published, and the gate would then
+    # refuse over its own reading rather than over an edit.
+    $expected = Get-PrDescription -EntryText $EntryText
+    if (-not $expected) { return $na }
+
+    # ONLY TODAY'S SHAPE IS LOCKED, and the heading is what says which shape this is: Get-PrDescription
+    # carries it on the merged format and cannot produce it on the legacy one.
+    $expectedLines = @($expected -split "\r?\n" | ForEach-Object { $_.TrimEnd() })
+    if ($expectedLines.Count -eq 0 -or $expectedLines[0] -notmatch '^#{2}\s+\S') { return $na }
+    $heading = $expectedLines[0]
+
+    $bodyLines = @($PrBody -split "\r?\n" | ForEach-Object { $_.TrimEnd() })
+
+    # ANCHORED ON THE HEADING RATHER THAN SCANNED FOR THE WHOLE BLOCK, so a body that carries the section
+    # with ONE line edited reports that line instead of "not found anywhere". Which is the whole value of
+    # the check: "the section is gone" and "somebody rewrote its third paragraph" need different answers.
+    $at = -1
+    for ($i = 0; $i -lt $bodyLines.Count; $i++) {
+        if ($bodyLines[$i] -eq $heading) { $at = $i; break }
+    }
+    if ($at -lt 0) {
+        return [PSCustomObject]@{ Applicable = $true; Locked = $false; Heading = $heading; FirstDrift = $heading }
+    }
+
+    for ($k = 0; $k -lt $expectedLines.Count; $k++) {
+        $b = $at + $k
+        $have = if ($b -lt $bodyLines.Count) { $bodyLines[$b] } else { $null }
+        if ($have -ne $expectedLines[$k]) {
+            return [PSCustomObject]@{
+                Applicable = $true; Locked = $false; Heading = $heading; FirstDrift = $expectedLines[$k]
+            }
+        }
+    }
+
+    return [PSCustomObject]@{ Applicable = $true; Locked = $true; Heading = $heading; FirstDrift = '' }
+}
+
 function Get-PrDescriptionPlaceholderDefaults {
     <#
     .SYNOPSIS
@@ -488,13 +637,14 @@ function Get-PrDescriptionPlaceholderDefaults {
         defines no Get-PrDescriptionPlaceholder of its own.
 
     .DESCRIPTION
-        RECOGNISE SIX, WRITE ONE. The last is what this family's template carries now (the entry path moved
-        under workflow-davekjohn/ on August 14, 2026, the file was renamed branch-deployment.md on
-        August 19, and on August 23 it became the DEPLOY section of development-cycle.md); the older
+        RECOGNISE ALL, WRITE ONE -- and deliberately no count here, because this list only grows and a
+        tally of it goes stale silently. The last is what this family's template carries now (the entry path
+        moved under workflow-davekjohn/ on August 14, 2026, the file was renamed branch-deployment.md on
+        August 19, on August 23 it became the DEPLOY section of development-cycle.md, and on August 25 that
+        section started travelling WITH its heading -- issue #884); the older
         strings stay because a consumer's PR template is THEIR file, and this script must not silently
         stop filling it in because the template it ships beside moved on. An unrecognised placeholder is
         a PR body with no description at all -- the outcome this list exists to prevent.
-
         MOVED OUT OF open-pr.ps1 ON AUGUST 10, 2026, and the move is the point rather than tidiness
         (#573). While the list lived inline in the script, nothing else in the repo could read it -- so
         the reference template shipped with the plugin could not be held against it, and a reference
@@ -511,7 +661,8 @@ function Get-PrDescriptionPlaceholderDefaults {
         "<!-- Filled from branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->",
         "<!-- Filled from workflow-davekjohn/branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->",
         "<!-- Filled from workflow-davekjohn/branch/branch-deployment.md. Opening a PR by hand? Paste that file's body here. -->",
-        "<!-- Filled from the DEPLOY section of workflow-davekjohn/development-cycle.md. Opening a PR by hand? Paste that section's body here. -->"
+        "<!-- Filled from the DEPLOY section of workflow-davekjohn/development-cycle.md. Opening a PR by hand? Paste that section's body here. -->",
+        "<!-- Filled from the DEPLOY section of workflow-davekjohn/development-cycle.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->"
     )
 }
 

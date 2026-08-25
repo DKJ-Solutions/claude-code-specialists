@@ -45,7 +45,7 @@ merge, so on the trunk there is no copy. It used to sit there in an empty state 
 write in it; a repo updating from an older plugin still has that copy until its next fold clears it, and
 what marks it is the **trunk's name in its heading**, which is what stops the fold mistaking it for an
 entry. The full convention is spelled out in
-[`DEVELOPMENT-CYCLE-portable.md`](DEVELOPMENT-CYCLE-portable.md), which travels with this plugin; the
+[`DEVELOPMENT-portable.md`](DEVELOPMENT-portable.md), which travels with this plugin; the
 guidance for every field is inside the document itself, so there is no reference copy to keep current.
 
 **The branch name is validated by your own lib, not by the plugin.** `new-branch` calls
@@ -66,7 +66,7 @@ one go. The entry is one heading with two `###` sections under it:
 ```text
 ## DEPLOY: `<your branch>` · <stamp>
 
-### What makes this PR extra special
+### What makes this deploy extra special
 ### Pull Request
 ```
 
@@ -76,7 +76,7 @@ it *began* is stamped on the document's own `#` heading. A section restating any
 in two places.
 
 **The entry holds both tiers, and neither names a number.** Tier 0's reason goes directly under the DEPLOY
-heading — that heading IS its section; the audience tier gets `### What makes this PR extra special`, and it
+heading — that heading IS its section; the audience tier gets `### What makes this deploy extra special`, and it
 means the one tier your repo has stated in `Get-ReleaseAudienceTier`. Each carries its reason and its
 `**Score:**`; that is the description, written once per audience rather than once as prose and again per tier.
 **A repo that has stated no audience tier gets the older shape instead** — a `#### Tier N` sub-section for
@@ -313,13 +313,3 @@ A repo running this workflow carries **two** contributing pages, deliberately (D
 
 So adopting this workflow never rewrites your root page — the folder file arrives beside it and takes
 precedence only where they conflict.
-
-## One thing to do before you adopt a root `CONTRIBUTING.md`
-
-If your repo overrides `Get-ReservedRootMd` — the list of root `*.md` files that are permanent documents
-rather than unfolded changelog entries — **add the new document to it**. The shared default already
-contains `CONTRIBUTING`, so a repo that defines nothing is fine; a repo that lists its own set and forgets
-it meets a refusal at its next release, naming the new document as an entry somebody failed to fold. It
-costs no data, because the cut stops before writing anything, but the message points at the wrong problem.
-The same holds for every permanent root document you add: an entry for a file that is not there is inert,
-so the risk runs one way only.

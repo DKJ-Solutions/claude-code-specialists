@@ -49,6 +49,11 @@ $EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 # The plugin tree: Get-TouchedPlugins and the roots it reads, for the 'Plugins:' line. Also a
 # $PSScriptRoot-relative sibling of the fold script, so the fixture carries it for the same reason.
 $PluginTreeSrc    = Join-Path $RepoRoot 'scripts\lib\plugin-tree-lib.ps1'
+# Get-SeamValue + Get-DefaultChangelogPath (issue #885, group A): the changelog path itself is now read
+# through this seam. Same $PSScriptRoot-relative sibling reasoning as the three above -- unconditionally
+# dot-sourced by the fold script, so a fixture missing it fails not with a wrong answer but with a raw
+# "term not recognized" error at the dot-source line.
+$SeamLibSrc       = Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1'
 # Dot-sourced into the RUNNER as well, not only copied into each fixture: the branch/ cases build their
 # fixture files with the real formatters and assert with the real predicates, so a change to the format
 # breaks the script and its test together instead of leaving the test asserting a shape nothing writes.
@@ -121,7 +126,16 @@ function New-FoldFixture {
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')       -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')       -Force
     Copy-Item -LiteralPath $PluginTreeSrc    -Destination (Join-Path $dir 'scripts\lib\plugin-tree-lib.ps1')          -Force
+    Copy-Item -LiteralPath $SeamLibSrc       -Destination (Join-Path $dir 'scripts\lib\seam-lib.ps1')                 -Force
     Copy-Item -LiteralPath $RepoConfigSrc    -Destination (Join-Path $dir 'scripts\repo-config.ps1')                  -Force
+
+    # .claude-plugin/marketplace.json (issue #885): every assertion in this suite is about the FOLD
+    # MECHANISM against a flat, root-level CHANGELOG.md -- the isolation feature that repoints the
+    # default for a consumer is tested on its own fixture, not here. Get-DefaultChangelogPath tests
+    # exactly this file's presence, so this fixture reads as the workflow's SOURCE and keeps
+    # everything at root, matching every path this suite already asserts on.
+    New-Item -ItemType Directory -Path (Join-Path $dir '.claude-plugin') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $dir '.claude-plugin\marketplace.json'), '{}', $Utf8NoBom)
 
     [System.IO.File]::WriteAllText((Join-Path $dir 'CHANGELOG.md'), $script:FixtureIntro, $Utf8NoBom)
     $script:fixtures += $dir

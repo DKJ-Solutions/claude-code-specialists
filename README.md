@@ -225,13 +225,12 @@ at repo level deliberately, because they differ per repo (or are safety-critical
 deliberately carry **no safety/guardrail hooks** and **no repo-specific skills** — with a few named,
 repo-neutral exceptions: the skill `specialists-init` (the adoption path itself), the skill
 `discover-workflow` (`workflow-default`'s own repo-neutral read, see
-[Teams and workflows](#teams-and-workflows--whats-the-difference)), and five informational, read-only
+[Teams and workflows](#teams-and-workflows--whats-the-difference)), and four informational, read-only
 SessionStart hooks that never block — `roster-sessioncheck` (roster-drift signaling) plus
 `workflow-sessioncheck` (flags two or more enabled workflows, see
 [Teams and workflows](#teams-and-workflows--whats-the-difference)) in the **core team**, and
-`connector-sessioncheck` (sync signaling), `script-contract-sessioncheck` (signals when a repo's own
-workflow libs no longer expose a function the shared scripts call) plus `prompt-sessioncheck` (announces
-an assignment waiting in the prompt inbox, and stays silent in a repo that has none) in
+`connector-sessioncheck` (sync signaling) plus `script-contract-sessioncheck` (signals when a repo's own
+workflow libs no longer expose a function the shared scripts call) in
 **`workflow-davekjohn`**; see the [connectors README](connectors/README.md).
 The add-on teams `team-lifehub` and `team-shopify` may carry domain skills that a repo shares.
 
@@ -543,13 +542,13 @@ matters operationally for the skills/subagents/hooks split described under
 bundled in a plugin works across all three surfaces, but a **subagent** or a **hook** runs only in
 Cowork and in Claude Code — in a plain Claude.ai Chat session they show up grayed out (see
 [Use plugins in Claude](https://support.claude.com/en/articles/13837440-use-plugins-in-claude)).
-Concretely for claude-code-specialists: the specialists roster (the subagents under Chris) and the five
+Concretely for claude-code-specialists: the specialists roster (the subagents under Chris) and the four
 SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`,
-`workflow-sessioncheck`, `prompt-sessioncheck`) function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
+`workflow-sessioncheck`) function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `fix-mojibake`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `adopt-shopify-floor`,
 `cut-release`, `adopt-config`, `adopt-workflow-folder`, `discover-workflow`, `lock`, `handover`,
-`prompt`, `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `prune-merged`,
+`release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `prune-merged`,
 `measure-skill`, `worktree-lane`, `orchestrator`)<!-- /skills:all -->
 remain available there.
 
@@ -633,12 +632,11 @@ typo there would quietly exclude the plugin it meant to keep and report success.
 <!-- skills:all -->Most skills in claude-code-specialists today (`fold-changelog`, `open-pr`, `ship-pr`,
 `new-branch`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`, `sync-roster`,
 `start-task`, `adopt-config`, `adopt-workflow-folder`, `adopt-shopify-floor`, `discover-workflow`,
-`lock`, `handover`, `prompt`, `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`,
+`lock`, `handover`, `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`,
 `prune-merged`, `measure-skill`, `worktree-lane`) are a thin wrapper around a script — procedural
 **mechanism** (branch, PR, ship, fold, bootstrap, teardown, roster-sync, encoding repair, reading a
 repo's own conventions, placing an add-on team's operational floor, pushing a branch to its own preview
-theme, the standing before and after a context clear, the assignment written in an editor rather than the
-terminal, the reading copy of the release notes, reaping the local branches a merge left behind, pricing
+theme, the standing before and after a context clear, the reading copy of the release notes, reaping the local branches a merge left behind, pricing
 what a skill costs the sessions that carry it, and giving a branch its own worktree so another one can
 ship).
 `lock` and `handover` are the first pair to wrap **one** script

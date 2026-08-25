@@ -62,7 +62,7 @@ comments** on the way and writes the PR line into `### Pull Request`:
 
 **Score:** 2
 
-### What makes this PR extra special
+### What makes this deploy extra special
 
 …or one line saying why it reaches nobody there…
 
@@ -77,7 +77,7 @@ Short strong title
 
 **The entry opens with the change's two audiences, lowest first, and neither names a tier number.**
 Tier 0 answers directly under the DEPLOY heading; the audience tier answers under
-`### What makes this PR extra special`, which means whichever single tier the repo has stated
+`### What makes this deploy extra special`, which means whichever single tier the repo has stated
 (`Get-ReleaseAudienceTier`). **Not every change reaches that audience** — that is why these are blocks rather
 than the table they replaced, where a missing row read as an omission, and why the second one can answer
 `N/A` with a line saying why. Where a repo has stated no audience tier, each tier the model has gets a

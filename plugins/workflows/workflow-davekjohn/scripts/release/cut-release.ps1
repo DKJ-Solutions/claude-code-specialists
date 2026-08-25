@@ -273,27 +273,14 @@ if ($absent.Count -gt 0) {
 # Shared native-capture helper (#114): the #107 EAP=Continue -> capture -> $LASTEXITCODE dance for
 # the git mutations in the final block lives here in one tested place.
 . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
+# Get-SeamValue (issue #885, group A): this used to be a private copy defined below; it is now the one
+# definition every seam reader in this workflow shares. See seam-lib.ps1's synopsis for why.
+. (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
 
 # --- The repo's own answers, read once (#417) -----------------------------------------------------
 # Every one of these is OPTIONAL in the script contract, and every fallback is what this script did
 # before it was shared -- so a consumer that defines none of them gets the unchanged behaviour.
-function Get-SeamValue {
-    <#
-        Calls an optional repo-config function, or returns $Default when the repo does not define it.
-
-        $Name takes MORE THAN ONE NAME where a seam has been renamed: they are tried in order and the
-        first one the repo defines wins, so the current name is preferred and a retired one still
-        answers. That matters because this is a CONSUMER-OWNED file -- a repo that defined the old name
-        receives the rename through a plugin update rather than by choosing to, and without the fallback
-        it would drop to $Default in silence. A seam whose default is "off" fails that way without
-        erring once.
-    #>
-    param([Parameter(Mandatory)][string[]]$Name, $Default)
-    foreach ($n in $Name) {
-        if (Get-Command $n -ErrorAction SilentlyContinue) { return (& $n) }
-    }
-    return $Default
-}
+# Get-SeamValue itself now lives in seam-lib.ps1, dot-sourced above.
 
 $notesGrouping = Get-SeamValue -Name 'Get-ReleaseNotesGrouping' -Default 'major'
 # WHERE THE FULL RELEASE LIST LIVES -- the one survivor of the three changelog-release seams (August 5,
@@ -302,7 +289,11 @@ $notesGrouping = Get-SeamValue -Name 'Get-ReleaseNotesGrouping' -Default 'major'
 # behind a pointer. A cut writes no such block any more -- it empties the changelog down to its intro -- so
 # both knobs describe machinery that is gone and are retired. This one stays because the row inserter below
 # still writes into that file, which is now the only list of releases there is.
-$historyRelPath = Get-SeamValue -Name 'Get-ReleaseHistoryPath'    -Default 'releases/README.md'
+# COMPUTED DEFAULT SINCE ISSUE #885 (was the literal 'releases/README.md'): source keeps its root file,
+# a consumer is isolated into workflow-davekjohn/releases/history.md by default. See
+# Get-DefaultReleaseHistoryPath's own doc comment for the reversal and the accepted cost.
+$historyRelPath = Get-SeamValue -Name 'Get-ReleaseHistoryPath' -Default (Get-DefaultReleaseHistoryPath -RepoRoot $repoRoot)
+Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $historyRelPath -SeamName 'Get-ReleaseHistoryPath'
 # The computed fallback is a fact, not a guess: no marketplace manifest means there are no plugins to
 # version or card. Stated in repo-config here anyway, because in this repo the answer is load-bearing.
 $pluginTier    = Get-SeamValue -Name 'Get-ReleasePluginTier' `
@@ -348,16 +339,31 @@ if ($null -eq $audienceTier) { $audienceTier = 2 }
 # pointed the cut at a directory that does not exist there and left the one that does out of the
 # release, so the only safe answer was @(), the tier switched off.
 #
-# Get-ReleaseHistoryPath is the precedent and the same sentence applies: a location convention rather
-# than a fact about the repo, and it is already the default -- so nothing changes for anyone who does
-# not set it. The name follows this file's own vocabulary for the document (Get-ReleaseNoteWording,
-# below) rather than the tier that reads it: since the two hand-written documents merged there is one
-# release note with a named section per reader, and the consumer is a section of it, not its title.
+# Get-ReleaseHistoryPath was the precedent for the reasoning, not any more for the CONSEQUENCE (issue
+# #885): its default is now COMPUTED rather than flat, so something DOES change for a consumer who sets
+# nothing -- deliberately, and the accepted cost is recorded at the computed default itself
+# (Get-DefaultReleaseHistoryPath). The name follows this file's own vocabulary for the document
+# (Get-ReleaseNoteWording, below) rather than the tier that reads it: since the two hand-written
+# documents merged there is one release note with a named section per reader, and the consumer is a
+# section of it, not its title.
 #
-# releases/development/ is deliberately NOT given one. The reporter could show a repo that genuinely
-# differs on this path and none that differs on that one, and a seam nobody can be shown to need is a
-# knob a consumer has to read past. It comes back when somebody measures it.
+# Get-ReleaseNoteRoot's DEFAULT deliberately does NOT move with this branch, unlike the three seams
+# below it and Get-ReleaseHistoryPath above -- see its own contract record. Every one of those had NO
+# seam at all until #885, so a computed default redefines nothing anyone was relying on; this one
+# already had consumers configuring it or relying on its literal fallback, and "a repo that answers
+# nothing must keep meaning what it meant yesterday" still holds for exactly that reason.
 $noteRootRelPath = Get-SeamValue -Name 'Get-ReleaseNoteRoot' -Default 'releases/notes'
+
+# releases/development/, releases/github/ and releases/internal/ GAIN SEAMS HERE (issue #885, group E) --
+# #885 is the measurement the comment above used to wait for: "a seam nobody can be shown to need is a
+# knob a consumer has to read past. It comes back when somebody measures it." Each default is computed
+# the same way as the history path: source keeps its root, consumer is isolated. Read together because
+# all three name the SAME generated-notes tree at different tiers, and new-internal-note.ps1 must agree
+# with the last two -- see its own matching seam reads.
+$devNotesRootRelPath = Get-SeamValue -Name 'Get-ReleaseDevelopmentNotesRoot' -Default (Get-DefaultReleaseDevelopmentNotesRoot -RepoRoot $repoRoot)
+Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $devNotesRootRelPath -SeamName 'Get-ReleaseDevelopmentNotesRoot'
+$githubNotesRootRelPath = Get-SeamValue -Name 'Get-ReleaseGithubNotesRoot' -Default (Get-DefaultReleaseGithubNotesRoot -RepoRoot $repoRoot)
+Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $githubNotesRootRelPath -SeamName 'Get-ReleaseGithubNotesRoot'
 
 # How many minors a major line must have had before a major may be cut. A major here is a RECAP of the
 # minors before it, so what earns one is their accumulation -- 10 in this repo. Repo-owned because it is
@@ -378,20 +384,18 @@ function Write-Utf8NoBom([string]$Path, [string]$Content) {
     [System.IO.File]::WriteAllText($Path, $Content, $Utf8NoBom)
 }
 
-# Permanent root .md files that are NOT branch changelog entries. The stray-entry guardrail below
-# treats every other root *.md as an unfolded entry (deliberately catch-all, so an entry with an
-# unknown branch prefix is never missed) -- so any permanent root doc added over time must be listed,
-# or a release would falsely refuse to cut.
+# Root .md files this repo has named as permanent, checked FIRST as a manual override: never scanned
+# regardless of content. No longer load-bearing for safety (see the content check below), so a repo
+# that defines nothing and adds a new root doc is still safe -- but naming one here still costs nothing
+# and settles it outright for a repo that would rather not rely on the content test.
 #
 # THE LIST MOVED TO THE SEAM IN #417 and no longer lives here. It had gone stale three times, each
 # time blocking a release over a document nobody had failed to fold (#165, then QUICKSTART.md +
-# UNINSTALL.md in #405, then ADOPTION.md in #408) -- and once this script is shared, which root docs
-# a repo has is by definition not something the script can know. The fallback below is the workshop's
-# own list, so a consumer that defines nothing still gets the behaviour this script always had -- and
-# it tracks that list rather than a snapshot of it: the install and uninstall pages left the root for
-# plugins/, so they left here too. A fallback that kept naming them would not have blocked anything,
-# but it would have described a root the workshop no longer has, which is how this list went stale the
-# first three times.
+# UNINSTALL.md in #405, then ADOPTION.md in #408) -- three incidents that were the actual reason the
+# stray-entry test below no longer treats "not on this list" as the danger signal (issue #885, group
+# D). The fallback below is the workshop's own list, so a consumer that defines nothing still gets the
+# override this script always had -- and it tracks that list rather than a snapshot of it: the install
+# and uninstall pages left the root for plugins/, so they left here too.
 $reservedRootMd = @(Get-SeamValue -Name 'Get-ReservedRootMd' -Default @(
     'CHANGELOG.md', 'CLAUDE.md', 'README.md', 'LICENSE.md', 'CONTRIBUTING.md', 'SECURITY.md'))
 
@@ -434,9 +438,20 @@ $branch = (git rev-parse --abbrev-ref HEAD).Trim()
 if ($branch -ne 'main') { Write-Error "A release is cut directly on main; you are on '$branch'."; exit 1 }
 if ((git status --porcelain)) { Write-Error "Working tree not clean -- commit/stash first."; exit 1 }
 
-$strayEntries = Get-ChildItem -Path $repoRoot -Filter '*.md' -File |
+# ISSUE #885, GROUP D: inverted from a name blocklist to a CONTENT test. The old form treated every
+# root *.md not on $reservedRootMd as an unfolded entry -- catch-all by name, so any permanent doc a
+# consumer added had to be listed there too, or a release falsely refused to cut over a file nobody
+# forgot to fold (measured three times: #165, #405, #408). An entry is recognisable by what it IS, not
+# by what it is not: Test-BranchChangelogIsFilled is the same predicate the branch's own document is
+# held to (see the branch/ guard just below), and it is true only for a document that either declares a
+# non-trunk branch or opens with an entry-level heading (## or ###) -- a shape a consumer's own README,
+# ticket file or ADOPTION.md essentially never has, since those open with a plain # title. So a new
+# permanent root doc is safe with NO configuration, and $reservedRootMd above becomes an optional
+# override rather than something that has to be kept current.
+$strayEntries = @(Get-ChildItem -Path $repoRoot -Filter '*.md' -File |
     Where-Object { $reservedRootMd -notcontains $_.Name } |
-    Select-Object -ExpandProperty Name
+    Where-Object { Test-BranchChangelogIsFilled -Text ([System.IO.File]::ReadAllText($_.FullName)) } |
+    Select-Object -ExpandProperty Name)
 if ($strayEntries.Count -gt 0) {
     Write-Error "There are still unfolded changelog entry files in the root: $($strayEntries -join ', '). Fold them first (fold-changelog-entry.ps1)."
     exit 1
@@ -582,8 +597,20 @@ if ((git tag --list $tagName)) { Write-Error "Tag $tagName already exists."; exi
 # READ HERE RATHER THAN FURTHER DOWN, because the tier gate below needs it and a gate that runs after
 # the first write is not a gate. Nothing between this read and the write at the end touches the file, so
 # reading early costs nothing and means the whole run judges ONE snapshot of the changelog.
-$changelogPath = Join-Path $repoRoot 'CHANGELOG.md'
-$changelogRaw = Get-Content -Path $changelogPath -Raw -Encoding UTF8
+#
+# SEAMED (issue #885, group A): this used to be hard-coded to 'CHANGELOG.md', with no seam and no guard,
+# so a repo whose changelog is not at the root threw an unhandled error rather than a refusal that said
+# what was wrong. Get-DefaultChangelogPath's computed default keeps this repo's own answer unchanged --
+# it publishes plugins, so the default IS 'CHANGELOG.md' -- while a consumer is isolated by default.
+$changelogRel = Get-SeamValue -Name 'Get-ChangelogPath' -Default (Get-DefaultChangelogPath -RepoRoot $repoRoot)
+Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $changelogRel -SeamName 'Get-ChangelogPath'
+$changelogPath = Join-Path $repoRoot $changelogRel
+# READ DEFENSIVELY, same reasoning fold-changelog-entry.ps1 already reads by: an absent changelog is not
+# a reason to crash, it is nothing pending -- Get-PullRequestEntriesByTier finds no block in '' correctly.
+$changelogRaw = ''
+if (Test-Path -LiteralPath $changelogPath) {
+    $changelogRaw = [string](Get-Content -Path $changelogPath -Raw -Encoding UTF8)
+}
 $tierGroups = @(Get-PullRequestEntriesByTier -Content $changelogRaw)
 $entries = @($tierGroups | ForEach-Object { $_.Entries } | Where-Object { $_ })
 
@@ -839,7 +866,7 @@ $notesDirName = if ($notesGrouping -eq 'minor') {
 } else {
     ($new -split '\.')[0] + '.x'
 }
-$notesRelPath = "releases/development/$notesDirName/$new.md"
+$notesRelPath = "$devNotesRootRelPath/$notesDirName/$new.md"
 $today = (Get-Date -Format 'yyyy-MM-dd')
 
 # $changelogPath / $changelogRaw / $tierGroups / $entries were read up with the bump gate, which had to
@@ -933,11 +960,9 @@ if ($cutNote) {
 # the generated published one. The '-github-body' suffix went with the move, because the root says it and
 # both siblings are '<X.Y.Z>.md' already.
 #
-# NO SEAM, DELIBERATELY, and the precedent is stated one knob over: Get-ReleaseNoteRoot's contract record
-# says releases/development/ "deliberately has no equivalent knob: nobody has been able to show a repo that
-# differs on it". A brand-new root has no legacy placement to accommodate either, so it stays hardcoded
-# until somebody differs -- and the day they do, that is one function, not a migration.
-$bodyRelPath = "releases/github/$notesDirName/$new.md"
+# SEAMED NOW (issue #885, group E) -- see $devNotesRootRelPath's own comment above for why the same
+# measurement that ended the "no seam, deliberately" era applies to this root too.
+$bodyRelPath = "$githubNotesRootRelPath/$notesDirName/$new.md"
 $bodyPointer = if ($cutNote) {
     "Whether you need to act, and what it is worth: see the notes attached to this release."
 } else {
@@ -955,7 +980,7 @@ foreach ($rel in $plannedFiles) {
 }
 $notesAbs = Join-Path $repoRoot ($notesRelPath -replace '/', '\')
 
-$notesDir = Join-Path $repoRoot ("releases\development\$notesDirName")
+$notesDir = Join-Path $repoRoot (($devNotesRootRelPath -replace '/', '\') + "\$notesDirName")
 New-Item -ItemType Directory -Force -Path $notesDir | Out-Null
 Write-Utf8NoBom -Path $notesAbs -Content $notesContent
 Write-Host "  created: $notesRelPath ($($entries.Count) entries)" -ForegroundColor DarkGray
@@ -998,7 +1023,7 @@ $shortTitle = if ($Title) { $Title } else { "$typeLabel release" }
 # it produces byte-identical rows to the old strip. The history moved back to releases/README.md on
 # August 19 -- the handling stays, because a consumer may still answer the seam with a root elsewhere.
 $historyDirRel = if ($historyRelPath -match '/') { $historyRelPath -replace '/[^/]+$', '' } else { '' }
-$rowTargetRel = if ($cutNote) { "$noteRootRelPath/$notesDirName/$new.md" } else { "releases/development/$notesDirName/$new.md" }
+$rowTargetRel = if ($cutNote) { "$noteRootRelPath/$notesDirName/$new.md" } else { "$devNotesRootRelPath/$notesDirName/$new.md" }
 $versionTarget = Get-RelativeLinkPath -FromDir $historyDirRel -To $rowTargetRel
 $newRow = "| [$new]($versionTarget) | $today | $typeLabel | $shortTitle |"
 if (Test-Path -LiteralPath $relReadmePath) {

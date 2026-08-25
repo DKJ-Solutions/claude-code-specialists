@@ -1,6 +1,6 @@
 ---
 name: check-branch-entry
-description: Answer whether this branch carries a WRITTEN changelog entry, the way the CI gate answers it -- so you learn it before the push rather than from a red check. Use it on a branch whose work is finished, when a PR was opened outside open-pr, or when a red "Branch entry" check needs explaining. It adds no rule of its own: it calls the same two functions open-pr calls, and it reports the significance rather than refusing on it, because that refusal belongs to the release cut.
+description: Answer whether this branch carries a WRITTEN changelog entry, the way the CI gate answers it -- so you learn it before the push rather than from a red check. Use it on a branch whose work is finished, when a PR was opened outside open-pr, or when a red "Branch entry" check needs explaining. It adds no rule of its own: it calls the same two functions open-pr calls, and -- given a PR number -- the same DEPLOY-lock function ship-pr calls, so a section edited after the PR opened is refused here too. It reports the significance rather than refusing on it, because that refusal belongs to the release cut.
 ---
 
 # check-branch-entry -- is the entry written?
@@ -28,12 +28,24 @@ So this is the same answer as a script, callable from CI. `adopt-workflow-folder
 calls it (`.github/workflows/branch-entry.yml`), and this skill is for asking the question yourself.
 
 **It adds no rule of its own**, and that is the design rather than modesty. It calls
-`Test-BranchChangelogIsFilled` and `Get-EntryScaffoldFindings` -- the two functions `open-pr` calls -- so
-there is exactly one definition of "written" in the system. Both existing consumers wrote this gate by
+`Test-BranchChangelogIsFilled` and `Get-EntryScaffoldFindings` -- the two functions `open-pr` calls -- and,
+when you pass `-Pr`, `Test-DeployLock`, the one `ship-pr` calls. So there is exactly one definition of
+"written" in the system, and one of "diverged". Both existing consumers wrote this gate by
 hand in shell before it shipped, which is a second definition in every repo, free to drift from the fold
 that reads the first one; inbound
 [#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789) is the report, and both had
 already drifted.
+
+**The lock, with `-Pr` (issue #884).** The DEPLOY section travels four times -- your document, the PR body,
+`CHANGELOG.md`, the release notes -- and it is **fixed at the moment the PR opens**, because that is what
+the review approved and what the fold takes. So an edit to that section after the PR exists is refused:
+`ship-pr` refuses the merge, and this gate is the half that a PR merged from the GitHub UI still meets.
+Put the section back to what the PR published, or republish it deliberately with `open-pr.ps1
+-RefreshBody`, so the change is reviewable where the review happens.
+
+**An unreadable PR body is not a finding**, the same tolerance `ship-pr` applies: `gh` failing says
+something about the token or the network, not about the section, and refusing on that would be refusing on
+no evidence.
 
 ## What it refuses, and what it deliberately does not
 
@@ -42,6 +54,9 @@ already drifted.
 | the entry file is missing | **exit 1** -- the branch declares nothing. `new-branch` is idempotent; run it here. |
 | the document **declares the trunk** | **exit 1** -- an empty document left behind by a fold that ran under the older behaviour, not an entry. Told apart by the branch NAME in the heading, not by its level. |
 | the entry is **scaffolded but not filled in** | **exit 1**, naming each field still waiting. This is the case a heading test lets through, because the scaffold already writes a heading and a title. |
+| the **DEPLOY section no longer matches the PR** (with `-Pr`) | **exit 1**, naming the first line the PR body does not have. The section is fixed once the PR opens. |
+| the PR body **cannot be read** (with `-Pr`) | **exit 0**, said out loud -- a statement about the token, not about the section. |
+| **no `-Pr` given** | the lock is skipped and the run says so. Every other check above still runs. |
 | the **significance** is not settled | **exit 0**, with the finding printed and the release cut named as where the refusal lives. |
 | the branch prefix is **exempt** | **exit 0** -- see the seam below. |
 | the branch is the **trunk** | **exit 0**, said out loud: the trunk is where having no document at all is the *designed* state. |
@@ -58,6 +73,7 @@ lines are blank carries no number, so its reach *is* tier 0, which is a complete
 | parameter | what it does |
 |---|---|
 | `-Branch` | the branch to judge. Defaults to the current one. **CI has to pass this**: a `pull_request` checkout is a detached merge commit, so `git rev-parse --abbrev-ref HEAD` answers `HEAD` there, and the script refuses rather than guessing. |
+| `-Pr` | the PR number to hold the DEPLOY section against, which turns the **lock** on. Omitted, the lock is skipped and the run says so -- every other check here needs no PR, no token and no network, and that stays true. Pass it on a finished branch to answer *"does my PR still say what my document says?"* before `ship-pr` refuses the merge over it. |
 
 ## The seam it reads
 
