@@ -4119,7 +4119,7 @@ $script:BranchFileDefaults = [ordered]@{
         '> inside this repo belongs under the first `**Score:**`. If the change reaches that reader',
         '> not at all, N/A is a complete answer and the common one.',
         '>',
-        '> The phase arc, the marks and the whole form: `DEVELOPMENT-CYCLE-portable.md`, which ships',
+        '> The phase arc, the marks and the whole form: `DEVELOPMENT-portable.md`, which ships',
         '> with this workflow.'
     )
 
@@ -4202,7 +4202,7 @@ function Get-BranchFilePaths {
 
         WHAT THAT COSTS IS THE REFERENCE COPY, and it is paid elsewhere on purpose. The empty document on the
         trunk was also the thing a reader opened to see the whole form at once; the portable page
-        DEVELOPMENT-CYCLE-portable.md is what carries that now, and unlike a file scaffolded into a consumer
+        DEVELOPMENT-portable.md is what carries that now, and unlike a file scaffolded into a consumer
         once it travels with every plugin update.
 
         UNDER workflow-davekjohn/ SINCE AUGUST 14, 2026 (Dave): everything portable about the workflow
@@ -4509,7 +4509,7 @@ function Get-BranchFilesRereadNote {
         the recovery was always automatic and cost one read; what it cost was reading as a broken tool in
         the one place a reader is already looking at those exact paths.
 
-        ONE SOURCE BECAUSE TWO SCRIPTS PRINT IT. The doc half of the same report is in DEVELOPMENT-CYCLE-portable.md,
+        ONE SOURCE BECAUSE TWO SCRIPTS PRINT IT. The doc half of the same report is in DEVELOPMENT-portable.md,
         which reaches the session that did NOT run the script; these are not alternatives.
     #>
     return 'Note: rewritten just now -- re-read these before editing them, or the next write is refused as stale.'

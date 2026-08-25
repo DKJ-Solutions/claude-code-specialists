@@ -87,7 +87,7 @@ workflow-davekjohn/development-cycle.md
 cannot collide on it and the repo root stops filling up with other people's work. **And it exists only
 while a branch is open** (Dave, August 23, 2026): this script creates it, the fold removes it at the merge,
 so on the trunk there is no copy at all. It used to be rewritten to an empty state carrying a warning not
-to write there; that placeholder is gone, and `DEVELOPMENT-CYCLE-portable.md` is where the whole form can
+to write there; that placeholder is gone, and `DEVELOPMENT-portable.md` is where the whole form can
 be read without a branch open.
 
 **Why one file and not two** (Dave, August 23, 2026). The two jobs are genuinely different, and for two
@@ -148,7 +148,7 @@ untouched entry *and* one whose prompt was deleted rather than answered.
 while anything is still `- [ ]`. Resolve each step as `- [x]` done or `- [~]` dropped, with the reason
 kept on the line — that third mark exists so nobody is ever pushed into ticking a box for work they did
 not do. There is no `-Force`. Full convention and reasoning: the `open-pr` skill, and
-[`DEVELOPMENT-CYCLE-portable.md`](../../DEVELOPMENT-CYCLE-portable.md), which travels with this plugin.
+[`DEVELOPMENT-portable.md`](../../DEVELOPMENT-portable.md), which travels with this plugin.
 
 **So work that happens AFTER the merge is not a step** — opening the PR, waiting for CI, merging, folding,
 publishing a Release, any measurement that only exists once the run is over. It is what the DEPLOY section
