@@ -267,15 +267,17 @@ The constitution above, concretely implemented here:
   here was measured there. Moved off this always-on path on August 15, 2026, where it was 9,440 B over
   102 lines: 26% of this document, and the same shape as the release craft moved out the day before.
 
-- **Three more gates arrive with the workflow plugin**, and all of them read the branch's own document.
-  Two run locally: the **scaffold gate** refuses to push an entry still carrying the wording
-  `new-branch.ps1` wrote it with, and the **step-list gate** refuses to push *and* to merge while
-  `workflow-davekjohn/development-cycle.md` has an unresolved step above its DEPLOY heading. The third runs in **CI**
-  (`.github/workflows/branch-entry.yml` → `check-branch-entry.ps1`) and exists because the first two are
-  escapable by not using the scripts; it re-uses their functions rather than restating the convention, and
-  it reports the significance instead of refusing on it. Their mechanics, escape valves and the
-  measurements behind them are in
-  [`workflow-davekjohn/CLAUDE.md`](workflow-davekjohn/CLAUDE.md#the-three-gates-this-workflow-adds-on-top).
+- **Four more gates arrive with the workflow plugin**, and all of them read the branch's own document.
+  Three run locally: the **scaffold gate** refuses to push an entry still carrying the wording
+  `new-branch.ps1` wrote it with, the **step-list gate** refuses to push *and* to merge while
+  `workflow-davekjohn/development-cycle.md` has an unresolved step above its DEPLOY heading, and the
+  **DEPLOY lock** refuses to merge once that section no longer matches what the PR published — it is fixed
+  at the moment the PR opens, because that is what the review approved and what the fold folds. The fourth
+  runs in **CI** (`.github/workflows/branch-entry.yml` → `check-branch-entry.ps1`) and exists because the
+  first three are escapable by not using the scripts; it re-uses their functions rather than restating the
+  convention, and it reports the significance instead of refusing on it. Their mechanics, escape valves and
+  the measurements behind them are in
+  [`workflow-davekjohn/CLAUDE.md`](workflow-davekjohn/CLAUDE.md#the-four-gates-this-workflow-adds-on-top).
 - **Three deliberate exceptions to "never directly on `main`", each one bounded.** Together they are
   one procedure read end to end — **fold the changelog, bump the version, write the release notes** —
   and that is why they are the three (Dave, August 23, 2026):

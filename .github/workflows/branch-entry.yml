@@ -17,10 +17,17 @@
 # otherwise. The local gates (open-pr refuses to push an unwritten entry, ship-pr refuses to merge with
 # unresolved steps) are what hold today; this closes the hole they cannot: a branch pushed by hand, or a
 # PR opened in the GitHub UI, meets neither of them.
+#
+# WHY IT ALSO CARRIES THE PR NUMBER SINCE AUGUST 25, 2026 (issue #884). The same script now holds the
+# DEPLOY section against what the PR published -- the section is fixed once the PR opens, because it is
+# what the review approved and what the fold puts into CHANGELOG.md. ship-pr refuses that merge locally;
+# this is the half a PR merged from the GitHub UI still meets. Reading a PR body needs a scope the
+# default token does not have, which is the one permission line below.
 name: Branch entry
 
 permissions:
   contents: read
+  pull-requests: read
 
 on:
   pull_request:
@@ -32,8 +39,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Changelog entry written
+      - name: Changelog entry written, and the DEPLOY section still matches the PR
         shell: powershell
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint/check-branch-entry.ps1 -Branch "${{ github.head_ref }}"
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint/check-branch-entry.ps1 -Branch "${{ github.head_ref }}" -Pr "${{ github.event.pull_request.number }}"
           exit $LASTEXITCODE

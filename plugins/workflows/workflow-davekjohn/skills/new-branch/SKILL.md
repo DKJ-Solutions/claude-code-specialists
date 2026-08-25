@@ -117,7 +117,7 @@ Two sections, one of them filled in for you:
 ```text
 ## DEPLOY: `<your branch>`                      <- what this branch delivers to main
                                                 <- tier 0 answers HERE, under no heading of its own
-### What makes this PR extra special            <- your audience tier: the same, or N/A
+### What makes this deploy extra special            <- your audience tier: the same, or N/A
 ### Pull Request · <stamp>  <- the title you gave -Title; the fold adds the number and the moment it landed
 ```
 
@@ -181,7 +181,7 @@ why it is not three, is the knob further down:
 
 **Score:**
 
-### What makes this PR extra special
+### What makes this deploy extra special
 
 **Score:**
 ```
@@ -248,7 +248,7 @@ The routine version bump stops needing a developer.
 
 **Score:** 4
 
-### What makes this PR extra special
+### What makes this deploy extra special
 
 Consumers must re-add the marketplace under its new name; installs break without it.
 

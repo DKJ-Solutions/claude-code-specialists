@@ -30,9 +30,26 @@
     settled is a branch that can merge and a release that cannot be cut from it; this prints what the cut
     will say, so the author learns it here rather than at the cut, and merges anyway.
 
-    WHAT IT DOES NOT DO. It reads no PR body and knows nothing about labels, previews or review state. A
-    repo whose merge rule turns on something a visitor can see gates that separately -- one consumer does,
-    against its own PR template, and that template is its own rather than anything this plugin ships.
+    THE DEPLOY LOCK, AND IT IS WHY THIS SCRIPT NOW READS A PR BODY AT ALL (Dave, issue #884,
+    August 25, 2026). The DEPLOY section travels four times -- development-cycle.md, the PR body,
+    CHANGELOG.md, the release notes -- and is fixed at the moment the PR opens, because that is what the
+    review approved and what the fold takes. ship-pr refuses the merge on divergence, and ship-pr is
+    local, which is this gate's whole reason for existing. It ADDS NO RULE HERE EITHER: the comparison is
+    Test-DeployLock in pr-body-lib, the same function ship-pr calls.
+
+    ONLY WITH -Pr, AND SILENT-BUT-SAID WITHOUT IT. This paragraph replaces one that read "It reads no PR
+    body and knows nothing about labels, previews or review state" -- and the half of that which was
+    load-bearing is kept rather than quietly dropped: the entry checks above still need no token, no
+    network and no PR, so the gate stays runnable on a branch that has none. The lock is therefore
+    OPT-IN by parameter rather than resolved from the branch. What has genuinely changed is only that a
+    caller may now hand it a PR number, and what has NOT is review state: a text comparison against a
+    published copy is not a judgement a visitor makes. A repo whose merge rule turns on something a
+    visitor can SEE still gates that separately -- one consumer does, against its own PR template, and
+    that template is its own rather than anything this plugin ships.
+
+    AN UNREADABLE BODY IS NOT A FINDING, the same tolerance ship-pr applies: gh failing says something
+    about the token or the network, not about the section, and a gate that refused on that would be
+    refusing on no evidence.
 
     RUN IT FROM CI, and from the command line whenever you want the answer early:
 
@@ -55,6 +72,12 @@
     The branch to judge. Defaults to the current one. CI passes the PR's head ref, because a pull_request
     checkout is a detached merge commit and 'git rev-parse --abbrev-ref HEAD' answers 'HEAD' there.
 
+.PARAMETER Pr
+    The PR number to hold the DEPLOY section against, enabling the lock. Omitted, the lock is skipped and
+    the run says so -- every other check here needs no PR, no token and no network, and that stays true.
+    CI passes the pull_request event's own number; on the command line it is what makes "does my PR still
+    match my document?" answerable before the merge refuses it.
+
 .PARAMETER RootOverride
     Repo root to operate on, for the test suite. A consumer never types this: the root is resolved
     dual-context like every other shared script.
@@ -65,6 +88,7 @@
 [CmdletBinding()]
 param(
     [string]$Branch = '',
+    [string]$Pr = '',
     [string]$RootOverride = ''
 )
 
@@ -91,6 +115,13 @@ if (Test-Path -LiteralPath $repoConfig -PathType Leaf) {
 }
 
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
+
+# For the DEPLOY lock, and only reached when -Pr is given. Loaded AFTER entry-scaffold-lib, because
+# Get-PrDescription probes the section-heading seams with Get-Command: a repo that renamed a heading is
+# read by its own names only while that lib is already in the session. native-capture-lib is what keeps
+# the gh call out of PowerShell 5.1's native-stderr trap, where a zero exit code still sets $? to false.
+. (Join-Path $PSScriptRoot '..\lib\pr-body-lib.ps1')
+. (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
 
 # branch-info.ps1 is REPO-OWNED and does not travel with the plugin -- every consumer keeps their own
 # prefix table -- so it is loaded from the repo being judged, guarded. All this gate wants from it is
@@ -196,6 +227,44 @@ if ($scaffoldFindings.Count -gt 0) {
 }
 
 Write-Host "[OK] '$entryRel' carries a written entry."
+
+# --- The DEPLOY lock: is the section still what the PR published? ------------------------------------
+# Refused, not reported, which puts it with the checks above rather than with the significance below. The
+# distinction is who the judgement belongs to: a significance score is the author's call about a finished
+# change, so this gate names it and merges anyway; a section that no longer matches the PR is not a
+# judgement at all, it is two copies of one text disagreeing, and the fold is about to pick one.
+if ($Pr) {
+    $lockView = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'view', "$Pr", '--json', 'body')
+    if ($lockView.ExitCode -ne 0) {
+        Write-Host "[INFO] PR #$Pr's body could not be read, so the DEPLOY lock was not checked." -ForegroundColor DarkYellow
+        Write-Host '       That is a statement about the token or the network, not about the section.' -ForegroundColor DarkYellow
+    } else {
+        $lockBody = ''
+        try { $lockBody = [string](($lockView.Output -join "`n") | ConvertFrom-Json).body } catch { $lockBody = '' }
+        $lock = Test-DeployLock -EntryText $entryText -PrBody $lockBody
+        if (-not $lock.Applicable) {
+            Write-Host "[OK] nothing to lock against PR #$Pr -- this entry carries no DEPLOY heading of its own."
+        } elseif ($lock.Locked) {
+            Write-Host "[OK] the DEPLOY section still matches what PR #$Pr published."
+        } else {
+            Write-Host "[ERROR] '$entryRel' has changed since PR #$Pr was opened." -ForegroundColor Red
+            if ($lock.FirstDrift -eq $lock.Heading) {
+                Write-Host "        PR #$Pr's body does not carry the section at all -- its heading is missing:" -ForegroundColor Red
+                Write-Host "          $($lock.Heading)" -ForegroundColor Red
+            } else {
+                Write-Host '        The first line the PR body does not have is:' -ForegroundColor Red
+                Write-Host "          $($lock.FirstDrift)" -ForegroundColor Red
+            }
+            Write-Host '        The DEPLOY section is fixed when the PR opens: it is what the review approved,'
+            Write-Host '        and the fold puts it verbatim into CHANGELOG.md and from there into the release'
+            Write-Host '        notes. Put it back to what the PR published, or republish it deliberately with'
+            Write-Host '        open-pr.ps1 -RefreshBody so the change is reviewable where the review happens.'
+            exit 1
+        }
+    }
+} else {
+    Write-Host '[INFO] no -Pr given, so the DEPLOY lock was not checked (every check above needs none).' -ForegroundColor DarkGray
+}
 
 # --- The significance: reported, never refused ------------------------------------------------------
 if (Test-EntrySignificanceActive) {

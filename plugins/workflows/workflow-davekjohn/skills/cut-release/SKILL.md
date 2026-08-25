@@ -202,7 +202,7 @@ a release for a missing timestamp would be ceremony rather than a guard.
 
      **Score:** 4
 
-     ### What makes this PR extra special
+     ### What makes this deploy extra special
 
      Consumers must re-add the marketplace under its new name.
 

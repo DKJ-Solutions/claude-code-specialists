@@ -55,12 +55,12 @@ bites only while the workflow is in play does not belong on the always-on path.
   [`CONTRIBUTING.md`](../CONTRIBUTING.md) on conflict**; the root page is the standard workflow that
   holds without the plugin.
 
-## The three gates this workflow adds on top
+## The four gates this workflow adds on top
 
 The repo's own lint and test gates are stated in the [root `CLAUDE.md`](../CLAUDE.md) and run in CI
-whether or not this plugin is installed. The three below arrive **with the workflow**, and all of them
-read `development-cycle.md`. Two run locally, before the push and before the merge; the third runs in
-CI, and it exists because the first two cannot.
+whether or not this plugin is installed. The four below arrive **with the workflow**, and all of them
+read `development-cycle.md`. Three run locally, before the push and before the merge; the fourth runs in
+CI, and it exists because the first three cannot.
 
 ### The scaffold gate, on the changelog entry itself
 
@@ -115,20 +115,52 @@ August 14, 2026 (Dave) the file itself sits inside `workflow-davekjohn/`, the wo
 the start of gathering everything portable in one place at a consumer instead of scattering it through
 their root.
 
-### The CI gate, because the two above are local
+### The DEPLOY lock, on the section the PR published
+
+**Dave, issue [#884](https://github.com/DaveKJohn/claude-code-specialists/issues/884), August 25, 2026.**
+The DEPLOY section travels four times — this document, the PR body, `CHANGELOG.md`, the developer release
+notes — and it has to be the same thing at every stop. So it is **fixed at the moment the PR opens**:
+`ship-pr.ps1` refuses the merge when the document has since diverged from what PR #NN carries. No `-Force`,
+like the step-list gate beside it.
+
+**What it closes is a window that shuts invisibly.** An edit made after the review lands in `CHANGELOG.md`
+and from there in the release notes having been seen by nobody — and the fold *removes* this document at the
+merge, so the place a reviewer would compare the two is the one place it no longer is. The same shape as the
+scaffold gate's own measurement, one document further along.
+
+**The PR is the recorded copy, so the lock stores nothing.** Three mechanisms were weighed and Dave chose
+this one: compare against the open PR. A fingerprint stamped into the document would add an artefact to the
+file the fold consumes and have to be stripped again on the way out; a silent re-sync at merge time refuses
+nothing and is therefore not a lock. `open-pr` already publishes the section, and reading it back *is* the
+comparison.
+
+**It is checkable at all only because the section now travels verbatim.** Until the same issue,
+`Get-PrDescription` dropped the `## DEPLOY:` heading and promoted every remaining one — so body and document
+were two *renderings* of one section, and a comparison would have had to reproduce that transform to make
+sense. The heading travels now, which reverses the August 9, 2026 promotion **on today's shape only**; the
+legacy `What does the change…` path keeps promoting, because there the H2 genuinely stays behind. The
+reasoning sits at both branches in `pr-body-lib.ps1`.
+
+**An unreadable body is not a finding.** `gh` failing says something about the token or the network, not
+about the section, and a gate that refused on that would be refusing on no evidence.
+
+### The CI gate, because the three above are local
 
 **August 20, 2026** (inbound
-[#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789)). Both gates above live in
-`open-pr` and `ship-pr`, so both are escapable by not using them: a branch pushed by hand, or a PR opened
-in the GitHub UI, meets neither. The convention was therefore enforced by whoever remembered the scripts —
+[#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789)). The three gates above live in
+`open-pr` and `ship-pr`, so all three are escapable by not using them: a branch pushed by hand, or a PR opened
+in the GitHub UI, meets none of them. The convention was therefore enforced by whoever remembered the scripts —
 and a convention that enforces nothing rots quietly, which matters here because `CHANGELOG.md` is the only
 readable answer to "what is merged but not yet released".
 
 [`check-branch-entry.ps1`](../scripts/lint/check-branch-entry.ps1) closes that, and
-[`.github/workflows/branch-entry.yml`](../.github/workflows/branch-entry.yml) is the six lines that call
+[`.github/workflows/branch-entry.yml`](../.github/workflows/branch-entry.yml) is the handful of lines that call
 it on every PR. **It adds no rule of its own** — it calls the same `Test-BranchChangelogIsFilled` and
-`Get-EntryScaffoldFindings` that `open-pr` calls, so there is one definition of "written" in the system
-rather than a second one in CI.
+`Get-EntryScaffoldFindings` that `open-pr` calls, and, given the PR number, the same `Test-DeployLock` that
+`ship-pr` calls. So there is one definition of "written" in the system and one of "diverged", rather than a
+second pair in CI. **Reading a PR body is why the workflow carries `pull-requests: read`** — the entry
+checks themselves still need no token, no network and no PR, so the lock is opt-in by parameter and the
+gate stays runnable on a branch that has none.
 
 **Two consumers had already written this gate by hand, and both had drifted from the convention** —
 that is the measurement behind shipping it rather than documenting it. Each refuses a merge over a missing
