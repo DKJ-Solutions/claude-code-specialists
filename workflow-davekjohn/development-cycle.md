@@ -24,6 +24,56 @@
 
 PLAN only for now (issue #886) -- do not start CREATE until Dave says go.
 
+
+## Where this stands (August 25, 2026, late)
+
+**The sequencing is CLEAR: all three branches this one waited on have landed.** #882 as
+[#889](https://github.com/DaveKJohn/claude-code-specialists/pull/889), #885 as
+[#890](https://github.com/DaveKJohn/claude-code-specialists/pull/890), and #884 as
+[#895](https://github.com/DaveKJohn/claude-code-specialists/pull/895). This branch has been merged up to
+`main` at `a8331dd7`, so CREATE would now only ever touch settled ground -- which is exactly the condition
+decision E set.
+
+**And one thing the PLAN below left open is settled by re-reading the issue rather than by asking.** The
+PLAN never said whether the ROOT FOLDER `workflow-davekjohn/` renames along with the plugin, and it
+matters more than the plugin id does: that path is baked into `Get-BranchFilePaths`, the seams,
+`adopt-workflow-folder`, CI, every consumer's tree, and -- load-bearing -- **the bound on the fold's
+direct-on-`main` exception in the root `CLAUDE.md`**. #886's own text answers it: *"The CLAUDE.md in the
+**contributing-davekjohn (now workflow-davekjohn)** folder"*, and *"contributing-davekjohn will have his
+own folder"*. The folder renames. Recorded here because a session that only reads this PLAN would have
+had to guess.
+
+**Re-measured against `main` today, because the PLAN's figures were taken at `459bf667` and three merges
+have landed since:** `workflow-davekjohn` occurs in **147** tracked files (was 150 -- the prompts removal
+took three), `workflow-default` in **33** (was 32). Neither number changes the shape of the job.
+
+**BLOCKED, and not on a decision.** CREATE's first act is a deletion -- `workflow-default` is to be
+REMOVED rather than renamed (the issue is explicit), and decision C retires the exclusivity guard with it:
+`plugins/workflows/workflow-default/` (5 files), `plugins/teams/team-alpha/hooks/workflow-sessioncheck.ps1`,
+and the two suites that exist only to test them (`workflow-exclusivity.tests.ps1`,
+`discover-workflow.tests.ps1`). **The session's auto-mode guardrail refuses file deletion**, so that step
+cannot be taken without Dave present to allow it. Nothing was half-done: the tree is clean and all eight
+files are intact.
+
+**Verified before stopping, so the removal is ready to run the moment it is allowed:** no consumer enables
+`workflow-default`. All four connector records (`claude-code-specialists`, `djcylow-react`,
+`smartwatchbanden`, `xoxowildhearts`) and this repo's own `.claude/settings.json` list
+`workflow-davekjohn` only. That re-confirms the PLAN's research against today's tree.
+
+**What the removal drags with it, mapped so the next session does not rediscover it.** The
+`[plugin-kind]` lint check (`check-plugin-integrity.ps1`) justifies its whole rule by
+`workflow-sessioncheck` counting enabled plugins by the `workflow-` prefix -- retire that hook and the
+justification is gone, and rename the plugin off the prefix and the rule FAILS. It has to be restated in
+the same movement, not afterwards. `shared-scripts-lib.ps1` carries a `check-report-lib-default` registry
+entry pointing into the deleted plugin. `plugins/teams/team-alpha/hooks/hooks.json` registers the hook.
+And `.claude/specialists/SPECIALISTS.md` names it in the always-loaded chain, so it is a token cost paid by
+every session until it goes.
+
+**Suggested order when this resumes**, gates between each: (1) remove `workflow-default` + retire the
+guard; (2) rename the plugin id and its directory, restating `[plugin-kind]`; (3) rename the root folder,
+which includes editing a safety-rule bound in the root `CLAUDE.md` and is the step to slow down on;
+(4) merge this folder's `CLAUDE.md` into its `CONTRIBUTING.md`.
+
 ## PLAN
 
 **The ask ([#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886), Dave).** Three
