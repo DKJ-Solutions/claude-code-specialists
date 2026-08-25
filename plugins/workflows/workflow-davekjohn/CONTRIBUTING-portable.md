@@ -45,7 +45,7 @@ merge, so on the trunk there is no copy. It used to sit there in an empty state 
 write in it; a repo updating from an older plugin still has that copy until its next fold clears it, and
 what marks it is the **trunk's name in its heading**, which is what stops the fold mistaking it for an
 entry. The full convention is spelled out in
-[`DEVELOPMENT-CYCLE-portable.md`](DEVELOPMENT-CYCLE-portable.md), which travels with this plugin; the
+[`DEVELOPMENT-portable.md`](DEVELOPMENT-portable.md), which travels with this plugin; the
 guidance for every field is inside the document itself, so there is no reference copy to keep current.
 
 **The branch name is validated by your own lib, not by the plugin.** `new-branch` calls

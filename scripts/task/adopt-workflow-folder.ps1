@@ -120,7 +120,7 @@ Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $changelogRel 
 
 # --- What the folder contains ---------------------------------------------------------------------
 # One list, each entry a repo-relative path plus the content it gets WHEN ABSENT. The docs name their
-# portable halves in code rather than linking them, the same choice DEVELOPMENT-CYCLE-portable.md explains: the
+# portable halves in code rather than linking them, the same choice DEVELOPMENT-portable.md explains: the
 # portable pages live in the plugin install, and a relative link into a plugin cache is a path that is
 # wrong on every machine but this one.
 
@@ -130,7 +130,7 @@ $folderReadme = @(
     'Everything portable about the `workflow-davekjohn` workflow gathers here, so the workflow occupies',
     'one folder in this repo''s root instead of scattering through it. The conventions themselves travel',
     'with the plugin as portable pages, readable in your plugin install or in the source repo. Three are',
-    'unconditional -- `CONTRIBUTING-portable.md`, `DEVELOPMENT-CYCLE-portable.md` and',
+    'unconditional -- `CONTRIBUTING-portable.md`, `DEVELOPMENT-portable.md` and',
     '`RELEASES-portable.md` -- and each page in this folder is this repo''s own set of answers to one of',
     'them. A fourth, `TICKETWORK-portable.md`, applies only where work arrives from somebody else''s',
     'tracker; skip it if yours does not.',
@@ -324,7 +324,7 @@ $targets = @(
     # reference for what a branch gets. The document is branch-lifetime now -- new-branch creates it, the
     # fold removes it -- so placing one here would put a file on their trunk that their own first fold then
     # deletes, and it would be the only thing in this list that is not permanently theirs. What it used to
-    # buy, a reader seeing the whole form at once, is DEVELOPMENT-CYCLE-portable.md's job; that page travels
+    # buy, a reader seeing the whole form at once, is DEVELOPMENT-portable.md's job; that page travels
     # with every plugin update, which a file scaffolded once never does.
 )
 # NO branch/templates/ ANY MORE. The reference copies of the two branch files were placed here because the

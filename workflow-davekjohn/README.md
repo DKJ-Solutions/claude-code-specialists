@@ -9,7 +9,7 @@ set of answers** to them.
 |---|---|---|
 | [`CLAUDE.md`](CLAUDE.md) | the working rules a Claude session needs in this folder | — |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | the workflow's contributing layer — it wins over the [root page](../CONTRIBUTING.md) on conflict | [`CONTRIBUTING-portable.md`](../plugins/workflows/workflow-davekjohn/CONTRIBUTING-portable.md) |
-| `development-cycle.md` | the branch's own document, present only while a branch is open: its plan, and the DEPLOY section that folds into the changelog | [`DEVELOPMENT-CYCLE-portable.md`](../plugins/workflows/workflow-davekjohn/DEVELOPMENT-CYCLE-portable.md) |
+| `development-cycle.md` | the branch's own document, present only while a branch is open: its plan, and the DEPLOY section that folds into the changelog | [`DEVELOPMENT-portable.md`](../plugins/workflows/workflow-davekjohn/DEVELOPMENT-portable.md) |
 | [`releases/`](releases/) | the release history and the published audience notes | [`RELEASES-portable.md`](../plugins/workflows/workflow-davekjohn/RELEASES-portable.md) |
 
 In this repo the portable pages resolve as relative links because this is the plugin's **source**; in a
