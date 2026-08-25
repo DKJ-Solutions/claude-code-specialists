@@ -455,8 +455,14 @@ $mergedDesc = Get-PrDescription -EntryText $merged
 Assert-True ($mergedDesc -match 'The opening argument')      'the merged format keeps the entry opening text -- the defect #853 reported'
 Assert-True ($mergedDesc -match 'The tier-2 answer')         'and the significance section, which is what a reviewer is deciding about'
 Assert-True (-not ($mergedDesc -match 'The PR title line'))  'and still stops at the Pull Request section, which the fold fills'
-Assert-True ($mergedDesc -match '(?m)^## What makes this PR extra special$') 'sections are still promoted one level for a body of its own'
-Assert-True (-not ($mergedDesc -match 'DEPLOY:'))            'the heading itself is not carried -- GitHub prints the title above the body'
+# THE HEADING TRAVELS AND NOTHING IS PROMOTED, on this path (Dave, issue #884, August 25, 2026). Both
+# asserts are the previous two INVERTED rather than deleted, which is the honest record of a reversal:
+# until this issue the heading was dropped and every remaining one moved up a level, on the reasoning
+# that a PR body is a document of its own and needs a title. It has one now -- its own -- and the lock
+# needs body and document to be the same text rather than two renderings of it.
+Assert-True ($mergedDesc -match '(?m)^## DEPLOY: `fix/thing-v1` \* 20260824-101500$') 'the DEPLOY heading travels with its section, verbatim'
+Assert-True ($mergedDesc -match '(?m)^### What makes this PR extra special$') 'and the sections keep the levels the document gave them -- nothing is promoted here'
+Assert-True (-not ($mergedDesc -match '(?m)^## What makes')) 'so no section is flattened up into the heading above it'
 Assert-True ($mergedDesc.Length -gt (Get-EntryDescription -EntryText $merged).Length) 'and it carries MORE than the fallback would have, which is the whole finding'
 
 # The legacy DEPLOY shape -- branch first, title last -- is matched by the same pattern, so a consumer
@@ -489,6 +495,87 @@ The author's own answer.
 $bothDesc = Get-PrDescription -EntryText $both
 Assert-True ($bothDesc -match "The author's own answer")            'a What section present in a merged entry still wins'
 Assert-True (-not ($bothDesc -match 'Scaffolded opening'))          'and the text above it is not swept in'
+
+# THE LEGACY PATH STILL PROMOTES, which is the half of the August 9, 2026 transform #884 did NOT reverse.
+# Its argument is untouched here: an entry found by its 'What' heading leaves its own H2 behind, so its H3
+# sections really would arrive in a PR body as a fragment of something larger. Consumers have branches in
+# flight under this shape and meet this code through a plugin update rather than by choosing to.
+$legacyPromote = @"
+## ``fix/promote-v1`` changelog
+
+### What does this change do?
+
+The answer.
+
+#### A sub-heading inside the body
+"@
+$legacyPromoteDesc = Get-PrDescription -EntryText $legacyPromote
+Assert-True ($legacyPromoteDesc -match '(?m)^### A sub-heading inside the body$') 'the legacy path still promotes one level -- H4 arrives as H3'
+Assert-True (-not ($legacyPromoteDesc -match 'DEPLOY')) 'and it carries no heading of its own, because there was none to carry'
+
+# --- Test-DeployLock: is the open PR body still carrying this document's DEPLOY section? --------------
+# THE LOCK (Dave, issue #884). The section is fixed when the PR opens, because the PR body is what the
+# review approved and the fold turns the document into CHANGELOG.md. These asserts are the contract both
+# callers depend on -- ship-pr before the merge, and check-branch-entry in CI.
+$lockEntry = @"
+## DEPLOY: ``fix/lock-v1`` * 20260825-120000
+
+The opening argument.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+Tier two.
+
+**Score:** 2
+
+### Pull Request
+
+A title
+"@
+$lockPublished = Get-PrDescription -EntryText $lockEntry
+
+$lockSame = Test-DeployLock -EntryText $lockEntry -PrBody $lockPublished
+Assert-True $lockSame.Applicable      'a merged-format entry with a published body is something the lock can judge'
+Assert-True $lockSame.Locked          'and an unchanged section is locked'
+Assert-Equal '' $lockSame.FirstDrift  'with no drift line to report'
+
+# CONTAINMENT, NOT EQUALITY, because a consumer's PR template may wrap the section -- open-pr splices the
+# description into that template rather than replacing the whole body.
+$lockWrapped = Test-DeployLock -EntryText $lockEntry -PrBody ("Some template preamble.`n`n" + $lockPublished + "`n`nA template footer.")
+Assert-True $lockWrapped.Locked 'a section wrapped by a template is still locked -- the test is containment'
+
+# CRLF IS WHAT A ROUND TRIP THROUGH GITHUB ACTUALLY RETURNS, so it is normalised. Nothing else is: case,
+# punctuation and heading levels are all real edits to a section that is supposed to be closed.
+$lockCrlf = Test-DeployLock -EntryText $lockEntry -PrBody ($lockPublished -replace "`n", "`r`n")
+Assert-True $lockCrlf.Locked 'a body that came back CRLF is still the same section'
+
+# ONE EDITED LINE IS THE CASE THE MESSAGE EXISTS FOR: "the section is gone" and "somebody rewrote its
+# second paragraph" need different answers, which is why the search anchors on the heading first.
+$lockEdited = Test-DeployLock -EntryText ($lockEntry -replace 'The opening argument\.', 'A different argument entirely.') -PrBody $lockPublished
+Assert-True (-not $lockEdited.Locked) 'a document edited after the PR opened is not locked'
+Assert-Equal 'A different argument entirely.' $lockEdited.FirstDrift 'and the finding names the first line the body does not have'
+
+$lockGone = Test-DeployLock -EntryText $lockEntry -PrBody 'A body with no section in it at all.'
+Assert-True (-not $lockGone.Locked) 'a body that does not carry the section is not locked'
+Assert-Equal $lockGone.Heading $lockGone.FirstDrift 'and the drift line IS the heading, which is how a caller tells the two cases apart'
+
+# NOT APPLICABLE IS A THIRD ANSWER, and both callers treat it as no finding. Locked stays $true on those
+# so a caller that reads only that field cannot refuse a merge over a question that was never asked.
+$lockLegacy = Test-DeployLock -EntryText $legacyPromote -PrBody $legacyPromoteDesc
+Assert-True (-not $lockLegacy.Applicable) 'an entry with no DEPLOY heading has no section to lock'
+Assert-True $lockLegacy.Locked            'and reports Locked so a caller reading one field cannot refuse over it'
+
+Assert-True (-not (Test-DeployLock -EntryText $lockEntry -PrBody '').Applicable)  'an empty body is nothing to hold the document against yet'
+Assert-True (-not (Test-DeployLock -EntryText '' -PrBody $lockPublished).Applicable) 'and an empty document is nothing to hold'
+
+# THE TWO HALVES OF #884 MEET HERE, which is the assert worth having above all the others: the lock is a
+# plain containment test ONLY because Get-PrDescription stopped transforming the section. Had the heading
+# promotion stayed, this comparison would have had to reproduce it -- so this asserts the property rather
+# than the implementation, and it fails the moment either half is reverted alone.
+Assert-True ($lockPublished -match '(?m)^## DEPLOY: `fix/lock-v1` \* 20260825-120000$') 'what the PR publishes opens with the document own heading'
+Assert-True ($lockEntry -match [regex]::Escape(($lockPublished -split "`n")[0])) 'and that heading is the document own line, verbatim, not a rendering of it'
 
 # A DEPLOY heading inside a FENCE is a quote, not the start of the answer -- this very entry format is
 # documented by entries that quote it, and firing there would return the explanation as the description.

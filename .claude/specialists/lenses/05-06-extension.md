@@ -24,10 +24,10 @@ rewrite when copying. Managing branches, PRs, and merges up to and including the
 `CHANGELOG.md` (repo root) is an **intro followed by one `##` per change, with no section headings at all**
 (Dave, August 5, 2026). A change *is* the `##`, and since August 6, 2026 its heading names the **branch** —
 `` ## DEPLOY: `feat/x` `` — with two `###` sections under it since August 16, 2026:
-`What makes this PR extra special` and `Pull Request`, which carries the PR title and which the fold
+`What makes this deploy extra special` and `Pull Request`, which carries the PR title and which the fold
 completes from the merge. **The entry holds both tiers, and since August 19, 2026 neither names itself**:
 tier 0 answers directly under the DEPLOY heading, under no heading of its own, and
-`### What makes this PR extra special` beside it means whichever single audience tier the repo has
+`### What makes this deploy extra special` beside it means whichever single audience tier the repo has
 stated. They replaced the impact table because not
 every change has a tier 1 or a tier 2 and a missing row read as an omission, and they stopped naming numbers
 because the author filling one in is answering the question, not classifying a reader. Everything above
@@ -220,7 +220,7 @@ in the closing report of every release.**
 The `releases/` directory (modeled on life-hub):
 - **`releases/development/<X>.x/<X.Y.Z>.md`** — the full release notes: **every** pending entry, tier 0
   included, ordered by **tier** and, inside a tier, ranked — one flat list at `CHANGELOG.md`'s own levels
-  (`## <title>` → `### What makes this PR extra special`), with no tier heading in between since
+  (`## <title>` → `### What makes this deploy extra special`), with no tier heading in between since
   August 25, 2026 ([#881](https://github.com/DaveKJohn/claude-code-specialists/issues/881)): this is the
   document a hand-written note is copied *from*, so it pastes at the level it was written at. Literally the
   whole changelog, which is what makes this the record rather than a summary of one — including each entry's
@@ -562,7 +562,7 @@ of the branch that same heading names, `Significance` was a heading over sub-sec
 the answer to the question above it, and `Branch title` was never a branch title — it is the PR title, and
 it moved into the `Pull Request` section where the rest of the PR's facts already live. What remains is
 the DEPLOY heading's own text (tier 0's answer, under no heading of its own, with
-`### What makes this PR extra special` beside it for the audience tier, each closing with `**Score:**`)
+`### What makes this deploy extra special` beside it for the audience tier, each closing with `**Score:**`)
 and `Pull Request` — the title, then the `Plugins:` line and the
 `[PR #N](…)` footer the **fold** writes underneath it, with the landing moment stamped on the `## DEPLOY:` heading. `Plugins:` stays a plain line,
 because a heading around one fact is more structure than content.
@@ -773,7 +773,7 @@ branch prefix, which this repo has measured does not predict impact.
 **weighs** for that document's reader, and therefore **where in it** the entry sits — so the most
 consequential change leads instead of sitting third under whichever heading its branch prefix produced.
 Both are declared in the entry's **DEPLOY section** — tier 0 directly under its heading, and the audience
-tier under `### What makes this PR extra special` beside it — each carrying why it matters there and then
+tier under `### What makes this deploy extra special` beside it — each carrying why it matters there and then
 its score:
 
 ```text
@@ -783,7 +783,7 @@ The routine version bump stops needing a developer.
 
 **Score:** 4
 
-### What makes this PR extra special
+### What makes this deploy extra special
 
 Nobody but this repo's own developers can observe it.
 

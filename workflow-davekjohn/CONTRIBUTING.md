@@ -60,7 +60,7 @@ rather than left to be worked out from the seam table above.
 
 **The audience tier is `2`, so the entry asks two questions rather than four.** Tier 0 needs no heading —
 the `` ## DEPLOY: `<branch>` `` line is its section, and its answer goes directly underneath — and the one
-audience tier gets `### What makes this PR extra special`. Both sit at the entry's own section level,
+audience tier gets `### What makes this deploy extra special`. Both sit at the entry's own section level,
 beside `### Pull Request`. A repo that has stated *no* audience tier gets the older shape instead, a
 `#### Tier N` sub-section per tier the model has, nested one level deeper; that is the shape the portable
 half describes as the fallback, and it is not what you will see here.

@@ -53,7 +53,14 @@
          Once green, print WHICH check governed the wait and for how long (#831) -- whichever finished
          last, labelled against the repo's own ruleset. Best-effort: unreadable, and the run says only
          how long it waited. The wait itself is unchanged; see the comment at the step.
-      4. Merge (gh pr merge <pr> --<method>, from Get-PrMergeMethod; 'merge' by default), with the
+      4. TWO GATES, THEN MERGE. The step-list gate refuses while development-cycle.md has an unresolved
+         step above DEPLOY, and the DEPLOY LOCK (issue #884) refuses when that section no longer matches
+         what PR #NN published -- the section is fixed at the moment the PR opens, because it is what the
+         review approved and what step 5 folds into CHANGELOG.md. Both are checked here rather than
+         inherited from step 1: open-pr has a -Force and a PR opened on github.com ran neither. Neither
+         has a -Force of its own. A PR body that cannot be READ is not a finding -- that says something
+         about the token, not about the section.
+         Then: gh pr merge <pr> --<method>, from Get-PrMergeMethod ('merge' by default), with the
          merge commit's subject set to 'merge: <branch> (#NN)' so every line in the graph starts with
          a type. No --admin: the CI gate is never bypassed.
       5. Check out main, fast-forward, and hand the fold to fold-changelog-entry.ps1 -Push, which folds
@@ -185,6 +192,11 @@ if (-not (Test-Path -LiteralPath $configPath)) {
 # For the step-list gate before the merge in step 4 (Get-BranchFilePaths / Get-BranchProgressFindings).
 # Same plugin-payload sibling, same reasoning as the two above.
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
+# For the DEPLOY lock before the merge in step 4 (Test-DeployLock, and the Get-PrDescription it calls).
+# Loaded AFTER entry-scaffold-lib on purpose: Get-PrDescription probes for the section-heading seams with
+# Get-Command and falls back to English defaults when they are absent, so a repo that renamed a heading is
+# read by its own names only while that lib is already in the session. Same plugin-payload sibling.
+. (Join-Path $PSScriptRoot '..\lib\pr-body-lib.ps1')
 $repo = Get-RepoName
 
 # The merge method is repo POLICY, not script logic (issue #411): this workshop merges, another repo
@@ -347,6 +359,62 @@ Resolve each step ($($shipMarks.Done.Trim()) done, $($shipMarks.Dropped.Trim()) 
 passed, so a re-run picks up from here. There is no -Force for this gate.
 "@
         exit 1
+    }
+}
+
+# THE DEPLOY LOCK FIRES HERE, BESIDE THE STEP-LIST GATE AND FOR THE SAME REASON (Dave, issue #884,
+# August 25, 2026). The section is fixed at the moment the PR opens: after that the document may not
+# diverge from what the PR published, because the PR body is what reviewers approved and the fold in step 5
+# is what turns the document into CHANGELOG.md. Without this, an edit made after the review lands in the
+# changelog and the release notes having been seen by nobody -- and it lands SILENTLY, because the fold
+# removes the document at the merge, so the place a reviewer would compare is the one place it no longer is.
+#
+# THE MERGE IS THE RIGHT PLACE, not the push. open-pr writes the section into the body, so at push time
+# there is nothing to have diverged yet; the window this closes opens the instant the PR exists and shuts
+# here. It is also the only point both escape routes pass through -- open-pr has a -Force, and a PR opened
+# by hand on github.com never ran it at all.
+#
+# READ FROM THE BRANCH'S OWN CHECKOUT, where HEAD still is at this point -- step 5 is what moves to main.
+# An unreadable body is NOT a finding: gh failing here says something about the network or the token, not
+# about the section, and a gate that refuses a merge over that would be refusing on no evidence. The
+# comparison itself is Test-DeployLock in pr-body-lib, the same function the CI gate calls, so "diverged"
+# has one definition rather than two.
+if (Test-Path -LiteralPath $shipProgressPath) {
+    $lockView = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
+        'pr', 'view', "$pr", '--json', 'body', '--repo', $repo)
+    if ($lockView.ExitCode -eq 0) {
+        $lockBody = ''
+        try {
+            $lockBody = [string](($lockView.Output -join "`n") | ConvertFrom-Json).body
+        } catch {
+            $lockBody = ''
+        }
+        $lockEntry = Get-DevelopmentCycleEntryText -Text ([System.IO.File]::ReadAllText($shipProgressPath, [System.Text.Encoding]::UTF8))
+        $lock = Test-DeployLock -EntryText $lockEntry -PrBody $lockBody
+        if ($lock.Applicable -and -not $lock.Locked) {
+            $lockDrift = if ($lock.FirstDrift -eq $lock.Heading) {
+                "the body does not carry the section at all -- its heading '$($lock.Heading)' is not in it"
+            } else {
+                "the first line the body does not have is:`n    $($lock.FirstDrift)"
+            }
+            Write-Error @"
+DEPLOY lock: $shipProgressRel has changed since PR #$pr was opened - it is NOT merged.
+
+$lockDrift
+
+The DEPLOY section is fixed when the PR opens: it is what the review approved, and step 5 folds it
+verbatim into CHANGELOG.md and from there into the release notes. Choose one:
+
+  - put the section back to what PR #$pr published, commit, and re-run; or
+  - deliberately republish it -- open-pr.ps1 -RefreshBody rewrites the PR body from the document, so
+    the change is reviewable where the review happens, and then re-run.
+
+CI has already passed, so a re-run picks up from here. There is no -Force for this gate.
+"@
+            exit 1
+        }
+    } else {
+        Write-Host "  DEPLOY lock: PR #$pr's body could not be read -- not checked (this is not a finding)." -ForegroundColor DarkGray
     }
 }
 

@@ -57,7 +57,7 @@ accepted, never refused, so no finished dossier became unopenable on the day the
 per change, ranked furthest-reach-first and, within a tier, highest-significance-first — so what the three
 `## Tier N - Pull Requests` sections used to say visually is now the ordering, and each entry states its own
 reach in its opening section — directly under the DEPLOY heading for tier 0, and under
-`### What makes this PR extra special` for the one audience tier the repo has stated. The
+`### What makes this deploy extra special` for the one audience tier the repo has stated. The
 **fold** is the only moment that order can be decided, because the cut empties the list: whatever order it
 leaves is what the release documents inherit, with nothing re-estimated days later.
 
@@ -197,7 +197,7 @@ heading: a reader who wants the tier reads it off the entry.
 
 Each entry arrives whole, exactly as it was folded — its `##` heading naming the **branch**, and beneath it
 the same `###` sections the scaffolder wrote on the day it was folded, at the very levels `CHANGELOG.md`
-carries them — today `What makes this PR extra special` and `Pull Request`, with tier 0's answer sitting
+carries them — today `What makes this deploy extra special` and `Pull Request`, with tier 0's answer sitting
 directly under the entry's own heading and carrying none of its own, and for an older entry whichever
 wording it was written with.
 

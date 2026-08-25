@@ -23,6 +23,9 @@ $RECYCLE.BIN/
 # Claude Code — per-user, not shared (the shared .claude/settings.json does stay in the repo)
 .claude/settings.local.json
 
+# Local secrets -- this repo is public; never let a token/key land in a tracked file.
+.env
+
 # PowerShell's own machine-local caches, which land here when a run resolves its per-user data
 # directory to the repo root instead of %LOCALAPPDATA%. Microsoft/Windows/PowerShell/ModuleAnalysisCache
 # was committed by accident in 65902dd; PowerShell REWRITES it in place on almost every run, so a tracked
