@@ -24,6 +24,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot       = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $CutReleasePath = Join-Path $RepoRoot 'scripts\release\cut-release.ps1'
+$SeamLibPath    = Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1'
 
 $script:pass = 0
 $script:fail = 0
@@ -51,6 +52,7 @@ Write-Host "cut-release.ps1 -- reserved-root-md allowlist covers every permanent
 #    root has neither file. A default carrying this repo's documents would be this repo's specifics
 #    shipped as everyone's.
 $cutReleaseText = [System.IO.File]::ReadAllText($CutReleasePath, [System.Text.Encoding]::UTF8)
+$seamLibText    = [System.IO.File]::ReadAllText($SeamLibPath, [System.Text.Encoding]::UTF8)
 $m = [regex]::Match($cutReleaseText, '\$reservedRootMd\s*=\s*@\(Get-SeamValue[^@]*@\(([^)]*)\)')
 if (-not $m.Success) { $m = [regex]::Match($cutReleaseText, '\$reservedRootMd\s*=\s*@\(([^)]*)\)') }
 Assert-True $m.Success 'found the $reservedRootMd fallback literal in cut-release.ps1'
@@ -120,8 +122,16 @@ Assert-True ($plannedBlock.Success -and $plannedBlock.Value -match 'bodyRelPath'
 # literal, so a grouping change (<X>.x -> <X.Y>) does not turn this red for a reason it is not about. It
 # used to be written into releases/development/ with a '-github-body' suffix: the one generated document
 # that IS published, sitting in the directory whose whole job is the record nobody publishes.
-Assert-True ($cutReleaseText -match '(?m)^\$bodyRelPath\s*=\s*"releases/github/') `
-    'the generated body is written into releases/github/'
+#
+# SEAMED SINCE ISSUE #885, GROUP E: the literal 'releases/github/' is gone from this assignment, replaced
+# by $githubNotesRootRelPath, whose own computed default (Get-DefaultReleaseGithubNotesRoot, in
+# seam-lib.ps1) is 'releases/github' for the source. Asserted in two parts so a regression in either half
+# is attributable: the assignment reads the seam variable, and that variable's default really is the old
+# literal for a repo that answers nothing.
+Assert-True ($cutReleaseText -match '(?m)^\$bodyRelPath\s*=\s*"\$githubNotesRootRelPath/') `
+    'the generated body is written from the seamed github-notes root'
+Assert-True ($seamLibText -match "return 'releases/github'") `
+    "and that seam's computed default for the source repo is still releases/github"
 # THE NEGATIVE HALF IS SCOPED TO THE ASSIGNMENT, and that is not fussiness -- the WHY comment three lines
 # above the assignment quotes the retired filename, so a check over the whole script text would fail on the
 # sentence explaining the move. Assert on the line that decides, not on the file that mentions.
@@ -232,8 +242,14 @@ $newIdx = $cutReleaseCode.IndexOf('Get-ReleaseConsumerBumps')
 $oldIdx = $cutReleaseCode.IndexOf('Get-ReleaseHighlightsBumps')
 Assert-True ($newIdx -ge 0 -and $oldIdx -gt $newIdx) 'the current name is tried before the retired one'
 # And the reader itself must accept more than one name, or the pair above is two arguments to a parameter
-# that only ever looks at the first.
-Assert-True ($cutReleaseText -match '\[string\[\]\]\$Name') 'Get-SeamValue takes a LIST of names, so a renamed seam can be read under both'
+# that only ever looks at the first. Get-SeamValue ITSELF MOVED OUT OF THIS FILE (issue #885, group A) into
+# seam-lib.ps1, so the signature is asserted there now -- plus that this file actually reads through it
+# rather than carrying a private copy again.
+Assert-True ($seamLibText -match '\[string\[\]\]\$Name') 'Get-SeamValue takes a LIST of names, so a renamed seam can be read under both'
+Assert-True ($cutReleaseText -notmatch '(?m)^function Get-SeamValue') `
+    'cut-release.ps1 no longer carries its own private copy of Get-SeamValue'
+Assert-True ($cutReleaseText.Contains('lib\seam-lib.ps1')) `
+    'and dot-sources the shared one instead'
 
 # WHERE THE NOTE GOES IS A SEAM TOO (inbound #616), and this assert exists because the knob above was
 # unanswerable without it: for a repo whose hand-written notes live elsewhere, naming the bumps pointed

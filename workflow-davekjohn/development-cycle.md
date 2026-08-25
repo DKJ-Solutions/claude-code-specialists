@@ -138,18 +138,13 @@ said, so this file stands on its own if the issue is ever unavailable.
   With permanence guaranteed the folder becomes the safest place for history rather than the riskiest, so
   this is the newer decision removing the older one's premise rather than overruling it.
 
-### Still open — blocks the CREATE step list
+### Resolved (Dave, August 25, 2026)
 
-- [ ] **Decide how far the `releases/` roots move in this cycle.** The changelog seam and the permanence
-  guarantee are settled. What is not: whether `Get-ReleaseHistoryPath`, the three hard-coded roots
-  (`releases/development/`, `releases/github/`, `releases/internal/`) and `Get-ReleaseNoteRoot`'s default
-  come along now or in a follow-up cycle. They are the same argument as the changelog and the objection
-  against them has expired, but `releases/development/` was given no seam *deliberately*
-  (`cut-release.ps1:357`: "a seam nobody can be shown to need is a knob a consumer has to read past. It
-  comes back when somebody measures it") — and #885 is that measurement, so reversing it is a decision
-  rather than a consequence.
+- [x] **The `releases/` roots move in THIS cycle, not a follow-up.** Same argument as the changelog seam,
+  and #885 is exactly the measurement `cut-release.ps1:357`'s refusal was waiting for. One cycle instead
+  of two. Group E in CREATE is no longer gated.
 
-### Scope recommended to CREATE, once the step above is answered
+### Scope recommended to CREATE
 
 1. `Get-ChangelogPath` with a computed default, plus `adopt-workflow-folder` placing
    `workflow-davekjohn/CHANGELOG.md` with its intro — required, because `cut-release.ps1:586` has no
@@ -173,9 +168,134 @@ would be this branch defeating its own purpose.
 
 ## CREATE
 
-- [ ] TODO: the first step of this branch
+Ordered: group A's first step gates the rest of A, and group E is gated on the open PLAN decision.
+Nothing here is built yet — this is the checklist only (Dave, August 25, 2026).
+
+### A — The changelog seam
+
+- [x] **Settle the seam-reading idiom first, because the changelog needs all four call sites and the
+  tree has two idioms.** `Get-SeamValue` is defined **twice** — `cut-release.ps1:280` and
+  `new-internal-note.ps1:114` — while `fold-changelog-entry.ps1`, `open-pr.ps1` and
+  `session-status.ps1` probe inline with `Get-Command Get-X -ErrorAction SilentlyContinue`. Promote one
+  `Get-SeamValue` into a shared lib and have the new seam use it. This is Ravi's call on the
+  duplication; doing it first means the changelog work adds one idiom rather than a third. Done: new
+  `scripts/lib/seam-lib.ps1`, array-capable version kept; both private copies removed, both callers
+  dot-source the shared one; `open-pr.ps1`'s own inline probes are untouched (unrelated seams, out of
+  scope).
+- [x] **Add `Get-ChangelogPath` with a computed default** — `workflow-davekjohn/CHANGELOG.md` unless
+  `.claude-plugin/marketplace.json` exists, the same one-file test `Get-ReleasePluginTier`'s fallback and
+  `adopt-workflow-folder.ps1`'s source refusal already use. Zero configuration gives the source its root
+  file and every consumer isolation. Done: `Get-DefaultChangelogPath` in `seam-lib.ps1`.
+- [x] **Repoint the three hard-coded reads** at the seam: `cut-release.ps1:585`,
+  `fold-changelog-entry.ps1:326`, `session-status.ps1:319`. Done, including the fold's own commit-scope
+  path list (`$paths = @($changelogRel) + ...`) which was still a `'CHANGELOG.md'` literal one line past
+  where the PLAN's own inventory looked.
+- [x] **Add the missing `Test-Path` guard at `cut-release.ps1:586`.** Independently a defect: the read
+  is unguarded, so a repo with no changelog gets an unhandled throw rather than a refusal that says what
+  is wrong. The fold already reads defensively at its line 363; make the cut match. Done — same
+  read-defensively-into-`''` pattern as the fold.
+- [x] **Register the seam in the contract** — a record in `scripts/lib/script-contract-lib.ps1` with
+  `Adopt`/`AdoptWhy`, and the mandatory/optional declaration in `scripts/sync/check-script-contract.ps1`
+  if it belongs there. Done: `Adopt = 'copy'`, `check-script-contract.ps1` needed no change — it reads
+  `Optional` off the record generically, nothing per-function to add there.
+- [x] **Decide whether `scripts/repo-config.ps1` declares this repo's answer explicitly** or leans on
+  the computed default. Explicit is the safer read for a source repo, but it duplicates a computation —
+  answer it once, in the record's `AdoptWhy`. **Decided: lean on the computed default**, same as
+  `Get-ReleaseHistoryPath`'s own precedent — this repo's `repo-config.ps1` declares nothing new.
+- [x] **`adopt-workflow-folder.ps1`: place `workflow-davekjohn/CHANGELOG.md` with its intro.** One entry
+  on the existing additive target list. Required, not cosmetic — without it a consumer's first cut reads
+  a file that is not there. Done, plus a re-adoption migration note (a genuinely pending entry in an
+  existing root `CHANGELOG.md` is not picked up by the next fold/cut) that the original checklist item
+  did not name but the accepted-cost reasoning implied.
+- [x] **Regenerate the derived artefacts**: `scripts/sync/build-config-blueprint.ps1` (the blueprint is
+  derived and the lint gate reports any difference) and `scripts/sync/build-shared-scripts.ps1` (check 8
+  of the lint gate holds every mirror LF-identical to its root source). Done, repeatedly, as each group
+  landed.
+
+### B — The permanence guarantee, written down
+
+- [ ] **State the guarantee**: no command in this plugin removes `workflow-davekjohn/`, and no future
+  teardown may. Uninstalling removes the plugin; the released record stays with the repo that released
+  it.
+- [ ] **Carry the `development-cycle.md` precision with it** wherever the guarantee is stated — the fold
+  deletes that file on every merge by design, it is working state rather than history, and it is removed
+  only after its content moves into the changelog. Omit this and the next reader finds a `Remove-Item`
+  inside a folder documented as permanent.
+- [ ] **Place it in the layers that actually reach a consumer**: `UNINSTALL.md`, the portable pages, and
+  the folder README that `adopt-workflow-folder.ps1` writes. The root `CLAUDE.md` gets it only insofar as
+  the fold exception's bounds change.
+- [ ] **Amend the August 19 record** in `script-contract-lib.ps1`'s `Get-ReleaseHistoryPath` entry, which
+  still argues from "a folder a teardown removes". Say why that premise no longer holds rather than
+  silently flipping the value — whatever group E decides.
+
+### C — TICKETWORK's optionality
+
+- [ ] **`adopt-workflow-folder.ps1:119`**: three portable pages every consumer answers
+  (`CONTRIBUTING`, `DEVELOPMENT-CYCLE`, `RELEASES`) and one that applies only where work arrives from
+  somebody else's tracker. One string; it currently writes all four into every consumer's folder README
+  as equals.
+- [ ] **Check the plugin's own `README.md:47`** against the same distinction. Its table already
+  describes TICKETWORK's scope per row, so this may need nothing — verify rather than assume, and record
+  which it was.
+
+### D — Provenance: the rule that makes the rest hold
+
+- [ ] **Invert the root `*.md` sweep to an allowlist of paths the plugin itself placed.** Today every
+  unrecognised root markdown file is read as an unfolded entry and refuses the release, with
+  `Get-ReservedRootMd` as the escape hatch — a list whose own contract record admits it "has gone stale
+  three times in the source alone".
+- [ ] **Retire the two portable-page workarounds that exist only because of that sweep** —
+  `TICKETWORK-portable.md`'s closing note and `CONTRIBUTING-portable.md:317`. They instruct consumers to
+  dodge the plugin; once the sweep is an allowlist there is nothing to dodge, and leaving them in place
+  would document a hazard that no longer exists.
+- [ ] **The preflight itself**: refuse to write any path the plugin cannot show it created. Scope it
+  deliberately — this is the largest item on the branch, and it is the backstop for the paths that
+  cannot move (`.github/`, `scripts/`) rather than a replacement for groups A and E.
+
+### E — The `releases/` roots · unblocked, Dave chose "now" over "follow-up cycle"
+
+- [x] **`Get-ReleaseHistoryPath`** into the folder, with the August 19 record amended per group B.
+  Done: `Get-DefaultReleaseHistoryPath` in `seam-lib.ps1` — `releases/README.md` for the source,
+  `workflow-davekjohn/releases/history.md` for a consumer. **`history.md`, not `README.md`**: a real
+  naming collision found while building this — `workflow-davekjohn/releases/README.md` already names
+  this folder's hand-written seam-ANSWERS page (`adopt-workflow-folder.ps1`'s own scaffold target), so
+  the list needed a filename of its own once both moved into the same directory. Same accepted-cost
+  duplication as the changelog: an existing consumer's history splits at the point this default starts
+  applying to them (old rows at their root file, new rows here) rather than moving under them silently a
+  second time; repointing the seam back keeps one list for a consumer who would rather have that.
+- [x] **Seams for the three hard-coded roots** — `releases/development/`, `releases/github/`,
+  `releases/internal/`. Note that `releases/development/` was refused a seam *deliberately*
+  (`cut-release.ps1:357`), so this step carries the reversal's reasoning, not just the code. Done:
+  `Get-ReleaseDevelopmentNotesRoot`, `Get-ReleaseGithubNotesRoot`, `Get-ReleaseInternalNotesRoot`, each
+  with a computed default in `seam-lib.ps1`. **Unlike the history path and the changelog, these three
+  carried NO seam at all before this branch** — every existing consumer's notes already sit at the exact
+  root literal the computed default still returns for the source, so there was no prior meaning to
+  redefine and no accepted-cost duplication to name here.
+- [~] **`Get-ReleaseNoteRoot`'s default repointed from `releases/notes` into the folder** — **dropped,
+  found while building this, not in the original PLAN.** This seam's own contract record already argues
+  against exactly this move, for a reason `#885`'s "expired objection" does not touch: *"the DEFAULT
+  deliberately stays `releases/notes`... a repo that answers nothing must keep meaning what it meant
+  yesterday."* Unlike the three roots above, `Get-ReleaseNoteRoot` already has real consumers configuring
+  it or relying on its literal fallback — a computed default would silently redirect an EXISTING
+  consumer's hand-written notes out from under them, which is the exact harm `#885` exists to prevent, not
+  a case of it. `adopt-workflow-folder.ps1`'s existing explicit next-steps instruction (`Get-ReleaseNoteRoot
+  -> 'workflow-davekjohn/releases/audience'`) remains the correct, opt-in way a *new* adoption isolates
+  this one — unchanged by this branch.
+
+### Non-goals, recorded so nobody builds them
+
+- `projectmanagement/` and any `research/` folder in a consumer are **never** relocated into
+  `workflow-davekjohn/`. They are the consumer's own, and annexing them would defeat the branch.
+- `.github/workflows/branch-entry.yml`, `scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1` stay
+  where they are, documented as the two named exceptions.
 
 ## TEST
+
+Deliberately not written yet — the checklist above is CREATE only (Dave, August 25, 2026). Each group
+above has suites that already exist and will need extending: `fold-changelog.tests.ps1`,
+`cut-release-guardrail.tests.ps1`, `cut-release-drive.tests.ps1`, `session-status.tests.ps1`,
+`adopt-workflow-folder.tests.ps1`, `script-contract.tests.ps1`, `repo-config.tests.ps1`,
+`config-blueprint.tests.ps1` and `shared-scripts.tests.ps1`.
 
 ## DEPLOY: `feat/isolate-workflow-from-consumer-root-v1`
 

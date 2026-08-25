@@ -220,6 +220,12 @@ if ($repo -match 'VUL-IN') {
 # the format.
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
 
+# Get-SeamValue + Get-DefaultChangelogPath (issue #885, group A): this script used to probe inline for
+# every other seam it reads and hard-code the changelog path outright. The changelog is the one seam
+# three different readers (this script, cut-release.ps1, session-status.ps1) must agree on, so it is the
+# one read through the shared definition rather than a fourth private idiom.
+. (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
+
 # BOM-less UTF8 -- Set-Content -Encoding UTF8 always adds a BOM in Windows PowerShell 5.1,
 # and the rest of the repo (CHANGELOG.md etc.) has no BOM.
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
@@ -323,7 +329,8 @@ if ($entryFiles.Count -eq 0) {
     exit 0
 }
 
-$changelogPath = Join-Path $repoRoot "CHANGELOG.md"
+$changelogRel = Get-SeamValue -Name 'Get-ChangelogPath' -Default (Get-DefaultChangelogPath -RepoRoot $repoRoot)
+$changelogPath = Join-Path $repoRoot $changelogRel
 
 # --- The document has to BE a flat list before anything is inserted into it (inbound #561) ---------
 #
@@ -850,7 +857,7 @@ if ($Commit) {
     # root, so normalising both sides costs nothing and removes the one way this could silently drop a
     # deletion from the commit.
     $tracked = @($lsFiles.Output | Where-Object { $_ } | ForEach-Object { ($_ -replace '/', '\').Trim() })
-    $paths = @('CHANGELOG.md') + @($writtenPaths | Where-Object { $tracked -contains ($_ -replace '/', '\') })
+    $paths = @($changelogRel) + @($writtenPaths | Where-Object { $tracked -contains ($_ -replace '/', '\') })
     $untracked = @($writtenPaths | Where-Object { $tracked -notcontains ($_ -replace '/', '\') })
     if ($untracked.Count -gt 0) {
         # Every disposal is a deletion again, so this can name it. The hedge here dated from the split, when

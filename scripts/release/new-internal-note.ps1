@@ -99,6 +99,9 @@ $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 # (see the call near the end). $PSScriptRoot-relative, like every other shared script's dot-source, so
 # the plugin mirror resolves its own copy rather than the consumer's repo root.
 . (Join-Path $PSScriptRoot '..\lib\release-lib.ps1')
+# Get-SeamValue (issue #885, group A): this used to be a private single-name copy defined below; it is
+# now the one array-capable definition every seam reader in this workflow shares.
+. (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
 
 # --- Parse the version --------------------------------------------------------------------------
 $verNum = ($Version.Trim() -replace '^[vV]', '')
@@ -110,12 +113,8 @@ $minor = $Matches[2]
 
 # --- The repo's own answers ----------------------------------------------------------------------
 # Optional, all of them, each falling back to the English text below -- so a consumer that defines
-# nothing still gets a working skeleton in this script's own language.
-function Get-SeamValue {
-    param([Parameter(Mandatory)][string]$Name, $Default)
-    if (Get-Command $Name -ErrorAction SilentlyContinue) { return (& $Name) }
-    return $Default
-}
+# nothing still gets a working skeleton in this script's own language. Get-SeamValue itself now lives
+# in seam-lib.ps1, dot-sourced above.
 
 $configPath = Join-Path $RepoRoot 'scripts\repo-config.ps1'
 if (Test-Path -LiteralPath $configPath) {
@@ -167,8 +166,11 @@ $w = @{
 $override = Get-SeamValue -Name 'Get-InternalNoteWording' -Default @{}
 if ($override) { foreach ($k in $override.Keys) { $w[$k] = $override[$k] } }
 
-$devRel = "releases/development/$notesDir/$verNum.md"
-$intRel = "releases/internal/$notesDir/$verNum.md"
+# SEAMED (issue #885, group E), and MUST AGREE WITH cut-release.ps1's OWN READ of the same two roots --
+# both are Get-SeamValue reads of the same seam names, falling back to the same computed defaults, so a
+# repo that configures either seam is read the same way by both scripts.
+$devRel = "$(Get-SeamValue -Name 'Get-ReleaseDevelopmentNotesRoot' -Default (Get-DefaultReleaseDevelopmentNotesRoot -RepoRoot $RepoRoot))/$notesDir/$verNum.md"
+$intRel = "$(Get-SeamValue -Name 'Get-ReleaseInternalNotesRoot' -Default (Get-DefaultReleaseInternalNotesRoot -RepoRoot $RepoRoot))/$notesDir/$verNum.md"
 $devFile = Join-Path $RepoRoot ($devRel -replace '/', '\')
 $intFile = Join-Path $RepoRoot ($intRel -replace '/', '\')
 
