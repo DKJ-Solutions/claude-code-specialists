@@ -103,7 +103,7 @@ below is which order Dave wants.
   rule needs restating regardless of A's answer.
 
   
-  Dave's answer: No, everything that refers to workflows is changed to contributing. So plugins/workflows as well. Change it to plugins/contributing
+  Dave's answer: Yes, keep plugins/workflows/
 
   
 - **B. Migration path for the 3 registered consumers + this repo, all on `workflow-davekjohn@claude-code-specialists: true` today.**
