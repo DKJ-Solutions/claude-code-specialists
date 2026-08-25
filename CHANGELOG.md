@@ -25,6 +25,49 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `feat/isolate-workflow-from-consumer-root-v1` · 20260825-204036
+
+Nothing changes for this repo's own release runs today — the computed defaults exempt the source repo
+outright, so `CHANGELOG.md` and `releases/` keep resolving to the exact root paths they always did. What
+a developer here meets is the plumbing underneath: the two duplicate `Get-SeamValue` copies collapse into
+one shared `seam-lib.ps1`, which also carries the four isolate-by-default seams and the new
+`Assert-WorkflowIsolatedSeamPath` provenance preflight, backed by its own dedicated suite
+(`seam-lib.tests.ps1`, 8 asserts) among the eleven suites this branch touched. Noticed the next time
+somebody works in a release script, not before.
+
+**Score:** 2
+
+### What makes this PR extra special
+
+A consumer no longer risks the plugin reaching into their repo root: the changelog, the three release-note
+roots (`releases/development/`, `releases/github/`, `releases/internal/`) and the release-history index
+all default inside `workflow-davekjohn/` now, and the provenance preflight refuses outright if a
+consumer's own explicit override still resolves outside that folder. This closes a hazard that was
+measured rather than theoretical — the root `*.md` sweep could misread a consumer's own permanent doc as a
+stray, unfolded changelog entry, and two portable pages (`TICKETWORK-portable.md`,
+`CONTRIBUTING-portable.md`) carried hand-written workarounds telling consumers how to dodge it; both are
+gone now because the sweep itself no longer needs them — it reads content, not a name list. An
+already-adopted consumer does have to notice this on their next fold or cut: entries land in
+`workflow-davekjohn/CHANGELOG.md` rather than their root file from here on, and a pending entry already
+sitting in their old root `CHANGELOG.md` is not picked up automatically — the re-adoption migration note
+this branch added documents exactly that. The same split reaches `releases/README.md`: an already-adopted
+consumer's release history moves to `workflow-davekjohn/releases/history.md` from here on (named
+`history.md`, not `README.md`, because that folder already uses `README.md` for its own hand-written
+seam-answers page) — old rows stay at the root file, new rows land in the folder, the same accepted-cost
+duplication as the changelog rather than a silent redirect.
+
+**Score:** 5
+
+### Pull Request
+
+Isolate the workflow from the consumer's repo root
+
+Plugins: workflow-davekjohn
+
+[PR #890](https://github.com/DaveKJohn/claude-code-specialists/pull/890)
+
+---
+
 ## DEPLOY: `fix/remove-prompt-inbox-v1` · 20260825-155219
 
 Removed the prompt-inbox mechanism entirely (issue #882, Dave): the `workflow-davekjohn/prompts/`
