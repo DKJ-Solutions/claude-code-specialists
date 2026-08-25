@@ -25,6 +25,30 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `docs/development-portable-rename-v1` · 20260825-222427
+
+Renamed `DEVELOPMENT-CYCLE-portable.md` to `DEVELOPMENT-portable.md` and repointed every reference
+to it repo-wide, so the manual's name no longer contradicts the working file it describes
+(`development-cycle.md`, not `development-cycle-cycle`).
+
+**Score:** 1 — cosmetic naming cleanup; no behavior, script contract, or consumer-facing change.
+
+### What makes this PR extra special
+
+N/A — an internal doc rename, nothing a subscriber of the service would ever see.
+
+**Score:** N/A
+
+### Pull Request
+
+Rename DEVELOPMENT-CYCLE-portable.md to DEVELOPMENT-portable.md and update every reference
+
+Plugins: workflow-davekjohn
+
+[PR #893](https://github.com/DaveKJohn/claude-code-specialists/pull/893)
+
+---
+
 ## DEPLOY: `feat/isolate-workflow-from-consumer-root-v1` · 20260825-204036
 
 Nothing changes for this repo's own release runs today — the computed defaults exempt the source repo
