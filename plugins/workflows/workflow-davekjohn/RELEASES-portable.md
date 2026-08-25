@@ -185,17 +185,22 @@ rewritten — literally the whole changelog, generated in full by `cut-release.p
 the per-PR record a developer goes back to, which is why it is never edited down: a summary of it is what
 the hand-written note is for.
 
-**It is the one document that still groups by tier**, and that is a difference from `CHANGELOG.md` rather
-than a copy of it: `## Tier <n> - <audience>` first, then that tier's entries as a flat ranked list in the
-order the fold left them. The changelog dropped its tier headings in the same change that made the entry
-declare its own reach; this document keeps them because it carries all three tiers at once and is the only
-place a reader needs them separated.
+**It renders at `CHANGELOG.md`'s own heading levels** — since August 25, 2026 the structure is the
+changelog's, entry for entry. Each tier's entries follow one another as a flat ranked list in the order the
+fold left them, highest tier first, with no heading marking where one tier stops and the next begins. It
+used to open each group with `## Tier <n> - <audience>`, which put every heading in this document one level
+deeper than the changelog the entries were copied out of — and this is the document a hand-written note is
+copied *from*, so the copy has to paste at the level it was written at. The tier still decides the order; it
+no longer prints a heading to say so, because *where a change reached* is a claim about attribution and this
+document is the record of *what changed*. Each entry states its own reach, so nothing is lost with the
+heading: a reader who wants the tier reads it off the entry.
 
-Each entry arrives whole, exactly as it was folded — its `###` heading naming the **branch**, and beneath it
-the same `####` sections the scaffolder wrote on the day it was folded, one heading level deeper than in
-`CHANGELOG.md` — today `What makes this PR extra special` and `Pull Request`, with tier 0's answer sitting
+Each entry arrives whole, exactly as it was folded — its `##` heading naming the **branch**, and beneath it
+the same `###` sections the scaffolder wrote on the day it was folded, at the very levels `CHANGELOG.md`
+carries them — today `What makes this PR extra special` and `Pull Request`, with tier 0's answer sitting
 directly under the entry's own heading and carrying none of its own, and for an older entry whichever
 wording it was written with.
+
 Nothing is rewritten and nothing is cut, which is what "the record" means. There are no
 branch-type categories in between — the grouping came from the branch prefix, which this repo measured does
 not predict impact. Tier 0 is in it, unlike in the hand-written note below.

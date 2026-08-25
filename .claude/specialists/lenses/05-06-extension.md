@@ -219,9 +219,11 @@ in the closing report of every release.**
 
 The `releases/` directory (modeled on life-hub):
 - **`releases/development/<X>.x/<X.Y.Z>.md`** — the full release notes: **every** pending entry, tier 0
-  included, grouped by **tier** and, inside a tier, a flat list in ranked order
-  (`## Tier 2 - consumers` → `### <title>` → `#### What does this change do?`). Literally the whole
-  changelog, which is what makes this the record rather than a summary of one — including each entry's
+  included, ordered by **tier** and, inside a tier, ranked — one flat list at `CHANGELOG.md`'s own levels
+  (`## <title>` → `### What makes this PR extra special`), with no tier heading in between since
+  August 25, 2026 ([#881](https://github.com/DaveKJohn/claude-code-specialists/issues/881)): this is the
+  document a hand-written note is copied *from*, so it pastes at the level it was written at. Literally the
+  whole changelog, which is what makes this the record rather than a summary of one — including each entry's
   impact table, since the cut empties `CHANGELOG.md` and this becomes the last place each ranking's
   justification lives. Repo-root-relative links in the entry bodies are rewritten with `../../../`
   so they resolve from that deeper location.
