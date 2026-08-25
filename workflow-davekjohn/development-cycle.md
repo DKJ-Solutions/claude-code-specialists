@@ -101,19 +101,33 @@ below is which order Dave wants.
   an already-large diff. Lint check 23 (`[plugin-kind]`, `check-plugin-integrity.ps1`) currently pairs the
   `workflow-` id prefix with living under `plugins/workflows/`; if the id drops that prefix, this check's
   rule needs restating regardless of A's answer.
+
+  
+  Dave's answer: No, everything that refers to workflows is changed to contributing. So plugins/workflows as well. Change it to plugins/contributing
+
+  
 - **B. Migration path for the 3 registered consumers + this repo, all on `workflow-davekjohn@claude-code-specialists: true` today.**
   A marketplace rename makes that id resolve to nothing at their next `claude plugin marketplace update`.
   Options: (i) accept the breakage, follow up with a manual PR per consumer repo — Dave owns all four
   checkouts, so this is small in absolute terms; (ii) a temporary alias/shim plugin id that points at the
   new one; (iii) something else. No CREATE work starts on this until Dave picks.
+
+  Dave's answer: Option 1. I accept the breakage. I'm the only consumer so I it's something I can fix easily myself.
+
+  
 - **C. Retire the "exactly one workflow" exclusivity guard, or keep it for a category that (for now) holds
   one plugin?** If retired: `workflow-sessioncheck` (in `team-alpha`), the "At most one, ever" section of
   `plugins/workflows/README.md`, and its test coverage all become dead machinery to remove. If kept: it
   still needs to stop matching on a `workflow-` prefix that will no longer exist.
+
+  Dave's answer: Yes retire workflow completely. 
+  
 - **E. Sequencing against `feat/isolate-workflow-from-consumer-root-v1`.** ~~Land the isolation branch
   first...~~ **RESOLVED (Dave, August 25, 2026), and widened.** This rename is the last of a four-issue
   set that all edit the same shared libs — see below. Order: **#882 → #885 → #884 → this branch (#886)**,
   each its own branch/PR, so this rename only ever touches settled ground.
+
+  
 
 **The wider picture, found while researching this branch: #886 is one of four open issues that all edit
 `workflow-davekjohn`'s shared libs, and running them independently would collide.**
