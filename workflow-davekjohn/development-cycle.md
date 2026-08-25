@@ -41,10 +41,40 @@ said, so this file stands on its own if the issue is ever unavailable.
   placement loop puts every target behind a `Test-Path`, reporting `[exists] ... left as it is`. So the
   overwrite the issue describes — a consumer's existing `releases/` being replaced — cannot happen at
   adoption. The issue's premise is repaired for the scaffold; what remains is elsewhere.
-- [x] **Two of the three folders the issue names do not exist.** `research/` and `projectmanagement/`
-  occur nowhere in the tree — not in the plugin, the scripts, the skills or the portable pages. Nothing
-  creates them, so nothing is relocated for them. The rule has to hold for folders not yet written,
-  which is a stronger requirement than relocating three.
+- [x] **`research/` and `projectmanagement/` are created by nobody in this plugin — and
+  `projectmanagement/` nevertheless exists, in a consumer.** Corrected after Dave pointed at
+  `BWJ-ecommerce/smartwatchbanden` (August 25, 2026); the first measurement grepped this tree, and a
+  consumer-owned folder is invisible to that. What the tree does say:
+  `TICKETWORK-portable.md` governs that layer and prescribes **no folder, no filename and no script** —
+  "Nothing below prescribes a filename, a folder, a language, or a set of section headings. Those are
+  yours" — and its closing section declines a template and a scaffolding script explicitly, pending a
+  second consumer. So the folder is that consumer's own naming choice, not plugin payload.
+- [x] **Which inverts that part of the issue, and is the most important thing this exploration found.**
+  The issue reads "everything that the plugin creates, like the releases, research, projectmanagement
+  folders, has to be placed inside the workflow-davekjohn folder." `projectmanagement/` is **not**
+  plugin-created, so moving it into `workflow-davekjohn/` would be the plugin annexing a folder the
+  consumer built — the exact opposite of the isolation this branch exists for. The rule protects it
+  where it stands; it does not relocate it. This is also why the rule has to be stated as provenance
+  ("never write a path it did not create") rather than as location: a location rule cannot tell these
+  two cases apart.
+- [x] **TICKETWORK is optional and single-consumer, and the scaffolded README misrepresents that**
+  (Dave, August 25, 2026). Every repo that installs the workflow always uses `CONTRIBUTING-portable.md`,
+  `DEVELOPMENT-CYCLE-portable.md` and `RELEASES-portable.md`; `TICKETWORK-portable.md` is used by
+  `smartwatchbanden` alone, and its own provenance section says so — built there on 2026-08-11 and
+  donated upward "without the duplication that normally earns a promotion", one repo rather than two.
+  But `adopt-workflow-folder.ps1:119` writes the four into every consumer's folder README as one flat
+  row of equals, so a repo that will never run a tracker is told it has four portable pages to answer.
+  Fix belongs in this cycle: it is one string in the scaffold, and it is the same defect class as the
+  rest of the branch — the plugin overstating what it needs from a consumer.
+- [x] **The root `*.md` namespace claim is already a known hazard, with two documented workarounds
+  telling the consumer to dodge the plugin.** `TICKETWORK-portable.md`'s closing note: "if your ticket
+  files live in the repo root as `*.md`, they will look like unfolded changelog entries to the release
+  cut. Put them in a directory, or add them to your `Get-ReservedRootMd`." And
+  `CONTRIBUTING-portable.md:317` says the same for a root `CONTRIBUTING.md`: a repo that overrides the
+  list and forgets its own document "meets a refusal at its next release, naming the new document as an
+  entry somebody failed to fold." Two portable pages carrying workarounds for one namespace claim is the
+  evidence for inverting that sweep to an allowlist of paths the plugin itself placed — and it is likely
+  why `smartwatchbanden` put its tickets in a directory to begin with.
 - [x] **The real surface is ten root paths, not three**, failing in four different ways: hard-coded with
   no seam (`CHANGELOG.md`), hard-coded by deliberate decision (`releases/development/`,
   `releases/github/`, `releases/internal/`), repointable but defaulting to the root
@@ -127,10 +157,19 @@ said, so this file stands on its own if the issue is ever unavailable.
 2. The permanence guarantee written into `CLAUDE.md`, the portable pages and `UNINSTALL.md`, including
    the `development-cycle.md` precision.
 3. The `releases/` roots, per the open decision above.
-4. The provenance preflight, as the backstop rather than the primary defence.
-5. `.github/` and `scripts/` stay where they are, documented as the two named exceptions — so the rule is
+4. The provenance preflight, as the backstop rather than the primary defence — and the root `*.md` sweep
+   inverted to an allowlist, which retires both portable-page workarounds instead of documenting them
+   better.
+5. **TICKETWORK's optionality in the scaffolded folder README** (`adopt-workflow-folder.ps1:119`): three
+   pages every consumer answers, one they answer only if their work arrives from somebody else's
+   tracker. One string, and it belongs to this branch's subject.
+6. `.github/` and `scripts/` stay where they are, documented as the two named exceptions — so the rule is
    stated as "never touches anything it did not create, and everything it creates is either inside its
    folder or in a path the consumer named" rather than the unachievable "never touches the root".
+
+**And one explicit non-goal, so nobody builds it:** `projectmanagement/` and any `research/` folder in a
+consumer are **not** relocated into `workflow-davekjohn/`. They are the consumer's, and annexing them
+would be this branch defeating its own purpose.
 
 ## CREATE
 
