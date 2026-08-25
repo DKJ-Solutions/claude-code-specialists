@@ -169,8 +169,12 @@ if ($override) { foreach ($k in $override.Keys) { $w[$k] = $override[$k] } }
 # SEAMED (issue #885, group E), and MUST AGREE WITH cut-release.ps1's OWN READ of the same two roots --
 # both are Get-SeamValue reads of the same seam names, falling back to the same computed defaults, so a
 # repo that configures either seam is read the same way by both scripts.
-$devRel = "$(Get-SeamValue -Name 'Get-ReleaseDevelopmentNotesRoot' -Default (Get-DefaultReleaseDevelopmentNotesRoot -RepoRoot $RepoRoot))/$notesDir/$verNum.md"
-$intRel = "$(Get-SeamValue -Name 'Get-ReleaseInternalNotesRoot' -Default (Get-DefaultReleaseInternalNotesRoot -RepoRoot $RepoRoot))/$notesDir/$verNum.md"
+$devRootRel = Get-SeamValue -Name 'Get-ReleaseDevelopmentNotesRoot' -Default (Get-DefaultReleaseDevelopmentNotesRoot -RepoRoot $RepoRoot)
+Assert-WorkflowIsolatedSeamPath -RepoRoot $RepoRoot -RelativePath $devRootRel -SeamName 'Get-ReleaseDevelopmentNotesRoot'
+$intRootRel = Get-SeamValue -Name 'Get-ReleaseInternalNotesRoot' -Default (Get-DefaultReleaseInternalNotesRoot -RepoRoot $RepoRoot)
+Assert-WorkflowIsolatedSeamPath -RepoRoot $RepoRoot -RelativePath $intRootRel -SeamName 'Get-ReleaseInternalNotesRoot'
+$devRel = "$devRootRel/$notesDir/$verNum.md"
+$intRel = "$intRootRel/$notesDir/$verNum.md"
 $devFile = Join-Path $RepoRoot ($devRel -replace '/', '\')
 $intFile = Join-Path $RepoRoot ($intRel -replace '/', '\')
 

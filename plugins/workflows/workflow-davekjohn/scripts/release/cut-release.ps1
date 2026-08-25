@@ -293,6 +293,7 @@ $notesGrouping = Get-SeamValue -Name 'Get-ReleaseNotesGrouping' -Default 'major'
 # a consumer is isolated into workflow-davekjohn/releases/history.md by default. See
 # Get-DefaultReleaseHistoryPath's own doc comment for the reversal and the accepted cost.
 $historyRelPath = Get-SeamValue -Name 'Get-ReleaseHistoryPath' -Default (Get-DefaultReleaseHistoryPath -RepoRoot $repoRoot)
+Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $historyRelPath -SeamName 'Get-ReleaseHistoryPath'
 # The computed fallback is a fact, not a guess: no marketplace manifest means there are no plugins to
 # version or card. Stated in repo-config here anyway, because in this repo the answer is load-bearing.
 $pluginTier    = Get-SeamValue -Name 'Get-ReleasePluginTier' `
@@ -360,7 +361,9 @@ $noteRootRelPath = Get-SeamValue -Name 'Get-ReleaseNoteRoot' -Default 'releases/
 # all three name the SAME generated-notes tree at different tiers, and new-internal-note.ps1 must agree
 # with the last two -- see its own matching seam reads.
 $devNotesRootRelPath = Get-SeamValue -Name 'Get-ReleaseDevelopmentNotesRoot' -Default (Get-DefaultReleaseDevelopmentNotesRoot -RepoRoot $repoRoot)
+Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $devNotesRootRelPath -SeamName 'Get-ReleaseDevelopmentNotesRoot'
 $githubNotesRootRelPath = Get-SeamValue -Name 'Get-ReleaseGithubNotesRoot' -Default (Get-DefaultReleaseGithubNotesRoot -RepoRoot $repoRoot)
+Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $githubNotesRootRelPath -SeamName 'Get-ReleaseGithubNotesRoot'
 
 # How many minors a major line must have had before a major may be cut. A major here is a RECAP of the
 # minors before it, so what earns one is their accumulation -- 10 in this repo. Repo-owned because it is
@@ -381,20 +384,18 @@ function Write-Utf8NoBom([string]$Path, [string]$Content) {
     [System.IO.File]::WriteAllText($Path, $Content, $Utf8NoBom)
 }
 
-# Permanent root .md files that are NOT branch changelog entries. The stray-entry guardrail below
-# treats every other root *.md as an unfolded entry (deliberately catch-all, so an entry with an
-# unknown branch prefix is never missed) -- so any permanent root doc added over time must be listed,
-# or a release would falsely refuse to cut.
+# Root .md files this repo has named as permanent, checked FIRST as a manual override: never scanned
+# regardless of content. No longer load-bearing for safety (see the content check below), so a repo
+# that defines nothing and adds a new root doc is still safe -- but naming one here still costs nothing
+# and settles it outright for a repo that would rather not rely on the content test.
 #
 # THE LIST MOVED TO THE SEAM IN #417 and no longer lives here. It had gone stale three times, each
 # time blocking a release over a document nobody had failed to fold (#165, then QUICKSTART.md +
-# UNINSTALL.md in #405, then ADOPTION.md in #408) -- and once this script is shared, which root docs
-# a repo has is by definition not something the script can know. The fallback below is the workshop's
-# own list, so a consumer that defines nothing still gets the behaviour this script always had -- and
-# it tracks that list rather than a snapshot of it: the install and uninstall pages left the root for
-# plugins/, so they left here too. A fallback that kept naming them would not have blocked anything,
-# but it would have described a root the workshop no longer has, which is how this list went stale the
-# first three times.
+# UNINSTALL.md in #405, then ADOPTION.md in #408) -- three incidents that were the actual reason the
+# stray-entry test below no longer treats "not on this list" as the danger signal (issue #885, group
+# D). The fallback below is the workshop's own list, so a consumer that defines nothing still gets the
+# override this script always had -- and it tracks that list rather than a snapshot of it: the install
+# and uninstall pages left the root for plugins/, so they left here too.
 $reservedRootMd = @(Get-SeamValue -Name 'Get-ReservedRootMd' -Default @(
     'CHANGELOG.md', 'CLAUDE.md', 'README.md', 'LICENSE.md', 'CONTRIBUTING.md', 'SECURITY.md'))
 
@@ -437,9 +438,20 @@ $branch = (git rev-parse --abbrev-ref HEAD).Trim()
 if ($branch -ne 'main') { Write-Error "A release is cut directly on main; you are on '$branch'."; exit 1 }
 if ((git status --porcelain)) { Write-Error "Working tree not clean -- commit/stash first."; exit 1 }
 
-$strayEntries = Get-ChildItem -Path $repoRoot -Filter '*.md' -File |
+# ISSUE #885, GROUP D: inverted from a name blocklist to a CONTENT test. The old form treated every
+# root *.md not on $reservedRootMd as an unfolded entry -- catch-all by name, so any permanent doc a
+# consumer added had to be listed there too, or a release falsely refused to cut over a file nobody
+# forgot to fold (measured three times: #165, #405, #408). An entry is recognisable by what it IS, not
+# by what it is not: Test-BranchChangelogIsFilled is the same predicate the branch's own document is
+# held to (see the branch/ guard just below), and it is true only for a document that either declares a
+# non-trunk branch or opens with an entry-level heading (## or ###) -- a shape a consumer's own README,
+# ticket file or ADOPTION.md essentially never has, since those open with a plain # title. So a new
+# permanent root doc is safe with NO configuration, and $reservedRootMd above becomes an optional
+# override rather than something that has to be kept current.
+$strayEntries = @(Get-ChildItem -Path $repoRoot -Filter '*.md' -File |
     Where-Object { $reservedRootMd -notcontains $_.Name } |
-    Select-Object -ExpandProperty Name
+    Where-Object { Test-BranchChangelogIsFilled -Text ([System.IO.File]::ReadAllText($_.FullName)) } |
+    Select-Object -ExpandProperty Name)
 if ($strayEntries.Count -gt 0) {
     Write-Error "There are still unfolded changelog entry files in the root: $($strayEntries -join ', '). Fold them first (fold-changelog-entry.ps1)."
     exit 1
@@ -591,6 +603,7 @@ if ((git tag --list $tagName)) { Write-Error "Tag $tagName already exists."; exi
 # what was wrong. Get-DefaultChangelogPath's computed default keeps this repo's own answer unchanged --
 # it publishes plugins, so the default IS 'CHANGELOG.md' -- while a consumer is isolated by default.
 $changelogRel = Get-SeamValue -Name 'Get-ChangelogPath' -Default (Get-DefaultChangelogPath -RepoRoot $repoRoot)
+Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $changelogRel -SeamName 'Get-ChangelogPath'
 $changelogPath = Join-Path $repoRoot $changelogRel
 # READ DEFENSIVELY, same reasoning fold-changelog-entry.ps1 already reads by: an absent changelog is not
 # a reason to crash, it is nothing pending -- Get-PullRequestEntriesByTier finds no block in '' correctly.

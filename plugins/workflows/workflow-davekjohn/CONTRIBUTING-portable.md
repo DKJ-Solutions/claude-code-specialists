@@ -313,13 +313,3 @@ A repo running this workflow carries **two** contributing pages, deliberately (D
 
 So adopting this workflow never rewrites your root page — the folder file arrives beside it and takes
 precedence only where they conflict.
-
-## One thing to do before you adopt a root `CONTRIBUTING.md`
-
-If your repo overrides `Get-ReservedRootMd` — the list of root `*.md` files that are permanent documents
-rather than unfolded changelog entries — **add the new document to it**. The shared default already
-contains `CONTRIBUTING`, so a repo that defines nothing is fine; a repo that lists its own set and forgets
-it meets a refusal at its next release, naming the new document as an entry somebody failed to fold. It
-costs no data, because the cut stops before writing anything, but the message points at the wrong problem.
-The same holds for every permanent root document you add: an entry for a file that is not there is inert,
-so the risk runs one way only.

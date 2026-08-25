@@ -214,43 +214,97 @@ Nothing here is built yet — this is the checklist only (Dave, August 25, 2026)
 
 ### B — The permanence guarantee, written down
 
-- [ ] **State the guarantee**: no command in this plugin removes `workflow-davekjohn/`, and no future
+- [x] **State the guarantee**: no command in this plugin removes `workflow-davekjohn/`, and no future
   teardown may. Uninstalling removes the plugin; the released record stays with the repo that released
-  it.
-- [ ] **Carry the `development-cycle.md` precision with it** wherever the guarantee is stated — the fold
+  it. Done: a bullet in `adopt-workflow-folder.ps1`'s scaffolded `$folderClaude` and `$folderReadme`
+  arrays (so every new consumer reads it on day one) and in the `adopt-workflow-folder` skill's own
+  "rules it works under" list.
+- [x] **Carry the `development-cycle.md` precision with it** wherever the guarantee is stated — the fold
   deletes that file on every merge by design, it is working state rather than history, and it is removed
   only after its content moves into the changelog. Omit this and the next reader finds a `Remove-Item`
-  inside a folder documented as permanent.
-- [ ] **Place it in the layers that actually reach a consumer**: `UNINSTALL.md`, the portable pages, and
+  inside a folder documented as permanent. Done, in the same three places as above.
+- [x] **Place it in the layers that actually reach a consumer**: `UNINSTALL.md`, the portable pages, and
   the folder README that `adopt-workflow-folder.ps1` writes. The root `CLAUDE.md` gets it only insofar as
-  the fold exception's bounds change.
-- [ ] **Amend the August 19 record** in `script-contract-lib.ps1`'s `Get-ReleaseHistoryPath` entry, which
+  the fold exception's bounds change. Done: a new bullet in `UNINSTALL.md`'s "What is left behind,
+  honestly" list, bounded to `workflow-davekjohn`'s own uninstall step; the skill carries the portable
+  half. The root `workflow-davekjohn/CLAUDE.md` fold-exception bounds are unchanged by this branch (still
+  `CHANGELOG.md` + `development-cycle.md` inside the folder) — verified rather than skipped, no edit
+  needed.
+- [x] **Amend the August 19 record** in `script-contract-lib.ps1`'s `Get-ReleaseHistoryPath` entry, which
   still argues from "a folder a teardown removes". Say why that premise no longer holds rather than
-  silently flipping the value — whatever group E decides.
+  silently flipping the value — whatever group E decides. **Already done, inside `fa322cb0`** (group E's
+  own commit) — the record reads "REVERSED AGAIN, ISSUE #885 ... the durability worry that sent the list
+  back to the root is answered a different way". Found while re-reading it for this step: the
+  `adopt-workflow-folder` SKILL.md had **not** been updated to match — it still told a reader to "leave
+  [`Get-ReleaseHistoryPath`] at its default, `releases/README.md`" and argued from the exact premise the
+  contract record had already reversed. Not on this list originally, but the same file and the same
+  defect class this step exists to close — repaired alongside it rather than filed separately.
 
 ### C — TICKETWORK's optionality
 
-- [ ] **`adopt-workflow-folder.ps1:119`**: three portable pages every consumer answers
+- [x] **`adopt-workflow-folder.ps1:119`**: three portable pages every consumer answers
   (`CONTRIBUTING`, `DEVELOPMENT-CYCLE`, `RELEASES`) and one that applies only where work arrives from
   somebody else's tracker. One string; it currently writes all four into every consumer's folder README
-  as equals.
-- [ ] **Check the plugin's own `README.md:47`** against the same distinction. Its table already
+  as equals. **Already resolved, as a side effect of group A's rewrite of the same paragraph** (commit
+  `fa322cb0`, blamed): the changelog-seam edit touched this exact prose block and, while rewriting it to
+  add `CHANGELOG.md`, split the four into "three are unconditional ... a fourth, `TICKETWORK-portable.md`,
+  applies only where work arrives from somebody else's tracker; skip it if yours does not." No further
+  edit needed — verified against the current file rather than assumed from the PLAN's snapshot.
+- [x] **Check the plugin's own `README.md:47`** against the same distinction. Its table already
   describes TICKETWORK's scope per row, so this may need nothing — verify rather than assume, and record
-  which it was.
+  which it was. **Verified: needs nothing.** Row already reads "the rules for the layer *before* a
+  branch, in a repo whose work arrives from somebody else's tracker" — distinct from the other three
+  rows, unchanged by this branch.
 
 ### D — Provenance: the rule that makes the rest hold
 
-- [ ] **Invert the root `*.md` sweep to an allowlist of paths the plugin itself placed.** Today every
-  unrecognised root markdown file is read as an unfolded entry and refuses the release, with
-  `Get-ReservedRootMd` as the escape hatch — a list whose own contract record admits it "has gone stale
-  three times in the source alone".
-- [ ] **Retire the two portable-page workarounds that exist only because of that sweep** —
-  `TICKETWORK-portable.md`'s closing note and `CONTRIBUTING-portable.md:317`. They instruct consumers to
-  dodge the plugin; once the sweep is an allowlist there is nothing to dodge, and leaving them in place
-  would document a hazard that no longer exists.
-- [ ] **The preflight itself**: refuse to write any path the plugin cannot show it created. Scope it
+**Scoped with Dave first (August 25, 2026)**, per his "durable over easy" instruction: not a runtime
+provenance log (rejected — it cannot even answer the question for a consumer's OWN permanent docs, which
+the plugin never created either way, and it adds state that itself can drift), but two content/seam-based
+mechanisms that need no consumer maintenance to stay correct.
+
+- [x] **Invert the root `*.md` sweep to an allowlist of paths the plugin itself placed.** Done, but as a
+  CONTENT test rather than a name allowlist: `cut-release.ps1`'s `$strayEntries` check now calls
+  `Test-BranchChangelogIsFilled` (the same pure predicate the branch's own live document is held to) on
+  every root `*.md` not on `$reservedRootMd`, instead of treating "not listed" as the danger signal.
+  `Get-ReservedRootMd` survives as an optional manual override, no longer load-bearing — its contract
+  record in `script-contract-lib.ps1` is amended accordingly. New/updated tests in
+  `cut-release-guardrail.tests.ps1`: the wiring (calls the predicate, still consults the override list
+  first), a run of the real predicate against every one of THIS repo's own tracked root docs (zero false
+  positives — `CHANGELOG.md` is the worked case for why the override step can't be skipped, since its own
+  content, read outside that filter, genuinely fails the check), and the positive case (a legacy
+  pre-split root entry still reads as stray). All green (73 asserts).
+- [x] **Retire the two portable-page workarounds that exist only because of that sweep** —
+  `TICKETWORK-portable.md`'s closing note and `CONTRIBUTING-portable.md:317`. Done: both removed outright
+  (no dangling links; checked). The hazard they warned about (a consumer's own root doc misread as an
+  entry) no longer exists once the sweep reads content instead of a name list.
+- [x] **The preflight itself**: refuse to write any path the plugin cannot show it created. Scope it
   deliberately — this is the largest item on the branch, and it is the backstop for the paths that
-  cannot move (`.github/`, `scripts/`) rather than a replacement for groups A and E.
+  cannot move (`.github/`, `scripts/`) rather than a replacement for groups A and E. **Built narrower
+  than the literal wording, deliberately**: `Assert-WorkflowIsolatedSeamPath` (new, `seam-lib.ps1`) is the
+  backstop specifically for the FOUR seams groups A/E made isolate-by-default
+  (`Get-ChangelogPath`, `Get-ReleaseHistoryPath`, `Get-ReleaseDevelopmentNotesRoot`,
+  `Get-ReleaseGithubNotesRoot`, plus the internal-note root read the same way) — refuses before any
+  read/write if a CONSUMER's own explicit seam override resolves outside `workflow-davekjohn/` (a source
+  repo is always exempt, matching every other source/consumer test in this codebase). Wired right after
+  each of those five seam reads, in `cut-release.ps1`, `fold-changelog-entry.ps1` and
+  `new-internal-note.ps1`. **Deliberately does NOT touch `Get-ReleaseNoteRoot`** — that seam's own
+  contract record argues its root default must stay put for real existing consumers, and forcing it
+  through this assert would refuse the one seam whose whole point is not moving. `.github/` and
+  `scripts/` themselves needed no new guard: the one write there (`branch-entry.yml`) is already
+  `Test-Path`-guarded additive-only in `adopt-workflow-folder.ps1`, and nothing in this workflow writes
+  under `scripts/`.
+  **Still open, found while parking mid-session**: no dedicated unit test yet for
+  `Assert-WorkflowIsolatedSeamPath` itself (a pure function, dot-sourceable — should get its own
+  fixture: a fake consumer seam resolving outside the folder gets refused, a source repo is exempt
+  regardless, an in-folder path passes). The five call sites are wired but only exercised indirectly by
+  the existing suites (which all pass on this repo's own — always-exempt, source-repo — configuration),
+  so the refusal path itself is UNTESTED. The mirrors are regenerated
+  (`build-shared-scripts.ps1`, `build-config-blueprint.ps1`) and the suites run so far are green:
+  `cut-release-guardrail` (73), `fold-changelog` (132), `internal-note` (90), `config-blueprint` (91),
+  `script-contract` (282), `shared-scripts` (443), `repo-config` (44). **Not yet run this session**:
+  `session-status.tests.ps1` (interrupted mid-run when the session was parked) and the remainder of the
+  full suite list TEST names in this file (`adopt-workflow-folder` already passed earlier, before group D).
 
 ### E — The `releases/` roots · unblocked, Dave chose "now" over "follow-up cycle"
 

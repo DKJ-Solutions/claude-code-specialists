@@ -330,6 +330,7 @@ if ($entryFiles.Count -eq 0) {
 }
 
 $changelogRel = Get-SeamValue -Name 'Get-ChangelogPath' -Default (Get-DefaultChangelogPath -RepoRoot $repoRoot)
+Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $changelogRel -SeamName 'Get-ChangelogPath'
 $changelogPath = Join-Path $repoRoot $changelogRel
 
 # --- The document has to BE a flat list before anything is inserted into it (inbound #561) ---------

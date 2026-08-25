@@ -128,3 +128,41 @@ function Get-DefaultReleaseInternalNotesRoot {
     if (Test-IsWorkflowSourceRepo -RepoRoot $RepoRoot) { return 'releases/internal' }
     return 'workflow-davekjohn/releases/internal'
 }
+
+function Assert-WorkflowIsolatedSeamPath {
+    <#
+        THE PROVENANCE PREFLIGHT (issue #885, group D): the backstop under the four seams groups A and E
+        made isolate-by-default (Get-ChangelogPath, Get-ReleaseHistoryPath,
+        Get-ReleaseDevelopmentNotesRoot, Get-ReleaseGithubNotesRoot) plus the internal-note root read the
+        same way -- not a replacement for them. Their COMPUTED defaults are already proven isolated; what
+        this catches is a repo's own EXPLICIT override resolving somewhere it should not, e.g. a typo'd
+        Get-ChangelogPath pointing at 'README.md' and the cut truncating a file it does not own. Call this
+        right after a seam of that kind resolves, before anything is read from or written to the path.
+
+        DELIBERATELY NOT UNIVERSAL. Get-ReleaseNoteRoot is read the same way but is NOT checked here and
+        must never be: its own contract record argues, on purpose, that its default stays at the root
+        ('releases/notes') rather than moving into the folder, because real consumers already configure it
+        or rely on that literal fallback -- forcing it through this assert would refuse the one seam whose
+        whole point is to keep meaning what it meant yesterday.
+
+        A SOURCE REPO (marketplace.json present) is exempt outright: it deliberately keeps these roots at
+        its own root by its own decision (Dave, August 14, 2026), and Get-Default*'s own computed answer
+        for a source IS that root -- so a source is not a repo that could resolve "outside the folder" in
+        the sense this check is guarding against.
+
+        Refuses (Write-Error + exit 1) rather than returning a bool, matching every other guardrail in
+        cut-release.ps1: a caller that reaches this call is about to read or write the path, so a silent
+        return leaves the mistake to be discovered in the write itself, at which point it may already have
+        clobbered something.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        [Parameter(Mandatory)][string]$RelativePath,
+        [Parameter(Mandatory)][string]$SeamName
+    )
+    if (Test-IsWorkflowSourceRepo -RepoRoot $RepoRoot) { return }
+    $normalized = $RelativePath -replace '\\', '/'
+    if ($normalized -eq 'workflow-davekjohn' -or $normalized -like 'workflow-davekjohn/*') { return }
+    Write-Error "$SeamName resolved to '$RelativePath', outside workflow-davekjohn/ -- this repo is a workflow consumer (issue #885), and this seam is one of the ones that isolates into that folder by default. Nothing was read or written. If '$RelativePath' is genuinely where this belongs, move it under workflow-davekjohn/ instead of pointing the seam outside it."
+    exit 1
+}

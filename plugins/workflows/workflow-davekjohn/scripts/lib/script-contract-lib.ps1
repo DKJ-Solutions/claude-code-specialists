@@ -250,9 +250,9 @@ $script:ContractRecords = @(
     # because the bump gate it feeds is a hard refusal and a shared script must not pin every consumer to
     # one repo's release cadence.
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReservedRootMd'; Scripts = @('cut-release');
-       Adopt = 'decide'; AdoptWhy = "an allowlist entry for a file that is not there is inert, so copying does no damage -- what it does is look complete while missing the consumer's OWN permanent root docs, and each one missing refuses a release over a document nobody failed to fold. This list has gone stale three times in the source alone";
+       Adopt = 'decide'; AdoptWhy = "NO LONGER LOAD-BEARING (issue #885, group D). Until now an allowlist entry for a file that is not there was inert-but-risky in the OTHER direction -- what mattered was a permanent doc missing from it, which refused a release over a document nobody failed to fold (measured three times: #165, #405, #408). The stray-entry check this list feeds now recognises an entry by CONTENT (Test-BranchChangelogIsFilled) rather than by exclusion from this list, so a repo that answers nothing is already safe. Naming a doc here is now a manual override -- skip the content check outright for a file you would rather not rely on that test for -- not a requirement";
        Optional = $true; Default = "this workshop's own root docs (CHANGELOG, CLAUDE, README, LICENSE, CONTRIBUTING, SECURITY, QUICKSTART, ADOPTION, UNINSTALL)";
-       Returns = 'the root *.md file names that are permanent docs rather than unfolded changelog entries; every other root *.md blocks the cut, so a permanent doc missing from this list refuses a release over a file nobody failed to fold' },
+       Returns = 'root *.md file names EXEMPTED from the stray-entry content check outright, regardless of what they contain. Every other root *.md is scanned by content (does it look like an unfolded entry), not blocked on sight for being unlisted' },
     # DECIDE, NOT COPY, AND THE MARKER WAS WRONG UNTIL AUGUST 10, 2026 (inbound #560). It was justified on
     # 'major' also being the built-in fallback, so copying it "changes no behaviour" -- true of the value and
     # false of the question. This function does not state how anyone WORKS; it states what the consumer's

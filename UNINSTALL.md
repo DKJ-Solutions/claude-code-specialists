@@ -423,6 +423,12 @@ are marked as such:
 
 - **Your history stays.** `CHANGELOG.md` and release notes that mention specialists are an accurate record
   of something that happened. History is finished business and is never rewritten.
+- **`workflow-davekjohn/`, if you ran that workflow, stays too — permanently, by design** (issue #885).
+  Uninstalling `workflow-davekjohn` in Step 2 takes the plugin's skills and scripts; it does not remove
+  this folder, and no future teardown of that plugin may either — the folder holds your own changelog and
+  release history, not the plugin's. `development-cycle.md` inside it is the one exception: it belongs to
+  whichever branch was open, the fold already removed it at that branch's merge, and an uninstall does not
+  bring it back.
 - **Lenses you filled in stay**, including the orchestrator's — they are your writing. The `@`-import that
   loaded them is gone, so they survive as files nothing reads. Present, tracked, and inert.
 - **Roster rows and specialist names in your own prose stay.** No rule a script could apply safely knows
