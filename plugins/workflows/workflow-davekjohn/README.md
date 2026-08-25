@@ -45,22 +45,23 @@ this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release work
 | [`RELEASES-portable.md`](RELEASES-portable.md) | the release workflow: the tier model, what a release must earn, the release documents, and how one is cut — your own `workflow-davekjohn/releases/README.md` holds your answers and your release list |
 | [`DEVELOPMENT-CYCLE-portable.md`](DEVELOPMENT-CYCLE-portable.md) | the document a branch works in: its two halves, the dossier form, the three step marks, the version suffix, its branch-long lifetime, and what the fold does at the merge |
 | [`TICKETWORK-portable.md`](TICKETWORK-portable.md) | the rules for the layer *before* a branch, in a repo whose work arrives from somebody else's tracker: whether a request can be built as written, and how the answer is recorded. Rules and reasoning only — no template and no script, deliberately |
-| [`skills/`](skills/) | the thirteen skills a specialist invokes — this is where most of the workflow lives |
+| [`skills/`](skills/) | the twelve skills a specialist invokes — this is where most of the workflow lives |
 | [`scripts/`](scripts/) | the scripts and libs those skills run, mirrored from the source repo's own `scripts/`. **Never edit a file there** — see [its README](scripts/README.md) |
-| [`hooks/`](hooks/) | three read-only SessionStart checks that never block: `connector-sessioncheck` and `script-contract-sessioncheck` belong to running this across several repos, `prompt-sessioncheck` announces an assignment waiting in the prompt inbox and stays silent in a repo that has none |
+| [`hooks/`](hooks/) | two read-only SessionStart checks that never block, both belonging to running this across several repos: `connector-sessioncheck` and `script-contract-sessioncheck` |
 | [`blueprint/`](blueprint/) | the source's own answers to the repo-owned seam, with the reasoning behind each — read by the `adopt-config` skill |
 | [`templates/`](templates/) | the one file in this cycle that has to be **copied** rather than imported: `pull_request_template.md`. GitHub reads a PR template only from `.github/` in your own repo, so what ships here is the reference to copy and to diff against — see the [`open-pr` skill](skills/open-pr/SKILL.md) for the two promises it makes |
 
 **No `agents/`, no `manuals/`.** Those belong to a team, and a workflow that shipped one would be
 answering the question the other directory owns.
 
-## The thirteen skills
+## The twelve skills
 
 **All of them, deliberately.** This table listed nine under the heading "The nine skills" while the
 directory held twelve — `lock`, `handover` and `prompt` had each arrived without a row, and the count in
 the heading is what made the gap look like a decision. A partial list of an enumerable set is worse than
 none: a reader who finds four of their skills undocumented here cannot tell which of the two documents is
-wrong.
+wrong. `prompt` itself is gone since ([#882](https://github.com/DaveKJohn/claude-code-specialists/issues/882),
+Dave) — the count below has dropped back to twelve for a real reason this time, not a gap.
 
 **It happened again, and the shape is worth naming: dropping the count did not stop the drift, it only
 made it quieter.** `check-branch-entry` shipped without a row and stayed missing until August 21, 2026,
@@ -74,7 +75,6 @@ counts the rows. **Count when you add one.**
 | [`adopt-workflow-folder`](skills/adopt-workflow-folder/SKILL.md) | right after installing — scaffolds `workflow-davekjohn/`, the one folder in your root where everything portable gathers (an install alone writes nothing into your repo) |
 | [`adopt-config`](skills/adopt-config/SKILL.md) | first-time setup — reads the blueprint, places what states the shared way of working, proposes the rest |
 | [`new-branch`](skills/new-branch/SKILL.md) | starting any piece of work — creates the branch and its `workflow-davekjohn/development-cycle.md` in one move |
-| [`prompt`](skills/prompt/SKILL.md) | the assignment written in an editor instead of the terminal — reads `workflow-davekjohn/prompts/prompt.md` and takes it through the ordinary intake |
 | [`park`](skills/park/SKILL.md) | handing an unfinished branch to another machine: push, no PR |
 | [`open-pr`](skills/open-pr/SKILL.md) | the work is committed — runs the four gates, pushes, opens the PR with the title and body composed from the entry |
 | [`ship-pr`](skills/ship-pr/SKILL.md) | open → wait for CI → merge → fold, in one motion |

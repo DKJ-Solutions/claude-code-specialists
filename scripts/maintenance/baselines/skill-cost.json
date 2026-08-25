@@ -74,11 +74,6 @@
                                     "OnInvoke":  2400,
                                     "Version":  "4.17.0"
                                 },
-    "workflow-davekjohn/prompt":  {
-                                      "AlwaysOn":  200,
-                                      "OnInvoke":  1800,
-                                      "Version":  "4.17.0"
-                                  },
     "workflow-davekjohn/release-notes-page":  {
                                                   "AlwaysOn":  240,
                                                   "OnInvoke":  3100,

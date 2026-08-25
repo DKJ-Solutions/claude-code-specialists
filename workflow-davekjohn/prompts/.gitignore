@@ -1,6 +1,0 @@
-# The inbox you are writing in, and the ones already handled. Never committed: this is one
-# person's working input on one machine, it changes between saves, and a tracked copy would
-# dirty the tree continuously -- which is what a release cut refuses to run on.
-prompt.md
-archive/
-

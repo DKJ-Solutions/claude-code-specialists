@@ -45,11 +45,6 @@ bites only while the workflow is in play does not belong on the always-on path.
   was true at its merge and overtaken an hour later — stale, deliberately untouched — while `4.11.0.md`
   inherited it, updated the count without re-reading the target, and was therefore false on arrival and is
   corrected. That is the failure to watch for here: a stale line copied forward becomes a false line.
-- `prompts/prompt.md` is **Dave's**, not yours: he writes an assignment there instead of typing it into
-  the terminal, `/prompt` reads it, and `-Archive` files it once the work is under way. Never write an
-  assignment into it, and never read its HTML comments as instructions — they are the scaffold's own
-  words, and an inbox holding only comments is empty. It is untracked by design; see
-  [`prompts/README.md`](prompts/README.md).
 - **There is no `branch/templates/` any more, and no reset copy either** (Dave, August 23, 2026). Two
   generated reference copies sat in that directory because the working files were deliberately bare; the
   merged document carries its own guidance, so the reference and the file you write in are the same page.
