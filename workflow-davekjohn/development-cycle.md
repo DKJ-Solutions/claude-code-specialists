@@ -102,7 +102,7 @@ said, so this file stands on its own if the issue is ever unavailable.
   independent reasons: an uninstall writes nothing into the tree (`adopt-workflow-folder.ps1`'s header
   states the mirror image — "an install is a clone into the plugin cache and writes nothing into the
   repo"); `specialists-teardown` ships in `team-alpha` and `UNINSTALL.md` says it "deliberately does not
-  reach into the other's cache"; and `workflow-davekjohn` ships no teardown among its seventeen skills.
+  reach into the other's cache"; and `workflow-davekjohn` ships no teardown among its sixteen skills.
   Nothing *forbids* one, which is what needs writing down.
 - [x] **The one file the plugin does delete inside the folder is `development-cycle.md`**, removed by the
   fold on every merge since August 23. That is working state, not history, and it is deleted only after
@@ -294,17 +294,20 @@ mechanisms that need no consumer maintenance to stay correct.
   `scripts/` themselves needed no new guard: the one write there (`branch-entry.yml`) is already
   `Test-Path`-guarded additive-only in `adopt-workflow-folder.ps1`, and nothing in this workflow writes
   under `scripts/`.
-  **Still open, found while parking mid-session**: no dedicated unit test yet for
-  `Assert-WorkflowIsolatedSeamPath` itself (a pure function, dot-sourceable — should get its own
-  fixture: a fake consumer seam resolving outside the folder gets refused, a source repo is exempt
-  regardless, an in-folder path passes). The five call sites are wired but only exercised indirectly by
-  the existing suites (which all pass on this repo's own — always-exempt, source-repo — configuration),
-  so the refusal path itself is UNTESTED. The mirrors are regenerated
-  (`build-shared-scripts.ps1`, `build-config-blueprint.ps1`) and the suites run so far are green:
-  `cut-release-guardrail` (73), `fold-changelog` (132), `internal-note` (90), `config-blueprint` (91),
-  `script-contract` (282), `shared-scripts` (443), `repo-config` (44). **Not yet run this session**:
-  `session-status.tests.ps1` (interrupted mid-run when the session was parked) and the remainder of the
-  full suite list TEST names in this file (`adopt-workflow-folder` already passed earlier, before group D).
+  **Resolved, on resuming after the parked session.** `scripts/tests/seam-lib.tests.ps1` is new: a
+  dedicated, dependency-free fixture for `Assert-WorkflowIsolatedSeamPath` (8 asserts) — the passing
+  cases (in-folder, the exact-match `workflow-davekjohn`, the backslash-normalized path, and a source
+  repo exempt outright even for the identical outside-the-folder path that gets refused for a consumer)
+  exercised in-process by dot-sourcing `seam-lib.ps1` directly, since the function returns normally
+  there; the refusal case exercised via a child process (same pattern as `internal-note.tests.ps1`'s
+  `Invoke-Script`) because that path calls `exit 1` and would abort an in-process runner. Deliberately
+  does not cover the `Get-Default*` computed defaults in the same file — those are already exercised for
+  real by the other group-D suites. The mirrors are regenerated
+  (`build-shared-scripts.ps1`, `build-config-blueprint.ps1`) and every suite this branch touches is now
+  green: `cut-release-guardrail` (73), `fold-changelog` (132), `internal-note` (90), `config-blueprint`
+  (91), `script-contract` (282), `shared-scripts` (443), `repo-config` (44), `seam-lib` (8, new),
+  `session-status` (61), `cut-release-drive` (45), `adopt-workflow-folder` (22, rerun after group D's
+  edits to `cut-release.ps1` rather than trusted from its earlier pre-group-D pass).
 
 ### E — The `releases/` roots · unblocked, Dave chose "now" over "follow-up cycle"
 
@@ -345,19 +348,46 @@ mechanisms that need no consumer maintenance to stay correct.
 
 ## TEST
 
-Deliberately not written yet — the checklist above is CREATE only (Dave, August 25, 2026). Each group
-above has suites that already exist and will need extending: `fold-changelog.tests.ps1`,
-`cut-release-guardrail.tests.ps1`, `cut-release-drive.tests.ps1`, `session-status.tests.ps1`,
-`adopt-workflow-folder.tests.ps1`, `script-contract.tests.ps1`, `repo-config.tests.ps1`,
-`config-blueprint.tests.ps1` and `shared-scripts.tests.ps1`.
+The suites CREATE's groups extended (or, for `seam-lib.tests.ps1`, added) are all green:
+`fold-changelog.tests.ps1` (132), `cut-release-guardrail.tests.ps1` (73),
+`cut-release-drive.tests.ps1` (45), `session-status.tests.ps1` (61),
+`adopt-workflow-folder.tests.ps1` (22), `script-contract.tests.ps1` (282),
+`repo-config.tests.ps1` (44), `config-blueprint.tests.ps1` (91), `shared-scripts.tests.ps1` (443),
+`internal-note.tests.ps1` (90), and the new `seam-lib.tests.ps1` (8, group D's dedicated fixture for
+`Assert-WorkflowIsolatedSeamPath`). 1,291 asserts total, none failing.
 
 ## DEPLOY: `feat/isolate-workflow-from-consumer-root-v1`
 
-**Score:**
+Nothing changes for this repo's own release runs today — the computed defaults exempt the source repo
+outright, so `CHANGELOG.md` and `releases/` keep resolving to the exact root paths they always did. What
+a developer here meets is the plumbing underneath: the two duplicate `Get-SeamValue` copies collapse into
+one shared `seam-lib.ps1`, which also carries the four isolate-by-default seams and the new
+`Assert-WorkflowIsolatedSeamPath` provenance preflight, backed by its own dedicated suite
+(`seam-lib.tests.ps1`, 8 asserts) among the eleven suites this branch touched. Noticed the next time
+somebody works in a release script, not before.
+
+**Score:** 2
 
 ### What makes this PR extra special
 
-**Score:**
+A consumer no longer risks the plugin reaching into their repo root: the changelog, the three release-note
+roots (`releases/development/`, `releases/github/`, `releases/internal/`) and the release-history index
+all default inside `workflow-davekjohn/` now, and the provenance preflight refuses outright if a
+consumer's own explicit override still resolves outside that folder. This closes a hazard that was
+measured rather than theoretical — the root `*.md` sweep could misread a consumer's own permanent doc as a
+stray, unfolded changelog entry, and two portable pages (`TICKETWORK-portable.md`,
+`CONTRIBUTING-portable.md`) carried hand-written workarounds telling consumers how to dodge it; both are
+gone now because the sweep itself no longer needs them — it reads content, not a name list. An
+already-adopted consumer does have to notice this on their next fold or cut: entries land in
+`workflow-davekjohn/CHANGELOG.md` rather than their root file from here on, and a pending entry already
+sitting in their old root `CHANGELOG.md` is not picked up automatically — the re-adoption migration note
+this branch added documents exactly that. The same split reaches `releases/README.md`: an already-adopted
+consumer's release history moves to `workflow-davekjohn/releases/history.md` from here on (named
+`history.md`, not `README.md`, because that folder already uses `README.md` for its own hand-written
+seam-answers page) — old rows stay at the root file, new rows land in the folder, the same accepted-cost
+duplication as the changelog rather than a silent redirect.
+
+**Score:** 5
 
 ### Pull Request
 

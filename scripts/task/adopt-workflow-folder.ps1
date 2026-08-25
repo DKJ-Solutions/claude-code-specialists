@@ -111,10 +111,12 @@ $nl = "`n"
 # this repo's own root (README.md holds the answers, root releases/README.md holds the list) purely because
 # they sit at different directory levels; folded into the SAME directory they need different names, or the
 # scaffold below would be asked to write two documents to one path.
-$historyRelPath = Get-SeamValue -Name 'Get-ReleaseHistoryPath' -Default 'workflow-davekjohn/releases/history.md'
+$historyRelPath = Get-SeamValue -Name 'Get-ReleaseHistoryPath' -Default (Get-DefaultReleaseHistoryPath -RepoRoot $repoRoot)
+Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $historyRelPath -SeamName 'Get-ReleaseHistoryPath'
 # WHERE THIS REPO KEEPS ITS CHANGELOG (issue #885, group A). Same reasoning: the scaffold below has to
 # name the same path the cut/fold/session-status seam resolves to, not a literal that can drift from it.
-$changelogRel = Get-SeamValue -Name 'Get-ChangelogPath' -Default 'workflow-davekjohn/CHANGELOG.md'
+$changelogRel = Get-SeamValue -Name 'Get-ChangelogPath' -Default (Get-DefaultChangelogPath -RepoRoot $repoRoot)
+Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $changelogRel -SeamName 'Get-ChangelogPath'
 
 # --- What the folder contains ---------------------------------------------------------------------
 # One list, each entry a repo-relative path plus the content it gets WHEN ABSENT. The docs name their
