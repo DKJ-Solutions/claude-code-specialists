@@ -477,6 +477,115 @@ Assert-True ($curDoc -notmatch '#469') 'current shape: so its number does not re
 Assert-Equal 3 (@([regex]::Matches($curDoc, '(?m)^- \[')).Count) 'current shape: exactly three bullets -- the tier-2 pair and the tier-1 one, nothing else'
 Remove-Item -Recurse -Force -LiteralPath $cur -ErrorAction SilentlyContinue
 
+# ===================================================================================================
+# THE FLAT SHAPE (#881, August 25, 2026): no tier heading, so the ENTRY's declaration is the filter
+# ===================================================================================================
+Write-Host "The flat shape: no tier heading, the entry's own declaration decides" -ForegroundColor Cyan
+# This is what release-lib writes NOW -- entries at '##' and their sections at '###', exactly
+# CHANGELOG.md's levels, with no '## Tier <n>' wrapper above them. The container heading this script used
+# to filter on is gone, and the fallback it had ("no tier headings, take everything") would have carried
+# the tier-0 entry into a document written for colleagues. Silent, plausible, and wrong in the direction
+# that publishes repo-internal work: the same failure shape as the fabricated bullet above.
+$flatNotes = @"
+# Release notes v3.7.0
+
+**Date:** 2026-08-25
+**Type:** Minor
+
+## A consumer-facing feature
+
+### What does this change do?
+
+Body text.
+
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 4 | consumers notice |
+| 1 | 3 | colleagues too |
+
+### Type of change
+
+Feat
+
+---
+
+## Something for colleagues
+
+### What does this change do?
+
+Body text.
+
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 1 | 3 | useful |
+
+### Type of change
+
+Docs
+
+---
+
+## Repo-internal housekeeping
+
+### What does this change do?
+
+Body text.
+
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 0 | - | - |
+
+### Type of change
+
+Chore
+"@
+$flat = New-Fixture -Label 'flat-shape' -NotesContent $flatNotes -Version '3.7.0'
+$rf = Invoke-Script -Dir $flat -Version '3.7.0'
+Assert-Equal 0 $rf.Code 'flat shape: exit 0'
+$flatDoc = [System.IO.File]::ReadAllText((Join-Path $flat 'releases\internal\3.x\3.7.0.md'))
+Assert-True ($flatDoc -match '- \[Feat\] A consumer-facing feature') 'flat shape: the tier-2 entry becomes a bullet'
+Assert-True ($flatDoc -match '- \[Docs\] Something for colleagues')  'flat shape: and so does the tier-1 entry'
+Assert-True ($flatDoc -notmatch 'Repo-internal housekeeping') `
+    'flat shape: the tier-0 entry is filtered out on ITS OWN declaration, with no heading to read it from'
+Assert-Equal 2 (@([regex]::Matches($flatDoc, '(?m)^- \[')).Count) 'flat shape: exactly two bullets'
+Remove-Item -Recurse -Force -LiteralPath $flat -ErrorAction SilentlyContinue
+
+# And the all-tier-0 case in the flat shape: the warning still names the reason rather than reporting a
+# parse failure, which is the one thing the container heading used to be needed for.
+$flatZeroNotes = @"
+# Release notes v3.8.0
+
+**Date:** 2026-08-25
+**Type:** Patch
+
+## Only housekeeping
+
+### What does this change do?
+
+Body text.
+
+### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 0 | - | - |
+
+### Type of change
+
+Chore
+"@
+$flatZero = New-Fixture -Label 'flat-allzero' -NotesContent $flatZeroNotes -Version '3.8.0'
+$rfz = Invoke-Script -Dir $flatZero -Version '3.8.0'
+Assert-Equal 0 $rfz.Code 'flat shape, all tier 0: exit 0'
+Assert-True ($rfz.Out -match 'is tier 0') 'flat shape, all tier 0: the warning names the tier, not a parse failure'
+Remove-Item -Recurse -Force -LiteralPath $flatZero -ErrorAction SilentlyContinue
+
 Write-Host "Notes whose every entry is tier 0: an empty list, with the reason" -ForegroundColor Cyan
 # Reachable only through -SkipTierGate (the cut refuses such a release), which is exactly why the message
 # has to distinguish it from "the notes did not parse" -- one is a bypassed judgement, the other a defect.

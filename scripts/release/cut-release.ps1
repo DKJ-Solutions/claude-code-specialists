@@ -866,9 +866,10 @@ if ($SummaryFile) {
     }
 }
 
-# The development notes are grouped BY TIER, each tier a flat ranked list of entries -- the same shape
-# CHANGELOG.md has, which is what makes this tier "the whole changelog, raw and complete". A repo whose
-# entries declare no tier gets one group and Build-ReleaseNotes renders the flat document it always did.
+# The development notes are ORDERED by tier, each tier a flat ranked list of entries, at CHANGELOG.md's own
+# heading levels -- literally the same shape, which is what makes this tier "the whole changelog, raw and
+# complete", and what lets a hand-written note paste an entry at the level it was written at (#881). A repo
+# whose entries declare no tier gets one group and the same document in arrival order.
 $notesContent = Build-ReleaseNotes -TierGroups $tierGroups -Version $new -Date $today -Type $typeLabel -Title $Title -Summary $summaryText
 # THE CHANGELOG IS EMPTIED, AND NOTHING IS WRITTEN BACK INTO IT (August 5, 2026). This call used to hand
 # over the version, the date, the type, the notes path and three seam values to rebuild a release block and

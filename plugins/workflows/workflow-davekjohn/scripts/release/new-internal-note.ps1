@@ -246,8 +246,22 @@ if (-not $typeLabel) {
 # consumer document -- and that inclusion is kept, because every existing note carries such entries. Tier 0 is repo-internal by definition -- it is in the developer notes, which is where the
 # record belongs, and putting it here would rebuild exactly the document this tier exists to avoid.
 #
-# NOTES WITH NO TIER HEADINGS AT ALL take everything, which is the repo-without-a-tier-split case: there
-# is no tier information to filter on, so filtering would empty the document rather than focus it.
+# WHERE THAT TIER IS READ FROM: THE ENTRY, AND ONLY THEN ITS CONTAINER (#881, August 25, 2026). This used
+# to be answered by the '## Tier <n>' heading the developer notes grouped their entries under, and that
+# heading is gone -- the notes render at CHANGELOG.md's own levels now. Falling back to "no tier headings
+# means take everything" would have carried every tier-0 entry into the document tier 0 exists to stay out
+# of, with no error and plausible output: the failure mode this file already pays for twice.
+#
+# So the entry's OWN declaration decides, via Resolve-EntryImpact -- the same reader
+# Get-PullRequestEntriesByTier groups on, so the two cannot disagree about what an entry claims. The
+# container heading stays as the FALLBACK, because it is the only tier information an archived note carries
+# whose entries pre-date the declaration entirely, and this script takes a VERSION: it can be run against
+# any release ever cut.
+#
+# NOTES WITH NO TIER INFORMATION AT ALL take everything, which is the repo-without-a-tier-split case: there
+# is nothing to filter on, so filtering would empty the document rather than focus it. Read from BOTH
+# sources -- a declared entry anywhere, or a tier heading anywhere -- because either one alone would answer
+# 'untiered' for a document the other can read.
 $bullets = New-Object System.Collections.Generic.List[string]
 
 $hasTierHeadings = [regex]::IsMatch($dev, '(?m)^##\s+Tier\s+\d+\b')
@@ -274,6 +288,7 @@ for ($i = 0; $i -lt $devLines.Count; $i++) {
 }
 
 $currentTier = $null
+$found = New-Object System.Collections.Generic.List[pscustomobject]
 for ($h = 0; $h -lt $heads.Count; $h++) {
     $head = $heads[$h]
 
@@ -313,11 +328,6 @@ for ($h = 0; $h -lt $heads.Count; $h++) {
     }
     if (-not $isEntry) { continue }
 
-    if ($hasTierHeadings -and ($null -eq $currentTier -or $currentTier -lt 1)) {
-        if ($currentTier -eq 0) { $skippedTier0++ }
-        continue
-    }
-
     $block = (@($devLines[$head.Index..$blockEnd]) -join "`n")
     # Re-levelled to the format's own depth so the section readers find what they look for, whatever depth
     # this document renders at.
@@ -329,7 +339,27 @@ for ($h = 0; $h -lt $heads.Count; $h++) {
     $title = (((Convert-EntryHeadingToTitle -EntryText $devLines[$head.Index]) -split "`r?`n")[0] -replace '^#+\s+', '').Trim()
 
     if (-not $title) { continue }
-    if ($type) { $bullets.Add("- [$type] $title") } else { $bullets.Add("- $title") }
+
+    # THE ENTRY'S OWN REACH FIRST, ITS CONTAINER SECOND -- collected rather than filtered here, because
+    # whether this note is tiered at all is a property of the WHOLE document and cannot be known until
+    # every entry has been read.
+    $impact = Resolve-EntryImpact -EntryText $canonical
+    $found.Add([pscustomobject]@{
+        Tier     = if ($impact.Declared) { [int]$impact.Tier } else { $currentTier }
+        Declared = [bool]$impact.Declared
+        Bullet   = if ($type) { "- [$type] $title" } else { "- $title" }
+    })
+}
+
+# A tiered note is one where SOMETHING declares a tier: an entry, or a grouping heading. Where nothing
+# does, every entry comes over -- see the comment above the walk.
+$hasTierInfo = $hasTierHeadings -or (@($found | Where-Object { $_.Declared }).Count -gt 0)
+foreach ($item in $found) {
+    if ($hasTierInfo -and ($null -eq $item.Tier -or [int]$item.Tier -lt 1)) {
+        if ($null -ne $item.Tier -and [int]$item.Tier -eq 0) { $skippedTier0++ }
+        continue
+    }
+    $bullets.Add($item.Bullet)
 }
 
 if ($bullets.Count -eq 0) {

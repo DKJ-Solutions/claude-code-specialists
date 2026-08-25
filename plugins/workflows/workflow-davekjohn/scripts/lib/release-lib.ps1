@@ -479,7 +479,13 @@ function Get-PullRequestEntriesByTier {
         The pending entries PER TIER, highest tier first: an array of objects with
 
           Tier      the tier as an int
-          Heading   the heading a generated release document gives that tier ('Tier 2 - consumers')
+          Heading   the tier's audience wording ('Tier 2 - consumers'). NO GENERATED DOCUMENT PRINTS IT
+                    ANY MORE since #881 (August 25, 2026) -- the development notes render at
+                    CHANGELOG.md's own levels, with no grouping heading. Kept rather than deleted: it is
+                    the single source of that wording, every development note ever cut carries it, and
+                    removing a published field of this contract is a separate decision from the level
+                    defect this change repaired. Same answer, and for the same reason, as the one v4.8.0
+                    already recorded for this heading.
           Entries   its entry blocks, in document order
           Declared  how many of those entries actually DECLARED their impact
 
@@ -488,8 +494,8 @@ function Get-PullRequestEntriesByTier {
 
           the flat list  -- the per-plugin CHANGELOGs and the RELEASE.md cards, which select on the
                             'Plugins:' line and do not care how far a change reaches;
-          per tier       -- the release notes (one section per tier), the consumer document (tier 2 only) and the
-                            cut's bump gate (which tiers are pending at all).
+          per tier       -- the release notes (which order and rank on it), the consumer document (tier 2
+                            only) and the cut's bump gate (which tiers are pending at all).
 
         THE TIER NOW COMES FROM THE ENTRY, which is the reversal this change is about. It used to come from
         the changelog SECTION an entry sat in, and this function's own header said deriving it from the
@@ -1034,9 +1040,13 @@ $script:ReleaseTierAudience = @{
 }
 
 function Get-ReleaseTierHeading {
-    <# The heading text for a tier in a generated release document, e.g. 'Tier 2 - consumers'. A tier
-       with no audience word in the map degrades to 'Tier <n>' rather than to a blank -- an unfamiliar
-       number is readable, a dangling separator is not. #>
+    <# The audience wording for a tier, e.g. 'Tier 2 - consumers'. A tier with no audience word in the map
+       degrades to 'Tier <n>' rather than to a blank -- an unfamiliar number is readable, a dangling
+       separator is not.
+
+       NOTHING RENDERS IT SINCE #881 (August 25, 2026): it was the development notes' grouping heading, and
+       those notes now render at CHANGELOG.md's own levels. It stays for the reason the Heading field above
+       states -- the wording every note ever cut carries, in one place. #>
     param([Parameter(Mandatory)][int]$Tier)
     $audience = $script:ReleaseTierAudience[$Tier]
     if ($audience) { return "Tier $Tier - $audience" }
@@ -1091,17 +1101,23 @@ function Build-ReleaseNotes {
         keeps its CRLF style via $nl. The entries come from that CRLF root CHANGELOG -- so here they
         are explicitly normalized to LF (#103, Victor #5), alongside the link rewriting below.
 
-        TWO SHAPES, ONE FUNCTION (the tier model, August 5, 2026):
+        TWO SHAPES, ONE FUNCTION (the tier model, August 5, 2026) -- AND SINCE #881 THEY DIFFER ONLY IN
+        ORDER, NOT IN LEVEL. Both render entries at '##' and their sections at '###', which is exactly what
+        CHANGELOG.md writes, so an entry copied out of this document pastes at the level it was written at:
 
-          -TierGroups  the pending entries grouped by tier. Renders one '## Tier <n> - <audience>'
-                       section per tier IN THE ORDER GIVEN, its entries as a flat list one level under
-                       it ('### <entry>'). This is the document the tier model produces: complete, raw,
-                       and structured the way CHANGELOG.md itself is. A tier with no entries is omitted.
-          -Entries     one flat list, entries at '##'. For a repo whose entries declare no tier at all:
-                       every one reads as tier 0, and a single '## Tier 0' wrapper around the whole
-                       document would be a level of structure that says nothing.
+          -TierGroups  the pending entries grouped by tier. Renders each tier's entries IN THE ORDER GIVEN,
+                       ranked within the tier, as one continuous flat list -- no grouping heading. A tier
+                       with no entries contributes nothing.
+          -Entries     one flat list in arrival order. For a repo whose entries declare no tier at all:
+                       every one reads as tier 0, so there is no order for a tier to impose.
 
         Give one or the other; -TierGroups wins if both arrive.
+
+        THE GROUPING HEADING IS GONE ON PURPOSE (Dave, #881, August 25, 2026). It was the last thing in the
+        pipeline that demoted this document a level relative to its own source, and the reason it was
+        accepted -- that it marked the boundary between what reached a consumer and what stayed internal --
+        is a claim about ATTRIBUTION, which the repo's own documentation is the right place for. The record
+        stays a record: what changed, at the levels it was written at.
     #>
     param(
         [AllowEmptyCollection()][string[]]$Entries = @(),
@@ -1132,23 +1148,35 @@ function Build-ReleaseNotes {
             $groupEntries = @($group.Entries | Where-Object { $_ -and $_.Trim() })
             if ($groupEntries.Count -eq 0) { continue }
             $linked = @($groupEntries | ForEach-Object { Convert-RootRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
-            # Entries one level under the tier heading, their own sections one level under that:
-            # '## Tier 2 - consumers' -> '### <entry>' -> '#### What does this change do?'.
+            # NO TIER HEADING, AND THE ENTRIES SIT AT '##' -- EXACTLY CHANGELOG.md'S LEVELS (Dave, #881,
+            # August 25, 2026). This group used to render as '## Tier 2 - consumers' with its entries one
+            # level under it, which put every heading in this document one level DEEPER than the changelog
+            # the entries were copied out of: 35 entries at '###' where the source had written them at
+            # '##'. The changelog is what a release note is copied FROM, so the copy has to paste at the
+            # level it was written at. The tier still decides the ORDER -- the groups arrive highest-first
+            # and each is ranked below -- it simply no longer prints a heading to say so.
             #
             # RANKED FROM TIER 1 UP, AND DELIBERATELY NOT AT TIER 0 (issue #467). Tier 0 is the RECORD --
             # complete and chronological, which is what a record is for -- and its entries are never asked
             # for a score in the first place. Unranked here means DOCUMENT ORDER, which is the order the
             # fold left CHANGELOG.md in, so tier 0 inherits a defined order rather than losing one.
             #
-            # THE DECLARATIONS ARE NOT STRIPPED HERE, and this is the one document where they survive. The
-            # cut EMPTIES the changelog, so these notes are the last place holding the reason behind each
+            # THE SCORES ARE NOT STRIPPED HERE, and this is the one document where they survive. The cut
+            # EMPTIES the changelog, so these notes are the last place holding the reason behind each
             # ranking; deleting it would leave every order asserted with its justification thrown away. The
-            # documents that travel outward strip it -- see Build-ConsumerNotes.
+            # documents that travel outward strip it -- see Build-ConsumerNotes. What does NOT survive the
+            # heading's removal is the tier NUMBER: an entry states its scores and never names its tier, so
+            # that heading was carrying the attribution alone. Dropping it is the deliberate half of #881 --
+            # this document is the record of WHAT CHANGED, and where each change reached is answered by the
+            # repo's own documentation rather than by a wrapper around the record.
             $rankByTier = if ([int]$group.Tier -ge 1) { [int]$group.Tier } else { 0 }
-            $inner = Format-RankedEntries -Entries $linked -EntryLevel 3 -RankByTier $rankByTier
-            $sections += ("## " + (Get-ReleaseTierHeading -Tier ([int]$group.Tier)) + "`n`n" + $inner)
+            $sections += (Format-RankedEntries -Entries $linked -EntryLevel 2 -RankByTier $rankByTier)
         }
-        $body = ($sections -join "`n`n")
+        # THE SAME SEPARATOR BETWEEN GROUPS AS WITHIN ONE. Format-RankedEntries joins its own entries with
+        # '---'; with the heading gone, joining the groups on a bare blank line would make the tier seam
+        # visible by the ABSENCE of a rule -- the single boundary in the document where two entries are not
+        # divided, which is a heading in all but name. Every entry boundary now reads identically.
+        $body = ($sections -join "`n`n---`n`n")
     } else {
         $linked = @($Entries | ForEach-Object { Convert-RootRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
         $body = Format-RankedEntries -Entries $linked -EntryLevel 2

@@ -584,27 +584,34 @@ Assert-Match $notes '^# Release notes v3\.5\.0' 'heading with version'
 Assert-Match $notes '\*\*Date:\*\* 2026-08-05' 'date line'
 Assert-Match $notes '\*\*Type:\*\* Minor' 'type line'
 Assert-Match $notes 'A title' 'title included'
-Assert-Match $notes '(?m)^## Tier 2 - consumers$' 'the tier heading names its audience'
-Assert-Match $notes '(?m)^## Tier 1 - colleagues$' 'and so does tier 1'
-Assert-Match $notes '(?m)^## Tier 0 - developers$' 'and tier 0'
-Assert-Match $notes ('(?s)## Tier 2 - consumers.*### #22 .*#### ' + $WhatRx) 'nesting: tier at ##, entry at ###, its sections at ####'
-Assert-Match $notes '(?s)## Tier 2.*## Tier 1.*## Tier 0' 'the tiers keep the order they were given'
+# THE LEVELS ARE CHANGELOG.md'S OWN (#881, August 25, 2026): entries at '##' and their sections at
+# '###', with NO grouping heading above them -- so an entry copied out of this document pastes at the
+# level it was written at. The tier still decides the order; it simply no longer prints a heading.
+foreach ($tierWord in 'Tier 2 - consumers', 'Tier 1 - colleagues', 'Tier 0 - developers') {
+    Assert-NoMatch $notes "(?m)^#+ $tierWord`$" "no '$tierWord' grouping heading"
+}
+Assert-Match $notes ('(?s)(?m)^## #22 .*^### ' + $WhatRx) 'nesting: entry at ##, its sections at ###'
+Assert-Match $notes '(?s)## #22 .*## #21 .*## #20 ' 'the tiers still decide the order, without a heading to announce it'
+# EVERY ENTRY BOUNDARY READS THE SAME, the tier seam included: a group joined on a bare blank line would
+# be the one place two entries are not divided by a rule, which is a heading in all but name.
+Assert-Equal 2 (@([regex]::Matches($notes, '(?m)^---$')).Count) 'two rules for three entries -- one per boundary, inside a tier and between tiers alike'
 # THE DEVELOPMENT NOTES ARE THE COMPLETE RECORD: tier 0 belongs in them, unlike in the other two
 # documents, and so do the declarations -- the cut EMPTIES the changelog, so this is the last place each
 # ranking's justification lives.
-Assert-Match $notes '### #20 ' 'tier-0 entries ARE in the developer notes -- this tier is the record'
+Assert-Match $notes '(?m)^## #20 ' 'tier-0 entries ARE in the developer notes -- this tier is the record'
 Assert-Match $notes '\| Tier \| Significance \| Why \|' 'the impact table survives into the record'
 Assert-Match $notes 'consumers must re-add the marketplace' "and so does each row's reason, which is the lasting half"
 # NO CATEGORY HEADINGS ANYWHERE -- the type is stated inside each entry now.
 foreach ($label in 'Features', 'Fixes', 'Maintenance') {
     Assert-NoMatch $notes "(?m)^#+ $label$" "no '$label' category heading"
 }
-Assert-Match $notes ('(?m)^#### ' + $TypeRx + '$') 'the type is stated inside the entry instead'
+Assert-Match $notes ('(?m)^### ' + $TypeRx + '$') 'the type is stated inside the entry instead'
 # An empty tier is omitted rather than printed as a heading with nothing under it.
 $sparse = @([pscustomobject]@{ Tier = 2; Entries = @($e22) }, [pscustomobject]@{ Tier = 1; Entries = @() })
 $sparseNotes = Build-ReleaseNotes -TierGroups $sparse -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
-Assert-Match $sparseNotes '(?m)^## Tier 2 - consumers$' 'a tier with entries is rendered'
-Assert-NoMatch $sparseNotes 'Tier 1' 'a tier with no entries is omitted, not written empty'
+Assert-Match $sparseNotes '(?m)^## #22 ' 'a tier with entries is rendered'
+Assert-NoMatch $sparseNotes 'Tier 1' 'a tier with no entries contributes nothing, not an empty section'
+Assert-NoMatch $sparseNotes '(?m)^---$' 'and no dangling rule where its boundary would have been'
 
 Write-Host "Build-ReleaseNotes -- ranked from tier 1 up, and deliberately not at tier 0" -ForegroundColor Cyan
 # TIER 0 IS THE RECORD: complete and chronological, which is what a record is for, and its entries are
@@ -612,20 +619,21 @@ Write-Host "Build-ReleaseNotes -- ranked from tier 1 up, and deliberately not at
 # so tier 0 inherits a defined order rather than losing one.
 $t1Group = @([pscustomobject]@{ Tier = 1; Entries = @($low, $high) })
 Assert-Match (Build-ReleaseNotes -TierGroups $t1Group -Version '3.5.0' -Date '2026-08-05' -Type 'Minor') `
-    '(?s)### #3 .*### #1 ' 'a tier-1 group is ranked by its own score'
+    '(?s)## #3 .*## #1 ' 'a tier-1 group is ranked by its own score'
 $t0Group = @([pscustomobject]@{ Tier = 0; Entries = @($e20, $e21) })
 Assert-Match (Build-ReleaseNotes -TierGroups $t0Group -Version '3.5.0' -Date '2026-08-05' -Type 'Minor') `
-    '(?s)### #20 .*### #21 ' 'a tier-0 group keeps document order -- the record is not re-sorted'
+    '(?s)## #20 .*## #21 ' 'a tier-0 group keeps document order -- the record is not re-sorted'
 
-Write-Host "Build-ReleaseNotes -Entries (the flat shape, for a repo that declares no tier)" -ForegroundColor Cyan
-# A single '## Tier 0' wrapper around the whole document would be a level of structure that says nothing.
+Write-Host "Build-ReleaseNotes -Entries (arrival order, for a repo that declares no tier)" -ForegroundColor Cyan
+# SINCE #881 THIS DIFFERS FROM -TierGroups IN ORDER ONLY. Both render at these levels; a repo whose
+# entries declare nothing has no tier to rank on, so the arrival order is all there is to keep.
 $flatNotes = Build-ReleaseNotes -Entries $entries -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
 Assert-Match $flatNotes '(?m)^## #22 ' 'flat: entries sit at ##'
 Assert-Match $flatNotes ('(?m)^### ' + $WhatRx + '$') 'flat: their sections at ###'
 Assert-NoMatch $flatNotes 'Tier \d - ' 'flat: no tier heading is invented'
 # -TierGroups wins when both arrive, which is what the doc promises.
 $bothArgs = Build-ReleaseNotes -Entries @($e21) -TierGroups $sparse -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
-Assert-Match $bothArgs '(?m)^## Tier 2 - consumers$' '-TierGroups wins if both are given'
+Assert-Match $bothArgs '(?m)^## #22 ' '-TierGroups wins if both are given'
 Assert-NoMatch $bothArgs '#21 ' 'and -Entries is then ignored rather than merged in'
 
 Write-Host "Build-ReleaseNotes -- link rewriting" -ForegroundColor Cyan
@@ -665,7 +673,7 @@ $sum = "## What 3.x was about`r`n`r`nA sentence with CRLF endings and a [root li
 $ms = Build-ReleaseNotes -TierGroups $groups -Version '4.0.0' -Date '2026-08-05' -Type 'Major' -Title 'A milestone' -Summary $sum
 Assert-Match $ms '## What 3\.x was about' 'summary: the authored heading is present'
 Assert-Match $ms '(?s)\*\*Type:\*\* Major.*A milestone.*## What 3\.x was about' 'summary: sits after the header and the title line'
-Assert-Match $ms '(?s)## What 3\.x was about.*\n---\n.*## Tier 2' 'summary: separated from the generated entries by a horizontal rule'
+Assert-Match $ms '(?s)## What 3\.x was about.*\n---\n.*## #22 ' 'summary: separated from the generated entries by a horizontal rule'
 Assert-NoMatch $ms "`r" 'summary: CRLF input is normalized to LF like every other block in this file'
 # A root-relative link inside the SUMMARY is deliberately NOT rewritten: unlike an entry (which was
 # authored in the root CHANGELOG and then moved three folders deeper), a summary is authored for this
