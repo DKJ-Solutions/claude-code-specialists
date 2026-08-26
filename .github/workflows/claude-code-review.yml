@@ -62,3 +62,55 @@ jobs:
           claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment"'
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
+
+      # WHY THIS STEP EXISTS -- issue #913. On PR #911 this check failed on both attempts and the log
+      # named no reason at all, so the only hypothesis available was a guess about the credential. That
+      # silence is not an upstream omission to be reported: the action's `sanitizeSdkOutput`
+      # (base-action/src/run-claude-sdk.ts, read at the pinned SHA) prints exactly seven fields of the
+      # result message -- type, subtype, is_error, duration_ms, num_turns, total_cost_usd and a COUNT of
+      # the permission denials -- suppresses every other message type outright, and drops the two fields
+      # that carry the reason: `result` (the error text) and `api_error_status` (429 for a rate limit,
+      # 529 for an overload). The one switch it offers is `show_full_output: true`, and that dumps ALL
+      # messages including tool results into a public log; upstream's own description of the input warns
+      # it may carry secrets. So the choice on offer is not "hidden or visible" but "nothing or
+      # everything", and this step takes the third option.
+      #
+      # WHAT IT READS, AND WHY THAT WORKS ON A FAILED RUN. The `execution_file` output, which upstream
+      # sets on the failure path too: `src/entrypoints/run.ts` calls `setExecutionFileOutputIfPresent()`
+      # from its catch block, so the output survives the throw that reddens the step above. The file is a
+      # JSON ARRAY of SDK messages whose last element is the result -- upstream reads it that way itself
+      # in `update-comment-link.ts`, so that is its documented shape rather than a guess about it.
+      #
+      # WHAT IT PRINTS, AND THE BOUND ON THAT. The structured fields, which are numbers and enums and can
+      # carry no content whatsoever, plus `result` truncated. That last one is free text, which is
+      # exactly why this step runs ON FAILURE ONLY: on a failed run it holds the error, and on a
+      # successful one -- where it would hold review prose about the diff -- this step does not run.
+      #
+      # NOT ADDED TO claude.yml, deliberately. The same blindness is there and this same step would
+      # cure it, but that workflow answers a human who typed '@claude' and is already reading the thread
+      # when it fails. This one runs unattended on every PR, which is what makes its silence expensive.
+      - name: Why the review failed
+        # The job is already red from the step above; a broken diagnostic must not become the story.
+        continue-on-error: true
+        if: failure() && steps.claude-review.outputs.execution_file != ''
+        shell: bash
+        env:
+          EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
+        run: |
+          jq -r '
+            [.[] | select(.type == "result")] | last
+            | if . == null then "No result message in the execution log."
+              else
+                "subtype:          \(.subtype)",
+                "is_error:         \(.is_error)",
+                "api_error_status: \(.api_error_status // "null")",
+                "stop_reason:      \(.stop_reason // "null")",
+                "num_turns:        \(.num_turns)",
+                "duration_ms:      \(.duration_ms)",
+                "total_cost_usd:   \(.total_cost_usd)",
+                "denials:          \(.permission_denials | length)",
+                "",
+                "result (truncated to 2000 characters):",
+                ((.result // "<the result message carried no result field>")[0:2000])
+              end
+          ' "$EXECUTION_FILE"
