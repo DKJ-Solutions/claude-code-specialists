@@ -292,10 +292,17 @@ entry unreadable to your own fold.
 
 Two optional parameters cover the "start now, continue later (maybe on another device)" case:
 
-- **`-Intent "<what is next / where I left off>"`** -- recorded at the **top of the document**, above the
-  phases. Omit it and nothing is written there. It kept its place and lost its heading when
-  `### Where I left off` went: the marks say where you stopped, and this is for what you decided and have
-  not written down anywhere else yet.
+- **`-Intent "<what is next / where I left off>"`** -- recorded **inside the first phase** (`PLAN`), as its
+  opening paragraph, with no heading of its own. Omit it and nothing is written there. The headinglessness
+  is what separates it from the `Where I left off` section retired on August 23, 2026, which every branch
+  had to answer: the marks say where you stopped, and this is for what you decided and have not written
+  down anywhere else yet.
+  **It moved out of the top of the document on August 26, 2026** ([#908](https://github.com/DaveKJohn/claude-code-specialists/issues/908),
+  [#925](https://github.com/DaveKJohn/claude-code-specialists/issues/925)), where it had been a bare
+  paragraph above the phases. That is the one region the preamble rule refuses, so this script wrote a
+  document its own branch-entry gate rejected — on every parked branch and every lane, and only once the
+  entry was written, which is at the PR. If you hold a branch scaffolded before that date, move the
+  paragraph under `PLAN` by hand; nothing else about the document changes.
   **It deliberately does not touch the DEPLOY section.** An intent is a status, and that section's text folds
   verbatim into `CHANGELOG.md` -- this repo measured three released entries that shipped a progress
   note that way. The entry's body is left empty, and the PR gate keeps refusing it until somebody
