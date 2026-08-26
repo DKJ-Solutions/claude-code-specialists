@@ -159,6 +159,12 @@ subject from the heading levels. It stays on #894 for its own branch.
 - [x] Run `scripts/lint/check-plugin-integrity.ps1` (0 errors) and every suite, and count PASS as well as
       FAIL: a parse error yields zero of both, which is how a broken suite read as green once during this
       branch
+- [x] Repair `release-lib.tests.ps1`, the seventh suite -- nine pins the sweep above missed, found by the
+      pre-PR gate. It crashed rather than failed (an uncaught throw from `Split-Changelog` on a fixture still
+      built at a literal `##`), so it reported neither a PASS nor a FAIL count: the exact reading error the
+      step above warns about. Three of the nine were passing while testing nothing, `-EntryLevel 3` having
+      meant "one deeper" until canonical became 3 and the shift a no-op -- so the block now composes BOTH
+      ends of every shift (`$CanonL`/`$DeepL`) instead of naming a level. 428 asserts, 0 failures
 
 ### DEPLOY: `feat/the-workflow-shifts-one-level-down-v1`
 
@@ -182,6 +188,17 @@ none before, having held only by the two pairs happening to agree.
 almost none of them were about the level they named: they were structural claims written with a literal `##`
 that had drifted into being a second definition of the format. Every one now reads its level from the lib, so
 the next re-level does not reproduce this afternoon.
+
+**A seventh suite held nine more, and three of them had gone GREEN.** `release-lib.tests.ps1` was not in the
+sweep above and was caught by the pre-PR gate instead, where it did not report nine failures but zero of
+anything: one fixture still built a pre-format entry at a literal `##`, `Split-Changelog` found no entry in it
+and threw, and an uncaught throw ends the run with neither a PASS count nor a FAIL count -- the exact reading
+error the TEST phase above says to watch for, met by the phase that wrote it. Six of the nine were ordinary red
+literals. The other three are the ones worth keeping: they passed `-EntryLevel 3` to `Set-EntryHeadingLevel` to
+mean *one deeper than canonical*, and once canonical WAS 3 the call became a no-op -- so "a canonical block
+still renders deeper" asserted that a block which had not moved looked like a block which had not moved. A
+literal level does not merely go stale; it goes stale in the direction that hides itself, which is why the
+repair composes both ends of every shift rather than typing the new numbers in.
 
 **And two of those pins were in the SCRIPTS, where the same drift is silent instead of red.** Both were found
 by a suite rather than by reading, and neither would have raised anything at runtime:
