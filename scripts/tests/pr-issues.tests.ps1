@@ -55,6 +55,20 @@ function Assert-Set {
     Assert-Equal $e $a $Name
 }
 
+function Assert-NameSet {
+    <#
+        The same comparison for CHECK NAMES rather than issue numbers, and a separate function because
+        Assert-Set is [int[]] on purpose: handed 'claude-review' it does not fail the assert, it throws
+        a parameter-transformation error mid-suite. Names are compared order-insensitively too -- the
+        verdict sorts its lists, and an assert that also pinned the order would fail on a resort that
+        changed nothing.
+    #>
+    param([string[]]$Expected, [string[]]$Actual, [string]$Name)
+    $e = (@($Expected | Sort-Object -Unique) -join ',')
+    $a = (@($Actual   | Sort-Object -Unique) -join ',')
+    Assert-Equal $e $a $Name
+}
+
 Write-Host "ConvertTo-IssueNumberList" -ForegroundColor Cyan
 # This function exists because `powershell -File` cannot bind an [int[]]: '332,340' arrives as one
 # string and casts to 332340, reading the comma as a THOUSANDS SEPARATOR -- silently, no error.
@@ -511,6 +525,119 @@ $idxAppend   = if ($idxExisting -ge 0) { $openPrText.IndexOf('Add-ResolvesBlock 
 Assert-True ($idxExisting -ge 0) 'the existing-PR path is still recognisable in open-pr.ps1'
 Assert-True ($idxRefresh -gt $idxExisting) 'the -RefreshBody block sits on the existing-PR path'
 Assert-True ($idxAppend -gt $idxRefresh)   'open-pr.ps1 appends the closing block AFTER the refresh, not before it (#919)'
+
+# --- The merge verdict: which check failing actually blocks a merge (issue #943) ------------------
+#
+# WHY THIS SUITE EXISTS. ship-pr.ps1 read the exit code of `gh pr checks --watch` as its merge verdict.
+# That exit code is non-zero when ANY check fails, so one broken advisory workflow refused every merge:
+# on August 26, 2026 `claude-review` was red on every PR (#942) while `lint-en-tests` -- the only check
+# the `main` ruleset requires -- was green, and GitHub itself called those PRs MERGEABLE / UNSTABLE.
+# The live remote no suite can reach is the query; the SELECTION is what is asserted here.
+#
+# The payloads below are the real ones, read off PR #937 that day:
+#   gh pr checks 937 --json name,bucket,state           -> claude-review fail, branch-entry + lint pass
+#   gh pr checks 937 --required --json name,bucket,state -> lint-en-tests pass
+# Both returned EXIT 0. That is the reason every assert here feeds a payload rather than an exit code:
+# in --json mode gh reports the outcome in the records and not in its exit status.
+
+Assert-Equal 'pass'    (Get-CheckOutcome -Record ([pscustomobject]@{ name = 'a'; bucket = 'pass' }))     'bucket pass -> pass'
+Assert-Equal 'fail'    (Get-CheckOutcome -Record ([pscustomobject]@{ name = 'a'; bucket = 'fail' }))     'bucket fail -> fail'
+Assert-Equal 'pending' (Get-CheckOutcome -Record ([pscustomobject]@{ name = 'a'; bucket = 'pending' }))  'bucket pending -> pending'
+Assert-Equal 'pass'    (Get-CheckOutcome -Record ([pscustomobject]@{ name = 'a'; bucket = 'skipping' })) 'a SKIPPED check does not block a merge on GitHub either -> pass'
+Assert-Equal 'fail'    (Get-CheckOutcome -Record ([pscustomobject]@{ name = 'a'; bucket = 'cancel' }))   'a CANCELLED check never went green -> fail, not pass'
+Assert-Equal 'fail'    (Get-CheckOutcome -Record ([pscustomobject]@{ name = 'a'; state = 'STARTUP_FAILURE' })) 'state fallback: a workflow that never started -> fail'
+Assert-Equal 'fail'    (Get-CheckOutcome -Record ([pscustomobject]@{ name = 'a'; state = 'TIMED_OUT' }))       'state fallback: timed out -> fail'
+Assert-Equal 'pending' (Get-CheckOutcome -Record ([pscustomobject]@{ name = 'a'; state = 'IN_PROGRESS' }))     'state fallback: in progress -> pending'
+Assert-Equal 'pass'    (Get-CheckOutcome -Record ([pscustomobject]@{ name = 'a'; state = 'SUCCESS' }))         'state fallback: success -> pass'
+
+# 'unknown' is NOT a synonym for 'pass', and this is the assert that keeps it that way: the only caller
+# is deciding whether a merge is safe, so a record it cannot read must not read as green.
+Assert-Equal 'unknown' (Get-CheckOutcome -Record ([pscustomobject]@{ name = 'a' }))                   'no bucket and no state -> unknown, never pass'
+Assert-Equal 'unknown' (Get-CheckOutcome -Record ([pscustomobject]@{ name = 'a'; bucket = 'wat' }))   'an unrecognised bucket with no state -> unknown'
+Assert-Equal 'unknown' (Get-CheckOutcome -Record $null)                                              'a null record -> unknown'
+
+$pr937All      = '[{"bucket":"fail","completedAt":"2026-08-26T16:07:10Z","name":"claude-review","state":"FAILURE"},{"bucket":"pass","completedAt":"2026-08-26T16:06:58Z","name":"branch-entry","state":"SUCCESS"},{"bucket":"pass","completedAt":"2026-08-26T16:15:43Z","name":"lint-en-tests","state":"SUCCESS"}]'
+$pr937Required = '[{"bucket":"pass","name":"lint-en-tests","state":"SUCCESS"}]'
+
+# THE CASE THE ISSUE IS ABOUT, in the exact shape it was measured in.
+$v = Get-MergeBlockVerdict -RequiredChecksJson $pr937Required -ChecksJson $pr937All
+Assert-True (-not $v.Blocked) 'PR #937 shape: required green, advisory red -> the merge is NOT blocked'
+Assert-NameSet @('claude-review') $v.FailedOther 'and the run can NAME the not-required check that failed'
+Assert-NameSet @() $v.FailedRequired 'nothing required failed'
+Assert-True ($v.Reason -like '*claude-review*') 'the reason names it too, so the transcript says which check was merged past'
+
+# The other direction, which must keep behaving exactly as it did before the change.
+$vReq = Get-MergeBlockVerdict -RequiredChecksJson '[{"bucket":"fail","name":"lint-en-tests","state":"FAILURE"}]' -ChecksJson $pr937All
+Assert-True $vReq.Blocked 'a REQUIRED check failing still blocks the merge'
+Assert-NameSet @('lint-en-tests') $vReq.FailedRequired 'and it is named'
+Assert-True ($vReq.Reason -like '*REQUIRES*') 'the refusal says the ruleset requires it -- the whole basis of the decision'
+
+# Not-green is broader than failing: a required check still running, or one whose state cannot be read,
+# is not something to merge past either. After --watch neither should occur; both are asserted anyway,
+# because "cannot happen" is how the premise this suite replaces was justified.
+$vPend = Get-MergeBlockVerdict -RequiredChecksJson '[{"bucket":"pending","name":"lint-en-tests","state":"IN_PROGRESS"}]' -ChecksJson $pr937All
+Assert-True $vPend.Blocked 'a required check that has not finished blocks the merge'
+$vUnk = Get-MergeBlockVerdict -RequiredChecksJson '[{"name":"lint-en-tests"}]' -ChecksJson $pr937All
+Assert-True $vUnk.Blocked 'a required check whose state cannot be read blocks the merge'
+
+# THE CONSERVATIVE HALF, and the one that keeps this fix from being a regression: with no readable
+# required list there is no way to tell a ruleset that requires nothing from one whose required checks
+# have not reported, so it refuses -- which is precisely what the script did before #943.
+foreach ($bad in @('', '   ', 'not json at all', '[]', '[{"noname":1}]')) {
+    $vBad = Get-MergeBlockVerdict -RequiredChecksJson $bad -ChecksJson $pr937All
+    Assert-True $vBad.Blocked "an unreadable required list ('$bad') keeps refusing, exactly as before #943"
+}
+
+# ChecksJson is presentation only. Absent, the verdict must not move.
+$vNoAll = Get-MergeBlockVerdict -RequiredChecksJson $pr937Required
+Assert-True (-not $vNoAll.Blocked) 'the verdict is made from the required list alone -- no ChecksJson needed'
+Assert-NameSet @() $vNoAll.FailedOther 'with nothing to read, nothing is named'
+$vJunkAll = Get-MergeBlockVerdict -RequiredChecksJson $pr937Required -ChecksJson 'not json'
+Assert-True (-not $vJunkAll.Blocked) 'an unreadable ChecksJson costs a name and cannot change the verdict'
+
+# TWO OR MORE REQUIRED CHECKS -- the 5.1 array-flattening pitfall, which this file already warns about
+# at step 2 of ship-pr.ps1 and which both parses here walked into anyway. `@(@($json | ConvertFrom-Json))`
+# hands back ONE element holding the whole array, whose .name member-enumerates to every name at once:
+# two required checks became the single string 'a b'. Measured on 2026-08-26 -- with exactly one required
+# check it works by accident, because a one-element array is handed through as the object itself, and one
+# required check is all this repo's ruleset has ever had.
+$twoRequiredGreen = '[{"bucket":"pass","name":"lint-en-tests","state":"SUCCESS"},{"bucket":"pass","name":"branch-entry","state":"SUCCESS"}]'
+$vTwo = Get-MergeBlockVerdict -RequiredChecksJson $twoRequiredGreen -ChecksJson $pr937All
+Assert-True (-not $vTwo.Blocked) 'two required checks, both green -> not blocked'
+Assert-NameSet @('claude-review') $vTwo.FailedOther 'and branch-entry is recognised as required, so it is not listed as an other failure'
+$vTwoBad = Get-MergeBlockVerdict -RequiredChecksJson '[{"bucket":"pass","name":"lint-en-tests","state":"SUCCESS"},{"bucket":"fail","name":"branch-entry","state":"FAILURE"}]'
+Assert-NameSet @('branch-entry') $vTwoBad.FailedRequired 'the SECOND of two required checks failing is still seen'
+Assert-True $vTwoBad.Blocked 'and it blocks'
+
+# The same pitfall in Get-CheckWaitReport's required-name parse, which had been there since #831 and
+# mislabelled every wait in any repo with more than one required check.
+$twoChecks = '[{"name":"a","startedAt":"2026-08-26T16:00:00Z","completedAt":"2026-08-26T16:07:10Z"},{"name":"b","startedAt":"2026-08-26T16:00:00Z","completedAt":"2026-08-26T16:15:43Z"}]'
+$reportTwo = Get-CheckWaitReport -ChecksJson $twoChecks -RequiredNamesJson '[{"name":"a"},{"name":"b"}]' -WaitedSeconds 10
+Assert-True ($reportTwo -like '*, required)*') "two required names: 'b' governed and IS required -- the label must say so"
+Assert-True ($reportTwo -notlike '*NOT required*') 'and must not say the opposite'
+$reportOne = Get-CheckWaitReport -ChecksJson $twoChecks -RequiredNamesJson '[{"name":"a"}]' -WaitedSeconds 10
+Assert-True ($reportOne -like '*NOT required*') 'one required name: the not-required label still works'
+Assert-True ($reportOne -like "*after the last required check ('a')*") 'and the excess-wait clause still fires'
+
+# The prose helper. Quoted per name, so a check name containing a space cannot read as two.
+Assert-Equal ''                     (Format-CheckNameList -Names @())                'no names -> empty, so a caller can concatenate unconditionally'
+Assert-Equal "'a'"                  (Format-CheckNameList -Names @('a'))             'one name'
+Assert-Equal "'a' and 'b'"          (Format-CheckNameList -Names @('a','b'))         'two names joined with and'
+Assert-Equal "'a', 'b' and 'c'"     (Format-CheckNameList -Names @('a','b','c'))     'three names: commas then and'
+Assert-Equal "'lint en tests'"      (Format-CheckNameList -Names @('lint en tests')) 'a name with spaces stays one quoted item'
+Assert-Equal "'a'"                  (Format-CheckNameList -Names @('a','',$null))    'blanks are dropped rather than quoted as empty'
+
+# AND SHIP-PR ITSELF STILL USES IT. The asserts above prove the decision; this one proves the caller
+# asks for it -- the same reasoning as the open-pr ordering assert above, and the same failure mode: a
+# reverted call site would leave every assert here green while the merge refused as before.
+$shipPrPath = Join-Path $PSScriptRoot '..\release\ship-pr.ps1'
+Assert-True (Test-Path -LiteralPath $shipPrPath) 'ship-pr.ps1 exists where this suite looks for it'
+$shipText = [System.IO.File]::ReadAllText((Resolve-Path $shipPrPath).Path, [System.Text.Encoding]::UTF8)
+Assert-True ($shipText -like '*Get-MergeBlockVerdict -RequiredChecksJson*') 'ship-pr.ps1 consults the verdict rather than the --watch exit code alone'
+Assert-True ($shipText -like '*--required*name,bucket,state*') 'and asks gh for the required checks WITH their state, since --json mode does not carry it in the exit code'
+$idxWatch   = $shipText.IndexOf("'--watch'")
+$idxVerdict = $shipText.IndexOf('Get-MergeBlockVerdict')
+Assert-True ($idxWatch -ge 0 -and $idxVerdict -gt $idxWatch) 'the wait still happens FIRST and the verdict second -- #831 kept the wait, #943 changed only the verdict'
 
 Write-Host ""
 if ($script:fail -gt 0) {

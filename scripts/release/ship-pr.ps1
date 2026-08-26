@@ -48,11 +48,16 @@
          --base a consumer's STACKED PR could be the one merged, and the previous inline parse hit the
          5.1 array-flattening pitfall -- its "no open PR" guard was dead code and a missing PR became
          the empty string, so the script would have run `gh pr merge ''`. See the comment at step 2.
-      3. Wait for the required CI check to finish (gh pr checks <pr> --watch). Branch protection on
-         main blocks the merge until it is green; if a check FAILS, this stops WITHOUT merging.
-         Once green, print WHICH check governed the wait and for how long (#831) -- whichever finished
-         last, labelled against the repo's own ruleset. Best-effort: unreadable, and the run says only
-         how long it waited. The wait itself is unchanged; see the comment at the step.
+      3. Wait for EVERY check the PR has to finish (gh pr checks <pr> --watch), then judge the merge on
+         the ones the ruleset REQUIRES. A failing required check stops the run WITHOUT merging; a
+         failing check the ruleset does not require prints a loud warning and does not (issue #943 --
+         the exit code of --watch says "something failed", never "the merge is blocked", and reading it
+         as the second let one broken advisory workflow block every chain). Either way, print WHICH
+         check governed the wait and for how long (#831) -- whichever finished last, labelled against
+         the repo's own ruleset. Best-effort: unreadable, and the run says only how long it waited --
+         except for the required list, where unreadable means REFUSE, since a ruleset that requires
+         nothing and one whose required checks have not reported look identical from here. The wait
+         itself is unchanged; see the comment at the step.
       4. TWO GATES, THEN MERGE. The step-list gate refuses while development-cycle.md has an unresolved
          step above DEPLOY, and the DEPLOY LOCK (issue #884) refuses when that section no longer matches
          what PR #NN published -- the section is fixed at the moment the PR opens, because it is what the
@@ -294,37 +299,69 @@ while ($true) {
     Start-Sleep -Seconds $PollSeconds
     $waited += $PollSeconds
 }
-# --watch now blocks until the registered check finishes; exit 0 = all passed, non-zero = a failure.
-# Branch protection blocks the merge until green, so a non-zero here means we must NOT merge.
+# --watch now blocks until the registered check finishes; exit 0 = all passed, non-zero = SOMETHING
+# failed. WHICH something is the whole question, and the answer is NOT in that exit code (#943). This
+# line used to read "branch protection blocks the merge until green, so a non-zero here means we must
+# NOT merge" -- true only of a check the ruleset REQUIRES. `gh pr checks --watch` exits non-zero when
+# ANY check fails, so the script inferred "the merge is blocked" from a signal that does not say so,
+# and on August 26, 2026 that inference was the whole chain: `claude-review` red on every PR (#942),
+# `lint-en-tests` -- the only check the `main` ruleset requires -- green, GitHub itself reporting those
+# PRs as MERGEABLE / UNSTABLE, and this script reporting BLOCKED. The wait is untouched (#831 measured
+# it and Dave kept it); only the verdict below moved.
 $checks = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'checks', "$pr", '--watch', '--interval', "$PollSeconds", '--repo', $repo)
 $checks.Output | ForEach-Object { Write-Host $_ }
-if ($checks.ExitCode -ne 0) {
-    Write-Error "CI did not pass for PR #$pr (exit $($checks.ExitCode)) -- NOT merged. Fix CI and re-run, or merge manually once green."
-    exit 1
-}
-Write-Host "ship-pr: CI green." -ForegroundColor Green
-
-# The two reads below happen AFTER the merge decision above, never before it, and both are
-# best-effort. Two reasons, and they are the same reason twice: a run that is about to stop must not
-# spend gh calls on a line nobody will read, and an unreadable payload must not be able to turn a
-# green run red. So a failure here costs the reader one line of detail and nothing else.
 $waitedSec = [int][math]::Round(((Get-Date) - $waitBegan).TotalSeconds)
-$waitReport = $null
+
+# ONE pair of reads, serving both remaining questions: which check governed the wait (#831, the line
+# printed further down) and, on a failure, whether what failed is a check the ruleset requires (#943,
+# the merge decision). Measured while writing this: `gh pr checks --json` returns exit 0 while
+# reporting a failing check in its payload, so the STATE has to be read from the records -- which is
+# why both reads ask for `bucket,state` and neither trusts its own exit code for the outcome.
+#
+# Still best-effort, and the invariant that mattered survives: an unreadable payload cannot turn a
+# GREEN run red, because a green watch never consults the verdict at all. What it can do is leave a
+# failing run refusing exactly as it did before this change -- Get-MergeBlockVerdict blocks on an
+# unreadable required-check list rather than guessing, which is the conservative half of the fix.
+# They no longer sit after the decision, because they are now part of it: a failing run that spends
+# two gh calls is spending them on the verdict, not on a line nobody will read.
+$checkFactsJson = ''
+$requiredFactsJson = ''
 try {
     $checkFacts = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
-        'pr', 'checks', "$pr", '--json', 'name,startedAt,completedAt', '--repo', $repo)
-    if ($checkFacts.ExitCode -eq 0) {
-        # `--required` exits non-zero on a repo whose ruleset requires nothing, which is a legitimate
-        # state and not an error: the label is then simply omitted rather than guessed.
-        $requiredFacts = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
-            'pr', 'checks', "$pr", '--required', '--json', 'name', '--repo', $repo)
-        $requiredJson = if ($requiredFacts.ExitCode -eq 0) { $requiredFacts.Output -join "`n" } else { '' }
-
-        $waitReport = Get-CheckWaitReport -ChecksJson ($checkFacts.Output -join "`n") `
-            -RequiredNamesJson $requiredJson -WaitedSeconds $waitedSec
-    }
+        'pr', 'checks', "$pr", '--json', 'name,bucket,state,startedAt,completedAt', '--repo', $repo)
+    if ($checkFacts.ExitCode -eq 0) { $checkFactsJson = $checkFacts.Output -join "`n" }
+    # `--required` exits non-zero on a repo whose ruleset requires nothing, which is a legitimate state
+    # and not an error. For the wait report the label is then simply omitted rather than guessed; for
+    # the verdict it is the case that keeps refusing, since "requires nothing" and "the required checks
+    # have not reported" are indistinguishable from here.
+    $requiredFacts = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
+        'pr', 'checks', "$pr", '--required', '--json', 'name,bucket,state', '--repo', $repo)
+    if ($requiredFacts.ExitCode -eq 0) { $requiredFactsJson = $requiredFacts.Output -join "`n" }
 } catch {
-    $waitReport = $null
+    $checkFactsJson = ''
+    $requiredFactsJson = ''
+}
+
+if ($checks.ExitCode -ne 0) {
+    $verdict = Get-MergeBlockVerdict -RequiredChecksJson $requiredFactsJson -ChecksJson $checkFactsJson
+    if ($verdict.Blocked) {
+        Write-Error "CI did not pass for PR #$pr (exit $($checks.ExitCode)) -- NOT merged: $($verdict.Reason). Fix CI and re-run, or merge manually once green."
+        exit 1
+    }
+    # Loud, and deliberately not reassuring. The merge is allowed to proceed because the ruleset says
+    # so, and that is the only claim being made here -- the red mark is still red and still worth
+    # chasing. Printed as a warning rather than swallowed, so a run that merged past a failing check
+    # says which check, in the transcript, where the next reader looks.
+    Write-Host "ship-pr: a check FAILED but the merge is not blocked -- $($verdict.Reason)." -ForegroundColor Yellow
+    Write-Host "  Continuing to step 4. The failing check is still failing; nothing here fixes it." -ForegroundColor Yellow
+} else {
+    Write-Host "ship-pr: CI green." -ForegroundColor Green
+}
+
+$waitReport = $null
+if ($checkFactsJson) {
+    $waitReport = Get-CheckWaitReport -ChecksJson $checkFactsJson `
+        -RequiredNamesJson $requiredFactsJson -WaitedSeconds $waitedSec
 }
 if ($waitReport) {
     Write-Host "  $waitReport" -ForegroundColor DarkGray
