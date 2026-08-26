@@ -205,6 +205,53 @@ function New-Fixture {
     return $dir
 }
 
+function New-BareOrigin {
+    <#
+        A bare repo added to $Dir as 'origin', so a push has somewhere to land -- no auth, no network.
+        Registered as a fixture so the teardown removes it. Extracted for #900: section (i) did this
+        inline when it was the only test that needed a remote, and four now do.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Dir,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+    $bare = Join-Path ([System.IO.Path]::GetTempPath()) ("new-branch-test-$PID-$Label-origin.git")
+    if (Test-Path -LiteralPath $bare) { Remove-Item -Recurse -Force -LiteralPath $bare }
+    $script:fixtures += $bare
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & git init --bare -q $bare 2>$null | Out-Null
+        & git -C $Dir remote add origin $bare 2>$null | Out-Null
+    } finally { $ErrorActionPreference = $prevEap }
+    return $bare
+}
+
+function Test-BranchOnRemote {
+    <# Is $Ref present in the bare repo $Bare? The push assert, read from the remote rather than from
+       the pusher's own output -- "reports it parked" and "actually pushed" are two claims. #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Bare,
+        [Parameter(Mandatory = $true)][string]$Ref
+    )
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & git -C $Bare rev-parse --verify --quiet $Ref 2>$null | Out-Null
+        return ($LASTEXITCODE -eq 0)
+    } finally { $ErrorActionPreference = $prevEap }
+}
+
+function Get-HeadCommitFiles {
+    <# The paths in $Dir's HEAD commit -- what a park commit actually swept in. #>
+    param([Parameter(Mandatory = $true)][string]$Dir)
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        return @(& git -C $Dir diff-tree --no-commit-id --name-only -r HEAD 2>$null)
+    } finally { $ErrorActionPreference = $prevEap }
+}
+
 function Invoke-NewBranch {
     <#
         Runs the fixture copy of new-branch.ps1 as a child process, with the fixture folder as cwd
@@ -218,13 +265,15 @@ function Invoke-NewBranch {
         [Parameter(Mandatory = $true)][string]$Name,
         [string]$Title,
         [string]$Intent,
-        [switch]$Park
+        [switch]$Park,
+        [switch]$NoPush
     )
     $scriptPath = Join-Path $Dir 'scripts\task\new-branch.ps1'
     $callArgs = @('-Name', $Name)
     if ($PSBoundParameters.ContainsKey('Title'))  { $callArgs += @('-Title', $Title) }
     if ($PSBoundParameters.ContainsKey('Intent')) { $callArgs += @('-Intent', $Intent) }
-    if ($Park) { $callArgs += '-Park' }
+    if ($Park)   { $callArgs += '-Park' }
+    if ($NoPush) { $callArgs += '-NoPush' }
 
     $prevPd  = $env:CLAUDE_PROJECT_DIR
     $prevEap = $ErrorActionPreference
@@ -614,10 +663,7 @@ try {
     # --- (i) -Park: commit the entry + push to origin, NO PR, entry-scoped ------------------------
     Write-Host "new-branch.ps1 -- -Park commits the entry and pushes to origin (no PR)" -ForegroundColor Cyan
     $fixtureI = New-Fixture -Label 'i'
-    # A bare repo as 'origin' so the push has somewhere to land -- no auth/network needed.
-    $bareRemote = Join-Path ([System.IO.Path]::GetTempPath()) ("new-branch-test-$PID-i-origin.git")
-    if (Test-Path -LiteralPath $bareRemote) { Remove-Item -Recurse -Force -LiteralPath $bareRemote }
-    $script:fixtures += $bareRemote
+    $bareRemote = New-BareOrigin -Dir $fixtureI -Label 'i'
     # An UNRELATED already-staged file (Victor's finding): staged on main before new-branch runs, so
     # `checkout -b` carries it, staged, into the new branch. A correctly entry-scoped park must NOT
     # sweep it into the park commit.
@@ -626,8 +672,6 @@ try {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git init --bare -q $bareRemote 2>$null | Out-Null
-        & git -C $fixtureI remote add origin $bareRemote 2>$null | Out-Null
         & git -C $fixtureI add -- 'stray.txt' 2>$null | Out-Null
     } finally {
         $ErrorActionPreference = $prevEap
@@ -843,6 +887,69 @@ Write-Output `$t.Type
     Assert-Equal $entryTextN1 $entryTextN2 'stacked/dirty: the uncommitted entry is left exactly as it was'
     Assert-True (Test-Phrase -Text $rN2.Out -Phrase 'UNCOMMITTED') 'stacked/dirty: the output says the work is uncommitted'
     Assert-True (Test-Phrase -Text $rN2.Out -Phrase "'docs/uncommitted-parent-v1'") 'stacked/dirty: and names whose work it is'
+
+    # --- (o) THE PUSH IS THE DEFAULT (#900) -- no switch, and the branch is on origin ---------------
+    # The pair (i) above and this one are the whole change: (i) proves -Park still behaves, this proves
+    # that a run naming NOTHING behaves identically. Asserted with a bare origin rather than trusting the
+    # output line, because "reports it parked" and "actually pushed" are the two halves that drifted apart
+    # once before.
+    Write-Host "new-branch.ps1 -- the creation push is the default (#900)" -ForegroundColor Cyan
+    $fixtureO = New-Fixture -Label 'o'
+    $bareO = New-BareOrigin -Dir $fixtureO -Label 'o'
+
+    $rO = Invoke-NewBranch -Dir $fixtureO -Name 'feat/pushed-by-default' -Title 'Pushed by default'
+    Assert-Equal 0 $rO.Code 'default push: new-branch exit 0'
+    Assert-True (Test-Phrase -Text $rO.Out -Phrase 'parked on origin') 'default push: reports the branch reached origin -- with no switch given'
+    Assert-True (Test-BranchOnRemote -Bare $bareO -Ref 'refs/heads/feat/pushed-by-default-v1') 'default push: the branch ref really is on origin'
+    # Scoped exactly as -Park was: the document and nothing else. The same pathspec discipline, now
+    # running unasked, which is precisely why it must not widen.
+    $filesO = Get-HeadCommitFiles -Dir $fixtureO
+    Assert-True ($filesO -contains (Get-BranchFilePaths).Cycle) 'default push: the commit carries the development cycle'
+    Assert-Equal 1 $filesO.Count 'default push: and carries nothing else -- one document, not a sweep'
+
+    # --- (p) -NoPush: the escape valve, with an origin sitting right there ---------------------------
+    # The assert that matters is the NEGATIVE one. Before #900 "nothing on origin" was the default and
+    # could pass for free in a fixture with no remote at all; here the remote exists and is deliberately
+    # left empty, so the switch has to be what stops the push.
+    Write-Host "new-branch.ps1 -- -NoPush leaves the branch local even with an origin configured" -ForegroundColor Cyan
+    $fixtureP = New-Fixture -Label 'p'
+    $bareP = New-BareOrigin -Dir $fixtureP -Label 'p'
+
+    $rNp = Invoke-NewBranch -Dir $fixtureP -Name 'feat/kept-local' -Title 'Kept local' -NoPush
+    Assert-Equal 0 $rNp.Code '-NoPush: new-branch exit 0'
+    Assert-True (Test-Phrase -Text $rNp.Out -Phrase 'local only') '-NoPush: says the branch stayed local'
+    Assert-True (-not (Test-BranchOnRemote -Bare $bareP -Ref 'refs/heads/feat/kept-local-v1')) '-NoPush: the branch ref is NOT on origin'
+    # Asserted on the commit count, not on `git status --porcelain`: git COLLAPSES a wholly untracked
+    # directory to `?? contributing-davekjohn/` and never names the file inside it, so a status match on
+    # the document would have failed for a reason that has nothing to do with the switch.
+    Assert-Equal 1 @(& git -C $fixtureP log --oneline).Count '-NoPush: nothing was committed -- only the fixture commit stands'
+
+    # --- (q) NO ORIGIN: the branch is still created (#900) -------------------------------------------
+    # THE CASE THE SUITE ITSELF FOUND. Every fixture above configures no remote, so making the push
+    # unconditional turned `git push` into an exit 1 out of branch CREATION -- "there is nowhere to push"
+    # arriving as "your branch could not be made". Test-GitOriginConfigured is the answer and this is the
+    # assert that keeps it: a repo with no remote is a legitimate repo.
+    Write-Host "new-branch.ps1 -- no 'origin' remote: the branch is created anyway (#900)" -ForegroundColor Cyan
+    $fixtureQ = New-Fixture -Label 'q'
+    $rQ = Invoke-NewBranch -Dir $fixtureQ -Name 'feat/no-remote-here' -Title 'No remote here'
+    Assert-Equal 0 $rQ.Code 'no origin: new-branch exit 0 -- the missing remote is not a failure'
+    Assert-True (Test-Phrase -Text $rQ.Out -Phrase "no 'origin' remote") 'no origin: and says why nothing was pushed'
+    $branchesQ = ((& git -C $fixtureQ branch --list 'feat/no-remote-here-v1') -join '').Trim()
+    Assert-True ([bool]$branchesQ) 'no origin: the branch exists locally all the same'
+    Assert-True (Test-Path -LiteralPath (Join-Path $fixtureQ ((Get-BranchFilePaths).Cycle))) 'no origin: and its document was written'
+
+    # --- (r) -Park still runs, and now announces that it changed nothing ----------------------------
+    # Kept accepted rather than removed: this script is mirrored into every consumer's plugin cache,
+    # where a -Park typed from a doc or a habit would otherwise fail on a parameter that is gone. The
+    # assert is that it is BOTH harmless and audible.
+    Write-Host "new-branch.ps1 -- -Park is accepted, announced, and changes nothing (#900)" -ForegroundColor Cyan
+    $fixtureR = New-Fixture -Label 'r'
+    $bareR = New-BareOrigin -Dir $fixtureR -Label 'r'
+
+    $rR = Invoke-NewBranch -Dir $fixtureR -Name 'feat/park-is-default' -Title 'Park is default' -Park
+    Assert-Equal 0 $rR.Code '-Park: still exit 0'
+    Assert-True (Test-Phrase -Text $rR.Out -Phrase 'the switch is accepted and changes nothing') '-Park: says out loud that it is the default now'
+    Assert-True (Test-BranchOnRemote -Bare $bareR -Ref 'refs/heads/feat/park-is-default-v1') '-Park: and the push happened -- same outcome as (o), which is the point'
 } finally {
     foreach ($f in $script:fixtures) {
         if (Test-Path -LiteralPath $f) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }

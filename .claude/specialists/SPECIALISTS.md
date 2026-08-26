@@ -70,7 +70,11 @@ routes; every specialist executes according to the shared safety rules and their
 
 **Where this actually runs.** This roster is a set of Claude Code subagents plus three informational
 
-SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`);
+SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`) and
+
+one Stop hook that acts rather than reports (`cycle-autopark`, #900 -- it pushes the branch's development
+
+cycle to origin until a PR publishes it);
 
 they run in Claude Code and in Cowork, but not in a plain Claude.ai Chat session (there they show up
 

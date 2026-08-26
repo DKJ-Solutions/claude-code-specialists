@@ -189,6 +189,12 @@ try {
     # a copy. Asserting only the first half would pass for a script that wrote into both.
     Assert-True (Test-Path -LiteralPath (Join-Path $laneA 'contributing-davekjohn\development-cycle.md')) "open: the development cycle is written in the lane"
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $fa 'contributing-davekjohn\development-cycle.md'))) "open: the primary did NOT gain one"
+    # AND THE LANE IS ON ORIGIN THE MOMENT IT OPENS (#900). Asserted here rather than left to
+    # new-branch's own suite, because a lane is the case that needs it most: opening one is by definition
+    # work running beside something else, which is exactly when the other side cannot see a local branch.
+    # The -RepoRoot delegation is what has to carry the push through, and nothing else covers that pair.
+    Invoke-Git @('-C', "$fa.git", 'rev-parse', '--verify', '--quiet', 'refs/heads/feat/lane-a-v1') | Out-Null
+    Assert-True ($LASTEXITCODE -eq 0) "open: the lane's branch is already on origin"
 
     # --- (b) A refused branch name rolls the lane back completely -----------------------------------
     Write-Host "worktree-lane.ps1 -- rolls back when new-branch refuses the name" -ForegroundColor Cyan
@@ -213,12 +219,20 @@ try {
     Assert-Equal 1 (Get-WorktreeCount -Dir $fc) "occupied path: nothing registered"
 
     # --- (d) HandBack refuses while the LANE is dirty ----------------------------------------------
-    # A freshly opened lane is always dirty: new-branch writes the two files and does not commit them.
-    # So this state is the default rather than a contrived one, which is exactly why it needs a guard.
+    # THE DIRT IS MADE HERE NOW, AND #900 IS WHY (August 26, 2026). This used to rest on the default: a
+    # freshly opened lane was always dirty, because new-branch wrote its document and committed nothing.
+    # Since the creation push became the default it commits and pushes that document, so a lane opens
+    # CLEAN -- which is the improvement, most of all for a lane, whose whole reason to exist is work
+    # running in parallel with something else.
+    #
+    # The guard is still worth its assert; what changed is only that the state has to be arranged. Note
+    # which direction that cuts: a test resting on a convenient default passes for two reasons and tells
+    # you nothing when one of them goes away.
     Write-Host "worktree-lane.ps1 -HandBack -- refuses on a dirty lane" -ForegroundColor Cyan
     $fd = New-Fixture -Label 'd'
     Invoke-WorktreeLane -Dir $fd -From $fd -Arguments @('-Name', 'feat/lane-d', '-Title', 'Lane D') | Out-Null
     $laneD = Join-Path "$fd-lanes" 'feat--lane-d'
+    [System.IO.File]::WriteAllText((Join-Path $laneD 'work-in-progress.txt'), "half-finished`n", (New-Object System.Text.UTF8Encoding $false))
     $rD = Invoke-WorktreeLane -Dir $fd -From $fd -Arguments @('-HandBack', '-Lane', $laneD)
     Assert-Equal 1 $rD.Code "dirty lane: exit 1"
     Assert-True ($rD.Out -match 'uncommitted work') "dirty lane: message names the cause"

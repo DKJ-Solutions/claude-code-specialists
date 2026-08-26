@@ -86,14 +86,51 @@ turned a day of planned work into a one-line branch deletion.
 a parked branch is by definition *not* merged, so its loss is unrecoverable, which is exactly the wrong
 thing to automate. Check your own repo's governance before reaching for `git push origin --delete`.
 
-## park vs. new-branch -Park
+## park-cycle -- the automatic one, and you do not run it
 
-Both put a branch on the remote without a PR, but they cover different moments:
+Since [#900](https://github.com/DaveKJohn/claude-code-specialists/issues/900) a third script sits beside
+this one, and it is here rather than on its own page because the three parking moments are one subject:
 
-- **`new-branch -Park`** parks a branch **at creation** and commits **only the branch files**
-  (leaving other staged work untouched) -- start-and-park in one move.
+```powershell
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/task/park-cycle.ps1"
+```
+
+**A Stop hook invokes it after every turn**, which is the point of it -- so this line is for reading, and
+for the rare occasion you want to see why nothing was pushed. It commits and pushes
+**`contributing-davekjohn/development-cycle.md` and nothing else**, because what another device needs from
+a branch in flight is the plan, which phase is running, and where the last session stopped.
+
+**Why a hook and not a habit.** `park` and `new-branch -Park` between them produced **six** commits in the
+entire history, while the median merged branch sat invisible on `origin` for **22 minutes** (mean 35, worst
+365, nine of 38 over half an hour). An opt-in backup is a backup nobody takes.
+
+**It stops the moment a PR exists, and that is not a nicety.** The DEPLOY lock
+([#884](https://github.com/DaveKJohn/claude-code-specialists/issues/884)) refuses the merge once this
+document has diverged from what the PR published, so a pusher that kept running after `open-pr` would block
+**every merge in the repo** -- and the failure would read as the lock misbehaving rather than as the
+pusher. Same reason its fail-safe runs in that direction: when `gh` cannot say whether a PR exists, it does
+**not** push. Being one turn stale is a nuisance; an unmergeable branch is a defect.
+
+It is silent unless it does something, and it never fails a turn -- it exits 0 on every outcome, including
+the ones it refuses on. Two parameters, both for callers rather than for you:
+
+- **`-Quiet`** -- print nothing when there is nothing to do. What the hook passes, so an ordinary turn adds
+  no line to the session. A push still reports itself.
+- **`-RepoRoot <path>`** -- act on that tree instead of the one resolved from `${CLAUDE_PROJECT_DIR}` or the
+  git root. For the suite, and for a caller acting on a worktree lane.
+
+## park vs. new-branch vs. park-cycle
+
+All three put a branch on the remote without a PR. They cover different moments, and only the middle one
+is something you ask for:
+
+- **`new-branch`** pushes **at creation**, committing **only the branch document** and leaving other staged
+  work untouched. Since #900 that is what happens by **default** -- `-NoPush` is how you opt out, and
+  `-Park` is still accepted, announces that it changed nothing, and is the switch this used to need.
 - **`park` (this skill)** parks an **existing** branch **at any point mid-work** and commits
-  **everything** outstanding -- back up a branch you are already working on.
+  **everything** outstanding -- back up a branch you are already working on. The deliberate one.
+- **`park-cycle`** keeps **the one document** current on the remote for the life of the branch, on a hook,
+  until a PR publishes it. The automatic one.
 
 **The commit says which of the two you got**, since
 [#507](https://github.com/DaveKJohn/claude-code-specialists/issues/507): `park: <branch> (all outstanding
@@ -112,15 +149,27 @@ name, and every document naming either — for a clarity the fix already deliver
 settled question rather than one that returns.
 
 **Neither was deleted, and the measurement is why.** The proposal on the table was to drop `-Park` as
-"parking a branch with nothing in it yet". Across the whole history there are **three** park commits --
-**two** of them from `-Park`, one from this script. The two entry points are two *moments*, and both are
-used; what was wrong was only that the record could not tell them apart.
+"parking a branch with nothing in it yet". Across the whole history there were **three** park commits at
+the time -- **two** of them from `-Park`, one from this script. The two entry points are two *moments*, and
+both were used; what was wrong was only that the record could not tell them apart.
+
+**#900 read that same measurement the other way, and both readings are right.** Three commits (later six)
+is proof that each moment is real, *and* proof that nobody parks often enough for an opt-in to work. So the
+answer was not to delete an entry point but to stop asking: the creation push became the default and
+`park-cycle` took over the middle of the branch. This script is what is left of the deliberate act, and it
+is still the only one that commits everything outstanding.
 
 ## Requirements in the consumer
 
-Self-contained: the script needs only `git` and a configured, reachable `origin`. It reads **no**
-repo-owned config (no `branch-info.ps1`, no `repo-config.ps1`), so there is nothing to scaffold. It
-resolves its repo root dual-context via `${CLAUDE_PROJECT_DIR}`.
+`park-branch.ps1` is self-contained: it needs only `git` and a configured, reachable `origin`, reads **no**
+repo-owned config (no `branch-info.ps1`, no `repo-config.ps1`), and resolves its repo root dual-context via
+`${CLAUDE_PROJECT_DIR}`.
+
+**`park-cycle.ps1` needs a little more, because it has to find the document.** It reads
+`scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1` when they exist -- for the folder seam and the
+trunk name -- and degrades to the shared defaults when they do not, so a repo mid-adoption gets the built-in
+answers rather than a failure. A repo with no `origin` is not a failure either: there is simply nowhere to
+park to, and it says so.
 
 ## Important
 

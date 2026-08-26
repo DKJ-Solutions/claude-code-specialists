@@ -180,7 +180,7 @@ held against nothing at all, and an unprefixed name switches the check off for i
 | [`team-lifehub/`](plugins/teams/team-lifehub/) | **An add-on team.** Five specialists for a personal information hub / brain-based knowledge repo (Astrid, Fiona, Hugo, Ian, Onyx). Deliberately domain-flavored: they know their repo and teammates by name. | Only a life-hub-style repo. |
 | [`team-shopify/`](plugins/teams/team-shopify/) | **An add-on team.** Three specialists for a Shopify store repo (Liam · Liquid, Sandra · store management, Steven · configuration) plus the domain skill `start-task`. Also deliberately domain-flavored. | Only a Shopify repo (e.g. smartwatchbanden). |
 | [`team-ecomm/`](plugins/teams/team-ecomm/) | **An add-on team.** E-commerce specialists for a commercial webshop repo of any platform (Sergio · SEO, Craig · CRO, Sean · performance/SEA). Platform-agnostic, and complementary to a platform team rather than exclusive. | Any commercial webshop repo — including a Shopify repo alongside `team-shopify`. |
-| [`contributing-davekjohn/`](plugins/workflows/contributing-davekjohn/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-config` and the rest — the plugin's own README carries the full list), their shared scripts, and the two session hooks that belong to running this across several repos. Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-config` places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that deliberately wants *this* way of working on top of its own. |
+| [`contributing-davekjohn/`](plugins/workflows/contributing-davekjohn/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-config` and the rest — the plugin's own README carries the full list), their shared scripts, the two session hooks that belong to running this across several repos, and one Stop hook that keeps a branch's development cycle on `origin` (#900). Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-config` places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that deliberately wants *this* way of working on top of its own. |
 
 In short: **`team-alpha` is the foundation; everything else is optional, along two different axes.**
 `team-lifehub` and `team-shopify` describe what *kind* of repo it is, so a repo
@@ -230,6 +230,15 @@ signaling) in the **core team**, and `connector-sessioncheck` (sync signaling) p
 `script-contract-sessioncheck` (signals when a repo's own workflow libs no longer expose a function the
 shared scripts call) in **`contributing-davekjohn`**; see the
 [connectors README](connectors/README.md).
+
+**And since August 26, 2026 one hook that acts rather than reports**, which is a real widening of that list
+and named as such: `cycle-autopark` (a **Stop** hook, in `contributing-davekjohn`) commits and pushes the
+branch's `development-cycle.md` to `origin` after every turn, until a PR publishes it
+([#900](https://github.com/DaveKJohn/claude-code-specialists/issues/900)). It writes to git, so it is not
+read-only — but it is still not a *guardrail*: it blocks nothing, refuses nothing, and exits 0 on every
+outcome. What earns it a place beside the three above is that it is repo-neutral and touches exactly one
+document, whose path the shared resolver decides; the four bounds that keep it that narrow are in the
+`park` skill.
 The add-on teams `team-lifehub` and `team-shopify` may carry domain skills that a repo shares.
 
 **Those last two moved out of the core on August 8, 2026, and the reason is the doctrine rather than
@@ -540,8 +549,9 @@ matters operationally for the skills/subagents/hooks split described under
 bundled in a plugin works across all three surfaces, but a **subagent** or a **hook** runs only in
 Cowork and in Claude Code — in a plain Claude.ai Chat session they show up grayed out (see
 [Use plugins in Claude](https://support.claude.com/en/articles/13837440-use-plugins-in-claude)).
-Concretely for claude-code-specialists: the specialists roster (the subagents under Chris) and the three
-SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`)
+Concretely for claude-code-specialists: the specialists roster (the subagents under Chris), the three
+SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`) and
+the Stop hook `cycle-autopark`
 function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `fix-mojibake`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `adopt-shopify-floor`,
@@ -933,7 +943,7 @@ was measured against the `life-hub` consumer on July 29, 2026 rather than estima
 | what an uninstall leaves | measured |
 |---|---|
 | Agent defs, manuals, persona bodies, skills, shared scripts | **gone cleanly** — plugin-owned |
-| The three `SessionStart` hooks | **gone cleanly** — plugin-owned, via `${CLAUDE_PLUGIN_ROOT}` |
+| The three `SessionStart` hooks (and, since #900, the `Stop` hook beside them) | **gone cleanly** — plugin-owned, via `${CLAUDE_PLUGIN_ROOT}` |
 | Lens files under `.claude/plugins/` | **26 git-tracked files**, now referencing nothing |
 | The two `@`-imports in `CLAUDE.md` | one **actively breaks** — it points into the marketplace cache |
 | Specialist mentions in `CLAUDE.md` | **101**, across 492 lines |

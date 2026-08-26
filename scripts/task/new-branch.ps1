@@ -63,18 +63,23 @@
     standing in. Used by worktree-lane.ps1 to open a branch inside a lane worktree. Omitted (the
     normal case): unchanged behaviour -- CLAUDE_PROJECT_DIR, else the git root.
 
+.PARAMETER NoPush
+    (Optional switch) leave the branch purely local: nothing committed, nothing on origin. The escape
+    valve for the rare branch that must not be visible yet -- since #900 the creation push is what
+    happens by default, and this is the only way to opt out of it.
+
 .PARAMETER Park
-    (Optional switch) after creating the branch + its document, commit development-cycle.md and push the
-    branch to origin with `git push -u` -- NO PR. The whole document, because the plan still in flight is
-    what parking exists to hand over, and it is a section of the same file as the entry. Push is not a
-    PR: parking makes the branch reachable from another device while the PR rule stays intact and
-    separate. Default (no -Park): purely local, nothing committed or pushed.
+    (Optional switch) ACCEPTED AND DOES NOTHING SINCE #900 (August 26, 2026): what it used to ask for is
+    now the default, so a run that names it gets exactly what a run that does not get. Kept rather than
+    removed because this script is mirrored into every consumer's plugin cache, where a `-Park` typed
+    from a doc, a lens or a habit would otherwise fail on a parameter that is no longer there. It prints
+    one line saying so, and -NoPush is the switch that now changes something.
 
 .EXAMPLE
     ./scripts/task/new-branch.ps1 -Name feat/new-plugin -Title "New domain plugin"
 
 .EXAMPLE
-    ./scripts/task/new-branch.ps1 -Name feat/spotify-dashboard -Title "Spotify dashboard" -Intent "Skeleton + routing done; next: wire the API client." -Park
+    ./scripts/task/new-branch.ps1 -Name feat/spotify-dashboard -Title "Spotify dashboard" -Intent "Skeleton + routing done; next: wire the API client."
 #>
 [CmdletBinding()]
 param(
@@ -92,6 +97,10 @@ param(
     # env var answers "which repo is the session working on"; this parameter answers "which tree does
     # this one call write to", and they are not the same question.
     [string]$RepoRoot,
+    # The escape valve, and its inverse used to be the switch (see .PARAMETER NoPush / Park). Named for
+    # what it PREVENTS rather than as -Local or -Offline: the one thing it turns off is the push, and a
+    # reader who wants the branch off the remote is looking for that word.
+    [switch]$NoPush,
     [switch]$Park
 )
 
@@ -464,17 +473,36 @@ if ($cycleTaken) {
     }
 }
 
-# -Park (opt-in): make the freshly created branch reachable from another device by committing its
+# THE CREATION PUSH: make the freshly created branch reachable from another device by committing its
 # development cycle (the plan, the intent and the entry, in one document) and pushing it -- NO PR. Push != PR:
-# the PR rule stays intact and separate (see the .PARAMETER Park note). git writes progress to stderr,
+# the PR rule stays intact and separate. git writes progress to stderr,
 # which under EAP=Stop would die as a terminating NativeCommandError before the exit-code check even on
 # exit 0 (the #107 pitfall) -- so every git call goes through the shared Invoke-NativeCapture
 # (EAP=Continue -> run -> record $LASTEXITCODE), the same helper open-pr.ps1 uses for its push.
 #
-# UNCONDITIONAL ON -Park SINCE THE MERGE. It used to be gated on the child's exit code, with a warning
+# THE DEFAULT SINCE #900 (August 26, 2026), AND IT WAS A DEFAULT QUESTION RATHER THAN A BUILD. This exact
+# block ran behind -Park for nineteen days and the switch was typed SIX times in the whole history, while
+# the window it exists to close was measured over the 38 merged branches carrying a readable creation
+# stamp: median 22 minutes invisible on origin, mean 35, max 365, nine of them over half an hour. An
+# opt-in backup is a backup nobody takes -- which is what those two figures are, side by side. Dave works
+# from more than one device, so a branch that exists only locally is a branch the other device cannot see
+# and will collide with.
+#
+# -NoPush IS THE ONLY WAY OUT, and it is deliberately not gated on anything else. A branch nobody may see
+# yet is a real case; a branch nobody CAN see is the defect.
+#
+# UNCONDITIONAL SINCE THE MERGE. It used to be gated on the child's exit code, with a warning
 # branch for "the entry step failed, so nothing was parked". There is no child any more: a failure above
 # either exits or throws under EAP=Stop, so reaching this line means the files are there.
 if ($Park) {
+    # ACCEPTED, ANNOUNCED, IGNORED -- see .PARAMETER Park. Said out loud rather than swallowed, because a
+    # consumer whose doc still names the switch should learn that it is the default now, not wonder
+    # whether their run behaved differently from the one beside it.
+    Write-Host "new-branch: -Park is the default since #900 -- the switch is accepted and changes nothing." -ForegroundColor DarkGray
+}
+if ($NoPush) {
+    Write-Host "new-branch: -NoPush -- branch and document are local only, nothing is on origin." -ForegroundColor Yellow
+} else {
     . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
     # ONE IMPLEMENTATION SINCE #507 (August 7, 2026). These four steps used to be written out here as
     # well as in park-branch.ps1, and the copies had drifted where it hurts a reader rather than a
@@ -483,14 +511,22 @@ if ($Park) {
     # too, and the shared function owns both.
     . (Join-Path $PSScriptRoot '..\lib\park-lib.ps1')
 
+    # NO ORIGIN, NO PUSH -- AND CREATING THE BRANCH STILL SUCCEEDS. A repo with no remote is a legitimate
+    # repo, and until the push became the default nobody met this: you had asked for it, so the failure was
+    # the right answer. Unasked, that same exit 1 would come out of branch CREATION. Test-GitOriginConfigured
+    # carries the full reasoning; park-branch.ps1 deliberately does NOT ask this question.
+    if (-not (Test-GitOriginConfigured -RepoRoot $repoRoot)) {
+        Write-Host "new-branch: no 'origin' remote -- the branch and its document stay local." -ForegroundColor Yellow
+    } else {
     # THE ONE DOCUMENT, since the merge (Dave, August 23, 2026). Parking exists to make work reachable from
     # another device, and both halves of what a reader needs -- the plan still in flight and the claim being
     # made -- are sections of this file now, so the pair that used to be listed here is one path. Named
     # explicitly rather than swept up, so the commit stays exactly as narrow as it was: this pushes to a
     # branch, but the pathspec discipline is the same everywhere.
-    $ok = Invoke-GitPark -RepoRoot $repoRoot -Branch $Name -Scope 'BranchFiles' `
-        -Paths @($cycleRel)
-    if (-not $ok) { exit 1 }
+        $ok = Invoke-GitPark -RepoRoot $repoRoot -Branch $Name -Scope 'BranchFiles' `
+            -Paths @($cycleRel)
+        if (-not $ok) { exit 1 }
+    }
 }
 
 exit 0
