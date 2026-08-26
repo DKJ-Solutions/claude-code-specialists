@@ -13,7 +13,7 @@ at `####` beneath it; entries before August 16 carry the longer set of headings 
 every earlier shape is read exactly as it always was. Every release ever cut is listed in
 [`releases/README.md`](releases/README.md) — each with its date, type and title, and a link to what that
 release was worth. How the mechanism works (entry files, the Significance sections, folding) is described in
-[`workflow-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md).
+[`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md).
 
 Each change declares its own **reach**, and per audience how much it **weighs** there — one `#### Tier N`
 sub-section per tier, each closing with its score. This list does not order on it: it is a record of what
