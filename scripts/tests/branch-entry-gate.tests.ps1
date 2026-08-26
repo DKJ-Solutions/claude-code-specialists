@@ -310,7 +310,39 @@ try {
     $r = Invoke-Gate -Dir $shapeReal -Branch 'feat/thing'
     Assert-True ($r.Code -eq 0) 'shape/#915: the preamble the scaffolder actually writes passes the gate that reads it'
 
-    # 9. #908 -- THE SAME FIXTURE WITH -Intent, which is the one input scenario 8 does not pass and the
+    # 9. #924 -- THE FINDING NAMES THE LEVEL IT ACTUALLY READ. The gate derives the phase level from the
+    #    document's own title, and until this scenario only the [OK] line quoted that derivation: six
+    #    markers on the failure path were typed as '##'/'###'. So on the day the shape shifted one level
+    #    down, a refused document was told to demote a '###' to a '###' and to look above "the first '##'"
+    #    in a document whose phases are '###' -- the success path level-aware and the failure path not,
+    #    which is the worse way round, since the failure message is the one read while confused.
+    #
+    #    Fed the same defect twice, at two levels, through one code path. That is the only shape that can
+    #    tell "reads the document" apart from "happens to match today's constant", and it is why the
+    #    asserts match on the LEVEL rather than on the wording -- a rephrasing must not break them.
+    $strayNote = 'Parked until Dave says go.'
+    $shapeLevelNow = New-SourceRepoFixture -Label 'shape-level-now'
+    Set-Entry -Dir $shapeLevelNow -Lines ($scaffoldPreamble + @($strayNote, '') + @(
+        "$phaseHashes PLAN", '', "$phaseHashes CREATE", '', '- [x] Did the thing', '', "$phaseHashes TEST", ''
+    ) + $shapeEntry)
+    $r = Invoke-Gate -Dir $shapeLevelNow -Branch 'feat/thing'
+    Assert-True ($r.Code -ne 0) 'shape/#924: (the fixture really is refused -- the stray sits in the preamble)'
+    Assert-True ($r.Out -match ("above the first '" + $phaseHashes + "'")) `
+        "shape/#924: the preamble finding names the document's own phase level, not a typed '##'"
+    Assert-True ($r.Out -match ("as a '" + ('#' * ((Get-BranchCycleSectionLevel) + 1)) + "'")) `
+        'shape/#924: and the remedy names one level under it, so nobody is told to demote a heading to its own level'
+
+    # The legacy-level half: phases at '##', so the SAME finding has to say '##'. Written out by hand
+    # rather than generated, because the point is a document the generator no longer writes.
+    $shapeLevelLegacy = New-SourceRepoFixture -Label 'shape-level-legacy'
+    Set-Entry -Dir $shapeLevelLegacy -Lines (@($shapeLines |
+        ForEach-Object { if ($_ -eq '## PLAN') { $strayNote, '', $_ } else { $_ } }))
+    $r = Invoke-Gate -Dir $shapeLevelLegacy -Branch 'feat/thing'
+    Assert-True ($r.Code -ne 0) 'shape/#924: (the legacy-level fixture is refused too)'
+    Assert-True ($r.Out -match "above the first '##'") `
+        'shape/#924: a document whose phases are ## gets a finding that says ## -- the level follows the file, not the calendar'
+
+    # 10. #908 -- THE SAME FIXTURE WITH -Intent, which is the one input scenario 8 does not pass and the
     #    reason this defect shipped green. Scenario 8 proves the scaffolder's GUIDANCE passes the gate that
     #    reads it; it says nothing about the scaffolder's other writer into that same region. -Intent was
     #    one: it emitted a branch's parking note between the guidance and the first phase, so new-branch
