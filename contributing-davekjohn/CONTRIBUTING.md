@@ -1,4 +1,4 @@
-# Contributing — the `contributing-davekjohn` layer
+# Contributing as DaveKJohn
 
 **This is the one page this folder has.** It was two — a `CONTRIBUTING.md` holding this repo's answers and
 a `CLAUDE.md` holding the workflow's mechanics — and they merged on August 26, 2026
