@@ -32,6 +32,43 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/one-wording-merge-loop-v1` · 20260826-195859
+
+Two getters in `entry-scaffold-lib.ps1` each merged a consumer's wording overrides over a defaults map,
+and the loop was the same code line for line -- thirty-three hundred lines apart. Both are now three
+lines over one shared helper, and the rule they enforce is written down once.
+
+The cost of the duplicate was measured rather than predicted, which is why this is worth doing at all:
+[#927](https://github.com/DaveKJohn/claude-code-specialists/issues/927) was a hole in one of those
+fail-safes, and repairing it meant writing the identical guard into **both** loops. Noticing the second
+one was luck -- the report named `StepPhases`, while `Route0` and `Route1` in the other map are
+list-valued for exactly the same reason. A repair aimed at the reported key alone would have shipped with
+the same bug one key over, in the same file.
+
+`Get-EntryScaffoldWording`'s three separate getters are deliberately **not** touched: each of those is
+read by a gate that must match the writer string-for-string, so each is its own contract. These two were
+one mechanism copied, and that is the difference that makes them promotable.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing reaches the subscriber of this plugin. The seam names, the accepted container shapes and the
+verdict for every possible override value are byte-identical to what shipped before; the 522 asserts are
+what says so. A consumer's `repo-config.ps1` needs no edit and would not notice this release.
+
+**Score:** N/A
+
+#### Pull Request
+
+One wording-merge loop, not two: the seam's fail-safe is stated once
+
+Plugins: contributing-davekjohn
+
+[PR #945](https://github.com/DaveKJohn/claude-code-specialists/pull/945)
+
+---
+
 ### DEPLOY: `docs/install-skill-counter-figures-v1` · 20260826-195824
 
 `INSTALL.md`'s warning about the skill counter states no totals any more
