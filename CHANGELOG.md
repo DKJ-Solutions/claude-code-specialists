@@ -32,6 +32,95 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/the-workflow-shifts-one-level-down-v1` · 20260826-135636
+
+The development cycle document and `CHANGELOG.md` each move one heading level deeper, and
+`contributing-davekjohn/CONTRIBUTING.md` moves one shallower -- the shape Dave asked for in the edited
+[#894](https://github.com/DaveKJohn/claude-code-specialists/issues/894), which PR #905 could not have built
+because the edits landed 21 minutes before its commit and after its plan was written. A branch document is now
+`## Development cycle` with `### PLAN`, `### CREATE`, `### TEST`, `### DEPLOY`; `CHANGELOG.md` gained a real
+`## [Unreleased]` section with `###` entries under it; and CONTRIBUTING's four steps became its top level, with
+section 1 split into 1A-1H, section 2 gaining "open the PR" as its own 2A, section 3 gaining an optional 3H
+wait for a `SHIP MAIN` / `PUSH LIVE` command, and section 4 reduced to the single act that command releases.
+
+**`## [Unreleased]` is what makes the rest cost nothing, and it reverses a decision on purpose.** The flat
+changelog -- an intro followed directly by one entry per change -- was Dave's own answer of August 5, 2026. He
+reversed it here, and the mechanical argument is that the pending heading takes H2, which is what lets an entry
+nest at H3 and therefore land at exactly the level the cycle document's DEPLOY phase carries. That equality is
+what makes the fold a verbatim paste instead of a re-level, and it now has an assert in both libs -- it had
+none before, having held only by the two pairs happening to agree.
+
+**Nothing was pinned that could be composed.** Sixty assertions across six suites failed on the shift, and
+almost none of them were about the level they named: they were structural claims written with a literal `##`
+that had drifted into being a second definition of the format. Every one now reads its level from the lib, so
+the next re-level does not reproduce this afternoon.
+
+**A seventh suite held nine more, and three of them had gone GREEN.** `release-lib.tests.ps1` was not in the
+sweep above and was caught by the pre-PR gate instead, where it did not report nine failures but zero of
+anything: one fixture still built a pre-format entry at a literal `##`, `Split-Changelog` found no entry in it
+and threw, and an uncaught throw ends the run with neither a PASS count nor a FAIL count -- the exact reading
+error the TEST phase above says to watch for, met by the phase that wrote it. Six of the nine were ordinary red
+literals. The other three are the ones worth keeping: they passed `-EntryLevel 3` to `Set-EntryHeadingLevel` to
+mean *one deeper than canonical*, and once canonical WAS 3 the call became a no-op -- so "a canonical block
+still renders deeper" asserted that a block which had not moved looked like a block which had not moved. A
+literal level does not merely go stale; it goes stale in the direction that hides itself, which is why the
+repair composes both ends of every shift rather than typing the new numbers in.
+
+**And two of those pins were in the SCRIPTS, where the same drift is silent instead of red.** Both were found
+by a suite rather than by reading, and neither would have raised anything at runtime:
+
+- **`Get-EntryInsertOffset`'s `$EntryPattern` default was the literal `'(?m)^## '`.** A parameter default
+  cannot call a function, so the level had been typed -- and once it was stale, every caller relying on the
+  default saw a changelog with no entries in it. The fold then ranked each new entry against an empty list
+  and appended it, which silently reverses the order the list is supposed to hold. It is resolved in the
+  function body now. The fixture that caught it carries a comment describing this exact failure from the
+  *previous* level move, three weeks earlier -- it had been repaired by typing the new number rather than by
+  composing it, which is why it broke a second time.
+- **`session-status.ps1` walked the changelog on `'^##\s'`.** Two things went wrong at once and only one was
+  loud: entries at H3 stopped being counted, so the status block would have reported "none pending" on a
+  changelog holding nine -- and `## [Unreleased]`, which sits at exactly the level that pattern wanted, would
+  have been printed *as* a pending change. It reads the level from the lib now and skips the pending heading;
+  the no-library fallback accepts both levels, because that branch cannot ask.
+
+**This section is pure ASCII, and by the time it merged it no longer had to be.** It was flattened while
+[#907](https://github.com/DaveKJohn/claude-code-specialists/issues/907) was open -- the DEPLOY lock compares
+the section against the PR body, `ship-pr` read that body through a non-UTF-8 decode, and any non-ASCII
+character therefore made a clean document mismatch a mojibake copy of itself. Three em-dashes went to `--` to
+get this merged, exactly as [#906](https://github.com/DaveKJohn/claude-code-specialists/pull/906) had done the
+day before. [#910](https://github.com/DaveKJohn/claude-code-specialists/pull/910) closed that hole while this
+branch was still open, and it landed on `main` between this PR opening and its merge -- so the flattening is
+left standing here as the last instance of a workaround that is already gone, not as a convention. Write the
+next one normally.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+**A consumer's `CHANGELOG.md` needs migrating, and the fold and the cut now say so instead of doing something
+quiet.** Their document's entries sit at the level the pending heading occupies, so without a migration
+`Split-Changelog` finds no entries and a cut would describe nothing. That path was already guarded; the guard
+had to be widened, because with an entry one level deeper a leftover heading falls into the HEAD where neither
+loop was looking. Widening it turned up a second gap the same guard already had: a leftover heading BELOW the
+first entry -- exactly the shape of the consumer document this guard was built from, which has two of them with
+a real entry between -- was never reported at all, and the assert demanding both had been passing on the
+example list inside the refusal's own message rather than on a finding.
+
+**What does not need migrating is anything in flight.** Every reader accepts both level pairs, so a branch open
+when the plugin updates keeps folding, and this branch is the proof: its own document was scaffolded before the
+shift and is read by the merged code.
+
+**Score:** 5
+
+#### Pull Request
+
+The cycle document and CONTRIBUTING shift one heading level down
+
+Plugins: contributing-davekjohn
+
+[PR #911](https://github.com/DaveKJohn/claude-code-specialists/pull/911)
+
+---
+
 ### DEPLOY: `fix/native-capture-utf8-read-v1` · 20260826-132946
 
 The DEPLOY lock refused correct work. `ship-pr` read the PR body back through the console decoder while
