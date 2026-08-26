@@ -538,7 +538,7 @@ Both are honest answers; the gate only refuses to guess.
 # wrong the moment it is published.
 #
 # WHY THIS GATE AND NOT THE LINT ONE. The window closes at the merge, and it closes INVISIBLY: the fold
-# moves the entry into CHANGELOG.md, and the next release moves it on into releases/development/ and
+# moves the entry into CHANGELOG.md, and the next release moves it on into the changelog notes and
 # into every per-plugin CHANGELOG.md that travels to consumers in the plugin cache. By then the place
 # a reviewer would look is the one place it no longer is -- CHANGELOG.md's Pull Requests section is
 # empty after a cut. Held against all 70 archived notes: one older instance, then three in one day, so

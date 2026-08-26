@@ -1,14 +1,14 @@
 <#
 .SYNOPSIS
     Cuts a repo-wide release directly on main: bumps all plugin versions in lockstep,
-    generates release notes in releases/development/, empties CHANGELOG.md down to its intro,
+    generates the changelog notes in contributing-davekjohn/releases/changelog/, empties CHANGELOG.md down to its intro,
     updates the overview table in releases/README.md, commits that on main, and sets +
     pushes the git tag vX.Y.Z.
 
 .DESCRIPTION
     A release here is a *recorded moment*: all plugins get the same version number
     (lockstep, repo-wide) and the state is tagged as vX.Y.Z. This script itself publishes nothing
-    to GitHub Releases -- only a git tag, release notes in releases/, and a row in the overview
+    to GitHub Releases -- only a git tag, the generated notes in contributing-davekjohn/releases/, and a row in the overview
     table. For a Minor/Major bump, publishing a GitHub Release is a manual follow-up step
     the release manager takes afterward, per the cut-release skill's closing checklist; a Patch
     bump skips that step entirely (tag only).
@@ -87,10 +87,10 @@
          that says which release is which, and a baseline from a different release mislabels this one in
          four places at once without warning: the notes, the overview row, the tier gate's question, and
          whether a consumer document is drafted. Inbound #802.
-      3. Generates releases/development/<X>.x/<X.Y.Z>.md from the pending entries, grouped by TIER,
+      3. Generates <changelog root>/<X>.x/<X.Y.Z>.md from the pending entries, grouped by TIER,
          adds a row to releases/README.md, empties CHANGELOG.md down to its intro, and bumps all
          plugin.json's. Within a tier the entries are RANKED BY THEIR OWN SIGNIFICANCE SCORES FROM
-         TIER 1 UP, and deliberately not at tier 0: the development note is the record, so it stays in
+         TIER 1 UP, and deliberately not at tier 0: the changelog note is the record, so it stays in
          the order the folds left. There is no category grouping any more -- the categories keyed on the
          branch prefix, which this repo has measured does not predict impact, so a document's most
          consequential change could only be reordered within whichever label its prefix produced.
@@ -354,13 +354,15 @@ if ($null -eq $audienceTier) { $audienceTier = 2 }
 # nothing must keep meaning what it meant yesterday" still holds for exactly that reason.
 $noteRootRelPath = Get-SeamValue -Name 'Get-ReleaseNoteRoot' -Default 'releases/notes'
 
-# releases/development/, releases/github/ and releases/internal/ GAIN SEAMS HERE (issue #885, group E) --
-# #885 is the measurement the comment above used to wait for: "a seam nobody can be shown to need is a
-# knob a consumer has to read past. It comes back when somebody measures it." Each default is computed
-# the same way as the history path: source keeps its root, consumer is isolated. Read together because
+# THE THREE GENERATED ROOTS GAIN SEAMS HERE (issue #885, group E) -- the tier-0 changelog notes, the
+# GitHub Release body and the tier-1 internal note. #885 is the measurement the comment above waited for:
+# "a seam nobody can be shown to need is a knob a consumer has to read past. It comes back when somebody
+# measures it." The first two are computed the same for BOTH kinds of repo since #914 -- they exist only
+# because the workflow does, so they live in its folder everywhere -- while the internal root still keeps
+# the source-versus-consumer branch #885 gave it, because #914 did not include it. Read together because
 # all three name the SAME generated-notes tree at different tiers, and new-internal-note.ps1 must agree
 # with the last two -- see its own matching seam reads.
-$devNotesRootRelPath = Get-SeamValue -Name 'Get-ReleaseDevelopmentNotesRoot' -Default (Get-DefaultReleaseDevelopmentNotesRoot -RepoRoot $repoRoot)
+$devNotesRootRelPath = Get-SeamValue -Name 'Get-ReleaseDevelopmentNotesRoot' -Default (Get-DefaultReleaseChangelogNotesRoot -RepoRoot $repoRoot)
 Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $devNotesRootRelPath -SeamName 'Get-ReleaseDevelopmentNotesRoot'
 $githubNotesRootRelPath = Get-SeamValue -Name 'Get-ReleaseGithubNotesRoot' -Default (Get-DefaultReleaseGithubNotesRoot -RepoRoot $repoRoot)
 Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $githubNotesRootRelPath -SeamName 'Get-ReleaseGithubNotesRoot'
@@ -893,11 +895,22 @@ if ($SummaryFile) {
     }
 }
 
-# The development notes are ORDERED by tier, each tier a flat ranked list of entries, at CHANGELOG.md's own
+# The changelog notes are ORDERED by tier, each tier a flat ranked list of entries, at CHANGELOG.md's own
 # heading levels -- literally the same shape, which is what makes this tier "the whole changelog, raw and
 # complete", and what lets a hand-written note paste an entry at the level it was written at (#881). A repo
 # whose entries declare no tier gets one group and the same document in arrival order.
-$notesContent = Build-ReleaseNotes -TierGroups $tierGroups -Version $new -Date $today -Type $typeLabel -Title $Title -Summary $summaryText
+#
+# THE LINK PREFIX IS DERIVED FROM THE NOTE'S OWN DEPTH, exactly as the hand-written draft below does it,
+# and this call was the ONE that still left it at Build-ReleaseNotes' '../../../' default (issue #914,
+# August 26, 2026). That default is the depth of a root sitting directly under releases/, which is where
+# this tree sat until #914 moved it into contributing-davekjohn/ -- one level deeper, so every
+# root-relative link in every note this cut writes would have pointed one directory short. Nothing would
+# have errored: a dead relative link in a generated document is discovered by a reader, and this repo has
+# already paid for that once (the v4.6.0 overview row). The derivation is what makes the root a seam
+# rather than a constant, so the answer is right at whatever depth a repo answers with.
+$notesDepth = @($notesRelPath -split '/').Count - 1
+$notesContent = Build-ReleaseNotes -TierGroups $tierGroups -Version $new -Date $today -Type $typeLabel `
+    -Title $Title -Summary $summaryText -LinkPrefix ('../' * $notesDepth)
 # THE CHANGELOG IS EMPTIED, AND NOTHING IS WRITTEN BACK INTO IT (August 5, 2026). This call used to hand
 # over the version, the date, the type, the notes path and three seam values to rebuild a release block and
 # one section per tier. There is no block and there are no sections: the intro stays as the repo wrote it,
@@ -954,9 +967,9 @@ if ($cutNote) {
 # the sort of confidently wrong line this repo keeps finding in published records.
 #
 # IT LIVES IN ITS OWN ROOT, AND THE ROOT IS THE STATEMENT (Dave, August 12, 2026). This file used to be
-# written into releases/development/ as '<X.Y.Z>-github-body.md', which put the one GENERATED document that
+# written into the tier-0 root as '<X.Y.Z>-github-body.md', which put the one GENERATED document that
 # does get published inside the directory whose whole job is the record nobody publishes. Each root answers
-# one question now: development/ is the record, audience/ is the hand-written published document, github/ is
+# one question now: changelog/ is the record, audience/ is the hand-written published document, github/ is
 # the generated published one. The '-github-body' suffix went with the move, because the root says it and
 # both siblings are '<X.Y.Z>.md' already.
 #

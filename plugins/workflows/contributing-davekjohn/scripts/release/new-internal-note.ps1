@@ -6,7 +6,7 @@
     THE TIER-1 release document, for colleagues, employers and management. It exists at EVERY release,
     patch included, and fills the gap between the other two:
 
-      releases/development/<dir>/<X.Y.Z>.md   tier 0   developers   -- always, complete and long
+      <changelog root>/<dir>/<X.Y.Z>.md        tier 0   developers   -- always, complete and long
       releases/internal/<dir>/<X.Y.Z>.md      tier 1   colleagues   -- always, what the work is worth
       releases/consumer/<dir>/<X.Y.Z>.md    tier 2   consumers    -- minor/major, what they notice
 
@@ -169,7 +169,7 @@ if ($override) { foreach ($k in $override.Keys) { $w[$k] = $override[$k] } }
 # SEAMED (issue #885, group E), and MUST AGREE WITH cut-release.ps1's OWN READ of the same two roots --
 # both are Get-SeamValue reads of the same seam names, falling back to the same computed defaults, so a
 # repo that configures either seam is read the same way by both scripts.
-$devRootRel = Get-SeamValue -Name 'Get-ReleaseDevelopmentNotesRoot' -Default (Get-DefaultReleaseDevelopmentNotesRoot -RepoRoot $RepoRoot)
+$devRootRel = Get-SeamValue -Name 'Get-ReleaseDevelopmentNotesRoot' -Default (Get-DefaultReleaseChangelogNotesRoot -RepoRoot $RepoRoot)
 Assert-WorkflowIsolatedSeamPath -RepoRoot $RepoRoot -RelativePath $devRootRel -SeamName 'Get-ReleaseDevelopmentNotesRoot'
 $intRootRel = Get-SeamValue -Name 'Get-ReleaseInternalNotesRoot' -Default (Get-DefaultReleaseInternalNotesRoot -RepoRoot $RepoRoot)
 Assert-WorkflowIsolatedSeamPath -RepoRoot $RepoRoot -RelativePath $intRootRel -SeamName 'Get-ReleaseInternalNotesRoot'

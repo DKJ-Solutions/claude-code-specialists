@@ -93,15 +93,19 @@ function New-Fixture {
     # here, not silently in someone's release.
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1') `
         -Destination (Join-Path $dir 'scripts\lib\seam-lib.ps1') -Force
-    # .claude-plugin/marketplace.json (issue #885): this fixture places its notes at the ROOT
-    # releases/development/ and releases/internal/ and every assertion below expects them there.
-    # Get-DefaultReleaseDevelopmentNotesRoot / Get-DefaultReleaseInternalNotesRoot test exactly this
-    # file's presence, so without it the fixture reads as a consumer and the script looks for its
-    # notes inside a contributing-davekjohn/ this fixture does not have.
+    # .claude-plugin/marketplace.json (issue #885): this fixture is a SOURCE repo, and that is what
+    # Get-DefaultReleaseInternalNotesRoot keys on -- so the internal note it WRITES lands at the root
+    # releases/internal/, which is where every assertion below expects it. Without this file the fixture
+    # reads as a consumer and the script looks for both roots inside a contributing-davekjohn/ it does
+    # not have.
+    #
+    # ITS INPUT IS A DIFFERENT MATTER SINCE #914: the tier-0 root stopped branching on the source, so the
+    # changelog notes it reads sit in contributing-davekjohn/releases/changelog/ in a source repo too. The
+    # fixture carries that mixed shape deliberately, because it is this repo's own tree.
     New-Item -ItemType Directory -Path (Join-Path $dir '.claude-plugin') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $dir '.claude-plugin\marketplace.json'), '{}', $Utf8NoBom)
     if ($null -ne $NotesContent) {
-        $notesPath = Join-Path $dir "releases\development\$NotesDir\$Version.md"
+        $notesPath = Join-Path $dir "contributing-davekjohn\releases\changelog\$NotesDir\$Version.md"
         New-Item -ItemType Directory -Path (Split-Path -Parent $notesPath) -Force | Out-Null
         [System.IO.File]::WriteAllText($notesPath, $NotesContent, $Utf8NoBom)
     }
@@ -241,7 +245,7 @@ Assert-Equal 3 (@([regex]::Matches($doc, '(?m)^- \[')).Count) 'exactly three bul
 Assert-True ($doc -notmatch 'A subheading inside the entry') 'an H4 inside an entry body is not read as an entry'
 # The skeleton says it is a skeleton, and points back at its source.
 Assert-True ($doc -match 'SKELETON') 'the document announces itself as a skeleton'
-Assert-True ($doc -match 'releases/development/3\.x/3\.2\.0\.md') 'and names the notes it was built from'
+Assert-True ($doc -match 'releases/changelog/3\.x/3\.2\.0\.md') 'and names the notes it was built from'
 Assert-True ($r.Out -match 'Step 1') 'the run prints the next step'
 Assert-True ($r.Out -match 'branch') 'and says it ships via a branch (the release commit is already tagged)'
 Remove-Item -Recurse -Force -LiteralPath $happy -ErrorAction SilentlyContinue

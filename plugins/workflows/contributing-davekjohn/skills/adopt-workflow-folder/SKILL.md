@@ -148,9 +148,10 @@ no section. That is the same "hole with a comment on it" that keeps `adopt-shopi
 cut warns `<path> is missing -- row not added: <the row>` and cuts the release anyway, so the cost is
 one row added by hand rather than a broken release.
 
-The generated `releases/development/` and `releases/github/` trees stay at the repo root for the same
-reason (Dave, August 14, 2026): they are the machine-written record and the publish artefact, not the
-folder's hand-kept pages.
+The generated `releases/changelog/` and `releases/github/` trees belong in this folder too, beside
+`releases/audience/` — nothing writes them but a cut, so they exist only because this workflow does
+(#914, August 26, 2026). They are where the two root seams point by default, so a repo that answers
+nothing gets them there; a repo whose notes already sit elsewhere repoints the seam at the tree it has.
 
 And if your `Get-MojibakePaths` copy predates August 14, 2026, re-adopt it via `adopt-config`: the old
 copy still names the retired root `branch/` location, so the moved files sit outside its coverage --

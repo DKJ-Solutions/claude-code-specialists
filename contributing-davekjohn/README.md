@@ -15,10 +15,10 @@ In this repo the portable pages resolve as relative links because this is the pl
 consumer they live in the plugin install instead, which is why the consumer version of this page (the
 `adopt-workflow-folder` skill scaffolds it) names them in code rather than linking them.
 
-Two things a consumer's folder has that this one deliberately does not carry as its own: the generated
-`releases/development/` and `releases/github/` trees stay at this repo's root (they are the
-machine-written record and the publish artefact, not hand-kept pages), and this page itself is
-hand-written rather than scaffolded — the scaffold refuses a repo that publishes plugins.
+One thing a consumer's folder has that this one deliberately does not: this page itself is hand-written
+rather than scaffolded — the scaffold refuses a repo that publishes plugins. The generated
+`releases/changelog/` and `releases/github/` trees sat at this repo's root until August 26, 2026 and
+now sit here too, so on that point the two folders match (#914).
 
 **This page also carries the folder's two index sections**, below the divider: the seam table — this repo's
 answer to every question the portable half leaves open — and the pointer list saying where the rest lives.

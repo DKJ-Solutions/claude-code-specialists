@@ -5,6 +5,7 @@ paths:
   - "plugins/**/hooks/**"
   - ".github/**"
   - "releases/**"
+  - "contributing-davekjohn/releases/**"
   - "CHANGELOG.md"
   - ".gitignore"
 ---
@@ -52,8 +53,9 @@ discovery — as an earlier pass did for `.github/workflows/ci.yml` — not a qu
   document-generating template strings (the category labels, the reference line, the
   `## Releases`/plugin-CHANGELOG intro texts, the date label) were translated in that pass.
   `CHANGELOG.md` itself is now fully English (its intro paragraphs and every `## Releases` reference
-  line were translated on July 22, 2026 — Dave's decision). The archived `releases/development/*.md`
-  notes stay in their original language, so older ones remain Dutch.
+  line were translated on July 22, 2026 — Dave's decision). The archived changelog notes
+  (`contributing-davekjohn/releases/changelog/*.md`) stay in their original language, so older ones
+  remain Dutch.
 - **The script layer is ASCII, and a character the script must EMIT is written as a code point.** Measured
   August 19, 2026, on the branch that gave the changelog entry's heading a middle dot: typed literally into
   `scripts/lib/entry-scaffold-lib.ps1`, that one character came out of every generated template as `Â·`.
@@ -120,7 +122,8 @@ discovery — as an earlier pass did for `.github/workflows/ci.yml` — not a qu
   predecessor in the drift-check (`scripts/lint/check-consumer-drift.ps1`) and the bootstrap templates,
   and the `[ERROR]` marker alongside its legacy predecessor in the connector session hook
   (`connector-sessioncheck.ps1`).
-- **History** — the archived per-release notes under `releases/development/*.md` are this repo's narrow
+- **History** — the archived per-release notes under `contributing-davekjohn/releases/changelog/*.md` (at
+  `releases/development/*.md` until August 26, 2026, #914) are this repo's narrow
   exception to the norm and may remain in their original language (older ones are Dutch).
   `CHANGELOG.md` and the release-history README (now `releases/README.md`) are themselves fully English (translated July 22, 2026,
   Dave's decision), so the exception no longer covers them.
