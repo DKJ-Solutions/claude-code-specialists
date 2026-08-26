@@ -251,7 +251,7 @@ Dave caught a fifth `##` heading in this document -- `## Where this stands`, wri
 - [x] Record the rule in `plugins/workflows/contributing-davekjohn/DEVELOPMENT-portable.md` with the measurement
 - [x] State it in the scaffolder preamble (`StepsGuidance`, `scripts/lib/entry-scaffold-lib.ps1`) so every future branch document carries it; mirror regenerated via `build-shared-scripts.ps1`
 - [x] File the gate gap as [#898](https://github.com/DaveKJohn/claude-code-specialists/issues/898) -- whether the check should refuse a fifth is Dave's call, not a measurement
-- [x] File [#897](https://github.com/DaveKJohn/claude-code-specialists/issues/897): the shared-scripts counts in both `scripts/README.md` pages are stale (42 pairs, not 23; the mirror table is nine rows short). Corrected the mirror page here since #886 had to edit it; the root page and the nine rows are the issue's
+- [x] File [#897](https://github.com/DaveKJohn/claude-code-specialists/issues/897): the shared-scripts counts in both `scripts/README.md` pages were stale (42 pairs, not 23; the mirror table nine rows short). **Closed on main by another session the same day**, and it chose the better answer than my correction did: the root page now states **no count at all** and points at the registry. This branch's merge-up then left the two pages on opposite strategies, so the mirror page was brought to the same doctrine -- numbers gone, the incompleteness stated in words, the missing rows still the issue's
 
 ### 2. Rename the plugin id and its directory (decisions A + B)
 

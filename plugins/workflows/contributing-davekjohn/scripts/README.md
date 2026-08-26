@@ -23,34 +23,31 @@ the generator; the lint reports a hand edit as drift.
 
 The registry is `Get-SharedScriptPairs` in
 [`scripts/lib/shared-scripts-lib.ps1`](../../../../scripts/lib/shared-scripts-lib.ps1), and it is the
-only place that knows the answer. It holds **42 pairs** (measured August 26, 2026 by calling
-`Get-SharedScriptPairs` rather than counting by hand), and they do **not** all land here: the shared set
-spans three plugins, because a script travels to whichever plugin owns the surface that calls it.
+only place that knows the answer. **This page deliberately states no count of it**, and the root
+`scripts/README.md` made the same choice on the same day (#897): a prose tally of a machine-held list is wrong
+when typed and wrong again after the next entry. Ask the registry instead — and note the pairs do **not** all
+land here, because a script travels to whichever plugin owns the surface that calls it.
 
-| where the mirror lands | pairs | why there |
-|---|---|---|
-| `contributing-davekjohn` (this folder) | 34 | the branch/PR/release way of working, which is what this plugin *is* |
-| `team-shopify` | 6 | the store-facing scripts, whose surface belongs to the platform team |
-| `team-alpha` | 2 | `sync/check-roster-sync.ps1` and `lib/check-report-lib.ps1` — the roster check belongs to the core team, since the roster does |
+| where the mirror lands | why there |
+|---|---|
+| `contributing-davekjohn` (this folder) | the branch/PR/release way of working, which is what this plugin *is* |
+| `team-shopify` | the store-facing scripts, whose surface belongs to the platform team |
+| `team-alpha` | `sync/check-roster-sync.ps1` and `lib/check-report-lib.ps1` — the roster check belongs to the core team, since the roster does |
 
 *A fourth destination, `workflow-default`, held one pair — `lib/check-report-lib.ps1` again — until
 [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886) removed that plugin on
 August 26, 2026.*
 
-**The table below lists 25 of those 34**, one row per registered pair, and it is **not** the complete
-set for this plugin — see the note under it. Not every one is reached through a skill, and the **Skill**
-cell says so rather than linking one, so an absent link is a fact rather than an oversight.
+**The table below is NOT the complete set for this plugin**, and that is stated rather than left to be
+discovered. It is hand-maintained beside a registry that can be asked, which is the shape that goes stale:
+three rows were missing when the count was last checked (August 15, 2026 — `adopt-workflow-folder`,
+`session-status` and `source-repo-guard-lib`, each registered but never listed), and re-measuring on
+August 26 found the header, the destination split and the row list all wrong at once, the split not even
+naming `team-shopify` as a destination. The numbers are gone from this page for that reason; the missing rows
+are tracked separately, because writing each one needs a description and a Skill answer rather than a figure.
 
-*This count has now gone stale twice under the same mechanism, and the second time it was worse than the
-first. Three rows were missing when it was last checked (August 15, 2026): `adopt-workflow-folder`,
-`session-status` and `source-repo-guard-lib`, each registered but never listed. Re-measured on
-August 26, 2026 against the registry itself: the header said 23 pairs where there were 42, the split
-said 20/2/1 where it is 34/6/2, `team-shopify` was not named as a destination at all, and the table
-below is **nine rows short** of what is registered. Every figure above is now taken from
-`Get-SharedScriptPairs`; the nine missing rows are tracked separately, because writing each one needs a
-description and a skill answer rather than a number. This is a hand-maintained list of a machine-held
-registry, which is the shape that goes stale — the note warning about it was already here, which is the
-point.*
+Not every script here is reached through a skill, and the **Skill** cell says so rather than linking one, so
+an absent link is a fact rather than an oversight.
 
 | Script | What it is | Skill |
 |---|---|---|
