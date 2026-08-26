@@ -1550,6 +1550,80 @@ foreach ($dutchPhase in @('ONTWERP', 'BOUW', 'TEST')) {
 Assert-True ($dutchArc -notmatch '(?m)^#+\s+PLAN\s*$') 'and none of the English defaults leaks in beside them'
 Assert-Equal $defaultReset ((Format-DevelopmentCycle -Branch '') -join "`n") 'teardown: the default reset is restored once the seam functions are gone'
 
+# --- ONE MERGE LOOP, NOT TWO (#941) ---------------------------------------------------------------
+# WHAT WAS PROMOTED AND WHY. Get-EntrySignificanceWording and Get-BranchFileWording each merged a
+# consumer's override map over a defaults map, and the loop was the same code line for line -- the
+# container split, the PS 5.1 string-indexing note, and both fail-safes. The cost was measured rather
+# than predicted: #927 above is a hole in the second fail-safe, and repairing it meant writing the
+# identical guard into BOTH loops. Noticing the second one at all was luck, because the report named
+# StepPhases while Route0 and Route1 are list-valued for exactly the same reason.
+#
+# SO THE ASSERTS BELOW RUN THE SAME THREE RULES DOWN BOTH SEAMS. That is the point of the block: a
+# rule stated once has to be provably reachable from both callers, otherwise the promotion has only
+# moved the duplication into the tests.
+Write-Host ""
+Write-Host "one merge loop, not two (#941)" -ForegroundColor Cyan
+
+# The container walk on its own, which is the half all THREE getters share. A hashtable is what a
+# consumer reaches for, an ordered dictionary is what copying a defaults block produces, and a
+# pscustomobject is what a repo returning a literal object hands back.
+Assert-Equal 'x' (Get-OverrideMapValue -Map @{ K = 'x' } -Key 'K')                  'map walk: a hashtable answers for a key it carries'
+Assert-Equal $null (Get-OverrideMapValue -Map @{ K = 'x' } -Key 'Other')            'map walk: and $null for one it does not'
+Assert-Equal 'x' (Get-OverrideMapValue -Map ([ordered]@{ K = 'x' }) -Key 'K')       'map walk: an ordered dictionary answers the same way'
+# THE PS 5.1 PITFALL, ASSERTED RATHER THAN DESCRIBED. $o['Key'] on a pscustomobject returns $null
+# SILENTLY, so a walk that indexed by string would read as "override absent" for every key such a
+# consumer set -- their whole seam ignored, with nothing reporting it.
+Assert-Equal 'x' (Get-OverrideMapValue -Map ([pscustomobject]@{ K = 'x' }) -Key 'K') 'map walk: a pscustomobject is read through PSObject, not by string index'
+Assert-Equal $null (Get-OverrideMapValue -Map $null -Key 'K')                        'map walk: no map at all is not an error, it is simply no answer'
+Assert-Equal $null (Get-OverrideMapValue -Map @{ K = $null } -Key 'K')               'map walk: present-but-null and absent are the same answer'
+
+# RULE 1, DOWN BOTH SEAMS: a key present but EMPTY keeps the default.
+$sigDefaults = Get-EntrySignificanceWording
+function Get-EntrySignificanceWordingOverrides { return @{ Uncomment1 = '' } }
+Assert-Equal $sigDefaults.Uncomment1 (Get-EntrySignificanceWording).Uncomment1 'significance seam: an empty override is ignored -- the same fail-safe the branch-file seam has'
+Remove-Item -Path Function:\Get-EntrySignificanceWordingOverrides
+
+# RULE 2, DOWN BOTH SEAMS: a LIST that leaves nothing usable behind keeps the default. Asserted on
+# the significance side because that is the side nobody had measured -- #927 was reported against
+# StepPhases, and Route0 was one key over with the identical shape.
+function Get-EntrySignificanceWordingOverrides { return @{ Route0 = @('', '') } }
+Assert-Equal (@($sigDefaults.Route0) -join '|') (@((Get-EntrySignificanceWording).Route0) -join '|') 'significance seam: a blank-only Route0 is ignored too -- the #927 rule, reached from the other caller'
+Remove-Item -Path Function:\Get-EntrySignificanceWordingOverrides
+
+# RULE 3, DOWN BOTH SEAMS: the pscustomobject shape is honoured, not silently dropped.
+function Get-EntrySignificanceWordingOverrides { return [pscustomobject]@{ Uncomment1 = 'HUN EIGEN ZIN' } }
+Assert-Equal 'HUN EIGEN ZIN' (Get-EntrySignificanceWording).Uncomment1 'significance seam: a pscustomobject override is honoured'
+Remove-Item -Path Function:\Get-EntrySignificanceWordingOverrides
+function Get-BranchFileWordingOverrides { return [pscustomobject]@{ TrunkWarningLead = 'PAS OP op `{0}`:' } }
+$objLead = (Format-DevelopmentCycle -Branch '') -join "`n"
+Remove-Item -Path Function:\Get-BranchFileWordingOverrides
+Assert-True ($objLead -match '(?m)^> PAS OP op `main`:') 'branch-file seam: and so is one on the other side of the same helper'
+
+# AND A REAL OVERRIDE STILL WINS ON BOTH, which is the seam's purpose and the thing a shared fail-safe
+# is most likely to break on its way past.
+function Get-EntrySignificanceWordingOverrides { return @{ Route0 = @('Verder naar Tier 1?') } }
+Assert-Equal 'Verder naar Tier 1?' (@((Get-EntrySignificanceWording).Route0) -join '|') 'significance seam: a real list override is untouched by either fail-safe'
+# AND IT IS STILL A LIST, which is the other half of the trap the helper's comma-wrap exists for: a
+# function returning a ONE-ELEMENT array unrolls it to the bare element, so this key would come back a
+# string while every other consumer's two-element one came back an array. The two inline loops read the
+# value directly and could not meet that; promoting them into a function is what created the risk.
+Assert-True ((Get-EntrySignificanceWording).Route0 -is [Array]) 'significance seam: and a one-element list override is still a LIST, not the bare string'
+Remove-Item -Path Function:\Get-EntrySignificanceWordingOverrides
+Assert-Equal ($sigDefaults.Route0 -join '|') ((Get-EntrySignificanceWording).Route0 -join '|') 'teardown: the significance defaults are back once the seam function is gone'
+
+# THE THIRD GETTER IS NOT THE SAME RULE, AND THAT IS THE POINT OF SPLITTING THE HELPER IN TWO.
+# Get-EntryGuidance reads its map the same way and then answers differently: an empty block means
+# "this repo wants no guidance", which is a documented answer rather than a missing one. Folding the
+# wording fail-safe into it would have made that answer UNREACHABLE -- a consumer switching guidance
+# off would silently get the English defaults back. Recounted while promoting the loop the issue
+# named: the container walk is shared by three callers, the verdict by two.
+$guidanceDefaults = Get-EntryGuidance
+function Get-EntryGuidanceOverrides { return @{ What = @() } }
+Assert-Equal 0 (@((Get-EntryGuidance).What).Count) 'guidance seam: an EMPTY block is honoured -- the opposite verdict, on purpose'
+Assert-True ((@((Get-EntryGuidance).Type) -join '|') -eq (@($guidanceDefaults.Type) -join '|')) 'guidance seam: and a key the consumer did not mention keeps its default'
+Remove-Item -Path Function:\Get-EntryGuidanceOverrides
+Assert-Equal (@($guidanceDefaults.What) -join '|') (@((Get-EntryGuidance).What) -join '|') 'teardown: the guidance defaults are back once the seam function is gone'
+
 Write-Host ""
 Write-Host "Remove-EntryAdminSections" -ForegroundColor Cyan
 # THE DEFECT THESE GUARD is not a missing stripper but a stripper aimed one level up: the heading rewrite

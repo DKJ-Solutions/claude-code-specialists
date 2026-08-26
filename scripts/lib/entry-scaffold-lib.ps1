@@ -1151,6 +1151,108 @@ $script:EntryGuidanceDefaults = [ordered]@{
     TierOptional = @()
 }
 
+function Get-OverrideMapValue {
+    <#
+        The value a consumer's override map carries for one key, or $null where it carries none.
+
+        TWO CONTAINERS TO SUPPORT, because a seam is hand-written: a hashtable is what a consumer reaches
+        for, an ordered dictionary is what copying a defaults block produces, and a pscustomobject is what
+        a repo returning a literal object hands back. A pscustomobject CANNOT BE INDEXED BY STRING in
+        PS 5.1 -- $o['Key'] returns $null silently, which would read as "override absent" for every key a
+        consumer set -- so that shape is read through PSObject.Properties instead.
+
+        ABSENT AND PRESENT-BUT-NULL ARE THE SAME ANSWER HERE, deliberately: every caller skips both, so
+        collapsing them costs nothing and saves the sentinel that a separate "was it there" flag would
+        need.
+
+        WHAT COUNTS AS AN ANSWER IS NOT THIS FUNCTION'S QUESTION (#941). Three getters in this file read a
+        map this way, and they do NOT agree on the line that follows: the two wording getters ignore an
+        empty value and keep their default, while Get-EntryGuidance takes it, because a repo that wants no
+        guidance says so by returning nothing. Folding those two rules into one helper would have made an
+        empty guidance block unreachable -- so the READ is shared and the VERDICT stays with the caller.
+    #>
+    param(
+        [AllowNull()]$Map,
+        [Parameter(Mandatory)][string]$Key
+    )
+    # EVERY RETURN IS COMMA-WRAPPED, AND THAT IS LOAD-BEARING. A function returning @() emits NOTHING,
+    # so the caller's variable is $null rather than an empty array -- and a one-element list is UNROLLED
+    # to the bare element, so a consumer's single-item override would come back a string. The two loops
+    # this was promoted out of read the value INLINE and never met either. The regression was caught by
+    # entry-scaffold.tests.ps1 asserting that an empty guidance block survives the seam, which is what
+    # Get-EntryGuidance documents a repo may say. ',$x' returns the object itself, whatever shape it has.
+    if ($Map -is [System.Collections.IDictionary]) {
+        if (-not $Map.Contains($Key)) { return $null }
+        return ,$Map[$Key]
+    }
+    if ($Map -and $Map.PSObject.Properties[$Key]) { return ,$Map.PSObject.Properties[$Key].Value }
+    return $null
+}
+
+function Merge-WordingOverrides {
+    <#
+        A consumer's wording overrides merged over a defaults map, as a pscustomobject -- the whole body
+        of both Get-EntrySignificanceWording and Get-BranchFileWording.
+
+        IT WAS THE SAME LOOP TWICE, thirty-three hundred lines apart in this file, and what it cost was
+        measured rather than predicted (#941). #927 was a hole in the second fail-safe below; repairing it
+        meant writing the identical guard line into BOTH loops, and noticing the second one at all was
+        luck -- the report named StepPhases, while Route0 and Route1 in the significance defaults are
+        list-valued for exactly the same reason. A repair aimed at the reported key alone would have
+        shipped with the same bug one key over, in the same file.
+
+        NOT Get-EntryScaffoldWording'S THREE SEPARATE GETTERS, which stay exactly as they are: each of
+        those is read by a GATE that must match the writer string-for-string, so each is its own contract
+        with its own name. These two were one mechanism copied, and that is what makes them promotable
+        where those three are not.
+
+        WHAT COUNTS AS AN ANSWER FROM A CONSUMER is the rule this function states, once:
+
+          - A KEY PRESENT BUT EMPTY IS IGNORED, the same fail-safe Get-EntryScaffoldWording uses: an empty
+            heading would produce a document with a blank line where its title should be, and nothing
+            would report it. An empty string is falsy, so a consumer who empties a key keeps the default.
+          - AND A LIST THAT LEAVES NOTHING USABLE BEHIND IS IGNORED TOO (#927, August 26, 2026). The
+            truthiness test measures the CONTAINER, and for every scalar that is the right question; an
+            empty array is falsy too, so that state is not reachable through it either. A list of BLANKS
+            is a third object and the one that got through -- two empty strings make a two-element array,
+            which is TRUTHY -- so it passed the test and was emptied AFTERWARDS, downstream, where every
+            reader of a list here filters the blanks out. StepPhases showed what that cost:
+            Format-DevelopmentCycle was left with no phase heading to write the scaffolded step under,
+            wrote it bare, and the step landed in the region check-branch-entry.ps1's #899 check calls the
+            preamble -- so that consumer's EVERY branch was refused, with no way through but deleting the
+            step the scaffolder had just written for them. The two sides of the seam disagreed about one
+            word: this one asked whether anything was THERE, the readers asked whether anything was
+            USABLE. It asks the readers' question now, so 'empty' means the same thing on both sides.
+
+        ONLY KEYS THE DEFAULTS ALREADY CARRY ARE READ, so a consumer inventing a key of their own gets it
+        ignored rather than added -- which is what keeps the map a contract instead of a bag.
+
+    .PARAMETER Defaults
+        The English defaults map: $script:EntrySignificanceWordingDefaults, $script:BranchFileDefaults.
+
+    .PARAMETER OverrideCommand
+        The NAME of the consumer's seam function. A name rather than a value, so "is it defined at all"
+        has one answer here instead of one per caller; an undefined seam simply returns the defaults.
+    #>
+    param(
+        [Parameter(Mandatory)]$Defaults,
+        [Parameter(Mandatory)][string]$OverrideCommand
+    )
+    $out = [ordered]@{}
+    foreach ($key in $Defaults.Keys) { $out[$key] = $Defaults[$key] }
+
+    if (-not (Get-Command $OverrideCommand -ErrorAction SilentlyContinue)) { return [pscustomobject]$out }
+    $overrides = & $OverrideCommand
+    if (-not $overrides) { return [pscustomobject]$out }
+
+    foreach ($key in @($out.Keys)) {
+        $v = Get-OverrideMapValue -Map $overrides -Key $key
+        if (($v -is [Array]) -and @($v | Where-Object { $_ }).Count -eq 0) { continue }
+        if ($v) { $out[$key] = $v }
+    }
+    return [pscustomobject]$out
+}
+
 function Get-EntryGuidance {
     <#
         The per-field guidance blocks, as an object of string arrays -- this repo's answers where
@@ -1163,17 +1265,14 @@ function Get-EntryGuidance {
     foreach ($key in $script:EntryGuidanceDefaults.Keys) { $out[$key] = $script:EntryGuidanceDefaults[$key] }
     if (Get-Command Get-EntryGuidanceOverrides -ErrorAction SilentlyContinue) {
         $override = Get-EntryGuidanceOverrides
-        if ($override) {
-            foreach ($key in @($out.Keys)) {
-                $v = $null
-                if ($override -is [System.Collections.IDictionary]) {
-                    if (-not $override.Contains($key)) { continue }
-                    $v = $override[$key]
-                } elseif ($override.PSObject.Properties[$key]) {
-                    $v = $override.PSObject.Properties[$key].Value
-                } else { continue }
-                if ($null -ne $v) { $out[$key] = @($v) }
-            }
+        foreach ($key in @($out.Keys)) {
+            # THE READ IS SHARED, THE ANSWER RULE IS NOT (#941). Get-OverrideMapValue is the same container
+            # walk the two wording getters use -- the hashtable/pscustomobject split and the PS 5.1
+            # string-indexing pitfall live there now. What differs is the line below it: there an empty
+            # value means "no answer, keep the default", here it means "this repo wants no guidance", which
+            # is a documented answer. So anything PRESENT is taken, empty included.
+            $v = Get-OverrideMapValue -Map $override -Key $key
+            if ($null -ne $v) { $out[$key] = @($v) }
         }
     }
     return [pscustomobject]$out
@@ -1274,31 +1373,13 @@ function Get-EntrySignificanceWording {
         One getter returning a map rather than three, for the reason Get-BranchFileWording gives: these are
         document prose read by a human, not markers a gate matches string-for-string, and a repo that
         translates one translates all of them.
+
+        THE MERGE ITSELF IS Merge-WordingOverrides, shared with Get-BranchFileWording since #941. Route0
+        and Route1 are list-valued here, so the list fail-safe #927 measured on StepPhases governs this map
+        for exactly the same reason -- which is the whole argument for stating it in one place.
     #>
-    $out = [ordered]@{}
-    foreach ($key in $script:EntrySignificanceWordingDefaults.Keys) {
-        $out[$key] = $script:EntrySignificanceWordingDefaults[$key]
-    }
-    if (Get-Command Get-EntrySignificanceWordingOverrides -ErrorAction SilentlyContinue) {
-        $override = Get-EntrySignificanceWordingOverrides
-        if ($override) {
-            foreach ($key in @($out.Keys)) {
-                $v = $null
-                if ($override -is [System.Collections.IDictionary]) {
-                    if (-not $override.Contains($key)) { continue }
-                    $v = $override[$key]
-                } elseif ($override.PSObject.Properties[$key]) {
-                    $v = $override.PSObject.Properties[$key].Value
-                } else { continue }
-                # THE SAME LIST RULE AS Get-BranchFileWording'S, and live here for the same reason: Route0 and
-                # Route1 are lists, so a blank-only override would pass the test below and put empty lines into
-                # the Significance section. The reasoning is written out once, at that seam (#927).
-                if (($v -is [Array]) -and @($v | Where-Object { $_ }).Count -eq 0) { continue }
-                if ($v) { $out[$key] = $v }
-            }
-        }
-    }
-    return [pscustomobject]$out
+    return Merge-WordingOverrides -Defaults $script:EntrySignificanceWordingDefaults `
+        -OverrideCommand 'Get-EntrySignificanceWordingOverrides'
 }
 
 function Format-EntrySignificanceSections {
@@ -4600,49 +4681,13 @@ function Get-BranchFileWording {
         gaining a fourteenth -- a count of the keys directly below it goes stale every time one is added,
         and buys a reader nothing that reading the map does not.)
 
-        A key present but EMPTY is ignored, the same fail-safe Get-EntryScaffoldWording uses: an empty
-        heading would produce a document with a blank line where its title should be, and nothing would
-        report it.
+        THE MERGE ITSELF IS Merge-WordingOverrides, shared with Get-EntrySignificanceWording since #941 --
+        the two getters were the same loop line for line, thirty-three hundred lines apart. Both fail-safes
+        are stated there, once: a key present but EMPTY is ignored, and so is a list override that leaves
+        nothing usable behind (#927).
     #>
-    $out = [ordered]@{}
-    foreach ($key in $script:BranchFileDefaults.Keys) { $out[$key] = $script:BranchFileDefaults[$key] }
-    if (Get-Command Get-BranchFileWordingOverrides -ErrorAction SilentlyContinue) {
-        $overrides = Get-BranchFileWordingOverrides
-        if ($overrides) {
-            foreach ($key in @($out.Keys)) {
-                # Two containers to support, because a seam is hand-written: a hashtable is what a
-                # consumer reaches for, an ordered dictionary is what copying the block above produces.
-                $v = $null
-                if ($overrides -is [System.Collections.IDictionary]) {
-                    if (-not $overrides.Contains($key)) { continue }
-                    $v = $overrides[$key]
-                } elseif ($overrides.PSObject.Properties[$key]) {
-                    # A pscustomobject cannot be indexed by string in PS 5.1 -- $o['Key'] returns $null
-                    # silently, which would read as "override absent" for every key a consumer set.
-                    $v = $overrides.PSObject.Properties[$key].Value
-                } else { continue }
-                # AND A LIST OVERRIDE THAT LEAVES NOTHING USABLE BEHIND IS IGNORED TOO (#927, August 26,
-                # 2026). The test below measures the CONTAINER, and for every scalar here that is the right
-                # question: an empty string is falsy, so a consumer who empties a key keeps the default, and
-                # that is the whole point of the fail-safe. An empty ARRAY is falsy too, which is why the
-                # state #927 reported -- a consumer emptying this seam -- is not reachable through it at all.
-                # A list of BLANKS is a third object, and the one that got through -- two
-                # empty strings make a two-element array, which is TRUTHY -- so it passed the test and was
-                # emptied AFTERWARDS, downstream, where every reader of a list here filters the blanks out.
-                #
-                # StepPhases is the key that showed what that cost. Format-DevelopmentCycle was left with no
-                # phase heading to write the scaffolded step under, wrote it bare, and the step landed in the
-                # region check-branch-entry.ps1's #899 check calls the preamble -- so that consumer's EVERY
-                # branch was refused, with no way through but deleting the step the scaffolder had just
-                # written for them. The two sides of the seam disagreed about one word: this one asked whether
-                # anything was THERE, the readers asked whether anything was USABLE. It asks the readers'
-                # question now, so 'empty' means the same thing on both sides of it.
-                if (($v -is [Array]) -and @($v | Where-Object { $_ }).Count -eq 0) { continue }
-                if ($v) { $out[$key] = $v }
-            }
-        }
-    }
-    return [pscustomobject]$out
+    return Merge-WordingOverrides -Defaults $script:BranchFileDefaults `
+        -OverrideCommand 'Get-BranchFileWordingOverrides'
 }
 
 function Format-BranchFileHeadingLine {
