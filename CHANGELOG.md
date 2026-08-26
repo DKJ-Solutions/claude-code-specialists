@@ -32,6 +32,42 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/seam-lib-folder-name-v1` · 20260826-220447
+
+`scripts/lib/seam-lib.ps1` is the file whose entire job is composing the workflow folder's name, and four
+of its own statements still named the pre-rename folder as the answer. A reader who trusted the prose next
+to `Get-WorkflowFolderName` -- whose docstring argues at length that hardcoding either name is wrong --
+concluded the default resolves inside `workflow-davekjohn/`. The four are rewritten to name the function
+instead of a folder, so the next rename cannot make them wrong again.
+
+The sweep the issue asked for found six more in two documents: `DEVELOPMENT-portable.md`, which ships to
+every consumer and told them the branch's one file lives at a path the scaffolder no longer writes, and
+`contributing-davekjohn/releases/README.md`, which named the plugin by its retired name and pointed at two
+`releases/page/` paths `.gitignore` already spells the other way.
+
+No behaviour changed and nothing was added: 10 statements in 3 files, plus the regenerated mirror. The
+other 347 occurrences of the old name in this tree were measured and deliberately left -- the dual-name
+scanners, the tests that pin the pre-rename answer, the published record, and the connector register.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Nothing a subscriber acts on: this is documentation prose in a shared script and two workflow documents,
+with no change to what any function returns.
+
+**Score:** N/A
+
+#### Pull Request
+
+seam-lib and two docs name the pre-rename workflow folder in live statements
+
+Plugins: contributing-davekjohn
+
+[PR #950](https://github.com/DaveKJohn/claude-code-specialists/pull/950)
+
+---
+
 ### DEPLOY: `feat/release-roots-changelog-move-v1` · 20260826-214629
 
 The three note roots are siblings. `releases/development/` is `contributing-davekjohn/releases/changelog/`
