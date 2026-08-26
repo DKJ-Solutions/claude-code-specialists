@@ -295,7 +295,7 @@ The constitution above, concretely implemented here:
      the document exists only while a branch is open — which narrows what the exception does without
      changing what it may touch. Committing stays opt-in, because it is this exception being used.
   2. The **release commit** (only on explicit request): [`cut-release.ps1`](scripts/release/cut-release.ps1)
-     bumps all plugin versions in lockstep, generates the release notes in `releases/development/`,
+     bumps all plugin versions in lockstep, generates the release notes in `contributing-davekjohn/releases/`,
      **empties `CHANGELOG.md` down to its intro**, commits that on `main`, and tags `vX.Y.Z`.
      Deliberately no branch/PR — just like the fold. **A major additionally needs two preparation
      commits ahead of it** (Dave, August 9, 2026), under this same exception and bounded just as

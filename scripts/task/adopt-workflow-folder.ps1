@@ -190,7 +190,7 @@ $folderContributing = @(
     '  plugin never has to guess at the shape of a file it does not own.',
     ('- `releases/README.md` here states this repo''s release ANSWERS, and IS the release LIST the cut'),
     ('  inserts its row into (at `' + $historyRelPath + '`) -- a history that stays with the repo that cut'),
-    '  it. `releases/audience/` is where the cut drafts the hand-written note; `releases/development/`,',
+    '  it. `releases/audience/` is where the cut drafts the hand-written note; `releases/changelog/`,',
     '  `releases/github/` and `releases/internal/` hold the generated documents.',
     '',
     '## Specific to this repo',

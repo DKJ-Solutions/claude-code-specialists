@@ -151,7 +151,7 @@ foreach ($fn in 'Get-ReservedRootMd', 'Get-ReleasePluginTier', 'Get-ReleaseConsu
 # because that reasoning is what has to fail if anyone reclassifies it back.
 $grpRec = $contract | Where-Object { $_.Function -eq 'Get-ReleaseNotesGrouping' }
 Assert-Equal 'decide' $grpRec.Adopt 'Get-ReleaseNotesGrouping describes a TREE, not a way of working -- so it is proposed, never placed'
-Assert-Match 'releases/development' $grpRec.Returns 'and its Returns text names the tree the answer is read off, so a decider does not have to guess'
+Assert-Match 'releases/changelog' $grpRec.Returns 'and its Returns text names the tree the answer is read off, so a decider does not have to guess (the tier-0 directory renamed development -> changelog in #914; the assert follows the current name, because a decider compares it against a tree they have TODAY)'
 
 # branch-info.ps1 says of ITSELF that it is repo-owned and does not travel, and its refusal of 'chore/'
 # is written down as this repo's rule. Both records were classified 'copy' on the first pass; this

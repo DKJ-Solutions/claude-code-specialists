@@ -153,20 +153,36 @@ Assert-True ($plannedBlock.Success -and $plannedBlock.Value -match 'noteRelPath'
 # leaving it out of the pre-flight would let a re-cut clobber a published Release body without a word.
 Assert-True ($plannedBlock.Success -and $plannedBlock.Value -match 'bodyRelPath') `
     'the generated GitHub Release body is guarded too, at every release'
+# THE TIER-0 NOTES' LINK PREFIX IS DERIVED, NOT DEFAULTED (issue #914, August 26, 2026). Build-ReleaseNotes
+# defaults $LinkPrefix to '../../../', the depth of a root sitting directly under releases/ -- and #914 moved
+# this repo's root one level deeper, into contributing-davekjohn/. The call had been relying on that default
+# since the function existed, so the move would have written every root-relative link in every note one
+# directory short, with nothing erroring: a dead relative link inside a tagged, immutable document, found by
+# a reader. Asserted on the CALL, because that is where the mistake was, and on the derivation rather than on
+# a count of '../' -- pinning four would turn red for the next repo whose root sits somewhere else, which is
+# the whole reason the root is a seam.
+Assert-True ($cutReleaseText -match '(?m)^\$notesDepth\s*=\s*@\(\$notesRelPath -split') `
+    "the tier-0 notes' link depth is derived from the note path the seam produced"
+Assert-True ($cutReleaseText -match "-LinkPrefix \('\.\./' \* \`$notesDepth\)") `
+    'and Build-ReleaseNotes is called with it rather than left on its shallowest-shape default'
 # THE BODY HAS ITS OWN ROOT SINCE AUGUST 12, 2026 (Dave). Asserted on the ROOT rather than on the whole
 # literal, so a grouping change (<X>.x -> <X.Y>) does not turn this red for a reason it is not about. It
 # used to be written into releases/development/ with a '-github-body' suffix: the one generated document
 # that IS published, sitting in the directory whose whole job is the record nobody publishes.
 #
 # SEAMED SINCE ISSUE #885, GROUP E: the literal 'releases/github/' is gone from this assignment, replaced
-# by $githubNotesRootRelPath, whose own computed default (Get-DefaultReleaseGithubNotesRoot, in
-# seam-lib.ps1) is 'releases/github' for the source. Asserted in two parts so a regression in either half
-# is attributable: the assignment reads the seam variable, and that variable's default really is the old
-# literal for a repo that answers nothing.
+# by $githubNotesRootRelPath, whose own computed default lives in seam-lib.ps1
+# (Get-DefaultReleaseGithubNotesRoot). Asserted in two parts so a regression in either half is
+# attributable: the assignment reads the seam variable, and that variable's default really resolves where
+# this repo's tree is.
+#
+# THE DEFAULT MOVED INTO THE WORKFLOW FOLDER IN #914 (August 26, 2026) and stopped branching on the
+# source, which is why the second assert is on the COMPOSED path and not on a literal any more. The
+# source-versus-consumer half is asserted where it belongs, in seam-lib.tests.ps1.
 Assert-True ($cutReleaseText -match '(?m)^\$bodyRelPath\s*=\s*"\$githubNotesRootRelPath/') `
     'the generated body is written from the seamed github-notes root'
-Assert-True ($seamLibText -match "return 'releases/github'") `
-    "and that seam's computed default for the source repo is still releases/github"
+Assert-True ($seamLibText -match [regex]::Escape('/releases/github"')) `
+    "and that seam's computed default composes the workflow folder with releases/github"
 # THE NEGATIVE HALF IS SCOPED TO THE ASSIGNMENT, and that is not fussiness -- the WHY comment three lines
 # above the assignment quotes the retired filename, so a check over the whole script text would fail on the
 # sentence explaining the move. Assert on the line that decides, not on the file that mentions.

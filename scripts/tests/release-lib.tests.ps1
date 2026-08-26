@@ -713,7 +713,15 @@ Assert-Equal 'development/4.x/4.9.0.md' (Get-RelativeLinkPath -FromDir 'releases
 Assert-Equal 'audience/4.x/4.9.0.md' (Get-RelativeLinkPath -FromDir 'contributing-davekjohn/releases' -To 'contributing-davekjohn/releases/audience/4.x/4.9.0.md') `
     'workflow folder: the audience note sits under the same README'
 Assert-Equal '../../releases/development/4.x/4.9.0.md' (Get-RelativeLinkPath -FromDir 'contributing-davekjohn/releases' -To 'releases/development/4.x/4.9.0.md') `
-    'workflow folder: the development notes stay at the repo root, so the row climbs out'
+    'the pre-#914 layout: a history inside the folder and the notes at the repo root, so the row climbs out'
+# THE SHAPE EVERY ROW IN THIS REPO ACTUALLY HAS SINCE #914 (August 26, 2026), and nothing asserted it
+# before: the history stayed at releases/README.md while all three note trees moved into
+# contributing-davekjohn/releases/, so every one of the 102 rows climbs out of releases/ and back down.
+# The two cases above it are the pre-#914 layouts and are kept -- a consumer may still have either.
+Assert-Equal '../contributing-davekjohn/releases/changelog/4.x/4.9.0.md' (Get-RelativeLinkPath -FromDir 'releases' -To 'contributing-davekjohn/releases/changelog/4.x/4.9.0.md') `
+    'this repo since #914: the history stays at the root and the notes moved into the folder, so the row climbs out'
+Assert-Equal '../contributing-davekjohn/releases/audience/4.x/4.9.0.md' (Get-RelativeLinkPath -FromDir 'releases' -To 'contributing-davekjohn/releases/audience/4.x/4.9.0.md') `
+    'and the same for a release that has a hand-written note -- the shape 30 rows already had'
 Assert-Equal 'CHANGELOG.md' (Get-RelativeLinkPath -FromDir '' -To 'CHANGELOG.md') `
     'an empty from-dir returns the path itself'
 $lnTier = Build-ReleaseNotes -TierGroups @([pscustomobject]@{ Tier = 1; Entries = @($linkEntry) }) -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'

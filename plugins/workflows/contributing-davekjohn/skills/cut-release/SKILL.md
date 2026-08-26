@@ -616,11 +616,12 @@ owes this text. Write it there, and the cut carries it outward for you.
   **The default is still `releases/notes/` even though the source repo now answers `releases/audience/`**,
   and that is deliberate: an unstated seam has to keep meaning what it meant yesterday, so a repo that never
   answered this knob is not silently pointed at a directory it does not have. Consider matching the source's
-  rename if it suits you — every root under its `releases/` now names its **reader** (`development/`,
-  `audience/`, `github/`) rather than the form of the document — but nothing requires it.
+  rename if it suits you — every one of its note roots now names its **reader** or its content
+  (`changelog/`, `audience/`, `github/`) rather than the form of the document — but nothing requires it.
   The per-release folder *inside* it stays `Get-ReleaseNotesGrouping`'s answer, so this is the root alone,
-  with no trailing slash. `releases/development/` deliberately has no equivalent: nobody has yet been able
-  to show a repo that differs on it, and a seam nobody needs is a knob every reader has to read past.
+  with no trailing slash. The tier-0 tree had no equivalent knob until #885 measured one into existence
+  (`Get-ReleaseDevelopmentNotesRoot`), and #914 then moved and renamed the directory it points at — while
+  THIS seam's fallback deliberately stayed put, being the one consumers already answer or rely on.
 - **Six seams retired on August 5, 2026, and a consumer that still defines one is unaffected** — nothing
   calls them, so they are simply dead code in that repo's config. `Get-ChangelogTierHeadings` and the legacy
   `Get-ChangelogHeading` (#178) configured changelog section headings, and the document has none;

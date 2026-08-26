@@ -216,7 +216,7 @@ infrastructure.
     above, before it shipped: the degrade path is an `else`, and an assert pins that a block *after* the
     failing one still prints.
 - **`scripts/lib/release-lib.ps1`** — the pure release helpers (version bump, emptying `CHANGELOG.md` down
-  to its intro, and the assembly of the `releases/development/` notes)
+  to its intro, and the assembly of the changelog notes under `contributing-davekjohn/releases/changelog/`)
   that [`cut-release.ps1`](../../../scripts/release/cut-release.ps1) dot-sources; deliberately
   pure so [Tycho #18](04-18-extension.md) can test them in isolation. The release *process* is
   [Rendall #06](05-06-extension.md)'s domain; Sylvester guards the script mechanics underneath.

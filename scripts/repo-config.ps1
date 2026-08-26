@@ -370,8 +370,8 @@ function Get-PrMergeMethod {
 # Same pattern as the changelog section headings (#178, now the tier map) and the entry-stub wording
 # (#410).
 
-# 'major' -> releases/development/<X>.x/<X.Y.Z>.md   (this workshop)
-# 'minor' -> releases/development/<X.Y>/<X.Y.Z>.md   (a repo that cuts often enough for that to help)
+# 'major' -> <changelog root>/<X>.x/<X.Y.Z>.md   (this workshop)
+# 'minor' -> <changelog root>/<X.Y>/<X.Y.Z>.md   (a repo that cuts often enough for that to help)
 $script:ReleaseNotesGrouping = 'major'
 
 function Get-ReleaseNotesGrouping {
@@ -447,12 +447,12 @@ function Get-ReleaseHistoryPath {
 # so here rather than relying on anything to guess.
 #
 # 'releases/audience' SINCE AUGUST 12, 2026 (Dave; inbound #620), completing the same naming rule one step
-# further. Every root under releases/ now names WHO reads it: development/ is the record for this repo's own
-# developers, github/ is the generated Release body, audience/ is the one hand-written document written for
-# whoever this repo publishes to. 'notes/' named the FORM -- which is the mistake 'highlights/' made, caught
-# two days later in the sibling it was renamed alongside rather than in itself. It is also the root that has
-# to agree with Get-ReleaseAudienceTier: the tier says which reader, so the directory should not say
-# something orthogonal to it.
+# further. Every note root now names WHO reads it: changelog/ (development/ until #914) is the record for
+# this repo's own developers, github/ is the generated Release body, audience/ is the one hand-written
+# document written for whoever this repo publishes to. 'notes/' named the FORM -- the mistake 'highlights/'
+# made, caught two days later in the sibling it was renamed alongside rather than in itself. It is also the
+# root that has to agree with Get-ReleaseAudienceTier: the tier says which reader, so the directory should
+# not say something orthogonal to it.
 #
 # THE SHARED DEFAULT IS DELIBERATELY *NOT* MOVED WITH IT. cut-release.ps1 and session-status.ps1 still fall
 # back to 'releases/notes', and script-contract-lib still records that as the Default, because an unstated
@@ -462,13 +462,22 @@ function Get-ReleaseHistoryPath {
 # root nobody filled, reported as "no release note was found", which reads as a repo that has not cut one.
 # This is a repo-level rename, so it is stated here, which is the only place that can state it.
 #
-# UNDER contributing-davekjohn/ SINCE AUGUST 14, 2026 (Dave; the folder renamed off workflow-davekjohn/ on August 26, #886), together with the history README above: the
+# UNDER contributing-davekjohn/ SINCE AUGUST 14, 2026 (Dave; the folder renamed off workflow-davekjohn/ on
+# August 26, #886). It moved together with the release history that day, which went back to the repo root
+# on August 19 while this stayed -- the split the paragraph below finishes. The
 # hand-kept release pages are the workflow's portable belongings, so they live in its folder -- the same
-# answer the adopt-workflow-folder scaffold proposes to every consumer. The generated development/ and
-# github/ trees stay at the repo root deliberately: they are the machine-written record and the publish
-# artefact, and their roots are hardcoded by design (see cut-release.ps1). The history-table row and the
-# note's link prefix are both computed from these seam values since the same day, which is what makes
-# this repointing a two-line change instead of a dead-link generator.
+# answer the adopt-workflow-folder scaffold proposes to every consumer.
+#
+# AND THE GENERATED TREES FOLLOWED ON AUGUST 26, 2026 (Dave; issue #914). This block used to say they
+# stayed at the repo root deliberately -- "the machine-written record and the publish artefact", with
+# roots "hardcoded by design". Both halves of that reason expired: #885 gave each of them a seam, so
+# nothing is hardcoded any more, and once they are seams the question is no longer what THIS repo does
+# but what every repo's default should be -- and a tree nothing writes but a cut exists only because the
+# workflow does, exactly like the hand-written note that was already in the folder. So the three note
+# roots are siblings now, and releases/ holds nothing but the release LIST. What did NOT move is that
+# list (Get-ReleaseHistoryPath, above): a repo that has cut releases has a history whichever tooling cut
+# it. The history-table row and the note's link prefix are both computed from these seam values, which is
+# what makes each of these repointings a few lines rather than a dead-link generator.
 $script:ReleaseNoteRoot = 'contributing-davekjohn/releases/audience'
 
 function Get-ReleaseNoteRoot {
@@ -576,14 +585,14 @@ function Get-ReservedRootMd {
 # mismatch a storefront repo has with its management -- one tier serving two audiences badly.
 #
 # So this repo writes two documents per release plus a generated announcement:
-#   releases/development/<X>.x/<X.Y.Z>.md  tier 0  developers  -- every release, complete, raw
-#   releases/notes/<X>.x/<X.Y.Z>.md        tiers 1+2           -- minor/major here, hand-written
-#   releases/github/<X>.x/<X.Y.Z>.md       generated           -- every release, the announcement
+#   contributing-davekjohn/releases/changelog/<X>.x/<X.Y.Z>.md  tier 0  developers  -- every release, complete, raw
+#   contributing-davekjohn/releases/audience/<X>.x/<X.Y.Z>.md   tiers 1+2         -- minor/major here, hand-written
+#   contributing-davekjohn/releases/github/<X>.x/<X.Y.Z>.md     generated         -- every release, the announcement
 #
 # EACH ROOT ANSWERS ONE QUESTION, WHICH IS WHY THE BODY HAS ITS OWN (Dave, August 12, 2026). The generated
-# announcement used to be written into releases/development/ as '<X.Y.Z>-github-body.md' -- the one generated
+# announcement used to be written into the tier-0 root as '<X.Y.Z>-github-body.md' -- the one generated
 # document that DOES get published, inside the directory whose whole job is the record nobody publishes.
-# development/ is the record, github/ is the generated published document, and the hand-written one is the
+# changelog/ is the record, github/ is the generated published document, and the hand-written one is the
 # third root. The suffix went with the move: the root says it, and both siblings are '<X.Y.Z>.md' already.
 #
 # THE SECTIONS INSIDE THE NOTE FOLLOW THE TIER, while whether the note EXISTS follows the bump. Its

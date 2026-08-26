@@ -216,8 +216,8 @@ A fixture release page.
 $HistoryMajors
 "@
     New-Item -ItemType Directory -Path (Join-Path $root 'contributing-davekjohn\releases\audience\1.x') -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $root 'releases\development\1.x') -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $root 'releases\github\1.x') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $root 'contributing-davekjohn\releases\changelog\1.x') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $root 'contributing-davekjohn\releases\github\1.x') -Force | Out-Null
 
     # A git repo with NO remote: -NoPush is belt, this is braces.
     Push-Location $root
@@ -279,10 +279,10 @@ try {
     Assert-Match '# Changelog'   $changelog 'happy path: the CHANGELOG intro survives the cut'
     Assert-NotMatch 'a-fixture-change' $changelog 'happy path: the pending entry is gone from CHANGELOG.md'
 
-    # The development note carries the entry that was folded away, which is the whole point of writing
+    # The changelog note carries the entry that was folded away, which is the whole point of writing
     # it before emptying the file.
-    $notePath = Join-Path $root 'releases\development\1.x\1.4.1.md'
-    Assert-True (Test-Path -LiteralPath $notePath) 'happy path: the development note was written at the grouped path'
+    $notePath = Join-Path $root 'contributing-davekjohn\releases\changelog\1.x\1.4.1.md'
+    Assert-True (Test-Path -LiteralPath $notePath) 'happy path: the changelog note was written at the grouped path'
     if (Test-Path -LiteralPath $notePath) {
         Assert-Match 'A fixture change' (Get-Content -LiteralPath $notePath -Raw) 'happy path: and it carries the entry the CHANGELOG lost'
     }
@@ -393,7 +393,7 @@ try {
     # release the manifests have never heard of.
     Write-Host ""
     Write-Host "cut-release.ps1 -- a baseline that disagrees with the recorded release numbering refuses" -ForegroundColor Cyan
-    $recordedHistory = "#### 1.x`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n| [1.9.9](development/1.x/1.9.9.md) | 2026-08-20 | Patch | Recorded, but untagged and unbumped |`n"
+    $recordedHistory = "#### 1.x`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n| [1.9.9](../contributing-davekjohn/releases/changelog/1.x/1.9.9.md) | 2026-08-20 | Patch | Recorded, but untagged and unbumped |`n"
     $root6 = New-CutFixture -Name 'baseline' -HistoryMajors $recordedHistory
     $r6 = Invoke-Cut -Root $root6 -Arguments @('-Bump', 'patch', '-NoPush', '-SkipLint', '-SkipTests')
     Assert-True ($r6.Code -ne 0) 'baseline: refused with a non-zero exit'
@@ -416,8 +416,8 @@ try {
     $root7 = New-CutFixture -Name 'statedtype' -HistoryMajors $recordedHistory
     $r7 = Invoke-Cut -Root $root7 -Arguments @('-Version', '1.4.1', '-Type', 'patch', '-NoPush', '-SkipLint', '-SkipTests')
     Assert-Equal 0 $r7.Code 'stated type: the cut runs'
-    $note7 = Join-Path $root7 'releases\development\1.x\1.4.1.md'
-    Assert-True (Test-Path -LiteralPath $note7) 'stated type: the development note was written'
+    $note7 = Join-Path $root7 'contributing-davekjohn\releases\changelog\1.x\1.4.1.md'
+    Assert-True (Test-Path -LiteralPath $note7) 'stated type: the changelog note was written'
     if (Test-Path -LiteralPath $note7) {
         Assert-Match '(?m)^\*\*Type:\*\*\s*Patch' (Get-Content -LiteralPath $note7 -Raw) 'stated type: and it is labelled Patch -- the type the author stated, not the one the baseline implied'
     }

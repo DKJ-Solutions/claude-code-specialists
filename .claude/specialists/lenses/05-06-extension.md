@@ -167,7 +167,7 @@ description while building; ownership of the entry mechanism stays Rendall's.
 
 A release here is a **recorded moment**: all plugins get the same version number
 (**lockstep, repo-wide**) and the state is tagged as `vX.Y.Z`. `cut-release.ps1` itself publishes
-nothing to GitHub Releases — only a git tag, the full notes in `releases/development/`, and a
+nothing to GitHub Releases — only a git tag, the full notes in `contributing-davekjohn/releases/changelog/`, and a
 reference to them in `CHANGELOG.md`. Publishing a GitHub Release is a manual closing step Rendall walks
 through afterward, per the `cut-release` skill's checklist — not automated by the script.
 
@@ -177,7 +177,7 @@ through afterward, per the `cut-release` skill's checklist — not automated by 
 - **Every release.** Until August 4 a patch skipped the step entirely (tag only). It no longer does, so
   the Release page becomes a continuous record rather than one with gaps where the patches were.
 - **A generated body**, with every hand-written document and the development notes as **attachments**.
-  `cut-release.ps1` writes `releases/github/<dir>/<X.Y.Z>.md` — the release title, a
+  `cut-release.ps1` writes `contributing-davekjohn/releases/github/<dir>/<X.Y.Z>.md` — the release title, a
   pointer at the attached notes where one is expected, and one linked line per change that landed, every
   tier included. Rendall edits nothing; he points `gh` at it, and the cut prints the exact command.
 - **What this replaced, and why it is the more important half.** The body was the **internal note** from
@@ -218,17 +218,21 @@ independent releases, and the `update` half being the measurement that broke the
 this lens used to state as one rule. Rendall's local obligation is unchanged: **name the refresh command
 in the closing report of every release.**
 
-The `releases/` directory (modeled on life-hub):
-- **`releases/development/<X>.x/<X.Y.Z>.md`** — the full release notes: **every** pending entry, tier 0
+The note roots, all three under `contributing-davekjohn/releases/` since #914 (August 26, 2026); `releases/`
+at the repo root now holds nothing but the release list:
+- **`changelog/<X>.x/<X.Y.Z>.md`** — the full release notes: **every** pending entry, tier 0
   included, ordered by **tier** and, inside a tier, ranked — one flat list at `CHANGELOG.md`'s own levels
   (`## <title>` → `### What makes this deploy extra special`), with no tier heading in between since
   August 25, 2026 ([#881](https://github.com/DaveKJohn/claude-code-specialists/issues/881)): this is the
   document a hand-written note is copied *from*, so it pastes at the level it was written at. Literally the
   whole changelog, which is what makes this the record rather than a summary of one — including each entry's
   impact table, since the cut empties `CHANGELOG.md` and this becomes the last place each ranking's
-  justification lives. Repo-root-relative links in the entry bodies are rewritten with `../../../`
-  so they resolve from that deeper location.
-- **`releases/README.md`** — an overview table of all versions (newest at the top).
+  justification lives. Repo-root-relative links in the entry bodies are rewritten with a prefix the cut
+  DERIVES from the note's own depth — `../../../../` at this root since #914, and never a constant
+  again — so they resolve from that deeper location.
+And beside them, at the repo root rather than in the folder:
+- **`releases/README.md`** — an overview table of all versions (newest at the top). It stayed behind at
+  #914 deliberately: a repo that has cut releases has a history whichever tooling cut it.
 - In `CHANGELOG.md` the cut writes **nothing at all** — it empties the document down to its intro. The
   internal note's only inbound link is therefore the **Version cell of the `releases/README.md` row**,
   written by `new-internal-note.ps1`. That the cut cannot write it is unchanged and is the reason the step is
@@ -254,12 +258,12 @@ The `releases/` directory (modeled on life-hub):
     sectioned one keeps both registers and writes the overlap once.
   - **The overview row now points here on the first write.** `Set-ReleaseInternalNoteLink` existed because
     the note did not exist while the cut ran; it does now, so the cut writes the Version cell correctly
-    straight away and nothing repoints it afterwards. A patch's row keeps pointing at the development notes,
+    straight away and nothing repoints it afterwards. A patch's row keeps pointing at the changelog notes,
     which is the most readable document that release has.
 - **`contributing-davekjohn/releases/audience/<X>.x/<X.Y.Z>.md`, the *For consumers* section** — *what the two-document era's
   `releases/consumer/` document became.* **That directory no longer exists**: on August 12, 2026 Dave had its
-  twelve documents merged with their `releases/internal/` counterparts, one merged document per version, so
-  `releases/` holds three reader-named roots and nothing else. Read the paragraph below as history — it
+  twelve documents merged with their `releases/internal/` counterparts, one merged document per version. Read
+  the paragraph below as history — it
   describes how the separate document was generated, and every word of it still explains why the section
   reads the way it does.
   Was the tier-2 document, generated **only for a minor or
@@ -390,7 +394,7 @@ does everything in one motion:
 `cut-release.ps1 (-Version <X.Y.Z> | -Bump <major|minor|patch>) [-Title "…"] [-SummaryFile <path>]` on
 a clean `main`:
 1. bumps all plugin versions in lockstep to `X.Y.Z`;
-2. generates `releases/development/<X>.x/<X.Y.Z>.md`, adds a row to `releases/README.md`, and **empties
+2. generates `contributing-davekjohn/releases/changelog/<X>.x/<X.Y.Z>.md`, adds a row to `releases/README.md`, and **empties
    `CHANGELOG.md` down to its intro** — the intro passes through verbatim, so whatever the repo says about
    itself up there survives every cut, in whatever language it wrote it;
 3. **(retired, August 8, 2026 -- Dave)** steps 3 and 4 used to write a per-plugin `CHANGELOG.md` and
@@ -606,7 +610,7 @@ number decides which release document it appears in:
 |---|---|---|---|
 | **2** | subscribers of the service | the *For consumers* section of `contributing-davekjohn/releases/audience/<X>.x/<X.Y.Z>.md` | minor/major |
 | **1** | management and the employer/commissioner | the organisation's two sections of that same file | minor/major |
-| **0** | only this repo's developers | `releases/development/<X>.x/<X.Y.Z>.md` | every release |
+| **0** | only this repo's developers | `contributing-davekjohn/releases/changelog/<X>.x/<X.Y.Z>.md` | every release |
 
 **TIERS 1 AND 2 ARE TWO KINDS OF AUDIENCE, NOT TWO RUNGS, AND A REPO HAS EXACTLY ONE** (Dave, August 12,
 2026; inbound [#620](https://github.com/DaveKJohn/claude-code-specialists/issues/620)). Tier 1 is
@@ -641,7 +645,8 @@ gate that began refusing an *extra* answered tier would have turned finished dos
 cannot be opened. An asserted test holds exactly that case — do not "tighten" it.
 
 **`releases/notes/` BECAME `releases/audience/` IN THE SAME MOVEMENT** (August 12, 2026), completing the
-rule that every root under `releases/` names its **reader**: `development/` the developers, `github/` the
+rule that every note root names its **reader** — or, since #914 renamed `development/` to `changelog/`,
+what the document **is**: `changelog/` the changelog for that version, `github/` the
 Release page, `audience/` whoever this repo publishes to. `notes/` named the *form* — the same mistake
 `highlights/` made, fixed in that sibling two days earlier and missed in this one. **The shared default
 stays `releases/notes`** in `cut-release.ps1`, `session-status.ps1` and the contract record: an unstated
@@ -653,8 +658,8 @@ WAS NOT FINISHED** (Dave, August 12, 2026). This paragraph said they *stay as fr
 freeze was the assistant's call written as settled, in three places, **none of which named Dave**, while
 the rename standing beside it in the same entry was attributed to him. Asked why `releases/` still had
 five folders, he was offered the freeze as one of three options and chose the merge instead: the twelve
-`consumer/`+`internal/` pairs are now twelve documents in `audience/`, and `releases/` holds three
-reader-named roots and nothing else. **The identical filenames are why it was a merge and not a rename** —
+`consumer/`+`internal/` pairs are now twelve documents in `audience/`, leaving three
+note roots and nothing else. **The identical filenames are why it was a merge and not a rename** —
 `3.x/3.2.0.md` existed in both trees, so 24 documents became 12 and no `git mv` could do it.
 
 **The published-record rule is what made it safe, and it is the half to copy.** Each pair kept both
@@ -714,7 +719,7 @@ choosing to. `Get-SeamValue` takes a **list** of names now, the current one firs
 
 **What was deliberately NOT renamed, and the rule behind it.** No GitHub Release body links to a
 `releases/highlights/…` path — checked rather than assumed, which is what made moving all eleven
-documents safe. The **prose** in the archived `releases/development/` notes and in the already-folded
+documents safe. The **prose** in the archived changelog notes and in the already-folded
 `CHANGELOG.md` entries keeps the old word, because those describe what the document was called on the
 day they were written; that is the same published-record rule that left the seven wrong merge dates
 standing that [Chris's lens](01-01-extension.md#the-dave-rules) records.
@@ -969,7 +974,7 @@ release management. Rendall's craft in such a repo is whatever *that* repo's rel
   omitted, it resolves the repo root as before.
 - `scripts/release/cut-release.ps1 (-Version <X.Y.Z> | -Bump <major|minor|patch>) [-Title "…"] [-NoPush] [-SkipLint] [-SkipTierGate]`
   — cut a repo-wide release, directly on `main`: the **bump gate** (does the pending work earn this bump?)
-  + lockstep bump + release notes in `releases/development/` + `releases/README.md` row +
+  + lockstep bump + release notes in `contributing-davekjohn/releases/changelog/` + `releases/README.md` row +
   `CHANGELOG.md` emptied down to its intro + commit + tag `vX.Y.Z` + push. It wrote per-plugin
   `CHANGELOG.md`s and `RELEASE.md` cards until August 8, 2026 — see step 3 above for why it no longer does.
   The pure logic (version bump, CHANGELOG transformation, notes assembly) lives in

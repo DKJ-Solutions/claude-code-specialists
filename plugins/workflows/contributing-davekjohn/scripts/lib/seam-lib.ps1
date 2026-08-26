@@ -120,37 +120,52 @@ function Get-DefaultReleaseHistoryPath {
     return "$(Get-WorkflowFolderName -RepoRoot $RepoRoot)/releases/history.md"
 }
 
-function Get-DefaultReleaseDevelopmentNotesRoot {
+function Get-DefaultReleaseChangelogNotesRoot {
     <#
-        The generated development notes' (tier 0, always written) computed default (issue #885, group E).
-        UNLIKE Get-ReleaseNoteRoot (the HAND-WRITTEN audience note's root, which keeps its 'releases/notes'
-        default deliberately -- see that seam's own contract record), this root carried NO seam at all
-        before this branch: 'releases/development/' was hard-coded everywhere, by deliberate refusal
-        (cut-release.ps1's own comment: "a seam nobody can be shown to need... it comes back when somebody
-        measures it" -- #885 is that measurement). So there is no prior meaning a computed default could
-        silently redefine: every existing consumer's development notes already sit at the ROOT path this
-        default still returns for the source, and only a consumer newly adopting the isolated folder gets
-        the isolated answer.
+        The generated tier-0 notes' (always written) computed default (issue #885, group E; renamed and
+        relocated by issue #914, August 26, 2026).
+
+        'changelog', NOT 'development'. The name says what the document IS -- the changelog for that
+        version, the entries as the fold left them, which is literally what CHANGELOG.md held before the
+        cut emptied it -- rather than which stage of the work produced it. 'development/' named the stage,
+        the same mistake 'notes/' and 'highlights/' made in the sibling root that became 'audience/' (see
+        Get-ReleaseNoteRoot's own record), and it is the only root under releases/ that still named
+        something other than its reader or its content.
+
+        AND IT IS ONE ANSWER FOR BOTH KINDS OF REPO, where every other computed default in this file
+        branches on Test-IsWorkflowSourceRepo. Those branch because the source keeps its ROOT files: a
+        repo's changelog and its release history exist whichever tooling cut them, so a plugin folder is
+        the wrong home for them. This tree is the opposite -- nothing writes it but a cut, so it exists
+        only BECAUSE the workflow does, exactly like the hand-written note that already lived in the
+        folder. #914 is the decision that the source stops being special here, which REVERSES the
+        August 14, 2026 answer recorded at Get-ReleaseNoteRoot ("the generated development/ and github/
+        trees stay at the repo root deliberately"). What changed is not that argument's force but its
+        subject: it was made while those roots had no seam at all and their location was a fact about
+        this repo, and #885 turned them into a seam every consumer answers.
+
+        SO THE BRANCH IS GONE RATHER THAN LEFT RETURNING THE SAME STRING TWICE. A vestigial branch reads
+        as a distinction somebody still relies on, and the next reader repairs one half of it.
     #>
     param([Parameter(Mandatory)][string]$RepoRoot)
-    if (Test-IsWorkflowSourceRepo -RepoRoot $RepoRoot) { return 'releases/development' }
-    return "$(Get-WorkflowFolderName -RepoRoot $RepoRoot)/releases/development"
+    return "$(Get-WorkflowFolderName -RepoRoot $RepoRoot)/releases/changelog"
 }
 
+
 function Get-DefaultReleaseGithubNotesRoot {
-    <# The generated GitHub Release body's computed default (issue #885, group E). Same reasoning and same
-       "no prior seam to redefine" argument as Get-DefaultReleaseDevelopmentNotesRoot -- read that one first. #>
+    <# The generated GitHub Release body's computed default (issue #885, group E), relocated into the
+       workflow folder by #914 on the same reasoning as Get-DefaultReleaseChangelogNotesRoot above -- read
+       that one first, including why it no longer branches on the source. Its NAME was already right: the
+       root says who reads it. #>
     param([Parameter(Mandatory)][string]$RepoRoot)
-    if (Test-IsWorkflowSourceRepo -RepoRoot $RepoRoot) { return 'releases/github' }
     return "$(Get-WorkflowFolderName -RepoRoot $RepoRoot)/releases/github"
 }
 
 function Get-DefaultReleaseInternalNotesRoot {
     <# The generated internal note's (tier 1) computed default (issue #885, group E). Same reasoning and
-       same "no prior seam to redefine" argument as Get-DefaultReleaseDevelopmentNotesRoot -- read that one
+       same "no prior seam to redefine" argument as Get-DefaultReleaseChangelogNotesRoot -- read that one
        first. Read by new-internal-note.ps1, which is why it exists as its own function rather than being
-       folded into the development-notes one: the two roots are read by different scripts on different days
-       (the cut writes the development note at every release; the internal note is a separate, later run). #>
+       folded into the changelog-notes one: the two roots are read by different scripts on different days
+       (the cut writes the changelog note at every release; the internal note is a separate, later run). #>
     param([Parameter(Mandatory)][string]$RepoRoot)
     if (Test-IsWorkflowSourceRepo -RepoRoot $RepoRoot) { return 'releases/internal' }
     return "$(Get-WorkflowFolderName -RepoRoot $RepoRoot)/releases/internal"

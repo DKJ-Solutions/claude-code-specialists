@@ -23,11 +23,11 @@
       3. a SOURCE repo (marketplace.json present) is exempt outright, even for the identical
          outside-the-folder path that got refused for the consumer in case 1 -- proving
          Test-IsWorkflowSourceRepo really short-circuits the whole check rather than the folder
-         happening to match.
-
-    Deliberately not covered here (out of scope, per the branch's own tracking note): the Get-Default*
-    computed-default functions in the same file -- those are exercised elsewhere (cut-release-guardrail,
-    internal-note, and the other group-D suites all read through them for real).
+         happening to match;
+      4. which of the Get-Default* computed defaults still branch on Test-IsWorkflowSourceRepo and which
+         stopped (issue #914) -- see section 3's own note for why the branch's ABSENCE needs an assert.
+         The rest of what those functions do is exercised elsewhere too (cut-release-guardrail,
+         internal-note, and the other group-D suites all read through them for real).
 
     Pure ASCII (repo convention for .ps1).
 #>
@@ -143,6 +143,47 @@ Assert-True ($r.Out -match 'Get-ChangelogPath') 'and the refusal names the seam'
 Assert-True ($r.Out -match 'CHANGELOG\.md') 'and the offending path'
 Assert-True ($r.Out -match 'contributing-davekjohn') 'and the folder it should have resolved inside'
 
+
+# --- 3. The computed defaults: which of them stopped branching on the source (issue #914) -----------
+# THIS SECTION IS WHY THE FILE SYNOPSIS'S "out of scope" NOTE NO LONGER HOLDS FOR ALL OF THEM. #885 gave
+# five seams a computed default and every one branched on Test-IsWorkflowSourceRepo; #914 removed that
+# branch from exactly two -- the tier-0 changelog notes and the GitHub Release body -- because a tree
+# nothing writes but a cut exists only BECAUSE the workflow does. The branch's absence is the whole
+# change, and nothing asserted it: the two functions return one string, so a reinstated branch would go
+# on returning a valid path and be discovered at somebody's next cut. The three that KEEP the branch are
+# asserted here too, so "collapse them all for symmetry" fails a test rather than reading as tidying.
+Write-Host "seam-lib.ps1 -- the computed defaults: source vs consumer" -ForegroundColor Cyan
+
+# Both fixtures need the folder to exist, because Get-WorkflowFolderName prefers what is there.
+New-Item -ItemType Directory -Path (Join-Path $consumerDir 'contributing-davekjohn') -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $sourceDir   'contributing-davekjohn') -Force | Out-Null
+
+$dfltChangelogSrc = Get-DefaultReleaseChangelogNotesRoot -RepoRoot $sourceDir
+$dfltChangelogCon = Get-DefaultReleaseChangelogNotesRoot -RepoRoot $consumerDir
+Assert-True ($dfltChangelogSrc -eq 'contributing-davekjohn/releases/changelog') `
+    "the changelog notes root is inside the folder in a SOURCE repo: '$dfltChangelogSrc'"
+Assert-True ($dfltChangelogSrc -eq $dfltChangelogCon) `
+    'and it is the SAME answer for a consumer -- #914 removed the source branch, it did not move it'
+
+$dfltGithubSrc = Get-DefaultReleaseGithubNotesRoot -RepoRoot $sourceDir
+Assert-True ($dfltGithubSrc -eq 'contributing-davekjohn/releases/github') `
+    "the GitHub-body root is inside the folder in a SOURCE repo too: '$dfltGithubSrc'"
+Assert-True ($dfltGithubSrc -eq (Get-DefaultReleaseGithubNotesRoot -RepoRoot $consumerDir)) `
+    'and the same for a consumer, for the same reason'
+
+# THE THREE THAT STILL BRANCH, and the reason is not symmetry: a repo's changelog and its release list
+# exist whichever tooling cut them, so a source keeps them at its root. #914 did not include the internal
+# note either, so its branch stands until somebody asks for it.
+Assert-True ((Get-DefaultChangelogPath -RepoRoot $sourceDir) -eq 'CHANGELOG.md') `
+    'the changelog path still keeps a source at its own root file'
+Assert-True ((Get-DefaultChangelogPath -RepoRoot $consumerDir) -eq 'contributing-davekjohn/CHANGELOG.md') `
+    'and still isolates a consumer'
+Assert-True ((Get-DefaultReleaseHistoryPath -RepoRoot $sourceDir) -eq 'releases/README.md') `
+    'the release history still keeps a source at releases/README.md -- it stayed behind at #914'
+Assert-True ((Get-DefaultReleaseInternalNotesRoot -RepoRoot $sourceDir) -eq 'releases/internal') `
+    'the internal-note root still branches: #914 did not include it'
+Assert-True ((Get-DefaultReleaseInternalNotesRoot -RepoRoot $consumerDir) -eq 'contributing-davekjohn/releases/internal') `
+    'and a consumer still gets the isolated answer for it'
 Remove-Item -Recurse -Force -LiteralPath $consumerDir -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force -LiteralPath $sourceDir -ErrorAction SilentlyContinue
 Remove-Item -Force -LiteralPath $wrapperPath -ErrorAction SilentlyContinue

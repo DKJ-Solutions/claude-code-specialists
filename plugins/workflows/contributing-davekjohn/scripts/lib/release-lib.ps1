@@ -1056,8 +1056,10 @@ function Get-ReleaseTierHeading {
 function Get-RelativeLinkPath {
     <#
         Pure: the relative link from one repo-relative directory to a repo-relative file, both with
-        forward slashes -- 'audience/4.x/4.9.0.md' from 'releases' to 'releases/audience/4.x/4.9.0.md',
-        and '../../releases/development/4.x/4.9.0.md' from 'contributing-davekjohn/releases' to that file.
+        forward slashes -- 'changelog/4.x/4.9.0.md' from 'contributing-davekjohn/releases' to
+        'contributing-davekjohn/releases/changelog/4.x/4.9.0.md', and the same file reached from 'releases'
+        as '../contributing-davekjohn/releases/changelog/4.x/4.9.0.md' -- which is the shape this repo's own
+        overview rows have carried since #914.
 
         WHY IT EXISTS (August 14, 2026). cut-release.ps1 built the history-table row with
         `-replace '^releases/'`, which is correct only while the history README sits directly in
@@ -1067,10 +1069,12 @@ function Get-RelativeLinkPath {
         while the generated development notes stayed at the repo root. Same class as the v4.6.0 dead-row
         bug, caught before shipping this time rather than after.
 
-        The source's history moved back to releases/README.md on August 19, so this repo no longer
-        exercises that path -- and the handling stays, deliberately. A consumer may still answer the seam
-        with a root outside releases/, and a correction kept only while it is being used is a correction
-        that breaks the next time somebody needs it.
+        The source's history moved back to releases/README.md on August 19, and the handling stayed --
+        deliberately, because a correction kept only while it is being used is a correction that breaks the
+        next time somebody needs it. It never actually went unused: the note-carrying rows had pointed at
+        contributing-davekjohn/releases/audience/ since August 14, so they were '../' rows all along. #914
+        moved the remaining two note trees in beside it, which makes every row in the overview a '../' row --
+        all 102 of them, where before it was the 30 that pointed at a hand-written note.
 
         [System.IO.Path]::GetRelativePath does not exist on the .NET Framework Windows PowerShell 5.1
         runs on -- the same reason cut-release's collision guard keeps repo-relative strings.
@@ -1095,7 +1099,8 @@ function Get-RelativeLinkPath {
 
 function Build-ReleaseNotes {
     <#
-        Builds the full release notes (the releases/development/<X>.x/<X.Y.Z>.md file) from the
+        Builds the full changelog notes -- the tier-0 <changelog root>/<X>.x/<X.Y.Z>.md file, which is
+        contributing-davekjohn/releases/changelog/ in this repo since #914 -- from the
         entry blocks. Pure string out -- DELIBERATELY hard LF, because this is a NEW, standalone file
         with no existing newline style of its own, unlike the root CHANGELOG.md which detects and
         keeps its CRLF style via $nl. The entries come from that CRLF root CHANGELOG -- so here they
@@ -1134,11 +1139,14 @@ function Build-ReleaseNotes {
         # release. Empty by default, so an ordinary release is byte-identical to before.
         [string]$Summary = '',
         # Prefix to resolve repo-root-relative links in entry bodies from the deeper location of
-        # the notes file (releases/development/<X>.x/ = 3 folders deep -> '../../../').
+        # the notes file. THE DEFAULT IS THE SHALLOWEST SHAPE ANY REPO HAS -- a root directly under
+        # releases/, three folders deep. cut-release.ps1 does not rely on it: it derives the prefix from
+        # the note path the seam produced, because a root one level deeper (this repo since #914) needs a
+        # fourth '../' and nothing would error if it did not get one.
         [string]$LinkPrefix = '../../../'
     )
     # Entries are written with repo-root-relative links; rewrite them so they resolve correctly
-    # from the notes file (releases/development/<X>.x/ = 3 folders deep -> '../../../'). External
+    # from the notes file, at whatever depth the caller says it sits (see the LinkPrefix note above). External
     # (http/mailto), anchor (#) and absolute (/) links are left alone, as are links that already
     # start with ../. Format-RankedEntries then re-levels the entries and normalizes to LF, so the CRLF
     # of the source CHANGELOG does not cross the pure-LF output.

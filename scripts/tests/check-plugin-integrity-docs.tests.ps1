@@ -383,6 +383,18 @@ try {
     $t2 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True ($t2.Out -match "\[consumer-tier\].*links into 'internal/'") `
         'consumer-tier: a link into the internal tree is reported too'
+    # AND THE TIER-0 TREE UNDER ITS CURRENT NAME (issue #914, August 26, 2026). The directory renamed
+    # 'development' -> 'changelog', and this check matches the tier by LITERAL directory name -- so the
+    # rename would have taken it silent on the exact defect it was written for, with its coverage count
+    # still reading healthy. Both names are asserted, in both directions: the new one because it is what
+    # this repo has, the old one above because an unmigrated consumer still has that.
+    [System.IO.File]::WriteAllText($ctrDoc,
+        "# Release notes v9.0.0`n`nThe full recap is in the [release notes](../../changelog/9.x/9.0.0.md).`n", $Utf8NoBom)
+    $t2b = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($t2b.Out -match "\[consumer-tier\].*links into 'changelog/'") `
+        'consumer-tier: a link into the RENAMED tier-0 tree is reported -- the rename did not silence the check'
+    Assert-True ($t2b.Out -match "tier 0, only this repo's own developers") `
+        'consumer-tier: and it is named as tier 0, the same tier the old directory name reports'
 
     # 63. THE LINK TEXT IS NOT THE TARGET. v3.7.0's real consumer document writes ABOUT the tiers, and a
     #     check matching anywhere on the line would accuse it. This is the first of the three narrowings.

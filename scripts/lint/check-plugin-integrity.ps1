@@ -2425,7 +2425,7 @@ Write-Coverage -Category 'pr-template' -Checked $prtChecked `
 
 # --- 25. the consumer document does not send its reader into a tier written for somebody else -------------
 # WHAT THIS IS FOR, and it is measured rather than imagined (August 10, 2026). The tier model gives each
-# release document a named reader, and tier 0 -- releases/development/ -- is defined as "only this repo's own
+# release document a named reader, and tier 0 -- the changelog notes -- is defined as "only this repo's own
 # developers". A link from the consumer document into that tree hands a paying reader the per-PR record and
 # calls it theirs. Measured on the day this landed: TWO of eleven consumer documents did exactly that, both
 # of them labelling it invitingly -- v4.0.0's "The full recap is in the release notes" and v3.5.0's "Full
@@ -2512,8 +2512,14 @@ if ($ctrRoots.Count -eq 0) {
             # tiers, which is what v3.7.0 legitimately does.
             foreach ($m in [regex]::Matches($ctrLines[$i], '\]\(([^)]+)\)')) {
                 $ctrTarget = $m.Groups[1].Value
-                if ($ctrTarget -match '(^|/)(development|internal)/') {
-                    $ctrTier = if ($Matches[2] -eq 'development') { 'tier 0, only this repo''s own developers' } else { 'tier 1, colleagues on this project' }
+                # 'changelog' IS LISTED BESIDE 'development', AND BOTH STAY (issue #914, August 26, 2026).
+                # The tier-0 directory renamed, and this line is a LITERAL -- the same shape as the
+                # hardcoded root the comment above this check describes going quiet. Dropping the old name
+                # would un-cover every consumer who has not migrated; keeping only it would have covered
+                # nothing here from the day of the rename onward, with the coverage count still reading
+                # healthy. Recognise both, write one.
+                if ($ctrTarget -match '(^|/)(development|changelog|internal)/') {
+                    $ctrTier = if ($Matches[2] -eq 'internal') { 'tier 1, colleagues on this project' } else { 'tier 0, only this repo''s own developers' }
                     Add-Error ("[consumer-tier] $ctrRel line $($i + 1) links into '$($Matches[2])/' ($ctrTier): $ctrTarget`n" +
                         '  This document''s reader is a consumer of the product. Point them at another consumer document, at the docs, or at nothing -- ' +
                         'a link offered to them has to lead somewhere written for them.')
@@ -2523,7 +2529,7 @@ if ($ctrRoots.Count -eq 0) {
     }
 }
 Write-Coverage -Category 'consumer-tier' -Checked $ctrChecked `
-    -Note $(if ($ctrChecked -eq 0) { $ctrNote } else { "every document in the hand-written note tree Get-ReleaseNoteRoot names -- releases/audience/ here, one document with a named section per reader, and since August 12, 2026 the only such tree in this repo: the twelve releases/consumer/ + releases/internal/ pairs were merged into it -- plus the pre-rename releases/notes/ and a releases/consumer/ archive, both still read for a consumer who has one, held against offering its reader a link into the development (tier 0) or internal (tier 1) tree. The rule follows the READER, not the directory: a consumer reads the organisation section too. LINK TARGETS only -- a tier named in link text or prose is someone writing ABOUT the model, which is check 4's declined-path territory. Two neighbouring rules (a score, a branch name) were measured on this same tree and declined at 4 and 3 findings, all false; the reasoning is above the check" })
+    -Note $(if ($ctrChecked -eq 0) { $ctrNote } else { "every document in the hand-written note tree Get-ReleaseNoteRoot names -- releases/audience/ here, one document with a named section per reader, and since August 12, 2026 the only such tree in this repo: the twelve releases/consumer/ + releases/internal/ pairs were merged into it -- plus the pre-rename releases/notes/ and a releases/consumer/ archive, both still read for a consumer who has one, held against offering its reader a link into the tier-0 tree (changelog/ since #914, development/ before it -- both recognised, so a consumer mid-migration stays covered) or the internal (tier 1) one. The rule follows the READER, not the directory: a consumer reads the organisation section too. LINK TARGETS only -- a tier named in link text or prose is someone writing ABOUT the model, which is check 4's declined-path territory. Two neighbouring rules (a score, a branch name) were measured on this same tree and declined at 4 and 3 findings, all false; the reasoning is above the check" })
 
 # --- 26. no frontmatter-bearing shipped document carries a byte-order mark --------------------------------
 # READ AS BYTES, AND THAT IS THE WHOLE POINT. Every other reader in this gate goes through
@@ -2676,7 +2682,7 @@ Write-Coverage -Category 'script-ascii' -Checked $asciiScripts.Count `
 # tree returns 12 lines and only 3 are imports:
 #   - 7 are PowerShell '@(...)' expressions inside fenced blocks. Fences are tracked, exactly as check 4
 #     argues for links: illustrating a thing is not doing it.
-#   - 1 is PROSE -- releases/development/1.x/1.16.0.md, a paragraph that happens to wrap onto
+#   - 1 is PROSE -- contributing-davekjohn/releases/changelog/1.x/1.16.0.md, a paragraph that happens to wrap onto
 #     '@-imported here (this maintenance repo ...)'. Get-ImportLinePath takes the rest of the line as the
 #     path, which is right for the always-on walk (it never meets prose) and wrong for a scan set that
 #     includes archived release notes. A target containing WHITESPACE is therefore not an import here.

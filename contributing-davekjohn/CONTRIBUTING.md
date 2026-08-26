@@ -377,15 +377,14 @@ publishing the GitHub Release. Step 4 below is the one part that is **not**.
 
 **The step numbers below match [#894](https://github.com/DaveKJohn/claude-code-specialists/issues/894)
 exactly, and they did not before.** That issue used to ask for a step creating *three* kinds of release note
-under one root — `releases/changelog/`, `releases/github/` and `releases/audience/` inside this folder — where
-`releases/development/` and `releases/github/` sit at the repo root and only `audience` sits here. Its
-August 26, 2026 edit dropped that step, so section 3 is seven steps on both sides and nothing is pending
-between them.
+under one root inside this folder. Its August 26, 2026 edit dropped that step, so section 3 is seven steps on
+both sides and nothing is pending between them.
 
-**The subject itself did not go away with it.** The rename (`development` -> `changelog`) and the relocation
-of two roots is a real open question about the release-note layout; it is simply no longer part of #894, and
-it now stands on its own in
-[#914](https://github.com/DaveKJohn/claude-code-specialists/issues/914).
+**The subject did not go away with it, and it is now settled.** It stood on its own as
+[#914](https://github.com/DaveKJohn/claude-code-specialists/issues/914) and was carried out the same day: the
+tier-0 root renamed `development` -> `changelog`, and it and `github/` moved out of the repo root into this
+folder beside `audience/`. The three note roots are siblings now, `releases/` at the root holds nothing but
+the release list, and the layout question the step was about has an answer rather than an owner.
 
 ### 3.1. The bump: tier 0 only is a PATCH, anything higher is a MINOR
 
@@ -415,12 +414,16 @@ release notes, **empties `CHANGELOG.md` down to its intro**, commits that on `ma
 Deliberately no branch or PR — just like the fold. See
 [Rendall #06](../.claude/specialists/lenses/05-06-extension.md#versioning--releases).
 
-**Where those documents live in THIS repo**, since the step names and the tree do not line up by themselves:
-the developer notes are `releases/development/<major>.x/<version>.md` and the GitHub notes
-`releases/github/<major>.x/<version>.md`, both at the **repo root**. This repo is the workflow's *source*, and
-`Test-IsWorkflowSourceRepo` deliberately keeps a source's root files at the root. A **consumer** gets the same
-two trees inside their own `contributing-davekjohn/`, which is what the seams
-`Get-ReleaseDevelopmentNotesRoot` and `Get-ReleaseGithubNotesRoot` answer per repo.
+**Where those documents live**, since the step names and the tree do not line up by themselves: the changelog
+notes are `contributing-davekjohn/releases/changelog/<major>.x/<version>.md` and the GitHub notes
+`contributing-davekjohn/releases/github/<major>.x/<version>.md` — **the same answer here as in a consumer**,
+which is the part that changed on August 26, 2026 (#914). Both trees sat at this repo's root until then, on
+the reasoning that `Test-IsWorkflowSourceRepo` keeps a source's root files at the root. That reasoning covers
+the files a repo would have anyway — its changelog, its release list — and these are not those: nothing
+writes them but a cut, so they belong to the workflow wherever it runs. The seams
+`Get-ReleaseDevelopmentNotesRoot` and `Get-ReleaseGithubNotesRoot` still answer this per repo; they simply no
+longer answer it differently for the source. (The seam NAMES kept `Development`: renaming one is a contract
+change a consumer has to act on, and #914 asked for the directory.)
 
 **A major needs two commits ahead of it, and they run under this same exception** (Dave, August 9, 2026).
 `cut-release.ps1` refuses to file a new major's row under the previous major's section and does not open the
