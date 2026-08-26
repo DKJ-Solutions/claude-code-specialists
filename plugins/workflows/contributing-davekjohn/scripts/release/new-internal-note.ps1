@@ -168,9 +168,12 @@ if ($override) { foreach ($k in $override.Keys) { $w[$k] = $override[$k] } }
 
 # SEAMED (issue #885, group E), and MUST AGREE WITH cut-release.ps1's OWN READ of the same two roots --
 # both are Get-SeamValue reads of the same seam names, falling back to the same computed defaults, so a
-# repo that configures either seam is read the same way by both scripts.
-$devRootRel = Get-SeamValue -Name 'Get-ReleaseDevelopmentNotesRoot' -Default (Get-DefaultReleaseChangelogNotesRoot -RepoRoot $RepoRoot)
-Assert-WorkflowIsolatedSeamPath -RepoRoot $RepoRoot -RelativePath $devRootRel -SeamName 'Get-ReleaseDevelopmentNotesRoot'
+# repo that configures either seam is read the same way by both scripts. That agreement is why the
+# tier-0 root's retired name is listed HERE too and in the same order (issue #947): a repo still
+# carrying Get-ReleaseDevelopmentNotesRoot must be answered identically by both, or the cut writes its
+# note in one tree and this script looks for it in another.
+$devRootRel = Get-SeamValue -Name 'Get-ReleaseChangelogNotesRoot', 'Get-ReleaseDevelopmentNotesRoot' -Default (Get-DefaultReleaseChangelogNotesRoot -RepoRoot $RepoRoot)
+Assert-WorkflowIsolatedSeamPath -RepoRoot $RepoRoot -RelativePath $devRootRel -SeamName 'Get-ReleaseChangelogNotesRoot'
 $intRootRel = Get-SeamValue -Name 'Get-ReleaseInternalNotesRoot' -Default (Get-DefaultReleaseInternalNotesRoot -RepoRoot $RepoRoot)
 Assert-WorkflowIsolatedSeamPath -RepoRoot $RepoRoot -RelativePath $intRootRel -SeamName 'Get-ReleaseInternalNotesRoot'
 $devRel = "$devRootRel/$notesDir/$verNum.md"

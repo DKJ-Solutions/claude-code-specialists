@@ -292,6 +292,19 @@ Assert-True ($cutReleaseCode -match 'Get-ReleaseHighlightsBumps') `
 $newIdx = $cutReleaseCode.IndexOf('Get-ReleaseConsumerBumps')
 $oldIdx = $cutReleaseCode.IndexOf('Get-ReleaseHighlightsBumps')
 Assert-True ($newIdx -ge 0 -and $oldIdx -gt $newIdx) 'the current name is tried before the retired one'
+
+# THE SECOND RENAMED SEAM, SAME SHAPE (issue #947, August 26, 2026). The tier-0 notes root was
+# Get-ReleaseDevelopmentNotesRoot until the directory rename of #914 caught up with it. It breaks LOUDER
+# than the one above rather than in silence -- a cut that resolves the wrong root writes its note into a
+# second tree beside the consumer's own, which they see -- but it breaks in the same way, so it is read
+# under both names in the same order. Asserted on the CODE view, so the explaining comment above the read
+# cannot satisfy it.
+Assert-True ($cutReleaseCode -match 'Get-ReleaseChangelogNotesRoot') 'the current tier-0 root seam name is read'
+Assert-True ($cutReleaseCode -match 'Get-ReleaseDevelopmentNotesRoot') `
+    'the retired tier-0 root seam name is STILL read as a fallback -- dropping it starts a second notes tree for a consumer'
+$newRootIdx = $cutReleaseCode.IndexOf('Get-ReleaseChangelogNotesRoot')
+$oldRootIdx = $cutReleaseCode.IndexOf('Get-ReleaseDevelopmentNotesRoot')
+Assert-True ($newRootIdx -ge 0 -and $oldRootIdx -gt $newRootIdx) 'the current tier-0 root name is tried before the retired one'
 # And the reader itself must accept more than one name, or the pair above is two arguments to a parameter
 # that only ever looks at the first. Get-SeamValue ITSELF MOVED OUT OF THIS FILE (issue #885, group A) into
 # seam-lib.ps1, so the signature is asserted there now -- plus that this file actually reads through it

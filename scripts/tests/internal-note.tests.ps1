@@ -66,7 +66,11 @@ function New-Fixture {
         # correct (measured: run by hand it exits 1 and writes nothing). The absent case has to stay
         # distinguishable from the empty-string case, so no type constraint here.
         $NotesContent = $null,
-        $RepoConfig = $null
+        $RepoConfig = $null,
+        # Where the tier-0 notes are PLANTED, repo-root-relative with forward slashes. Defaults to the
+        # computed answer every other fixture here relies on. A test that repoints the seam has to plant
+        # the notes where it repointed them, or it asserts the refusal rather than the seam (issue #947).
+        [string]$NotesRoot = 'contributing-davekjohn/releases/changelog'
     )
     $dir = Join-Path ([System.IO.Path]::GetTempPath()) "internal-note-test-$PID-$Label"
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
@@ -105,7 +109,7 @@ function New-Fixture {
     New-Item -ItemType Directory -Path (Join-Path $dir '.claude-plugin') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $dir '.claude-plugin\marketplace.json'), '{}', $Utf8NoBom)
     if ($null -ne $NotesContent) {
-        $notesPath = Join-Path $dir "contributing-davekjohn\releases\changelog\$NotesDir\$Version.md"
+        $notesPath = Join-Path $dir (($NotesRoot -replace '/', '\') + "\$NotesDir\$Version.md")
         New-Item -ItemType Directory -Path (Split-Path -Parent $notesPath) -Force | Out-Null
         [System.IO.File]::WriteAllText($notesPath, $NotesContent, $Utf8NoBom)
     }
@@ -638,6 +642,34 @@ Assert-Equal 0 $r.Code 'untiered notes: exit 0'
 $doc = [System.IO.File]::ReadAllText((Join-Path $flat 'releases\internal\3.x\3.2.0.md'))
 Assert-True ($doc -match '- \[Chore\] An untiered entry') 'untiered notes: every entry is carried over, tier filter or not'
 Remove-Item -Recurse -Force -LiteralPath $flat -ErrorAction SilentlyContinue
+
+Write-Host "The tier-0 root answers under BOTH seam names" -ForegroundColor Cyan
+# THE RENAME'S FALLBACK, ASSERTED AS BEHAVIOUR RATHER THAN AS TEXT (issue #947, August 26, 2026). The seam
+# was Get-ReleaseDevelopmentNotesRoot until the directory rename of #914 caught up with it, and a consumer
+# receives that rename through a plugin update rather than by choosing to. Get-SeamValue takes an array of
+# names precisely so the retired one keeps answering -- so this plants the notes somewhere only the OLD
+# name points at and requires the script to find them. Drop the fallback and this fixture falls through to
+# the computed default, finds nothing there, and refuses: the exact silent break the array exists to
+# prevent, except here it is loud, because reading is a precondition of this script rather than an option.
+$oldNameCfg = "function Get-ReleaseDevelopmentNotesRoot { return 'legacy/devnotes' }`n"
+$retired = New-Fixture -Label 'seam-retired-name' -NotesContent $notes -RepoConfig $oldNameCfg -NotesRoot 'legacy/devnotes'
+$r = Invoke-Script -Dir $retired
+Assert-Equal 0 $r.Code 'retired seam name: the notes are found under the name a consumer already defined'
+Assert-True ($r.Out -match 'legacy/devnotes') 'retired seam name: and it is the retired seam''s path that was read'
+Remove-Item -Recurse -Force -LiteralPath $retired -ErrorAction SilentlyContinue
+
+# AND THE CURRENT NAME WINS WHERE BOTH ARE DEFINED, which is exactly the mid-migration state: a consumer
+# who adds the new name without deleting the old one must move, not stay. Asserted by pointing the two at
+# DIFFERENT directories and planting the notes only under the current one -- so a reader that preferred the
+# retired name would refuse rather than quietly pass.
+$bothCfg = "function Get-ReleaseChangelogNotesRoot { return 'legacy/current' }`n" +
+           "function Get-ReleaseDevelopmentNotesRoot { return 'legacy/stale' }`n"
+$both = New-Fixture -Label 'seam-both-names' -NotesContent $notes -RepoConfig $bothCfg -NotesRoot 'legacy/current'
+$r = Invoke-Script -Dir $both
+Assert-Equal 0 $r.Code 'both seam names defined: the CURRENT one is tried first'
+Assert-True ($r.Out -match 'legacy/current') 'both seam names defined: and it is the current name''s path that was read'
+Assert-True ($r.Out -notmatch 'legacy/stale') 'both seam names defined: the retired name is not consulted at all'
+Remove-Item -Recurse -Force -LiteralPath $both -ErrorAction SilentlyContinue
 
 Write-Host ""
 if ($script:fail -gt 0) {

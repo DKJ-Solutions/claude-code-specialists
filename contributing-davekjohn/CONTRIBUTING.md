@@ -421,9 +421,11 @@ which is the part that changed on August 26, 2026 (#914). Both trees sat at this
 the reasoning that `Test-IsWorkflowSourceRepo` keeps a source's root files at the root. That reasoning covers
 the files a repo would have anyway — its changelog, its release list — and these are not those: nothing
 writes them but a cut, so they belong to the workflow wherever it runs. The seams
-`Get-ReleaseDevelopmentNotesRoot` and `Get-ReleaseGithubNotesRoot` still answer this per repo; they simply no
-longer answer it differently for the source. (The seam NAMES kept `Development`: renaming one is a contract
-change a consumer has to act on, and #914 asked for the directory.)
+`Get-ReleaseChangelogNotesRoot` and `Get-ReleaseGithubNotesRoot` still answer this per repo; they simply no
+longer answer it differently for the source. (The first of those was `Get-ReleaseDevelopmentNotesRoot` until
+#947 the same day. #914 had left it, on the reasoning that renaming a seam is a contract change a consumer
+has to act on — right about the cost, wrong about who pays it: `Get-SeamValue` takes an array of names, so
+both read sites read the old name too and a consumer who defined it acts on nothing.)
 
 **A major needs two commits ahead of it, and they run under this same exception** (Dave, August 9, 2026).
 `cut-release.ps1` refuses to file a new major's row under the previous major's section and does not open the

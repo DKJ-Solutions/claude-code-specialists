@@ -175,7 +175,7 @@ function Assert-WorkflowIsolatedSeamPath {
     <#
         THE PROVENANCE PREFLIGHT (issue #885, group D): the backstop under the four seams groups A and E
         made isolate-by-default (Get-ChangelogPath, Get-ReleaseHistoryPath,
-        Get-ReleaseDevelopmentNotesRoot, Get-ReleaseGithubNotesRoot) plus the internal-note root read the
+        Get-ReleaseChangelogNotesRoot, Get-ReleaseGithubNotesRoot) plus the internal-note root read the
         same way -- not a replacement for them. Their COMPUTED defaults are already proven isolated; what
         this catches is a repo's own EXPLICIT override resolving somewhere it should not, e.g. a typo'd
         Get-ChangelogPath pointing at 'README.md' and the cut truncating a file it does not own. Call this

@@ -620,8 +620,9 @@ owes this text. Write it there, and the cut carries it outward for you.
   (`changelog/`, `audience/`, `github/`) rather than the form of the document — but nothing requires it.
   The per-release folder *inside* it stays `Get-ReleaseNotesGrouping`'s answer, so this is the root alone,
   with no trailing slash. The tier-0 tree had no equivalent knob until #885 measured one into existence
-  (`Get-ReleaseDevelopmentNotesRoot`), and #914 then moved and renamed the directory it points at — while
-  THIS seam's fallback deliberately stayed put, being the one consumers already answer or rely on.
+  (`Get-ReleaseChangelogNotesRoot`, named `Get-ReleaseDevelopmentNotesRoot` until #947), and #914 then moved
+  and renamed the directory it points at — while THIS seam's fallback deliberately stayed put, being the one
+  consumers already answer or rely on.
 - **Six seams retired on August 5, 2026, and a consumer that still defines one is unaffected** — nothing
   calls them, so they are simply dead code in that repo's config. `Get-ChangelogTierHeadings` and the legacy
   `Get-ChangelogHeading` (#178) configured changelog section headings, and the document has none;

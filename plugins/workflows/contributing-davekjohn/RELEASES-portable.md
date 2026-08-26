@@ -168,10 +168,15 @@ answered that knob is not silently pointed at a directory they do not have.
 and the two generated ones joined `audience/` there in #914. The reasoning is worth stating because it is the
 line between these roots and the two files that stayed at the repo root: a repo's `CHANGELOG.md` and its
 release list exist whichever tooling cut them, so a repo that publishes plugins keeps those at its own root —
-while a tree nothing writes but a cut exists only *because* this workflow does. `Get-ReleaseDevelopmentNotesRoot`
+while a tree nothing writes but a cut exists only *because* this workflow does. `Get-ReleaseChangelogNotesRoot`
 and `Get-ReleaseGithubNotesRoot` still answer it per repo; they simply no longer answer it differently for the
 workflow's source repo. If your notes already sit somewhere else, point the seam at the tree you have — that
 keeps one tree rather than starting a second beside it.
+
+**If your config defines `Get-ReleaseDevelopmentNotesRoot`, leave it — it still answers** (#947, August 26,
+2026). That was this seam's name until the directory rename caught up with it; both read sites try the new
+name first and fall back to the old one, so nothing in your repo has to change. Rename it when you next touch
+that file, not because anything is waiting on you.
 
 **`consumer/` and `internal/` are gone, and the twelve pairs in them are now twelve documents in
 `audience/`** (Dave, August 12, 2026). They had been written up as *frozen archives* of the two-document
