@@ -7,8 +7,11 @@
 
         . (Join-Path $PSScriptRoot '..\lib\park-lib.ps1')
 
-    Supplies Invoke-GitPark, which both parking entry points call: park-branch.ps1 (an existing branch,
-    mid-work) and new-branch.ps1 -Park (a branch at creation).
+    Supplies Invoke-GitPark, which all three parking entry points call: park-branch.ps1 (an existing
+    branch, mid-work, everything outstanding), new-branch.ps1 (a branch at creation) and park-cycle.ps1
+    (the development cycle, automatically, for the life of the branch). The first is invoked
+    deliberately; the other two run on their own, and Test-GitOriginConfigured below is the one thing
+    that distinguishes them -- see its own note.
 
     WHY ONE OWNER (issue #507, August 7, 2026). The two entry points had a copy each of the same four
     steps, and they had already drifted in the way that matters least to a script and most to a person:
@@ -57,6 +60,29 @@ function Get-GitParkScopes {
     <# The scope names this function accepts, and the phrase each one puts in the commit subject. Exposed
        so a test can assert the pair rather than re-typing either half. #>
     return $script:GitParkScopes
+}
+
+function Test-GitOriginConfigured {
+    <#
+        Does $RepoRoot have a remote called 'origin' at all? $true / $false, and it asks nothing about
+        whether that remote is reachable -- that is the push's answer to give.
+
+        WHY THE AUTOMATIC CALLERS NEED THIS AND THE DELIBERATE ONE DOES NOT (#900, August 26, 2026). A
+        repo with no remote is a legitimate repo, and until this was the DEFAULT nobody met the case: you
+        asked for a park, so `park: git push failed (is 'origin' configured and reachable?)` was the right
+        answer to give you. Once new-branch pushes on its own, that same failure arrives unasked -- and it
+        would exit 1 out of branch CREATION in every remote-less repo, turning "there is nowhere to push"
+        into "your branch could not be made". Found by the suite, whose fixtures deliberately configure no
+        remote to assert that new-branch stayed local.
+
+        So Invoke-GitPark is deliberately NOT changed: park-branch.ps1 must keep reporting the failure it
+        always did. This is the question its two automatic callers ask FIRST, and skip on.
+    #>
+    param([Parameter(Mandatory)][string]$RepoRoot)
+
+    $res = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'remote') -DiscardStderr
+    if ($res.ExitCode -ne 0) { return $false }
+    return @(($res.Output | Out-String) -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -eq 'origin' }).Count -gt 0
 }
 
 function Invoke-GitPark {

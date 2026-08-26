@@ -324,9 +324,14 @@ Two optional parameters cover the "start now, continue later (maybe on another d
   (`Get-EntryTitlePlaceholder`, `Get-EntryBodyHeading`, `Get-EntryBodyPlaceholder`) are **no longer
   written by anything**; they survive only as wording `open-pr` still refuses wherever an older entry
   carries it.
-- **`-Park`** -- after creating the branch + entry, commits the entry (the intent carrier) and
-  pushes the branch to `origin` with `git push -u`. **This opens no PR.** Push is not a PR: parking
-  makes the branch reachable from another device, while the PR rule stays intact and separate.
+- **`-NoPush`** -- leave the branch purely local: nothing committed, nothing on `origin`. The escape valve
+  for the rare branch that must not be visible yet. **Since
+  [#900](https://github.com/DaveKJohn/claude-code-specialists/issues/900) the push is the default**, so this
+  is the only way to opt out of it.
+- **`-Park`** -- **accepted and does nothing.** What it used to ask for is what now happens without it, and
+  it prints one line saying so. Kept rather than removed because this script is mirrored into every
+  consumer's plugin cache, where a `-Park` typed from a doc or a habit would otherwise fail on a parameter
+  that is gone.
 - **`-RepoRoot "<path>"`** -- create the branch and its document in a tree **other** than the one you
   are standing in. You almost certainly do not type this: it exists for the `worktree-lane` skill, which
   opens a branch inside a lane worktree. Same parameter, same name and same reasoning as
@@ -343,10 +348,13 @@ Two optional parameters cover the "start now, continue later (maybe on another d
 ```powershell
 powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/task/new-branch.ps1" `
   -Name "feat/spotify-dashboard" -Title "Spotify dashboard" `
-  -Intent "Skeleton + routing done; next: wire the API client." -Park
+  -Intent "Skeleton + routing done; next: wire the API client."
 ```
 
-Parking additionally needs a configured, reachable `origin` (git only -- no `gh`, no PR).
+The push needs a configured, reachable `origin` (git only -- no `gh`, no PR). **A repo with no `origin` is
+not an error**: the branch and its document are created exactly as before, and the script says why nothing
+was pushed. That case is real -- every fixture in this script's own suite is such a repo, which is how it
+was found.
 
 ## Requirements in the consumer
 
@@ -368,11 +376,17 @@ repo as a model, or use the `VUL-IN` scaffold the `specialists-init` bootstrap p
 
 ## Important
 
-- **No push, no PR by default.** Without `-Park` the script only runs `git checkout`/`checkout -b`
-  locally and writes the two branch files; nothing leaves the machine. With `-Park` it also commits
-  **both** of them and pushes the branch to `origin` -- but still **opens no PR**. Both, because the
-  step list is the half that says what was still in flight, and that is what parking hands over.
-  Opening a PR remains a separate, explicit step (the `open-pr` skill).
+- **A push by default, and still no PR -- ever.** The script commits the branch document and pushes the
+  branch to `origin` with `git push -u`, and that is where it stops. **Push is not a PR**: it makes the
+  branch reachable from another device while the PR rule stays intact and separate, and opening one remains
+  a separate, explicit step (the `open-pr` skill). Reversed on
+  [#900](https://github.com/DaveKJohn/claude-code-specialists/issues/900), August 26, 2026: this ran behind
+  `-Park` for nineteen days and the switch was typed **six** times in the whole history, while the median
+  merged branch sat invisible on `origin` for **22 minutes** and the worst for **365**. `-NoPush` is the way
+  out; the document then stays uncommitted exactly as it did before.
+- **The document stays current on the remote after that, and you do not do it.** A Stop hook runs
+  `park-cycle.ps1` after every turn, pushing that one file until a PR publishes it -- see the `park` skill,
+  which documents all three parking moments on one page.
 - **Idempotent repetition, per file.** Running the script again on a branch that already exists does
   not fail or overwrite -- it resumes. The two branch files are judged **separately**, and on what
   each one says it belongs to rather than on whether it exists (both exist on the trunk by design):

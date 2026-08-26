@@ -126,6 +126,21 @@ function Get-SharedScriptPairs {
             Skill  = 'park'
         },
         @{
+            # THE AUTOMATIC HALF OF PARKING (#900, August 26, 2026), invoked by the Stop hook
+            # cycle-autopark.ps1 -- which is why this row exists at all: the hook runs from
+            # ${CLAUDE_PLUGIN_ROOT}, so a consumer whose plugin carried the hook but not this script
+            # would have a hook that silently does nothing.
+            #
+            # DOCUMENTED IN THE 'park' SKILL RATHER THAN ITS OWN, beside park-branch. The three parking
+            # moments -- at creation, deliberately mid-work, and automatically -- are one subject, and a
+            # reader deciding between them wants them on one page. It also means the model does not
+            # reach for this: the page carries disable-model-invocation, and the hook is what runs it.
+            Name   = 'park-cycle'
+            Source = 'scripts\task\park-cycle.ps1'
+            Plugin = 'contributing-davekjohn'
+            Skill  = 'park'
+        },
+        @{
             # CENTRALIZED FROM TWO CONSUMER COPIES (inbound #815, August 21, 2026) -- the #81 argument
             # again: a mechanism several repos need, living as a hand-written copy in each, is a
             # mechanism that will drift. Nothing in the plugin deleted a branch anywhere before this.

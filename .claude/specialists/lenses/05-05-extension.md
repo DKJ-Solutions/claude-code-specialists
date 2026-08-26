@@ -399,24 +399,37 @@ entitled to its own. Do not read a consumer without these scripts as misconfigur
 
 Derek prefers not to touch the git commands by hand. His toolbox:
 
-- `scripts/task/new-branch.ps1 -Name <branch-name> [-Title "…"] [-Intent "…"] [-Park]` — create (or
+- `scripts/task/new-branch.ps1 -Name <branch-name> [-Title "…"] [-Intent "…"] [-NoPush]` — create (or
   idempotently resume) the branch and, in the same move, write its `contributing-davekjohn/development-cycle.md`.
   `-Intent` records where you left off / what is next **as the opening paragraph of `PLAN`, without a
   heading** — above the phases until #908/#925 (August 26, 2026), which is the one region the preamble
   rule refuses, so the scaffolder wrote a document its own branch-entry gate rejected. Deliberately not in
-  the DEPLOY section, whose text folds verbatim into `CHANGELOG.md`; `-Park` commits
-  that one file and pushes the branch to `origin` for later / another device — **still no PR** (#162).
-  Without `-Park`: no push, no PR — just the branch + the document on disk. See
+  the DEPLOY section, whose text folds verbatim into `CHANGELOG.md`.
+  **And it pushes, by default, since #900 (August 26, 2026)** — the document is committed and the branch
+  goes to `origin`, **still no PR** (#162). That ran behind `-Park` for nineteen days and the switch was
+  typed six times in the whole history, against a measured median of **22 minutes** invisible on `origin`
+  per merged branch (worst 365). `-NoPush` is the escape valve; `-Park` is still accepted, says it changed
+  nothing, and is there so a consumer's typed habit does not fail on a missing parameter. A repo with no
+  `origin` creates the branch as before and says why nothing was pushed. See
   [Step 3 above](#classifying-naming-and-creating-a-branch).
+- `scripts/task/park-cycle.ps1 [-Quiet]` — **Derek does not run this**, and it is here so he recognises its
+  commits. A Stop hook (`cycle-autopark.ps1`) invokes it after every turn and it pushes
+  `contributing-davekjohn/development-cycle.md`, and only that file, for the life of the branch — the plan
+  and the phase state being what another device actually needs. **It becomes a no-op the moment a PR
+  exists**, because the DEPLOY lock (#884) refuses the merge once that document diverges from what the PR
+  published; a pusher that kept going would block every merge in the repo. Same reason its fail-safe runs
+  that way: `gh` unable to answer means no push. So a branch with a PR on it shows no further `park:`
+  commits, by design.
 - `scripts/task/park-branch.ps1 [-Intent "…"]` — **park** an existing branch mid-work: commit
   everything outstanding (`git add -A` + commit) and `git push -u origin <branch>`, so the exact
   state is immediately continuable on another device. Refuses on `main`, opens **no PR**, and does
   **no live/deploy action** — git only. Already committed locally but not pushed? It skips the
   commit and just pushes. Self-contained (no repo-owned config). `-Intent` records where you left
-  off in the park commit message. Runs via the `park` skill (#175). **`park` vs `new-branch -Park`:**
-  `-Park` parks *at creation* and commits *only the two branch files*; `park-branch` parks an
-  *existing* branch and commits *everything* — start-and-park versus back-up-mid-work. **The commit
-  subject says which** since August 7, 2026 (#507): `(all outstanding work)` against `(the branch files
+  off in the park commit message. Runs via the `park` skill (#175). **Three parking moments, and this is the
+  only deliberate one:** `new-branch` pushes *at creation* and commits *only the branch document*,
+  `park-cycle` keeps that document current *on a hook*, and `park-branch` is the one you invoke — an
+  *existing* branch, *everything* outstanding. **The commit
+  subject tells the scope apart** since August 7, 2026 (#507): `(all outstanding work)` against `(the branch files
   only)`. Both used to write the same sentence while committing different things, so the log could not
   answer the one question a park is asked later — which half of my work is on origin? One implementation
   now (`Invoke-GitPark`), with the scope choosing the pathspec and the words together.

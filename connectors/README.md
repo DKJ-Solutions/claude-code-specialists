@@ -293,7 +293,9 @@ exceptions to the rule that plugins carry no hooks/skills — the full list is i
 [What lives here and what doesn't](../README.md#what-lives-here-and-what-doesnt), and it has grown since
 this paragraph first named its two siblings — and shrank again on August 26, 2026: three SessionStart
 hooks (`connector-sessioncheck` and `script-contract-sessioncheck` in `contributing-davekjohn`,
-`roster-sessioncheck` in the core team) plus the skill `specialists-init`. Mind the **version gate**: consumers only receive the
+`roster-sessioncheck` in the core team), one Stop hook (`cycle-autopark`, also
+`contributing-davekjohn` — the first hook here that *acts* instead of reporting, #900) plus the skill
+`specialists-init`. Mind the **version gate**: consumers only receive the
 hook after a release bump plus `claude plugin marketplace update <marketplace>` and
 `claude plugin update <plugin>@<marketplace> --scope project` (neither the refresh nor the scope flag
 is optional — see [Staying up to date](../INSTALL.md#staying-up-to-date)) + session restart on

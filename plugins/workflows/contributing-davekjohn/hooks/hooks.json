@@ -16,6 +16,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/cycle-autopark.ps1\"",
+            "timeout": 60
+          }
+        ]
+      }
     ]
   }
 }
