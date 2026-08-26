@@ -187,17 +187,25 @@ the next re-level does not reproduce this afternoon.
 by a suite rather than by reading, and neither would have raised anything at runtime:
 
 - **`Get-EntryInsertOffset`'s `$EntryPattern` default was the literal `'(?m)^## '`.** A parameter default
-  cannot call a function, so the level had been typed — and once it was stale, every caller relying on the
+  cannot call a function, so the level had been typed -- and once it was stale, every caller relying on the
   default saw a changelog with no entries in it. The fold then ranked each new entry against an empty list
   and appended it, which silently reverses the order the list is supposed to hold. It is resolved in the
   function body now. The fixture that caught it carries a comment describing this exact failure from the
-  *previous* level move, three weeks earlier — it had been repaired by typing the new number rather than by
+  *previous* level move, three weeks earlier -- it had been repaired by typing the new number rather than by
   composing it, which is why it broke a second time.
 - **`session-status.ps1` walked the changelog on `'^##\s'`.** Two things went wrong at once and only one was
   loud: entries at H3 stopped being counted, so the status block would have reported "none pending" on a
-  changelog holding nine — and `## [Unreleased]`, which sits at exactly the level that pattern wanted, would
+  changelog holding nine -- and `## [Unreleased]`, which sits at exactly the level that pattern wanted, would
   have been printed *as* a pending change. It reads the level from the lib now and skips the pending heading;
   the no-library fallback accepts both levels, because that branch cannot ask.
+
+**This section is pure ASCII on purpose, and it is not a house style.** The DEPLOY lock compares the section
+against the PR body, and `ship-pr` reads that body through a non-UTF-8 decode -- so any non-ASCII character
+makes a clean document mismatch a mojibake copy of itself
+([#907](https://github.com/DaveKJohn/claude-code-specialists/issues/907), still open). Three em-dashes were
+flattened to `--` to get this merged, exactly as
+[#906](https://github.com/DaveKJohn/claude-code-specialists/pull/906) did the day before. Do not copy the
+convention; fix the decode.
 
 **Score:** 4
 
