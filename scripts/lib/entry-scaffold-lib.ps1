@@ -4318,13 +4318,23 @@ $script:BranchFileDefaults = [ordered]@{
         # text went on telling every new branch to write the shape the scaffolder no longer produced.
         # Concatenated rather than interpolated because a backtick is PowerShell's escape character, so a
         # double-quoted string carrying markdown backticks reads them as escapes.
-        '> **FOUR `' + $script:BranchCyclePhaseHashes + '` HEADINGS, AND NEVER A FIFTH** -- PLAN, CREATE, TEST, DEPLOY are the whole top',
-        '> level. A section needing its own heading goes in as a `' + $script:BranchCycleSubHashes + '` UNDER whichever of the four owns',
+        #
+        # AND THE PARENTHESES AROUND EACH CONCATENATION ARE LOAD-BEARING -- do not tidy them away
+        # (#915, August 26, 2026). In PowerShell ',' binds TIGHTER than '+', so inside an array literal
+        # an unparenthesised 'a' + $H + 'b' is not string concatenation at all: it parses as ARRAY
+        # concatenation of its neighbours, ('...', 'a') + $H + ('b', '...'), turning one element into
+        # three and dropping a bare '###' line into the guidance. That is what shipped: 38 elements
+        # where 30 are written, four of them a naked marker, and check-branch-entry.ps1 then read those
+        # markers as branch content in the generic region and refused every new branch document. It
+        # fails into well-formed output rather than into an error, which is why it read as working code
+        # and why the scaffold suite now asserts that no generated element is a bare marker.
+        ('> **FOUR `' + $script:BranchCyclePhaseHashes + '` HEADINGS, AND NEVER A FIFTH** -- PLAN, CREATE, TEST, DEPLOY are the whole top'),
+        ('> level. A section needing its own heading goes in as a `' + $script:BranchCycleSubHashes + '` UNDER whichever of the four owns'),
         '> it. No gate sees a heading, so this one is on you (Dave, August 26, 2026).',
         '>',
-        '> **AND NOTHING BRANCH-SPECIFIC ABOVE `' + $script:BranchCyclePhaseHashes + ' PLAN`** -- everything between the title and that heading',
+        ('> **AND NOTHING BRANCH-SPECIFIC ABOVE `' + $script:BranchCyclePhaseHashes + ' PLAN`** -- everything between the title and that heading'),
         '> is this guidance, which is identical in every branch document. A status line, a note about',
-        '> THIS branch or an instruction to a session belongs under one of the four, normally as a `' + $script:BranchCycleSubHashes + '`',
+        ('> THIS branch or an instruction to a session belongs under one of the four, normally as a `' + $script:BranchCycleSubHashes + '`'),
         '> in PLAN. Same rule, same reason: no gate reads this region (Dave, August 26, 2026).',
         '>',
         '> **DEPLOY takes no steps of its own, and it is WRITTEN LAST** -- it is what the branch DID, once',
