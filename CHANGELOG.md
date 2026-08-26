@@ -25,6 +25,70 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `feat/rename-workflow-to-contributing-davekjohn-v1` · 20260826-111226
+
+`workflow-davekjohn` is now `contributing-davekjohn` -- the plugin, its directory, and its root folder in the
+repo -- and `workflow-default` is gone along with the "exactly one workflow" guard that only existed because
+there were two. The plugin's name now says what it does: it serves one owner's contributing rules, not a
+workflow among several. Its folder carries **one** page instead of two, arranged as the four steps work
+actually moves through, and the folder's `CLAUDE.md` is merged into it.
+
+**Nothing is renamed without the old name still being read.** That is this repo's own precedent rather than a
+new idea: `Get-BranchFilePaths` already kept four legacy filenames readable, on the argument that a consumer
+meets a rename through a plugin update rather than by choosing to, and that a half-finished branch must not be
+stranded. So seven document names resolve where one is written, both folder names satisfy the isolation guard
+and the script-contract check, the bootstrap recognises either plugin id, and the seam defaults prefer whichever
+folder actually exists. Two of those would have failed **loudly** in an unmigrated consumer if they had been
+swept: the isolation guard refuses with `exit 1`, and the contract check is forwarded by a SessionStart hook as
+`[ERROR]`.
+
+**Two rules Dave stated mid-branch are now written down and shipped**, after he caught both by eye in this
+branch's own document: `development-cycle.md` has four `##` headings and never a fifth, and nothing
+branch-specific sits above `## PLAN`. Neither is enforced by anything -- measured, not assumed -- so both went
+into the portable page and into the scaffolder's preamble, where every future branch document in every repo
+will carry them. The gate question is [#898](https://github.com/DaveKJohn/claude-code-specialists/issues/898)
+and [#899](https://github.com/DaveKJohn/claude-code-specialists/issues/899).
+
+**A record's prose and its links were treated differently, deliberately.** Renaming twice made 61 links in
+published release notes dead. Measured before deciding: of 29 occurrences of the old plugin path in history, 22
+were link targets and 7 were prose in backticks. The link targets followed the move -- which the folder's own
+doctrine explicitly permits -- and every prose mention stayed exactly as written. The same split applied to the
+`skill-cost.json` baseline: its 13 keys are addresses and moved, its values and their `Version` fields are the
+measurement and did not.
+
+**Score:** 5
+
+### What makes this deploy extra special
+
+**Every consumer of this marketplace has to act, and nothing will tell them so.** Their
+`.claude/settings.json` names `workflow-davekjohn@claude-code-specialists`, which resolves to nothing at their
+next `claude plugin marketplace update` -- and the hook that would have had an opinion about their workflow
+keys is the one this change retired. That breakage is accepted rather than avoided: Dave answered decision B
+with *"I accept the breakage. I'm the only consumer so it's something I can fix easily myself."*
+
+What softens it is that **only the install line is urgent.** Everything a consumer already has on disk keeps
+working: their `workflow-davekjohn/` folder is still read, their branch documents still resolve, their seams
+still pass the isolation guard, and their `CLAUDE.md` in that folder is untouched because the scaffold never
+overwrites. So the migration is `claude plugin install contributing-davekjohn@claude-code-specialists --scope
+project` plus one settings line, and the folder rename can wait for a quiet moment. This repo consumes itself,
+so it is the first consumer to need exactly that -- `check-connectors.ps1` already says so.
+
+**And a `workflow-default` install, if anybody has one, simply stops resolving.** No consumer in the register
+had it enabled -- re-verified across all four connector records -- so the measured population of that breakage
+is zero.
+
+**Score:** 4
+
+### Pull Request
+
+Rename workflow-davekjohn to contributing-davekjohn, and remove workflow-default
+
+Plugins: contributing-davekjohn, team-alpha, team-shopify
+
+[PR #905](https://github.com/DaveKJohn/claude-code-specialists/pull/905)
+
+---
+
 ## DEPLOY: `feat/the-cycle-document-has-a-shape-gate-v1` · 20260826-105312
 
 `check-branch-entry.ps1` now reads the SHAPE of `development-cycle.md`, not only its step marks. Two rules
