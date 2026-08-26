@@ -585,7 +585,17 @@ function Get-CheckWaitReport {
     $required = @()
     if ($RequiredNamesJson -and $RequiredNamesJson.Trim()) {
         try {
-            $required = @(@($RequiredNamesJson | ConvertFrom-Json) |
+            # ASSIGN FIRST, WRAP SECOND -- the same 5.1 rule the ChecksJson parse above already follows,
+            # and this parse did not until August 26, 2026. Inlined as
+            # `@(@($RequiredNamesJson | ConvertFrom-Json) | ...)` it collapsed the whole payload into ONE
+            # element, whose `.name` member-enumerates to every name at once: two required checks became
+            # the single bogus string 'a b', so `-contains` never matched and the label read ', NOT
+            # required' for a check that was required. It survived unseen because this repo's ruleset
+            # requires exactly ONE check, and a one-element JSON array is handed through as the object
+            # itself -- so the only shape anybody ran was the one shape that happens to work. Measured
+            # both ways when Get-MergeBlockVerdict below hit the identical trap.
+            $parsedRequired = $RequiredNamesJson | ConvertFrom-Json
+            $required = @(@($parsedRequired) |
                 Where-Object { $_ -and $_.name } |
                 ForEach-Object { [string]$_.name })
         } catch {
@@ -622,4 +632,222 @@ function Get-CheckWaitReport {
     }
 
     return ($parts -join '; ')
+}
+
+function Format-CheckNameList {
+    <#
+    .SYNOPSIS
+        A list of check names as readable prose: "'a'", "'a' and 'b'", "'a', 'b' and 'c'". '' when empty.
+
+    .DESCRIPTION
+        Exists because Get-MergeBlockVerdict's Reason is read by a human in a terminal at the moment a
+        merge either happens or does not, so a bare PowerShell array rendering ('System.Object[]', or a
+        space-joined run of names) is the wrong output for the one line that explains the decision.
+
+        Quoted per name rather than around the whole list, so a check name containing a space cannot be
+        mistaken for two. Empty in, empty out -- a caller with nothing to name concatenates it
+        unconditionally instead of branching, the same tolerance Format-CheckDuration already applies.
+    #>
+    param([string[]]$Names)
+
+    $clean = @(@($Names) | Where-Object { $_ -and ([string]$_).Trim() } | ForEach-Object { "'$_'" })
+    if ($clean.Count -eq 0) { return '' }
+    if ($clean.Count -eq 1) { return $clean[0] }
+    return (($clean[0..($clean.Count - 2)] -join ', ') + ' and ' + $clean[-1])
+}
+
+function Get-CheckOutcome {
+    <#
+    .SYNOPSIS
+        One `gh pr checks --json` record reduced to 'pass', 'fail', 'pending' or 'unknown'.
+
+    .DESCRIPTION
+        Reads `bucket` first and `state` as the fallback, because which one a payload carries depends on
+        what the caller asked for rather than on the check: `bucket` is a gh convenience field and
+        `state` is the API's own word. A caller that asked for both gets the cheaper read; one that asked
+        for only the second still gets an answer.
+
+        'unknown' is a real answer and NOT a synonym for 'pass'. A record whose outcome cannot be read is
+        a check nobody has proved green, and the only caller of this function is deciding whether a merge
+        is safe -- so it needs the difference. That is also why the fail list is generous: cancelled,
+        timed out and startup-failed are all "not green", and treating any of them as passing would let a
+        merge through on a check that never ran.
+
+        NEUTRAL and SKIPPED map to 'pass' because GitHub itself does not let either block a merge, and
+        EXPECTED maps to 'pending' because it means a status that is awaited and has not arrived.
+    #>
+    param($Record)
+
+    if ($null -eq $Record) { return 'unknown' }
+
+    # A field the caller never asked gh for is absent, and absent is not empty under Set-StrictMode --
+    # so ask the object whether it carries the property before reading it.
+    $bucket = ''
+    if ($Record.PSObject.Properties['bucket']) { $bucket = ([string]$Record.bucket).Trim().ToLowerInvariant() }
+    switch ($bucket) {
+        'pass'     { return 'pass' }
+        'skipping' { return 'pass' }
+        'fail'     { return 'fail' }
+        'cancel'   { return 'fail' }
+        'pending'  { return 'pending' }
+    }
+
+    $state = ''
+    if ($Record.PSObject.Properties['state']) { $state = ([string]$Record.state).Trim().ToUpperInvariant() }
+    switch ($state) {
+        'SUCCESS'         { return 'pass' }
+        'NEUTRAL'         { return 'pass' }
+        'SKIPPED'         { return 'pass' }
+        'FAILURE'         { return 'fail' }
+        'ERROR'           { return 'fail' }
+        'CANCELLED'       { return 'fail' }
+        'TIMED_OUT'       { return 'fail' }
+        'ACTION_REQUIRED' { return 'fail' }
+        'STARTUP_FAILURE' { return 'fail' }
+        'IN_PROGRESS'     { return 'pending' }
+        'QUEUED'          { return 'pending' }
+        'PENDING'         { return 'pending' }
+        'WAITING'         { return 'pending' }
+        'REQUESTED'       { return 'pending' }
+        'EXPECTED'        { return 'pending' }
+    }
+
+    return 'unknown'
+}
+
+function Get-MergeBlockVerdict {
+    <#
+    .SYNOPSIS
+        Whether a failing CI run actually blocks the merge -- i.e. whether what failed is a check the
+        repo's ruleset REQUIRES. Returns Blocked / Reason / FailedRequired / FailedOther.
+
+    .DESCRIPTION
+        ship-pr.ps1 waits for every check a PR has and used to read the exit code of
+        `gh pr checks --watch` as its verdict. That exit code is non-zero when ANY check fails, and the
+        comment above it justified the refusal with "branch protection blocks the merge until green" --
+        which is true only of a REQUIRED check. So the script was stricter than the ruleset it exists to
+        respect, and on August 26, 2026 that difference was the whole chain: `claude-review` went red on
+        every PR (issue #942) while `lint-en-tests`, the only check the `main` ruleset requires, was
+        green. GitHub reported those PRs as MERGEABLE / UNSTABLE -- its own word for "mergeable, with a
+        non-required check failing" -- and the script read it as BLOCKED (issue #943).
+
+        THE WAIT IS UNCHANGED, and deliberately so. Issue #831 measured over n=100 paired runs that the
+        non-required check governs the wait 23% of the time at a median cost of 0s, and Dave's answer
+        (August 24, 2026) was to keep the wait and make it legible instead. Waiting on a non-required
+        check costs seconds; REFUSING on one costs the merge for as long as that workflow is broken, and
+        nobody had measured that. So only the verdict moves here, which is also why this takes the
+        issue's second direction rather than its first: switching the WATCH to `--required` would have
+        stopped waiting on a pending non-required check too, a second change with no measurement behind
+        it.
+
+        THE SELECTION IS THE PART THAT NEEDS A TEST, not the query -- the same split as
+        Get-CheckWaitReport and Get-ExistingPrRecord above, for the same reason: the caller drives a live
+        remote no suite can reach, while this can be handed a payload.
+
+        READ THE PAYLOAD, NEVER AN EXIT CODE. Measured on PR #937 (August 26, 2026):
+        `gh pr checks 937 --json name,bucket,state` returns exit 0 while reporting `claude-review` as
+        `fail`. JSON mode carries the outcome in the records and not in the exit status, so a caller that
+        read the exit code of the JSON call would conclude everything passed.
+
+        AND THE UNREADABLE CASE REFUSES. Without a readable required-check list this cannot tell a
+        ruleset that requires nothing from one whose required checks have not reported yet, so it keeps
+        the old behaviour rather than guessing: a script that lets a merge through on an unread ruleset
+        is a worse defect than the one being repaired. `gh pr checks --required` prints nothing and exits
+        non-zero where a ruleset requires nothing, which is exactly that case.
+
+    .PARAMETER RequiredChecksJson
+        `gh pr checks <pr> --required --json name,bucket,state` output. The verdict is made from this and
+        from nothing else.
+
+    .PARAMETER ChecksJson
+        `gh pr checks <pr> --json name,bucket,state` output, i.e. every check. Optional, and used only to
+        NAME the not-required checks that failed -- never for the verdict. Left out, the verdict is
+        identical and the reason simply does not list them.
+    #>
+    param(
+        [string]$RequiredChecksJson,
+        [string]$ChecksJson = ''
+    )
+
+    $unreadable = [pscustomobject]@{
+        Blocked        = $true
+        Reason         = 'the required-check list could not be read, so which checks this ruleset requires is unknown -- refusing on the CI failure, exactly as before'
+        FailedRequired = @()
+        FailedOther    = @()
+    }
+
+    if (-not $RequiredChecksJson -or -not $RequiredChecksJson.Trim()) { return $unreadable }
+    try { $parsedRequired = $RequiredChecksJson | ConvertFrom-Json } catch { return $unreadable }
+
+    # Assign first, wrap second -- 5.1 hands a parsed JSON array to the pipeline as ONE object.
+    $requiredRecords = @(@($parsedRequired) | Where-Object { $_ -and $_.name })
+    if ($requiredRecords.Count -eq 0) { return $unreadable }
+
+    $failedRequired = @()
+    $unfinishedRequired = @()
+    $requiredNames = @()
+    foreach ($r in $requiredRecords) {
+        $name = [string]$r.name
+        $requiredNames += $name
+        switch (Get-CheckOutcome -Record $r) {
+            'fail'    { $failedRequired += $name }
+            'pending' { $unfinishedRequired += $name }
+            'unknown' { $unfinishedRequired += $name }
+        }
+    }
+    $failedRequired = @($failedRequired | Sort-Object -Unique)
+    $unfinishedRequired = @($unfinishedRequired | Sort-Object -Unique)
+    $requiredNames = @($requiredNames | Sort-Object -Unique)
+
+    if ($failedRequired.Count -gt 0) {
+        $it = if ($failedRequired.Count -eq 1) { 'it' } else { 'they' }
+        return [pscustomobject]@{
+            Blocked        = $true
+            Reason         = "the ruleset REQUIRES $(Format-CheckNameList -Names $failedRequired), and $it failed"
+            FailedRequired = $failedRequired
+            FailedOther    = @()
+        }
+    }
+
+    if ($unfinishedRequired.Count -gt 0) {
+        $has = if ($unfinishedRequired.Count -eq 1) { 'has' } else { 'have' }
+        return [pscustomobject]@{
+            Blocked        = $true
+            Reason         = "the required check $(Format-CheckNameList -Names $unfinishedRequired) $has not finished, or its state could not be read -- so the merge is not green"
+            FailedRequired = @()
+            FailedOther    = @()
+        }
+    }
+
+    # Every required check passed, so the merge is not blocked. What remains is naming what DID fail,
+    # which is presentation only -- an unreadable payload here costs the reader some detail and cannot
+    # change the verdict above it.
+    $failedOther = @()
+    if ($ChecksJson -and $ChecksJson.Trim()) {
+        try {
+            # Assign first, wrap second -- see the note in Get-CheckWaitReport above.
+            $parsedAll = $ChecksJson | ConvertFrom-Json
+            $failedOther = @(@($parsedAll) |
+                Where-Object { $_ -and $_.name } |
+                Where-Object { $requiredNames -notcontains [string]$_.name } |
+                Where-Object { (Get-CheckOutcome -Record $_) -eq 'fail' } |
+                ForEach-Object { [string]$_.name })
+        } catch {
+            $failedOther = @()
+        }
+        $failedOther = @($failedOther | Sort-Object -Unique)
+    }
+
+    $what = if ($failedOther.Count -gt 0) {
+        $them = if ($failedOther.Count -eq 1) { 'it' } else { 'them' }
+        "$(Format-CheckNameList -Names $failedOther) failed, and the ruleset does not require $them"
+    } else {
+        'what failed is not a check the ruleset requires'
+    }
+    return [pscustomobject]@{
+        Blocked        = $false
+        Reason         = "every required check passed ($(Format-CheckNameList -Names $requiredNames)); $what"
+        FailedRequired = @()
+        FailedOther    = $failedOther
+    }
 }
