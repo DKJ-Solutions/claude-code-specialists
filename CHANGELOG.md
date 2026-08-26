@@ -32,6 +32,54 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/release-roots-changelog-move-v1` · 20260826-214629
+
+The three note roots are siblings. `releases/development/` is `contributing-davekjohn/releases/changelog/`
+and `releases/github/` is `contributing-davekjohn/releases/github/`, joining `audience/`, which has been
+there since August 14. `releases/` at the repo root now holds one file: the list of every release ever cut,
+which stays because a repo that has cut releases has a history whichever tooling cut it.
+
+`changelog` rather than `development` because the name should say what the document **is** -- the changelog
+for that version, the entries at the levels the fold left them -- not which stage of the work produced it.
+That is the same correction `notes/` -> `audience/` made two weeks ago in the sibling root, and this was the
+last root still named after something other than its reader or its content.
+
+Two computed defaults stopped branching on `Test-IsWorkflowSourceRepo`, and the branch is gone rather than
+left returning one string twice. The other three keep it, and the line between them is not symmetry: a
+repo's changelog and its release list exist whichever tooling cut them, so a source keeps those at its root,
+while a tree nothing writes but a cut belongs to the workflow in every repo.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+**A consumer who has answered neither root seam gets one migration, not two.** #885 moved their default from
+the repo root into `contributing-davekjohn/releases/development/` and has not been released yet, so both
+changes reach them in the same version and the tree they never saw is the only one that never existed. The
+accepted cost recorded at #885 -- old notes stay where they are, new ones land in the folder -- is paid once,
+and repointing the seam at the tree they already have still keeps a single tree for anyone who would rather
+have that. The seam **names** are unchanged, so nothing in a consumer's `repo-config.ps1` has to move on the
+same day the default under it does.
+
+**And the shipped lint gate would have gone quiet without being asked to.** Check 25 holds every
+hand-written note against linking its reader into a tier the note was not written for, and it matched the
+tier-0 tree by the literal directory name `development/`. Renaming the directory and shipping that check
+unchanged would have left a gate that finds nothing, reports a healthy count, and is discovered by whoever
+reads a released document. Both names are matched now -- which is also what keeps an unmigrated consumer
+covered, so the fix and the compatibility are one line. That is the third time this repo has paid for a path
+written as a literal in a place that reads a seam everywhere else: `releases/notes` in this very check
+(August 12), the overview row at the v4.6.0 cut, and this.
+
+**Score:** 3
+
+#### Pull Request
+
+the release-note roots become siblings: development -> changelog, and the generated trees move into the workflow folder
+
+[PR #949](https://github.com/DaveKJohn/claude-code-specialists/pull/949)
+
+---
+
 ### DEPLOY: `feat/plugin-scoped-skill-span-v1` · 20260826-213106
 
 A plugin README that enumerates its own skills can now be machine-checked. Check 29 reads an opt-in
