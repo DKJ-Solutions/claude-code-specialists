@@ -375,6 +375,75 @@ function Format-EntryAudienceGuidance {
     return @($Lines | ForEach-Object { [string]$_ -replace '\{0\}', $sentence })
 }
 
+function Remove-EntryAudienceGuidance {
+    <#
+        The counterpart of Format-EntryAudienceGuidance, for a repo that states NO audience tier:
+        Get-EntryAudienceTier returns $null there, so nothing can fill '{0}' and the sentence has to go.
+
+        IT REMOVES THE WHOLE PARAGRAPH, NOT THE LINE (issue #928, August 26, 2026). The call site used to
+        filter `$_ -notmatch '{0}'`, which is right about the seam and wrong about the sentence: the seam
+        opens a paragraph whose remaining lines finish it. In StepsGuidance that is three lines, so every
+        no-tier consumer's branch document carried a paragraph beginning mid-sentence, referring to "that
+        reader" after the clause naming that reader had been dropped. Not measurable here -- this repo's
+        scripts/repo-config.ps1 states tier 2 -- which is why it reached consumers only.
+
+        BY SHAPE, NOT BY WORDING, so it survives a consumer's translation. A paragraph ends at a SEPARATOR:
+        a line that is empty once a leading '>' is stripped. That is the same move check-branch-entry.ps1
+        makes for the #899 preamble check and for the same reason -- the wording is a seam and the shape is
+        not. Marking the paragraph in the wording instead would have put the burden on whoever translates it.
+
+        A BLOCK CARRYING NO '{0}' COMES BACK UNTOUCHED, exactly as its sibling above does, and for the same
+        reason: a repo that replaced the wording with its own prose gets exactly its own prose.
+
+        AND ONE ADJACENT SEPARATOR GOES WITH IT, or removing an interior paragraph would leave the two
+        separators that fenced it back to back -- a doubled '>' line in the middle of the block. The one
+        BEFORE is preferred, so the paragraph that followed keeps the blank line above it; where the seam
+        opens the block and has none, the one after is taken instead.
+
+        THE BOUND IS ONE SEAM PARAGRAPH, which is what the wording has and all it is built for. Two
+        seam-carrying paragraphs ADJACENT to each other, the first of them opening the block, would leave
+        one separator standing: the first falls back to taking the one after it, and the second then reads
+        that as its own "before" and takes nothing. Named rather than repaired -- StepsGuidance carries a
+        single '{0}' and no consumer override has ever carried two, so the repair would be built for a
+        shape nobody has. Found by Victor in review, August 26, 2026.
+    #>
+    param([AllowEmptyCollection()][string[]]$Lines = @())
+
+    $all = @($Lines | ForEach-Object { [string]$_ })
+    if ($all.Count -eq 0) { return @() }
+
+    # A separator is what fences one paragraph from the next: blank, or a blockquote marker with nothing
+    # after it. Anything else is prose and belongs to the paragraph it sits in.
+    $isSeparator = {
+        param([string]$line)
+        return ([string]($line -replace '^\s*>', '')).Trim() -eq ''
+    }
+
+    $drop = New-Object 'System.Collections.Generic.HashSet[int]'
+    for ($i = 0; $i -lt $all.Count; $i++) {
+        if ($all[$i] -notmatch '\{0\}') { continue }
+        if ($drop.Contains($i)) { continue }
+
+        # Expand to the paragraph's own bounds. The seam is not necessarily its first line: a translation
+        # may need the tier sentence in a different position than English does.
+        $start = $i
+        while ($start -gt 0 -and -not (& $isSeparator $all[$start - 1])) { $start-- }
+        $end = $i
+        while ($end -lt ($all.Count - 1) -and -not (& $isSeparator $all[$end + 1])) { $end++ }
+
+        for ($j = $start; $j -le $end; $j++) { [void]$drop.Add($j) }
+
+        if ($start -gt 0 -and (& $isSeparator $all[$start - 1])) {
+            [void]$drop.Add($start - 1)
+        } elseif ($end -lt ($all.Count - 1) -and (& $isSeparator $all[$end + 1])) {
+            [void]$drop.Add($end + 1)
+        }
+    }
+
+    if ($drop.Count -eq 0) { return $all }
+    return @(0..($all.Count - 1) | Where-Object { -not $drop.Contains($_) } | ForEach-Object { $all[$_] })
+}
+
 function Format-EntryTierLine {
     <# The single line an entry carries, e.g. 'Tier: 0'. One formatter, so the writer and the parser
        below cannot disagree about the spacing. #>
@@ -4899,13 +4968,15 @@ function Format-DevelopmentCycle {
     # SO THE SEAM STAYS ALIVE and is read here instead: the '{0}' line in StepsGuidance goes through
     # Format-EntryAudienceGuidance exactly as it did below, so a consumer's own Get-ReleaseAudienceDescription
     # still answers it and nothing about that contract changed. A repo that asks about NO audience tier gets
-    # the line removed rather than a dangling '{0}' -- Get-EntryAudienceTier returns $null there, and a
-    # placeholder nobody can fill is worse than a sentence nobody needs.
+    # the WHOLE audience paragraph removed rather than a dangling '{0}' -- Get-EntryAudienceTier returns
+    # $null there, and a placeholder nobody can fill is worse than a sentence nobody needs. Dropping only the
+    # seam LINE was issue #928: its two continuation lines stayed behind and went on finishing a sentence
+    # that was no longer there. Remove-EntryAudienceGuidance carries why the paragraph is found by shape.
     $audienceTier = Get-EntryAudienceTier
     $stepsBlock = if ($null -ne $audienceTier) {
         @(Format-EntryAudienceGuidance -Lines @($w.StepsGuidance) -Tier $audienceTier)
     } else {
-        @(@($w.StepsGuidance) | Where-Object { [string]$_ -notmatch '\{0\}' })
+        @(Remove-EntryAudienceGuidance -Lines @($w.StepsGuidance))
     }
     foreach ($line in @($stepsBlock | Where-Object { $null -ne $_ })) { $lines.Add([string]$line) }
     $lines.Add('')
