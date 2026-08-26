@@ -25,6 +25,61 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `feat/the-cycle-document-has-a-shape-gate-v1` · 20260826-105312
+
+`check-branch-entry.ps1` now reads the SHAPE of `development-cycle.md`, not only its step marks. Two rules
+that were enforced by Dave reading the file, on a document a session writes, with nothing in between:
+
+- **Four `##` headings, never a fifth** ([#898](https://github.com/DaveKJohn/claude-code-specialists/issues/898)).
+  Anything else is a `###` under one of the four.
+- **Nothing but guidance above the first `##`** ([#899](https://github.com/DaveKJohn/claude-code-specialists/issues/899)).
+  That region is identical in every branch document in every repo.
+
+Both were broken on the same document within one afternoon, and #899's had been broken by **two sessions
+in a row in the same position** -- which is what makes it a shape the document invites rather than a slip.
+The harm is worth naming, because "wrong place" understates it: the stray paragraph sat flush under the
+guidance with no heading between them, so it *read* as guidance. A reader who finds one branch's status
+inside a generic block learns to distrust the whole block, including the rules that do apply everywhere.
+
+**The two rules are scoped differently, and that asymmetry is the design.** The heading count runs only in
+the repo that maintains this workflow, behind `Test-IsWorkflowSourceRepo`: heading-blindness is a stated
+feature of this gate precisely so a repo that adopted the document may keep headings of its own, and a
+check refusing those would refuse correct files elsewhere. The preamble rule holds everywhere, because it
+reads the shape and not the text -- guidance is blockquoted whatever language it has been translated into,
+so it survives the case a byte comparison against the scaffolder could not (inbound #562 is the consumer
+who translated that block).
+
+Neither check re-derives where the entry begins: both read `Split-DevelopmentCycle`, the one splitter three
+readers already share, and both are fence-aware, because a document explaining this format quotes its own
+headings.
+
+**One correction the tests forced, kept here because it is the useful part.** The first draft reported
+"every heading past the fourth" -- which named `## DEPLOY` as the extra the moment the stray sat *above*
+`## PLAN`, which is exactly where both measured instances sat. A count cannot say which heading does not
+belong. The phases are now read by name from `Get-BranchFileWording`, the same source the scaffolder writes
+them from, so a repo that renames a phase is judged by its own names.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+N/A. One of the two rules reaches a consumer -- the preamble check, which refuses only content that would
+misread as generic guidance in their own document -- and the heading rule deliberately does not. The
+portable page states which is which, so an adopter can see the boundary rather than infer it. Nothing they
+have written today starts failing.
+
+**Score:** N/A
+
+### Pull Request
+
+the branch-entry gate holds development-cycle.md to its four phases and its generic preamble
+
+Plugins: workflow-davekjohn
+
+[PR #904](https://github.com/DaveKJohn/claude-code-specialists/pull/904)
+
+---
+
 ## DEPLOY: `fix/the-guard-covers-every-entry-point-v1` · 20260826-102307
 
 `scripts/maintenance/measure-always-on.ps1` now carries the source-repo guard, and

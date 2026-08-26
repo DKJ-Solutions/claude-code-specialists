@@ -167,6 +167,122 @@ try {
     $r = Invoke-Gate -Dir $unscored -Branch 'feat/thing'
     Assert-True ($r.Code -eq 0) 'unscored: an unsettled significance does NOT block the merge -- that refusal is the cut''s'
     Assert-True ($r.Out -match 'RELEASE CUT will refuse') 'unscored: and the gate says where the refusal does live'
+
+    # --- The document's SHAPE: four phases (#898) and a generic preamble (#899) ----------------------
+    # BOTH RULES WERE CAUGHT BY EYE, on the same document, on the same afternoon, and neither had a
+    # reader. #898: a fifth '## Where this stands (August 25, 2026, late)' above '## PLAN', which survived
+    # a park and a merge-up with every gate green -- the reporter tested it rather than assuming, and got
+    # byte-identical gate output at four headings and at five. #899: branch state written into the region
+    # between the H1 and the first '##', which is generic guidance in every branch document in every repo.
+    # Two sessions in a row used that region that way, so it is a shape the document invites.
+    #
+    # THE TWO CHECKS ARE SCOPED DIFFERENTLY, ON PURPOSE, and these scenarios are where that is pinned:
+    #   - the heading rule is the SOURCE REPO's. DEVELOPMENT-portable.md states heading-blindness as a
+    #     feature precisely so a consumer may keep headings of their own, so refusing them everywhere
+    #     would break correct files elsewhere -- the shape this repo declined at 124 findings once before.
+    #   - the preamble rule holds EVERYWHERE, because it reads the SHAPE and not the text: guidance is
+    #     blockquoted whatever language it has been translated into. A byte comparison against
+    #     StepsGuidance could not say that -- it carries a '{0}' seam the consumer answers themselves.
+    Write-Host 'the document shape'
+
+    function New-SourceRepoFixture {
+        <# Same fixture as New-Consumer plus the one file that makes Test-IsWorkflowSourceRepo say yes.
+           Written here rather than as a flag on New-Consumer so the two callers read differently at the
+           call site -- which of the two a scenario builds IS the thing under test. #>
+        param([Parameter(Mandatory = $true)][string]$Label)
+        $dir = New-Consumer -Label $Label
+        New-Item -ItemType Directory -Path (Join-Path $dir '.claude-plugin') -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $dir '.claude-plugin\marketplace.json'),
+            "{ `"name`": `"fixture`", `"plugins`": [] }`n", (New-Object System.Text.UTF8Encoding($false)))
+        return $dir
+    }
+
+    # A document that is WRITTEN, so the scaffold gate above is already satisfied and these scenarios
+    # measure the shape and nothing else. The DEPLOY half comes from Format-EntryBlock -- the same source
+    # the passing scenarios above use, so a change to the entry format shows up here rather than leaving
+    # this suite asserting against a shape nothing produces. The head is spelled out on purpose: the
+    # preamble's SHAPE is the subject of #899, and a scenario that hid it behind a formatter call would
+    # read as though the region were incidental.
+    $shapeHead = @(
+        '# Development cycle: `feat/thing`',
+        '',
+        '> **How this file is read.** A step is `- [ ]` until it is resolved.',
+        '> The four phases are below, and this block is the same in every branch document.',
+        '',
+        '## PLAN',
+        '',
+        '## CREATE',
+        '',
+        '- [x] Did the thing',
+        '',
+        '## TEST',
+        ''
+    )
+    $shapeEntry = @(Format-EntryBlock -Branch 'feat/thing' -Type 'Feat' `
+        -Description 'The thing now does the thing.' -Body 'The thing now does the thing.' `
+        -ImpactRows @([pscustomobject]@{ Tier = 0; Score = 2; Why = 'Maintainers notice it.' }))
+    $shapeLines = $shapeHead + $shapeEntry
+
+    # 1. THE BASELINE, and it has to be a source repo: without it the scenario below would pass for the
+    #    wrong reason (scoped out rather than shaped right).
+    $shapeOk = New-SourceRepoFixture -Label 'shape-ok'
+    Set-Entry -Dir $shapeOk -Lines $shapeLines
+    $r = Invoke-Gate -Dir $shapeOk -Branch 'feat/thing'
+    Assert-True ($r.Code -eq 0) 'shape: a four-phase document with a guidance-only preamble passes in the source repo'
+
+    # 2. #898 -- the fifth heading, in the position the measured instance used.
+    $shapeFive = New-SourceRepoFixture -Label 'shape-five'
+    Set-Entry -Dir $shapeFive -Lines (@($shapeLines |
+        ForEach-Object { if ($_ -eq '## PLAN') { '## Where this stands (August 25, 2026, late)', '', 'Parked.', '', $_ } else { $_ } }))
+    $r = Invoke-Gate -Dir $shapeFive -Branch 'feat/thing'
+    Assert-True ($r.Code -ne 0) 'shape/#898: a fifth ## heading fails the gate in the source repo'
+    Assert-True ($r.Out -match 'Where this stands') 'shape/#898: and the finding names the extra heading, so the repair needs no counting'
+    Assert-True ($r.Out -match '###') 'shape/#898: and it says to demote it, which is the whole remedy'
+
+    # 3. THE SCOPING, which is the half a later refactor is most likely to drop. Same document, consumer
+    #    fixture: it must pass. Without this assert the check could quietly become repo-wide and every
+    #    consumer that keeps a heading of their own would start failing, having changed nothing.
+    $shapeFiveConsumer = New-Consumer -Label 'shape-five-consumer'
+    Set-Entry -Dir $shapeFiveConsumer -Lines (@($shapeLines |
+        ForEach-Object { if ($_ -eq '## PLAN') { '## Our own section', '', 'Text.', '', $_ } else { $_ } }))
+    $r = Invoke-Gate -Dir $shapeFiveConsumer -Branch 'feat/thing'
+    Assert-True ($r.Code -eq 0) 'shape/#898: a consumer keeping a heading of their own is NOT refused -- heading-blindness is their guarantee'
+
+    # 4. A '##' INSIDE A FENCE is illustration, not a phase. Every reader of this format is fence-aware
+    #    and this one has to be too: a document explaining the arc quotes its own headings.
+    $shapeFenced = New-SourceRepoFixture -Label 'shape-fenced'
+    Set-Entry -Dir $shapeFenced -Lines (@($shapeLines |
+        ForEach-Object { if ($_ -eq '## TEST') { '```text', '## NOT A PHASE', '```', '', $_ } else { $_ } }))
+    $r = Invoke-Gate -Dir $shapeFenced -Branch 'feat/thing'
+    Assert-True ($r.Code -eq 0) 'shape/#898: a ## inside a fence is illustration -- quoting a heading is not writing one'
+
+    # 5. #899 -- branch prose in the preamble, in the shape both measured instances had: a plain paragraph
+    #    flush against the guidance block, with no heading between them.
+    $preBranch = New-Consumer -Label 'pre-branch'
+    Set-Entry -Dir $preBranch -Lines (@($shapeLines |
+        ForEach-Object { if ($_ -eq '## PLAN') { 'PLAN only for now (issue #886) -- do not start CREATE until Dave says go.', '', $_ } else { $_ } }))
+    $r = Invoke-Gate -Dir $preBranch -Branch 'feat/thing'
+    Assert-True ($r.Code -ne 0) 'shape/#899: branch prose above the first ## fails the gate'
+    Assert-True ($r.Out -match 'PLAN only for now') 'shape/#899: and the finding quotes the line, so there is nothing to hunt for'
+
+    # 6. AND IT HOLDS IN A CONSUMER, deliberately unlike #898: this rule reads the shape, so it says the
+    #    same thing in every repo. The asymmetry between 5 and 3 is the design, not an inconsistency.
+    Assert-True ($preBranch -notmatch 'nothing') 'shape/#899: (the fixture above is a CONSUMER -- the rule is not source-scoped)'
+
+    # 7. A TRANSLATED GUIDANCE BLOCK STILL PASSES, which is the reason this is a shape rule and not a byte
+    #    comparison against StepsGuidance. Inbound #562 is the measured consumer who translated the block;
+    #    a byte check would have refused their correct document.
+    $preTranslated = New-Consumer -Label 'pre-translated'
+    Set-Entry -Dir $preTranslated -Lines (@(
+        '# Development cycle: `feat/thing` ' + [char]0x00B7 + ' 20260826-120000',
+        '',
+        '> **Zo wordt dit bestand gelezen.** Een stap is `- [ ]` tot hij is afgehandeld.',
+        '> De vier fasen staan hieronder.',
+        '',
+        '## PLAN', '', '## CREATE', '', '- [x] Done', '', '## TEST', '',
+        '## DEPLOY: `feat/thing`', '', 'It does the thing.', '', '**Score:** 3'))
+    $r = Invoke-Gate -Dir $preTranslated -Branch 'feat/thing'
+    Assert-True ($r.Code -eq 0) 'shape/#899: a translated guidance block passes -- the rule reads the blockquote, not the words'
 }
 finally {
     foreach ($d in $script:trees) {

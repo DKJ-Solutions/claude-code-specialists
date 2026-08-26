@@ -121,6 +121,11 @@ if (Test-Path -LiteralPath $repoConfig -PathType Leaf) {
 # read by its own names only while that lib is already in the session. native-capture-lib is what keeps
 # the gh call out of PowerShell 5.1's native-stderr trap, where a zero exit code still sets $? to false.
 . (Join-Path $PSScriptRoot '..\lib\pr-body-lib.ps1')
+# Test-IsWorkflowSourceRepo, for the heading rule's source-repo scoping (#898). The one-file test -- a repo
+# with .claude-plugin/marketplace.json is the workflow's source -- already factored out here rather than
+# repeated a fifth time. Both issues that asked for this scoping named it 'Test-SourceRepo', which exists
+# nowhere; the mechanism is real and this is its name.
+. (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
 . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
 
 # branch-info.ps1 is REPO-OWNED and does not travel with the plugin -- every consumer keeps their own
@@ -227,6 +232,108 @@ if ($scaffoldFindings.Count -gt 0) {
 }
 
 Write-Host "[OK] '$entryRel' carries a written entry."
+
+# --- The document's SHAPE: four phases (#898) and a generic preamble (#899) ---------------------------
+# TWO RULES DAVE ENFORCED BY READING, on a document a session writes, with no signal in between. Both were
+# caught by eye on August 26, 2026, on the same document, within one afternoon -- and the second one had
+# been introduced by the session before, in the same position, which is what makes it a shape the document
+# invites rather than a slip.
+#
+# THEY ARE SCOPED DIFFERENTLY, AND THAT ASYMMETRY IS THE DESIGN rather than an inconsistency:
+#
+#   #898, the heading count, is the SOURCE REPO's rule. DEVELOPMENT-portable.md states heading-blindness
+#   as a FEATURE -- "the gate reads step marks only, so a heading of any level is invisible to it" -- and
+#   the reason it is a feature is that a consumer may keep headings of their own in a document they
+#   adopted. Refusing those everywhere would break correct files in somebody else's repo, which is the
+#   shape this house declined once already at 124 findings, all false. So it runs behind
+#   Test-IsWorkflowSourceRepo and this family is held to its own rule.
+#
+#   #899, the preamble, holds EVERYWHERE, because it reads the SHAPE and not the text. The region between
+#   the H1 and the first '##' is the scaffolder's guidance, which is blockquoted whatever language it has
+#   been translated into -- so "a non-blank line that does not start with '>'" survives translation. A byte
+#   comparison against StepsGuidance could not: it carries a '{0}' seam the consumer answers themselves,
+#   and inbound #562 is the measured consumer who translated the block around it.
+#
+# WHY THE PREAMBLE ONE IS NOT MERELY TIDINESS. The measured paragraph sat flush under the guidance with no
+# heading between them, so it READ as guidance -- and guidance is generic by construction. A reader who
+# finds one branch's status inside it learns to distrust the whole region, including the rules that do
+# apply everywhere.
+#
+# NEITHER RE-DERIVES WHERE THE ENTRY BEGINS. Split-DevelopmentCycle is the one splitter three readers
+# already share, and it is fence-aware because a document explaining this format quotes its own headings.
+# A second parser here is exactly the drift entry-scaffold-lib.ps1 exists to prevent.
+$shapeFindings = @()
+$cycleHalves = Split-DevelopmentCycle -Text $fileText
+$headText = [string]$cycleHalves.Head
+
+# Fence tracking, so a quoted '##' is illustration rather than a phase. Same rule check 4 of the lint gate
+# argues for links and check 28 for imports.
+$inShapeFence = $false
+$shapeLineNo = 0
+$topHeadings = @()
+$preambleStrays = @()
+$seenFirstTop = $false
+foreach ($shapeLine in [regex]::Split($fileText, '\r?\n')) {
+    $shapeLineNo++
+    if ($shapeLine -match '^\s{0,3}(?:`{3,}|~{3,})') { $inShapeFence = -not $inShapeFence; continue }
+    if ($inShapeFence) { continue }
+    if ($shapeLine -match '^##\s+(\S.*)$') {
+        $seenFirstTop = $true
+        $topHeadings += [pscustomobject]@{ Line = $shapeLineNo; Text = $Matches[1].Trim() }
+        continue
+    }
+    if ($shapeLine -match '^#\s') { continue }
+    # The preamble region: everything after the H1 and before the first '##'. Blank lines and blockquote
+    # lines are the guidance block; anything else is this branch's own content, sitting where the text is
+    # supposed to be identical in every branch document in every repo.
+    if (-not $seenFirstTop -and $shapeLine.Trim() -ne '' -and $shapeLine -notmatch '^\s*>') {
+        $preambleStrays += [pscustomobject]@{ Line = $shapeLineNo; Text = $shapeLine.Trim() }
+    }
+}
+
+# The arc is PLAN / CREATE / TEST / DEPLOY. Held only in the source repo -- see the block above.
+#
+# THE PHASES ARE NAMED, NOT COUNTED, and the first draft of this check got that wrong in a way worth
+# recording: it reported "everything past the fourth heading", which named '## DEPLOY' as the extra the
+# moment the stray sat ABOVE '## PLAN' -- which is exactly where both measured instances sat. A count
+# cannot say WHICH heading does not belong; only the names can. Read from Get-BranchFileWording, the
+# same source the scaffolder writes them from, so a repo that renames a phase is judged by its own names
+# rather than by three literals typed here.
+$knownPhases = @()
+if (Get-Command Get-BranchFileWording -ErrorAction SilentlyContinue) {
+    $knownPhases = @((Get-BranchFileWording).StepPhases | Where-Object { $_ })
+}
+if ($knownPhases.Count -eq 0) { $knownPhases = @('PLAN', 'CREATE', 'TEST') }
+
+# DEPLOY is matched on its PREFIX, because its heading carries the branch name ('## DEPLOY: `feat/x`').
+$strayHeadings = @($topHeadings | Where-Object {
+    ($knownPhases -notcontains $_.Text) -and ($_.Text -notmatch '^DEPLOY\b')
+})
+
+if ($strayHeadings.Count -gt 0 -and (Test-IsWorkflowSourceRepo -RepoRoot $repoRoot)) {
+    $shapeFindings += "carries $($topHeadings.Count) '##' headings, and the arc is $($knownPhases -join ' / ') / DEPLOY -- four, never a fifth."
+    foreach ($h in $strayHeadings) {
+        $shapeFindings += "  extra heading, line $($h.Line): '## $($h.Text)'"
+    }
+    $shapeFindings += "  Demote it to '###' under whichever of the four it belongs to."
+}
+
+if ($preambleStrays.Count -gt 0) {
+    $shapeFindings += "carries branch content above the first '##', where the block is generic guidance:"
+    foreach ($s in $preambleStrays) {
+        $trimmed = if ($s.Text.Length -gt 72) { $s.Text.Substring(0, 72) + '...' } else { $s.Text }
+        $shapeFindings += "  line $($s.Line): $trimmed"
+    }
+    $shapeFindings += '  That region is identical in every branch document in every repo, so a status note'
+    $shapeFindings += "  there reads as guidance. Move it under a '###' inside one of the phases."
+}
+
+if ($shapeFindings.Count -gt 0) {
+    Write-Host "[ERROR] '$entryRel' $($shapeFindings[0])" -ForegroundColor Red
+    foreach ($f in ($shapeFindings | Select-Object -Skip 1)) { Write-Host "        $f" -ForegroundColor Red }
+    exit 1
+}
+Write-Host "[OK] '$entryRel' keeps its shape: $($topHeadings.Count) '##' heading(s), and nothing but guidance above the first."
 
 # --- The DEPLOY lock: is the section still what the PR published? ------------------------------------
 # Refused, not reported, which puts it with the checks above rather than with the significance below. The
