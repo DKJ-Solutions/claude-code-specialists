@@ -32,6 +32,58 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/plugin-readme-skill-table-v1` · 20260826-153911
+
+The workflow plugin's own skill table lists all **16** skills it ships and no longer says how many
+([#873](https://github.com/DaveKJohn/claude-code-specialists/issues/873)). `measure-skill` and
+`worktree-lane` had each arrived without a row; the heading read *"The twelve skills"* above 14 of them,
+and the layout table's `skills/` row said twelve as well. Both counts are gone rather than corrected --
+the third time this table has drifted, and every time a number is what made the gap look like a decision.
+
+**The half that prevents recurrence got a verified answer, which is what the report actually asked for.**
+It proposed a lint-checked enumeration span, the mechanism check 10 already enforces on the root `README.md`.
+Held against `scripts/lint/check-plugin-integrity.ps1`, that span cannot carry this table: its canonical
+set is built from *every* published plugin's `skills/` (24 skills today, so a 16-name span would report the
+team plugins' as missing), and every backtick-quoted token inside a span counts as a claimed name, which a
+two-column table with backticked paths in its second column cannot honour. Both constraints are now written
+into the section's own note, replacing the *"nothing here is machine-checked"* sentence that recorded only
+the risk. The variant that *would* fit -- scoped to one plugin, reading each row's link target instead of
+its backticks -- is [#920](https://github.com/DaveKJohn/claude-code-specialists/issues/920), with the
+measurement for why it must stay opt-in: `team-alpha` and `team-shopify` enumerate none of their skills, so
+a generic rule starts life with an 8-finding exemption list.
+
+**One instance of the same defect class was found and deliberately not repaired here.** `INSTALL.md` tells
+a reader that *"14 of the 19 skills across the six shipped plugins"* carry `disable-model-invocation`;
+measured today that is 16 of 24 across five. It is a consumer-facing document making four separate claims,
+one of them needing a rewrite rather than a new number, so it is
+[#922](https://github.com/DaveKJohn/claude-code-specialists/issues/922).
+
+Nothing about the workflow changes and no script moved. What changes is that the page now agrees with the
+directory beside it, and that a reader who wonders why it is not machine-checked gets the reason instead of
+a warning.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+This README ships with the plugin, so it is the page a consumer reads when adopting the workflow -- and for
+`worktree-lane` it is the *only* discovery route, since that skill carries
+`disable-model-invocation: true` and therefore never appears in a slash list. A consumer who read this table
+to find out what the workflow gives them was missing two of sixteen skills, one of them invisible everywhere
+else. They notice the moment they open the page; nothing they already do changes.
+
+**Score:** 3
+
+#### Pull Request
+
+The workflow plugin's README lists every skill it ships, and stops counting them
+
+Plugins: contributing-davekjohn
+
+[PR #923](https://github.com/DaveKJohn/claude-code-specialists/pull/923)
+
+---
+
 ### DEPLOY: `fix/the-guidance-array-parenthesises-its-levels-v1` · 20260826-152509
 
 `new-branch.ps1` writes a usable `development-cycle.md` again. Four lines of `$script:BranchFileDefaults.StepsGuidance`
