@@ -55,7 +55,8 @@ a fix would have to run first.
 
 **So the repair is not the credential and it is not a guess at one.** Nothing in a workflow file can fix an
 upstream rate limit; what it can fix is that the next occurrence arrives unattributable. That is the defect
-this branch closes, and the issue's own open question is answered by this PR's own review run.
+this branch closes. The issue's own open question cannot be answered by this PR, for a reason found
+only by running it -- see TEST.
 
 #### This document's own guidance block was repaired by hand, and why that is not part of this change
 
@@ -96,12 +97,27 @@ file instead is that the disclosure is bounded to the fields that name the failu
       `id: claude-review` on the step above it.
 - [x] Lint gate + all suites.
 
-#### The one check that cannot be a step here
+#### The test #913 asked for cannot be run by this PR, and finding that out is a result of its own
 
-The issue closes by naming the test a fix would have to run first -- the check re-run on an unrelated PR -- and
-this PR is that PR. It cannot be a step above DEPLOY, because the step gate counts them before the push that
-creates the run. So it is written here instead: a green answers #913 in one direction, a red in the other, and
-from this merge onward a red says which.
+The issue closes by naming the check a fix would have to run first -- `claude-review` re-run on an unrelated
+PR -- and the plan was for this PR to be that PR. It is not, and the run says so itself. `claude-review` went
+green here in **10 seconds**, against 1m0s to 7m2s on the runs that actually reviewed something, and the log
+gives the reason:
+
+```
+Action skipped due to workflow validation error. This is expected when adding Claude Code workflows to
+new repositories or on PRs with workflow changes. If you're seeing this, your workflow will begin working
+once you merge your PR.
+```
+
+[Run 32968440602](https://github.com/DaveKJohn/claude-code-specialists/actions/runs/32968440602). So a PR that
+touches `.github/workflows/claude-code-review.yml` is reviewed by nobody, and the check reports **success**
+rather than skipped -- a green that means the opposite of what a green normally means here. That is worth
+knowing well beyond this branch: it is exactly the PR class where a reviewer is most wanted.
+
+It also means the diagnostic step below cannot be exercised end to end until it is on `main`. What was
+verified instead is everything that does not need the runner: the shipped jq filter against five cases, the
+YAML, and the three upstream mechanisms read at the pinned SHA rather than assumed.
 
 ### DEPLOY: `fix/the-review-failure-names-its-reason-v1`
 
@@ -136,6 +152,13 @@ rather than overlooked: it is the only switch on offer, it dumps every message i
 public log, and its own description warns it may carry secrets. Reading the file keeps the disclosure to the
 fields that name the failure -- which is also why the step runs on failure only, where `result` holds an error
 instead of review prose about the diff.
+
+**And the branch found a second thing, which only the changelog can keep:** a PR that edits this workflow is
+reviewed by nobody. `claude-review` skipped itself on this very PR -- 10 seconds against the 1m0s-7m2s of the
+runs that reviewed something -- reporting `Action skipped due to workflow validation error ... expected ... on
+PRs with workflow changes`. It reports that as **success**, not as skipped, so the green means the opposite of
+what a green means on any other PR. Nothing here changes that, and it is written down rather than repaired:
+the class it silently excuses is the one where a reviewer is most wanted.
 
 `claude.yml` has the identical blindness and is deliberately left alone: it answers a human who typed
 `@claude` and is already reading the thread when it breaks. This check runs unattended on every PR, which is
