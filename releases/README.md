@@ -83,6 +83,7 @@ list sits at the **end** of the page:
 
 | Version | Date | Type | Title |
 |---|---|---|---|
+| [4.20.0](../contributing-davekjohn/releases/audience/4.x/4.20.0.md) | 2026-08-26 | Minor | Minor release |
 | [4.19.0](../contributing-davekjohn/releases/audience/4.x/4.19.0.md) | 2026-08-24 | Minor | A branch carries one document through four phases, the close-out gains three shapes, and findings become issues instead of questions |
 | [4.18.0](../contributing-davekjohn/releases/audience/4.x/4.18.0.md) | 2026-08-21 | Minor | Consumer-reported repairs across the sync, the cut and the branch files, plus a shared Shopify preview push |
 | [4.17.0](../contributing-davekjohn/releases/audience/4.x/4.17.0.md) | 2026-08-20 | Minor | The Shopify floor gains its pre-task sync, and the branch-entry convention gains a shipped gate |
