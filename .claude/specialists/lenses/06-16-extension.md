@@ -97,6 +97,21 @@ the governance of the entire specialists system live here.
   fence form is documented as the convention; until this bullet it was not, so the claim is being made
   true here rather than struck out.
 
+  **It fired a third time on August 26, 2026, and that one was worse than the first two, because it was
+  GREEN.** Building check 29 ([#920](https://github.com/DaveKJohn/claude-code-specialists/issues/920)),
+  the new marker was named in prose in a paragraph *above* the real span it was introducing. The first
+  two instances were unpaired markers, which the gate refuses loudly. This one paired: the prose BEGIN
+  found the real span's END, swallowed the real BEGIN in between, and checked the whole table as one
+  span — the right verdict for the wrong reason, and nothing said so. Both checks had reported a
+  duplicate END since the day they shipped and were silent on its mirror, a **nested BEGIN**; that
+  asymmetry was repaired in the same movement, on check 10 as well as on check 29, and both suites now
+  pin it (scenarios 14b and 34).
+
+  So the bullet's own advice is now enforced rather than remembered — but read the order carefully,
+  because it is the lesson: *the discipline came first and the gate followed it*. A marker named in
+  prose is still best written as prose (*"the plugin-scoped span"*), and a fence is still the only way
+  to show one literally. What changed is that forgetting now costs a red gate instead of a quiet pass.
+
 ### Boundaries with the other roles
 
 - Scripts, `.json` manifests (`marketplace.json`/`plugin.json`), and harness config are
