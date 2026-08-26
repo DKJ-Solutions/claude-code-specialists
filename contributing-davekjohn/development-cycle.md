@@ -77,12 +77,20 @@ wait is the reason this was the pickable one.
       away if it ever bites -- but it has not, and the call only runs when there is something to push
 - [~] no change to `park-branch.ps1`. It keeps failing loudly when there is no `origin`, because you
       asked it to park; only the two automatic callers ask the origin question first
+- [x] one layer removed on review: `park-cycle` asks `Get-BranchTrunkName` for the trunk rather than
+      probing the consumer's `Get-TrunkBranchName` seam a second time itself -- that shared resolver
+      already does the probe and the fallback, so the copied two-step was one more place that has to keep
+      agreeing with it. `check-branch-entry.ps1` still carries the older shape; that is not a defect
+      there, just a layer this script does not need
 
 ### TEST
 
-- [x] `scripts/tests/park-cycle.tests.ps1`, 41 asserts: the happy path, idempotence, `-Quiet`'s silence,
+- [x] `scripts/tests/park-cycle.tests.ps1`, 45 asserts: the happy path, idempotence, `-Quiet`'s silence,
       the DEPLOY lock, the fail-safe, the trunk, a reset document, another branch's document, no origin,
-      no document, and a committed-but-unpushed one
+      no document, a committed-but-unpushed one, and the trunk seam
+- [x] the trunk-seam case asserts **inverted**, which is what makes it prove something: the fixture's
+      trunk is `master` and the branch checked out is called `main`, so a script that assumed `main`
+      would refuse with "on the trunk" and look well-behaved doing it
 - [x] a `gh` shim per fixture, first on PATH, answering the one shape the script parses. Not a
       workaround: a bare repo is not a GitHub remote, so a real `gh pr list` fails against every fixture
       -- and a suite that accepted that would exercise only the fail-safe path and report "no PR" and "gh

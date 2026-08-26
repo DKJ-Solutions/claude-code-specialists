@@ -82,7 +82,10 @@ function New-Fixture {
     param(
         [Parameter(Mandatory = $true)][string]$Label,
         [ValidateSet('none', 'pr', 'fail')][string]$GhAnswer = 'none',
-        [switch]$NoOrigin
+        [switch]$NoOrigin,
+        # Writes a scripts/repo-config.ps1 answering the OPTIONAL trunk seam with this name. Omitted:
+        # no repo-config at all, which is the unadopted repo every other fixture here models.
+        [string]$TrunkName = ''
     )
     $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("park-cycle-test-$PID-$Label")
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
@@ -103,6 +106,11 @@ function New-Fixture {
         'fail' { "@echo off`r`nexit /b 1`r`n" }
     }
     [System.IO.File]::WriteAllText((Join-Path $dir '_bin\gh.cmd'), $ghBody, (New-Object System.Text.ASCIIEncoding))
+
+    if ($TrunkName) {
+        $cfg = "function Get-TrunkBranchName { '$TrunkName' }`r`n"
+        [System.IO.File]::WriteAllText((Join-Path $dir 'scripts\repo-config.ps1'), $cfg, (New-Object System.Text.ASCIIEncoding))
+    }
 
     $bareRemote = "$dir.git"
     if (Test-Path -LiteralPath $bareRemote) { Remove-Item -Recurse -Force -LiteralPath $bareRemote }
@@ -358,6 +366,25 @@ try {
     Assert-True ($rK.Out -match 'parked on origin') 'unpushed commit: pushed anyway'
     Assert-Equal 2 (Get-CommitCount -Dir $fixK) 'unpushed commit: no empty extra commit was made'
     Assert-True (Test-RefOnRemote -Bare "$fixK.git" -Ref 'refs/heads/feat/committed-not-pushed-v1') 'unpushed commit: the branch ref is on origin'
+
+    # --- (l) THE TRUNK SEAM: a consumer whose trunk is not 'main' -------------------------------
+    # THE ASSERT IS INVERTED ON PURPOSE, which is what makes it prove anything. This repo's trunk is
+    # 'master' here, and the branch checked out is called 'main' -- so a script that assumed 'main' is
+    # the trunk would refuse with "on the trunk" and look perfectly well-behaved doing it. Only a script
+    # that actually reads Get-TrunkBranchName parks this branch.
+    #
+    # It also pins the layer this script deliberately does NOT have: it asks Get-BranchTrunkName, which
+    # probes that seam itself, rather than probing the seam a second time on its own.
+    Write-Host "park-cycle.ps1 -- reads the consumer's trunk name, so 'main' can be an ordinary branch" -ForegroundColor Cyan
+    $fixL = New-Fixture -Label 'l' -GhAnswer 'none' -TrunkName 'master'
+    # The fixture's initial commit already sits on 'main'; here that is a FEATURE branch, not the trunk.
+    $relL = New-CycleDocument -Dir $fixL -Branch 'main'
+
+    $rL = Invoke-ParkCycle -Dir $fixL
+    Assert-Equal 0 $rL.Code 'trunk seam: exit 0'
+    Assert-True (-not ($rL.Out -match 'on the trunk')) "trunk seam: 'main' is NOT treated as the trunk -- the seam was read"
+    Assert-True ($rL.Out -match 'parked on origin') 'trunk seam: and the branch was parked'
+    Assert-True ((Get-HeadFiles -Dir $fixL) -contains $relL) 'trunk seam: the commit carries the development cycle'
 } finally {
     foreach ($f in $script:fixtures) {
         if (Test-Path -LiteralPath $f) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }

@@ -143,11 +143,12 @@ if (-not $branch -or $branch -eq 'HEAD') {
     exit 0
 }
 
-# BOUND 2: the trunk. Same seam and same fallback order as check-branch-entry.ps1 -- the repo's own
-# Get-TrunkBranchName when it has one, the shared Get-BranchTrunkName otherwise.
-$trunk = if (Get-Command Get-TrunkBranchName -ErrorAction SilentlyContinue) {
-    $t = ([string](Get-TrunkBranchName)).Trim(); if ($t) { $t } else { 'main' }
-} elseif (Get-Command Get-BranchTrunkName -ErrorAction SilentlyContinue) {
+# BOUND 2: the trunk, asked of the shared resolver and NOT of the seam directly. Get-BranchTrunkName
+# already probes the consumer's optional Get-TrunkBranchName and falls back to 'main', so a second probe
+# here would be one more place that has to keep agreeing with it -- exactly the shape park-lib was
+# extracted to end. (check-branch-entry.ps1 carries that older two-step; it is not a defect there, it is
+# just a layer this one does not need.)
+$trunk = if (Get-Command Get-BranchTrunkName -ErrorAction SilentlyContinue) {
     $t = ([string](Get-BranchTrunkName)).Trim(); if ($t) { $t } else { 'main' }
 } else { 'main' }
 
