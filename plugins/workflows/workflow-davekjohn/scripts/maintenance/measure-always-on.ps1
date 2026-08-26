@@ -22,7 +22,9 @@
     SO IT IS NOT A GATE, AND MUST NOT BECOME ONE. It always exits 0. The two things it can find that ARE
     defects rather than measurements -- an import that does not resolve, and sections that fail to sum to
     their file -- are printed loudly and adjudicated by nobody here. The verdict on a dead import belongs
-    to the lint gate, which does not yet cover the class (issue #874); the sum check is an assertion about
+    to the lint gate, and since check 28 it has one -- for a target IN THE TREE (issue #874). A target in
+    the marketplace clone stays outside that gate's reach, because CI is a machine with no clone, so this
+    script remains the only place such an import is reported at all. The sum check is an assertion about
     this script's own arithmetic, and it failing means the report is wrong, not the repo.
 
     THE ONE DISTINCTION THE OUTPUT MUST CARRY. Bytes are a MEASUREMENT. Tokens are an ESTIMATE at a
@@ -183,8 +185,10 @@ if ($missing.Count -gt 0) {
         Write-Host ("    '{0}' imported by {1}" -f $d.Target, (($d.ImportedBy.Replace($RepoRoot, '.')) -replace '\\', '/')) -ForegroundColor Red
         Write-Host ("      resolved to: {0}" -f ($d.Path -replace '\\', '/')) -ForegroundColor DarkGray
     }
-    Write-Host '    A dead @-import costs the session the WHOLE document, and nothing errors. No gate' -ForegroundColor DarkGray
-    Write-Host '    covers this class yet (issue #874); this script reports it and adjudicates nothing.' -ForegroundColor DarkGray
+    Write-Host '    A dead @-import costs the session the WHOLE document, and nothing errors. The lint' -ForegroundColor DarkGray
+    Write-Host '    gate refuses one whose target is IN THE TREE (check 28, issue #874). A target in the' -ForegroundColor DarkGray
+    Write-Host '    marketplace clone is outside its reach -- CI has no clone -- so for that one this line' -ForegroundColor DarkGray
+    Write-Host '    is the only report there is. Either way this script adjudicates nothing.' -ForegroundColor DarkGray
     Write-Host ''
 }
 
