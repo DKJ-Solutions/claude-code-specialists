@@ -397,8 +397,14 @@ the PR", because nothing is doing two jobs at once.
 **There is also no `Where I left off` any more** (Dave, August 23, 2026). It asked the author to write down
 what the step list already says: an unticked box *is* where you left off, and a second account of it beside
 the list is one that can disagree with the list. A parking note still has a place — `new-branch -Park
--Intent` writes it at the top of the document, above the phases — because that is the one thing the marks
-genuinely cannot carry: what you decided and have not written down anywhere yet.
+-Intent` writes it as the opening paragraph of `PLAN`, still without a heading — because that is the one
+thing the marks genuinely cannot carry: what you decided and have not written down anywhere yet.
+
+**It sat above the phases until #908** (August 26, 2026), and that is worth knowing if you have a branch in
+flight from an older version of this workflow. The region between the title and the first phase heading is
+generic guidance, identical in every branch document in every repo, and the CI gate reads it: a note there
+is refused as branch content the moment the entry is written. Move it under one of the four — `PLAN` for a
+parking note — and the gate goes quiet.
 
 ## Why the name is fixed
 

@@ -50,9 +50,13 @@
 
 .PARAMETER Intent
     (Optional) the direction of the branch -- what still needs to happen and where you left off.
-    Recorded at the top of development-cycle.md, above the phases; typically given together with -Park
-    when parking a branch for later / another device (#162). It deliberately does not touch the DEPLOY
-    section: an intent is a status, and that section's text folds verbatim into CHANGELOG.md.
+    Recorded in development-cycle.md as the opening paragraph of its FIRST PHASE (PLAN), without a heading
+    of its own; typically given together with -Park when parking a branch for later / another device (#162).
+    It deliberately does not touch the DEPLOY section: an intent is a status, and that section's text folds
+    verbatim into CHANGELOG.md.
+
+    It sat ABOVE the phases until #908 (August 26, 2026), where the document's own guidance says nothing
+    branch-specific may go and where the CI gate refused it once the entry was written.
 
 .PARAMETER RepoRoot
     (Optional) the tree to create the branch and its document in, when that is NOT the tree you are
@@ -391,8 +395,10 @@ if ($cycleTaken) {
     # -Intent IS THE PARKING NOTE AND IT DOES NOT LAND IN THE ENTRY (Dave, August 6, 2026). It is a status,
     # typically written when parking (#162), and it used to become the entry BODY -- which put a progress
     # note in the text that folds verbatim into CHANGELOG.md, the defect the v3.2.0 measurement found three
-    # times. It goes to the top of the document instead, above the phases; the entry scaffolds with an empty
-    # body and the gate keeps refusing it until somebody writes what the change does.
+    # times. It goes into the document's first phase instead -- as PLAN's opening paragraph since #908, no
+    # longer above the phases, where the document's own guidance forbids branch-specific text and the CI
+    # gate refuses it; the entry scaffolds with an empty body and the gate keeps refusing that until
+    # somebody writes what the change does.
     $body = ''
 
     # THE SECTION SHAPE IS THE SHAPE, ALWAYS -- the ranking's on/off switch does not change it. An earlier
