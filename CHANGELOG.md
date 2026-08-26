@@ -32,6 +32,88 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/branch-visible-on-origin-v1` · 20260826-185903
+
+A branch and its development cycle now reach `origin` **without anybody deciding to send them**
+([#900](https://github.com/DaveKJohn/claude-code-specialists/issues/900)). Two changes, one at each end of
+a branch's life. `new-branch` pushes at creation by default -- that exact block ran behind `-Park` for
+nineteen days -- and a new **Stop** hook, `cycle-autopark`, keeps `development-cycle.md` current on the
+remote for the rest of the branch by invoking the new `park-cycle.ps1` after every turn. Still no PR at
+either end: push is not a PR, and opening one stays a separate, explicit step.
+
+**The measurement is the whole argument, and it is two numbers side by side.** `park` and
+`new-branch -Park` produced **six** commits in the entire history. Over the 38 merged branches carrying a
+readable creation stamp, the median branch was invisible on `origin` for **22 minutes**, the mean 35, the
+worst **365**, nine of them over half an hour. An opt-in backup is a backup nobody takes. The same
+measurement had already been read once, in #507, as proof that both parking moments were real -- and both
+readings are right: each moment is used, and nobody reaches for either often enough for an opt-in to work.
+So no entry point was deleted; what changed is that two of the three stopped asking.
+
+**What another device needs is the document, not the branch name**, which is why one push at creation was
+not the whole answer. Dave's own addition to the issue: *"zorg ook dat development-cycle zoveel mogelijk
+up-to-date is op origin niet alleen de branch zelf. Daar staat de belangrijkste info over de branch."* The
+plan, which phase is running and where the last session stopped all live in that one file. Hence the
+split the repo's own rule dictates -- what has to happen without anyone asking is a hook, what somebody
+invokes is a script in a skill -- so the creation push went into `new-branch` and the ongoing freshness
+into a hook, over a script that also runs by hand.
+
+**The bound that matters most is where it STOPS.** The DEPLOY lock (#884) refuses the merge once this
+document has diverged from what the PR published, so a pusher that kept running after `open-pr` would not
+be a convenience -- it would block **every merge in the repo**, structurally, and the failure would read as
+the lock misbehaving rather than as the hook. So any open PR on the branch makes it a no-op, and its
+fail-safe runs the same direction: when `gh` cannot answer, it does not push. Being one turn stale is a
+nuisance; an unmergeable branch is a defect. Three narrower bounds beside it: one named pathspec and never
+`git add -A`, nothing on the trunk where the fold removes this file, and no amend and no force -- which
+the constitution forbids anyway, so this costs a handful of small `park:` commits per branch.
+
+**One stale count is repaired along the way, and it is #886's rather than this branch's.** Four documents
+enumerate this repo's hooks and all four had to learn about the new one, which is how a fifth line came to
+be read: the root README's platform-reach table called `team-alpha`'s hooks **two**. That was **true when
+it was written** on August 15, 2026 -- the core team carried `roster-sessioncheck` *and*
+`workflow-sessioncheck` then -- and stopped being true this morning, when #886 retired the second one. So
+it is one word, and the reason it is fixed here rather than filed is that this branch is already editing
+that table for that exact subject. Every other mention of `workflow-sessioncheck` in the tree was checked
+in the same pass: six of them, all already in the past tense.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+Both halves ship in shared scripts and one of them is a **hook**, so every consumer receives this through
+the next plugin update rather than by choosing it -- and a hook that commits on your behalf is the most
+intrusive thing this plugin has ever shipped. Three decisions are there for that reader specifically.
+
+**It is the first hook here that acts rather than reports.** The three beside it are read-only
+SessionStart checks that never block; this one writes to git. That is a real widening of the
+"repo-neutral exceptions" list in the root README and it is named as such there rather than slipped in. It
+is still not a guardrail: it refuses nothing, blocks nothing, and exits 0 on every outcome including the
+ones it declines -- a Stop hook that fails is a hook that interrupts the work it was added to protect.
+
+**It is silent unless it does something.** A turn that did not touch the document prints nothing at all,
+which is the difference between a hook nobody notices and one everybody turns off. A push does report
+itself, because a commit made on somebody's behalf should be visible in the transcript that caused it.
+
+**And a consumer who cannot push is not broken.** No `origin` means there is nowhere to park to and it
+says so; a repo mid-adoption with no `repo-config.ps1` or `branch-info.ps1` gets the shared defaults rather
+than a failure; and `-NoPush` is there for the branch that genuinely must not be visible yet. The one
+thing a consumer may need to know up front is the consequence the issue itself flagged: pushing at
+creation produces remote branches for work that is later abandoned, and `deleteBranchOnMerge` reaps only
+merged ones. Nothing cleans those up. That is something to watch, not a reason to hold this back.
+
+**Score:** 4
+
+#### Pull Request
+
+the branch and its development cycle reach origin without anybody remembering to push
+
+Plugins: contributing-davekjohn
+
+Plugins: contributing-davekjohn
+
+[PR #939](https://github.com/DaveKJohn/claude-code-specialists/pull/939)
+
+---
+
 ### DEPLOY: `docs/change-contributing-title-v1` · 20260826-170138
 
 The one page in `contributing-davekjohn/` opens under a new H1 -- **`Contributing as DaveKJohn`**, where it
