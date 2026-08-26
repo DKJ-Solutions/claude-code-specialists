@@ -143,6 +143,15 @@ nuisance; an unmergeable branch is a defect. Three narrower bounds beside it: on
 `git add -A`, nothing on the trunk where the fold removes this file, and no amend and no force -- which
 the constitution forbids anyway, so this costs a handful of small `park:` commits per branch.
 
+**One stale count is repaired along the way, and it is #886's rather than this branch's.** Four documents
+enumerate this repo's hooks and all four had to learn about the new one, which is how a fifth line came to
+be read: the root README's platform-reach table called `team-alpha`'s hooks **two**. That was **true when
+it was written** on August 15, 2026 -- the core team carried `roster-sessioncheck` *and*
+`workflow-sessioncheck` then -- and stopped being true this morning, when #886 retired the second one. So
+it is one word, and the reason it is fixed here rather than filed is that this branch is already editing
+that table for that exact subject. Every other mention of `workflow-sessioncheck` in the tree was checked
+in the same pass: six of them, all already in the past tense.
+
 **Score:** 4
 
 #### What makes this deploy extra special

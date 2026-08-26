@@ -605,7 +605,7 @@ specialist's *craft* is portable and one step of one procedure is not. So:
 |---|---|---|
 | **portable** | works with no repository | the personas, manuals, and 13 of 15 `team-alpha` agent defs; the shared blocks in `agent-shared/`; the `orchestrator` skill |
 | **degraded** | works, minus a named step | Ravi `06-24` and Liam `04-20` — one step each, both of them a script |
-| **repo-bound** | cannot function at all | both workflow plugins whole; `team-alpha`'s three PowerShell skills and its two SessionStart hooks; `team-shopify`'s `start-task` |
+| **repo-bound** | cannot function at all | both workflow plugins whole; `team-alpha`'s three PowerShell skills and its one SessionStart hook; `team-shopify`'s `start-task` |
 
 **What the Claude App package is: a filtered publication, not a second repository.**
 [`publish-to-business.ps1`](scripts/release/publish-to-business.ps1) already overwrites
