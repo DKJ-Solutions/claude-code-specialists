@@ -588,6 +588,29 @@ try {
     Assert-True ($progressTextH -match [regex]::Escape($intentText)) '-Intent: the intent is recorded in the step list instead'
     Assert-True (-not ($progressTextH -match 'what has been done so far')) '-Intent: and it replaces that section placeholder rather than sitting beside it'
 
+    # WHERE, NOT MERELY THAT (#908, August 26, 2026). The two asserts above are what let this ship: they
+    # only ask whether the text is in the document somewhere, and it was -- above the first phase heading,
+    # which is the one region the document's own guidance declares generic and which check-branch-entry.ps1
+    # refuses. So the placement is measured against the same boundary the gate reads, derived from the
+    # wording rather than from a literal '###', because a consumer may translate or re-level either.
+    # BY LINE, NOT BY IndexOf, AND THE FIRST DRAFT OF THIS ASSERT GOT IT WRONG IN THE WAY THIS REPO KEEPS
+    # PAYING FOR: a MENTION read as a USE. The guidance block a few lines up quotes the heading it is
+    # talking about -- "NOTHING BRANCH-SPECIFIC ABOVE `### PLAN`" -- so a substring search for '### PLAN'
+    # lands inside the preamble, which is the exact region this assert exists to prove the note is NOT in.
+    # It failed loudly, but only because of the third assert; the second one had passed for the wrong
+    # reason. A whole-line match cannot confuse the two: a quoted heading is never a line of its own.
+    $planHeadingH = ('#' * (Get-BranchCycleSectionLevel)) + ' ' + @((Get-BranchFileWording).StepPhases)[0]
+    $cycleLinesH  = [regex]::Split($progressTextH, '\r?\n')
+    $planLineH    = [array]::IndexOf($cycleLinesH, $planHeadingH)
+    $intentLineH  = [array]::IndexOf($cycleLinesH, $intentText)
+    Assert-True ($planLineH -ge 0) "-Intent: (the fixture really carries the first phase heading '$planHeadingH')"
+    Assert-True ($intentLineH -gt $planLineH) '-Intent: the intent sits BELOW the first phase heading -- above it is the generic region the CI gate refuses'
+    # And it LEADS that phase rather than landing in a later one: nothing but blank lines between them.
+    $betweenH = @()
+    if ($intentLineH -gt $planLineH + 1) { $betweenH = @($cycleLinesH[($planLineH + 1)..($intentLineH - 1)]) }
+    Assert-Equal 0 @($betweenH | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count `
+        '-Intent: and it LEADS that phase -- nothing between the heading and the note'
+
     # --- (i) -Park: commit the entry + push to origin, NO PR, entry-scoped ------------------------
     Write-Host "new-branch.ps1 -- -Park commits the entry and pushes to origin (no PR)" -ForegroundColor Cyan
     $fixtureI = New-Fixture -Label 'i'

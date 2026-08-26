@@ -309,6 +309,35 @@ try {
     ) + $shapeEntry)
     $r = Invoke-Gate -Dir $shapeReal -Branch 'feat/thing'
     Assert-True ($r.Code -eq 0) 'shape/#915: the preamble the scaffolder actually writes passes the gate that reads it'
+
+    # 9. #908 -- THE SAME FIXTURE WITH -Intent, which is the one input scenario 8 does not pass and the
+    #    reason this defect shipped green. Scenario 8 proves the scaffolder's GUIDANCE passes the gate that
+    #    reads it; it says nothing about the scaffolder's other writer into that same region. -Intent was
+    #    one: it emitted a branch's parking note between the guidance and the first phase, so new-branch
+    #    -Intent produced a document this gate refused -- silently on a fresh scaffold, because the
+    #    unwritten-entry check exits first, and then loudly at the PR once the entry was written.
+    #
+    #    SO THIS FEEDS THE WHOLE DOCUMENT, not a hand-assembled head. Scenario 8 takes the preamble from
+    #    the formatter and writes the phases out, deliberately, because the region's SHAPE is #899's
+    #    subject. Here the PLACEMENT is the subject, so the phases have to come from the formatter too --
+    #    a hand-written '## PLAN' would be the test asserting its own idea of where the intent goes.
+    #    The entry half is replaced with the written one, because the entry check runs first and a
+    #    scaffolded entry would mask whatever the shape check has to say.
+    $intentText = 'Skeleton + routing done; next: wire the API client.'
+    $cycleWithIntent = @(Format-DevelopmentCycle -Branch 'feat/thing' -Id '20260826-000000' -Intent $intentText)
+    $entryHeadRx = '^#{1,6}\s+DEPLOY\b'
+    $cycleHead = @()
+    foreach ($cycleLine in $cycleWithIntent) {
+        if ($cycleLine -match $entryHeadRx) { break }
+        $cycleHead += $cycleLine
+    }
+    Assert-True (@($cycleHead | Where-Object { $_ -eq $intentText }).Count -eq 1) `
+        'shape/#908: (the fixture really carries the intent, once, above the entry)'
+    $shapeIntent = New-SourceRepoFixture -Label 'shape-intent'
+    Set-Entry -Dir $shapeIntent -Lines ($cycleHead + $shapeEntry)
+    $r = Invoke-Gate -Dir $shapeIntent -Branch 'feat/thing'
+    Assert-True ($r.Code -eq 0) 'shape/#908: a document carrying -Intent passes -- the note is inside a phase, not above the first one'
+    Assert-True ($r.Out -notmatch 'branch content above') 'shape/#908: and specifically not as a preamble stray'
 }
 finally {
     foreach ($d in $script:trees) {

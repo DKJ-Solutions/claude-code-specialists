@@ -4843,11 +4843,17 @@ function Format-DevelopmentCycle {
         step, and placeholder text where the two stamps go. Everything a reader would have opened the
         template for is in the file already sitting on their trunk.
 
-        -Intent IS THE PARKING NOTE, and it is a paragraph at the top rather than a section of its own. The
+        -Intent IS THE PARKING NOTE, and it is a headingless paragraph leading the FIRST PHASE. The
         'Where I left off' heading went with the merge (Dave: an unticked box already says where you left
         off), and he is right about the ordinary case -- but a parked branch has something the step list
         genuinely cannot hold, which is what you decided and have not written down anywhere yet. So it keeps
         its place and loses its heading.
+
+        ITS PLACE IS INSIDE PLAN, NOT ABOVE IT, SINCE #908 (August 26, 2026). It was a paragraph at the top
+        of the document, which is the one region the guidance block a few lines above it declares generic --
+        and check-branch-entry.ps1's #899 check reads that region in every repo, so a document carrying an
+        intent was refused by CI as soon as its entry was written. See the block at the emission site for
+        the measurement and for why the anchor is the first phase by position rather than the word 'PLAN'.
     #>
     param(
         [AllowEmptyString()][string]$Branch = '',
@@ -4904,10 +4910,34 @@ function Format-DevelopmentCycle {
     foreach ($line in @($stepsBlock | Where-Object { $null -ne $_ })) { $lines.Add([string]$line) }
     $lines.Add('')
 
-    if ($Intent) {
-        foreach ($line in ($Intent -split '\r?\n')) { $lines.Add($line) }
-        $lines.Add('')
-    }
+    # -INTENT IS WRITTEN INSIDE THE FIRST PHASE, NOT ABOVE IT (#908, August 26, 2026). It used to sit right
+    # here, between the guidance and the phases -- and the guidance printed a few lines earlier says NOTHING
+    # BRANCH-SPECIFIC ABOVE the first phase heading, naming "a note about THIS branch" as its own example and
+    # "normally as a sub-heading in PLAN" as the destination. So the scaffolder stated the rule and broke it
+    # in the same file, two screens apart.
+    #
+    # AND THE COST WAS NOT TIDINESS, which is why this is a fix rather than a polish. The #899 check in
+    # check-branch-entry.ps1 READS that region, and unlike its heading-count sibling it is deliberately NOT
+    # scoped to this repo -- it reads the SHAPE (a non-blank line that does not start with '>'), so it
+    # survives translation and holds in every consumer. Measured on the real gate before this change, on a
+    # document generated with -Intent and its entry filled in: exit 1, "carries branch content above the
+    # first '##'", naming the intent line. The gate is silent on a FRESH scaffold only because the
+    # unwritten-entry check refuses first -- so the failure surfaces the moment the entry is written, which
+    # is at the PR. Every consumer that passed -Intent had a branch CI would not let through.
+    #
+    # THE FIRST PHASE BY POSITION, NOT THE LITERAL 'PLAN'. StepPhases is a seam a consumer may rename or
+    # translate, and this file already reads phase names from the wording rather than typing them -- the same
+    # reason check-branch-entry.ps1 names the arc from Get-BranchFileWording instead of from three literals.
+    # Position is also the honest anchor: the planning phase is the one the preamble points at, and the one
+    # that is otherwise EMPTY, because the scaffolded step goes under FirstStepPhase (CREATE).
+    #
+    # AND STILL NO HEADING OF ITS OWN (Dave, August 23, 2026). 'Where I left off' was retired that day --
+    # an unticked box already says where you left off -- with the note that a parking record "keeps its place
+    # and loses its heading". Its place is inside the first phase now; the headinglessness is unchanged, and
+    # the preamble's "normally" leaves room for it, because the gate reads only the region ABOVE the first
+    # phase heading and nothing below it.
+    $intentLines = @()
+    if ($Intent) { $intentLines = @($Intent -split '\r?\n') }
 
     # THE SCAFFOLDED STEP STAYS IN THE FILE A BRANCH ACTUALLY GETS (Dave, August 6, 2026). Without it a fresh
     # branch reaches a PR with no plan at all and the step-list gate has nothing to refuse --
@@ -4923,6 +4953,13 @@ function Format-DevelopmentCycle {
             if ((-not $onTrunk) -and $phase -eq $w.FirstStepPhase) {
                 $phaseBody = @((Get-BranchProgressMarks).Open + $w.FirstStep)
             }
+            # The parking note LEADS the first phase. The blank line between it and a step is needed only
+            # where both land in the same phase -- they do not by default, since FirstStepPhase is CREATE,
+            # but a consumer may point both at one and a note glued to a checkbox reads as its label.
+            if ($intentLines.Count -gt 0 -and $phase -eq $phases[0]) {
+                $lead = if ($phaseBody.Count -gt 0) { @($intentLines) + @('') } else { @($intentLines) }
+                $phaseBody = @($lead) + @($phaseBody)
+            }
             $phaseGuidance = @()
             if ($w.StepPhaseGuidance -and $w.StepPhaseGuidance.Contains($phase)) {
                 $phaseGuidance = @($w.StepPhaseGuidance[$phase])
@@ -4930,8 +4967,15 @@ function Format-DevelopmentCycle {
             Add-BranchProgressSection -Lines $lines -Heading $phase -Guidance $phaseGuidance -Body $phaseBody
         }
     } elseif (-not $onTrunk) {
-        # No phases configured (a consumer switched them off through the seam): the pre-#655 shape, which is
-        # still exactly what the gate expects -- a bare open step under the file's own heading.
+        # No phases configured (a consumer switched them off through the seam): the pre-#655 shape -- a bare
+        # open step under the file's own heading, with the parking note above it.
+        #
+        # THIS SHAPE HAS NO PHASE HEADING FOR EITHER OF THEM TO SIT UNDER, so both the note and the step land
+        # in the region #899 calls the preamble. That is a property of the seam rather than of -Intent: the
+        # bare step has stood there since #655 and trips the same check. Nothing is invented here to work
+        # around it -- the note is placed exactly where the step already is.
+        foreach ($line in $intentLines) { $lines.Add($line) }
+        if ($intentLines.Count -gt 0) { $lines.Add('') }
         $lines.Add((Get-BranchProgressMarks).Open + $w.FirstStep)
         $lines.Add('')
     }
