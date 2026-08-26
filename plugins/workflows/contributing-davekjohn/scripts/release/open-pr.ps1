@@ -114,6 +114,17 @@
     that says "does not exist" sends the author to add another '../'. Not -Force-able, as with the tier
     gate: there is no legitimate dead link, and the fix the message spells out is one line.
 
+    Title gate (#936, August 26, 2026): the entry's title must not already carry the branch's own type
+    prefix. The type is composed in from the branch name, so a title typed as 'fix: ...' on a fix/ branch
+    becomes 'fix: fix: ...' -- which is what PR #934 opened as, printed as a DarkGray progress line that no
+    gate read. Refused rather than stripped, because those same words are the entry's Pull Request section
+    and travel verbatim into CHANGELOG.md and the release documents: correcting the title here would repair
+    the copy a reviewer sees and keep the copy that lasts. Bounded to exactly this branch's prefix and not
+    to any '<word>:', so a legitimate 'sync-roster: ...' cannot be accused -- the fear of that stripper is
+    why the guard was left out until the defect it predicted arrived. -Force-able, as the scaffold gate is
+    and the link gate is not: this refuses text somebody wrote, and a consumer whose seam names an unusual
+    prefix should get a warning rather than a wedge.
+
     Lint gate (guardrail for main): before the push, scripts/lint/check-plugin-integrity.ps1 runs.
     If that finds errors (invalid marketplace/plugin manifests, missing agent-def frontmatter,
     dead links), the branch is NOT pushed and NO PR is opened. Use -SkipLint to deliberately skip
@@ -183,8 +194,9 @@
     Declare that this PR closes no issue. The deliberate way past the resolves gate.
 
 .PARAMETER Force
-    Ship an entry that still carries its scaffold wording -- the escape valve for the scaffold gate,
-    for the rare entry that legitimately quotes that wording outside a fence. Warns instead of blocking.
+    Ship an entry the content gates object to -- the escape valve for the scaffold gate, for the rare entry
+    that legitimately quotes that wording outside a fence, and for the title gate, for the rare title that
+    legitimately opens with this repo's own type name. Warns instead of blocking.
     Deliberately separate from -SkipLint/-SkipTests: those skip a tool, this overrules a content
     judgement, and conflating them would let a routine "skip the slow suites" also wave prose through.
 
@@ -712,6 +724,57 @@ prefixes instead and write the path as it reads from the root.
 Correct the link(s) and run again.
 "@
         exit 1
+    }
+
+    # Title gate (#936): the entry's title must not already carry the branch's own type prefix.
+    #
+    # THE DEFECT ITS OWN COMMENT PREDICTED. Get-PrTitle composes '<branch type>: <the entry's words>' and
+    # strips nothing, with a paragraph explaining that the strip was left out because no title in
+    # CHANGELOG.md or the release record had ever carried a prefix -- and inviting whoever met the case to
+    # come back to it. PR #934 was that case: 'fix: fix: the no-tier fallback drops the whole audience
+    # paragraph', from a -Title given with the prefix already on it.
+    #
+    # REFUSED HERE RATHER THAN STRIPPED THERE, because the entry outlives the PR title. The same line is the
+    # folded entry's 'Pull Request' section, so it travels verbatim into CHANGELOG.md and on into the release
+    # documents. A silent strip would repair the copy a reviewer sees for a day and keep the copy consumers
+    # read; refusing sends the author to the entry, which is the only edit that fixes both. Same doctrine as
+    # the link gate above, which declined a fold-time rewrite for the same reason.
+    #
+    # NOTHING ELSE WOULD HAVE CAUGHT IT. open-pr prints the composed title as a DarkGray progress line and
+    # carries on; no gate read it. #934's doubled title was noticed by eye in ship-pr's own output, which is
+    # not a gate.
+    #
+    # BOUNDED TO THIS BRANCH'S PREFIX, in Get-PrTitlePrefixFinding -- deliberately not any '<word>:', which
+    # would mangle a legitimate 'sync-roster: ...'. The fear of that stripper is what kept the guard out from
+    # August 7 to August 26, 2026, and the bound is what answers it.
+    #
+    # -Force-ABLE, unlike the link and impact gates and like the scaffold gate it most resembles. This
+    # refuses TEXT SOMEBODY WROTE, and a title that legitimately opens with this repo's own type name
+    # followed by a colon is rare rather than impossible -- a consumer whose seam names an unusual prefix is
+    # where it would surface. An escape valve there is a warning; no escape valve is a wedged consumer.
+    $titlePrefix = Get-PrTitlePrefixFinding -Prefix $(if ($info.IsKnown) { $info.Prefix } else { '' }) -TitleWords $titleWords
+    if ($titlePrefix) {
+        $entryRel = $entryPath.Substring($repoRoot.Length).TrimStart('\', '/')
+        if ($Force) {
+            Write-Warning "title gate: the title in $entryRel already starts with '$titlePrefix', so the PR reads '$prTitle' - but -Force was given."
+        } else {
+            Write-Error @"
+title gate: the title in $entryRel already carries its own type prefix - nothing pushed, no PR opened.
+
+  the title reads:  $titlePrefix ...
+  the PR would be:  $prTitle
+
+The type comes off the BRANCH NAME and is put in front for you, so the title is written as words alone.
+Drop the '$titlePrefix' from the title and run again.
+
+Worth knowing why this is refused rather than quietly corrected: those same words are the entry's Pull
+Request section, which the fold copies verbatim into CHANGELOG.md and the next release copies on into
+releases/. Stripping it here would fix the PR title and leave the line that lasts.
+
+If the title really does begin with that word, ship it with -Force.
+"@
+            exit 1
+        }
     }
 }
 

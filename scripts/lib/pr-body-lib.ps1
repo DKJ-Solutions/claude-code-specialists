@@ -318,12 +318,20 @@ function Get-PrTitle {
         the section is free-form markdown; a two-line answer would otherwise reach `gh pr create --title`
         with a newline in it.
 
-        NO PREFIX IS STRIPPED, deliberately. A title already reading 'fix: ...' would compose to
-        'fix: fix: ...', and the guard for that is three lines. Measured before leaving it out: of every entry
-        in CHANGELOG.md and the release record, NOT ONE title carries a type prefix -- the convention has
-        always been to write the words alone. Building the strip would be guarding a defect that has never
-        happened, and a stripper that guesses at prefixes is how a legitimate title like 'sync-roster: ...'
-        gets mangled. Named here rather than repaired: if it ever does happen, this is the note to come back to.
+        NO PREFIX IS STRIPPED, deliberately -- AND IT HAPPENED (#936, August 26, 2026). This paragraph used
+        to close with "if it ever does happen, this is the note to come back to", on the premise that of every
+        entry in CHANGELOG.md and the release record NOT ONE title carried a type prefix. That premise expired
+        on PR #934, which opened as 'fix: fix: the no-tier fallback drops the whole audience paragraph': the
+        title was handed to new-branch.ps1 with a 'fix: ' already on it and this function put the branch type
+        in front of it again. Coming back to the note, as asked.
+
+        THE STRIP STILL DOES NOT LIVE HERE, and that is the repair rather than the absence of one. The doubled
+        title is not merely what the PR is called: the same line travels verbatim into CHANGELOG.md as the
+        folded entry's 'Pull Request' section, so the artefact that survives the merge is the ENTRY. Stripping
+        here would quietly correct the PR title and leave that entry wrong -- the fault repaired where it is
+        visible and kept where it lasts. So the guard is a REFUSAL in open-pr.ps1's title gate, which sends the
+        author back to the entry; Get-PrTitlePrefixFinding below is what that gate reads, and it is bounded to
+        exactly the branch's own prefix so a legitimate title like 'sync-roster: ...' cannot be accused.
 
         THE WORDS MAY COME FROM A PRE-SPLIT ENTRY'S HEADING, which is why the caller passes them rather than
         this reading the section itself. An entry written before the dossier form has NO title section at
@@ -348,6 +356,53 @@ function Get-PrTitle {
     # Putting that unknown word in front of the title would state a type no table backs.
     if ([string]::IsNullOrWhiteSpace($Prefix)) { return $words }
     return ($Prefix.Trim() + ': ' + $words)
+}
+
+function Get-PrTitlePrefixFinding {
+    <#
+    .SYNOPSIS
+        The type prefix the entry's title ALREADY carries, when it is this branch's own. '' when there is none.
+
+    .DESCRIPTION
+        WHAT THIS EXISTS FOR (#936, August 26, 2026). Get-PrTitle above composes '<branch type>: <words>' and
+        strips nothing, so a title written as 'fix: the fallback drops ...' on a fix/ branch composes to
+        'fix: fix: the fallback drops ...'. That shipped on PR #934. The convention is documented -- the
+        new-branch skill says to write the words WITHOUT a prefix -- and a documented convention nothing
+        measures is one this repo has watched break before.
+
+        A FINDING, NOT A REPAIR, and the caller refuses on it. The doubled line is not only the PR title: the
+        fold copies the same words into CHANGELOG.md, and from there the release documents carry them to
+        consumers. Silently stripping would fix the copy that is visible for a day and leave the copy that
+        lasts, so the author is sent back to the entry instead.
+
+        BOUNDED TO THE BRANCH'S OWN PREFIX, which is what makes the check safe to refuse on. It is NOT
+        '^\w+:' -- that would mangle a legitimate title like 'sync-roster: the ignore list is empty', and the
+        fear of exactly that is why the strip was left out in the first place. Only the word the branch table
+        already handed us counts, so a title can collide with this only by beginning with this repo's own type
+        name followed by a colon.
+
+        AN EMPTY PREFIX IS NO FINDING. open-pr passes '' for a branch whose prefix the table does not know,
+        and Get-PrTitle then composes the words alone -- nothing is doubled, so there is nothing to report.
+
+        CASE-INSENSITIVE, because 'Fix: ...' doubles just as visibly as 'fix: ...' and an author who
+        capitalised the first word of their sentence made the same mistake.
+
+        PURE, and it normalises by CALLING Get-PrTitle with no prefix rather than repeating its rules. Which
+        line of a free-form section is the title, and what happens to its inner whitespace, is defined once
+        above; a second copy here would be free to judge a different string than the one that ships.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Prefix,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$TitleWords
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Prefix)) { return '' }
+    $words = Get-PrTitle -Prefix '' -TitleWords $TitleWords
+    if (-not $words) { return '' }
+
+    $match = [regex]::Match($words, '^' + [regex]::Escape($Prefix.Trim()) + '\s*:', 'IgnoreCase')
+    if (-not $match.Success) { return '' }
+    return $match.Value
 }
 
 function Update-PrBodySection {
