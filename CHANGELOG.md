@@ -32,6 +32,46 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/ci-concurrency-supersedes-pr-runs-v1` · 20260826-194414
+
+`.github/workflows/ci.yml` now declares a `concurrency` group keyed on the workflow and the ref, so one
+run per ref supersedes the last instead of queueing beside it. `on: pull_request` fires on `synchronize`,
+which meant every push to an open branch started a second full run of `lint-en-tests` -- the lint gate
+plus all 52 suites on `windows-latest` -- while the previous one was still going; PR #933 held three
+consecutive runs of one branch at ~7m40s each, on a runner whose minutes bill double. Superseded PR runs
+are cancelled now. Runs for a push to `main` are not: `cancel-in-progress` is conditional on the event
+being a pull request, because `ship-pr.ps1` pushes to the trunk twice per branch -- the merge commit and
+then the fold commit, measured 6s apart on #932 -- and a plain `true` would have the fold cancel the
+merge commit's own run, leaving the commit the `main` ruleset gates on with a check that never reported.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The interesting half is not the `concurrency` key, which is ordinary. It is that the obvious value for
+`cancel-in-progress` is wrong here for a reason that cannot be read off the workflow file. `true` looks
+safe because a PR run and a push-to-`main` run can never collide -- `github.ref` is `refs/pull/N/merge`
+against `refs/heads/main`, so they are always in different groups. That reasoning is correct and still
+leads to the wrong setting, because the collision that matters is `main` against `main`: this repo pushes
+to its own trunk twice per branch, and the second push is the fold. Measured on the real history, that
+gap was 6 seconds on #932 and 7 minutes on #933 -- at 6 seconds the merge commit's gate would be
+cancelled essentially every time.
+
+So the comment above the block carries that measurement rather than an explanation of what `concurrency`
+does, which is the house style in that file and the only part of this change a later reader cannot
+reconstruct. A cancelled check is not a passing check, and the failure would have been silent: green
+everywhere, with the one commit the ruleset actually guards never having been gated.
+
+**Score:** 2
+
+#### Pull Request
+
+every PR push starts a full CI run while the previous one is still going
+
+[PR #938](https://github.com/DaveKJohn/claude-code-specialists/pull/938)
+
+---
+
 ### DEPLOY: `fix/blank-phase-override-empties-the-arc-v1` · 20260826-192047
 
 Two seams in `scripts/lib/entry-scaffold-lib.ps1` now agree with their readers about what *empty* means. A
