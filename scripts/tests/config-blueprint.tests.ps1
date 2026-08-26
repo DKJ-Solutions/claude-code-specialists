@@ -212,7 +212,7 @@ foreach ($rec in @($bp.records | Where-Object { $_.declared -and $_.text })) {
 # Get-TestCommands since inbound #644 (this repo's suites are all PowerShell), Get-EntryGateExemptPrefixes
 # since inbound #789 (this repo runs no mirror branches, so 'sync' being the default IS its answer), and
 # Get-ReleasePageMasthead since inbound #809 (this repo has no wordmark to put on its page) -- five, until
-# issue #885 added four more (Get-ChangelogPath, Get-ReleaseDevelopmentNotesRoot, Get-ReleaseGithubNotesRoot,
+# issue #885 added four more (Get-ChangelogPath, Get-ReleaseChangelogNotesRoot, Get-ReleaseGithubNotesRoot,
 # Get-ReleaseInternalNotesRoot), each with a computed default that already states this repo's own answer
 # without an explicit declaration (see each record's own AdoptWhy). Recorded as declared=false with no text
 # rather than dropped, because "this repo does not state it either" is an answer -- and the honest one to

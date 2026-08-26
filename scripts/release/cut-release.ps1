@@ -362,8 +362,16 @@ $noteRootRelPath = Get-SeamValue -Name 'Get-ReleaseNoteRoot' -Default 'releases/
 # the source-versus-consumer branch #885 gave it, because #914 did not include it. Read together because
 # all three name the SAME generated-notes tree at different tiers, and new-internal-note.ps1 must agree
 # with the last two -- see its own matching seam reads.
-$devNotesRootRelPath = Get-SeamValue -Name 'Get-ReleaseDevelopmentNotesRoot' -Default (Get-DefaultReleaseChangelogNotesRoot -RepoRoot $repoRoot)
-Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $devNotesRootRelPath -SeamName 'Get-ReleaseDevelopmentNotesRoot'
+#
+# TWO NAMES READ, ONE WRITTEN (issue #947, August 26, 2026), the same shape as Get-ReleaseConsumerBumps
+# further up. #914 renamed the DIRECTORY development -> changelog and deliberately left the seam alone,
+# which left the two halves of one mechanism disagreeing by name: the seam said 'Development' while its
+# own computed default said 'Changelog'. The current name is preferred and the retired one still
+# answers, because a consumer receives this rename through a plugin update rather than by choosing to --
+# without the fallback, a repo that had defined the old name would drop to the computed default in
+# silence and the cut would start a second tree beside the one holding its notes.
+$devNotesRootRelPath = Get-SeamValue -Name 'Get-ReleaseChangelogNotesRoot', 'Get-ReleaseDevelopmentNotesRoot' -Default (Get-DefaultReleaseChangelogNotesRoot -RepoRoot $repoRoot)
+Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $devNotesRootRelPath -SeamName 'Get-ReleaseChangelogNotesRoot'
 $githubNotesRootRelPath = Get-SeamValue -Name 'Get-ReleaseGithubNotesRoot' -Default (Get-DefaultReleaseGithubNotesRoot -RepoRoot $repoRoot)
 Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $githubNotesRootRelPath -SeamName 'Get-ReleaseGithubNotesRoot'
 
