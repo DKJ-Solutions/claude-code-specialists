@@ -32,6 +32,69 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/the-review-failure-names-its-reason-v1` · 20260826-144804
+
+When `claude-review` goes red, the log now names the reason. A failure-only step in
+`.github/workflows/claude-code-review.yml` reads the execution file the action leaves behind and prints the
+result message's `subtype`, `is_error`, `api_error_status`, `stop_reason`, turn count, duration, cost and
+denial count, plus its `result` string truncated to 2,000 characters. On PR #911 -- inbound
+[#913](https://github.com/DaveKJohn/claude-code-specialists/issues/913) -- the check failed twice and said
+nothing but `is_error:true`, which left a guess about the credential as the only available hypothesis.
+
+**The guess was half wrong, and the numbers already in the log say so.** #913 inferred an expired or
+rate-limited OAuth token from the empty `ANTHROPIC_API_KEY:` line. Attempt 1 reports `num_turns: 12` and
+`total_cost_usd: 1.03208985` across 69 seconds, so the token authenticated and did real work; an expired
+credential cannot spend a dollar over twelve turns. Attempt 2 reports `num_turns: 1` and `total_cost_usd: 0`
+in 470ms, a different failure entirely. A rate limit is consistent with both and an expiry with neither --
+which is as far as the log can be read, and exactly why the reason has to be printed rather than reconstructed.
+The other candidate the numbers offer is refuted outright: the three runs that PASSED that day carry
+`permission_denials_count` of 6, 10 and 16, against the failing run's 1.
+
+**The silence had a located cause, not a mysterious one.** `sanitizeSdkOutput` in the action's
+`base-action/src/run-claude-sdk.ts`, read at the pinned SHA `e63208c`, emits seven fields of the result message
+and suppresses every other message type. The SDK's own `SDKResultSuccess` type carries two more that name a
+reason -- `result` and `api_error_status`, the latter holding 429 for a rate limit and 529 for an overload --
+and neither is among the seven. So nothing was missing upstream that could be asked for; what was missing was a
+reader for the file it already writes.
+
+**Three mechanisms were read rather than assumed, because a workflow that leans on the wrong one fails only
+when it is needed.** `execution_file` survives the failure, because `src/entrypoints/run.ts` calls
+`setExecutionFileOutputIfPresent()` from its catch block. The file is an array whose last element is the
+result, which is how upstream reads it in `update-comment-link.ts`. And `show_full_output: true` was rejected
+rather than overlooked: it is the only switch on offer, it dumps every message including tool results into a
+public log, and its own description warns it may carry secrets. Reading the file keeps the disclosure to the
+fields that name the failure -- which is also why the step runs on failure only, where `result` holds an error
+instead of review prose about the diff.
+
+**And the branch found a second thing, which only the changelog can keep:** a PR that edits this workflow is
+reviewed by nobody. `claude-review` skipped itself on this very PR -- 10 seconds against the 1m0s-7m2s of the
+runs that reviewed something -- reporting `Action skipped due to workflow validation error ... expected ... on
+PRs with workflow changes`. It reports that as **success**, not as skipped, so the green means the opposite of
+what a green means on any other PR. Nothing here changes that, and it is written down rather than repaired:
+the class it silently excuses is the one where a reviewer is most wanted.
+
+`claude.yml` has the identical blindness and is deliberately left alone: it answers a human who typed
+`@claude` and is already reading the thread when it breaks. This check runs unattended on every PR, which is
+what makes its silence expensive.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- `.github/workflows/claude-code-review.yml` is this repo's own CI. It is not plugin payload, it ships
+in no release, and no consumer of the specialists plugins ever reads it. The mechanism generalises to any repo
+running `claude-code-action`, but nothing here delivers it to one.
+
+**Score:** N/A
+
+#### Pull Request
+
+The claude-review failure names its own reason
+
+[PR #916](https://github.com/DaveKJohn/claude-code-specialists/pull/916)
+
+---
+
 ### DEPLOY: `feat/the-workflow-shifts-one-level-down-v1` · 20260826-135636
 
 The development cycle document and `CHANGELOG.md` each move one heading level deeper, and
