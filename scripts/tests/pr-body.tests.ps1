@@ -336,6 +336,41 @@ Assert-Equal 'words alone' (Get-PrTitle -Prefix '' -TitleWords 'words alone') 'a
 Assert-Equal '' (Get-PrTitle -Prefix 'fix' -TitleWords '') 'no words means no title, not a bare prefix'
 Assert-Equal '' (Get-PrTitle -Prefix 'fix' -TitleWords "   `n  `n") 'a whitespace-only section is no title either'
 
+# THE COMPOSER STILL DOUBLES, PINNED ON PURPOSE (#936). This is the defect PR #934 shipped, and the repair
+# is a refusal in open-pr rather than a strip here -- so an assert that the doubling still happens is what
+# stops somebody "fixing" it in this function and leaving the entry, which is the copy CHANGELOG.md keeps,
+# quietly wrong. Delete this assert only together with the title gate.
+Assert-Equal 'fix: fix: the fallback drops the paragraph' (Get-PrTitle -Prefix 'fix' -TitleWords 'fix: the fallback drops the paragraph') 'a prefixed title still composes to a doubled one -- the gate refuses it, this function does not strip it'
+
+# --- Get-PrTitlePrefixFinding: the title gate's reader (#936) --------------------------------------
+# Nothing fed Get-PrTitle words that already carried a prefix until PR #934 did it in production, which
+# is the gap these asserts close. The finding is the matched text, so the refusal can quote it back.
+Write-Host ""
+Write-Host "Get-PrTitlePrefixFinding -- the entry's title already carries the branch's type" -ForegroundColor Cyan
+
+Assert-Equal 'fix:' (Get-PrTitlePrefixFinding -Prefix 'fix' -TitleWords 'fix: the fallback drops the paragraph') 'the branch prefix on the title is reported, as the text that was matched'
+Assert-Equal 'fix:' (Get-PrTitlePrefixFinding -Prefix 'fix' -TitleWords 'fix:no space after the colon') 'the space after the colon is not what makes it a prefix'
+Assert-Equal 'fix :' (Get-PrTitlePrefixFinding -Prefix 'fix' -TitleWords 'fix : spaced out') 'whitespace before the colon does not hide it either'
+Assert-Equal 'Fix:' (Get-PrTitlePrefixFinding -Prefix 'fix' -TitleWords 'Fix: capitalised like a sentence') 'the match is case-insensitive -- a capitalised first word is the same mistake'
+
+# BOUNDED TO THE BRANCH'S OWN PREFIX, which is the whole reason this is safe to refuse on. A stripper
+# guessing at any '<word>:' is what the composer above deliberately did not build, and these three are the
+# titles it would have mangled.
+Assert-Equal '' (Get-PrTitlePrefixFinding -Prefix 'fix' -TitleWords 'sync-roster: the ignore list is empty') 'a legitimate colon-carrying title is not a finding'
+Assert-Equal '' (Get-PrTitlePrefixFinding -Prefix 'fix' -TitleWords 'docs: written on the wrong branch') 'ANOTHER type prefix is not this branch prefix -- the gate reports only what would be doubled'
+Assert-Equal '' (Get-PrTitlePrefixFinding -Prefix 'fix' -TitleWords 'fixture loading is broken') 'a word that merely STARTS with the prefix is not a prefix -- the colon is required'
+
+# THE SAME NORMALISATION AS THE TITLE, because the gate must judge the string that ships. These two shapes
+# are what Get-PrTitle would pick, and the finding has to see them the same way.
+Assert-Equal 'feat:' (Get-PrTitlePrefixFinding -Prefix 'feat' -TitleWords "`n`n  feat: after the blanks`nmore") 'the first non-empty line is judged, not the raw section'
+Assert-Equal 'feat:' (Get-PrTitlePrefixFinding -Prefix '  feat  ' -TitleWords 'feat: a padded prefix argument') 'the prefix argument is trimmed, as the composer trims it'
+
+# NO PREFIX, NO DOUBLING, NO FINDING. open-pr passes '' for a branch whose prefix the table does not know,
+# and the composer then writes the words alone -- so there is nothing to report even when they carry a colon.
+Assert-Equal '' (Get-PrTitlePrefixFinding -Prefix '' -TitleWords 'fix: on an unknown branch prefix') 'an empty prefix is never a finding, because nothing is composed in front'
+Assert-Equal '' (Get-PrTitlePrefixFinding -Prefix 'fix' -TitleWords '') 'no words is no finding -- the empty title is the scaffold gate to report, not this one'
+Assert-Equal '' (Get-PrTitlePrefixFinding -Prefix 'fix' -TitleWords "   `n  `n") 'a whitespace-only section is no finding either'
+
 # --- Get-PrDescription: the PR body is the answer onwards, not the whole dossier --------------------
 #
 # The three sections it drops are answered by the PAGE around the body -- Branch title IS the PR title,
