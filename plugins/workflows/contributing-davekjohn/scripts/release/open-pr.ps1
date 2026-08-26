@@ -391,7 +391,9 @@ if (Test-Path -LiteralPath $entryPath) {
 # (head, base) pair, so with the base pinned there is at most one answer -- which is also why --limit 1
 # cannot hide a second candidate.
 $existingPr = $null
-$prLookup = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--head', $branch, '--base', 'main', '--state', 'open', '--json', 'number,url,body', '--limit', '1', '--repo', $repo) -DiscardStderr
+# -Utf8 because 'body' is in the field list (issue #907): the record this builds carries the existing
+# PR's prose, and -RefreshBody then compares against it. number and url would not have cared.
+$prLookup = Invoke-NativeCapture -Utf8 -FilePath 'gh' -Arguments @('pr', 'list', '--head', $branch, '--base', 'main', '--state', 'open', '--json', 'number,url,body', '--limit', '1', '--repo', $repo) -DiscardStderr
 if ($prLookup.ExitCode -ne 0) {
     Write-Warning "could not ask gh whether '$branch' already has an open PR (exit $($prLookup.ExitCode)) - continuing as if it has none."
 } else {
