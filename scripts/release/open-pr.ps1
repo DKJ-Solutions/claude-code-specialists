@@ -811,27 +811,33 @@ $descPlaceholders = if (Get-Command -Name Get-PrDescriptionPlaceholder -ErrorAct
 # and both are collected into ONE `gh pr edit` below rather than sent separately, because two calls would
 # be two PR updates (and two notifications) for one run:
 #
-#   1. A -Resolves the existing body does not yet carry. NOT a matter of taste: if this run declares an
+#   1. -RefreshBody, which rewrites the description section from the entry. OPT-IN, because a body may
+#      have been edited on github.com and refreshing unasked would overwrite that.
+#   2. A -Resolves the existing body does not yet carry. NOT a matter of taste: if this run declares an
 #      issue closed and the declaration never reaches the body, GitHub closes nothing at the merge, and
 #      ship-pr.ps1's step 6 reads the same body back and confirms the same silence. That is the #341-#343
 #      failure arrived at from the other side, so the block is APPENDED rather than skipped.
 #      Add-ResolvesBlock is idempotent per issue, so an already-declared number is not duplicated.
-#   2. -RefreshBody, which rewrites the description section from the entry. OPT-IN, because a body may
-#      have been edited on github.com and refreshing unasked would overwrite that.
 #
-# Both are computed against the SAME starting body and compared to it once at the end, so "nothing to do"
-# means no API call at all rather than a no-op edit.
+# THE ORDER IS THE WHOLE POINT, AND IT USED TO BE THE OTHER WAY ROUND (#919, August 26, 2026). These two
+# edits are SEQUENTIAL on one variable, not independent: the second consumes the first one's output. With
+# the resolves block appended FIRST, the refresh below then replaced it -- because a template carrying no
+# headings makes the description the body's LEADING section, whose only boundary is the form's own later
+# headings, and a form with none of those means the leading section is the whole body. Measured on PR
+# #916: the run printed the lost-section warning, exited 0, and published a body closing nothing. Had it
+# merged there, the issue would have stayed open -- the #341-#343 failure reached through the door built
+# to prevent it.
+#
+# REFRESH FIRST, THEN APPEND, and no new knowledge of stops or heading levels is needed for it:
+# Add-ResolvesBlock is idempotent per issue, so appending after the rewrite is a no-op where the block
+# survived and restores it where it did not. The comment that used to stand here claimed both were
+# "computed against the SAME starting body", which is what the code below now actually does per edit --
+# each is compared to the body as it went IN, so "nothing to do" still means no API call at all rather
+# than a no-op edit.
 if ($existingPr) {
     $currentBody = [string]$existingPr.body
     $newBody = $currentBody
     $edits = @()
-
-    if ($resolveIssues.Count -gt 0) {
-        $newBody = Add-ResolvesBlock -Body $newBody -Issues $resolveIssues
-        if ($newBody -ne $currentBody) {
-            $edits += "closing keyword(s) for $(($resolveIssues | ForEach-Object { "#$_" }) -join ', ')"
-        }
-    }
 
     if ($RefreshBody) {
         # THE DESCRIPTION IS THE SECTION THE PLACEHOLDER SITS IN, and the template says which that is.
@@ -947,6 +953,19 @@ if ($existingPr) {
             } else {
                 Write-Host "-RefreshBody: the PR description already matches the entry - nothing sent." -ForegroundColor DarkGray
             }
+        }
+    }
+
+    # AND THE CLOSING BLOCK GOES ON LAST, AFTER ANY REFRESH (#919) -- see the ordering note above this
+    # `if`. Compared against the body as it went INTO this call rather than against $currentBody, which is
+    # what the old position could get away with because nothing had touched $newBody yet: from here a
+    # refresh may already have changed it, and comparing to the starting body would credit this edit with
+    # the refresh's change and announce a closing keyword that was never added.
+    if ($resolveIssues.Count -gt 0) {
+        $beforeResolves = $newBody
+        $newBody = Add-ResolvesBlock -Body $newBody -Issues $resolveIssues
+        if ($newBody -ne $beforeResolves) {
+            $edits += "closing keyword(s) for $(($resolveIssues | ForEach-Object { "#$_" }) -join ', ')"
         }
     }
 
