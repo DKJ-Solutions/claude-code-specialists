@@ -4,21 +4,13 @@
 > `- [~]` dropped with the reason, which exists so nobody ticks a box for work they did not do.
 > open-pr and ship-pr both refuse while one is still open, and there is no `-Force`.
 >
-> **FOUR `
-###
-` HEADINGS, AND NEVER A FIFTH** -- PLAN, CREATE, TEST, DEPLOY are the whole top
-> level. A section needing its own heading goes in as a `
-####
-` UNDER whichever of the four owns
+> **FOUR `###` HEADINGS, AND NEVER A FIFTH** -- PLAN, CREATE, TEST, DEPLOY are the whole top
+> level. A section needing its own heading goes in as a `####` UNDER whichever of the four owns
 > it. No gate sees a heading, so this one is on you (Dave, August 26, 2026).
 >
-> **AND NOTHING BRANCH-SPECIFIC ABOVE `
-###
- PLAN`** -- everything between the title and that heading
+> **AND NOTHING BRANCH-SPECIFIC ABOVE `### PLAN`** -- everything between the title and that heading
 > is this guidance, which is identical in every branch document. A status line, a note about
-> THIS branch or an instruction to a session belongs under one of the four, normally as a `
-####
-`
+> THIS branch or an instruction to a session belongs under one of the four, normally as a `####`
 > in PLAN. Same rule, same reason: no gate reads this region (Dave, August 26, 2026).
 >
 > **DEPLOY takes no steps of its own, and it is WRITTEN LAST** -- it is what the branch DID, once
@@ -74,6 +66,19 @@ born with an 8-finding exemption list -- the shape this repo has scar tissue fro
 
 - [x] Verify the report's symptom, subject, size and proposed repair against the tree
 - [x] Measure whether a plugin-scoped enumeration rule could be generic (it cannot -- filed as #920)
+
+#### The guidance block above was repaired by hand, and that is a bug in the scaffolder
+
+`new-branch.ps1` wrote it with four lines split into three each: in a PowerShell array literal the comma
+binds tighter than `+`, so `'a' + $hashes + 'b',` is three elements rather than one concatenated string,
+and the join with a newline turns each into its own line. Six of the resulting lines carry no `>`, which is
+exactly what the preamble region forbids -- `branch-entry` refused this PR with 8 findings before the block
+was joined back up. The values are right and the composition is wrong, the same class as the middot and the
+`sed`-written dash escapes. Filed as
+[#924](https://github.com/DaveKJohn/claude-code-specialists/issues/924); it affects every branch created
+since that change, so it is the next branch rather than this one.
+
+- [x] File the scaffolder defect with its mechanism (#924), repair this document's own copy by hand
 
 ### CREATE
 
