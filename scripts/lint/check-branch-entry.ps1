@@ -207,8 +207,8 @@ $fileText  = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::U
 $entryText = Get-DevelopmentCycleEntryText -Text $fileText
 
 # "IS THIS THE RESET STATE" IS A QUESTION ABOUT THE DOCUMENT, NOT ABOUT THE SECTION -- and asking it of the
-# section is a measured defect rather than a hypothetical. A reset document's DEPLOY section opens with its
-# own '##', so the level half of Test-BranchChangelogIsFilled reads it as an entry: the gate then fell
+# section is a measured defect rather than a hypothetical. A reset document's DEPLOY section opens with a
+# heading of its own, so the level half of Test-BranchChangelogIsFilled reads it as an entry: the gate then fell
 # through to the scaffold check and refused a reset file with "has not been written yet" instead of "still
 # in its reset state". Correct verdict, wrong reason, and the wrong reason sends the reader to write in a
 # file they should not be writing in at all. Caught by branch-entry-gate.tests.ps1.
@@ -249,7 +249,7 @@ Write-Host "[OK] '$entryRel' carries a written entry."
 #   Test-IsWorkflowSourceRepo and this family is held to its own rule.
 #
 #   #899, the preamble, holds EVERYWHERE, because it reads the SHAPE and not the text. The region between
-#   the H1 and the first '##' is the scaffolder's guidance, which is blockquoted whatever language it has
+#   the title and the first phase heading is the scaffolder's guidance, which is blockquoted whatever language it has
 #   been translated into -- so "a non-blank line that does not start with '>'" survives translation. A byte
 #   comparison against StepsGuidance could not: it carries a '{0}' seam the consumer answers themselves,
 #   and inbound #562 is the measured consumer who translated the block around it.
@@ -289,6 +289,15 @@ if ($titleLevel -le 0) { $titleLevel = Get-BranchCycleHeadingLevel }
 $phaseLevel = $titleLevel + 1
 $phaseRx    = '^#{' + $phaseLevel + '}\s+(\S.*)$'
 $titleRx    = '^#{1,' + $titleLevel + '}\s'
+# AND EVERY FINDING BELOW QUOTES THESE INSTEAD OF TYPING A LEVEL (#924, August 26, 2026). The reasoning is
+# already written out at the [OK] line further down -- "the level in this line is the one that was actually
+# READ, not a literal" -- and it held for that one line only. Six markers on the FAILURE path were typed,
+# so on the day the shape shifted one level down the gate refused a document for the new levels while
+# reporting the old ones: it told a reader to demote a '###' to a '###', and pointed at "the first '##'"
+# in a document whose phases are '###'. That is the worse way round of the two, because the failure
+# message is the one somebody reads while they cannot yet see what is wrong.
+$phaseMark = '#' * $phaseLevel
+$subMark   = '#' * ($phaseLevel + 1)
 
 $inShapeFence = $false
 $shapeLineNo = 0
@@ -305,7 +314,7 @@ foreach ($shapeLine in [regex]::Split($fileText, '\r?\n')) {
         continue
     }
     if ($shapeLine -match $titleRx) { continue }
-    # The preamble region: everything after the H1 and before the first '##'. Blank lines and blockquote
+    # The preamble region: everything after the title and before the first phase heading. Blank lines and blockquote
     # lines are the guidance block; anything else is this branch's own content, sitting where the text is
     # supposed to be identical in every branch document in every repo.
     if (-not $seenFirstTop -and $shapeLine.Trim() -ne '' -and $shapeLine -notmatch '^\s*>') {
@@ -327,27 +336,27 @@ if (Get-Command Get-BranchFileWording -ErrorAction SilentlyContinue) {
 }
 if ($knownPhases.Count -eq 0) { $knownPhases = @('PLAN', 'CREATE', 'TEST') }
 
-# DEPLOY is matched on its PREFIX, because its heading carries the branch name ('## DEPLOY: `feat/x`').
+# DEPLOY is matched on its PREFIX, because its heading carries the branch name (DEPLOY: feat/x).
 $strayHeadings = @($topHeadings | Where-Object {
     ($knownPhases -notcontains $_.Text) -and ($_.Text -notmatch '^DEPLOY\b')
 })
 
 if ($strayHeadings.Count -gt 0 -and (Test-IsWorkflowSourceRepo -RepoRoot $repoRoot)) {
-    $shapeFindings += "carries $($topHeadings.Count) '##' headings, and the arc is $($knownPhases -join ' / ') / DEPLOY -- four, never a fifth."
+    $shapeFindings += "carries $($topHeadings.Count) '$phaseMark' headings, and the arc is $($knownPhases -join ' / ') / DEPLOY -- four, never a fifth."
     foreach ($h in $strayHeadings) {
-        $shapeFindings += "  extra heading, line $($h.Line): '## $($h.Text)'"
+        $shapeFindings += "  extra heading, line $($h.Line): '$phaseMark $($h.Text)'"
     }
-    $shapeFindings += "  Demote it to '###' under whichever of the four it belongs to."
+    $shapeFindings += "  Demote it to '$subMark' under whichever of the four it belongs to."
 }
 
 if ($preambleStrays.Count -gt 0) {
-    $shapeFindings += "carries branch content above the first '##', where the block is generic guidance:"
+    $shapeFindings += "carries branch content above the first '$phaseMark', where the block is generic guidance:"
     foreach ($s in $preambleStrays) {
         $trimmed = if ($s.Text.Length -gt 72) { $s.Text.Substring(0, 72) + '...' } else { $s.Text }
         $shapeFindings += "  line $($s.Line): $trimmed"
     }
     $shapeFindings += '  That region is identical in every branch document in every repo, so a status note'
-    $shapeFindings += "  there reads as guidance. Move it under a '###' inside one of the phases."
+    $shapeFindings += "  there reads as guidance. Move it under one of the '$phaseMark' phases, as a '$subMark'."
 }
 
 if ($shapeFindings.Count -gt 0) {
@@ -358,8 +367,9 @@ if ($shapeFindings.Count -gt 0) {
 # The level in this line is the one that was actually READ, not a literal: the checks above derive the phase
 # level from the document's own title, so a message naming '##' would have described the wrong shape for every
 # document written after August 26, 2026 -- and a coverage line that misreports what it read is worse than
-# none, because it reads as confirmation.
-Write-Host "[OK] '$entryRel' keeps its shape: $($topHeadings.Count) '$('#' * $phaseLevel)' heading(s), and nothing but guidance above the first."
+# none, because it reads as confirmation. It quotes $phaseMark rather than composing a second time, which is
+# what made the findings above disagree with this line for one day.
+Write-Host "[OK] '$entryRel' keeps its shape: $($topHeadings.Count) '$phaseMark' heading(s), and nothing but guidance above the first."
 
 # --- The DEPLOY lock: is the section still what the PR published? ------------------------------------
 # Refused, not reported, which puts it with the checks above rather than with the significance below. The
