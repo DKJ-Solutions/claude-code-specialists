@@ -1,6 +1,6 @@
 # `development-cycle.md` — the portable half
 
-Everything a branch needs to carry lives in **one file**: `workflow-davekjohn/development-cycle.md`,
+Everything a branch needs to carry lives in **one file**: `contributing-davekjohn/development-cycle.md`,
 inside the workflow's own root folder, where everything portable gathers. It has two halves with two
 different readers, and they are sections of one document rather than two files:
 
@@ -226,7 +226,7 @@ something Claude's own output demonstrates, and for a branch that is the gate ou
 depend on:
 
 ```text
-/goal every step above the DEPLOY heading in workflow-davekjohn/development-cycle.md is resolved
+/goal every step above the DEPLOY heading in contributing-davekjohn/development-cycle.md is resolved
 and open-pr reports the lint and test gates green, or stop after 20 turns
 ```
 
