@@ -77,6 +77,10 @@ $PluginTreeSrc       = Join-Path $RepoRoot 'scripts\lib\plugin-tree-lib.ps1'
 # list and the reference PR template; a fixture missing it does not skip that check, it kills the whole
 # script before check 23 runs -- which is exactly how this suite failed when the check landed.
 $PrBodyLibSrc        = Join-Path $RepoRoot 'scripts\lib\pr-body-lib.ps1'
+# Added with lint check 28 (August 26, 2026), for the same reason as the line above: the lint dot-sources
+# this for the '@'-import parser, and a fixture missing it kills the script at that line rather than
+# skipping one check.
+$MeasureContextSrc   = Join-Path $RepoRoot 'scripts\lib\measure-context-lib.ps1'
 
 $ProjectDir    = Join-Path $Fixture 'project'
 $UserHomeDir   = Join-Path $Fixture 'user-home'
@@ -195,6 +199,7 @@ function New-LintFixtureBase {
     Copy-Item -Path $EntryScaffoldSrc    -Destination (Join-Path $LintFixture 'scripts\lib\entry-scaffold-lib.ps1') -Force
     Copy-Item -Path $PluginTreeSrc       -Destination (Join-Path $LintFixture 'scripts\lib\plugin-tree-lib.ps1') -Force
     Copy-Item -Path $PrBodyLibSrc        -Destination (Join-Path $LintFixture 'scripts\lib\pr-body-lib.ps1') -Force
+    Copy-Item -Path $MeasureContextSrc   -Destination (Join-Path $LintFixture 'scripts\lib\measure-context-lib.ps1') -Force
 }
 
 # Rewrites .claude-plugin/marketplace.json to declare exactly $Plugins (each a hashtable with Name +
