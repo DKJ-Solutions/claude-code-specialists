@@ -394,11 +394,20 @@ screen. An author who has just ticked the last box is now looking at the paragra
 gate counts only above it, and the scaffold gate reads only inside it. Nothing has to be "replaced before
 the PR", because nothing is doing two jobs at once.
 
-**There is also no `Where I left off` any more** (Dave, August 23, 2026). It asked the author to write down
-what the step list already says: an unticked box *is* where you left off, and a second account of it beside
-the list is one that can disagree with the list. A parking note still has a place — `new-branch -Park
--Intent` writes it at the top of the document, above the phases — because that is the one thing the marks
-genuinely cannot carry: what you decided and have not written down anywhere yet.
+**There is no `Where I left off` section every branch has to answer** (Dave, August 23, 2026). It asked the
+author to write down what the step list already says: an unticked box *is* where you left off, and a second
+account of it beside the list is one that can disagree with the list. A parking note still has a place —
+`new-branch -Park -Intent` writes it as a `####` **inside the first phase**, under a heading of its own —
+because that is the one thing the marks genuinely cannot carry: what you decided and have not written down
+anywhere yet. It appears only when `-Intent` is given, which is the whole difference from the section that
+was retired.
+
+**It sat *above* the phases until August 26, 2026, and that was a defect rather than a preference.** A bare
+paragraph between the guidance block and the first phase is exactly what the preamble rule refuses, so every
+document `-Intent` wrote — every parked branch, every lane — was rejected by the branch-entry gate, and the
+only way through was to move by hand what the script had just written. Both halves of that collision were
+deliberate decisions taken three days apart, neither aware of the other. The guidance block won, because it
+had already said where such a note belongs: *under one of the four, normally as a `####` in PLAN*.
 
 ## Why the name is fixed
 

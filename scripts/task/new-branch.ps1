@@ -50,9 +50,14 @@
 
 .PARAMETER Intent
     (Optional) the direction of the branch -- what still needs to happen and where you left off.
-    Recorded at the top of development-cycle.md, above the phases; typically given together with -Park
-    when parking a branch for later / another device (#162). It deliberately does not touch the DEPLOY
-    section: an intent is a status, and that section's text folds verbatim into CHANGELOG.md.
+    Recorded INSIDE THE FIRST PHASE of development-cycle.md, as a sub-section with a heading of its own;
+    typically given together with -Park when parking a branch for later / another device (#162). It
+    deliberately does not touch the DEPLOY section: an intent is a status, and that section's text folds
+    verbatim into CHANGELOG.md.
+
+    It was written above the phases until #925 (August 26, 2026), and a bare paragraph there is exactly
+    what check-branch-entry.ps1's preamble rule refuses -- so this script produced a document its own gate
+    rejected whenever the parameter was used.
 
 .PARAMETER RepoRoot
     (Optional) the tree to create the branch and its document in, when that is NOT the tree you are

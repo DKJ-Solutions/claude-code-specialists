@@ -1799,6 +1799,31 @@ Assert-Equal 0 $notQuoted.Count "every guidance element opens with '>' -- an ele
 $phaseHashes = '#' * (Get-BranchCycleSectionLevel)
 Assert-True (((Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260826-000000') -join "`n") -match ('FOUR `' + $phaseHashes + '` HEADINGS')) 'and the level composed from the knob reaches the document on one line, not orphaned onto its own'
 
+# --- -Intent LANDS INSIDE THE FIRST PHASE, NOT ABOVE IT (#925) ------------------------------------------
+# The intent used to be written as a bare paragraph between the guidance block and the first phase, which is
+# the one region check-branch-entry.ps1's preamble rule refuses -- so new-branch -Intent, park-branch and
+# worktree-lane -Intent each produced a document the gate rejected. Asserted POSITIONALLY rather than by
+# presence: 'the intent is somewhere in the file' was already true of the defect, and is exactly the assert
+# that let it ship. branch-entry-gate.tests.ps1 holds the other half, that the gate accepts the result.
+Write-Host "the intent is a section of the first phase, not a paragraph above the phases" -ForegroundColor Cyan
+$intentText  = 'Skeleton + routing done; next: wire the API client.'
+$intentDoc   = @(Format-DevelopmentCycle -Branch 'feat/intent-v1' -Id '20260826-000000' -Intent $intentText)
+$subHashes   = '#' * ((Get-BranchCycleSectionLevel) + 1)
+$firstPhase  = @((Get-BranchFileWording).StepPhases | Where-Object { $_ })[0]
+$idxFirst    = [array]::FindIndex([string[]]$intentDoc, [Predicate[string]]{ param($l) $l -eq "$phaseHashes $firstPhase" })
+$idxHeading  = [array]::FindIndex([string[]]$intentDoc, [Predicate[string]]{ param($l) $l -eq "$subHashes $((Get-BranchFileWording).IntentHeading)" })
+$idxText     = [array]::FindIndex([string[]]$intentDoc, [Predicate[string]]{ param($l) $l -eq $intentText })
+Assert-True ($idxFirst -ge 0) "(the fixture really carries the first phase, '$firstPhase')"
+Assert-True ($idxHeading -gt $idxFirst) 'the intent heading sits UNDER the first phase, which is what keeps it out of the preamble'
+Assert-True ($idxText -gt $idxHeading) 'and the intent text sits under its own heading rather than beside it'
+# The heading is what makes it a section instead of prose, so its absence is the defect rather than a
+# cosmetic difference -- without it the text is a bare paragraph again wherever it is put.
+Assert-True ((Get-BranchFileWording).IntentHeading -ne '') 'the wording map carries a heading for it -- an empty one would put a bare paragraph back'
+# AND NOTHING IS WRITTEN WHEN NOTHING WAS ASKED FOR. A heading standing over an empty section is the thing
+# the August 23 decision retired, so it must not come back for every branch.
+$noIntentDoc = ((Format-DevelopmentCycle -Branch 'feat/no-intent-v1' -Id '20260826-000000') -join "`n")
+Assert-True (-not ($noIntentDoc -match [regex]::Escape((Get-BranchFileWording).IntentHeading))) 'without -Intent the heading does not appear at all -- it is not a section every branch has to answer'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red

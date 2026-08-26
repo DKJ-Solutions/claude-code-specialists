@@ -309,6 +309,30 @@ try {
     ) + $shapeEntry)
     $r = Invoke-Gate -Dir $shapeReal -Branch 'feat/thing'
     Assert-True ($r.Code -eq 0) 'shape/#915: the preamble the scaffolder actually writes passes the gate that reads it'
+
+    # 10. #925 -- THE SCAFFOLDED DOCUMENT WITH -Intent. Scenario 8 feeds this gate what the formatter writes
+    #     and passes, but it calls Format-DevelopmentCycle WITHOUT that parameter -- and -Intent was the one
+    #     input that put a non-blockquote line in the preamble. So the scaffolder wrote a document this gate
+    #     rejected, on every parked branch and every lane, and the only way through was to move by hand what
+    #     the script had just written. Not a subtle failure: the whole scenario is one extra argument.
+    #
+    #     THE WHOLE DOCUMENT COMES FROM THE FORMATTER HERE, phases included, unlike scenario 8 where the
+    #     phases are written out. The subject is where one section lands relative to another, and a fixture
+    #     that hand-writes the phases cannot see that: the intent has to be placed by the same code that
+    #     places what it must sit under.
+    $intentText = 'Skeleton + routing done; next: wire the API client.'
+    $intentDoc = @(Format-DevelopmentCycle -Branch 'feat/thing' -Id '20260826-000000' `
+        -Intent $intentText -Description 'The thing now does the thing.' -Type 'Feat' `
+        -Body 'The thing now does the thing.' `
+        -ImpactRows @([pscustomobject]@{ Tier = 0; Score = 2; Why = 'Maintainers notice it.' }))
+    # Checked on the DOCUMENT and not on the gate's output: a green run prints no line from the file, so an
+    # assert against $r.Out would only ever hold while the gate was failing -- which is the shape of a
+    # fixture check that quietly stops checking the moment the bug is fixed.
+    Assert-True (@($intentDoc | Where-Object { $_ -eq $intentText }).Count -eq 1) 'shape/#925: (the fixture really carries the intent, so the pass below is not a pass on an absent one)'
+    $shapeIntent = New-SourceRepoFixture -Label 'shape-intent'
+    Set-Entry -Dir $shapeIntent -Lines $intentDoc
+    $r = Invoke-Gate -Dir $shapeIntent -Branch 'feat/thing'
+    Assert-True ($r.Code -eq 0) 'shape/#925: a document scaffolded WITH -Intent passes -- the intent is inside a phase, not above the first one'
 }
 finally {
     foreach ($d in $script:trees) {

@@ -4223,9 +4223,25 @@ $script:BranchFileDefaults = [ordered]@{
     # the list is one that can disagree with the list. Removed rather than left pointing at nothing, so a
     # consumer who overrode it gets a script-contract failure instead of a silently ignored setting.
     #
-    # WHAT IT WAS ALSO USED FOR IS PARKING, and that keeps working: new-branch -Park passed its status text
-    # here as -Intent. The intent now goes where a reader of a parked branch actually looks -- see
-    # Format-DevelopmentCycle, which writes it under the phase the first step lives in.
+    # WHAT IT WAS ALSO USED FOR IS PARKING, and that keeps working -- but as IntentHeading below, one level
+    # deeper and inside a phase, rather than as a section of the document's own. The distinction is the whole
+    # of #925: the old key named a top-level section, which is why removing it left the intent with nowhere
+    # to go but the preamble.
+    #
+    # THE INTENT'S HEADING (#925, August 26, 2026), and it is a sub-section of the FIRST phase rather than a
+    # section of the document. It came back because the alternative was worse in a way nothing had noticed:
+    # with no heading the intent was written as a bare paragraph above the first phase, which is exactly the
+    # region the preamble rule refuses -- so new-branch -Intent, park-branch and worktree-lane -Intent each
+    # produced a document the branch-entry gate rejected, and the only way through was to move by hand what
+    # the script had just written. Both halves of that collision were deliberate: the paragraph placement
+    # (Dave, August 23) and the preamble rule (Dave, August 26), decided three days apart without each other
+    # in view. Dave settled it on August 26 the way the document's OWN guidance already read -- "a note about
+    # THIS branch belongs under one of the four, normally as a '####' in PLAN".
+    #
+    # SO THE 'unticked box already says where you left off' ARGUMENT IS UNTOUCHED. What it retired was a
+    # heading asking every branch to restate its step list; this one appears only when -Intent is given, and
+    # holds the thing the step list genuinely cannot: what you decided and have not written down yet.
+    IntentHeading  = 'Where I left off'
     FirstStep      = 'TODO: the first step of this branch'
     # THE PHASES OF THE STEP LIST (Dave, August 14, 2026; issue #655). A branch moves through a
     # recognisable arc instead of an ad-hoc list. They are the file's own H2 sections since August 19,
@@ -4843,11 +4859,19 @@ function Format-DevelopmentCycle {
         step, and placeholder text where the two stamps go. Everything a reader would have opened the
         template for is in the file already sitting on their trunk.
 
-        -Intent IS THE PARKING NOTE, and it is a paragraph at the top rather than a section of its own. The
-        'Where I left off' heading went with the merge (Dave: an unticked box already says where you left
-        off), and he is right about the ordinary case -- but a parked branch has something the step list
-        genuinely cannot hold, which is what you decided and have not written down anywhere yet. So it keeps
-        its place and loses its heading.
+        -Intent IS THE PARKING NOTE, and it is a '####' section of the FIRST phase -- not a paragraph above
+        the phases, which is where it sat until #925 (August 26, 2026). A parked branch has something the
+        step list genuinely cannot hold, which is what you decided and have not written down anywhere yet,
+        so it keeps a place of its own; the 'unticked box already says where you left off' argument (Dave,
+        August 23) retired a heading every branch had to answer, and this one appears only when -Intent is
+        given.
+
+        WHY THE PLACE CHANGED, because it was not a preference. A bare paragraph between the guidance block
+        and the first phase is exactly what the preamble rule refuses, so the scaffolder was writing a
+        document the branch-entry gate rejected -- and the guidance it wrote three lines above the paragraph
+        already said where the paragraph belonged: "a note about THIS branch belongs under one of the four,
+        normally as a '####' in PLAN". Two deliberate decisions three days apart, neither aware of the other;
+        Dave settled it on August 26 in favour of the guidance.
     #>
     param(
         [AllowEmptyString()][string]$Branch = '',
@@ -4904,9 +4928,19 @@ function Format-DevelopmentCycle {
     foreach ($line in @($stepsBlock | Where-Object { $null -ne $_ })) { $lines.Add([string]$line) }
     $lines.Add('')
 
+    # THE INTENT USED TO BE ADDED HERE, and here is the one place it must not go (#925, August 26, 2026).
+    # A bare paragraph between the guidance block and the first phase is precisely what the preamble rule
+    # refuses -- so every document new-branch -Intent, park-branch and worktree-lane -Intent wrote was
+    # rejected by the branch-entry gate, and the only way through was to move by hand what the script had
+    # just written. It goes into the FIRST phase now, under a heading of its own; the block is built below,
+    # where the phases are.
+    $intentLines = @()
     if ($Intent) {
-        foreach ($line in ($Intent -split '\r?\n')) { $lines.Add($line) }
-        $lines.Add('')
+        # Composed with .Add on a List rather than in a ',' array literal, deliberately: in an array literal
+        # ',' binds tighter than '+', which is how a bare '###' reached this very guidance block (#915).
+        if ($w.IntentHeading) { $intentLines += (($script:BranchCycleSubHashes) + ' ' + $w.IntentHeading) }
+        $intentLines += ''
+        foreach ($line in ($Intent -split '\r?\n')) { $intentLines += $line }
     }
 
     # THE SCAFFOLDED STEP STAYS IN THE FILE A BRANCH ACTUALLY GETS (Dave, August 6, 2026). Without it a fresh
@@ -4923,6 +4957,18 @@ function Format-DevelopmentCycle {
             if ((-not $onTrunk) -and $phase -eq $w.FirstStepPhase) {
                 $phaseBody = @((Get-BranchProgressMarks).Open + $w.FirstStep)
             }
+            # THE INTENT GOES UNDER THE FIRST PHASE, AFTER ANY STEP THAT PHASE OWNS. After, because a '####'
+            # heading claims everything below it: a step written under the intent's heading would read as a
+            # step OF the intent rather than of the phase. With the default arc the two never meet -- the
+            # first phase is PLAN and the scaffolded step lives in CREATE -- but a consumer whose
+            # FirstStepPhase IS their first phase gets a document that still nests correctly.
+            #
+            # The FIRST phase and not FirstStepPhase, which is the guidance block's own answer: "a note about
+            # THIS branch belongs under one of the four, normally as a '####' in PLAN". An intent is direction
+            # rather than a step, so it belongs where the plan is.
+            if ($intentLines.Count -gt 0 -and $phase -eq $phases[0]) {
+                $phaseBody = @($phaseBody) + $intentLines
+            }
             $phaseGuidance = @()
             if ($w.StepPhaseGuidance -and $w.StepPhaseGuidance.Contains($phase)) {
                 $phaseGuidance = @($w.StepPhaseGuidance[$phase])
@@ -4932,8 +4978,17 @@ function Format-DevelopmentCycle {
     } elseif (-not $onTrunk) {
         # No phases configured (a consumer switched them off through the seam): the pre-#655 shape, which is
         # still exactly what the gate expects -- a bare open step under the file's own heading.
+        #
+        # THE INTENT KEEPS ITS HEADING HERE TOO, even though there is no phase to sit under. Without a phase
+        # heading the intent would be a bare paragraph again, and its heading is what makes the block a
+        # section rather than prose. Note that this whole shape has a preamble problem the intent did not
+        # cause and does not fix: the DEPLOY heading is the first section-level heading in it, so the bare
+        # step above it is itself read as preamble content. That predates #925 and is a consumer-configured
+        # shape nobody here runs -- named rather than quietly relied upon.
         $lines.Add((Get-BranchProgressMarks).Open + $w.FirstStep)
         $lines.Add('')
+        foreach ($line in $intentLines) { $lines.Add($line) }
+        if ($intentLines.Count -gt 0) { $lines.Add('') }
     }
 
     # AND THE FOURTH PHASE, WRITTEN BY THE FORMATTER THAT OWNS WHAT GOES IN IT. Its heading carries the
