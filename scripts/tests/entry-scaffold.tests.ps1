@@ -1934,6 +1934,62 @@ $phaseHashes = '#' * (Get-BranchCycleSectionLevel)
 Assert-True (((Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260826-000000') -join "`n") -match ('FOUR `' + $phaseHashes + '` HEADINGS')) 'and the level composed from the knob reaches the document on one line, not orphaned onto its own'
 
 Write-Host ""
+Write-Host "Remove-EntryAudienceGuidance -- a no-tier repo drops the audience PARAGRAPH, not one line of it (#928)" -ForegroundColor Cyan
+# THE SEAM LINE OPENS A SENTENCE THE LINES BELOW IT FINISH. The call site used to filter '$_ -notmatch {0}',
+# which is right about the seam and wrong about the sentence: in a repo with no Get-ReleaseAudienceTier the
+# two continuation lines stayed, so every branch document carried a paragraph beginning mid-sentence and
+# referring to "that reader" after the clause naming that reader had been dropped. Not reachable here --
+# scripts/repo-config.ps1 states tier 2 -- so it reached consumers only and nothing in this repo caught it.
+#
+# THE PARAGRAPH IS COMPUTED FROM THE WORDING, NOT TYPED. Pinning the prose would make this assert go red on
+# every legitimate edit of the guidance and be raised rather than read; deriving it means the assert follows
+# the wording wherever it goes, and still fails the moment a continuation line survives the drop.
+$sg = @((Get-BranchFileWording).StepsGuidance | ForEach-Object { [string]$_ })
+$seamIdx = 0..($sg.Count - 1) | Where-Object { $sg[$_] -match '\{0\}' } | Select-Object -First 1
+Assert-True ($null -ne $seamIdx) 'the guidance still carries the audience seam this case is about'
+
+$isSep = { param([string]$l) ([string]($l -replace '^\s*>', '')).Trim() -eq '' }
+$pStart = $seamIdx; while ($pStart -gt 0 -and -not (& $isSep $sg[$pStart - 1])) { $pStart-- }
+$pEnd = $seamIdx; while ($pEnd -lt ($sg.Count - 1) -and -not (& $isSep $sg[$pEnd + 1])) { $pEnd++ }
+Assert-True ($pEnd -gt $pStart) 'and that seam opens a MULTI-line paragraph -- the whole reason this case exists'
+
+$dropped = @($sg[$pStart..$pEnd])
+$kept = @(Remove-EntryAudienceGuidance -Lines $sg)
+foreach ($line in $dropped) {
+    Assert-True (-not ($kept -contains $line)) "the whole paragraph goes: '$($line.Substring(0, [Math]::Min(52, $line.Length)))...'"
+}
+# AND ONLY THE PARAGRAPH GOES. The paragraphs fencing it must survive, or a fix for a dangling sentence has
+# quietly eaten the guidance around it.
+if ($pStart -gt 1) { Assert-True ($kept -contains $sg[$pStart - 2]) 'the paragraph above it survives' }
+if ($pEnd -lt ($sg.Count - 2)) { Assert-True ($kept -contains $sg[$pEnd + 2]) 'and the paragraph below it survives' }
+Assert-Equal ($sg.Count - $dropped.Count - 1) $kept.Count 'exactly the paragraph plus ONE fencing separator is removed'
+$doubled = @(0..($kept.Count - 2) | Where-Object { (& $isSep $kept[$_]) -and (& $isSep $kept[$_ + 1]) })
+Assert-Equal 0 $doubled.Count 'and no doubled separator is left where the paragraph stood'
+
+# A BLOCK CARRYING NO SEAM COMES BACK UNTOUCHED, which is what makes this safe over a consumer override: a
+# repo that replaced the wording with its own prose gets exactly its own prose back.
+$ownProse = @('> own prose', '>', '> a second paragraph')
+Assert-Equal ($ownProse -join '~') ((@(Remove-EntryAudienceGuidance -Lines $ownProse)) -join '~') 'a block with no seam is returned as it came'
+Assert-Equal 0 (@(Remove-EntryAudienceGuidance -Lines @())).Count 'and an empty block is not an error'
+
+# THE DOCUMENT A NO-TIER CONSUMER IS ACTUALLY HANDED, which is the half that reaches a reader. The seam is
+# unstated at this point in the suite -- Get-ReleaseAudienceTier was removed above -- so this renders the
+# real fallback rather than a simulated one.
+Assert-Equal $null (Get-EntryAudienceTier) 'the no-tier case is the one being rendered here'
+$noTierDoc = (Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260826-000000') -join "`n"
+Assert-True ($noTierDoc -notmatch '\{0\}') 'no dangling placeholder reaches the document'
+foreach ($line in $dropped) {
+    $needle = [regex]::Escape(($line -replace '^\s*>\s*', '').Trim())
+    Assert-True ($noTierDoc -notmatch $needle) 'and no line of the audience paragraph reaches it either'
+}
+
+# THE TIER-STATED PATH IS UNCHANGED, so the repair cannot be mistaken for "drop it always".
+function Get-ReleaseAudienceTier { 2 }
+$tierDoc = (Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260826-000000') -join "`n"
+Assert-True ($tierDoc -match 'For tier 2 audiences') 'a repo that STATES a tier still gets the sentence'
+Assert-True ($tierDoc -match [regex]::Escape(($sg[$pEnd] -replace '^\s*>\s*', '').Trim())) 'and the lines finishing that sentence come with it'
+Remove-Item function:Get-ReleaseAudienceTier
+Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
     exit 1
