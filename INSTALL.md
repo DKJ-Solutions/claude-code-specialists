@@ -1146,11 +1146,11 @@ When an update adds a **new skill**, restart your Claude Code session before you
 skill file from an updated plugin version. So a slash command that did not exist in the previous
 release stays absent until you restart — `claude plugin update`'s own `Restart to apply changes.` is
 literally true here. Don't trust the skill counter those two commands print as evidence either way:
-it excludes any skill with `disable-model-invocation: true`. **14 of the 19 skills across the six
-shipped plugins** carry that flag — `cut-release`, `fold-changelog`, `open-pr` and `ship-pr` among
-them, all four of them `contributing-davekjohn`'s rather than `team-alpha`'s — so an unchanged count, or
-even `0 skills`, proves nothing about whether a new skill has actually landed. The only reliable check
-is the slash list itself.
+it excludes any skill with `disable-model-invocation: true`, and **skills from the team plugins and the
+workflow plugin alike carry that flag** — `team-alpha`'s `specialists-init`, `specialists-teardown` and
+`sync-roster`, and `cut-release`, `fold-changelog`, `open-pr` and `ship-pr` from
+`contributing-davekjohn`. So an unchanged count, or even `0 skills`, proves nothing about whether a new
+skill has actually landed. The only reliable check is the slash list itself.
 
 ### Getting out again
 
