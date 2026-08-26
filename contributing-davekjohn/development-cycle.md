@@ -90,4 +90,4 @@ receives this heading, in this release or any other.
 
 #### Pull Request
 
-Change title to 'Contributing as DaveKJohn'
+the contributing layer's page is titled Contributing as DaveKJohn
