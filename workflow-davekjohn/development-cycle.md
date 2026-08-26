@@ -71,24 +71,64 @@ August 26, 2026 and both answers are the option the analysis recommended:
 
 ## CREATE
 
-- [ ] Dot-source `seam-lib.ps1` in `check-branch-entry.ps1` for `Test-IsWorkflowSourceRepo`
-- [ ] #898: refuse a fifth `##` in the source repo, naming the extra heading and its line, and saying to demote it
-- [ ] #899: refuse a non-blank, non-`>` line between the H1 and the first `##`, naming the line -- in every repo
-- [ ] Rewrite the heading-blindness sentence in `plugins/workflows/workflow-davekjohn/DEVELOPMENT-portable.md`, and regenerate the mirror if the source half moves
+- [x] Dot-source `seam-lib.ps1` in `check-branch-entry.ps1` for `Test-IsWorkflowSourceRepo`
+- [x] #898: refuse a fifth `##` in the source repo, naming the extra heading and its line, and saying to demote it
+- [x] #899: refuse a non-blank, non-`>` line between the H1 and the first `##`, naming the line -- in every repo
+- [x] Rewrite the heading-blindness sentence in `plugins/workflows/workflow-davekjohn/DEVELOPMENT-portable.md`, and regenerate the mirror if the source half moves -- the sentence is now split by scope, since only one of the two rules holds in a consumer. `build-shared-scripts.ps1` updated the gate's mirror; the page is plugin-carried and needed no regeneration
+- [x] Both checks are fence-aware, reusing `Split-DevelopmentCycle`'s own rule rather than a second parser
 
 ## TEST
 
-- [ ] Scenarios in `scripts/tests/branch-entry-gate.tests.ps1`: four headings (pass), five (error), five in a CONSUMER fixture (pass -- the scoping is the point), a `##` inside a fence (pass), guidance-only preamble (pass), a plain paragraph in the preamble (error), a translated blockquote preamble (pass)
-- [ ] Each check RED before its fix and green after, verified in that order
-- [ ] `check-plugin-integrity.ps1` green and the full suite green, the same set CI runs
+- [x] Scenarios in `scripts/tests/branch-entry-gate.tests.ps1`: four headings (pass), five (error), five in a CONSUMER fixture (pass -- the scoping is the point), a `##` inside a fence (pass), guidance-only preamble (pass), a plain paragraph in the preamble (error), a translated blockquote preamble (pass)
+- [x] Each check RED before its fix and green after, verified in that order -- 5 red, then 25 of 25 green
+- [x] **A red scenario caught a real defect in the first draft**, which is why the assert names the heading rather than counting: reporting "everything past the fourth" named `## DEPLOY` as the extra the moment the stray sat ABOVE `## PLAN` -- which is exactly where both measured instances sat. The phases are now read from `Get-BranchFileWording`, the source the scaffolder writes them from
+- [x] `check-plugin-integrity.ps1` green (0 findings) and `check-script-contract.ps1` clean
+- [x] The full suite green (`scripts/tests/*.tests.ps1`), the same set CI runs -- 53 suites, 0 failing, 502s
 
 ## DEPLOY: `feat/the-cycle-document-has-a-shape-gate-v1`
 
-**Score:**
+`check-branch-entry.ps1` now reads the SHAPE of `development-cycle.md`, not only its step marks. Two rules
+that were enforced by Dave reading the file, on a document a session writes, with nothing in between:
+
+- **Four `##` headings, never a fifth** ([#898](https://github.com/DaveKJohn/claude-code-specialists/issues/898)).
+  Anything else is a `###` under one of the four.
+- **Nothing but guidance above the first `##`** ([#899](https://github.com/DaveKJohn/claude-code-specialists/issues/899)).
+  That region is identical in every branch document in every repo.
+
+Both were broken on the same document within one afternoon, and #899's had been broken by **two sessions
+in a row in the same position** -- which is what makes it a shape the document invites rather than a slip.
+The harm is worth naming, because "wrong place" understates it: the stray paragraph sat flush under the
+guidance with no heading between them, so it *read* as guidance. A reader who finds one branch's status
+inside a generic block learns to distrust the whole block, including the rules that do apply everywhere.
+
+**The two rules are scoped differently, and that asymmetry is the design.** The heading count runs only in
+the repo that maintains this workflow, behind `Test-IsWorkflowSourceRepo`: heading-blindness is a stated
+feature of this gate precisely so a repo that adopted the document may keep headings of its own, and a
+check refusing those would refuse correct files elsewhere. The preamble rule holds everywhere, because it
+reads the shape and not the text -- guidance is blockquoted whatever language it has been translated into,
+so it survives the case a byte comparison against the scaffolder could not (inbound #562 is the consumer
+who translated that block).
+
+Neither check re-derives where the entry begins: both read `Split-DevelopmentCycle`, the one splitter three
+readers already share, and both are fence-aware, because a document explaining this format quotes its own
+headings.
+
+**One correction the tests forced, kept here because it is the useful part.** The first draft reported
+"every heading past the fourth" -- which named `## DEPLOY` as the extra the moment the stray sat *above*
+`## PLAN`, which is exactly where both measured instances sat. A count cannot say which heading does not
+belong. The phases are now read by name from `Get-BranchFileWording`, the same source the scaffolder writes
+them from, so a repo that renames a phase is judged by its own names.
+
+**Score:** 3
 
 ### What makes this deploy extra special
 
-**Score:**
+N/A. One of the two rules reaches a consumer -- the preamble check, which refuses only content that would
+misread as generic guidance in their own document -- and the heading rule deliberately does not. The
+portable page states which is which, so an adopter can see the boundary rather than infer it. Nothing they
+have written today starts failing.
+
+**Score:** N/A
 
 ### Pull Request
 

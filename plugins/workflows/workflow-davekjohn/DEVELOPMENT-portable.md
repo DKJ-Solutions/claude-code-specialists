@@ -97,10 +97,27 @@ stand.
 
 The document is scaffolded with **PLAN**, **CREATE** and **TEST** as headings, and **DEPLOY** is the fourth
 phase — written by the formatter that owns what goes in it, because that section *is* the changelog entry.
-So a branch moves through a recognisable arc instead of an ad-hoc list. The gate reads step marks only, so a
-heading of any level is invisible to it and the arc is drawn on top of the mechanism without touching it.
+So a branch moves through a recognisable arc instead of an ad-hoc list. **Four `##` headings, never a
+fifth**: anything else you need is a `###` under one of them. The step half of the gate still reads step
+marks only, so a heading of any level is invisible *to that half* and the arc stays drawn on top of the
+mechanism rather than inside it.
 **A phase with nothing under it is not a finding**: a branch that had nothing to test says so by leaving
 that heading bare, exactly as a branch with no step list at all is permitted.
+
+**Two shape rules, and only one of them is checked in your repo.** `check-branch-entry.ps1` refuses a
+document whose region between the H1 and the first `##` carries anything but the guidance block — that
+one holds **everywhere**, because it reads the shape rather than the text: guidance is blockquoted
+whatever language it has been translated into, so a `>`-less paragraph there is this branch's own content
+sitting where every branch document is identical. The **heading count** is refused only in the repo that
+maintains this workflow, deliberately: heading-blindness is what lets a repo that adopted this document
+keep headings of its own, and a check that refused those would refuse correct files. Both rules were added
+in the source repo on August 26, 2026 after the same document broke each of them within one afternoon —
+issues [#898](https://github.com/DaveKJohn/claude-code-specialists/issues/898) and
+[#899](https://github.com/DaveKJohn/claude-code-specialists/issues/899). The preamble one had been broken
+by two sessions in a row, in the same position, which is what makes it a shape the document invites rather
+than a slip. **Why that one is not tidiness:** the stray paragraph sat flush under the guidance with no
+heading between them, so it *read* as guidance — and a reader who finds one branch's status inside a
+generic block learns to distrust the whole block, including the rules that do apply everywhere.
 
 **But an empty phase is a statement, and on a branch whose work *was* judgement that statement is
 false.** Verifying a report, choosing between two designs, establishing that a claim still holds —
