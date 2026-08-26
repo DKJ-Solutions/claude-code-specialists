@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/change-contributing-title-v1` · 20260826-170138
+
+The one page in `contributing-davekjohn/` opens under a new H1 -- **`Contributing as DaveKJohn`**, where it
+read **`Contributing -- the contributing-davekjohn layer`**. The old heading described where the file SITS:
+a layer over the two root documents. That is true, and it is the answer to a question a reader arrives with
+only once they already know the page exists. The new one names the subject instead -- this is how work is
+contributed in DaveKJohn's repos -- which is what the folder, the plugin and the page have each been about
+since the folder's two pages merged into one on August 26, 2026
+([#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)). The layering itself is not lost:
+the page states it in its own opening paragraph, where it is prose a reader meets in context rather than a
+heading standing in for a title.
+
+**Nothing links to the old anchor**, checked across every `.md`, `.ps1` and `.json` in the tree, so the
+rename strands no reference and needs no follow-up edit anywhere -- which is what makes a heading safe to
+change at all in a repo whose lint gate scans for dead links.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+This page is the repo's own adopted copy, not plugin payload: the shipped document is
+`plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md`, and it is untouched. No consumer
+receives this heading, in this release or any other.
+
+**Score:** N/A
+
+#### Pull Request
+
+the contributing layer's page is titled Contributing as DaveKJohn
+
+[PR #933](https://github.com/DaveKJohn/claude-code-specialists/pull/933)
+
+---
+
 ### DEPLOY: `fix/intent-placement-in-the-skill-page-v1` · 20260826-163806
 
 The `new-branch` skill page and the DevOps lens now name where `-Intent` actually writes: the opening
