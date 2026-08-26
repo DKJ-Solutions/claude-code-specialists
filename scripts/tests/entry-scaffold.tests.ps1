@@ -1490,6 +1490,66 @@ Remove-Item -Path Function:\Get-BranchFileWordingOverrides
 # override would make every later assert read a document no repo produces.
 Assert-Equal $defaultReset ((Format-DevelopmentCycle -Branch '') -join "`n") 'teardown: the default reset is restored once the seam function is gone'
 
+# --- A BLANK-ONLY LIST OVERRIDE IS EMPTY TOO (#927) -----------------------------------------------
+# THE MEASURED DEFECT, and it is the fail-safe above asking the wrong question rather than a rule that was
+# missing. An empty array is falsy, so a consumer who EMPTIES StepPhases keeps the three defaults -- which
+# is why the state #927 reported, 'a consumer who empties the seam', turns out not to be reachable through
+# the seam at all. A list of BLANKS is: two empty strings make a two-element array, which is TRUTHY, so it
+# was honoured here and emptied AFTERWARDS, downstream, where every reader of a list filters blanks out.
+# Format-DevelopmentCycle was then left with no phase heading to write the scaffolded step under, wrote it
+# bare, and that lands it in the preamble region check-branch-entry.ps1's #899 check refuses -- so such a
+# repo's EVERY branch was blocked, with no way through but deleting the step the scaffolder wrote.
+Write-Host ""
+Write-Host "a blank-only list override is empty too (#927)" -ForegroundColor Cyan
+$defaultArc = @((Get-BranchFileWording).StepPhases)
+function Get-BranchFileWordingOverrides { return @{ StepPhases = @('', '') } }
+$blankArc = @((Get-BranchFileWording).StepPhases | Where-Object { $_ })
+Assert-Equal ($defaultArc -join '|') ($blankArc -join '|') 'blank-only StepPhases: ignored, so the default arc stands -- as an empty one already was'
+# AND THE DOCUMENT IS THE ASSERT THAT MATTERS, because the seam is only the first of the two halves. #899
+# reads the SHAPE, so this reads the shape too: nothing but guidance above the first phase heading. Written
+# with -Intent, since a parked branch is where a dropped note would cost the most.
+$blankDoc = (Format-DevelopmentCycle -Branch 'feat/blank-arc-v1' -Intent 'parked mid-flight.') -join "`n"
+Remove-Item -Path Function:\Get-BranchFileWordingOverrides
+$arcTitleRx = '^#{1,' + (Get-BranchCycleHeadingLevel) + '}\s'
+$arcPhaseRx = '^#{' + (Get-BranchCycleSectionLevel) + '}\s+\S'
+$arcFence   = $false
+$arcSeen    = $false
+$arcStrays  = 0
+foreach ($arcLine in @($blankDoc -split "`n")) {
+    if ($arcLine -match '^\s{0,3}(?:`{3,}|~{3,})') { $arcFence = -not $arcFence; continue }
+    if ($arcFence) { continue }
+    if ($arcLine -match $arcPhaseRx) { $arcSeen = $true; continue }
+    if ($arcLine -match $arcTitleRx) { continue }
+    if ((-not $arcSeen) -and $arcLine.Trim() -ne '' -and $arcLine -notmatch '^\s*>') { $arcStrays++ }
+}
+Assert-Equal 0 $arcStrays 'and nothing but guidance stands above the first phase heading -- the shape #899 reads'
+Assert-True ($blankDoc.Contains((Get-BranchProgressMarks).Open)) 'the scaffolded step is still written, under a phase rather than dropped'
+Assert-True ($blankDoc.Contains('parked mid-flight.')) 'and so is the parking intent, which is the one thing in this file nobody can reconstruct'
+# THE FALLBACK TAKES THE STEP'S PHASE WITH IT, and this is the assert for the hole that a half-fallback
+# would open: an arc from the defaults with FirstStepPhase still on a consumer's own name matches nothing,
+# and the step disappears without a word. A silent document is worse than a refused one.
+function Get-BranchFileWordingOverrides { return @{ StepPhases = @('', ''); FirstStepPhase = 'BOUWEN' } }
+$orphanDoc = (Format-DevelopmentCycle -Branch 'feat/orphan-step-v1') -join "`n"
+Remove-Item -Path Function:\Get-BranchFileWordingOverrides
+Assert-True ($orphanDoc.Contains((Get-BranchProgressMarks).Open)) 'a FirstStepPhase naming no surviving phase still gets its step, under the default the arc fell back to'
+# THE SAME HOLE WITHOUT #927 ANYWHERE NEAR IT, which is what makes it a defect of its own rather than a
+# consequence: the arc is the untouched default and only this key is wrong. Before the membership anchor the
+# step was dropped here too, and nothing said so.
+function Get-BranchFileWordingOverrides { return @{ FirstStepPhase = 'CRAETE' } }
+$typoDoc = (Format-DevelopmentCycle -Branch 'feat/typo-phase-v1') -join "`n"
+Remove-Item -Path Function:\Get-BranchFileWordingOverrides
+Assert-True ($typoDoc.Contains((Get-BranchProgressMarks).Open)) 'a mistyped FirstStepPhase against the default arc still gets its step'
+# A REAL OVERRIDE IS UNTOUCHED BY ALL OF THIS, which is the seam's whole purpose and the thing a fail-safe
+# is most likely to break on its way past.
+function Get-BranchFileWordingOverrides { return @{ StepPhases = @('ONTWERP', 'BOUW', 'TEST'); FirstStepPhase = 'BOUW' } }
+$dutchArc = (Format-DevelopmentCycle -Branch 'feat/dutch-arc-v1') -join "`n"
+Remove-Item -Path Function:\Get-BranchFileWordingOverrides
+foreach ($dutchPhase in @('ONTWERP', 'BOUW', 'TEST')) {
+    Assert-True ($dutchArc -match "(?m)^#{$(Get-BranchCycleSectionLevel)}\s+$dutchPhase\s*$") "a renamed arc still writes its own '$dutchPhase' heading"
+}
+Assert-True ($dutchArc -notmatch '(?m)^#+\s+PLAN\s*$') 'and none of the English defaults leaks in beside them'
+Assert-Equal $defaultReset ((Format-DevelopmentCycle -Branch '') -join "`n") 'teardown: the default reset is restored once the seam functions are gone'
+
 Write-Host ""
 Write-Host "Remove-EntryAdminSections" -ForegroundColor Cyan
 # THE DEFECT THESE GUARD is not a missing stripper but a stripper aimed one level up: the heading rewrite

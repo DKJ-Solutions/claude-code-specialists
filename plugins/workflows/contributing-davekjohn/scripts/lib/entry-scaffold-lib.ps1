@@ -1290,6 +1290,10 @@ function Get-EntrySignificanceWording {
                 } elseif ($override.PSObject.Properties[$key]) {
                     $v = $override.PSObject.Properties[$key].Value
                 } else { continue }
+                # THE SAME LIST RULE AS Get-BranchFileWording'S, and live here for the same reason: Route0 and
+                # Route1 are lists, so a blank-only override would pass the test below and put empty lines into
+                # the Significance section. The reasoning is written out once, at that seam (#927).
+                if (($v -is [Array]) -and @($v | Where-Object { $_ }).Count -eq 0) { continue }
                 if ($v) { $out[$key] = $v }
             }
         }
@@ -4617,6 +4621,23 @@ function Get-BranchFileWording {
                     # silently, which would read as "override absent" for every key a consumer set.
                     $v = $overrides.PSObject.Properties[$key].Value
                 } else { continue }
+                # AND A LIST OVERRIDE THAT LEAVES NOTHING USABLE BEHIND IS IGNORED TOO (#927, August 26,
+                # 2026). The test below measures the CONTAINER, and for every scalar here that is the right
+                # question: an empty string is falsy, so a consumer who empties a key keeps the default, and
+                # that is the whole point of the fail-safe. An empty ARRAY is falsy too, which is why the
+                # state #927 reported -- a consumer emptying this seam -- is not reachable through it at all.
+                # A list of BLANKS is a third object, and the one that got through -- two
+                # empty strings make a two-element array, which is TRUTHY -- so it passed the test and was
+                # emptied AFTERWARDS, downstream, where every reader of a list here filters the blanks out.
+                #
+                # StepPhases is the key that showed what that cost. Format-DevelopmentCycle was left with no
+                # phase heading to write the scaffolded step under, wrote it bare, and the step landed in the
+                # region check-branch-entry.ps1's #899 check calls the preamble -- so that consumer's EVERY
+                # branch was refused, with no way through but deleting the step the scaffolder had just
+                # written for them. The two sides of the seam disagreed about one word: this one asked whether
+                # anything was THERE, the readers asked whether anything was USABLE. It asks the readers'
+                # question now, so 'empty' means the same thing on both sides of it.
+                if (($v -is [Array]) -and @($v | Where-Object { $_ }).Count -eq 0) { continue }
                 if ($v) { $out[$key] = $v }
             }
         }
@@ -4946,38 +4967,56 @@ function Format-DevelopmentCycle {
     # the ordinary branch while leaving that case alone. The TRUNK copy carries none, for the reason the
     # template carried none: it is read as an example, and an example whose first line is somebody else's
     # TODO gets copied in.
+
+    # THE ARC CANNOT BE EMPTIED, AND THIS IS THE OTHER HALF OF THAT (#927, August 26, 2026). The branch
+    # retired from here wrote the scaffolded step with NO heading above it whenever the phase list came
+    # back empty -- the pre-#655 shape -- and that put the step in the region check-branch-entry.ps1's
+    # #899 check calls the preamble. Every branch in such a repo was refused with no way through but
+    # deleting the step this function had just written. Get-BranchFileWording now ignores an override that
+    # leaves no usable phase behind, so the seam cannot reach that state at all; this fallback covers the
+    # caller who replaced the getter outright, which is how the case was measured.
+    #
+    # ZERO PHASES IS A BROKEN SETTING, NOT A CONFIGURATION, so it gets the answer the seam gives one layer
+    # up: keep the default. The arc is not decoration -- it is the shape the gate reads and the fold folds --
+    # so a document without it is refused wherever it goes. Writing the default three is visibly wrong in a
+    # repo that renamed them, and visible is the point; writing nothing would silently DROP a parked
+    # branch's intent, which is the one thing in this file nobody can reconstruct afterwards.
+    #
+    # AND THE STEP IS ANCHORED ON MEMBERSHIP, NOT ON A NAME, which is a defect of its own that predates
+    # #927 and was found by its test. FirstStepPhase used to be compared straight against each phase, so a
+    # value naming no phase in the arc -- a typo, a rename that moved one and not the other, or the arc
+    # falling back to the defaults while this key kept a consumer's own word -- matched nothing and the
+    # scaffolded step was DROPPED. Silently: the document is well-formed, every gate is green, and the
+    # branch simply arrives with no plan in it. That is the worse failure of the two this block guards
+    # against, because a refused document tells you what to fix.
     $phases = @($w.StepPhases | Where-Object { $_ })
-    if ($phases.Count -gt 0) {
-        foreach ($phase in $phases) {
-            $phaseBody = @()
-            if ((-not $onTrunk) -and $phase -eq $w.FirstStepPhase) {
-                $phaseBody = @((Get-BranchProgressMarks).Open + $w.FirstStep)
-            }
-            # The parking note LEADS the first phase. The blank line between it and a step is needed only
-            # where both land in the same phase -- they do not by default, since FirstStepPhase is CREATE,
-            # but a consumer may point both at one and a note glued to a checkbox reads as its label.
-            if ($intentLines.Count -gt 0 -and $phase -eq $phases[0]) {
-                $lead = if ($phaseBody.Count -gt 0) { @($intentLines) + @('') } else { @($intentLines) }
-                $phaseBody = @($lead) + @($phaseBody)
-            }
-            $phaseGuidance = @()
-            if ($w.StepPhaseGuidance -and $w.StepPhaseGuidance.Contains($phase)) {
-                $phaseGuidance = @($w.StepPhaseGuidance[$phase])
-            }
-            Add-BranchProgressSection -Lines $lines -Heading $phase -Guidance $phaseGuidance -Body $phaseBody
+    if ($phases.Count -eq 0) { $phases = @($script:BranchFileDefaults.StepPhases | Where-Object { $_ }) }
+    $firstStepPhase = $w.FirstStepPhase
+    if ($phases -notcontains $firstStepPhase) {
+        # The default name where the arc carries it, and otherwise the arc's OWN first phase -- never a
+        # heading this document does not have. A consumer who renamed the arc and forgot this key gets their
+        # step in their own first phase, which is where a reader of a fresh branch looks anyway.
+        $firstStepPhase = if ($phases -contains $script:BranchFileDefaults.FirstStepPhase) {
+            $script:BranchFileDefaults.FirstStepPhase
+        } else { $phases[0] }
+    }
+    foreach ($phase in $phases) {
+        $phaseBody = @()
+        if ((-not $onTrunk) -and $phase -eq $firstStepPhase) {
+            $phaseBody = @((Get-BranchProgressMarks).Open + $w.FirstStep)
         }
-    } elseif (-not $onTrunk) {
-        # No phases configured (a consumer switched them off through the seam): the pre-#655 shape -- a bare
-        # open step under the file's own heading, with the parking note above it.
-        #
-        # THIS SHAPE HAS NO PHASE HEADING FOR EITHER OF THEM TO SIT UNDER, so both the note and the step land
-        # in the region #899 calls the preamble. That is a property of the seam rather than of -Intent: the
-        # bare step has stood there since #655 and trips the same check. Nothing is invented here to work
-        # around it -- the note is placed exactly where the step already is.
-        foreach ($line in $intentLines) { $lines.Add($line) }
-        if ($intentLines.Count -gt 0) { $lines.Add('') }
-        $lines.Add((Get-BranchProgressMarks).Open + $w.FirstStep)
-        $lines.Add('')
+        # The parking note LEADS the first phase. The blank line between it and a step is needed only
+        # where both land in the same phase -- they do not by default, since FirstStepPhase is CREATE,
+        # but a consumer may point both at one and a note glued to a checkbox reads as its label.
+        if ($intentLines.Count -gt 0 -and $phase -eq $phases[0]) {
+            $lead = if ($phaseBody.Count -gt 0) { @($intentLines) + @('') } else { @($intentLines) }
+            $phaseBody = @($lead) + @($phaseBody)
+        }
+        $phaseGuidance = @()
+        if ($w.StepPhaseGuidance -and $w.StepPhaseGuidance.Contains($phase)) {
+            $phaseGuidance = @($w.StepPhaseGuidance[$phase])
+        }
+        Add-BranchProgressSection -Lines $lines -Heading $phase -Guidance $phaseGuidance -Body $phaseBody
     }
 
     # AND THE FOURTH PHASE, WRITTEN BY THE FORMATTER THAT OWNS WHAT GOES IN IT. Its heading carries the
