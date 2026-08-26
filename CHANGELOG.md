@@ -32,6 +32,59 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/blank-phase-override-empties-the-arc-v1` · 20260826-192047
+
+Two seams in `scripts/lib/entry-scaffold-lib.ps1` now agree with their readers about what *empty* means. A
+wording override that is a list of blanks used to pass the merge's truthiness test and be emptied
+afterwards, downstream, where every reader filters blanks out. For `StepPhases` that left
+`Format-DevelopmentCycle` with no phase heading to write the scaffolded step under, so it wrote the step
+bare -- into the region `check-branch-entry.ps1`'s `#899` check refuses, which blocked every branch in such
+a repo with no way through but deleting the step the scaffolder had just written
+([#927](https://github.com/DaveKJohn/claude-code-specialists/issues/927)). The same rule now guards
+`Get-EntrySignificanceWording`, whose `Route0` and `Route1` are lists as well.
+
+**#927's own premise did not survive the measurement it asked for, and the fix follows the measurement.**
+It reported the state as "a consumer who empties the seam"; emptying a key is exactly what the fail-safe
+already ignores, so that consumer does not exist. Neither of the two directions the issue proposed --
+tolerating the phase-less shape in `#899`, or retiring the phase-less branch -- addresses the route that
+does reach it, and both would have left the identical hole standing one key over.
+
+**The phase-less branch is retired all the same**, for a different reason than the issue gave: zero phases
+is a broken setting rather than a configuration, and it now gets the answer the seam gives one layer up --
+keep the default. Writing the default arc is visibly wrong in a repo that renamed it, and visible is the
+point; writing nothing would silently drop a parked branch's `-Intent`, the one thing in that document
+nobody can reconstruct afterwards.
+
+**And the test wrote for it found a second defect that predates all of this**: `FirstStepPhase` was matched
+by name, so a typo or a rename that moved the arc and not the key dropped the scaffolded step in silence --
+a well-formed document, every gate green, and a branch arriving with no plan in it. The step is anchored on
+membership now: the default phase where the arc carries it, otherwise the arc's own first phase, never a
+heading the document does not have.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+This is plugin payload -- `entry-scaffold-lib.ps1` mirrors into
+`plugins/workflows/contributing-davekjohn/`, so both repairs reach every consumer of the workflow at the
+next release. **No registered consumer is in either broken state today**, checked across the five manifests
+in `connectors/`, which is what keeps this a 2 rather than higher. What it is worth is the failure it takes
+off the table for the consumer who translates the arc -- the seam's whole purpose -- and lands one key
+slightly wrong: today that is either every branch refused with no diagnosable cause, or a plan silently
+missing from the document a gate has just called fine.
+
+**Score:** 2
+
+#### Pull Request
+
+A blank-only StepPhases override empties the arc, and the scaffolded step lands where the gate refuses it
+
+Plugins: contributing-davekjohn
+
+[PR #940](https://github.com/DaveKJohn/claude-code-specialists/pull/940)
+
+---
+
 ### DEPLOY: `feat/branch-visible-on-origin-v1` · 20260826-185903
 
 A branch and its development cycle now reach `origin` **without anybody deciding to send them**
