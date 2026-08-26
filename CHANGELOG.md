@@ -32,6 +32,54 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/plugin-scoped-skill-span-v1` · 20260826-213106
+
+A plugin README that enumerates its own skills can now be machine-checked. Check 29 reads an opt-in
+`skills:plugin` span, resolves the plugin from the **document's own path** rather than from anything
+written in the marker, and counts a claim only where a link resolves to that plugin's
+`skills/<one>/SKILL.md`. Check 10 could serve neither half: its canonical set is the whole marketplace,
+so a span in one plugin's README reports every other plugin's skills as missing, and its *wrap tightly*
+rule -- every backtick inside the span is a claimed name -- is unmeetable in a two-column table whose
+second column is prose. The workflow plugin's table carries the first span, and the count that had
+drifted three times (nine/twelve, thirteen/fourteen, fourteen/sixteen) is now held by a gate rather than
+by *count when you add one*.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+**The check caught its own author twice, and the second catch was the valuable one.** The first run
+fired on this branch document, where the marker had been typed into the PLAN paragraph -- an unpaired
+BEGIN, refused loudly, exactly as check 10 refuses it. The second was worse and quieter: the same
+marker named in prose *above* the real span in the plugin README paired with that span's END, swallowed
+the real BEGIN in between, and reported **green**. Right verdict, wrong reason, nothing said so.
+
+That exposed an asymmetry both checks had carried from the start. A duplicate END pasted inside an open
+span was reported from day one; its mirror, a **nested BEGIN**, was never visited by the walk at all --
+it jumps from a span's opener straight past its END -- so the span simply paired across it. Repaired in
+both checks in this movement, not just in the new one, and pinned by a scenario each. Check 10's is
+born green across the whole scan set.
+
+**Nothing about the rule is generic, and that is deliberate.** Measured over all four plugins before
+proposing it: `contributing-davekjohn` ships 16 and lists 16; `team-alpha` ships 4 and lists 0;
+`team-shopify` ships 4 and lists 0; `team-ecomm` ships 0. A rule that simply required every plugin
+README to enumerate its skills would be born with 8 findings on two documents that never claimed to
+enumerate anything -- an exemption list on day one, which is the shape this repo has scar tissue from.
+An explicit sentinel fires on exactly the one table that means it, and a document with no span passes
+in silence.
+
+**Score:** 2
+
+#### Pull Request
+
+a plugin-scoped skill span, so a plugin README's own table is machine-checked
+
+Plugins: contributing-davekjohn
+
+[PR #946](https://github.com/DaveKJohn/claude-code-specialists/pull/946)
+
+---
+
 ### DEPLOY: `fix/audience-paragraph-drops-whole-v1` · 20260826-195936
 
 A repo that states no audience tier now has the whole audience paragraph dropped from its branch
