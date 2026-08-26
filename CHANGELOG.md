@@ -25,6 +25,43 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `fix/the-changelog-intro-names-the-current-folder-v1` · 20260826-114730
+
+`CHANGELOG.md`'s intro named `workflow-davekjohn/CONTRIBUTING.md` in the text of a link already pointing at
+`contributing-davekjohn/CONTRIBUTING.md`. One line, and the intro is the one part of that file which is live
+prose rather than history -- every release cut copies it through verbatim, so it would have shipped a dead
+path into the next release notes.
+
+**What it corrects is the reach of a rule, not a typo.** #905 renamed a folder that published notes link
+into, and followed the doctrine those notes carry: repoint targets, never rewrite prose. Applied across
+`CHANGELOG.md` that is right for the entries and wrong for the intro, which this repo separately documents
+as a live statement rather than a record. Measured after the fix: one instance in the live layers, now zero,
+and the two in history left as the testimony they are.
+
+**This entry is written in ASCII on purpose, and it is not a house style.** The DEPLOY lock refused to merge
+it while it carried em-dashes -- not because the section had changed, but because `ship-pr` reads the PR body
+through a non-UTF-8 decode, so a clean document was being compared against a mojibake body
+([#907](https://github.com/DaveKJohn/claude-code-specialists/issues/907), filed with the byte proof). The
+dashes were flattened to get one line of documentation merged, and the underlying defect is somebody's own
+branch rather than a convention anybody should copy.
+
+**Score:** 2
+
+### What makes this deploy extra special
+
+N/A -- the changelog intro is read by whoever opens this repo's changelog, not by a consumer of the plugins.
+A reader who clicked the link landed in the right place either way; only the label was wrong.
+
+**Score:** N/A
+
+### Pull Request
+
+Fix the changelog intro so its link text names the folder that exists
+
+[PR #906](https://github.com/DaveKJohn/claude-code-specialists/pull/906)
+
+---
+
 ## DEPLOY: `feat/rename-workflow-to-contributing-davekjohn-v1` · 20260826-111226
 
 `workflow-davekjohn` is now `contributing-davekjohn` -- the plugin, its directory, and its root folder in the
