@@ -32,6 +32,43 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/release-changelog-seam-rename-v1` · 20260826-224318
+
+The tier-0 release-notes seam is now `Get-ReleaseChangelogNotesRoot`, matching both the directory it
+points at (`contributing-davekjohn/releases/changelog/`) and the computed default behind it
+(`Get-DefaultReleaseChangelogNotesRoot`). #914 renamed the directory and deliberately left the seam,
+so the two halves of one mechanism disagreed by name inside `scripts/lib/seam-lib.ps1`, and the
+contract record's `Returns` text carried a sentence that existed only because the name was wrong.
+
+**Nothing in a consumer's repo has to change.** Both read sites -- `scripts/release/cut-release.ps1`
+and `scripts/release/new-internal-note.ps1` -- pass the current name and the retired one to
+`Get-SeamValue` in that order, which is what that parameter takes an array for. A repo that already
+defines `Get-ReleaseDevelopmentNotesRoot` keeps answering under it; a repo that defines both is
+answered by the current name, so a mid-migration config moves rather than staying. Both cases are
+asserted as behaviour rather than as text, and a negative run confirms the asserts fail without the
+fallback.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The rename it reverses was itself argued, and this reversal names the part of that argument that was
+wrong rather than quietly replacing it. The detail worth keeping is the scope discipline: the issue
+named a local variable while explicitly calling it correct, a rename of it was started anyway, and
+reading that sentence again is what stopped a twenty-site diff that would have repaired nothing.
+
+**Score:** 1
+
+#### Pull Request
+
+Rename the tier-0 notes seam to Get-ReleaseChangelogNotesRoot
+
+Plugins: contributing-davekjohn
+
+[PR #951](https://github.com/DaveKJohn/claude-code-specialists/pull/951)
+
+---
+
 ### DEPLOY: `fix/seam-lib-folder-name-v1` · 20260826-220447
 
 `scripts/lib/seam-lib.ps1` is the file whose entire job is composing the workflow folder's name, and four
