@@ -55,6 +55,11 @@ $PluginTreeSrc = Join-Path $RepoRoot 'scripts\lib\plugin-tree-lib.ps1'
 # Eighth, since check 24 (August 10, 2026): pr-body-lib.ps1 holds the recognised placeholder strings and
 # the reference PR template, both dot-sourced by the lint. Copied for the same reason as the seven above.
 $PrBodyLibSrc = Join-Path $RepoRoot 'scripts\lib\pr-body-lib.ps1'
+# Ninth, since check 28 (August 26, 2026): measure-context-lib.ps1 holds the '@'-import parser the lint
+# resolves import targets with. Copied for the same reason as the eight above -- a lib the fixture does
+# not carry does not make one check misbehave, it kills the script at the dot-source and every check
+# after it silently never runs.
+$MeasureContextSrc = Join-Path $RepoRoot 'scripts\lib\measure-context-lib.ps1'
 # Dot-sourced into the RUNNER as well as copied into the fixture: check 13b's scenarios build their
 # template files from Get-BranchTemplates, so the test and the check read the same definition. A fixture
 # written out by hand here would be the very second source of the format that check exists to prevent.
@@ -192,6 +197,7 @@ function New-IntegrityFixture {
     Copy-Item -Path $EntryScaffoldSrc -Destination (Join-Path $Fixture 'scripts\lib\entry-scaffold-lib.ps1') -Force
     Copy-Item -Path $PluginTreeSrc -Destination (Join-Path $Fixture 'scripts\lib\plugin-tree-lib.ps1') -Force
     Copy-Item -Path $PrBodyLibSrc -Destination (Join-Path $Fixture 'scripts\lib\pr-body-lib.ps1') -Force
+    Copy-Item -Path $MeasureContextSrc -Destination (Join-Path $Fixture 'scripts\lib\measure-context-lib.ps1') -Force
 
     # The reference PR template check 24 holds, written from the same function the check compares against
     # -- never typed out here, for the reason stated at the dot-source above.

@@ -25,6 +25,106 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `fix/the-guard-covers-every-entry-point-v1` · 20260826-102307
+
+`scripts/maintenance/measure-always-on.ps1` now carries the source-repo guard, and
+[`scripts/README.md`](scripts/README.md) states the rule instead of counting it.
+
+**The gap, and why nothing saw it.** The guard refuses a shared script that is running from a released
+copy inside the repo that maintains it -- the mechanism behind
+[#897](https://github.com/DaveKJohn/claude-code-specialists/issues/897)'s subject. `measure-always-on.ps1`
+joined the shared registry on August 25 without it, while `scripts/README.md` claimed every shared entry
+point but two carried it. Both named exceptions are sound: they are invoked from the plugin by a
+SessionStart hook, so refusing there would fail every session start here. This one is no hook -- its own
+skill page prints `${CLAUDE_PLUGIN_ROOT}/scripts/maintenance/measure-always-on.ps1` and then says to run
+the local copy instead, which is precisely what the guard exists to enforce rather than request.
+
+It was invisible because **the guard's suite tested whether the guard decides correctly and never whether
+it is called.** That half is now asserted off the registry, so the next entry point is held to the rule on
+the day it is registered rather than on the day somebody re-counts. Two supporting asserts keep the assert
+itself honest: the entry-point set must be non-empty, and an exemption must name a file that exists and is
+registered -- a licence cannot outlive what it excuses.
+
+**A stale measurement tool is the worst place for this gap**, which is why it is repaired rather than
+exempted. A stale copy of a measuring script does not fail; it reports. That file's own docstring is the
+record of what a plausible wrong number costs here: the chars-per-token factor was inherited unexamined
+through three hand measurements and was ~19% too generous, so every derived figure was under-stated while
+looking precise.
+
+**The page stops counting, and that is the durable half.** Its two tallies were both wrong, and re-typing
+them would have been wrong again twice over: the registry holds **43** pairs today and **42** the moment
+#886 removes `workflow-default`, because `check-report-lib` is deliberately registered to two other
+plugins as well. So the counts are gone -- the registry is named as the authority, and the entry-point
+claim is a rule with two named exceptions held by a test. Same resolution the root `CLAUDE.md` reached
+about counting a name inside the document that carries it.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+N/A. A consumer receives the mirrored `measure-always-on.ps1` with the guard in it, and the guard is a
+no-op for them by construction -- it refuses only where the repo being operated on holds its own copy of
+the running script, which a consumer never does. The README and the test are source-side. No consumer
+behaviour changes.
+
+**Score:** N/A
+
+### Pull Request
+
+every shared entry point carries the source-repo guard, and scripts/README.md stops counting
+
+Plugins: workflow-davekjohn
+
+[PR #902](https://github.com/DaveKJohn/claude-code-specialists/pull/902)
+
+---
+
+## DEPLOY: `feat/gate-validates-import-targets-v1` · 20260826-093433
+
+The lint gate now resolves every `@`-import target it can see, and refuses a dead one whose target is
+in the tree. Check 4 has validated `[text](target)` links since the beginning; an `@`-import is a
+different syntax and matched none of it, so no gate in this repo had ever resolved one --
+[issue #874](https://github.com/DaveKJohn/claude-code-specialists/issues/874).
+
+**Why this class is not just another dead link.** A dead link costs a reader one click. A dead import
+costs the **session the whole document**: Claude Code drops one it cannot resolve without erroring, so
+nothing fails and the instructions simply are not there. This repo's always-on path is assembled out of
+exactly three imports, and two of them are not repo-relative -- so the layer that vanishes is the one
+carrying the safety rules or the roster, and the only symptom is a session behaving as if it had never
+read them.
+
+Check 28 reuses the parser in `scripts/lib/measure-context-lib.ps1` rather than restating the three
+resolution rules, so the gate and `scripts/maintenance/measure-always-on.ps1` cannot drift on what an
+import means or where it resolves from. Two discriminators keep it honest, both measured before it was
+written: a fenced `@(...)` is PowerShell, and a target containing whitespace is prose -- seven and one of
+the twelve column-0 `@` lines in the tree respectively. A target outside the repo is counted and named,
+never refused, because a `~/`-relative import points into the plugin marketplace clone and CI is a
+machine without one.
+
+**Born green**, this repo's standing bar for a new check: 294 files scanned, 2 resolving in-tree imports,
+1 outside the repo, 1 line read as prose, 0 findings and 0 exemptions.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+N/A. The check itself lives in `scripts/lint/`, which is this repo's own gate and does not travel to a
+consumer. What does travel is the plugin mirror of `measure-always-on.ps1`, and only its wording changed
+there -- the sentence saying no gate covers this class was true when it was written and is not any more.
+No consumer behaviour changes.
+
+**Score:** N/A
+
+### Pull Request
+
+the lint gate validates every '@'-import target
+
+Plugins: workflow-davekjohn
+
+[PR #901](https://github.com/DaveKJohn/claude-code-specialists/pull/901)
+
+---
+
 ## DEPLOY: `fix/the-deploy-section-is-locked-at-the-pr-v1` · 20260825-234507
 
 The DEPLOY section is now **one text in all four places it lands** -- the branch's own

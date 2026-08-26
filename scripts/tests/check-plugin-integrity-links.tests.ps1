@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
-    check-plugin-integrity.ps1, part 1 of 4: check 4 (the dead-link scan set) and check 10 (the
-    marked <!-- skills:all --> spans), plus scenario 16 -- a root entry file is scanned before the fold.
+    check-plugin-integrity.ps1, part 1 of 4: check 4 (the dead-link scan set), check 10 (the
+    marked <!-- skills:all --> spans) and check 28 (the '@'-import targets), plus scenario 16 -- a root
+    entry file is scanned before the fold.
 
 .DESCRIPTION
     The fixture, the assert helpers and Invoke-Integrity live in check-plugin-integrity-fixture.ps1,
@@ -13,6 +14,11 @@
     and drops CONTRIBUTING.md, the connectors README or one of the four payload layers, that must fail
     loudly here. Check 10's fifteen scenarios cover the span mechanics, the fence masking in both
     directions, and the symmetric orphan-END sweep.
+
+    Check 28 is check 4's sibling -- the same scan set, a different syntax -- and its scenarios pin the
+    resolution rule (file-relative, NOT repo-root-relative) separately from both discriminators (a fenced
+    '@(...)' and a prose line), because each can fail invisibly in the others' direction. One assert
+    compares its coverage count against check 4's, so the two sets cannot silently drift apart.
 
     Test gap (honest, inherited from the single file): the anchor-slug logic and the full scan engine
     are not re-exercised here -- they are covered by the repo-wide lint smoke checks in
@@ -511,6 +517,101 @@ try {
     Remove-Item -LiteralPath $entryPath -Force
     $r17 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($r17.Out -match [regex]::Escape('fix-my-branch.md'))) 'scenario 16: after the fold removes it, the entry file is gone from the set without complaint'
+
+    # --- check 28: every '@'-import target resolves ----------------------------------------------------
+    # 18-24. THE SIBLING OF CHECK 4, AND IT BELONGS IN THIS FILE FOR THAT REASON: it reads the same
+    #        $linkFiles set and answers the same question about a different syntax. Issue #874.
+    #
+    #        What separates them is the COST OF BEING WRONG. A dead markdown link costs a reader one
+    #        click; a dead '@'-import costs the session the WHOLE document, and nothing errors -- Claude
+    #        Code drops an import it cannot resolve in silence, so the only symptom is a session behaving
+    #        as if it had never read the layer that vanished. In this repo that layer is the safety rules
+    #        or the roster.
+    #
+    #        The scenarios below pin the resolution rule and BOTH discriminators, because each of the
+    #        three can fail on its own and each failure is invisible in the other two's direction: a
+    #        check that resolved root-relative would pass every positive test in a root document and be
+    #        wrong everywhere else, and a check without the discriminators would be born accusing correct
+    #        files -- which is the shape this repo refuses on principle (see check 27's exemption note).
+    Write-Host "check 28: '@'-import targets resolve" -ForegroundColor Cyan
+    $impDir     = Join-Path $Fixture 'plugins\teams\team-alpha'
+    $impProbe   = Join-Path $impDir 'import-probe.md'
+    $impSibling = Join-Path $impDir 'import-sibling.md'
+    [System.IO.File]::WriteAllText($impSibling, "# The sibling`n`nA target that exists.`n", $Utf8NoBom)
+
+    # 18. A RESOLVING IMPORT IS SILENT, and the coverage line still reports a non-empty scan. Without the
+    #     second half a check that examined nothing at all would pass this scenario.
+    [System.IO.File]::WriteAllText($impProbe, "# The probe`n`n@import-sibling.md`n", $Utf8NoBom)
+    $im1 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($im1.Out -match '\[import\].*import-probe')) `
+        'import: a resolving import is not a finding'
+    Assert-True ($im1.Out -match '\[import\] checked [1-9]') `
+        'import: and the pass is not an empty scan'
+
+    # 19. THE RESOLUTION RULE ITSELF, which is the one thing a second implementation would get wrong:
+    #     an import resolves relative to the IMPORTING FILE's own directory, not to the repo root. The
+    #     fixture root holds a CONTRIBUTING.md; this probe sits three levels down and must NOT find it.
+    #     A root-relative reader passes scenario 18 and fails only here.
+    [System.IO.File]::WriteAllText($impProbe, "# The probe`n`n@CONTRIBUTING.md`n", $Utf8NoBom)
+    $im2 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($im2.Out -match '\[import\].*import-probe\.md:3') `
+        'import: a target that exists at the REPO ROOT but not beside the importing file is dead -- the rule is file-relative'
+    Assert-True ($im2.Code -ne 0) `
+        'import: and it fails the gate -- a dropped import costs the session the whole document'
+    Assert-True ($im2.Out -match 'importing file') `
+        'import: and the finding states the base it resolved from, so the repair needs no source reading'
+
+    # 20. A HOME-RELATIVE IMPORT IS COUNTED, NEVER REFUSED. SPECIALISTS.md imports the orchestrator's
+    #     persona from the plugin marketplace clone under '~/', and CI is a machine with no clone. An
+    #     error there would fail every PR for a correct file, so this assert is what keeps CI usable.
+    [System.IO.File]::WriteAllText($impProbe,
+        "# The probe`n`n@~/.claude/plugins/marketplaces/nothing-here/absent.md`n", $Utf8NoBom)
+    $im3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($im3.Out -match '\[import\].*import-probe')) `
+        'import: a target outside the repo is not a finding -- CI has no marketplace clone'
+    Assert-True ($im3.Out -match '1 outside the repo') `
+        'import: but it is counted and named, so "no findings" does not mean "nothing was seen"'
+
+    # 21. A FENCED '@(...)' IS POWERSHELL, NOT AN IMPORT. Seven of the twelve column-0 '@' lines in the
+    #     real tree are exactly this, and check 4 already argues the case for links: illustrating a thing
+    #     is not doing it.
+    # Built from single-quoted parts and joined, so the fence delimiters are literal backticks rather
+    # than an escape sequence three levels deep -- the readable form, and the one a later editor cannot
+    # miscount.
+    [System.IO.File]::WriteAllText($impProbe,
+        ((@('# The probe', '', '```powershell', '@(Get-ChildItem .).Count', '```', '')) -join "`n"), $Utf8NoBom)
+    $im4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($im4.Out -match '\[import\].*import-probe')) `
+        'import: a fenced PowerShell array expression is not an import'
+
+    # 22. PROSE THAT WRAPS ONTO AN '@' IS NOT AN IMPORT EITHER, and this is the discriminator that keeps
+    #     the check from being born with an exemption list. One line in the real tree needs it --
+    #     releases/development/1.x/1.16.0.md, a paragraph that wraps onto '@-imported here (...)' -- and
+    #     it sits in an archived note the language rule already exempts from repair. A target containing
+    #     WHITESPACE is prose; the lib's parser takes the rest of the line, which is right for the
+    #     always-on walk (it never meets prose) and wrong for a set that includes release history.
+    [System.IO.File]::WriteAllText($impProbe,
+        "# The probe`n`nA sentence that wraps onto`n@-imported here (which is prose, not a path).`n", $Utf8NoBom)
+    $im5 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($im5.Out -match '\[import\].*import-probe')) `
+        'import: a line beginning with @ whose target contains whitespace is prose, not an import'
+    Assert-True ($im5.Out -match 'read as prose') `
+        'import: and the coverage line says how many were read that way, so the discriminator is visible rather than silent'
+
+    # 23. THE SET IS CHECK 4'S SET, asserted on the count rather than on a name. If $linkFiles is ever
+    #     refactored and this check is left reading something narrower, the two numbers diverge and this
+    #     fails -- which is the same coverage guard the rest of this file exists for.
+    Assert-True ($im5.Out -match '\[import\] checked (\d+)') 'import: the coverage line reports a count'
+    $impCount  = [int]([regex]::Match($im5.Out, '\[import\] checked (\d+)').Groups[1].Value)
+    $linkCount = [int]([regex]::Match($im5.Out, '\[link-scan\] checked (\d+)').Groups[1].Value)
+    Assert-True ($impCount -eq $linkCount) `
+        'import: the scan set IS check 4 set -- a narrower one here would go unnoticed without this'
+
+    # 24. And the fixture is clean again once the probe is gone, so nothing above leaks into a later run.
+    Remove-Item -LiteralPath $impProbe -Force
+    Remove-Item -LiteralPath $impSibling -Force
+    Assert-True (-not ((Invoke-Integrity -FixtureRoot $Fixture).Out -match '\[import\] \.')) `
+        'import: the fixture is clean again once the probes are gone'
 
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

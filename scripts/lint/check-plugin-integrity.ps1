@@ -238,6 +238,14 @@ function Add-Error([string]$Msg) { $script:errors.Add($Msg) }
 # anything, which is how a consumer merged twelve PRs with no description.
 . (Join-Path $PSScriptRoot '..\lib\pr-body-lib.ps1')
 
+# measure-context-lib supplies the '@'-import parser check 28 resolves imports with: Get-ImportLinePath,
+# Resolve-ImportPath and Test-IsFenceLine. Reused rather than restated so the gate and
+# scripts/maintenance/measure-always-on.ps1 cannot drift on what an import means or where it resolves from
+# -- the three rules are subtle enough that two implementations would eventually disagree, and the one that
+# matters resolves relative to the IMPORTING FILE rather than to the repo root. It sets no strict mode of
+# its own, like every lib in that directory, so it cannot loosen this script's Set-StrictMode.
+. (Join-Path $PSScriptRoot '..\lib\measure-context-lib.ps1')
+
 # -SkipCheck, resolved once here so every wrapped block asks the same question. The list of skippable
 # names is written out rather than derived from the Write-Coverage calls: deriving it would accept any
 # category the file happens to mention, including one in a comment, and the whole point of validating is
@@ -2616,6 +2624,97 @@ Write-Coverage -Category 'script-ascii' -Checked $asciiScripts.Count `
         'no .ps1 found under scripts/ or in any plugin -- a literal non-ASCII character anywhere in the script layer could not have been seen'
     } else {
         "every .ps1 check 5 parses, held to the ASCII rule .claude/rules/language-layers.md states for the script layer. A literal non-ASCII character in a BOM-less .ps1 is decoded by Windows PowerShell 5.1 as two CP1252 characters, silently, and reaches whatever the script EMITS -- measured on a middot in entry-scaffold-lib.ps1 that came out wrong in every generated changelog template (August 19, 2026). A BOM is deliberately not a finding: on a .ps1 it is the fix, not the defect, and check 26 owns the files where one breaks something. Born green: 2 findings at introduction across all 158 tracked .ps1 files, both repaired rather than exempted, 0 exemptions"
+    })
+
+# --- 28. every '@'-import target resolves -----------------------------------------------------------------
+# THE CLASS CHECK 4 CANNOT SEE. The [link] check above validates '[text](target)' and nothing else, so an
+# '@'-import -- a different syntax entirely -- matches none of it. Reported as issue #874.
+#
+# WHY IT IS NOT JUST ANOTHER DEAD LINK. A dead markdown link costs a reader one click. A dead '@'-import
+# costs the SESSION THE WHOLE DOCUMENT, silently: Claude Code drops an import it cannot resolve, nothing
+# errors, and the instructions simply are not there. The failure is asymmetric in the worst direction,
+# because the always-on path of this repo is assembled entirely out of imports and the layer that would
+# vanish is the one carrying the safety rules or the roster. The only symptom is a session behaving as
+# if it had never read them.
+#
+# THE THREE RESOLUTION RULES ARE NOT RESTATED HERE. measure-context-lib.ps1 already implements and
+# documents them ('~/' -> user home, rooted -> as given, otherwise -> relative to the IMPORTING FILE's
+# own directory, which is not the repo root), and its suite pins them. This check reuses that parser,
+# so the gate and the measurement script cannot drift on what an import means. The issue proposed
+# restating the rules; reusing them is the same repair with one definition instead of two.
+#
+# TWO DISCRIMINATORS, BOTH MEASURED BEFORE THIS WAS WRITTEN. A '^@' sweep of every markdown file in the
+# tree returns 12 lines and only 3 are imports:
+#   - 7 are PowerShell '@(...)' expressions inside fenced blocks. Fences are tracked, exactly as check 4
+#     argues for links: illustrating a thing is not doing it.
+#   - 1 is PROSE -- releases/development/1.x/1.16.0.md, a paragraph that happens to wrap onto
+#     '@-imported here (this maintenance repo ...)'. Get-ImportLinePath takes the rest of the line as the
+#     path, which is right for the always-on walk (it never meets prose) and wrong for a scan set that
+#     includes archived release notes. A target containing WHITESPACE is therefore not an import here.
+#     That is a discriminator rather than an exemption list, deliberately: a check born needing one is
+#     the shape this repo has scar tissue from (see check 27).
+#
+# AN IMPORT OUTSIDE THE REPO IS COUNTED, NOT REFUSED. SPECIALISTS.md imports the orchestrator's persona
+# from the plugin MARKETPLACE CLONE under '~/', which legitimately does not exist on a machine without
+# that plugin installed. CI is such a machine, so erroring there would fail every PR for a correct file.
+# The coverage line names how many were seen instead.
+#
+# WHAT IS DELIBERATELY NOT BUILT, because it has not bitten. The mirror image of the prose rule: a
+# wrapped paragraph beginning '@' at column 0 INSIDE an always-on document would be read by Claude Code
+# as an import, and the document after it lost. No instance exists -- the only prose line in the tree
+# sits in an archived release note nothing loads -- and .claude/rules/language-layers.md's standing rule
+# is that a risk which has not bitten is written down rather than built against. This comment is that
+# writing-down.
+#
+# BORN GREEN: 3 imports on the always-on path, all three resolving, 0 findings at introduction.
+$importScanFiles = @($linkFiles)
+$importAnyLine = [regex]'(?m)^@'
+$importResolved = 0
+$importExternal = 0
+$importNotAPath = 0
+foreach ($lf in $importScanFiles) {
+    $importText = [System.IO.File]::ReadAllText($lf, [System.Text.Encoding]::UTF8)
+    # One regex pass per file decides whether the line walk is worth doing. Every other file in the scan
+    # set -- the overwhelming majority -- costs exactly that pass, which matters because this set is a few
+    # hundred documents and the gate runs on every PR and again inside its own fixture suites.
+    if (-not $importAnyLine.IsMatch($importText)) { continue }
+    $importRel = $lf.Replace($RepoRoot, '.')
+    $importInFence = $false
+    $importLineNo = 0
+    foreach ($importLine in [regex]::Split($importText, '\r?\n')) {
+        $importLineNo++
+        if (Test-IsFenceLine $importLine) { $importInFence = -not $importInFence; continue }
+        if ($importInFence) { continue }
+        $importTarget = Get-ImportLinePath -Line $importLine
+        if (-not $importTarget) { continue }
+        if ($importTarget -match '\s') { $importNotAPath++; continue }
+        # A target that cannot even be turned into a path is not one. Resolve-ImportPath goes through
+        # System.IO.Path, which throws on characters no filesystem accepts -- and a line carrying those
+        # is prose the whitespace rule happened not to catch, not an import somebody meant.
+        $importPath = $null
+        try { $importPath = Resolve-ImportPath -Target $importTarget -ImportingFile $lf } catch { $importPath = $null }
+        if (-not $importPath) { $importNotAPath++; continue }
+        if (-not $importPath.StartsWith($RepoRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $importExternal++
+            continue
+        }
+        if (-not (Test-Path -LiteralPath $importPath -PathType Leaf)) {
+            Add-Error ("[import] ${importRel}:${importLineNo} -> dead '@'-import '$importTarget'" +
+                " (expected file does not exist). An import resolves relative to the IMPORTING FILE's own" +
+                " directory unless it starts with '~/' or is rooted -- so from" +
+                " '$((Split-Path -Parent $lf).Replace($RepoRoot, '.'))', not from the repo root. Claude Code" +
+                " drops an import it cannot resolve WITHOUT ERRORING, so this costs the session the whole" +
+                " document rather than one link.")
+            continue
+        }
+        $importResolved++
+    }
+}
+Write-Coverage -Category 'import' -Checked $importScanFiles.Count `
+    -Note $(if ($importScanFiles.Count -eq 0) {
+        'the scan set is empty -- no dead @-import anywhere could be found, which is not the same as there being none'
+    } else {
+        "every file check 4 reads for links, read again for column-0 '@'-imports and resolved through measure-context-lib's own parser. Found $importResolved resolving in-tree import(s) and $importExternal outside the repo (not a finding: a '~/'-relative import points into the plugin marketplace clone, which CI does not have). $importNotAPath line(s) began with '@' and were read as prose rather than as a path. Fenced blocks are excluded, as in check 4. A dead import is not a dead link: Claude Code drops it silently and the session loses the WHOLE document"
     })
 
 # --- Report ---------------------------------------------------------------------------------------------

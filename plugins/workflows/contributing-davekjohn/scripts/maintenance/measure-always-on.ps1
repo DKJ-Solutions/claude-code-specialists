@@ -22,7 +22,9 @@
     SO IT IS NOT A GATE, AND MUST NOT BECOME ONE. It always exits 0. The two things it can find that ARE
     defects rather than measurements -- an import that does not resolve, and sections that fail to sum to
     their file -- are printed loudly and adjudicated by nobody here. The verdict on a dead import belongs
-    to the lint gate, which does not yet cover the class (issue #874); the sum check is an assertion about
+    to the lint gate, and since check 28 it has one -- for a target IN THE TREE (issue #874). A target in
+    the marketplace clone stays outside that gate's reach, because CI is a machine with no clone, so this
+    script remains the only place such an import is reported at all. The sum check is an assertion about
     this script's own arithmetic, and it failing means the report is wrong, not the repo.
 
     THE ONE DISTINCTION THE OUTPUT MUST CARRY. Bytes are a MEASUREMENT. Tokens are an ESTIMATE at a
@@ -84,6 +86,25 @@ if (-not $RepoRoot) {
 }
 if (-not $RepoRoot) { throw 'Not inside a git repository, and -RepoRoot was not given.' }
 $RepoRoot = [System.IO.Path]::GetFullPath($RepoRoot.Trim())
+
+# THE SOURCE-REPO GUARD: refuses this script when it is a released copy running in the repo that
+# maintains it. Guarded dot-source, so a tree without the lib behaves as before.
+#
+# ADDED LATE, AND THE REASON IS WORTH KEEPING (August 26, 2026, issue #897). This script joined the
+# shared registry on August 25 without the guard, and scripts/README.md meanwhile claimed every shared
+# entry point but two carried it -- both of those SessionStart hooks, exempt because a refusal there
+# would fail every session start. This one is no hook: its skill page prints
+# '${CLAUDE_PLUGIN_ROOT}/scripts/maintenance/measure-always-on.ps1' and then says to run the local copy
+# instead, which is exactly the situation the guard exists to enforce rather than to request. Nothing
+# detected the omission because the guard's suite tested whether the guard DECIDES correctly and never
+# whether it is CALLED; it now asserts coverage off the registry.
+#
+# It matters most here, of all scripts. A stale copy of a MEASUREMENT tool does not fail -- it reports,
+# and this file's own docstring is a record of what a plausible wrong number costs: the chars-per-token
+# factor was inherited unexamined through three hand measurements and was ~19% too generous, so every
+# derived figure was under-stated while looking precise.
+$guardLib = Join-Path $PSScriptRoot '..\lib\source-repo-guard-lib.ps1'
+if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCopy -ScriptPath $PSCommandPath }
 
 # $PSScriptRoot-relative, NOT $RepoRoot-relative, and that is the whole difference between a script
 # that travels and one that does not. The lib is mirrored beside this script into the plugin; the
@@ -183,8 +204,10 @@ if ($missing.Count -gt 0) {
         Write-Host ("    '{0}' imported by {1}" -f $d.Target, (($d.ImportedBy.Replace($RepoRoot, '.')) -replace '\\', '/')) -ForegroundColor Red
         Write-Host ("      resolved to: {0}" -f ($d.Path -replace '\\', '/')) -ForegroundColor DarkGray
     }
-    Write-Host '    A dead @-import costs the session the WHOLE document, and nothing errors. No gate' -ForegroundColor DarkGray
-    Write-Host '    covers this class yet (issue #874); this script reports it and adjudicates nothing.' -ForegroundColor DarkGray
+    Write-Host '    A dead @-import costs the session the WHOLE document, and nothing errors. The lint' -ForegroundColor DarkGray
+    Write-Host '    gate refuses one whose target is IN THE TREE (check 28, issue #874). A target in the' -ForegroundColor DarkGray
+    Write-Host '    marketplace clone is outside its reach -- CI has no clone -- so for that one this line' -ForegroundColor DarkGray
+    Write-Host '    is the only report there is. Either way this script adjudicates nothing.' -ForegroundColor DarkGray
     Write-Host ''
 }
 

@@ -20,7 +20,16 @@ infrastructure.
   scans for dead links (in `README.md`, `CHANGELOG.md`, the manuals, `SKILL.md`s, and `releases/**`),
   checks that every `scripts/**/*.ps1` parses without errors (catching syntax errors in the
   orchestration that would only break at runtime), and guards (check 7) that every shared-block
-  region in an agent def still equals its source in `agent-shared/`. **Checks 9 and 17 were retired on
+  region in an agent def still equals its source in `agent-shared/`. **Check 28 reads that same
+  scan set a second time for `@`-imports** (August 26, 2026, issue #874), because an import is a
+  different syntax and the link scan matched none of it. It is worth separating from its sibling by
+  what being wrong costs: a dead link costs a reader one click, a dead import costs the session **the
+  whole document** — Claude Code drops one it cannot resolve without erroring, and this repo's
+  always-on path is assembled entirely out of three of them, so the layer that vanishes is the one
+  carrying the safety rules or the roster. It reuses `measure-context-lib.ps1`'s parser rather than
+  restating the three resolution rules, so the gate and `measure-always-on.ps1` cannot drift on what an
+  import means; a target outside the repo is counted, never refused, because a `~/`-relative import
+  points into the marketplace clone and CI is a machine without one. **Checks 9 and 17 were retired on
   August 8, 2026** with the documents they guarded — the per-plugin `RELEASE.md` card and
   `CHANGELOG.md`. Both were the right repair for a real defect (a version stated twice, and a
   write-once intro that drifted), and both dissolved rather than being weakened: with the second copy
