@@ -87,6 +87,25 @@ if (-not $RepoRoot) {
 if (-not $RepoRoot) { throw 'Not inside a git repository, and -RepoRoot was not given.' }
 $RepoRoot = [System.IO.Path]::GetFullPath($RepoRoot.Trim())
 
+# THE SOURCE-REPO GUARD: refuses this script when it is a released copy running in the repo that
+# maintains it. Guarded dot-source, so a tree without the lib behaves as before.
+#
+# ADDED LATE, AND THE REASON IS WORTH KEEPING (August 26, 2026, issue #897). This script joined the
+# shared registry on August 25 without the guard, and scripts/README.md meanwhile claimed every shared
+# entry point but two carried it -- both of those SessionStart hooks, exempt because a refusal there
+# would fail every session start. This one is no hook: its skill page prints
+# '${CLAUDE_PLUGIN_ROOT}/scripts/maintenance/measure-always-on.ps1' and then says to run the local copy
+# instead, which is exactly the situation the guard exists to enforce rather than to request. Nothing
+# detected the omission because the guard's suite tested whether the guard DECIDES correctly and never
+# whether it is CALLED; it now asserts coverage off the registry.
+#
+# It matters most here, of all scripts. A stale copy of a MEASUREMENT tool does not fail -- it reports,
+# and this file's own docstring is a record of what a plausible wrong number costs: the chars-per-token
+# factor was inherited unexamined through three hand measurements and was ~19% too generous, so every
+# derived figure was under-stated while looking precise.
+$guardLib = Join-Path $PSScriptRoot '..\lib\source-repo-guard-lib.ps1'
+if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCopy -ScriptPath $PSCommandPath }
+
 # $PSScriptRoot-relative, NOT $RepoRoot-relative, and that is the whole difference between a script
 # that travels and one that does not. The lib is mirrored beside this script into the plugin; the
 # repo being MEASURED is a consumer's, which has no scripts/lib of its own.
