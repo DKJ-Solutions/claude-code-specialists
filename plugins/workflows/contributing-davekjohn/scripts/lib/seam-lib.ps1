@@ -2,8 +2,10 @@
 .SYNOPSIS
     Get-SeamValue: read an optional repo-config seam function, falling back to a default when the repo
     does not define it. Get-Default*: the computed defaults for the changelog and release-note-root seams
-    (issue #885) -- source keeps its root files, consumer is isolated inside workflow-davekjohn/ by
-    default.
+    (issue #885) -- source keeps its root files, consumer is isolated inside the workflow's own root
+    folder by default. That folder is NAMED by Get-WorkflowFolderName below and never written out here:
+    it renamed once already (#886), and a docstring that states the answer instead of the function goes
+    stale the next time it does.
 
 .DESCRIPTION
     ONE DEFINITION, WHERE THERE WERE TWO PLUS THREE INLINE PROBES (issue #885, group A). cut-release.ps1
@@ -46,8 +48,9 @@ function Get-DefaultChangelogPath {
         publishes plugins (the same one-file test Get-ReleasePluginTier's fallback and
         adopt-workflow-folder.ps1's source refusal already use -- a repo with a
         .claude-plugin/marketplace.json is the workflow's SOURCE, not a consumer, and keeps its root
-        file), workflow-davekjohn/CHANGELOG.md otherwise -- so every consumer is isolated by default and
-        the Get-ChangelogPath seam exists only for the repo that wants to differ from that.
+        file), '<workflow folder>/CHANGELOG.md' otherwise, the folder name coming from
+        Get-WorkflowFolderName -- so every consumer is isolated by default and the Get-ChangelogPath seam
+        exists only for the repo that wants to differ from that.
     #>
     param([Parameter(Mandatory)][string]$RepoRoot)
     if (Test-Path -LiteralPath (Join-Path $RepoRoot '.claude-plugin\marketplace.json') -PathType Leaf) {
@@ -102,10 +105,10 @@ function Get-DefaultReleaseHistoryPath {
         The release-history seam's computed default (issue #885, group E), REVERSING the August 19, 2026
         answer rather than silently replacing it -- see script-contract-lib.ps1's Get-ReleaseHistoryPath
         record for why that premise no longer holds. 'releases/README.md' for the source (unchanged: it
-        still keeps its root file, same as Get-DefaultChangelogPath), 'workflow-davekjohn/releases/history.md'
-        for a consumer.
+        still keeps its root file, same as Get-DefaultChangelogPath), '<workflow folder>/releases/history.md'
+        for a consumer -- the folder name from Get-WorkflowFolderName, exactly as above.
 
-        history.md, NOT README.md: 'workflow-davekjohn/releases/README.md' already names this folder's
+        history.md, NOT README.md: that same folder's 'releases/README.md' already names its
         seam-ANSWERS page (adopt-workflow-folder.ps1's own scaffold target). The list and the answers are
         two different documents that happen to share a filename in the source repo only because they sit at
         different directory levels there; folded into one directory they need different names.
