@@ -280,7 +280,7 @@ The constitution above, concretely implemented here:
   first three are escapable by not using the scripts; it re-uses their functions rather than restating the
   convention, and it reports the significance instead of refusing on it. Their mechanics, escape valves and
   the measurements behind them are in
-  [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md), under its OPEN PR step -- each gate
+  [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md), under its PULL REQUEST step -- each gate
   sits at the point where it fires rather than in a list of its own.
 - **Three deliberate exceptions to "never directly on `main`", each one bounded.** Together they are
   one procedure read end to end — **fold the changelog, bump the version, write the release notes** —
@@ -321,8 +321,8 @@ The constitution above, concretely implemented here:
   intact**: widening was refused then and the bounds are written out now for exactly the same reason.
   What changed is the judgement about which size is right, not the rule about stating it. How the
   three actually run and the measurements behind each are in
-  [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) -- the fold under its OPEN PR
-  step, the release commit and the notes commit under CUT RELEASE --
+  [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) -- the fold under its PULL
+  REQUEST step, the release commit and the notes commit under CUT RELEASE --
   and in [the release lens](.claude/specialists/lenses/05-06-extension.md#versioning--releases).
 - **This repo is `public`.** A deliberate choice, so the remote `github` marketplace source can be
   read without gh auth. Consequence: **nothing confidential** belongs here — no personal

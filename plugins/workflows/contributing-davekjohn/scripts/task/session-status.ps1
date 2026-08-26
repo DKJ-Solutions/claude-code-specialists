@@ -350,11 +350,33 @@ if (-not (Test-Path -LiteralPath $changelog -PathType Leaf)) {
     # the discriminator for it is the score label underneath -- neither is visible one line at a time,
     # and neither is fence-aware. An entry that QUOTES a tier heading inside a code fence -- the entries
     # documenting this format do -- is now read as what it is rather than as what it describes.
+    # THE LEVEL COMES FROM THE LIBRARY WHERE THERE IS ONE, and this line was a literal '^##' until
+    # August 26, 2026. Two things went wrong at once when both level pairs shifted one deeper, and only one of
+    # them was loud: an entry at H3 stopped being counted at all, so this block reported "none pending" on a
+    # changelog holding eight -- and '## [Unreleased]', which is NOT an entry but sits at exactly the level
+    # this pattern used to want, would have been printed as one. A status line that names a section heading as
+    # a pending change is worse than one that says nothing.
+    #
+    # THE FALLBACK SPANS BOTH LEVELS, because it is the one branch that cannot ask. Without the reader this
+    # script has no way to know which pair the document in front of it was written under, and the two failure
+    # directions are not equal: too narrow reports "none pending" on a changelog full of entries, too wide
+    # reports one extra line. So it accepts either, and pays for that with the literal pending-heading test
+    # below -- the label is a seam, but its default is known, and guessing it is strictly better than counting
+    # a section heading as a change.
+    $entryRx = if ($script:HaveEntryReader -and (Get-Command Get-EntryHeadingPattern -ErrorAction SilentlyContinue)) {
+        (Get-EntryHeadingPattern) + '(?<h>.+)$'
+    } else { '^#{2,3}\s+(?<h>.+)$' }
+    # The pending section's own heading, so it is skipped rather than counted.
+    $pendRx = if ($script:HaveEntryReader -and (Get-Command Get-ChangelogUnreleasedPattern -ErrorAction SilentlyContinue)) {
+        Get-ChangelogUnreleasedPattern
+    } else { '^#{2,3}\s+\[Unreleased\]\s*$' }
+
     $entries = 0
     $heading = $null
     $body    = New-Object 'System.Collections.Generic.List[string]'
     foreach ($line in (Get-Content -LiteralPath $changelog -Encoding UTF8)) {
-        if ($line -match '^##\s+(?<h>.+)$') {
+        if ($pendRx -and ($line -match $pendRx)) { continue }
+        if ($line -match $entryRx) {
             if ($null -ne $heading) { Write-EntryTiers -EntryText ($body -join "`n") -NotApplicable $naLabel }
             $entries++
             $heading = $Matches['h']

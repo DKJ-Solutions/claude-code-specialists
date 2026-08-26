@@ -44,6 +44,10 @@ $CutRelease = Join-Path $RepoRoot 'scripts\release\cut-release.ps1'
 # the exact pitfall that broke cutting v1.12.0 (#107), which is why this lib exists; a suite about
 # cut-release re-learning it by hand would be the wrong lesson.
 . (Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1')
+# The entry format's levels, so the fixture below states the shape the cut actually reads rather than a copy
+# of it. Loaded here because this suite drives the cut as a child process and had no need for the lib until
+# the levels became something a fixture must not hardcode.
+. (Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1')
 $FixtureDir = Join-Path ([System.IO.Path]::GetTempPath()) "cut-release-drive-$PID"
 
 $script:pass = 0
@@ -143,12 +147,21 @@ function New-CutFixture {
 "@
     }
 
+    # THE LEVELS COME FROM THE LIB, not from literals in the here-strings below (August 26, 2026). Both
+    # pairs shifted one deeper and a pending section joined them, so a fixture stating the old shape is a
+    # document the cut now correctly REFUSES to read -- which is how seventeen assertions here went red
+    # against untouched machinery.
+    $cutEntryH = '#' * (Get-EntryHeadingLevel)
+    $cutSectH  = '#' * (Get-EntrySectionLevel)
+    $cutTierH  = '#' * (Get-EntryTierSubLevel)
+    $cutPendH  = Get-ChangelogUnreleasedHeading
+
     # CHANGELOG: an intro, then one pending entry scored at tier 0 so a patch is what it earns -- plus a
     # higher tier's section where the caller asked for one, which is what lets a minor be earned AND gives
     # the audience section something real to be pre-filled from.
     $topTierSection = if ($EntryTopTier -gt 0) { @"
 
-#### Tier $EntryTopTier
+$cutTierH Tier $EntryTopTier
 
 The reader this repo publishes to notices it.
 
@@ -159,36 +172,36 @@ The reader this repo publishes to notices it.
 
 Everything merged since the last release, furthest reach first.
 
----
+$cutPendH
 
-## ``fix/a-fixture-change`` changelog
+$cutEntryH ``fix/a-fixture-change`` changelog
 
-### Branch title
+$cutSectH Branch title
 
 A fixture change
 
-### Branch ID
+$cutSectH Branch ID
 
 20260815-000000
 
-### Branch type
+$cutSectH Branch type
 
 fix
 
-### What does the change on this branch bring to main?
+$cutSectH What does the change on this branch bring to main?
 
 A fixture entry, written so this suite has something real to fold.
 
-### Significance
+$cutSectH Significance
 
-#### Tier 0
+$cutTierH Tier 0
 
 The maintainers notice it.
 
 **Score:** 2
 $topTierSection
 
-### Pull Request
+$cutSectH Pull Request
 
 https://github.com/DaveKJohn/claude-code-specialists/pull/1
 "@

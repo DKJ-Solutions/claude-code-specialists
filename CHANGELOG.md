@@ -1,9 +1,13 @@
 # Changelog
 
-Everything merged since the last release, **newest first**: **one `##` per change**, and under it two
-named `###` sections. The `##` heading is the change's own — `` DEPLOY: `<branch>` `` and the moment it
+Everything merged since the last release sits under **`## [Unreleased]`**, **newest first**: **one `###` per
+change**, and under it two named `####` sections. The `###` heading is the change's own —
+`` DEPLOY: `<branch>` `` and the moment it
 landed — and the text directly beneath it answers what a reader arrives with: what the change deploys to
-`main`. Then `### What makes this deploy extra special` for the second audience, and `### Pull Request`.
+`main`. Then `#### What makes this deploy extra special` for the second audience, and `#### Pull Request`.
+Every level here moved one deeper on August 26, 2026, when the pending section above them was introduced and
+the development cycle beside them shifted to match; entries written before that day carry the whole set one
+level shallower and are read exactly as they always were.
 The tier numbers live in the parser rather than in any heading. That second heading said `PR` rather than
 `deploy` for one day, August 24 to 25, 2026, and `change` for the four days before that; every wording it
 has ever carried is still read, so an entry below written under any of them is parsed exactly as it always
@@ -15,8 +19,9 @@ every earlier shape is read exactly as it always was. Every release ever cut is 
 release was worth. How the mechanism works (entry files, the Significance sections, folding) is described in
 [`workflow-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md).
 
-Each change declares its own **reach**, and per audience how much it **weighs** there — one `#### Tier N`
-sub-section per tier, each closing with its score. This list does not order on it: it is a record of what
+Each change declares its own **reach**, and per audience how much it **weighs** there — one `##### Tier N`
+sub-section per tier where a repo writes them numbered, each closing with its score; here the audience tier
+carries a named heading beside the others instead. This list does not order on it: it is a record of what
 landed, so it reads in the order things landed. What the declaration decides is what the **release
 documents** lead with — they rank themselves on it — and what may be released at all, because **the bump
 follows the highest tier pending**: **tier 0 only earns a patch**, **tier 1 or higher earns a minor**, and
@@ -25,7 +30,9 @@ a release with nobody to announce it to.
 
 ---
 
-## DEPLOY: `feat/rename-workflow-to-contributing-davekjohn-v1` · 20260826-111226
+## [Unreleased]
+
+### DEPLOY: `feat/rename-workflow-to-contributing-davekjohn-v1` · 20260826-111226
 
 `workflow-davekjohn` is now `contributing-davekjohn` -- the plugin, its directory, and its root folder in the
 repo -- and `workflow-default` is gone along with the "exactly one workflow" guard that only existed because
@@ -58,7 +65,7 @@ measurement and did not.
 
 **Score:** 5
 
-### What makes this deploy extra special
+#### What makes this deploy extra special
 
 **Every consumer of this marketplace has to act, and nothing will tell them so.** Their
 `.claude/settings.json` names `workflow-davekjohn@claude-code-specialists`, which resolves to nothing at their
@@ -79,7 +86,7 @@ is zero.
 
 **Score:** 4
 
-### Pull Request
+#### Pull Request
 
 Rename workflow-davekjohn to contributing-davekjohn, and remove workflow-default
 
@@ -89,7 +96,7 @@ Plugins: contributing-davekjohn, team-alpha, team-shopify
 
 ---
 
-## DEPLOY: `feat/the-cycle-document-has-a-shape-gate-v1` · 20260826-105312
+### DEPLOY: `feat/the-cycle-document-has-a-shape-gate-v1` · 20260826-105312
 
 `check-branch-entry.ps1` now reads the SHAPE of `development-cycle.md`, not only its step marks. Two rules
 that were enforced by Dave reading the file, on a document a session writes, with nothing in between:
@@ -125,7 +132,7 @@ them from, so a repo that renames a phase is judged by its own names.
 
 **Score:** 3
 
-### What makes this deploy extra special
+#### What makes this deploy extra special
 
 N/A. One of the two rules reaches a consumer -- the preamble check, which refuses only content that would
 misread as generic guidance in their own document -- and the heading rule deliberately does not. The
@@ -134,7 +141,7 @@ have written today starts failing.
 
 **Score:** N/A
 
-### Pull Request
+#### Pull Request
 
 the branch-entry gate holds development-cycle.md to its four phases and its generic preamble
 
@@ -144,7 +151,7 @@ Plugins: workflow-davekjohn
 
 ---
 
-## DEPLOY: `fix/the-guard-covers-every-entry-point-v1` · 20260826-102307
+### DEPLOY: `fix/the-guard-covers-every-entry-point-v1` · 20260826-102307
 
 `scripts/maintenance/measure-always-on.ps1` now carries the source-repo guard, and
 [`scripts/README.md`](scripts/README.md) states the rule instead of counting it.
@@ -179,7 +186,7 @@ about counting a name inside the document that carries it.
 
 **Score:** 3
 
-### What makes this deploy extra special
+#### What makes this deploy extra special
 
 N/A. A consumer receives the mirrored `measure-always-on.ps1` with the guard in it, and the guard is a
 no-op for them by construction -- it refuses only where the repo being operated on holds its own copy of
@@ -188,7 +195,7 @@ behaviour changes.
 
 **Score:** N/A
 
-### Pull Request
+#### Pull Request
 
 every shared entry point carries the source-repo guard, and scripts/README.md stops counting
 
@@ -198,7 +205,7 @@ Plugins: workflow-davekjohn
 
 ---
 
-## DEPLOY: `feat/gate-validates-import-targets-v1` · 20260826-093433
+### DEPLOY: `feat/gate-validates-import-targets-v1` · 20260826-093433
 
 The lint gate now resolves every `@`-import target it can see, and refuses a dead one whose target is
 in the tree. Check 4 has validated `[text](target)` links since the beginning; an `@`-import is a
@@ -225,7 +232,7 @@ machine without one.
 
 **Score:** 3
 
-### What makes this deploy extra special
+#### What makes this deploy extra special
 
 N/A. The check itself lives in `scripts/lint/`, which is this repo's own gate and does not travel to a
 consumer. What does travel is the plugin mirror of `measure-always-on.ps1`, and only its wording changed
@@ -234,7 +241,7 @@ No consumer behaviour changes.
 
 **Score:** N/A
 
-### Pull Request
+#### Pull Request
 
 the lint gate validates every '@'-import target
 
@@ -244,7 +251,7 @@ Plugins: workflow-davekjohn
 
 ---
 
-## DEPLOY: `fix/the-deploy-section-is-locked-at-the-pr-v1` · 20260825-234507
+### DEPLOY: `fix/the-deploy-section-is-locked-at-the-pr-v1` · 20260825-234507
 
 The DEPLOY section is now **one text in all four places it lands** -- the branch's own
 `development-cycle.md`, the PR body, `CHANGELOG.md`, and the developer release notes -- and it is **fixed
@@ -267,7 +274,7 @@ because there the H2 genuinely stays behind, and consumers have such branches in
 
 **Score:** 3
 
-### What makes this deploy extra special
+#### What makes this deploy extra special
 
 A consumer meets three things at their next plugin update. Their PR bodies start carrying the
 `## DEPLOY:` heading and the section's own levels, instead of a level-shifted copy with the heading
@@ -286,7 +293,7 @@ not fire.
 
 **Score:** 4
 
-### Pull Request
+#### Pull Request
 
 The DEPLOY section is locked once the PR opens, and says deploy everywhere
 
@@ -296,7 +303,7 @@ Plugins: workflow-davekjohn
 
 ---
 
-## DEPLOY: `docs/development-portable-rename-v1` · 20260825-222427
+### DEPLOY: `docs/development-portable-rename-v1` · 20260825-222427
 
 Renamed `DEVELOPMENT-CYCLE-portable.md` to `DEVELOPMENT-portable.md` and repointed every reference
 to it repo-wide, so the manual's name no longer contradicts the working file it describes
@@ -304,13 +311,13 @@ to it repo-wide, so the manual's name no longer contradicts the working file it 
 
 **Score:** 1 — cosmetic naming cleanup; no behavior, script contract, or consumer-facing change.
 
-### What makes this PR extra special
+#### What makes this PR extra special
 
 N/A — an internal doc rename, nothing a subscriber of the service would ever see.
 
 **Score:** N/A
 
-### Pull Request
+#### Pull Request
 
 Rename DEVELOPMENT-CYCLE-portable.md to DEVELOPMENT-portable.md and update every reference
 
@@ -320,7 +327,7 @@ Plugins: workflow-davekjohn
 
 ---
 
-## DEPLOY: `feat/isolate-workflow-from-consumer-root-v1` · 20260825-204036
+### DEPLOY: `feat/isolate-workflow-from-consumer-root-v1` · 20260825-204036
 
 Nothing changes for this repo's own release runs today — the computed defaults exempt the source repo
 outright, so `CHANGELOG.md` and `releases/` keep resolving to the exact root paths they always did. What
@@ -332,7 +339,7 @@ somebody works in a release script, not before.
 
 **Score:** 2
 
-### What makes this PR extra special
+#### What makes this PR extra special
 
 A consumer no longer risks the plugin reaching into their repo root: the changelog, the three release-note
 roots (`releases/development/`, `releases/github/`, `releases/internal/`) and the release-history index
@@ -353,7 +360,7 @@ duplication as the changelog rather than a silent redirect.
 
 **Score:** 5
 
-### Pull Request
+#### Pull Request
 
 Isolate the workflow from the consumer's repo root
 
@@ -363,7 +370,7 @@ Plugins: workflow-davekjohn
 
 ---
 
-## DEPLOY: `fix/remove-prompt-inbox-v1` · 20260825-155219
+### DEPLOY: `fix/remove-prompt-inbox-v1` · 20260825-155219
 
 Removed the prompt-inbox mechanism entirely (issue #882, Dave): the `workflow-davekjohn/prompts/`
 folder, the `prompt` skill, its two scripts (`prompt-inbox.ps1` + `prompt-inbox-lib.ps1`, root and
@@ -378,14 +385,14 @@ hook line; nothing in how a branch, PR or release works changes.
 
 **Score:** 3
 
-### What makes this PR extra special
+#### What makes this PR extra special
 
 N/A — nothing here reaches a service subscriber; the prompt inbox was a workflow-authoring convenience
 inside this repo and its consumers, never anything an end user of a published product could see.
 
 **Score:** N/A
 
-### Pull Request
+#### Pull Request
 
 Remove the prompt inbox from workflow-davekjohn
 
@@ -395,7 +402,7 @@ Plugins: workflow-davekjohn
 
 ---
 
-## DEPLOY: `fix/release-notes-at-the-changelogs-own-level-v1` · 20260825-125958
+### DEPLOY: `fix/release-notes-at-the-changelogs-own-level-v1` · 20260825-125958
 
 **The generated developer release notes now render at `CHANGELOG.md`'s own heading levels.** Entries sit at
 `##` and their sections at `###`, exactly where the fold wrote them, so an entry copied out of the record
@@ -428,7 +435,7 @@ carries it, and removing a published field of that contract is a decision of its
 
 **Score:** 2
 
-### What makes this PR extra special
+#### What makes this PR extra special
 
 A consumer's cut writes this document too, so the level correction and the repaired tier filter both
 arrive with the plugin — including the failure the filter prevents, which a consumer would have met as
@@ -437,7 +444,7 @@ shape, so the page describing the document and the generator writing it agree.
 
 **Score:** 3
 
-### Pull Request
+#### Pull Request
 
 Developer release notes render at CHANGELOG.md's own heading levels
 

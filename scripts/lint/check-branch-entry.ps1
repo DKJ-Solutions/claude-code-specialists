@@ -266,8 +266,30 @@ $shapeFindings = @()
 $cycleHalves = Split-DevelopmentCycle -Text $fileText
 $headText = [string]$cycleHalves.Head
 
-# Fence tracking, so a quoted '##' is illustration rather than a phase. Same rule check 4 of the lint gate
+# Fence tracking, so a quoted heading is illustration rather than a phase. Same rule check 4 of the lint gate
 # argues for links and check 28 for imports.
+#
+# THE LEVELS ARE READ OFF THE DOCUMENT, NOT PINNED, and a range would be wrong rather than merely loose
+# (August 26, 2026). Both levels shifted one down that day: the title went H1 -> H2 and the phases H2 -> H3.
+# So the new TITLE level and the old PHASE level are the same number, and a gate accepting '^#{2,3}' as a
+# phase would read a post-shift title as a fifth phase -- refusing a correct document, which is the one
+# failure mode this gate must not have. Reading the first heading as the title and the phases as exactly one
+# level under it needs no era flag and no list of levels to maintain: it is the invariant the format has
+# always had, and the one the suite already asserts as "the sections sit exactly one level under the title".
+$titleLevel = 0
+$inTitleProbe = $false
+foreach ($probeLine in [regex]::Split($fileText, '\r?\n')) {
+    if ($probeLine -match '^\s{0,3}(?:`{3,}|~{3,})') { $inTitleProbe = -not $inTitleProbe; continue }
+    if ($inTitleProbe) { continue }
+    if ($probeLine -match '^(#{1,6})\s+\S') { $titleLevel = $Matches[1].Length; break }
+}
+# No heading at all: fall back to the written pair, so a malformed document is judged by today's shape
+# rather than skipping the check entirely.
+if ($titleLevel -le 0) { $titleLevel = Get-BranchCycleHeadingLevel }
+$phaseLevel = $titleLevel + 1
+$phaseRx    = '^#{' + $phaseLevel + '}\s+(\S.*)$'
+$titleRx    = '^#{1,' + $titleLevel + '}\s'
+
 $inShapeFence = $false
 $shapeLineNo = 0
 $topHeadings = @()
@@ -277,12 +299,12 @@ foreach ($shapeLine in [regex]::Split($fileText, '\r?\n')) {
     $shapeLineNo++
     if ($shapeLine -match '^\s{0,3}(?:`{3,}|~{3,})') { $inShapeFence = -not $inShapeFence; continue }
     if ($inShapeFence) { continue }
-    if ($shapeLine -match '^##\s+(\S.*)$') {
+    if ($shapeLine -match $phaseRx) {
         $seenFirstTop = $true
         $topHeadings += [pscustomobject]@{ Line = $shapeLineNo; Text = $Matches[1].Trim() }
         continue
     }
-    if ($shapeLine -match '^#\s') { continue }
+    if ($shapeLine -match $titleRx) { continue }
     # The preamble region: everything after the H1 and before the first '##'. Blank lines and blockquote
     # lines are the guidance block; anything else is this branch's own content, sitting where the text is
     # supposed to be identical in every branch document in every repo.
@@ -333,7 +355,11 @@ if ($shapeFindings.Count -gt 0) {
     foreach ($f in ($shapeFindings | Select-Object -Skip 1)) { Write-Host "        $f" -ForegroundColor Red }
     exit 1
 }
-Write-Host "[OK] '$entryRel' keeps its shape: $($topHeadings.Count) '##' heading(s), and nothing but guidance above the first."
+# The level in this line is the one that was actually READ, not a literal: the checks above derive the phase
+# level from the document's own title, so a message naming '##' would have described the wrong shape for every
+# document written after August 26, 2026 -- and a coverage line that misreports what it read is worse than
+# none, because it reads as confirmation.
+Write-Host "[OK] '$entryRel' keeps its shape: $($topHeadings.Count) '$('#' * $phaseLevel)' heading(s), and nothing but guidance above the first."
 
 # --- The DEPLOY lock: is the section still what the PR published? ------------------------------------
 # Refused, not reported, which puts it with the checks above rather than with the significance below. The

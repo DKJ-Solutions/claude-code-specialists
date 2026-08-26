@@ -600,8 +600,14 @@ function Test-DeployLock {
 
     # ONLY TODAY'S SHAPE IS LOCKED, and the heading is what says which shape this is: Get-PrDescription
     # carries it on the merged format and cannot produce it on the legacy one.
+    # THE LEVEL COMES FROM THE FORMAT, not from a literal here. It was '^#{2}' until August 26, 2026, when the
+    # cycle file shifted one level down and the DEPLOY heading became an H3 -- and both levels have to pass,
+    # because a PR opened from a document scaffolded before the shift publishes the old one. Read off the
+    # entry heading level so a future re-level cannot leave this test locking a shape nothing writes.
+    $lockLevel = if (Get-Command -Name Get-EntryHeadingLevel -ErrorAction SilentlyContinue) { Get-EntryHeadingLevel } else { 3 }
+    $lockRx = '^#{' + ($lockLevel - 1) + ',' + $lockLevel + '}\s+\S'
     $expectedLines = @($expected -split "\r?\n" | ForEach-Object { $_.TrimEnd() })
-    if ($expectedLines.Count -eq 0 -or $expectedLines[0] -notmatch '^#{2}\s+\S') { return $na }
+    if ($expectedLines.Count -eq 0 -or $expectedLines[0] -notmatch $lockRx) { return $na }
     $heading = $expectedLines[0]
 
     $bodyLines = @($PrBody -split "\r?\n" | ForEach-Object { $_.TrimEnd() })

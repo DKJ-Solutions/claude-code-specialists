@@ -21,6 +21,18 @@ $ErrorActionPreference = 'Stop'
 
 $Fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("check-plugin-integrity-docs-$PID")
 
+# The entry format's levels, composed from the lib rather than typed -- the same rule the entries suite
+# follows. Both pairs shifted one deeper on August 26, 2026, and a fixture stating them in literals is a
+# second definition of the format that the check under test does not read.
+#
+# THE BACKTICK COMES FROM ITS CODE POINT, because it is PowerShell's own escape character: written literally
+# inside a double-quoted string it escapes the next character instead of appearing.
+$docTick      = [char]0x60
+$docEntryHash = '#' * (Get-EntryHeadingLevel)
+$docSectHash  = '#' * (Get-EntrySectionLevel)
+$docEntryH    = $docTick + $docEntryHash + $docTick
+$docSectH     = $docTick + $docSectHash + $docTick
+
 try {
     New-IntegrityFixture -Fixture $Fixture
 
@@ -119,7 +131,7 @@ try {
     New-Item -ItemType Directory -Path (Split-Path -Parent $shapeDoc) -Force | Out-Null
 
     # 44. A wrong count is reported, naming the file, the claim and the truth.
-    [System.IO.File]::WriteAllText($shapeDoc, "# branch`n`nAn entry is one ``##`` heading with three named ``###`` sections under it.`n", $Utf8NoBom)
+    [System.IO.File]::WriteAllText($shapeDoc, "# branch`n`nAn entry is one $docEntryH heading with three named $docSectH sections under it.`n", $Utf8NoBom)
     $e1 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True ($e1.Out -match '\[entry-shape\].*README\.md.*says an entry has 3') `
         'entry-shape: a stale section count is reported, naming the document and the number it claims'
@@ -133,7 +145,7 @@ try {
     #     for the four retired sections too -- which is what keeps older entries readable -- so counting
     #     it would hold a document to a shape no reader ever meets.
     $shapeCount = @(Get-EntryWrittenSectionKeys).Count
-    [System.IO.File]::WriteAllText($shapeDoc, "# branch`n`nAn entry is one ``##`` heading with $shapeCount named ``###`` sections under it.`n", $Utf8NoBom)
+    [System.IO.File]::WriteAllText($shapeDoc, "# branch`n`nAn entry is one $docEntryH heading with $shapeCount named $docSectH sections under it.`n", $Utf8NoBom)
     $e2 = Invoke-Integrity -FixtureRoot $Fixture
     # MATCHED ON THE FINDING'S OWN WORDS, not on the file name, and that is a repair rather than a style
     # choice: '\[entry-shape\].*README\.md' also matches the COVERAGE line, which names the branch README
@@ -207,14 +219,14 @@ try {
     # 49. A claim REFLOWED across a line break is still caught. Matching is over the whole head rather than
     #     line by line, because where the wrap falls is a formatting accident no author would think of as a
     #     bypass -- and the drift that prompted this was written exactly that way.
-    Write-ShapeChangelog "Everything merged since the last release: one ``##`` per change, and under it three`nnamed ``###`` sections."
+    Write-ShapeChangelog "Everything merged since the last release: one $docEntryH per change, and under it three`nnamed $docSectH sections."
     $e6 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True ($e6.Out -match '\[entry-shape\] CHANGELOG\.md:3: says an entry has 3') `
         'entry-shape: a claim split across a line break in the intro is caught, at the line it starts on'
 
     # 50. And the right count clears it -- taken from the scaffolder, not from the literal 'six', so this
     #     keeps meaning something the day the format gains a section.
-    Write-ShapeChangelog "Everything merged since the last release: one ``##`` per change, and under it $shapeCount named ``###`` sections."
+    Write-ShapeChangelog "Everything merged since the last release: one $docEntryH per change, and under it $shapeCount named $docSectH sections."
     $e7 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($e7.Out -match 'says an entry has')) `
         'entry-shape: an intro stating the count the scaffolder writes clears the finding'
