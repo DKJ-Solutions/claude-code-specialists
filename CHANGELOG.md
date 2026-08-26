@@ -32,6 +32,61 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/scaffold-guidance-concat-v1` · 20260826-155456
+
+`check-branch-entry.ps1` now prints the heading level it actually read in its **findings**, not only in its
+`[OK]` line ([#924](https://github.com/DaveKJohn/claude-code-specialists/issues/924)). The gate derives that
+level from the document's own title -- deliberately, so a shape change needs no era flag -- and one line
+quoted the derivation while six typed `##` or `###`. When the format shifted one level down on August 26,
+2026, every refusal therefore described the shape the document no longer had: it named `'##'` headings in a
+`###` document, misquoted the stray heading it had just found, and told the reader to demote a `###` to a
+`###`. The success path was level-aware and the failure path was not, which is the worse way round -- the
+failure message is the one somebody reads while they cannot yet see what is wrong.
+
+The six now quote one composed pair, `$phaseMark` and `$subMark`, built beside the `$phaseLevel` the checks
+already use, so there is a single source rather than a literal per message. Two live comments naming a level
+were rewritten to name the thing instead; the three that narrate a past measured defect keep theirs, because
+that history really did happen at `##`.
+
+**The guard is what makes this more than a rewording.** `branch-entry-gate.tests.ps1` gains scenario 9: the
+same defect fed through the same code path at two levels, asserting that a current-level document is told
+`###`/`####` and a legacy-level one `##`. Both new asserts were confirmed red against the literals before
+being trusted -- and the legacy assert stays *green* under the defect, which is the reason one level on its
+own proves nothing.
+
+**This branch was opened for something else and that is the more useful half of its story.** It was meant
+to repair the comma-versus-`+` defect in the guidance array; `#921` had already landed that against `#915`
+twenty minutes before the report was written, including the regression test the report proposed. The report
+was filed from a checkout one commit behind and never fetched -- the first of the five inbound patterns,
+applied to a report this house wrote itself. What made it convincing is worth naming: a lane is based on
+`origin/main`, but its dossier is scaffolded by the **primary** checkout's scripts, so the lane held a fixed
+source tree and a broken document at the same time.
+
+Nothing changes about what the gate accepts or refuses. What changes is that a refusal now describes the
+document in front of the reader.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+`check-branch-entry.ps1` ships with the plugin, and it is the gate a consumer meets in CI rather than one
+they run by hand -- so a consumer who is refused reads this message with no context and no repo history to
+fall back on. Being told to demote a heading to the level it already has is worse there than here: a
+maintainer of this repo knows the format shifted, and a consumer taking the workflow does not. They notice
+the first time a branch of theirs is refused; nothing they already do changes.
+
+**Score:** 3
+
+#### Pull Request
+
+The gate's findings name the heading level they actually read
+
+Plugins: contributing-davekjohn
+
+[PR #926](https://github.com/DaveKJohn/claude-code-specialists/pull/926)
+
+---
+
 ### DEPLOY: `docs/plugin-readme-skill-table-v1` · 20260826-153911
 
 The workflow plugin's own skill table lists all **16** skills it ships and no longer says how many
