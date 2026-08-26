@@ -8,8 +8,8 @@ specific to this repo comes last**, under
 **Everything in this file holds on its own**, and that is deliberate. Two plugins layer on top of it
 where they are installed, and nothing below assumes either one is:
 
-- **`workflow-davekjohn`** — the branch, entry and release mechanics, on its own page
-  [`workflow-davekjohn/CLAUDE.md`](workflow-davekjohn/CLAUDE.md).
+- **`contributing-davekjohn`** — the branch, entry and release mechanics, on its own page
+  [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md).
 - **`team-alpha`** — the specialists, reached through the single `@`-import at the foot of this file.
 
 Uninstall both and this guide still describes how the repo is run: the rules below are the repo's own,
@@ -224,19 +224,22 @@ instead of unconditionally. Reader-facing statement in
 
 **This section stands on its own, and that is deliberate.** Everything below holds in this repo
 whether or not a plugin is installed — the branch, the PR, the required CI check, the lint and test
-gates, and the two exceptions with their bounds. **The layer on top** is the `workflow-davekjohn`
-plugin, which carries its own page:
+gates, and the three direct-on-`main` exceptions with their bounds. **The layer on top** is the
+`contributing-davekjohn` plugin, which carries its own page:
 
-📄 **[`workflow-davekjohn/CLAUDE.md`](workflow-davekjohn/CLAUDE.md)**
+📄 **[`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md)**
 
 **When the plugin is installed, that page applies on top of this one — and where the two disagree, the
-plugin's page wins.** It does not replace anything below; it adds the workflow's own mechanics (the two
-gates on the branch dossier, how the exceptions actually run, the measurements behind them). The
-layering mirrors the one [`workflow-davekjohn/CONTRIBUTING.md`](workflow-davekjohn/CONTRIBUTING.md)
-already makes over the root [`CONTRIBUTING.md`](CONTRIBUTING.md) (Dave, August 14, 2026), and
-was extended to this operating guide on August 19, 2026. The second reason is the one the two moves
-before it give: this file loads on **every** session, the folder page only when a session touches that
-folder.
+plugin's page wins.** It does not replace anything below; it adds the workflow's own mechanics (the four
+gates on the branch dossier, how those three exceptions actually run, the measurements behind them).
+
+**That folder used to carry two pages and now carries one** (August 26, 2026,
+[#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)): a `CONTRIBUTING.md` layering over
+the root [`CONTRIBUTING.md`](CONTRIBUTING.md) since August 14, 2026 (Dave), and a `CLAUDE.md` layering over
+this file since August 19. They said the same thing about their own layering twice, so they merged into the
+one page linked above — which now layers over **both** root documents. The reason the layer exists at all is
+unchanged and is the one the two moves before it give: this file loads on **every** session, the folder page
+only when a session touches that folder.
 
 The constitution above, concretely implemented here:
 
@@ -270,21 +273,22 @@ The constitution above, concretely implemented here:
 - **Four more gates arrive with the workflow plugin**, and all of them read the branch's own document.
   Three run locally: the **scaffold gate** refuses to push an entry still carrying the wording
   `new-branch.ps1` wrote it with, the **step-list gate** refuses to push *and* to merge while
-  `workflow-davekjohn/development-cycle.md` has an unresolved step above its DEPLOY heading, and the
+  `contributing-davekjohn/development-cycle.md` has an unresolved step above its DEPLOY heading, and the
   **DEPLOY lock** refuses to merge once that section no longer matches what the PR published — it is fixed
   at the moment the PR opens, because that is what the review approved and what the fold folds. The fourth
   runs in **CI** (`.github/workflows/branch-entry.yml` → `check-branch-entry.ps1`) and exists because the
   first three are escapable by not using the scripts; it re-uses their functions rather than restating the
   convention, and it reports the significance instead of refusing on it. Their mechanics, escape valves and
   the measurements behind them are in
-  [`workflow-davekjohn/CLAUDE.md`](workflow-davekjohn/CLAUDE.md#the-four-gates-this-workflow-adds-on-top).
+  [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md), under its OPEN PR step -- each gate
+  sits at the point where it fires rather than in a list of its own.
 - **Three deliberate exceptions to "never directly on `main`", each one bounded.** Together they are
   one procedure read end to end — **fold the changelog, bump the version, write the release notes** —
   and that is why they are the three (Dave, August 23, 2026):
   1. The **fold commit** after a merge: [`fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)
      folds the entry into `CHANGELOG.md` and clears it, and with `-Commit`/`-Push` makes that commit
      itself. **Bounded to two paths** — `CHANGELOG.md` and
-     `workflow-davekjohn/development-cycle.md`, which the same run **removes** — and the commit names
+     `contributing-davekjohn/development-cycle.md`, which the same run **removes** — and the commit names
      them, so nothing else in the tree can ride along. It was three until August 23, 2026, when the
      entry and the step list became sections of one document: the bound narrowed with the tree rather
      than being relaxed. Later that day the second path stopped being a rewrite and became a deletion —
@@ -317,7 +321,8 @@ The constitution above, concretely implemented here:
   intact**: widening was refused then and the bounds are written out now for exactly the same reason.
   What changed is the judgement about which size is right, not the rule about stating it. How the
   three actually run and the measurements behind each are in
-  [`workflow-davekjohn/CLAUDE.md`](workflow-davekjohn/CLAUDE.md#how-the-three-direct-on-main-exceptions-actually-run)
+  [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) -- the fold under its OPEN PR
+  step, the release commit and the notes commit under CUT RELEASE --
   and in [the release lens](.claude/specialists/lenses/05-06-extension.md#versioning--releases).
 - **This repo is `public`.** A deliberate choice, so the remote `github` marketplace source can be
   read without gh auth. Consequence: **nothing confidential** belongs here — no personal

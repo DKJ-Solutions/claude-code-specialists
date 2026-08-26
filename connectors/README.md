@@ -179,9 +179,9 @@ structural path difference.
 
 ## The session check (automatic)
 
-The **`workflow-davekjohn`** plugin carries a **SessionStart hook**
-([`hooks/hooks.json`](../plugins/workflows/workflow-davekjohn/hooks/hooks.json) +
-[`connector-sessioncheck.ps1`](../plugins/workflows/workflow-davekjohn/hooks/connector-sessioncheck.ps1)) that, when a
+The **`contributing-davekjohn`** plugin carries a **SessionStart hook**
+([`hooks/hooks.json`](../plugins/workflows/contributing-davekjohn/hooks/hooks.json) +
+[`connector-sessioncheck.ps1`](../plugins/workflows/contributing-davekjohn/hooks/connector-sessioncheck.ps1)) that, when a
 session starts, locates the workshop checkout and runs the connectors check there.
 
 **It moved out of the core on August 8, 2026, and the reason is what this register is.** The check
@@ -291,9 +291,9 @@ inventory per plugin, `visibility` and `localCheckout` left as `VUL-IN` because 
 which then lands here through the normal branch + PR flow. This hook is one of the named, repo-neutral
 exceptions to the rule that plugins carry no hooks/skills — the full list is in the root README under
 [What lives here and what doesn't](../README.md#what-lives-here-and-what-doesnt), and it has grown since
-this paragraph first named its two siblings: four SessionStart hooks (`connector-sessioncheck` and
-`script-contract-sessioncheck` in `workflow-davekjohn`, `roster-sessioncheck`
-and `workflow-sessioncheck` in the core team) plus the skills `specialists-init` and `discover-workflow`. Mind the **version gate**: consumers only receive the
+this paragraph first named its two siblings — and shrank again on August 26, 2026: three SessionStart
+hooks (`connector-sessioncheck` and `script-contract-sessioncheck` in `contributing-davekjohn`,
+`roster-sessioncheck` in the core team) plus the skill `specialists-init`. Mind the **version gate**: consumers only receive the
 hook after a release bump plus `claude plugin marketplace update <marketplace>` and
 `claude plugin update <plugin>@<marketplace> --scope project` (neither the refresh nor the scope flag
 is optional — see [Staying up to date](../INSTALL.md#staying-up-to-date)) + session restart on

@@ -188,7 +188,7 @@ From your repo root:
 ```powershell
 claude plugin uninstall team-alpha@claude-code-specialists --scope project
 # and once more for each add-on team you enabled -- and for
-# workflow-davekjohn if you enabled the workflow
+# contributing-davekjohn if you enabled the workflow
 ```
 
 **If you ran the workflow, take its scripts out before you uninstall it.** Step 1's
@@ -196,7 +196,7 @@ claude plugin uninstall team-alpha@claude-code-specialists --scope project
 output: the two plugins are separately versioned and separately installed, so the teardown that ships
 in one deliberately does not reach into the other's cache. `new-branch`, `open-pr`, `ship-pr`,
 `fold-changelog-entry`, `cut-release` and the libs they dot-source live in
-`~\.claude\plugins\cache\claude-code-specialists\workflow-davekjohn\<version>\scripts\` —
+`~\.claude\plugins\cache\claude-code-specialists\contributing-davekjohn\<version>\scripts\` —
 copy that tree into your own `scripts/` first if you want to keep the workflow after disconnecting.
 Its structure matters: those scripts reach their siblings `$PSScriptRoot`-relative, so a flattened copy
 breaks at the next branch rather than at the copy.
@@ -423,8 +423,8 @@ are marked as such:
 
 - **Your history stays.** `CHANGELOG.md` and release notes that mention specialists are an accurate record
   of something that happened. History is finished business and is never rewritten.
-- **`workflow-davekjohn/`, if you ran that workflow, stays too — permanently, by design** (issue #885).
-  Uninstalling `workflow-davekjohn` in Step 2 takes the plugin's skills and scripts; it does not remove
+- **`contributing-davekjohn/`, if you ran that workflow, stays too — permanently, by design** (issue #885).
+  Uninstalling `contributing-davekjohn` in Step 2 takes the plugin's skills and scripts; it does not remove
   this folder, and no future teardown of that plugin may either — the folder holds your own changelog and
   release history, not the plugin's. `development-cycle.md` inside it is a precision on that permanence,
   not an exception to it: it belongs to whichever branch was open, the fold already removed it at that

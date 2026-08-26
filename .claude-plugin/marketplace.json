@@ -24,14 +24,9 @@
       "description": "Add-on team for commercial webshop repos (any platform): Sergio (SEO), Craig (CRO), Sean (performance/SEA), with room to grow into the wider e-commerce craft (lifecycle/email, analytics). Complementary to a platform team like team-shopify — a commercial webshop repo can enable both. Teams stack."
     },
     {
-      "name": "workflow-default",
-      "source": "./plugins/workflows/workflow-default",
-      "description": "The workflow a repo gets when it has not chosen one: the specialists follow the conventions the repo already has, and name the questions it does not answer instead of filling them in. Ships the discover-workflow skill. Enable exactly one workflow -- this is the one to keep until a repo deliberately picks another."
-    },
-    {
-      "name": "workflow-davekjohn",
-      "source": "./plugins/workflows/workflow-davekjohn",
-      "description": "DaveKJohn's own way of working, packaged as an opt-in: the branch-and-entry model, the tier ladder, the fold, the release cut, and the gates that hold them, as skills plus their shared scripts. A workflow is not a team but a method, and the name says whose it is — a consuming repo has its own way of working, and the specialists adapt to it. Enable this only if you want THIS one. Requires team-alpha, and exactly one workflow may be enabled at a time."
+      "name": "contributing-davekjohn",
+      "source": "./plugins/workflows/contributing-davekjohn",
+      "description": "DaveKJohn's own way of working, packaged as an opt-in: the branch-and-entry model, the tier ladder, the fold, the release cut, and the gates that hold them, as skills plus their shared scripts. A workflow is not a team but a method, and the name says whose it is — a consuming repo has its own way of working, and the specialists adapt to it. Enable this only if you want THIS one. Requires team-alpha."
     }
   ]
 }

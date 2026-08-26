@@ -40,11 +40,13 @@ rather than merely conventional — lint check 23 (`[plugin-kind]`) in
 [`check-plugin-integrity.ps1`](../../scripts/lint/check-plugin-integrity.ps1) holds every published
 plugin to it.
 
-The half that matters is the naming, and the reason sits one directory over: the core team's
-`workflow-sessioncheck` hook
-([`team-alpha/hooks/workflow-sessioncheck.ps1`](team-alpha/hooks/workflow-sessioncheck.ps1)) counts
-enabled workflows **by the `workflow-` prefix and nothing else**. So the rule is not tidiness about
-where files live — a plugin whose name does not say which kind it is would be invisible to that count.
+The half that matters is the naming, and until August 26, 2026 the reason sat one directory over: the
+core team's `workflow-sessioncheck` hook counted enabled workflows **by the `workflow-` prefix and
+nothing else**, so a plugin whose name did not say which kind it was would be invisible to that count.
+[#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886) retired that hook along with
+`workflow-default`, and the naming rule kept its teeth on a reason of its own: **the directory half is
+derived from the name.** A plugin matching neither prefix is held to no location rule at all, so an
+unprefixed name switches the check off for itself rather than merely reading untidily.
 
 ## What a team folder holds
 

@@ -11,7 +11,7 @@ under [`teams/`](teams/) — or *how does work move through this repo* — then 
 |---|---|---|
 | **Answers** | who the specialists are | how work moves through the repo |
 | **Ships** | `agents/` + `manuals/` — one subagent definition and one portable playbook per specialist | `skills/`, and the scripts and hooks behind them — no specialists at all |
-| **Stacks?** | **Yes.** Enable the core team plus as many add-on teams as the repo's domain calls for; each one adds colleagues. | **No.** At most one may be enabled, because two would answer the same question differently. |
+| **Stacks?** | **Yes.** Enable the core team plus as many add-on teams as the repo's domain calls for; each one adds colleagues. | **In practice, no** — there is one, and it is opt-in. Two would answer the same question differently, but nothing checks it any more; see below. |
 | **Named** | `team-<name>`, under `plugins/teams/` | `workflow-<name>`, under `plugins/workflows/` |
 | **Enable none, and** | the repo has no specialists | the specialists use plain git/gh |
 
@@ -22,6 +22,12 @@ saying which one is this repo's; they would then pick, silently and differently 
 raise no such conflict, because a second team hands the repo more colleagues rather than a second
 answer.
 
+**That said, the conflict is currently unreachable and the check that guarded it is gone**
+([#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886), August 26, 2026). There is one
+workflow plugin left, so there is no second answer to collide with, and a repo's own way of working is
+not a plugin — it is what the repo already had. The paragraph above is kept as the reason the rule would
+have to be re-answered the day a second workflow is added, not as a description of a live guard.
+
 ## Which one am I making? The test question
 
 > Does this describe a **craft**, or a **way of working**?
@@ -29,7 +35,8 @@ answer.
 A craft is the same in every repo, so it can travel in a plugin and be enabled without a decision: how
 a code reviewer reads a diff, how a technical writer sharpens a document. A way of working belongs to
 one repo and has to be *chosen* — which is why the workflows are the only plugins here that carry an
-owner's name, and why the default one imposes nothing at all.
+owner's name, and why there is no default one to receive instead: a repo that enables none keeps the way
+of working it already had.
 
 That question is not a rhetorical device: it was arrived at by measurement. Of what the core team used
 to ship before August 8, 2026, **9% described a craft and 47% was workflow machinery** — so most of
@@ -46,12 +53,15 @@ first, and nobody reads both pages in one sitting.
 - **A plugin's name says which kind it is, and it must sit in the directory that name claims.** Lint
   check 23 (`[plugin-kind]`) in
   [`../scripts/lint/check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1) holds
-  every published plugin to both halves. The naming half is the load-bearing one: the count below keys
-  on the `workflow-` prefix and nothing else.
-- **At most one workflow may be enabled.** The `workflow-sessioncheck` SessionStart hook, in the
-  **core team** rather than in the workflow plugins, counts the enabled ids beginning with
-  `workflow-` and reports when there is more than one. It never blocks, and it is silent at zero as
-  well as at one.
+  every published plugin to both halves. The naming half is the load-bearing one, and since
+  [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886) it carries its own reason
+  rather than a borrowed one: the directory half is **derived** from the prefix, so a plugin matching
+  neither is held to no location rule at all.
+- **~~At most one workflow may be enabled.~~ Retired August 26, 2026 (#886).** The
+  `workflow-sessioncheck` SessionStart hook counted the enabled ids beginning with `workflow-` and
+  reported above one. It went with `workflow-default`, whose existence was the only thing that made two
+  reachable. Recorded rather than deleted, because the question comes back the day a second workflow
+  does.
 
 Both are stated in full where they apply: [`teams/README.md`](teams/README.md) and
 [`workflows/README.md`](workflows/README.md).

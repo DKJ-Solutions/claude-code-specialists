@@ -481,9 +481,9 @@ try {
     # ONE DOCUMENT, AND NO branch/ DIRECTORY AT ALL. The second half is the assert that would catch a
     # scaffolder still writing the retired pair beside the new file -- which would leave two entries for one
     # branch, the exact half-state the merge removes.
-    $wfDirFiles = @(Get-ChildItem -LiteralPath (Join-Path $fixtureBC 'workflow-davekjohn') -Filter '*.md' -File)
+    $wfDirFiles = @(Get-ChildItem -LiteralPath (Join-Path $fixtureBC 'contributing-davekjohn') -Filter '*.md' -File)
     Assert-Equal 1 $wfDirFiles.Count 'exactly one branch document, no duplicate per branch'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fixtureBC 'workflow-davekjohn\branch'))) 'and no branch/ directory is created any more'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fixtureBC 'contributing-davekjohn\branch'))) 'and no branch/ directory is created any more'
 
     Write-Host "new-branch.ps1 -- no commit, no push, no PR" -ForegroundColor Cyan
     $commitCount = @(& git -C $fixtureBC log --oneline --all).Count
@@ -491,7 +491,7 @@ try {
     $remotes = @(& git -C $fixtureBC remote)
     Assert-Equal 0 $remotes.Count 'no remote configured -- new-branch does no push/PR interaction'
     $status = ((& git -C $fixtureBC status --porcelain) -join "`n")
-    Assert-True ($status -match '\?\? workflow-davekjohn/') 'the branch files are untracked -- no git add/commit performed'
+    Assert-True ($status -match '\?\? contributing-davekjohn/') 'the branch files are untracked -- no git add/commit performed'
 
     # --- (e) Soft warn on unknown prefix: branch + entry still created, fallback type, exit 0 -------
     Write-Host "new-branch.ps1 -- unknown prefix: soft warn, no hard reject" -ForegroundColor Cyan

@@ -15,7 +15,7 @@
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/seam-lib.tests.ps1
 
     What is asserted:
-      1. a consumer whose seam resolves OUTSIDE workflow-davekjohn/ is refused (exit 1), and the
+      1. a consumer whose seam resolves OUTSIDE contributing-davekjohn/ is refused (exit 1), and the
          refusal names the seam and the offending path;
       2. a consumer whose seam resolves INSIDE the folder passes, including the exact-match
          'workflow-davekjohn' case and the backslash-separated case (proving the '\' -> '/'
@@ -86,10 +86,19 @@ function Test-ReturnsNormally {
     }
 }
 
+# BOTH FOLDER NAMES PASS, AND BOTH ARE ASSERTED (#886, August 26, 2026). The folder renamed
+# 'workflow-davekjohn/' -> 'contributing-davekjohn/'. The three asserts below it cover the OLD name and are
+# kept deliberately: they are what proves an unmigrated consumer's seams still resolve, and this guard
+# refuses with exit 1 rather than warning, so losing that tolerance would be a hard stop rather than a
+# nuisance.
+Assert-True (Test-ReturnsNormally $consumerDir 'contributing-davekjohn/CHANGELOG.md' 'Get-ChangelogPath') `
+    'consumer, in-folder path under the CURRENT folder name: passes'
+Assert-True (Test-ReturnsNormally $consumerDir 'contributing-davekjohn' 'Get-ChangelogPath') `
+    'consumer, exact match "contributing-davekjohn" with no trailing path: passes'
 Assert-True (Test-ReturnsNormally $consumerDir 'workflow-davekjohn/CHANGELOG.md' 'Get-ChangelogPath') `
-    'consumer, in-folder path: passes'
+    'consumer, in-folder path under the PRE-RENAME folder name: still passes'
 Assert-True (Test-ReturnsNormally $consumerDir 'workflow-davekjohn' 'Get-ChangelogPath') `
-    'consumer, exact match "workflow-davekjohn" with no trailing path: passes'
+    'consumer, exact match "workflow-davekjohn" (PRE-RENAME) with no trailing path: still passes'
 Assert-True (Test-ReturnsNormally $consumerDir 'workflow-davekjohn\CHANGELOG.md' 'Get-ChangelogPath') `
     'consumer, backslash-separated in-folder path: passes (the \ -> / normalization works)'
 # THE CASE THAT PROVES THE SHORT-CIRCUIT, NOT JUST THE FOLDER MATCH: the exact same relative path that
@@ -132,7 +141,7 @@ $r = Invoke-AssertChild $consumerDir 'CHANGELOG.md' 'Get-ChangelogPath'
 Assert-True ($r.Code -eq 1) 'consumer, path outside the folder: exits 1'
 Assert-True ($r.Out -match 'Get-ChangelogPath') 'and the refusal names the seam'
 Assert-True ($r.Out -match 'CHANGELOG\.md') 'and the offending path'
-Assert-True ($r.Out -match 'workflow-davekjohn') 'and the folder it should have resolved inside'
+Assert-True ($r.Out -match 'contributing-davekjohn') 'and the folder it should have resolved inside'
 
 Remove-Item -Recurse -Force -LiteralPath $consumerDir -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force -LiteralPath $sourceDir -ErrorAction SilentlyContinue

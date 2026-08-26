@@ -5,7 +5,7 @@ mirrored into the plugins for consumers to run — twenty-seven scripts and one 
 mirror is generated rather than maintained, so a
 change lands *here* and travels outward, never the other way around. The mirror's own page, written for the
 consumer who only has the copy, is
-[`plugins/workflows/workflow-davekjohn/scripts/README.md`](../plugins/workflows/workflow-davekjohn/scripts/README.md).
+[`plugins/workflows/contributing-davekjohn/scripts/README.md`](../plugins/workflows/contributing-davekjohn/scripts/README.md).
 
 Three consequences worth knowing before you touch anything:
 
@@ -22,7 +22,7 @@ Three consequences worth knowing before you touch anything:
   mirror as drift.
 - **CI runs these from a bare checkout, with no plugin cache.** Anything the lint gate or a test suite
   reaches has to be resolvable from this directory alone — which is why a few files
-  [deliberately cannot move](../plugins/workflows/workflow-davekjohn/scripts/README.md#what-deliberately-stays-in-the-consumers-root-cannot-move-here)
+  [deliberately cannot move](../plugins/workflows/contributing-davekjohn/scripts/README.md#what-deliberately-stays-in-the-consumers-root-cannot-move-here)
   into a plugin.
 
 **Why the first of those needs saying, measured on August 12, 2026 against mirror `4.5.0`.** Every skill
@@ -44,7 +44,7 @@ cache holds a release and this directory is by definition ahead of it between re
 | directory | what lives there |
 |---|---|
 | [`lib/`](lib/) | the shared helpers every other directory dot-sources — no standalone entry points |
-| [`task/`](task/) | starting and parking work: the branch and its `workflow-davekjohn/development-cycle.md` |
+| [`task/`](task/) | starting and parking work: the branch and its `contributing-davekjohn/development-cycle.md` |
 | [`release/`](release/) | moving work to the trunk and beyond: the PR, the merge, the fold, the cut |
 | [`lint/`](lint/) | the gates that run before a PR and in CI |
 | [`sync/`](sync/) | keeping the generated artefacts and the connected repos honest |
@@ -73,7 +73,7 @@ a test, reached by one of these rather than run directly.
 
 | script | what it does | skill |
 |---|---|---|
-| [`task/new-branch.ps1`](task/new-branch.ps1) | creates the branch **and** its `workflow-davekjohn/development-cycle.md`, in one move — a branch is never entry-less | `new-branch` |
+| [`task/new-branch.ps1`](task/new-branch.ps1) | creates the branch **and** its `contributing-davekjohn/development-cycle.md`, in one move — a branch is never entry-less | `new-branch` |
 | [`task/park-branch.ps1`](task/park-branch.ps1) | commits outstanding work and pushes, with no PR — for handing a branch to another machine | `park` |
 | [`task/adopt-config.ps1`](task/adopt-config.ps1) | reads the config blueprint and places or proposes each seam answer | `adopt-config` |
 | [`release/open-pr.ps1`](release/open-pr.ps1) | the four gates, the push and the PR; the body and title come from the entry | `open-pr` |
@@ -108,7 +108,7 @@ from one another because they overrule different kinds of judgement.
 2. **The test gate** — every `tests/*.tests.ps1` suite.
 3. **The scaffold gate** — refuses an entry still carrying the wording `new-branch.ps1` wrote, or one whose
    description, body or any tier reason is still empty once HTML comments are stripped.
-4. **The step-list gate** — refuses while `workflow-davekjohn/development-cycle.md` has an unresolved step above its DEPLOY heading. `ship-pr.ps1`
+4. **The step-list gate** — refuses while `contributing-davekjohn/development-cycle.md` has an unresolved step above its DEPLOY heading. `ship-pr.ps1`
    refuses at the merge for the same reason, and **this one has no `-Force`**: the `- [~]` dropped mark is
    the way past a step that turned out not to be needed.
 

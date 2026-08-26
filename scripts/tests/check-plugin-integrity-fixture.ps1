@@ -161,16 +161,14 @@ function New-IntegrityFixture {
     New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude-plugin') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\teams\team-alpha\.claude-plugin') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\teams\team-shopify\.claude-plugin') -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\workflows\workflow-default\.claude-plugin') -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\workflows\workflow-davekjohn\.claude-plugin') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\workflows\contributing-davekjohn\.claude-plugin') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude-plugin\marketplace.json'), (@'
 {
   "name": "fixture-marketplace",
   "plugins": [
     { "name": "team-alpha",         "source": "./plugins/teams/team-alpha" },
     { "name": "team-shopify",       "source": "./plugins/teams/team-shopify" },
-    { "name": "workflow-default",   "source": "./plugins/workflows/workflow-default" },
-    { "name": "workflow-davekjohn", "source": "./plugins/workflows/workflow-davekjohn" }
+    { "name": "contributing-davekjohn", "source": "./plugins/workflows/contributing-davekjohn" }
   ]
 }
 '@), $Utf8NoBom)
@@ -182,10 +180,8 @@ function New-IntegrityFixture {
     # measured instance of that same failure, after workflow-default.
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-shopify\.claude-plugin\plugin.json'),
         "{ `"name`": `"team-shopify`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\workflows\workflow-default\.claude-plugin\plugin.json'),
-        "{ `"name`": `"workflow-default`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\workflows\workflow-davekjohn\.claude-plugin\plugin.json'),
-        "{ `"name`": `"workflow-davekjohn`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\workflows\contributing-davekjohn\.claude-plugin\plugin.json'),
+        "{ `"name`": `"contributing-davekjohn`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
 
     Copy-Item -Path $IntegritySrc -Destination (Join-Path $Fixture 'scripts\lint\check-plugin-integrity.ps1') -Force
     Copy-Item -Path $AgentSharedLibSrc -Destination (Join-Path $Fixture 'scripts\lib\agent-shared-lib.ps1') -Force
@@ -199,9 +195,9 @@ function New-IntegrityFixture {
 
     # The reference PR template check 24 holds, written from the same function the check compares against
     # -- never typed out here, for the reason stated at the dot-source above.
-    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\workflows\workflow-davekjohn\templates') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\workflows\contributing-davekjohn\templates') -Force | Out-Null
     [System.IO.File]::WriteAllText(
-        (Join-Path $Fixture 'plugins\workflows\workflow-davekjohn\templates\pull_request_template.md'),
+        (Join-Path $Fixture 'plugins\workflows\contributing-davekjohn\templates\pull_request_template.md'),
         (((Get-PrTemplateReference) -join "`n") + "`n"), $Utf8NoBom)
 
     $skillAlphaMd = "---`nname: skill-alpha`ndescription: Fixture skill alpha.`n---`n`n# Skill Alpha`n"

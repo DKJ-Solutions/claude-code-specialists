@@ -63,9 +63,11 @@ function Get-BusinessMarketplaceRepo {
 # THE TARGET SERVES CLAUDE APP USERS, AND A WORKFLOW CANNOT WORK THERE. A workflow plugin is a method
 # for moving work through a REPOSITORY -- branches, a changelog entry, a PR, a fold, a release cut --
 # and every one of its skills ends in a PowerShell script run against a checkout. A Claude App user has
-# no checkout, so offering them a workflow offers something that can only fail at the last step. Both
-# workflows are in scope, not just workflow-davekjohn: workflow-default exists to read the conventions
-# a repo already has, and with no repo there are no conventions to read.
+# no checkout, so offering them a workflow offers something that can only fail at the last step. THE RULE
+# IS ABOUT THE KIND, NOT ABOUT THE ONE PLUGIN THAT CURRENTLY HAS IT: the seam below is an allowlist of
+# teams, so a workflow is excluded by not being named rather than by being named, and a second workflow
+# added later is excluded on arrival. It read 'both workflows' until issue #886 removed workflow-default
+# and left one.
 #
 # WHY THIS IS AN EXCLUSION AND NOT A HIDE FLAG. The manifest format has no per-entry way to gate an
 # entry, and inventing one would need Claude to honour it. A plugin that does not travel is not offered
@@ -73,10 +75,10 @@ function Get-BusinessMarketplaceRepo {
 # misconfigured into offering the thing anyway.
 #
 # THE UNIT IS THE PLUGIN, NOT THE ITEM, AND THAT IS DELIBERATE. team-alpha ships three PowerShell
-# skills (specialists-init, specialists-teardown, sync-roster) and two SessionStart hooks that a Claude
+# skills (specialists-init, specialists-teardown, sync-roster) and one SessionStart hook that a Claude
 # App user cannot run either. They travel anyway: the plugin published here has to be byte-identical to
-# the plugin released here, or its version number stops meaning one thing. Those five items are already
-# handled where they can be handled without forking the plugin -- the hooks are inert in a plain Chat
+# the plugin released here, or its version number stops meaning one thing. Those four items are already
+# handled where they can be handled without forking the plugin -- the hook is inert in a plain Chat
 # session, and v4.9.0 (#672) made all three skills non-model-invocable and had each name its PowerShell
 # dependency in its own description, so the model cannot walk a user into one. Per-item filtering would
 # buy a little tidiness and cost the single-source-of-truth guarantee.
@@ -265,18 +267,24 @@ function Get-MojibakePaths {
     $paths = @(Get-ChildItem -LiteralPath $RepoRoot -Filter '*.md' -File |
         Select-Object -ExpandProperty FullName)
 
-    # workflow-davekjohn/ -- the workflow's own root folder, which holds the branch's entry and step list
+    # contributing-davekjohn/ -- the workflow's own root folder, which holds the branch's entry and step list
     # (under branch/, covered by the root glob above until the split moved them on August 6, 2026, and
-    # under this folder since August 14, 2026). The entry is the single highest-value file in this set:
-    # its text is pasted verbatim into CHANGELOG.md and from there into the release notes, so a mis-decode
-    # caught anywhere later has already been copied twice.
+    # under this folder since August 14, 2026; the folder itself renamed off 'workflow-davekjohn/' on
+    # August 26, 2026, #886). The entry is the single highest-value file in this set: its text is pasted
+    # verbatim into CHANGELOG.md and from there into the release notes, so a mis-decode caught anywhere
+    # later has already been copied twice.
     # -Recurse covers the folder's other pages -- the release notes under releases/audience/ and, in a
     # consumer, the scaffolded docs. It also covered branch/templates/ until the merged development cycle
     # retired that directory on August 23, 2026.
-    $workflowDir = Join-Path $RepoRoot 'workflow-davekjohn'
-    if (Test-Path -LiteralPath $workflowDir) {
-        $paths += @(Get-ChildItem -LiteralPath $workflowDir -Recurse -Filter '*.md' -File |
-            Select-Object -ExpandProperty FullName)
+    # BOTH NAMES ARE SCANNED, and the reason is what this check is for: a repo mid-rename has prose in
+    # whichever folder it still uses, and a mojibake check that silently skips the folder a consumer
+    # actually has is worse than no check -- it reports a clean run over nothing.
+    foreach ($workflowFolderName in @('contributing-davekjohn', 'workflow-davekjohn')) {
+        $workflowDir = Join-Path $RepoRoot $workflowFolderName
+        if (Test-Path -LiteralPath $workflowDir) {
+            $paths += @(Get-ChildItem -LiteralPath $workflowDir -Recurse -Filter '*.md' -File |
+                Select-Object -ExpandProperty FullName)
+        }
     }
 
     # Every markdown file under plugins/: the manuals, agent defs, personas and skill pages -- all prose,
@@ -408,7 +416,7 @@ function Get-ReleaseNotesGrouping {
 # Version cell at the internal note once the note exists. One edit here moves all three.
 #
 # IT IS BACK AT THE DEFAULT, releases/README.md, since August 19, 2026 (Dave), and the round trip is the
-# instructive part. It moved to workflow-davekjohn/ on August 14 with the hand-kept release pages, on the
+# instructive part. It moved to the workflow folder on August 14 with the hand-kept release pages, on the
 # reasoning that everything the workflow owns gathers in the workflow's own folder. That swept up one
 # thing the workflow does NOT own: a repo that has cut releases has a HISTORY, whichever tooling cut it,
 # and an index of files living in releases/ had no business sitting in a plugin folder that a teardown
@@ -454,14 +462,14 @@ function Get-ReleaseHistoryPath {
 # root nobody filled, reported as "no release note was found", which reads as a repo that has not cut one.
 # This is a repo-level rename, so it is stated here, which is the only place that can state it.
 #
-# UNDER workflow-davekjohn/ SINCE AUGUST 14, 2026 (Dave), together with the history README above: the
+# UNDER contributing-davekjohn/ SINCE AUGUST 14, 2026 (Dave; the folder renamed off workflow-davekjohn/ on August 26, #886), together with the history README above: the
 # hand-kept release pages are the workflow's portable belongings, so they live in its folder -- the same
 # answer the adopt-workflow-folder scaffold proposes to every consumer. The generated development/ and
 # github/ trees stay at the repo root deliberately: they are the machine-written record and the publish
 # artefact, and their roots are hardcoded by design (see cut-release.ps1). The history-table row and the
 # note's link prefix are both computed from these seam values since the same day, which is what makes
 # this repointing a two-line change instead of a dead-link generator.
-$script:ReleaseNoteRoot = 'workflow-davekjohn/releases/audience'
+$script:ReleaseNoteRoot = 'contributing-davekjohn/releases/audience'
 
 function Get-ReleaseNoteRoot {
     <# Repo-root-relative directory the hand-written release note is written into and read back from. #>
@@ -791,7 +799,7 @@ function Get-ReleasePageTitle {
 #
 # THE TOKEN IS NOT IN THIS REPOSITORY, and that is the half to remember. This repo is public, so a
 # committed token would be a lock with its key taped to the door -- it lives in
-# workflow-davekjohn/releases/page/worker-path-token.txt, which .gitignore keeps out. Nothing in git
+# contributing-davekjohn/releases/page/worker-path-token.txt, which .gitignore keeps out. Nothing in git
 # therefore remembers the URL: whoever creates it records it outside the repo. A consumer whose repo
 # is PRIVATE has the opposite answer available and should take it, since a tracked token survives a
 # lost machine.

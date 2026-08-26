@@ -23,7 +23,7 @@
         .github/ISSUE_TEMPLATE/           the inbound path the docs link to
         .gitignore, .gitattributes        so a clone behaves the same
 
-    WHAT DOES NOT. scripts/, .claude/, connectors/, releases/, workflow-davekjohn/, CLAUDE.md,
+    WHAT DOES NOT. scripts/, .claude/, connectors/, releases/, contributing-davekjohn/, CLAUDE.md,
     CONTRIBUTING.md, SECURITY.md. That is the maintainer's half of this repo and Claude never reads
     it from the marketplace. Keeping it out is what makes the published repo ~150 files instead of
     ~370, and it is also the reason the published repo can be private without giving colleagues
@@ -115,7 +115,7 @@
     Publishes the same set to a different target, for a second organisation.
 
 .EXAMPLE
-    ./scripts/release/publish-to-business.ps1 -TargetRepo OTHER-ORG/dev-plugins -Plugins team-alpha,workflow-davekjohn -DryRun
+    ./scripts/release/publish-to-business.ps1 -TargetRepo OTHER-ORG/dev-plugins -Plugins team-alpha,contributing-davekjohn -DryRun
 
     A different subset to a different target -- for an organisation that does have repositories.
 #>

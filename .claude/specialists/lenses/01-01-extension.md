@@ -57,7 +57,7 @@ product: agent defs, manuals, docs, and tooling.
   repo rather than to read a *better* summary.
   **A third mode joined them on August 19, 2026 and its rule is portable, so it lives in the `/handover`
   skill rather than here**
-  ([`handover/SKILL.md`](../../../plugins/workflows/workflow-davekjohn/skills/handover/SKILL.md)): a
+  ([`handover/SKILL.md`](../../../plugins/workflows/contributing-davekjohn/skills/handover/SKILL.md)): a
   briefing that is complete, current, and states a **cause that does not exist**. The instance was this
   repo's — a lock six minutes old, correct about its subject (inbound
   [#747](https://github.com/DaveKJohn/claude-code-specialists/issues/747)) and wrong about the mechanism,

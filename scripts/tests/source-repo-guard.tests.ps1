@@ -91,7 +91,7 @@ try {
     Write-Host 'The in-repo plugin mirror is NOT refused' -ForegroundColor Cyan
     # Lint check 8 holds this byte-identical to the source, so running it is not the staleness the guard is
     # about. Refusing it would also make the drift lint's own fixtures unrunnable.
-    $mirror = Join-Path $src 'plugins\workflows\workflow-davekjohn\scripts\task\session-status.ps1'
+    $mirror = Join-Path $src 'plugins\workflows\contributing-davekjohn\scripts\task\session-status.ps1'
     New-Item -ItemType Directory -Path (Split-Path -Parent $mirror) -Force | Out-Null
     Set-Content -LiteralPath $mirror -Value '# in-repo mirror' -Encoding UTF8
     Assert-Equal $null (Get-OwnCopyPath -ScriptPath $mirror -RepoRoot $src) 'the mirror inside the repo is allowed'
@@ -119,7 +119,7 @@ try {
 
     Write-Host 'The relative path comes from the INNERMOST scripts segment' -ForegroundColor Cyan
     # A mirror path carries two ('...\plugins\...\scripts\task\x.ps1'), and taking the first would compose
-    # a nonsense local path like scripts\workflows\workflow-davekjohn\scripts\task\x.ps1.
+    # a nonsense local path like scripts\workflows\contributing-davekjohn\scripts\task\x.ps1.
     $deep = New-Tree -Label 'deep'; $fixtures += $deep
     $deepScript = Join-Path $deep 'scripts\plugins\workflows\wf\scripts\task\session-status.ps1'
     New-Item -ItemType Directory -Path (Split-Path -Parent $deepScript) -Force | Out-Null

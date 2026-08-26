@@ -116,7 +116,7 @@ Judged and recorded on August 15, 2026 after
 Both stay as they are; what follows is the note that was missing.
 
 - **The "chore is a contradiction" rule**, stated in full in [`CLAUDE.md`](../../../CLAUDE.md),
-  [`workflow-davekjohn/CONTRIBUTING.md`](../../../workflow-davekjohn/CONTRIBUTING.md),
+  [`contributing-davekjohn/CONTRIBUTING.md`](../../../contributing-davekjohn/CONTRIBUTING.md),
   [Derek's lens](05-05-extension.md), and once more as a comment in
   [`scripts/lib/branch-info.ps1`](../../../scripts/lib/branch-info.ps1). Four readers, four doors: the
   constitution, someone reading only the workflow folder, the DevOps specialist opening his own lens,
@@ -128,8 +128,8 @@ Both stay as they are; what follows is the note that was missing.
   day it was written down) lives with the code, in `branch-info.ps1`, which is also the one place that
   admits the count can no longer be reproduced.
 - **The "81 of 89" tier measurement**, in both
-  [`RELEASES-portable.md`](../../../plugins/workflows/workflow-davekjohn/RELEASES-portable.md) and
-  [`CONTRIBUTING-portable.md`](../../../plugins/workflows/workflow-davekjohn/CONTRIBUTING-portable.md).
+  [`RELEASES-portable.md`](../../../plugins/workflows/contributing-davekjohn/RELEASES-portable.md) and
+  [`CONTRIBUTING-portable.md`](../../../plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md).
   This one is the weaker case and is recorded as such: it is a portable-vs-portable pair, both shipped,
   both hand-maintained, and it is a *number* rather than a rule — so a re-measurement has to be applied
   twice, which is exactly the failure the rule above says to avoid. It stays because the two documents
@@ -185,9 +185,11 @@ otherwise be false about her own manual. The citations belong here:
   `skillOverrides` states outright that plugin skills are not affected by it. **The other two failed on
   reach rather than on content**, and that is what turned the observation into a rule:
   - **Wrong plugin root.** Derek's and Rendall's portable personas were the natural owners of a chain
-    command, and they are `team-alpha` — a plugin that ships neither `workflow-davekjohn`'s scripts nor a
+    command, and they are `team-alpha` — a plugin that ships neither `contributing-davekjohn`'s scripts nor a
     dependency on it, so `${CLAUDE_PLUGIN_ROOT}` written there resolves into the wrong root.
-  - **Right owner, wrong reach.** `workflow-davekjohn/CLAUDE.md` *is* the correct owner, and
+  - **Right owner, wrong reach.** `contributing-davekjohn/CLAUDE.md` *is* the correct owner -- that page has
+    since merged into the folder's `CONTRIBUTING.md` (#886, August 26, 2026), and the argument reads the same
+    against its successor -- and
     `adopt-workflow-folder` never overwrites — so the sentence would have reached new adopters only, while
     the reporter, who already had the folder, would never have seen it. The fix landed in
     `new-branch/SKILL.md` instead: plugin payload, replaced by an update, and the one skill in that chain

@@ -192,7 +192,7 @@ try {
     # teardown's classification turns on exactly that, and the case below proves it still recognises
     # this shape as generated rather than authored.
     Assert-True (-not ($rcText -match "=\s*'[^']*VUL-IN")) 'core-only: no placeholder value -- the roster half is complete as generated'
-    Assert-True ($r1.Out -match 'workflow-davekjohn') 'core-only: the run NAMES the pack the missing half belongs to, so the absence is legible'
+    Assert-True ($r1.Out -match 'contributing-davekjohn') 'core-only: the run NAMES the pack the missing half belongs to, so the absence is legible'
 
     # --- 1c0. The core-only scaffold must stay REMOVABLE by the teardown ---------------------------
     # Without this, a file the bootstrap just wrote is classified as authored and kept forever --
@@ -233,7 +233,7 @@ try {
     if (Test-Path -LiteralPath $FixtureWf) { Remove-Item -Recurse -Force -LiteralPath $FixtureWf }
     New-Item -ItemType Directory -Path (Join-Path $FixtureWf '.claude') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $FixtureWf '.claude\settings.json'),
-        '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true, "workflow-davekjohn@claude-code-specialists": true } }', $Utf8NoBom)
+        '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true, "contributing-davekjohn@claude-code-specialists": true } }', $Utf8NoBom)
     $rWf = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $FixtureWf)
     Assert-Equal 0 $rWf.Code 'workflow plugin: bootstrap exit 0'
     $rcScaffold = Join-Path $FixtureWf 'scripts\repo-config.ps1'
@@ -288,7 +288,7 @@ try {
     $contractCheck = Join-Path $RepoRoot 'scripts\sync\check-script-contract.ps1'
     $rc = Invoke-Script -Path $contractCheck -ScriptArgs @('-ConsumerPathOverride', $FixtureWf)
     # ONE [ERROR] IS THE DESIGNED STATE SINCE AUGUST 14, 2026, and it is not about anything the
-    # bootstrap wrote: the workflow folder (workflow-davekjohn/) arrives through the workflow plugin's
+    # bootstrap wrote: the workflow folder (contributing-davekjohn/) arrives through the workflow plugin's
     # own adopt-workflow-folder skill, a step AFTER the bootstrap -- the same split that keeps
     # specialists-init (team-alpha) out of workflow-specific territory. So the guarantee #226 bought is
     # asserted at its true width: every FUNCTION the bootstrap scaffolds satisfies the contract, and
@@ -296,7 +296,7 @@ try {
     Assert-Equal 1 $rc.Code 'scaffolds vs contract: exit-code 1 -- the one finding is the workflow-folder pointer, by design'
     $rcErrors = @([regex]::Matches($rc.Out, '\[ERROR\]')).Count
     Assert-Equal 1 $rcErrors 'scaffolds vs contract: exactly one [ERROR] -- nothing about a file the bootstrap just wrote'
-    Assert-True ($rc.Out -match "\[ERROR\].*'workflow-davekjohn/' does not exist") 'scaffolds vs contract: and it is the workflow-folder pointer, naming the adopt-workflow-folder step'
+    Assert-True ($rc.Out -match "\[ERROR\].*'contributing-davekjohn/' does not exist") 'scaffolds vs contract: and it is the workflow-folder pointer, naming the adopt-workflow-folder step'
     # And it must be reaching the real per-function verdicts, not passing because the [BOOTSTRAP]
     # short-circuit from #225 swallowed the run -- that would make this assertion worthless.
     Assert-True (-not ($rc.Out -match '\[BOOTSTRAP\]')) 'scaffolds vs contract: the libs exist, so the check really did probe them'
@@ -345,7 +345,7 @@ try {
             # below would pass or fail for the wrong reason.
             New-Item -ItemType Directory -Path (Join-Path $gitFix '.claude') -Force | Out-Null
             [System.IO.File]::WriteAllText((Join-Path $gitFix '.claude\settings.json'),
-                '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true, "workflow-davekjohn@claude-code-specialists": true } }', $Utf8NoBom)
+                '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true, "contributing-davekjohn@claude-code-specialists": true } }', $Utf8NoBom)
             $rg = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $gitFix)
             Assert-Equal 0 $rg.Code "git derivation ($Label): bootstrap exit 0"
             $txt = [System.IO.File]::ReadAllText((Join-Path $gitFix 'scripts\repo-config.ps1'), [System.Text.Encoding]::UTF8)
