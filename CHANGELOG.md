@@ -32,6 +32,49 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/refuse-only-on-a-required-check-v1` · 20260826-194853
+
+`ship-pr.ps1` judged the merge on the exit code of `gh pr checks --watch`, which is non-zero when **any**
+check fails. The `main` ruleset requires only `lint-en-tests`, so one broken advisory workflow refused
+every merge in the repo: on August 26, 2026 `claude-review` was red on every PR (#942) while GitHub itself
+reported those PRs as `MERGEABLE` / `UNSTABLE` -- its own word for "mergeable, with a non-required check
+failing" -- and the script reported `BLOCKED`. Getting a branch out meant hand-running the two step-4
+gates whose whole point is that forgetting them is impossible, which is the argument for repairing the
+judgement rather than documenting the workaround.
+
+The wait is untouched. #831 measured it (n=100, the non-required check governs 23% of the time at a median
+cost of 0s) and Dave kept it; only the verdict moved. A failing required check still refuses exactly as
+before, and so does an unreadable required-check list -- from inside the script, "this ruleset requires
+nothing" and "the required checks have not reported yet" look identical, so that case keeps refusing
+rather than guessing.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+A second, older defect surfaced while proving the first, in the same file and the same distinction.
+`Get-CheckWaitReport`'s required-name parse walked into the Windows PowerShell 5.1 array-flattening
+pitfall this very script warns about at its step 2: written inline as
+`@(@($json | ConvertFrom-Json) | ...)` it collapses the payload into **one** element whose `.name`
+member-enumerates to every name at once, so two required checks became the single string `a b`, `-contains`
+never matched, and the wait was labelled `NOT required` for a check that was required. Measured both ways
+on August 26, 2026. It had been there since #831 and was invisible here for a reason worth keeping: this
+repo's ruleset requires exactly **one** check, and a one-element JSON array is handed through as the
+object itself -- so the only shape anybody ever ran was the one shape that happens to work. A consumer
+with two required checks had been reading a wrong label all along.
+
+**Score:** 3
+
+#### Pull Request
+
+ship-pr judges the merge on the required checks, not on every check
+
+Plugins: contributing-davekjohn
+
+[PR #944](https://github.com/DaveKJohn/claude-code-specialists/pull/944)
+
+---
+
 ### DEPLOY: `fix/pr-title-carries-branch-prefix-v1` · 20260826-194448
 
 `open-pr.ps1` now refuses a branch whose changelog entry gives its title a type prefix the script is about
