@@ -32,6 +32,37 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/new-branch-intent-lands-in-plan-v1` · 20260826-161931
+
+`new-branch.ps1 -Intent` now writes its parking note as the opening paragraph of the document's first
+phase (`PLAN`) instead of above the phases. The region between the title and the first phase heading is
+generic guidance, and `check-branch-entry.ps1` refuses branch content there -- so a branch scaffolded
+with `-Intent` was rejected by CI as soon as its entry was written, which is at the PR. The parameter,
+its pass-through from `worktree-lane.ps1` and its place in the document are otherwise unchanged; it
+still keeps no heading of its own and still never touches the DEPLOY section.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+The scaffolder stated a rule and broke it in the same file, and the half that made it expensive was not
+the contradiction but the gate: `-Intent` produced a branch a consumer's CI would not let through, and
+the failure was invisible until the entry was written. Anyone who has a branch in flight carrying an
+intent above the phases can move that paragraph under `PLAN` by hand; nothing else about the document
+changes.
+
+**Score:** 4
+
+#### Pull Request
+
+new-branch -Intent writes into PLAN instead of above it
+
+Plugins: contributing-davekjohn
+
+[PR #929](https://github.com/DaveKJohn/claude-code-specialists/pull/929)
+
+---
+
 ### DEPLOY: `fix/scaffold-guidance-concat-v1` · 20260826-155456
 
 `check-branch-entry.ps1` now prints the heading level it actually read in its **findings**, not only in its
