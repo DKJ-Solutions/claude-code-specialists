@@ -32,6 +32,62 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/contributing-numbered-steps-v1` · 20260826-150053
+
+`contributing-davekjohn/CONTRIBUTING.md` now carries the step numbering
+[#894](https://github.com/DaveKJohn/claude-code-specialists/issues/894) asks for: four numbered `##` sections,
+their substeps as `###`, and the four gates as `####` under the step where they fire. The letters are gone --
+`1A`-`1H`, `2A`-`2E`, `3A`-`3G`, `4A` became `1.1`-`1.5`, `2.1`-`2.6`, `3.1`-`3.7` and `4.1` -- and every
+in-text reference to a step or a gate moved with them.
+
+**Four `##` *in total*, which needed more than a renumber.** The seam table and the pointer list sat between
+the title and step 1 as `##` sections that were not steps, so the page read as six. Both moved to
+[`contributing-davekjohn/README.md`](contributing-davekjohn/README.md), the folder index they always were.
+
+**One new section, and it is the only content here that is not a renaming:** `2.3`, the merge queue
+([#912](https://github.com/DaveKJohn/claude-code-specialists/issues/912)). Two PRs must not merge at once,
+because every branch's fold writes into the same place in `CHANGELOG.md` -- the top of `## [Unreleased]` --
+and it writes there after the merge, on `main`. Two folds racing break in the gap between the merge and the
+fold, which is the state nothing reports: the later run's fold push is rejected as non-fast-forward, or
+`ship-pr.ps1` step 5 aborts on its ff-only merge before folding at all. Either way the PR is merged, the entry
+has not landed, and every gate stays green until a release trips over it. **No gate enforces the queue**,
+which the section says out loud rather than leaving a reader to assume a script is watching.
+
+**The sync in `2.3.3` is written as hygiene rather than as ordering, deliberately.** The fold inserts at the
+top of `## [Unreleased]` on whatever `main` it is standing on, so the order entries end up in follows merge
+order and not branch freshness -- syncing a stale branch does not move its entry up. The queue is what keeps
+the order; the sync keeps a branch from merging a tree it was never tested against. Both claims were checked
+against `ship-pr.ps1` step 5 rather than inferred from the shape of the problem.
+
+**Two stale statements were corrected on the way, both of which had gone stale within the last two days.**
+The fold paragraph said "2C and 2D are one command" while pointing at `2D` and `2E` -- it had been left behind
+when "Open the PR" became its own step. And section 3 opened by explaining that its letters differed from #894
+by one, because the issue asked for a release-note step this page did not have; the August 26 edit dropped
+that step, so the two now agree and the paragraph was describing a gap that had closed. The subject itself did
+not go away with it and is now [#914](https://github.com/DaveKJohn/claude-code-specialists/issues/914).
+
+It changes how the page reads for anyone following the cycle here -- every step reference in it is a different
+string than it was -- but the cycle it describes is unchanged, and the one genuinely new step is a convention
+rather than a mechanism. A reader notices the moment they open the page; nobody has to do anything differently
+except queue behind an in-flight merge.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Nothing here reaches a consumer. This page is this repo's own set of answers; the portable half that ships
+with the plugin is untouched.
+
+**Score:** N/A
+
+#### Pull Request
+
+CONTRIBUTING.md's four steps become numbered ## sections with dotted substeps, and the PR gains a merge queue
+
+[PR #917](https://github.com/DaveKJohn/claude-code-specialists/pull/917)
+
+---
+
 ### DEPLOY: `fix/the-review-failure-names-its-reason-v1` · 20260826-144804
 
 When `claude-review` goes red, the log now names the reason. A failure-only step in
